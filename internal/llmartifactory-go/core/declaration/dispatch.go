@@ -7,6 +7,7 @@ import (
 
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type dispatchVersion struct {
@@ -66,8 +67,11 @@ func (d *Dispatcher) Resolve(raw []byte) (schemaModel.Key, error) {
 	if err != nil {
 		return schemaModel.Key{}, err
 	}
-	if header.version != "" {
-		key, found := d.byVersion[dispatchVersion(header)]
+	if header.versionSpecified {
+		key, found := d.byVersion[dispatchVersion{
+			kind:    header.kind,
+			version: header.version,
+		}]
 		if !found {
 			return schemaModel.Key{}, fmt.Errorf(
 				"%w: declaration type %q apiVersion %q",
@@ -102,7 +106,8 @@ func ValidateSchemaHeader(expected schemaModel.Key, raw []byte) error {
 	}
 	if expected.Entity != schemaModel.EntityArtifact ||
 		header.kind != expected.Kind ||
-		(header.version != "" && header.version != expected.SchemaVersion) {
+		(header.versionSpecified &&
+			header.version != expected.SchemaVersion) {
 		return fmt.Errorf(
 			"%w: declaration header does not match expected schema %q/%q/%q",
 			spec.ErrInvalid,
@@ -115,8 +120,9 @@ func ValidateSchemaHeader(expected schemaModel.Key, raw []byte) error {
 }
 
 type dispatchHeader struct {
-	kind    schemaModel.Kind
-	version string
+	kind             schemaModel.Kind
+	version          string
+	versionSpecified bool
 }
 
 func readDispatchHeader(raw []byte) (dispatchHeader, error) {
@@ -187,5 +193,58 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 		return dispatchHeader{}, err
 	}
 
-	return dispatchHeader{kind: header.Type, version: header.APIVersion}, nil
+	if hasVersion {
+		if err := spec.ValidateRequiredText(
+			"declaration apiVersion",
+			header.APIVersion,
+			spec.MaxVersionBytes,
+		); err != nil {
+			return dispatchHeader{}, err
+		}
+	}
+
+	return dispatchHeader{
+		kind:             header.Type,
+		version:          header.APIVersion,
+		versionSpecified: hasVersion,
+	}, nil
+}
+
+// CanonicalDocumentForSchema removes the declaration-language dispatch-only
+// apiVersion header after Dispatcher.Resolve has selected the expected schema
+// key. The family schema therefore validates the portable declaration body,
+// while apiVersion remains grammar metadata rather than Definition content.
+//
+// This preserves canonical bytes and Definition digests for existing omitted
+// v1 declarations and makes explicit apiVersion: v1 canonicalize identically.
+func CanonicalDocumentForSchema(raw []byte) ([]byte, error) {
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		spec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	header, err := readDispatchHeader(canonical)
+	if err != nil {
+		return nil, err
+	}
+	if !header.versionSpecified {
+		return canonical, nil
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(canonical, &fields); err != nil {
+		return nil, fmt.Errorf(
+			"%w: decode declaration for apiVersion normalization: %w",
+			spec.ErrInvalid,
+			err,
+		)
+	}
+	delete(fields, "apiVersion")
+	return jsonutil.MarshalCanonicalObject(
+		fields,
+		spec.MaxDefinitionBytes,
+	)
 }

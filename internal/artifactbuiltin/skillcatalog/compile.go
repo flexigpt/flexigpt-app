@@ -35,6 +35,7 @@ func Compile(
 		SetName:            topology.BuiltinEmbeddedPackageSkills,
 		SchemaVersion:      skillDomain.HydrationSchemaVersion,
 		InstallerName:      skillDomain.BuiltInInstallerName,
+		Interpretations:    registry,
 		AdditionalDecoders: []ingest.Decoder{skillmarkdown.NewDecoder()},
 		Packages:           packageInputs(prepared),
 	})

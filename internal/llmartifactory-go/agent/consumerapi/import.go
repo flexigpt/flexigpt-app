@@ -675,7 +675,7 @@ func (a *API) CommitAgentImport(
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
-	collectionView, err := a.GetAgentCollection(
+	collectionView, err := a.GetAgentPlugin(
 		ctx,
 		membership.Plugin.Artifact.Ref(),
 	)
@@ -993,7 +993,7 @@ func (a *API) analyzeAgentImportMembership(
 			continue
 		}
 
-		value, err := a.GetAgentCollection(ctx, item.Ref)
+		value, err := a.GetAgentPlugin(ctx, item.Ref)
 		if err != nil {
 			return nil, nil, err
 		}

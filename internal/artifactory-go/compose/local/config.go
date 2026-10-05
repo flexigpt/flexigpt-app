@@ -1,9 +1,8 @@
 package local
 
 import (
-	"io/fs"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
@@ -20,7 +19,9 @@ import (
 type Config struct {
 	BaseDirectory string
 
-	EmbeddedProviders         map[string]fs.FS
+	// EmbeddedProviders explicitly selects mutable or immutable provider
+	// behavior for every application-supplied embedded filesystem.
+	EmbeddedProviders         map[string]iofs.ProviderRegistration
 	AdditionalSourceDrivers   []driver.Driver
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 

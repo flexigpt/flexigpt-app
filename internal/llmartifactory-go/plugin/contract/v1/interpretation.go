@@ -15,6 +15,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodePluginEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedPluginEntry(entry)
+			return err
+		},
 		Relationships: pluginRelationships,
 	}
 }
@@ -22,7 +26,7 @@ func Interpretation() interpretation.Registration {
 func pluginRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodePluginEntry(entry)
+	document, err := DecodeAdmittedPluginEntry(entry)
 	if err != nil {
 		return nil, err
 	}

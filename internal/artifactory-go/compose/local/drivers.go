@@ -22,7 +22,10 @@ func localSourceDrivers(ctx context.Context, config Config, base string) ([]driv
 	if err != nil {
 		return nil, err
 	}
-	embedded, err := iofs.New(ctx, config.EmbeddedProviders)
+	embedded, err := iofs.NewWithRegistrations(
+		ctx,
+		config.EmbeddedProviders,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
 
-func (a *API) CreateAgentCollection(
+func (a *API) CreateAgentPlugin(
 	ctx context.Context,
 	request plugin.CreateRequest,
 ) (plugin.PluginView, error) {
@@ -39,7 +39,7 @@ func (a *API) ensureAgentBaselineCollection(
 	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
-func (a *API) GetAgentCollection(
+func (a *API) GetAgentPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
@@ -69,10 +69,10 @@ func (a *API) UpdateAgentCollection(
 	return a.plugins.Update(ctx, request)
 }
 
-// AddAgentCollectionMember adds one explicit named Agent relationship. It is
+// AddAgentPluginMember adds one explicit named Agent relationship. It is
 // useful for relationships such as a user Plugin reference to a protected
 // built-in Agent using scope "builtin".
-func (a *API) AddAgentCollectionMember(
+func (a *API) AddAgentPluginMember(
 	ctx context.Context,
 	request plugin.AddMemberRequest,
 ) (plugin.PluginView, error) {
@@ -82,11 +82,11 @@ func (a *API) AddAgentCollectionMember(
 	return a.plugins.AddMember(ctx, request)
 }
 
-// AddAgentCollectionArtifactMember adds one currently available root Agent
+// AddAgentPluginArtifactMember adds one currently available root Agent
 // Artifact to a Plugin. Same-Root Artifacts are represented by an exact
 // source-relative locator; cross-Root Artifact references are rejected by the
 // generic Plugin API.
-func (a *API) AddAgentCollectionArtifactMember(
+func (a *API) AddAgentPluginArtifactMember(
 	ctx context.Context,
 	request plugin.AddArtifactMemberRequest,
 ) (plugin.PluginView, error) {
@@ -115,9 +115,9 @@ func (a *API) AddAgentCollectionArtifactMember(
 	return a.plugins.AddArtifactMember(ctx, request)
 }
 
-// RemoveAgentCollectionMember removes one direct member by the normalized
+// RemoveAgentPluginMember removes one direct member by the normalized
 // index exposed in PluginView.Members.
-func (a *API) RemoveAgentCollectionMember(
+func (a *API) RemoveAgentPluginMember(
 	ctx context.Context,
 	request plugin.RemoveMemberRequest,
 ) (plugin.PluginView, error) {
@@ -147,7 +147,7 @@ func (a *API) SetAgentCollectionEnabled(
 	)
 }
 
-func (a *API) DeleteAgentCollection(
+func (a *API) DeleteAgentPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
@@ -164,7 +164,20 @@ func (a *API) DeleteAgentCollection(
 	)
 }
 
-func (a *API) ListAgentCollectionMembers(
+func (a *API) ListAgentPluginMembers(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (plugin.DirectMembership, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.DirectMembership{}, spec.ErrClosed
+	}
+	return a.plugins.ResolveDirectMembers(ctx, ref)
+}
+
+// ResolveAgentPluginCapabilities is the explicit recursive graph API.
+// It preserves the prior capability-plan behavior without presenting it as a
+// direct member-list operation.
+func (a *API) ResolveAgentPluginCapabilities(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginCapabilityPlan, error) {

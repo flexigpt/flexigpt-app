@@ -3,16 +3,17 @@ package artifactsetup
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"path/filepath"
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
@@ -81,7 +82,18 @@ func OpenArtifactStore(
 		return nil, err
 	}
 
+	workspacePolicySource, err := workspace.DefaultPolicySource()
+	if err != nil {
+		return nil, err
+	}
 	workspaceFS, err := artifactbuiltin.EmbeddedWorkspacePackages()
+	if err != nil {
+		return nil, err
+	}
+	workspaceContentDigest, err := iofs.ContentDigest(
+		ctx,
+		workspaceFS,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +117,14 @@ func OpenArtifactStore(
 
 	store, err := local.Open(ctx, local.Config{
 		BaseDirectory: baseDirectory,
-		EmbeddedProviders: map[string]fs.FS{
-			"workspace-default-policy": workspaceFS,
+		EmbeddedProviders: map[string]iofs.ProviderRegistration{
+			workspacePolicySource.ProviderKey: {
+				Filesystem: workspaceFS,
+				Immutable: &iofs.ImmutableContentEvidence{
+					Revision:      workspacePolicySource.Policy.Version,
+					ContentDigest: workspaceContentDigest,
+				},
+			},
 		},
 		SchemaCodecs: registrations.SchemaCodecs(),
 		Decoders:     registrations.Decoders(),

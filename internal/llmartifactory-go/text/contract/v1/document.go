@@ -74,6 +74,32 @@ func DecodeTextEntry(entry declaration.Entry) (TextDocument, error) {
 	return value, nil
 }
 
+func DecodeAdmittedTextJSON(
+	raw []byte,
+) (TextDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return TextDocument{}, err
+	}
+	return DecodeAdmittedTextEntry(entry)
+}
+
+func DecodeAdmittedTextEntry(
+	entry declaration.Entry,
+) (TextDocument, error) {
+	var value TextDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return TextDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return TextDocument{}, err
+	}
+	return value, nil
+}
+
 // DefinitionForDocument is Text's typed Definition reconstruction boundary.
 // It validates Text semantics and returns an admitted immutable Definition
 // without routing through declaration-decoder package globals.

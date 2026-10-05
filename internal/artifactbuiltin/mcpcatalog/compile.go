@@ -35,6 +35,7 @@ func Compile(
 		SetName:            topology.BuiltinEmbeddedPackageMCPs,
 		SchemaVersion:      mcpDomain.HydrationSchemaVersion,
 		InstallerName:      mcpDomain.BuiltInInstallerName,
+		Interpretations:    registry,
 		AdditionalDecoders: []ingest.Decoder{mcpconfig.NewDecoder()},
 		Packages:           packageInputs(prepared),
 	})

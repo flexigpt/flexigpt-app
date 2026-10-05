@@ -15,7 +15,7 @@ import (
 	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
 )
 
-const installationDataNamespace = "flexigpt.site/mcp-installation-v1"
+const InstallationDataNamespace artifactModel.DataNamespace = "flexigpt.site/mcp-installation-v1"
 
 type InputBinding struct {
 	Value     *string `json:"value,omitempty"`
@@ -72,7 +72,7 @@ func MergeServerData(
 	if err != nil {
 		return nil, err
 	}
-	fields[installationDataNamespace] = payload
+	fields[string(InstallationDataNamespace)] = payload
 	return artifactModel.EncodeDataObject(fields)
 }
 
@@ -83,7 +83,7 @@ func DecodeServerData(
 	if err != nil {
 		return ServerData{}, err
 	}
-	if payload, found := fields[installationDataNamespace]; found {
+	if payload, found := fields[string(InstallationDataNamespace)]; found {
 		return decodeServerDataPayload(payload)
 	}
 	return DefaultServerData(), nil

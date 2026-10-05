@@ -16,7 +16,6 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
@@ -57,12 +56,11 @@ func New(
 	if err := dependencies.BuiltinRoot.Validate(); err != nil {
 		return nil, err
 	}
-	if dependencies.BuiltinRoot != topology.BuiltinRootID() ||
-		!dependencies.Protection.IsProtectedRoot(
-			dependencies.BuiltinRoot,
-		) {
+	if !dependencies.Protection.IsProtectedRoot(
+		dependencies.BuiltinRoot,
+	) {
 		return nil, fmt.Errorf(
-			"%w: Model Store requires the protected built-in Root",
+			"%w: Model Store built-in Root must be protected",
 			spec.ErrInvalid,
 		)
 	}

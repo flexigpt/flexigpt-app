@@ -62,13 +62,10 @@ func (c *schemaCodec) Canonicalize(
 	); err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
-	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
-	if err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
-	if err := c.registration.ValidateEntry(entry); err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
+
+	// Generic expected-key schema execution has already completed before this
+	// method is invoked. Family semantic interpretation occurs once in
+	// Registry.DefinitionsForSchemaValidatedDocument.
 	return schemaModel.ParsedDocument{
 		Key:    c.registration.SchemaKey,
 		Digest: cryptoutil.DigestBytes(raw),

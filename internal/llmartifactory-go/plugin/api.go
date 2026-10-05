@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
@@ -140,11 +139,12 @@ type MemberReference struct {
 }
 
 type CreateRequest struct {
-	RootID      rootModel.RootID     `json:"rootID"`
-	SourceID    sourceModel.SourceID `json:"sourceID,omitempty"`
-	Name        spec.LogicalName     `json:"name"`
-	DisplayName string               `json:"displayName,omitempty"`
-	Description string               `json:"description,omitempty"`
+	RootID           rootModel.RootID               `json:"rootID"`
+	SourceID         sourceModel.SourceID           `json:"sourceID,omitempty"`
+	Name             spec.LogicalName               `json:"name"`
+	DisplayName      string                         `json:"displayName,omitempty"`
+	Description      string                         `json:"description,omitempty"`
+	MembershipPolicy *pluginDomain.MembershipPolicy `json:"membershipPolicy,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -213,11 +213,7 @@ func (a *API) Get(
 	if a == nil {
 		return PluginView{}, spec.ErrClosed
 	}
-	value, err := a.loadEditableCollection(ctx, ref, 0)
-	if err != nil {
-		return PluginView{}, err
-	}
-	return a.collectionViewOf(value.artifact, value.document)
+	return a.Read(ctx, ref)
 }
 
 // SetEnabled changes the generic local enablement metadata of a Plugin.
@@ -634,6 +630,14 @@ func (a *API) create(
 	if err := request.Name.Validate(); err != nil {
 		return PluginView{}, err
 	}
+
+	membership, err := a.creationMembershipPolicy(
+		request.MembershipPolicy,
+	)
+	if err != nil {
+		return PluginView{}, err
+	}
+
 	if a.domain != nil &&
 		request.Name == a.domain.BaselineName &&
 		!allowBaseline {
@@ -661,20 +665,19 @@ func (a *API) create(
 		return PluginView{}, err
 	}
 
+	metadata, err := pluginDomain.PutMetadata(
+		nil,
+		membership,
+	)
+	if err != nil {
+		return PluginView{}, err
+	}
 	document := pluginv1.PluginDocument{
 		Type:        pluginv1.PluginType,
 		Name:        string(request.Name),
 		DisplayName: request.DisplayName,
 		Description: request.Description,
-	}
-	if a.domain != nil {
-		document.Metadata, err = pluginDomain.PutMetadata(
-			document.Metadata,
-			a.domain.MembershipPolicy,
-		)
-		if err != nil {
-			return PluginView{}, err
-		}
+		Metadata:    metadata,
 	}
 	_, digest, err := collectionDocumentPayload(document)
 	if err != nil {
@@ -1374,34 +1377,68 @@ func (a *API) isBaselineEditableCollection(
 		value.address.Name == a.domain.BaselineName
 }
 
+func (a *API) creationMembershipPolicy(
+	requested *pluginDomain.MembershipPolicy,
+) (pluginDomain.MembershipPolicy, error) {
+	if a == nil {
+		return pluginDomain.MembershipPolicy{}, spec.ErrClosed
+	}
+	if a.domain != nil {
+		if requested != nil {
+			return pluginDomain.MembershipPolicy{}, fmt.Errorf(
+				"%w: Plugin family profile owns membership policy",
+				spec.ErrInvalid,
+			)
+		}
+		value := a.domain.MembershipPolicy
+		value.AllowedTypes = append(
+			[]declaration.Type(nil),
+			value.AllowedTypes...,
+		)
+		value.AllowedForms = append(
+			[]declaration.MemberForm(nil),
+			value.AllowedForms...,
+		)
+		if err := value.Validate(); err != nil {
+			return pluginDomain.MembershipPolicy{}, err
+		}
+		return value, nil
+	}
+
+	if requested == nil {
+		return pluginDomain.MembershipPolicy{}, fmt.Errorf(
+			"%w: generic Plugin creation requires an explicit membership policy",
+			spec.ErrInvalid,
+		)
+	}
+	value := *requested
+	value.AllowedTypes = append(
+		[]declaration.Type(nil),
+		requested.AllowedTypes...,
+	)
+	value.AllowedForms = append(
+		[]declaration.MemberForm(nil),
+		requested.AllowedForms...,
+	)
+	if err := value.Validate(); err != nil {
+		return pluginDomain.MembershipPolicy{}, err
+	}
+	if value.Mode == pluginDomain.MembershipModeLegacyUnconstrained {
+		return pluginDomain.MembershipPolicy{}, fmt.Errorf(
+			"%w: new generic Plugins cannot use legacy-unconstrained membership",
+			spec.ErrInvalid,
+		)
+	}
+	return value, nil
+}
+
 func normalizedMemberIndexes(
 	values []declaration.Entry,
 ) ([]int, error) {
-	type member struct {
-		index int
-		raw   []byte
-	}
-
-	ordered := make([]member, 0, len(values))
-	for index, value := range values {
-		raw, err := value.CanonicalJSON()
-		if err != nil {
-			return nil, err
-		}
-		ordered = append(ordered, member{
-			index: index,
-			raw:   raw,
-		})
-	}
-	sort.SliceStable(ordered, func(left, right int) bool {
-		return bytes.Compare(ordered[left].raw, ordered[right].raw) < 0
-	})
-
-	output := make([]int, len(ordered))
-	for index, value := range ordered {
-		output[index] = value.index
-	}
-	return output, nil
+	return declaration.SortedMemberIndexes(
+		"Plugin members",
+		values,
+	)
 }
 
 func normalizedMemberIndex(
@@ -1418,4 +1455,34 @@ func normalizedMemberIndex(
 		}
 	}
 	return 0, fmt.Errorf("%w: Plugin member does not exist", spec.ErrNotFound)
+}
+
+func normalizedMemberIndexForEntry(
+	values []declaration.Entry,
+	member declaration.Entry,
+) (int, error) {
+	identity, err := declaration.MemberIdentityJSON(member)
+	if err != nil {
+		return 0, err
+	}
+
+	ordered, err := normalizedMemberIndexes(values)
+	if err != nil {
+		return 0, err
+	}
+	for normalizedIndex, sourceIndex := range ordered {
+		current, err := declaration.MemberIdentityJSON(
+			values[sourceIndex],
+		)
+		if err != nil {
+			return 0, err
+		}
+		if bytes.Equal(current, identity) {
+			return normalizedIndex, nil
+		}
+	}
+	return 0, fmt.Errorf(
+		"%w: Plugin member does not exist",
+		spec.ErrNotFound,
+	)
 }

@@ -2,15 +2,46 @@ package consumerapi
 
 import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
+	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
+type DefaultPolicySource struct {
+	ProviderKey string
+	Root        spec.Locator
+	Locator     spec.Locator
+	DecoderID   spec.DecoderID
+	Policy      workspaceDomain.DefaultPolicy
+}
+
+func (s DefaultPolicySource) Validate() error {
+	if err := spec.ValidateIdentifier(
+		"Workspace default policy provider key",
+		s.ProviderKey,
+		spec.MaxKindBytes,
+	); err != nil {
+		return err
+	}
+	if err := s.Root.ValidatePortable(false); err != nil {
+		return err
+	}
+	if err := s.Locator.ValidatePortable(false); err != nil {
+		return err
+	}
+	if err := s.DecoderID.Validate(); err != nil {
+		return err
+	}
+	return s.Policy.Validate()
+}
+
 type Config struct {
-	ContextComposition workspaceRuntime.CompositionPolicy
-	Composition        *composition.Resolver
-	MCPServers         mcp.ServerResolver
+	ContextComposition  workspaceRuntime.CompositionPolicy
+	Composition         *composition.Resolver
+	MCPServers          mcp.ServerResolver
+	DefaultPolicySource DefaultPolicySource
 
 	// AdditionalDecoderHints lets application composition add dedicated
 	// decoders without making Workspace import unrelated family services.
@@ -27,6 +58,7 @@ func (c Config) normalized() Config {
 	for index, hint := range c.AdditionalDecoderHints {
 		output.AdditionalDecoderHints[index] = hint.Clone()
 	}
+	output.DefaultPolicySource = c.DefaultPolicySource
 	return output
 }
 

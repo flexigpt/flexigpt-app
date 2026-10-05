@@ -17,6 +17,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeSkillEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedSkillEntry(entry)
+			return err
+		},
 		Relationships: skillRelationships,
 		LocatorCandidates: func(
 			target spec.Locator,
@@ -41,7 +45,7 @@ func Interpretation() interpretation.Registration {
 func skillRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeSkillEntry(entry)
+	document, err := DecodeAdmittedSkillEntry(entry)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
@@ -216,10 +215,10 @@ func (a *StoreAPI) defaultWorkspaceRecord(
 
 	refs := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, entry := range entries {
-		if entry.Binding.Locator == spec.Locator(defaultpolicy.PolicyLocator) &&
+		if entry.Binding.Locator == a.policySource.Locator &&
 			entry.Binding.SubresourceLocator == "" &&
 			entry.Kind == workspaceDomain.WorkspaceArtifactKind &&
-			string(entry.LogicalName) == defaultpolicy.PolicyID {
+			string(entry.LogicalName) == a.policy.ID {
 			refs = append(refs, entry.Ref())
 		}
 	}
@@ -244,6 +243,10 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
+	if a == nil || a.refresher == nil {
+		return spec.ErrClosed
+	}
+
 	values, err := a.workspaceSources.required(ctx, rootID)
 	if err != nil {
 		return err
@@ -267,10 +270,9 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 
 	if len(physical) != 0 {
 		for _, record := range physical {
-			if err := a.resolver.RefreshWorkspaceWithCompositionSource(
+			if err := a.refresher.Refresh(
 				ctx,
 				record.Ref(),
-				values.Directory.ID,
 			); err != nil {
 				return err
 			}
@@ -288,10 +290,9 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 	if record.State != artifactModel.StateAvailable {
 		return nil
 	}
-	return a.resolver.RefreshWorkspaceWithCompositionSource(
+	return a.refresher.Refresh(
 		ctx,
 		record.Ref(),
-		values.Directory.ID,
 	)
 }
 
@@ -350,7 +351,7 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 				spec.ErrReferenceUnresolved,
 			)
 		}
-		if string(workspace.Artifact.LogicalName) != defaultpolicy.PolicyID ||
+		if string(workspace.Artifact.LogicalName) != a.policy.ID ||
 			cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
 			return fmt.Errorf(
 				"%w: selected default Workspace does not match the active policy",

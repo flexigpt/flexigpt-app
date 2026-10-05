@@ -105,6 +105,32 @@ func DecodeToolEntry(
 	return value, nil
 }
 
+func DecodeAdmittedToolJSON(
+	raw []byte,
+) (ToolDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return ToolDocument{}, err
+	}
+	return DecodeAdmittedToolEntry(entry)
+}
+
+func DecodeAdmittedToolEntry(
+	entry declaration.Entry,
+) (ToolDocument, error) {
+	var value ToolDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return ToolDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return ToolDocument{}, err
+	}
+	return value, nil
+}
+
 func DefinitionForDocument(
 	document ToolDocument,
 ) (definitionModel.Definition, error) {

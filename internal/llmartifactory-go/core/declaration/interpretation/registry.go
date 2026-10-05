@@ -25,6 +25,11 @@ type Registration struct {
 
 	ValidateEntry func(declaration.Entry) error
 
+	// ValidateAdmittedEntry validates family semantics of an Entry whose
+	// enclosing Definition has already passed schema admission. It must not
+	// execute the family JSON Schema again.
+	ValidateAdmittedEntry func(declaration.Entry) error
+
 	// Relationships returns direct family-owned relationship facts. The core
 	// traverses these facts but does not interpret family document fields.
 	Relationships func(declaration.Entry) ([]Relationship, error)
@@ -65,6 +70,13 @@ func (r Registration) Validate() error {
 	if r.ValidateEntry == nil {
 		return fmt.Errorf(
 			"%w: declaration interpretation %q has no semantic validator",
+			spec.ErrInvalid,
+			r.DeclarationType,
+		)
+	}
+	if r.ValidateAdmittedEntry == nil {
+		return fmt.Errorf(
+			"%w: declaration interpretation %q has no admitted semantic validator",
 			spec.ErrInvalid,
 			r.DeclarationType,
 		)
@@ -212,6 +224,301 @@ func (r *Registry) Relationships(
 	if err := registration.ValidateEntry(entry); err != nil {
 		return nil, err
 	}
+	return r.relationshipsForValidatedEntry(registration, entry)
+}
+
+// AdmittedRelationships extracts relationship facts from an Entry that was
+// reconstructed from an admitted Definition. It intentionally invokes only
+// family semantic validation and never repeats schema execution.
+func (r *Registry) AdmittedRelationships(
+	entry declaration.Entry,
+) ([]Relationship, error) {
+	registration, err := r.registrationForEntry(entry)
+	if err != nil {
+		return nil, err
+	}
+	if err := registration.ValidateAdmittedEntry(entry); err != nil {
+		return nil, err
+	}
+	return r.relationshipsForValidatedEntry(registration, entry)
+}
+
+func (r *Registry) ValidateTree(
+	root declaration.Entry,
+) error {
+	_, err := r.walkNamedEntries(root)
+	return err
+}
+
+func (r *Registry) WalkNamedEntries(
+	root declaration.Entry,
+) ([]NamedEntry, error) {
+	return r.walkNamedEntries(root)
+}
+
+// DefinitionForSchema reconstructs the immutable generic Definition from a
+// family-owned validated declaration. It does not rerun JSON Schema execution.
+func (r *Registry) DefinitionForSchema(
+	key schemaModel.Key,
+	entry declaration.Entry,
+) (definitionModel.Definition, error) {
+	registration, err := r.registrationForSchema(key)
+	if err != nil {
+		return definitionModel.Definition{}, err
+	}
+	if err := registration.ValidateEntry(entry); err != nil {
+		return definitionModel.Definition{}, err
+	}
+	return r.definitionForValidatedSchema(
+		registration,
+		key,
+		entry,
+	)
+}
+
+func (r *Registry) DefinitionForEntry(
+	entry declaration.Entry,
+) (definitionModel.Definition, error) {
+	registration, err := r.registrationForEntry(entry)
+	if err != nil {
+		return definitionModel.Definition{}, err
+	}
+	if err := registration.ValidateEntry(entry); err != nil {
+		return definitionModel.Definition{}, err
+	}
+	return r.definitionForValidatedSchema(
+		registration,
+		registration.SchemaKey,
+		entry,
+	)
+}
+
+func (r *Registry) DefinitionsForDocument(
+	key schemaModel.Key,
+	raw []byte,
+) ([]AdmittedEntry, error) {
+	return r.definitionsForDocument(key, raw, false)
+}
+
+// DefinitionsForSchemaValidatedDocument reconstructs Definitions after the
+// generic expected-key schema catalog has already validated the root
+// declaration. Nested contained declarations still receive their owning
+// family schema validation during tree admission.
+func (r *Registry) DefinitionsForSchemaValidatedDocument(
+	key schemaModel.Key,
+	raw []byte,
+) ([]AdmittedEntry, error) {
+	return r.definitionsForDocument(key, raw, true)
+}
+
+// EntryFromDefinition performs family-owned typed reconstruction preparation.
+// It verifies the admitted Definition linkage and family semantic invariants
+// without executing the admission schema or recalculating the digest.
+func (r *Registry) EntryFromDefinition(
+	value definitionModel.Definition,
+) (declaration.Entry, error) {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
+		return declaration.Entry{}, err
+	}
+	key := schemaModel.ArtifactKey(
+		value.Kind,
+		value.SchemaID,
+		value.SchemaVersion,
+	)
+	registration, err := r.registrationForSchema(key)
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+	entry, err := declaration.DecodeCanonicalEntryJSON(value.Body)
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+	if entry.Header().Type != registration.DeclarationType ||
+		entry.Header().Name != string(value.LogicalName) {
+		return declaration.Entry{}, fmt.Errorf(
+			"%w: Definition body identity differs from Definition metadata",
+			spec.ErrDigestMismatch,
+		)
+	}
+	if err := registration.ValidateAdmittedEntry(entry); err != nil {
+		return declaration.Entry{}, err
+	}
+	if registration.LogicalVersion != nil {
+		version, err := registration.LogicalVersion(entry)
+		if err != nil {
+			return declaration.Entry{}, err
+		}
+		if version != value.LogicalVersion {
+			return declaration.Entry{}, fmt.Errorf(
+				"%w: Definition logical version differs from family identity",
+				spec.ErrDigestMismatch,
+			)
+		}
+	}
+	return entry, nil
+}
+
+func (r *Registry) definitionForValidatedSchema(
+	registration Registration,
+	key schemaModel.Key,
+	entry declaration.Entry,
+) (definitionModel.Definition, error) {
+	if entry.Header().Type != registration.DeclarationType {
+		return definitionModel.Definition{}, fmt.Errorf(
+			"%w: declaration type differs from schema interpretation",
+			spec.ErrInvalid,
+		)
+	}
+
+	version := spec.LogicalVersion("")
+	var err error
+	if registration.LogicalVersion != nil {
+		version, err = registration.LogicalVersion(entry)
+		if err != nil {
+			return definitionModel.Definition{}, err
+		}
+	}
+	if err := version.Validate(true); err != nil {
+		return definitionModel.Definition{}, err
+	}
+
+	header := entry.Header()
+	body, err := entry.CanonicalJSON()
+	if err != nil {
+		return definitionModel.Definition{}, err
+	}
+	displayName := header.DisplayName
+	if displayName == "" {
+		displayName = header.Name
+	}
+
+	return definition.Admit(definitionModel.Definition{
+		Kind:           artifactModel.ArtifactKind(registration.DeclarationType),
+		SchemaID:       key.SchemaID,
+		SchemaVersion:  key.SchemaVersion,
+		LogicalName:    spec.LogicalName(header.Name),
+		LogicalVersion: version,
+		DisplayName:    displayName,
+		Description:    header.Description,
+		Labels:         declaration.CloneStringMap(header.Labels),
+		Body:           body,
+	})
+}
+
+func (r *Registry) walkNamedEntries(
+	root declaration.Entry,
+) ([]NamedEntry, error) {
+	return r.walkNamedEntriesWithRootValidation(root, false)
+}
+
+func (r *Registry) walkNamedEntriesWithRootValidation(
+	root declaration.Entry,
+	rootSchemaValidated bool,
+) ([]NamedEntry, error) {
+	if r == nil {
+		return nil, spec.ErrClosed
+	}
+	if err := root.Validate(); err != nil {
+		return nil, err
+	}
+	if root.Header().Name == "" {
+		return nil, fmt.Errorf(
+			"%w: declaration root requires a name",
+			spec.ErrInvalid,
+		)
+	}
+
+	output := make([]NamedEntry, 0)
+	seen := make(map[spec.SubresourceLocator]struct{})
+
+	var walk func(
+		declaration.Entry,
+		[]string,
+		int,
+		bool,
+	) error
+	walk = func(
+		entry declaration.Entry,
+		path []string,
+		depth int,
+		schemaValidated bool,
+	) error {
+		if depth > spec.MaxDiscoveryDepth {
+			return fmt.Errorf(
+				"%w: declaration nesting exceeds depth %d",
+				spec.ErrInvalid,
+				spec.MaxDiscoveryDepth,
+			)
+		}
+
+		registration, err := r.registrationForEntry(entry)
+		if err != nil {
+			return err
+		}
+		if schemaValidated {
+			if err := registration.ValidateAdmittedEntry(entry); err != nil {
+				return err
+			}
+		} else {
+			if err := registration.ValidateEntry(entry); err != nil {
+				return err
+			}
+		}
+
+		subresource := spec.SubresourceLocator(strings.Join(path, "/"))
+		if err := subresource.Validate(); err != nil {
+			return err
+		}
+		if _, duplicate := seen[subresource]; duplicate {
+			return fmt.Errorf(
+				"%w: declaration emits duplicate subresource %q",
+				spec.ErrIdentityConflict,
+				subresource,
+			)
+		}
+		seen[subresource] = struct{}{}
+		output = append(output, NamedEntry{
+			SubresourceLocator: subresource,
+			Entry:              entry.Clone(),
+		})
+
+		relationships, err := r.relationshipsForValidatedEntry(
+			registration,
+			entry,
+		)
+		if err != nil {
+			return err
+		}
+		for _, relationship := range relationships {
+			if relationship.Form != declaration.MemberContained {
+				continue
+			}
+			target, err := relationship.Declared.ContainedDeclaration()
+			if err != nil {
+				return err
+			}
+			if err := walk(
+				target,
+				append([]string(nil), relationship.ContainedPath...),
+				depth+1,
+				false,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if err := walk(root, nil, 0, rootSchemaValidated); err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+func (r *Registry) relationshipsForValidatedEntry(
+	registration Registration,
+	entry declaration.Entry,
+) ([]Relationship, error) {
 	if registration.Relationships == nil {
 		return []Relationship{}, nil
 	}
@@ -248,86 +555,10 @@ func (r *Registry) Relationships(
 	return output, nil
 }
 
-func (r *Registry) ValidateTree(
-	root declaration.Entry,
-) error {
-	_, err := r.walkNamedEntries(root)
-	return err
-}
-
-func (r *Registry) WalkNamedEntries(
-	root declaration.Entry,
-) ([]NamedEntry, error) {
-	return r.walkNamedEntries(root)
-}
-
-// DefinitionForSchema reconstructs the immutable generic Definition from a
-// family-owned validated declaration. It does not rerun JSON Schema execution.
-func (r *Registry) DefinitionForSchema(
-	key schemaModel.Key,
-	entry declaration.Entry,
-) (definitionModel.Definition, error) {
-	registration, err := r.registrationForSchema(key)
-	if err != nil {
-		return definitionModel.Definition{}, err
-	}
-	if err := registration.ValidateEntry(entry); err != nil {
-		return definitionModel.Definition{}, err
-	}
-	if entry.Header().Type != registration.DeclarationType {
-		return definitionModel.Definition{}, fmt.Errorf(
-			"%w: declaration type differs from schema interpretation",
-			spec.ErrInvalid,
-		)
-	}
-
-	version := spec.LogicalVersion("")
-	if registration.LogicalVersion != nil {
-		version, err = registration.LogicalVersion(entry)
-		if err != nil {
-			return definitionModel.Definition{}, err
-		}
-	}
-	if err := version.Validate(true); err != nil {
-		return definitionModel.Definition{}, err
-	}
-
-	header := entry.Header()
-	body, err := entry.CanonicalJSON()
-	if err != nil {
-		return definitionModel.Definition{}, err
-	}
-	displayName := header.DisplayName
-	if displayName == "" {
-		displayName = header.Name
-	}
-
-	return definition.Admit(definitionModel.Definition{
-		Kind:           artifactModel.ArtifactKind(registration.DeclarationType),
-		SchemaID:       key.SchemaID,
-		SchemaVersion:  key.SchemaVersion,
-		LogicalName:    spec.LogicalName(header.Name),
-		LogicalVersion: version,
-		DisplayName:    displayName,
-		Description:    header.Description,
-		Labels:         declaration.CloneStringMap(header.Labels),
-		Body:           body,
-	})
-}
-
-func (r *Registry) DefinitionForEntry(
-	entry declaration.Entry,
-) (definitionModel.Definition, error) {
-	registration, err := r.registrationForEntry(entry)
-	if err != nil {
-		return definitionModel.Definition{}, err
-	}
-	return r.DefinitionForSchema(registration.SchemaKey, entry)
-}
-
-func (r *Registry) DefinitionsForDocument(
+func (r *Registry) definitionsForDocument(
 	key schemaModel.Key,
 	raw []byte,
+	rootSchemaValidated bool,
 ) ([]AdmittedEntry, error) {
 	registration, err := r.registrationForSchema(key)
 	if err != nil {
@@ -344,7 +575,10 @@ func (r *Registry) DefinitionsForDocument(
 		)
 	}
 
-	entries, err := r.WalkNamedEntries(root)
+	entries, err := r.walkNamedEntriesWithRootValidation(
+		root,
+		rootSchemaValidated,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -352,9 +586,21 @@ func (r *Registry) DefinitionsForDocument(
 	for index, entry := range entries {
 		var definitionValue definitionModel.Definition
 		if index == 0 {
-			definitionValue, err = r.DefinitionForSchema(key, entry.Entry)
+			definitionValue, err = r.definitionForValidatedSchema(
+				registration,
+				key,
+				entry.Entry,
+			)
 		} else {
-			definitionValue, err = r.DefinitionForEntry(entry.Entry)
+			nested, nestedErr := r.registrationForEntry(entry.Entry)
+			if nestedErr != nil {
+				return nil, nestedErr
+			}
+			definitionValue, err = r.definitionForValidatedSchema(
+				nested,
+				nested.SchemaKey,
+				entry.Entry,
+			)
 		}
 		if err != nil {
 			return nil, err
@@ -363,140 +609,6 @@ func (r *Registry) DefinitionsForDocument(
 			SubresourceLocator: entry.SubresourceLocator,
 			Definition:         definitionValue,
 		})
-	}
-	return output, nil
-}
-
-// EntryFromDefinition performs family-owned typed reconstruction preparation.
-// It verifies the admitted Definition linkage and family semantic invariants
-// without executing the admission schema or recalculating the digest.
-func (r *Registry) EntryFromDefinition(
-	value definitionModel.Definition,
-) (declaration.Entry, error) {
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return declaration.Entry{}, err
-	}
-	key := schemaModel.ArtifactKey(
-		value.Kind,
-		value.SchemaID,
-		value.SchemaVersion,
-	)
-	registration, err := r.registrationForSchema(key)
-	if err != nil {
-		return declaration.Entry{}, err
-	}
-	entry, err := declaration.DecodeCanonicalEntryJSON(value.Body)
-	if err != nil {
-		return declaration.Entry{}, err
-	}
-	if entry.Header().Type != registration.DeclarationType ||
-		entry.Header().Name != string(value.LogicalName) {
-		return declaration.Entry{}, fmt.Errorf(
-			"%w: Definition body identity differs from Definition metadata",
-			spec.ErrDigestMismatch,
-		)
-	}
-	if err := registration.ValidateEntry(entry); err != nil {
-		return declaration.Entry{}, err
-	}
-	if registration.LogicalVersion != nil {
-		version, err := registration.LogicalVersion(entry)
-		if err != nil {
-			return declaration.Entry{}, err
-		}
-		if version != value.LogicalVersion {
-			return declaration.Entry{}, fmt.Errorf(
-				"%w: Definition logical version differs from family identity",
-				spec.ErrDigestMismatch,
-			)
-		}
-	}
-	return entry, nil
-}
-
-func (r *Registry) walkNamedEntries(
-	root declaration.Entry,
-) ([]NamedEntry, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
-	if err := root.Validate(); err != nil {
-		return nil, err
-	}
-	if root.Header().Name == "" {
-		return nil, fmt.Errorf(
-			"%w: declaration root requires a name",
-			spec.ErrInvalid,
-		)
-	}
-
-	output := make([]NamedEntry, 0)
-	seen := make(map[spec.SubresourceLocator]struct{})
-
-	var walk func(declaration.Entry, []string, int) error
-	walk = func(
-		entry declaration.Entry,
-		path []string,
-		depth int,
-	) error {
-		if depth > spec.MaxDiscoveryDepth {
-			return fmt.Errorf(
-				"%w: declaration nesting exceeds depth %d",
-				spec.ErrInvalid,
-				spec.MaxDiscoveryDepth,
-			)
-		}
-
-		registration, err := r.registrationForEntry(entry)
-		if err != nil {
-			return err
-		}
-		if err := registration.ValidateEntry(entry); err != nil {
-			return err
-		}
-
-		subresource := spec.SubresourceLocator(strings.Join(path, "/"))
-		if err := subresource.Validate(); err != nil {
-			return err
-		}
-		if _, duplicate := seen[subresource]; duplicate {
-			return fmt.Errorf(
-				"%w: declaration emits duplicate subresource %q",
-				spec.ErrIdentityConflict,
-				subresource,
-			)
-		}
-		seen[subresource] = struct{}{}
-		output = append(output, NamedEntry{
-			SubresourceLocator: subresource,
-			Entry:              entry.Clone(),
-		})
-
-		relationships, err := r.Relationships(entry)
-		if err != nil {
-			return err
-		}
-		for _, relationship := range relationships {
-			if relationship.Form != declaration.MemberContained {
-				continue
-			}
-			target, err := relationship.Declared.ContainedDeclaration()
-			if err != nil {
-				return err
-			}
-			if err := walk(
-				target,
-				append([]string(nil), relationship.ContainedPath...),
-				depth+1,
-			); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	if err := walk(root, nil, 0); err != nil {
-		return nil, err
 	}
 	return output, nil
 }

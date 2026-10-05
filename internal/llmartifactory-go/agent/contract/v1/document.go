@@ -64,6 +64,32 @@ func DecodeAgentEntry(
 	return value, nil
 }
 
+func DecodeAdmittedAgentJSON(
+	raw []byte,
+) (AgentDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return AgentDocument{}, err
+	}
+	return DecodeAdmittedAgentEntry(entry)
+}
+
+func DecodeAdmittedAgentEntry(
+	entry declaration.Entry,
+) (AgentDocument, error) {
+	var value AgentDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return AgentDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return AgentDocument{}, err
+	}
+	return value, nil
+}
+
 // DefinitionForDocument is Agent's direct Definition reconstruction boundary.
 // Cross-family contained declaration admission remains owned by the supplied
 // interpretation registry.

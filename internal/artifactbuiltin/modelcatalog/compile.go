@@ -6,12 +6,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
+	interpretations *interpretation.Registry,
 	prepared []PreparedPackage,
 ) (installModel.CompiledPackageSet, error) {
 	values, err := NormalizePreparedPackages(prepared)
@@ -23,10 +25,11 @@ func Compile(
 		ctx,
 		temporaryDirectory,
 		artifactsetup.CompileConfig{
-			SetName:       generatedCatalogName,
-			SchemaVersion: modelDomain.HydrationSchemaVersion,
-			InstallerName: modelDomain.BuiltInInstallerName,
-			Packages:      packageInputs(values),
+			SetName:         generatedCatalogName,
+			SchemaVersion:   modelDomain.HydrationSchemaVersion,
+			InstallerName:   modelDomain.BuiltInInstallerName,
+			Interpretations: interpretations,
+			Packages:        packageInputs(values),
 		},
 	)
 }

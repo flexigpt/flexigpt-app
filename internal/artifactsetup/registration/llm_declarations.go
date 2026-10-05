@@ -12,7 +12,6 @@ import (
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/sourceformat/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
@@ -41,29 +40,73 @@ func NewLLMInterpretationRegistry() (*interpretation.Registry, error) {
 // LLMDeclarationSchemaCodecs returns the selected family schema codecs. Schema
 // registration is separate from decoder and locator selection.
 func LLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
-	registrations := llmFamilyRegistrations()
-	output := make([]schema.Codec, 0, len(registrations))
-
-	for _, registration := range registrations {
-		schemaJSON, err := llmFamilySchema(registration.DeclarationType)
-		if err != nil {
-			return nil, err
-		}
-
+	output := make([]schema.Codec, 0, len(llmFamilyRegistrations()))
+	add := func(
+		registration interpretation.Registration,
+		raw []byte,
+	) error {
 		codec, err := interpretation.NewSchemaCodec(
 			registration,
-			schemaJSON,
+			raw,
 		)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"create declaration schema codec for %q: %w",
-				registration.DeclarationType,
-				err,
-			)
+			return err
 		}
 		output = append(output, codec)
+		return nil
 	}
 
+	if err := add(textv1.Interpretation(), textv1.TextJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Text schema codec: %w", err)
+	}
+	if err := add(modelv1.Interpretation(), modelv1.ModelJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Model schema codec: %w", err)
+	}
+	if err := add(
+		modelproviderv1.Interpretation(),
+		modelproviderv1.ModelProviderJSONSchema(),
+	); err != nil {
+		return nil, fmt.Errorf("create Model Provider schema codec: %w", err)
+	}
+	if err := add(toolv1.Interpretation(), toolv1.ToolJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Tool schema codec: %w", err)
+	}
+	if err := add(skillv1.Interpretation(), skillv1.SkillJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Skill schema codec: %w", err)
+	}
+	if err := add(mcpv1.Interpretation(), mcpv1.MCPJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create MCP schema codec: %w", err)
+	}
+	if err := add(
+		mcppolicyv1.Interpretation(),
+		mcppolicyv1.MCPPolicyJSONSchema(),
+	); err != nil {
+		return nil, fmt.Errorf("create MCP Policy schema codec: %w", err)
+	}
+	if err := add(pluginv1.Interpretation(), pluginv1.PluginJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Plugin schema codec: %w", err)
+	}
+	if err := add(agentv1.Interpretation(), agentv1.AgentJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Agent schema codec: %w", err)
+	}
+	if err := add(teamv1.Interpretation(), teamv1.TeamJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Team schema codec: %w", err)
+	}
+	if err := add(loopv1.Interpretation(), loopv1.LoopJSONSchema()); err != nil {
+		return nil, fmt.Errorf("create Loop schema codec: %w", err)
+	}
+	if err := add(
+		workflowv1.Interpretation(),
+		workflowv1.WorkflowJSONSchema(),
+	); err != nil {
+		return nil, fmt.Errorf("create Workflow schema codec: %w", err)
+	}
+	if err := add(
+		workspacev1.Interpretation(),
+		workspacev1.WorkspaceJSONSchema(),
+	); err != nil {
+		return nil, fmt.Errorf("create Workspace schema codec: %w", err)
+	}
 	return output, nil
 }
 
@@ -138,44 +181,5 @@ func llmFamilyRegistrations() []interpretation.Registration {
 		loopv1.Interpretation(),
 		workflowv1.Interpretation(),
 		workspacev1.Interpretation(),
-	}
-}
-
-func llmFamilySchema(
-	declarationType declaration.Type,
-) ([]byte, error) {
-	switch declarationType {
-	case textv1.TextType:
-		return textv1.TextJSONSchema(), nil
-	case modelv1.ModelType:
-		return modelv1.ModelJSONSchema(), nil
-	case modelproviderv1.ModelProviderType:
-		return modelproviderv1.ModelProviderJSONSchema(), nil
-	case toolv1.ToolType:
-		return toolv1.ToolJSONSchema(), nil
-	case skillv1.SkillType:
-		return skillv1.SkillJSONSchema(), nil
-	case mcpv1.MCPType:
-		return mcpv1.MCPJSONSchema(), nil
-	case mcppolicyv1.MCPPolicyType:
-		return mcppolicyv1.MCPPolicyJSONSchema(), nil
-	case pluginv1.PluginType:
-		return pluginv1.PluginJSONSchema(), nil
-	case agentv1.AgentType:
-		return agentv1.AgentJSONSchema(), nil
-	case teamv1.TeamType:
-		return teamv1.TeamJSONSchema(), nil
-	case loopv1.LoopType:
-		return loopv1.LoopJSONSchema(), nil
-	case workflowv1.WorkflowType:
-		return workflowv1.WorkflowJSONSchema(), nil
-	case workspacev1.WorkspaceType:
-		return workspacev1.WorkspaceJSONSchema(), nil
-	default:
-		return nil, fmt.Errorf(
-			"%w: no selected LLM schema for declaration type %q",
-			spec.ErrUnsupported,
-			declarationType,
-		)
 	}
 }

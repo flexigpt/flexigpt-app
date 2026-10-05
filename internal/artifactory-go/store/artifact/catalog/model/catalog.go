@@ -1,7 +1,7 @@
 // Package model contains Artifact Store's internal committed read spec.
 //
 // It is not a transport model and is never returned directly by Agent, Skill,
-// Collection, MCP, Tool, or Workspace consumer APIs.
+// Plugin, MCP, Tool, or Workspace consumer APIs.
 //
 // The Artifact Store owns this projection because it can read Artifact,
 // Source, and immutable Definition metadata in one durable read. Consumer

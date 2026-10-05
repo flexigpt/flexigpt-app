@@ -85,6 +85,32 @@ func DecodeMCPPolicyEntry(
 	return value, nil
 }
 
+func DecodeAdmittedMCPPolicyJSON(
+	raw []byte,
+) (MCPPolicyDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	return DecodeAdmittedMCPPolicyEntry(entry)
+}
+
+func DecodeAdmittedMCPPolicyEntry(
+	entry declaration.Entry,
+) (MCPPolicyDocument, error) {
+	var value MCPPolicyDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeMCPPolicy(
 	raw []byte,
 ) (MCPPolicyDocument, error) {

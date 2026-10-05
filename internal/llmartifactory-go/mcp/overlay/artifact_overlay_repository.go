@@ -167,7 +167,27 @@ func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 	if r == nil || r.localState == nil {
 		return spec.ErrClosed
 	}
-	return r.localState.PurgeArtifactLocalState(ctx, ref)
+	record, err := r.artifact(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	request := artifactcleanupFlow.PurgeRequest{
+		Artifact:                 ref,
+		ExpectedArtifactRevision: record.Revision,
+		AllNamespaces:            true,
+	}
+	if !r.protection.IsProtectedRoot(record.RootID) {
+		request.DataNamespaces = []artifactModel.DataNamespace{
+			serverMCPDomain.InstallationDataNamespace,
+		}
+	}
+
+	_, err = r.localState.CleanupArtifactLocalState(
+		ctx,
+		request,
+	)
+	return err
 }
 
 func (r *ArtifactOverlayRepository) artifact(

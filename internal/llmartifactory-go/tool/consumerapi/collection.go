@@ -55,11 +55,11 @@ func (a *API) SetToolCollectionEnabled(
 	return a.plugins.SetEnabled(ctx, ref, expectedRevision, enabled)
 }
 
-func (a *API) collectionForTool(
+func (a *API) pluginForTool(
 	ctx context.Context,
 	name spec.LogicalName,
 ) (plugin.PluginView, error) {
-	collectionName, found := a.collectionByTool[name]
+	pluginName, found := a.pluginByTool[name]
 	if !found {
 		return plugin.PluginView{}, fmt.Errorf(
 			"%w: Tool %q has no generated Tool Plugin",
@@ -72,7 +72,7 @@ func (a *API) collectionForTool(
 		ctx,
 		a.builtinRoot,
 		artifactModel.ArtifactKind(pluginv1.PluginType),
-		collectionName,
+		pluginName,
 		catalogModel.ListOptions{},
 	)
 	if err != nil {
@@ -99,7 +99,7 @@ func (a *API) collectionForTool(
 		)
 	default:
 		return plugin.PluginView{}, fmt.Errorf(
-			"%w: Tool %q belongs to %d Tool Collections",
+			"%w: Tool %q belongs to %d Tool Plugins",
 			spec.ErrIdentityConflict,
 			name,
 			len(matches),

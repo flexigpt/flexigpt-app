@@ -20,7 +20,7 @@ func (a *API) ResolveEnabledTool(
 	if err != nil {
 		return ResolvedToolView{}, err
 	}
-	collectionView, err := a.collectionForTool(
+	pluginView, err := a.pluginForTool(
 		ctx,
 		value.Artifact.LogicalName,
 	)
@@ -29,7 +29,7 @@ func (a *API) ResolveEnabledTool(
 	}
 	output := ResolvedToolView{
 		Tool:   toolView(value),
-		Plugin: collectionView,
+		Plugin: pluginView,
 	}
 	if !output.Enabled() {
 		return ResolvedToolView{}, fmt.Errorf(

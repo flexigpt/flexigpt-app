@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
@@ -26,6 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/skill"
@@ -41,13 +41,15 @@ type StoreAPI struct {
 	artifacts        artifact.API
 	resources        resourceFlow.API
 	workspaceSources workspaceSourceRegistry
-	policy           defaultpolicy.Policy
+	policy           workspaceDomain.DefaultPolicy
+	policySource     DefaultPolicySource
 
 	config        Config
 	promptAdapter *prompt.Adapter
 	skillAdapter  *skill.Adapter
 	mcpAdapter    *mcp.Adapter
 	resolver      *composition.Resolver
+	refresher     *corerefresh.Service
 }
 
 func NewStoreAPI(
@@ -66,12 +68,10 @@ func NewStoreAPI(
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
-	policy, err := defaultpolicy.Load()
-	if err != nil {
+	config = config.normalized()
+	if err := config.DefaultPolicySource.Validate(); err != nil {
 		return nil, err
 	}
-
-	config = config.normalized()
 	if err := config.ContextComposition.Validate(); err != nil {
 		return nil, err
 	}
@@ -81,11 +81,13 @@ func NewStoreAPI(
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
+	policy, err := config.DefaultPolicySource.Policy.Clone()
+	if err != nil {
+		return nil, err
+	}
 
 	workspaceSources := newWorkspaceSourceRegistry(sources)
-	refreshCoordinator := newWorkspaceRefreshCoordinator(
-		sources, discovery, workspaceSources,
-	)
+	refreshCoordinator := newWorkspaceRefreshCoordinator(sources, workspaceSources)
 
 	output := &StoreAPI{
 		roots:            roots,
@@ -95,6 +97,7 @@ func NewStoreAPI(
 		resources:        resources,
 		workspaceSources: workspaceSources,
 		policy:           policy,
+		policySource:     config.DefaultPolicySource,
 		config:           config,
 		cat:              cat,
 	}
@@ -123,17 +126,40 @@ func NewStoreAPI(
 		}
 	}
 
-	resolver, err := config.Composition.WithRefreshCoordinator(
+	output.resolver = config.Composition
+	planner, err := composition.NewReachableDiscoveryPlanner(
+		func(
+			ctx context.Context,
+			ref artifactModel.ArtifactRef,
+		) (*composition.ResolvedEntry, error) {
+			workspace, err := output.workspaceForRef(ctx, ref)
+			if err != nil {
+				return nil, err
+			}
+			return config.Composition.ResolveWorkspaceWithCompositionSource(
+				ctx,
+				workspace.Ref(),
+				workspace.CompositionSourceID,
+			)
+		},
 		refreshCoordinator,
 	)
 	if err != nil {
 		return nil, err
 	}
-
+	refresher, err := corerefresh.New(
+		sources,
+		discovery,
+		planner,
+		composition.DefaultLimits().MaxDepth,
+	)
+	if err != nil {
+		return nil, err
+	}
 	output.promptAdapter = promptAdapter
 	output.skillAdapter = skillAdapter
 	output.mcpAdapter = mcpAdapter
-	output.resolver = resolver
+	output.refresher = refresher
 	return output, nil
 }
 
@@ -178,10 +204,10 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	}
 	for _, entry := range policyEntries {
 		if entry.Binding.Locator !=
-			spec.Locator(defaultpolicy.PolicyLocator) ||
+			a.policySource.Locator ||
 			entry.Binding.SubresourceLocator != "" ||
 			entry.Kind != workspaceDomain.WorkspaceArtifactKind ||
-			string(entry.LogicalName) != defaultpolicy.PolicyID {
+			string(entry.LogicalName) != a.policy.ID {
 			continue
 		}
 		output = append(output, workspaceArtifactCatalogViewOf(entry))
@@ -231,7 +257,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	if !isWorkspaceDirectoryCatalogArtifact(values, record) {
+	if !a.isWorkspaceDirectoryCatalogArtifact(values, record) {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: Artifact is not exposed by this Workspace directory",
 			workspaceDomain.ErrReferenceUnresolved,
@@ -560,14 +586,17 @@ func (a *StoreAPI) ensureWorkspaceSources(
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
-	policyDiscovery, err := policySourceDiscovery()
+	policyDiscovery, err := a.policySourceDiscovery()
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
 	policyConfig, err := json.Marshal(struct {
 		ProviderKey string `json:"providerKey"`
 		Root        string `json:"root"`
-	}{ProviderKey: defaultpolicy.ProviderKey, Root: defaultpolicy.PolicyRoot})
+	}{
+		ProviderKey: a.policySource.ProviderKey,
+		Root:        string(a.policySource.Root),
+	})
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
@@ -883,7 +912,7 @@ func workspaceArtifactCatalogViewOf(
 	}
 }
 
-func isWorkspaceDirectoryCatalogArtifact(
+func (a *StoreAPI) isWorkspaceDirectoryCatalogArtifact(
 	values workspaceSourceSet,
 	value artifactModel.Artifact,
 ) bool {
@@ -894,10 +923,10 @@ func isWorkspaceDirectoryCatalogArtifact(
 		return true
 	}
 	return value.Binding.SourceID == values.Policy.ID &&
-		value.Binding.Locator == spec.Locator(defaultpolicy.PolicyLocator) &&
+		value.Binding.Locator == a.policySource.Locator &&
 		value.Binding.SubresourceLocator == "" &&
 		value.Kind == workspaceDomain.WorkspaceArtifactKind &&
-		string(value.LogicalName) == defaultpolicy.PolicyID
+		string(value.LogicalName) == a.policy.ID
 }
 
 func workspaceRootStorageKey(rootPath string) spec.StorageKey {
@@ -908,15 +937,15 @@ func workspaceRootStorageKey(rootPath string) spec.StorageKey {
 	return spec.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
 }
 
-func policySourceDiscovery() (sourceModel.DiscoverySpec, error) {
+func (a *StoreAPI) policySourceDiscovery() (sourceModel.DiscoverySpec, error) {
 	value := sourceModel.DiscoverySpec{
-		ExplicitLocators: []spec.Locator{defaultpolicy.PolicyLocator},
+		ExplicitLocators: []spec.Locator{a.policySource.Locator},
 		DecoderHints: []sourceModel.DecoderHint{{
-			Locator:    defaultpolicy.PolicyLocator,
+			Locator:    a.policySource.Locator,
 			Recursive:  false,
-			DecoderIDs: []spec.DecoderID{"artifact-declaration-yaml"},
+			DecoderIDs: []spec.DecoderID{a.policySource.DecoderID},
 		}},
-		AllowedDecoderIDs: []spec.DecoderID{"artifact-declaration-yaml"},
+		AllowedDecoderIDs: []spec.DecoderID{a.policySource.DecoderID},
 		Authoritative:     true,
 	}
 	value = value.Normalized()

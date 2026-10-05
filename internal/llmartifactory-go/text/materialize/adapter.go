@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
+	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 )
 
 type Document struct {
@@ -77,7 +77,7 @@ func (a *Adapter) Resolve(
 		)
 	}
 
-	declarationValue, err := textv1.DecodeTextJSON(resolved.Definition.Body)
+	declarationValue, err := textv1.DecodeAdmittedTextJSON(resolved.Definition.Body)
 	if err != nil {
 		return Document{}, err
 	}
@@ -140,7 +140,7 @@ func (a *Adapter) ResolveWithContentSource(
 			spec.ErrReferenceUnresolved,
 		)
 	}
-	declarationValue, err := textv1.DecodeTextJSON(resolved.Definition.Body)
+	declarationValue, err := textv1.DecodeAdmittedTextJSON(resolved.Definition.Body)
 	if err != nil {
 		return Document{}, err
 	}

@@ -830,7 +830,7 @@ Domains remain responsible for:
 
 Domain resolution consumes committed or explicitly verified state. It does not silently prepare Sources or publish content.
 
-A Plugin or Collection declaration containing membership is still domain content. It does not create a generic Store ownership relationship merely because its members refer to Artifacts.
+A Plugin declaration containing membership is still domain content. It does not create a generic Store ownership relationship merely because its members refer to Artifacts.
 
 Likewise, domain graph planning must not automatically fetch plaintext credentials or execute runtime capabilities.
 

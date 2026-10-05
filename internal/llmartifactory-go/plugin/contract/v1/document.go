@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
 const (
@@ -68,6 +69,32 @@ func DecodePluginEntry(entry declaration.Entry) (PluginDocument, error) {
 	return value, nil
 }
 
+func DecodeAdmittedPluginJSON(
+	raw []byte,
+) (PluginDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return PluginDocument{}, err
+	}
+	return DecodeAdmittedPluginEntry(entry)
+}
+
+func DecodeAdmittedPluginEntry(
+	entry declaration.Entry,
+) (PluginDocument, error) {
+	var value PluginDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return PluginDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return PluginDocument{}, err
+	}
+	return value, nil
+}
+
 func (v PluginDocument) Clone() (PluginDocument, error) {
 	return jsonutil.CloneJSON(v)
 }
@@ -115,8 +142,21 @@ func (v PluginDocument) validateFields() error {
 	); err != nil {
 		return err
 	}
-	return declaration.ValidateMembersWithoutRelationshipBehavior(
+	if err := declaration.ValidateMembersWithoutRelationshipBehavior(
 		"Plugin members",
 		v.Members,
-	)
+	); err != nil {
+		return err
+	}
+
+	policy, err := pluginDomain.FromMetadata(v.Metadata)
+	if err != nil {
+		return err
+	}
+	for index, member := range v.Members {
+		if err := policy.Allows(member); err != nil {
+			return fmt.Errorf("plugin members[%d]: %w", index, err)
+		}
+	}
+	return nil
 }

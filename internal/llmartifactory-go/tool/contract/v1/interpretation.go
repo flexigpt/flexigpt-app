@@ -14,5 +14,9 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeToolEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedToolEntry(entry)
+			return err
+		},
 	}
 }

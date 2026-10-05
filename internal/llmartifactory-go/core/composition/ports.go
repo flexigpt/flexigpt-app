@@ -9,7 +9,6 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
 // ArtifactReader is the entity read boundary used by declaration resolution.
@@ -65,52 +64,4 @@ type SourceEntryInspector interface {
 		sourceID sourceModel.SourceID,
 		locator spec.Locator,
 	) (sourceModel.Entry, error)
-}
-
-type RefreshTarget struct {
-	RootID   rootModel.RootID
-	SourceID sourceModel.SourceID
-}
-
-func (t RefreshTarget) Validate() error {
-	if err := t.RootID.Validate(); err != nil {
-		return err
-	}
-	return t.SourceID.Validate()
-}
-
-type RefreshDirective struct {
-	Target  RefreshTarget
-	Changed bool
-}
-
-type SelectorRefreshRequest struct {
-	Parent   artifactModel.Artifact
-	Selector declaration.Selector
-}
-
-type LocatedMemberRefreshRequest struct {
-	Parent artifactModel.Artifact
-	Member declaration.Entry
-}
-
-// RefreshCoordinator belongs at application composition boundaries.
-//
-// It owns Source discovery configuration and Source refresh. The resolver
-// owns only the reachable selector and local-locator closure traversal.
-type RefreshCoordinator interface {
-	PrepareSelectorDiscovery(
-		ctx context.Context,
-		request SelectorRefreshRequest,
-	) ([]RefreshDirective, error)
-
-	PrepareLocatedMemberDiscovery(
-		ctx context.Context,
-		request LocatedMemberRefreshRequest,
-	) ([]RefreshDirective, error)
-
-	RefreshSource(
-		ctx context.Context,
-		target RefreshTarget,
-	) error
 }

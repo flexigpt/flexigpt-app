@@ -1,7 +1,6 @@
 package defaultpolicy
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
+	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -22,39 +22,34 @@ const (
 	PolicyVersion = "v1"
 )
 
-type Policy struct {
-	ID            string                        `json:"policyID"`
-	Version       string                        `json:"policyVersion"`
-	Digest        cryptoutil.Digest             `json:"policyDigest"`
-	RawYAML       []byte                        `json:"-"`
-	CanonicalJSON []byte                        `json:"-"`
-	Document      workspacev1.WorkspaceDocument `json:"-"`
-}
-
-func Load() (Policy, error) {
+func Load() (workspaceDomain.DefaultPolicy, error) {
 	packages, err := artifactbuiltin.EmbeddedWorkspacePackages()
 	if err != nil {
-		return Policy{}, err
+		return workspaceDomain.DefaultPolicy{}, err
 	}
 	rawYAML, err := fs.ReadFile(packages, PolicyRoot+"/"+PolicyLocator)
 	if err != nil {
-		return Policy{}, err
+		return workspaceDomain.DefaultPolicy{}, err
 	}
 	canonical, err := yamlutil.CanonicalObjectJSON(rawYAML, spec.MaxDefinitionBytes)
 	if err != nil {
-		return Policy{}, err
+		return workspaceDomain.DefaultPolicy{}, err
 	}
 	document, err := workspacev1.DecodeWorkspaceJSON(canonical)
 	if err != nil {
-		return Policy{}, err
+		return workspaceDomain.DefaultPolicy{}, err
 	}
 	if document.Name != PolicyID {
-		return Policy{}, fmt.Errorf("%w: base policy name is %q", spec.ErrInvalid, document.Name)
+		return workspaceDomain.DefaultPolicy{}, fmt.Errorf(
+			"%w: base policy name is %q",
+			spec.ErrInvalid,
+			document.Name,
+		)
 	}
 	if err := validatePolicyDocument(document); err != nil {
-		return Policy{}, err
+		return workspaceDomain.DefaultPolicy{}, err
 	}
-	output := Policy{
+	output := workspaceDomain.DefaultPolicy{
 		ID:            PolicyID,
 		Version:       PolicyVersion,
 		Digest:        cryptoutil.DigestBytes(canonical),
@@ -62,34 +57,10 @@ func Load() (Policy, error) {
 		CanonicalJSON: append([]byte(nil), canonical...),
 		Document:      document,
 	}
+	if err := output.Validate(); err != nil {
+		return workspaceDomain.DefaultPolicy{}, err
+	}
 	return output, nil
-}
-
-func (p Policy) Validate() error {
-	if p.ID != PolicyID || p.Version != PolicyVersion {
-		return fmt.Errorf("%w: base policy identity is invalid", spec.ErrInvalid)
-	}
-	if p.Document.Name != p.ID {
-		return fmt.Errorf("%w: base policy document identity is invalid", spec.ErrInvalid)
-	}
-	if err := cryptoutil.ValidateDigest(p.Digest); err != nil {
-		return err
-	}
-	if err := validatePolicyDocument(p.Document); err != nil {
-		return err
-	}
-	canonical, err := p.Document.CanonicalJSON()
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(canonical, p.CanonicalJSON) ||
-		cryptoutil.DigestBytes(canonical) != p.Digest {
-		return fmt.Errorf("%w: base policy bytes or digest do not match its document", spec.ErrDigestMismatch)
-	}
-	if len(p.RawYAML) == 0 {
-		return fmt.Errorf("%w: base policy YAML is empty", spec.ErrInvalid)
-	}
-	return nil
 }
 
 func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {

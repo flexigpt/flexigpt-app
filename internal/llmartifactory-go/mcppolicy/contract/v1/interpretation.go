@@ -15,5 +15,9 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeMCPPolicyEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedMCPPolicyEntry(entry)
+			return err
+		},
 	}
 }

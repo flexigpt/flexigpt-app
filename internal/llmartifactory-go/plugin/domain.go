@@ -141,11 +141,6 @@ func (p Profile) managedCollectionBaselineDisplayName() string {
 	return string(p.BaselineName)
 }
 
-func (p Profile) pluginMetadata() map[string]json.RawMessage {
-	metadata, _ := pluginDomain.PutMetadata(nil, p.MembershipPolicy)
-	return metadata
-}
-
 func (a *API) EnsureBaseline(
 	ctx context.Context,
 	rootID rootModel.RootID,
@@ -217,11 +212,20 @@ func (a *API) EnsureBaseline(
 		if existing.State == artifactModel.StateAvailable {
 			return a.Read(ctx, existing.Ref())
 		}
+
+		metadata, err := pluginDomain.PutMetadata(
+			nil,
+			a.domain.MembershipPolicy,
+		)
+		if err != nil {
+			return PluginView{}, err
+		}
 		document := pluginv1.PluginDocument{
 			Type:        pluginv1.PluginType,
 			Name:        string(a.domain.BaselineName),
 			DisplayName: a.domain.managedCollectionBaselineDisplayName(),
 			Description: a.domain.BaselineDescription,
+			Metadata:    metadata,
 		}
 		record, err := a.publishDocument(
 			ctx,
@@ -353,13 +357,7 @@ func (a *API) validateDomainEntry(
 	if a == nil || a.domain == nil {
 		return nil
 	}
-	policy, err := pluginDomain.FromMetadata(
-		a.domain.pluginMetadata(),
-	)
-	if err != nil {
-		return err
-	}
-	if err := policy.Allows(member); err != nil {
+	if err := a.domain.MembershipPolicy.Allows(member); err != nil {
 		return err
 	}
 	if !a.domain.allows(member.Header().Type) {
@@ -400,6 +398,36 @@ func (a *API) validateEditableDomainDocument(
 		}
 	}
 	return nil
+}
+
+func (a *API) isBaselinePlugin(
+	record artifactModel.Artifact,
+	sourceValue sourceModel.Summary,
+) bool {
+	if a == nil || a.domain == nil {
+		return IsBaselinePluginArtifactForSource(
+			record,
+			sourceValue,
+		)
+	}
+	if a.domain.ReadOnly ||
+		record.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
+		record.RootID != sourceValue.RootID ||
+		record.Binding.SourceID != sourceValue.ID ||
+		record.Binding.SubresourceLocator != "" ||
+		sourceValue.Kind != managedfs.Kind ||
+		sourceValue.StorageKey != a.domain.SourceStorageKey {
+		return false
+	}
+
+	address, err := a.managedCollectionAddressFromLocator(
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return false
+	}
+	return record.LogicalName == a.domain.BaselineName &&
+		address.Name == a.domain.BaselineName
 }
 
 func IsBaselinePluginArtifact(
@@ -585,10 +613,7 @@ func (a *API) Read(
 		}
 	}
 
-	baseline := IsBaselinePluginArtifactForSource(record, sourceValue)
-	if a.domain != nil && a.domain.ReadOnly {
-		baseline = false
-	}
+	baseline := a.isBaselinePlugin(record, sourceValue)
 	return readCollectionViewOf(
 		record,
 		document,

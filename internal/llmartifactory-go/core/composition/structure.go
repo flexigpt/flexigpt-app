@@ -25,7 +25,10 @@ func (r *Resolver) resolveStructure(
 	if !found {
 		return fmt.Errorf("%w: declaration has no Root scope", spec.ErrInvalid)
 	}
-	facts, err := r.interpretations.Relationships(entry)
+	// "entry was reconstructed from an admitted Definition by
+	// resolveTerminalDeclaration. Composition must retain family semantic
+	// checks but must not execute the already-completed family JSON Schema.
+	facts, err := r.interpretations.AdmittedRelationships(entry)
 	if err != nil {
 		return err
 	}

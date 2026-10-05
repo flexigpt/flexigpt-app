@@ -70,11 +70,25 @@ func (d *canonicalDecoder) Decode(
 		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
 
-	parsed, err := d.schemas.CanonicalizeExpected(ctx, key, raw)
+	document, err := declaration.CanonicalDocumentForSchema(raw)
+	if err != nil {
+		return nil, decodeDiagnostic(
+			candidate,
+			"artifact.declaration-invalid",
+			err,
+		)
+	}
+
+	parsed, err := d.schemas.CanonicalizeExpected(
+		ctx,
+		key,
+		document,
+	)
 	if err != nil {
 		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
-	entries, err := d.interpretations.DefinitionsForDocument(
+
+	entries, err := d.interpretations.DefinitionsForSchemaValidatedDocument(
 		parsed.Key,
 		parsed.Raw,
 	)

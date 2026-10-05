@@ -137,6 +137,32 @@ func DecodeWorkflowEntry(
 	return value, nil
 }
 
+func DecodeAdmittedWorkflowJSON(
+	raw []byte,
+) (WorkflowDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return WorkflowDocument{}, err
+	}
+	return DecodeAdmittedWorkflowEntry(entry)
+}
+
+func DecodeAdmittedWorkflowEntry(
+	entry declaration.Entry,
+) (WorkflowDocument, error) {
+	var value WorkflowDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return WorkflowDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeWorkflow(
 	raw []byte,
 ) (WorkflowDocument, error) {

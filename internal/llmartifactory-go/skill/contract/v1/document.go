@@ -62,6 +62,32 @@ func DecodeSkillEntry(
 	return value, nil
 }
 
+func DecodeAdmittedSkillJSON(
+	raw []byte,
+) (SkillDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return SkillDocument{}, err
+	}
+	return DecodeAdmittedSkillEntry(entry)
+}
+
+func DecodeAdmittedSkillEntry(
+	entry declaration.Entry,
+) (SkillDocument, error) {
+	var value SkillDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return SkillDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return SkillDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeSkill(
 	raw []byte,
 ) (SkillDocument, error) {

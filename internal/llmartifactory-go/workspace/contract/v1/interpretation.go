@@ -14,6 +14,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeWorkspaceEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedWorkspaceEntry(entry)
+			return err
+		},
 		Relationships: workspaceRelationships,
 	}
 }
@@ -21,7 +25,7 @@ func Interpretation() interpretation.Registration {
 func workspaceRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeWorkspaceEntry(entry)
+	document, err := DecodeAdmittedWorkspaceEntry(entry)
 	if err != nil {
 		return nil, err
 	}

@@ -96,11 +96,7 @@ type ResolverOptions struct {
 	// provider evidence. It cannot fabricate Artifact identity.
 	ArtifactCapabilityProjectors map[declaration.Type]ArtifactCapabilityProjector
 
-	// Refresh is absent from ordinary resolution. It is required only by the
-	// explicit RefreshPlugin, RefreshAgent, RefreshTeam, and RefreshWorkspace
-	// operations.
-	Refresh RefreshCoordinator
-	Limits  Limits
+	Limits Limits
 }
 
 type Resolver struct {
@@ -110,7 +106,6 @@ type Resolver struct {
 	locators        LocatorResolver
 	interpretations *interpretation.Registry
 	scope           ScopeBinding
-	refresh         RefreshCoordinator
 	limits          Limits
 
 	directCapabilities []DirectCapabilityProvider
@@ -204,33 +199,10 @@ func New(options ResolverOptions) (*Resolver, error) {
 		locators:           options.Locators,
 		interpretations:    options.Interpretations,
 		scope:              options.Scope,
-		refresh:            options.Refresh,
 		limits:             limits,
 		directCapabilities: directCapabilities,
 		projectors:         projectors,
 	}, nil
-}
-
-// WithRefreshCoordinator derives an explicitly refresh-capable resolver from
-// the same immutable composition configuration. It does not construct another
-// graph resolver, another locator registry, or another interpretation
-// registry. Workspace owns its refresh coordinator because Workspace owns its
-// source-preparation rules.
-func (r *Resolver) WithRefreshCoordinator(
-	coordinator RefreshCoordinator,
-) (*Resolver, error) {
-	if err := r.ready(); err != nil {
-		return nil, err
-	}
-	if coordinator == nil {
-		return nil, fmt.Errorf(
-			"%w: Artifact composition refresh coordinator is nil",
-			spec.ErrInvalid,
-		)
-	}
-	output := *r
-	output.refresh = coordinator
-	return &output, nil
 }
 
 func (r *Resolver) ready() error {

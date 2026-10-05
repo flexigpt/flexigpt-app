@@ -114,7 +114,7 @@ func SkillDeclarationFromDefinition(
 func ValidateDefinition(
 	value definitionModel.Definition,
 ) error {
-	if err := value.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
 		return err
 	}
 	if value.Kind != SkillArtifactKind {
@@ -145,7 +145,7 @@ func ValidateDefinition(
 		)
 	}
 
-	doc, err := skillv1.DecodeSkillJSON(value.Body)
+	doc, err := skillv1.DecodeAdmittedSkillJSON(value.Body)
 	if err != nil {
 		return err
 	}

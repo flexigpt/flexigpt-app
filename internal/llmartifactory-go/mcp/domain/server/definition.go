@@ -8,7 +8,7 @@ import (
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
+	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
@@ -59,7 +59,7 @@ func DefinitionForDocument(
 func ServerDocumentFromDefinition(
 	input definitionModel.Definition,
 ) (ServerDocument, error) {
-	if err := input.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(input); err != nil {
 		return ServerDocument{}, err
 	}
 	if input.Kind != mcpDomain.MCPArtifactKind ||
@@ -71,7 +71,7 @@ func ServerDocumentFromDefinition(
 		)
 	}
 
-	decl, err := mcpv1.DecodeMCPJSON(input.Body)
+	decl, err := mcpv1.DecodeAdmittedMCPJSON(input.Body)
 	if err != nil {
 		return ServerDocument{}, err
 	}

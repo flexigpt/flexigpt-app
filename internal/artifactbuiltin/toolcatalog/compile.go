@@ -29,10 +29,11 @@ func Compile(
 	}
 
 	return artifactsetup.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactsetup.CompileConfig{
-		SetName:       topology.BuiltinEmbeddedPackageTools,
-		SchemaVersion: toolDomain.HydrationSchemaVersion,
-		InstallerName: toolDomain.BuiltInInstallerName,
-		Packages:      packageInputs(prepared),
+		SetName:         topology.BuiltinEmbeddedPackageTools,
+		SchemaVersion:   toolDomain.HydrationSchemaVersion,
+		InstallerName:   toolDomain.BuiltInInstallerName,
+		Interpretations: registry,
+		Packages:        packageInputs(prepared),
 	})
 }
 

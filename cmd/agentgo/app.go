@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
@@ -52,8 +52,7 @@ type App struct {
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
-	artifactStoreComposition *compose.Store
-	artifactStoreSetup       *artifactsetup.Handle
+	artifactStoreSetup *artifactsetup.Handle
 
 	dataBasePath string
 
@@ -219,9 +218,16 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
+	if artifactSetup.Store == nil || artifactSetup.LLM == nil {
+		_ = artifactSetup.Close()
+		panic(
+			"failed to initialize managers: Artifact Store setup returned an incomplete handle",
+		)
+	}
+
 	a.artifactStoreSetup = artifactSetup
-	a.artifactStoreComposition = artifactSetup.Store
 	artifactComposition := artifactSetup.Store
+
 	artifactCompositionResolver := artifactSetup.LLM.Composition()
 	artifactInterpretations := artifactSetup.LLM.Interpretations()
 	if artifactCompositionResolver == nil {
@@ -260,6 +266,18 @@ func (a *App) initManagers() {
 		)
 	}
 
+	toolBuiltinCatalog, err := ToolBuiltinCatalog()
+	if err != nil {
+		slog.Error(
+			"couldn't load generated Tool built-in catalog",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool built-in catalog initialization failed\n" +
+				err.Error(),
+		)
+	}
 	err = InitToolStoreWrapper(
 		a.toolStoreAPI,
 		artifactComposition.Sources,
@@ -269,6 +287,7 @@ func (a *App) initManagers() {
 		artifactComposition.Protection,
 		artifactComposition.Catalog,
 		artifactComposition.Definitions,
+		toolBuiltinCatalog,
 		artifactCompositionResolver,
 	)
 	if err != nil {
@@ -501,6 +520,14 @@ func (a *App) initManagers() {
 		panic("failed to initialize Workspace MCP resolver: " + err.Error())
 	}
 
+	workspaceConfig, err := workspace.DefaultWorkspaceConfig()
+	if err != nil {
+		panic(
+			"failed to initialize managers: Workspace default policy setup failed\n" +
+				err.Error(),
+		)
+	}
+
 	err = InitWorkspaceWrappers(
 		a.workspaceStoreAPI,
 		a.workspaceRuntimeAPI,
@@ -512,6 +539,7 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.TrustedNativeResources,
 		artifactCompositionResolver,
+		workspaceConfig,
 		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID rootModel.RootID) error {
 			return artifactsetup.EnsureRootBaselines(
@@ -534,7 +562,7 @@ func (a *App) initManagers() {
 
 	err = artifactsetup.EnsureBuiltInTopology(
 		context.Background(),
-		a.artifactStoreComposition.Topology,
+		artifactComposition.Topology,
 		a.toolBuiltInInstaller,
 		a.modelBuiltInInstaller,
 		a.skillBuiltInInstaller,
@@ -565,7 +593,7 @@ func (a *App) initManagers() {
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't provision user Artifact baseline Collections",
+			"couldn't provision user Artifact baseline Plugins",
 			"error",
 			err,
 		)
@@ -574,7 +602,7 @@ func (a *App) initManagers() {
 			err,
 		)
 	} else {
-		slog.Info("user Artifact baseline Collections initialized")
+		slog.Info("user Artifact baseline Plugins initialized")
 	}
 
 	workspaceConversationSource, err := workspaceConsumerAPI.NewConversationSource(
@@ -724,7 +752,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 			)
 		}
 		a.artifactStoreSetup = nil
-		a.artifactStoreComposition = nil
 	}
 
 	if a.conversationStoreAPI != nil {

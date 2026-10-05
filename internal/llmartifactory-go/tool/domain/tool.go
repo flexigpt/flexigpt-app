@@ -8,8 +8,8 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
 // Tool is internal decoded Store material. Consumer and Wails APIs expose
@@ -38,7 +38,7 @@ func DecodeTool(
 			record.ID,
 		)
 	}
-	if err := value.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
 		return Tool{}, err
 	}
 	if value.Kind != ToolArtifactKind ||
@@ -58,7 +58,7 @@ func DecodeTool(
 		)
 	}
 
-	document, err := toolv1.DecodeToolJSON(value.Body)
+	document, err := toolv1.DecodeAdmittedToolJSON(value.Body)
 	if err != nil {
 		return Tool{}, err
 	}

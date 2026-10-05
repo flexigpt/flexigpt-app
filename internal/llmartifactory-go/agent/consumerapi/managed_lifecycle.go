@@ -243,7 +243,7 @@ func (a *API) loadManagedAgent(
 	if err != nil {
 		return editableManagedAgent{}, err
 	}
-	document, err := agentv1.DecodeAgentJSON(definitionValue.Body)
+	document, err := agentv1.DecodeAdmittedAgentJSON(definitionValue.Body)
 	if err != nil {
 		return editableManagedAgent{}, err
 	}

@@ -10,7 +10,6 @@ import (
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -18,6 +17,7 @@ import (
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 func (a *API) CreateProvider(
@@ -659,13 +659,14 @@ func (a *API) ensureManagedSource(
 		)
 	}
 
-	draft := modelDomain.ManagedSourceDraft()
+	draft := modelDomain.ManagedSourceDraft(
+		sourceModel.SourceID(uuidutil.NewUUIDv7()),
+	)
 	summary, _, err := a.sources.Ensure(ctx, rootID, draft)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	if summary.ID != draft.ID ||
-		summary.StorageKey != draft.StorageKey ||
+	if summary.StorageKey != draft.StorageKey ||
 		summary.Kind != managedfs.Kind {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Root %q has an incompatible managed Model Source",
@@ -700,29 +701,50 @@ func (a *API) ensureManagedDeclarationDiscovery(
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	desired := source.MergeDiscoveryScopes(
-		summary.Discovery,
-		required,
-	)
-	if summary.Enabled && summary.Discovery.Equal(desired) {
-		return summary, nil
+	if !summary.Enabled {
+		summary, err = a.sources.Update(
+			ctx,
+			rootID,
+			summary.ID,
+			sourceModel.Update{
+				ExpectedRevision: summary.Revision,
+				DisplayName:      summary.DisplayName,
+				Enabled:          true,
+			},
+		)
+		if err != nil {
+			return sourceModel.Summary{}, err
+		}
 	}
 
-	updated, err := a.sources.Update(
+	prepared, err := a.sources.PrepareDiscovery(
 		ctx,
 		rootID,
 		summary.ID,
-		sourceModel.Update{
+		sourceModel.DiscoveryPreparation{
 			ExpectedRevision: summary.Revision,
-			DisplayName:      summary.DisplayName,
-			Enabled:          true,
-			Discovery:        &desired,
+			Intent:           sourceModel.DiscoveryPreparationAdditive,
+			Requirement: sourceModel.DiscoveryRequirement{
+				ExplicitLocators: append(
+					[]spec.Locator(nil),
+					required.ExplicitLocators...,
+				),
+				DirectoryRoots: append(
+					[]sourceModel.DirectoryRoot(nil),
+					required.DirectoryRoots...,
+				),
+				DecoderHints: append(
+					[]sourceModel.DecoderHint(nil),
+					required.DecoderHints...,
+				),
+				RequireAuthoritative: required.Authoritative,
+			},
 		},
 	)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	return updated, nil
+	return prepared, nil
 }
 
 func (a *API) currentManagedSourceGeneration(
@@ -769,12 +791,6 @@ func (a *API) managedRecord(
 		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: protected Model Artifacts cannot be mutated through managed authoring",
 			spec.ErrProtected,
-		)
-	}
-	if record.Binding.SourceID != modelDomain.ManagedSourceID {
-		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
-			"%w: Model Artifact is not owned by the managed Model Source",
-			spec.ErrUnsupported,
 		)
 	}
 

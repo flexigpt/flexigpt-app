@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
@@ -150,8 +150,10 @@ func newWorkflowHarness(
 		ctx,
 		local.Config{
 			BaseDirectory: t.TempDir(),
-			EmbeddedProviders: map[string]fs.FS{
-				defaultpolicy.ProviderKey: workspaceFS,
+			EmbeddedProviders: map[string]iofs.ProviderRegistration{
+				defaultpolicy.ProviderKey: {
+					Filesystem: workspaceFS,
+				},
 			},
 			SchemaCodecs: schemaCodecs,
 			Decoders:     decoders,

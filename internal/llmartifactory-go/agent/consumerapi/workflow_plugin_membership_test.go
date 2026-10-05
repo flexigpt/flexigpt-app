@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
-func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
+func TestWorkflow_AgentPluginMembershipRestoresAfterReimport(
 	t *testing.T,
 ) {
 	harness, primary := newManagedImportFixture(
@@ -20,7 +20,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		"restoration-primary",
 	)
 
-	secondary, err := harness.api.CreateAgentCollection(
+	secondary, err := harness.api.CreateAgentPlugin(
 		t.Context(),
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -55,7 +55,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 	requireNoError(t, err)
 
 	primaryRef := first.Plugin.Artifact.Ref()
-	secondaryWithMember, err := harness.api.AddAgentCollectionArtifactMember(
+	secondaryWithMember, err := harness.api.AddAgentPluginArtifactMember(
 		t.Context(),
 		plugin.AddArtifactMemberRequest{
 			Plugin:           secondary.Artifact.Ref(),
@@ -71,7 +71,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		)
 	}
 
-	_, err = harness.api.AddAgentCollectionArtifactMember(
+	_, err = harness.api.AddAgentPluginArtifactMember(
 		t.Context(),
 		plugin.AddArtifactMemberRequest{
 			Plugin:           secondaryWithMember.Artifact.Ref(),
@@ -82,13 +82,13 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 	requireErrorIs(t, err, spec.ErrIdentityConflict)
 
 	secondaryRef := secondaryWithMember.Artifact.Ref()
-	requireCollectionContainsAgent(
+	requirePluginContainsAgent(
 		t,
 		harness,
 		primaryRef,
 		first.Agent.Ref,
 	)
-	requireCollectionContainsAgent(
+	requirePluginContainsAgent(
 		t,
 		harness,
 		secondaryRef,
@@ -106,12 +106,12 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		),
 	)
 
-	primaryAfterDelete, err := harness.api.GetAgentCollection(
+	primaryAfterDelete, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		primaryRef,
 	)
 	requireNoError(t, err)
-	secondaryAfterDelete, err := harness.api.GetAgentCollection(
+	secondaryAfterDelete, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		secondaryRef,
 	)
@@ -122,20 +122,20 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		t.Fatal("Agent deletion unexpectedly detached Plugin memberships")
 	}
 
-	assertCollectionDoesNotContainAgent(
+	assertPluginDoesNotContainAgent(
 		t,
 		harness,
 		primaryRef,
 		first.Agent.Ref,
 	)
-	assertCollectionDoesNotContainAgent(
+	assertPluginDoesNotContainAgent(
 		t,
 		harness,
 		secondaryRef,
 		first.Agent.Ref,
 	)
-	requireCollectionPlanComplete(t, harness, primaryRef, false)
-	requireCollectionPlanComplete(t, harness, secondaryRef, false)
+	requirePluginCapabilityPlanComplete(t, harness, primaryRef, false)
+	requirePluginCapabilityPlanComplete(t, harness, secondaryRef, false)
 
 	restoredPreview := previewManagedAgentImport(
 		t,
@@ -181,26 +181,26 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		secondaryRef,
 	)
 
-	requireCollectionContainsAgent(
+	requirePluginContainsAgent(
 		t,
 		harness,
 		primaryRef,
 		restored.Agent.Ref,
 	)
-	requireCollectionContainsAgent(
+	requirePluginContainsAgent(
 		t,
 		harness,
 		secondaryRef,
 		restored.Agent.Ref,
 	)
-	requireCollectionPlanComplete(t, harness, primaryRef, true)
-	requireCollectionPlanComplete(t, harness, secondaryRef, true)
+	requirePluginCapabilityPlanComplete(t, harness, primaryRef, true)
+	requirePluginCapabilityPlanComplete(t, harness, secondaryRef, true)
 }
 
-func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
+func TestWorkflow_AgentPluginCanAddAndRemoveBuiltinReference(
 	t *testing.T,
 ) {
-	harness, collectionValue := newManagedImportFixture(
+	harness, pluginValue := newManagedImportFixture(
 		t,
 		"builtin-member-plugin",
 	)
@@ -219,11 +219,11 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 		"local-dev-workspace",
 	)
 
-	added, err := harness.api.AddAgentCollectionMember(
+	added, err := harness.api.AddAgentPluginMember(
 		t.Context(),
 		plugin.AddMemberRequest{
-			Plugin:           collectionValue.Artifact.Ref(),
-			ExpectedRevision: collectionValue.Artifact.Revision,
+			Plugin:           pluginValue.Artifact.Ref(),
+			ExpectedRevision: pluginValue.Artifact.Revision,
 			Member: plugin.MemberReference{
 				Type:  declaration.TypeAgent,
 				Name:  builtinAgent.Name,
@@ -235,19 +235,19 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 
 	// Plugin-filtered ListAgents is root-local. The member refers to a
 	// protected built-in in another Root, so assert it through resolution.
-	requireCollectionCapabilityContainsAgent(
+	requirePluginCapabilityContainsAgent(
 		t,
 		harness,
 		added.Artifact.Ref(),
 		builtinAgent.Ref,
 	)
 
-	memberIndex := requireAgentCollectionMemberIndex(
+	memberIndex := requireAgentPluginMemberIndex(
 		t,
 		added.Members,
 		builtinAgent.Name,
 	)
-	removed, err := harness.api.RemoveAgentCollectionMember(
+	removed, err := harness.api.RemoveAgentPluginMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
 			Plugin:           added.Artifact.Ref(),
@@ -266,7 +266,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 
 	requireNoError(
 		t,
-		harness.api.DeleteAgentCollection(
+		harness.api.DeleteAgentPlugin(
 			t.Context(),
 			removed.Artifact.Ref(),
 			removed.Artifact.Revision,
@@ -274,10 +274,10 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 	)
 }
 
-func requireCollectionContainsAgent(
+func requirePluginContainsAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
@@ -286,30 +286,30 @@ func requireCollectionContainsAgent(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
 			RootID: topology.UserRootID(),
-			Plugin: &collectionRef,
+			Plugin: &pluginRef,
 		},
 	)
 	requireNoError(t, err)
 	if !containsAgent(agents, agentRef) {
 		t.Fatalf(
 			"Plugin %q does not contain Agent %q",
-			collectionRef,
+			pluginRef,
 			agentRef,
 		)
 	}
 }
 
-func requireCollectionCapabilityContainsAgent(
+func requirePluginCapabilityContainsAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 
-	plan, err := harness.api.ListAgentCollectionMembers(
+	plan, err := harness.api.ResolveAgentPluginCapabilities(
 		t.Context(),
-		collectionRef,
+		pluginRef,
 	)
 	requireNoError(t, err)
 
@@ -326,16 +326,16 @@ func requireCollectionCapabilityContainsAgent(
 
 	t.Fatalf(
 		"Plugin %q capability plan does not resolve Agent %q: %#v",
-		collectionRef,
+		pluginRef,
 		agentRef,
 		plan.Occurrences,
 	)
 }
 
-func assertCollectionDoesNotContainAgent(
+func assertPluginDoesNotContainAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
@@ -344,36 +344,36 @@ func assertCollectionDoesNotContainAgent(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
 			RootID: topology.UserRootID(),
-			Plugin: &collectionRef,
+			Plugin: &pluginRef,
 		},
 	)
 	requireNoError(t, err)
 	if containsAgent(agents, agentRef) {
 		t.Fatalf(
 			"Plugin %q unexpectedly contains Agent %q",
-			collectionRef,
+			pluginRef,
 			agentRef,
 		)
 	}
 }
 
-func requireCollectionPlanComplete(
+func requirePluginCapabilityPlanComplete(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	expected bool,
 ) {
 	t.Helper()
 
-	plan, err := harness.api.ListAgentCollectionMembers(
+	plan, err := harness.api.ResolveAgentPluginCapabilities(
 		t.Context(),
-		collectionRef,
+		pluginRef,
 	)
 	requireNoError(t, err)
 	if plan.Complete != expected {
 		t.Fatalf(
 			"Plugin %q capability completeness = %t, want %t: %#v",
-			collectionRef,
+			pluginRef,
 			plan.Complete,
 			expected,
 			plan.Occurrences,
@@ -384,18 +384,18 @@ func requireCollectionPlanComplete(
 func requireRestoredMembership(
 	t *testing.T,
 	values []agentConsumerAPI.AgentRestoredMembership,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 
 	for _, value := range values {
-		if value.Plugin == collectionRef {
+		if value.Plugin == pluginRef {
 			return
 		}
 	}
 	t.Fatalf(
 		"restored memberships %#v do not contain Plugin %q",
 		values,
-		collectionRef,
+		pluginRef,
 	)
 }

@@ -8,14 +8,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
+	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
 func BodyFromDefinition(
 	input definitionModel.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
-	if err := input.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(input); err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
 	if input.Kind != mcpDomain.MCPPolicyArtifactKind ||
@@ -27,7 +27,7 @@ func BodyFromDefinition(
 		)
 	}
 
-	document, err := mcppolicyv1.DecodeMCPPolicyJSON(input.Body)
+	document, err := mcppolicyv1.DecodeAdmittedMCPPolicyJSON(input.Body)
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}

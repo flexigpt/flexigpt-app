@@ -26,6 +26,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	expected, err := modelcatalog.Compile(
 		t.Context(),
 		t.TempDir(),
+		registry,
 		prepared,
 	)
 	if err != nil {
@@ -46,6 +47,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	recompiled, err := modelcatalog.Compile(
 		t.Context(),
 		t.TempDir(),
+		registry,
 		reprepared,
 	)
 	if err != nil {

@@ -17,6 +17,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeAgentEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedAgentEntry(entry)
+			return err
+		},
 		Relationships: agentRelationships,
 	}
 }
@@ -24,7 +28,7 @@ func Interpretation() interpretation.Registration {
 func agentRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeAgentEntry(entry)
+	document, err := DecodeAdmittedAgentEntry(entry)
 	if err != nil {
 		return nil, err
 	}

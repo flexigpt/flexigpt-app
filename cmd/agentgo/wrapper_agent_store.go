@@ -212,13 +212,13 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 	)
 }
 
-func (w *AgentStoreWrapper) CreateAgentCollection(
+func (w *AgentStoreWrapper) CreateAgentPlugin(
 	request plugin.CreateRequest,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
-			return api.CreateAgentCollection(
+			return api.CreateAgentPlugin(
 				context.Background(),
 				request,
 			)
@@ -226,13 +226,13 @@ func (w *AgentStoreWrapper) CreateAgentCollection(
 	)
 }
 
-func (w *AgentStoreWrapper) GetAgentCollection(
+func (w *AgentStoreWrapper) GetAgentPlugin(
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
-			return api.GetAgentCollection(context.Background(), ref)
+			return api.GetAgentPlugin(context.Background(), ref)
 		},
 	)
 }
@@ -248,13 +248,30 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 	)
 }
 
-func (w *AgentStoreWrapper) ListAgentCollectionMembers(
+func (w *AgentStoreWrapper) ListAgentPluginMembers(
+	ref artifactModel.ArtifactRef,
+) (plugin.DirectMembership, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (plugin.DirectMembership, error) {
+			return api.ListAgentPluginMembers(
+				context.Background(),
+				ref,
+			)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) ResolveAgentPluginCapabilities(
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.PluginCapabilityPlan, error) {
-			return api.ListAgentCollectionMembers(
+		func(api *agentConsumerAPI.API) (
+			plugin.PluginCapabilityPlan,
+			error,
+		) {
+			return api.ResolveAgentPluginCapabilities(
 				context.Background(),
 				ref,
 			)
@@ -273,7 +290,7 @@ func (w *AgentStoreWrapper) UpdateAgentCollection(
 	)
 }
 
-func (w *AgentStoreWrapper) AddAgentCollectionMember(
+func (w *AgentStoreWrapper) AddAgentPluginMember(
 	request plugin.AddMemberRequest,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
@@ -282,7 +299,7 @@ func (w *AgentStoreWrapper) AddAgentCollectionMember(
 			plugin.PluginView,
 			error,
 		) {
-			return api.AddAgentCollectionMember(
+			return api.AddAgentPluginMember(
 				context.Background(),
 				request,
 			)
@@ -290,7 +307,7 @@ func (w *AgentStoreWrapper) AddAgentCollectionMember(
 	)
 }
 
-func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
+func (w *AgentStoreWrapper) AddAgentPluginArtifactMember(
 	request plugin.AddArtifactMemberRequest,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
@@ -299,7 +316,7 @@ func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
 			plugin.PluginView,
 			error,
 		) {
-			return api.AddAgentCollectionArtifactMember(
+			return api.AddAgentPluginArtifactMember(
 				context.Background(),
 				request,
 			)
@@ -307,7 +324,7 @@ func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
 	)
 }
 
-func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
+func (w *AgentStoreWrapper) RemoveAgentPluginMember(
 	request plugin.RemoveMemberRequest,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
@@ -316,7 +333,7 @@ func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
 			plugin.PluginView,
 			error,
 		) {
-			return api.RemoveAgentCollectionMember(
+			return api.RemoveAgentPluginMember(
 				context.Background(),
 				request,
 			)
@@ -342,7 +359,7 @@ func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 	)
 }
 
-func (w *AgentStoreWrapper) DeleteAgentCollection(
+func (w *AgentStoreWrapper) DeleteAgentPlugin(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
@@ -350,7 +367,7 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 		if w == nil || w.api == nil {
 			return spec.ErrClosed
 		}
-		return w.api.DeleteAgentCollection(
+		return w.api.DeleteAgentPlugin(
 			context.Background(),
 			ref,
 			expectedRevision,

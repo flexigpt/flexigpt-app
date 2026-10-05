@@ -59,6 +59,32 @@ func DecodeWorkspaceEntry(
 	return value, nil
 }
 
+func DecodeAdmittedWorkspaceJSON(
+	raw []byte,
+) (WorkspaceDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return WorkspaceDocument{}, err
+	}
+	return DecodeAdmittedWorkspaceEntry(entry)
+}
+
+func DecodeAdmittedWorkspaceEntry(
+	entry declaration.Entry,
+) (WorkspaceDocument, error) {
+	var value WorkspaceDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return WorkspaceDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return WorkspaceDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeWorkspace(
 	raw []byte,
 ) (WorkspaceDocument, error) {

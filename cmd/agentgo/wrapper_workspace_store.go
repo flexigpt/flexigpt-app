@@ -34,6 +34,7 @@ func InitWorkspaceWrappers(
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	resolver *composition.Resolver,
+	workspaceConfig workspaceConsumerAPI.Config,
 	mcpServers mcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {
@@ -45,9 +46,8 @@ func InitWorkspaceWrappers(
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
-	config := workspaceConsumerAPI.DefaultConfig()
-	config.Composition = resolver
-	config.MCPServers = mcpServers
+	workspaceConfig.Composition = resolver
+	workspaceConfig.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,
 		discovery,
@@ -56,7 +56,7 @@ func InitWorkspaceWrappers(
 		nativeResources,
 		roots,
 		cat,
-		config,
+		workspaceConfig,
 	)
 	if err != nil {
 		return err

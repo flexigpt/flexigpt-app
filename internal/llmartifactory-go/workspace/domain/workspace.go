@@ -7,7 +7,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
+	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 )
 
 const WorkspaceArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
@@ -54,7 +54,7 @@ func NewWorkspace(
 	if err := record.Validate(); err != nil {
 		return Workspace{}, err
 	}
-	if err := value.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
 		return Workspace{}, err
 	}
 	if record.Kind != WorkspaceArtifactKind {
@@ -81,7 +81,7 @@ func NewWorkspace(
 		)
 	}
 
-	document, err := workspacev1.DecodeWorkspaceJSON(value.Body)
+	document, err := workspacev1.DecodeAdmittedWorkspaceJSON(value.Body)
 	if err != nil {
 		return Workspace{}, fmt.Errorf(
 			"%w: decode Workspace Definition: %w",

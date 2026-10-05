@@ -4,22 +4,19 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
 type ToolStoreWrapper struct {
@@ -35,6 +32,7 @@ func InitToolStoreWrapper(
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
+	builtin toolDomain.BuiltinCatalog,
 	resolver *composition.Resolver,
 ) error {
 	if wrapper == nil {
@@ -49,7 +47,7 @@ func InitToolStoreWrapper(
 		protection,
 		cat,
 		definitions,
-		topology.BuiltinRootID(),
+		builtin,
 		resolver,
 	)
 	if err != nil {
@@ -57,18 +55,6 @@ func InitToolStoreWrapper(
 	}
 	wrapper.api = api
 	return nil
-}
-
-func NewToolBuiltInInstaller(
-	hydrator installModel.CompiledHydrationCoordinator,
-) (installFlow.HydrationInstaller, error) {
-	if hydrator == nil {
-		return nil, errors.New("tool generated catalog installer hydrator is required")
-	}
-
-	return toolcatalog.NewInstaller(toolcatalog.InstallerDependencies{
-		Hydrator: hydrator,
-	})
 }
 
 func withToolStore[T any](

@@ -298,7 +298,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 	)
 	requireErrorIs(t, err, spec.ErrProtected)
 
-	_, err = harness.api.CreateAgentCollection(
+	_, err = harness.api.CreateAgentPlugin(
 		t.Context(),
 		plugin.CreateRequest{
 			RootID:      topology.BuiltinRootID(),
@@ -329,7 +329,7 @@ func newManagedImportFixture(
 	)
 	requireNoError(t, err)
 
-	value, err := harness.api.CreateAgentCollection(
+	value, err := harness.api.CreateAgentPlugin(
 		t.Context(),
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),

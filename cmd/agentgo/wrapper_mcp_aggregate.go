@@ -51,12 +51,13 @@ func (w *MCPAggregateWrapper) GetMCPServer(
 	)
 }
 
-func (w *MCPAggregateWrapper) ListMCPCollectionServers(
+func (w *MCPAggregateWrapper) ListMCPPluginServers(
 	ref artifactModel.ArtifactRef,
 ) ([]mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
 		w,
 		func(service *mcpAggregate.Service) ([]mcpAggregate.MCPServerDetails, error) {
+			// The outer runtime aggregate remains the execution owner.
 			return service.ListMCPCollectionServers(context.Background(), ref)
 		},
 	)

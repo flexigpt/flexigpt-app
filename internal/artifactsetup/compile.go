@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 // CompileConfig selects one application-owned built-in package set. All
@@ -23,6 +24,8 @@ type CompileConfig struct {
 	SetName       string
 	SchemaVersion string
 	InstallerName string
+
+	Interpretations *interpretation.Registry
 
 	AdditionalSchemaCodecs []schema.Codec
 	AdditionalDecoders     []ingest.Decoder
@@ -51,11 +54,13 @@ func CompileBuiltInPackageSet(
 			spec.ErrInvalid,
 		)
 	}
-
-	interpretations, err := registration.NewLLMInterpretationRegistry()
-	if err != nil {
-		return installModel.CompiledPackageSet{}, err
+	if config.Interpretations == nil {
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
+			"%w: built-in compilation interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
+
 	codecs, err := registration.LLMDeclarationSchemaCodecs()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
@@ -76,7 +81,7 @@ func CompileBuiltInPackageSet(
 	// selection. Reusing that runtime set here would make unrelated decoder
 	// registrations alter compiled package fingerprints.
 	canonicalDecoders, err := registration.LLMCanonicalDeclarationDecoders(
-		interpretations,
+		config.Interpretations,
 	)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err

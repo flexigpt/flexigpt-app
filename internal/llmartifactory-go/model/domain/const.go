@@ -9,8 +9,8 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 const (
@@ -26,11 +26,6 @@ const (
 
 	BuiltInInitialEnabledLabel = "model.initialEnabled"
 
-	// ManagedSourceID is Root-local. The same stable source ID is used in
-	// every mutable Root because Artifact Store source identity is scoped by
-	// RootID and SourceID together.
-	ManagedSourceID sourceModel.SourceID = "0192c4c0-0002-7000-8000-000000000001"
-
 	ManagedSourceStorageKey spec.StorageKey = "model-artifacts"
 
 	BuiltInInstallerName   = "model"
@@ -41,11 +36,13 @@ const (
 // Store in one mutable Root. Packages remain independent even though their
 // source storage shares one Source.
 //
-// Discovery starts empty. The consumer API adds one exact declaration locator
-// and decoder hint before each managed publication.
-func ManagedSourceDraft() sourceModel.Draft {
+// "candidateID" is used only when Source.Ensure creates a Root-local Source.
+// Existing Roots reuse the Source returned by storage-key lookup.
+func ManagedSourceDraft(
+	candidateID sourceModel.SourceID,
+) sourceModel.Draft {
 	return sourceModel.Draft{
-		ID:          ManagedSourceID,
+		ID:          candidateID,
 		StorageKey:  ManagedSourceStorageKey,
 		Kind:        managedfs.Kind,
 		DisplayName: "Managed Model Artifacts",

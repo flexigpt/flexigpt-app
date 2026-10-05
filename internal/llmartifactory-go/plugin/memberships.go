@@ -69,6 +69,14 @@ func (a *API) ListMembershipsForArtifact(
 	}
 	output := make([]ArtifactMembershipView, 0)
 	for _, collectionValue := range plugins {
+		_, document, err := a.readCollectionDocument(
+			ctx,
+			collectionValue.Ref,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		plugin, err := a.resolver.ResolvePluginMembers(
 			ctx,
 			collectionValue.Ref,
@@ -84,7 +92,7 @@ func (a *API) ListMembershipsForArtifact(
 			)
 		}
 
-		for index, relationship := range plugin.Relationships {
+		for _, relationship := range plugin.Relationships {
 			header := relationship.Declared.Header()
 			if header.Type != targetType ||
 				header.Name != string(target.LogicalName) {
@@ -103,12 +111,19 @@ func (a *API) ListMembershipsForArtifact(
 			if err != nil {
 				return nil, err
 			}
+			memberIndex, err := normalizedMemberIndexForEntry(
+				document.Members,
+				relationship.Declared,
+			)
+			if err != nil {
+				return nil, err
+			}
 
 			view := ArtifactMembershipView{
 				Plugin:             collectionValue.Ref,
 				CollectionName:     collectionValue.Name,
 				CollectionRevision: collectionValue.Revision,
-				MemberIndex:        index,
+				MemberIndex:        memberIndex,
 				Member:             member,
 				Status:             relationship.Status,
 			}

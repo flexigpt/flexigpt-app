@@ -86,6 +86,32 @@ func DecodeModelProviderEntry(
 	return value, nil
 }
 
+func DecodeAdmittedModelProviderJSON(
+	raw []byte,
+) (ProviderDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return ProviderDocument{}, err
+	}
+	return DecodeAdmittedModelProviderEntry(entry)
+}
+
+func DecodeAdmittedModelProviderEntry(
+	entry declaration.Entry,
+) (ProviderDocument, error) {
+	var value ProviderDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return ProviderDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return ProviderDocument{}, err
+	}
+	return value, nil
+}
+
 func DefinitionForDocument(
 	document ProviderDocument,
 ) (definitionModel.Definition, error) {

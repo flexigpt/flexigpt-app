@@ -15,6 +15,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeLoopEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedLoopEntry(entry)
+			return err
+		},
 		Relationships: loopRelationships,
 	}
 }
@@ -22,7 +26,7 @@ func Interpretation() interpretation.Registration {
 func loopRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeLoopEntry(entry)
+	document, err := DecodeAdmittedLoopEntry(entry)
 	if err != nil {
 		return nil, err
 	}

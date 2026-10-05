@@ -41,6 +41,13 @@ type API interface {
 	ExpectedCanonicalizer
 }
 
+// KeyReader is an optional setup-time inspection capability. It permits an
+// upper domain aggregate to verify that its selected registrations match the
+// already assembled generic Store without exposing a provider implementation.
+type KeyReader interface {
+	Keys() []schemaModel.Key
+}
+
 // Catalog is setup-time schema access supplied to decoder registrations.
 type Catalog interface {
 	ExpectedCanonicalizer

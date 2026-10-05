@@ -16,6 +16,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeMCPEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedMCPEntry(entry)
+			return err
+		},
 		Relationships: mcpRelationships,
 	}
 }
@@ -23,7 +27,7 @@ func Interpretation() interpretation.Registration {
 func mcpRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeMCPEntry(entry)
+	document, err := DecodeAdmittedMCPEntry(entry)
 	if err != nil {
 		return nil, err
 	}

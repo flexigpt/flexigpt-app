@@ -159,6 +159,32 @@ func DecodeMCPEntry(
 	return value, nil
 }
 
+func DecodeAdmittedMCPJSON(
+	raw []byte,
+) (MCPDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return MCPDocument{}, err
+	}
+	return DecodeAdmittedMCPEntry(entry)
+}
+
+func DecodeAdmittedMCPEntry(
+	entry declaration.Entry,
+) (MCPDocument, error) {
+	var value MCPDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return MCPDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return MCPDocument{}, err
+	}
+	return value, nil
+}
+
 // DefinitionForDeclaration projects a named canonical MCP declaration without
 // translating it through a consumer runtime representation. In particular it
 // preserves locator, server, include, metadata, and transport data in Body.

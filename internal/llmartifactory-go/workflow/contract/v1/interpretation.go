@@ -17,6 +17,10 @@ func Interpretation() interpretation.Registration {
 			_, err := DecodeWorkflowEntry(entry)
 			return err
 		},
+		ValidateAdmittedEntry: func(entry declaration.Entry) error {
+			_, err := DecodeAdmittedWorkflowEntry(entry)
+			return err
+		},
 		Relationships: workflowRelationships,
 	}
 }
@@ -24,7 +28,7 @@ func Interpretation() interpretation.Registration {
 func workflowRelationships(
 	entry declaration.Entry,
 ) ([]interpretation.Relationship, error) {
-	document, err := DecodeWorkflowEntry(entry)
+	document, err := DecodeAdmittedWorkflowEntry(entry)
 	if err != nil {
 		return nil, err
 	}

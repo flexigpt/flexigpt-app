@@ -147,7 +147,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 		t.Fatalf("Agent baseline Plugin is not recognized as managed")
 	}
 
-	created, err := harness.api.CreateAgentCollection(
+	created, err := harness.api.CreateAgentPlugin(
 		t.Context(),
 		plugin.CreateRequest{
 			Name:        "workflow-plugin",
@@ -185,7 +185,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 
-	readCollection, err := harness.api.GetAgentCollection(
+	readCollection, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		updated.Artifact.Ref(),
 	)
@@ -483,7 +483,7 @@ members:
 		t.Fatalf("deleted Agent remains in Plugin Agent list")
 	}
 
-	currentCollection, err := harness.api.GetAgentCollection(
+	currentCollection, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		collectionRef,
 	)
@@ -494,7 +494,7 @@ members:
 		)
 	}
 
-	staleMemberships, err := harness.api.ListAgentCollectionMembers(
+	staleMemberships, err := harness.api.ListAgentPluginMembers(
 		t.Context(),
 		collectionRef,
 	)
@@ -505,19 +505,19 @@ members:
 		)
 	}
 
-	err = harness.api.DeleteAgentCollection(
+	err = harness.api.DeleteAgentPlugin(
 		t.Context(),
 		collectionRef,
 		currentCollection.Artifact.Revision,
 	)
 	requireErrorIs(t, err, spec.ErrConflict)
 
-	memberIndex := requireAgentCollectionMemberIndex(
+	memberIndex := requireAgentPluginMemberIndex(
 		t,
 		currentCollection.Members,
 		spec.LogicalName("workflow-agent"),
 	)
-	detachedCollection, err := harness.api.RemoveAgentCollectionMember(
+	detachedCollection, err := harness.api.RemoveAgentPluginMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
 			Plugin:           collectionRef,
@@ -533,7 +533,7 @@ members:
 		)
 	}
 
-	currentMemberships, err := harness.api.ListAgentCollectionMembers(
+	currentMemberships, err := harness.api.ListAgentPluginMembers(
 		t.Context(),
 		detachedCollection.Artifact.Ref(),
 	)
@@ -541,13 +541,13 @@ members:
 	if !currentMemberships.Complete {
 		t.Fatalf(
 			"empty Plugin capability plan is incomplete: %#v",
-			currentMemberships.Occurrences,
+			currentMemberships,
 		)
 	}
 
 	requireNoError(
 		t,
-		harness.api.DeleteAgentCollection(
+		harness.api.DeleteAgentPlugin(
 			t.Context(),
 			detachedCollection.Artifact.Ref(),
 			detachedCollection.Artifact.Revision,
@@ -640,7 +640,7 @@ func requireAvailableCapability(
 	return artifactModel.ArtifactRef{}
 }
 
-func requireAgentCollectionMemberIndex(
+func requireAgentPluginMemberIndex(
 	t *testing.T,
 	values []plugin.MemberReference,
 	name spec.LogicalName,

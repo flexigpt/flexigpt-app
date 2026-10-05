@@ -5,37 +5,37 @@ import (
 	"net/url"
 	"path"
 
-	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
 type workspaceRefreshCoordinator struct {
 	sources          source.API
-	discovery        refreshFlow.API
 	workspaceSources workspaceSourceRegistry
 }
 
 func newWorkspaceRefreshCoordinator(
 	sources source.API,
-	discovery refreshFlow.API,
 	workspaceSources workspaceSourceRegistry,
 ) *workspaceRefreshCoordinator {
 	return &workspaceRefreshCoordinator{
 		sources:          sources,
-		discovery:        discovery,
 		workspaceSources: workspaceSources,
 	}
 }
 
-func (c *workspaceRefreshCoordinator) PrepareSelectorDiscovery(
+func (c *workspaceRefreshCoordinator) RequirementsForSelector(
 	ctx context.Context,
-	request composition.SelectorRefreshRequest,
-) ([]composition.RefreshDirective, error) {
+	request composition.SelectorDiscoveryRequest,
+) ([]corerefresh.Requirement, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
 	current, err := c.sources.Get(
 		ctx,
 		request.Parent.RootID,
@@ -57,7 +57,6 @@ func (c *workspaceRefreshCoordinator) PrepareSelectorDiscovery(
 		return nil, err
 	}
 
-	next := current.Discovery.Clone()
 	include := append([]string(nil), request.Selector.Include...)
 	if len(include) == 0 {
 		defaultInclude, err := topology.DiscoveryIncludePatternsForUse(
@@ -68,22 +67,28 @@ func (c *workspaceRefreshCoordinator) PrepareSelectorDiscovery(
 		}
 		include = defaultInclude
 	}
-	next.DirectoryRoots = source.AppendDirectoryRoot(
-		next.DirectoryRoots,
-		sourceModel.DirectoryRoot{
-			Root:            base,
-			Recursive:       true,
-			IncludePatterns: include,
-			ExcludePatterns: append([]string(nil), request.Selector.Exclude...),
+	return []corerefresh.Requirement{{
+		RootID:   current.RootID,
+		SourceID: current.ID,
+		Discovery: sourceModel.DiscoveryRequirement{
+			DirectoryRoots: []sourceModel.DirectoryRoot{{
+				Root:            base,
+				Recursive:       true,
+				IncludePatterns: include,
+				ExcludePatterns: append([]string(nil), request.Selector.Exclude...),
+			}},
+			RequireAuthoritative: true,
 		},
-	)
-	return c.updateDiscoveryForRefresh(ctx, current, next)
+	}}, nil
 }
 
-func (c *workspaceRefreshCoordinator) PrepareLocatedMemberDiscovery(
+func (c *workspaceRefreshCoordinator) RequirementsForLocatedMember(
 	ctx context.Context,
-	request composition.LocatedMemberRefreshRequest,
-) ([]composition.RefreshDirective, error) {
+	request composition.LocatedMemberDiscoveryRequest,
+) ([]corerefresh.Requirement, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
 	header := request.Member.Header()
 	if header.Locator == nil {
 		return nil, nil
@@ -115,74 +120,29 @@ func (c *workspaceRefreshCoordinator) PrepareLocatedMemberDiscovery(
 		return nil, err
 	}
 
-	next := current.Discovery.Clone()
+	requirement := sourceModel.DiscoveryRequirement{
+		RequireAuthoritative: true,
+	}
 	candidates := locatedRefreshCandidates(header.Type, target)
 	for _, candidate := range candidates {
-		inScope, err := next.InScope(candidate)
+		inScope, err := current.Discovery.InScope(candidate)
 		if err != nil {
 			return nil, err
 		}
 		if !inScope {
-			next.ExplicitLocators = source.AppendUniqueLocator(
-				next.ExplicitLocators,
+			requirement.ExplicitLocators = append(
+				requirement.ExplicitLocators,
 				candidate,
 			)
 		}
 	}
-	return c.updateDiscoveryForRefresh(ctx, current, next)
-}
-
-func (c *workspaceRefreshCoordinator) RefreshSource(
-	ctx context.Context,
-	target composition.RefreshTarget,
-) error {
-	if c == nil || c.discovery == nil {
-		return spec.ErrClosed
+	if len(requirement.ExplicitLocators) == 0 {
+		return nil, nil
 	}
-	_, err := c.discovery.RefreshSource(
-		ctx,
-		target.RootID,
-		target.SourceID,
-	)
-	return err
-}
-
-func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
-	ctx context.Context,
-	current sourceModel.Summary,
-	next sourceModel.DiscoverySpec,
-) ([]composition.RefreshDirective, error) {
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
-		return nil, err
-	}
-
-	target := composition.RefreshTarget{
-		RootID:   current.RootID,
-		SourceID: current.ID,
-	}
-	if current.Discovery.Equal(next) {
-		return []composition.RefreshDirective{{
-			Target: target,
-		}}, nil
-	}
-
-	if _, err := c.sources.Update(
-		ctx,
-		current.RootID,
-		current.ID,
-		sourceModel.Update{
-			ExpectedRevision: current.Revision,
-			DisplayName:      current.DisplayName,
-			Enabled:          current.Enabled,
-			Discovery:        &next,
-		},
-	); err != nil {
-		return nil, err
-	}
-	return []composition.RefreshDirective{{
-		Target:  target,
-		Changed: true,
+	return []corerefresh.Requirement{{
+		RootID:    current.RootID,
+		SourceID:  current.ID,
+		Discovery: requirement,
 	}}, nil
 }
 

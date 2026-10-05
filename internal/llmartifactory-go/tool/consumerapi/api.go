@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -17,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
@@ -33,9 +30,9 @@ type API struct {
 	cat              catalog.API
 	definitions      definition.API
 
-	builtinRoot      rootModel.RootID
-	builtinSource    sourceModel.SourceID
-	collectionByTool map[spec.LogicalName]spec.LogicalName
+	builtinRoot   rootModel.RootID
+	builtinSource sourceModel.SourceID
+	pluginByTool  map[spec.LogicalName]spec.LogicalName
 }
 
 func New(
@@ -46,7 +43,7 @@ func New(
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
-	builtinRoot rootModel.RootID,
+	builtin toolDomain.BuiltinCatalog,
 	resolver *composition.Resolver,
 ) (*API, error) {
 	if sources == nil ||
@@ -62,33 +59,17 @@ func New(
 	if resolver == nil {
 		return nil, fmt.Errorf("%w: Tool composition resolver is nil", spec.ErrInvalid)
 	}
-	if err := builtinRoot.Validate(); err != nil {
+	if err := builtin.Validate(); err != nil {
 		return nil, err
 	}
-	if builtinRoot != topology.BuiltinRootID() ||
-		!protection.IsProtectedRoot(builtinRoot) {
+	if !protection.IsProtectedRoot(builtin.RootID) {
 		return nil, fmt.Errorf(
-			"%w: Tool Store requires the protected built-in Root",
+			"%w: Tool Store built-in Root must be protected",
 			spec.ErrInvalid,
 		)
 	}
 
-	builtinSource, err := topology.BuiltinSource(
-		topology.BuiltinSourceRolePackages,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if builtinSource.Kind != managedfs.Kind {
-		return nil, fmt.Errorf(
-			"%w: built-in Tool Source must be managed",
-			spec.ErrInvalid,
-		)
-	}
-	collectionByTool, err := toolcatalog.GeneratedToolCollectionIndex()
-	if err != nil {
-		return nil, err
-	}
+	ownedBuiltin := builtin.Clone()
 
 	plugins, err := plugin.New(
 		artifacts,
@@ -111,9 +92,9 @@ func New(
 		plugins:          plugins,
 		discovery:        discovery,
 		resolver:         resolver,
-		builtinRoot:      builtinRoot,
-		builtinSource:    builtinSource.ID,
-		collectionByTool: collectionByTool,
+		builtinRoot:      ownedBuiltin.RootID,
+		builtinSource:    ownedBuiltin.SourceID,
+		pluginByTool:     ownedBuiltin.PluginByTool,
 		cat:              cat,
 		definitions:      definitions,
 	}, nil

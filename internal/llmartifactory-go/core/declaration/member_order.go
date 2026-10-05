@@ -106,12 +106,15 @@ func normalizeMemberStringSet(
 	return nil
 }
 
-func SortedMembers(
+// SortedMemberIndexes returns source indexes in the canonical member order.
+// Plugin display, mutation, reverse-membership reporting, and removal all use
+// this same ordering contract.
+func SortedMemberIndexes(
 	label string,
 	values []Entry,
-) ([]Entry, error) {
+) ([]int, error) {
 	type sortable struct {
-		entry    Entry
+		index    int
 		identity []byte
 		raw      []byte
 	}
@@ -123,7 +126,7 @@ func SortedMembers(
 			return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
 		ordered = append(ordered, sortable{
-			entry:    value.Clone(),
+			index:    index,
 			identity: identity,
 			raw:      raw,
 		})
@@ -139,9 +142,24 @@ func SortedMembers(
 		return bytes.Compare(ordered[left].raw, ordered[right].raw) < 0
 	})
 
-	output := make([]Entry, len(ordered))
+	output := make([]int, len(ordered))
 	for index, value := range ordered {
-		output[index] = value.entry.Clone()
+		output[index] = value.index
+	}
+	return output, nil
+}
+
+func SortedMembers(
+	label string,
+	values []Entry,
+) ([]Entry, error) {
+	indexes, err := SortedMemberIndexes(label, values)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]Entry, len(indexes))
+	for index, sourceIndex := range indexes {
+		output[index] = values[sourceIndex].Clone()
 	}
 	return output, nil
 }

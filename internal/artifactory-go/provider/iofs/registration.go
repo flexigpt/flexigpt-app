@@ -31,6 +31,35 @@ type immutableProvider struct {
 	contentDigest cryptoutil.Digest
 }
 
+// ContentDigest returns the bounded immutable-content evidence for one fs.FS.
+// Application setup uses this when it explicitly registers application-owned
+// embedded content as immutable for one Adapter lifetime.
+func ContentDigest(
+	ctx context.Context,
+	provider fs.FS,
+) (cryptoutil.Digest, error) {
+	if ctx == nil {
+		return "", fmt.Errorf(
+			"%w: embedded content digest context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if provider == nil {
+		return "", fmt.Errorf(
+			"%w: embedded content filesystem is nil",
+			spec.ErrInvalid,
+		)
+	}
+	value, err := fingerprint(ctx, provider)
+	if err != nil {
+		return "", err
+	}
+	return cryptoutil.Digest(value), nil
+}
+
 func NewWithRegistrations(
 	ctx context.Context,
 	registrations map[string]ProviderRegistration,
@@ -81,11 +110,11 @@ func NewWithRegistrations(
 			return nil, err
 		}
 
-		observed, err := fingerprint(ctx, registration.Filesystem)
+		observed, err := ContentDigest(ctx, registration.Filesystem)
 		if err != nil {
 			return nil, err
 		}
-		if cryptoutil.Digest(observed) != registration.Immutable.ContentDigest {
+		if observed != registration.Immutable.ContentDigest {
 			return nil, fmt.Errorf(
 				"%w: immutable embedded provider %q content evidence differs",
 				spec.ErrDigestMismatch,

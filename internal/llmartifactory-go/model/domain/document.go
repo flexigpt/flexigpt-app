@@ -6,8 +6,8 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 // Provider is immutable decoded source material for one model.provider
@@ -46,7 +46,7 @@ func DecodeProvider(
 			record.ID,
 		)
 	}
-	if err := value.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
 		return Provider{}, err
 	}
 	if value.Kind != ModelProviderArtifactKind ||
@@ -66,7 +66,7 @@ func DecodeProvider(
 		)
 	}
 
-	document, err := modelproviderv1.DecodeModelProviderJSON(value.Body)
+	document, err := modelproviderv1.DecodeAdmittedModelProviderJSON(value.Body)
 	if err != nil {
 		return Provider{}, err
 	}
@@ -102,7 +102,7 @@ func DecodeModel(
 			record.ID,
 		)
 	}
-	if err := value.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
 		return Model{}, err
 	}
 	if value.Kind != ModelArtifactKind ||
@@ -122,7 +122,7 @@ func DecodeModel(
 		)
 	}
 
-	document, err := modelv1.DecodeModelJSON(value.Body)
+	document, err := modelv1.DecodeAdmittedModelJSON(value.Body)
 	if err != nil {
 		return Model{}, err
 	}

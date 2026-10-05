@@ -62,6 +62,32 @@ func DecodeTeamEntry(
 	return value, nil
 }
 
+func DecodeAdmittedTeamJSON(
+	raw []byte,
+) (TeamDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return TeamDocument{}, err
+	}
+	return DecodeAdmittedTeamEntry(entry)
+}
+
+func DecodeAdmittedTeamEntry(
+	entry declaration.Entry,
+) (TeamDocument, error) {
+	var value TeamDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return TeamDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return TeamDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeTeam(
 	raw []byte,
 ) (TeamDocument, error) {

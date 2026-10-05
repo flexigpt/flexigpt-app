@@ -48,6 +48,14 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 	if err := config.Scope.Validate(); err != nil {
 		return nil, err
 	}
+	if err := validateRegistrationSelection(
+		config.Store,
+		codecs,
+		decoders,
+		config.Interpretations,
+	); err != nil {
+		return nil, err
+	}
 
 	locatorRuntime := catalogLocatorRuntime{catalog: config.Store.Catalog}
 	locators, err := locator.NewRegistry(config.LocatorFactories...)

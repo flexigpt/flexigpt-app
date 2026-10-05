@@ -62,6 +62,32 @@ func DecodeLoopEntry(
 	return value, nil
 }
 
+func DecodeAdmittedLoopJSON(
+	raw []byte,
+) (LoopDocument, error) {
+	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+	if err != nil {
+		return LoopDocument{}, err
+	}
+	return DecodeAdmittedLoopEntry(entry)
+}
+
+func DecodeAdmittedLoopEntry(
+	entry declaration.Entry,
+) (LoopDocument, error) {
+	var value LoopDocument
+	if err := declaration.DecodeAdmittedEntryInto(
+		entry,
+		&value,
+	); err != nil {
+		return LoopDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return LoopDocument{}, err
+	}
+	return value, nil
+}
+
 func decodeLoop(
 	raw []byte,
 ) (LoopDocument, error) {
