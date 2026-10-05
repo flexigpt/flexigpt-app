@@ -3,13 +3,13 @@ package aggregate
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
 )
 
 const (
@@ -53,7 +53,7 @@ func (t TargetV1) Validate() error {
 
 func NewMappedTarget(
 	value modelConsumerAPI.ResolvedModel,
-) (resolve.MappedTarget, error) {
+) (composition.MappedTarget, error) {
 	targetValue := TargetV1{
 		ModelArtifact:            value.Model.Artifact.Ref(),
 		ModelDefinitionDigest:    value.Model.Definition.Digest,
@@ -63,28 +63,28 @@ func NewMappedTarget(
 		Name:                     value.Model.Artifact.LogicalName,
 	}
 	if err := targetValue.Validate(); err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 
-	identifier, err := resolve.EncodeMappedIdentifier(
+	identifier, err := composition.EncodeMappedIdentifier(
 		targetIdentifierV1,
 		targetValue,
 	)
 	if err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 
-	return resolve.MappedTarget{
+	return composition.MappedTarget{
 		Provider:   MappedTargetProviderV1,
 		Identifier: identifier,
 		Type:       declaration.TypeModel,
 		Name:       targetValue.Name,
-		Builtin:    value.Model.Artifact.RootID == documentTopology.BuiltinRootID(),
+		Builtin:    value.Model.Artifact.RootID == topology.BuiltinRootID(),
 	}, nil
 }
 
 func DecodeTarget(
-	target resolve.MappedTarget,
+	target composition.MappedTarget,
 ) (TargetV1, error) {
 	if err := target.Validate(); err != nil {
 		return TargetV1{}, err
@@ -104,7 +104,7 @@ func DecodeTarget(
 		)
 	}
 
-	value, err := resolve.DecodeMappedIdentifier[TargetV1](
+	value, err := composition.DecodeMappedIdentifier[TargetV1](
 		target.Identifier,
 		targetIdentifierV1,
 	)

@@ -8,9 +8,9 @@ import (
 )
 
 type Repository interface {
-	PurgeArtifactLocalState(
+	CleanupArtifactLocalState(
 		ctx context.Context,
-		ref artifactModel.ArtifactRef,
+		request PurgeRequest,
 		now time.Time,
-	) error
+	) (artifactModel.Artifact, error)
 }

@@ -4,11 +4,7 @@ import (
 	"context"
 	"errors"
 
-	agentBuiltin "github.com/flexigpt/flexigpt-app/internal/agent/store/builtin"
-	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/agentcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -22,7 +18,11 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/collection"
+	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
 type AgentStoreWrapper struct {
@@ -38,8 +38,8 @@ func NewAgentBuiltInInstaller(
 		)
 	}
 
-	return agentBuiltin.NewInstaller(
-		agentBuiltin.InstallerDependencies{
+	return agentcatalog.NewInstaller(
+		agentcatalog.InstallerDependencies{
 			Hydrator: hydrator,
 		},
 	)
@@ -56,8 +56,8 @@ func InitAgentStoreWrapper(
 	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	definitions definition.API,
-	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
-	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
+	fallbackProviders map[declaration.Type]composition.FallbackProvider,
+	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
 	locatorResolvers ...locator.Factory,
 ) error {
 	if wrapper == nil ||
@@ -134,12 +134,12 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 // every Root. This avoids frontend root discovery through an unrelated global
 // Agent list and ensures empty Collections remain visible.
 func (w *AgentStoreWrapper) ListAgentCollectionsForManagement() (
-	[]collection.ListItem,
+	[]plugin.ListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]collection.ListItem, error) {
+		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
 			return api.ListAgentCollectionsForManagement(
 				context.Background(),
 			)
@@ -213,11 +213,11 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 }
 
 func (w *AgentStoreWrapper) CreateAgentCollection(
-	request collection.CreateRequest,
-) (collection.CollectionView, error) {
+	request plugin.CreateRequest,
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
 			return api.CreateAgentCollection(
 				context.Background(),
 				request,
@@ -228,10 +228,10 @@ func (w *AgentStoreWrapper) CreateAgentCollection(
 
 func (w *AgentStoreWrapper) GetAgentCollection(
 	ref artifactModel.ArtifactRef,
-) (collection.CollectionView, error) {
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
 			return api.GetAgentCollection(context.Background(), ref)
 		},
 	)
@@ -239,10 +239,10 @@ func (w *AgentStoreWrapper) GetAgentCollection(
 
 func (w *AgentStoreWrapper) ListAgentCollections(
 	rootID rootModel.RootID,
-) ([]collection.ListItem, error) {
+) ([]plugin.ListItem, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]collection.ListItem, error) {
+		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
 			return api.ListAgentCollections(context.Background(), rootID)
 		},
 	)
@@ -250,10 +250,10 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 
 func (w *AgentStoreWrapper) ListAgentCollectionMembers(
 	ref artifactModel.ArtifactRef,
-) (collection.CollectionCapabilityPlan, error) {
+) (plugin.CollectionCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionCapabilityPlan, error) {
+		func(api *agentConsumerAPI.API) (plugin.CollectionCapabilityPlan, error) {
 			return api.ListAgentCollectionMembers(
 				context.Background(),
 				ref,
@@ -263,23 +263,23 @@ func (w *AgentStoreWrapper) ListAgentCollectionMembers(
 }
 
 func (w *AgentStoreWrapper) UpdateAgentCollection(
-	request collection.UpdateRequest,
-) (collection.CollectionView, error) {
+	request plugin.UpdateRequest,
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
 			return api.UpdateAgentCollection(context.Background(), request)
 		},
 	)
 }
 
 func (w *AgentStoreWrapper) AddAgentCollectionMember(
-	request collection.AddMemberRequest,
-) (collection.CollectionView, error) {
+	request plugin.AddMemberRequest,
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			collection.CollectionView,
+			plugin.CollectionView,
 			error,
 		) {
 			return api.AddAgentCollectionMember(
@@ -291,12 +291,12 @@ func (w *AgentStoreWrapper) AddAgentCollectionMember(
 }
 
 func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
-	request collection.AddArtifactMemberRequest,
-) (collection.CollectionView, error) {
+	request plugin.AddArtifactMemberRequest,
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			collection.CollectionView,
+			plugin.CollectionView,
 			error,
 		) {
 			return api.AddAgentCollectionArtifactMember(
@@ -308,12 +308,12 @@ func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
 }
 
 func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
-	request collection.RemoveMemberRequest,
-) (collection.CollectionView, error) {
+	request plugin.RemoveMemberRequest,
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			collection.CollectionView,
+			plugin.CollectionView,
 			error,
 		) {
 			return api.RemoveAgentCollectionMember(
@@ -328,10 +328,10 @@ func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (collection.CollectionView, error) {
+) (plugin.CollectionView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
 			return api.SetAgentCollectionEnabled(
 				context.Background(),
 				ref,

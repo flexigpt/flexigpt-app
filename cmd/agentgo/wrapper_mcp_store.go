@@ -3,15 +3,14 @@ package main
 import (
 	"context"
 
-	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 )
 
 type MCPSettingsView struct {
@@ -154,12 +153,12 @@ func (w *MCPStoreWrapper) GetMCPPolicy(
 }
 
 func (w *MCPStoreWrapper) CreateMCPCollection(
-	request collection.CreateRequest,
-) (collection.CollectionView, error) {
+	request plugin.CreateRequest,
+) (plugin.CollectionView, error) {
 	return withRecoveryResp(
-		func() (collection.CollectionView, error) {
+		func() (plugin.CollectionView, error) {
 			if w == nil || w.api == nil {
-				return collection.CollectionView{}, spec.ErrClosed
+				return plugin.CollectionView{}, spec.ErrClosed
 			}
 
 			// A blank RootID means "create in the retained user Root". The
@@ -167,15 +166,15 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {
-					return collection.CollectionView{}, spec.ErrClosed
+					return plugin.CollectionView{}, spec.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
-					documentTopology.UserRootDraft(),
+					topology.UserRootDraft(),
 				); err != nil {
-					return collection.CollectionView{}, err
+					return plugin.CollectionView{}, err
 				}
-				request.RootID = documentTopology.UserRootID()
+				request.RootID = topology.UserRootID()
 			}
 
 			return w.api.CreateMCPCollection(
@@ -188,8 +187,8 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 
 func (w *MCPStoreWrapper) GetMCPCollection(
 	ref artifactModel.ArtifactRef,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+) (plugin.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 		return api.GetMCPCollection(context.Background(), ref)
 	})
 }
@@ -198,10 +197,10 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (collection.CollectionView, error) {
+) (plugin.CollectionView, error) {
 	return withMCPStore(
 		w,
-		func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 			return api.SetMCPCollectionEnabled(
 				context.Background(),
 				ref,
@@ -214,18 +213,18 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 
 func (w *MCPStoreWrapper) ListMCPCollections(
 	rootID rootModel.RootID,
-) ([]collection.ListItem, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.ListItem, error) {
+) ([]plugin.ListItem, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]plugin.ListItem, error) {
 		return api.ListMCPCollections(context.Background(), rootID)
 	})
 }
 
 func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
 	ref artifactModel.ArtifactRef,
-) ([]collection.ArtifactMembershipView, error) {
+) ([]plugin.ArtifactMembershipView, error) {
 	return withMCPStore(
 		w,
-		func(api *mcpConsumerAPI.API) ([]collection.ArtifactMembershipView, error) {
+		func(api *mcpConsumerAPI.API) ([]plugin.ArtifactMembershipView, error) {
 			return api.ListMCPCollectionMemberships(
 				context.Background(),
 				ref,
@@ -235,39 +234,39 @@ func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
 }
 
 func (w *MCPStoreWrapper) UpdateMCPCollection(
-	request collection.UpdateRequest,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+	request plugin.UpdateRequest,
+) (plugin.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 		return api.UpdateMCPCollection(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPCollectionMember(
-	request collection.AddMemberRequest,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+	request plugin.AddMemberRequest,
+) (plugin.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 		return api.AddMCPCollectionMember(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPServerToCollection(
-	request collection.AddArtifactMemberRequest,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+	request plugin.AddArtifactMemberRequest,
+) (plugin.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 		return api.AddMCPServerToCollection(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) RemoveMCPCollectionMember(
-	request collection.RemoveMemberRequest,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+	request plugin.RemoveMemberRequest,
+) (plugin.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
 		return api.RemoveMCPCollectionMember(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) DeleteMCPCollection(
-	request collection.DeleteRequest,
+	request plugin.DeleteRequest,
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {

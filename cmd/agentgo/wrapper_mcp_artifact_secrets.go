@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
-	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
+	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 )
 
 type artifactMCPSecretResolver struct {
@@ -96,7 +96,7 @@ func (r *artifactMCPSecretResolver) ResolveSecret(
 		return "", fmt.Errorf(
 			"%w: %w: MCP secret is unavailable",
 			spec.ErrReferenceUnresolved,
-			mcpDomainSecret.ErrNotFound,
+			secretMCPDomain.ErrNotFound,
 		)
 	}
 
@@ -162,11 +162,11 @@ func (r *artifactMCPSecretResolver) bindingKey(
 		return secretModel.BindingKey{}, spec.ErrClosed
 	}
 
-	selector, err := mcpDomainSecret.ParseMCPSecretRef(logicalRef)
+	selector, err := secretMCPDomain.ParseMCPSecretRef(logicalRef)
 	if err != nil {
 		return secretModel.BindingKey{}, err
 	}
-	slot, err := mcpDomainSecret.ArtifactBindingSlot(selector)
+	slot, err := secretMCPDomain.ArtifactBindingSlot(selector)
 	if err != nil {
 		return secretModel.BindingKey{}, err
 	}

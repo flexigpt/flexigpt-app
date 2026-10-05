@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
 
 type Service struct {
@@ -20,9 +20,9 @@ type Service struct {
 }
 
 type InvokeRequest struct {
-	Target    resolve.MappedTarget `json:"target"`
-	Args      json.RawMessage      `json:"args"`
-	TimeoutMS int                  `json:"timeoutMS,omitempty"`
+	Target    composition.MappedTarget `json:"target"`
+	Args      json.RawMessage          `json:"args"`
+	TimeoutMS int                      `json:"timeoutMS,omitempty"`
 }
 
 func New(
@@ -44,34 +44,34 @@ func New(
 func (s *Service) MapToolTarget(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (resolve.MappedTarget, error) {
+) (composition.MappedTarget, error) {
 	if err := s.ready(ctx); err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 	value, err := s.tools.ResolveEnabledTool(ctx, ref)
 	if err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 	return NewMappedTarget(value)
 }
 
 func (s *Service) MapArtifactTarget(
 	ctx context.Context,
-	request resolve.ArtifactTargetRequest,
-) (resolve.MappedTarget, bool, error) {
+	request composition.ArtifactTargetRequest,
+) (composition.MappedTarget, bool, error) {
 	if err := s.ready(ctx); err != nil {
-		return resolve.MappedTarget{}, false, err
+		return composition.MappedTarget{}, false, err
 	}
 	if request.Type != declaration.TypeTool {
-		return resolve.MappedTarget{}, false, nil
+		return composition.MappedTarget{}, false, nil
 	}
 
 	value, err := s.tools.ResolveEnabledTool(ctx, request.Artifact.Ref())
 	if err != nil {
-		return resolve.MappedTarget{}, true, err
+		return composition.MappedTarget{}, true, err
 	}
 	if request.Definition.Digest != value.Tool.DefinitionDigest {
-		return resolve.MappedTarget{}, true, fmt.Errorf(
+		return composition.MappedTarget{}, true, fmt.Errorf(
 			"%w: Tool definition changed during target mapping",
 			spec.ErrRefreshRequired,
 		)
@@ -83,7 +83,7 @@ func (s *Service) MapArtifactTarget(
 
 func (s *Service) ResolveMappedTool(
 	ctx context.Context,
-	target resolve.MappedTarget,
+	target composition.MappedTarget,
 ) (toolConsumerAPI.ResolvedToolView, error) {
 	if err := s.ready(ctx); err != nil {
 		return toolConsumerAPI.ResolvedToolView{}, err

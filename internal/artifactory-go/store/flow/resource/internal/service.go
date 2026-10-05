@@ -276,6 +276,21 @@ func (s *Service) StatSourceEntry(
 	if err := locator.Validate(true); err != nil {
 		return sourceModel.Entry{}, err
 	}
+	if session := verificationSessionFromContext(ctx); session != nil {
+		if session.service != s {
+			return sourceModel.Entry{}, fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				spec.ErrInvalid,
+			)
+		}
+		return s.statSourceEntryInSession(
+			ctx,
+			session,
+			rootID,
+			sourceID,
+			locator,
+		)
+	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
@@ -363,6 +378,25 @@ func (s *Service) ReadSourceTree(
 		return nil, fmt.Errorf(
 			"%w: Source tree byte limit is invalid",
 			spec.ErrInvalid,
+		)
+	}
+	if session := verificationSessionFromContext(ctx); session != nil {
+		if session.service != s {
+			return nil, fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				spec.ErrInvalid,
+			)
+		}
+		return s.readSourceTreeInSession(
+			ctx,
+			session,
+			rootID,
+			sourceID,
+			base,
+			include,
+			exclude,
+			maximumEntries,
+			maximumBytes,
 		)
 	}
 

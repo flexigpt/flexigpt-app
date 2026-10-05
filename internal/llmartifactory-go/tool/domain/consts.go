@@ -1,0 +1,33 @@
+package domain
+
+import (
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+)
+
+const (
+	ToolArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
+		toolv1.ToolType,
+	)
+
+	ToolPackageKind           managedpackageModel.PackageKind = "tool"
+	ToolCollectionPackageKind managedpackageModel.PackageKind = "tool-collection"
+
+	BuiltInInstallerName   = "tool"
+	HydrationSchemaVersion = "tool.builtin-hydration/v1"
+)
+
+func ToolDocumentFile() spec.Locator {
+	return topology.MustDefaultDocumentFile(
+		topology.DocumentUseToolPackage,
+	)
+}
+
+func ToolCollectionDocumentFile() spec.Locator {
+	return topology.MustDefaultDocumentFile(
+		topology.DocumentUseToolCollection,
+	)
+}

@@ -5,10 +5,10 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type MCPAggregateWrapper struct {
@@ -76,7 +76,7 @@ func (w *MCPAggregateWrapper) GetMCPServersForRuntimeServers(
 func (w *MCPAggregateWrapper) SaveMCPServerSettings(
 	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
-	data mcpDomainServer.ServerData,
+	data serverMCPDomain.ServerData,
 ) (mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
 		w,

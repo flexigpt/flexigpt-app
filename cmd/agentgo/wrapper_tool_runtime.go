@@ -6,9 +6,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
@@ -20,9 +20,9 @@ type ToolRuntimeInvokeRequest struct {
 }
 
 type ToolAggregateInvokeRequest struct {
-	Target    resolve.MappedTarget   `json:"target"`
-	Args      jsonutil.JSONRawString `json:"args,omitempty"`
-	TimeoutMS int                    `json:"timeoutMS,omitempty"`
+	Target    composition.MappedTarget `json:"target"`
+	Args      jsonutil.JSONRawString   `json:"args,omitempty"`
+	TimeoutMS int                      `json:"timeoutMS,omitempty"`
 }
 
 func toolArgumentsFromBridge(

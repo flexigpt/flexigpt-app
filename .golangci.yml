@@ -464,6 +464,16 @@ linters:
           alias: ${1}Model
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/(\w+)/model
           alias: ${2}Model
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/domain
+          alias: ${1}Domain
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/consumerapi
+          alias: ${1}ConsumerAPI
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/overlay
+          alias: ${1}Overlay
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/providerapi
+          alias: ${1}ProviderAPI
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/(\w+)
+          alias: ${1}MCPDomain
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts
           alias: ${1}Consts
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec

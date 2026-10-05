@@ -5,7 +5,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
 )
 
 type WorkspaceRuntimeWrapper struct {

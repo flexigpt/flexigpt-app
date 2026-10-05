@@ -25,28 +25,20 @@ type Config struct {
 
 type Adapter struct {
 	providers map[string]fs.FS
+	immutable map[string]immutableProvider
 }
 
-func New(providers map[string]fs.FS) (*Adapter, error) {
-	output := make(map[string]fs.FS, len(providers))
+func New(ctx context.Context, providers map[string]fs.FS) (*Adapter, error) {
+	registrations := make(
+		map[string]ProviderRegistration,
+		len(providers),
+	)
 	for key, provider := range providers {
-		if err := spec.ValidateIdentifier(
-			"embedded provider key",
-			key,
-			spec.MaxKindBytes,
-		); err != nil {
-			return nil, err
+		registrations[key] = ProviderRegistration{
+			Filesystem: provider,
 		}
-		if provider == nil {
-			return nil, fmt.Errorf(
-				"%w: embedded provider %q is nil",
-				spec.ErrInvalid,
-				key,
-			)
-		}
-		output[key] = provider
 	}
-	return &Adapter{providers: output}, nil
+	return NewWithRegistrations(ctx, registrations)
 }
 
 func (*Adapter) Kind() sourceModel.SourceKind {
@@ -107,13 +99,24 @@ func (a *Adapter) Open(
 			return nil, fmt.Errorf("open embedded root %q: %w", config.Root, err)
 		}
 	}
-	generation, err := fingerprint(ctx, provider)
+	var generation string
+	immutable := false
+	if evidence, found := a.immutable[config.ProviderKey]; found {
+		generation, err = evidence.generation(
+			config.ProviderKey,
+			config.Root,
+		)
+		immutable = true
+	} else {
+		generation, err = fingerprint(ctx, provider)
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &snapshot{
 		provider:   provider,
 		generation: generation,
+		immutable:  immutable,
 	}, nil
 }
 

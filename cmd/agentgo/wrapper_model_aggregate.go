@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 
 type ModelAggregateWrapper struct {
@@ -151,13 +151,13 @@ func (w *ModelAggregateWrapper) setProviderRuntimePublisher(
 }
 
 func (w *ModelAggregateWrapper) targetMappers() (
-	map[declaration.Type]resolve.ArtifactTargetMapper,
+	map[declaration.Type]composition.ArtifactTargetMapper,
 	error,
 ) {
 	if w == nil || w.service == nil {
 		return nil, spec.ErrClosed
 	}
-	return map[declaration.Type]resolve.ArtifactTargetMapper{
+	return map[declaration.Type]composition.ArtifactTargetMapper{
 		declaration.TypeModel: w.service,
 	}, nil
 }

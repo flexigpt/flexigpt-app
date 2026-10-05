@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type AuthState interface {
@@ -205,7 +205,7 @@ func (s *Service) SaveMCPServerSettings(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
-	data mcpDomainServer.ServerData,
+	data serverMCPDomain.ServerData,
 ) (MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
 		return MCPServerDetails{}, err
@@ -360,19 +360,19 @@ func (s *Service) serverDetails(
 }
 
 func retainServerSecretBindings(
-	current mcpDomainServer.ServerData,
-	next mcpDomainServer.ServerData,
-	document mcpDomainServer.ServerDocument,
-) mcpDomainServer.ServerData {
+	current serverMCPDomain.ServerData,
+	next serverMCPDomain.ServerData,
+	document serverMCPDomain.ServerDocument,
+) serverMCPDomain.ServerData {
 	output := next.Clone()
 	if output.Inputs == nil {
-		output.Inputs = map[string]mcpDomainServer.InputBinding{}
+		output.Inputs = map[string]serverMCPDomain.InputBinding{}
 	}
 
 	for name, declaration := range document.Configuration.Install.Inputs {
 		switch declaration.Kind {
-		case mcpDomainServer.InputSecret,
-			mcpDomainServer.InputOAuthClientCredentials:
+		case serverMCPDomain.InputSecret,
+			serverMCPDomain.InputOAuthClientCredentials:
 		default:
 			continue
 		}
@@ -391,7 +391,7 @@ func (s *Service) saveMCPServerSettings(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
-	data mcpDomainServer.ServerData,
+	data serverMCPDomain.ServerData,
 ) (MCPServerDetails, error) {
 	if err := s.lifecycle.SaveServerSettings(
 		ctx,
@@ -407,7 +407,7 @@ func (s *Service) saveMCPServerSettings(
 
 func (s *Service) serverAuthHealth(
 	ctx context.Context,
-	resolved mcpDomainServer.Resolved,
+	resolved serverMCPDomain.Resolved,
 ) (mcpAuth.MCPAuthHealth, error) {
 	config, err := s.source.InspectRuntimeConfig(ctx, resolved)
 	if err == nil {

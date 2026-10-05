@@ -12,8 +12,8 @@ import (
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 var nonAutoGoFunctions = map[string]struct{}{

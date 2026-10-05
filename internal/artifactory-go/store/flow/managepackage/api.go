@@ -16,4 +16,12 @@ type API interface {
 		ctx context.Context,
 		request managepackageModel.RemoveRequest,
 	) error
+
+	// RemoveWithOutcome exposes physical and catalog publication boundaries.
+	// Remove remains the normal command when the caller does not need the
+	// operational recovery record.
+	RemoveWithOutcome(
+		ctx context.Context,
+		request managepackageModel.RemoveRequest,
+	) (managepackageModel.RemovalOutcome, error)
 }

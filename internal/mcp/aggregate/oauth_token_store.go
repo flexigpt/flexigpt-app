@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	"golang.org/x/oauth2"
 )
 
@@ -35,7 +35,7 @@ func (s *OAuthTokenStore) LoadOAuthToken(
 	}
 	raw, err := s.secrets.ResolveSecret(ctx, ref)
 	if err != nil {
-		if errors.Is(err, mcpDomainSecret.ErrNotFound) {
+		if errors.Is(err, secretMCPDomain.ErrNotFound) {
 			return nil, mcpAuth.ErrOAuthTokenNotFound
 		}
 		return nil, err
@@ -85,9 +85,9 @@ func oauthTokenSecretRef(serverID mcpServer.ServerID) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return mcpDomainSecret.NewMCPSecretRefString(
+	return secretMCPDomain.NewMCPSecretRefString(
 		ref,
-		mcpDomainSecret.MCPSecretKindOAuthToken,
+		secretMCPDomain.MCPSecretKindOAuthToken,
 		"token",
 	)
 }

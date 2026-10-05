@@ -24,6 +24,7 @@ type PublishResult struct {
 	Source     sourceModel.Summary    `json:"source"`
 	Generation string                 `json:"generation"`
 	Refreshed  bool                   `json:"refreshed"`
+	Outcome    PublicationOutcome     `json:"outcome"`
 }
 
 type RemoveRequest struct {

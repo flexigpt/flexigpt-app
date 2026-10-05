@@ -3,7 +3,7 @@ package runtime
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
 func TestEngineComposeTruncatesAtUTF8Boundary(t *testing.T) {

@@ -64,7 +64,7 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 		}
 	}()
 
-	drivers, err := localSourceDrivers(config, base)
+	drivers, err := localSourceDrivers(ctx, config, base)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,6 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 	if err != nil {
 		return nil, err
 	}
-	resources.transferSecretOwnership()
 
 	for _, draft := range config.RetainedRoots {
 		if _, err := assembled.Roots.Create(ctx, draft); err != nil {
@@ -115,6 +114,9 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 			)
 		}
 	}
+	// Retained Root initialization is part of local opening. SecretValues
+	// remains caller-owned until the fully assembled deployment succeeds.
+	resources.transferSecretOwnership()
 	return assembled, nil
 }
 

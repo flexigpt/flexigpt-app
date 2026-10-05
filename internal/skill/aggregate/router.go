@@ -15,8 +15,8 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
+	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/materialize"
 )
 
 // ArtifactRouter is the flat Root-scoped Skill Artifact resolver.

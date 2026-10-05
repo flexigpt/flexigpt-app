@@ -14,6 +14,15 @@ type API interface {
 	Get(ctx context.Context, rootID rootModel.RootID, sourceID sourceModel.SourceID) (sourceModel.Summary, error)
 	List(ctx context.Context, rootID rootModel.RootID) ([]sourceModel.Summary, error)
 
+	// PrepareDiscovery performs a revision-checked additive declaration
+	// discovery update. It does not refresh Source content.
+	PrepareDiscovery(
+		ctx context.Context,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		preparation sourceModel.DiscoveryPreparation,
+	) (sourceModel.Summary, error)
+
 	// Update atomically publishes Source lifecycle invalidation when an enabled
 	// Source becomes disabled or loses its final discovery configuration.
 	Update(

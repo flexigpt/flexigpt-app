@@ -13,14 +13,14 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
-	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelproviderv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
 const (
@@ -40,7 +40,7 @@ type preparedModel struct {
 // independent source-backed Model Provider and Model packages.
 func PreparePackages(
 	ctx context.Context,
-) ([]modelBuiltin.PreparedPackage, error) {
+) ([]modelcatalog.PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Model catalog conversion context is nil",
@@ -136,7 +136,7 @@ func PreparePackages(
 		modelsByProvider[providerName] = prepared
 	}
 
-	output := make([]modelBuiltin.PreparedPackage, 0)
+	output := make([]modelcatalog.PreparedPackage, 0)
 	for _, providerName := range providerNames {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -171,7 +171,7 @@ func PreparePackages(
 				err,
 			)
 		}
-		preparedProvider, err := modelBuiltin.PrepareProviderPackage(
+		preparedProvider, err := modelcatalog.PrepareProviderPackage(
 			ctx,
 			providerDocument,
 		)
@@ -195,7 +195,7 @@ func PreparePackages(
 					err,
 				)
 			}
-			preparedModel, err := modelBuiltin.PrepareModelPackage(
+			preparedModel, err := modelcatalog.PrepareModelPackage(
 				ctx,
 				document,
 			)
@@ -206,7 +206,7 @@ func PreparePackages(
 		}
 	}
 
-	return modelBuiltin.NormalizePreparedPackages(output)
+	return modelcatalog.NormalizePreparedPackages(output)
 }
 
 func providerDocumentFromInference(

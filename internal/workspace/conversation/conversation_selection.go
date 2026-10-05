@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
+	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
-	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
 type ConversationSelectionStatus string

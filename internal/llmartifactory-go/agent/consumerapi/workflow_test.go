@@ -1,0 +1,697 @@
+package consumerapi_test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+)
+
+func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
+	t *testing.T,
+) {
+	harness := newWorkflowHarness(t)
+
+	initial, err := harness.api.ListAgentsForManagement(t.Context())
+	requireNoError(t, err)
+	if len(initial) != 0 {
+		t.Fatalf("initial management Agent list = %#v, want empty", initial)
+	}
+
+	harness.installBundledAgents(t)
+
+	builtinAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID: topology.BuiltinRootID(),
+		},
+	)
+	requireNoError(t, err)
+
+	known := requireNamedAgent(
+		t,
+		builtinAgents,
+		spec.LogicalName("local-dev-workspace"),
+	)
+	if !known.BuiltIn {
+		t.Fatalf("bundled Agent BuiltIn = false")
+	}
+
+	resolution, err := harness.api.ResolveAgent(
+		t.Context(),
+		known.Ref,
+	)
+	requireNoError(t, err)
+	if !resolution.Capabilities.Complete {
+		t.Fatalf(
+			"bundled Agent capability plan is incomplete: %#v",
+			resolution.Capabilities.Occurrences,
+		)
+	}
+
+	exported, err := harness.api.ExportAgent(
+		t.Context(),
+		agentConsumerAPI.AgentExportRequest{
+			Agent: known.Ref,
+		},
+	)
+	requireNoError(t, err)
+	if exported.Type != declaration.TypeAgent {
+		t.Fatalf("export type = %q, want %q", exported.Type, declaration.TypeAgent)
+	}
+	if exported.Name != known.Name {
+		t.Fatalf("export name = %q, want %q", exported.Name, known.Name)
+	}
+	if exported.MediaType != "application/yaml" {
+		t.Fatalf(
+			"export media type = %q, want application/yaml",
+			exported.MediaType,
+		)
+	}
+	if exported.ContentDigest == "" || exported.DefinitionDigest == "" {
+		t.Fatalf("export is missing content or definition digest")
+	}
+	if !strings.Contains(exported.Content, "local-dev-workspace") {
+		t.Fatalf("export does not contain the expected Agent name")
+	}
+	if !exported.BuiltIn {
+		t.Fatalf("built-in Agent export has incorrect ownership flags")
+	}
+
+	userVisible, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID:         topology.UserRootID(),
+			IncludeBuiltin: true,
+		},
+	)
+	requireNoError(t, err)
+	requireNamedAgent(
+		t,
+		userVisible,
+		spec.LogicalName("local-dev-workspace"),
+	)
+
+	before := append([]agentConsumerAPI.AgentListItem(nil), builtinAgents...)
+
+	harness.ensureBundledAgents(t)
+
+	after, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID: topology.BuiltinRootID(),
+		},
+	)
+	requireNoError(t, err)
+	requireSameAgentRevisions(t, before, after)
+
+	inspection, err := harness.store.Refresh.InspectSource(
+		t.Context(),
+		topology.BuiltinRootID(),
+		topology.BuiltinPackageSourceID(),
+	)
+	requireNoError(t, err)
+	if !inspection.IsCurrent() {
+		t.Fatalf("bundled Agent package Source is not current: %#v", inspection)
+	}
+}
+
+func TestWorkflow_UserCollection_ManagedAgentCRUD(
+	t *testing.T,
+) {
+	harness := newWorkflowHarness(t)
+	harness.installBundledAgents(t)
+
+	baselineEnsurer, err := agentConsumerAPI.NewBaselineEnsurer(
+		harness.api,
+	)
+	requireNoError(t, err)
+
+	baseline, err := baselineEnsurer.EnsureAgentBaselineCollection(
+		t.Context(),
+		topology.UserRootID(),
+	)
+	requireNoError(t, err)
+	if !baseline.Baseline {
+		t.Fatalf("Agent baseline Collection is not marked as baseline")
+	}
+	if !harness.api.IsManagedAgentCollection(baseline) {
+		t.Fatalf("Agent baseline Collection is not recognized as managed")
+	}
+
+	created, err := harness.api.CreateAgentCollection(
+		t.Context(),
+		plugin.CreateRequest{
+			Name:        "workflow-collection",
+			DisplayName: "Workflow Collection",
+			Description: "Initial workflow Collection description.",
+		},
+	)
+	requireNoError(t, err)
+	if created.Artifact.RootID != topology.UserRootID() {
+		t.Fatalf(
+			"default Collection Root = %q, want %q",
+			created.Artifact.RootID,
+			topology.UserRootID(),
+		)
+	}
+	if !created.Editable || !harness.api.IsManagedAgentCollection(created) {
+		t.Fatalf("new Agent Collection is not editable managed state")
+	}
+
+	updated, err := harness.api.UpdateAgentCollection(
+		t.Context(),
+		plugin.UpdateRequest{
+			Collection:       created.Artifact.Ref(),
+			ExpectedRevision: created.Artifact.Revision,
+			DisplayName:      "Workflow Collection Updated",
+			Description:      "Updated workflow Collection description.",
+		},
+	)
+	requireNoError(t, err)
+
+	_, err = harness.store.Refresh.RefreshSource(
+		t.Context(),
+		topology.UserRootID(),
+		updated.Artifact.Binding.SourceID,
+	)
+	requireNoError(t, err)
+
+	readCollection, err := harness.api.GetAgentCollection(
+		t.Context(),
+		updated.Artifact.Ref(),
+	)
+	requireNoError(t, err)
+	if readCollection.DisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"Collection display name = %q",
+			readCollection.DisplayName,
+		)
+	}
+	if readCollection.Description != "Updated workflow Collection description." {
+		t.Fatalf(
+			"Collection description = %q",
+			readCollection.Description,
+		)
+	}
+
+	disabledCollection, err := harness.api.SetAgentCollectionEnabled(
+		t.Context(),
+		readCollection.Artifact.Ref(),
+		readCollection.Artifact.Revision,
+		false,
+	)
+	requireNoError(t, err)
+	if disabledCollection.Artifact.Enabled {
+		t.Fatalf("Collection remained enabled after disable")
+	}
+
+	enabledCollection, err := harness.api.SetAgentCollectionEnabled(
+		t.Context(),
+		disabledCollection.Artifact.Ref(),
+		disabledCollection.Artifact.Revision,
+		true,
+	)
+	requireNoError(t, err)
+	if !enabledCollection.Artifact.Enabled {
+		t.Fatalf("Collection remained disabled after enable")
+	}
+
+	destinations, err := harness.api.ListAgentImportDestinations(
+		t.Context(),
+		topology.UserRootID(),
+	)
+	requireNoError(t, err)
+	destination := requireImportDestination(
+		t,
+		destinations,
+		enabledCollection.Artifact.Ref(),
+	)
+	if destination.CollectionRevision != enabledCollection.Artifact.Revision {
+		t.Fatalf(
+			"destination Collection revision = %d, want %d",
+			destination.CollectionRevision,
+			enabledCollection.Artifact.Revision,
+		)
+	}
+	if destination.CollectionDisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"destination Collection display name = %q",
+			destination.CollectionDisplayName,
+		)
+	}
+
+	allDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
+		t.Context(),
+	)
+	requireNoError(t, err)
+	managementDestination := requireImportDestination(
+		t,
+		allDestinations,
+		enabledCollection.Artifact.Ref(),
+	)
+	if managementDestination.RootDisplayName == "" {
+		t.Fatalf("management import destination has no Root display name")
+	}
+	if managementDestination.CollectionDisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"management destination Collection display name = %q",
+			managementDestination.CollectionDisplayName,
+		)
+	}
+
+	inputPath := filepath.Join(t.TempDir(), "workflow-agent.yaml")
+	requireNoError(
+		t,
+		os.WriteFile(
+			inputPath,
+			[]byte(`type: agent
+name: workflow-agent
+displayName: Workflow Agent
+description: A managed Agent used by the consumer API workflow test.
+members:
+  - type: text
+    name: workflow-agent-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/plain
+      content: workflow instructions
+`),
+			0o600,
+		),
+	)
+
+	preview, err := harness.api.PreviewAgentImport(
+		t.Context(),
+		agentConsumerAPI.AgentImportPreviewRequest{
+			Path:                       inputPath,
+			Collection:                 enabledCollection.Artifact.Ref(),
+			ExpectedCollectionRevision: enabledCollection.Artifact.Revision,
+		},
+	)
+	requireNoError(t, err)
+	if !preview.CanImport {
+		t.Fatalf("managed Agent preview cannot import: %#v", preview.Issues)
+	}
+	if preview.Prepared == "" || preview.PreparedFingerprint == "" {
+		t.Fatalf("managed Agent preview has no prepared envelope")
+	}
+	if preview.Agent == nil ||
+		preview.Agent.Name != spec.LogicalName("workflow-agent") {
+		t.Fatalf("managed Agent preview has wrong projected Agent: %#v", preview.Agent)
+	}
+	if preview.NormalizedYAML == "" {
+		t.Fatalf("managed Agent preview has no normalized YAML")
+	}
+	if len(preview.RequiredConfirmationCodes) != 0 {
+		t.Fatalf(
+			"simple managed Agent unexpectedly requires confirmation: %#v",
+			preview.RequiredConfirmationCodes,
+		)
+	}
+
+	committed, err := harness.api.CommitAgentImport(
+		t.Context(),
+		agentConsumerAPI.AgentImportCommitRequest{
+			Prepared:                  preview.Prepared,
+			PreparedFingerprint:       preview.PreparedFingerprint,
+			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
+		},
+	)
+	requireNoError(t, err)
+	if committed.Collection.Artifact.Ref() !=
+		enabledCollection.Artifact.Ref() {
+		t.Fatalf("import committed membership to another Collection")
+	}
+
+	current, err := harness.api.GetAgent(
+		t.Context(),
+		committed.Agent.Ref,
+	)
+	requireNoError(t, err)
+	if current.Name != spec.LogicalName("workflow-agent") {
+		t.Fatalf("read Agent name = %q", current.Name)
+	}
+
+	allUserAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID: topology.UserRootID(),
+		},
+	)
+	requireNoError(t, err)
+	if !containsAgent(allUserAgents, committed.Agent.Ref) {
+		t.Fatalf("managed Agent is missing from the Root Agent list")
+	}
+
+	collectionRef := committed.Collection.Artifact.Ref()
+	collectionAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID:     topology.UserRootID(),
+			Collection: &collectionRef,
+		},
+	)
+	requireNoError(t, err)
+	if !containsAgent(collectionAgents, committed.Agent.Ref) {
+		t.Fatalf("managed Agent is missing from its Collection")
+	}
+
+	resolution, err := harness.api.ResolveAgent(
+		t.Context(),
+		committed.Agent.Ref,
+	)
+	requireNoError(t, err)
+	if !resolution.Capabilities.Complete {
+		t.Fatalf(
+			"managed Agent capability plan is incomplete: %#v",
+			resolution.Capabilities.Occurrences,
+		)
+	}
+
+	textRef := requireAvailableCapability(
+		t,
+		resolution.Capabilities,
+		declaration.TypeText,
+		spec.LogicalName("workflow-agent-instructions"),
+	)
+	materialized, err := harness.api.MaterializeAgentText(
+		t.Context(),
+		textRef,
+	)
+	requireNoError(t, err)
+	if materialized.Content != "workflow instructions" {
+		t.Fatalf("materialized Text = %q", materialized.Content)
+	}
+
+	exported, err := harness.api.ExportAgent(
+		t.Context(),
+		agentConsumerAPI.AgentExportRequest{
+			Agent: committed.Agent.Ref,
+		},
+	)
+	requireNoError(t, err)
+	if exported.BuiltIn {
+		t.Fatalf("managed Agent export has unexpected management flags")
+	}
+	if !strings.Contains(exported.Content, "workflow-agent") {
+		t.Fatalf("managed Agent export does not contain Agent name")
+	}
+
+	disabledAgent, err := harness.api.SetAgentEnabled(
+		t.Context(),
+		committed.Agent.Ref,
+		committed.Agent.Revision,
+		false,
+	)
+	requireNoError(t, err)
+	if disabledAgent.Enabled {
+		t.Fatalf("Agent remained enabled after disable")
+	}
+
+	disabled := false
+	disabledAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID:  topology.UserRootID(),
+			Enabled: &disabled,
+		},
+	)
+	requireNoError(t, err)
+	if !containsAgent(disabledAgents, committed.Agent.Ref) {
+		t.Fatalf("disabled Agent is missing from disabled Agent filter")
+	}
+
+	_, err = harness.api.SetAgentEnabled(
+		t.Context(),
+		committed.Agent.Ref,
+		committed.Agent.Revision,
+		true,
+	)
+	requireErrorIs(t, err, spec.ErrConflict)
+
+	enabledAgent, err := harness.api.SetAgentEnabled(
+		t.Context(),
+		disabledAgent.Ref,
+		disabledAgent.Revision,
+		true,
+	)
+	requireNoError(t, err)
+	if !enabledAgent.Enabled {
+		t.Fatalf("Agent remained disabled after enable")
+	}
+
+	requireNoError(
+		t,
+		harness.api.DeleteManagedAgent(
+			t.Context(),
+			agentConsumerAPI.ManagedAgentDeleteRequest{
+				Agent:            enabledAgent.Ref,
+				ExpectedRevision: enabledAgent.Revision,
+			},
+		),
+	)
+
+	remainingUserAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID: topology.UserRootID(),
+		},
+	)
+	requireNoError(t, err)
+	if containsAgent(remainingUserAgents, enabledAgent.Ref) {
+		t.Fatalf("deleted Agent remains in Root Agent list")
+	}
+
+	remainingCollectionAgents, err := harness.api.ListAgents(
+		t.Context(),
+		agentConsumerAPI.ListAgentsRequest{
+			RootID:     topology.UserRootID(),
+			Collection: &collectionRef,
+		},
+	)
+	requireNoError(t, err)
+	if containsAgent(remainingCollectionAgents, enabledAgent.Ref) {
+		t.Fatalf("deleted Agent remains in Collection Agent list")
+	}
+
+	currentCollection, err := harness.api.GetAgentCollection(
+		t.Context(),
+		collectionRef,
+	)
+	requireNoError(t, err)
+	if len(currentCollection.Members) == 0 {
+		t.Fatal(
+			"deleting the managed Agent unexpectedly detached Collection membership",
+		)
+	}
+
+	staleMemberships, err := harness.api.ListAgentCollectionMembers(
+		t.Context(),
+		collectionRef,
+	)
+	requireNoError(t, err)
+	if staleMemberships.Complete {
+		t.Fatal(
+			"Collection capability plan remained complete after deleting its Agent",
+		)
+	}
+
+	err = harness.api.DeleteAgentCollection(
+		t.Context(),
+		collectionRef,
+		currentCollection.Artifact.Revision,
+	)
+	requireErrorIs(t, err, spec.ErrConflict)
+
+	memberIndex := requireAgentCollectionMemberIndex(
+		t,
+		currentCollection.Members,
+		spec.LogicalName("workflow-agent"),
+	)
+	detachedCollection, err := harness.api.RemoveAgentCollectionMember(
+		t.Context(),
+		plugin.RemoveMemberRequest{
+			Collection:       collectionRef,
+			ExpectedRevision: currentCollection.Artifact.Revision,
+			Index:            memberIndex,
+		},
+	)
+	requireNoError(t, err)
+	if len(detachedCollection.Members) != 0 {
+		t.Fatalf(
+			"Collection members after detach = %#v, want empty",
+			detachedCollection.Members,
+		)
+	}
+
+	currentMemberships, err := harness.api.ListAgentCollectionMembers(
+		t.Context(),
+		detachedCollection.Artifact.Ref(),
+	)
+	requireNoError(t, err)
+	if !currentMemberships.Complete {
+		t.Fatalf(
+			"empty Collection capability plan is incomplete: %#v",
+			currentMemberships.Occurrences,
+		)
+	}
+
+	requireNoError(
+		t,
+		harness.api.DeleteAgentCollection(
+			t.Context(),
+			detachedCollection.Artifact.Ref(),
+			detachedCollection.Artifact.Revision,
+		),
+	)
+
+	collections, err := harness.api.ListAgentCollections(
+		t.Context(),
+		topology.UserRootID(),
+	)
+	requireNoError(t, err)
+	if containsCollection(collections, collectionRef) {
+		t.Fatalf("deleted custom Collection remains in Collection list")
+	}
+
+	remainingDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
+		t.Context(),
+	)
+	requireNoError(t, err)
+	if hasImportDestination(remainingDestinations, collectionRef) {
+		t.Fatalf("deleted custom Collection remains an import destination")
+	}
+}
+
+func requireNamedAgent(
+	t *testing.T,
+	values []agentConsumerAPI.AgentListItem,
+	name spec.LogicalName,
+) agentConsumerAPI.AgentListItem {
+	t.Helper()
+
+	for _, value := range values {
+		if value.Name == name {
+			return value
+		}
+	}
+	t.Fatalf("Agent %q was not found", name)
+	return agentConsumerAPI.AgentListItem{}
+}
+
+func requireImportDestination(
+	t *testing.T,
+	values []agentConsumerAPI.AgentImportDestination,
+	ref artifactModel.ArtifactRef,
+) agentConsumerAPI.AgentImportDestination {
+	t.Helper()
+
+	for _, value := range values {
+		if value.Collection == ref {
+			return value
+		}
+	}
+	t.Fatalf("Agent import destination %q was not found", ref)
+	return agentConsumerAPI.AgentImportDestination{}
+}
+
+func requireAvailableCapability(
+	t *testing.T,
+	plan agentConsumerAPI.AgentCapabilityPlan,
+	declarationType declaration.Type,
+	name spec.LogicalName,
+) artifactModel.ArtifactRef {
+	t.Helper()
+
+	for _, occurrence := range plan.Occurrences {
+		if occurrence.Type != declarationType ||
+			occurrence.Name != name {
+			continue
+		}
+		if occurrence.Status != composition.ResolutionAvailable ||
+			occurrence.Artifact == nil {
+			t.Fatalf(
+				"capability %s/%s is not available: %#v",
+				declarationType,
+				name,
+				occurrence,
+			)
+		}
+		return *occurrence.Artifact
+	}
+
+	t.Fatalf(
+		"capability %s/%s was not found in %#v",
+		declarationType,
+		name,
+		plan.Occurrences,
+	)
+	return artifactModel.ArtifactRef{}
+}
+
+func requireAgentCollectionMemberIndex(
+	t *testing.T,
+	values []plugin.MemberReference,
+	name spec.LogicalName,
+) int {
+	t.Helper()
+
+	for index, value := range values {
+		if value.Type == declaration.TypeAgent &&
+			value.Name == name {
+			return index
+		}
+	}
+
+	t.Fatalf(
+		"Agent Collection member %q was not found in %#v",
+		name,
+		values,
+	)
+	return 0
+}
+
+func containsAgent(
+	values []agentConsumerAPI.AgentListItem,
+	ref artifactModel.ArtifactRef,
+) bool {
+	for _, value := range values {
+		if value.Ref == ref {
+			return true
+		}
+	}
+	return false
+}
+
+func containsCollection(
+	values []plugin.ListItem,
+	ref artifactModel.ArtifactRef,
+) bool {
+	for _, value := range values {
+		if value.Ref == ref {
+			return true
+		}
+	}
+	return false
+}
+
+func hasImportDestination(
+	values []agentConsumerAPI.AgentImportDestination,
+	ref artifactModel.ArtifactRef,
+) bool {
+	for _, value := range values {
+		if value.Collection == ref {
+			return true
+		}
+	}
+	return false
+}

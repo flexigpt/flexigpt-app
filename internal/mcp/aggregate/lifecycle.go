@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type RuntimeInvalidator interface {
@@ -23,7 +23,7 @@ type Lifecycle struct {
 			ctx context.Context,
 			ref artifactModel.ArtifactRef,
 			expectedSettingsRevision uint64,
-			data mcpDomainServer.ServerData,
+			data serverMCPDomain.ServerData,
 		) error
 	}
 	runtime RuntimeInvalidator
@@ -35,7 +35,7 @@ func NewLifecycle(
 			ctx context.Context,
 			ref artifactModel.ArtifactRef,
 			expectedSettingsRevision uint64,
-			data mcpDomainServer.ServerData,
+			data serverMCPDomain.ServerData,
 		) error
 	},
 	runtime RuntimeInvalidator,
@@ -101,7 +101,7 @@ func (l *Lifecycle) SaveServerSettings(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
-	data mcpDomainServer.ServerData,
+	data serverMCPDomain.ServerData,
 ) error {
 	if err := l.InvalidateServer(ctx, ref); err != nil {
 		return err

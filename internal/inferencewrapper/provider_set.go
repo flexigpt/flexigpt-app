@@ -365,7 +365,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	// do not report selected Skills as silently available.
 	//
 	// This covers stale persisted conversations where Workspace selection
-	// survives but a selected Artifact can no longer resolve. A usable Context
+	// survives but a selected Artifact can no longer composition. A usable Context
 	// may still make the turn partial rather than
 	// completely unavailable.
 	if workspaceUsage != nil &&

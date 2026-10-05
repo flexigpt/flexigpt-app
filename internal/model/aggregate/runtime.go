@@ -9,13 +9,13 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
-	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
 const runtimeRequestPatchDigestDomain = "flexigpt.spec.runtime-request-patch/v1"

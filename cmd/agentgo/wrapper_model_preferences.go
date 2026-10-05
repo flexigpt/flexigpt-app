@@ -9,7 +9,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
+	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
 
 const modelPreferenceSchemaVersion = "v1"

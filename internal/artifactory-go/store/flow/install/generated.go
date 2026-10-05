@@ -3,12 +3,17 @@ package install
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+)
+
+var ErrGeneratedPackageSetNotLoaded = errors.New(
+	"generated Artifact package set is not loaded",
 )
 
 // Generated payloads contain base64 file content and Definition metadata.

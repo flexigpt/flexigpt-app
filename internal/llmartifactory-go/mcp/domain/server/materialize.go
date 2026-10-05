@@ -1,0 +1,488 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"runtime"
+	"slices"
+	"strings"
+
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcpv1"
+)
+
+func materializeValidated(
+	ctx context.Context,
+	_ artifactModel.ArtifactRef,
+	document ServerDocument,
+	data ServerData,
+	secrets SecretResolver,
+	environment EnvironmentResolver,
+	resolveSecrets bool,
+) (MaterializedServer, error) {
+	if ctx == nil {
+		return MaterializedServer{}, fmt.Errorf(
+			"%w: MCP materialization context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return MaterializedServer{}, err
+	}
+
+	core, err := selectProfile(
+		document.MCPServer,
+		document.Configuration.ConnectionProfiles,
+		data.SelectedConnectionProfile,
+	)
+	if err != nil {
+		return MaterializedServer{}, err
+	}
+
+	timeoutMS := document.Configuration.TimeoutMS
+	if timeoutMS == 0 {
+		timeoutMS = DefaultConnectionTimeoutMS
+	}
+
+	values := make(map[string]string)
+	secretValues := make(map[string]struct{})
+	unboundOptional := make(map[string]struct{})
+	clientCredentialRef := ""
+
+	for name, declaration := range document.Configuration.Install.Inputs {
+		binding, bound := data.Inputs[name]
+
+		switch declaration.Kind {
+		case InputSecret:
+			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
+				if declaration.Required {
+					return MaterializedServer{}, fmt.Errorf(
+						"%w: required secret input %q is not bound",
+						spec.ErrReferenceUnresolved,
+						name,
+					)
+				}
+				unboundOptional[name] = struct{}{}
+				continue
+			}
+			if !resolveSecrets {
+				values[name] = "configured"
+				continue
+			}
+			if secrets == nil {
+				return MaterializedServer{}, fmt.Errorf(
+					"%w: secret resolver is unavailable",
+					spec.ErrReferenceUnresolved,
+				)
+			}
+			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
+			if err != nil {
+				return MaterializedServer{}, err
+			}
+			if value == "" {
+				return MaterializedServer{}, fmt.Errorf(
+					"%w: secret input %q is empty",
+					spec.ErrReferenceUnresolved,
+					name,
+				)
+			}
+			values[name] = value
+			secretValues[value] = struct{}{}
+
+		case InputOAuthClientCredentials:
+			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
+				if declaration.Required {
+					return MaterializedServer{}, fmt.Errorf(
+						"%w: OAuth client input %q is not bound",
+						spec.ErrReferenceUnresolved,
+						name,
+					)
+				}
+				unboundOptional[name] = struct{}{}
+				continue
+			}
+			if document.Configuration.Auth.ClientCredentialsInput == name {
+				clientCredentialRef = binding.SecretRef
+			}
+			if !resolveSecrets {
+				continue
+			}
+			if secrets == nil {
+				return MaterializedServer{}, fmt.Errorf(
+					"%w: secret resolver is unavailable",
+					spec.ErrReferenceUnresolved,
+				)
+			}
+			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
+			if err != nil {
+				return MaterializedServer{}, err
+			}
+			if strings.TrimSpace(value) == "" {
+				return MaterializedServer{}, fmt.Errorf(
+					"%w: OAuth client input %q is empty",
+					spec.ErrReferenceUnresolved,
+					name,
+				)
+			}
+			secretValues[value] = struct{}{}
+
+		case InputText, InputPath:
+			switch {
+			case bound && binding.Value != nil:
+				values[name] = *binding.Value
+			case declaration.Default != nil:
+				values[name] = *declaration.Default
+			case declaration.Required:
+				return MaterializedServer{}, fmt.Errorf(
+					"%w: required MCP input %q is not bound",
+					spec.ErrReferenceUnresolved,
+					name,
+				)
+			default:
+				unboundOptional[name] = struct{}{}
+			}
+
+		default:
+			return MaterializedServer{}, fmt.Errorf(
+				"%w: unsupported MCP input kind %q",
+				spec.ErrInvalid,
+				declaration.Kind,
+			)
+		}
+	}
+
+	for _, name := range document.Configuration.Install.AllowEnvironment {
+		if _, present := values[name]; present {
+			continue
+		}
+		if environment == nil {
+			continue
+		}
+		value, found, err := environment.ResolveEnvironment(ctx, name)
+		if err != nil {
+			return MaterializedServer{}, err
+		}
+		if found {
+			values[name] = value
+			delete(unboundOptional, name)
+		}
+	}
+
+	core, err = substituteCore(core, values, unboundOptional)
+	if err != nil {
+		return MaterializedServer{}, err
+	}
+	auth := document.Configuration.Auth
+	auth.ClientIDMetadataDocumentURL, err = substituteOptionalScalar(
+		auth.ClientIDMetadataDocumentURL,
+		values,
+		unboundOptional,
+	)
+	if err != nil {
+		return MaterializedServer{}, err
+	}
+
+	if auth.ClientCredentialsInput != "" &&
+		clientCredentialRef == "" &&
+		auth.Mode == mcpv1.HTTPAuthModeClientCredentials {
+		return MaterializedServer{}, fmt.Errorf(
+			"%w: required OAuth client credentials are not configured",
+			spec.ErrReferenceUnresolved,
+		)
+	}
+	sensitive := make([]string, 0, len(secretValues))
+	for value := range secretValues {
+		sensitive = append(sensitive, value)
+	}
+	slices.Sort(sensitive)
+
+	output := MaterializedServer{
+		Core:                           core,
+		Auth:                           auth,
+		ClientCredentialRef:            clientCredentialRef,
+		ClientCredentialSecretRequired: document.OAuthClientSecretRequired(),
+		TimeoutMS:                      timeoutMS,
+		SensitiveValues:                sensitive,
+	}
+	if err := output.Validate(); err != nil {
+		return MaterializedServer{}, err
+	}
+
+	return output, nil
+}
+
+func selectProfile(
+	base CoreServer,
+	profiles map[string]ConnectionProfile,
+	selected string,
+) (CoreServer, error) {
+	if selected == "" {
+		matches := make([]string, 0)
+		for name, profile := range profiles {
+			if slices.Contains(profile.Platforms, runtime.GOOS) {
+				matches = append(matches, name)
+			}
+		}
+		if len(matches) > 1 {
+			return CoreServer{}, fmt.Errorf(
+				"%w: multiple MCP connection profiles match platform %q",
+				spec.ErrConflict,
+				runtime.GOOS,
+			)
+		}
+		if len(matches) == 1 {
+			selected = matches[0]
+		}
+	}
+	if selected == "" {
+		return cloneCore(base), nil
+	}
+
+	profile, found := profiles[selected]
+	if !found {
+		return CoreServer{}, fmt.Errorf(
+			"%w: MCP connection profile %q does not exist",
+			spec.ErrReferenceUnresolved,
+			selected,
+		)
+	}
+	if len(profile.Platforms) != 0 &&
+		!slices.Contains(profile.Platforms, runtime.GOOS) {
+		return CoreServer{}, fmt.Errorf(
+			"%w: MCP connection profile %q does not support %q",
+			spec.ErrInvalid,
+			selected,
+			runtime.GOOS,
+		)
+	}
+
+	output := cloneCore(base)
+	switch {
+	case profile.Stdio != nil:
+		if output.Type != ServerTypeStdio {
+			if profile.Stdio.Command == nil {
+				return CoreServer{}, fmt.Errorf(
+					"%w: transport-changing stdio profile requires command",
+					spec.ErrInvalid,
+				)
+			}
+			output = CoreServer{
+				Type: ServerTypeStdio,
+				Env:  map[string]string{},
+			}
+		}
+		if profile.Stdio.Command != nil {
+			output.Command = *profile.Stdio.Command
+		}
+		if profile.Stdio.Args != nil {
+			output.Args = slices.Clone(*profile.Stdio.Args)
+		}
+		if output.Env == nil {
+			output.Env = map[string]string{}
+		}
+		maps.Copy(output.Env, profile.Stdio.Env)
+		for _, name := range profile.Stdio.RemoveEnv {
+			delete(output.Env, name)
+		}
+
+	case profile.HTTP != nil:
+		if output.Type != ServerTypeHTTP {
+			if profile.HTTP.URL == nil {
+				return CoreServer{}, fmt.Errorf(
+					"%w: transport-changing HTTP profile requires URL",
+					spec.ErrInvalid,
+				)
+			}
+			output = CoreServer{
+				Type:    ServerTypeHTTP,
+				Headers: map[string]string{},
+			}
+		}
+		if profile.HTTP.URL != nil {
+			output.URL = *profile.HTTP.URL
+		}
+		if output.Headers == nil {
+			output.Headers = map[string]string{}
+		}
+		maps.Copy(output.Headers, profile.HTTP.Headers)
+		for _, name := range profile.HTTP.RemoveHeaders {
+			deleteFold(output.Headers, name)
+		}
+
+	default:
+		return CoreServer{}, fmt.Errorf(
+			"%w: MCP profile has no connection overlay",
+			spec.ErrInvalid,
+		)
+	}
+	return output, nil
+}
+
+func substituteCore(
+	input CoreServer,
+	values map[string]string,
+	optional map[string]struct{},
+) (CoreServer, error) {
+	output := cloneCore(input)
+	var err error
+
+	if output.Command, err = substituteRequired(output.Command, values); err != nil {
+		return CoreServer{}, err
+	}
+	if output.Args, err = substituteArguments(output.Args, values, optional); err != nil {
+		return CoreServer{}, err
+	}
+	if output.Env, err = substituteOptionalMap(output.Env, values, optional); err != nil {
+		return CoreServer{}, err
+	}
+	if output.URL, err = substituteRequired(output.URL, values); err != nil {
+		return CoreServer{}, err
+	}
+	if output.Headers, err = substituteOptionalMap(output.Headers, values, optional); err != nil {
+		return CoreServer{}, err
+	}
+	return output, nil
+}
+
+func substituteRequired(
+	input string,
+	values map[string]string,
+) (string, error) {
+	output, missing := substituteTemplate(input, values)
+	if len(missing) != 0 {
+		return "", unresolvedInputError(missing[0])
+	}
+	return output, nil
+}
+
+func substituteOptionalScalar(
+	input string,
+	values map[string]string,
+	optional map[string]struct{},
+) (string, error) {
+	output, missing := substituteTemplate(input, values)
+	if len(missing) == 0 {
+		return output, nil
+	}
+	if missingAreOptional(missing, optional) && placeholderOnly(input) {
+		return "", nil
+	}
+	return "", unresolvedInputError(missing[0])
+}
+
+func substituteArguments(
+	input []string,
+	values map[string]string,
+	optional map[string]struct{},
+) ([]string, error) {
+	output := make([]string, 0, len(input))
+	for _, value := range input {
+		resolved, missing := substituteTemplate(value, values)
+		if len(missing) == 0 {
+			output = append(output, resolved)
+			continue
+		}
+		if missingAreOptional(missing, optional) && placeholderOnly(value) {
+			continue
+		}
+		return nil, unresolvedInputError(missing[0])
+	}
+	return output, nil
+}
+
+func substituteOptionalMap(
+	input map[string]string,
+	values map[string]string,
+	optional map[string]struct{},
+) (map[string]string, error) {
+	if len(input) == 0 {
+		return maps.Clone(input), nil
+	}
+
+	output := make(map[string]string, len(input))
+	for key, value := range input {
+		resolved, missing := substituteTemplate(value, values)
+		if len(missing) != 0 {
+			if missingAreOptional(missing, optional) {
+				continue
+			}
+			return nil, unresolvedInputError(missing[0])
+		}
+		output[key] = resolved
+	}
+	return output, nil
+}
+
+func substituteTemplate(
+	input string,
+	values map[string]string,
+) (output string, missing []string) {
+	missingSet := make(map[string]struct{})
+	output = placeholderPattern.ReplaceAllStringFunc(
+		input,
+		func(match string) string {
+			parts := placeholderPattern.FindStringSubmatch(match)
+			if len(parts) != 2 {
+				return match
+			}
+			value, found := values[parts[1]]
+			if !found {
+				missingSet[parts[1]] = struct{}{}
+				return match
+			}
+			return value
+		},
+	)
+	if len(missingSet) == 0 {
+		return output, nil
+	}
+	missing = make([]string, 0, len(missingSet))
+	for name := range missingSet {
+		missing = append(missing, name)
+	}
+	slices.Sort(missing)
+	return output, missing
+}
+
+func missingAreOptional(
+	missing []string,
+	optional map[string]struct{},
+) bool {
+	for _, name := range missing {
+		if _, found := optional[name]; !found {
+			return false
+		}
+	}
+	return len(missing) != 0
+}
+
+func placeholderOnly(value string) bool {
+	matches := placeholderPattern.FindAllString(value, -1)
+	return len(matches) != 0 && strings.Join(matches, "") == value
+}
+
+func unresolvedInputError(name string) error {
+	return fmt.Errorf(
+		"%w: MCP input %q is unresolved",
+		spec.ErrReferenceUnresolved,
+		name,
+	)
+}
+
+func cloneCore(input CoreServer) CoreServer {
+	output := input
+	output.Args = slices.Clone(input.Args)
+	output.Env = maps.Clone(input.Env)
+	output.Headers = maps.Clone(input.Headers)
+	return output
+}
+
+func deleteFold(values map[string]string, name string) {
+	for key := range values {
+		if strings.EqualFold(strings.TrimSpace(key), strings.TrimSpace(name)) {
+			delete(values, key)
+		}
+	}
+}

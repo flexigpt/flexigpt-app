@@ -7,17 +7,18 @@ import (
 	"os"
 	"path/filepath"
 
-	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -55,6 +56,7 @@ type App struct {
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
 	artifactStoreComposition *compose.Store
+	artifactStoreSetup       *artifactsetup.Handle
 	artifactLocatorFactories []locator.Factory
 
 	dataBasePath string
@@ -76,24 +78,24 @@ func newApp() *App {
 	}
 
 	app := &App{}
-	storageName := documentTopology.MustApplicationStorageName
+	storageName := topology.MustApplicationStorageName
 	app.dataBasePath = filepath.Join(
 		xdg.DataHome,
-		storageName(documentTopology.ApplicationStorageDataDirectory),
+		storageName(topology.ApplicationStorageDataDirectory),
 	)
 
 	app.settingsDirPath = filepath.Join(
 		app.dataBasePath,
-		storageName(documentTopology.ApplicationStorageSettingsDirectory),
+		storageName(topology.ApplicationStorageSettingsDirectory),
 	)
 	app.conversationsDirPath = filepath.Join(
 		app.dataBasePath,
-		storageName(documentTopology.ApplicationStorageConversationsDirectory),
+		storageName(topology.ApplicationStorageConversationsDirectory),
 	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
-			documentTopology.ApplicationStorageArtifactStoreDirectory,
+			topology.ApplicationStorageArtifactStoreDirectory,
 		),
 	)
 
@@ -206,7 +208,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
 
-	artifactComposition, locatorFactories, err := composeArtifactStore(
+	artifactSetup, err := artifactsetup.OpenArtifactStore(
 		context.Background(),
 		a.artifactStoreDirPath,
 	)
@@ -221,8 +223,10 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
-	a.artifactStoreComposition = artifactComposition
-	a.artifactLocatorFactories = locatorFactories
+	a.artifactStoreSetup = artifactSetup
+	a.artifactStoreComposition = artifactSetup.Store
+	a.artifactLocatorFactories = artifactSetup.LocatorFactories()
+	artifactComposition := artifactSetup.Store
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
@@ -352,7 +356,7 @@ func (a *App) initManagers() {
 		)
 	}
 
-	fallbackProviders := map[declaration.Type]resolve.FallbackProvider{}
+	fallbackProviders := map[declaration.Type]composition.FallbackProvider{}
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
 		artifactComposition.Roots,
@@ -526,7 +530,7 @@ func (a *App) initManagers() {
 		targetMappers,
 		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID rootModel.RootID) error {
-			return ensureUserArtifactBaselineCollectionsForRoot(
+			return artifactsetup.EnsureRootBaselines(
 				ctx,
 				rootID,
 				skillBaselineEnsurer,
@@ -544,7 +548,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace consumer, runtime engine, and aggregate APIs initialized")
 
-	err = ensureBuiltinArtifactTopology(
+	err = artifactsetup.EnsureBuiltInTopology(
 		context.Background(),
 		a.artifactStoreComposition.Topology,
 		a.toolBuiltInInstaller,
@@ -567,7 +571,7 @@ func (a *App) initManagers() {
 		slog.Info("shared built-in artifact topology initialized")
 	}
 
-	err = ensureUserArtifactBaselineCollections(
+	err = artifactsetup.EnsureMutableRootBaselines(
 		context.Background(),
 		artifactComposition.Roots,
 		artifactComposition.Protection,
@@ -727,14 +731,15 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	a.agentBuiltInInstaller = nil
 	a.modelBuiltInInstaller = nil
 	a.toolBuiltInInstaller = nil
-	if a.artifactStoreComposition != nil {
-		if err := a.artifactStoreComposition.Close(); err != nil {
+	if a.artifactStoreSetup != nil {
+		if err := a.artifactStoreSetup.Close(); err != nil {
 			slog.Error(
-				"close Artifact Store composition",
+				"close artifact store setup",
 				"error",
 				err,
 			)
 		}
+		a.artifactStoreSetup = nil
 		a.artifactStoreComposition = nil
 		a.artifactLocatorFactories = nil
 	}

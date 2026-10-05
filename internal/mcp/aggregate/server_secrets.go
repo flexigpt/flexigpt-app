@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 func (s *Service) SetMCPServerSecret(
@@ -30,7 +30,7 @@ func (s *Service) SetMCPServerSecret(
 		return MCPServerDetails{}, err
 	}
 
-	if kind == mcpDomainSecret.MCPSecretKindOAuthClientCredentials {
+	if kind == secretMCPDomain.MCPSecretKindOAuthClientCredentials {
 		if err := mcpAuth.ValidateOAuthClientCredentialsSecret(
 			value,
 			resolved.Document.OAuthClientSecretRequired(),
@@ -38,7 +38,7 @@ func (s *Service) SetMCPServerSecret(
 			return MCPServerDetails{}, err
 		}
 	}
-	if kind == mcpDomainSecret.MCPSecretKindHTTPHeader &&
+	if kind == secretMCPDomain.MCPSecretKindHTTPHeader &&
 		(strings.TrimSpace(value) == "" ||
 			strings.ContainsAny(value, "\r\n\x00")) {
 		return MCPServerDetails{}, fmt.Errorf(
@@ -47,7 +47,7 @@ func (s *Service) SetMCPServerSecret(
 		)
 	}
 
-	secretRef, err := mcpDomainSecret.NewMCPSecretRefString(
+	secretRef, err := secretMCPDomain.NewMCPSecretRefString(
 		ref,
 		kind,
 		slot,
@@ -61,9 +61,9 @@ func (s *Service) SetMCPServerSecret(
 
 	data := resolved.Installation.Clone()
 	if data.Inputs == nil {
-		data.Inputs = map[string]mcpDomainServer.InputBinding{}
+		data.Inputs = map[string]serverMCPDomain.InputBinding{}
 	}
-	data.Inputs[input] = mcpDomainServer.InputBinding{
+	data.Inputs[input] = serverMCPDomain.InputBinding{
 		SecretRef: secretRef,
 	}
 	return s.saveMCPServerSettings(
@@ -112,19 +112,19 @@ func (s *Service) serverSecretTarget(
 	ref artifactModel.ArtifactRef,
 	input string,
 ) (
-	mcpDomainServer.Resolved,
-	mcpDomainSecret.MCPSecretKind,
+	serverMCPDomain.Resolved,
+	secretMCPDomain.MCPSecretKind,
 	string,
 	error,
 ) {
 	resolved, err := s.servers.InspectMCPServer(ctx, ref)
 	if err != nil {
-		return mcpDomainServer.Resolved{}, "", "", err
+		return serverMCPDomain.Resolved{}, "", "", err
 	}
 
 	declaration, found := resolved.Document.Configuration.Install.Inputs[input]
 	if !found {
-		return mcpDomainServer.Resolved{}, "", "", fmt.Errorf(
+		return serverMCPDomain.Resolved{}, "", "", fmt.Errorf(
 			"%w: MCP secret input %q is not declared",
 			mcpAuth.ErrMCPInvalidAuthRequest,
 			input,
@@ -132,45 +132,45 @@ func (s *Service) serverSecretTarget(
 	}
 
 	switch declaration.Kind {
-	case mcpDomainServer.InputOAuthClientCredentials:
+	case serverMCPDomain.InputOAuthClientCredentials:
 		if resolved.Document.Configuration.Auth.ClientCredentialsInput != input {
-			return mcpDomainServer.Resolved{}, "", "", fmt.Errorf(
+			return serverMCPDomain.Resolved{}, "", "", fmt.Errorf(
 				"%w: MCP secret input %q is not an OAuth client credential input",
 				mcpAuth.ErrMCPInvalidAuthRequest,
 				input,
 			)
 		}
 		return resolved,
-			mcpDomainSecret.MCPSecretKindOAuthClientCredentials,
+			secretMCPDomain.MCPSecretKindOAuthClientCredentials,
 			"clientCredentials",
 			nil
 
-	case mcpDomainServer.InputSecret:
+	case serverMCPDomain.InputSecret:
 		targets, err := resolved.Document.SecretInputTargets()
 		if err != nil {
-			return mcpDomainServer.Resolved{}, "", "", err
+			return serverMCPDomain.Resolved{}, "", "", err
 		}
 		target, found := targets[input]
 		if !found {
-			return mcpDomainServer.Resolved{}, "", "", fmt.Errorf(
+			return serverMCPDomain.Resolved{}, "", "", fmt.Errorf(
 				"%w: MCP secret input %q has no target",
 				mcpAuth.ErrMCPInvalidAuthRequest,
 				input,
 			)
 		}
-		if target.Kind == mcpDomainServer.SecretInputTargetHTTPHeader {
+		if target.Kind == serverMCPDomain.SecretInputTargetHTTPHeader {
 			return resolved,
-				mcpDomainSecret.MCPSecretKindHTTPHeader,
+				secretMCPDomain.MCPSecretKindHTTPHeader,
 				target.Slot,
 				nil
 		}
 		return resolved,
-			mcpDomainSecret.MCPSecretKindStdioEnv,
+			secretMCPDomain.MCPSecretKindStdioEnv,
 			target.Slot,
 			nil
 
 	default:
-		return mcpDomainServer.Resolved{}, "", "", fmt.Errorf(
+		return serverMCPDomain.Resolved{}, "", "", fmt.Errorf(
 			"%w: MCP input %q does not accept a secret",
 			mcpAuth.ErrMCPInvalidAuthRequest,
 			input,

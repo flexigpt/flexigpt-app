@@ -64,14 +64,62 @@ func (s *Service) PurgeArtifactLocalState(ctx context.Context, ref artifactModel
 	if err != nil {
 		return err
 	}
-	if s.policy != nil && s.policy.IsProtectedRoot(value.RootID) && !root.IsInstallerPrivileged(ctx) {
-		return fmt.Errorf("%w: protected Artifact local-state purge requires installer privilege", spec.ErrProtected)
+	_, err = s.CleanupArtifactLocalState(ctx, PurgeRequest{
+		Artifact:                 ref,
+		ExpectedArtifactRevision: value.Revision,
+		AllNamespaces:            true,
+	})
+	return err
+}
+
+func (s *Service) CleanupArtifactLocalState(
+	ctx context.Context,
+	request PurgeRequest,
+) (PurgeResult, error) {
+	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
+		return PurgeResult{}, spec.ErrClosed
 	}
-	if err := s.repository.PurgeArtifactLocalState(ctx, ref, clockutil.NowUTC(s.clock)); err != nil {
-		return err
+	if ctx == nil {
+		return PurgeResult{}, fmt.Errorf(
+			"%w: Artifact cleanup context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return PurgeResult{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return PurgeResult{}, err
+	}
+	value, err := s.artifacts.Get(ctx, request.Artifact)
+	if err != nil {
+		return PurgeResult{}, err
+	}
+	if s.policy != nil && s.policy.IsProtectedRoot(value.RootID) && !root.IsInstallerPrivileged(ctx) {
+		return PurgeResult{}, fmt.Errorf(
+			"%w: protected Artifact local-state purge requires installer privilege",
+			spec.ErrProtected,
+		)
+	}
+	if value.Revision != request.ExpectedArtifactRevision {
+		return PurgeResult{}, spec.ErrConflict
+	}
+	updated, err := s.repository.CleanupArtifactLocalState(
+		ctx,
+		request,
+		clockutil.NowUTC(s.clock),
+	)
+	if err != nil {
+		return PurgeResult{}, err
+	}
+	if updated.Ref() != request.Artifact {
+		return PurgeResult{}, fmt.Errorf(
+			"%w: Artifact cleanup repository returned another Artifact",
+			spec.ErrInvalid,
+		)
 	}
 	if s.cleanup != nil {
 		_ = s.cleanup.DrainSecretGarbage(context.WithoutCancel(ctx))
 	}
-	return nil
+	return PurgeResult{Artifact: updated.Clone()}, nil
 }

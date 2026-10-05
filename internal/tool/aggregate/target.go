@@ -3,13 +3,13 @@ package aggregate
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 )
 
 const (
@@ -55,9 +55,9 @@ func (t TargetV1) Validate() error {
 
 func NewMappedTarget(
 	value toolConsumerAPI.ResolvedToolView,
-) (resolve.MappedTarget, error) {
+) (composition.MappedTarget, error) {
 	if !value.Enabled() || !value.Tool.BuiltIn {
-		return resolve.MappedTarget{}, fmt.Errorf(
+		return composition.MappedTarget{}, fmt.Errorf(
 			"%w: Tool %q is disabled",
 			spec.ErrReferenceUnresolved,
 			value.Tool.Artifact.LogicalName,
@@ -72,18 +72,18 @@ func NewMappedTarget(
 		Implementation:   value.Tool.Implementation.Kind,
 	}
 	if err := targetValue.Validate(); err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 
-	identifier, err := resolve.EncodeMappedIdentifier(
+	identifier, err := composition.EncodeMappedIdentifier(
 		targetIdentifierV1,
 		targetValue,
 	)
 	if err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 
-	return resolve.MappedTarget{
+	return composition.MappedTarget{
 		Provider:   MappedTargetProviderV1,
 		Identifier: identifier,
 		Type:       declaration.TypeTool,
@@ -93,7 +93,7 @@ func NewMappedTarget(
 }
 
 func DecodeTarget(
-	target resolve.MappedTarget,
+	target composition.MappedTarget,
 ) (TargetV1, error) {
 	if err := target.Validate(); err != nil {
 		return TargetV1{}, err
@@ -112,7 +112,7 @@ func DecodeTarget(
 		)
 	}
 
-	value, err := resolve.DecodeMappedIdentifier[TargetV1](
+	value, err := composition.DecodeMappedIdentifier[TargetV1](
 		target.Identifier,
 		targetIdentifierV1,
 	)

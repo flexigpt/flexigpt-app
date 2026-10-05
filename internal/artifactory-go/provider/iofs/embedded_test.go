@@ -18,7 +18,7 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 		"assets/one.txt":     &fstest.MapFile{Data: []byte("one")},
 		"assets/dir/two.txt": &fstest.MapFile{Data: []byte("two")},
 	}
-	adapter, err := New(map[string]fs.FS{"fixture": provider})
+	adapter, err := New(t.Context(), map[string]fs.FS{"fixture": provider})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -71,10 +71,10 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(map[string]fs.FS{"missing": nil}); !errors.Is(err, spec.ErrInvalid) {
+	if _, err := New(t.Context(), map[string]fs.FS{"missing": nil}); !errors.Is(err, spec.ErrInvalid) {
 		t.Fatalf("nil provider error=%v, want ErrInvalid", err)
 	}
-	adapter, err := New(nil)
+	adapter, err := New(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("New empty: %v", err)
 	}

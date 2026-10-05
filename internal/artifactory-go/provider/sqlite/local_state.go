@@ -256,7 +256,7 @@ func (r *OverlayRepository) DeleteOverlay(
 		return spec.ErrConflict
 	}
 
-	if err := queueNamespaceBindingSecretsTx(
+	if err := detachNamespaceBindingsTx(
 		ctx,
 		tx,
 		ref,
@@ -264,19 +264,6 @@ func (r *OverlayRepository) DeleteOverlay(
 		now.UTC(),
 	); err != nil {
 		return err
-	}
-
-	if _, err := tx.ExecContext(
-		ctx,
-		`DELETE FROM artifact_secret_bindings
-		 WHERE root_id = ?
-		   AND artifact_id = ?
-		   AND namespace = ?`,
-		string(ref.RootID),
-		string(ref.ArtifactID),
-		string(namespace),
-	); err != nil {
-		return sqliteError(err)
 	}
 
 	result, err := tx.ExecContext(
@@ -452,15 +439,10 @@ func (r *SecretRepository) AttachSecretBinding(
 		return secretModel.Binding{}, spec.ErrConflict
 	}
 
+	var previousRef *secretModel.Ref
 	if found && current.Ref != nil {
-		if err := enqueueSecretRecordTx(
-			ctx,
-			tx,
-			*current.Ref,
-			now.UTC(),
-		); err != nil {
-			return secretModel.Binding{}, err
-		}
+		value := *current.Ref
+		previousRef = &value
 	}
 
 	ref := request.Record.Ref
@@ -533,6 +515,17 @@ func (r *SecretRepository) AttachSecretBinding(
 		)
 		if err != nil {
 			return secretModel.Binding{}, sqliteError(err)
+		}
+	}
+
+	if previousRef != nil {
+		if err := enqueueSecretRecordTx(
+			ctx,
+			tx,
+			*previousRef,
+			now.UTC(),
+		); err != nil {
+			return secretModel.Binding{}, err
 		}
 	}
 
@@ -624,14 +617,7 @@ func (r *SecretRepository) ClearSecretBinding(
 		)
 	}
 
-	if err := enqueueSecretRecordTx(
-		ctx,
-		tx,
-		*current.Ref,
-		now.UTC(),
-	); err != nil {
-		return err
-	}
+	previousRef := *current.Ref
 
 	result, err := tx.ExecContext(
 		ctx,
@@ -658,6 +644,14 @@ func (r *SecretRepository) ClearSecretBinding(
 	if err := requireOneChanged(
 		result,
 		"secret binding changed during clear",
+	); err != nil {
+		return err
+	}
+	if err := enqueueSecretRecordTx(
+		ctx,
+		tx,
+		previousRef,
+		now.UTC(),
 	); err != nil {
 		return err
 	}
@@ -689,41 +683,6 @@ func (r *SecretRepository) QueueSecretForCleanup(
 	defer func() { _ = tx.Rollback() }()
 
 	if err := enqueueSecretRecordTx(ctx, tx, ref, now.UTC()); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-func (r *ArtifactCleanupRepository) PurgeArtifactLocalState(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-	now time.Time,
-) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-	if now.IsZero() {
-		return fmt.Errorf(
-			"%w: local-state purge time is required",
-			spec.ErrInvalid,
-		)
-	}
-
-	tx, err := r.store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := purgeArtifactLocalStateTx(
-		ctx,
-		tx,
-		ref,
-		now.UTC(),
-	); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1230,6 +1189,43 @@ func enqueueSecretRecordTx(
 		return err
 	}
 
+	var bound int
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		 FROM artifact_secret_bindings
+		 WHERE secret_ref = ?`,
+		string(record.Ref),
+	).Scan(&bound); err != nil {
+		return err
+	}
+
+	if bound != 0 {
+		if _, err := tx.ExecContext(
+			ctx,
+			`UPDATE artifact_secret_records
+			 SET state = ?,
+			     modified_at = ?
+			 WHERE ref = ?
+			   AND state != ?`,
+			string(secretModel.RecordStateActive),
+			timeValue(now),
+			string(record.Ref),
+			string(secretModel.RecordStateActive),
+		); err != nil {
+			return sqliteError(err)
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`DELETE FROM artifact_secret_cleanup
+			 WHERE secret_ref = ?`,
+			string(record.Ref),
+		); err != nil {
+			return sqliteError(err)
+		}
+		return nil
+	}
+
 	_, err = tx.ExecContext(
 		ctx,
 		`UPDATE artifact_secret_records
@@ -1259,104 +1255,6 @@ func enqueueSecretRecordTx(
 	return sqliteError(err)
 }
 
-func queueNamespaceBindingSecretsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	ref artifactModel.ArtifactRef,
-	namespace overlayModel.Namespace,
-	now time.Time,
-) error {
-	return queueBindingSecretsTx(
-		ctx,
-		tx,
-		`SELECT DISTINCT secret_ref
-		 FROM artifact_secret_bindings
-		 WHERE root_id = ?
-		   AND artifact_id = ?
-		   AND namespace = ?
-		   AND secret_ref IS NOT NULL`,
-		[]any{
-			string(ref.RootID),
-			string(ref.ArtifactID),
-			string(namespace),
-		},
-		now,
-	)
-}
-
-func queueArtifactBindingSecretsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	ref artifactModel.ArtifactRef,
-	now time.Time,
-) error {
-	return queueBindingSecretsTx(
-		ctx,
-		tx,
-		`SELECT DISTINCT secret_ref
-		 FROM artifact_secret_bindings
-		 WHERE root_id = ?
-		   AND artifact_id = ?
-		   AND secret_ref IS NOT NULL`,
-		[]any{
-			string(ref.RootID),
-			string(ref.ArtifactID),
-		},
-		now,
-	)
-}
-
-func queueRootBindingSecretsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	rootID rootModel.RootID,
-	now time.Time,
-) error {
-	return queueBindingSecretsTx(
-		ctx,
-		tx,
-		`SELECT DISTINCT secret_ref
-		 FROM artifact_secret_bindings
-		 WHERE root_id = ?
-		   AND secret_ref IS NOT NULL`,
-		[]any{string(rootID)},
-		now,
-	)
-}
-
-func queueBindingSecretsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	query string,
-	args []any,
-	now time.Time,
-) error {
-	rows, err := tx.QueryContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	refs := make([]secretModel.Ref, 0)
-	for rows.Next() {
-		var ref string
-		if err := rows.Scan(&ref); err != nil {
-			return err
-		}
-		refs = append(refs, secretModel.Ref(ref))
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	for _, ref := range refs {
-		if err := enqueueSecretRecordTx(ctx, tx, ref, now); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func purgeArtifactLocalStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -1373,15 +1271,6 @@ func purgeArtifactLocalStateTx(
 		return err
 	}
 
-	if err := queueArtifactBindingSecretsTx(
-		ctx,
-		tx,
-		ref,
-		now,
-	); err != nil {
-		return err
-	}
-
 	if _, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_protected_overlays
@@ -1392,16 +1281,7 @@ func purgeArtifactLocalStateTx(
 		return sqliteError(err)
 	}
 
-	if _, err := tx.ExecContext(
-		ctx,
-		`DELETE FROM artifact_secret_bindings
-		 WHERE root_id = ? AND artifact_id = ?`,
-		string(ref.RootID),
-		string(ref.ArtifactID),
-	); err != nil {
-		return sqliteError(err)
-	}
-	return nil
+	return detachArtifactBindingsTx(ctx, tx, ref, now)
 }
 
 // purgeRootLocalStateTx is called from protected-topology reset before the
@@ -1413,15 +1293,6 @@ func purgeRootLocalStateTx(
 	rootID rootModel.RootID,
 	now time.Time,
 ) error {
-	if err := queueRootBindingSecretsTx(
-		ctx,
-		tx,
-		rootID,
-		now,
-	); err != nil {
-		return err
-	}
-
 	if _, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_protected_overlays
@@ -1431,13 +1302,5 @@ func purgeRootLocalStateTx(
 		return sqliteError(err)
 	}
 
-	if _, err := tx.ExecContext(
-		ctx,
-		`DELETE FROM artifact_secret_bindings
-		 WHERE root_id = ?`,
-		string(rootID),
-	); err != nil {
-		return sqliteError(err)
-	}
-	return nil
+	return detachRootBindingsTx(ctx, tx, rootID, now)
 }

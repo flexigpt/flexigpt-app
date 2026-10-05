@@ -18,6 +18,7 @@ import (
 type snapshot struct {
 	provider   fs.FS
 	generation string
+	immutable  bool
 	closed     atomic.Bool
 }
 
@@ -126,6 +127,9 @@ func (s *snapshot) Open(
 func (s *snapshot) Confirm(ctx context.Context) error {
 	if err := s.ensureOpen(ctx); err != nil {
 		return err
+	}
+	if s.immutable {
+		return nil
 	}
 	current, err := fingerprint(ctx, s.provider)
 	if err != nil {

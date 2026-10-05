@@ -28,7 +28,7 @@ type verificationSessionSourceKey struct {
 
 type verificationSessionSource struct {
 	source     sourceModel.Source
-	inspection refreshModel.Inspection
+	inspection *refreshModel.Inspection
 	snapshot   driver.Snapshot
 }
 
@@ -46,6 +46,132 @@ type borrowedVerificationSession struct{}
 
 func (borrowedVerificationSession) Close(context.Context) error {
 	return nil
+}
+
+type borrowedSnapshot struct {
+	driver.Snapshot
+}
+
+func (borrowedSnapshot) Confirm(ctx context.Context) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: borrowed verification snapshot context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	return ctx.Err()
+}
+
+func (borrowedSnapshot) Close() error {
+	return nil
+}
+
+type borrowedTreeRuntime struct {
+	source   sourceModel.Source
+	snapshot driver.Snapshot
+}
+
+func (r borrowedTreeRuntime) Get(
+	ctx context.Context,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.Source, error) {
+	if err := ctx.Err(); err != nil {
+		return sourceModel.Source{}, err
+	}
+	if rootID != r.source.RootID || sourceID != r.source.ID {
+		return sourceModel.Source{}, fmt.Errorf(
+			"%w: Source %q in Root %q",
+			spec.ErrSourceNotFound,
+			sourceID,
+			rootID,
+		)
+	}
+	return r.source.Clone(), nil
+}
+
+func (r borrowedTreeRuntime) List(
+	ctx context.Context,
+	rootID rootModel.RootID,
+) ([]sourceModel.Source, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if rootID != r.source.RootID {
+		return []sourceModel.Source{}, nil
+	}
+	return []sourceModel.Source{r.source.Clone()}, nil
+}
+
+func (r borrowedTreeRuntime) Open(
+	ctx context.Context,
+	value sourceModel.Source,
+) (driver.Snapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if value.RootID != r.source.RootID ||
+		value.ID != r.source.ID ||
+		value.Revision != r.source.Revision {
+		return nil, fmt.Errorf(
+			"%w: borrowed verification snapshot Source changed",
+			spec.ErrConflict,
+		)
+	}
+	return borrowedSnapshot{Snapshot: r.snapshot}, nil
+}
+
+func (s *Service) readSourceTreeInSession(
+	ctx context.Context,
+	session *verificationSession,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	base spec.Locator,
+	include, exclude []string,
+	maximumEntries int,
+	maximumBytes int64,
+) ([]resourceModel.VerifiedEntry, error) {
+	var output []resourceModel.VerifiedEntry
+
+	err := session.withSource(
+		ctx,
+		verificationSessionSourceKey{
+			rootID:   rootID,
+			sourceID: sourceID,
+		},
+		func(current *verificationSessionSource) error {
+			proxy := *s
+			proxy.sources = borrowedTreeRuntime{
+				source:   current.source.Clone(),
+				snapshot: current.snapshot,
+			}
+
+			detached := context.WithValue(
+				ctx,
+				verificationSessionContextKey{},
+				nil,
+			)
+			values, err := proxy.ReadSourceTree(
+				detached,
+				rootID,
+				sourceID,
+				base,
+				include,
+				exclude,
+				maximumEntries,
+				maximumBytes,
+			)
+			if err != nil {
+				return err
+			}
+			output = values
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
 }
 
 // BeginVerificationSession creates a request-scoped session that reuses one
@@ -202,24 +328,11 @@ func (s *verificationSession) sourceLocked(
 	if err != nil {
 		return nil, err
 	}
-	inspection, err := s.service.refresh.InspectSourceMetadata(
-		ctx,
-		value,
-	)
-	if err != nil {
-		return nil, err
-	}
+
 	if !value.Enabled {
 		return nil, fmt.Errorf(
 			"%w: Artifact Source %q is disabled",
 			spec.ErrSourceUnavailable,
-			value.ID,
-		)
-	}
-	if !inspection.IsCurrent() {
-		return nil, fmt.Errorf(
-			"%w: Artifact Source %q changed during batch setup",
-			spec.ErrRefreshRequired,
 			value.ID,
 		)
 	}
@@ -228,24 +341,45 @@ func (s *verificationSession) sourceLocked(
 	if err != nil {
 		return nil, err
 	}
-	if snapshot.Generation() != inspection.State.SourceGeneration {
-		return nil, errors.Join(
-			fmt.Errorf(
-				"%w: Artifact Source %q changed during batch setup",
-				spec.ErrRefreshRequired,
-				value.ID,
-			),
-			snapshot.Close(),
-		)
-	}
 
 	current := &verificationSessionSource{
-		source:     value.Clone(),
-		inspection: inspection.Clone(),
-		snapshot:   snapshot,
+		source:   value.Clone(),
+		snapshot: snapshot,
 	}
 	s.sources[key] = current
 	return current, nil
+}
+
+func (s *verificationSession) ensureRefreshCurrentLocked(
+	ctx context.Context,
+	current *verificationSessionSource,
+) (refreshModel.Inspection, error) {
+	if current == nil {
+		return refreshModel.Inspection{}, spec.ErrClosed
+	}
+	if current.inspection != nil {
+		return current.inspection.Clone(), nil
+	}
+
+	inspection, err := s.service.refresh.InspectSourceMetadata(
+		ctx,
+		current.source,
+	)
+	if err != nil {
+		return refreshModel.Inspection{}, err
+	}
+	if !inspection.IsCurrent() ||
+		current.snapshot.Generation() != inspection.State.SourceGeneration {
+		return refreshModel.Inspection{}, fmt.Errorf(
+			"%w: Artifact Source %q changed during batch setup",
+			spec.ErrRefreshRequired,
+			current.source.ID,
+		)
+	}
+
+	copyValue := inspection.Clone()
+	current.inspection = &copyValue
+	return copyValue, nil
 }
 
 func readVerificationSessionEntry(
@@ -311,6 +445,13 @@ func (s *Service) resolveArtifactInSession(
 			sourceID: record.Binding.SourceID,
 		},
 		func(current *verificationSessionSource) error {
+			inspection, err := session.ensureRefreshCurrentLocked(
+				ctx,
+				current,
+			)
+			if err != nil {
+				return err
+			}
 			content, err := readVerificationSessionEntry(
 				ctx,
 				current.snapshot,
@@ -330,7 +471,7 @@ func (s *Service) resolveArtifactInSession(
 			}
 
 			sourceValue = current.source.Clone()
-			state = current.inspection.State.Clone()
+			state = inspection.State.Clone()
 			return nil
 		},
 	)
@@ -462,4 +603,45 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 		return "", err
 	}
 	return location, nil
+}
+
+func (s *Service) statSourceEntryInSession(
+	ctx context.Context,
+	session *verificationSession,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	locator spec.Locator,
+) (sourceModel.Entry, error) {
+	var output sourceModel.Entry
+
+	err := session.withSource(
+		ctx,
+		verificationSessionSourceKey{
+			rootID:   rootID,
+			sourceID: sourceID,
+		},
+		func(current *verificationSessionSource) error {
+			entry, err := current.snapshot.Stat(ctx, locator)
+			if err != nil {
+				return err
+			}
+			if err := entry.Validate(); err != nil {
+				return err
+			}
+			if entry.Locator != locator {
+				return fmt.Errorf(
+					"%w: Source stat for %q returned %q",
+					spec.ErrInvalid,
+					locator,
+					entry.Locator,
+				)
+			}
+			output = entry
+			return nil
+		},
+	)
+	if err != nil {
+		return sourceModel.Entry{}, err
+	}
+	return output, nil
 }

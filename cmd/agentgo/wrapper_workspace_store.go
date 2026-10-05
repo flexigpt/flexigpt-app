@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -16,8 +13,11 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
 )
 
 type WorkspaceStoreWrapper struct {
@@ -36,8 +36,8 @@ func InitWorkspaceWrappers(
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	locatorResolvers []locator.Factory,
-	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
-	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
+	fallbackProviders map[declaration.Type]composition.FallbackProvider,
+	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
 	mcpServers mcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {

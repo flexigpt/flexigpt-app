@@ -1,0 +1,106 @@
+package decoder
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"path"
+	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+)
+
+const JSONDecoderID spec.DecoderID = "artifact-declaration-json"
+
+type JSONDecoder struct {
+	core *canonicalDecoder
+}
+
+func NewJSONDecoder() *JSONDecoder {
+	return &JSONDecoder{
+		core: newCanonicalDecoder(),
+	}
+}
+
+func (*JSONDecoder) ID() spec.DecoderID {
+	return JSONDecoderID
+}
+
+func (*JSONDecoder) Revision() string {
+	return "artifact-declaration-json/v1"
+}
+
+func (*JSONDecoder) RequiredSchemaKeys() []schemaModel.Key {
+	return newCanonicalDecoder().RequiredSchemaKeys()
+}
+
+func (d *JSONDecoder) BindExpectedCanonicalizer(
+	catalog schema.Catalog,
+) error {
+	if d == nil || d.core == nil {
+		return fmt.Errorf(
+			"%w: canonical JSON declaration decoder is unavailable",
+			spec.ErrInvalid,
+		)
+	}
+	return d.core.BindExpectedCanonicalizer(catalog)
+}
+
+func (*JSONDecoder) Recognize(
+	_ context.Context,
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
+	requested := candidate.RequestsDecoder(JSONDecoderID)
+	declared := topology.IsCanonicalJSONDocument(
+		candidate.Locator,
+	)
+	extension := strings.ToLower(
+		path.Ext(string(candidate.Locator)),
+	)
+	if (extension == ".yaml" || extension == ".yml") && !requested &&
+		!declared {
+		return ingestModel.RecognitionNone
+	}
+
+	var header struct {
+		Type declaration.Type `json:"type"`
+	}
+	if err := json.Unmarshal(candidate.Content, &header); err != nil {
+		if requested || declared {
+			return ingestModel.RecognitionPossible
+		}
+		return ingestModel.RecognitionNone
+	}
+	if !supportsType(header.Type) {
+		if requested || declared {
+			return ingestModel.RecognitionPossible
+		}
+		return ingestModel.RecognitionNone
+	}
+	return ingestModel.RecognitionPreferred
+}
+
+func (d *JSONDecoder) Decode(
+	ctx context.Context,
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
+	if d == nil || d.core == nil {
+		return nil, []diagnostic.Diagnostic{{
+			Severity: diagnostic.SeverityError,
+			Code:     "artifact.declaration-schema-unavailable",
+			Message:  "canonical JSON declaration decoder is unavailable",
+			Location: &diagnostic.Location{Locator: candidate.Locator},
+		}}
+	}
+	return d.core.Decode(
+		ctx,
+		candidate,
+		candidate.Content,
+	)
+}

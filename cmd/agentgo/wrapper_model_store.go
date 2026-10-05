@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -22,11 +22,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
-	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
-	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
 
 type ModelStoreWrapper struct {
@@ -109,7 +109,7 @@ func initModelWrappers(
 		Protection:       protection,
 		Overlays:         overlays,
 		Adapters:         runtimeAdapter,
-		BuiltinRoot:      documentTopology.BuiltinRootID(),
+		BuiltinRoot:      topology.BuiltinRootID(),
 	})
 	if err != nil {
 		return nil, err
@@ -134,8 +134,8 @@ func initModelWrappers(
 	if err != nil {
 		return nil, err
 	}
-	installer, err := modelBuiltin.NewInstaller(
-		modelBuiltin.InstallerDependencies{
+	installer, err := modelcatalog.NewInstaller(
+		modelcatalog.InstallerDependencies{
 			Hydrator: hydrator,
 			Cleanup:  cleanup,
 		},

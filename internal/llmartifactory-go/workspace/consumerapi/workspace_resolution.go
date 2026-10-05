@@ -1,0 +1,111 @@
+package consumerapi
+
+import (
+	"context"
+	"fmt"
+
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
+)
+
+func (a *StoreAPI) resolveCurrentWorkspace(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (
+	workspaceDomain.Workspace,
+	*composition.ResolvedEntry,
+	error,
+) {
+	if a == nil || a.resolver == nil {
+		return workspaceDomain.Workspace{},
+			nil,
+			spec.ErrClosed
+	}
+	workspace, err := a.resolveWorkspace(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, nil, err
+	}
+	resolved, err := a.resolver.ResolveWorkspaceWithCompositionSource(
+		ctx,
+		workspace.Ref(),
+		workspace.CompositionSourceID,
+	)
+	if err != nil {
+		return workspaceDomain.Workspace{}, nil, err
+	}
+	if resolved == nil ||
+		resolved.Type != declaration.TypeWorkspace ||
+		resolved.Workspace == nil {
+		return workspaceDomain.Workspace{}, nil, fmt.Errorf(
+			"%w: Artifact %q did not resolve as a Workspace",
+			spec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+	return workspace, resolved, nil
+}
+
+// ResolveWorkspace is the runtime read boundary. It accepts only a currently
+// effective and enabled Workspace. Management projections use workspaceForRef.
+func (a *StoreAPI) resolveWorkspace(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (workspaceDomain.Workspace, error) {
+	if err := ref.Validate(); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	value, err := a.workspaceForRef(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	if err := a.requireEffectiveWorkspace(ctx, value); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return value, nil
+}
+
+func (a *StoreAPI) workspaceForRef(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (workspaceDomain.Workspace, error) {
+	if a.resolver != nil {
+		terminal, err := a.resolver.ResolveTerminalArtifact(ctx, ref)
+		if err != nil {
+			return workspaceDomain.Workspace{}, err
+		}
+		ref = terminal
+	}
+
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	value, err := a.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+
+	workspace, err := workspaceDomain.NewWorkspace(record, value)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	workspace.CompositionSourceID = record.Binding.SourceID
+
+	sources, err := a.workspaceSources.load(ctx, record.RootID)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	if sources.HasDirectory &&
+		(record.Binding.SourceID == sources.Directory.ID ||
+			(sources.HasPolicy &&
+				record.Binding.SourceID == sources.Policy.ID)) {
+		workspace.CompositionSourceID = sources.Directory.ID
+	}
+	if err := workspace.CompositionSourceID.Validate(); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return workspace, nil
+}

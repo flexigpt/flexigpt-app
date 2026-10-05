@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
@@ -9,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 )
 
-func localSourceDrivers(config Config, base string) ([]driver.Driver, error) {
+func localSourceDrivers(ctx context.Context, config Config, base string) ([]driver.Driver, error) {
 	filesystem, err := fsdir.NewWithTraversalPolicy(config.FilesystemTraversalPolicy)
 	if err != nil {
 		return nil, err
@@ -21,7 +22,7 @@ func localSourceDrivers(config Config, base string) ([]driver.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	embedded, err := iofs.New(config.EmbeddedProviders)
+	embedded, err := iofs.New(ctx, config.EmbeddedProviders)
 	if err != nil {
 		return nil, err
 	}

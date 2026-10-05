@@ -9,18 +9,18 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 )
 
 type ToolSelection struct {
-	ChoiceID              string                 `json:"choiceID"`
-	Target                resolve.MappedTarget   `json:"target"`
-	AutoExecute           bool                   `json:"autoExecute"`
-	UserArgSchemaInstance jsonutil.JSONRawString `json:"userArgSchemaInstance,omitempty"`
+	ChoiceID              string                   `json:"choiceID"`
+	Target                composition.MappedTarget `json:"target"`
+	AutoExecute           bool                     `json:"autoExecute"`
+	UserArgSchemaInstance jsonutil.JSONRawString   `json:"userArgSchemaInstance,omitempty"`
 }
 
 func (s ToolSelection) Validate() error {

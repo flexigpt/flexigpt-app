@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -47,7 +48,7 @@ func NewService(
 func (s *Service) Publish(
 	ctx context.Context,
 	request managepackageModel.PublishRequest,
-) (managepackageModel.PublishResult, error) {
+) (result managepackageModel.PublishResult, returnErr error) {
 	if s == nil {
 		return managepackageModel.PublishResult{}, spec.ErrClosed
 	}
@@ -85,6 +86,46 @@ func (s *Service) Publish(
 	if err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
+	before := state
+	defer func() {
+		if before.Generation == "" {
+			return
+		}
+
+		after, afterErr := s.sourceState(
+			context.WithoutCancel(ctx),
+			request.RootID,
+			request.Binding.SourceID,
+		)
+		if afterErr != nil {
+			returnErr = errors.Join(returnErr, afterErr)
+			return
+		}
+
+		if result.Outcome.PhysicalPackage == managepackageModel.PhysicalPackageUnknown {
+			result.Outcome.PhysicalPackage = managepackageModel.PhysicalPackageUnchanged
+			if after.Generation != before.Generation {
+				result.Outcome.PhysicalPackage = managepackageModel.PhysicalPackageChanged
+			}
+		}
+		result.Outcome.SourceGeneration = after.Generation
+		if returnErr == nil {
+			result.Outcome.SourceAcknowledged = true
+			result.Outcome.RefreshCompleted =
+				result.Refreshed || result.Artifact.ID != ""
+			result.Outcome.ArtifactVerified =
+				result.Artifact.ID != ""
+			return
+		}
+		if result.Outcome.PhysicalPackage ==
+			managepackageModel.PhysicalPackageChanged {
+			result.Outcome.RecoveryRequired = true
+			returnErr = &managepackageModel.PublicationError{
+				Outcome: result.Outcome,
+				Cause:   returnErr,
+			}
+		}
+	}()
 	if err := validateManagedSourceState(
 		state,
 		request.RootID,
@@ -139,6 +180,13 @@ func (s *Service) Publish(
 					Source:     published.Source,
 					Generation: published.Generation,
 					Refreshed:  false,
+					Outcome: managepackageModel.PublicationOutcome{
+						PhysicalPackage:    managepackageModel.PhysicalPackageUnchanged,
+						SourceGeneration:   published.Generation,
+						SourceAcknowledged: true,
+						RefreshCompleted:   true,
+						ArtifactVerified:   true,
+					},
 				}, nil
 			}
 		}
@@ -173,10 +221,103 @@ func (s *Service) Publish(
 		Source:     published.Source,
 		Generation: published.Generation,
 		Refreshed:  true,
+		Outcome: managepackageModel.PublicationOutcome{
+			PhysicalPackage: func() managepackageModel.PhysicalPackageState {
+				if published.Generation == before.Generation {
+					return managepackageModel.PhysicalPackageUnchanged
+				}
+				return managepackageModel.PhysicalPackageChanged
+			}(),
+			SourceGeneration:   published.Generation,
+			SourceAcknowledged: true,
+			RefreshCompleted:   true,
+			ArtifactVerified:   true,
+		},
 	}, nil
 }
 
 func (s *Service) Remove(
+	ctx context.Context,
+	request managepackageModel.RemoveRequest,
+) error {
+	_, err := s.RemoveWithOutcome(ctx, request)
+	return err
+}
+
+func (s *Service) RemoveWithOutcome(
+	ctx context.Context,
+	request managepackageModel.RemoveRequest,
+) (outcome managepackageModel.RemovalOutcome, returnErr error) {
+	before, beforeErr := s.sourceState(
+		ctx,
+		request.RootID,
+		request.SourceID,
+	)
+	if beforeErr != nil {
+		return managepackageModel.RemovalOutcome{}, beforeErr
+	}
+
+	defer func() {
+		after, afterErr := s.sourceState(
+			context.WithoutCancel(ctx),
+			request.RootID,
+			request.SourceID,
+		)
+		if afterErr != nil {
+			returnErr = errors.Join(returnErr, afterErr)
+			return
+		}
+
+		outcome.SourceGeneration = after.Generation
+		outcome.PhysicalPackage = managepackageModel.PhysicalPackageUnchanged
+		if after.Generation != before.Generation {
+			outcome.PhysicalPackage = managepackageModel.PhysicalPackageChanged
+		}
+
+		if returnErr == nil {
+			outcome.SourceAcknowledged = true
+			outcome.DiscoveryPruned =
+				request.PruneDiscoveryLocator != nil &&
+					after.Source.Discovery.Empty()
+			if after.Source.Discovery.Empty() {
+				outcome.RefreshCompleted = true
+			} else if inspection, err := s.dependencies.Refresh.InspectSource(
+				context.WithoutCancel(ctx),
+				request.RootID,
+				request.SourceID,
+			); err == nil {
+				outcome.RefreshCompleted = inspection.IsCurrent()
+			}
+
+			if request.ExpectedArtifact != nil {
+				record, err := s.dependencies.Artifacts.Get(
+					context.WithoutCancel(ctx),
+					*request.ExpectedArtifact,
+				)
+				if err != nil {
+					returnErr = err
+					return
+				}
+				outcome.ExpectedArtifactMissing =
+					record.State == artifactModel.StateMissing
+			}
+			return
+		}
+
+		if outcome.PhysicalPackage ==
+			managepackageModel.PhysicalPackageChanged {
+			outcome.RecoveryRequired = true
+			returnErr = &managepackageModel.RemovalError{
+				Outcome: outcome,
+				Cause:   returnErr,
+			}
+		}
+	}()
+
+	return outcome, s.remove(ctx, request)
+}
+
+func (s *Service) remove(
 	ctx context.Context,
 	request managepackageModel.RemoveRequest,
 ) error {

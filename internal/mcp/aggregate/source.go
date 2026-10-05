@@ -7,25 +7,25 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcpv1"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 // RuntimeServerSource is the Store-to-Runtime anti-corruption adapter.
 // Runtime receives only runtime/spec values and never Store values.
 type RuntimeServerSource struct {
 	servers     *ArtifactServerResolver
-	secrets     mcpDomainServer.SecretResolver
-	environment mcpDomainServer.EnvironmentResolver
+	secrets     serverMCPDomain.SecretResolver
+	environment serverMCPDomain.EnvironmentResolver
 }
 
 func NewRuntimeServerSource(
 	servers *ArtifactServerResolver,
-	secrets mcpDomainServer.SecretResolver,
-	environment mcpDomainServer.EnvironmentResolver,
+	secrets serverMCPDomain.SecretResolver,
+	environment serverMCPDomain.EnvironmentResolver,
 ) (*RuntimeServerSource, error) {
 	if servers == nil {
 		return nil, errors.New("MCP Artifact server resolver is required")
@@ -75,7 +75,7 @@ func (s *RuntimeServerSource) ResolveServer(
 
 func (s *RuntimeServerSource) InspectRuntimeConfig(
 	ctx context.Context,
-	resolved mcpDomainServer.Resolved,
+	resolved serverMCPDomain.Resolved,
 ) (mcpServer.RuntimeConfig, error) {
 	if s == nil {
 		return mcpServer.RuntimeConfig{}, mcpServer.ErrClosed
@@ -91,8 +91,8 @@ func (s *RuntimeServerSource) InspectRuntimeConfig(
 }
 
 func runtimeConfig(
-	resolved mcpDomainServer.Resolved,
-	input mcpDomainServer.MaterializedServer,
+	resolved serverMCPDomain.Resolved,
+	input serverMCPDomain.MaterializedServer,
 ) (mcpServer.RuntimeConfig, error) {
 	serverID, err := runtimeServerIDForArtifact(resolved.Server)
 	if err != nil {
@@ -123,7 +123,7 @@ func runtimeConfig(
 	}
 
 	switch input.Core.Type {
-	case mcpDomainServer.ServerTypeStdio:
+	case serverMCPDomain.ServerTypeStdio:
 		output.Transport = mcpServer.MCPTransportStdio
 		output.Stdio = &mcpServer.MCPRuntimeStdioConfig{
 			Command:          input.Core.Command,
@@ -132,7 +132,7 @@ func runtimeConfig(
 			StartupTimeoutMS: input.TimeoutMS,
 		}
 
-	case mcpDomainServer.ServerTypeHTTP:
+	case serverMCPDomain.ServerTypeHTTP:
 		authMode, err := runtimeHTTPAuthMode(input.Auth.Mode)
 		if err != nil {
 			return mcpServer.RuntimeConfig{}, err
@@ -172,7 +172,7 @@ func runtimeCatalogIDForRoot(
 }
 
 func runtimeInclude(
-	input *mcpDomainServer.Include,
+	input *serverMCPDomain.Include,
 ) *mcpServer.MCPInclude {
 	if input == nil {
 		return nil

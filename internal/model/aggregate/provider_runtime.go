@@ -9,7 +9,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
 )
 
 // ProviderRuntimePublisher owns the long-lived in-memory inference Provider

@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 // ArtifactServerResolver translates a runtime-owned opaque ServerID only at
@@ -28,18 +28,18 @@ func NewArtifactServerResolver(
 func (r *ArtifactServerResolver) ResolveMCPServer(
 	ctx context.Context,
 	serverID mcpServer.ServerID,
-) (mcpDomainServer.Resolved, error) {
+) (serverMCPDomain.Resolved, error) {
 	if r == nil || r.store == nil {
-		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed
+		return serverMCPDomain.Resolved{}, mcpServer.ErrClosed
 	}
 
 	ref, err := artifactRefForRuntimeServerID(serverID)
 	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return serverMCPDomain.Resolved{}, err
 	}
 	read, err := r.store.ResolveMCPServer(ctx, ref)
 	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return serverMCPDomain.Resolved{}, err
 	}
 	return read.Resolved, nil
 }
@@ -47,13 +47,13 @@ func (r *ArtifactServerResolver) ResolveMCPServer(
 func (r *ArtifactServerResolver) InspectMCPServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (mcpDomainServer.Resolved, error) {
+) (serverMCPDomain.Resolved, error) {
 	if r == nil || r.store == nil {
-		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed
+		return serverMCPDomain.Resolved{}, mcpServer.ErrClosed
 	}
 	read, err := r.store.ResolveMCPServer(ctx, ref)
 	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return serverMCPDomain.Resolved{}, err
 	}
 	return read.Resolved, nil
 }

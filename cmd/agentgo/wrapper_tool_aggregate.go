@@ -6,13 +6,13 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
 
 type ToolAggregateWrapper struct {
@@ -60,17 +60,17 @@ func withToolAggregate[T any](
 
 func (w *ToolAggregateWrapper) MapToolTarget(
 	ref artifactModel.ArtifactRef,
-) (resolve.MappedTarget, error) {
+) (composition.MappedTarget, error) {
 	return withToolAggregate(
 		w,
-		func(service *toolAggregate.Service) (resolve.MappedTarget, error) {
+		func(service *toolAggregate.Service) (composition.MappedTarget, error) {
 			return service.MapToolTarget(context.Background(), ref)
 		},
 	)
 }
 
 func (w *ToolAggregateWrapper) ResolveMappedTool(
-	target resolve.MappedTarget,
+	target composition.MappedTarget,
 ) (toolConsumerAPI.ResolvedToolView, error) {
 	return withToolAggregate(
 		w,
@@ -136,14 +136,14 @@ func (w *ToolAggregateWrapper) ready() error {
 // target translation because it resolves enabled Tool Artifacts and their
 // containing Tool Collections.
 func (w *ToolAggregateWrapper) targetMappers() (
-	map[declaration.Type]resolve.ArtifactTargetMapper,
+	map[declaration.Type]composition.ArtifactTargetMapper,
 	error,
 ) {
 	if err := w.ready(); err != nil {
 		return nil, err
 	}
 
-	return map[declaration.Type]resolve.ArtifactTargetMapper{
+	return map[declaration.Type]composition.ArtifactTargetMapper{
 		declaration.TypeTool: w.service,
 	}, nil
 }

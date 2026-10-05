@@ -12,8 +12,8 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
 const mcpGlobalSettingsSchemaVersion = "v1"

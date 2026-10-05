@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
 )
 
 type Service struct {
@@ -157,35 +157,35 @@ func (s *Service) ResolveRuntimeConfiguration(
 func (s *Service) MapModelTarget(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (resolve.MappedTarget, error) {
+) (composition.MappedTarget, error) {
 	if err := s.ready(ctx); err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 
 	resolved, err := s.store.ResolveModel(ctx, ref)
 	if err != nil {
-		return resolve.MappedTarget{}, err
+		return composition.MappedTarget{}, err
 	}
 	return NewMappedTarget(resolved)
 }
 
 func (s *Service) MapArtifactTarget(
 	ctx context.Context,
-	request resolve.ArtifactTargetRequest,
-) (resolve.MappedTarget, bool, error) {
+	request composition.ArtifactTargetRequest,
+) (composition.MappedTarget, bool, error) {
 	if err := s.ready(ctx); err != nil {
-		return resolve.MappedTarget{}, false, err
+		return composition.MappedTarget{}, false, err
 	}
 	if request.Type != declaration.TypeModel {
-		return resolve.MappedTarget{}, false, nil
+		return composition.MappedTarget{}, false, nil
 	}
 
 	resolved, err := s.store.ResolveModel(ctx, request.Artifact.Ref())
 	if err != nil {
-		return resolve.MappedTarget{}, true, err
+		return composition.MappedTarget{}, true, err
 	}
 	if request.Definition.Digest != resolved.Model.Definition.Digest {
-		return resolve.MappedTarget{}, true, fmt.Errorf(
+		return composition.MappedTarget{}, true, fmt.Errorf(
 			"%w: Model Definition changed during target mapping",
 			spec.ErrRefreshRequired,
 		)
@@ -197,7 +197,7 @@ func (s *Service) MapArtifactTarget(
 
 func (s *Service) ResolveMappedRuntimeModel(
 	ctx context.Context,
-	target resolve.MappedTarget,
+	target composition.MappedTarget,
 ) (RuntimeConfiguration, error) {
 	if err := s.ready(ctx); err != nil {
 		return RuntimeConfiguration{}, err

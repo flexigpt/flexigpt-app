@@ -1,0 +1,62 @@
+package domain
+
+import (
+	"fmt"
+
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+)
+
+// ArtifactNameReferenceLookupRoots returns the only Roots allowed for a
+// Model-to-Provider or Provider-to-Model logical-name reference in v1.
+//
+// An unscoped reference searches the current Root first and then the
+// protected built-in Root. A builtin-scoped reference searches only the
+// protected built-in Root. Arbitrary cross-root references are intentionally
+// not supported.
+func ArtifactNameReferenceLookupRoots(
+	reference declaration.ArtifactNameReference,
+	currentRoot rootModel.RootID,
+	builtinRoot rootModel.RootID,
+) ([]rootModel.RootID, error) {
+	if err := reference.Validate(); err != nil {
+		return nil, err
+	}
+	if err := currentRoot.Validate(); err != nil {
+		return nil, err
+	}
+
+	switch reference.Scope {
+	case declaration.LookupScopeBuiltin:
+		if builtinRoot == "" {
+			return nil, fmt.Errorf(
+				"%w: built-in lookup is unavailable",
+				spec.ErrReferenceUnresolved,
+			)
+		}
+		if err := builtinRoot.Validate(); err != nil {
+			return nil, err
+		}
+		return []rootModel.RootID{builtinRoot}, nil
+
+	case "":
+		output := make([]rootModel.RootID, 0, 2)
+		output = append(output, currentRoot)
+
+		if builtinRoot == "" || builtinRoot == currentRoot {
+			return output, nil
+		}
+		if err := builtinRoot.Validate(); err != nil {
+			return nil, err
+		}
+		return append(output, builtinRoot), nil
+
+	default:
+		return nil, fmt.Errorf(
+			"%w: unsupported Model reference scope %q",
+			spec.ErrInvalid,
+			reference.Scope,
+		)
+	}
+}

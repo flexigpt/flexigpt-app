@@ -6,9 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -22,6 +20,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -29,9 +32,6 @@ import (
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/sdkclient"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpBuiltin "github.com/flexigpt/flexigpt-app/internal/mcp/store/builtin"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
 const (
@@ -60,8 +60,8 @@ func initMCPWrappers(
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	locatorResolvers []locator.Factory,
-	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
-	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
+	fallbackProviders map[declaration.Type]composition.FallbackProvider,
+	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
 ) (installFlow.HydrationInstaller, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
@@ -278,8 +278,8 @@ func newMCPBuiltInInstaller(
 			"MCP generated built-in installer dependencies are incomplete",
 		)
 	}
-	return mcpBuiltin.NewInstaller(
-		mcpBuiltin.InstallerDependencies{
+	return mcpcatalog.NewInstaller(
+		mcpcatalog.InstallerDependencies{
 			Hydrator: hydrator,
 			Cleanup:  cleanup,
 		},
