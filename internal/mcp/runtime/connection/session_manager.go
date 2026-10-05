@@ -252,7 +252,7 @@ func (m *MCPRuntimeManager) InvalidateCatalog(
 	ctx context.Context,
 	ref mcpServer.CatalogID,
 ) error {
-	if err := validateRuntimeCollectionRef(ctx, ref); err != nil {
+	if err := validateRuntimePluginRef(ctx, ref); err != nil {
 		return err
 	}
 
@@ -1455,7 +1455,7 @@ func validateRuntimeRef(
 	return ref.Validate()
 }
 
-func validateRuntimeCollectionRef(
+func validateRuntimePluginRef(
 	ctx context.Context,
 	ref mcpServer.CatalogID,
 ) error {

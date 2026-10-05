@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	policyMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/policy"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
+	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
@@ -31,7 +31,7 @@ func (a *API) SaveMCPPolicy(
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
@@ -79,11 +79,11 @@ func (a *API) SaveMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	membership, err := a.plugins.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForPluginSource(
 		ctx,
-		plugin.EnsureMemberForCollectionSourceRequest{
+		plugin.EnsureMemberForPluginSourceRequest{
 			Plugin:           request.Plugin,
-			ExpectedRevision: request.ExpectedCollectionRevision,
+			ExpectedRevision: request.ExpectedPluginRevision,
 			Type:             mcppolicyv1.MCPPolicyType,
 			Name:             request.Name,
 			Locator:          locator,

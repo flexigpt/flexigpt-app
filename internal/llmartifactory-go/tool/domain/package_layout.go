@@ -20,11 +20,11 @@ func ToolPackageAddress(
 	)
 }
 
-func ToolCollectionPackageAddress(
+func ToolPluginPackageAddress(
 	name spec.LogicalName,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return managedpackageModel.NewManagedPackageAddress(
-		ToolCollectionPackageKind,
+		ToolPluginPackageKind,
 		name,
 		topology.UnversionedPackageVersion(),
 	)
@@ -40,12 +40,12 @@ func ToolPackageAddressFromLocator(
 	)
 }
 
-func ToolCollectionPackageAddressFromLocator(
+func ToolPluginPackageAddressFromLocator(
 	locator spec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return packageAddressFromLocator(
-		ToolCollectionPackageKind,
-		ToolCollectionDocumentFile(),
+		ToolPluginPackageKind,
+		ToolPluginDocumentFile(),
 		locator,
 	)
 }

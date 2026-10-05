@@ -26,7 +26,7 @@ func (a *API) CreateMCPServer(
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return ManagedMCPCreateResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
@@ -57,11 +57,11 @@ func (a *API) CreateMCPServer(
 		return ManagedMCPCreateResult{}, err
 	}
 
-	membership, err := a.plugins.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForPluginSource(
 		ctx,
-		plugin.EnsureMemberForCollectionSourceRequest{
+		plugin.EnsureMemberForPluginSourceRequest{
 			Plugin:           request.Plugin,
-			ExpectedRevision: request.ExpectedCollectionRevision,
+			ExpectedRevision: request.ExpectedPluginRevision,
 			Type:             declaration.TypeMCP,
 			Name:             request.Document.LogicalName,
 			Locator:          locator,
@@ -159,7 +159,7 @@ func (a *API) UpdateMCPServer(
 			spec.ErrInvalid,
 		)
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
@@ -182,7 +182,7 @@ func (a *API) UpdateMCPServer(
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
+	if collectionView.Artifact.Revision != request.ExpectedPluginRevision {
 		return ManagedMCPReplaceResult{}, spec.ErrConflict
 	}
 	if !collectionView.Editable &&

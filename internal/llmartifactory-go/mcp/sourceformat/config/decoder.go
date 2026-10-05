@@ -30,7 +30,7 @@ func (*Decoder) Recognize(
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	switch {
-	case IsRetiredMCPCollection(candidate.Content):
+	case IsRetiredMCPPlugin(candidate.Content):
 		return ingestModel.RecognitionPreferred
 	case IsMCPConfig(candidate.Content):
 		return ingestModel.RecognitionPreferred
@@ -57,7 +57,7 @@ func (d *Decoder) Decode(
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	switch {
-	case IsRetiredMCPCollection(candidate.Content):
+	case IsRetiredMCPPlugin(candidate.Content):
 		return nil, decoderError(
 			candidate.Locator,
 			"",

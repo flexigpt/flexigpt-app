@@ -130,7 +130,7 @@ func preparePackage(
 		)
 	}
 
-	plugin, expectations, err := canonicalCollectionPackage(
+	plugin, expectations, err := canonicalPluginPackage(
 		documentFile,
 		document,
 		files,
@@ -160,7 +160,7 @@ func preparePackage(
 	}
 
 	address, err := managedpackageModel.NewManagedPackageAddress(
-		skillDomain.BuiltinSkillCollectionPackageKind,
+		skillDomain.BuiltinSkillPluginPackageKind,
 		packageName,
 		topology.UnversionedPackageVersion(),
 	)
@@ -177,7 +177,7 @@ func preparePackage(
 	}, nil
 }
 
-func canonicalCollectionPackage(
+func canonicalPluginPackage(
 	documentFile spec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,

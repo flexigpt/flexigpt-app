@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	ManagedCollectionPackageKind managedpackageModel.PackageKind = "plugin"
+	ManagedPluginPackageKind managedpackageModel.PackageKind = "plugin"
 )
 
 type API struct {
@@ -192,7 +192,7 @@ type MemberMutationResult struct {
 	Created bool       `json:"created"`
 }
 
-type editableCollection struct {
+type editablePlugin struct {
 	artifact   artifactModel.Artifact
 	document   pluginv1.PluginDocument
 	address    managedpackageModel.ManagedPackageAddress
@@ -262,7 +262,7 @@ func (a *API) List(
 	ctx context.Context,
 	request ListRequest,
 ) ([]ListItem, error) {
-	return a.listCollections(ctx, request, false)
+	return a.listPlugins(ctx, request, false)
 }
 
 func (a *API) Update(
@@ -279,7 +279,7 @@ func (a *API) Update(
 		)
 	}
 
-	value, err := a.loadEditableCollection(
+	value, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -343,7 +343,7 @@ func (a *API) RemoveMember(
 		)
 	}
 
-	value, err := a.loadEditableCollection(
+	value, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -443,7 +443,7 @@ func (a *API) AddArtifactMember(
 		Type: declarationType,
 		Name: target.LogicalName,
 	}
-	collectionValue, err := a.loadEditableCollection(
+	collectionValue, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -472,10 +472,10 @@ func (a *API) AddArtifactMember(
 	)
 }
 
-// MemberForCollectionSource builds a location-constrained external reference
+// MemberForPluginSource builds a location-constrained external reference
 // for a declaration that will be published into the same managed Source as
 // the Plugin.
-func (a *API) MemberForCollectionSource(
+func (a *API) MemberForPluginSource(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 	declarationType declaration.Type,
@@ -500,7 +500,7 @@ func (a *API) MemberForCollectionSource(
 		return MemberReference{}, err
 	}
 
-	value, err := a.loadEditableCollection(ctx, collectionRef, 0)
+	value, err := a.loadEditablePlugin(ctx, collectionRef, 0)
 	if err != nil {
 		return MemberReference{}, err
 	}
@@ -532,7 +532,7 @@ func (a *API) Delete(
 		)
 	}
 
-	value, err := a.loadEditableCollection(
+	value, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -540,7 +540,7 @@ func (a *API) Delete(
 	if err != nil {
 		return err
 	}
-	if a.isBaselineEditableCollection(value) {
+	if a.isBaselineEditablePlugin(value) {
 		return fmt.Errorf(
 			"%w: baseline Plugin %q cannot be deleted",
 			spec.ErrProtected,
@@ -589,7 +589,7 @@ func (a *API) Delete(
 	)
 }
 
-func (a *API) resolveCollectionRef(
+func (a *API) resolvePluginRef(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.ArtifactRef, error) {
@@ -656,11 +656,11 @@ func (a *API) create(
 	if err != nil {
 		return PluginView{}, err
 	}
-	address, err := a.managedCollectionAddress(request.Name)
+	address, err := a.managedPluginAddress(request.Name)
 	if err != nil {
 		return PluginView{}, err
 	}
-	locator, err := address.FileLocator(a.managedCollectionDocumentFile())
+	locator, err := address.FileLocator(a.managedPluginDocumentFile())
 	if err != nil {
 		return PluginView{}, err
 	}
@@ -777,7 +777,7 @@ func (a *API) mutateEntry(
 		return MemberMutationResult{}, err
 	}
 
-	value, err := a.loadEditableCollection(
+	value, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -897,8 +897,8 @@ func (a *API) publishDocument(
 	expectedGeneration string,
 	allowPackageReplacement bool,
 ) (artifactModel.Artifact, error) {
-	documentFile := a.managedCollectionDocumentFile()
-	decoderID, err := a.managedCollectionDecoderID()
+	documentFile := a.managedPluginDocumentFile()
+	decoderID, err := a.managedPluginDecoderID()
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -951,42 +951,42 @@ func (a *API) publishDocument(
 	return published.Artifact, nil
 }
 
-func (a *API) loadEditableCollection(
+func (a *API) loadEditablePlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
-) (editableCollection, error) {
+) (editablePlugin, error) {
 	if err := a.requireDeclarationAuthoring(); err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if record.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Artifact %q is not a Plugin",
 			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if expectedRevision != 0 && record.Revision != expectedRevision {
-		return editableCollection{}, spec.ErrConflict
+		return editablePlugin{}, spec.ErrConflict
 	}
 	if record.State != artifactModel.StateAvailable {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
-		return editableCollection{}, fmt.Errorf(
-			"%w: contained Plugin declarations are not editable managed Collections",
+		return editablePlugin{}, fmt.Errorf(
+			"%w: contained Plugin declarations are not editable managed Plugins",
 			spec.ErrUnsupported,
 		)
 	}
@@ -997,36 +997,36 @@ func (a *API) loadEditableCollection(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if sourceValue.Kind != managedfs.Kind {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin is not backed by a managed Source",
 			spec.ErrUnsupported,
 		)
 	}
 	if !sourceValue.Enabled {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin Source is disabled",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 	if a.domain != nil &&
 		sourceValue.StorageKey != a.domain.SourceStorageKey {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin belongs to another managed domain Source",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 
-	address, err := a.managedCollectionAddressFromLocator(
+	address, err := a.managedPluginAddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if address.Name != record.LogicalName {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: managed Plugin package name does not match Artifact identity",
 			spec.ErrInvalid,
 		)
@@ -1038,10 +1038,10 @@ func (a *API) loadEditableCollection(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if !inspection.IsCurrent() {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: managed Plugin Source requires refresh",
 			spec.ErrRefreshRequired,
 		)
@@ -1049,30 +1049,30 @@ func (a *API) loadEditableCollection(
 
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	document, err := pluginv1.FromDefinition(
 		definitionValue,
 	)
 	if err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
 	if document.Name != string(record.LogicalName) {
-		return editableCollection{}, fmt.Errorf(
+		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",
 			spec.ErrInvalid,
 		)
 	}
 	if document.Locator != nil {
-		return editableCollection{}, fmt.Errorf(
-			"%w: located Plugin aliases are not editable managed Collections",
+		return editablePlugin{}, fmt.Errorf(
+			"%w: located Plugin aliases are not editable managed Plugins",
 			spec.ErrUnsupported,
 		)
 	}
 	if err := a.validateEditableDomainDocument(document); err != nil {
-		return editableCollection{}, err
+		return editablePlugin{}, err
 	}
-	return editableCollection{
+	return editablePlugin{
 		artifact:   record,
 		document:   document,
 		address:    address,
@@ -1080,16 +1080,16 @@ func (a *API) loadEditableCollection(
 	}, nil
 }
 
-func (a *API) managedCollectionAddress(
+func (a *API) managedPluginAddress(
 	name spec.LogicalName,
 ) (managedpackageModel.ManagedPackageAddress, error) {
-	return managedCollectionAddressFor(
-		a.managedCollectionPackageKind(),
+	return managedPluginAddressFor(
+		a.managedPluginPackageKind(),
 		name,
 	)
 }
 
-func managedCollectionAddressFor(
+func managedPluginAddressFor(
 	packageKind managedpackageModel.PackageKind,
 	name spec.LogicalName,
 ) (managedpackageModel.ManagedPackageAddress, error) {
@@ -1100,53 +1100,53 @@ func managedCollectionAddressFor(
 	)
 }
 
-func (a *API) managedCollectionAddressFromLocator(
+func (a *API) managedPluginAddressFromLocator(
 	locator spec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
-	return managedCollectionAddressFromLocatorFor(
-		a.managedCollectionPackageKind(),
-		a.managedCollectionDocumentFile(),
+	return managedPluginAddressFromLocatorFor(
+		a.managedPluginPackageKind(),
+		a.managedPluginDocumentFile(),
 		locator,
 	)
 }
 
-func (a *API) managedCollectionPackageKind() managedpackageModel.PackageKind {
+func (a *API) managedPluginPackageKind() managedpackageModel.PackageKind {
 	if a != nil && a.domain != nil && a.domain.PackageKind != "" {
 		return a.domain.PackageKind
 	}
-	return ManagedCollectionPackageKind
+	return ManagedPluginPackageKind
 }
 
-func (a *API) managedCollectionDocumentUse() string {
+func (a *API) managedPluginDocumentUse() string {
 	if a != nil && a.domain != nil && a.domain.DocumentUse != "" {
 		return a.domain.DocumentUse
 	}
 	return topology.DocumentUseManagedPlugin
 }
 
-func (a *API) managedCollectionDocumentFile() spec.Locator {
+func (a *API) managedPluginDocumentFile() spec.Locator {
 	return topology.MustDefaultDocumentFile(
-		a.managedCollectionDocumentUse(),
+		a.managedPluginDocumentUse(),
 	)
 }
 
-func (a *API) managedCollectionDecoderID() (spec.DecoderID, error) {
+func (a *API) managedPluginDecoderID() (spec.DecoderID, error) {
 	return topology.DefaultDocumentDecoderID(
-		a.managedCollectionDocumentUse(),
+		a.managedPluginDocumentUse(),
 	)
 }
 
-func managedCollectionAddressFromLocator(
+func managedPluginAddressFromLocator(
 	locator spec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
-	return managedCollectionAddressFromLocatorFor(
-		ManagedCollectionPackageKind,
+	return managedPluginAddressFromLocatorFor(
+		ManagedPluginPackageKind,
 		topology.MustDefaultDocumentFile(topology.DocumentUseManagedPlugin),
 		locator,
 	)
 }
 
-func managedCollectionAddressFromLocatorFor(
+func managedPluginAddressFromLocatorFor(
 	packageKind managedpackageModel.PackageKind,
 	documentFile spec.Locator,
 	locator spec.Locator,
@@ -1204,7 +1204,7 @@ func (a *API) collectionViewOf(
 ) (PluginView, error) {
 	baseline := IsBaselinePluginArtifact(record)
 	if a != nil && a.domain != nil {
-		address, err := a.managedCollectionAddressFromLocator(
+		address, err := a.managedPluginAddressFromLocator(
 			record.Binding.Locator,
 		)
 		if err == nil &&
@@ -1213,7 +1213,7 @@ func (a *API) collectionViewOf(
 			baseline = true
 		}
 	}
-	return readCollectionViewOf(
+	return readPluginViewOf(
 		record,
 		document,
 		true,
@@ -1368,8 +1368,8 @@ func locatorParts(value string) []string {
 	return strings.Split(value, "/")
 }
 
-func (a *API) isBaselineEditableCollection(
-	value editableCollection,
+func (a *API) isBaselineEditablePlugin(
+	value editablePlugin,
 ) bool {
 	return a != nil &&
 		a.domain != nil &&

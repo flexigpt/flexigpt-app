@@ -218,7 +218,7 @@ func projectAgentBoolean(
 	return &value, nil
 }
 
-func (a *API) listCollectionAgentRefs(
+func (a *API) listPluginAgentRefs(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]artifactModel.ArtifactRef, error) {

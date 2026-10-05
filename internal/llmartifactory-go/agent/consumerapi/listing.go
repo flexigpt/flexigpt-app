@@ -76,7 +76,7 @@ func (a *API) ListAgents(
 			)
 		}
 
-		refs, err := a.listCollectionAgentRefs(ctx, *request.Plugin)
+		refs, err := a.listPluginAgentRefs(ctx, *request.Plugin)
 		if err != nil {
 			return nil, err
 		}

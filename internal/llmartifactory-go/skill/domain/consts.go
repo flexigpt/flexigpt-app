@@ -6,17 +6,17 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
+	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 )
 
 const (
 	SkillArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 		skillv1.SkillType,
 	)
-	ManagedSkillPackageKind           managedpackageModel.PackageKind = "skill"
-	BuiltinSkillCollectionPackageKind managedpackageModel.PackageKind = "skill-collection"
-	SkillSchemaID                     schemaModel.SchemaID            = skillv1.SkillSchemaID
-	MarkdownDecoderID                 spec.DecoderID                  = "agent.skill-markdown"
+	ManagedSkillPackageKind       managedpackageModel.PackageKind = "skill"
+	BuiltinSkillPluginPackageKind managedpackageModel.PackageKind = "skill-collection"
+	SkillSchemaID                 schemaModel.SchemaID            = skillv1.SkillSchemaID
+	MarkdownDecoderID             spec.DecoderID                  = "agent.skill-markdown"
 
 	SkillSchemaVersion     = skillv1.SkillSchemaVersion
 	InsertLabelKey         = "skill.insert"

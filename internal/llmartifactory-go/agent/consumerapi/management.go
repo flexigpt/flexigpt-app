@@ -44,7 +44,7 @@ func (a *API) ListAgentsForManagement(
 	return output, nil
 }
 
-func (a *API) ListAgentCollectionsForManagement(
+func (a *API) ListAgentPluginsForManagement(
 	ctx context.Context,
 ) ([]plugin.ListItem, error) {
 	roots, err := a.managementRoots(ctx)
@@ -54,7 +54,7 @@ func (a *API) ListAgentCollectionsForManagement(
 
 	output := make([]plugin.ListItem, 0)
 	for _, rootValue := range roots {
-		values, err := a.ListAgentCollections(ctx, rootValue.ID)
+		values, err := a.ListAgentPlugins(ctx, rootValue.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -98,9 +98,9 @@ func (a *API) ListAgentImportDestinationsForManagement(
 		if output[left].RootID != output[right].RootID {
 			return output[left].RootID < output[right].RootID
 		}
-		if output[left].CollectionName != output[right].CollectionName {
-			return output[left].CollectionName <
-				output[right].CollectionName
+		if output[left].PluginName != output[right].PluginName {
+			return output[left].PluginName <
+				output[right].PluginName
 		}
 		return output[left].Plugin.ArtifactID <
 			output[right].Plugin.ArtifactID
@@ -108,7 +108,7 @@ func (a *API) ListAgentImportDestinationsForManagement(
 	return output, nil
 }
 
-func (a *API) ensureDefaultAgentCollectionRoot(
+func (a *API) ensureDefaultAgentPluginRoot(
 	ctx context.Context,
 ) (rootModel.RootID, error) {
 	if a == nil || a.roots == nil {

@@ -63,13 +63,13 @@ func (a *API) readOnlyDomainOrigin(record artifactModel.Artifact) bool {
 		return false
 	}
 
-	actual, err := a.managedCollectionAddressFromLocator(
+	actual, err := a.managedPluginAddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
 		return false
 	}
-	expected, err := a.managedCollectionAddress(record.LogicalName)
+	expected, err := a.managedPluginAddress(record.LogicalName)
 	if err != nil {
 		return false
 	}

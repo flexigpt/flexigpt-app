@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
 
 // ListRequest is the public Plugin listing request.
@@ -59,7 +59,7 @@ type collectionProjection struct {
 	members  []collectionMemberShape
 }
 
-func (a *API) listCollections(
+func (a *API) listPlugins(
 	ctx context.Context,
 	request ListRequest,
 	domainOnly bool,
@@ -307,7 +307,7 @@ func (a *API) collectionVisibleInList(
 			entry.Binding.SubresourceLocator != "" {
 			return false, nil
 		}
-		address, err := a.managedCollectionAddressFromLocator(
+		address, err := a.managedPluginAddressFromLocator(
 			entry.Binding.Locator,
 		)
 		if err != nil || address.Name != entry.LogicalName {
@@ -345,7 +345,7 @@ func (a *API) collectionListEditability(
 		return false, false
 	}
 
-	address, err := a.managedCollectionAddressFromLocator(
+	address, err := a.managedPluginAddressFromLocator(
 		entry.Binding.Locator,
 	)
 	if err != nil || address.Name != entry.LogicalName ||

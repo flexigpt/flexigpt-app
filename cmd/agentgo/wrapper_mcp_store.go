@@ -71,14 +71,14 @@ func (w *MCPStoreWrapper) ListMCPPolicies(
 	})
 }
 
-func (w *MCPStoreWrapper) ListMCPCollectionsPage(
+func (w *MCPStoreWrapper) ListMCPPluginsPage(
 	pageSize int,
 	pageToken string,
-) (mcpConsumerAPI.CollectionPage, error) {
+) (mcpConsumerAPI.PluginPage, error) {
 	return withMCPStoreManagement(
 		w,
-		func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.CollectionPage, error) {
-			return service.ListCollectionsPage(context.Background(), pageSize, pageToken)
+		func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.PluginPage, error) {
+			return service.ListPluginsPage(context.Background(), pageSize, pageToken)
 		},
 	)
 }
@@ -152,7 +152,7 @@ func (w *MCPStoreWrapper) GetMCPPolicy(
 	})
 }
 
-func (w *MCPStoreWrapper) CreateMCPCollection(
+func (w *MCPStoreWrapper) CreateMCPPlugin(
 	request plugin.CreateRequest,
 ) (plugin.PluginView, error) {
 	return withRecoveryResp(
@@ -177,7 +177,7 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 				request.RootID = topology.UserRootID()
 			}
 
-			return w.api.CreateMCPCollection(
+			return w.api.CreateMCPPlugin(
 				context.Background(),
 				request,
 			)
@@ -185,15 +185,15 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 	)
 }
 
-func (w *MCPStoreWrapper) GetMCPCollection(
+func (w *MCPStoreWrapper) GetMCPPlugin(
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-		return api.GetMCPCollection(context.Background(), ref)
+		return api.GetMCPPlugin(context.Background(), ref)
 	})
 }
 
-func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
+func (w *MCPStoreWrapper) SetMCPPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
@@ -201,7 +201,7 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 	return withMCPStore(
 		w,
 		func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-			return api.SetMCPCollectionEnabled(
+			return api.SetMCPPluginEnabled(
 				context.Background(),
 				ref,
 				expectedRevision,
@@ -211,21 +211,21 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 	)
 }
 
-func (w *MCPStoreWrapper) ListMCPCollections(
+func (w *MCPStoreWrapper) ListMCPPlugins(
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]plugin.ListItem, error) {
-		return api.ListMCPCollections(context.Background(), rootID)
+		return api.ListMCPPlugins(context.Background(), rootID)
 	})
 }
 
-func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
+func (w *MCPStoreWrapper) ListMCPPluginMemberships(
 	ref artifactModel.ArtifactRef,
 ) ([]plugin.ArtifactMembershipView, error) {
 	return withMCPStore(
 		w,
 		func(api *mcpConsumerAPI.API) ([]plugin.ArtifactMembershipView, error) {
-			return api.ListMCPCollectionMemberships(
+			return api.ListMCPPluginMemberships(
 				context.Background(),
 				ref,
 			)
@@ -233,46 +233,46 @@ func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
 	)
 }
 
-func (w *MCPStoreWrapper) UpdateMCPCollection(
+func (w *MCPStoreWrapper) UpdateMCPPlugin(
 	request plugin.UpdateRequest,
 ) (plugin.PluginView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-		return api.UpdateMCPCollection(context.Background(), request)
+		return api.UpdateMCPPlugin(context.Background(), request)
 	})
 }
 
-func (w *MCPStoreWrapper) AddMCPCollectionMember(
+func (w *MCPStoreWrapper) AddMCPPluginMember(
 	request plugin.AddMemberRequest,
 ) (plugin.PluginView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-		return api.AddMCPCollectionMember(context.Background(), request)
+		return api.AddMCPPluginMember(context.Background(), request)
 	})
 }
 
-func (w *MCPStoreWrapper) AddMCPServerToCollection(
+func (w *MCPStoreWrapper) AddMCPServerToPlugin(
 	request plugin.AddArtifactMemberRequest,
 ) (plugin.PluginView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-		return api.AddMCPServerToCollection(context.Background(), request)
+		return api.AddMCPServerToPlugin(context.Background(), request)
 	})
 }
 
-func (w *MCPStoreWrapper) RemoveMCPCollectionMember(
+func (w *MCPStoreWrapper) RemoveMCPPluginMember(
 	request plugin.RemoveMemberRequest,
 ) (plugin.PluginView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
-		return api.RemoveMCPCollectionMember(context.Background(), request)
+		return api.RemoveMCPPluginMember(context.Background(), request)
 	})
 }
 
-func (w *MCPStoreWrapper) DeleteMCPCollection(
+func (w *MCPStoreWrapper) DeleteMCPPlugin(
 	request plugin.DeleteRequest,
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return spec.ErrClosed
 		}
-		return w.api.DeleteMCPCollection(context.Background(), request)
+		return w.api.DeleteMCPPlugin(context.Background(), request)
 	})
 }
 

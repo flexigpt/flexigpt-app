@@ -9,7 +9,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
+	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 )
 
 type Decoded struct {
@@ -32,20 +32,20 @@ type configServer struct {
 	Headers   map[string]string `json:"headers,omitempty"`
 }
 
-// IsRetiredMCPCollection identifies only the removed proprietary source
+// IsRetiredMCPPlugin identifies only the removed proprietary source
 // format. It is retained solely to produce an explicit unsupported-format
 // diagnostic, never to decode or convert the document.
-func IsRetiredMCPCollection(
+func IsRetiredMCPPlugin(
 	raw []byte,
 ) bool {
 	var header struct {
 		Kind string `json:"kind"`
 	}
 	return json.Unmarshal(raw, &header) == nil &&
-		isRetiredMCPCollectionKind(header.Kind)
+		isRetiredMCPPluginKind(header.Kind)
 }
 
-func isRetiredMCPCollectionKind(
+func isRetiredMCPPluginKind(
 	kind string,
 ) bool {
 	return kind == "mcp.plugin" || kind == "mcp.bundle"
@@ -63,7 +63,7 @@ func IsMCPConfig(
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return false
 	}
-	return !isRetiredMCPCollectionKind(value.Kind) &&
+	return !isRetiredMCPPluginKind(value.Kind) &&
 		len(value.MCPServers) != 0
 }
 
@@ -164,7 +164,7 @@ func decodeMCPConfigDocument(
 	if err := json.Unmarshal(canonical, &value); err != nil {
 		return configDocument{}, err
 	}
-	if isRetiredMCPCollectionKind(value.Kind) {
+	if isRetiredMCPPluginKind(value.Kind) {
 		return configDocument{}, fmt.Errorf(
 			"%w: proprietary MCP plugin manifests are not supported",
 			spec.ErrUnsupported,

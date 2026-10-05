@@ -151,9 +151,9 @@ func TestWorkflow_ManagedAgentImportReportsExpectedSourceDigestMismatch(
 	preview, err := harness.api.PreviewAgentImport(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
-			Path:                       path,
-			Plugin:                     collectionValue.Artifact.Ref(),
-			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
+			Path:                   path,
+			Plugin:                 collectionValue.Artifact.Ref(),
+			ExpectedPluginRevision: collectionValue.Artifact.Revision,
 			ExpectedSourceDigest: cryptoutil.DigestBytes(
 				[]byte("different source bytes"),
 			),

@@ -51,7 +51,7 @@ type ConversationResourceSelectionRef struct {
 
 // ConversationSelection stores one user-selected Workspace Artifact and the
 // explicitly selected Root-scoped Artifact resources for one conversation
-// turn. No Collection or Catalog identity is persisted.
+// turn. No Plugin or Catalog identity is persisted.
 type ConversationSelection struct {
 	Workspace         artifactModel.ArtifactRef          `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`

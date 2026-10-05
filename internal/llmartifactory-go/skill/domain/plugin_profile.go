@@ -15,7 +15,7 @@ func PluginProfile() plugin.Profile {
 		BaselineName:        plugin.SkillBaselinePluginName,
 		BaselineDisplayName: "Skill Baseline",
 		BaselineDescription: "Application-provisioned editable Skill Plugin.",
-		PackageKind:         plugin.ManagedCollectionPackageKind,
+		PackageKind:         plugin.ManagedPluginPackageKind,
 		MembershipPolicy: pluginDomain.MembershipPolicy{
 			Mode: pluginDomain.MembershipModeSingleType,
 			AllowedTypes: []declaration.Type{

@@ -11,7 +11,7 @@ import (
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
-func (a *API) listCollectionTools(
+func (a *API) listPluginTools(
 	ctx context.Context,
 	value plugin.PluginView,
 ) ([]ToolListItem, error) {

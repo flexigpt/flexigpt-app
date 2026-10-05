@@ -123,7 +123,7 @@ func preparePackage(
 		)
 	}
 
-	_, expectations, err := canonicalCollectionPackage(
+	_, expectations, err := canonicalPluginPackage(
 		documentFile,
 		document,
 		files,
@@ -142,7 +142,7 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 	address, err := managedpackageModel.NewManagedPackageAddress(
-		agentDomain.BuiltinAgentCollectionPackageKind,
+		agentDomain.BuiltinAgentPluginPackageKind,
 		packageName,
 		topology.UnversionedPackageVersion(),
 	)
@@ -159,7 +159,7 @@ func preparePackage(
 	}, nil
 }
 
-func canonicalCollectionPackage(
+func canonicalPluginPackage(
 	documentFile spec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,

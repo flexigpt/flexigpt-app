@@ -236,7 +236,7 @@ func (a *API) CreateManagedSkill(
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return ManagedSkillCreateResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
@@ -294,11 +294,11 @@ func (a *API) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 
-	membership, err := a.plugins.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForPluginSource(
 		ctx,
-		plugin.EnsureMemberForCollectionSourceRequest{
+		plugin.EnsureMemberForPluginSourceRequest{
 			Plugin:           request.Plugin,
-			ExpectedRevision: request.ExpectedCollectionRevision,
+			ExpectedRevision: request.ExpectedPluginRevision,
 			Type:             declaration.TypeSkill,
 			Name:             definitionValue.LogicalName,
 			Locator:          locator,
@@ -392,7 +392,7 @@ func (a *API) ReplaceManagedSkill(
 			spec.ErrInvalid,
 		)
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
@@ -412,7 +412,7 @@ func (a *API) ReplaceManagedSkill(
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
+	if collectionView.Artifact.Revision != request.ExpectedPluginRevision {
 		return ManagedSkillReplaceResult{}, spec.ErrConflict
 	}
 	if !collectionView.Editable &&
@@ -803,7 +803,7 @@ func (a *API) getManagedSkillDocument(
 	}, nil
 }
 
-func (a *API) ensureSkillBaselineCollection(
+func (a *API) ensureSkillBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (plugin.PluginView, error) {

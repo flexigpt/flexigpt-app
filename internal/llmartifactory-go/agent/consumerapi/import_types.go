@@ -35,11 +35,11 @@ type AgentImportDestination struct {
 	SourceID        sourceModel.SourceID      `json:"sourceID"`
 	Plugin          artifactModel.ArtifactRef `json:"plugin"`
 
-	CollectionRevision    uint64           `json:"collectionRevision"`
-	CollectionName        spec.LogicalName `json:"collectionName"`
-	CollectionDisplayName string           `json:"collectionDisplayName"`
-	Baseline              bool             `json:"baseline"`
-	Enabled               bool             `json:"enabled"`
+	PluginRevision    uint64           `json:"collectionRevision"`
+	PluginName        spec.LogicalName `json:"collectionName"`
+	PluginDisplayName string           `json:"collectionDisplayName"`
+	Baseline          bool             `json:"baseline"`
+	Enabled           bool             `json:"enabled"`
 }
 
 type AgentImportPreviewRequest struct {
@@ -47,8 +47,8 @@ type AgentImportPreviewRequest struct {
 	// Its extension selects the backend parser and is never persisted.
 	Path string `json:"path"`
 
-	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
+	Plugin                 artifactModel.ArtifactRef `json:"plugin"`
+	ExpectedPluginRevision uint64                    `json:"expectedPluginRevision"`
 
 	ExpectedSourceDigest cryptoutil.Digest `json:"expectedSourceDigest,omitempty"`
 }

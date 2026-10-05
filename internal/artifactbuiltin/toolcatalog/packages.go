@@ -68,7 +68,7 @@ func PreparePackages(
 	output := make([]PreparedPackage, 0)
 
 	for _, root := range roots {
-		values, err := prepareCollectionDirectory(
+		values, err := preparePluginDirectory(
 			ctx,
 			packages,
 			root,
@@ -85,7 +85,7 @@ func PreparePackages(
 	return normalizePreparedPackages(output)
 }
 
-func prepareCollectionDirectory(
+func preparePluginDirectory(
 	ctx context.Context,
 	packages fs.FS,
 	collectionRoot spec.Locator,
@@ -94,7 +94,7 @@ func prepareCollectionDirectory(
 	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	pluginLocation := string(collectionRoot) + "/" +
-		string(toolDomain.ToolCollectionDocumentFile())
+		string(toolDomain.ToolPluginDocumentFile())
 	pluginBytes, err := fs.ReadFile(packages, pluginLocation)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -119,14 +119,14 @@ func prepareCollectionDirectory(
 	if err != nil {
 		return nil, err
 	}
-	toolNames, err := toolDomain.ValidateToolCollectionDocument(
+	toolNames, err := toolDomain.ValidateToolPluginDocument(
 		pluginDocument,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	collectionPackage, err := prepareCollectionPackage(
+	collectionPackage, err := preparePluginPackage(
 		collectionRoot,
 		pluginDocument,
 		registry,
@@ -213,7 +213,7 @@ func readStaticSDKTools(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if entry.Name() == string(toolDomain.ToolCollectionDocumentFile()) {
+		if entry.Name() == string(toolDomain.ToolPluginDocumentFile()) {
 			continue
 		}
 		if !entry.IsDir() {
@@ -319,7 +319,7 @@ func toolDocumentFromGoDescriptor(
 	}
 }
 
-func prepareCollectionPackage(
+func preparePluginPackage(
 	packageRoot spec.Locator,
 	document pluginv1.PluginDocument,
 	registry *interpretation.Registry,
@@ -336,7 +336,7 @@ func prepareCollectionPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	address, err := toolDomain.ToolCollectionPackageAddress(
+	address, err := toolDomain.ToolPluginPackageAddress(
 		spec.LogicalName(document.Name),
 	)
 	if err != nil {
@@ -346,9 +346,9 @@ func prepareCollectionPackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		Address:             address,
-		DocumentFile:        toolDomain.ToolCollectionDocumentFile(),
+		DocumentFile:        toolDomain.ToolPluginDocumentFile(),
 		PackageFiles: []managedpackageModel.ManagedPackageFile{{
-			Locator: toolDomain.ToolCollectionDocumentFile(),
+			Locator: toolDomain.ToolPluginDocumentFile(),
 			Content: raw,
 		}},
 		ExpectedKind: artifactModel.ArtifactKind(

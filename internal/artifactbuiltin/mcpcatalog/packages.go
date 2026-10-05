@@ -131,7 +131,7 @@ func preparePackage(
 			packageRoot,
 		)
 	}
-	expectations, err := canonicalCollectionExpectations(
+	expectations, err := canonicalPluginExpectations(
 		documentFile,
 		document,
 		registry,
@@ -151,7 +151,7 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 	address, err := managedpackageModel.NewManagedPackageAddress(
-		mcpDomain.MCPCollectionPackageKind,
+		mcpDomain.MCPPluginPackageKind,
 		packageName,
 		topology.UnversionedPackageVersion(),
 	)
@@ -168,7 +168,7 @@ func preparePackage(
 	}, nil
 }
 
-func canonicalCollectionExpectations(
+func canonicalPluginExpectations(
 	documentFile spec.Locator,
 	document []byte,
 	registry *interpretation.Registry,

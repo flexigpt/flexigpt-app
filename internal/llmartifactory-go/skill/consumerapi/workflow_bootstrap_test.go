@@ -108,15 +108,15 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		t.Fatal("markdown-output is disabled after built-in hydration")
 	}
 
-	builtinCollections, err := fixture.api.ListSkillCollections(
+	builtinPlugins, err := fixture.api.ListSkillPlugins(
 		ctx,
 		topology.BuiltinRootID(),
 	)
 	requireNoError(t, err)
-	if len(builtinCollections) == 0 {
-		t.Fatal("built-in hydration produced no visible Skill Collections")
+	if len(builtinPlugins) == 0 {
+		t.Fatal("built-in hydration produced no visible Skill Plugins")
 	}
-	for _, value := range builtinCollections {
+	for _, value := range builtinPlugins {
 		if value.Editable {
 			t.Fatalf(
 				"built-in Plugin %q is unexpectedly editable",
@@ -155,13 +155,13 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		)
 	}
 
-	userCollections, err := fixture.api.ListSkillCollections(
+	userPlugins, err := fixture.api.ListSkillPlugins(
 		ctx,
 		topology.UserRootID(),
 	)
 	requireNoError(t, err)
-	listedBaseline, found := findCollectionByName(
-		userCollections,
+	listedBaseline, found := findPluginByName(
+		userPlugins,
 		string(plugin.SkillBaselinePluginName),
 	)
 	if !found {
@@ -175,7 +175,7 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		)
 	}
 
-	err = fixture.api.DeleteSkillCollection(
+	err = fixture.api.DeleteSkillPlugin(
 		ctx,
 		plugin.DeleteRequest{
 			Plugin:           baseline.Artifact.Ref(),

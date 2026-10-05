@@ -123,12 +123,12 @@ type PolicyView struct {
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
-	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
-	Name                       spec.LogicalName          `json:"name"`
-	Description                string                    `json:"description,omitempty"`
-	Policy                     mcpPolicy.MCPPolicy       `json:"policy"`
-	Enabled                    bool                      `json:"enabled"`
+	Plugin                 artifactModel.ArtifactRef `json:"plugin"`
+	ExpectedPluginRevision uint64                    `json:"expectedPluginRevision"`
+	Name                   spec.LogicalName          `json:"name"`
+	Description            string                    `json:"description,omitempty"`
+	Policy                 mcpPolicy.MCPPolicy       `json:"policy"`
+	Enabled                bool                      `json:"enabled"`
 }
 
 type ManagedMCPPolicyUpsertResult struct {
@@ -139,10 +139,10 @@ type ManagedMCPPolicyUpsertResult struct {
 }
 
 type ManagedMCPCreateRequest struct {
-	Plugin                     artifactModel.ArtifactRef      `json:"plugin"`
-	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
-	Document                   serverMCPDomain.ServerDocument `json:"document"`
-	Enabled                    bool                           `json:"enabled"`
+	Plugin                 artifactModel.ArtifactRef      `json:"plugin"`
+	ExpectedPluginRevision uint64                         `json:"expectedPluginRevision"`
+	Document               serverMCPDomain.ServerDocument `json:"document"`
+	Enabled                bool                           `json:"enabled"`
 }
 
 type ManagedMCPCreateResult struct {
@@ -153,12 +153,12 @@ type ManagedMCPCreateResult struct {
 }
 
 type ManagedMCPReplaceRequest struct {
-	Plugin                     artifactModel.ArtifactRef      `json:"plugin"`
-	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
-	Artifact                   artifactModel.ArtifactRef      `json:"artifact"`
-	ExpectedArtifactRevision   uint64                         `json:"expectedArtifactRevision"`
-	Document                   serverMCPDomain.ServerDocument `json:"document"`
-	Enabled                    bool                           `json:"enabled"`
+	Plugin                   artifactModel.ArtifactRef      `json:"plugin"`
+	ExpectedPluginRevision   uint64                         `json:"expectedPluginRevision"`
+	Artifact                 artifactModel.ArtifactRef      `json:"artifact"`
+	ExpectedArtifactRevision uint64                         `json:"expectedArtifactRevision"`
+	Document                 serverMCPDomain.ServerDocument `json:"document"`
+	Enabled                  bool                           `json:"enabled"`
 }
 
 type ManagedMCPReplaceResult struct {
@@ -197,7 +197,7 @@ type ManagementStore interface {
 		ref artifactModel.ArtifactRef,
 	) (PolicyView, error)
 
-	ListMCPCollectionServers(
+	ListMCPPluginServers(
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,
 	) ([]ServerRead, error)

@@ -76,10 +76,10 @@ func DecodeTool(
 	}, nil
 }
 
-// ValidateToolCollectionDocument applies the restrictions of the built-in
+// ValidateToolPluginDocument applies the restrictions of the built-in
 // Tool catalog. Generic Plugin decoding and projection remain owned by
 // the plugin package.
-func ValidateToolCollectionDocument(
+func ValidateToolPluginDocument(
 	document pluginv1.PluginDocument,
 ) ([]spec.LogicalName, error) {
 	if err := document.Validate(); err != nil {
@@ -87,7 +87,7 @@ func ValidateToolCollectionDocument(
 	}
 	if document.Locator != nil {
 		return nil, fmt.Errorf(
-			"%w: Tool Collections cannot be located aliases",
+			"%w: Tool Plugins cannot be located aliases",
 			spec.ErrUnsupported,
 		)
 	}
@@ -116,7 +116,7 @@ func ValidateToolCollectionDocument(
 			header.Type != declaration.TypeTool ||
 			header.Locator != nil {
 			return nil, fmt.Errorf(
-				"%w: Tool Collections require named built-in Tool references",
+				"%w: Tool Plugins require named built-in Tool references",
 				spec.ErrUnsupported,
 			)
 		}

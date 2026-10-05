@@ -65,11 +65,11 @@ func (p Profile) Validate() error {
 	if err := p.validateAuthoringConfiguration(); err != nil {
 		return err
 	}
-	if err := p.managedCollectionPackageKind().Validate(); err != nil {
+	if err := p.managedPluginPackageKind().Validate(); err != nil {
 		return err
 	}
 	documentFile, err := topology.DefaultDocumentFile(
-		p.managedCollectionDocumentUse(),
+		p.managedPluginDocumentUse(),
 	)
 	if err != nil {
 		return err
@@ -120,21 +120,21 @@ func (p Profile) allows(
 	)
 }
 
-func (p Profile) managedCollectionPackageKind() managedpackageModel.PackageKind {
+func (p Profile) managedPluginPackageKind() managedpackageModel.PackageKind {
 	if p.PackageKind != "" {
 		return p.PackageKind
 	}
-	return ManagedCollectionPackageKind
+	return ManagedPluginPackageKind
 }
 
-func (p Profile) managedCollectionDocumentUse() string {
+func (p Profile) managedPluginDocumentUse() string {
 	if p.DocumentUse != "" {
 		return p.DocumentUse
 	}
 	return topology.DocumentUseManagedPlugin
 }
 
-func (p Profile) managedCollectionBaselineDisplayName() string {
+func (p Profile) managedPluginBaselineDisplayName() string {
 	if p.BaselineDisplayName != "" {
 		return p.BaselineDisplayName
 	}
@@ -162,16 +162,16 @@ func (a *API) EnsureBaseline(
 	if err != nil {
 		return PluginView{}, err
 	}
-	address, err := a.managedCollectionAddress(a.domain.BaselineName)
+	address, err := a.managedPluginAddress(a.domain.BaselineName)
 	if err != nil {
 		return PluginView{}, err
 	}
-	documentFile := a.managedCollectionDocumentFile()
+	documentFile := a.managedPluginDocumentFile()
 	locator, err := address.FileLocator(documentFile)
 	if err != nil {
 		return PluginView{}, err
 	}
-	decoderID, err := a.managedCollectionDecoderID()
+	decoderID, err := a.managedPluginDecoderID()
 	if err != nil {
 		return PluginView{}, err
 	}
@@ -223,7 +223,7 @@ func (a *API) EnsureBaseline(
 		document := pluginv1.PluginDocument{
 			Type:        pluginv1.PluginType,
 			Name:        string(a.domain.BaselineName),
-			DisplayName: a.domain.managedCollectionBaselineDisplayName(),
+			DisplayName: a.domain.managedPluginBaselineDisplayName(),
 			Description: a.domain.BaselineDescription,
 			Metadata:    metadata,
 		}
@@ -253,7 +253,7 @@ func (a *API) EnsureBaseline(
 			RootID:      rootID,
 			SourceID:    sourceValue.ID,
 			Name:        a.domain.BaselineName,
-			DisplayName: a.domain.managedCollectionBaselineDisplayName(),
+			DisplayName: a.domain.managedPluginBaselineDisplayName(),
 			Description: a.domain.BaselineDescription,
 		},
 		true,
@@ -420,7 +420,7 @@ func (a *API) isBaselinePlugin(
 		return false
 	}
 
-	address, err := a.managedCollectionAddressFromLocator(
+	address, err := a.managedPluginAddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -436,7 +436,7 @@ func IsBaselinePluginArtifact(
 	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
 		return false
 	}
-	address, err := managedCollectionAddressFromLocator(
+	address, err := managedPluginAddressFromLocator(
 		value.Binding.Locator,
 	)
 	if err != nil {
@@ -458,7 +458,7 @@ func IsBaselinePluginArtifactForSource(
 		sourceValue.Kind != managedfs.Kind {
 		return false
 	}
-	address, err := managedCollectionAddressFromLocator(
+	address, err := managedPluginAddressFromLocator(
 		value.Binding.Locator,
 	)
 	if err != nil {
@@ -472,7 +472,7 @@ func IsBaselinePluginArtifactForSource(
 			sourceValue.StorageKey == MCPManagedPluginSourceStorageKey)
 }
 
-func (a *API) readCollectionDocument(
+func (a *API) readPluginDocument(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.Artifact, pluginv1.PluginDocument, error) {
@@ -522,7 +522,7 @@ func (a *API) readCollectionDocument(
 	return record, document, nil
 }
 
-func (a *API) domainCollectionVisible(
+func (a *API) domainPluginVisible(
 	ctx context.Context,
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
@@ -567,15 +567,15 @@ func (a *API) Read(
 	if a == nil {
 		return PluginView{}, spec.ErrClosed
 	}
-	ref, err := a.resolveCollectionRef(ctx, ref)
+	ref, err := a.resolvePluginRef(ctx, ref)
 	if err != nil {
 		return PluginView{}, err
 	}
-	record, document, err := a.readCollectionDocument(ctx, ref)
+	record, document, err := a.readPluginDocument(ctx, ref)
 	if err != nil {
 		return PluginView{}, err
 	}
-	visible, err := a.domainCollectionVisible(ctx, record, document)
+	visible, err := a.domainPluginVisible(ctx, record, document)
 	if err != nil {
 		return PluginView{}, err
 	}
@@ -605,7 +605,7 @@ func (a *API) Read(
 		sourceValue.Kind == managedfs.Kind &&
 		(a.domain == nil ||
 			sourceValue.StorageKey == a.domain.SourceStorageKey) {
-		if _, err := a.managedCollectionAddressFromLocator(
+		if _, err := a.managedPluginAddressFromLocator(
 			record.Binding.Locator,
 		); err == nil &&
 			a.validateEditableDomainDocument(document) == nil {
@@ -614,7 +614,7 @@ func (a *API) Read(
 	}
 
 	baseline := a.isBaselinePlugin(record, sourceValue)
-	return readCollectionViewOf(
+	return readPluginViewOf(
 		record,
 		document,
 		editable,
@@ -627,10 +627,10 @@ func (a *API) ListDomain(
 	ctx context.Context,
 	request ListRequest,
 ) ([]ListItem, error) {
-	return a.listCollections(ctx, request, true)
+	return a.listPlugins(ctx, request, true)
 }
 
-func readCollectionViewOf(
+func readPluginViewOf(
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 	editable bool,

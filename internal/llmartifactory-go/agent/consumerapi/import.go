@@ -50,9 +50,9 @@ type preparedAgentImport struct {
 	RootID   rootModel.RootID     `json:"rootID"`
 	SourceID sourceModel.SourceID `json:"sourceID"`
 
-	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
-	ExpectedSourceGeneration   string                    `json:"expectedSourceGeneration"`
+	Plugin                   artifactModel.ArtifactRef `json:"plugin"`
+	ExpectedPluginRevision   uint64                    `json:"expectedPluginRevision"`
+	ExpectedSourceGeneration string                    `json:"expectedSourceGeneration"`
 
 	Address      managedpackageModel.ManagedPackageAddress `json:"address"`
 	AgentLocator spec.Locator                              `json:"agentLocator"`
@@ -84,7 +84,7 @@ func (a *API) ListAgentImportDestinations(
 		return nil, nil
 	}
 
-	values, err := a.ListAgentCollections(ctx, rootID)
+	values, err := a.ListAgentPlugins(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,19 +95,19 @@ func (a *API) ListAgentImportDestinations(
 			continue
 		}
 		output = append(output, AgentImportDestination{
-			RootID:                rootID,
-			SourceID:              value.SourceID,
-			Plugin:                value.Ref,
-			CollectionRevision:    value.Revision,
-			CollectionName:        value.Name,
-			CollectionDisplayName: value.DisplayName,
-			Baseline:              value.Baseline,
-			Enabled:               value.Enabled,
+			RootID:            rootID,
+			SourceID:          value.SourceID,
+			Plugin:            value.Ref,
+			PluginRevision:    value.Revision,
+			PluginName:        value.Name,
+			PluginDisplayName: value.DisplayName,
+			Baseline:          value.Baseline,
+			Enabled:           value.Enabled,
 		})
 	}
 
 	sort.Slice(output, func(left, right int) bool {
-		return output[left].CollectionName < output[right].CollectionName
+		return output[left].PluginName < output[right].PluginName
 	})
 	return output, nil
 }
@@ -129,7 +129,7 @@ func (a *API) PreviewAgentImport(
 	if err := ctx.Err(); err != nil {
 		return AgentImportPreview{}, err
 	}
-	if request.ExpectedCollectionRevision == 0 {
+	if request.ExpectedPluginRevision == 0 {
 		return AgentImportPreview{}, fmt.Errorf(
 			"%w: expected Agent Plugin revision is required",
 			spec.ErrInvalid,
@@ -150,7 +150,7 @@ func (a *API) PreviewAgentImport(
 	destination, err := a.agentImportDestination(
 		ctx,
 		request.Plugin,
-		request.ExpectedCollectionRevision,
+		request.ExpectedPluginRevision,
 	)
 	if err != nil {
 		return AgentImportPreview{}, err
@@ -428,21 +428,21 @@ func (a *API) PreviewAgentImport(
 	}
 
 	plan := preparedAgentImport{
-		ProfileID:                  agentv1.ManagedAgentImportProfileID,
-		ExpiresAt:                  time.Now().UTC().Add(managedAgentPreparedTTL),
-		SourceDigest:               preview.SourceDigest,
-		DefinitionDigest:           rootDefinition.Digest,
-		CanonicalDeclaration:       append(json.RawMessage(nil), rawAgent...),
-		RootID:                     destination.value.RootID,
-		SourceID:                   destination.value.SourceID,
-		Plugin:                     request.Plugin,
-		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-		ExpectedSourceGeneration:   destination.sourceGeneration,
-		Address:                    address,
-		AgentLocator:               agentLocator,
-		RestoredMemberships:        preview.RestoredMemberships,
-		MCPSetupDescriptors:        preview.MCPSetupDescriptors,
-		RequiredConfirmationCodes:  requiredCodes,
+		ProfileID:                 agentv1.ManagedAgentImportProfileID,
+		ExpiresAt:                 time.Now().UTC().Add(managedAgentPreparedTTL),
+		SourceDigest:              preview.SourceDigest,
+		DefinitionDigest:          rootDefinition.Digest,
+		CanonicalDeclaration:      append(json.RawMessage(nil), rawAgent...),
+		RootID:                    destination.value.RootID,
+		SourceID:                  destination.value.SourceID,
+		Plugin:                    request.Plugin,
+		ExpectedPluginRevision:    request.ExpectedPluginRevision,
+		ExpectedSourceGeneration:  destination.sourceGeneration,
+		Address:                   address,
+		AgentLocator:              agentLocator,
+		RestoredMemberships:       preview.RestoredMemberships,
+		MCPSetupDescriptors:       preview.MCPSetupDescriptors,
+		RequiredConfirmationCodes: requiredCodes,
 	}
 
 	sealed, err := a.importSigner.Seal(plan)
@@ -514,7 +514,7 @@ func (a *API) CommitAgentImport(
 	destination, err := a.agentImportDestination(
 		ctx,
 		plan.Plugin,
-		plan.ExpectedCollectionRevision,
+		plan.ExpectedPluginRevision,
 	)
 	if err != nil {
 		return AgentImportCommitResult{}, err
@@ -642,11 +642,11 @@ func (a *API) CommitAgentImport(
 		)
 	}
 
-	membership, err := a.plugins.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForPluginSource(
 		ctx,
-		plugin.EnsureMemberForCollectionSourceRequest{
+		plugin.EnsureMemberForPluginSourceRequest{
 			Plugin:           plan.Plugin,
-			ExpectedRevision: plan.ExpectedCollectionRevision,
+			ExpectedRevision: plan.ExpectedPluginRevision,
 			Type:             declaration.TypeAgent,
 			Name:             rootDefinition.LogicalName,
 			Locator:          agentLocator,
@@ -717,7 +717,7 @@ func (a *API) agentImportDestination(
 		value.Artifact.Revision != expectedRevision {
 		return agentImportDestinationState{}, spec.ErrConflict
 	}
-	if !a.IsManagedAgentCollection(value) {
+	if !a.IsManagedAgentPlugin(value) {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected Plugin is not an editable managed Agent Plugin",
 			spec.ErrUnsupported,
@@ -725,7 +725,7 @@ func (a *API) agentImportDestination(
 	}
 	if a.protection.IsProtectedRoot(value.Artifact.RootID) {
 		return agentImportDestinationState{}, fmt.Errorf(
-			"%w: protected Collections cannot receive managed Agent imports",
+			"%w: protected Plugins cannot receive managed Agent imports",
 			spec.ErrProtected,
 		)
 	}
@@ -767,14 +767,14 @@ func (a *API) agentImportDestination(
 
 	return agentImportDestinationState{
 		value: AgentImportDestination{
-			RootID:                value.Artifact.RootID,
-			SourceID:              value.Artifact.Binding.SourceID,
-			Plugin:                value.Artifact.Ref(),
-			CollectionRevision:    value.Artifact.Revision,
-			CollectionName:        value.Artifact.LogicalName,
-			CollectionDisplayName: value.DisplayName,
-			Baseline:              value.Baseline,
-			Enabled:               value.Artifact.Enabled,
+			RootID:            value.Artifact.RootID,
+			SourceID:          value.Artifact.Binding.SourceID,
+			Plugin:            value.Artifact.Ref(),
+			PluginRevision:    value.Artifact.Revision,
+			PluginName:        value.Artifact.LogicalName,
+			PluginDisplayName: value.DisplayName,
+			Baseline:          value.Baseline,
+			Enabled:           value.Artifact.Enabled,
 		},
 		plugin:           value,
 		sourceGeneration: inspection.State.SourceGeneration,
@@ -940,7 +940,7 @@ func (a *API) analyzeAgentImportMembership(
 	[]AgentImportConflict,
 	error,
 ) {
-	if _, err := a.plugins.MemberForCollectionSource(
+	if _, err := a.plugins.MemberForPluginSource(
 		ctx,
 		selected.Artifact.Ref(),
 		declaration.TypeAgent,
@@ -981,7 +981,7 @@ func (a *API) analyzeAgentImportMembership(
 		})
 	}
 
-	plugins, err := a.ListAgentCollections(
+	plugins, err := a.ListAgentPlugins(
 		ctx,
 		selected.Artifact.RootID,
 	)

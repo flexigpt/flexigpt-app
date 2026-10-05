@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
-func (a *API) CreateSkillCollection(
+func (a *API) CreateSkillPlugin(
 	ctx context.Context,
 	request plugin.CreateRequest,
 ) (plugin.PluginView, error) {
@@ -20,7 +20,7 @@ func (a *API) CreateSkillCollection(
 	return a.plugins.Create(ctx, request)
 }
 
-func (a *API) ResolveSkillCollection(
+func (a *API) ResolveSkillPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginCapabilityPlan, error) {
@@ -41,7 +41,7 @@ func (a *API) ResolveSkillCollection(
 	)
 }
 
-func (a *API) GetSkillCollection(
+func (a *API) GetSkillPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
@@ -51,7 +51,7 @@ func (a *API) GetSkillCollection(
 	return a.plugins.Read(ctx, ref)
 }
 
-func (a *API) SetSkillCollectionEnabled(
+func (a *API) SetSkillPluginEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
@@ -68,7 +68,7 @@ func (a *API) SetSkillCollectionEnabled(
 	)
 }
 
-func (a *API) ListSkillCollections(
+func (a *API) ListSkillPlugins(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
@@ -80,7 +80,7 @@ func (a *API) ListSkillCollections(
 	})
 }
 
-func (a *API) ListSkillCollectionMemberships(
+func (a *API) ListSkillPluginMemberships(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]plugin.ArtifactMembershipView, error) {
@@ -90,7 +90,7 @@ func (a *API) ListSkillCollectionMemberships(
 	return a.plugins.ListMembershipsForArtifact(ctx, ref)
 }
 
-func (a *API) UpdateSkillCollection(
+func (a *API) UpdateSkillPlugin(
 	ctx context.Context,
 	request plugin.UpdateRequest,
 ) (plugin.PluginView, error) {
@@ -100,7 +100,7 @@ func (a *API) UpdateSkillCollection(
 	return a.plugins.Update(ctx, request)
 }
 
-func (a *API) AddSkillCollectionMember(
+func (a *API) AddSkillPluginMember(
 	ctx context.Context,
 	request plugin.AddMemberRequest,
 ) (plugin.PluginView, error) {
@@ -110,7 +110,7 @@ func (a *API) AddSkillCollectionMember(
 	return a.plugins.AddMember(ctx, request)
 }
 
-func (a *API) AttachSkillArtifactToCollection(
+func (a *API) AttachSkillArtifactToPlugin(
 	ctx context.Context,
 	request plugin.AddArtifactMemberRequest,
 ) (plugin.PluginView, error) {
@@ -120,7 +120,7 @@ func (a *API) AttachSkillArtifactToCollection(
 	return a.plugins.AddArtifactMember(ctx, request)
 }
 
-func (a *API) RemoveSkillCollectionMember(
+func (a *API) RemoveSkillPluginMember(
 	ctx context.Context,
 	request plugin.RemoveMemberRequest,
 ) (plugin.PluginView, error) {
@@ -130,7 +130,7 @@ func (a *API) RemoveSkillCollectionMember(
 	return a.plugins.RemoveMember(ctx, request)
 }
 
-func (a *API) DeleteSkillCollection(
+func (a *API) DeleteSkillPlugin(
 	ctx context.Context,
 	request plugin.DeleteRequest,
 ) error {

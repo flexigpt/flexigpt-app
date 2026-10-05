@@ -45,7 +45,7 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 }
 
 type BaselineEnsurer interface {
-	EnsureMCPBaselineCollection(
+	EnsureMCPBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) (plugin.PluginView, error)
@@ -65,14 +65,14 @@ func NewBaselineEnsurer(api *API) (BaselineEnsurer, error) {
 	return &baselineEnsurer{api: api}, nil
 }
 
-func (s *baselineEnsurer) EnsureMCPBaselineCollection(
+func (s *baselineEnsurer) EnsureMCPBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (plugin.PluginView, error) {
 	if s == nil || s.api == nil {
 		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return s.api.ensureMCPBaselineCollection(ctx, rootID)
+	return s.api.ensureMCPBaselinePlugin(ctx, rootID)
 }
 
 // ManagementStoreFacade is passed to runtime and aggregate orchestration.
@@ -117,11 +117,11 @@ func (s *ManagementStoreFacade) GetMCPPolicy(
 	return s.api.GetMCPPolicy(ctx, ref)
 }
 
-func (s *ManagementStoreFacade) ListMCPCollectionServers(
+func (s *ManagementStoreFacade) ListMCPPluginServers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	return s.api.ListMCPCollectionServers(ctx, ref)
+	return s.api.ListMCPPluginServers(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(
@@ -185,14 +185,14 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 	return &CatalogStore{api: api}, nil
 }
 
-func (s *CatalogStore) ListMCPCollections(
+func (s *CatalogStore) ListMCPPlugins(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed
 	}
-	return s.api.ListMCPCollections(ctx, rootID)
+	return s.api.ListMCPPlugins(ctx, rootID)
 }
 
 func (s *CatalogStore) ListServers(

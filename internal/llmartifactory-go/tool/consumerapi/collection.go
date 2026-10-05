@@ -11,7 +11,7 @@ import (
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
 
-func (a *API) ListToolCollections(
+func (a *API) ListToolPlugins(
 	ctx context.Context,
 ) ([]plugin.ListItem, error) {
 	if err := a.ready(ctx); err != nil {
@@ -22,7 +22,7 @@ func (a *API) ListToolCollections(
 	})
 }
 
-func (a *API) GetToolCollection(
+func (a *API) GetToolPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
@@ -43,13 +43,13 @@ func (a *API) GetToolCollection(
 	return view, nil
 }
 
-func (a *API) SetToolCollectionEnabled(
+func (a *API) SetToolPluginEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (plugin.PluginView, error) {
-	if _, err := a.GetToolCollection(ctx, ref); err != nil {
+	if _, err := a.GetToolPlugin(ctx, ref); err != nil {
 		return plugin.PluginView{}, err
 	}
 	return a.plugins.SetEnabled(ctx, ref, expectedRevision, enabled)
@@ -90,7 +90,7 @@ func (a *API) pluginForTool(
 	}
 	switch len(matches) {
 	case 1:
-		return a.GetToolCollection(ctx, matches[0])
+		return a.GetToolPlugin(ctx, matches[0])
 	case 0:
 		return plugin.PluginView{}, fmt.Errorf(
 			"%w: Tool %q has no Tool Plugin",

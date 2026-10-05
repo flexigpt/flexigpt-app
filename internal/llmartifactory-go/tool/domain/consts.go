@@ -13,8 +13,8 @@ const (
 		toolv1.ToolType,
 	)
 
-	ToolPackageKind           managedpackageModel.PackageKind = "tool"
-	ToolCollectionPackageKind managedpackageModel.PackageKind = "tool-collection"
+	ToolPackageKind       managedpackageModel.PackageKind = "tool"
+	ToolPluginPackageKind managedpackageModel.PackageKind = "tool-collection"
 
 	BuiltInInstallerName   = "tool"
 	HydrationSchemaVersion = "tool.builtin-hydration/v1"
@@ -26,7 +26,7 @@ func ToolDocumentFile() spec.Locator {
 	)
 }
 
-func ToolCollectionDocumentFile() spec.Locator {
+func ToolPluginDocumentFile() spec.Locator {
 	return topology.MustDefaultDocumentFile(
 		topology.DocumentUseToolPlugin,
 	)

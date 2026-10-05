@@ -54,9 +54,9 @@ type SkillListItem struct {
 }
 
 type ManagedSkillCreateRequest struct {
-	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
-	SkillName                  string                    `json:"skillName"`
+	Plugin                 artifactModel.ArtifactRef `json:"plugin"`
+	ExpectedPluginRevision uint64                    `json:"expectedPluginRevision"`
+	SkillName              string                    `json:"skillName"`
 
 	// SKILLMD and Files describe the logical Agent Skill directory supplied by
 	// the caller. Files must contain SKILL.md at the logical package root.
@@ -74,11 +74,11 @@ type ManagedSkillCreateResult struct {
 }
 
 type ManagedSkillReplaceRequest struct {
-	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
-	Artifact                   artifactModel.ArtifactRef `json:"artifact"`
-	ExpectedArtifactRevision   uint64                    `json:"expectedArtifactRevision"`
-	SkillName                  string                    `json:"skillName"`
+	Plugin                   artifactModel.ArtifactRef `json:"plugin"`
+	ExpectedPluginRevision   uint64                    `json:"expectedPluginRevision"`
+	Artifact                 artifactModel.ArtifactRef `json:"artifact"`
+	ExpectedArtifactRevision uint64                    `json:"expectedArtifactRevision"`
+	SkillName                string                    `json:"skillName"`
 
 	// SKILLMD and Files describe the logical Agent Skill directory supplied by
 	// the caller. Files must contain SKILL.md at the logical package root.

@@ -24,9 +24,9 @@ var (
 	generatedCatalogFingerprintOnce sync.Once
 	generatedCatalogFingerprint     cryptoutil.Digest
 
-	generatedCollectionIndexOnce sync.Once
-	generatedCollectionIndex     map[spec.LogicalName]spec.LogicalName
-	errGeneratedCollectionIndex  error
+	generatedPluginIndexOnce sync.Once
+	generatedPluginIndex     map[spec.LogicalName]spec.LogicalName
+	errGeneratedPluginIndex  error
 )
 
 func generatedCatalogValue() (
@@ -61,18 +61,18 @@ func GeneratedCatalogFingerprint() cryptoutil.Digest {
 	return generatedCatalogFingerprint
 }
 
-// GeneratedToolCollectionIndex maps a generated Tool name to its generated
+// GeneratedToolPluginIndex maps a generated Tool name to its generated
 // Tool Plugin name. It is derived once from the compile-time catalog and
 // avoids rediscovering membership by listing and decoding every Plugin at
 // runtime.
-func GeneratedToolCollectionIndex() (
+func GeneratedToolPluginIndex() (
 	map[spec.LogicalName]spec.LogicalName,
 	error,
 ) {
-	generatedCollectionIndexOnce.Do(func() {
+	generatedPluginIndexOnce.Do(func() {
 		set, err := generatedCatalogValue()
 		if err != nil {
-			errGeneratedCollectionIndex = err
+			errGeneratedPluginIndex = err
 			return
 		}
 
@@ -81,7 +81,7 @@ func GeneratedToolCollectionIndex() (
 		)
 		for _, packageValue := range set.Packages {
 			if packageValue.Address.Kind !=
-				toolDomain.ToolCollectionPackageKind {
+				toolDomain.ToolPluginPackageKind {
 				continue
 			}
 			plugins[packageValue.EmbeddedRoot] = packageValue.Address.Name
@@ -96,14 +96,14 @@ func GeneratedToolCollectionIndex() (
 			}
 			collectionName, found := plugins[packageValue.EmbeddedRoot]
 			if !found {
-				errGeneratedCollectionIndex = fmt.Errorf(
+				errGeneratedPluginIndex = fmt.Errorf(
 					"generated Tool %q has no generated Tool Plugin",
 					packageValue.Address.Name,
 				)
 				return
 			}
 			if previous, duplicate := index[packageValue.Address.Name]; duplicate {
-				errGeneratedCollectionIndex = fmt.Errorf(
+				errGeneratedPluginIndex = fmt.Errorf(
 					"generated Tool %q belongs to both %q and %q",
 					packageValue.Address.Name,
 					previous,
@@ -113,10 +113,10 @@ func GeneratedToolCollectionIndex() (
 			}
 			index[packageValue.Address.Name] = collectionName
 		}
-		generatedCollectionIndex = index
+		generatedPluginIndex = index
 	})
-	if errGeneratedCollectionIndex != nil {
-		return nil, errGeneratedCollectionIndex
+	if errGeneratedPluginIndex != nil {
+		return nil, errGeneratedPluginIndex
 	}
-	return maps.Clone(generatedCollectionIndex), nil
+	return maps.Clone(generatedPluginIndex), nil
 }

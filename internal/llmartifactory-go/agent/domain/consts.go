@@ -17,12 +17,12 @@ const (
 		agentv1.AgentType,
 	)
 
-	ManagedAgentPackageKind           managedpackageModel.PackageKind = "agent"
-	BuiltinAgentCollectionPackageKind managedpackageModel.PackageKind = "agent-collection"
-	AgentManagedSourceStorageKey      spec.StorageKey                 = "user-agents"
-	AgentManagedCollectionPackageKind managedpackageModel.PackageKind = "plugin"
-	AgentBaselineCollectionName       spec.LogicalName                = "agent-baseline"
-	AgentSchemaID                     schemaModel.SchemaID            = agentv1.AgentSchemaID
+	ManagedAgentPackageKind       managedpackageModel.PackageKind = "agent"
+	BuiltinAgentPluginPackageKind managedpackageModel.PackageKind = "agent-collection"
+	AgentManagedSourceStorageKey  spec.StorageKey                 = "user-agents"
+	AgentManagedPluginPackageKind managedpackageModel.PackageKind = "plugin"
+	AgentBaselinePluginName       spec.LogicalName                = "agent-baseline"
+	AgentSchemaID                 schemaModel.SchemaID            = agentv1.AgentSchemaID
 
 	AgentSchemaVersion            = agentv1.AgentSchemaVersion
 	AgentManagedSourceDisplayName = "User-managed Agents"
@@ -48,10 +48,10 @@ func AgentPluginProfile() plugin.Profile {
 		Name:                "agent",
 		SourceStorageKey:    AgentManagedSourceStorageKey,
 		SourceDisplayName:   AgentManagedSourceDisplayName,
-		BaselineName:        AgentBaselineCollectionName,
+		BaselineName:        AgentBaselinePluginName,
 		BaselineDisplayName: AgentBaselineDisplayName,
 		BaselineDescription: AgentBaselineDescription,
-		PackageKind:         AgentManagedCollectionPackageKind,
+		PackageKind:         AgentManagedPluginPackageKind,
 		DocumentUse:         topology.DocumentUseAgentManagedPlugin,
 		MembershipPolicy: pluginDomain.MembershipPolicy{
 			Mode: pluginDomain.MembershipModeSingleType,

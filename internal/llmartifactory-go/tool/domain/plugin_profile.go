@@ -13,7 +13,7 @@ func PluginProfile() plugin.Profile {
 	return plugin.Profile{
 		Name:        "tool",
 		ReadOnly:    true,
-		PackageKind: ToolCollectionPackageKind,
+		PackageKind: ToolPluginPackageKind,
 		DocumentUse: topology.DocumentUseToolPlugin,
 		MembershipPolicy: pluginDomain.MembershipPolicy{
 			Mode: pluginDomain.MembershipModeSingleType,
@@ -25,7 +25,7 @@ func PluginProfile() plugin.Profile {
 			},
 		},
 		ValidateDocument: func(document pluginv1.PluginDocument) error {
-			_, err := ValidateToolCollectionDocument(document)
+			_, err := ValidateToolPluginDocument(document)
 			return err
 		},
 	}

@@ -21,7 +21,7 @@ import (
 
 // ArtifactRouter is the flat Root-scoped Skill Artifact resolver.
 //
-// It intentionally does not infer Skill ownership from Collection membership.
+// It intentionally does not infer Skill ownership from Plugin membership.
 type ArtifactRouter struct {
 	artifacts       artifact.API
 	cat             catalog.API

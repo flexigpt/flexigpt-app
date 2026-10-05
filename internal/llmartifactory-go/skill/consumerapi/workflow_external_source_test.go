@@ -149,7 +149,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	)
 	requireNoError(t, err)
 
-	collectionValue, err := fixture.api.CreateSkillCollection(
+	collectionValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -160,7 +160,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	)
 	requireNoError(t, err)
 
-	attached, err := fixture.api.AttachSkillArtifactToCollection(
+	attached, err := fixture.api.AttachSkillArtifactToPlugin(
 		ctx,
 		plugin.AddArtifactMemberRequest{
 			Plugin:           collectionValue.Artifact.Ref(),
@@ -184,7 +184,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		)
 	}
 
-	capabilities, err := fixture.api.ResolveSkillCollection(
+	capabilities, err := fixture.api.ResolveSkillPlugin(
 		ctx,
 		attached.Artifact.Ref(),
 	)
@@ -193,7 +193,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		t.Fatal("Plugin containing external Skill is incomplete")
 	}
 
-	memberships, err := fixture.api.ListSkillCollectionMemberships(
+	memberships, err := fixture.api.ListSkillPluginMemberships(
 		ctx,
 		external.Artifact.Ref(),
 	)
@@ -216,12 +216,12 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	_, err = fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Plugin:                     attached.Artifact.Ref(),
-			ExpectedCollectionRevision: attached.Artifact.Revision,
-			Artifact:                   external.Artifact.Ref(),
-			ExpectedArtifactRevision:   external.Artifact.Revision,
-			SkillName:                  skillName,
-			SKILLMD:                    document,
+			Plugin:                   attached.Artifact.Ref(),
+			ExpectedPluginRevision:   attached.Artifact.Revision,
+			Artifact:                 external.Artifact.Ref(),
+			ExpectedArtifactRevision: external.Artifact.Revision,
+			SkillName:                skillName,
+			SKILLMD:                  document,
 			Files: managedSkillFiles(
 				document,
 				"This package must not replace the external source.\n",
@@ -248,7 +248,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		)
 	}
 
-	detached, err := fixture.api.RemoveSkillCollectionMember(
+	detached, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
 			Plugin:           attached.Artifact.Ref(),
@@ -266,7 +266,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 
 	requireNoError(
 		t,
-		fixture.api.DeleteSkillCollection(
+		fixture.api.DeleteSkillPlugin(
 			ctx,
 			plugin.DeleteRequest{
 				Plugin:           detached.Artifact.Ref(),

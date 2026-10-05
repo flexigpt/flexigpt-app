@@ -130,17 +130,17 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 	)
 }
 
-// ListAgentCollectionsForManagement returns every Agent Collection across
+// ListAgentPluginsForManagement returns every Agent Plugin across
 // every Root. This avoids frontend root discovery through an unrelated global
-// Agent list and ensures empty Collections remain visible.
-func (w *AgentStoreWrapper) ListAgentCollectionsForManagement() (
+// Agent list and ensures empty Plugins remain visible.
+func (w *AgentStoreWrapper) ListAgentPluginsForManagement() (
 	[]plugin.ListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
-			return api.ListAgentCollectionsForManagement(
+			return api.ListAgentPluginsForManagement(
 				context.Background(),
 			)
 		},
@@ -237,13 +237,13 @@ func (w *AgentStoreWrapper) GetAgentPlugin(
 	)
 }
 
-func (w *AgentStoreWrapper) ListAgentCollections(
+func (w *AgentStoreWrapper) ListAgentPlugins(
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
-			return api.ListAgentCollections(context.Background(), rootID)
+			return api.ListAgentPlugins(context.Background(), rootID)
 		},
 	)
 }
@@ -279,13 +279,13 @@ func (w *AgentStoreWrapper) ResolveAgentPluginCapabilities(
 	)
 }
 
-func (w *AgentStoreWrapper) UpdateAgentCollection(
+func (w *AgentStoreWrapper) UpdateAgentPlugin(
 	request plugin.UpdateRequest,
 ) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
-			return api.UpdateAgentCollection(context.Background(), request)
+			return api.UpdateAgentPlugin(context.Background(), request)
 		},
 	)
 }
@@ -341,7 +341,7 @@ func (w *AgentStoreWrapper) RemoveAgentPluginMember(
 	)
 }
 
-func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
+func (w *AgentStoreWrapper) SetAgentPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
@@ -349,7 +349,7 @@ func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
-			return api.SetAgentCollectionEnabled(
+			return api.SetAgentPluginEnabled(
 				context.Background(),
 				ref,
 				expectedRevision,

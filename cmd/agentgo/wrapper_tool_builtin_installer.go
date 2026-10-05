@@ -33,7 +33,7 @@ func ToolBuiltinCatalog() (toolDomain.BuiltinCatalog, error) {
 		return toolDomain.BuiltinCatalog{}, err
 	}
 
-	index, err := toolcatalog.GeneratedToolCollectionIndex()
+	index, err := toolcatalog.GeneratedToolPluginIndex()
 	if err != nil {
 		return toolDomain.BuiltinCatalog{}, fmt.Errorf(
 			"load generated Tool Plugin index: %w",

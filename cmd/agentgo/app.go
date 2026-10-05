@@ -30,7 +30,7 @@ type App struct {
 	ctx context.Context
 
 	settingStoreAPI       *SettingStoreWrapper
-	conversationStoreAPI  *ConversationCollectionWrapper
+	conversationStoreAPI  *ConversationPluginWrapper
 	modelStoreAPI         *ModelStoreWrapper
 	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
@@ -115,7 +115,7 @@ func newApp() *App {
 	// Wails needs some instance of a struct to create bindings from its methods.
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
 	app.settingStoreAPI = &SettingStoreWrapper{}
-	app.conversationStoreAPI = &ConversationCollectionWrapper{}
+	app.conversationStoreAPI = &ConversationPluginWrapper{}
 	app.modelStoreAPI = &ModelStoreWrapper{}
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
@@ -192,7 +192,7 @@ func ensureAppPrivateDirectory(location string) error {
 }
 
 func (a *App) initManagers() {
-	err := InitConversationCollectionWrapper(a.conversationStoreAPI, a.conversationsDirPath)
+	err := InitConversationPluginWrapper(a.conversationStoreAPI, a.conversationsDirPath)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize conversation store",

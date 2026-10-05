@@ -70,30 +70,30 @@ func withToolStore[T any](
 	})
 }
 
-func (w *ToolStoreWrapper) ListToolCollections() (
+func (w *ToolStoreWrapper) ListToolPlugins() (
 	[]plugin.ListItem,
 	error,
 ) {
 	return withToolStore(
 		w,
 		func(api *toolConsumerAPI.API) ([]plugin.ListItem, error) {
-			return api.ListToolCollections(context.Background())
+			return api.ListToolPlugins(context.Background())
 		},
 	)
 }
 
-func (w *ToolStoreWrapper) GetToolCollection(
+func (w *ToolStoreWrapper) GetToolPlugin(
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
 	return withToolStore(
 		w,
 		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
-			return api.GetToolCollection(context.Background(), ref)
+			return api.GetToolPlugin(context.Background(), ref)
 		},
 	)
 }
 
-func (w *ToolStoreWrapper) ListCollectionTools(
+func (w *ToolStoreWrapper) ListPluginTools(
 	ref artifactModel.ArtifactRef,
 ) ([]toolConsumerAPI.ToolListItem, error) {
 	return withToolStore(
@@ -133,7 +133,7 @@ func (w *ToolStoreWrapper) SetToolEnabled(
 	)
 }
 
-func (w *ToolStoreWrapper) SetToolCollectionEnabled(
+func (w *ToolStoreWrapper) SetToolPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
@@ -141,7 +141,7 @@ func (w *ToolStoreWrapper) SetToolCollectionEnabled(
 	return withToolStore(
 		w,
 		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
-			return api.SetToolCollectionEnabled(
+			return api.SetToolPluginEnabled(
 				context.Background(),
 				ref,
 				expectedRevision,

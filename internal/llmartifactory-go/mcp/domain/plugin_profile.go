@@ -14,7 +14,7 @@ func PluginProfile() plugin.Profile {
 		BaselineName:        plugin.MCPBaselinePluginName,
 		BaselineDisplayName: "MCP Baseline",
 		BaselineDescription: "Application-provisioned editable MCP Plugin.",
-		PackageKind:         plugin.ManagedCollectionPackageKind,
+		PackageKind:         plugin.ManagedPluginPackageKind,
 		MembershipPolicy: pluginDomain.MembershipPolicy{
 			Mode: pluginDomain.MembershipModeMixedType,
 			AllowedTypes: []declaration.Type{

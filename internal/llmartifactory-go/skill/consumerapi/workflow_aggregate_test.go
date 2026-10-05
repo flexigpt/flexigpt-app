@@ -24,7 +24,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillCollection(
+	collectionValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -36,7 +36,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	requireNoError(t, err)
 
 	const skillName = "catalog-notes"
-	created, _ := createManagedSkillInCollection(
+	created, _ := createManagedSkillInPlugin(
 		t,
 		fixture.api,
 		collectionValue,
@@ -207,7 +207,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 		t.Fatal("aggregate resolved re-enabled Skill as disabled")
 	}
 
-	currentCollection, err := fixture.api.GetSkillCollection(
+	currentPlugin, err := fixture.api.GetSkillPlugin(
 		ctx,
 		created.Plugin.Artifact.Ref(),
 	)
@@ -224,12 +224,12 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	replaced, err := fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Plugin:                     currentCollection.Artifact.Ref(),
-			ExpectedCollectionRevision: currentCollection.Artifact.Revision,
-			Artifact:                   currentSkill.Ref(),
-			ExpectedArtifactRevision:   currentSkill.Revision,
-			SkillName:                  skillName,
-			SKILLMD:                    replacementDocument,
+			Plugin:                   currentPlugin.Artifact.Ref(),
+			ExpectedPluginRevision:   currentPlugin.Artifact.Revision,
+			Artifact:                 currentSkill.Ref(),
+			ExpectedArtifactRevision: currentSkill.Revision,
+			SkillName:                skillName,
+			SKILLMD:                  replacementDocument,
 			Files: managedSkillFiles(
 				replacementDocument,
 				"Check catalog, migrations, and compatibility.\n",

@@ -58,7 +58,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 	)
 	requireErrorIs(t, err, spec.ErrConflict)
 
-	_, err = harness.api.SetAgentCollectionEnabled(
+	_, err = harness.api.SetAgentPluginEnabled(
 		t.Context(),
 		collectionValue.Artifact.Ref(),
 		collectionValue.Artifact.Revision,
@@ -323,7 +323,7 @@ func newManagedImportFixture(
 	)
 	requireNoError(t, err)
 
-	_, err = baselineEnsurer.EnsureAgentBaselineCollection(
+	_, err = baselineEnsurer.EnsureAgentBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)
@@ -353,9 +353,9 @@ func previewManagedAgentImport(
 	preview, err := harness.api.PreviewAgentImport(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
-			Path:                       path,
-			Plugin:                     collectionValue.Artifact.Ref(),
-			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
+			Path:                   path,
+			Plugin:                 collectionValue.Artifact.Ref(),
+			ExpectedPluginRevision: collectionValue.Artifact.Revision,
 		},
 	)
 	requireNoError(t, err)

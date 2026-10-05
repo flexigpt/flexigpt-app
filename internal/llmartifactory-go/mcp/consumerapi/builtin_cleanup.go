@@ -69,7 +69,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 
 	directories := make(map[spec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
-		if address.Kind != mcpDomain.MCPCollectionPackageKind {
+		if address.Kind != mcpDomain.MCPPluginPackageKind {
 			continue
 		}
 		directory, err := address.Directory()

@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
-type EnsureMemberForCollectionSourceRequest struct {
+type EnsureMemberForPluginSourceRequest struct {
 	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Type             declaration.Type          `json:"type"`
@@ -16,15 +16,15 @@ type EnsureMemberForCollectionSourceRequest struct {
 	Locator          spec.Locator              `json:"locator"`
 }
 
-func (a *API) EnsureMemberForCollectionSource(
+func (a *API) EnsureMemberForPluginSource(
 	ctx context.Context,
-	request EnsureMemberForCollectionSourceRequest,
+	request EnsureMemberForPluginSourceRequest,
 ) (MemberMutationResult, error) {
 	if a == nil {
 		return MemberMutationResult{}, spec.ErrClosed
 	}
 
-	member, err := a.MemberForCollectionSource(
+	member, err := a.MemberForPluginSource(
 		ctx,
 		request.Plugin,
 		request.Type,

@@ -21,7 +21,7 @@ const (
 	serverPageKind     = "servers"
 )
 
-type CollectionPage struct {
+type PluginPage struct {
 	Items         []plugin.ListItem `json:"items"`
 	NextPageToken string            `json:"nextPageToken,omitempty"`
 }
@@ -36,7 +36,7 @@ type RootStore interface {
 }
 
 type Store interface {
-	ListMCPCollections(
+	ListMCPPlugins(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) ([]plugin.ListItem, error)
@@ -82,30 +82,30 @@ type pageKey struct {
 	id     artifactModel.ArtifactID
 }
 
-func (s *MCPListService) ListCollectionsPage(
+func (s *MCPListService) ListPluginsPage(
 	ctx context.Context,
 	pageSize int,
 	pageToken string,
-) (CollectionPage, error) {
+) (PluginPage, error) {
 	cursor, err := decodeCursor(
 		collectionPageKind,
 		pageSize,
 		pageToken,
 	)
 	if err != nil {
-		return CollectionPage{}, err
+		return PluginPage{}, err
 	}
 
 	roots, err := s.orderedRoots(ctx)
 	if err != nil {
-		return CollectionPage{}, err
+		return PluginPage{}, err
 	}
 	items, next, err := pageAcrossRoots(
 		ctx,
 		roots,
 		cursor,
 		func(ctx context.Context, rootID rootModel.RootID) ([]plugin.ListItem, error) {
-			return s.store.ListMCPCollections(ctx, rootID)
+			return s.store.ListMCPPlugins(ctx, rootID)
 		},
 		func(value plugin.ListItem) pageKey {
 			return pageKey{
@@ -116,12 +116,12 @@ func (s *MCPListService) ListCollectionsPage(
 		},
 	)
 	if err != nil {
-		return CollectionPage{}, err
+		return PluginPage{}, err
 	}
 	if items == nil {
 		items = []plugin.ListItem{}
 	}
-	return CollectionPage{
+	return PluginPage{
 		Items:         items,
 		NextPageToken: next,
 	}, nil

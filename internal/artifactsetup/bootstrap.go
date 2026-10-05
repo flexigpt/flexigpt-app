@@ -14,21 +14,21 @@ import (
 )
 
 type SkillBaselineEnsurer interface {
-	EnsureSkillBaselineCollection(
+	EnsureSkillBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) (plugin.PluginView, error)
 }
 
 type MCPBaselineEnsurer interface {
-	EnsureMCPBaselineCollection(
+	EnsureMCPBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) (plugin.PluginView, error)
 }
 
 type AgentBaselineEnsurer interface {
-	EnsureAgentBaselineCollection(
+	EnsureAgentBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) (plugin.PluginView, error)
@@ -89,7 +89,7 @@ func EnsureRootBaselines(
 	}
 
 	var result error
-	if _, err := skills.EnsureSkillBaselineCollection(ctx, rootID); err != nil {
+	if _, err := skills.EnsureSkillBaselinePlugin(ctx, rootID); err != nil {
 		result = errors.Join(
 			result,
 			fmt.Errorf("ensure Skill baseline Plugin: %w", err),
@@ -99,7 +99,7 @@ func EnsureRootBaselines(
 		return errors.Join(result, ctx.Err())
 	}
 
-	if _, err := mcp.EnsureMCPBaselineCollection(ctx, rootID); err != nil {
+	if _, err := mcp.EnsureMCPBaselinePlugin(ctx, rootID); err != nil {
 		result = errors.Join(
 			result,
 			fmt.Errorf("ensure MCP baseline Plugin: %w", err),
@@ -109,7 +109,7 @@ func EnsureRootBaselines(
 		return errors.Join(result, ctx.Err())
 	}
 
-	if _, err := agents.EnsureAgentBaselineCollection(ctx, rootID); err != nil {
+	if _, err := agents.EnsureAgentBaselinePlugin(ctx, rootID); err != nil {
 		result = errors.Join(
 			result,
 			fmt.Errorf("ensure Agent baseline Plugin: %w", err),

@@ -115,12 +115,12 @@ func (a *API) ListTools(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 ) ([]ToolListItem, error) {
-	view, err := a.GetToolCollection(ctx, collectionRef)
+	view, err := a.GetToolPlugin(ctx, collectionRef)
 	if err != nil {
 		return nil, err
 	}
 
-	return a.listCollectionTools(ctx, view)
+	return a.listPluginTools(ctx, view)
 }
 
 func (a *API) SetToolEnabled(

@@ -15,8 +15,8 @@ import (
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
 	Plugin             artifactModel.ArtifactRef    `json:"plugin"`
-	CollectionName     spec.LogicalName             `json:"collectionName"`
-	CollectionRevision uint64                       `json:"collectionRevision"`
+	PluginName         spec.LogicalName             `json:"collectionName"`
+	PluginRevision     uint64                       `json:"collectionRevision"`
 	MemberIndex        int                          `json:"memberIndex"`
 	Member             MemberReference              `json:"member"`
 	Status             composition.ResolutionStatus `json:"status"`
@@ -69,7 +69,7 @@ func (a *API) ListMembershipsForArtifact(
 	}
 	output := make([]ArtifactMembershipView, 0)
 	for _, collectionValue := range plugins {
-		_, document, err := a.readCollectionDocument(
+		_, document, err := a.readPluginDocument(
 			ctx,
 			collectionValue.Ref,
 		)
@@ -120,12 +120,12 @@ func (a *API) ListMembershipsForArtifact(
 			}
 
 			view := ArtifactMembershipView{
-				Plugin:             collectionValue.Ref,
-				CollectionName:     collectionValue.Name,
-				CollectionRevision: collectionValue.Revision,
-				MemberIndex:        memberIndex,
-				Member:             member,
-				Status:             relationship.Status,
+				Plugin:         collectionValue.Ref,
+				PluginName:     collectionValue.Name,
+				PluginRevision: collectionValue.Revision,
+				MemberIndex:    memberIndex,
+				Member:         member,
+				Status:         relationship.Status,
 			}
 			if relationship.Issue != nil {
 				view.Code = relationship.Issue.Code

@@ -58,7 +58,7 @@ func (w *MCPAggregateWrapper) ListMCPPluginServers(
 		w,
 		func(service *mcpAggregate.Service) ([]mcpAggregate.MCPServerDetails, error) {
 			// The outer runtime aggregate remains the execution owner.
-			return service.ListMCPCollectionServers(context.Background(), ref)
+			return service.ListMCPPluginServers(context.Background(), ref)
 		},
 	)
 }

@@ -10,7 +10,7 @@ import (
 )
 
 type BaselineEnsurer interface {
-	EnsureSkillBaselineCollection(
+	EnsureSkillBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
 	) (plugin.PluginView, error)
@@ -30,12 +30,12 @@ func NewBaselineEnsurer(api *API) (BaselineEnsurer, error) {
 	return &baselineEnsurer{api: api}, nil
 }
 
-func (s *baselineEnsurer) EnsureSkillBaselineCollection(
+func (s *baselineEnsurer) EnsureSkillBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (plugin.PluginView, error) {
 	if s == nil || s.api == nil {
 		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return s.api.ensureSkillBaselineCollection(ctx, rootID)
+	return s.api.ensureSkillBaselinePlugin(ctx, rootID)
 }

@@ -124,14 +124,14 @@ func (s *Service) GetMCPServer(
 	return s.serverDetails(ctx, read)
 }
 
-func (s *Service) ListMCPCollectionServers(
+func (s *Service) ListMCPPluginServers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
 		return nil, err
 	}
-	reads, err := s.store.ListMCPCollectionServers(ctx, ref)
+	reads, err := s.store.ListMCPPluginServers(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

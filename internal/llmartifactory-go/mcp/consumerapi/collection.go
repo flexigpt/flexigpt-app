@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
-func (a *API) CreateMCPCollection(
+func (a *API) CreateMCPPlugin(
 	ctx context.Context,
 	request plugin.CreateRequest,
 ) (plugin.PluginView, error) {
@@ -19,7 +19,7 @@ func (a *API) CreateMCPCollection(
 	return a.plugins.Create(ctx, request)
 }
 
-func (a *API) ensureMCPBaselineCollection(
+func (a *API) ensureMCPBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (plugin.PluginView, error) {
@@ -29,7 +29,7 @@ func (a *API) ensureMCPBaselineCollection(
 	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
-func (a *API) GetMCPCollection(
+func (a *API) GetMCPPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginView, error) {
@@ -39,7 +39,7 @@ func (a *API) GetMCPCollection(
 	return a.plugins.Read(ctx, ref)
 }
 
-func (a *API) SetMCPCollectionEnabled(
+func (a *API) SetMCPPluginEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
@@ -56,7 +56,7 @@ func (a *API) SetMCPCollectionEnabled(
 	)
 }
 
-func (a *API) ResolveMCPCollection(
+func (a *API) ResolveMCPPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (plugin.PluginCapabilityPlan, error) {
@@ -66,7 +66,7 @@ func (a *API) ResolveMCPCollection(
 	return a.plugins.ResolveCapabilities(ctx, ref)
 }
 
-func (a *API) ListMCPCollections(
+func (a *API) ListMCPPlugins(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
@@ -78,7 +78,7 @@ func (a *API) ListMCPCollections(
 	})
 }
 
-func (a *API) ListMCPCollectionMemberships(
+func (a *API) ListMCPPluginMemberships(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]plugin.ArtifactMembershipView, error) {
@@ -88,7 +88,7 @@ func (a *API) ListMCPCollectionMemberships(
 	return a.plugins.ListMembershipsForArtifact(ctx, ref)
 }
 
-func (a *API) UpdateMCPCollection(
+func (a *API) UpdateMCPPlugin(
 	ctx context.Context,
 	request plugin.UpdateRequest,
 ) (plugin.PluginView, error) {
@@ -98,7 +98,7 @@ func (a *API) UpdateMCPCollection(
 	return a.plugins.Update(ctx, request)
 }
 
-func (a *API) AddMCPCollectionMember(
+func (a *API) AddMCPPluginMember(
 	ctx context.Context,
 	request plugin.AddMemberRequest,
 ) (plugin.PluginView, error) {
@@ -108,7 +108,7 @@ func (a *API) AddMCPCollectionMember(
 	return a.plugins.AddMember(ctx, request)
 }
 
-func (a *API) AddMCPServerToCollection(
+func (a *API) AddMCPServerToPlugin(
 	ctx context.Context,
 	request plugin.AddArtifactMemberRequest,
 ) (plugin.PluginView, error) {
@@ -118,7 +118,7 @@ func (a *API) AddMCPServerToCollection(
 	return a.plugins.AddArtifactMember(ctx, request)
 }
 
-func (a *API) RemoveMCPCollectionMember(
+func (a *API) RemoveMCPPluginMember(
 	ctx context.Context,
 	request plugin.RemoveMemberRequest,
 ) (plugin.PluginView, error) {
@@ -128,7 +128,7 @@ func (a *API) RemoveMCPCollectionMember(
 	return a.plugins.RemoveMember(ctx, request)
 }
 
-func (a *API) DeleteMCPCollection(
+func (a *API) DeleteMCPPlugin(
 	ctx context.Context,
 	request plugin.DeleteRequest,
 ) error {

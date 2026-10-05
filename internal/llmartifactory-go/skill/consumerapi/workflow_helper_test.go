@@ -133,7 +133,7 @@ func (f *skillWorkflowFixture) ensureUserBaseline(
 ) plugin.PluginView {
 	t.Helper()
 
-	value, err := f.baselineEnsurer.EnsureSkillBaselineCollection(
+	value, err := f.baselineEnsurer.EnsureSkillBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)
@@ -141,7 +141,7 @@ func (f *skillWorkflowFixture) ensureUserBaseline(
 	return value
 }
 
-func createManagedSkillInCollection(
+func createManagedSkillInPlugin(
 	t *testing.T,
 	api *skillConsumerAPI.API,
 	collectionValue plugin.PluginView,
@@ -156,12 +156,12 @@ func createManagedSkillInCollection(
 	result, err := api.CreateManagedSkill(
 		t.Context(),
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Plugin:                     collectionValue.Artifact.Ref(),
-			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
-			SkillName:                  name,
-			SKILLMD:                    document,
-			Files:                      managedSkillFiles(document, checklist),
-			Enabled:                    true,
+			Plugin:                 collectionValue.Artifact.Ref(),
+			ExpectedPluginRevision: collectionValue.Artifact.Revision,
+			SkillName:              name,
+			SKILLMD:                document,
+			Files:                  managedSkillFiles(document, checklist),
+			Enabled:                true,
 		},
 	)
 	requireNoError(t, err)
@@ -216,7 +216,7 @@ func findSkillByName(
 	return skillConsumerAPI.SkillListItem{}, false
 }
 
-func findCollectionByName(
+func findPluginByName(
 	values []plugin.ListItem,
 	name string,
 ) (plugin.ListItem, bool) {

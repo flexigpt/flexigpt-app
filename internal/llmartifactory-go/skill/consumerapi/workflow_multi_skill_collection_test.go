@@ -22,7 +22,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillCollection(
+	collectionValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -38,7 +38,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		secondSkillName = "second-multi-skill"
 	)
 
-	first, _ := createManagedSkillInCollection(
+	first, _ := createManagedSkillInPlugin(
 		t,
 		fixture.api,
 		collectionValue,
@@ -47,7 +47,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		"Use the first initial instructions.",
 		"First checklist.\n",
 	)
-	second, _ := createManagedSkillInCollection(
+	second, _ := createManagedSkillInPlugin(
 		t,
 		fixture.api,
 		first.Plugin,
@@ -57,7 +57,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		"Second checklist.\n",
 	)
 
-	collectionAfterCreate, err := fixture.api.GetSkillCollection(
+	collectionAfterCreate, err := fixture.api.GetSkillPlugin(
 		ctx,
 		second.Plugin.Artifact.Ref(),
 	)
@@ -69,7 +69,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	capabilities, err := fixture.api.ResolveSkillCollection(
+	capabilities, err := fixture.api.ResolveSkillPlugin(
 		ctx,
 		collectionAfterCreate.Artifact.Ref(),
 	)
@@ -126,12 +126,12 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	replacedFirst, err := fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Plugin:                     collectionAfterCreate.Artifact.Ref(),
-			ExpectedCollectionRevision: collectionAfterCreate.Artifact.Revision,
-			Artifact:                   firstCurrent.Ref(),
-			ExpectedArtifactRevision:   firstCurrent.Revision,
-			SkillName:                  firstSkillName,
-			SKILLMD:                    replacementDocument,
+			Plugin:                   collectionAfterCreate.Artifact.Ref(),
+			ExpectedPluginRevision:   collectionAfterCreate.Artifact.Revision,
+			Artifact:                 firstCurrent.Ref(),
+			ExpectedArtifactRevision: firstCurrent.Revision,
+			SkillName:                firstSkillName,
+			SKILLMD:                  replacementDocument,
 			Files: managedSkillFiles(
 				replacementDocument,
 				"Updated first checklist.\n",
@@ -178,7 +178,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("aggregate resolved second Skill as disabled")
 	}
 
-	collectionBeforeDetach, err := fixture.api.GetSkillCollection(
+	collectionBeforeDetach, err := fixture.api.GetSkillPlugin(
 		ctx,
 		replacedFirst.Plugin.Artifact.Ref(),
 	)
@@ -195,7 +195,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterDetach, err := fixture.api.RemoveSkillCollectionMember(
+	collectionAfterDetach, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
 			Plugin:           collectionBeforeDetach.Artifact.Ref(),
@@ -243,13 +243,13 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterFirstPurge, err := fixture.api.GetSkillCollection(
+	collectionAfterFirstPurge, err := fixture.api.GetSkillPlugin(
 		ctx,
 		collectionAfterDetach.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
-	capabilities, err = fixture.api.ResolveSkillCollection(
+	capabilities, err = fixture.api.ResolveSkillPlugin(
 		ctx,
 		collectionAfterFirstPurge.Artifact.Ref(),
 	)
@@ -303,7 +303,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterSecondDetach, err := fixture.api.RemoveSkillCollectionMember(
+	collectionAfterSecondDetach, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
 			Plugin:           collectionAfterFirstPurge.Artifact.Ref(),
@@ -329,7 +329,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	requireNoError(
 		t,
-		fixture.api.DeleteSkillCollection(
+		fixture.api.DeleteSkillPlugin(
 			ctx,
 			plugin.DeleteRequest{
 				Plugin: collectionAfterSecondDetach.Artifact.Ref(),

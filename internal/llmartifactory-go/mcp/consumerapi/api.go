@@ -173,10 +173,10 @@ func (a *API) SaveServerSettings(
 	return err
 }
 
-// ListMCPCollectionServers resolves every available server once, sharing one
+// ListMCPPluginServers resolves every available server once, sharing one
 // resource verification session across the plugin and its dependencies.
 // Aggregate owns the public projection and runtime identities.
-func (a *API) ListMCPCollectionServers(
+func (a *API) ListMCPPluginServers(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
@@ -194,7 +194,7 @@ func (a *API) ListMCPCollectionServers(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) ([]ServerRead, error) {
-			return a.listMCPCollectionServers(
+			return a.listMCPPluginServers(
 				sessionCtx,
 				collectionRef,
 			)
@@ -379,7 +379,7 @@ func (a *API) saveBuiltInServerSettings(
 	)
 }
 
-func (a *API) listMCPCollectionServers(
+func (a *API) listMCPPluginServers(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {

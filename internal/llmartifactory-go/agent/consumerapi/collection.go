@@ -20,7 +20,7 @@ func (a *API) CreateAgentPlugin(
 		return plugin.PluginView{}, spec.ErrClosed
 	}
 	if request.RootID == "" {
-		rootID, err := a.ensureDefaultAgentCollectionRoot(ctx)
+		rootID, err := a.ensureDefaultAgentPluginRoot(ctx)
 		if err != nil {
 			return plugin.PluginView{}, err
 		}
@@ -29,7 +29,7 @@ func (a *API) CreateAgentPlugin(
 	return a.plugins.Create(ctx, request)
 }
 
-func (a *API) ensureAgentBaselineCollection(
+func (a *API) ensureAgentBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (plugin.PluginView, error) {
@@ -49,7 +49,7 @@ func (a *API) GetAgentPlugin(
 	return a.plugins.Read(ctx, ref)
 }
 
-func (a *API) ListAgentCollections(
+func (a *API) ListAgentPlugins(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
@@ -59,7 +59,7 @@ func (a *API) ListAgentCollections(
 	return a.plugins.ListDomain(ctx, plugin.ListRequest{RootID: rootID})
 }
 
-func (a *API) UpdateAgentCollection(
+func (a *API) UpdateAgentPlugin(
 	ctx context.Context,
 	request plugin.UpdateRequest,
 ) (plugin.PluginView, error) {
@@ -130,7 +130,7 @@ func (a *API) RemoveAgentPluginMember(
 	)
 }
 
-func (a *API) SetAgentCollectionEnabled(
+func (a *API) SetAgentPluginEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
@@ -187,7 +187,7 @@ func (a *API) ResolveAgentPluginCapabilities(
 	return a.plugins.ResolveCapabilities(ctx, ref)
 }
 
-func (a *API) IsManagedAgentCollection(
+func (a *API) IsManagedAgentPlugin(
 	value plugin.PluginView,
 ) bool {
 	if value.Artifact.Binding.SubresourceLocator != "" {

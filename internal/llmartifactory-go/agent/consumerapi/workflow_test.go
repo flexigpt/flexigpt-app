@@ -124,7 +124,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	}
 }
 
-func TestWorkflow_UserCollection_ManagedAgentCRUD(
+func TestWorkflow_UserPlugin_ManagedAgentCRUD(
 	t *testing.T,
 ) {
 	harness := newWorkflowHarness(t)
@@ -135,7 +135,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 
-	baseline, err := baselineEnsurer.EnsureAgentBaselineCollection(
+	baseline, err := baselineEnsurer.EnsureAgentBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)
@@ -143,7 +143,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	if !baseline.Baseline {
 		t.Fatalf("Agent baseline Plugin is not marked as baseline")
 	}
-	if !harness.api.IsManagedAgentCollection(baseline) {
+	if !harness.api.IsManagedAgentPlugin(baseline) {
 		t.Fatalf("Agent baseline Plugin is not recognized as managed")
 	}
 
@@ -163,11 +163,11 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 			topology.UserRootID(),
 		)
 	}
-	if !created.Editable || !harness.api.IsManagedAgentCollection(created) {
+	if !created.Editable || !harness.api.IsManagedAgentPlugin(created) {
 		t.Fatalf("new Agent Plugin is not editable managed state")
 	}
 
-	updated, err := harness.api.UpdateAgentCollection(
+	updated, err := harness.api.UpdateAgentPlugin(
 		t.Context(),
 		plugin.UpdateRequest{
 			Plugin:           created.Artifact.Ref(),
@@ -185,43 +185,43 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 
-	readCollection, err := harness.api.GetAgentPlugin(
+	readPlugin, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		updated.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if readCollection.DisplayName != "Workflow Plugin Updated" {
+	if readPlugin.DisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
 			"Plugin display name = %q",
-			readCollection.DisplayName,
+			readPlugin.DisplayName,
 		)
 	}
-	if readCollection.Description != "Updated workflow Plugin description." {
+	if readPlugin.Description != "Updated workflow Plugin description." {
 		t.Fatalf(
 			"Plugin description = %q",
-			readCollection.Description,
+			readPlugin.Description,
 		)
 	}
 
-	disabledCollection, err := harness.api.SetAgentCollectionEnabled(
+	disabledPlugin, err := harness.api.SetAgentPluginEnabled(
 		t.Context(),
-		readCollection.Artifact.Ref(),
-		readCollection.Artifact.Revision,
+		readPlugin.Artifact.Ref(),
+		readPlugin.Artifact.Revision,
 		false,
 	)
 	requireNoError(t, err)
-	if disabledCollection.Artifact.Enabled {
+	if disabledPlugin.Artifact.Enabled {
 		t.Fatalf("Plugin remained enabled after disable")
 	}
 
-	enabledCollection, err := harness.api.SetAgentCollectionEnabled(
+	enabledPlugin, err := harness.api.SetAgentPluginEnabled(
 		t.Context(),
-		disabledCollection.Artifact.Ref(),
-		disabledCollection.Artifact.Revision,
+		disabledPlugin.Artifact.Ref(),
+		disabledPlugin.Artifact.Revision,
 		true,
 	)
 	requireNoError(t, err)
-	if !enabledCollection.Artifact.Enabled {
+	if !enabledPlugin.Artifact.Enabled {
 		t.Fatalf("Plugin remained disabled after enable")
 	}
 
@@ -233,19 +233,19 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	destination := requireImportDestination(
 		t,
 		destinations,
-		enabledCollection.Artifact.Ref(),
+		enabledPlugin.Artifact.Ref(),
 	)
-	if destination.CollectionRevision != enabledCollection.Artifact.Revision {
+	if destination.PluginRevision != enabledPlugin.Artifact.Revision {
 		t.Fatalf(
 			"destination Plugin revision = %d, want %d",
-			destination.CollectionRevision,
-			enabledCollection.Artifact.Revision,
+			destination.PluginRevision,
+			enabledPlugin.Artifact.Revision,
 		)
 	}
-	if destination.CollectionDisplayName != "Workflow Plugin Updated" {
+	if destination.PluginDisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
 			"destination Plugin display name = %q",
-			destination.CollectionDisplayName,
+			destination.PluginDisplayName,
 		)
 	}
 
@@ -256,15 +256,15 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	managementDestination := requireImportDestination(
 		t,
 		allDestinations,
-		enabledCollection.Artifact.Ref(),
+		enabledPlugin.Artifact.Ref(),
 	)
 	if managementDestination.RootDisplayName == "" {
 		t.Fatalf("management import destination has no Root display name")
 	}
-	if managementDestination.CollectionDisplayName != "Workflow Plugin Updated" {
+	if managementDestination.PluginDisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
 			"management destination Plugin display name = %q",
-			managementDestination.CollectionDisplayName,
+			managementDestination.PluginDisplayName,
 		)
 	}
 
@@ -292,9 +292,9 @@ members:
 	preview, err := harness.api.PreviewAgentImport(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
-			Path:                       inputPath,
-			Plugin:                     enabledCollection.Artifact.Ref(),
-			ExpectedCollectionRevision: enabledCollection.Artifact.Revision,
+			Path:                   inputPath,
+			Plugin:                 enabledPlugin.Artifact.Ref(),
+			ExpectedPluginRevision: enabledPlugin.Artifact.Revision,
 		},
 	)
 	requireNoError(t, err)
@@ -328,7 +328,7 @@ members:
 	)
 	requireNoError(t, err)
 	if committed.Plugin.Artifact.Ref() !=
-		enabledCollection.Artifact.Ref() {
+		enabledPlugin.Artifact.Ref() {
 		t.Fatalf("import committed membership to another Plugin")
 	}
 
@@ -471,7 +471,7 @@ members:
 		t.Fatalf("deleted Agent remains in Root Agent list")
 	}
 
-	remainingCollectionAgents, err := harness.api.ListAgents(
+	remainingPluginAgents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
 			RootID: topology.UserRootID(),
@@ -479,16 +479,16 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if containsAgent(remainingCollectionAgents, enabledAgent.Ref) {
+	if containsAgent(remainingPluginAgents, enabledAgent.Ref) {
 		t.Fatalf("deleted Agent remains in Plugin Agent list")
 	}
 
-	currentCollection, err := harness.api.GetAgentPlugin(
+	currentPlugin, err := harness.api.GetAgentPlugin(
 		t.Context(),
 		collectionRef,
 	)
 	requireNoError(t, err)
-	if len(currentCollection.Members) == 0 {
+	if len(currentPlugin.Members) == 0 {
 		t.Fatal(
 			"deleting the managed Agent unexpectedly detached Plugin membership",
 		)
@@ -508,34 +508,34 @@ members:
 	err = harness.api.DeleteAgentPlugin(
 		t.Context(),
 		collectionRef,
-		currentCollection.Artifact.Revision,
+		currentPlugin.Artifact.Revision,
 	)
 	requireErrorIs(t, err, spec.ErrConflict)
 
 	memberIndex := requireAgentPluginMemberIndex(
 		t,
-		currentCollection.Members,
+		currentPlugin.Members,
 		spec.LogicalName("workflow-agent"),
 	)
-	detachedCollection, err := harness.api.RemoveAgentPluginMember(
+	detachedPlugin, err := harness.api.RemoveAgentPluginMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
 			Plugin:           collectionRef,
-			ExpectedRevision: currentCollection.Artifact.Revision,
+			ExpectedRevision: currentPlugin.Artifact.Revision,
 			Index:            memberIndex,
 		},
 	)
 	requireNoError(t, err)
-	if len(detachedCollection.Members) != 0 {
+	if len(detachedPlugin.Members) != 0 {
 		t.Fatalf(
 			"Plugin members after detach = %#v, want empty",
-			detachedCollection.Members,
+			detachedPlugin.Members,
 		)
 	}
 
 	currentMemberships, err := harness.api.ListAgentPluginMembers(
 		t.Context(),
-		detachedCollection.Artifact.Ref(),
+		detachedPlugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 	if !currentMemberships.Complete {
@@ -549,17 +549,17 @@ members:
 		t,
 		harness.api.DeleteAgentPlugin(
 			t.Context(),
-			detachedCollection.Artifact.Ref(),
-			detachedCollection.Artifact.Revision,
+			detachedPlugin.Artifact.Ref(),
+			detachedPlugin.Artifact.Revision,
 		),
 	)
 
-	plugins, err := harness.api.ListAgentCollections(
+	plugins, err := harness.api.ListAgentPlugins(
 		t.Context(),
 		topology.UserRootID(),
 	)
 	requireNoError(t, err)
-	if containsCollection(plugins, collectionRef) {
+	if containsPlugin(plugins, collectionRef) {
 		t.Fatalf("deleted custom Plugin remains in Plugin list")
 	}
 
@@ -674,7 +674,7 @@ func containsAgent(
 	return false
 }
 
-func containsCollection(
+func containsPlugin(
 	values []plugin.ListItem,
 	ref artifactModel.ArtifactRef,
 ) bool {
