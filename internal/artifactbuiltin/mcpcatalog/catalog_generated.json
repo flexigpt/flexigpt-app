@@ -10,7 +10,7 @@
   "packages": [
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "cloudflare",
         "version": "unversioned"
       },
@@ -762,11 +762,11 @@
           "size": 4966
         }
       ],
-      "fingerprint": "sha256:7739c713dd2da9321561439a2f116fa1cb349d20da575af6b630b8a57f2a3d98"
+      "fingerprint": "sha256:ed4ec8d6732776efbb022d3c4e9af30031d59b14f4ef68342758fd3f2905e59f"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "design",
         "version": "unversioned"
       },
@@ -929,11 +929,11 @@
           "size": 1591
         }
       ],
-      "fingerprint": "sha256:e650f261f3613f46cb5dac9595bc11c5a7ffeb7e712a481cd06f63b7bc1972fe"
+      "fingerprint": "sha256:a2a3d18162622222c6af5b6178c54fc37c6bef338bece079083d875774f982ab"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "general-services",
         "version": "unversioned"
       },
@@ -1157,11 +1157,11 @@
           "size": 1762
         }
       ],
-      "fingerprint": "sha256:508379285a3b8dd6160cc4a786e5101fe97be06a49db4af636bea60340f881d2"
+      "fingerprint": "sha256:c4492b898fd37de5d55f3b54a23541977c1a18528178c2d8d5646d26f0c65ab3"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "google",
         "version": "unversioned"
       },
@@ -1536,11 +1536,11 @@
           "size": 2945
         }
       ],
-      "fingerprint": "sha256:2de7c228817bd48e7f7cdfb951cab8462b7f5dc7ab4efcce036c3cde00b0940a"
+      "fingerprint": "sha256:131dea62a70fc93c8522bb3a68cceab4b8b511c2d413500961a40c4c7d72aa3a"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "microsoft",
         "version": "unversioned"
       },
@@ -2104,11 +2104,11 @@
           "size": 6825
         }
       ],
-      "fingerprint": "sha256:8e198b99e6a92340978f9bb24ce76f84682f55c295f79094fc5d88ea7e12a3c3"
+      "fingerprint": "sha256:54ff8f1c3fc99fbd327316c370615c878470db7592c2f244294d3ed414da3800"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "policies",
         "version": "unversioned"
       },
@@ -2511,11 +2511,11 @@
           "size": 3957
         }
       ],
-      "fingerprint": "sha256:dd217f02ec917ae2cd4a7426ad57d221480bcb2d6f23c64f751c0d644f76ae2b"
+      "fingerprint": "sha256:229098275e614bfc4c1a838b5f5a2f64afb0d5105ea342fa8652ccec81057610"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "search",
         "version": "unversioned"
       },
@@ -2720,11 +2720,11 @@
           "size": 1405
         }
       ],
-      "fingerprint": "sha256:87646b1038069d53904191373fff24197057a486724b0ae5f3fbfb684a30d460"
+      "fingerprint": "sha256:917898e51b810eeffd577308f58a4a2351079000589b5845c84bf09b26ca8cc2"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "software-dev-hosting",
         "version": "unversioned"
       },
@@ -3038,11 +3038,11 @@
           "size": 2580
         }
       ],
-      "fingerprint": "sha256:5681cf4a6a034f51eaee6b2ec04119032fad5fda474c14405946f84d03e0e117"
+      "fingerprint": "sha256:53492381d937abfee2575c59f44e536414d658a79be968872a16485e8ad6fbb8"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "task-management",
         "version": "unversioned"
       },
@@ -3234,11 +3234,11 @@
           "size": 1357
         }
       ],
-      "fingerprint": "sha256:a2dcfe6bf0b15bb31e2b3716b99efedc5dd905dc3cd01ac49d08e5d74850d55f"
+      "fingerprint": "sha256:717d9639fcf599f37b1ca40dfd463121aaef0a9147be76c70f04c6006760a9be"
     },
     {
       "address": {
-        "kind": "mcp-collection",
+        "kind": "mcp-plugin",
         "name": "zoom",
         "version": "unversioned"
       },
@@ -3616,7 +3616,7 @@
           "size": 3838
         }
       ],
-      "fingerprint": "sha256:0b9ba018a0cb4341fee4eaff8f4ce41c6a9e9f379ae00a4cb3dbd10b47ad7b47"
+      "fingerprint": "sha256:c404f6070edc968b9f4ecc72518d296af117909d81bab0a01522f150d00071a8"
     }
   ]
 }

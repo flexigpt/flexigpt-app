@@ -18,7 +18,7 @@ const (
 
 	ManagedMCPPackageKind       managedpackageModel.PackageKind = "mcp"
 	ManagedMCPPolicyPackageKind managedpackageModel.PackageKind = "mcp-policy"
-	MCPPluginPackageKind        managedpackageModel.PackageKind = "mcp-collection"
+	MCPPluginPackageKind        managedpackageModel.PackageKind = "mcp-plugin"
 	SourceDecoderID             spec.DecoderID                  = "artifact.mcp-json"
 
 	InstallationDataSchemaVersion = "v1"

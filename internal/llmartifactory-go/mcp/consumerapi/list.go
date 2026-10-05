@@ -17,8 +17,8 @@ const (
 	DefaultPageSize = 50
 	MaxPageSize     = 200
 
-	collectionPageKind = "plugins"
-	serverPageKind     = "servers"
+	pluginPageKind = "plugins"
+	serverPageKind = "servers"
 )
 
 type PluginPage struct {
@@ -88,7 +88,7 @@ func (s *MCPListService) ListPluginsPage(
 	pageToken string,
 ) (PluginPage, error) {
 	cursor, err := decodeCursor(
-		collectionPageKind,
+		pluginPageKind,
 		pageSize,
 		pageToken,
 	)

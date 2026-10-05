@@ -10,7 +10,7 @@
   "packages": [
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "anthropicmessages",
         "version": "unversioned"
       },
@@ -55,11 +55,11 @@
           "size": 221
         }
       ],
-      "fingerprint": "sha256:be341ab09dbb7fec63781b4deffed20769c2c66f02f5b223c9fbf791cdaee798"
+      "fingerprint": "sha256:5839f3d9ae24391433682891c2d133b0a3ce98d48ac7b1ce5b60ebe9060e7fde"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "exec",
         "version": "unversioned"
       },
@@ -109,11 +109,11 @@
           "size": 270
         }
       ],
-      "fingerprint": "sha256:78d3a3c31b888e8217f853479b1bf71efdc17a09155d5e3a55d7ff9e6f00337b"
+      "fingerprint": "sha256:aa317b9aa937996a7eccad7a82934cdc443d8a293b09022d01e776ab3eeaeb85"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "fs",
         "version": "unversioned"
       },
@@ -193,11 +193,11 @@
           "size": 561
         }
       ],
-      "fingerprint": "sha256:55c1f034a3a1ee38275d97c9944685d919632d7197243c420e0fb40aa1b4bc29"
+      "fingerprint": "sha256:bd6e1e9c8afcce171fe3b9478ea40c41f9ca202b13d3341c239a609da21e1199"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "git",
         "version": "unversioned"
       },
@@ -342,11 +342,11 @@
           "size": 1242
         }
       ],
-      "fingerprint": "sha256:96cdb92a1d4dfc2ecf3a0169dd670f5b8500d2d13c69b500d9b6bb6a963de993"
+      "fingerprint": "sha256:a30470a26f97ea16e0ddd06626ba565faecec1603475d17784416e792202fe5e"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "googlegeneratecontent",
         "version": "unversioned"
       },
@@ -391,11 +391,11 @@
           "size": 210
         }
       ],
-      "fingerprint": "sha256:37a8c0ece50a16b578dc46738086a509b2a84705cb4baf0b556bc6d19dbc88a2"
+      "fingerprint": "sha256:00eb52fc1152524eab93548bbfe9de5540a7de6aac8b00620f81adecf6795e2b"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "image",
         "version": "unversioned"
       },
@@ -440,11 +440,11 @@
           "size": 167
         }
       ],
-      "fingerprint": "sha256:dc92811e4ec31dd77727c79eaf991acd6342b146354b4ab5472b644384fd446d"
+      "fingerprint": "sha256:199a4f069b977a781be113c27fb36e5ed58c607fbccbb8c972e1b3175a2606cb"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "openaichat",
         "version": "unversioned"
       },
@@ -489,11 +489,11 @@
           "size": 224
         }
       ],
-      "fingerprint": "sha256:9d339b3ae4b9137c5d44981a7ae4d4f7447185ecc58d9d64201bd559e2e18a9f"
+      "fingerprint": "sha256:fd597a5bdc5a837fb34b93096d46b1195e2d23596c90c1bee315d51e2b07ed4d"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "openairesponses",
         "version": "unversioned"
       },
@@ -538,11 +538,11 @@
           "size": 212
         }
       ],
-      "fingerprint": "sha256:4206bfe90b26796bb363213bc070004bca61b632a325ccb346154afa07dc4615"
+      "fingerprint": "sha256:c4e4f6dda3a80968d7fe5197bf1ff451c32bbe9a041b81e2103da82ddc4c29db"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "text",
         "version": "unversioned"
       },
@@ -612,11 +612,11 @@
           "size": 454
         }
       ],
-      "fingerprint": "sha256:06430302b4565c190c032c2ac11163a6787e25aa80e8a026c66108beaa711b82"
+      "fingerprint": "sha256:ca8718e8a8193a0c86d1a3848de6e5e2be3752ab2c55b58caa0d50244ca6304f"
     },
     {
       "address": {
-        "kind": "tool-collection",
+        "kind": "tool-plugin",
         "name": "web",
         "version": "unversioned"
       },
@@ -661,7 +661,7 @@
           "size": 187
         }
       ],
-      "fingerprint": "sha256:6b64e724ce9518c92c14363aa228a246e1007ee0389b6d9bb61b401d90462cc4"
+      "fingerprint": "sha256:5bde24c869d95f46b32849dc577936f4e6be2c2173e9a692d5ee11481613250c"
     },
     {
       "address": {

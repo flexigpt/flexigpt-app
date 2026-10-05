@@ -10,7 +10,7 @@
   "packages": [
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "core-instructions",
         "version": "unversioned"
       },
@@ -166,11 +166,11 @@
           "size": 1267
         }
       ],
-      "fingerprint": "sha256:2db2a1cf52551bbcdc12281544180cb38278df3699e8c3a3b06cfe437807f4db"
+      "fingerprint": "sha256:b89060d9cb47ee4e3c40a5cf135443cec817338cfa1d2aa7cc18ef60d6a1d905"
     },
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "product-leadership",
         "version": "unversioned"
       },
@@ -443,11 +443,11 @@
           "size": 3019
         }
       ],
-      "fingerprint": "sha256:04d9027e39e07e613927e4648f8172a051ddb31acc91b1c76a4c3bae88a9afbc"
+      "fingerprint": "sha256:1cf9e0ac6ac5f5cad27769e45a90245d4b3812e5a71f008b58a50d9b0e7e514a"
     },
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "research-analysis",
         "version": "unversioned"
       },
@@ -525,11 +525,11 @@
           "size": 3001
         }
       ],
-      "fingerprint": "sha256:e9a3f414b2d1aed9c2ed22bcb38109364cb5da2fc6596adef08822a6ecbcbcd7"
+      "fingerprint": "sha256:7dad8087a3c057bb4c6da06a83c08800e2d3a2b8a473ff38e14876a89eb7d7b0"
     },
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "software-dev-templates",
         "version": "unversioned"
       },
@@ -685,11 +685,11 @@
           "size": 335
         }
       ],
-      "fingerprint": "sha256:183306a966ff34d58c341b53536a69acab254a9624874779ad6a0506e0ef1fc7"
+      "fingerprint": "sha256:5332cc9590321ad6b557ac6f68d576029c1971cfa2034777ecc31be77675d780"
     },
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "software-dev",
         "version": "unversioned"
       },
@@ -1052,11 +1052,11 @@
           "size": 3497
         }
       ],
-      "fingerprint": "sha256:709ada9f5fab39e311d768e1e1fa1ff7dadfc6809aabf35aba966af0b4cbdc0d"
+      "fingerprint": "sha256:7bb4b3287205aaa6696685758bf331b338868ea93b472c8d852e25d3139e5607"
     },
     {
       "address": {
-        "kind": "skill-collection",
+        "kind": "skill-plugin",
         "name": "technical-content-writing",
         "version": "unversioned"
       },
@@ -1290,7 +1290,7 @@
           "size": 2955
         }
       ],
-      "fingerprint": "sha256:dd0f29ccd60e228dd5ff395bd72e4d26878bd21867dd4c0d5b9557751bb052a6"
+      "fingerprint": "sha256:48479c3fe75f336940c81a040a8dcb766ca53d0cf5fb50a8631d40f2b91795fd"
     }
   ]
 }

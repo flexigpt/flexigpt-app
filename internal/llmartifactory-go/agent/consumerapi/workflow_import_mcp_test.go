@@ -12,7 +12,7 @@ import (
 func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 	t *testing.T,
 ) {
-	harness, collectionValue := newManagedImportFixture(
+	harness, pluginValue := newManagedImportFixture(
 		t,
 		"inline-mcp-plugin",
 	)
@@ -36,7 +36,7 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 	preview := previewManagedAgentImport(
 		t,
 		harness,
-		collectionValue,
+		pluginValue,
 		path,
 	)
 	if !preview.CanImport {
@@ -138,7 +138,7 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 func TestWorkflow_ManagedAgentImportReportsExpectedSourceDigestMismatch(
 	t *testing.T,
 ) {
-	harness, collectionValue := newManagedImportFixture(
+	harness, pluginValue := newManagedImportFixture(
 		t,
 		"source-digest-plugin",
 	)
@@ -152,8 +152,8 @@ func TestWorkflow_ManagedAgentImportReportsExpectedSourceDigestMismatch(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
 			Path:                   path,
-			Plugin:                 collectionValue.Artifact.Ref(),
-			ExpectedPluginRevision: collectionValue.Artifact.Revision,
+			Plugin:                 pluginValue.Artifact.Ref(),
+			ExpectedPluginRevision: pluginValue.Artifact.Revision,
 			ExpectedSourceDigest: cryptoutil.DigestBytes(
 				[]byte("different source bytes"),
 			),

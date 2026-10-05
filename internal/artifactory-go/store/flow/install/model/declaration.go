@@ -12,7 +12,7 @@ import (
 // Declaration is application-supplied protected topology metadata.
 //
 // It intentionally describes only generic Artifact Store entities. It does
-// not describe package bytes, collection kinds, artifact kinds, feature roles,
+// not describe package bytes, plugin kinds, artifact kinds, feature roles,
 // or any built-in product semantics.
 type Declaration struct {
 	Root    rootModel.RootDraft `json:"root"`

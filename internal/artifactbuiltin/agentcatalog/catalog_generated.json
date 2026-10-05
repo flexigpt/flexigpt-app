@@ -10,7 +10,7 @@
   "packages": [
     {
       "address": {
-        "kind": "agent-collection",
+        "kind": "agent-plugin",
         "name": "core-agents",
         "version": "unversioned"
       },
@@ -532,11 +532,11 @@
           "size": 541
         }
       ],
-      "fingerprint": "sha256:5d859732b0708b9e99d01f531b37129d8e1e8169b3a90a48b0fa2b7f9b6447e4"
+      "fingerprint": "sha256:c8a1a4f5cd8253b9b9bacd0add8e1de3eb2c8bf4dca19d21acf7ceb6aefd6a5f"
     },
     {
       "address": {
-        "kind": "agent-collection",
+        "kind": "agent-plugin",
         "name": "product-leadership-agents",
         "version": "unversioned"
       },
@@ -1674,11 +1674,11 @@
           "size": 2076
         }
       ],
-      "fingerprint": "sha256:36643fb18d554bb1737125e63c852a0f64e150ef7d9f727a5f3105b2cfc881c9"
+      "fingerprint": "sha256:f1589dfb3f2652154e8861197f0dbdbd3542ea2e4db5bbb45e3417e26496548e"
     },
     {
       "address": {
-        "kind": "agent-collection",
+        "kind": "agent-plugin",
         "name": "research-analysis-agents",
         "version": "unversioned"
       },
@@ -1906,11 +1906,11 @@
           "size": 2167
         }
       ],
-      "fingerprint": "sha256:6e074e6f3d3d84df7c60591e011d9d5e2b95945178b4edb6ed8e0e84041e4aa6"
+      "fingerprint": "sha256:7896dcf705aecd0c956e52a0c426be9a9d24eedb61cb77d36fd7ec79a4643228"
     },
     {
       "address": {
-        "kind": "agent-collection",
+        "kind": "agent-plugin",
         "name": "software-development-agents",
         "version": "unversioned"
       },
@@ -3276,11 +3276,11 @@
           "size": 2130
         }
       ],
-      "fingerprint": "sha256:f25a31bd05d3040492a9e7ed528dccc02d047b21b29f94d77e5bb0eda7eafebf"
+      "fingerprint": "sha256:70aa470a11c8bfd7675f57cbf182ee59b01568234ff22cf7c5eeb0ea4cd2a8d5"
     },
     {
       "address": {
-        "kind": "agent-collection",
+        "kind": "agent-plugin",
         "name": "technical-content-writing-agents",
         "version": "unversioned"
       },
@@ -4204,7 +4204,7 @@
           "size": 2109
         }
       ],
-      "fingerprint": "sha256:623353efdc24deab50c647cc5b91185f5b7705b877091c3a898c9ec0a7cf1819"
+      "fingerprint": "sha256:fc679f1e618d3c95a026b7cf180462b5ce882bc8c2af7faa75ac9516c7651ac2"
     }
   ]
 }

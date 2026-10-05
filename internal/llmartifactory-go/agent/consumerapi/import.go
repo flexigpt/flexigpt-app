@@ -675,7 +675,7 @@ func (a *API) CommitAgentImport(
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
-	collectionView, err := a.GetAgentPlugin(
+	pluginView, err := a.GetAgentPlugin(
 		ctx,
 		membership.Plugin.Artifact.Ref(),
 	)
@@ -690,7 +690,7 @@ func (a *API) CommitAgentImport(
 	)
 	return AgentImportCommitResult{
 		Agent:               agent,
-		Plugin:              collectionView,
+		Plugin:              pluginView,
 		RestoredMemberships: plan.RestoredMemberships,
 		MCPSetupDescriptors: setup,
 		PreparedFingerprint: fingerprint,
@@ -699,17 +699,17 @@ func (a *API) CommitAgentImport(
 
 func (a *API) agentImportDestination(
 	ctx context.Context,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) (agentImportDestinationState, error) {
 	if a == nil || a.plugins == nil {
 		return agentImportDestinationState{}, spec.ErrClosed
 	}
-	if err := collectionRef.Validate(); err != nil {
+	if err := pluginRef.Validate(); err != nil {
 		return agentImportDestinationState{}, err
 	}
 
-	value, err := a.plugins.Get(ctx, collectionRef)
+	value, err := a.plugins.Get(ctx, pluginRef)
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}

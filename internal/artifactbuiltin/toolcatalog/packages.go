@@ -88,18 +88,18 @@ func PreparePackages(
 func preparePluginDirectory(
 	ctx context.Context,
 	packages fs.FS,
-	collectionRoot spec.Locator,
+	pluginRoot spec.Locator,
 	goTools toolDomain.GoToolLocator,
 	seenTools map[spec.LogicalName]spec.Locator,
 	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
-	pluginLocation := string(collectionRoot) + "/" +
+	pluginLocation := string(pluginRoot) + "/" +
 		string(toolDomain.ToolPluginDocumentFile())
 	pluginBytes, err := fs.ReadFile(packages, pluginLocation)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"read Tool Plugin %q: %w",
-			collectionRoot,
+			pluginRoot,
 			err,
 		)
 	}
@@ -126,8 +126,8 @@ func preparePluginDirectory(
 		return nil, err
 	}
 
-	collectionPackage, err := preparePluginPackage(
-		collectionRoot,
+	pluginPackage, err := preparePluginPackage(
+		pluginRoot,
 		pluginDocument,
 		registry,
 	)
@@ -138,7 +138,7 @@ func preparePluginDirectory(
 	staticTools, err := readStaticSDKTools(
 		ctx,
 		packages,
-		collectionRoot,
+		pluginRoot,
 		toolNames,
 	)
 	if err != nil {
@@ -150,7 +150,7 @@ func preparePluginDirectory(
 		0,
 		1+len(toolNames),
 	)
-	output = append(output, collectionPackage)
+	output = append(output, pluginPackage)
 
 	for _, name := range toolNames {
 		if previous, duplicate := seenTools[name]; duplicate {
@@ -159,10 +159,10 @@ func preparePluginDirectory(
 				spec.ErrIdentityConflict,
 				name,
 				previous,
-				collectionRoot,
+				pluginRoot,
 			)
 		}
-		seenTools[name] = collectionRoot
+		seenTools[name] = pluginRoot
 
 		document, found := staticTools[name]
 		if !found {
@@ -179,7 +179,7 @@ func preparePluginDirectory(
 		}
 
 		prepared, err := prepareToolPackage(
-			collectionRoot,
+			pluginRoot,
 			document,
 			registry,
 		)
@@ -195,7 +195,7 @@ func preparePluginDirectory(
 func readStaticSDKTools(
 	ctx context.Context,
 	packages fs.FS,
-	collectionRoot spec.Locator,
+	pluginRoot spec.Locator,
 	declared []spec.LogicalName,
 ) (map[spec.LogicalName]toolv1.ToolDocument, error) {
 	allowed := make(map[spec.LogicalName]struct{}, len(declared))
@@ -203,7 +203,7 @@ func readStaticSDKTools(
 		allowed[name] = struct{}{}
 	}
 
-	entries, err := fs.ReadDir(packages, string(collectionRoot))
+	entries, err := fs.ReadDir(packages, string(pluginRoot))
 	if err != nil {
 		return nil, err
 	}
@@ -220,12 +220,12 @@ func readStaticSDKTools(
 			return nil, fmt.Errorf(
 				"%w: Tool Plugin directory %q contains unexpected file %q",
 				spec.ErrInvalid,
-				collectionRoot,
+				pluginRoot,
 				entry.Name(),
 			)
 		}
 
-		directory := string(collectionRoot) + "/" + entry.Name()
+		directory := string(pluginRoot) + "/" + entry.Name()
 		files, err := fs.ReadDir(packages, directory)
 		if err != nil {
 			return nil, err
@@ -240,7 +240,7 @@ func readStaticSDKTools(
 			)
 		}
 
-		location := string(collectionRoot) + "/" + entry.Name() +
+		location := string(pluginRoot) + "/" + entry.Name() +
 			"/" + string(toolDomain.ToolDocumentFile())
 		rawDocument, err := fs.ReadFile(packages, location)
 		if err != nil {
@@ -279,14 +279,14 @@ func readStaticSDKTools(
 				"%w: embedded SDK Tool %q is not declared by Plugin %q",
 				spec.ErrInvalid,
 				name,
-				collectionRoot,
+				pluginRoot,
 			)
 		}
 		if _, duplicate := output[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Plugin %q repeats embedded SDK Tool %q",
 				spec.ErrIdentityConflict,
-				collectionRoot,
+				pluginRoot,
 				name,
 			)
 		}
@@ -361,7 +361,7 @@ func preparePluginPackage(
 }
 
 func prepareToolPackage(
-	collectionRoot spec.Locator,
+	pluginRoot spec.Locator,
 	document toolv1.ToolDocument,
 	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
@@ -389,7 +389,7 @@ func prepareToolPackage(
 	}
 
 	return PreparedPackage{
-		EmbeddedPackageRoot: collectionRoot,
+		EmbeddedPackageRoot: pluginRoot,
 		Address:             address,
 		DocumentFile:        toolDomain.ToolDocumentFile(),
 		PackageFiles: []managedpackageModel.ManagedPackageFile{{

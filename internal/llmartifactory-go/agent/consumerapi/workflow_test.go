@@ -352,16 +352,16 @@ members:
 		t.Fatalf("managed Agent is missing from the Root Agent list")
 	}
 
-	collectionRef := committed.Plugin.Artifact.Ref()
-	collectionAgents, err := harness.api.ListAgents(
+	pluginRef := committed.Plugin.Artifact.Ref()
+	pluginAgents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
 			RootID: topology.UserRootID(),
-			Plugin: &collectionRef,
+			Plugin: &pluginRef,
 		},
 	)
 	requireNoError(t, err)
-	if !containsAgent(collectionAgents, committed.Agent.Ref) {
+	if !containsAgent(pluginAgents, committed.Agent.Ref) {
 		t.Fatalf("managed Agent is missing from its Plugin")
 	}
 
@@ -475,7 +475,7 @@ members:
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
 			RootID: topology.UserRootID(),
-			Plugin: &collectionRef,
+			Plugin: &pluginRef,
 		},
 	)
 	requireNoError(t, err)
@@ -485,7 +485,7 @@ members:
 
 	currentPlugin, err := harness.api.GetAgentPlugin(
 		t.Context(),
-		collectionRef,
+		pluginRef,
 	)
 	requireNoError(t, err)
 	if len(currentPlugin.Members) == 0 {
@@ -496,7 +496,7 @@ members:
 
 	staleMemberships, err := harness.api.ListAgentPluginMembers(
 		t.Context(),
-		collectionRef,
+		pluginRef,
 	)
 	requireNoError(t, err)
 	if staleMemberships.Complete {
@@ -507,7 +507,7 @@ members:
 
 	err = harness.api.DeleteAgentPlugin(
 		t.Context(),
-		collectionRef,
+		pluginRef,
 		currentPlugin.Artifact.Revision,
 	)
 	requireErrorIs(t, err, spec.ErrConflict)
@@ -520,7 +520,7 @@ members:
 	detachedPlugin, err := harness.api.RemoveAgentPluginMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
-			Plugin:           collectionRef,
+			Plugin:           pluginRef,
 			ExpectedRevision: currentPlugin.Artifact.Revision,
 			Index:            memberIndex,
 		},
@@ -559,7 +559,7 @@ members:
 		topology.UserRootID(),
 	)
 	requireNoError(t, err)
-	if containsPlugin(plugins, collectionRef) {
+	if containsPlugin(plugins, pluginRef) {
 		t.Fatalf("deleted custom Plugin remains in Plugin list")
 	}
 
@@ -567,7 +567,7 @@ members:
 		t.Context(),
 	)
 	requireNoError(t, err)
-	if hasImportDestination(remainingDestinations, collectionRef) {
+	if hasImportDestination(remainingDestinations, pluginRef) {
 		t.Fatalf("deleted custom Plugin remains an import destination")
 	}
 }

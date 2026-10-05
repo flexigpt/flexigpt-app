@@ -22,7 +22,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -41,7 +41,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	first, _ := createManagedSkillInPlugin(
 		t,
 		fixture.api,
-		collectionValue,
+		pluginValue,
 		firstSkillName,
 		"First managed Skill.",
 		"Use the first initial instructions.",
@@ -57,21 +57,21 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		"Second checklist.\n",
 	)
 
-	collectionAfterCreate, err := fixture.api.GetSkillPlugin(
+	pluginAfterCreate, err := fixture.api.GetSkillPlugin(
 		ctx,
 		second.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if len(collectionAfterCreate.Members) != 2 {
+	if len(pluginAfterCreate.Members) != 2 {
 		t.Fatalf(
 			"Plugin members after two Skill creates=%d, want 2",
-			len(collectionAfterCreate.Members),
+			len(pluginAfterCreate.Members),
 		)
 	}
 
 	capabilities, err := fixture.api.ResolveSkillPlugin(
 		ctx,
-		collectionAfterCreate.Artifact.Ref(),
+		pluginAfterCreate.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 	if !capabilities.Complete {
@@ -126,8 +126,8 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	replacedFirst, err := fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Plugin:                   collectionAfterCreate.Artifact.Ref(),
-			ExpectedPluginRevision:   collectionAfterCreate.Artifact.Revision,
+			Plugin:                   pluginAfterCreate.Artifact.Ref(),
+			ExpectedPluginRevision:   pluginAfterCreate.Artifact.Revision,
 			Artifact:                 firstCurrent.Ref(),
 			ExpectedArtifactRevision: firstCurrent.Revision,
 			SkillName:                firstSkillName,
@@ -178,14 +178,14 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("aggregate resolved second Skill as disabled")
 	}
 
-	collectionBeforeDetach, err := fixture.api.GetSkillPlugin(
+	pluginBeforeDetach, err := fixture.api.GetSkillPlugin(
 		ctx,
 		replacedFirst.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
-	firstMemberIndex, found := collectionMemberIndexByName(
-		collectionBeforeDetach.Members,
+	firstMemberIndex, found := pluginMemberIndexByName(
+		pluginBeforeDetach.Members,
 		firstSkillName,
 	)
 	if !found {
@@ -195,25 +195,25 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterDetach, err := fixture.api.RemoveSkillPluginMember(
+	pluginAfterDetach, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Plugin:           collectionBeforeDetach.Artifact.Ref(),
-			ExpectedRevision: collectionBeforeDetach.Artifact.Revision,
+			Plugin:           pluginBeforeDetach.Artifact.Ref(),
+			ExpectedRevision: pluginBeforeDetach.Artifact.Revision,
 			Index:            firstMemberIndex,
 		},
 	)
 	requireNoError(t, err)
-	if len(collectionAfterDetach.Members) != 1 {
+	if len(pluginAfterDetach.Members) != 1 {
 		t.Fatalf(
 			"Plugin members after first detach=%d, want 1",
-			len(collectionAfterDetach.Members),
+			len(pluginAfterDetach.Members),
 		)
 	}
-	if string(collectionAfterDetach.Members[0].Name) != secondSkillName {
+	if string(pluginAfterDetach.Members[0].Name) != secondSkillName {
 		t.Fatalf(
 			"remaining Plugin member=%q, want %q",
-			collectionAfterDetach.Members[0].Name,
+			pluginAfterDetach.Members[0].Name,
 			secondSkillName,
 		)
 	}
@@ -243,15 +243,15 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterFirstPurge, err := fixture.api.GetSkillPlugin(
+	pluginAfterFirstPurge, err := fixture.api.GetSkillPlugin(
 		ctx,
-		collectionAfterDetach.Artifact.Ref(),
+		pluginAfterDetach.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
 	capabilities, err = fixture.api.ResolveSkillPlugin(
 		ctx,
-		collectionAfterFirstPurge.Artifact.Ref(),
+		pluginAfterFirstPurge.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 	if !capabilities.Complete {
@@ -292,8 +292,8 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("aggregate resolved remaining second Skill as disabled")
 	}
 
-	secondMemberIndex, found := collectionMemberIndexByName(
-		collectionAfterFirstPurge.Members,
+	secondMemberIndex, found := pluginMemberIndexByName(
+		pluginAfterFirstPurge.Members,
 		secondSkillName,
 	)
 	if !found {
@@ -303,11 +303,11 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	collectionAfterSecondDetach, err := fixture.api.RemoveSkillPluginMember(
+	pluginAfterSecondDetach, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Plugin:           collectionAfterFirstPurge.Artifact.Ref(),
-			ExpectedRevision: collectionAfterFirstPurge.Artifact.Revision,
+			Plugin:           pluginAfterFirstPurge.Artifact.Ref(),
+			ExpectedRevision: pluginAfterFirstPurge.Artifact.Revision,
 			Index:            secondMemberIndex,
 		},
 	)
@@ -332,8 +332,8 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		fixture.api.DeleteSkillPlugin(
 			ctx,
 			plugin.DeleteRequest{
-				Plugin: collectionAfterSecondDetach.Artifact.Ref(),
-				ExpectedRevision: collectionAfterSecondDetach.
+				Plugin: pluginAfterSecondDetach.Artifact.Ref(),
+				ExpectedRevision: pluginAfterSecondDetach.
 					Artifact.Revision,
 			},
 		),
@@ -354,7 +354,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	}
 }
 
-func collectionMemberIndexByName(
+func pluginMemberIndexByName(
 	values []plugin.MemberReference,
 	name string,
 ) (int, bool) {

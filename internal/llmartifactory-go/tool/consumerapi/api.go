@@ -113,9 +113,9 @@ func (a *API) GetTool(
 
 func (a *API) ListTools(
 	ctx context.Context,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 ) ([]ToolListItem, error) {
-	view, err := a.GetToolPlugin(ctx, collectionRef)
+	view, err := a.GetToolPlugin(ctx, pluginRef)
 	if err != nil {
 		return nil, err
 	}

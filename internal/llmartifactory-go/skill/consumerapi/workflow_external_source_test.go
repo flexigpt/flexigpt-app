@@ -149,7 +149,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	)
 	requireNoError(t, err)
 
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -163,8 +163,8 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	attached, err := fixture.api.AttachSkillArtifactToPlugin(
 		ctx,
 		plugin.AddArtifactMemberRequest{
-			Plugin:           collectionValue.Artifact.Ref(),
-			ExpectedRevision: collectionValue.Artifact.Revision,
+			Plugin:           pluginValue.Artifact.Ref(),
+			ExpectedRevision: pluginValue.Artifact.Revision,
 			Artifact:         external.Artifact.Ref(),
 		},
 	)

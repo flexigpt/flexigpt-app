@@ -15,8 +15,8 @@ import (
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
 	Plugin             artifactModel.ArtifactRef    `json:"plugin"`
-	PluginName         spec.LogicalName             `json:"collectionName"`
-	PluginRevision     uint64                       `json:"collectionRevision"`
+	PluginName         spec.LogicalName             `json:"pluginName"`
+	PluginRevision     uint64                       `json:"pluginRevision"`
 	MemberIndex        int                          `json:"memberIndex"`
 	Member             MemberReference              `json:"member"`
 	Status             composition.ResolutionStatus `json:"status"`
@@ -68,10 +68,10 @@ func (a *API) ListMembershipsForArtifact(
 		return nil, err
 	}
 	output := make([]ArtifactMembershipView, 0)
-	for _, collectionValue := range plugins {
+	for _, pluginValue := range plugins {
 		_, document, err := a.readPluginDocument(
 			ctx,
-			collectionValue.Ref,
+			pluginValue.Ref,
 		)
 		if err != nil {
 			return nil, err
@@ -79,7 +79,7 @@ func (a *API) ListMembershipsForArtifact(
 
 		plugin, err := a.resolver.ResolvePluginMembers(
 			ctx,
-			collectionValue.Ref,
+			pluginValue.Ref,
 		)
 		if err != nil {
 			return nil, err
@@ -88,7 +88,7 @@ func (a *API) ListMembershipsForArtifact(
 			return nil, fmt.Errorf(
 				"%w: Plugin %q did not resolve as a Plugin",
 				spec.ErrReferenceUnresolved,
-				collectionValue.Ref.ArtifactID,
+				pluginValue.Ref.ArtifactID,
 			)
 		}
 
@@ -120,9 +120,9 @@ func (a *API) ListMembershipsForArtifact(
 			}
 
 			view := ArtifactMembershipView{
-				Plugin:         collectionValue.Ref,
-				PluginName:     collectionValue.Name,
-				PluginRevision: collectionValue.Revision,
+				Plugin:         pluginValue.Ref,
+				PluginName:     pluginValue.Name,
+				PluginRevision: pluginValue.Revision,
 				MemberIndex:    memberIndex,
 				Member:         member,
 				Status:         relationship.Status,

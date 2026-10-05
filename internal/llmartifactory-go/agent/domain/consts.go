@@ -18,7 +18,7 @@ const (
 	)
 
 	ManagedAgentPackageKind       managedpackageModel.PackageKind = "agent"
-	BuiltinAgentPluginPackageKind managedpackageModel.PackageKind = "agent-collection"
+	BuiltinAgentPluginPackageKind managedpackageModel.PackageKind = "agent-plugin"
 	AgentManagedSourceStorageKey  spec.StorageKey                 = "user-agents"
 	AgentManagedPluginPackageKind managedpackageModel.PackageKind = "plugin"
 	AgentBaselinePluginName       spec.LogicalName                = "agent-baseline"

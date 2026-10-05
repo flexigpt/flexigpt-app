@@ -14,7 +14,7 @@ const (
 	)
 
 	ToolPackageKind       managedpackageModel.PackageKind = "tool"
-	ToolPluginPackageKind managedpackageModel.PackageKind = "tool-collection"
+	ToolPluginPackageKind managedpackageModel.PackageKind = "tool-plugin"
 
 	BuiltInInstallerName   = "tool"
 	HydrationSchemaVersion = "tool.builtin-hydration/v1"

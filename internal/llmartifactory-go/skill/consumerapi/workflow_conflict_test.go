@@ -20,7 +20,7 @@ func TestSkillStoreWorkflowRejectsStalePluginAndSkillMutations(
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -31,13 +31,13 @@ func TestSkillStoreWorkflowRejectsStalePluginAndSkillMutations(
 	)
 	requireNoError(t, err)
 
-	stalePlugin := collectionValue
+	stalePlugin := pluginValue
 
 	winnerPlugin, err := fixture.api.UpdateSkillPlugin(
 		ctx,
 		plugin.UpdateRequest{
-			Plugin:           collectionValue.Artifact.Ref(),
-			ExpectedRevision: collectionValue.Artifact.Revision,
+			Plugin:           pluginValue.Artifact.Ref(),
+			ExpectedRevision: pluginValue.Artifact.Revision,
 			DisplayName:      "Concurrency workflow winner",
 			Description:      "Winner Plugin description.",
 		},
@@ -233,7 +233,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -249,7 +249,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 	initial, initialDocument := createManagedSkillInPlugin(
 		t,
 		fixture.api,
-		collectionValue,
+		pluginValue,
 		skillName,
 		"Create replay-safe release notes.",
 		"Use the original package unless an explicit replace succeeds.",

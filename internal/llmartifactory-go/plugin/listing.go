@@ -49,14 +49,14 @@ type ListItem struct {
 	Baseline    bool `json:"baseline"`
 }
 
-type collectionMemberShape struct {
+type pluginMemberShape struct {
 	Type declaration.Type
 	Form declaration.MemberForm
 }
 
-type collectionProjection struct {
+type pluginProjection struct {
 	document pluginv1.PluginDocument
-	members  []collectionMemberShape
+	members  []pluginMemberShape
 }
 
 func (a *API) listPlugins(
@@ -89,7 +89,7 @@ func (a *API) listPlugins(
 		return nil, err
 	}
 
-	documents, err := a.collectionDocuments(ctx, entries)
+	documents, err := a.pluginDocuments(ctx, entries)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +112,12 @@ func (a *API) listPlugins(
 			copyValue := value.Clone()
 			document = &copyValue
 		}
-		projection, err := a.collectionProjectionFor(entry, document)
+		projection, err := a.pluginProjectionFor(entry, document)
 		if err != nil {
 			return nil, err
 		}
 		if domainOnly {
-			visible, err := a.collectionVisibleInList(
+			visible, err := a.pluginVisibleInList(
 				entry,
 				projection,
 			)
@@ -141,7 +141,7 @@ func (a *API) listPlugins(
 			}
 		}
 
-		editable, baseline := a.collectionListEditability(
+		editable, baseline := a.pluginListEditability(
 			entry,
 			projection,
 		)
@@ -179,7 +179,7 @@ func (a *API) listPlugins(
 	return output, nil
 }
 
-func (a *API) collectionDocuments(
+func (a *API) pluginDocuments(
 	ctx context.Context,
 	entries []catalogModel.Entry,
 ) (map[definitionModel.Key]definitionModel.Definition, error) {
@@ -227,12 +227,12 @@ func (a *API) collectionDocuments(
 	return output, nil
 }
 
-func (a *API) collectionProjectionFor(
+func (a *API) pluginProjectionFor(
 	entry catalogModel.Entry,
 	loaded *definitionModel.Definition,
-) (collectionProjection, error) {
+) (pluginProjection, error) {
 	if entry.Definition == nil {
-		return collectionProjection{}, fmt.Errorf(
+		return pluginProjection{}, fmt.Errorf(
 			"%w: Plugin Definition is unavailable",
 			spec.ErrDefinitionNotFound,
 		)
@@ -244,7 +244,7 @@ func (a *API) collectionProjectionFor(
 	}
 	if cached, found := a.catalogProjections.Get(key); found {
 		if cached.document.Name != string(entry.LogicalName) {
-			return collectionProjection{}, fmt.Errorf(
+			return pluginProjection{}, fmt.Errorf(
 				"%w: cached Plugin identity differs from catalog identity",
 				spec.ErrDigestMismatch,
 			)
@@ -252,7 +252,7 @@ func (a *API) collectionProjectionFor(
 		return cached, nil
 	}
 	if loaded == nil {
-		return collectionProjection{}, fmt.Errorf(
+		return pluginProjection{}, fmt.Errorf(
 			"%w: Plugin listing requires an admitted Definition document",
 			spec.ErrDefinitionNotFound,
 		)
@@ -261,29 +261,29 @@ func (a *API) collectionProjectionFor(
 	return a.catalogProjections.GetOrLoad(
 		key,
 		len(loaded.Body),
-		func() (collectionProjection, error) {
+		func() (pluginProjection, error) {
 			document, err := pluginv1.FromDefinition(*loaded)
 			if err != nil {
-				return collectionProjection{}, err
+				return pluginProjection{}, err
 			}
 			if document.Name != string(entry.LogicalName) {
-				return collectionProjection{}, fmt.Errorf(
+				return pluginProjection{}, fmt.Errorf(
 					"%w: Plugin Definition identity differs from catalog identity",
 					spec.ErrDigestMismatch,
 				)
 			}
-			projection := collectionProjection{
+			projection := pluginProjection{
 				document: document,
-				members:  make([]collectionMemberShape, 0, len(document.Members)),
+				members:  make([]pluginMemberShape, 0, len(document.Members)),
 			}
 			for _, member := range document.Members {
 				form, err := member.MemberForm()
 				if err != nil {
-					return collectionProjection{}, err
+					return pluginProjection{}, err
 				}
 				projection.members = append(
 					projection.members,
-					collectionMemberShape{
+					pluginMemberShape{
 						Type: member.Header().Type,
 						Form: form,
 					},
@@ -294,9 +294,9 @@ func (a *API) collectionProjectionFor(
 	)
 }
 
-func (a *API) collectionVisibleInList(
+func (a *API) pluginVisibleInList(
 	entry catalogModel.Entry,
-	projection collectionProjection,
+	projection pluginProjection,
 ) (bool, error) {
 	if a.domain == nil {
 		return true, nil
@@ -331,9 +331,9 @@ func (a *API) collectionVisibleInList(
 	return true, nil
 }
 
-func (a *API) collectionListEditability(
+func (a *API) pluginListEditability(
 	entry catalogModel.Entry,
-	projection collectionProjection,
+	projection pluginProjection,
 ) (editable, baseline bool) {
 	if entry.Ref().RootID == topology.BuiltinRootID() ||
 		entry.Source.Kind != managedfs.Kind ||
@@ -362,7 +362,7 @@ func (a *API) collectionListEditability(
 }
 
 func (a *API) validateEditableProjection(
-	projection collectionProjection,
+	projection pluginProjection,
 ) error {
 	for _, member := range projection.members {
 		if member.Form != declaration.MemberNamed {

@@ -24,7 +24,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 
 	ctx := t.Context()
 
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -39,7 +39,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	created, _ := createManagedSkillInPlugin(
 		t,
 		fixture.api,
-		collectionValue,
+		pluginValue,
 		skillName,
 		"Prepare catalog-aware release notes.",
 		"Use the current verified Skill package.",

@@ -23,7 +23,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	baseline := fixture.ensureUserBaseline(t)
 
 	ctx := t.Context()
-	collectionValue, err := fixture.api.CreateSkillPlugin(
+	pluginValue, err := fixture.api.CreateSkillPlugin(
 		ctx,
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
@@ -34,68 +34,68 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	)
 	requireNoError(t, err)
 
-	if collectionValue.Baseline {
+	if pluginValue.Baseline {
 		t.Fatal("new user Skill Plugin is incorrectly a baseline")
 	}
-	if !collectionValue.Editable {
+	if !pluginValue.Editable {
 		t.Fatal("new user Skill Plugin is not editable")
 	}
-	if !collectionValue.Deletable {
+	if !pluginValue.Deletable {
 		t.Fatal("new user Skill Plugin is not deletable")
 	}
-	if len(collectionValue.Members) != 0 {
+	if len(pluginValue.Members) != 0 {
 		t.Fatalf(
 			"new user Skill Plugin members=%d, want 0",
-			len(collectionValue.Members),
+			len(pluginValue.Members),
 		)
 	}
 
-	collectionValue, err = fixture.api.SetSkillPluginEnabled(
+	pluginValue, err = fixture.api.SetSkillPluginEnabled(
 		ctx,
-		collectionValue.Artifact.Ref(),
-		collectionValue.Artifact.Revision,
+		pluginValue.Artifact.Ref(),
+		pluginValue.Artifact.Revision,
 		false,
 	)
 	requireNoError(t, err)
-	if collectionValue.Artifact.Enabled {
+	if pluginValue.Artifact.Enabled {
 		t.Fatal("Plugin remains enabled after disable")
 	}
-	if !collectionValue.Editable {
+	if !pluginValue.Editable {
 		t.Fatal("disabling Plugin unexpectedly changed editability")
 	}
 
-	collectionValue, err = fixture.api.SetSkillPluginEnabled(
+	pluginValue, err = fixture.api.SetSkillPluginEnabled(
 		ctx,
-		collectionValue.Artifact.Ref(),
-		collectionValue.Artifact.Revision,
+		pluginValue.Artifact.Ref(),
+		pluginValue.Artifact.Revision,
 		true,
 	)
 	requireNoError(t, err)
-	if !collectionValue.Artifact.Enabled {
+	if !pluginValue.Artifact.Enabled {
 		t.Fatal("Plugin remains disabled after enable")
 	}
 
-	collectionValue, err = fixture.api.UpdateSkillPlugin(
+	pluginValue, err = fixture.api.UpdateSkillPlugin(
 		ctx,
 		plugin.UpdateRequest{
-			Plugin:           collectionValue.Artifact.Ref(),
-			ExpectedRevision: collectionValue.Artifact.Revision,
+			Plugin:           pluginValue.Artifact.Ref(),
+			ExpectedRevision: pluginValue.Artifact.Revision,
 			DisplayName:      "Release workflow v2",
 			Description:      "Updated release authoring Skill workflow.",
 		},
 	)
 	requireNoError(t, err)
-	if collectionValue.DisplayName != "Release workflow v2" {
+	if pluginValue.DisplayName != "Release workflow v2" {
 		t.Fatalf(
 			"Plugin display name=%q, want updated value",
-			collectionValue.DisplayName,
+			pluginValue.DisplayName,
 		)
 	}
-	if collectionValue.Description !=
+	if pluginValue.Description !=
 		"Updated release authoring Skill workflow." {
 		t.Fatalf(
 			"Plugin description=%q, want updated value",
-			collectionValue.Description,
+			pluginValue.Description,
 		)
 	}
 
@@ -113,8 +113,8 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	created, err := fixture.api.CreateManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Plugin:                 collectionValue.Artifact.Ref(),
-			ExpectedPluginRevision: collectionValue.Artifact.Revision,
+			Plugin:                 pluginValue.Artifact.Ref(),
+			ExpectedPluginRevision: pluginValue.Artifact.Revision,
 			SkillName:              skillName,
 			SKILLMD:                initialDocument,
 			Files:                  managedSkillFiles(initialDocument, initialChecklist),
@@ -137,19 +137,19 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		t.Fatal("created Skill is disabled")
 	}
 	if created.Plugin.Artifact.Ref() !=
-		collectionValue.Artifact.Ref() {
+		pluginValue.Artifact.Ref() {
 		t.Fatalf(
 			"created Skill Plugin ref=%+v, want %+v",
 			created.Plugin.Artifact.Ref(),
-			collectionValue.Artifact.Ref(),
+			pluginValue.Artifact.Ref(),
 		)
 	}
 	if created.Plugin.Artifact.Revision <=
-		collectionValue.Artifact.Revision {
+		pluginValue.Artifact.Revision {
 		t.Fatalf(
 			"Plugin revision after automatic membership=%d, want greater than %d",
 			created.Plugin.Artifact.Revision,
-			collectionValue.Artifact.Revision,
+			pluginValue.Artifact.Revision,
 		)
 	}
 
@@ -436,7 +436,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		t.Fatal("managed Skill replacement did not replace packaged resource")
 	}
 
-	collectionBeforeDetach, err := fixture.api.GetSkillPlugin(
+	pluginBeforeDetach, err := fixture.api.GetSkillPlugin(
 		ctx,
 		gotPlugin.Artifact.Ref(),
 	)
@@ -445,8 +445,8 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	detachedPlugin, err := fixture.api.RemoveSkillPluginMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Plugin:           collectionBeforeDetach.Artifact.Ref(),
-			ExpectedRevision: collectionBeforeDetach.Artifact.Revision,
+			Plugin:           pluginBeforeDetach.Artifact.Ref(),
+			ExpectedRevision: pluginBeforeDetach.Artifact.Revision,
 			Index:            0,
 		},
 	)
@@ -499,7 +499,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		t.Fatalf("purged Skill %q remains in ListSkills", skillName)
 	}
 
-	collectionBeforeDelete, err := fixture.api.GetSkillPlugin(
+	pluginBeforeDelete, err := fixture.api.GetSkillPlugin(
 		ctx,
 		detachedPlugin.Artifact.Ref(),
 	)
@@ -508,15 +508,15 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	err = fixture.api.DeleteSkillPlugin(
 		ctx,
 		plugin.DeleteRequest{
-			Plugin:           collectionBeforeDelete.Artifact.Ref(),
-			ExpectedRevision: collectionBeforeDelete.Artifact.Revision,
+			Plugin:           pluginBeforeDelete.Artifact.Ref(),
+			ExpectedRevision: pluginBeforeDelete.Artifact.Revision,
 		},
 	)
 	requireNoError(t, err)
 
 	_, err = fixture.api.GetSkillPlugin(
 		ctx,
-		collectionBeforeDelete.Artifact.Ref(),
+		pluginBeforeDelete.Artifact.Ref(),
 	)
 	if !errors.Is(err, spec.ErrArtifactNotFound) {
 		t.Fatalf(

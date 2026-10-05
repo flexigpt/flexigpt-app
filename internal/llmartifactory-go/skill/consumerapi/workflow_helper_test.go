@@ -144,7 +144,7 @@ func (f *skillWorkflowFixture) ensureUserBaseline(
 func createManagedSkillInPlugin(
 	t *testing.T,
 	api *skillConsumerAPI.API,
-	collectionValue plugin.PluginView,
+	pluginValue plugin.PluginView,
 	name string,
 	description string,
 	body string,
@@ -156,8 +156,8 @@ func createManagedSkillInPlugin(
 	result, err := api.CreateManagedSkill(
 		t.Context(),
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Plugin:                 collectionValue.Artifact.Ref(),
-			ExpectedPluginRevision: collectionValue.Artifact.Revision,
+			Plugin:                 pluginValue.Artifact.Ref(),
+			ExpectedPluginRevision: pluginValue.Artifact.Revision,
 			SkillName:              name,
 			SKILLMD:                document,
 			Files:                  managedSkillFiles(document, checklist),

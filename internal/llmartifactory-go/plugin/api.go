@@ -50,7 +50,7 @@ type API struct {
 	resolver *composition.Resolver
 
 	// Immutable Plugin projections keyed by Root-local Definition digest.
-	catalogProjections DocumentCache[collectionProjection]
+	catalogProjections DocumentCache[pluginProjection]
 }
 
 func New(
@@ -287,7 +287,7 @@ func (a *API) Update(
 	if err != nil {
 		return PluginView{}, err
 	}
-	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
+	if _, err := a.pluginViewOf(value.artifact, value.document); err != nil {
 		return PluginView{}, err
 	}
 
@@ -308,7 +308,7 @@ func (a *API) Update(
 	if err != nil {
 		return PluginView{}, err
 	}
-	return a.collectionViewOf(record, value.document)
+	return a.pluginViewOf(record, value.document)
 }
 
 func (a *API) AddMember(
@@ -351,7 +351,7 @@ func (a *API) RemoveMember(
 	if err != nil {
 		return PluginView{}, err
 	}
-	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
+	if _, err := a.pluginViewOf(value.artifact, value.document); err != nil {
 		return PluginView{}, err
 	}
 	if request.Index < 0 || request.Index >= len(value.document.Members) {
@@ -389,7 +389,7 @@ func (a *API) RemoveMember(
 	if err != nil {
 		return PluginView{}, err
 	}
-	return a.collectionViewOf(record, value.document)
+	return a.pluginViewOf(record, value.document)
 }
 
 func (a *API) AddEntry(
@@ -443,7 +443,7 @@ func (a *API) AddArtifactMember(
 		Type: declarationType,
 		Name: target.LogicalName,
 	}
-	collectionValue, err := a.loadEditablePlugin(
+	pluginValue, err := a.loadEditablePlugin(
 		ctx,
 		request.Plugin,
 		request.ExpectedRevision,
@@ -451,9 +451,9 @@ func (a *API) AddArtifactMember(
 	if err != nil {
 		return PluginView{}, err
 	}
-	if target.Binding.SourceID == collectionValue.artifact.Binding.SourceID {
+	if target.Binding.SourceID == pluginValue.artifact.Binding.SourceID {
 		locator, err := relativeSourceLocator(
-			collectionValue.artifact.Binding.Locator,
+			pluginValue.artifact.Binding.Locator,
 			target.Binding.Locator,
 		)
 		if err != nil {
@@ -477,7 +477,7 @@ func (a *API) AddArtifactMember(
 // the Plugin.
 func (a *API) MemberForPluginSource(
 	ctx context.Context,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 	declarationType declaration.Type,
 	name spec.LogicalName,
 	target spec.Locator,
@@ -500,7 +500,7 @@ func (a *API) MemberForPluginSource(
 		return MemberReference{}, err
 	}
 
-	value, err := a.loadEditablePlugin(ctx, collectionRef, 0)
+	value, err := a.loadEditablePlugin(ctx, pluginRef, 0)
 	if err != nil {
 		return MemberReference{}, err
 	}
@@ -679,7 +679,7 @@ func (a *API) create(
 		Description: request.Description,
 		Metadata:    metadata,
 	}
-	_, digest, err := collectionDocumentPayload(document)
+	_, digest, err := pluginDocumentPayload(document)
 	if err != nil {
 		return PluginView{}, err
 	}
@@ -724,7 +724,7 @@ func (a *API) create(
 	if err != nil {
 		return PluginView{}, err
 	}
-	return a.collectionViewOf(record, document)
+	return a.pluginViewOf(record, document)
 }
 
 func (a *API) mutateMember(
@@ -785,7 +785,7 @@ func (a *API) mutateEntry(
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
-	view, err := a.collectionViewOf(value.artifact, value.document)
+	view, err := a.pluginViewOf(value.artifact, value.document)
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
@@ -848,7 +848,7 @@ func (a *API) mutateEntry(
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
-	view, err = a.collectionViewOf(record, value.document)
+	view, err = a.pluginViewOf(record, value.document)
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
@@ -903,7 +903,7 @@ func (a *API) publishDocument(
 		return artifactModel.Artifact{}, err
 	}
 
-	raw, digest, err := collectionDocumentPayload(document)
+	raw, digest, err := pluginDocumentPayload(document)
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -1184,7 +1184,7 @@ func managedPluginAddressFromLocatorFor(
 	return address, nil
 }
 
-func collectionDocumentPayload(
+func pluginDocumentPayload(
 	document pluginv1.PluginDocument,
 ) ([]byte, cryptoutil.Digest, error) {
 	raw, err := document.CanonicalJSON()
@@ -1198,7 +1198,7 @@ func collectionDocumentPayload(
 	return raw, value.Digest, nil
 }
 
-func (a *API) collectionViewOf(
+func (a *API) pluginViewOf(
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 ) (PluginView, error) {

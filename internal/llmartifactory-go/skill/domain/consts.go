@@ -14,7 +14,7 @@ const (
 		skillv1.SkillType,
 	)
 	ManagedSkillPackageKind       managedpackageModel.PackageKind = "skill"
-	BuiltinSkillPluginPackageKind managedpackageModel.PackageKind = "skill-collection"
+	BuiltinSkillPluginPackageKind managedpackageModel.PackageKind = "skill-plugin"
 	SkillSchemaID                 schemaModel.SchemaID            = skillv1.SkillSchemaID
 	MarkdownDecoderID             spec.DecoderID                  = "agent.skill-markdown"
 

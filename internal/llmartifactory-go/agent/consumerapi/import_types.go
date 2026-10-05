@@ -35,9 +35,9 @@ type AgentImportDestination struct {
 	SourceID        sourceModel.SourceID      `json:"sourceID"`
 	Plugin          artifactModel.ArtifactRef `json:"plugin"`
 
-	PluginRevision    uint64           `json:"collectionRevision"`
-	PluginName        spec.LogicalName `json:"collectionName"`
-	PluginDisplayName string           `json:"collectionDisplayName"`
+	PluginRevision    uint64           `json:"pluginRevision"`
+	PluginName        spec.LogicalName `json:"pluginName"`
+	PluginDisplayName string           `json:"pluginDisplayName"`
 	Baseline          bool             `json:"baseline"`
 	Enabled           bool             `json:"enabled"`
 }

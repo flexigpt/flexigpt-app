@@ -408,15 +408,15 @@ func (a *API) ReplaceManagedSkill(
 		return ManagedSkillReplaceResult{}, err
 	}
 
-	collectionView, err := a.plugins.Read(ctx, request.Plugin)
+	pluginView, err := a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if collectionView.Artifact.Revision != request.ExpectedPluginRevision {
+	if pluginView.Artifact.Revision != request.ExpectedPluginRevision {
 		return ManagedSkillReplaceResult{}, spec.ErrConflict
 	}
-	if !collectionView.Editable &&
-		!collectionView.Baseline {
+	if !pluginView.Editable &&
+		!pluginView.Baseline {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill Plugin is read-only",
 			spec.ErrUnsupported,
@@ -437,7 +437,7 @@ func (a *API) ReplaceManagedSkill(
 			spec.ErrUnsupported,
 		)
 	}
-	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
+	if current.Binding.SourceID != pluginView.Artifact.Binding.SourceID {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not owned by this Plugin Source",
 			spec.ErrUnsupported,
@@ -589,7 +589,7 @@ func (a *API) ReplaceManagedSkill(
 		}
 	}
 
-	collectionView, err = a.plugins.Read(ctx, request.Plugin)
+	pluginView, err = a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
@@ -597,7 +597,7 @@ func (a *API) ReplaceManagedSkill(
 	return ManagedSkillReplaceResult{
 		Artifact: updated,
 		Address:  updated.Address(),
-		Plugin:   collectionView,
+		Plugin:   pluginView,
 	}, nil
 }
 

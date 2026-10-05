@@ -94,7 +94,7 @@ func GeneratedToolPluginIndex() (
 			if packageValue.Address.Kind != toolDomain.ToolPackageKind {
 				continue
 			}
-			collectionName, found := plugins[packageValue.EmbeddedRoot]
+			pluginName, found := plugins[packageValue.EmbeddedRoot]
 			if !found {
 				errGeneratedPluginIndex = fmt.Errorf(
 					"generated Tool %q has no generated Tool Plugin",
@@ -107,11 +107,11 @@ func GeneratedToolPluginIndex() (
 					"generated Tool %q belongs to both %q and %q",
 					packageValue.Address.Name,
 					previous,
-					collectionName,
+					pluginName,
 				)
 				return
 			}
-			index[packageValue.Address.Name] = collectionName
+			index[packageValue.Address.Name] = pluginName
 		}
 		generatedPluginIndex = index
 	})

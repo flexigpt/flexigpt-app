@@ -178,7 +178,7 @@ func (a *API) SaveServerSettings(
 // Aggregate owns the public projection and runtime identities.
 func (a *API) ListMCPPluginServers(
 	ctx context.Context,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
 	if a == nil ||
 		a.plugins == nil ||
@@ -186,7 +186,7 @@ func (a *API) ListMCPPluginServers(
 		a.declarationResolver == nil {
 		return nil, spec.ErrClosed
 	}
-	if err := collectionRef.Validate(); err != nil {
+	if err := pluginRef.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -196,7 +196,7 @@ func (a *API) ListMCPPluginServers(
 		func(sessionCtx context.Context) ([]ServerRead, error) {
 			return a.listMCPPluginServers(
 				sessionCtx,
-				collectionRef,
+				pluginRef,
 			)
 		},
 	)
@@ -381,15 +381,15 @@ func (a *API) saveBuiltInServerSettings(
 
 func (a *API) listMCPPluginServers(
 	ctx context.Context,
-	collectionRef artifactModel.ArtifactRef,
+	pluginRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	if _, err := a.plugins.Read(ctx, collectionRef); err != nil {
+	if _, err := a.plugins.Read(ctx, pluginRef); err != nil {
 		return nil, err
 	}
 
 	p, err := a.declarationResolver.ResolvePluginMembers(
 		ctx,
-		collectionRef,
+		pluginRef,
 	)
 	if err != nil {
 		return nil, err

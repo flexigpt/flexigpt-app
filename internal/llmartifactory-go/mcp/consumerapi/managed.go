@@ -178,15 +178,15 @@ func (a *API) UpdateMCPServer(
 		)
 	}
 
-	collectionView, err := a.plugins.Read(ctx, request.Plugin)
+	pluginView, err := a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if collectionView.Artifact.Revision != request.ExpectedPluginRevision {
+	if pluginView.Artifact.Revision != request.ExpectedPluginRevision {
 		return ManagedMCPReplaceResult{}, spec.ErrConflict
 	}
-	if !collectionView.Editable &&
-		!collectionView.Baseline {
+	if !pluginView.Editable &&
+		!pluginView.Baseline {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Plugin is read-only",
 			spec.ErrUnsupported,
@@ -212,7 +212,7 @@ func (a *API) UpdateMCPServer(
 			spec.ErrUnsupported,
 		)
 	}
-	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
+	if current.Binding.SourceID != pluginView.Artifact.Binding.SourceID {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Server is not owned by this Plugin Source",
 			spec.ErrUnsupported,
@@ -386,7 +386,7 @@ func (a *API) UpdateMCPServer(
 		}
 	}
 
-	collectionView, err = a.plugins.Read(ctx, request.Plugin)
+	pluginView, err = a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
@@ -394,7 +394,7 @@ func (a *API) UpdateMCPServer(
 	return ManagedMCPReplaceResult{
 		Artifact: updated,
 		Address:  updated.Address(),
-		Plugin:   collectionView,
+		Plugin:   pluginView,
 	}, nil
 }
 
