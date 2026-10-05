@@ -5,13 +5,13 @@ import {spec} from '../models';
 import {main} from '../models';
 import {runtime} from '../models';
 import {model} from '../models';
-import {resolve} from '../models';
+import {composition} from '../models';
 import {consumerapi} from '../models';
 
 export function HydrateInferenceToolChoice(arg1:aggregate.ToolSelection):Promise<spec.ToolChoice>;
 
 export function InvokeMappedTool(arg1:main.ToolAggregateInvokeRequest):Promise<runtime.InvokeResponse>;
 
-export function MapToolTarget(arg1:model.ArtifactRef):Promise<resolve.MappedTarget>;
+export function MapToolTarget(arg1:model.ArtifactRef):Promise<composition.MappedTarget>;
 
-export function ResolveMappedTool(arg1:resolve.MappedTarget):Promise<consumerapi.ResolvedToolView>;
+export function ResolveMappedTool(arg1:composition.MappedTarget):Promise<consumerapi.ResolvedToolView>;

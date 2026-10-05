@@ -222,7 +222,7 @@ export namespace aggregate {
 	}
 	export class ToolSelection {
 	    choiceID: string;
-	    target: resolve.MappedTarget;
+	    target: composition.MappedTarget;
 	    autoExecute: boolean;
 	    userArgSchemaInstance?: string;
 	
@@ -233,7 +233,7 @@ export namespace aggregate {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.choiceID = source["choiceID"];
-	        this.target = this.convertValues(source["target"], resolve.MappedTarget);
+	        this.target = this.convertValues(source["target"], composition.MappedTarget);
 	        this.autoExecute = source["autoExecute"];
 	        this.userArgSchemaInstance = source["userArgSchemaInstance"];
 	    }
@@ -716,142 +716,60 @@ export namespace auth {
 
 }
 
-export namespace collection {
+export namespace composition {
 	
-	export class AddArtifactMemberRequest {
-	    collection: model.ArtifactRef;
-	    expectedRevision: number;
-	    artifact: model.ArtifactRef;
-	
-	    static createFrom(source: any = {}) {
-	        return new AddArtifactMemberRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class MemberReference {
+	export class MappedTarget {
+	    provider: string;
+	    identifier: string;
 	    type: string;
 	    name: string;
-	    insert?: string;
-	    locator?: declaration.Locator;
-	    scope?: string;
-	    server?: string;
+	    builtin: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new MemberReference(source);
+	        return new MappedTarget(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.identifier = source["identifier"];
 	        this.type = source["type"];
 	        this.name = source["name"];
-	        this.insert = source["insert"];
-	        this.locator = this.convertValues(source["locator"], declaration.Locator);
-	        this.scope = source["scope"];
-	        this.server = source["server"];
+	        this.builtin = source["builtin"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
-	export class AddMemberRequest {
-	    collection: model.ArtifactRef;
-	    expectedRevision: number;
-	    member: MemberReference;
-	
-	    static createFrom(source: any = {}) {
-	        return new AddMemberRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.member = this.convertValues(source["member"], MemberReference);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ArtifactMembershipView {
-	    collection: model.ArtifactRef;
-	    collectionName: string;
-	    collectionRevision: number;
-	    memberIndex: number;
-	    member: MemberReference;
+	export class CapabilityOccurrence {
+	    path: string;
+	    kind: string;
+	    type: string;
+	    name?: string;
 	    status: string;
-	    resolvedArtifact?: model.ArtifactRef;
-	    resolvedToArtifact: boolean;
+	    required: boolean;
+	    scope?: string;
+	    artifact?: model.ArtifactRef;
+	    mapped?: MappedTarget;
+	    overrides?: Record<string, Array<number>>;
+	    use?: Record<string, Array<number>>;
 	    code?: string;
 	    message?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ArtifactMembershipView(source);
+	        return new CapabilityOccurrence(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.collectionName = source["collectionName"];
-	        this.collectionRevision = source["collectionRevision"];
-	        this.memberIndex = source["memberIndex"];
-	        this.member = this.convertValues(source["member"], MemberReference);
+	        this.path = source["path"];
+	        this.kind = source["kind"];
+	        this.type = source["type"];
+	        this.name = source["name"];
 	        this.status = source["status"];
-	        this.resolvedArtifact = this.convertValues(source["resolvedArtifact"], model.ArtifactRef);
-	        this.resolvedToArtifact = source["resolvedToArtifact"];
+	        this.required = source["required"];
+	        this.scope = source["scope"];
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
+	        this.mapped = this.convertValues(source["mapped"], MappedTarget);
+	        this.overrides = source["overrides"];
+	        this.use = source["use"];
 	        this.code = source["code"];
 	        this.message = source["message"];
 	    }
@@ -874,287 +792,26 @@ export namespace collection {
 		    return a;
 		}
 	}
-	export class CollectionMemberView {
-	    type: string;
-	    name?: string;
-	    insert?: string;
-	    locator?: declaration.Locator;
-	    server?: string;
-	    contained: boolean;
-	    selector: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionMemberView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.insert = source["insert"];
-	        this.locator = this.convertValues(source["locator"], declaration.Locator);
-	        this.server = source["server"];
-	        this.contained = source["contained"];
-	        this.selector = source["selector"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class CollectionView {
-	    artifact: model.Artifact;
-	    name: string;
-	    displayName: string;
-	    description?: string;
-	    members: MemberReference[];
-	    entries: CollectionMemberView[];
-	    editable: boolean;
-	    deletable: boolean;
-	    baseline: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.members = this.convertValues(source["members"], MemberReference);
-	        this.entries = this.convertValues(source["entries"], CollectionMemberView);
-	        this.editable = source["editable"];
-	        this.deletable = source["deletable"];
-	        this.baseline = source["baseline"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class CollectionCapabilityPlan {
-	    collection: CollectionView;
-	    occurrences: resolve.CapabilityOccurrence[];
+	export class CapabilityPlan {
+	    rootArtifact?: model.ArtifactRef;
+	    rootMapped?: MappedTarget;
+	    rootType: string;
+	    rootName: string;
+	    occurrences: CapabilityOccurrence[];
 	    complete: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new CollectionCapabilityPlan(source);
+	        return new CapabilityPlan(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], CollectionView);
-	        this.occurrences = this.convertValues(source["occurrences"], resolve.CapabilityOccurrence);
+	        this.rootArtifact = this.convertValues(source["rootArtifact"], model.ArtifactRef);
+	        this.rootMapped = this.convertValues(source["rootMapped"], MappedTarget);
+	        this.rootType = source["rootType"];
+	        this.rootName = source["rootName"];
+	        this.occurrences = this.convertValues(source["occurrences"], CapabilityOccurrence);
 	        this.complete = source["complete"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	
-	export class CreateRequest {
-	    rootID: string;
-	    sourceID?: string;
-	    name: string;
-	    displayName?: string;
-	    description?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreateRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.sourceID = source["sourceID"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	    }
-	}
-	export class DeleteRequest {
-	    collection: model.ArtifactRef;
-	    expectedRevision: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ListItem {
-	    ref: model.ArtifactRef;
-	    sourceID: string;
-	    name: string;
-	    displayName: string;
-	    description?: string;
-	    state: string;
-	    enabled: boolean;
-	    revision: number;
-	    memberCount: number;
-	    builtIn: boolean;
-	    editable: boolean;
-	    deletable: boolean;
-	    baseline: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListItem(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
-	        this.sourceID = source["sourceID"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.state = source["state"];
-	        this.enabled = source["enabled"];
-	        this.revision = source["revision"];
-	        this.memberCount = source["memberCount"];
-	        this.builtIn = source["builtIn"];
-	        this.editable = source["editable"];
-	        this.deletable = source["deletable"];
-	        this.baseline = source["baseline"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class RemoveMemberRequest {
-	    collection: model.ArtifactRef;
-	    expectedRevision: number;
-	    index: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoveMemberRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.index = source["index"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class UpdateRequest {
-	    collection: model.ArtifactRef;
-	    expectedRevision: number;
-	    description?: string;
-	    displayName?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdateRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.description = source["description"];
-	        this.displayName = source["displayName"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1187,7 +844,7 @@ export namespace consumerapi {
 	    status: string;
 	    required: boolean;
 	    artifact?: model.ArtifactRef;
-	    mapped?: resolve.MappedTarget;
+	    mapped?: composition.MappedTarget;
 	    autoExecute?: boolean;
 	    includeSystemPrompt?: boolean;
 	    skillUseMode?: string;
@@ -1206,7 +863,7 @@ export namespace consumerapi {
 	        this.status = source["status"];
 	        this.required = source["required"];
 	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
-	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
+	        this.mapped = this.convertValues(source["mapped"], composition.MappedTarget);
 	        this.autoExecute = source["autoExecute"];
 	        this.includeSystemPrompt = source["includeSystemPrompt"];
 	        this.skillUseMode = source["skillUseMode"];
@@ -1510,7 +1167,7 @@ export namespace consumerapi {
 	}
 	export class AgentImportCommitResult {
 	    agent: AgentView;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	    restoredMemberships?: AgentRestoredMembership[];
 	    mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
 	    preparedFingerprint: string;
@@ -1522,7 +1179,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.agent = this.convertValues(source["agent"], AgentView);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	        this.restoredMemberships = this.convertValues(source["restoredMemberships"], AgentRestoredMembership);
 	        this.mcpSetupDescriptors = this.convertValues(source["mcpSetupDescriptors"], AgentMCPSetupDescriptor);
 	        this.preparedFingerprint = source["preparedFingerprint"];
@@ -1633,7 +1290,7 @@ export namespace consumerapi {
 	    scope?: string;
 	    status: string;
 	    artifact?: model.ArtifactRef;
-	    mapped?: resolve.MappedTarget;
+	    mapped?: composition.MappedTarget;
 	    code?: string;
 	    message?: string;
 	
@@ -1649,7 +1306,7 @@ export namespace consumerapi {
 	        this.scope = source["scope"];
 	        this.status = source["status"];
 	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
-	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
+	        this.mapped = this.convertValues(source["mapped"], composition.MappedTarget);
 	        this.code = source["code"];
 	        this.message = source["message"];
 	    }
@@ -1903,7 +1560,7 @@ export namespace consumerapi {
 	}
 	
 	export class CollectionPage {
-	    items: collection.ListItem[];
+	    items: plugin.ListItem[];
 	    nextPageToken?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1912,7 +1569,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.items = this.convertValues(source["items"], collection.ListItem);
+	        this.items = this.convertValues(source["items"], plugin.ListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
 	
@@ -2057,7 +1714,7 @@ export namespace consumerapi {
 	export class ManagedMCPCreateResult {
 	    artifact: model.Artifact;
 	    address: model.ArtifactAddress;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	    membershipCreated: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2068,7 +1725,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
 	
@@ -2133,7 +1790,7 @@ export namespace consumerapi {
 	export class ManagedMCPPolicyUpsertResult {
 	    artifact: model.Artifact;
 	    address: model.ArtifactAddress;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	    membershipCreated: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2144,7 +1801,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
 	
@@ -2209,7 +1866,7 @@ export namespace consumerapi {
 	export class ManagedMCPReplaceResult {
 	    artifact: model.Artifact;
 	    address: model.ArtifactAddress;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedMCPReplaceResult(source);
@@ -2219,7 +1876,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2551,7 +2208,7 @@ export namespace consumerapi {
 	export class ManagedSkillCreateResult {
 	    artifact: model.Artifact;
 	    address: model.ArtifactAddress;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	    membershipCreated: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2562,7 +2219,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
 	
@@ -2631,7 +2288,7 @@ export namespace consumerapi {
 	export class ManagedSkillReplaceResult {
 	    artifact: model.Artifact;
 	    address: model.ArtifactAddress;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedSkillReplaceResult(source);
@@ -2641,7 +2298,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3004,7 +2661,7 @@ export namespace consumerapi {
 	}
 	export class ResolvedToolView {
 	    tool: ToolView;
-	    collection: collection.CollectionView;
+	    collection: plugin.CollectionView;
 	
 	    static createFrom(source: any = {}) {
 	        return new ResolvedToolView(source);
@@ -3013,7 +2670,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tool = this.convertValues(source["tool"], ToolView);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collection = this.convertValues(source["collection"], plugin.CollectionView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4052,7 +3709,7 @@ export namespace consumerapi {
 	}
 	export class WorkspaceRuntimePlan {
 	    workspace: domain.WorkspaceView;
-	    capabilities: resolve.CapabilityPlan;
+	    capabilities: composition.CapabilityPlan;
 	    prompt: WorkspacePromptPlan;
 	    skills: WorkspaceSkillLoadPlan;
 	    mcpServers: WorkspaceMCPServerLoadPlan;
@@ -4064,7 +3721,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.workspace = this.convertValues(source["workspace"], domain.WorkspaceView);
-	        this.capabilities = this.convertValues(source["capabilities"], resolve.CapabilityPlan);
+	        this.capabilities = this.convertValues(source["capabilities"], composition.CapabilityPlan);
 	        this.prompt = this.convertValues(source["prompt"], WorkspacePromptPlan);
 	        this.skills = this.convertValues(source["skills"], WorkspaceSkillLoadPlan);
 	        this.mcpServers = this.convertValues(source["mcpServers"], WorkspaceMCPServerLoadPlan);
@@ -5599,7 +5256,7 @@ export namespace main {
 		}
 	}
 	export class ToolAggregateInvokeRequest {
-	    target: resolve.MappedTarget;
+	    target: composition.MappedTarget;
 	    args?: string;
 	    timeoutMS?: number;
 	
@@ -5609,7 +5266,7 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.target = this.convertValues(source["target"], resolve.MappedTarget);
+	        this.target = this.convertValues(source["target"], composition.MappedTarget);
 	        this.args = source["args"];
 	        this.timeoutMS = source["timeoutMS"];
 	    }
@@ -5965,6 +5622,468 @@ export namespace model {
 
 }
 
+export namespace plugin {
+	
+	export class AddArtifactMemberRequest {
+	    collection: model.ArtifactRef;
+	    expectedRevision: number;
+	    artifact: model.ArtifactRef;
+	
+	    static createFrom(source: any = {}) {
+	        return new AddArtifactMemberRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.expectedRevision = source["expectedRevision"];
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MemberReference {
+	    type: string;
+	    name: string;
+	    insert?: string;
+	    locator?: declaration.Locator;
+	    scope?: string;
+	    server?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberReference(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.insert = source["insert"];
+	        this.locator = this.convertValues(source["locator"], declaration.Locator);
+	        this.scope = source["scope"];
+	        this.server = source["server"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AddMemberRequest {
+	    collection: model.ArtifactRef;
+	    expectedRevision: number;
+	    member: MemberReference;
+	
+	    static createFrom(source: any = {}) {
+	        return new AddMemberRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.expectedRevision = source["expectedRevision"];
+	        this.member = this.convertValues(source["member"], MemberReference);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ArtifactMembershipView {
+	    collection: model.ArtifactRef;
+	    collectionName: string;
+	    collectionRevision: number;
+	    memberIndex: number;
+	    member: MemberReference;
+	    status: string;
+	    resolvedArtifact?: model.ArtifactRef;
+	    resolvedToArtifact: boolean;
+	    code?: string;
+	    message?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArtifactMembershipView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.collectionName = source["collectionName"];
+	        this.collectionRevision = source["collectionRevision"];
+	        this.memberIndex = source["memberIndex"];
+	        this.member = this.convertValues(source["member"], MemberReference);
+	        this.status = source["status"];
+	        this.resolvedArtifact = this.convertValues(source["resolvedArtifact"], model.ArtifactRef);
+	        this.resolvedToArtifact = source["resolvedToArtifact"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CollectionMemberView {
+	    type: string;
+	    name?: string;
+	    insert?: string;
+	    locator?: declaration.Locator;
+	    server?: string;
+	    contained: boolean;
+	    selector: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionMemberView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.insert = source["insert"];
+	        this.locator = this.convertValues(source["locator"], declaration.Locator);
+	        this.server = source["server"];
+	        this.contained = source["contained"];
+	        this.selector = source["selector"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CollectionView {
+	    artifact: model.Artifact;
+	    name: string;
+	    displayName: string;
+	    description?: string;
+	    members: MemberReference[];
+	    entries: CollectionMemberView[];
+	    editable: boolean;
+	    deletable: boolean;
+	    baseline: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.members = this.convertValues(source["members"], MemberReference);
+	        this.entries = this.convertValues(source["entries"], CollectionMemberView);
+	        this.editable = source["editable"];
+	        this.deletable = source["deletable"];
+	        this.baseline = source["baseline"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CollectionCapabilityPlan {
+	    collection: CollectionView;
+	    occurrences: composition.CapabilityOccurrence[];
+	    complete: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionCapabilityPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], CollectionView);
+	        this.occurrences = this.convertValues(source["occurrences"], composition.CapabilityOccurrence);
+	        this.complete = source["complete"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class CreateRequest {
+	    rootID: string;
+	    sourceID?: string;
+	    name: string;
+	    displayName?: string;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.sourceID = source["sourceID"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	    }
+	}
+	export class DeleteRequest {
+	    collection: model.ArtifactRef;
+	    expectedRevision: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.expectedRevision = source["expectedRevision"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListItem {
+	    ref: model.ArtifactRef;
+	    sourceID: string;
+	    name: string;
+	    displayName: string;
+	    description?: string;
+	    state: string;
+	    enabled: boolean;
+	    revision: number;
+	    memberCount: number;
+	    builtIn: boolean;
+	    editable: boolean;
+	    deletable: boolean;
+	    baseline: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
+	        this.sourceID = source["sourceID"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.state = source["state"];
+	        this.enabled = source["enabled"];
+	        this.revision = source["revision"];
+	        this.memberCount = source["memberCount"];
+	        this.builtIn = source["builtIn"];
+	        this.editable = source["editable"];
+	        this.deletable = source["deletable"];
+	        this.baseline = source["baseline"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class RemoveMemberRequest {
+	    collection: model.ArtifactRef;
+	    expectedRevision: number;
+	    index: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoveMemberRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.expectedRevision = source["expectedRevision"];
+	        this.index = source["index"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class UpdateRequest {
+	    collection: model.ArtifactRef;
+	    expectedRevision: number;
+	    description?: string;
+	    displayName?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
+	        this.expectedRevision = source["expectedRevision"];
+	        this.description = source["description"];
+	        this.displayName = source["displayName"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace policy {
 	
 	export class MCPAppsPolicy {
@@ -6136,125 +6255,6 @@ export namespace provider {
 	        this.locations = source["locations"];
 	        this.moreLocations = source["moreLocations"];
 	    }
-	}
-
-}
-
-export namespace resolve {
-	
-	export class MappedTarget {
-	    provider: string;
-	    identifier: string;
-	    type: string;
-	    name: string;
-	    builtin: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new MappedTarget(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.provider = source["provider"];
-	        this.identifier = source["identifier"];
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.builtin = source["builtin"];
-	    }
-	}
-	export class CapabilityOccurrence {
-	    path: string;
-	    kind: string;
-	    type: string;
-	    name?: string;
-	    status: string;
-	    required: boolean;
-	    scope?: string;
-	    artifact?: model.ArtifactRef;
-	    mapped?: MappedTarget;
-	    overrides?: Record<string, Array<number>>;
-	    use?: Record<string, Array<number>>;
-	    code?: string;
-	    message?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CapabilityOccurrence(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.path = source["path"];
-	        this.kind = source["kind"];
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.status = source["status"];
-	        this.required = source["required"];
-	        this.scope = source["scope"];
-	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
-	        this.mapped = this.convertValues(source["mapped"], MappedTarget);
-	        this.overrides = source["overrides"];
-	        this.use = source["use"];
-	        this.code = source["code"];
-	        this.message = source["message"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class CapabilityPlan {
-	    rootArtifact?: model.ArtifactRef;
-	    rootMapped?: MappedTarget;
-	    rootType: string;
-	    rootName: string;
-	    occurrences: CapabilityOccurrence[];
-	    complete: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new CapabilityPlan(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootArtifact = this.convertValues(source["rootArtifact"], model.ArtifactRef);
-	        this.rootMapped = this.convertValues(source["rootMapped"], MappedTarget);
-	        this.rootType = source["rootType"];
-	        this.rootName = source["rootName"];
-	        this.occurrences = this.convertValues(source["occurrences"], CapabilityOccurrence);
-	        this.complete = source["complete"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }
