@@ -1,21 +1,3 @@
-The last proposed patch should be discarded. It introduced temporary aggregation, more redirection, and several incomplete changes rather than completing the responsibility split.
-
-The baseline for the following proposals is **your last attached code, before that patch**. These proposals replace the earlier phase numbering.
-
-One important correction to the original design:
-
-> **Entity ownership does not require an entity-specific composition package.**
-> An entity should expose its actual responsibilities and the constructors needed to establish them. Construction should not become another architectural layer.
-
-Below are two implementation briefs:
-
-1. **Artifactory:** the detailed target architecture, including ownership of generic helpers.
-2. **LLM Artifactory:** the complementary domain architecture and its invariants.
-
-Each ends with a prompt for the implementing agent.
-
----
-
 # Proposal 1 — Artifactory: source-backed artifact storage and lifecycle
 
 ## 1. Purpose
