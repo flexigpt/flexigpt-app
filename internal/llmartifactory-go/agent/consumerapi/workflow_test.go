@@ -141,39 +141,39 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 	if !baseline.Baseline {
-		t.Fatalf("Agent baseline Collection is not marked as baseline")
+		t.Fatalf("Agent baseline Plugin is not marked as baseline")
 	}
 	if !harness.api.IsManagedAgentCollection(baseline) {
-		t.Fatalf("Agent baseline Collection is not recognized as managed")
+		t.Fatalf("Agent baseline Plugin is not recognized as managed")
 	}
 
 	created, err := harness.api.CreateAgentCollection(
 		t.Context(),
 		plugin.CreateRequest{
-			Name:        "workflow-collection",
-			DisplayName: "Workflow Collection",
-			Description: "Initial workflow Collection description.",
+			Name:        "workflow-plugin",
+			DisplayName: "Workflow Plugin",
+			Description: "Initial workflow Plugin description.",
 		},
 	)
 	requireNoError(t, err)
 	if created.Artifact.RootID != topology.UserRootID() {
 		t.Fatalf(
-			"default Collection Root = %q, want %q",
+			"default Plugin Root = %q, want %q",
 			created.Artifact.RootID,
 			topology.UserRootID(),
 		)
 	}
 	if !created.Editable || !harness.api.IsManagedAgentCollection(created) {
-		t.Fatalf("new Agent Collection is not editable managed state")
+		t.Fatalf("new Agent Plugin is not editable managed state")
 	}
 
 	updated, err := harness.api.UpdateAgentCollection(
 		t.Context(),
 		plugin.UpdateRequest{
-			Collection:       created.Artifact.Ref(),
+			Plugin:           created.Artifact.Ref(),
 			ExpectedRevision: created.Artifact.Revision,
-			DisplayName:      "Workflow Collection Updated",
-			Description:      "Updated workflow Collection description.",
+			DisplayName:      "Workflow Plugin Updated",
+			Description:      "Updated workflow Plugin description.",
 		},
 	)
 	requireNoError(t, err)
@@ -190,15 +190,15 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 		updated.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if readCollection.DisplayName != "Workflow Collection Updated" {
+	if readCollection.DisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
-			"Collection display name = %q",
+			"Plugin display name = %q",
 			readCollection.DisplayName,
 		)
 	}
-	if readCollection.Description != "Updated workflow Collection description." {
+	if readCollection.Description != "Updated workflow Plugin description." {
 		t.Fatalf(
-			"Collection description = %q",
+			"Plugin description = %q",
 			readCollection.Description,
 		)
 	}
@@ -211,7 +211,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 	if disabledCollection.Artifact.Enabled {
-		t.Fatalf("Collection remained enabled after disable")
+		t.Fatalf("Plugin remained enabled after disable")
 	}
 
 	enabledCollection, err := harness.api.SetAgentCollectionEnabled(
@@ -222,7 +222,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 	if !enabledCollection.Artifact.Enabled {
-		t.Fatalf("Collection remained disabled after enable")
+		t.Fatalf("Plugin remained disabled after enable")
 	}
 
 	destinations, err := harness.api.ListAgentImportDestinations(
@@ -237,14 +237,14 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	if destination.CollectionRevision != enabledCollection.Artifact.Revision {
 		t.Fatalf(
-			"destination Collection revision = %d, want %d",
+			"destination Plugin revision = %d, want %d",
 			destination.CollectionRevision,
 			enabledCollection.Artifact.Revision,
 		)
 	}
-	if destination.CollectionDisplayName != "Workflow Collection Updated" {
+	if destination.CollectionDisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
-			"destination Collection display name = %q",
+			"destination Plugin display name = %q",
 			destination.CollectionDisplayName,
 		)
 	}
@@ -261,9 +261,9 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	if managementDestination.RootDisplayName == "" {
 		t.Fatalf("management import destination has no Root display name")
 	}
-	if managementDestination.CollectionDisplayName != "Workflow Collection Updated" {
+	if managementDestination.CollectionDisplayName != "Workflow Plugin Updated" {
 		t.Fatalf(
-			"management destination Collection display name = %q",
+			"management destination Plugin display name = %q",
 			managementDestination.CollectionDisplayName,
 		)
 	}
@@ -293,7 +293,7 @@ members:
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
 			Path:                       inputPath,
-			Collection:                 enabledCollection.Artifact.Ref(),
+			Plugin:                     enabledCollection.Artifact.Ref(),
 			ExpectedCollectionRevision: enabledCollection.Artifact.Revision,
 		},
 	)
@@ -327,9 +327,9 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if committed.Collection.Artifact.Ref() !=
+	if committed.Plugin.Artifact.Ref() !=
 		enabledCollection.Artifact.Ref() {
-		t.Fatalf("import committed membership to another Collection")
+		t.Fatalf("import committed membership to another Plugin")
 	}
 
 	current, err := harness.api.GetAgent(
@@ -352,17 +352,17 @@ members:
 		t.Fatalf("managed Agent is missing from the Root Agent list")
 	}
 
-	collectionRef := committed.Collection.Artifact.Ref()
+	collectionRef := committed.Plugin.Artifact.Ref()
 	collectionAgents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
-			RootID:     topology.UserRootID(),
-			Collection: &collectionRef,
+			RootID: topology.UserRootID(),
+			Plugin: &collectionRef,
 		},
 	)
 	requireNoError(t, err)
 	if !containsAgent(collectionAgents, committed.Agent.Ref) {
-		t.Fatalf("managed Agent is missing from its Collection")
+		t.Fatalf("managed Agent is missing from its Plugin")
 	}
 
 	resolution, err := harness.api.ResolveAgent(
@@ -474,13 +474,13 @@ members:
 	remainingCollectionAgents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
-			RootID:     topology.UserRootID(),
-			Collection: &collectionRef,
+			RootID: topology.UserRootID(),
+			Plugin: &collectionRef,
 		},
 	)
 	requireNoError(t, err)
 	if containsAgent(remainingCollectionAgents, enabledAgent.Ref) {
-		t.Fatalf("deleted Agent remains in Collection Agent list")
+		t.Fatalf("deleted Agent remains in Plugin Agent list")
 	}
 
 	currentCollection, err := harness.api.GetAgentCollection(
@@ -490,7 +490,7 @@ members:
 	requireNoError(t, err)
 	if len(currentCollection.Members) == 0 {
 		t.Fatal(
-			"deleting the managed Agent unexpectedly detached Collection membership",
+			"deleting the managed Agent unexpectedly detached Plugin membership",
 		)
 	}
 
@@ -501,7 +501,7 @@ members:
 	requireNoError(t, err)
 	if staleMemberships.Complete {
 		t.Fatal(
-			"Collection capability plan remained complete after deleting its Agent",
+			"Plugin capability plan remained complete after deleting its Agent",
 		)
 	}
 
@@ -520,7 +520,7 @@ members:
 	detachedCollection, err := harness.api.RemoveAgentCollectionMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
-			Collection:       collectionRef,
+			Plugin:           collectionRef,
 			ExpectedRevision: currentCollection.Artifact.Revision,
 			Index:            memberIndex,
 		},
@@ -528,7 +528,7 @@ members:
 	requireNoError(t, err)
 	if len(detachedCollection.Members) != 0 {
 		t.Fatalf(
-			"Collection members after detach = %#v, want empty",
+			"Plugin members after detach = %#v, want empty",
 			detachedCollection.Members,
 		)
 	}
@@ -540,7 +540,7 @@ members:
 	requireNoError(t, err)
 	if !currentMemberships.Complete {
 		t.Fatalf(
-			"empty Collection capability plan is incomplete: %#v",
+			"empty Plugin capability plan is incomplete: %#v",
 			currentMemberships.Occurrences,
 		)
 	}
@@ -554,13 +554,13 @@ members:
 		),
 	)
 
-	collections, err := harness.api.ListAgentCollections(
+	plugins, err := harness.api.ListAgentCollections(
 		t.Context(),
 		topology.UserRootID(),
 	)
 	requireNoError(t, err)
-	if containsCollection(collections, collectionRef) {
-		t.Fatalf("deleted custom Collection remains in Collection list")
+	if containsCollection(plugins, collectionRef) {
+		t.Fatalf("deleted custom Plugin remains in Plugin list")
 	}
 
 	remainingDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
@@ -568,7 +568,7 @@ members:
 	)
 	requireNoError(t, err)
 	if hasImportDestination(remainingDestinations, collectionRef) {
-		t.Fatalf("deleted custom Collection remains an import destination")
+		t.Fatalf("deleted custom Plugin remains an import destination")
 	}
 }
 
@@ -596,7 +596,7 @@ func requireImportDestination(
 	t.Helper()
 
 	for _, value := range values {
-		if value.Collection == ref {
+		if value.Plugin == ref {
 			return value
 		}
 	}
@@ -618,7 +618,9 @@ func requireAvailableCapability(
 			continue
 		}
 		if occurrence.Status != composition.ResolutionAvailable ||
-			occurrence.Artifact == nil {
+			occurrence.Target == nil ||
+			occurrence.Target.Form != composition.TargetFormArtifact ||
+			occurrence.Target.Artifact == nil {
 			t.Fatalf(
 				"capability %s/%s is not available: %#v",
 				declarationType,
@@ -626,7 +628,7 @@ func requireAvailableCapability(
 				occurrence,
 			)
 		}
-		return *occurrence.Artifact
+		return *occurrence.Target.Artifact
 	}
 
 	t.Fatalf(
@@ -653,7 +655,7 @@ func requireAgentCollectionMemberIndex(
 	}
 
 	t.Fatalf(
-		"Agent Collection member %q was not found in %#v",
+		"Agent Plugin member %q was not found in %#v",
 		name,
 		values,
 	)
@@ -689,7 +691,7 @@ func hasImportDestination(
 	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
-		if value.Collection == ref {
+		if value.Plugin == ref {
 			return true
 		}
 	}

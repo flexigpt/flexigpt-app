@@ -8,9 +8,8 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 )
 
 func ManagedAgentDocumentFile() spec.Locator {
@@ -126,7 +125,7 @@ func ManagedAgentEntryPayload(
 	if err != nil {
 		return nil, definitionModel.Definition{}, err
 	}
-	value, err := decoder.DefinitionForEntry(entry)
+	value, err := agentv1.DefinitionForDocument(document)
 	if err != nil {
 		return nil, definitionModel.Definition{}, err
 	}

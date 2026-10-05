@@ -14,7 +14,7 @@ import (
 // member matching.
 //
 // It deliberately does not recursively expand each selected member's own
-// capabilities. Collection listing and membership inspection need direct
+// capabilities. Plugin listing and membership inspection need direct
 // selection, not a complete Agent, Skill, MCP, Tool, or Workflow graph.
 func (r *Resolver) ResolvePluginMembers(
 	ctx context.Context,

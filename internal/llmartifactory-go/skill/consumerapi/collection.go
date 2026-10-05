@@ -13,27 +13,27 @@ import (
 func (a *API) CreateSkillCollection(
 	ctx context.Context,
 	request plugin.CreateRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.Create(ctx, request)
+	return a.plugins.Create(ctx, request)
 }
 
 func (a *API) ResolveSkillCollection(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionCapabilityPlan, error) {
+) (plugin.PluginCapabilityPlan, error) {
 	if a == nil ||
 		a.resources == nil ||
-		a.collections == nil {
-		return plugin.CollectionCapabilityPlan{}, spec.ErrClosed
+		a.plugins == nil {
+		return plugin.PluginCapabilityPlan{}, spec.ErrClosed
 	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
-		func(sessionCtx context.Context) (plugin.CollectionCapabilityPlan, error) {
-			return a.collections.ResolveCapabilities(
+		func(sessionCtx context.Context) (plugin.PluginCapabilityPlan, error) {
+			return a.plugins.ResolveCapabilities(
 				sessionCtx,
 				ref,
 			)
@@ -44,11 +44,11 @@ func (a *API) ResolveSkillCollection(
 func (a *API) GetSkillCollection(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.Read(ctx, ref)
+	return a.plugins.Read(ctx, ref)
 }
 
 func (a *API) SetSkillCollectionEnabled(
@@ -56,11 +56,11 @@ func (a *API) SetSkillCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.SetEnabled(
+	return a.plugins.SetEnabled(
 		ctx,
 		ref,
 		expectedRevision,
@@ -72,10 +72,10 @@ func (a *API) ListSkillCollections(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return nil, spec.ErrClosed
 	}
-	return a.collections.ListDomain(ctx, plugin.ListRequest{
+	return a.plugins.ListDomain(ctx, plugin.ListRequest{
 		RootID: rootID,
 	})
 }
@@ -84,58 +84,58 @@ func (a *API) ListSkillCollectionMemberships(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]plugin.ArtifactMembershipView, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return nil, spec.ErrClosed
 	}
-	return a.collections.ListMembershipsForArtifact(ctx, ref)
+	return a.plugins.ListMembershipsForArtifact(ctx, ref)
 }
 
 func (a *API) UpdateSkillCollection(
 	ctx context.Context,
 	request plugin.UpdateRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.Update(ctx, request)
+	return a.plugins.Update(ctx, request)
 }
 
 func (a *API) AddSkillCollectionMember(
 	ctx context.Context,
 	request plugin.AddMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.AddMember(ctx, request)
+	return a.plugins.AddMember(ctx, request)
 }
 
 func (a *API) AttachSkillArtifactToCollection(
 	ctx context.Context,
 	request plugin.AddArtifactMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.AddArtifactMember(ctx, request)
+	return a.plugins.AddArtifactMember(ctx, request)
 }
 
 func (a *API) RemoveSkillCollectionMember(
 	ctx context.Context,
 	request plugin.RemoveMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.RemoveMember(ctx, request)
+	return a.plugins.RemoveMember(ctx, request)
 }
 
 func (a *API) DeleteSkillCollection(
 	ctx context.Context,
 	request plugin.DeleteRequest,
 ) error {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return spec.ErrClosed
 	}
-	return a.collections.Delete(ctx, request)
+	return a.plugins.Delete(ctx, request)
 }

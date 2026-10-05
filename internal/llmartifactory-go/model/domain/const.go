@@ -9,8 +9,8 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 const (

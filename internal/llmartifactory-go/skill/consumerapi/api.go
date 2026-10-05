@@ -39,7 +39,7 @@ type API struct {
 	managedArtifacts managepackageFlow.API
 	protection       root.ProtectionAPI
 	definitions      definition.API
-	collections      *plugin.API
+	plugins          *plugin.API
 
 	declarationResolver *composition.Resolver
 }
@@ -73,6 +73,11 @@ func New(
 			option(&config)
 		}
 	}
+	graphResolver, err := requiredCompositionResolver(config.resolver)
+	if err != nil {
+		return nil, err
+	}
+
 	output := &API{
 		sources:          sources,
 		discovery:        discovery,
@@ -83,29 +88,7 @@ func New(
 		cat:              cat,
 		definitions:      definitions,
 	}
-	locators, err := composition.NewProviderLocatorResolver(
-		config.locatorResolvers,
-		skillLocatorRuntime{cat: cat},
-	)
-	if err != nil {
-		return nil, err
-	}
-	graphResolver, err := composition.NewWithOptions(
-		composition.ResolverOptions{
-			Artifacts:            artifacts,
-			Catalog:              cat,
-			SourceEntries:        resources,
-			Locators:             locators,
-			FallbackProviders:    config.fallbackProviders,
-			TargetMappers:        config.targetMappers,
-			ProtectedBuiltinRoot: topology.BuiltinRootID(),
-			Limits:               composition.DefaultLimits(),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	collections, err := plugin.NewWithResolver(
+	plugins, err := plugin.New(
 		artifacts,
 		cat,
 		sources,
@@ -113,12 +96,12 @@ func New(
 		managedArtifacts,
 		definitions,
 		graphResolver,
-		plugin.SkillDomainPolicy(),
+		skillDomain.PluginProfile(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	output.collections = collections
+	output.plugins = plugins
 	output.declarationResolver = graphResolver
 	return output, nil
 }
@@ -247,21 +230,21 @@ func (a *API) CreateManagedSkill(
 	ctx context.Context,
 	request ManagedSkillCreateRequest,
 ) (ManagedSkillCreateResult, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return ManagedSkillCreateResult{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedSkillCreateResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	if err := a.requireMutable(
 		ctx,
-		request.Collection.RootID,
+		request.Plugin.RootID,
 	); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
@@ -311,10 +294,10 @@ func (a *API) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 
-	membership, err := a.collections.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForCollectionSource(
 		ctx,
 		plugin.EnsureMemberForCollectionSourceRequest{
-			Collection:       request.Collection,
+			Plugin:           request.Plugin,
 			ExpectedRevision: request.ExpectedCollectionRevision,
 			Type:             declaration.TypeSkill,
 			Name:             definitionValue.LogicalName,
@@ -326,18 +309,18 @@ func (a *API) CreateManagedSkill(
 	}
 
 	result := ManagedSkillCreateResult{
-		Collection:        membership.Collection,
+		Plugin:            membership.Plugin,
 		MembershipCreated: membership.Created,
 	}
-	rootID := membership.Collection.Artifact.RootID
-	sourceID := membership.Collection.Artifact.Binding.SourceID
+	rootID := membership.Plugin.Artifact.RootID
+	sourceID := membership.Plugin.Artifact.Binding.SourceID
 	decoderID, err := topology.DefaultDocumentDecoderID(
 		topology.DocumentUseSkillPackage,
 	)
 	if err != nil {
 		return result, err
 	}
-	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
@@ -389,21 +372,21 @@ func (a *API) CreateManagedSkill(
 
 // ReplaceManagedSkill replaces the complete managed Skill package for an
 // existing managed Skill Artifact. The Skill Artifact identity, logical name,
-// package address, Collection membership, and managed Source remain stable.
+// package address, Plugin membership, and managed Source remain stable.
 func (a *API) ReplaceManagedSkill(
 	ctx context.Context,
 	request ManagedSkillReplaceRequest,
 ) (ManagedSkillReplaceResult, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return ManagedSkillReplaceResult{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
 	if err := request.Artifact.Validate(); err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if request.Collection.RootID != request.Artifact.RootID {
+	if request.Plugin.RootID != request.Artifact.RootID {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill Artifact belongs to another Root",
 			spec.ErrInvalid,
@@ -411,7 +394,7 @@ func (a *API) ReplaceManagedSkill(
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
@@ -425,7 +408,7 @@ func (a *API) ReplaceManagedSkill(
 		return ManagedSkillReplaceResult{}, err
 	}
 
-	collectionView, err := a.collections.Read(ctx, request.Collection)
+	collectionView, err := a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
@@ -435,7 +418,7 @@ func (a *API) ReplaceManagedSkill(
 	if !collectionView.Editable &&
 		!collectionView.Baseline {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
-			"%w: Skill Collection is read-only",
+			"%w: Skill Plugin is read-only",
 			spec.ErrUnsupported,
 		)
 	}
@@ -456,7 +439,7 @@ func (a *API) ReplaceManagedSkill(
 	}
 	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
-			"%w: Skill is not owned by this Collection Source",
+			"%w: Skill is not owned by this Plugin Source",
 			spec.ErrUnsupported,
 		)
 	}
@@ -476,7 +459,7 @@ func (a *API) ReplaceManagedSkill(
 		)
 	}
 
-	memberships, err := a.collections.ListMembershipsForArtifact(
+	memberships, err := a.plugins.ListMembershipsForArtifact(
 		ctx,
 		request.Artifact,
 	)
@@ -485,7 +468,7 @@ func (a *API) ReplaceManagedSkill(
 	}
 	memberFound := false
 	for _, membership := range memberships {
-		if membership.Collection != request.Collection ||
+		if membership.Plugin != request.Plugin ||
 			!membership.ResolvedToArtifact {
 			continue
 		}
@@ -494,7 +477,7 @@ func (a *API) ReplaceManagedSkill(
 	}
 	if !memberFound {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
-			"%w: Skill is not a direct member of the requested Collection",
+			"%w: Skill is not a direct member of the requested Plugin",
 			spec.ErrReferenceUnresolved,
 		)
 	}
@@ -606,15 +589,15 @@ func (a *API) ReplaceManagedSkill(
 		}
 	}
 
-	collectionView, err = a.collections.Read(ctx, request.Collection)
+	collectionView, err = a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
 
 	return ManagedSkillReplaceResult{
-		Artifact:   updated,
-		Address:    updated.Address(),
-		Collection: collectionView,
+		Artifact: updated,
+		Address:  updated.Address(),
+		Plugin:   collectionView,
 	}, nil
 }
 
@@ -692,7 +675,7 @@ func (a *API) PurgeSkill(
 		Package:          packageAddress,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == plugin.SkillManagedSourceStorageKey {
+	if sourceValue.StorageKey == plugin.SkillManagedPluginSourceStorageKey {
 		locator := value.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}
@@ -823,11 +806,11 @@ func (a *API) getManagedSkillDocument(
 func (a *API) ensureSkillBaselineCollection(
 	ctx context.Context,
 	rootID rootModel.RootID,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.EnsureBaseline(ctx, rootID)
+	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
 func (a *API) requireMutable(

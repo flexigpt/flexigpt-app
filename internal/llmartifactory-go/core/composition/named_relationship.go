@@ -2,13 +2,10 @@ package composition
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -17,28 +14,17 @@ type NamedRelationshipRequest struct {
 	Member declaration.Entry
 }
 
-type NamedRelationshipTarget struct {
-	Type declaration.Type
-
-	Artifact *artifactModel.ArtifactRef
-	Mapped   *MappedTarget
-}
-
-// NamedRelationshipInspection preserves ordinary relationship-resolution
-// status without requiring callers to treat missing or ambiguous targets as
-// operation failures.
+// NamedRelationshipInspection preserves normal unavailable and ambiguous
+// outcomes as data. Infrastructure failures still return an error.
 type NamedRelationshipInspection struct {
 	Type   declaration.Type
 	Status ResolutionStatus
-
-	Artifact *artifactModel.ArtifactRef
-	Mapped   *MappedTarget
-	Issue    *ResolutionIssue
+	Target *CapabilityTarget
+	Issue  *ResolutionIssue
 }
 
-// InspectNamedRelationship resolves one named external declaration member and
-// projects normal relationship failures as unavailable or ambiguous results.
-// Infrastructure failures remain returned errors.
+// InspectNamedRelationship resolves exactly one named external relationship.
+// It deliberately does not accept selector, contained, or located members.
 func (r *Resolver) InspectNamedRelationship(
 	ctx context.Context,
 	request NamedRelationshipRequest,
@@ -97,7 +83,7 @@ func (r *Resolver) InspectNamedRelationship(
 		0,
 	)
 	if err != nil {
-		status, issue, observed := namedRelationshipInspectionFailure(err)
+		status, issue, observed := resolutionFailure(err)
 		if !observed {
 			return NamedRelationshipInspection{}, err
 		}
@@ -105,126 +91,40 @@ func (r *Resolver) InspectNamedRelationship(
 		output.Issue = &issue
 		return output, nil
 	}
-	if value == nil {
+	if value == nil || value.Target == nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
-			"%w: named relationship has no target",
+			"%w: named relationship resolved without a target",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 
 	output.Status = ResolutionAvailable
-	if ref, found := value.ArtifactRef(); found {
-		copyRef := ref
-		output.Artifact = &copyRef
-	}
-	output.Mapped = cloneMappedTarget(value.Mapped)
-	if output.Artifact == nil && output.Mapped == nil {
-		return NamedRelationshipInspection{}, fmt.Errorf(
-			"%w: named relationship resolved without a target",
-			spec.ErrReferenceUnresolved,
-		)
-	}
+	output.Target = pointerTarget(*value.Target)
 	return output, nil
 }
 
-func namedRelationshipInspectionFailure(
-	err error,
-) (ResolutionStatus, ResolutionIssue, bool) {
-	status, issue, partial := resolutionFailure(err)
-	if partial {
-		return status, issue, true
-	}
-	if errors.Is(err, spec.ErrInvalid) ||
-		errors.Is(err, spec.ErrDigestMismatch) {
-		return ResolutionUnavailable, ResolutionIssue{
-			Code:    "artifactModel.reference-invalid",
-			Message: diagnostic.BoundedMessage(err.Error()),
-		}, true
-	}
-	return "", ResolutionIssue{}, false
-}
-
-// ResolveNamedRelationship preflights one named external declaration member
-// through the normal shared resolver lookup path. It intentionally does not
-// expose generic arbitrary Artifact lookup and does not support located,
-// contained, or selector relationships.
+// ResolveNamedRelationship is the strict counterpart of
+// InspectNamedRelationship. Normal unavailable and ambiguous relationship
+// outcomes are returned as errors.
 func (r *Resolver) ResolveNamedRelationship(
 	ctx context.Context,
 	request NamedRelationshipRequest,
-) (NamedRelationshipTarget, error) {
-	if err := r.ready(); err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-
-	form, err := request.Member.MemberForm()
+) (CapabilityTarget, error) {
+	inspection, err := r.InspectNamedRelationship(ctx, request)
 	if err != nil {
-		return NamedRelationshipTarget{}, err
+		return CapabilityTarget{}, err
 	}
-	if form != declaration.MemberNamed {
-		return NamedRelationshipTarget{}, fmt.Errorf(
-			"%w: named relationship preflight requires a named member",
-			spec.ErrInvalid,
-		)
-	}
-
-	header := request.Member.Header()
-	if header.Locator != nil {
-		return NamedRelationshipTarget{}, fmt.Errorf(
-			"%w: named relationship preflight does not accept a locator",
-			spec.ErrInvalid,
-		)
-	}
-
-	relationship, err := request.Member.Relationship()
-	if err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-	expectedVersion, err := memberTextLogicalVersion(request.Member)
-	if err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-
-	state := newResolutionState()
-	value, err := r.resolveNamedMember(
-		ctx,
-		&state,
-		request.RootID,
-		header.Type,
-		spec.LogicalName(header.Name),
-		expectedVersion,
-		relationship.Scope,
-		nil,
-		0,
-	)
-	if err != nil {
-		return NamedRelationshipTarget{}, err
-	}
-	if value == nil {
-		return NamedRelationshipTarget{}, fmt.Errorf(
-			"%w: named relationship has no target",
+	if inspection.Status != ResolutionAvailable ||
+		inspection.Target == nil {
+		message := "named relationship is unavailable"
+		if inspection.Issue != nil && inspection.Issue.Message != "" {
+			message = inspection.Issue.Message
+		}
+		return CapabilityTarget{}, fmt.Errorf(
+			"%w: %s",
 			spec.ErrReferenceUnresolved,
+			message,
 		)
 	}
-
-	output := NamedRelationshipTarget{
-		Type: header.Type,
-	}
-	if ref, found := value.ArtifactRef(); found {
-		copyRef := ref
-		output.Artifact = &copyRef
-	}
-	output.Mapped = cloneMappedTarget(value.Mapped)
-	if output.Artifact == nil && output.Mapped == nil {
-		return NamedRelationshipTarget{}, fmt.Errorf(
-			"%w: named relationship resolved without a target",
-			spec.ErrReferenceUnresolved,
-		)
-	}
-	return output, nil
+	return inspection.Target.Clone(), nil
 }

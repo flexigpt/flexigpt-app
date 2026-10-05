@@ -20,8 +20,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
@@ -56,9 +55,8 @@ func InitAgentStoreWrapper(
 	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	definitions definition.API,
-	fallbackProviders map[declaration.Type]composition.FallbackProvider,
-	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
-	locatorResolvers ...locator.Factory,
+	resolver *composition.Resolver,
+	interpretations *interpretation.Registry,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -68,7 +66,8 @@ func InitAgentStoreWrapper(
 		artifacts == nil ||
 		resources == nil ||
 		managedArtifacts == nil ||
-		protection == nil {
+		protection == nil ||
+		interpretations == nil {
 		return errors.New("agent store wrapper dependencies are incomplete")
 	}
 
@@ -82,9 +81,10 @@ func InitAgentStoreWrapper(
 		protection,
 		definitions,
 		agentConsumerAPI.WithRoots(roots),
-		agentConsumerAPI.WithLocatorResolvers(locatorResolvers),
-		agentConsumerAPI.WithFallbackProviders(fallbackProviders),
-		agentConsumerAPI.WithTargetMappers(targetMappers),
+		agentConsumerAPI.WithCompositionResolver(resolver),
+		agentConsumerAPI.WithDeclarationInterpretations(
+			interpretations,
+		),
 	)
 	if err != nil {
 		return err
@@ -214,10 +214,10 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 
 func (w *AgentStoreWrapper) CreateAgentCollection(
 	request plugin.CreateRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
 			return api.CreateAgentCollection(
 				context.Background(),
 				request,
@@ -228,10 +228,10 @@ func (w *AgentStoreWrapper) CreateAgentCollection(
 
 func (w *AgentStoreWrapper) GetAgentCollection(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
 			return api.GetAgentCollection(context.Background(), ref)
 		},
 	)
@@ -250,10 +250,10 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 
 func (w *AgentStoreWrapper) ListAgentCollectionMembers(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionCapabilityPlan, error) {
+) (plugin.PluginCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.CollectionCapabilityPlan, error) {
+		func(api *agentConsumerAPI.API) (plugin.PluginCapabilityPlan, error) {
 			return api.ListAgentCollectionMembers(
 				context.Background(),
 				ref,
@@ -264,10 +264,10 @@ func (w *AgentStoreWrapper) ListAgentCollectionMembers(
 
 func (w *AgentStoreWrapper) UpdateAgentCollection(
 	request plugin.UpdateRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
 			return api.UpdateAgentCollection(context.Background(), request)
 		},
 	)
@@ -275,11 +275,11 @@ func (w *AgentStoreWrapper) UpdateAgentCollection(
 
 func (w *AgentStoreWrapper) AddAgentCollectionMember(
 	request plugin.AddMemberRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			plugin.CollectionView,
+			plugin.PluginView,
 			error,
 		) {
 			return api.AddAgentCollectionMember(
@@ -292,11 +292,11 @@ func (w *AgentStoreWrapper) AddAgentCollectionMember(
 
 func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
 	request plugin.AddArtifactMemberRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			plugin.CollectionView,
+			plugin.PluginView,
 			error,
 		) {
 			return api.AddAgentCollectionArtifactMember(
@@ -309,11 +309,11 @@ func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
 
 func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
 	request plugin.RemoveMemberRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
 		func(api *agentConsumerAPI.API) (
-			plugin.CollectionView,
+			plugin.PluginView,
 			error,
 		) {
 			return api.RemoveAgentCollectionMember(
@@ -328,10 +328,10 @@ func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
 			return api.SetAgentCollectionEnabled(
 				context.Background(),
 				ref,

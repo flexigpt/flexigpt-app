@@ -14,7 +14,7 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"inline-mcp-collection",
+		"inline-mcp-plugin",
 	)
 
 	path := writeManagedAgentImport(
@@ -140,7 +140,7 @@ func TestWorkflow_ManagedAgentImportReportsExpectedSourceDigestMismatch(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"source-digest-collection",
+		"source-digest-plugin",
 	)
 
 	path := writeSimpleManagedAgentImport(
@@ -152,7 +152,7 @@ func TestWorkflow_ManagedAgentImportReportsExpectedSourceDigestMismatch(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
 			Path:                       path,
-			Collection:                 collectionValue.Artifact.Ref(),
+			Plugin:                     collectionValue.Artifact.Ref(),
 			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
 			ExpectedSourceDigest: cryptoutil.DigestBytes(
 				[]byte("different source bytes"),

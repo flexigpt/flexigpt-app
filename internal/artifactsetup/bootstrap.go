@@ -17,21 +17,21 @@ type SkillBaselineEnsurer interface {
 	EnsureSkillBaselineCollection(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.CollectionView, error)
+	) (plugin.PluginView, error)
 }
 
 type MCPBaselineEnsurer interface {
 	EnsureMCPBaselineCollection(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.CollectionView, error)
+	) (plugin.PluginView, error)
 }
 
 type AgentBaselineEnsurer interface {
 	EnsureAgentBaselineCollection(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.CollectionView, error)
+	) (plugin.PluginView, error)
 }
 
 // EnsureBuiltInTopology installs and reconciles all application-owned

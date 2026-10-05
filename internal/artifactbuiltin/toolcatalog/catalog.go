@@ -62,8 +62,8 @@ func GeneratedCatalogFingerprint() cryptoutil.Digest {
 }
 
 // GeneratedToolCollectionIndex maps a generated Tool name to its generated
-// Tool Collection name. It is derived once from the compile-time catalog and
-// avoids rediscovering membership by listing and decoding every Collection at
+// Tool Plugin name. It is derived once from the compile-time catalog and
+// avoids rediscovering membership by listing and decoding every Plugin at
 // runtime.
 func GeneratedToolCollectionIndex() (
 	map[spec.LogicalName]spec.LogicalName,
@@ -76,7 +76,7 @@ func GeneratedToolCollectionIndex() (
 			return
 		}
 
-		collections := make(
+		plugins := make(
 			map[spec.Locator]spec.LogicalName,
 		)
 		for _, packageValue := range set.Packages {
@@ -84,7 +84,7 @@ func GeneratedToolCollectionIndex() (
 				toolDomain.ToolCollectionPackageKind {
 				continue
 			}
-			collections[packageValue.EmbeddedRoot] = packageValue.Address.Name
+			plugins[packageValue.EmbeddedRoot] = packageValue.Address.Name
 		}
 
 		index := make(
@@ -94,10 +94,10 @@ func GeneratedToolCollectionIndex() (
 			if packageValue.Address.Kind != toolDomain.ToolPackageKind {
 				continue
 			}
-			collectionName, found := collections[packageValue.EmbeddedRoot]
+			collectionName, found := plugins[packageValue.EmbeddedRoot]
 			if !found {
 				errGeneratedCollectionIndex = fmt.Errorf(
-					"generated Tool %q has no generated Tool Collection",
+					"generated Tool %q has no generated Tool Plugin",
 					packageValue.Address.Name,
 				)
 				return

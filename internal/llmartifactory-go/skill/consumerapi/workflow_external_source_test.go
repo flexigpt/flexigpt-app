@@ -125,8 +125,8 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 
 	document := workflowSkillMarkdown(
 		skillName,
-		"External Skill attached to a managed Collection.",
-		"The Collection must not take ownership of this Skill package.",
+		"External Skill attached to a managed Plugin.",
+		"The Plugin must not take ownership of this Skill package.",
 	)
 	requireNoError(
 		t,
@@ -155,7 +155,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 			RootID:      topology.UserRootID(),
 			Name:        "external-attachment",
 			DisplayName: "External attachment",
-			Description: "Collection for externally sourced Skills.",
+			Description: "Plugin for externally sourced Skills.",
 		},
 	)
 	requireNoError(t, err)
@@ -163,7 +163,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	attached, err := fixture.api.AttachSkillArtifactToCollection(
 		ctx,
 		plugin.AddArtifactMemberRequest{
-			Collection:       collectionValue.Artifact.Ref(),
+			Plugin:           collectionValue.Artifact.Ref(),
 			ExpectedRevision: collectionValue.Artifact.Revision,
 			Artifact:         external.Artifact.Ref(),
 		},
@@ -172,13 +172,13 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 
 	if len(attached.Members) != 1 {
 		t.Fatalf(
-			"attached Collection members=%d, want 1",
+			"attached Plugin members=%d, want 1",
 			len(attached.Members),
 		)
 	}
 	if string(attached.Members[0].Name) != skillName {
 		t.Fatalf(
-			"attached Collection member name=%q, want %q",
+			"attached Plugin member name=%q, want %q",
 			attached.Members[0].Name,
 			skillName,
 		)
@@ -190,7 +190,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	)
 	requireNoError(t, err)
 	if !capabilities.Complete {
-		t.Fatal("Collection containing external Skill is incomplete")
+		t.Fatal("Plugin containing external Skill is incomplete")
 	}
 
 	memberships, err := fixture.api.ListSkillCollectionMemberships(
@@ -216,7 +216,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	_, err = fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Collection:                 attached.Artifact.Ref(),
+			Plugin:                     attached.Artifact.Ref(),
 			ExpectedCollectionRevision: attached.Artifact.Revision,
 			Artifact:                   external.Artifact.Ref(),
 			ExpectedArtifactRevision:   external.Artifact.Revision,
@@ -251,7 +251,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	detached, err := fixture.api.RemoveSkillCollectionMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Collection:       attached.Artifact.Ref(),
+			Plugin:           attached.Artifact.Ref(),
 			ExpectedRevision: attached.Artifact.Revision,
 			Index:            0,
 		},
@@ -259,7 +259,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	requireNoError(t, err)
 	if len(detached.Members) != 0 {
 		t.Fatalf(
-			"Collection members after detach=%d, want 0",
+			"Plugin members after detach=%d, want 0",
 			len(detached.Members),
 		)
 	}
@@ -269,7 +269,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		fixture.api.DeleteSkillCollection(
 			ctx,
 			plugin.DeleteRequest{
-				Collection:       detached.Artifact.Ref(),
+				Plugin:           detached.Artifact.Ref(),
 				ExpectedRevision: detached.Artifact.Revision,
 			},
 		),
@@ -282,7 +282,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 	requireNoError(t, err)
 	if externalAfterCleanup.State != artifactModel.StateAvailable {
 		t.Fatalf(
-			"external Skill state after Collection cleanup=%q, want %q",
+			"external Skill state after Plugin cleanup=%q, want %q",
 			externalAfterCleanup.State,
 			artifactModel.StateAvailable,
 		)

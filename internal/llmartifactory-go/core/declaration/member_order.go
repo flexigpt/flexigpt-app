@@ -175,13 +175,14 @@ func ValidateMemberUniqueness(
 		}
 		header := value.Header()
 		key := string(header.Type) + "\x00" + header.Name
-		if header.Type == TypeText {
+		if value.hasField("insert") {
 			insert, err := value.TextInsert()
 			if err != nil {
 				return fmt.Errorf("%s[%d]: %w", label, index, err)
 			}
 			key += "\x00" + string(insert)
 		}
+
 		if previous, duplicate := contained[key]; duplicate {
 			return fmt.Errorf(
 				"%w: %s[%d] duplicates contained declaration identity from %s[%d]",

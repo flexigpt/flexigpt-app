@@ -28,12 +28,12 @@ func (a *API) ResolveEnabledTool(
 		return ResolvedToolView{}, err
 	}
 	output := ResolvedToolView{
-		Tool:       toolView(value),
-		Collection: collectionView,
+		Tool:   toolView(value),
+		Plugin: collectionView,
 	}
 	if !output.Enabled() {
 		return ResolvedToolView{}, fmt.Errorf(
-			"%w: Tool %q or its Collection is disabled",
+			"%w: Tool %q or its Plugin is disabled",
 			spec.ErrReferenceUnresolved,
 			value.Artifact.LogicalName,
 		)

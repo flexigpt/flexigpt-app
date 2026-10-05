@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-func (p DomainPolicy) validateAuthoringConfiguration() error {
+func (p Profile) validateAuthoringConfiguration() error {
 	if p.ReadOnly {
 		return nil
 	}
@@ -15,7 +15,7 @@ func (p DomainPolicy) validateAuthoringConfiguration() error {
 		return err
 	}
 	if err := spec.ValidateRequiredText(
-		"Collection domain Source display name",
+		"Plugin domain Source display name",
 		p.SourceDisplayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
@@ -25,14 +25,14 @@ func (p DomainPolicy) validateAuthoringConfiguration() error {
 		return err
 	}
 	if err := spec.ValidateOptionalText(
-		"Collection baseline display name",
+		"Plugin baseline display name",
 		p.BaselineDisplayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
 	return spec.ValidateRequiredText(
-		"Collection baseline description",
+		"Plugin baseline description",
 		p.BaselineDescription,
 		spec.MaxDescriptionBytes,
 	)
@@ -44,7 +44,7 @@ func (a *API) requireDeclarationAuthoring() error {
 	}
 	if a.domain != nil && a.domain.ReadOnly {
 		return fmt.Errorf(
-			"%w: %s Collection declarations are read-only",
+			"%w: %s Plugin declarations are read-only",
 			spec.ErrUnsupported,
 			a.domain.Name,
 		)
@@ -53,7 +53,7 @@ func (a *API) requireDeclarationAuthoring() error {
 }
 
 // A read-only domain has no managed user Source or baseline through which
-// an empty Collection can be classified. Its declared package origin is
+// an empty Plugin can be classified. Its declared package origin is
 // therefore part of domain visibility.
 func (a *API) readOnlyDomainOrigin(record artifactModel.Artifact) bool {
 	if a == nil || a.domain == nil || !a.domain.ReadOnly {

@@ -59,24 +59,24 @@ func (a *API) ListAgents(
 	}
 
 	allowedRefs := map[artifactModel.ArtifactRef]struct{}(nil)
-	if request.Collection != nil {
-		if err := request.Collection.Validate(); err != nil {
+	if request.Plugin != nil {
+		if err := request.Plugin.Validate(); err != nil {
 			return nil, err
 		}
-		if request.Collection.RootID != request.RootID {
+		if request.Plugin.RootID != request.RootID {
 			return nil, fmt.Errorf(
-				"%w: Agent Collection belongs to another Root",
+				"%w: Agent Plugin belongs to another Root",
 				spec.ErrInvalid,
 			)
 		}
 		if request.IncludeBuiltin {
 			return nil, fmt.Errorf(
-				"%w: collection-filtered Agent lists cannot include another Root",
+				"%w: plugin-filtered Agent lists cannot include another Root",
 				spec.ErrInvalid,
 			)
 		}
 
-		refs, err := a.listCollectionAgentRefs(ctx, *request.Collection)
+		refs, err := a.listCollectionAgentRefs(ctx, *request.Plugin)
 		if err != nil {
 			return nil, err
 		}

@@ -36,9 +36,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err
 	}
-	if resolved == nil ||
-		resolved.Type != declaration.TypeWorkspace ||
-		resolved.Workspace == nil {
+	if resolved == nil || resolved.Type != declaration.TypeWorkspace {
 		return workspaceDomain.Workspace{}, nil, fmt.Errorf(
 			"%w: Artifact %q did not resolve as a Workspace",
 			spec.ErrReferenceUnresolved,

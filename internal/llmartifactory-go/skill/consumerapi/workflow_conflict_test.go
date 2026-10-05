@@ -26,7 +26,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 			RootID:      topology.UserRootID(),
 			Name:        "concurrency-workflow",
 			DisplayName: "Concurrency workflow",
-			Description: "Initial Collection description.",
+			Description: "Initial Plugin description.",
 		},
 	)
 	requireNoError(t, err)
@@ -36,10 +36,10 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	winnerCollection, err := fixture.api.UpdateSkillCollection(
 		ctx,
 		plugin.UpdateRequest{
-			Collection:       collectionValue.Artifact.Ref(),
+			Plugin:           collectionValue.Artifact.Ref(),
 			ExpectedRevision: collectionValue.Artifact.Revision,
 			DisplayName:      "Concurrency workflow winner",
-			Description:      "Winner Collection description.",
+			Description:      "Winner Plugin description.",
 		},
 	)
 	requireNoError(t, err)
@@ -47,7 +47,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	_, err = fixture.api.UpdateSkillCollection(
 		ctx,
 		plugin.UpdateRequest{
-			Collection:       staleCollection.Artifact.Ref(),
+			Plugin:           staleCollection.Artifact.Ref(),
 			ExpectedRevision: staleCollection.Artifact.Revision,
 			DisplayName:      "Concurrency workflow stale writer",
 			Description:      "Stale writer must not win.",
@@ -55,7 +55,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	)
 	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
-			"stale Collection update error=%v, want ErrConflict",
+			"stale Plugin update error=%v, want ErrConflict",
 			err,
 		)
 	}
@@ -68,14 +68,14 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	if verifiedCollection.DisplayName !=
 		"Concurrency workflow winner" {
 		t.Fatalf(
-			"Collection display name after stale update=%q, want winner value",
+			"Plugin display name after stale update=%q, want winner value",
 			verifiedCollection.DisplayName,
 		)
 	}
 	if verifiedCollection.Description !=
-		"Winner Collection description." {
+		"Winner Plugin description." {
 		t.Fatalf(
-			"Collection description after stale update=%q, want winner value",
+			"Plugin description after stale update=%q, want winner value",
 			verifiedCollection.Description,
 		)
 	}
@@ -90,7 +90,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	created, err := fixture.api.CreateManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Collection:                 winnerCollection.Artifact.Ref(),
+			Plugin:                     winnerCollection.Artifact.Ref(),
 			ExpectedCollectionRevision: winnerCollection.Artifact.Revision,
 			SkillName:                  skillName,
 			SKILLMD:                    initialDocument,
@@ -105,28 +105,28 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 
 	staleCollectionForCreate := winnerCollection
 	staleDocument := workflowSkillMarkdown(
-		"stale-collection-skill",
+		"stale-plugin-skill",
 		"This Skill must not be created.",
-		"Do not publish from a stale Collection revision.",
+		"Do not publish from a stale Plugin revision.",
 	)
 	_, err = fixture.api.CreateManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Collection: staleCollectionForCreate.Artifact.Ref(),
+			Plugin: staleCollectionForCreate.Artifact.Ref(),
 			ExpectedCollectionRevision: staleCollectionForCreate.
 				Artifact.Revision,
-			SkillName: "stale-collection-skill",
+			SkillName: "stale-plugin-skill",
 			SKILLMD:   staleDocument,
 			Files: managedSkillFiles(
 				staleDocument,
-				"Stale Collection write.\n",
+				"Stale Plugin write.\n",
 			),
 			Enabled: true,
 		},
 	)
 	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
-			"stale Collection Skill create error=%v, want ErrConflict",
+			"stale Plugin Skill create error=%v, want ErrConflict",
 			err,
 		)
 	}
@@ -159,7 +159,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 
 	currentCollection, err := fixture.api.GetSkillCollection(
 		ctx,
-		created.Collection.Artifact.Ref(),
+		created.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
@@ -171,7 +171,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	_, err = fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Collection:                 currentCollection.Artifact.Ref(),
+			Plugin:                     currentCollection.Artifact.Ref(),
 			ExpectedCollectionRevision: currentCollection.Artifact.Revision,
 			Artifact:                   staleSkill.Ref(),
 			ExpectedArtifactRevision:   staleSkill.Revision,
@@ -218,9 +218,9 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 	requireNoError(t, err)
 	if _, found := findSkillByName(
 		userSkills,
-		"stale-collection-skill",
+		"stale-plugin-skill",
 	); found {
-		t.Fatal("stale Collection create published a new Skill")
+		t.Fatal("stale Plugin create published a new Skill")
 	}
 }
 
@@ -239,7 +239,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 			RootID:      topology.UserRootID(),
 			Name:        "replay-workflow",
 			DisplayName: "Replay workflow",
-			Description: "Collection used to verify managed create replay.",
+			Description: "Plugin used to verify managed create replay.",
 		},
 	)
 	requireNoError(t, err)
@@ -259,8 +259,8 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 	replayed, err := fixture.api.CreateManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Collection:                 initial.Collection.Artifact.Ref(),
-			ExpectedCollectionRevision: initial.Collection.Artifact.Revision,
+			Plugin:                     initial.Plugin.Artifact.Ref(),
+			ExpectedCollectionRevision: initial.Plugin.Artifact.Revision,
 			SkillName:                  skillName,
 			SKILLMD:                    initialDocument,
 			Files: managedSkillFiles(
@@ -273,7 +273,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 	requireNoError(t, err)
 
 	if replayed.MembershipCreated {
-		t.Fatal("idempotent managed Skill create recreated Collection membership")
+		t.Fatal("idempotent managed Skill create recreated Plugin membership")
 	}
 	if replayed.Artifact.Ref() != initial.Artifact.Ref() {
 		t.Fatalf(
@@ -298,8 +298,8 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 	_, err = fixture.api.CreateManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Collection:                 replayed.Collection.Artifact.Ref(),
-			ExpectedCollectionRevision: replayed.Collection.Artifact.Revision,
+			Plugin:                     replayed.Plugin.Artifact.Ref(),
+			ExpectedCollectionRevision: replayed.Plugin.Artifact.Revision,
 			SkillName:                  skillName,
 			SKILLMD:                    replacementDocument,
 			Files: managedSkillFiles(

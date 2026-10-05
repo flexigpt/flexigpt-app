@@ -9,18 +9,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
+	interpretations *interpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedAgentPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages)
+	prepared, err := PreparePackages(ctx, packages, interpretations)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}

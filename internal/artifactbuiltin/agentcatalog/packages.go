@@ -15,11 +15,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -46,18 +46,22 @@ type ArtifactExpectation struct {
 	DefinitionDigest cryptoutil.Digest
 }
 
-// PreparePackages reads direct embedded Agent Collection package directories.
+// PreparePackages reads direct embedded Agent Plugin package directories.
 // Every package contains one canonical Plugin document and each direct Plugin
 // member identifies one concrete package-local Agent declaration.
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
+	interpretations *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in Agent package preparation context is nil",
 			spec.ErrInvalid,
 		)
+	}
+	if interpretations == nil {
+		return nil, fmt.Errorf("%w: Agent package interpretation registry is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -76,7 +80,7 @@ func PreparePackages(
 
 	output := make([]PreparedPackage, 0, len(roots))
 	for _, packageRoot := range roots {
-		value, err := preparePackage(ctx, packages, packageRoot)
+		value, err := preparePackage(ctx, packages, packageRoot, interpretations)
 		if err != nil {
 			return nil, err
 		}
@@ -93,6 +97,7 @@ func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
+	interpretations *interpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(ctx, packages, packageRoot)
 	if err != nil {
@@ -105,14 +110,14 @@ func preparePackage(
 
 	documentFile, document, found, err := managedpackageModel.PackageFileContentOneOf(
 		files,
-		topology.CollectionDocumentFiles(),
+		topology.PluginDocumentFiles(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded Agent package %q lacks a supported Collection document",
+			"%w: embedded Agent package %q lacks a supported Plugin document",
 			spec.ErrInvalid,
 			packageRoot,
 		)
@@ -122,6 +127,7 @@ func preparePackage(
 		documentFile,
 		document,
 		files,
+		interpretations,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -157,6 +163,7 @@ func canonicalCollectionPackage(
 	documentFile spec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
+	interpretations *interpretation.Registry,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -180,11 +187,11 @@ func canonicalCollectionPackage(
 			spec.ErrInvalid,
 		)
 	}
-	if err := decoder.ValidateEntryTree(r); err != nil {
+	if err := interpretations.ValidateTree(r); err != nil {
 		return pluginv1.PluginDocument{}, nil, err
 	}
 
-	collection, err := pluginv1.DecodePluginEntry(r)
+	plugin, err := pluginv1.DecodePluginEntry(r)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
 	}
@@ -192,6 +199,7 @@ func canonicalCollectionPackage(
 	expectations, err := expectationsForDocument(
 		documentFile,
 		r,
+		interpretations,
 	)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
@@ -205,7 +213,7 @@ func canonicalCollectionPackage(
 	seenNames := make(map[spec.LogicalName]spec.Locator)
 	seenDocuments := make(map[spec.Locator]struct{})
 
-	for index, member := range collection.Members {
+	for index, member := range plugin.Members {
 		form, err := member.MemberForm()
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, err
@@ -301,7 +309,7 @@ func canonicalCollectionPackage(
 			)
 		}
 
-		agentRoot, agentDocument, err := canonicalAgentDocument(content)
+		agentRoot, agentDocument, err := canonicalAgentDocument(content, interpretations)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"validate built-in Agent %q: %w",
@@ -327,6 +335,7 @@ func canonicalCollectionPackage(
 		agentExpectations, err := expectationsForDocument(
 			documentLocator,
 			agentRoot,
+			interpretations,
 		)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, err
@@ -349,17 +358,18 @@ func canonicalCollectionPackage(
 				"%w: built-in Agent document %q is not referenced by Plugin %q",
 				spec.ErrInvalid,
 				locator,
-				collection.Name,
+				plugin.Name,
 			)
 		}
 	}
 
 	sortExpectations(expectations)
-	return collection, expectations, nil
+	return plugin, expectations, nil
 }
 
 func canonicalAgentDocument(
 	content []byte,
+	interpretations *interpretation.Registry,
 ) (declaration.Entry, agentv1.AgentDocument, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		content,
@@ -379,7 +389,7 @@ func canonicalAgentDocument(
 			declaration.TypeAgent,
 		)
 	}
-	if err := decoder.ValidateEntryTree(r); err != nil {
+	if err := interpretations.ValidateTree(r); err != nil {
 		return declaration.Entry{}, agentv1.AgentDocument{}, err
 	}
 	document, err := agentv1.DecodeAgentEntry(r)
@@ -392,8 +402,9 @@ func canonicalAgentDocument(
 func expectationsForDocument(
 	locator spec.Locator,
 	entry declaration.Entry,
+	interpretations *interpretation.Registry,
 ) ([]ArtifactExpectation, error) {
-	namedEntries, err := declaration.WalkNamedEntries(entry)
+	namedEntries, err := interpretations.WalkNamedEntries(entry)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +415,7 @@ func expectationsForDocument(
 		len(namedEntries),
 	)
 	for _, named := range namedEntries {
-		value, err := decoder.DefinitionForNamedEntry(named)
+		value, err := interpretations.DefinitionForEntry(named.Entry)
 		if err != nil {
 			return nil, err
 		}
@@ -511,9 +522,9 @@ func PackageFingerprint(
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
-	if !topology.IsCollectionDocumentFile(value.PluginDocumentFile) {
+	if !topology.IsPluginDocumentFile(value.PluginDocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in Agent Collection document is not declared in topology",
+			"%w: built-in Agent Plugin document is not declared in topology",
 			spec.ErrInvalid,
 		)
 	}

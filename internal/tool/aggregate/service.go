@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
 
@@ -20,9 +19,9 @@ type Service struct {
 }
 
 type InvokeRequest struct {
-	Target    composition.MappedTarget `json:"target"`
-	Args      json.RawMessage          `json:"args"`
-	TimeoutMS int                      `json:"timeoutMS,omitempty"`
+	Target    composition.CapabilityTarget `json:"target"`
+	Args      json.RawMessage              `json:"args"`
+	TimeoutMS int                          `json:"timeoutMS,omitempty"`
 }
 
 func New(
@@ -41,73 +40,46 @@ func New(
 	}, nil
 }
 
-func (s *Service) MapToolTarget(
+// ResolveToolTarget resolves a source-backed Tool capability target for the
+// Go Tool runtime. Direct Tool capability targets remain owned by their
+// application-supplied runtime adapter and are not coerced into Artifacts.
+func (s *Service) ResolveToolTarget(
 	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (composition.MappedTarget, error) {
-	if err := s.ready(ctx); err != nil {
-		return composition.MappedTarget{}, err
-	}
-	value, err := s.tools.ResolveEnabledTool(ctx, ref)
-	if err != nil {
-		return composition.MappedTarget{}, err
-	}
-	return NewMappedTarget(value)
-}
-
-func (s *Service) MapArtifactTarget(
-	ctx context.Context,
-	request composition.ArtifactTargetRequest,
-) (composition.MappedTarget, bool, error) {
-	if err := s.ready(ctx); err != nil {
-		return composition.MappedTarget{}, false, err
-	}
-	if request.Type != declaration.TypeTool {
-		return composition.MappedTarget{}, false, nil
-	}
-
-	value, err := s.tools.ResolveEnabledTool(ctx, request.Artifact.Ref())
-	if err != nil {
-		return composition.MappedTarget{}, true, err
-	}
-	if request.Definition.Digest != value.Tool.DefinitionDigest {
-		return composition.MappedTarget{}, true, fmt.Errorf(
-			"%w: Tool definition changed during target mapping",
-			spec.ErrRefreshRequired,
-		)
-	}
-
-	target, err := NewMappedTarget(value)
-	return target, true, err
-}
-
-func (s *Service) ResolveMappedTool(
-	ctx context.Context,
-	target composition.MappedTarget,
+	target composition.CapabilityTarget,
 ) (toolConsumerAPI.ResolvedToolView, error) {
 	if err := s.ready(ctx); err != nil {
 		return toolConsumerAPI.ResolvedToolView{}, err
 	}
-	value, err := DecodeTarget(target)
-	if err != nil {
+	if err := target.Validate(); err != nil {
 		return toolConsumerAPI.ResolvedToolView{}, err
+	}
+	if target.Type != declaration.TypeTool {
+		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+			"%w: capability target type is %q, expected tool",
+			spec.ErrUnsupported,
+			target.Type,
+		)
+	}
+	if target.Form != composition.TargetFormArtifact ||
+		target.Artifact == nil {
+		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+			"%w: direct Tool capability targets require an application runtime adapter",
+			spec.ErrUnsupported,
+		)
 	}
 
-	resolved, err := s.tools.ResolveEnabledTool(ctx, value.ToolArtifact)
+	value, err := s.tools.ResolveEnabledTool(ctx, *target.Artifact)
 	if err != nil {
 		return toolConsumerAPI.ResolvedToolView{}, err
 	}
-	tool := resolved.Tool
-	if tool.DefinitionDigest != value.DefinitionDigest ||
-		tool.Name != value.Name ||
-		tool.Version != value.Version ||
-		tool.Implementation.Kind != value.Implementation {
+	if value.Tool.Artifact.Ref() != *target.Artifact ||
+		value.Tool.Name != target.Name {
 		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
-			"%w: mapped Tool target no longer matches its Artifact",
+			"%w: Tool capability target no longer matches its Artifact",
 			spec.ErrReferenceUnresolved,
 		)
 	}
-	return resolved, nil
+	return value, nil
 }
 
 func (s *Service) Invoke(
@@ -117,7 +89,7 @@ func (s *Service) Invoke(
 	if err := s.ready(ctx); err != nil {
 		return nil, err
 	}
-	resolved, err := s.ResolveMappedTool(ctx, request.Target)
+	resolved, err := s.ResolveToolTarget(ctx, request.Target)
 	if err != nil {
 		return nil, err
 	}

@@ -6,8 +6,8 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
@@ -51,15 +51,15 @@ type ToolView struct {
 }
 
 type ResolvedToolView struct {
-	Tool       ToolView              `json:"tool"`
-	Collection plugin.CollectionView `json:"collection"`
+	Tool   ToolView          `json:"tool"`
+	Plugin plugin.PluginView `json:"plugin"`
 }
 
 func (v ResolvedToolView) Enabled() bool {
 	return v.Tool.Artifact.State == artifactModel.StateAvailable &&
-		v.Collection.Artifact.State == artifactModel.StateAvailable &&
+		v.Plugin.Artifact.State == artifactModel.StateAvailable &&
 		v.Tool.Artifact.Enabled &&
-		v.Collection.Artifact.Enabled
+		v.Plugin.Artifact.Enabled
 }
 
 func toolView(value toolDomain.Tool) ToolView {

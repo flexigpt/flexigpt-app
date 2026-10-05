@@ -19,7 +19,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"stale-import-collection",
+		"stale-import-plugin",
 	)
 
 	path := writeSimpleManagedAgentImport(
@@ -95,7 +95,7 @@ func TestWorkflow_ManagedAgentImportSurfacesIdentityAndBuiltinConflicts(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"identity-import-collection",
+		"identity-import-plugin",
 	)
 
 	firstPath := writeSimpleManagedAgentImport(
@@ -125,7 +125,7 @@ func TestWorkflow_ManagedAgentImportSurfacesIdentityAndBuiltinConflicts(
 	duplicatePreview := previewManagedAgentImport(
 		t,
 		harness,
-		firstCommit.Collection,
+		firstCommit.Plugin,
 		firstPath,
 	)
 	if duplicatePreview.CanImport {
@@ -147,7 +147,7 @@ func TestWorkflow_ManagedAgentImportSurfacesIdentityAndBuiltinConflicts(
 	builtinNamePreview := previewManagedAgentImport(
 		t,
 		harness,
-		firstCommit.Collection,
+		firstCommit.Plugin,
 		builtinNamePath,
 	)
 	if builtinNamePreview.CanImport {
@@ -168,7 +168,7 @@ func TestWorkflow_ManagedAgentImportRequiresDeclaredConfirmation(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"confirmation-import-collection",
+		"confirmation-import-plugin",
 	)
 
 	path := writeManagedAgentImport(
@@ -302,8 +302,8 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 		t.Context(),
 		plugin.CreateRequest{
 			RootID:      topology.BuiltinRootID(),
-			Name:        "protected-test-collection",
-			DisplayName: "Protected Test Collection",
+			Name:        "protected-test-plugin",
+			DisplayName: "Protected Test Plugin",
 		},
 	)
 	requireErrorIs(t, err, spec.ErrProtected)
@@ -312,7 +312,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 func newManagedImportFixture(
 	t *testing.T,
 	collectionName string,
-) (*workflowHarness, plugin.CollectionView) {
+) (*workflowHarness, plugin.PluginView) {
 	t.Helper()
 
 	harness := newWorkflowHarness(t)
@@ -334,7 +334,7 @@ func newManagedImportFixture(
 		plugin.CreateRequest{
 			RootID:      topology.UserRootID(),
 			Name:        spec.LogicalName(collectionName),
-			DisplayName: "Managed Import Guard Collection",
+			DisplayName: "Managed Import Guard Plugin",
 		},
 	)
 	requireNoError(t, err)
@@ -345,7 +345,7 @@ func newManagedImportFixture(
 func previewManagedAgentImport(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionValue plugin.CollectionView,
+	collectionValue plugin.PluginView,
 	path string,
 ) agentConsumerAPI.AgentImportPreview {
 	t.Helper()
@@ -354,7 +354,7 @@ func previewManagedAgentImport(
 		t.Context(),
 		agentConsumerAPI.AgentImportPreviewRequest{
 			Path:                       path,
-			Collection:                 collectionValue.Artifact.Ref(),
+			Plugin:                     collectionValue.Artifact.Ref(),
 			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
 		},
 	)

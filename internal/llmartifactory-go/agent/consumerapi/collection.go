@@ -8,123 +8,123 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
 
 func (a *API) CreateAgentCollection(
 	ctx context.Context,
 	request plugin.CreateRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
 	if request.RootID == "" {
 		rootID, err := a.ensureDefaultAgentCollectionRoot(ctx)
 		if err != nil {
-			return plugin.CollectionView{}, err
+			return plugin.PluginView{}, err
 		}
 		request.RootID = rootID
 	}
-	return a.collections.Create(ctx, request)
+	return a.plugins.Create(ctx, request)
 }
 
 func (a *API) ensureAgentBaselineCollection(
 	ctx context.Context,
 	rootID rootModel.RootID,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.EnsureBaseline(ctx, rootID)
+	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
 func (a *API) GetAgentCollection(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.Read(ctx, ref)
+	return a.plugins.Read(ctx, ref)
 }
 
 func (a *API) ListAgentCollections(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]plugin.ListItem, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return nil, spec.ErrClosed
 	}
-	return a.collections.ListDomain(ctx, plugin.ListRequest{RootID: rootID})
+	return a.plugins.ListDomain(ctx, plugin.ListRequest{RootID: rootID})
 }
 
 func (a *API) UpdateAgentCollection(
 	ctx context.Context,
 	request plugin.UpdateRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.Update(ctx, request)
+	return a.plugins.Update(ctx, request)
 }
 
 // AddAgentCollectionMember adds one explicit named Agent relationship. It is
-// useful for relationships such as a user Collection reference to a protected
+// useful for relationships such as a user Plugin reference to a protected
 // built-in Agent using scope "builtin".
 func (a *API) AddAgentCollectionMember(
 	ctx context.Context,
 	request plugin.AddMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.AddMember(ctx, request)
+	return a.plugins.AddMember(ctx, request)
 }
 
 // AddAgentCollectionArtifactMember adds one currently available root Agent
-// Artifact to a Collection. Same-Root Artifacts are represented by an exact
+// Artifact to a Plugin. Same-Root Artifacts are represented by an exact
 // source-relative locator; cross-Root Artifact references are rejected by the
-// generic Collection API.
+// generic Plugin API.
 func (a *API) AddAgentCollectionArtifactMember(
 	ctx context.Context,
 	request plugin.AddArtifactMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
 
 	target, err := a.getAgentRecord(ctx, request.Artifact)
 	if err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 	if target.State != artifactModel.StateAvailable {
-		return plugin.CollectionView{}, fmt.Errorf(
+		return plugin.PluginView{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
 			target.ID,
 		)
 	}
 	if target.Binding.SubresourceLocator != "" {
-		return plugin.CollectionView{}, fmt.Errorf(
-			"%w: contained Agent Artifacts cannot be direct Collection members",
+		return plugin.PluginView{}, fmt.Errorf(
+			"%w: contained Agent Artifacts cannot be direct Plugin members",
 			spec.ErrUnsupported,
 		)
 	}
 
-	return a.collections.AddArtifactMember(ctx, request)
+	return a.plugins.AddArtifactMember(ctx, request)
 }
 
 // RemoveAgentCollectionMember removes one direct member by the normalized
-// index exposed in CollectionView.Members.
+// index exposed in PluginView.Members.
 func (a *API) RemoveAgentCollectionMember(
 	ctx context.Context,
 	request plugin.RemoveMemberRequest,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.RemoveMember(
+	return a.plugins.RemoveMember(
 		ctx,
 		request,
 	)
@@ -135,11 +135,11 @@ func (a *API) SetAgentCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+) (plugin.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginView{}, spec.ErrClosed
 	}
-	return a.collections.SetEnabled(
+	return a.plugins.SetEnabled(
 		ctx,
 		ref,
 		expectedRevision,
@@ -152,13 +152,13 @@ func (a *API) DeleteAgentCollection(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return spec.ErrClosed
 	}
-	return a.collections.Delete(
+	return a.plugins.Delete(
 		ctx,
 		plugin.DeleteRequest{
-			Collection:       ref,
+			Plugin:           ref,
 			ExpectedRevision: expectedRevision,
 		},
 	)
@@ -167,15 +167,15 @@ func (a *API) DeleteAgentCollection(
 func (a *API) ListAgentCollectionMembers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionCapabilityPlan, error) {
-	if a == nil || a.collections == nil {
-		return plugin.CollectionCapabilityPlan{}, spec.ErrClosed
+) (plugin.PluginCapabilityPlan, error) {
+	if a == nil || a.plugins == nil {
+		return plugin.PluginCapabilityPlan{}, spec.ErrClosed
 	}
-	return a.collections.ResolveCapabilities(ctx, ref)
+	return a.plugins.ResolveCapabilities(ctx, ref)
 }
 
 func (a *API) IsManagedAgentCollection(
-	value plugin.CollectionView,
+	value plugin.PluginView,
 ) bool {
 	if value.Artifact.Binding.SubresourceLocator != "" {
 		return false

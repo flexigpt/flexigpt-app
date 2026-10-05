@@ -10,11 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
-// ArtifactMembershipView is one direct external Collection member whose
+// ArtifactMembershipView is one direct external Plugin member whose
 // declared type and name match a selected Artifact. It remains visible when
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
-	Collection         artifactModel.ArtifactRef    `json:"collection"`
+	Plugin             artifactModel.ArtifactRef    `json:"plugin"`
 	CollectionName     spec.LogicalName             `json:"collectionName"`
 	CollectionRevision uint64                       `json:"collectionRevision"`
 	MemberIndex        int                          `json:"memberIndex"`
@@ -32,7 +32,7 @@ func (a *API) ListMembershipsForArtifact(
 ) ([]ArtifactMembershipView, error) {
 	if a == nil || a.resolver == nil {
 		return nil, fmt.Errorf(
-			"%w: Collection resolver is unavailable",
+			"%w: Plugin resolver is unavailable",
 			spec.ErrUnsupported,
 		)
 	}
@@ -46,7 +46,7 @@ func (a *API) ListMembershipsForArtifact(
 	}
 	if a.domain != nil && !a.domain.allows(targetType) {
 		return nil, fmt.Errorf(
-			"%w: Artifact type %q is not supported by the %s Collection domain",
+			"%w: Artifact type %q is not supported by the %s Plugin domain",
 			spec.ErrUnsupported,
 			targetType,
 			a.domain.Name,
@@ -84,7 +84,7 @@ func (a *API) ListMembershipsForArtifact(
 			)
 		}
 
-		for index, relationship := range plugin.MemberResults {
+		for index, relationship := range plugin.Relationships {
 			header := relationship.Declared.Header()
 			if header.Type != targetType ||
 				header.Name != string(target.LogicalName) {
@@ -105,7 +105,7 @@ func (a *API) ListMembershipsForArtifact(
 			}
 
 			view := ArtifactMembershipView{
-				Collection:         collectionValue.Ref,
+				Plugin:             collectionValue.Ref,
 				CollectionName:     collectionValue.Name,
 				CollectionRevision: collectionValue.Revision,
 				MemberIndex:        index,

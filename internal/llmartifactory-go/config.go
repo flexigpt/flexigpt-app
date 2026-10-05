@@ -4,7 +4,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 // Config contains separately named LLM-domain registrations. It deliberately
@@ -17,5 +20,11 @@ type Config struct {
 
 	SchemaCodecs     []schema.Codec
 	Decoders         []ingest.Decoder
+	Interpretations  *interpretation.Registry
 	LocatorFactories []locator.Factory
+
+	Scope composition.ScopeBinding
+
+	DirectCapabilities           []composition.DirectCapabilityProvider
+	ArtifactCapabilityProjectors map[declaration.Type]composition.ArtifactCapabilityProjector
 }

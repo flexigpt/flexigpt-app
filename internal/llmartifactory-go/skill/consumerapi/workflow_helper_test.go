@@ -12,12 +12,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/canonical"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
-	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/providerapi"
 )
 
 type skillWorkflowFixture struct {
@@ -31,24 +31,24 @@ type skillWorkflowFixture struct {
 func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	t.Helper()
 
-	canonicalRegistration, err := canonical.NewRegistration()
+	registry, err := registration.NewLLMInterpretationRegistry()
 	requireNoError(t, err)
-
-	skillRegistration, err := skillProviderAPI.NewRegistration()
+	schemaCodecs, err := registration.LLMDeclarationSchemaCodecs()
 	requireNoError(t, err)
-
-	locatorRegistry, err := locator.NewRegistry(
-		canonicalRegistration.LocatorFactories()...,
+	canonicalDecoders, err := registration.LLMCanonicalDeclarationDecoders(
+		registry,
 	)
 	requireNoError(t, err)
-
-	schemaCodecs := canonicalRegistration.SchemaCodecs()
-
-	decoders := canonicalRegistration.Decoders()
-	decoders = append(
-		decoders,
-		skillRegistration.Decoders()...,
+	sourceFormatDecoders, err := registration.LLMSourceFormatDecoders(
+		registry,
 	)
+	requireNoError(t, err)
+	locatorFactories, err := registration.LLMPathLocatorFactories(
+		registry,
+	)
+	requireNoError(t, err)
+	//nolint:gocritic // Ok assign.
+	decoders := append(canonicalDecoders, sourceFormatDecoders...)
 
 	store, err := local.Open(
 		t.Context(),
@@ -68,6 +68,23 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		}
 	})
 
+	llm, err := llmartifactory.Open(t.Context(), llmartifactory.Config{
+		Store:            store,
+		SchemaCodecs:     schemaCodecs,
+		Decoders:         decoders,
+		Interpretations:  registry,
+		LocatorFactories: locatorFactories,
+		Scope: composition.ScopeBinding{
+			BuiltinRoot: topology.BuiltinRootID(),
+		},
+	})
+	requireNoError(t, err)
+	t.Cleanup(func() {
+		if err := llm.Close(); err != nil {
+			t.Errorf("close Skill workflow LLM Artifactory: %v", err)
+		}
+	})
+
 	api, err := skillConsumerAPI.New(
 		store.Sources,
 		store.Refresh,
@@ -77,9 +94,7 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		store.Protection,
 		store.Catalog,
 		store.Definitions,
-		skillConsumerAPI.WithLocatorResolvers(
-			locatorRegistry.Factories(),
-		),
+		skillConsumerAPI.WithCompositionResolver(llm.Composition()),
 	)
 	requireNoError(t, err)
 
@@ -115,7 +130,7 @@ func (f *skillWorkflowFixture) bootstrapBuiltins(t *testing.T) {
 
 func (f *skillWorkflowFixture) ensureUserBaseline(
 	t *testing.T,
-) plugin.CollectionView {
+) plugin.PluginView {
 	t.Helper()
 
 	value, err := f.baselineEnsurer.EnsureSkillBaselineCollection(
@@ -129,7 +144,7 @@ func (f *skillWorkflowFixture) ensureUserBaseline(
 func createManagedSkillInCollection(
 	t *testing.T,
 	api *skillConsumerAPI.API,
-	collectionValue plugin.CollectionView,
+	collectionValue plugin.PluginView,
 	name string,
 	description string,
 	body string,
@@ -141,7 +156,7 @@ func createManagedSkillInCollection(
 	result, err := api.CreateManagedSkill(
 		t.Context(),
 		skillConsumerAPI.ManagedSkillCreateRequest{
-			Collection:                 collectionValue.Artifact.Ref(),
+			Plugin:                     collectionValue.Artifact.Ref(),
 			ExpectedCollectionRevision: collectionValue.Artifact.Revision,
 			SkillName:                  name,
 			SKILLMD:                    document,

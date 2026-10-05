@@ -9,7 +9,7 @@ import (
 )
 
 type EnsureMemberForCollectionSourceRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Type             declaration.Type          `json:"type"`
 	Name             spec.LogicalName          `json:"name"`
@@ -26,7 +26,7 @@ func (a *API) EnsureMemberForCollectionSource(
 
 	member, err := a.MemberForCollectionSource(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.Type,
 		request.Name,
 		request.Locator,
@@ -35,7 +35,7 @@ func (a *API) EnsureMemberForCollectionSource(
 		return MemberMutationResult{}, err
 	}
 	return a.EnsureMember(ctx, AddMemberRequest{
-		Collection:       request.Collection,
+		Plugin:           request.Plugin,
 		ExpectedRevision: request.ExpectedRevision,
 		Member:           member,
 	})

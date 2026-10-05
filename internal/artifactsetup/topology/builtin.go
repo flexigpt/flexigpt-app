@@ -336,13 +336,27 @@ func loadBuiltinTopology(
 		)
 	}
 
+	builtinRoot := rootModel.RootDraft{
+		ID:          wire.Builtin.Root.ID,
+		StorageKey:  wire.Builtin.Root.StorageKey,
+		DisplayName: wire.Builtin.Root.DisplayName,
+		Description: wire.Builtin.Root.Description,
+	}
+	if err := validateConfiguredRoot(
+		"built-in Root",
+		builtinRoot,
+	); err != nil {
+		return builtinTopologyConfig{}, err
+	}
+	if !wire.Builtin.Root.Protected {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: built-in Root must be protected",
+			spec.ErrInvalid,
+		)
+	}
+
 	declaration := installModel.Declaration{
-		Root: rootModel.RootDraft{
-			ID:          wire.Builtin.Root.ID,
-			StorageKey:  wire.Builtin.Root.StorageKey,
-			DisplayName: wire.Builtin.Root.DisplayName,
-			Description: wire.Builtin.Root.Description,
-		},
+		Root:    builtinRoot,
 		Sources: make([]sourceModel.Draft, 0, len(wire.Builtin.Sources)),
 	}
 	sourcesByName := make(map[string]sourceModel.Draft, len(wire.Builtin.Sources))
@@ -468,6 +482,18 @@ func loadBuiltinTopology(
 			spec.ErrInvalid,
 		)
 	}
+	if !packageSource.Enabled {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: built-in package Source must be enabled",
+			spec.ErrInvalid,
+		)
+	}
+	if !packageSource.Discovery.Authoritative {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: built-in package Source discovery must be authoritative",
+			spec.ErrInvalid,
+		)
+	}
 
 	embeddedRoots := make(
 		map[string]spec.Locator,
@@ -499,6 +525,22 @@ func loadBuiltinTopology(
 				required,
 			)
 		}
+	}
+	supportedEmbeddedPackages := map[string]struct{}{
+		BuiltinEmbeddedPackageSkills: {},
+		BuiltinEmbeddedPackageAgents: {},
+		BuiltinEmbeddedPackageMCPs:   {},
+		BuiltinEmbeddedPackageTools:  {},
+	}
+	for name := range embeddedRoots {
+		if _, supported := supportedEmbeddedPackages[name]; supported {
+			continue
+		}
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: built-in topology declares unsupported embedded package set %q",
+			spec.ErrInvalid,
+			name,
+		)
 	}
 
 	return builtinTopologyConfig{

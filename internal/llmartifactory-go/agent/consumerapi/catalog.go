@@ -11,9 +11,9 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
 )
 
 func agentBuiltinRootID() rootModel.RootID {
@@ -144,13 +144,9 @@ func projectAgentCapabilityPlan(
 			Code:     occurrence.Code,
 			Message:  occurrence.Message,
 		}
-		if occurrence.Artifact != nil {
-			ref := *occurrence.Artifact
-			projected.Artifact = &ref
-		}
-		if occurrence.Mapped != nil {
-			target := *occurrence.Mapped
-			projected.Mapped = &target
+		if occurrence.Target != nil {
+			target := occurrence.Target.Clone()
+			projected.Target = &target
 		}
 
 		if raw, found := occurrence.Overrides["autoExecute"]; found {
@@ -226,10 +222,10 @@ func (a *API) listCollectionAgentRefs(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]artifactModel.ArtifactRef, error) {
-	if a == nil || a.collections == nil || a.declarationResolver == nil {
+	if a == nil || a.plugins == nil || a.declarationResolver == nil {
 		return nil, spec.ErrClosed
 	}
-	if _, err := a.collections.Read(ctx, ref); err != nil {
+	if _, err := a.plugins.Read(ctx, ref); err != nil {
 		return nil, err
 	}
 
@@ -239,7 +235,7 @@ func (a *API) listCollectionAgentRefs(
 	}
 
 	refs := make(map[artifactModel.ArtifactRef]struct{})
-	for _, relationship := range plugin.MemberResults {
+	for _, relationship := range plugin.Relationships {
 		if relationship.Declared.Header().Type != agentv1.AgentType {
 			continue
 		}

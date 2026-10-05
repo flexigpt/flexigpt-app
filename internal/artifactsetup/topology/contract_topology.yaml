@@ -2,7 +2,7 @@ packageVersions:
   unversioned: "unversioned"
 
 documents:
-  collections:
+  plugins:
     - locator: "plugin.yaml"
       format: "yaml"
       decoderID: "artifact-declaration-yaml"
@@ -114,18 +114,18 @@ documents:
       format: "markdown"
 
 documentUses:
-  collection:
+  plugin:
     documentSets:
-      - "collections"
+      - "plugins"
 
   canonicalYAML:
     documentSets:
-      - "collections"
+      - "plugins"
       - "agents"
 
   canonicalJSON:
     documentSets:
-      - "collections"
+      - "plugins"
       - "agents"
       - "tools"
 
@@ -165,19 +165,19 @@ documentUses:
       - "tools"
     defaultLocator: "tool.yaml"
 
-  toolCollection:
+  toolPlugin:
     documentSets:
-      - "collections"
+      - "plugins"
     defaultLocator: "plugin.yaml"
 
-  managedCollection:
+  managedPlugin:
     documentSets:
-      - "collections"
+      - "plugins"
     defaultLocator: "plugin.json"
 
-  agentManagedCollection:
+  agentManagedPlugin:
     documentSets:
-      - "collections"
+      - "plugins"
     defaultLocator: "plugin.yaml"
 
   managedAgent:
@@ -258,7 +258,7 @@ discovery:
       - "**/*.yaml"
       - "**/*.yml"
     documentSets:
-      - "collections"
+      - "plugins"
       - "mcpConfigs"
       - "mcpPolicies"
 
@@ -273,7 +273,7 @@ discovery:
       - "**/*.agent.md"
       - "**/docs/**/*.md"
     documentSets:
-      - "collections"
+      - "plugins"
       - "mcpConfigs"
       - "agents"
       - "skillPackages"
@@ -296,7 +296,7 @@ discovery:
       - "**/*.yaml"
       - "**/*.yml"
     documentSets:
-      - "collections"
+      - "plugins"
       - "mcpConfigs"
       - "agents"
       - "skillPackages"
@@ -317,31 +317,3 @@ discoveryUses:
   selector:
     profiles:
       - "selector"
-
-resolver:
-  types:
-    - type: "text"
-    - type: "model.provider"
-    - type: "model"
-      supportsSelectors: true
-      supportsMappedFallbackTargets: true
-    - type: "tool"
-      supportsSelectors: true
-      supportsMappedFallbackTargets: true
-    - type: "skill"
-      supportsSelectors: true
-    - type: "mcp"
-      supportsSelectors: true
-    - type: "mcp.policy"
-      supportsSelectors: true
-    - type: "plugin"
-      supportsSelectors: true
-    - type: "agent"
-      supportsSelectors: true
-    - type: "team"
-      supportsSelectors: true
-    - type: "loop"
-      supportsSelectors: true
-    - type: "workflow"
-      supportsSelectors: true
-    - type: "workspace"

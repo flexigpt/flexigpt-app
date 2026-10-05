@@ -154,11 +154,11 @@ func (w *MCPStoreWrapper) GetMCPPolicy(
 
 func (w *MCPStoreWrapper) CreateMCPCollection(
 	request plugin.CreateRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withRecoveryResp(
-		func() (plugin.CollectionView, error) {
+		func() (plugin.PluginView, error) {
 			if w == nil || w.api == nil {
-				return plugin.CollectionView{}, spec.ErrClosed
+				return plugin.PluginView{}, spec.ErrClosed
 			}
 
 			// A blank RootID means "create in the retained user Root". The
@@ -166,13 +166,13 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {
-					return plugin.CollectionView{}, spec.ErrClosed
+					return plugin.PluginView{}, spec.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
 					topology.UserRootDraft(),
 				); err != nil {
-					return plugin.CollectionView{}, err
+					return plugin.PluginView{}, err
 				}
 				request.RootID = topology.UserRootID()
 			}
@@ -187,8 +187,8 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 
 func (w *MCPStoreWrapper) GetMCPCollection(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 		return api.GetMCPCollection(context.Background(), ref)
 	})
 }
@@ -197,10 +197,10 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withMCPStore(
 		w,
-		func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 			return api.SetMCPCollectionEnabled(
 				context.Background(),
 				ref,
@@ -235,32 +235,32 @@ func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
 
 func (w *MCPStoreWrapper) UpdateMCPCollection(
 	request plugin.UpdateRequest,
-) (plugin.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 		return api.UpdateMCPCollection(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPCollectionMember(
 	request plugin.AddMemberRequest,
-) (plugin.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 		return api.AddMCPCollectionMember(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPServerToCollection(
 	request plugin.AddArtifactMemberRequest,
-) (plugin.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 		return api.AddMCPServerToCollection(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) RemoveMCPCollectionMember(
 	request plugin.RemoveMemberRequest,
-) (plugin.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
 		return api.RemoveMCPCollectionMember(context.Background(), request)
 	})
 }

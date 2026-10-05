@@ -21,8 +21,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
@@ -59,9 +57,7 @@ func initMCPWrappers(
 	secretRuntime secret.RuntimeAPI,
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
-	locatorResolvers []locator.Factory,
-	fallbackProviders map[declaration.Type]composition.FallbackProvider,
-	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
+	resolver *composition.Resolver,
 ) (installFlow.HydrationInstaller, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
@@ -121,9 +117,7 @@ func initMCPWrappers(
 		overlays,
 		secrets,
 		mcpPolicy.Baseline(),
-		mcpConsumerAPI.WithLocatorResolvers(locatorResolvers),
-		mcpConsumerAPI.WithFallbackProviders(fallbackProviders),
-		mcpConsumerAPI.WithTargetMappers(targetMappers),
+		mcpConsumerAPI.WithCompositionResolver(resolver),
 	)
 	if err != nil {
 		return nil, err

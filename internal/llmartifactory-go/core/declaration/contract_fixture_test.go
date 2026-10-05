@@ -11,22 +11,21 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/codec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/skillv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/teamv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/workflowv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
+	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
+	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
+	teamv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/team/contract/v1"
+	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
+	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
+	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -37,6 +36,7 @@ var contractFixtures embed.FS
 
 func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 	schemas := schemasByType(t)
+	registry := declarationTestRegistry(t)
 	entries, err := fs.ReadDir(contractFixtures, contractFixtureDirectory)
 	if err != nil {
 		t.Fatalf("read contract fixtures err: %v", err)
@@ -128,10 +128,10 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 				)
 			}
 
-			if err := decoder.ValidateEntryTree(entry); err != nil {
+			if err := registry.ValidateTree(entry); err != nil {
 				t.Fatalf("validate complete declaration tree err: %v", err)
 			}
-			named, err := declaration.WalkNamedEntries(entry)
+			named, err := registry.WalkNamedEntries(entry)
 			if err != nil {
 				t.Fatalf("walk named declarations: %v", err)
 			}
@@ -149,7 +149,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 				}
 
 				if index == 0 {
-					definitionValue, err := decoder.DefinitionForEntry(value.Entry)
+					definitionValue, err := registry.DefinitionForEntry(value.Entry)
 					if err != nil {
 						t.Fatalf("create root Definition: %v", err)
 					}
@@ -159,7 +159,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 					continue
 				}
 
-				definitionValue, err := decoder.DefinitionForNamedEntry(value)
+				definitionValue, err := registry.DefinitionForEntry(value.Entry)
 				if err != nil {
 					t.Fatalf(
 						"create contained Definition %q: %v",
@@ -200,15 +200,46 @@ func TestMCPRejectsRetiredSSETransport(t *testing.T) {
 func schemasByType(t *testing.T) map[declaration.Type][]byte {
 	t.Helper()
 
-	output := make(map[declaration.Type][]byte, len(declaration.Types()))
-	for _, value := range codec.AllSchemaCodecs() {
-		declarationType := declaration.Type(value.Key().Kind)
-		if _, duplicate := output[declarationType]; duplicate {
-			t.Fatalf("duplicate schema codec for type %q", declarationType)
-		}
-		output[declarationType] = value.JSONSchema()
+	output := map[declaration.Type][]byte{
+		textv1.TextType:                   textv1.TextJSONSchema(),
+		modelv1.ModelType:                 modelv1.ModelJSONSchema(),
+		modelproviderv1.ModelProviderType: modelproviderv1.ModelProviderJSONSchema(),
+		toolv1.ToolType:                   toolv1.ToolJSONSchema(),
+		skillv1.SkillType:                 skillv1.SkillJSONSchema(),
+		mcpv1.MCPType:                     mcpv1.MCPJSONSchema(),
+		mcppolicyv1.MCPPolicyType:         mcppolicyv1.MCPPolicyJSONSchema(),
+		pluginv1.PluginType:               pluginv1.PluginJSONSchema(),
+		agentv1.AgentType:                 agentv1.AgentJSONSchema(),
+		teamv1.TeamType:                   teamv1.TeamJSONSchema(),
+		loopv1.LoopType:                   loopv1.LoopJSONSchema(),
+		workflowv1.WorkflowType:           workflowv1.WorkflowJSONSchema(),
+		workspacev1.WorkspaceType:         workspacev1.WorkspaceJSONSchema(),
 	}
 	return output
+}
+
+func declarationTestRegistry(t *testing.T) *interpretation.Registry {
+	t.Helper()
+
+	registry, err := interpretation.NewRegistry(
+		textv1.Interpretation(),
+		modelv1.Interpretation(),
+		modelproviderv1.Interpretation(),
+		toolv1.Interpretation(),
+		skillv1.Interpretation(),
+		mcpv1.Interpretation(),
+		mcppolicyv1.Interpretation(),
+		pluginv1.Interpretation(),
+		agentv1.Interpretation(),
+		teamv1.Interpretation(),
+		loopv1.Interpretation(),
+		workflowv1.Interpretation(),
+		workspacev1.Interpretation(),
+	)
+	if err != nil {
+		t.Fatalf("create declaration interpretation registry: %v", err)
+	}
+	return registry
 }
 
 func canonicalConcreteDocument(

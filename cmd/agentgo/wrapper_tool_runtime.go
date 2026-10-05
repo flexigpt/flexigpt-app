@@ -20,9 +20,9 @@ type ToolRuntimeInvokeRequest struct {
 }
 
 type ToolAggregateInvokeRequest struct {
-	Target    composition.MappedTarget `json:"target"`
-	Args      jsonutil.JSONRawString   `json:"args,omitempty"`
-	TimeoutMS int                      `json:"timeoutMS,omitempty"`
+	Target    composition.CapabilityTarget `json:"target"`
+	Args      jsonutil.JSONRawString       `json:"args,omitempty"`
+	TimeoutMS int                          `json:"timeoutMS,omitempty"`
 }
 
 func toolArgumentsFromBridge(

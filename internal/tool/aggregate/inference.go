@@ -12,15 +12,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
 type ToolSelection struct {
-	ChoiceID              string                   `json:"choiceID"`
-	Target                composition.MappedTarget `json:"target"`
-	AutoExecute           bool                     `json:"autoExecute"`
-	UserArgSchemaInstance jsonutil.JSONRawString   `json:"userArgSchemaInstance,omitempty"`
+	ChoiceID              string                       `json:"choiceID"`
+	Target                composition.CapabilityTarget `json:"target"`
+	AutoExecute           bool                         `json:"autoExecute"`
+	UserArgSchemaInstance jsonutil.JSONRawString       `json:"userArgSchemaInstance,omitempty"`
 }
 
 func (s ToolSelection) Validate() error {
@@ -42,7 +42,7 @@ func (s *Service) HydrateInferenceToolChoice(
 		return inferenceSpec.ToolChoice{}, err
 	}
 
-	resolved, err := s.ResolveMappedTool(ctx, selection.Target)
+	resolved, err := s.ResolveToolTarget(ctx, selection.Target)
 	if err != nil {
 		return inferenceSpec.ToolChoice{}, err
 	}

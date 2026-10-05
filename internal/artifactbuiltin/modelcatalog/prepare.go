@@ -10,10 +10,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 const generatedCatalogName = "models"
@@ -35,9 +35,16 @@ type PreparedPackage struct {
 func PrepareProviderPackage(
 	ctx context.Context,
 	document modelproviderv1.ProviderDocument,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := requirePreparationContext(ctx); err != nil {
 		return PreparedPackage{}, err
+	}
+	if registry == nil {
+		return PreparedPackage{}, fmt.Errorf(
+			"%w: Model package interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
 	if err := document.Validate(); err != nil {
 		return PreparedPackage{}, err
@@ -51,7 +58,7 @@ func PrepareProviderPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	definitionValue, err := decoder.DefinitionForEntry(entry)
+	definitionValue, err := registry.DefinitionForEntry(entry)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -85,9 +92,16 @@ func PrepareProviderPackage(
 func PrepareModelPackage(
 	ctx context.Context,
 	document modelv1.ModelDocument,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := requirePreparationContext(ctx); err != nil {
 		return PreparedPackage{}, err
+	}
+	if registry == nil {
+		return PreparedPackage{}, fmt.Errorf(
+			"%w: Model package interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
 	if err := document.Validate(); err != nil {
 		return PreparedPackage{}, err
@@ -101,7 +115,7 @@ func PrepareModelPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	definitionValue, err := decoder.DefinitionForEntry(entry)
+	definitionValue, err := registry.DefinitionForEntry(entry)
 	if err != nil {
 		return PreparedPackage{}, err
 	}

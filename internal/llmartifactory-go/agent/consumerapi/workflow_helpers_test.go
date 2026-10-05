@@ -23,16 +23,14 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/canonical"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/markdown"
-	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/providerapi"
-	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/providerapi"
 )
 
 const workflowDependencySourceID sourceModel.SourceID = "0192c4c0-00f0-7000-8000-000000000001"
@@ -56,53 +54,66 @@ type workflowDependency struct {
 	Insert declaration.InsertTarget
 }
 
-// workflowMappedFallback models the application-composition fallback route
-// used by Tool and Model references. Built-in Agent packages are allowed to
-// depend on these mapped runtime targets without requiring source-backed
-// Tool or Model Artifacts.
-type workflowMappedFallback struct {
-	declarationType declaration.Type
+// workflowDirectCapabilityProvider models an application-supplied capability
+// for Model and Tool references. It deliberately has no fabricated Artifact,
+// Source, Definition, or local-state identity.
+type workflowDirectCapabilityProvider struct{}
+
+func (workflowDirectCapabilityProvider) ProviderIdentity() string {
+	return "workflowtest"
 }
 
-func (f workflowMappedFallback) ResolveFallback(
+func (p workflowDirectCapabilityProvider) ResolveDirectCapability(
 	ctx context.Context,
-	request composition.FallbackRequest,
-) (composition.FallbackTarget, bool, error) {
+	request composition.DirectCapabilityRequest,
+) (composition.CapabilityTarget, bool, error) {
 	if ctx == nil {
-		return composition.FallbackTarget{}, false, fmt.Errorf(
-			"%w: workflow fallback context is nil",
+		return composition.CapabilityTarget{}, false, fmt.Errorf(
+			"%w: workflow direct capability context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return composition.FallbackTarget{}, false, err
+		return composition.CapabilityTarget{}, false, err
 	}
-	if request.Type != f.declarationType {
-		return composition.FallbackTarget{}, false, nil
+	if err := request.RootID.Validate(); err != nil {
+		return composition.CapabilityTarget{}, false, err
 	}
 	if err := request.Name.Validate(); err != nil {
-		return composition.FallbackTarget{}, false, err
+		return composition.CapabilityTarget{}, false, err
+	}
+	if err := request.Scope.Validate(); err != nil {
+		return composition.CapabilityTarget{}, false, err
 	}
 
-	return composition.FallbackTarget{
-		Mapped: &composition.MappedTarget{
-			Provider:   "workflow-test",
-			Identifier: "v1." + string(request.Name),
-			Type:       request.Type,
-			Name:       request.Name,
-			Builtin:    true,
-		},
-	}, true, nil
+	switch request.Type {
+	case declaration.TypeModel, declaration.TypeTool:
+	default:
+		return composition.CapabilityTarget{}, false, nil
+	}
+
+	target := composition.CapabilityTarget{
+		Form:             composition.TargetFormDirect,
+		Type:             request.Type,
+		Name:             request.Name,
+		Provenance:       composition.TargetProvenanceDirectCapability,
+		ProviderIdentity: p.ProviderIdentity(),
+		ProviderLocalID:  "v1." + string(request.Name),
+		Evidence: cryptoutil.DigestBytes([]byte(
+			string(request.RootID) + "\x00" +
+				string(request.Type) + "\x00" +
+				string(request.Name),
+		)),
+	}
+	if err := target.Validate(); err != nil {
+		return composition.CapabilityTarget{}, false, err
+	}
+	return target, true, nil
 }
 
-func workflowFallbackProviders() map[declaration.Type]composition.FallbackProvider {
-	return map[declaration.Type]composition.FallbackProvider{
-		declaration.TypeModel: workflowMappedFallback{
-			declarationType: declaration.TypeModel,
-		},
-		declaration.TypeTool: workflowMappedFallback{
-			declarationType: declaration.TypeTool,
-		},
+func workflowDirectCapabilities() []composition.DirectCapabilityProvider {
+	return []composition.DirectCapabilityProvider{
+		workflowDirectCapabilityProvider{},
 	}
 }
 
@@ -114,38 +125,24 @@ func newWorkflowHarness(
 	ctx := t.Context()
 	requireNoError(t, topology.ValidateApplicationTopology())
 
-	canonicalRegistration, err := canonical.NewRegistration()
+	registry, err := registration.NewLLMInterpretationRegistry()
 	requireNoError(t, err)
-
-	markdownRegistration, err := markdown.NewRegistration()
+	schemaCodecs, err := registration.LLMDeclarationSchemaCodecs()
 	requireNoError(t, err)
-
-	skillRegistration, err := skillProviderAPI.NewRegistration()
-	requireNoError(t, err)
-
-	mcpRegistration, err := mcpProviderAPI.NewRegistration()
-	requireNoError(t, err)
-
-	locatorRegistry, err := locator.NewRegistry(
-		canonicalRegistration.LocatorFactories()...,
+	canonicalDecoders, err := registration.LLMCanonicalDeclarationDecoders(
+		registry,
 	)
 	requireNoError(t, err)
-
-	schemaCodecs := canonicalRegistration.SchemaCodecs()
-
-	decoders := canonicalRegistration.Decoders()
-	decoders = append(
-		decoders,
-		markdownRegistration.Decoders()...,
+	sourceFormatDecoders, err := registration.LLMSourceFormatDecoders(
+		registry,
 	)
-	decoders = append(
-		decoders,
-		skillRegistration.Decoders()...,
+	requireNoError(t, err)
+	locatorFactories, err := registration.LLMPathLocatorFactories(
+		registry,
 	)
-	decoders = append(
-		decoders,
-		mcpRegistration.Decoders()...,
-	)
+	requireNoError(t, err)
+	//nolint:gocritic // Ok assign.
+	decoders := append(canonicalDecoders, sourceFormatDecoders...)
 	workspaceFS, err := artifactbuiltin.EmbeddedWorkspacePackages()
 	requireNoError(t, err)
 
@@ -170,6 +167,24 @@ func newWorkflowHarness(
 		}
 	})
 
+	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
+		Store:            store,
+		SchemaCodecs:     schemaCodecs,
+		Decoders:         decoders,
+		Interpretations:  registry,
+		LocatorFactories: locatorFactories,
+		Scope: composition.ScopeBinding{
+			BuiltinRoot: topology.BuiltinRootID(),
+		},
+		DirectCapabilities: workflowDirectCapabilities(),
+	})
+	requireNoError(t, err)
+	t.Cleanup(func() {
+		if closeErr := llm.Close(); closeErr != nil {
+			t.Errorf("close workflow LLM Artifactory: %v", closeErr)
+		}
+	})
+
 	api, err := agentConsumerAPI.New(
 		store.Sources,
 		store.Refresh,
@@ -180,12 +195,8 @@ func newWorkflowHarness(
 		store.Protection,
 		store.Definitions,
 		agentConsumerAPI.WithRoots(store.Roots),
-		agentConsumerAPI.WithFallbackProviders(
-			workflowFallbackProviders(),
-		),
-		agentConsumerAPI.WithLocatorResolvers(
-			locatorRegistry.Factories(),
-		),
+		agentConsumerAPI.WithCompositionResolver(llm.Composition()),
+		agentConsumerAPI.WithDeclarationInterpretations(registry),
 	)
 	requireNoError(t, err)
 

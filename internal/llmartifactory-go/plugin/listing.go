@@ -14,22 +14,22 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
 
-// ListRequest is the public Collection listing request.
+// ListRequest is the public Plugin listing request.
 //
 // It contains only domain-owned listing choices. Generic Artifact Store query
-// details remain inside the Collection API.
+// details remain inside the Plugin API.
 type ListRequest struct {
 	RootID rootModel.RootID `json:"rootID"`
 }
 
-// ListItem is a lightweight Collection projection.
+// ListItem is a lightweight Plugin projection.
 //
 // Members are not returned in ordinary listings. The member count is enough
 // for management pages to determine whether deletion can be offered. Read
-// returns CollectionView when a caller explicitly selects one Collection.
+// returns PluginView when a caller explicitly selects one Plugin.
 type ListItem struct {
 	Ref      artifactModel.ArtifactRef `json:"ref"`
 	SourceID sourceModel.SourceID      `json:"sourceID"`
@@ -69,7 +69,7 @@ func (a *API) listCollections(
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
-			"%w: Collection list context is nil",
+			"%w: Plugin list context is nil",
 			spec.ErrInvalid,
 		)
 	}
@@ -209,7 +209,7 @@ func (a *API) collectionDocuments(
 	}
 	if len(values) != len(keys) {
 		return nil, fmt.Errorf(
-			"%w: Collection Definition batch is incomplete",
+			"%w: Plugin Definition batch is incomplete",
 			spec.ErrDefinitionNotFound,
 		)
 	}
@@ -218,7 +218,7 @@ func (a *API) collectionDocuments(
 	for index, value := range values {
 		if value.Digest != keys[index].Digest {
 			return nil, fmt.Errorf(
-				"%w: Collection Definition batch returned another digest",
+				"%w: Plugin Definition batch returned another digest",
 				spec.ErrDigestMismatch,
 			)
 		}
@@ -233,7 +233,7 @@ func (a *API) collectionProjectionFor(
 ) (collectionProjection, error) {
 	if entry.Definition == nil {
 		return collectionProjection{}, fmt.Errorf(
-			"%w: Collection Definition is unavailable",
+			"%w: Plugin Definition is unavailable",
 			spec.ErrDefinitionNotFound,
 		)
 	}
@@ -253,7 +253,7 @@ func (a *API) collectionProjectionFor(
 	}
 	if loaded == nil {
 		return collectionProjection{}, fmt.Errorf(
-			"%w: Collection listing requires an admitted Definition document",
+			"%w: Plugin listing requires an admitted Definition document",
 			spec.ErrDefinitionNotFound,
 		)
 	}
@@ -268,7 +268,7 @@ func (a *API) collectionProjectionFor(
 			}
 			if document.Name != string(entry.LogicalName) {
 				return collectionProjection{}, fmt.Errorf(
-					"%w: Collection Definition identity differs from catalog identity",
+					"%w: Plugin Definition identity differs from catalog identity",
 					spec.ErrDigestMismatch,
 				)
 			}
@@ -367,7 +367,7 @@ func (a *API) validateEditableProjection(
 	for _, member := range projection.members {
 		if member.Form != declaration.MemberNamed {
 			return fmt.Errorf(
-				"%w: editable Collection has a non-named member",
+				"%w: editable Plugin has a non-named member",
 				spec.ErrUnsupported,
 			)
 		}
@@ -375,7 +375,7 @@ func (a *API) validateEditableProjection(
 			(!a.domain.allows(member.Type) ||
 				!a.domain.allowsMemberForm(member.Form)) {
 			return fmt.Errorf(
-				"%w: Collection member is outside the domain policy",
+				"%w: Plugin member is outside the domain policy",
 				spec.ErrUnsupported,
 			)
 		}

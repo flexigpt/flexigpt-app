@@ -7,8 +7,6 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 )
@@ -148,18 +146,6 @@ func (w *ModelAggregateWrapper) setProviderRuntimePublisher(
 		return spec.ErrClosed
 	}
 	return w.service.SetProviderRuntimePublisher(publisher)
-}
-
-func (w *ModelAggregateWrapper) targetMappers() (
-	map[declaration.Type]composition.ArtifactTargetMapper,
-	error,
-) {
-	if w == nil || w.service == nil {
-		return nil, spec.ErrClosed
-	}
-	return map[declaration.Type]composition.ArtifactTargetMapper{
-		declaration.TypeModel: w.service,
-	}, nil
 }
 
 // initModelProviderRuntime restores the shared inference registry at startup.

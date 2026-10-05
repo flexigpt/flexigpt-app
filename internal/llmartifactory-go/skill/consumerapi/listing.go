@@ -83,7 +83,7 @@ func skillListItem(
 	managed := false
 	if entry.State == artifactModel.StateAvailable &&
 		entry.Source.Kind == managedfs.Kind &&
-		entry.Source.StorageKey == plugin.SkillManagedSourceStorageKey &&
+		entry.Source.StorageKey == plugin.SkillManagedPluginSourceStorageKey &&
 		entry.Binding.SubresourceLocator == "" {
 		_, err := skillDomain.ManagedPackageAddressFromSkillLocator(
 			entry.Binding.Locator,

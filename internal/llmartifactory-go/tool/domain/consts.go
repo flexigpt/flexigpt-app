@@ -5,7 +5,7 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
 const (
@@ -28,6 +28,6 @@ func ToolDocumentFile() spec.Locator {
 
 func ToolCollectionDocumentFile() spec.Locator {
 	return topology.MustDefaultDocumentFile(
-		topology.DocumentUseToolCollection,
+		topology.DocumentUseToolPlugin,
 	)
 }

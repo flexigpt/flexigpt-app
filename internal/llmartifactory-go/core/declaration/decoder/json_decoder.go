@@ -12,8 +12,8 @@ import (
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 const JSONDecoderID spec.DecoderID = "artifact-declaration-json"
@@ -22,9 +22,9 @@ type JSONDecoder struct {
 	core *canonicalDecoder
 }
 
-func NewJSONDecoder() *JSONDecoder {
+func NewJSONDecoder(registry *interpretation.Registry) *JSONDecoder {
 	return &JSONDecoder{
-		core: newCanonicalDecoder(),
+		core: newCanonicalDecoder(registry),
 	}
 }
 
@@ -36,8 +36,11 @@ func (*JSONDecoder) Revision() string {
 	return "artifact-declaration-json/v1"
 }
 
-func (*JSONDecoder) RequiredSchemaKeys() []schemaModel.Key {
-	return newCanonicalDecoder().RequiredSchemaKeys()
+func (d *JSONDecoder) RequiredSchemaKeys() []schemaModel.Key {
+	if d == nil || d.core == nil {
+		return nil
+	}
+	return d.core.RequiredSchemaKeys()
 }
 
 func (d *JSONDecoder) BindExpectedCanonicalizer(
@@ -52,19 +55,15 @@ func (d *JSONDecoder) BindExpectedCanonicalizer(
 	return d.core.BindExpectedCanonicalizer(catalog)
 }
 
-func (*JSONDecoder) Recognize(
+func (d *JSONDecoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	requested := candidate.RequestsDecoder(JSONDecoderID)
-	declared := topology.IsCanonicalJSONDocument(
-		candidate.Locator,
-	)
 	extension := strings.ToLower(
 		path.Ext(string(candidate.Locator)),
 	)
-	if (extension == ".yaml" || extension == ".yml") && !requested &&
-		!declared {
+	if extension != ".json" && !requested {
 		return ingestModel.RecognitionNone
 	}
 
@@ -72,13 +71,14 @@ func (*JSONDecoder) Recognize(
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
-		if requested || declared {
+		if requested {
 			return ingestModel.RecognitionPossible
 		}
 		return ingestModel.RecognitionNone
 	}
-	if !supportsType(header.Type) {
-		if requested || declared {
+	if d == nil || d.core == nil || d.core.interpretations == nil ||
+		!d.core.interpretations.SupportsType(header.Type) {
+		if requested {
 			return ingestModel.RecognitionPossible
 		}
 		return ingestModel.RecognitionNone

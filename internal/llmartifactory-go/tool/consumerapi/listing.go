@@ -13,7 +13,7 @@ import (
 
 func (a *API) listCollectionTools(
 	ctx context.Context,
-	value plugin.CollectionView,
+	value plugin.PluginView,
 ) ([]ToolListItem, error) {
 	allowed := make(map[spec.LogicalName]struct{}, len(value.Members))
 	for _, member := range value.Members {

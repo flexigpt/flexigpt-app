@@ -6,7 +6,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 // Artifactory is the LLM-domain attachment to one assembled generic Artifact
@@ -19,6 +21,8 @@ type Artifactory struct {
 	schemaCodecs     []schema.Codec
 	decoders         []ingest.Decoder
 	locatorFactories []locator.Factory
+	interpretations  *interpretation.Registry
+	composition      *composition.Resolver
 
 	mu     sync.RWMutex
 	closed bool
@@ -65,4 +69,31 @@ func (a *Artifactory) LocatorFactories() []locator.Factory {
 		return nil
 	}
 	return append([]locator.Factory(nil), a.locatorFactories...)
+}
+
+func (a *Artifactory) Interpretations() *interpretation.Registry {
+	if a == nil {
+		return nil
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.closed {
+		return nil
+	}
+	return a.interpretations
+}
+
+// Composition exposes the one LLM composition owner assembled for this
+// Artifactory attachment. Families consume this shared resolver rather than
+// constructing private graph resolvers.
+func (a *Artifactory) Composition() *composition.Resolver {
+	if a == nil {
+		return nil
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.closed {
+		return nil
+	}
+	return a.composition
 }

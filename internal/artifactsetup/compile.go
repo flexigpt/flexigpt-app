@@ -13,8 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/canonical"
 )
 
 // CompileConfig selects one application-owned built-in package set. All
@@ -52,18 +52,48 @@ func CompileBuiltInPackageSet(
 		)
 	}
 
-	registration, err := canonical.NewRegistration()
+	interpretations, err := registration.NewLLMInterpretationRegistry()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
-	codecs := append(
-		registration.SchemaCodecs(),
+	codecs, err := registration.LLMDeclarationSchemaCodecs()
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+	codecs = append(
+		append([]schema.Codec(nil), codecs...),
 		config.AdditionalSchemaCodecs...,
 	)
-	decoders := append(
-		registration.Decoders(),
+	codecs, err = schema.NormalizeCodecs(codecs)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
+	// Compilation intentionally receives only canonical declaration decoders
+	// plus the explicit source-format adapters required by this package set.
+	//
+	// Runtime Store assembly uses the complete application source-format
+	// selection. Reusing that runtime set here would make unrelated decoder
+	// registrations alter compiled package fingerprints.
+	canonicalDecoders, err := registration.LLMCanonicalDeclarationDecoders(
+		interpretations,
+	)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+	decoders := make([]ingest.Decoder, 0, len(canonicalDecoders)+len(config.AdditionalDecoders))
+	decoders = append(
+		decoders,
+		canonicalDecoders...,
+	)
+	decoders = append(
+		decoders,
 		config.AdditionalDecoders...,
 	)
+	decoders, err = ingest.NormalizeDecoders(decoders)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
 
 	store, err := local.Open(ctx, local.Config{
 		BaseDirectory:    filepath.Join(temporaryDirectory, "artifact-store"),

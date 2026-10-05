@@ -12,66 +12,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func (r *Resolver) resolveEntries(
+func (r *Resolver) resolveRelationship(
 	ctx context.Context,
 	state *resolutionState,
 	rootID rootModel.RootID,
-	values []declaration.Entry,
+	fact interpretation.Relationship,
 	from *artifactModel.Artifact,
 	depth int,
-	relationshipPath []string,
-) ([]*ResolvedEntry, []ResolvedRelationship, error) {
-	ordered, err := declaration.SortedMembers(
-		"composition members",
-		values,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	available := make([]*ResolvedEntry, 0, len(ordered))
-	relationships := make([]ResolvedRelationship, 0, len(ordered))
-	for _, member := range ordered {
-		relationship, err := r.resolveMember(
-			ctx,
-			state,
-			rootID,
-			member,
-			from,
-			depth,
-			relationshipPath,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		relationships = append(relationships, relationship)
-		if relationship.Resolved != nil {
-			available = append(available, relationship.Resolved)
-		}
-		if relationship.Selector != nil {
-			for _, match := range relationship.Selector.Matches {
-				if match.Resolved != nil {
-					available = append(available, match.Resolved)
-				}
-			}
-		}
-	}
-	return available, relationships, nil
-}
-
-func (r *Resolver) resolveMember(
-	ctx context.Context,
-	state *resolutionState,
-	rootID rootModel.RootID,
-	member declaration.Entry,
-	from *artifactModel.Artifact,
-	depth int,
-	relationshipPath []string,
 ) (ResolvedRelationship, error) {
-	var err error
+	member := fact.Declared.Clone()
 	form, err := member.MemberForm()
 	if err != nil {
 		return ResolvedRelationship{}, err
@@ -84,7 +36,8 @@ func (r *Resolver) resolveMember(
 	relationship := ResolvedRelationship{
 		Declared:  member.Clone(),
 		Form:      form,
-		Required:  true,
+		Path:      append([]string(nil), fact.Path...),
+		Required:  fact.Required,
 		Scope:     relationshipFields.Scope,
 		Overrides: declaration.CloneRawMessageMap(relationshipFields.Overrides),
 		Use:       declaration.CloneRawMessageMap(relationshipFields.Use),
@@ -93,23 +46,23 @@ func (r *Resolver) resolveMember(
 	if member.Header().Type == declaration.TypeWorkspace {
 		relationship.Status = ResolutionUnavailable
 		relationship.Issue = &ResolutionIssue{
-			Code:    "artifactModel.workspace-nested",
+			Code:    "artifact.reference.workspace-nested",
 			Message: "Workspace cannot be resolved as a nested relationship",
 		}
 		return relationship, nil
 	}
 
 	var resolved *ResolvedEntry
+	var errNew error
 	switch form {
 	case declaration.MemberNamed:
 		header := member.Header()
-		var expectedVersion spec.LogicalVersion
-		expectedVersion, err = memberTextLogicalVersion(member)
+		expectedVersion, err := memberTextLogicalVersion(member)
 		if err != nil {
 			return ResolvedRelationship{}, err
 		}
 		if header.Locator != nil {
-			resolved, err = r.resolveLocatedMember(
+			resolved, errNew = r.resolveLocatedMember(
 				ctx,
 				state,
 				rootID,
@@ -119,7 +72,7 @@ func (r *Resolver) resolveMember(
 				depth,
 			)
 		} else {
-			resolved, err = r.resolveNamedMember(
+			resolved, errNew = r.resolveNamedMember(
 				ctx,
 				state,
 				rootID,
@@ -133,13 +86,12 @@ func (r *Resolver) resolveMember(
 		}
 
 	case declaration.MemberContained:
-		resolved, err = r.resolveContainedMember(
+		resolved, errNew = r.resolveContainedMember(
 			ctx,
 			state,
 			rootID,
-			member,
+			fact,
 			from,
-			relationshipPath,
 			depth,
 		)
 
@@ -173,15 +125,15 @@ func (r *Resolver) resolveMember(
 		)
 	}
 
-	if err == nil {
+	if errNew == nil {
 		relationship.Status = ResolutionAvailable
 		relationship.Resolved = resolved
 		return relationship, nil
 	}
 
-	status, issue, partial := resolutionFailure(err)
+	status, issue, partial := resolutionFailure(errNew)
 	if !partial {
-		return ResolvedRelationship{}, err
+		return ResolvedRelationship{}, errNew
 	}
 	relationship.Status = status
 	relationship.Issue = &issue
@@ -212,6 +164,7 @@ func (r *Resolver) resolveNamedMember(
 			depth,
 		)
 	}
+
 	if scope != declaration.LookupScopeBuiltin {
 		value, found, err := r.resolveInRoot(
 			ctx,
@@ -230,12 +183,13 @@ func (r *Resolver) resolveNamedMember(
 		}
 	}
 
-	if r.builtinRoot != "" &&
-		(scope == declaration.LookupScopeBuiltin || r.builtinRoot != rootID) {
+	if r.scope.BuiltinRoot != "" &&
+		(scope == declaration.LookupScopeBuiltin ||
+			r.scope.BuiltinRoot != rootID) {
 		value, found, err := r.resolveInRoot(
 			ctx,
 			state,
-			r.builtinRoot,
+			r.scope.BuiltinRoot,
 			declarationType,
 			name,
 			expectedVersion,
@@ -249,16 +203,13 @@ func (r *Resolver) resolveNamedMember(
 		}
 	}
 
-	return r.resolveFallback(
+	return r.resolveDirectCapability(
 		ctx,
-		state,
 		rootID,
 		declarationType,
 		name,
-		expectedVersion,
 		scope,
 		from,
-		depth,
 	)
 }
 
@@ -274,11 +225,11 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	depth int,
 ) (*ResolvedEntry, error) {
 	if scope == declaration.LookupScopeBuiltin {
-		if r.builtinRoot != "" {
+		if r.scope.BuiltinRoot != "" {
 			value, found, err := r.resolveInRoot(
 				ctx,
 				state,
-				r.builtinRoot,
+				r.scope.BuiltinRoot,
 				declarationType,
 				name,
 				expectedVersion,
@@ -291,16 +242,13 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 				return value, nil
 			}
 		}
-		return r.resolveFallback(
+		return r.resolveDirectCapability(
 			ctx,
-			state,
 			rootID,
 			declarationType,
 			name,
-			expectedVersion,
 			scope,
 			from,
-			depth,
 		)
 	}
 
@@ -314,19 +262,56 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	if err != nil {
 		return nil, err
 	}
-	compositionRecords := make([]catalogModel.Entry, 0)
+
+	terminals := make(map[artifactModel.ArtifactRef]struct{})
 	for _, record := range records {
-		if record.Binding.SourceID != state.compositionSourceID {
+		if record.Binding.SourceID != state.compositionSourceID ||
+			record.State != artifactModel.StateAvailable {
 			continue
 		}
-		compositionRecords = append(compositionRecords, record)
+		if expectedVersion != "" &&
+			record.LogicalVersion != expectedVersion {
+			continue
+		}
+
+		terminal, err := r.resolveTerminalArtifact(
+			ctx,
+			record.Ref(),
+			declarationType,
+			expectedVersion,
+		)
+		if err != nil {
+			status, _, partial := resolutionFailure(err)
+			if partial && status == ResolutionUnavailable {
+				continue
+			}
+			return nil, err
+		}
+		terminals[terminal] = struct{}{}
 	}
-	if len(compositionRecords) == 0 {
-		if r.builtinRoot != "" && r.builtinRoot != rootID {
+
+	switch len(terminals) {
+	case 1:
+		var terminal artifactModel.ArtifactRef
+		for value := range terminals {
+			terminal = value
+		}
+		return r.resolveArtifact(
+			ctx,
+			state,
+			terminal,
+			declarationType,
+			expectedVersion,
+			depth+1,
+		)
+
+	case 0:
+		if r.scope.BuiltinRoot != "" &&
+			r.scope.BuiltinRoot != rootID {
 			value, found, err := r.resolveInRoot(
 				ctx,
 				state,
-				r.builtinRoot,
+				r.scope.BuiltinRoot,
 				declarationType,
 				name,
 				expectedVersion,
@@ -339,43 +324,18 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 				return value, nil
 			}
 		}
-		return r.resolveFallback(ctx, state, rootID, declarationType, name, expectedVersion, scope, from, depth)
-	}
-	terminals := make(map[artifactModel.ArtifactRef]struct{})
-	for _, record := range compositionRecords {
-		if record.State != artifactModel.StateAvailable {
-			continue
-		}
-		if expectedVersion != "" && record.LogicalVersion != expectedVersion {
-			continue
-		}
-		terminal, err := r.resolveTerminalArtifact(ctx, record.Ref(), declarationType, expectedVersion)
-		if err != nil {
-			status, _, partial := resolutionFailure(err)
-			if partial && status == ResolutionUnavailable {
-				continue
-			}
-			return nil, err
-		}
-		terminals[terminal] = struct{}{}
-	}
-	switch len(terminals) {
-	case 0:
-		return nil, fmt.Errorf(
-			"%w: %s/%s is unavailable in composition source",
-			spec.ErrReferenceUnresolved,
+		return r.resolveDirectCapability(
+			ctx,
+			rootID,
 			declarationType,
 			name,
+			scope,
+			from,
 		)
-	case 1:
-		var terminal artifactModel.ArtifactRef
-		for value := range terminals {
-			terminal = value
-		}
-		return r.resolveArtifact(ctx, state, terminal, declarationType, expectedVersion, depth+1)
+
 	default:
 		return nil, fmt.Errorf(
-			"%w: %s/%s resolves to %d terminal Artifacts",
+			"%w: %s/%s resolves to %d terminal Artifacts in the composition Source",
 			spec.ErrIdentityConflict,
 			declarationType,
 			name,
@@ -433,6 +393,7 @@ func (r *Resolver) resolveInRoot(
 	switch len(terminals) {
 	case 0:
 		return nil, false, nil
+
 	case 1:
 		var terminal artifactModel.ArtifactRef
 		for value := range terminals {
@@ -450,6 +411,7 @@ func (r *Resolver) resolveInRoot(
 			return nil, false, err
 		}
 		return resolved, true, nil
+
 	default:
 		return nil, false, fmt.Errorf(
 			"%w: %s/%s resolves to %d terminal Artifacts in Root %q",
@@ -462,90 +424,57 @@ func (r *Resolver) resolveInRoot(
 	}
 }
 
-func (r *Resolver) resolveFallback(
+func (r *Resolver) resolveDirectCapability(
 	ctx context.Context,
-	state *resolutionState,
 	rootID rootModel.RootID,
 	declarationType declaration.Type,
 	name spec.LogicalName,
-	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifactModel.Artifact,
-	depth int,
 ) (*ResolvedEntry, error) {
-	typeResolver, found := r.registry.Resolver(declarationType)
-	if !found || typeResolver.FallbackProvider() == nil {
-		return nil, fmt.Errorf(
-			"%w: %s/%s",
-			spec.ErrReferenceUnresolved,
-			declarationType,
-			name,
+	for _, provider := range r.directCapabilities {
+		target, found, err := provider.ResolveDirectCapability(
+			ctx,
+			DirectCapabilityRequest{
+				RootID: rootID,
+				Type:   declarationType,
+				Name:   name,
+				Scope:  scope,
+			},
 		)
-	}
-
-	target, found, err := typeResolver.FallbackProvider().ResolveFallback(
-		ctx,
-		FallbackRequest{
-			RootID: rootID,
-			Type:   declarationType,
-			Name:   name,
-			Scope:  scope,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf(
-			"%w: %s/%s",
-			spec.ErrReferenceUnresolved,
-			declarationType,
-			name,
-		)
-	}
-	if err := target.Validate(); err != nil {
-		return nil, err
-	}
-
-	if target.Artifact != nil {
-		if r.builtinRoot == "" || target.Artifact.RootID != r.builtinRoot {
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
+		if err := target.Validate(); err != nil {
+			return nil, err
+		}
+		if target.Form != TargetFormDirect ||
+			target.Type != declarationType ||
+			target.Name != name ||
+			target.Provenance != TargetProvenanceDirectCapability ||
+			target.ProviderIdentity != provider.ProviderIdentity() {
 			return nil, fmt.Errorf(
-				"%w: Artifact-backed fallback must target the protected built-in Root",
+				"%w: direct capability target identity is invalid",
 				spec.ErrInvalid,
 			)
 		}
-		return r.resolveArtifact(
-			ctx,
-			state,
-			*target.Artifact,
-			declarationType,
-			expectedVersion,
-			depth+1,
-		)
+		return &ResolvedEntry{
+			Type:              declarationType,
+			scopeRootID:       rootID,
+			DeclarationOrigin: cloneArtifactPointer(from),
+			Target:            pointerTarget(target),
+		}, nil
 	}
 
-	if !typeResolver.SupportsMappedFallbackTargets() {
-		return nil, fmt.Errorf(
-			"%w: Artifact type %q does not support mapped fallback targets",
-			spec.ErrUnsupported,
-			declarationType,
-		)
-	}
-	if target.Mapped.Type != declarationType ||
-		target.Mapped.Name != name ||
-		!target.Mapped.Builtin {
-		return nil, fmt.Errorf(
-			"%w: fallback target identity is invalid",
-			spec.ErrInvalid,
-		)
-	}
-
-	return &ResolvedEntry{
-		Type:              declarationType,
-		scopeRootID:       rootID,
-		DeclarationOrigin: cloneArtifactPointer(from),
-		Mapped:            cloneMappedTarget(target.Mapped),
-	}, nil
+	return nil, fmt.Errorf(
+		"%w: %s/%s",
+		spec.ErrReferenceUnresolved,
+		declarationType,
+		name,
+	)
 }
 
 func (r *Resolver) resolveLocatedMember(
@@ -563,12 +492,6 @@ func (r *Resolver) resolveLocatedMember(
 			spec.ErrLocatorUnresolved,
 		)
 	}
-	effectiveFrom := from
-	if state.usesCompositionSource(rootID) {
-		copied := from.Clone()
-		copied.Binding.SourceID = state.compositionSourceID
-		effectiveFrom = &copied
-	}
 	if r.locators == nil {
 		return nil, fmt.Errorf(
 			"%w: declaration locator requires a locator resolver",
@@ -577,6 +500,20 @@ func (r *Resolver) resolveLocatedMember(
 	}
 
 	header := member.Header()
+	if header.Locator == nil {
+		return nil, fmt.Errorf(
+			"%w: located member has no locator",
+			spec.ErrInvalid,
+		)
+	}
+
+	effectiveFrom := from
+	if state.usesCompositionSource(rootID) {
+		copyValue := from.Clone()
+		copyValue.Binding.SourceID = state.compositionSourceID
+		effectiveFrom = &copyValue
+	}
+
 	ref, err := r.locators.ResolveArtifactLocator(
 		ctx,
 		LocatorRequest{
@@ -593,10 +530,11 @@ func (r *Resolver) resolveLocatedMember(
 	}
 	if ref.RootID != rootID {
 		return nil, fmt.Errorf(
-			"%w: located member resolver returned another Root",
+			"%w: located member resolver returned an Artifact from another Root",
 			spec.ErrInvalid,
 		)
 	}
+
 	return r.resolveArtifact(
 		ctx,
 		state,
@@ -611,9 +549,8 @@ func (r *Resolver) resolveContainedMember(
 	ctx context.Context,
 	state *resolutionState,
 	rootID rootModel.RootID,
-	member declaration.Entry,
+	fact interpretation.Relationship,
 	from *artifactModel.Artifact,
-	relationshipPath []string,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if from == nil {
@@ -623,28 +560,26 @@ func (r *Resolver) resolveContainedMember(
 		)
 	}
 
-	// Parameters are opaque here. ContainedDeclaration only reconstructs the
-	// declaration document by combining outer identity with parameters.
-	target, err := member.ContainedDeclaration()
+	target, err := fact.Declared.ContainedDeclaration()
 	if err != nil {
 		return nil, err
 	}
-	expectedDefinition, err := decoder.DefinitionForEntry(target)
+	expectedDefinition, err := r.interpretations.DefinitionForEntry(target)
 	if err != nil {
 		return nil, err
 	}
-	expectedVersion, err := memberTextLogicalVersion(member)
+	expectedVersion, err := memberTextLogicalVersion(fact.Declared)
 	if err != nil {
 		return nil, err
 	}
 
-	subresource, err := containedMemberSubresource(
-		*from,
-		member,
-		relationshipPath,
-	)
+	subresource, err := containedMemberSubresource(*from, fact)
 	if err != nil {
 		return nil, err
+	}
+	sourceID := from.Binding.SourceID
+	if state.usesCompositionSource(rootID) {
+		sourceID = state.compositionSourceID
 	}
 
 	header := target.Header()
@@ -662,7 +597,7 @@ func (r *Resolver) resolveContainedMember(
 	matches := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, record := range records {
 		if record.State != artifactModel.StateAvailable ||
-			record.Binding.SourceID != from.Binding.SourceID ||
+			record.Binding.SourceID != sourceID ||
 			record.Binding.Locator != from.Binding.Locator ||
 			record.Binding.SubresourceLocator != subresource {
 			continue
@@ -675,7 +610,6 @@ func (r *Resolver) resolveContainedMember(
 			record.Definition.Digest != expectedDefinition.Digest {
 			continue
 		}
-
 		matches = append(matches, record.Ref())
 	}
 
@@ -709,24 +643,11 @@ func (r *Resolver) resolveContainedMember(
 
 func containedMemberSubresource(
 	parent artifactModel.Artifact,
-	member declaration.Entry,
-	relationshipPath []string,
+	fact interpretation.Relationship,
 ) (spec.SubresourceLocator, error) {
-	header := member.Header()
-	segments := append([]string(nil), relationshipPath...)
-	if !isDirectProgramSlotMember(relationshipPath, header.Type) {
-		segments = append(segments, string(header.Type))
-	}
-	if header.Type == declaration.TypeText {
-		insert, err := member.TextInsert()
-		if err != nil {
-			return "", err
-		}
-		segments = append(segments, string(insert))
-	}
-	segments = append(segments, header.Name)
-
-	value := spec.SubresourceLocator(strings.Join(segments, "/"))
+	value := spec.SubresourceLocator(
+		strings.Join(fact.ContainedPath, "/"),
+	)
 	if parent.Binding.SubresourceLocator != "" {
 		value = parent.Binding.SubresourceLocator + "/" + value
 	}
@@ -734,24 +655,6 @@ func containedMemberSubresource(
 		return "", err
 	}
 	return value, nil
-}
-
-func isDirectProgramSlotMember(
-	relationshipPath []string,
-	declarationType declaration.Type,
-) bool {
-	if len(relationshipPath) == 0 {
-		return false
-	}
-
-	switch relationshipPath[len(relationshipPath)-1] {
-	case loopStr:
-		return declarationType == declaration.TypeLoop
-	case workflowStr:
-		return declarationType == declaration.TypeWorkflow
-	default:
-		return false
-	}
 }
 
 func memberTextLogicalVersion(
@@ -782,28 +685,37 @@ func resolutionFailure(
 		errors.Is(err, context.DeadlineExceeded),
 		errors.Is(err, spec.ErrClosed):
 		return "", ResolutionIssue{}, false
+
 	case errors.Is(err, spec.ErrDigestMismatch),
 		errors.Is(err, spec.ErrInvalid):
-		return ResolutionUnavailable, issue("artifactModel.reference-invalid"), true
+		return ResolutionUnavailable, issue("artifact.reference-invalid"), true
+
 	case errors.Is(err, spec.ErrIdentityConflict):
-		return ResolutionAmbiguous, issue("artifactModel.identity-conflict"), true
+		return ResolutionAmbiguous, issue("artifact.identity-conflict"), true
+
 	case errors.Is(err, spec.ErrLocatorLimitExceeded):
-		return ResolutionUnavailable, issue("artifactModel.locator-limit-exceeded"), true
+		return ResolutionUnavailable, issue("artifact.locator-limit-exceeded"), true
+
 	case errors.Is(err, spec.ErrLocatorUnresolved):
-		return ResolutionUnavailable, issue("artifactModel.locator-unresolved"), true
+		return ResolutionUnavailable, issue("artifact.locator-unresolved"), true
+
 	case errors.Is(err, spec.ErrSourceUnavailable):
-		return ResolutionUnavailable, issue("artifactModel.source-unavailable"), true
+		return ResolutionUnavailable, issue("artifact.source-unavailable"), true
+
 	case errors.Is(err, spec.ErrRefreshRequired):
-		return ResolutionUnavailable, issue("artifactModel.refresh-required"), true
+		return ResolutionUnavailable, issue("artifact.refresh-required"), true
+
 	case errors.Is(err, spec.ErrUnsupported):
-		return ResolutionUnavailable, issue("artifactModel.selector-unavailable"), true
+		return ResolutionUnavailable, issue("artifact.reference-unsupported"), true
+
 	case errors.Is(err, spec.ErrReferenceUnresolved),
 		errors.Is(err, spec.ErrArtifactNotFound),
 		errors.Is(err, spec.ErrRootNotFound),
 		errors.Is(err, spec.ErrDefinitionNotFound),
 		errors.Is(err, spec.ErrSourceNotFound),
 		errors.Is(err, spec.ErrNotFound):
-		return ResolutionUnavailable, issue("artifactModel.reference-unresolved"), true
+		return ResolutionUnavailable, issue("artifact.reference-unresolved"), true
+
 	default:
 		return "", ResolutionIssue{}, false
 	}

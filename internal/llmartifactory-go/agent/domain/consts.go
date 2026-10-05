@@ -6,9 +6,10 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 	AgentSchemaVersion            = agentv1.AgentSchemaVersion
 	AgentManagedSourceDisplayName = "User-managed Agents"
 	AgentBaselineDisplayName      = "Agent Baseline"
-	AgentBaselineDescription      = "Application-provisioned editable Agent Collection."
+	AgentBaselineDescription      = "Application-provisioned editable Agent Plugin."
 	BuiltInInstallerName          = "agent.agent"
 	HydrationSchemaVersion        = "agent.agent.builtin-hydration/v1"
 )
@@ -42,8 +43,8 @@ func IsAgentSchema(value schemaModel.Key) bool {
 		value.SchemaVersion == AgentSchemaVersion
 }
 
-func AgentCollectionDomainPolicy() plugin.DomainPolicy {
-	return plugin.DomainPolicy{
+func AgentPluginProfile() plugin.Profile {
+	return plugin.Profile{
 		Name:                "agent",
 		SourceStorageKey:    AgentManagedSourceStorageKey,
 		SourceDisplayName:   AgentManagedSourceDisplayName,
@@ -51,12 +52,15 @@ func AgentCollectionDomainPolicy() plugin.DomainPolicy {
 		BaselineDisplayName: AgentBaselineDisplayName,
 		BaselineDescription: AgentBaselineDescription,
 		PackageKind:         AgentManagedCollectionPackageKind,
-		DocumentUse:         topology.DocumentUseAgentManagedCollection,
-		AllowedMemberTypes: []declaration.Type{
-			declaration.TypeAgent,
-		},
-		AllowedMemberForms: []declaration.MemberForm{
-			declaration.MemberNamed,
+		DocumentUse:         topology.DocumentUseAgentManagedPlugin,
+		MembershipPolicy: pluginDomain.MembershipPolicy{
+			Mode: pluginDomain.MembershipModeSingleType,
+			AllowedTypes: []declaration.Type{
+				agentv1.AgentType,
+			},
+			AllowedForms: []declaration.MemberForm{
+				declaration.MemberNamed,
+			},
 		},
 	}
 }

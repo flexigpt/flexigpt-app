@@ -33,7 +33,7 @@ type AgentImportDestination struct {
 	RootID          rootModel.RootID          `json:"rootID"`
 	RootDisplayName string                    `json:"rootDisplayName,omitempty"`
 	SourceID        sourceModel.SourceID      `json:"sourceID"`
-	Collection      artifactModel.ArtifactRef `json:"collection"`
+	Plugin          artifactModel.ArtifactRef `json:"plugin"`
 
 	CollectionRevision    uint64           `json:"collectionRevision"`
 	CollectionName        spec.LogicalName `json:"collectionName"`
@@ -47,7 +47,7 @@ type AgentImportPreviewRequest struct {
 	// Its extension selects the backend parser and is never persisted.
 	Path string `json:"path"`
 
-	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 
 	ExpectedSourceDigest cryptoutil.Digest `json:"expectedSourceDigest,omitempty"`
@@ -68,8 +68,7 @@ type AgentImportRelationship struct {
 	Scope  declaration.LookupScope      `json:"scope,omitempty"`
 	Status composition.ResolutionStatus `json:"status"`
 
-	Artifact *artifactModel.ArtifactRef `json:"artifact,omitempty"`
-	Mapped   *composition.MappedTarget  `json:"mapped,omitempty"`
+	Target *composition.CapabilityTarget `json:"target,omitempty"`
 
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
@@ -82,9 +81,9 @@ type AgentImportConflict struct {
 }
 
 type AgentRestoredMembership struct {
-	Collection artifactModel.ArtifactRef `json:"collection"`
-	Path       string                    `json:"path"`
-	Message    string                    `json:"message"`
+	Plugin  artifactModel.ArtifactRef `json:"plugin"`
+	Path    string                    `json:"path"`
+	Message string                    `json:"message"`
 }
 
 type AgentMCPSetupInput struct {
@@ -146,7 +145,7 @@ type AgentImportCommitRequest struct {
 
 type AgentImportCommitResult struct {
 	Agent               AgentView                 `json:"agent"`
-	Collection          plugin.CollectionView     `json:"collection"`
+	Plugin              plugin.PluginView         `json:"plugin"`
 	RestoredMemberships []AgentRestoredMembership `json:"restoredMemberships,omitempty"`
 	MCPSetupDescriptors []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors,omitempty"`
 	PreparedFingerprint cryptoutil.Digest         `json:"preparedFingerprint"`

@@ -10,14 +10,15 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/codec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/textv1"
 )
 
 type resolutionState struct {
-	nodes                int
-	active               map[artifactModel.ArtifactRef]struct{}
-	directRoot           *artifactModel.ArtifactRef
+	nodes int
+
+	active map[artifactModel.ArtifactRef]struct{}
+
+	directRoot *artifactModel.ArtifactRef
+
 	compositionRootID    rootModel.RootID
 	compositionSourceID  sourceModel.SourceID
 	hasCompositionSource bool
@@ -29,7 +30,9 @@ func newResolutionState() resolutionState {
 	}
 }
 
-func (s *resolutionState) usesCompositionSource(rootID rootModel.RootID) bool {
+func (s *resolutionState) usesCompositionSource(
+	rootID rootModel.RootID,
+) bool {
 	return s != nil &&
 		s.hasCompositionSource &&
 		s.compositionRootID == rootID
@@ -129,12 +132,8 @@ func (r *Resolver) ResolveWorkflow(
 func (r *Resolver) ResolveWorkspace(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (*ResolvedWorkspace, error) {
-	value, err := r.ResolveWorkspaceEntry(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return value.Workspace, nil
+) (*ResolvedEntry, error) {
+	return r.resolveTyped(ctx, ref, declaration.TypeWorkspace)
 }
 
 func (r *Resolver) ResolveWorkspaceWithCompositionSource(
@@ -154,35 +153,24 @@ func (r *Resolver) ResolveWorkspaceWithCompositionSource(
 	if err := compositionSourceID.Validate(); err != nil {
 		return nil, err
 	}
+
 	state := newResolutionState()
 	state.compositionRootID = ref.RootID
 	state.compositionSourceID = compositionSourceID
 	state.hasCompositionSource = true
-	return r.resolveArtifact(ctx, &state, ref, declaration.TypeWorkspace, "", 0)
+
+	return r.resolveArtifact(
+		ctx,
+		&state,
+		ref,
+		declaration.TypeWorkspace,
+		"",
+		0,
+	)
 }
 
-func (r *Resolver) ResolveWorkspaceEntry(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (*ResolvedEntry, error) {
-	value, err := r.resolveTyped(ctx, ref, declaration.TypeWorkspace)
-	if err != nil {
-		return nil, err
-	}
-	if value.Workspace == nil {
-		return nil, fmt.Errorf(
-			"%w: Workspace resolver produced no Workspace projection",
-			spec.ErrReferenceUnresolved,
-		)
-	}
-	return value, nil
-}
-
-// ResolveTerminalArtifact follows source-selected aliases for every
-// alias-capable declaration type. Text and Skill locators remain resource
-// locators, while Tool and Model locator behavior remains outside this
-// helper. It does not resolve a generic type/name request or expand
-// composition.
+// ResolveTerminalArtifact follows only declaration aliases. It does not expand
+// relationships and does not synthesize direct capability targets.
 func (r *Resolver) ResolveTerminalArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
@@ -196,6 +184,7 @@ func (r *Resolver) ResolveTerminalArtifact(
 	if err := ref.Validate(); err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
+
 	return r.resolveTerminalArtifact(ctx, ref, "", "")
 }
 
@@ -251,49 +240,9 @@ func (r *Resolver) resolveArtifact(
 	state.active[ref] = struct{}{}
 	defer delete(state.active, ref)
 
-	// Direct Collection membership resolution must resolve the Collection
-	// relationships, but must not recursively expand the selected member.
-	// The selected Artifact is still loaded and type-checked above.
-	if state.directRoot != nil && ref != *state.directRoot {
-		return &ResolvedEntry{
-			Type:              loaded.declarationType,
-			scopeRootID:       loaded.record.RootID,
-			DeclarationOrigin: pointerArtifact(loaded.record),
-			Artifact:          pointerArtifact(loaded.record),
-			Definition:        pointerDefinition(loaded.definition),
-		}, nil
-	}
-
-	if mapper := r.targetMappers[loaded.declarationType]; mapper != nil {
-		mapped, handled, err := mapper.MapArtifactTarget(
-			ctx,
-			ArtifactTargetRequest{
-				Artifact:   loaded.record.Clone(),
-				Definition: loaded.definition.Clone(),
-				Type:       loaded.declarationType,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		if handled {
-			if err := mapped.Validate(); err != nil {
-				return nil, err
-			}
-			if mapped.Type != loaded.declarationType ||
-				mapped.Name != loaded.record.LogicalName {
-				return nil, fmt.Errorf(
-					"%w: mapped target does not match Artifact identity",
-					spec.ErrInvalid,
-				)
-			}
-			return &ResolvedEntry{
-				Type:              loaded.declarationType,
-				scopeRootID:       loaded.record.RootID,
-				DeclarationOrigin: pointerArtifact(loaded.record),
-				Mapped:            cloneMappedTarget(&mapped),
-			}, nil
-		}
+	target, err := r.targetForLoadedArtifact(ctx, state, loaded)
+	if err != nil {
+		return nil, err
 	}
 
 	node := &ResolvedEntry{
@@ -302,7 +251,15 @@ func (r *Resolver) resolveArtifact(
 		DeclarationOrigin: pointerArtifact(loaded.record),
 		Artifact:          pointerArtifact(loaded.record),
 		Definition:        pointerDefinition(loaded.definition),
+		Target:            pointerTarget(target),
 	}
+
+	// Direct Plugin membership resolves the immediate target but intentionally
+	// does not recursively expand that target's own graph.
+	if state.directRoot != nil && ref != *state.directRoot {
+		return node, nil
+	}
+
 	if err := r.resolveStructure(
 		ctx,
 		state,
@@ -313,6 +270,75 @@ func (r *Resolver) resolveArtifact(
 		return nil, err
 	}
 	return node, nil
+}
+
+func (r *Resolver) targetForLoadedArtifact(
+	ctx context.Context,
+	state *resolutionState,
+	loaded loadedDeclarationArtifact,
+) (CapabilityTarget, error) {
+	target := CapabilityTarget{
+		Form:       TargetFormArtifact,
+		Type:       loaded.declarationType,
+		Name:       loaded.record.LogicalName,
+		Provenance: targetProvenanceForArtifact(r, state, loaded.record),
+		Artifact:   pointerArtifactRef(loaded.record.Ref()),
+	}
+
+	projector := r.projectors[loaded.declarationType]
+	if projector == nil {
+		return target, nil
+	}
+
+	projected, handled, err := projector.ProjectArtifactCapability(
+		ctx,
+		ArtifactCapabilityRequest{
+			Artifact: loaded.record.Clone(),
+			Type:     loaded.declarationType,
+		},
+	)
+	if err != nil {
+		return CapabilityTarget{}, err
+	}
+	if !handled {
+		return target, nil
+	}
+	if err := projected.Validate(); err != nil {
+		return CapabilityTarget{}, err
+	}
+	if projected.Type != loaded.declarationType ||
+		projected.Name != loaded.record.LogicalName {
+		return CapabilityTarget{}, fmt.Errorf(
+			"%w: projected capability target does not match Artifact identity",
+			spec.ErrInvalid,
+		)
+	}
+
+	switch projected.Form {
+	case TargetFormArtifact:
+		if projected.Artifact == nil ||
+			*projected.Artifact != loaded.record.Ref() {
+			return CapabilityTarget{}, fmt.Errorf(
+				"%w: projected Artifact capability target changed Artifact identity",
+				spec.ErrInvalid,
+			)
+		}
+
+	case TargetFormDirect:
+		if projected.Provenance != TargetProvenanceDirectCapability {
+			return CapabilityTarget{}, fmt.Errorf(
+				"%w: projected direct capability target has invalid provenance",
+				spec.ErrInvalid,
+			)
+		}
+
+	default:
+		return CapabilityTarget{}, fmt.Errorf(
+			"%w: projected capability target has unsupported form",
+			spec.ErrInvalid,
+		)
+	}
+	return projected.Clone(), nil
 }
 
 func (r *Resolver) loadAvailableDeclarationArtifact(
@@ -327,7 +353,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	}
 	if record.Ref() != ref {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
-			"%w: ArtifactReader returned another Artifact",
+			"%w: Artifact reader returned another Artifact",
 			spec.ErrInvalid,
 		)
 	}
@@ -357,16 +383,16 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			expectedType,
 		)
 	}
-	if expectedVersion != "" && record.LogicalVersion != expectedVersion {
+	if expectedVersion != "" &&
+		record.LogicalVersion != expectedVersion {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
-			"%w: Artifact %q has Text insertion identity %q, expected %q",
+			"%w: Artifact %q has logical version %q, expected %q",
 			spec.ErrReferenceUnresolved,
 			record.ID,
 			record.LogicalVersion,
 			expectedVersion,
 		)
 	}
-
 	if record.ResolvedDefinition == nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has no current Definition",
@@ -374,10 +400,8 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			record.ID,
 		)
 	}
-	definitionValue, err := r.artifacts.GetDefinition(
-		ctx,
-		record.Ref(),
-	)
+
+	definitionValue, err := r.artifacts.GetDefinition(ctx, record.Ref())
 	if err != nil {
 		return loadedDeclarationArtifact{}, err
 	}
@@ -386,10 +410,6 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			"%w: Artifact Definition changed during resolution",
 			spec.ErrRefreshRequired,
 		)
-	}
-
-	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
-		return loadedDeclarationArtifact{}, err
 	}
 	if definitionValue.Kind != record.Kind ||
 		definitionValue.LogicalName != record.LogicalName ||
@@ -400,38 +420,26 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		)
 	}
 
-	entry, err := declaration.DecodeCanonicalEntryJSON(definitionValue.Body)
+	entry, err := r.interpretations.EntryFromDefinition(definitionValue)
 	if err != nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
-			"%w: Artifact Definition body is not a canonical declaration: %w",
-			spec.ErrReferenceUnresolved,
+			"%w: Artifact Definition interpretation: %w",
+			spec.ErrDigestMismatch,
 			err,
 		)
 	}
 	header := entry.Header()
 	if header.Type != declarationType ||
-		header.Name != string(definitionValue.LogicalName) {
+		header.Name != string(record.LogicalName) {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition declaration identity differs from Artifact state",
 			spec.ErrDigestMismatch,
 		)
 	}
-	if declarationType == declaration.TypeText {
-		text, err := textv1.DecodeTextEntry(entry)
-		if err != nil {
-			return loadedDeclarationArtifact{}, err
-		}
-		if record.LogicalVersion != spec.LogicalVersion(text.Insert) {
-			return loadedDeclarationArtifact{}, fmt.Errorf(
-				"%w: Text Artifact identity does not match insert target",
-				spec.ErrDigestMismatch,
-			)
-		}
-	}
 
 	return loadedDeclarationArtifact{
-		record:          record,
-		definition:      definitionValue,
+		record:          record.Clone(),
+		definition:      definitionValue.Clone(),
 		entry:           entry,
 		declarationType: declarationType,
 	}, nil
@@ -443,7 +451,12 @@ func (r *Resolver) resolveTerminalArtifact(
 	expectedType declaration.Type,
 	expectedVersion spec.LogicalVersion,
 ) (artifactModel.ArtifactRef, error) {
-	loaded, err := r.resolveTerminalDeclaration(ctx, ref, expectedType, expectedVersion)
+	loaded, err := r.resolveTerminalDeclaration(
+		ctx,
+		ref,
+		expectedType,
+		expectedVersion,
+	)
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
@@ -463,14 +476,14 @@ func (r *Resolver) resolveTerminalDeclaration(
 	for depth := 0; depth <= r.limits.MaxDepth; depth++ {
 		if _, duplicate := seen[current]; duplicate {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
-				"%w: source-selected declaration alias cycle at Artifact %q",
+				"%w: declaration alias cycle at Artifact %q",
 				spec.ErrReferenceUnresolved,
 				current.ArtifactID,
 			)
 		}
 		if len(seen) >= r.limits.MaxNodes {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
-				"%w: source-selected declaration alias limit exceeded",
+				"%w: declaration alias limit exceeded",
 				spec.ErrLocatorLimitExceeded,
 			)
 		}
@@ -488,26 +501,24 @@ func (r *Resolver) resolveTerminalDeclaration(
 		if expectedName != "" &&
 			loaded.record.LogicalName != expectedName {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
-				"%w: source-selected declaration resolved to another name",
+				"%w: declaration alias resolved to another logical name",
 				spec.ErrReferenceUnresolved,
 			)
 		}
 
-		alias, err := sourceSelectedAlias(loaded.entry)
-		if err != nil {
-			return loadedDeclarationArtifact{}, err
-		}
-		if !alias {
+		header := loaded.entry.Header()
+		if !r.interpretations.DeclarationAliasEligible(
+			loaded.declarationType,
+		) || header.Locator == nil {
 			return loaded, nil
 		}
 		if r.locators == nil {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
-				"%w: source-selected declaration requires a locator resolver",
+				"%w: declaration alias requires a locator resolver",
 				spec.ErrLocatorUnresolved,
 			)
 		}
 
-		header := loaded.entry.Header()
 		next, err := r.locators.ResolveArtifactLocator(
 			ctx,
 			LocatorRequest{
@@ -531,35 +542,16 @@ func (r *Resolver) resolveTerminalDeclaration(
 				spec.ErrInvalid,
 			)
 		}
+
 		expectedType = header.Type
 		expectedName = spec.LogicalName(header.Name)
 		current = next
 	}
 
 	return loadedDeclarationArtifact{}, fmt.Errorf(
-		"%w: source-selected declaration alias depth exceeded",
+		"%w: declaration alias depth exceeded",
 		spec.ErrLocatorLimitExceeded,
 	)
-}
-
-func sourceSelectedAlias(entry declaration.Entry) (bool, error) {
-	header := entry.Header()
-	if header.Locator == nil {
-		return false, nil
-	}
-	switch header.Type {
-	case declaration.TypePlugin,
-		declaration.TypeAgent,
-		declaration.TypeTeam,
-		declaration.TypeLoop,
-		declaration.TypeWorkflow,
-		declaration.TypeWorkspace,
-		declaration.TypeMCP,
-		declaration.TypeMCPPolicy:
-		return true, nil
-	default:
-		return false, nil
-	}
 }
 
 func (r *Resolver) reserve(
@@ -568,7 +560,7 @@ func (r *Resolver) reserve(
 ) error {
 	if depth > r.limits.MaxDepth {
 		return fmt.Errorf(
-			"%w: Artifact resolution exceeds depth %d",
+			"%w: Artifact composition exceeds depth %d",
 			spec.ErrLocatorLimitExceeded,
 			r.limits.MaxDepth,
 		)
@@ -576,7 +568,7 @@ func (r *Resolver) reserve(
 	state.nodes++
 	if state.nodes > r.limits.MaxNodes {
 		return fmt.Errorf(
-			"%w: Artifact resolution exceeds %d nodes",
+			"%w: Artifact composition exceeds %d nodes",
 			spec.ErrLocatorLimitExceeded,
 			r.limits.MaxNodes,
 		)
@@ -584,67 +576,50 @@ func (r *Resolver) reserve(
 	return nil
 }
 
-func validateDefinitionContract(
-	value definitionModel.Definition,
-	declarationType declaration.Type,
-) error {
-	key, found := codec.SchemaKeyForType(declarationType)
-	if !found {
-		return fmt.Errorf(
-			"%w: no schema is registered for Artifact type %q",
-			spec.ErrUnsupported,
-			declarationType,
-		)
+func targetProvenanceForArtifact(
+	r *Resolver,
+	state *resolutionState,
+	value artifactModel.Artifact,
+) TargetProvenance {
+	if state != nil &&
+		state.usesCompositionSource(value.RootID) &&
+		value.Binding.SourceID == state.compositionSourceID {
+		return TargetProvenanceCompositionSource
 	}
-	if value.SchemaID != key.SchemaID ||
-		value.SchemaVersion != key.SchemaVersion {
-		return fmt.Errorf(
-			"%w: Artifact Definition schema does not match Artifact type %q",
-			spec.ErrDigestMismatch,
-			declarationType,
-		)
+	if r != nil &&
+		r.scope.BuiltinRoot != "" &&
+		value.RootID == r.scope.BuiltinRoot {
+		return TargetProvenanceBuiltinScope
 	}
-	return nil
+	return TargetProvenanceCurrentRoot
 }
 
-func pointerArtifact(value artifactModel.Artifact) *artifactModel.Artifact {
+func pointerArtifact(
+	value artifactModel.Artifact,
+) *artifactModel.Artifact {
 	copyValue := value.Clone()
 	return &copyValue
 }
 
-func cloneArtifactPointer(value *artifactModel.Artifact) *artifactModel.Artifact {
+func pointerArtifactRef(
+	value artifactModel.ArtifactRef,
+) *artifactModel.ArtifactRef {
+	copyValue := value
+	return &copyValue
+}
+
+func cloneArtifactPointer(
+	value *artifactModel.Artifact,
+) *artifactModel.Artifact {
 	if value == nil {
 		return nil
 	}
 	return pointerArtifact(*value)
 }
 
-func pointerDefinition(value definitionModel.Definition) *definitionModel.Definition {
+func pointerDefinition(
+	value definitionModel.Definition,
+) *definitionModel.Definition {
 	copyValue := value.Clone()
-	return &copyValue
-}
-
-func pointerRelationship(
-	value ResolvedRelationship,
-) *ResolvedRelationship {
-	copyValue := value
-	return &copyValue
-}
-
-func cloneOutputMatch(
-	value *declaration.OutputMatch,
-) *declaration.OutputMatch {
-	if value == nil {
-		return nil
-	}
-	copyValue := value.Clone()
-	return &copyValue
-}
-
-func cloneMappedTarget(value *MappedTarget) *MappedTarget {
-	if value == nil {
-		return nil
-	}
-	copyValue := *value
 	return &copyValue
 }

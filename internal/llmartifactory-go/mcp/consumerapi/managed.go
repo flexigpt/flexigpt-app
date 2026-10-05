@@ -20,19 +20,19 @@ func (a *API) CreateMCPServer(
 	ctx context.Context,
 	request ManagedMCPCreateRequest,
 ) (ManagedMCPCreateResult, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return ManagedMCPCreateResult{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPCreateResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
-	if a.protection.IsProtectedRoot(request.Collection.RootID) {
+	if a.protection.IsProtectedRoot(request.Plugin.RootID) {
 		return ManagedMCPCreateResult{}, fmt.Errorf(
 			"%w: managed MCP publication is not allowed in a protected Root",
 			spec.ErrProtected,
@@ -57,10 +57,10 @@ func (a *API) CreateMCPServer(
 		return ManagedMCPCreateResult{}, err
 	}
 
-	membership, err := a.collections.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForCollectionSource(
 		ctx,
 		plugin.EnsureMemberForCollectionSourceRequest{
-			Collection:       request.Collection,
+			Plugin:           request.Plugin,
 			ExpectedRevision: request.ExpectedCollectionRevision,
 			Type:             declaration.TypeMCP,
 			Name:             request.Document.LogicalName,
@@ -72,18 +72,18 @@ func (a *API) CreateMCPServer(
 	}
 
 	result := ManagedMCPCreateResult{
-		Collection:        membership.Collection,
+		Plugin:            membership.Plugin,
 		MembershipCreated: membership.Created,
 	}
-	rootID := membership.Collection.Artifact.RootID
-	sourceID := membership.Collection.Artifact.Binding.SourceID
+	rootID := membership.Plugin.Artifact.RootID
+	sourceID := membership.Plugin.Artifact.Binding.SourceID
 	decoderID, err := topology.DefaultDocumentDecoderID(
 		topology.DocumentUseManagedMCP,
 	)
 	if err != nil {
 		return result, err
 	}
-	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
@@ -137,23 +137,23 @@ func (a *API) CreateMCPServer(
 }
 
 // UpdateMCPServer replaces one complete managed MCP package while retaining
-// its Artifact identity, managed package address, and direct Collection
+// its Artifact identity, managed package address, and direct Plugin
 // membership. Existing installation data is preserved only when it remains
 // valid for the replacement server document.
 func (a *API) UpdateMCPServer(
 	ctx context.Context,
 	request ManagedMCPReplaceRequest,
 ) (ManagedMCPReplaceResult, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return ManagedMCPReplaceResult{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
 	if err := request.Artifact.Validate(); err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if request.Collection.RootID != request.Artifact.RootID {
+	if request.Plugin.RootID != request.Artifact.RootID {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Artifact belongs to another Root",
 			spec.ErrInvalid,
@@ -161,7 +161,7 @@ func (a *API) UpdateMCPServer(
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
@@ -171,14 +171,14 @@ func (a *API) UpdateMCPServer(
 			spec.ErrInvalid,
 		)
 	}
-	if a.protection.IsProtectedRoot(request.Collection.RootID) {
+	if a.protection.IsProtectedRoot(request.Plugin.RootID) {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: managed MCP replacement is not allowed in a protected Root",
 			spec.ErrProtected,
 		)
 	}
 
-	collectionView, err := a.collections.Read(ctx, request.Collection)
+	collectionView, err := a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
@@ -188,7 +188,7 @@ func (a *API) UpdateMCPServer(
 	if !collectionView.Editable &&
 		!collectionView.Baseline {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
-			"%w: MCP Collection is read-only",
+			"%w: MCP Plugin is read-only",
 			spec.ErrUnsupported,
 		)
 	}
@@ -214,7 +214,7 @@ func (a *API) UpdateMCPServer(
 	}
 	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
-			"%w: MCP Server is not owned by this Collection Source",
+			"%w: MCP Server is not owned by this Plugin Source",
 			spec.ErrUnsupported,
 		)
 	}
@@ -234,7 +234,7 @@ func (a *API) UpdateMCPServer(
 		)
 	}
 
-	memberships, err := a.collections.ListMembershipsForArtifact(
+	memberships, err := a.plugins.ListMembershipsForArtifact(
 		ctx,
 		request.Artifact,
 	)
@@ -243,7 +243,7 @@ func (a *API) UpdateMCPServer(
 	}
 	memberFound := false
 	for _, membership := range memberships {
-		if membership.Collection != request.Collection ||
+		if membership.Plugin != request.Plugin ||
 			!membership.ResolvedToArtifact {
 			continue
 		}
@@ -252,7 +252,7 @@ func (a *API) UpdateMCPServer(
 	}
 	if !memberFound {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
-			"%w: MCP Server is not a direct member of the requested Collection",
+			"%w: MCP Server is not a direct member of the requested Plugin",
 			spec.ErrReferenceUnresolved,
 		)
 	}
@@ -331,7 +331,7 @@ func (a *API) UpdateMCPServer(
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		current.RootID,
 		current.Binding.SourceID,
@@ -386,15 +386,15 @@ func (a *API) UpdateMCPServer(
 		}
 	}
 
-	collectionView, err = a.collections.Read(ctx, request.Collection)
+	collectionView, err = a.plugins.Read(ctx, request.Plugin)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
 
 	return ManagedMCPReplaceResult{
-		Artifact:   updated,
-		Address:    updated.Address(),
-		Collection: collectionView,
+		Artifact: updated,
+		Address:  updated.Address(),
+		Plugin:   collectionView,
 	}, nil
 }
 
@@ -466,7 +466,7 @@ func (a *API) DeleteMCPServer(
 		Package:          address,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == plugin.MCPManagedSourceStorageKey {
+	if sourceValue.StorageKey == plugin.MCPManagedPluginSourceStorageKey {
 		locator := record.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}

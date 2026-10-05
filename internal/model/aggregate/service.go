@@ -154,75 +154,45 @@ func (s *Service) ResolveRuntimeConfiguration(
 	return s.runtime.ResolveRuntime(ctx, resolved, preparedRequestPatch)
 }
 
-func (s *Service) MapModelTarget(
+// ResolveRuntimeModelTarget resolves a source-backed Model capability target
+// into runtime configuration. Direct Model capability targets are deliberately
+// not decoded here: their runtime preparation remains owned by the
+// application-supplied direct capability provider.
+func (s *Service) ResolveRuntimeModelTarget(
 	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (composition.MappedTarget, error) {
-	if err := s.ready(ctx); err != nil {
-		return composition.MappedTarget{}, err
-	}
-
-	resolved, err := s.store.ResolveModel(ctx, ref)
-	if err != nil {
-		return composition.MappedTarget{}, err
-	}
-	return NewMappedTarget(resolved)
-}
-
-func (s *Service) MapArtifactTarget(
-	ctx context.Context,
-	request composition.ArtifactTargetRequest,
-) (composition.MappedTarget, bool, error) {
-	if err := s.ready(ctx); err != nil {
-		return composition.MappedTarget{}, false, err
-	}
-	if request.Type != declaration.TypeModel {
-		return composition.MappedTarget{}, false, nil
-	}
-
-	resolved, err := s.store.ResolveModel(ctx, request.Artifact.Ref())
-	if err != nil {
-		return composition.MappedTarget{}, true, err
-	}
-	if request.Definition.Digest != resolved.Model.Definition.Digest {
-		return composition.MappedTarget{}, true, fmt.Errorf(
-			"%w: Model Definition changed during target mapping",
-			spec.ErrRefreshRequired,
-		)
-	}
-
-	target, err := NewMappedTarget(resolved)
-	return target, true, err
-}
-
-func (s *Service) ResolveMappedRuntimeModel(
-	ctx context.Context,
-	target composition.MappedTarget,
+	target composition.CapabilityTarget,
 ) (RuntimeConfiguration, error) {
 	if err := s.ready(ctx); err != nil {
 		return RuntimeConfiguration{}, err
 	}
-
-	value, err := DecodeTarget(target)
-	if err != nil {
+	if err := target.Validate(); err != nil {
 		return RuntimeConfiguration{}, err
 	}
-
-	resolved, err := s.store.ResolveModel(ctx, value.ModelArtifact)
-	if err != nil {
-		return RuntimeConfiguration{}, err
-	}
-	if resolved.Model.Artifact.LogicalName != value.Name ||
-		resolved.Model.Definition.Digest != value.ModelDefinitionDigest ||
-		resolved.Provider.Artifact.Ref() != value.ProviderArtifact ||
-		resolved.Provider.Definition.Digest != value.ProviderDefinitionDigest ||
-		resolved.Fingerprint != value.ConfigurationFingerprint {
+	if target.Type != declaration.TypeModel {
 		return RuntimeConfiguration{}, fmt.Errorf(
-			"%w: mapped Model target no longer matches current source-backed configuration",
+			"%w: capability target type is %q, expected model",
+			spec.ErrUnsupported,
+			target.Type,
+		)
+	}
+	if target.Form != composition.TargetFormArtifact ||
+		target.Artifact == nil {
+		return RuntimeConfiguration{}, fmt.Errorf(
+			"%w: direct Model capability targets require an application runtime adapter",
+			spec.ErrUnsupported,
+		)
+	}
+	resolved, err := s.store.ResolveModel(ctx, *target.Artifact)
+	if err != nil {
+		return RuntimeConfiguration{}, err
+	}
+	if resolved.Model.Artifact.Ref() != *target.Artifact ||
+		resolved.Model.Artifact.LogicalName != target.Name {
+		return RuntimeConfiguration{}, fmt.Errorf(
+			"%w: Model capability target no longer matches current source-backed configuration",
 			spec.ErrReferenceUnresolved,
 		)
 	}
-
 	return s.runtime.ResolveRuntime(
 		ctx,
 		resolved,

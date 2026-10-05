@@ -14,8 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
 )
@@ -35,9 +33,7 @@ func InitWorkspaceWrappers(
 	cat catalog.API,
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
-	locatorResolvers []locator.Factory,
-	fallbackProviders map[declaration.Type]composition.FallbackProvider,
-	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
+	resolver *composition.Resolver,
 	mcpServers mcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {
@@ -50,12 +46,7 @@ func InitWorkspaceWrappers(
 	}
 
 	config := workspaceConsumerAPI.DefaultConfig()
-	config.LocatorResolvers = append(
-		[]locator.Factory(nil),
-		locatorResolvers...,
-	)
-	config.FallbackProviders = fallbackProviders
-	config.TargetMappers = targetMappers
+	config.Composition = resolver
 	config.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,

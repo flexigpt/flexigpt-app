@@ -282,7 +282,7 @@ func (s *Service) SaveMCPPolicy(
 	if err := s.ready(); err != nil {
 		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 	if err := request.Name.Validate(); err != nil {
@@ -291,7 +291,7 @@ func (s *Service) SaveMCPPolicy(
 
 	affected, err := s.store.ListMCPServersReferencingPolicy(
 		ctx,
-		request.Collection.RootID,
+		request.Plugin.RootID,
 		request.Name,
 	)
 	if err != nil {

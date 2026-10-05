@@ -10,7 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 )
 
 var installationInputNamePattern = regexp.MustCompile(

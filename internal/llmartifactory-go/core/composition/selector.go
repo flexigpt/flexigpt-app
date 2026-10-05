@@ -49,8 +49,7 @@ func (r *Resolver) expandSelector(
 	if err != nil {
 		return ResolvedSelector{}, err
 	}
-	typeResolver, found := r.registry.Resolver(selector.Type)
-	if !found || !typeResolver.SupportsSelectors() {
+	if !r.interpretations.SelectorEligible(selector.Type) {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: Artifact type %q does not support member selectors",
 			spec.ErrUnsupported,

@@ -17,6 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 )
@@ -34,6 +35,7 @@ func InitToolStoreWrapper(
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
+	resolver *composition.Resolver,
 ) error {
 	if wrapper == nil {
 		return errors.New("tool store wrapper is required")
@@ -48,6 +50,7 @@ func InitToolStoreWrapper(
 		cat,
 		definitions,
 		topology.BuiltinRootID(),
+		resolver,
 	)
 	if err != nil {
 		return err
@@ -95,10 +98,10 @@ func (w *ToolStoreWrapper) ListToolCollections() (
 
 func (w *ToolStoreWrapper) GetToolCollection(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
 			return api.GetToolCollection(context.Background(), ref)
 		},
 	)
@@ -148,10 +151,10 @@ func (w *ToolStoreWrapper) SetToolCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
 			return api.SetToolCollectionEnabled(
 				context.Background(),
 				ref,

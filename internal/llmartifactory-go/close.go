@@ -17,6 +17,8 @@ func (a *Artifactory) Close() error {
 	a.schemaCodecs = nil
 	a.decoders = nil
 	a.locatorFactories = nil
+	a.interpretations = nil
+	a.composition = nil
 	a.store = nil
 	return nil
 }

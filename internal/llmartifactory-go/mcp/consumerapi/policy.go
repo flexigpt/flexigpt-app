@@ -11,9 +11,9 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcppolicyv1"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	policyMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/policy"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
@@ -25,22 +25,22 @@ func (a *API) SaveMCPPolicy(
 	if a == nil {
 		return ManagedMCPPolicyUpsertResult{}, spec.ErrClosed
 	}
-	if a.collections == nil {
+	if a.plugins == nil {
 		return ManagedMCPPolicyUpsertResult{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
+	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	if err := request.Name.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	if a.protection.IsProtectedRoot(request.Collection.RootID) {
+	if a.protection.IsProtectedRoot(request.Plugin.RootID) {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
 			"%w: managed MCP Policy publication is not allowed in a protected Root",
 			spec.ErrProtected,
@@ -79,10 +79,10 @@ func (a *API) SaveMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	membership, err := a.collections.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForCollectionSource(
 		ctx,
 		plugin.EnsureMemberForCollectionSourceRequest{
-			Collection:       request.Collection,
+			Plugin:           request.Plugin,
 			ExpectedRevision: request.ExpectedCollectionRevision,
 			Type:             mcppolicyv1.MCPPolicyType,
 			Name:             request.Name,
@@ -94,18 +94,18 @@ func (a *API) SaveMCPPolicy(
 	}
 
 	result := ManagedMCPPolicyUpsertResult{
-		Collection:        membership.Collection,
+		Plugin:            membership.Plugin,
 		MembershipCreated: membership.Created,
 	}
-	rootID := membership.Collection.Artifact.RootID
-	sourceID := membership.Collection.Artifact.Binding.SourceID
+	rootID := membership.Plugin.Artifact.RootID
+	sourceID := membership.Plugin.Artifact.Binding.SourceID
 	decoderID, err := topology.DefaultDocumentDecoderID(
 		topology.DocumentUseManagedMCPPolicy,
 	)
 	if err != nil {
 		return result, err
 	}
-	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
@@ -225,7 +225,7 @@ func (a *API) DeleteMCPPolicy(
 		Package:          address,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == plugin.MCPManagedSourceStorageKey {
+	if sourceValue.StorageKey == plugin.MCPManagedPluginSourceStorageKey {
 		locator := record.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}

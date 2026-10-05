@@ -13,9 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
@@ -57,7 +54,6 @@ type App struct {
 
 	artifactStoreComposition *compose.Store
 	artifactStoreSetup       *artifactsetup.Handle
-	artifactLocatorFactories []locator.Factory
 
 	dataBasePath string
 
@@ -225,8 +221,19 @@ func (a *App) initManagers() {
 	}
 	a.artifactStoreSetup = artifactSetup
 	a.artifactStoreComposition = artifactSetup.Store
-	a.artifactLocatorFactories = artifactSetup.LocatorFactories()
 	artifactComposition := artifactSetup.Store
+	artifactCompositionResolver := artifactSetup.LLM.Composition()
+	artifactInterpretations := artifactSetup.LLM.Interpretations()
+	if artifactCompositionResolver == nil {
+		panic(
+			"failed to initialize managers: LLM Artifactory composition resolver is unavailable",
+		)
+	}
+	if artifactInterpretations == nil {
+		panic(
+			"failed to initialize managers: LLM Artifactory declaration interpretation registry is unavailable",
+		)
+	}
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
@@ -262,6 +269,7 @@ func (a *App) initManagers() {
 		artifactComposition.Protection,
 		artifactComposition.Catalog,
 		artifactComposition.Definitions,
+		artifactCompositionResolver,
 	)
 	if err != nil {
 		slog.Error(
@@ -340,23 +348,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Model Store and aggregate initialized")
 
-	targetMappers, err := artifactTargetMappers(
-		a.toolAggregateAPI,
-		a.modelAggregateAPI,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Artifact target mappers",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Artifact target mappers failed\n" +
-				err.Error(),
-		)
-	}
-
-	fallbackProviders := map[declaration.Type]composition.FallbackProvider{}
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
 		artifactComposition.Roots,
@@ -368,9 +359,7 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
 		artifactComposition.Definitions,
-		fallbackProviders,
-		targetMappers,
-		a.artifactLocatorFactories...,
+		artifactCompositionResolver,
 	)
 	if err != nil {
 		slog.Error(
@@ -411,9 +400,8 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
 		artifactComposition.Definitions,
-		fallbackProviders,
-		targetMappers,
-		a.artifactLocatorFactories...,
+		artifactCompositionResolver,
+		artifactInterpretations,
 	)
 	if err != nil {
 		slog.Error(
@@ -488,9 +476,7 @@ func (a *App) initManagers() {
 		artifactComposition.SecretRuntime,
 		artifactComposition.ArtifactCleanup,
 		artifactComposition.Topology,
-		a.artifactLocatorFactories,
-		fallbackProviders,
-		targetMappers,
+		artifactCompositionResolver,
 	)
 	if err != nil {
 		slog.Error(
@@ -525,9 +511,7 @@ func (a *App) initManagers() {
 		artifactComposition.Catalog,
 		artifactComposition.Resources,
 		artifactComposition.TrustedNativeResources,
-		a.artifactLocatorFactories,
-		fallbackProviders,
-		targetMappers,
+		artifactCompositionResolver,
 		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID rootModel.RootID) error {
 			return artifactsetup.EnsureRootBaselines(
@@ -741,7 +725,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 		}
 		a.artifactStoreSetup = nil
 		a.artifactStoreComposition = nil
-		a.artifactLocatorFactories = nil
 	}
 
 	if a.conversationStoreAPI != nil {

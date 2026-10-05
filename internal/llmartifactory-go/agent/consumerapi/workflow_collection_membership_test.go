@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -53,11 +54,11 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 	)
 	requireNoError(t, err)
 
-	primaryRef := first.Collection.Artifact.Ref()
+	primaryRef := first.Plugin.Artifact.Ref()
 	secondaryWithMember, err := harness.api.AddAgentCollectionArtifactMember(
 		t.Context(),
 		plugin.AddArtifactMemberRequest{
-			Collection:       secondary.Artifact.Ref(),
+			Plugin:           secondary.Artifact.Ref(),
 			ExpectedRevision: secondary.Artifact.Revision,
 			Artifact:         first.Agent.Ref,
 		},
@@ -65,7 +66,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 	requireNoError(t, err)
 	if len(secondaryWithMember.Members) != 1 {
 		t.Fatalf(
-			"secondary Collection members = %#v, want one member",
+			"secondary Plugin members = %#v, want one member",
 			secondaryWithMember.Members,
 		)
 	}
@@ -73,7 +74,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 	_, err = harness.api.AddAgentCollectionArtifactMember(
 		t.Context(),
 		plugin.AddArtifactMemberRequest{
-			Collection:       secondaryWithMember.Artifact.Ref(),
+			Plugin:           secondaryWithMember.Artifact.Ref(),
 			ExpectedRevision: secondaryWithMember.Artifact.Revision,
 			Artifact:         first.Agent.Ref,
 		},
@@ -118,7 +119,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 
 	if len(primaryAfterDelete.Members) == 0 ||
 		len(secondaryAfterDelete.Members) == 0 {
-		t.Fatal("Agent deletion unexpectedly detached Collection memberships")
+		t.Fatal("Agent deletion unexpectedly detached Plugin memberships")
 	}
 
 	assertCollectionDoesNotContainAgent(
@@ -201,7 +202,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 ) {
 	harness, collectionValue := newManagedImportFixture(
 		t,
-		"builtin-member-collection",
+		"builtin-member-plugin",
 	)
 
 	builtinAgents, err := harness.api.ListAgents(
@@ -221,7 +222,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 	added, err := harness.api.AddAgentCollectionMember(
 		t.Context(),
 		plugin.AddMemberRequest{
-			Collection:       collectionValue.Artifact.Ref(),
+			Plugin:           collectionValue.Artifact.Ref(),
 			ExpectedRevision: collectionValue.Artifact.Revision,
 			Member: plugin.MemberReference{
 				Type:  declaration.TypeAgent,
@@ -232,7 +233,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 	)
 	requireNoError(t, err)
 
-	// Collection-filtered ListAgents is root-local. The member refers to a
+	// Plugin-filtered ListAgents is root-local. The member refers to a
 	// protected built-in in another Root, so assert it through resolution.
 	requireCollectionCapabilityContainsAgent(
 		t,
@@ -249,7 +250,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 	removed, err := harness.api.RemoveAgentCollectionMember(
 		t.Context(),
 		plugin.RemoveMemberRequest{
-			Collection:       added.Artifact.Ref(),
+			Plugin:           added.Artifact.Ref(),
 			ExpectedRevision: added.Artifact.Revision,
 			Index:            memberIndex,
 		},
@@ -258,7 +259,7 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 
 	if len(removed.Members) != 0 {
 		t.Fatalf(
-			"Collection members after built-in removal = %#v, want empty",
+			"Plugin members after built-in removal = %#v, want empty",
 			removed.Members,
 		)
 	}
@@ -284,14 +285,14 @@ func requireCollectionContainsAgent(
 	agents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
-			RootID:     topology.UserRootID(),
-			Collection: &collectionRef,
+			RootID: topology.UserRootID(),
+			Plugin: &collectionRef,
 		},
 	)
 	requireNoError(t, err)
 	if !containsAgent(agents, agentRef) {
 		t.Fatalf(
-			"Collection %q does not contain Agent %q",
+			"Plugin %q does not contain Agent %q",
 			collectionRef,
 			agentRef,
 		)
@@ -314,15 +315,17 @@ func requireCollectionCapabilityContainsAgent(
 
 	for _, occurrence := range plan.Occurrences {
 		if occurrence.Type != declaration.TypeAgent ||
-			occurrence.Artifact == nil ||
-			*occurrence.Artifact != agentRef {
+			occurrence.Target == nil ||
+			occurrence.Target.Form != composition.TargetFormArtifact ||
+			occurrence.Target.Artifact == nil ||
+			*occurrence.Target.Artifact != agentRef {
 			continue
 		}
 		return
 	}
 
 	t.Fatalf(
-		"Collection %q capability plan does not resolve Agent %q: %#v",
+		"Plugin %q capability plan does not resolve Agent %q: %#v",
 		collectionRef,
 		agentRef,
 		plan.Occurrences,
@@ -340,14 +343,14 @@ func assertCollectionDoesNotContainAgent(
 	agents, err := harness.api.ListAgents(
 		t.Context(),
 		agentConsumerAPI.ListAgentsRequest{
-			RootID:     topology.UserRootID(),
-			Collection: &collectionRef,
+			RootID: topology.UserRootID(),
+			Plugin: &collectionRef,
 		},
 	)
 	requireNoError(t, err)
 	if containsAgent(agents, agentRef) {
 		t.Fatalf(
-			"Collection %q unexpectedly contains Agent %q",
+			"Plugin %q unexpectedly contains Agent %q",
 			collectionRef,
 			agentRef,
 		)
@@ -369,7 +372,7 @@ func requireCollectionPlanComplete(
 	requireNoError(t, err)
 	if plan.Complete != expected {
 		t.Fatalf(
-			"Collection %q capability completeness = %t, want %t: %#v",
+			"Plugin %q capability completeness = %t, want %t: %#v",
 			collectionRef,
 			plan.Complete,
 			expected,
@@ -386,12 +389,12 @@ func requireRestoredMembership(
 	t.Helper()
 
 	for _, value := range values {
-		if value.Collection == collectionRef {
+		if value.Plugin == collectionRef {
 			return
 		}
 	}
 	t.Fatalf(
-		"restored memberships %#v do not contain Collection %q",
+		"restored memberships %#v do not contain Plugin %q",
 		values,
 		collectionRef,
 	)

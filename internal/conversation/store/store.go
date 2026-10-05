@@ -557,8 +557,8 @@ func validateConversationToolSelections(
 		}
 		choiceIDs[value.ChoiceID] = struct{}{}
 
-		key := value.Target.Provider + "\x00" +
-			value.Target.Identifier
+		key := value.Target.ProviderIdentity + "\x00" +
+			value.Target.ProviderLocalID
 		if _, duplicate := targets[key]; duplicate {
 			return fmt.Errorf(
 				"%s[%d]: duplicate Tool target",

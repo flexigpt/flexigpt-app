@@ -17,7 +17,7 @@ const (
 	DefaultPageSize = 50
 	MaxPageSize     = 200
 
-	collectionPageKind = "collections"
+	collectionPageKind = "plugins"
 	serverPageKind     = "servers"
 )
 

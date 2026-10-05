@@ -13,7 +13,7 @@ type BaselineEnsurer interface {
 	EnsureAgentBaselineCollection(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.CollectionView, error)
+	) (plugin.PluginView, error)
 }
 
 type baselineEnsurer struct {
@@ -23,9 +23,9 @@ type baselineEnsurer struct {
 func NewBaselineEnsurer(
 	api *API,
 ) (BaselineEnsurer, error) {
-	if api == nil || api.collections == nil {
+	if api == nil || api.plugins == nil {
 		return nil, fmt.Errorf(
-			"%w: Agent baseline ensurer requires collections",
+			"%w: Agent baseline ensurer requires plugins",
 			spec.ErrInvalid,
 		)
 	}
@@ -35,9 +35,9 @@ func NewBaselineEnsurer(
 func (s *baselineEnsurer) EnsureAgentBaselineCollection(
 	ctx context.Context,
 	rootID rootModel.RootID,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	if s == nil || s.api == nil {
-		return plugin.CollectionView{}, spec.ErrClosed
+		return plugin.PluginView{}, spec.ErrClosed
 	}
 	return s.api.ensureAgentBaselineCollection(ctx, rootID)
 }

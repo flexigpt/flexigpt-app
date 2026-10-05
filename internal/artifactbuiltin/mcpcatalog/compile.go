@@ -6,36 +6,36 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
-	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/providerapi"
+	mcpconfig "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/sourceformat/config"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
+	registry *interpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedMCPPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages)
+	prepared, err := PreparePackages(ctx, packages, registry)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	sourceProvider, err := mcpProviderAPI.NewRegistration()
-	if err != nil {
-		return installModel.CompiledPackageSet{}, err
-	}
-
+	// MCP package admission needs the standard MCP configuration adapter in
+	// addition to canonical declaration decoding.
 	return artifactsetup.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactsetup.CompileConfig{
 		SetName:            topology.BuiltinEmbeddedPackageMCPs,
 		SchemaVersion:      mcpDomain.HydrationSchemaVersion,
 		InstallerName:      mcpDomain.BuiltInInstallerName,
-		AdditionalDecoders: sourceProvider.Decoders(),
+		AdditionalDecoders: []ingest.Decoder{mcpconfig.NewDecoder()},
 		Packages:           packageInputs(prepared),
 	})
 }

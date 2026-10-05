@@ -1,4 +1,4 @@
-// Package plugin owns domain collections backed by managed Plugin declarations.
+// Package plugin owns managed Plugin declarations and direct membership.
 //
 // Plugin membership remains declaration content. This package does not
 // create Artifact Store ownership, foreign keys, or lifecycle relationships.
@@ -31,8 +31,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
 const (
@@ -47,14 +47,14 @@ type API struct {
 	definitions      definition.API
 	managedArtifacts managepackageFlow.API
 
-	domain   *DomainPolicy
+	domain   *Profile
 	resolver *composition.Resolver
 
 	// Immutable Plugin projections keyed by Root-local Definition digest.
 	catalogProjections DocumentCache[collectionProjection]
 }
 
-func NewWithResolver(
+func New(
 	artifacts artifact.API,
 	cat catalog.API,
 	sources source.API,
@@ -62,7 +62,7 @@ func NewWithResolver(
 	managedArtifacts managepackageFlow.API,
 	definitions definition.API,
 	resolver *composition.Resolver,
-	domains ...DomainPolicy,
+	profiles ...Profile,
 ) (*API, error) {
 	if artifacts == nil ||
 		cat == nil ||
@@ -71,13 +71,13 @@ func NewWithResolver(
 		definitions == nil ||
 		managedArtifacts == nil {
 		return nil, fmt.Errorf(
-			"%w: managed Collection dependencies are incomplete",
+			"%w: managed Plugin dependencies are incomplete",
 			spec.ErrInvalid,
 		)
 	}
-	if len(domains) > 1 {
+	if len(profiles) > 1 {
 		return nil, fmt.Errorf(
-			"%w: Collection API has multiple domain policies",
+			"%w: Plugin API has multiple domain policies",
 			spec.ErrInvalid,
 		)
 	}
@@ -90,37 +90,35 @@ func NewWithResolver(
 		definitions:      definitions,
 		resolver:         resolver,
 	}
-	if len(domains) == 1 {
-		value := domains[0]
+	if len(profiles) == 1 {
+		value := profiles[0]
 		if err := value.Validate(); err != nil {
 			return nil, err
 		}
-		value.AllowedMemberTypes = append(
-			[]declaration.Type(nil),
-			value.AllowedMemberTypes...,
-		)
-		value.AllowedMemberForms = append(
+		value.MembershipPolicy.AllowedTypes = append([]declaration.Type(nil), value.MembershipPolicy.AllowedTypes...)
+		value.MembershipPolicy.AllowedForms = append(
 			[]declaration.MemberForm(nil),
-			value.AllowedMemberForms...,
+			value.MembershipPolicy.AllowedForms...,
 		)
 		output.domain = &value
 	}
 	return output, nil
 }
 
-type CollectionView struct {
-	Artifact    artifactModel.Artifact `json:"artifact"`
-	Name        spec.LogicalName       `json:"name"`
-	DisplayName string                 `json:"displayName"`
-	Description string                 `json:"description,omitempty"`
-	Members     []MemberReference      `json:"members"`
-	Entries     []CollectionMemberView `json:"entries"`
-	Editable    bool                   `json:"editable"`
-	Deletable   bool                   `json:"deletable"`
-	Baseline    bool                   `json:"baseline"`
+type PluginView struct {
+	Artifact    artifactModel.Artifact        `json:"artifact"`
+	Name        spec.LogicalName              `json:"name"`
+	DisplayName string                        `json:"displayName"`
+	Description string                        `json:"description,omitempty"`
+	Members     []MemberReference             `json:"members"`
+	Entries     []PluginMemberView            `json:"entries"`
+	Editable    bool                          `json:"editable"`
+	Deletable   bool                          `json:"deletable"`
+	Baseline    bool                          `json:"baseline"`
+	Membership  pluginDomain.MembershipPolicy `json:"membership"`
 }
 
-type CollectionMemberView struct {
+type PluginMemberView struct {
 	Type      declaration.Type         `json:"type"`
 	Name      spec.LogicalName         `json:"name,omitempty"`
 	Insert    declaration.InsertTarget `json:"insert,omitempty"`
@@ -150,38 +148,38 @@ type CreateRequest struct {
 }
 
 type UpdateRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Description      string                    `json:"description,omitempty"`
 	DisplayName      string                    `json:"displayName,omitempty"`
 }
 
 type AddMemberRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Member           MemberReference           `json:"member"`
 }
 
 type AddEntryRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Entry            declaration.Entry         `json:"entry"`
 }
 
 type AddArtifactMemberRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Artifact         artifactModel.ArtifactRef `json:"artifact"`
 }
 
 type RemoveMemberRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 	Index            int                       `json:"index"`
 }
 
 type DeleteRequest struct {
-	Collection       artifactModel.ArtifactRef `json:"collection"`
+	Plugin           artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedRevision uint64                    `json:"expectedRevision"`
 }
 
@@ -189,9 +187,9 @@ type DeleteRequest struct {
 // Created reports whether this call appended the member rather than finding an
 // identical existing membership.
 type MemberMutationResult struct {
-	Collection CollectionView `json:"collection"`
-	Index      int            `json:"index"`
-	Created    bool           `json:"created"`
+	Plugin  PluginView `json:"plugin"`
+	Index   int        `json:"index"`
+	Created bool       `json:"created"`
 }
 
 type editableCollection struct {
@@ -204,51 +202,51 @@ type editableCollection struct {
 func (a *API) Create(
 	ctx context.Context,
 	request CreateRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	return a.create(ctx, request, false)
 }
 
 func (a *API) Get(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	value, err := a.loadEditableCollection(ctx, ref, 0)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	return a.collectionViewOf(value.artifact, value.document)
 }
 
-// SetEnabled changes the generic local enablement metadata of a Collection.
+// SetEnabled changes the generic local enablement metadata of a Plugin.
 //
-// It is intentionally independent of Collection editability, membership,
+// It is intentionally independent of Plugin editability, membership,
 // deletion eligibility, source ownership, and Root protection. A disabled
-// Collection remains readable and editable when it was otherwise editable.
+// Plugin remains readable and editable when it was otherwise editable.
 func (a *API) SetEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	if expectedRevision == 0 {
-		return CollectionView{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+		return PluginView{}, fmt.Errorf(
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 
 	view, err := a.Read(ctx, ref)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if view.Artifact.Revision != expectedRevision {
-		return CollectionView{}, spec.ErrConflict
+		return PluginView{}, spec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -258,7 +256,7 @@ func (a *API) SetEnabled(
 		enabled,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	view.Artifact = updated.Clone()
 	return view, nil
@@ -274,27 +272,27 @@ func (a *API) List(
 func (a *API) Update(
 	ctx context.Context,
 	request UpdateRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
-		return CollectionView{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+		return PluginView{}, fmt.Errorf(
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 
 	value, err := a.loadEditableCollection(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedRevision,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	if request.DisplayName != "" {
@@ -312,7 +310,7 @@ func (a *API) Update(
 		false,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	return a.collectionViewOf(record, value.document)
 }
@@ -320,12 +318,12 @@ func (a *API) Update(
 func (a *API) AddMember(
 	ctx context.Context,
 	request AddMemberRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	result, err := a.mutateMember(ctx, request, false)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
-	return result.Collection, nil
+	return result.Plugin, nil
 }
 
 func (a *API) EnsureMember(
@@ -338,38 +336,38 @@ func (a *API) EnsureMember(
 func (a *API) RemoveMember(
 	ctx context.Context,
 	request RemoveMemberRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
-		return CollectionView{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+		return PluginView{}, fmt.Errorf(
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 
 	value, err := a.loadEditableCollection(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedRevision,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if request.Index < 0 || request.Index >= len(value.document.Members) {
-		return CollectionView{}, fmt.Errorf(
-			"%w: Collection member index %d is out of range",
+		return PluginView{}, fmt.Errorf(
+			"%w: Plugin member index %d is out of range",
 			spec.ErrNotFound,
 			request.Index,
 		)
 	}
 	normalized, err := normalizedMemberIndexes(value.document.Members)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	sourceIndex := normalized[request.Index]
 
@@ -393,7 +391,7 @@ func (a *API) RemoveMember(
 		false,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	return a.collectionViewOf(record, value.document)
 }
@@ -401,12 +399,12 @@ func (a *API) RemoveMember(
 func (a *API) AddEntry(
 	ctx context.Context,
 	request AddEntryRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	result, err := a.mutateEntry(ctx, request, false)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
-	return result.Collection, nil
+	return result.Plugin, nil
 }
 
 func (a *API) EnsureEntry(
@@ -419,30 +417,30 @@ func (a *API) EnsureEntry(
 func (a *API) AddArtifactMember(
 	ctx context.Context,
 	request AddArtifactMemberRequest,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
-	if err := request.Collection.Validate(); err != nil {
-		return CollectionView{}, err
+	if err := request.Plugin.Validate(); err != nil {
+		return PluginView{}, err
 	}
 	if err := request.Artifact.Validate(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
-	if request.Collection.RootID != request.Artifact.RootID {
-		return CollectionView{}, fmt.Errorf(
-			"%w: Collection member Artifact belongs to another Root",
+	if request.Plugin.RootID != request.Artifact.RootID {
+		return PluginView{}, fmt.Errorf(
+			"%w: Plugin member Artifact belongs to another Root",
 			spec.ErrInvalid,
 		)
 	}
 
 	target, err := a.artifacts.Get(ctx, request.Artifact)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	declarationType := declaration.Type(target.Kind)
 	if err := declarationType.Validate(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	member := MemberReference{
@@ -451,11 +449,11 @@ func (a *API) AddArtifactMember(
 	}
 	collectionValue, err := a.loadEditableCollection(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedRevision,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if target.Binding.SourceID == collectionValue.artifact.Binding.SourceID {
 		locator, err := relativeSourceLocator(
@@ -463,7 +461,7 @@ func (a *API) AddArtifactMember(
 			target.Binding.Locator,
 		)
 		if err != nil {
-			return CollectionView{}, err
+			return PluginView{}, err
 		}
 		member.Locator = &locator
 	}
@@ -471,7 +469,7 @@ func (a *API) AddArtifactMember(
 	return a.AddMember(
 		ctx,
 		AddMemberRequest{
-			Collection:       request.Collection,
+			Plugin:           request.Plugin,
 			ExpectedRevision: request.ExpectedRevision,
 			Member:           member,
 		},
@@ -480,7 +478,7 @@ func (a *API) AddArtifactMember(
 
 // MemberForCollectionSource builds a location-constrained external reference
 // for a declaration that will be published into the same managed Source as
-// the Collection.
+// the Plugin.
 func (a *API) MemberForCollectionSource(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
@@ -533,14 +531,14 @@ func (a *API) Delete(
 	}
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
 
 	value, err := a.loadEditableCollection(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedRevision,
 	)
 	if err != nil {
@@ -548,14 +546,14 @@ func (a *API) Delete(
 	}
 	if a.isBaselineEditableCollection(value) {
 		return fmt.Errorf(
-			"%w: baseline Collection %q cannot be deleted",
+			"%w: baseline Plugin %q cannot be deleted",
 			spec.ErrProtected,
 			value.artifact.LogicalName,
 		)
 	}
 	if len(value.document.Members) != 0 {
 		return fmt.Errorf(
-			"%w: Collection %q has %d direct members; detach them before deletion",
+			"%w: Plugin %q has %d direct members; detach them before deletion",
 			spec.ErrConflict,
 			value.artifact.LogicalName,
 			len(value.document.Members),
@@ -566,7 +564,7 @@ func (a *API) Delete(
 		RootID:             value.artifact.RootID,
 		SourceID:           value.artifact.Binding.SourceID,
 		Package:            value.address,
-		ExpectedArtifact:   &request.Collection,
+		ExpectedArtifact:   &request.Plugin,
 		ExpectedGeneration: value.generation,
 	}
 	if a.domain != nil {
@@ -577,20 +575,20 @@ func (a *API) Delete(
 		return err
 	}
 
-	missing, err := a.artifacts.Get(ctx, request.Collection)
+	missing, err := a.artifacts.Get(ctx, request.Plugin)
 	if err != nil {
 		return err
 	}
 	if missing.State != artifactModel.StateMissing {
 		return fmt.Errorf(
-			"%w: removed Collection Artifact is not missing",
+			"%w: removed Plugin Artifact is not missing",
 			spec.ErrConflict,
 		)
 	}
 
 	return a.artifacts.Purge(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		missing.Revision,
 	)
 }
@@ -623,24 +621,24 @@ func (a *API) create(
 	ctx context.Context,
 	request CreateRequest,
 	allowBaseline bool,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if err := request.RootID.Validate(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if err := request.Name.Validate(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if a.domain != nil &&
 		request.Name == a.domain.BaselineName &&
 		!allowBaseline {
-		return CollectionView{}, fmt.Errorf(
-			"%w: baseline Collection %q is application-provisioned",
+		return PluginView{}, fmt.Errorf(
+			"%w: baseline Plugin %q is application-provisioned",
 			spec.ErrProtected,
 			request.Name,
 		)
@@ -652,15 +650,15 @@ func (a *API) create(
 		request.SourceID,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	address, err := a.managedCollectionAddress(request.Name)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	locator, err := address.FileLocator(a.managedCollectionDocumentFile())
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	document := pluginv1.PluginDocument{
@@ -669,9 +667,18 @@ func (a *API) create(
 		DisplayName: request.DisplayName,
 		Description: request.Description,
 	}
+	if a.domain != nil {
+		document.Metadata, err = pluginDomain.PutMetadata(
+			document.Metadata,
+			a.domain.MembershipPolicy,
+		)
+		if err != nil {
+			return PluginView{}, err
+		}
+	}
 	_, digest, err := collectionDocumentPayload(document)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	existing, err := a.artifacts.FindByOrigin(
@@ -690,8 +697,8 @@ func (a *API) create(
 			*existing.ResolvedDefinition == digest {
 			return a.Get(ctx, existing.Ref())
 		}
-		return CollectionView{}, fmt.Errorf(
-			"%w: managed Collection %q already exists",
+		return PluginView{}, fmt.Errorf(
+			"%w: managed Plugin %q already exists",
 			spec.ErrConflict,
 			request.Name,
 		)
@@ -699,7 +706,7 @@ func (a *API) create(
 	case errors.Is(err, spec.ErrArtifactNotFound),
 		errors.Is(err, spec.ErrNotFound):
 	default:
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	record, err := a.publishDocument(
@@ -712,7 +719,7 @@ func (a *API) create(
 		false,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	return a.collectionViewOf(record, document)
 }
@@ -736,7 +743,7 @@ func (a *API) mutateMember(
 	return a.mutateEntry(
 		ctx,
 		AddEntryRequest{
-			Collection:       request.Collection,
+			Plugin:           request.Plugin,
 			ExpectedRevision: request.ExpectedRevision,
 			Entry:            member,
 		},
@@ -754,7 +761,7 @@ func (a *API) mutateEntry(
 	}
 	if request.ExpectedRevision == 0 {
 		return MemberMutationResult{}, fmt.Errorf(
-			"%w: expected Collection revision is required",
+			"%w: expected Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
@@ -762,14 +769,14 @@ func (a *API) mutateEntry(
 		return MemberMutationResult{}, err
 	}
 	member := request.Entry.Clone()
-	memberRaw, err := member.CanonicalJSON()
+	_, err := member.CanonicalJSON()
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
 
 	value, err := a.loadEditableCollection(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedRevision,
 	)
 	if err != nil {
@@ -787,17 +794,21 @@ func (a *API) mutateEntry(
 		if err != nil {
 			return MemberMutationResult{}, err
 		}
+		memberIdentity, err := declaration.MemberIdentityJSON(member)
+		if err != nil {
+			return MemberMutationResult{}, err
+		}
 		for normalizedIndex, sourceIndex := range normalized {
 			current := value.document.Members[sourceIndex]
-			currentRaw, err := current.CanonicalJSON()
+			currentIdentity, err := declaration.MemberIdentityJSON(current)
 			if err != nil {
 				return MemberMutationResult{}, err
 			}
-			if bytes.Equal(currentRaw, memberRaw) {
+			if bytes.Equal(currentIdentity, memberIdentity) {
 				return MemberMutationResult{
-					Collection: view,
-					Index:      normalizedIndex,
-					Created:    false,
+					Plugin:  view,
+					Index:   normalizedIndex,
+					Created: false,
 				}, nil
 			}
 		}
@@ -807,6 +818,14 @@ func (a *API) mutateEntry(
 		append([]declaration.Entry(nil), value.document.Members...),
 		member,
 	)
+	policy, err := pluginDomain.FromMetadata(value.document.Metadata)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	if err := policy.Allows(member); err != nil {
+		return MemberMutationResult{}, err
+	}
+
 	normalizedIndex, err := normalizedMemberIndex(
 		value.document.Members,
 		len(value.document.Members)-1,
@@ -831,9 +850,9 @@ func (a *API) mutateEntry(
 		return MemberMutationResult{}, err
 	}
 	return MemberMutationResult{
-		Collection: view,
-		Index:      normalizedIndex,
-		Created:    true,
+		Plugin:  view,
+		Index:   normalizedIndex,
+		Created: true,
 	}, nil
 }
 
@@ -852,14 +871,14 @@ func (a *API) managedSource(
 	}
 	if value.Kind != managedfs.Kind {
 		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: editable Collection Source must have kind %q",
+			"%w: editable Plugin Source must have kind %q",
 			spec.ErrUnsupported,
 			managedfs.Kind,
 		)
 	}
 	if !value.Enabled {
 		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: editable Collection Source is disabled",
+			"%w: editable Plugin Source is disabled",
 			spec.ErrConflict,
 		)
 	}
@@ -957,14 +976,14 @@ func (a *API) loadEditableCollection(
 	}
 	if record.State != artifactModel.StateAvailable {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Collection Artifact %q is unavailable",
+			"%w: Plugin Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return editableCollection{}, fmt.Errorf(
-			"%w: contained Collection declarations are not editable managed Collections",
+			"%w: contained Plugin declarations are not editable managed Collections",
 			spec.ErrUnsupported,
 		)
 	}
@@ -979,20 +998,20 @@ func (a *API) loadEditableCollection(
 	}
 	if sourceValue.Kind != managedfs.Kind {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Collection is not backed by a managed Source",
+			"%w: Plugin is not backed by a managed Source",
 			spec.ErrUnsupported,
 		)
 	}
 	if !sourceValue.Enabled {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Collection Source is disabled",
+			"%w: Plugin Source is disabled",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 	if a.domain != nil &&
 		sourceValue.StorageKey != a.domain.SourceStorageKey {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Collection belongs to another managed domain Source",
+			"%w: Plugin belongs to another managed domain Source",
 			spec.ErrReferenceUnresolved,
 		)
 	}
@@ -1005,7 +1024,7 @@ func (a *API) loadEditableCollection(
 	}
 	if address.Name != record.LogicalName {
 		return editableCollection{}, fmt.Errorf(
-			"%w: managed Collection package name does not match Artifact identity",
+			"%w: managed Plugin package name does not match Artifact identity",
 			spec.ErrInvalid,
 		)
 	}
@@ -1020,7 +1039,7 @@ func (a *API) loadEditableCollection(
 	}
 	if !inspection.IsCurrent() {
 		return editableCollection{}, fmt.Errorf(
-			"%w: managed Collection Source requires refresh",
+			"%w: managed Plugin Source requires refresh",
 			spec.ErrRefreshRequired,
 		)
 	}
@@ -1037,13 +1056,13 @@ func (a *API) loadEditableCollection(
 	}
 	if document.Name != string(record.LogicalName) {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Collection declaration name differs from Artifact identity",
+			"%w: Plugin declaration name differs from Artifact identity",
 			spec.ErrInvalid,
 		)
 	}
 	if document.Locator != nil {
 		return editableCollection{}, fmt.Errorf(
-			"%w: located Collection aliases are not editable managed Collections",
+			"%w: located Plugin aliases are not editable managed Collections",
 			spec.ErrUnsupported,
 		)
 	}
@@ -1099,7 +1118,7 @@ func (a *API) managedCollectionDocumentUse() string {
 	if a != nil && a.domain != nil && a.domain.DocumentUse != "" {
 		return a.domain.DocumentUse
 	}
-	return topology.DocumentUseManagedCollection
+	return topology.DocumentUseManagedPlugin
 }
 
 func (a *API) managedCollectionDocumentFile() spec.Locator {
@@ -1119,7 +1138,7 @@ func managedCollectionAddressFromLocator(
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		ManagedCollectionPackageKind,
-		topology.MustDefaultDocumentFile(topology.DocumentUseManagedCollection),
+		topology.MustDefaultDocumentFile(topology.DocumentUseManagedPlugin),
 		locator,
 	)
 }
@@ -1140,7 +1159,7 @@ func managedCollectionAddressFromLocatorFor(
 	}
 	if path.Base(string(locator)) != string(documentFile) {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
-			"%w: Collection locator %q is not %q",
+			"%w: Plugin locator %q is not %q",
 			spec.ErrUnsupported,
 			locator,
 			documentFile,
@@ -1154,7 +1173,7 @@ func managedCollectionAddressFromLocatorFor(
 	}
 	if address.Kind != packageKind {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
-			"%w: managed Collection package kind must be %q",
+			"%w: managed Plugin package kind must be %q",
 			spec.ErrUnsupported,
 			packageKind,
 		)
@@ -1169,11 +1188,7 @@ func collectionDocumentPayload(
 	if err != nil {
 		return nil, "", err
 	}
-	entry, err := declaration.NewEntry(document)
-	if err != nil {
-		return nil, "", err
-	}
-	value, err := decoder.DefinitionForEntry(entry)
+	value, err := pluginv1.DefinitionForDocument(document)
 	if err != nil {
 		return nil, "", err
 	}
@@ -1183,8 +1198,8 @@ func collectionDocumentPayload(
 func (a *API) collectionViewOf(
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
-) (CollectionView, error) {
-	baseline := IsBaselineCollectionArtifact(record)
+) (PluginView, error) {
+	baseline := IsBaselinePluginArtifact(record)
 	if a != nil && a.domain != nil {
 		address, err := a.managedCollectionAddressFromLocator(
 			record.Binding.Locator,
@@ -1402,5 +1417,5 @@ func normalizedMemberIndex(
 			return index, nil
 		}
 	}
-	return 0, fmt.Errorf("%w: Collection member does not exist", spec.ErrNotFound)
+	return 0, fmt.Errorf("%w: Plugin member does not exist", spec.ErrNotFound)
 }

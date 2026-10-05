@@ -119,24 +119,24 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	for _, value := range builtinCollections {
 		if value.Editable {
 			t.Fatalf(
-				"built-in Collection %q is unexpectedly editable",
+				"built-in Plugin %q is unexpectedly editable",
 				value.Name,
 			)
 		}
 		if value.Deletable {
 			t.Fatalf(
-				"built-in Collection %q is unexpectedly deletable",
+				"built-in Plugin %q is unexpectedly deletable",
 				value.Name,
 			)
 		}
 	}
 
 	baseline := fixture.ensureUserBaseline(t)
-	if baseline.Name != plugin.SkillBaselineCollectionName {
+	if baseline.Name != plugin.SkillBaselinePluginName {
 		t.Fatalf(
 			"baseline name=%q, want %q",
 			baseline.Name,
-			plugin.SkillBaselineCollectionName,
+			plugin.SkillBaselinePluginName,
 		)
 	}
 	if !baseline.Baseline {
@@ -162,10 +162,10 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	requireNoError(t, err)
 	listedBaseline, found := findCollectionByName(
 		userCollections,
-		string(plugin.SkillBaselineCollectionName),
+		string(plugin.SkillBaselinePluginName),
 	)
 	if !found {
-		t.Fatal("user Skill baseline is absent from Collection listing")
+		t.Fatal("user Skill baseline is absent from Plugin listing")
 	}
 	if listedBaseline.Ref != baseline.Artifact.Ref() {
 		t.Fatalf(
@@ -178,7 +178,7 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	err = fixture.api.DeleteSkillCollection(
 		ctx,
 		plugin.DeleteRequest{
-			Collection:       baseline.Artifact.Ref(),
+			Plugin:           baseline.Artifact.Ref(),
 			ExpectedRevision: baseline.Artifact.Revision,
 		},
 	)

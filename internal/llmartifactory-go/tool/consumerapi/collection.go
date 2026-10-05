@@ -7,31 +7,9 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
-
-func toolCollectionPolicy() plugin.DomainPolicy {
-	return plugin.DomainPolicy{
-		Name:        "tool",
-		ReadOnly:    true,
-		PackageKind: toolDomain.ToolCollectionPackageKind,
-		DocumentUse: topology.DocumentUseToolCollection,
-		AllowedMemberTypes: []declaration.Type{
-			declaration.TypeTool,
-		},
-		AllowedMemberForms: []declaration.MemberForm{
-			declaration.MemberNamed,
-		},
-		ValidateDocument: func(document pluginv1.PluginDocument) error {
-			_, err := toolDomain.ValidateToolCollectionDocument(document)
-			return err
-		},
-	}
-}
 
 func (a *API) ListToolCollections(
 	ctx context.Context,
@@ -39,7 +17,7 @@ func (a *API) ListToolCollections(
 	if err := a.ready(ctx); err != nil {
 		return nil, err
 	}
-	return a.collections.ListDomain(ctx, plugin.ListRequest{
+	return a.plugins.ListDomain(ctx, plugin.ListRequest{
 		RootID: a.builtinRoot,
 	})
 }
@@ -47,20 +25,20 @@ func (a *API) ListToolCollections(
 func (a *API) GetToolCollection(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	if err := a.ready(ctx); err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 	if err := a.requireBuiltinRef(ref); err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 
-	view, err := a.collections.Read(ctx, ref)
+	view, err := a.plugins.Read(ctx, ref)
 	if err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 	if err := a.requireBuiltinArtifact(view.Artifact); err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 	return view, nil
 }
@@ -70,21 +48,21 @@ func (a *API) SetToolCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	if _, err := a.GetToolCollection(ctx, ref); err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
-	return a.collections.SetEnabled(ctx, ref, expectedRevision, enabled)
+	return a.plugins.SetEnabled(ctx, ref, expectedRevision, enabled)
 }
 
 func (a *API) collectionForTool(
 	ctx context.Context,
 	name spec.LogicalName,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	collectionName, found := a.collectionByTool[name]
 	if !found {
-		return plugin.CollectionView{}, fmt.Errorf(
-			"%w: Tool %q has no generated Tool Collection",
+		return plugin.PluginView{}, fmt.Errorf(
+			"%w: Tool %q has no generated Tool Plugin",
 			spec.ErrReferenceUnresolved,
 			name,
 		)
@@ -98,7 +76,7 @@ func (a *API) collectionForTool(
 		catalogModel.ListOptions{},
 	)
 	if err != nil {
-		return plugin.CollectionView{}, err
+		return plugin.PluginView{}, err
 	}
 
 	matches := make([]artifactModel.ArtifactRef, 0, 1)
@@ -114,13 +92,13 @@ func (a *API) collectionForTool(
 	case 1:
 		return a.GetToolCollection(ctx, matches[0])
 	case 0:
-		return plugin.CollectionView{}, fmt.Errorf(
-			"%w: Tool %q has no Tool Collection",
+		return plugin.PluginView{}, fmt.Errorf(
+			"%w: Tool %q has no Tool Plugin",
 			spec.ErrReferenceUnresolved,
 			name,
 		)
 	default:
-		return plugin.CollectionView{}, fmt.Errorf(
+		return plugin.PluginView{}, fmt.Errorf(
 			"%w: Tool %q belongs to %d Tool Collections",
 			spec.ErrIdentityConflict,
 			name,

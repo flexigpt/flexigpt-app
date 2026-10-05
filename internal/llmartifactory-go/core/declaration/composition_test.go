@@ -120,7 +120,8 @@ func TestWalkNamedEntriesSkipsExternalMembers(t *testing.T) {
 		},
 	})
 
-	entries, err := declaration.WalkNamedEntries(root)
+	registry := declarationTestRegistry(t)
+	entries, err := registry.WalkNamedEntries(root)
 	if err != nil {
 		t.Fatalf("WalkNamedEntries() error = %v", err)
 	}
@@ -150,7 +151,8 @@ func TestWalkNamedEntriesUsesTextInsertionIdentity(t *testing.T) {
 		},
 	})
 
-	entries, err := declaration.WalkNamedEntries(root)
+	registry := declarationTestRegistry(t)
+	entries, err := registry.WalkNamedEntries(root)
 	if err != nil {
 		t.Fatalf("WalkNamedEntries() error = %v", err)
 	}

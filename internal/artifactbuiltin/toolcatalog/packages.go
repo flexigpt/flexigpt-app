@@ -13,9 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -35,6 +35,7 @@ func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
 	goTools toolDomain.GoToolLocator,
+	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -44,6 +45,12 @@ func PreparePackages(
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if registry == nil {
+		return nil, fmt.Errorf(
+			"%w: Tool package interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
 	if packages == nil || goTools == nil {
 		return nil, fmt.Errorf(
@@ -67,6 +74,7 @@ func PreparePackages(
 			root,
 			goTools,
 			seenTools,
+			registry,
 		)
 		if err != nil {
 			return nil, err
@@ -83,13 +91,14 @@ func prepareCollectionDirectory(
 	collectionRoot spec.Locator,
 	goTools toolDomain.GoToolLocator,
 	seenTools map[spec.LogicalName]spec.Locator,
+	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	pluginLocation := string(collectionRoot) + "/" +
 		string(toolDomain.ToolCollectionDocumentFile())
 	pluginBytes, err := fs.ReadFile(packages, pluginLocation)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"read Tool Collection %q: %w",
+			"read Tool Plugin %q: %w",
 			collectionRoot,
 			err,
 		)
@@ -120,6 +129,7 @@ func prepareCollectionDirectory(
 	collectionPackage, err := prepareCollectionPackage(
 		collectionRoot,
 		pluginDocument,
+		registry,
 	)
 	if err != nil {
 		return nil, err
@@ -145,7 +155,7 @@ func prepareCollectionDirectory(
 	for _, name := range toolNames {
 		if previous, duplicate := seenTools[name]; duplicate {
 			return nil, fmt.Errorf(
-				"%w: Tool %q belongs to both Collection directories %q and %q",
+				"%w: Tool %q belongs to both Plugin directories %q and %q",
 				spec.ErrIdentityConflict,
 				name,
 				previous,
@@ -159,7 +169,7 @@ func prepareCollectionDirectory(
 			goDescriptor, err := goTools.LookupGoToolByName(ctx, name)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"tool collection %q references Tool %q that is neither embedded SDK Tool nor registered Go Tool: %w",
+					"tool plugin %q references Tool %q that is neither embedded SDK Tool nor registered Go Tool: %w",
 					pluginDocument.Name,
 					name,
 					err,
@@ -171,6 +181,7 @@ func prepareCollectionDirectory(
 		prepared, err := prepareToolPackage(
 			collectionRoot,
 			document,
+			registry,
 		)
 		if err != nil {
 			return nil, err
@@ -207,7 +218,7 @@ func readStaticSDKTools(
 		}
 		if !entry.IsDir() {
 			return nil, fmt.Errorf(
-				"%w: Tool Collection directory %q contains unexpected file %q",
+				"%w: Tool Plugin directory %q contains unexpected file %q",
 				spec.ErrInvalid,
 				collectionRoot,
 				entry.Name(),
@@ -265,7 +276,7 @@ func readStaticSDKTools(
 		name := spec.LogicalName(document.Name)
 		if _, found := allowed[name]; !found {
 			return nil, fmt.Errorf(
-				"%w: embedded SDK Tool %q is not declared by Collection %q",
+				"%w: embedded SDK Tool %q is not declared by Plugin %q",
 				spec.ErrInvalid,
 				name,
 				collectionRoot,
@@ -273,7 +284,7 @@ func readStaticSDKTools(
 		}
 		if _, duplicate := output[name]; duplicate {
 			return nil, fmt.Errorf(
-				"%w: Collection %q repeats embedded SDK Tool %q",
+				"%w: Plugin %q repeats embedded SDK Tool %q",
 				spec.ErrIdentityConflict,
 				collectionRoot,
 				name,
@@ -311,6 +322,7 @@ func toolDocumentFromGoDescriptor(
 func prepareCollectionPackage(
 	packageRoot spec.Locator,
 	document pluginv1.PluginDocument,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	raw, err := document.CanonicalJSON()
 	if err != nil {
@@ -320,7 +332,7 @@ func prepareCollectionPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	definitionValue, err := decoder.DefinitionForEntry(entry)
+	definitionValue, err := registry.DefinitionForEntry(entry)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -351,6 +363,7 @@ func prepareCollectionPackage(
 func prepareToolPackage(
 	collectionRoot spec.Locator,
 	document toolv1.ToolDocument,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := document.Validate(); err != nil {
 		return PreparedPackage{}, err
@@ -363,7 +376,7 @@ func prepareToolPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	definitionValue, err := decoder.DefinitionForEntry(entry)
+	definitionValue, err := registry.DefinitionForEntry(entry)
 	if err != nil {
 		return PreparedPackage{}, err
 	}

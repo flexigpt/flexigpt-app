@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -42,7 +41,7 @@ type API struct {
 	secretCleaner       serverMCPDomain.SecretCleaner
 	baselinePolicy      mcpPolicy.MCPPolicy
 	declarationResolver *composition.Resolver
-	collections         *plugin.API
+	plugins             *plugin.API
 }
 
 func New(
@@ -80,6 +79,11 @@ func New(
 			option(&config)
 		}
 	}
+	aliases, err := requiredCompositionResolver(config.resolver)
+	if err != nil {
+		return nil, err
+	}
+
 	output := &API{
 		sources:          sources,
 		discovery:        discovery,
@@ -93,29 +97,7 @@ func New(
 		cat:              cat,
 		definitions:      definitions,
 	}
-	locators, err := composition.NewProviderLocatorResolver(
-		config.locatorResolvers,
-		mcpLocatorRuntime{cat: cat},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("bind MCP declaration locator resolvers: %w", err)
-	}
-	aliases, err := composition.NewWithOptions(
-		composition.ResolverOptions{
-			Artifacts:            artifacts,
-			Catalog:              cat,
-			SourceEntries:        resources,
-			Locators:             locators,
-			FallbackProviders:    config.fallbackProviders,
-			TargetMappers:        config.targetMappers,
-			ProtectedBuiltinRoot: topology.BuiltinRootID(),
-			Limits:               composition.DefaultLimits(),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	collections, err := plugin.NewWithResolver(
+	plugins, err := plugin.New(
 		artifacts,
 		cat,
 		sources,
@@ -123,13 +105,13 @@ func New(
 		managedArtifacts,
 		definitions,
 		aliases,
-		plugin.MCPDomainPolicy(),
+		mcpDomain.PluginProfile(),
 	)
 	if err != nil {
 		return nil, err
 	}
 	output.declarationResolver = aliases
-	output.collections = collections
+	output.plugins = plugins
 	return output, nil
 }
 
@@ -192,14 +174,14 @@ func (a *API) SaveServerSettings(
 }
 
 // ListMCPCollectionServers resolves every available server once, sharing one
-// resource verification session across the collection and its dependencies.
+// resource verification session across the plugin and its dependencies.
 // Aggregate owns the public projection and runtime identities.
 func (a *API) ListMCPCollectionServers(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
 	if a == nil ||
-		a.collections == nil ||
+		a.plugins == nil ||
 		a.resources == nil ||
 		a.declarationResolver == nil {
 		return nil, spec.ErrClosed
@@ -401,26 +383,26 @@ func (a *API) listMCPCollectionServers(
 	ctx context.Context,
 	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	if _, err := a.collections.Read(ctx, collectionRef); err != nil {
+	if _, err := a.plugins.Read(ctx, collectionRef); err != nil {
 		return nil, err
 	}
 
-	collection, err := a.declarationResolver.ResolvePluginMembers(
+	p, err := a.declarationResolver.ResolvePluginMembers(
 		ctx,
 		collectionRef,
 	)
 	if err != nil {
 		return nil, err
 	}
-	if collection == nil || collection.Type != declaration.TypePlugin {
+	if p == nil || p.Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
-			"%w: MCP Collection did not resolve as a Plugin",
+			"%w: MCP Plugin did not resolve as a Plugin",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 
 	refs := make(map[artifactModel.ArtifactRef]struct{})
-	for _, relationship := range collection.MemberResults {
+	for _, relationship := range p.Relationships {
 		if relationship.Declared.Header().Type != declaration.TypeMCP {
 			continue
 		}
@@ -460,7 +442,7 @@ func (a *API) listMCPCollectionServers(
 		material, err := a.resolveServerMaterial(ctx, ref)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"load MCP Collection server %q: %w",
+				"load MCP Plugin server %q: %w",
 				ref.ArtifactID,
 				err,
 			)
@@ -469,7 +451,7 @@ func (a *API) listMCPCollectionServers(
 		read, err := a.serverReadFromMaterial(ctx, material)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"resolve MCP Collection server policy %q: %w",
+				"resolve MCP Plugin server policy %q: %w",
 				ref.ArtifactID,
 				err,
 			)
@@ -645,6 +627,25 @@ func (a *API) resolveDeclarationArtifact(
 	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)
 }
 
+func resolvedMCPPolicyRelationship(
+	value *composition.ResolvedEntry,
+	name spec.LogicalName,
+) (*composition.ResolvedRelationship, bool) {
+	if value == nil {
+		return nil, false
+	}
+	for _, relationship := range value.Relationships {
+		header := relationship.Declared.Header()
+		if header.Type != declaration.TypeMCPPolicy ||
+			header.Name != string(name) {
+			continue
+		}
+		copyValue := relationship
+		return &copyValue, true
+	}
+	return nil, false
+}
+
 func (a *API) effectiveInstallation(
 	ctx context.Context,
 	record artifactModel.Artifact,
@@ -709,8 +710,11 @@ func (a *API) effectivePolicy(
 		if err != nil {
 			return mcpPolicy.Effective{}, err
 		}
-		if resolvedServer.MCP == nil ||
-			resolvedServer.MCP.PolicyResult == nil {
+		policyResult, found := resolvedMCPPolicyRelationship(
+			resolvedServer,
+			reference.Name,
+		)
+		if !found {
 			if reference.Required {
 				return mcpPolicy.Effective{}, fmt.Errorf(
 					"%w: required MCP Policy %q did not resolve",
@@ -719,7 +723,6 @@ func (a *API) effectivePolicy(
 				)
 			}
 		} else {
-			policyResult := resolvedServer.MCP.PolicyResult
 			if !policyResult.IsAvailable() {
 				if reference.Required {
 					return mcpPolicy.Effective{}, fmt.Errorf(
@@ -730,14 +733,18 @@ func (a *API) effectivePolicy(
 					)
 				}
 			} else {
-				policyRef, found := policyResult.Resolved.ArtifactRef()
-				if !found {
+				if policyResult.Resolved == nil ||
+					policyResult.Resolved.Target == nil ||
+					policyResult.Resolved.Target.Form !=
+						composition.TargetFormArtifact ||
+					policyResult.Resolved.Target.Artifact == nil {
 					return mcpPolicy.Effective{}, fmt.Errorf(
-						"%w: MCP Policy %q did not resolve to an Artifact",
+						"%w: MCP Policy %q did not resolve to a source-backed Artifact",
 						spec.ErrReferenceUnresolved,
 						reference.Name,
 					)
 				}
+				policyRef := *policyResult.Resolved.Target.Artifact
 				policy, err := a.policyBodyForArtifact(ctx, policyRef)
 				if err != nil {
 					return mcpPolicy.Effective{}, err

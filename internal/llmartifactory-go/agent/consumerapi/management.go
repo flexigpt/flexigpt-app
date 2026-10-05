@@ -102,8 +102,8 @@ func (a *API) ListAgentImportDestinationsForManagement(
 			return output[left].CollectionName <
 				output[right].CollectionName
 		}
-		return output[left].Collection.ArtifactID <
-			output[right].Collection.ArtifactID
+		return output[left].Plugin.ArtifactID <
+			output[right].Plugin.ArtifactID
 	})
 	return output, nil
 }
@@ -116,7 +116,7 @@ func (a *API) ensureDefaultAgentCollectionRoot(
 	}
 	if ctx == nil {
 		return "", fmt.Errorf(
-			"%w: default Agent Collection Root context is nil",
+			"%w: default Agent Plugin Root context is nil",
 			spec.ErrInvalid,
 		)
 	}
@@ -133,7 +133,7 @@ func (a *API) ensureDefaultAgentCollectionRoot(
 	}
 	if value.ID != topology.UserRootID() {
 		return "", fmt.Errorf(
-			"%w: default Agent Collection Root has unexpected ID %q",
+			"%w: default Agent Plugin Root has unexpected ID %q",
 			spec.ErrInvalid,
 			value.ID,
 		)

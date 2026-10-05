@@ -6,36 +6,36 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
-	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/providerapi"
+	skillmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/sourceformat/markdown"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
+	registry *interpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedSkillPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages)
+	prepared, err := PreparePackages(ctx, packages, registry)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	sourceProvider, err := skillProviderAPI.NewRegistration()
-	if err != nil {
-		return installModel.CompiledPackageSet{}, err
-	}
-
+	// Skill package admission needs the SKILL.md source-format adapter in
+	// addition to canonical declaration decoding.
 	return artifactsetup.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactsetup.CompileConfig{
 		SetName:            topology.BuiltinEmbeddedPackageSkills,
 		SchemaVersion:      skillDomain.HydrationSchemaVersion,
 		InstallerName:      skillDomain.BuiltInInstallerName,
-		AdditionalDecoders: sourceProvider.Decoders(),
+		AdditionalDecoders: []ingest.Decoder{skillmarkdown.NewDecoder()},
 		Packages:           packageInputs(prepared),
 	})
 }

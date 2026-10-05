@@ -7,7 +7,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 )
 
 const WorkspaceArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(

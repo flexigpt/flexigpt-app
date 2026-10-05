@@ -22,8 +22,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
@@ -59,9 +57,7 @@ func InitSkillStoreWrapper(
 	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	definitions definition.API,
-	fallbackProviders map[declaration.Type]composition.FallbackProvider,
-	targetMappers map[declaration.Type]composition.ArtifactTargetMapper,
-	locatorResolvers ...locator.Factory,
+	resolver *composition.Resolver,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -84,14 +80,8 @@ func InitSkillStoreWrapper(
 		protection,
 		cat,
 		definitions,
-		skillConsumerAPI.WithLocatorResolvers(
-			locatorResolvers,
-		),
-		skillConsumerAPI.WithFallbackProviders(
-			fallbackProviders,
-		),
-		skillConsumerAPI.WithTargetMappers(
-			targetMappers,
+		skillConsumerAPI.WithCompositionResolver(
+			resolver,
 		),
 	)
 	if err != nil {
@@ -321,11 +311,11 @@ func (w *SkillStoreWrapper) PurgeSkill(
 
 func (w *SkillStoreWrapper) CreateSkillCollection(
 	request plugin.CreateRequest,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withRecoveryResp(
-		func() (plugin.CollectionView, error) {
+		func() (plugin.PluginView, error) {
 			if w == nil || w.api == nil {
-				return plugin.CollectionView{}, spec.ErrClosed
+				return plugin.PluginView{}, spec.ErrClosed
 			}
 
 			// A blank RootID is UI request routing to the retained user Root.
@@ -340,16 +330,16 @@ func (w *SkillStoreWrapper) CreateSkillCollection(
 
 func (w *SkillStoreWrapper) ResolveSkillCollection(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionCapabilityPlan, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionCapabilityPlan, error) {
+) (plugin.PluginCapabilityPlan, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginCapabilityPlan, error) {
 		return api.ResolveSkillCollection(context.Background(), ref)
 	})
 }
 
 func (w *SkillStoreWrapper) GetSkillCollection(
 	ref artifactModel.ArtifactRef,
-) (plugin.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 		return api.GetSkillCollection(context.Background(), ref)
 	})
 }
@@ -358,10 +348,10 @@ func (w *SkillStoreWrapper) SetSkillCollectionEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
 	return withSkillStore(
 		w,
-		func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+		func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 			return api.SetSkillCollectionEnabled(
 				context.Background(),
 				ref,
@@ -396,32 +386,32 @@ func (w *SkillStoreWrapper) ListSkillCollectionMemberships(
 
 func (w *SkillStoreWrapper) UpdateSkillCollection(
 	request plugin.UpdateRequest,
-) (plugin.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 		return api.UpdateSkillCollection(context.Background(), request)
 	})
 }
 
 func (w *SkillStoreWrapper) AddSkillCollectionMember(
 	request plugin.AddMemberRequest,
-) (plugin.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 		return api.AddSkillCollectionMember(context.Background(), request)
 	})
 }
 
 func (w *SkillStoreWrapper) AttachSkillArtifactToCollection(
 	request plugin.AddArtifactMemberRequest,
-) (plugin.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 		return api.AttachSkillArtifactToCollection(context.Background(), request)
 	})
 }
 
 func (w *SkillStoreWrapper) RemoveSkillCollectionMember(
 	request plugin.RemoveMemberRequest,
-) (plugin.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.CollectionView, error) {
+) (plugin.PluginView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (plugin.PluginView, error) {
 		return api.RemoveSkillCollectionMember(context.Background(), request)
 	})
 }

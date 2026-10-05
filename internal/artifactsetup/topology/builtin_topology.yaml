@@ -43,7 +43,7 @@ builtin:
         authoritative: true
         includePatterns: []
         documentSets:
-          - "collections"
+          - "plugins"
           - "mcpConfigs"
           - "modelProviders"
           - "models"

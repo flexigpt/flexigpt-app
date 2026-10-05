@@ -11,7 +11,6 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -19,34 +18,34 @@ import (
 var contractTopologyYAML []byte
 
 const (
-	DocumentUseCollection                          = "collection"
-	DocumentUseCanonicalYAML                       = "canonicalYAML"
-	DocumentUseCanonicalJSON                       = "canonicalJSON"
-	DocumentUseMCPConfig                           = "mcpConfig"
-	DocumentUseSkillPackage                        = "skillPackage"
-	DocumentUseModelProviderPackage                = "modelProviderPackage"
-	DocumentUseModelPackage                        = "modelPackage"
-	DocumentUseToolPackage                         = "toolPackage"
-	DocumentUseToolCollection                      = "toolCollection"
-	DocumentUseManagedCollection                   = "managedCollection"
-	DocumentUseManagedModelProvider                = "managedModelProvider"
-	DocumentUseManagedModel                        = "managedModel"
-	DocumentUseAgentManagedCollection              = "agentManagedCollection"
-	DocumentUseManagedAgent                        = "managedAgent"
-	DocumentUseManagedMCP                          = "managedMCP"
-	DocumentUseManagedMCPPolicy                    = "managedMCPPolicy"
-	DocumentUseAgentMarkdown                       = "agentMarkdown"
-	DocumentUseWorkspaceMarkdown                   = "workspaceMarkdown"
-	DocumentUseWorkspaceInstructions               = "workspaceInstructions"
-	DiscoveryUseSkill                              = "skill"
-	DiscoveryUseMCP                                = "mcp"
-	DiscoveryUseWorkspace                          = "workspace"
-	DiscoveryUseSelector                           = "selector"
-	MarkdownRuleAgent                              = "agent"
-	MarkdownRuleText                               = "text"
-	MarkdownRuleDefaultText                        = "defaultText"
-	MarkdownRuleInstructionText                    = "instructionText"
-	RepositoryRootLocator             spec.Locator = "."
+	DocumentUsePlugin                             = "plugin"
+	DocumentUseCanonicalYAML                      = "canonicalYAML"
+	DocumentUseCanonicalJSON                      = "canonicalJSON"
+	DocumentUseMCPConfig                          = "mcpConfig"
+	DocumentUseSkillPackage                       = "skillPackage"
+	DocumentUseModelProviderPackage               = "modelProviderPackage"
+	DocumentUseModelPackage                       = "modelPackage"
+	DocumentUseToolPackage                        = "toolPackage"
+	DocumentUseToolPlugin                         = "toolPlugin"
+	DocumentUseManagedPlugin                      = "managedPlugin"
+	DocumentUseManagedModelProvider               = "managedModelProvider"
+	DocumentUseManagedModel                       = "managedModel"
+	DocumentUseAgentManagedPlugin                 = "agentManagedPlugin"
+	DocumentUseManagedAgent                       = "managedAgent"
+	DocumentUseManagedMCP                         = "managedMCP"
+	DocumentUseManagedMCPPolicy                   = "managedMCPPolicy"
+	DocumentUseAgentMarkdown                      = "agentMarkdown"
+	DocumentUseWorkspaceMarkdown                  = "workspaceMarkdown"
+	DocumentUseWorkspaceInstructions              = "workspaceInstructions"
+	DiscoveryUseSkill                             = "skill"
+	DiscoveryUseMCP                               = "mcp"
+	DiscoveryUseWorkspace                         = "workspace"
+	DiscoveryUseSelector                          = "selector"
+	MarkdownRuleAgent                             = "agent"
+	MarkdownRuleText                              = "text"
+	MarkdownRuleDefaultText                       = "defaultText"
+	MarkdownRuleInstructionText                   = "instructionText"
+	RepositoryRootLocator            spec.Locator = "."
 )
 
 type documentFormat string
@@ -98,12 +97,6 @@ type discoveryUseWire struct {
 	Profiles []string `json:"profiles"`
 }
 
-type resolverTypePolicyWire struct {
-	Type                          declaration.Type `json:"type"`
-	SupportsSelectors             bool             `json:"supportsSelectors,omitempty"`
-	SupportsMappedFallbackTargets bool             `json:"supportsMappedFallbackTargets,omitempty"`
-}
-
 type contractTopologyWire struct {
 	PackageVersions struct {
 		Unversioned spec.LogicalVersion `json:"unversioned"`
@@ -114,10 +107,6 @@ type contractTopologyWire struct {
 	MarkdownRules map[string]markdownRuleWire     `json:"markdownRules"`
 	Discovery     map[string]discoveryProfileWire `json:"discovery"`
 	DiscoveryUses map[string]discoveryUseWire     `json:"discoveryUses"`
-
-	Resolver struct {
-		Types []resolverTypePolicyWire `json:"types"`
-	} `json:"resolver"`
 }
 
 type documentAlias struct {
@@ -140,21 +129,12 @@ type markdownRule struct {
 	excludeRules        []string
 }
 
-// ResolverTypePolicy contains resolver behavior that is declarative rather
-// than intrinsic to a concrete declaration implementation.
-type ResolverTypePolicy struct {
-	Type                          declaration.Type
-	SupportsSelectors             bool
-	SupportsMappedFallbackTargets bool
-}
-
 type contractTopology struct {
 	documentSets              map[string][]documentAlias
 	documentUses              map[string]documentUse
 	markdownRules             map[string]markdownRule
 	discoveryProfiles         map[string]sourceModel.DiscoverySpec
 	discoveryUses             map[string]sourceModel.DiscoverySpec
-	resolverTypePolicies      []ResolverTypePolicy
 	unversionedPackageVersion spec.LogicalVersion
 }
 
@@ -248,13 +228,13 @@ func IsDocumentFormat(
 	return configuredContractTopology.matchesDocument(locator, use, format)
 }
 
-func CollectionDocumentFiles() []spec.Locator {
-	return MustDocumentFiles(DocumentUseCollection)
+func PluginDocumentFiles() []spec.Locator {
+	return MustDocumentFiles(DocumentUsePlugin)
 }
 
-func IsCollectionDocumentFile(value spec.Locator) bool {
+func IsPluginDocumentFile(value spec.Locator) bool {
 	return path.Base(string(value)) == string(value) &&
-		IsDocument(value, DocumentUseCollection)
+		IsDocument(value, DocumentUsePlugin)
 }
 
 func IsMCPConfigDocument(locator spec.Locator) bool {
@@ -367,13 +347,6 @@ func MatchesMarkdownRule(rule string, locator spec.Locator) bool {
 
 func UnversionedPackageVersion() spec.LogicalVersion {
 	return configuredContractTopology.unversionedPackageVersion
-}
-
-func ResolverTypePolicies() []ResolverTypePolicy {
-	return append(
-		[]ResolverTypePolicy(nil),
-		configuredContractTopology.resolverTypePolicies...,
-	)
 }
 
 func DiscoverySpecForUse(name string) (sourceModel.DiscoverySpec, error) {
@@ -610,10 +583,6 @@ func loadContractTopology(raw []byte) (contractTopology, error) {
 	if err != nil {
 		return contractTopology{}, err
 	}
-	resolverPolicies, err := parseResolverTypePolicies(wire.Resolver.Types)
-	if err != nil {
-		return contractTopology{}, err
-	}
 
 	value := contractTopology{
 		documentSets:              documentSets,
@@ -621,7 +590,6 @@ func loadContractTopology(raw []byte) (contractTopology, error) {
 		markdownRules:             markdownRules,
 		discoveryProfiles:         discoveryProfiles,
 		discoveryUses:             discoveryUses,
-		resolverTypePolicies:      resolverPolicies,
 		unversionedPackageVersion: wire.PackageVersions.Unversioned,
 	}
 	if err := validateRequiredContractBindings(value); err != nil {
@@ -1239,47 +1207,9 @@ func mergeDiscoveryProfiles(
 	return output, nil
 }
 
-func parseResolverTypePolicies(
-	values []resolverTypePolicyWire,
-) ([]ResolverTypePolicy, error) {
-	if len(values) == 0 {
-		return nil, fmt.Errorf(
-			"%w: contract topology has no resolver type policies",
-			spec.ErrInvalid,
-		)
-	}
-
-	seen := make(map[declaration.Type]struct{}, len(values))
-	output := make([]ResolverTypePolicy, 0, len(values))
-	for index, value := range values {
-		if err := value.Type.Validate(); err != nil {
-			return nil, fmt.Errorf("resolver types[%d]: %w", index, err)
-		}
-		if _, duplicate := seen[value.Type]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: resolver type policy repeats %q",
-				spec.ErrInvalid,
-				value.Type,
-			)
-		}
-		seen[value.Type] = struct{}{}
-		output = append(output, ResolverTypePolicy(value))
-	}
-	for _, declarationType := range declaration.Types() {
-		if _, found := seen[declarationType]; !found {
-			return nil, fmt.Errorf(
-				"%w: contract topology has no resolver policy for %q",
-				spec.ErrInvalid,
-				declarationType,
-			)
-		}
-	}
-	return output, nil
-}
-
 func validateRequiredContractBindings(value contractTopology) error {
 	for _, use := range []string{
-		DocumentUseCollection,
+		DocumentUsePlugin,
 		DocumentUseCanonicalYAML,
 		DocumentUseCanonicalJSON,
 		DocumentUseMCPConfig,
@@ -1287,11 +1217,11 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseModelProviderPackage,
 		DocumentUseModelPackage,
 		DocumentUseToolPackage,
-		DocumentUseToolCollection,
-		DocumentUseManagedCollection,
+		DocumentUseToolPlugin,
+		DocumentUseManagedPlugin,
 		DocumentUseManagedModelProvider,
 		DocumentUseManagedModel,
-		DocumentUseAgentManagedCollection,
+		DocumentUseAgentManagedPlugin,
 		DocumentUseManagedAgent,
 		DocumentUseManagedMCP,
 		DocumentUseManagedMCPPolicy,
@@ -1312,11 +1242,11 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseModelProviderPackage,
 		DocumentUseModelPackage,
 		DocumentUseToolPackage,
-		DocumentUseToolCollection,
-		DocumentUseManagedCollection,
+		DocumentUseToolPlugin,
+		DocumentUseManagedPlugin,
 		DocumentUseManagedModelProvider,
 		DocumentUseManagedModel,
-		DocumentUseAgentManagedCollection,
+		DocumentUseAgentManagedPlugin,
 		DocumentUseManagedAgent,
 		DocumentUseManagedMCP,
 		DocumentUseManagedMCPPolicy,
@@ -1328,6 +1258,27 @@ func validateRequiredContractBindings(value contractTopology) error {
 			return err
 		}
 	}
+
+	uses := make([]string, 0, len(value.documentUses))
+	for use := range value.documentUses {
+		uses = append(uses, use)
+	}
+	slices.Sort(uses)
+
+	for _, use := range uses {
+		documentUse := value.documentUses[use]
+		if documentUse.defaultLocator == "" {
+			continue
+		}
+		if _, err := value.defaultDocumentDecoderID(use); err != nil {
+			return fmt.Errorf(
+				"document use %q default decoder: %w",
+				use,
+				err,
+			)
+		}
+	}
+
 	for _, name := range []string{
 		MarkdownRuleAgent,
 		MarkdownRuleText,

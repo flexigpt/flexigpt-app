@@ -103,7 +103,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 		if _, found := directories[spec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
 			continue
 		}
-		if !topology.IsCollectionDocumentFile(
+		if !topology.IsPluginDocumentFile(
 			spec.Locator(path.Base(string(entry.Binding.Locator))),
 		) {
 			continue

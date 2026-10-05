@@ -18,6 +18,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
@@ -27,7 +28,8 @@ type API struct {
 	artifacts        artifact.API
 	managedArtifacts managepackageFlow.API
 	discovery        refreshFlow.API
-	collections      *plugin.API
+	plugins          *plugin.API
+	resolver         *composition.Resolver
 	cat              catalog.API
 	definitions      definition.API
 
@@ -45,6 +47,7 @@ func New(
 	cat catalog.API,
 	definitions definition.API,
 	builtinRoot rootModel.RootID,
+	resolver *composition.Resolver,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
@@ -55,6 +58,9 @@ func New(
 			"%w: Tool Store dependencies are incomplete",
 			spec.ErrInvalid,
 		)
+	}
+	if resolver == nil {
+		return nil, fmt.Errorf("%w: Tool composition resolver is nil", spec.ErrInvalid)
 	}
 	if err := builtinRoot.Validate(); err != nil {
 		return nil, err
@@ -84,18 +90,15 @@ func New(
 		return nil, err
 	}
 
-	// Built-in Tool Collections have direct named references and no aliases.
-	// A graph resolver is deliberately not installed here: the Tool target
-	// mapper itself calls this Store to check Collection membership.
-	collections, err := plugin.NewWithResolver(
+	plugins, err := plugin.New(
 		artifacts,
 		cat,
 		sources,
 		discovery,
 		managedArtifacts,
 		definitions,
-		nil,
-		toolCollectionPolicy(),
+		resolver,
+		toolDomain.PluginProfile(),
 	)
 	if err != nil {
 		return nil, err
@@ -105,8 +108,9 @@ func New(
 		protection:       protection,
 		artifacts:        artifacts,
 		managedArtifacts: managedArtifacts,
-		collections:      collections,
+		plugins:          plugins,
 		discovery:        discovery,
+		resolver:         resolver,
 		builtinRoot:      builtinRoot,
 		builtinSource:    builtinSource.ID,
 		collectionByTool: collectionByTool,

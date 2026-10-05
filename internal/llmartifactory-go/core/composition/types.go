@@ -1,27 +1,17 @@
-// Package composition resolves validated portable Artifact declarations.
-//
-// It owns declaration lookup, alias traversal, composition expansion,
-// member-selector expansion, fallback dispatch, and explicit refresh closure
-// coordination. It does not execute Artifacts, materialize resources, manage
-// secrets, connect MCP servers, or schedule Workflows.
 package composition
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-)
-
-const (
-	membersStr  = "members"
-	loopStr     = "loop"
-	workflowStr = "workflow"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 type LocatorRequest struct {
@@ -35,36 +25,13 @@ type LocatorRequest struct {
 
 // LocatorResolver resolves one supported external declaration locator kind.
 //
-// The initial application registration supports local path locators. URL, Git,
-// package, archive, and other Locator kinds remain portable declaration data
-// and return ErrLocatorUnresolved until a provider is registered for them.
+// A locator resolver consumes committed catalog state only. It must not create
+// Sources, prepare discovery, refresh content, or publish packages.
 type LocatorResolver interface {
 	ResolveArtifactLocator(
 		ctx context.Context,
 		request LocatorRequest,
 	) (artifactModel.ArtifactRef, error)
-}
-
-// ArtifactTargetRequest contains a source-backed terminal Artifact selected
-// by normal resolver lookup. A registered type mapper may replace it with a
-// mapped target before it reaches a consumer capability plan.
-type ArtifactTargetRequest struct {
-	Artifact   artifactModel.Artifact
-	Definition definitionModel.Definition
-	Type       declaration.Type
-}
-
-// ArtifactTargetMapper projects one source-backed Artifact into a mapped
-// target. The mapper is registered by application composition for types that
-// intentionally expose a runtime capability rather than a raw Artifact.
-//
-// Returning handled=false leaves the ordinary Artifact target unchanged.
-// Returning handled=true with an error makes the relationship unavailable.
-type ArtifactTargetMapper interface {
-	MapArtifactTarget(
-		ctx context.Context,
-		request ArtifactTargetRequest,
-	) (MappedTarget, bool, error)
 }
 
 type Limits struct {
@@ -90,16 +57,16 @@ func (l Limits) Normalized() Limits {
 }
 
 func (l Limits) Validate() error {
-	l = l.Normalized()
-	if l.MaxDepth <= 0 || l.MaxDepth > spec.MaxDiscoveryDepth {
+	value := l.Normalized()
+	if value.MaxDepth <= 0 || value.MaxDepth > spec.MaxDiscoveryDepth {
 		return fmt.Errorf(
-			"%w: Artifact resolver depth limit is invalid",
+			"%w: Artifact composition depth limit is invalid",
 			spec.ErrInvalid,
 		)
 	}
-	if l.MaxNodes <= 0 || l.MaxNodes > spec.MaxDiscoveryEntries {
+	if value.MaxNodes <= 0 || value.MaxNodes > spec.MaxDiscoveryEntries {
 		return fmt.Errorf(
-			"%w: Artifact resolver node limit is invalid",
+			"%w: Artifact composition node limit is invalid",
 			spec.ErrInvalid,
 		)
 	}
@@ -108,125 +75,169 @@ func (l Limits) Validate() error {
 
 type ResolverOptions struct {
 	Artifacts ArtifactReader
+	Catalog   ArtifactCatalogReader
 
-	// Catalog is the committed Artifact read projection used for named,
-	// contained, and selector relationship resolution.
-	//
-	// Production composition should provide store/artifact/catalog.API.
-	Catalog ArtifactCatalogReader
-
-	// SourceEntries verifies that a selector base is a directory in the
-	// declaring Source. It is used only for member-selector resolution.
+	// SourceEntries is required only for selector relationships. It remains
+	// separate from catalog reads because selector bases require verified
+	// physical Source entry metadata.
 	SourceEntries SourceEntryInspector
 
-	Locators LocatorResolver
-	Registry *Registry
+	Locators        LocatorResolver
+	Interpretations *interpretation.Registry
+	Scope           ScopeBinding
 
-	// ProtectedBuiltinRoot enables current Root followed by protected built-in
-	// Root lookup for named external members.
-	ProtectedBuiltinRoot rootModel.RootID
+	// DirectCapabilities are application-supplied non-Artifact targets. They
+	// are consulted only after applicable Artifact lookup has no result.
+	DirectCapabilities []DirectCapabilityProvider
 
-	// Tool and Model are the initial mapped-fallback-capable types. A future
-	// type may register a provider when its resolver and consumer support it.
-	FallbackProviders map[declaration.Type]FallbackProvider
+	// ArtifactCapabilityProjectors let application composition attach a
+	// runtime-neutral target to a source-backed Artifact. A projector may keep
+	// the Artifact target or produce an explicitly direct target with durable
+	// provider evidence. It cannot fabricate Artifact identity.
+	ArtifactCapabilityProjectors map[declaration.Type]ArtifactCapabilityProjector
 
-	// TargetMappers project an Artifact-backed terminal target into a mapped
-	// target for selected declaration types.
-	TargetMappers map[declaration.Type]ArtifactTargetMapper
-
-	// Refresh is never used by normal resolution. It is used only by
-	// RefreshPlugin, RefreshAgent, RefreshTeam, and RefreshWorkspace.
+	// Refresh is absent from ordinary resolution. It is required only by the
+	// explicit RefreshPlugin, RefreshAgent, RefreshTeam, and RefreshWorkspace
+	// operations.
 	Refresh RefreshCoordinator
 	Limits  Limits
 }
 
 type Resolver struct {
-	artifacts     ArtifactReader
-	catalog       ArtifactCatalogReader
-	locators      LocatorResolver
-	sourceEntries SourceEntryInspector
-	registry      *Registry
-	targetMappers map[declaration.Type]ArtifactTargetMapper
-	builtinRoot   rootModel.RootID
-	refresh       RefreshCoordinator
-	limits        Limits
+	artifacts       ArtifactReader
+	catalog         ArtifactCatalogReader
+	sourceEntries   SourceEntryInspector
+	locators        LocatorResolver
+	interpretations *interpretation.Registry
+	scope           ScopeBinding
+	refresh         RefreshCoordinator
+	limits          Limits
+
+	directCapabilities []DirectCapabilityProvider
+	projectors         map[declaration.Type]ArtifactCapabilityProjector
 }
 
-func NewWithOptions(options ResolverOptions) (*Resolver, error) {
+func New(options ResolverOptions) (*Resolver, error) {
 	if options.Artifacts == nil {
 		return nil, fmt.Errorf(
-			"%w: Artifact resolver ArtifactReader is nil",
+			"%w: Artifact composition ArtifactReader is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if options.Catalog == nil {
 		return nil, fmt.Errorf(
-			"%w: Artifact resolver ArtifactCatalogReader is nil",
+			"%w: Artifact composition ArtifactCatalogReader is nil",
 			spec.ErrInvalid,
 		)
 	}
+	if options.Interpretations == nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact composition interpretation registry is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if err := options.Scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	limits := options.Limits.Normalized()
 	if err := limits.Validate(); err != nil {
 		return nil, err
 	}
-	if options.ProtectedBuiltinRoot != "" {
-		if err := options.ProtectedBuiltinRoot.Validate(); err != nil {
-			return nil, err
-		}
-	}
 
-	registry := options.Registry
-	if registry == nil {
-		registry = DefaultRegistry()
-	}
-	if err := registry.ValidateComplete(); err != nil {
-		return nil, err
-	}
-	registry = registry.Clone()
-	for declarationType, provider := range options.FallbackProviders {
-		var err error
-		registry, err = registry.WithFallback(
-			declarationType,
-			provider,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	targetMappers := make(
-		map[declaration.Type]ArtifactTargetMapper,
-		len(options.TargetMappers),
+	directCapabilities := append(
+		[]DirectCapabilityProvider(nil),
+		options.DirectCapabilities...,
 	)
-	for declarationType, mapper := range options.TargetMappers {
+	seenProviders := make(
+		map[string]struct{},
+		len(directCapabilities),
+	)
+	for index, provider := range directCapabilities {
+		if provider == nil {
+			return nil, fmt.Errorf(
+				"%w: direct capability provider %d is nil",
+				spec.ErrInvalid,
+				index,
+			)
+		}
+		identity := provider.ProviderIdentity()
+		if err := spec.ValidateIdentifier(
+			"direct capability provider identity",
+			identity,
+			spec.MaxKindBytes,
+		); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seenProviders[identity]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate direct capability provider %q",
+				spec.ErrConflict,
+				identity,
+			)
+		}
+		seenProviders[identity] = struct{}{}
+	}
+
+	projectors := make(
+		map[declaration.Type]ArtifactCapabilityProjector,
+		len(options.ArtifactCapabilityProjectors),
+	)
+	for declarationType, projector := range options.ArtifactCapabilityProjectors {
 		if err := declarationType.Validate(); err != nil {
 			return nil, err
 		}
-		if mapper == nil {
+		if projector == nil {
 			return nil, fmt.Errorf(
-				"%w: Artifact target mapper for %q is nil",
+				"%w: Artifact capability projector for %q is nil",
 				spec.ErrInvalid,
 				declarationType,
 			)
 		}
-		targetMappers[declarationType] = mapper
+		projectors[declarationType] = projector
 	}
 
 	return &Resolver{
-		artifacts:     options.Artifacts,
-		catalog:       options.Catalog,
-		locators:      options.Locators,
-		sourceEntries: options.SourceEntries,
-		registry:      registry,
-		targetMappers: targetMappers,
-		builtinRoot:   options.ProtectedBuiltinRoot,
-		refresh:       options.Refresh,
-		limits:        limits,
+		artifacts:          options.Artifacts,
+		catalog:            options.Catalog,
+		sourceEntries:      options.SourceEntries,
+		locators:           options.Locators,
+		interpretations:    options.Interpretations,
+		scope:              options.Scope,
+		refresh:            options.Refresh,
+		limits:             limits,
+		directCapabilities: directCapabilities,
+		projectors:         projectors,
 	}, nil
 }
 
+// WithRefreshCoordinator derives an explicitly refresh-capable resolver from
+// the same immutable composition configuration. It does not construct another
+// graph resolver, another locator registry, or another interpretation
+// registry. Workspace owns its refresh coordinator because Workspace owns its
+// source-preparation rules.
+func (r *Resolver) WithRefreshCoordinator(
+	coordinator RefreshCoordinator,
+) (*Resolver, error) {
+	if err := r.ready(); err != nil {
+		return nil, err
+	}
+	if coordinator == nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact composition refresh coordinator is nil",
+			spec.ErrInvalid,
+		)
+	}
+	output := *r
+	output.refresh = coordinator
+	return &output, nil
+}
+
 func (r *Resolver) ready() error {
-	if r == nil || r.artifacts == nil || r.catalog == nil {
+	if r == nil ||
+		r.artifacts == nil ||
+		r.catalog == nil ||
+		r.interpretations == nil {
 		return spec.ErrClosed
 	}
 	return nil
@@ -245,31 +256,14 @@ type ResolutionIssue struct {
 	Message string `json:"message"`
 }
 
-type FallbackRequest struct {
-	RootID rootModel.RootID
-	Type   declaration.Type
-	Name   spec.LogicalName
-	Scope  declaration.LookupScope
-}
-
-// FallbackProvider is called only for a named external relationship after the
-// applicable current and protected built-in Root lookups found no target.
-//
-// It is never called for located members, contained members, member selectors,
-// source-selected aliases, or arbitrary ArtifactRefs.
-type FallbackProvider interface {
-	ResolveFallback(
-		ctx context.Context,
-		request FallbackRequest,
-	) (FallbackTarget, bool, error)
-}
-
-// ResolvedRelationship is in-process resolver graph state. Consumer APIs
-// expose CapabilityPlan rather than serializing resolver implementation data.
+// ResolvedRelationship is private composition graph state. Family APIs expose
+// capability plans, direct Plugin membership views, or family-specific
+// projections instead of serializing this implementation graph.
 type ResolvedRelationship struct {
 	Declared  declaration.Entry          `json:"-"`
 	Form      declaration.MemberForm     `json:"-"`
 	Status    ResolutionStatus           `json:"-"`
+	Path      []string                   `json:"-"`
 	Required  bool                       `json:"-"`
 	Scope     declaration.LookupScope    `json:"-"`
 	Overrides map[string]json.RawMessage `json:"-"`
@@ -298,80 +292,38 @@ type ResolvedSelectorMatch struct {
 	Issue    *ResolutionIssue          `json:"-"`
 }
 
-// ResolvedEntry is an internal graph node. It can contain canonical
-// declaration bodies and nested relationships. CapabilityPlan is its
-// supported consumer-facing projection.
+// ResolvedEntry joins a source-backed declaration Artifact, its current
+// immutable Definition, and the family-owned direct relationship facts.
+//
+// A direct capability target has no Artifact or Definition of its own. It can
+// still occur as a relationship result, but never as the root of an
+// ArtifactRef-based resolution operation.
 type ResolvedEntry struct {
 	Type declaration.Type `json:"-"`
 
 	scopeRootID       rootModel.RootID
 	DeclarationOrigin *artifactModel.Artifact `json:"-"`
 
-	Artifact   *artifactModel.Artifact     `json:"-"`
-	Definition *definitionModel.Definition `json:"-"`
-	Mapped     *MappedTarget               `json:"-"`
-
-	Members            []*ResolvedEntry       `json:"-"`
-	MemberResults      []ResolvedRelationship `json:"-"`
-	AllowedTools       []*ResolvedEntry       `json:"-"`
-	AllowedToolResults []ResolvedRelationship `json:"-"`
-
-	DirectLoop           *ResolvedEntry        `json:"-"`
-	DirectLoopResult     *ResolvedRelationship `json:"-"`
-	DirectWorkflow       *ResolvedEntry        `json:"-"`
-	DirectWorkflowResult *ResolvedRelationship `json:"-"`
-
-	Loop      *ResolvedLoop      `json:"-"`
-	Workflow  *ResolvedWorkflow  `json:"-"`
-	Workspace *ResolvedWorkspace `json:"-"`
-	MCP       *ResolvedMCP       `json:"-"`
+	Artifact      *artifactModel.Artifact     `json:"-"`
+	Definition    *definitionModel.Definition `json:"-"`
+	Target        *CapabilityTarget           `json:"-"`
+	Relationships []ResolvedRelationship      `json:"-"`
 }
 
-type ResolvedMCP struct {
-	Policy         *ResolvedEntry        `json:"-"`
-	PolicyResult   *ResolvedRelationship `json:"-"`
-	PolicyRequired bool                  `json:"-"`
-}
-
-type ResolvedLoop struct {
-	BodyResult    *ResolvedRelationship    `json:"-"`
-	Body          *ResolvedEntry           `json:"-"`
-	MaxIterations int                      `json:"-"`
-	Until         *declaration.OutputMatch `json:"-"`
-}
-
-type ResolvedWorkflow struct {
-	Start []string               `json:"-"`
-	Nodes []ResolvedWorkflowNode `json:"-"`
-	Edges []ResolvedWorkflowEdge `json:"-"`
-}
-
-type ResolvedWorkflowNode struct {
-	ID           string                `json:"-"`
-	Join         string                `json:"-"`
-	Member       *ResolvedEntry        `json:"-"`
-	MemberResult *ResolvedRelationship `json:"-"`
-}
-
-type ResolvedWorkflowEdge struct {
-	From  string                   `json:"-"`
-	To    string                   `json:"-"`
-	Match *declaration.OutputMatch `json:"-"`
-}
-
-type ResolvedWorkspace struct {
-	Members       []*ResolvedEntry       `json:"-"`
-	MemberResults []ResolvedRelationship `json:"-"`
-}
-
-func (r *ResolvedEntry) ArtifactRef() (artifactModel.ArtifactRef, bool) {
+func (r *ResolvedEntry) ArtifactRef() (
+	artifactModel.ArtifactRef,
+	bool,
+) {
 	if r == nil || r.Artifact == nil {
 		return artifactModel.ArtifactRef{}, false
 	}
 	return r.Artifact.Ref(), true
 }
 
-func (r *ResolvedEntry) RootID() (rootModel.RootID, bool) {
+func (r *ResolvedEntry) RootID() (
+	rootModel.RootID,
+	bool,
+) {
 	if r == nil {
 		return "", false
 	}
@@ -384,10 +336,69 @@ func (r *ResolvedEntry) RootID() (rootModel.RootID, bool) {
 	return "", false
 }
 
+func (r *ResolvedEntry) TargetValue() (
+	CapabilityTarget,
+	bool,
+) {
+	if r == nil || r.Target == nil {
+		return CapabilityTarget{}, false
+	}
+	return r.Target.Clone(), true
+}
+
+func (r *ResolvedEntry) Relationship(
+	path ...string,
+) (*ResolvedRelationship, bool) {
+	if r == nil {
+		return nil, false
+	}
+	for _, value := range r.Relationships {
+		if !slices.Equal(value.Path, path) {
+			continue
+		}
+		copyValue := cloneResolvedRelationship(value)
+		return &copyValue, true
+	}
+	return nil, false
+}
+
+func cloneResolvedRelationship(
+	value ResolvedRelationship,
+) ResolvedRelationship {
+	output := value
+	output.Declared = value.Declared.Clone()
+	output.Path = append([]string(nil), value.Path...)
+	output.Overrides = declaration.CloneRawMessageMap(value.Overrides)
+	output.Use = declaration.CloneRawMessageMap(value.Use)
+	if value.Issue != nil {
+		issue := *value.Issue
+		output.Issue = &issue
+	}
+	if value.Selector == nil {
+		return output
+	}
+
+	selector := *value.Selector
+	selector.Matches = make(
+		[]ResolvedSelectorMatch,
+		len(value.Selector.Matches),
+	)
+	copy(selector.Matches, value.Selector.Matches)
+	for index := range selector.Matches {
+		if selector.Matches[index].Issue == nil {
+			continue
+		}
+		issue := *selector.Matches[index].Issue
+		selector.Matches[index].Issue = &issue
+	}
+	output.Selector = &selector
+	return output
+}
+
 func validateResolutionContext(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf(
-			"%w: Artifact resolver context is nil",
+			"%w: Artifact composition context is nil",
 			spec.ErrInvalid,
 		)
 	}

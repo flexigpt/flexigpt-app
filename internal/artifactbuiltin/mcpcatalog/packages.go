@@ -8,11 +8,10 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
@@ -55,6 +54,7 @@ type ArtifactExpectation struct {
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
+	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -64,6 +64,12 @@ func PreparePackages(
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if registry == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in MCP package interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
 	if packages == nil {
 		return nil, fmt.Errorf(
@@ -79,7 +85,7 @@ func PreparePackages(
 
 	output := make([]PreparedPackage, 0, len(roots))
 	for _, packageRoot := range roots {
-		value, err := preparePackage(ctx, packages, packageRoot)
+		value, err := preparePackage(ctx, packages, packageRoot, registry)
 		if err != nil {
 			return nil, err
 		}
@@ -96,6 +102,7 @@ func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(
 		ctx,
@@ -112,14 +119,14 @@ func preparePackage(
 
 	documentFile, document, found, err := managedpackageModel.PackageFileContentOneOf(
 		files,
-		topology.CollectionDocumentFiles(),
+		topology.PluginDocumentFiles(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded MCP package %q lacks a supported Collection document",
+			"%w: embedded MCP package %q lacks a supported Plugin document",
 			spec.ErrInvalid,
 			packageRoot,
 		)
@@ -127,6 +134,7 @@ func preparePackage(
 	expectations, err := canonicalCollectionExpectations(
 		documentFile,
 		document,
+		registry,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -163,6 +171,7 @@ func preparePackage(
 func canonicalCollectionExpectations(
 	documentFile spec.Locator,
 	document []byte,
+	registry *interpretation.Registry,
 ) ([]ArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
@@ -181,14 +190,14 @@ func canonicalCollectionExpectations(
 			spec.ErrInvalid,
 		)
 	}
-	if err := decoder.ValidateEntryTree(root); err != nil {
+	if err := registry.ValidateTree(root); err != nil {
 		return nil, err
 	}
-	collection, err := pluginv1.DecodePluginEntry(root)
+	plugin, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
 		return nil, err
 	}
-	for index, member := range collection.Members {
+	for index, member := range plugin.Members {
 		switch member.Header().Type {
 		case declaration.TypeMCP, declaration.TypeMCPPolicy:
 		default:
@@ -200,19 +209,16 @@ func canonicalCollectionExpectations(
 			)
 		}
 	}
-	named, err := declaration.WalkNamedEntries(root)
+	named, err := registry.WalkNamedEntries(root)
 	if err != nil {
 		return nil, err
 	}
 
 	output := make([]ArtifactExpectation, 0, len(named))
 	for _, value := range named {
-		var definitionValue definitionModel.Definition
-		if value.SubresourceLocator == "" {
-			definitionValue, err = decoder.DefinitionForEntry(value.Entry)
-		} else {
-			definitionValue, err = decoder.DefinitionForNamedEntry(value)
-		}
+		definitionValue, err := registry.DefinitionForEntry(
+			value.Entry,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +249,7 @@ func canonicalCollectionExpectations(
 				Subresource:      value.SubresourceLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
+				LogicalVersion:   definitionValue.LogicalVersion,
 				DefinitionDigest: definitionValue.Digest,
 			},
 		)
@@ -304,9 +311,9 @@ func validatePreparedPackageIdentities(
 func PackageFingerprint(
 	value PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	if !topology.IsCollectionDocumentFile(value.DocumentFile) {
+	if !topology.IsPluginDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in MCP Collection document is not declared in topology",
+			"%w: built-in MCP Plugin document is not declared in topology",
 			spec.ErrInvalid,
 		)
 	}

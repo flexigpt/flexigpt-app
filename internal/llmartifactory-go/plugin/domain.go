@@ -17,19 +17,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
-	SkillManagedSourceStorageKey spec.StorageKey = "user-skills"
-	MCPManagedSourceStorageKey   spec.StorageKey = "user-mcps"
+	SkillManagedPluginSourceStorageKey spec.StorageKey = "user-skills"
+	MCPManagedPluginSourceStorageKey   spec.StorageKey = "user-mcps"
 
-	SkillBaselineCollectionName spec.LogicalName = "skill-baseline"
-	MCPBaselineCollectionName   spec.LogicalName = "mcp-baseline"
+	SkillBaselinePluginName spec.LogicalName = "skill-baseline"
+	MCPBaselinePluginName   spec.LogicalName = "mcp-baseline"
 )
 
-type DomainPolicy struct {
+// Profile is supplied by the owning family. Plugin owns enforcement of the
+// profile at managed Plugin boundaries but does not invent Agent, Skill, MCP,
+// or Tool membership policy itself.
+type Profile struct {
 	Name                string
 	SourceStorageKey    spec.StorageKey
 	SourceDisplayName   string
@@ -38,51 +42,21 @@ type DomainPolicy struct {
 	BaselineDescription string
 	PackageKind         managedpackageModel.PackageKind
 	DocumentUse         string
-	AllowedMemberTypes  []declaration.Type
-	AllowedMemberForms  []declaration.MemberForm
+	MembershipPolicy    pluginDomain.MembershipPolicy
 
 	// ReadOnly prohibits declaration authoring and baseline provisioning.
 	// Local Artifact enablement remains supported.
 	ReadOnly bool
 
 	// ValidateDocument applies additional consumer-specific restrictions
-	// after generic Collection decoding and domain visibility checks.
+	// after generic Plugin decoding and domain visibility checks.
 	// It is internal configuration, never a transport projection.
 	ValidateDocument func(pluginv1.PluginDocument) error
 }
 
-func SkillDomainPolicy() DomainPolicy {
-	return DomainPolicy{
-		Name:                "skill",
-		SourceStorageKey:    SkillManagedSourceStorageKey,
-		SourceDisplayName:   "User-managed Skills",
-		BaselineName:        SkillBaselineCollectionName,
-		BaselineDisplayName: "Skill Baseline",
-		BaselineDescription: "Application-provisioned editable Skill Collection.",
-		AllowedMemberTypes: []declaration.Type{
-			declaration.TypeSkill,
-		},
-	}
-}
-
-func MCPDomainPolicy() DomainPolicy {
-	return DomainPolicy{
-		Name:                "mcp",
-		SourceStorageKey:    MCPManagedSourceStorageKey,
-		SourceDisplayName:   "User-managed MCP artifacts",
-		BaselineName:        MCPBaselineCollectionName,
-		BaselineDisplayName: "MCP Baseline",
-		BaselineDescription: "Application-provisioned editable MCP Collection.",
-		AllowedMemberTypes: []declaration.Type{
-			declaration.TypeMCP,
-			declaration.TypeMCPPolicy,
-		},
-	}
-}
-
-func (p DomainPolicy) Validate() error {
+func (p Profile) Validate() error {
 	if err := spec.ValidateIdentifier(
-		"Collection domain name",
+		"Plugin family profile name",
 		p.Name,
 		spec.MaxKindBytes,
 	); err != nil {
@@ -105,7 +79,7 @@ func (p DomainPolicy) Validate() error {
 	}
 	if path.Base(string(documentFile)) != string(documentFile) {
 		return fmt.Errorf(
-			"%w: Collection domain document file must be a package-root file",
+			"%w: plugin domain document file must be a package-root file",
 			spec.ErrInvalid,
 		)
 	}
@@ -113,130 +87,98 @@ func (p DomainPolicy) Validate() error {
 	case ".json", ".yaml", ".yml":
 	default:
 		return fmt.Errorf(
-			"%w: Collection domain document file %q has an unsupported extension",
+			"%w: plugin domain document file %q has an unsupported extension",
 			spec.ErrInvalid,
 			documentFile,
 		)
 	}
-	if len(p.AllowedMemberTypes) == 0 {
-		return fmt.Errorf(
-			"%w: Collection domain %q has no allowed member types",
-			spec.ErrInvalid,
-			p.Name,
-		)
-	}
-	seen := make(map[declaration.Type]struct{}, len(p.AllowedMemberTypes))
-	for _, value := range p.AllowedMemberTypes {
-		if err := value.Validate(); err != nil {
-			return err
-		}
-		if _, duplicate := seen[value]; duplicate {
-			return fmt.Errorf(
-				"%w: Collection domain %q repeats member type %q",
-				spec.ErrInvalid,
-				p.Name,
-				value,
-			)
-		}
-		seen[value] = struct{}{}
-	}
-	seenForms := make(
-		map[declaration.MemberForm]struct{},
-		len(p.AllowedMemberForms),
-	)
-	for _, form := range p.AllowedMemberForms {
-		switch form {
-		case declaration.MemberNamed,
-			declaration.MemberContained,
-			declaration.MemberSelector:
-		default:
-			return fmt.Errorf(
-				"%w: Collection domain %q has unsupported member form %q",
-				spec.ErrInvalid,
-				p.Name,
-				form,
-			)
-		}
-		if _, duplicate := seenForms[form]; duplicate {
-			return fmt.Errorf(
-				"%w: Collection domain %q repeats member form %q",
-				spec.ErrInvalid,
-				p.Name,
-				form,
-			)
-		}
-		seenForms[form] = struct{}{}
+	if err := p.MembershipPolicy.Validate(); err != nil {
+		return fmt.Errorf("plugin membership policy: %w", err)
 	}
 	return nil
 }
 
-func (p DomainPolicy) allowsMemberForm(
+func (p Profile) allowsMemberForm(
 	value declaration.MemberForm,
 ) bool {
-	if len(p.AllowedMemberForms) == 0 {
+	if len(p.MembershipPolicy.AllowedForms) == 0 {
 		return value == declaration.MemberNamed
 	}
-	return slices.Contains(p.AllowedMemberForms, value)
+	return slices.Contains(p.MembershipPolicy.AllowedForms, value)
 }
 
-func (p DomainPolicy) managedCollectionPackageKind() managedpackageModel.PackageKind {
+func (p Profile) allows(
+	value declaration.Type,
+) bool {
+	if p.MembershipPolicy.Mode ==
+		pluginDomain.MembershipModeLegacyUnconstrained {
+		return true
+	}
+	return slices.Contains(
+		p.MembershipPolicy.AllowedTypes,
+		value,
+	)
+}
+
+func (p Profile) managedCollectionPackageKind() managedpackageModel.PackageKind {
 	if p.PackageKind != "" {
 		return p.PackageKind
 	}
 	return ManagedCollectionPackageKind
 }
 
-func (p DomainPolicy) managedCollectionDocumentUse() string {
+func (p Profile) managedCollectionDocumentUse() string {
 	if p.DocumentUse != "" {
 		return p.DocumentUse
 	}
-	return topology.DocumentUseManagedCollection
+	return topology.DocumentUseManagedPlugin
 }
 
-func (p DomainPolicy) managedCollectionBaselineDisplayName() string {
+func (p Profile) managedCollectionBaselineDisplayName() string {
 	if p.BaselineDisplayName != "" {
 		return p.BaselineDisplayName
 	}
 	return string(p.BaselineName)
 }
 
-func (p DomainPolicy) allows(value declaration.Type) bool {
-	return slices.Contains(p.AllowedMemberTypes, value)
+func (p Profile) pluginMetadata() map[string]json.RawMessage {
+	metadata, _ := pluginDomain.PutMetadata(nil, p.MembershipPolicy)
+	return metadata
 }
 
 func (a *API) EnsureBaseline(
 	ctx context.Context,
 	rootID rootModel.RootID,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil || a.domain == nil {
-		return CollectionView{}, fmt.Errorf(
-			"%w: Collection baseline is not configured",
+		return PluginView{}, fmt.Errorf(
+			"%w: Plugin baseline is not configured",
 			spec.ErrUnsupported,
 		)
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	sourceValue, err := a.managedSource(ctx, rootID, "")
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	address, err := a.managedCollectionAddress(a.domain.BaselineName)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	documentFile := a.managedCollectionDocumentFile()
 	locator, err := address.FileLocator(documentFile)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	decoderID, err := a.managedCollectionDecoderID()
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if _, err := a.EnsureManagedDeclarationDiscovery(
 		ctx,
@@ -245,7 +187,7 @@ func (a *API) EnsureBaseline(
 		locator,
 		decoderID,
 	); err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	// Keep the managed declaration origin configured before inspecting the
@@ -261,7 +203,7 @@ func (a *API) EnsureBaseline(
 		artifactModel.ArtifactKind(pluginv1.PluginType),
 	)
 	if err != nil && !errors.Is(err, spec.ErrArtifactNotFound) && !errors.Is(err, spec.ErrNotFound) {
-		return CollectionView{}, err
+		return PluginView{}, err
 	} else if existing.State == artifactModel.StateAvailable {
 		return a.Read(ctx, existing.Ref())
 	}
@@ -291,14 +233,14 @@ func (a *API) EnsureBaseline(
 			true,
 		)
 		if err != nil {
-			return CollectionView{}, err
+			return PluginView{}, err
 		}
 		return a.Read(ctx, record.Ref())
 
 	case errors.Is(err, spec.ErrArtifactNotFound),
 		errors.Is(err, spec.ErrNotFound):
 	default:
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 
 	return a.create(
@@ -333,13 +275,13 @@ func (a *API) domainManagedSource(
 		if value.Kind != managedfs.Kind ||
 			value.StorageKey != a.domain.SourceStorageKey {
 			return sourceModel.Summary{}, fmt.Errorf(
-				"%w: Collection belongs to another managed domain Source",
+				"%w: Plugin belongs to another managed domain Source",
 				spec.ErrUnsupported,
 			)
 		}
 		if !value.Enabled {
 			return sourceModel.Summary{}, fmt.Errorf(
-				"%w: Collection domain Source is disabled",
+				"%w: Plugin domain Source is disabled",
 				spec.ErrConflict,
 			)
 		}
@@ -385,7 +327,7 @@ func (a *API) validateDomainMember(
 	}
 	if !a.domain.allows(member.Type) {
 		return fmt.Errorf(
-			"%w: %s Collection cannot contain %q members",
+			"%w: %s Plugin cannot contain %q members",
 			spec.ErrUnsupported,
 			a.domain.Name,
 			member.Type,
@@ -393,7 +335,7 @@ func (a *API) validateDomainMember(
 	}
 	if !a.domain.allowsMemberForm(declaration.MemberNamed) {
 		return fmt.Errorf(
-			"%w: %s Collection does not support named external members",
+			"%w: %s Plugin does not support named external members",
 			spec.ErrUnsupported,
 			a.domain.Name,
 		)
@@ -411,9 +353,18 @@ func (a *API) validateDomainEntry(
 	if a == nil || a.domain == nil {
 		return nil
 	}
+	policy, err := pluginDomain.FromMetadata(
+		a.domain.pluginMetadata(),
+	)
+	if err != nil {
+		return err
+	}
+	if err := policy.Allows(member); err != nil {
+		return err
+	}
 	if !a.domain.allows(member.Header().Type) {
 		return fmt.Errorf(
-			"%w: %s Collection cannot contain %q members",
+			"%w: %s Plugin cannot contain %q members",
 			spec.ErrUnsupported,
 			a.domain.Name,
 			member.Header().Type,
@@ -421,7 +372,7 @@ func (a *API) validateDomainEntry(
 	}
 	if !a.domain.allowsMemberForm(form) {
 		return fmt.Errorf(
-			"%w: %s Collection cannot contain %q members",
+			"%w: %s Plugin cannot contain %q members",
 			spec.ErrUnsupported,
 			a.domain.Name,
 			form,
@@ -436,7 +387,7 @@ func (a *API) validateEditableDomainDocument(
 	for index, member := range document.Members {
 		form, err := member.MemberForm()
 		if err != nil {
-			return fmt.Errorf("collection members[%d]: %w", index, err)
+			return fmt.Errorf("plugin members[%d]: %w", index, err)
 		}
 		if form != declaration.MemberNamed {
 			return fmt.Errorf(
@@ -445,13 +396,13 @@ func (a *API) validateEditableDomainDocument(
 			)
 		}
 		if err := a.validateDomainEntry(member); err != nil {
-			return fmt.Errorf("collection members[%d]: %w", index, err)
+			return fmt.Errorf("plugin members[%d]: %w", index, err)
 		}
 	}
 	return nil
 }
 
-func IsBaselineCollectionArtifact(
+func IsBaselinePluginArtifact(
 	value artifactModel.Artifact,
 ) bool {
 	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
@@ -463,13 +414,13 @@ func IsBaselineCollectionArtifact(
 	if err != nil {
 		return false
 	}
-	return (value.LogicalName == SkillBaselineCollectionName &&
-		address.Name == SkillBaselineCollectionName) ||
-		(value.LogicalName == MCPBaselineCollectionName &&
-			address.Name == MCPBaselineCollectionName)
+	return (value.LogicalName == SkillBaselinePluginName &&
+		address.Name == SkillBaselinePluginName) ||
+		(value.LogicalName == MCPBaselinePluginName &&
+			address.Name == MCPBaselinePluginName)
 }
 
-func IsBaselineCollectionArtifactForSource(
+func IsBaselinePluginArtifactForSource(
 	value artifactModel.Artifact,
 	sourceValue sourceModel.Summary,
 ) bool {
@@ -485,12 +436,12 @@ func IsBaselineCollectionArtifactForSource(
 	if err != nil {
 		return false
 	}
-	return (value.LogicalName == SkillBaselineCollectionName &&
-		address.Name == SkillBaselineCollectionName &&
-		sourceValue.StorageKey == SkillManagedSourceStorageKey) ||
-		(value.LogicalName == MCPBaselineCollectionName &&
-			address.Name == MCPBaselineCollectionName &&
-			sourceValue.StorageKey == MCPManagedSourceStorageKey)
+	return (value.LogicalName == SkillBaselinePluginName &&
+		address.Name == SkillBaselinePluginName &&
+		sourceValue.StorageKey == SkillManagedPluginSourceStorageKey) ||
+		(value.LogicalName == MCPBaselinePluginName &&
+			address.Name == MCPBaselinePluginName &&
+			sourceValue.StorageKey == MCPManagedPluginSourceStorageKey)
 }
 
 func (a *API) readCollectionDocument(
@@ -513,7 +464,7 @@ func (a *API) readCollectionDocument(
 		a.domain.ReadOnly &&
 		!a.readOnlyDomainOrigin(record) {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
-			"%w: Collection does not belong to this read-only domain",
+			"%w: Plugin does not belong to this read-only domain",
 			spec.ErrUnsupported,
 		)
 	}
@@ -525,7 +476,7 @@ func (a *API) readCollectionDocument(
 	if record.ResolvedDefinition == nil ||
 		*record.ResolvedDefinition != definitionValue.Digest {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
-			"%w: Collection definition changed during read",
+			"%w: Plugin definition changed during read",
 			spec.ErrRefreshRequired,
 		)
 	}
@@ -584,31 +535,31 @@ func (a *API) domainCollectionVisible(
 func (a *API) Read(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (CollectionView, error) {
+) (PluginView, error) {
 	if a == nil {
-		return CollectionView{}, spec.ErrClosed
+		return PluginView{}, spec.ErrClosed
 	}
 	ref, err := a.resolveCollectionRef(ctx, ref)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	record, document, err := a.readCollectionDocument(ctx, ref)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	visible, err := a.domainCollectionVisible(ctx, record, document)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if !visible {
-		return CollectionView{}, fmt.Errorf(
-			"%w: Collection is not visible in this domain",
+		return PluginView{}, fmt.Errorf(
+			"%w: Plugin is not visible in this domain",
 			spec.ErrUnsupported,
 		)
 	}
 	if a.domain != nil && a.domain.ValidateDocument != nil {
 		if err := a.domain.ValidateDocument(document); err != nil {
-			return CollectionView{}, err
+			return PluginView{}, err
 		}
 	}
 
@@ -619,7 +570,7 @@ func (a *API) Read(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	if record.Binding.SubresourceLocator == "" &&
 		(a.domain == nil || !a.domain.ReadOnly) &&
@@ -634,7 +585,7 @@ func (a *API) Read(
 		}
 	}
 
-	baseline := IsBaselineCollectionArtifactForSource(record, sourceValue)
+	baseline := IsBaselinePluginArtifactForSource(record, sourceValue)
 	if a.domain != nil && a.domain.ReadOnly {
 		baseline = false
 	}
@@ -660,19 +611,30 @@ func readCollectionViewOf(
 	editable bool,
 	deletable bool,
 	baseline bool,
-) (CollectionView, error) {
+) (PluginView, error) {
 	ordered, err := declaration.SortedMembers(
-		"Collection members",
+		"Plugin members",
 		document.Members,
 	)
 	if err != nil {
-		return CollectionView{}, err
+		return PluginView{}, err
 	}
 	displayName := document.DisplayName
 	if displayName == "" {
 		displayName = record.DisplayName
 	}
-	view := CollectionView{
+	membership, err := pluginDomain.FromMetadata(document.Metadata)
+	if err != nil {
+		return PluginView{}, err
+	}
+	for index, member := range ordered {
+		if err := membership.Allows(member); err != nil {
+			return PluginView{}, fmt.Errorf(
+				"plugin members[%d]: %w", index, err,
+			)
+		}
+	}
+	view := PluginView{
 		Artifact:    record.Clone(),
 		Name:        spec.LogicalName(document.Name),
 		DisplayName: displayName,
@@ -680,20 +642,21 @@ func readCollectionViewOf(
 		Editable:    editable,
 		Deletable:   deletable,
 		Baseline:    baseline,
+		Membership:  membership,
 		Members:     make([]MemberReference, 0, len(ordered)),
-		Entries:     make([]CollectionMemberView, 0, len(ordered)),
+		Entries:     make([]PluginMemberView, 0, len(ordered)),
 	}
 	for index, entry := range ordered {
 		form, err := entry.MemberForm()
 		if err != nil {
-			return CollectionView{}, fmt.Errorf(
-				"collection members[%d]: %w",
+			return PluginView{}, fmt.Errorf(
+				"plugin members[%d]: %w",
 				index,
 				err,
 			)
 		}
 		header := entry.Header()
-		member := CollectionMemberView{
+		member := PluginMemberView{
 			Type:      header.Type,
 			Name:      spec.LogicalName(header.Name),
 			Contained: form == declaration.MemberContained,
@@ -706,14 +669,14 @@ func readCollectionViewOf(
 		if header.Type == declaration.TypeText {
 			insert, err := entry.TextInsert()
 			if err != nil {
-				return CollectionView{}, err
+				return PluginView{}, err
 			}
 			member.Insert = insert
 		}
 		if form == declaration.MemberNamed {
 			reference, err := memberReferenceFromEntry(entry)
 			if err != nil {
-				return CollectionView{}, err
+				return PluginView{}, err
 			}
 			member.Server = reference.Server
 			view.Members = append(view.Members, reference)

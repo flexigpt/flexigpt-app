@@ -47,13 +47,6 @@ func (s Selector) Validate() error {
 	if err := s.Type.Validate(); err != nil {
 		return err
 	}
-	if s.Type == TypeText || s.Type == TypeWorkspace {
-		return fmt.Errorf(
-			"%w: Artifact type %q does not support member selectors",
-			spec.ErrInvalid,
-			s.Type,
-		)
-	}
 	if err := s.Base.Validate(); err != nil {
 		return fmt.Errorf("member selector base: %w", err)
 	}
@@ -248,16 +241,6 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		}); err != nil {
 			return "", err
 		}
-		if header.Type == TypeText {
-			if _, err := e.TextInsert(); err != nil {
-				return "", err
-			}
-		} else if _, present := fields["insert"]; present {
-			return "", fmt.Errorf(
-				"%w: member insert is valid only for Text",
-				spec.ErrInvalid,
-			)
-		}
 		if _, err := e.Relationship(); err != nil {
 			return "", err
 		}
@@ -317,12 +300,6 @@ func (e Entry) Relationship() (Relationship, error) {
 }
 
 func (e Entry) TextInsert() (InsertTarget, error) {
-	if e.Header().Type != TypeText {
-		return "", fmt.Errorf(
-			"%w: insertion identity is valid only for Text",
-			spec.ErrInvalid,
-		)
-	}
 	var value struct {
 		Insert InsertTarget `json:"insert"`
 	}
@@ -361,14 +338,7 @@ func (e Entry) ContainedDeclaration() (Entry, error) {
 			target[identity] = append(json.RawMessage(nil), raw...)
 		}
 	}
-	if e.Header().Type == TypeText {
-		raw, present := fields["insert"]
-		if !present {
-			return Entry{}, fmt.Errorf(
-				"%w: Text member requires direct insert",
-				spec.ErrInvalid,
-			)
-		}
+	if raw, present := fields["insert"]; present {
 		target["insert"] = append(json.RawMessage(nil), raw...)
 	}
 
@@ -404,11 +374,7 @@ func NewContainedMember(target Entry) (Entry, error) {
 		case "type", "name", "locator":
 			member[name] = append(json.RawMessage(nil), raw...)
 		case "insert":
-			if target.Header().Type == TypeText {
-				member[name] = append(json.RawMessage(nil), raw...)
-			} else {
-				parameters[name] = append(json.RawMessage(nil), raw...)
-			}
+			member[name] = append(json.RawMessage(nil), raw...)
 		default:
 			parameters[name] = append(json.RawMessage(nil), raw...)
 		}
@@ -450,17 +416,6 @@ func (e Entry) validateNamedMember(
 			spec.ErrInvalid,
 		)
 	}
-	if header.Type == TypeText {
-		if _, err := e.TextInsert(); err != nil {
-			return err
-		}
-	} else if _, present := fields["insert"]; present {
-		return fmt.Errorf(
-			"%w: member insert is valid only for Text",
-			spec.ErrInvalid,
-		)
-	}
-
 	serverRaw, hasServer := fields["server"]
 	if !hasServer {
 		return nil

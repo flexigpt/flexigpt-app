@@ -75,11 +75,18 @@ func NewStoreAPI(
 	if err := config.ContextComposition.Validate(); err != nil {
 		return nil, err
 	}
+	if config.Composition == nil {
+		return nil, fmt.Errorf(
+			"%w: Workspace composition resolver is required",
+			workspaceDomain.ErrInvalidWorkspace,
+		)
+	}
 
 	workspaceSources := newWorkspaceSourceRegistry(sources)
 	refreshCoordinator := newWorkspaceRefreshCoordinator(
 		sources, discovery, workspaceSources,
 	)
+
 	output := &StoreAPI{
 		roots:            roots,
 		sources:          sources,
@@ -116,27 +123,8 @@ func NewStoreAPI(
 		}
 	}
 
-	locators, err := composition.NewProviderLocatorResolver(
-		config.LocatorResolvers,
-		workspaceLocatorRuntime{
-			cat: cat,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	resolver, err := composition.NewWithOptions(
-		composition.ResolverOptions{
-			Artifacts:            artifacts,
-			Catalog:              cat,
-			SourceEntries:        resources,
-			Locators:             locators,
-			FallbackProviders:    config.FallbackProviders,
-			TargetMappers:        config.TargetMappers,
-			ProtectedBuiltinRoot: topology.BuiltinRootID(),
-			Refresh:              refreshCoordinator,
-			Limits:               config.ResolverLimits,
-		},
+	resolver, err := config.Composition.WithRefreshCoordinator(
+		refreshCoordinator,
 	)
 	if err != nil {
 		return nil, err

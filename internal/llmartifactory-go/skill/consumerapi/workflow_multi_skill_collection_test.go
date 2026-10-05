@@ -28,7 +28,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 			RootID:      topology.UserRootID(),
 			Name:        "multi-skill-workflow",
 			DisplayName: "Multi Skill workflow",
-			Description: "Collection used to verify partial Skill cleanup.",
+			Description: "Plugin used to verify partial Skill cleanup.",
 		},
 	)
 	requireNoError(t, err)
@@ -50,7 +50,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	second, _ := createManagedSkillInCollection(
 		t,
 		fixture.api,
-		first.Collection,
+		first.Plugin,
 		secondSkillName,
 		"Second managed Skill.",
 		"Use the second initial instructions.",
@@ -59,12 +59,12 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	collectionAfterCreate, err := fixture.api.GetSkillCollection(
 		ctx,
-		second.Collection.Artifact.Ref(),
+		second.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 	if len(collectionAfterCreate.Members) != 2 {
 		t.Fatalf(
-			"Collection members after two Skill creates=%d, want 2",
+			"Plugin members after two Skill creates=%d, want 2",
 			len(collectionAfterCreate.Members),
 		)
 	}
@@ -75,19 +75,19 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	)
 	requireNoError(t, err)
 	if !capabilities.Complete {
-		t.Fatal("Collection with two managed Skills is incomplete")
+		t.Fatal("Plugin with two managed Skills is incomplete")
 	}
 	if !capabilityPlanContainsArtifact(
 		capabilities.Occurrences,
 		first.Artifact.Ref(),
 	) {
-		t.Fatal("Collection capability plan does not contain first Skill")
+		t.Fatal("Plugin capability plan does not contain first Skill")
 	}
 	if !capabilityPlanContainsArtifact(
 		capabilities.Occurrences,
 		second.Artifact.Ref(),
 	) {
-		t.Fatal("Collection capability plan does not contain second Skill")
+		t.Fatal("Plugin capability plan does not contain second Skill")
 	}
 
 	aggregateService, _ := newSkillAggregateService(t, fixture)
@@ -126,7 +126,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	replacedFirst, err := fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Collection:                 collectionAfterCreate.Artifact.Ref(),
+			Plugin:                     collectionAfterCreate.Artifact.Ref(),
 			ExpectedCollectionRevision: collectionAfterCreate.Artifact.Revision,
 			Artifact:                   firstCurrent.Ref(),
 			ExpectedArtifactRevision:   firstCurrent.Revision,
@@ -180,7 +180,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	collectionBeforeDetach, err := fixture.api.GetSkillCollection(
 		ctx,
-		replacedFirst.Collection.Artifact.Ref(),
+		replacedFirst.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
@@ -190,7 +190,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	)
 	if !found {
 		t.Fatalf(
-			"Collection does not contain first Skill member %q",
+			"Plugin does not contain first Skill member %q",
 			firstSkillName,
 		)
 	}
@@ -198,7 +198,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	collectionAfterDetach, err := fixture.api.RemoveSkillCollectionMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Collection:       collectionBeforeDetach.Artifact.Ref(),
+			Plugin:           collectionBeforeDetach.Artifact.Ref(),
 			ExpectedRevision: collectionBeforeDetach.Artifact.Revision,
 			Index:            firstMemberIndex,
 		},
@@ -206,13 +206,13 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	requireNoError(t, err)
 	if len(collectionAfterDetach.Members) != 1 {
 		t.Fatalf(
-			"Collection members after first detach=%d, want 1",
+			"Plugin members after first detach=%d, want 1",
 			len(collectionAfterDetach.Members),
 		)
 	}
 	if string(collectionAfterDetach.Members[0].Name) != secondSkillName {
 		t.Fatalf(
-			"remaining Collection member=%q, want %q",
+			"remaining Plugin member=%q, want %q",
 			collectionAfterDetach.Members[0].Name,
 			secondSkillName,
 		)
@@ -255,19 +255,19 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	)
 	requireNoError(t, err)
 	if !capabilities.Complete {
-		t.Fatal("Collection is incomplete after first Skill partial cleanup")
+		t.Fatal("Plugin is incomplete after first Skill partial cleanup")
 	}
 	if capabilityPlanContainsArtifact(
 		capabilities.Occurrences,
 		first.Artifact.Ref(),
 	) {
-		t.Fatal("Collection capability plan still contains purged first Skill")
+		t.Fatal("Plugin capability plan still contains purged first Skill")
 	}
 	if !capabilityPlanContainsArtifact(
 		capabilities.Occurrences,
 		second.Artifact.Ref(),
 	) {
-		t.Fatal("Collection capability plan lost second Skill after partial cleanup")
+		t.Fatal("Plugin capability plan lost second Skill after partial cleanup")
 	}
 
 	secondAfterFirstPurge, err := fixture.api.GetSkill(
@@ -298,7 +298,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	)
 	if !found {
 		t.Fatalf(
-			"Collection does not contain second Skill member %q",
+			"Plugin does not contain second Skill member %q",
 			secondSkillName,
 		)
 	}
@@ -306,7 +306,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	collectionAfterSecondDetach, err := fixture.api.RemoveSkillCollectionMember(
 		ctx,
 		plugin.RemoveMemberRequest{
-			Collection:       collectionAfterFirstPurge.Artifact.Ref(),
+			Plugin:           collectionAfterFirstPurge.Artifact.Ref(),
 			ExpectedRevision: collectionAfterFirstPurge.Artifact.Revision,
 			Index:            secondMemberIndex,
 		},
@@ -332,7 +332,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		fixture.api.DeleteSkillCollection(
 			ctx,
 			plugin.DeleteRequest{
-				Collection: collectionAfterSecondDetach.Artifact.Ref(),
+				Plugin: collectionAfterSecondDetach.Artifact.Ref(),
 				ExpectedRevision: collectionAfterSecondDetach.
 					Artifact.Revision,
 			},
@@ -371,7 +371,10 @@ func capabilityPlanContainsArtifact(
 	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
-		if value.Artifact != nil && *value.Artifact == ref {
+		if value.Target != nil &&
+			value.Target.Form == composition.TargetFormArtifact &&
+			value.Target.Artifact != nil &&
+			*value.Target.Artifact == ref {
 			return true
 		}
 	}

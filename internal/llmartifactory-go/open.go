@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 )
 
@@ -29,6 +30,12 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 			spec.ErrInvalid,
 		)
 	}
+	if config.Interpretations == nil {
+		return nil, fmt.Errorf(
+			"%w: LLM Artifactory declaration interpretation registry is nil",
+			spec.ErrInvalid,
+		)
+	}
 
 	codecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
 	if err != nil {
@@ -38,15 +45,43 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := config.Scope.Validate(); err != nil {
+		return nil, err
+	}
+
+	locatorRuntime := catalogLocatorRuntime{catalog: config.Store.Catalog}
 	locators, err := locator.NewRegistry(config.LocatorFactories...)
 	if err != nil {
 		return nil, err
 	}
 
+	locatorResolver, err := composition.NewProviderLocatorResolver(
+		locators.Factories(),
+		locatorRuntime,
+	)
+	if err != nil {
+		return nil, err
+	}
+	resolver, err := composition.New(composition.ResolverOptions{
+		Artifacts:                    config.Store.Artifacts,
+		Catalog:                      config.Store.Catalog,
+		SourceEntries:                config.Store.Resources,
+		Locators:                     locatorResolver,
+		Interpretations:              config.Interpretations,
+		Scope:                        config.Scope,
+		DirectCapabilities:           config.DirectCapabilities,
+		ArtifactCapabilityProjectors: config.ArtifactCapabilityProjectors,
+		Limits:                       composition.DefaultLimits(),
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &Artifactory{
 		store:            config.Store,
 		schemaCodecs:     codecs,
 		decoders:         decoders,
 		locatorFactories: locators.Factories(),
+		interpretations:  config.Interpretations,
+		composition:      resolver,
 	}, nil
 }

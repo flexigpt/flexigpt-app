@@ -15,9 +15,9 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 func (a *API) CreateProvider(
@@ -807,11 +807,7 @@ func providerDefinition(
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
-	entry, err := declaration.NewEntry(declarationDocument)
-	if err != nil {
-		return definitionModel.Definition{}, nil, err
-	}
-	value, err := decoder.DefinitionForEntry(entry)
+	value, err := modelproviderv1.DefinitionForDocument(declarationDocument)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
@@ -829,11 +825,7 @@ func modelDefinition(
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
-	entry, err := declaration.NewEntry(declarationDocument)
-	if err != nil {
-		return definitionModel.Definition{}, nil, err
-	}
-	value, err := decoder.DefinitionForEntry(entry)
+	value, err := modelv1.DefinitionForDocument(declarationDocument)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}

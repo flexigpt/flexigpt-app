@@ -45,13 +45,12 @@ type AgentCapabilityOccurrence struct {
 	Status   composition.ResolutionStatus `json:"status"`
 	Required bool                         `json:"required"`
 
-	Artifact            *artifactModel.ArtifactRef `json:"artifact,omitempty"`
-	Mapped              *composition.MappedTarget  `json:"mapped,omitempty"`
-	AutoExecute         *bool                      `json:"autoExecute,omitempty"`
-	IncludeSystemPrompt *bool                      `json:"includeSystemPrompt,omitempty"`
-	SkillUseMode        AgentSkillUseMode          `json:"skillUseMode,omitempty"`
-	Code                string                     `json:"code,omitempty"`
-	Message             string                     `json:"message,omitempty"`
+	Target              *composition.CapabilityTarget `json:"target,omitempty"`
+	AutoExecute         *bool                         `json:"autoExecute,omitempty"`
+	IncludeSystemPrompt *bool                         `json:"includeSystemPrompt,omitempty"`
+	SkillUseMode        AgentSkillUseMode             `json:"skillUseMode,omitempty"`
+	Code                string                        `json:"code,omitempty"`
+	Message             string                        `json:"message,omitempty"`
 }
 
 type AgentCapabilityPlan struct {
@@ -81,9 +80,9 @@ type ListAgentsRequest struct {
 
 	LogicalNames []spec.LogicalName `json:"logicalNames,omitempty"`
 
-	// Collection limits the result to currently available direct Agent
-	// relationships selected by one Agent Collection Plugin.
-	Collection *artifactModel.ArtifactRef `json:"collection,omitempty"`
+	// Plugin limits the result to currently available direct Agent
+	// relationships selected by one Agent Plugin Plugin.
+	Plugin *artifactModel.ArtifactRef `json:"plugin,omitempty"`
 
 	// IncludeBuiltin appends Agent Artifacts from the protected built-in Root
 	// when RootID is not already the protected Root.

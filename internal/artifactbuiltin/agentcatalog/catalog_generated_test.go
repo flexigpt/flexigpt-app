@@ -5,10 +5,16 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
-	expected, err := Compile(t.Context(), t.TempDir())
+	registry, err := registration.NewLLMInterpretationRegistry()
+	if err != nil {
+		t.Fatalf("create Agent catalog interpretation registry: %v", err)
+	}
+
+	expected, err := Compile(t.Context(), t.TempDir(), registry)
 	if err != nil {
 		t.Fatalf("compile embedded Agent packages: %v", err)
 	}
@@ -18,7 +24,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("fingerprint expected generated Agent catalog: %v", err)
 	}
 
-	recompiled, err := Compile(t.Context(), t.TempDir())
+	recompiled, err := Compile(t.Context(), t.TempDir(), registry)
 	if err != nil {
 		t.Fatalf("compile embedded Agent packages again: %v", err)
 	}

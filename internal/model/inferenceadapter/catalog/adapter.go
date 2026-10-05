@@ -18,9 +18,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
+	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 )
 
 const (
@@ -40,10 +41,17 @@ type preparedModel struct {
 // independent source-backed Model Provider and Model packages.
 func PreparePackages(
 	ctx context.Context,
+	registry *interpretation.Registry,
 ) ([]modelcatalog.PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Model catalog conversion context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if registry == nil {
+		return nil, fmt.Errorf(
+			"%w: Model catalog interpretation registry is nil",
 			spec.ErrInvalid,
 		)
 	}
@@ -174,6 +182,7 @@ func PreparePackages(
 		preparedProvider, err := modelcatalog.PrepareProviderPackage(
 			ctx,
 			providerDocument,
+			registry,
 		)
 		if err != nil {
 			return nil, err
@@ -198,6 +207,7 @@ func PreparePackages(
 			preparedModel, err := modelcatalog.PrepareModelPackage(
 				ctx,
 				document,
+				registry,
 			)
 			if err != nil {
 				return nil, err

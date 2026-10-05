@@ -11,15 +11,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/canonical"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
-	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/providerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
-	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/providerapi"
 )
 
 const secretValuesFileName = "secrets.json"
@@ -78,35 +76,10 @@ func OpenArtifactStore(
 		return nil, err
 	}
 
-	canon, err := canonical.NewRegistration()
+	registrations, err := registration.New()
 	if err != nil {
 		return nil, err
 	}
-	md, err := markdown.NewRegistration()
-	if err != nil {
-		return nil, err
-	}
-	skill, err := skillProviderAPI.NewRegistration()
-	if err != nil {
-		return nil, err
-	}
-	mcp, err := mcpProviderAPI.NewRegistration()
-	if err != nil {
-		return nil, err
-	}
-
-	locators, err := locator.NewRegistry(
-		canon.LocatorFactories()...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	codecs := canon.SchemaCodecs()
-	decoders := canon.Decoders()
-	decoders = append(decoders, md.Decoders()...)
-	decoders = append(decoders, skill.Decoders()...)
-	decoders = append(decoders, mcp.Decoders()...)
 
 	workspaceFS, err := artifactbuiltin.EmbeddedWorkspacePackages()
 	if err != nil {
@@ -135,8 +108,8 @@ func OpenArtifactStore(
 		EmbeddedProviders: map[string]fs.FS{
 			"workspace-default-policy": workspaceFS,
 		},
-		SchemaCodecs: codecs,
-		Decoders:     decoders,
+		SchemaCodecs: registrations.SchemaCodecs(),
+		Decoders:     registrations.Decoders(),
 
 		ProtectedRootIDs:           topology.ProtectedRootIDs(),
 		RetainedRoots:              topology.RetainedRootDrafts(),
@@ -150,9 +123,13 @@ func OpenArtifactStore(
 
 	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
 		Store:            store,
-		SchemaCodecs:     codecs,
-		Decoders:         decoders,
-		LocatorFactories: locators.Factories(),
+		SchemaCodecs:     registrations.SchemaCodecs(),
+		Decoders:         registrations.Decoders(),
+		Interpretations:  registrations.Interpretations(),
+		LocatorFactories: registrations.LocatorFactories(),
+		Scope: composition.ScopeBinding{
+			BuiltinRoot: topology.BuiltinRootID(),
+		},
 	})
 	if err != nil {
 		return nil, errors.Join(err, store.Close())
@@ -161,6 +138,6 @@ func OpenArtifactStore(
 	return &Handle{
 		Store:            store,
 		LLM:              llm,
-		locatorFactories: locators.Factories(),
+		locatorFactories: registrations.LocatorFactories(),
 	}, nil
 }

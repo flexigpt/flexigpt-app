@@ -81,7 +81,10 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
-	key := locator.FactoryKey{LocatorKind: kind, ArtifactKind: input.ExpectedKind}
+	key := locator.FactoryKey{
+		LocatorKind:  kind,
+		ArtifactKind: input.ExpectedKind,
+	}
 	resolver, found := r.resolvers[key]
 	if !found {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(

@@ -30,7 +30,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 			RootID:      topology.UserRootID(),
 			Name:        "catalog-workflow",
 			DisplayName: "Catalog workflow",
-			Description: "Skill Collection used to verify aggregate catalog sync.",
+			Description: "Skill Plugin used to verify aggregate catalog sync.",
 		},
 	)
 	requireNoError(t, err)
@@ -209,7 +209,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 
 	currentCollection, err := fixture.api.GetSkillCollection(
 		ctx,
-		created.Collection.Artifact.Ref(),
+		created.Plugin.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 
@@ -224,7 +224,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	replaced, err := fixture.api.ReplaceManagedSkill(
 		ctx,
 		skillConsumerAPI.ManagedSkillReplaceRequest{
-			Collection:                 currentCollection.Artifact.Ref(),
+			Plugin:                     currentCollection.Artifact.Ref(),
 			ExpectedCollectionRevision: currentCollection.Artifact.Revision,
 			Artifact:                   currentSkill.Ref(),
 			ExpectedArtifactRevision:   currentSkill.Revision,

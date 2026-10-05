@@ -8,6 +8,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
@@ -15,13 +16,14 @@ func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
 	goTools toolDomain.GoToolLocator,
+	registry *interpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedToolPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages, goTools)
+	prepared, err := PreparePackages(ctx, packages, goTools, registry)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}

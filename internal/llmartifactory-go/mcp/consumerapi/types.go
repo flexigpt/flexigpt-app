@@ -123,7 +123,7 @@ type PolicyView struct {
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
-	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 	Name                       spec.LogicalName          `json:"name"`
 	Description                string                    `json:"description,omitempty"`
@@ -134,12 +134,12 @@ type ManagedMCPPolicyUpsertRequest struct {
 type ManagedMCPPolicyUpsertResult struct {
 	Artifact          artifactModel.Artifact        `json:"artifact"`
 	Address           artifactModel.ArtifactAddress `json:"address"`
-	Collection        plugin.CollectionView         `json:"collection"`
+	Plugin            plugin.PluginView             `json:"plugin"`
 	MembershipCreated bool                          `json:"membershipCreated"`
 }
 
 type ManagedMCPCreateRequest struct {
-	Collection                 artifactModel.ArtifactRef      `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef      `json:"plugin"`
 	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
 	Document                   serverMCPDomain.ServerDocument `json:"document"`
 	Enabled                    bool                           `json:"enabled"`
@@ -148,12 +148,12 @@ type ManagedMCPCreateRequest struct {
 type ManagedMCPCreateResult struct {
 	Artifact          artifactModel.Artifact        `json:"artifact"`
 	Address           artifactModel.ArtifactAddress `json:"address"`
-	Collection        plugin.CollectionView         `json:"collection"`
+	Plugin            plugin.PluginView             `json:"plugin"`
 	MembershipCreated bool                          `json:"membershipCreated"`
 }
 
 type ManagedMCPReplaceRequest struct {
-	Collection                 artifactModel.ArtifactRef      `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef      `json:"plugin"`
 	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
 	Artifact                   artifactModel.ArtifactRef      `json:"artifact"`
 	ExpectedArtifactRevision   uint64                         `json:"expectedArtifactRevision"`
@@ -162,9 +162,9 @@ type ManagedMCPReplaceRequest struct {
 }
 
 type ManagedMCPReplaceResult struct {
-	Artifact   artifactModel.Artifact        `json:"artifact"`
-	Address    artifactModel.ArtifactAddress `json:"address"`
-	Collection plugin.CollectionView         `json:"collection"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
+	Plugin   plugin.PluginView             `json:"plugin"`
 }
 
 type BuiltInArtifactExpectation struct {

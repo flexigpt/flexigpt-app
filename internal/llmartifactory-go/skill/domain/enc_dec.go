@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 )
 
 // ManagedSkillDocument is a source-backed editable Skill document. It is

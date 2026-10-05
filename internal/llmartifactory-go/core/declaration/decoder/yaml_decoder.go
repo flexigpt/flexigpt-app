@@ -12,8 +12,8 @@ import (
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -23,9 +23,9 @@ type YAMLDecoder struct {
 	core *canonicalDecoder
 }
 
-func NewYAMLDecoder() *YAMLDecoder {
+func NewYAMLDecoder(registry *interpretation.Registry) *YAMLDecoder {
 	return &YAMLDecoder{
-		core: newCanonicalDecoder(),
+		core: newCanonicalDecoder(registry),
 	}
 }
 
@@ -37,8 +37,11 @@ func (*YAMLDecoder) Revision() string {
 	return "artifact-declaration-yaml/v1"
 }
 
-func (*YAMLDecoder) RequiredSchemaKeys() []schemaModel.Key {
-	return newCanonicalDecoder().RequiredSchemaKeys()
+func (d *YAMLDecoder) RequiredSchemaKeys() []schemaModel.Key {
+	if d == nil || d.core == nil {
+		return nil
+	}
+	return d.core.RequiredSchemaKeys()
 }
 
 func (d *YAMLDecoder) BindExpectedCanonicalizer(
@@ -53,19 +56,15 @@ func (d *YAMLDecoder) BindExpectedCanonicalizer(
 	return d.core.BindExpectedCanonicalizer(catalog)
 }
 
-func (*YAMLDecoder) Recognize(
+func (d *YAMLDecoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	requested := candidate.RequestsDecoder(YAMLDecoderID)
-	declared := topology.IsCanonicalYAMLDocument(
-		candidate.Locator,
-	)
 	extension := strings.ToLower(path.Ext(string(candidate.Locator)))
 	if extension != ".yaml" &&
 		extension != ".yml" &&
-		!requested &&
-		!declared {
+		!requested {
 		return ingestModel.RecognitionNone
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -73,7 +72,7 @@ func (*YAMLDecoder) Recognize(
 		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
-		if requested || declared {
+		if requested {
 			return ingestModel.RecognitionPossible
 		}
 		return ingestModel.RecognitionNone
@@ -82,13 +81,14 @@ func (*YAMLDecoder) Recognize(
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
-		if requested || declared {
+		if requested {
 			return ingestModel.RecognitionPossible
 		}
 		return ingestModel.RecognitionNone
 	}
-	if !supportsType(header.Type) {
-		if requested || declared {
+	if d == nil || d.core == nil || d.core.interpretations == nil ||
+		!d.core.interpretations.SupportsType(header.Type) {
+		if requested {
 			return ingestModel.RecognitionPossible
 		}
 		return ingestModel.RecognitionNone

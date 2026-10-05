@@ -10,8 +10,8 @@ import (
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
 )
 
 type editableManagedAgent struct {
@@ -22,7 +22,7 @@ type editableManagedAgent struct {
 
 // DeleteManagedAgent removes the managed Agent package and purges every
 // Artifact emitted from its package document. It deliberately does not detach
-// Collection relationships, which become unavailable until an exact Agent
+// Plugin relationships, which become unavailable until an exact Agent
 // occurrence is restored.
 func (a *API) DeleteManagedAgent(
 	ctx context.Context,

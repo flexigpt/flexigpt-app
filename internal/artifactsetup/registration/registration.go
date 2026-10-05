@@ -1,0 +1,97 @@
+package registration
+
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+)
+
+type Selection struct {
+	interpretations *interpretation.Registry
+	schemaCodecs    []schema.Codec
+	decoders        []ingest.Decoder
+	locators        []locator.Factory
+}
+
+func New() (*Selection, error) {
+	interpretations, err := NewLLMInterpretationRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	codecs, err := LLMDeclarationSchemaCodecs()
+	if err != nil {
+		return nil, err
+	}
+	codecs, err = schema.NormalizeCodecs(codecs)
+	if err != nil {
+		return nil, err
+	}
+
+	canonicalDecoders, err := LLMCanonicalDeclarationDecoders(
+		interpretations,
+	)
+	if err != nil {
+		return nil, err
+	}
+	sourceFormatDecoders, err := LLMSourceFormatDecoders(
+		interpretations,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	decoders := append(
+		append([]ingest.Decoder(nil), canonicalDecoders...),
+		sourceFormatDecoders...,
+	)
+	decoders, err = ingest.NormalizeDecoders(decoders)
+	if err != nil {
+		return nil, err
+	}
+
+	factories, err := LLMPathLocatorFactories(interpretations)
+	if err != nil {
+		return nil, err
+	}
+	locators, err := locator.NewRegistry(factories...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Selection{
+		interpretations: interpretations,
+		schemaCodecs:    codecs,
+		decoders:        decoders,
+		locators:        locators.Factories(),
+	}, nil
+}
+
+func (s *Selection) Interpretations() *interpretation.Registry {
+	if s == nil {
+		return nil
+	}
+	return s.interpretations
+}
+
+func (s *Selection) SchemaCodecs() []schema.Codec {
+	if s == nil {
+		return nil
+	}
+	return append([]schema.Codec(nil), s.schemaCodecs...)
+}
+
+func (s *Selection) Decoders() []ingest.Decoder {
+	if s == nil {
+		return nil
+	}
+	return append([]ingest.Decoder(nil), s.decoders...)
+}
+
+func (s *Selection) LocatorFactories() []locator.Factory {
+	if s == nil {
+		return nil
+	}
+	return append([]locator.Factory(nil), s.locators...)
+}

@@ -72,7 +72,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 ) error {
 	if r == nil || r.refresh == nil {
 		return fmt.Errorf(
-			"%w: Artifact refresh coordinator is unavailable",
+			"%w: Artifact composition refresh coordinator is unavailable",
 			spec.ErrUnsupported,
 		)
 	}
@@ -101,10 +101,11 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 		if err != nil {
 			return err
 		}
+
 		rootID, found := rootEntry.RootID()
 		if !found {
 			return fmt.Errorf(
-				"%w: refresh root has no Root identity",
+				"%w: composition refresh root has no Root identity",
 				spec.ErrInvalid,
 			)
 		}
@@ -134,6 +135,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 		if len(targets) == 0 {
 			return nil
 		}
+
 		sort.Slice(targets, func(left, right int) bool {
 			if targets[left].RootID != targets[right].RootID {
 				return targets[left].RootID < targets[right].RootID
@@ -153,15 +155,16 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 	}
 
 	return fmt.Errorf(
-		"%w: Artifact refresh closure exceeds depth %d",
+		"%w: Artifact composition refresh closure exceeds depth %d",
 		spec.ErrLocatorLimitExceeded,
 		r.limits.MaxDepth,
 	)
 }
 
 type refreshWalker struct {
-	resolver   *Resolver
-	rootID     rootModel.RootID
+	resolver *Resolver
+	rootID   rootModel.RootID
+
 	directives map[RefreshTarget]bool
 	visited    map[artifactModel.ArtifactRef]struct{}
 }
@@ -180,74 +183,10 @@ func (w *refreshWalker) visitEntry(
 		w.visited[ref] = struct{}{}
 	}
 
-	switch entry.Type {
-	case declaration.TypePlugin,
-		declaration.TypeAgent,
-		declaration.TypeTeam:
-		for _, relationship := range entry.MemberResults {
-			if err := w.visitRelationship(ctx, entry, relationship); err != nil {
-				return err
-			}
+	for _, relationship := range entry.Relationships {
+		if err := w.visitRelationship(ctx, entry, relationship); err != nil {
+			return err
 		}
-		if entry.DirectLoopResult != nil {
-			if err := w.visitRelationship(
-				ctx,
-				entry,
-				*entry.DirectLoopResult,
-			); err != nil {
-				return err
-			}
-		}
-		if entry.DirectWorkflowResult != nil {
-			if err := w.visitRelationship(
-				ctx,
-				entry,
-				*entry.DirectWorkflowResult,
-			); err != nil {
-				return err
-			}
-		}
-
-	case declaration.TypeSkill:
-		for _, relationship := range entry.AllowedToolResults {
-			if err := w.visitRelationship(ctx, entry, relationship); err != nil {
-				return err
-			}
-		}
-
-	case declaration.TypeMCP:
-		if entry.MCP != nil && entry.MCP.PolicyResult != nil {
-			return w.visitRelationship(ctx, entry, *entry.MCP.PolicyResult)
-		}
-
-	case declaration.TypeLoop:
-		if entry.Loop != nil && entry.Loop.BodyResult != nil {
-			return w.visitRelationship(ctx, entry, *entry.Loop.BodyResult)
-		}
-
-	case declaration.TypeWorkflow:
-		if entry.Workflow == nil {
-			return nil
-		}
-		for _, node := range entry.Workflow.Nodes {
-			if node.MemberResult == nil {
-				continue
-			}
-			if err := w.visitRelationship(ctx, entry, *node.MemberResult); err != nil {
-				return err
-			}
-		}
-
-	case declaration.TypeWorkspace:
-		if entry.Workspace == nil {
-			return nil
-		}
-		for _, relationship := range entry.Workspace.MemberResults {
-			if err := w.visitRelationship(ctx, entry, relationship); err != nil {
-				return err
-			}
-		}
-	default:
 	}
 	return nil
 }

@@ -8,8 +8,8 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
 // Tool is internal decoded Store material. Consumer and Wails APIs expose
@@ -77,8 +77,8 @@ func DecodeTool(
 }
 
 // ValidateToolCollectionDocument applies the restrictions of the built-in
-// Tool catalog. Generic Collection decoding and projection remain owned by
-// the collection package.
+// Tool catalog. Generic Plugin decoding and projection remain owned by
+// the plugin package.
 func ValidateToolCollectionDocument(
 	document pluginv1.PluginDocument,
 ) ([]spec.LogicalName, error) {
@@ -93,7 +93,7 @@ func ValidateToolCollectionDocument(
 	}
 
 	ordered, err := declaration.SortedMembers(
-		"Tool Collection members",
+		"Tool Plugin members",
 		document.Members,
 	)
 	if err != nil {
@@ -106,7 +106,7 @@ func ValidateToolCollectionDocument(
 		form, err := member.MemberForm()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"Tool Collection members[%d]: %w",
+				"Tool Plugin members[%d]: %w",
 				index,
 				err,
 			)
@@ -129,7 +129,7 @@ func ValidateToolCollectionDocument(
 			len(relationship.Overrides) != 0 ||
 			len(relationship.Use) != 0 {
 			return nil, fmt.Errorf(
-				"%w: Tool Collection member %q has unsupported relationship behavior",
+				"%w: Tool Plugin member %q has unsupported relationship behavior",
 				spec.ErrUnsupported,
 				header.Name,
 			)
@@ -141,7 +141,7 @@ func ValidateToolCollectionDocument(
 		}
 		if _, duplicate := seen[name]; duplicate {
 			return nil, fmt.Errorf(
-				"%w: Tool Collection repeats Tool %q",
+				"%w: Tool Plugin repeats Tool %q",
 				spec.ErrIdentityConflict,
 				name,
 			)

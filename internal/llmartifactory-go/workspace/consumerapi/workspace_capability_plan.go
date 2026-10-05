@@ -60,14 +60,18 @@ func workspaceArtifactRefs(
 	for _, occurrence := range plan.Occurrences {
 		if occurrence.Status != composition.ResolutionAvailable ||
 			occurrence.Type != declarationType ||
-			occurrence.Artifact == nil {
+			occurrence.Target == nil ||
+			occurrence.Target.Form != composition.TargetFormArtifact ||
+			occurrence.Target.Artifact == nil {
 			continue
 		}
-		if _, duplicate := seen[*occurrence.Artifact]; duplicate {
+
+		ref := *occurrence.Target.Artifact
+		if _, duplicate := seen[ref]; duplicate {
 			continue
 		}
-		seen[*occurrence.Artifact] = struct{}{}
-		output = append(output, *occurrence.Artifact)
+		seen[ref] = struct{}{}
+		output = append(output, ref)
 	}
 
 	sort.Slice(output, func(left, right int) bool {

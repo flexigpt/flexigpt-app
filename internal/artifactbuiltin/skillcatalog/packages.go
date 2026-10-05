@@ -15,13 +15,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-// PreparedPackage is one embedded canonical Skill Collection package ready for
+// PreparedPackage is one embedded canonical Skill Plugin package ready for
 // publication through the shared managed built-in Source.
 type PreparedPackage struct {
 	EmbeddedPackageRoot spec.Locator
@@ -47,6 +47,7 @@ type ArtifactExpectation struct {
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
+	registry *interpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -56,6 +57,12 @@ func PreparePackages(
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if registry == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in Skill package interpretation registry is nil",
+			spec.ErrInvalid,
+		)
 	}
 	if packages == nil {
 		return nil, fmt.Errorf(
@@ -75,6 +82,7 @@ func PreparePackages(
 			ctx,
 			packages,
 			packageRoot,
+			registry,
 		)
 		if err != nil {
 			return nil, err
@@ -92,6 +100,7 @@ func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
+	registry *interpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(
 		ctx,
@@ -108,23 +117,24 @@ func preparePackage(
 
 	documentFile, document, found, err := managedpackageModel.PackageFileContentOneOf(
 		files,
-		topology.CollectionDocumentFiles(),
+		topology.PluginDocumentFiles(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded Skill package %q lacks a supported Collection document",
+			"%w: embedded Skill package %q lacks a supported Plugin document",
 			spec.ErrInvalid,
 			packageRoot,
 		)
 	}
 
-	collection, expectations, err := canonicalCollectionPackage(
+	plugin, expectations, err := canonicalCollectionPackage(
 		documentFile,
 		document,
 		files,
+		registry,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -140,12 +150,12 @@ func preparePackage(
 	if err := packageName.Validate(); err != nil {
 		return PreparedPackage{}, err
 	}
-	if collection.Name != string(packageName) {
+	if plugin.Name != string(packageName) {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Skill package directory %q does not match Plugin name %q",
 			spec.ErrInvalid,
 			packageRoot,
-			collection.Name,
+			plugin.Name,
 		)
 	}
 
@@ -171,6 +181,7 @@ func canonicalCollectionPackage(
 	documentFile spec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
+	registry *interpretation.Registry,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -193,16 +204,16 @@ func canonicalCollectionPackage(
 			spec.ErrInvalid,
 		)
 	}
-	if err := decoder.ValidateEntryTree(root); err != nil {
+	if err := registry.ValidateTree(root); err != nil {
 		return pluginv1.PluginDocument{}, nil, err
 	}
 
-	collection, err := pluginv1.DecodePluginEntry(root)
+	plugin, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
 	}
 
-	rootDefinition, err := decoder.DefinitionForEntry(root)
+	rootDefinition, err := registry.DefinitionForEntry(root)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
 	}
@@ -214,7 +225,7 @@ func canonicalCollectionPackage(
 	expectations := make(
 		[]ArtifactExpectation,
 		0,
-		1+len(collection.Members),
+		1+len(plugin.Members),
 	)
 	expectations = append(
 		expectations,
@@ -232,7 +243,7 @@ func canonicalCollectionPackage(
 	seenDocuments := map[spec.Locator]struct{}{
 		documentFile: {},
 	}
-	for index, member := range collection.Members {
+	for index, member := range plugin.Members {
 		form, err := member.MemberForm()
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, err
@@ -329,13 +340,13 @@ func canonicalCollectionPackage(
 				"%w: built-in Skill document %q is not referenced by Plugin %q",
 				spec.ErrInvalid,
 				locator,
-				collection.Name,
+				plugin.Name,
 			)
 		}
 	}
 
 	sortSkillExpectations(expectations)
-	return collection, expectations, nil
+	return plugin, expectations, nil
 }
 
 type preparedArtifactIdentity struct {
@@ -398,9 +409,9 @@ func PackageFingerprint(
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
-	if !topology.IsCollectionDocumentFile(value.DocumentFile) {
+	if !topology.IsPluginDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in Skill Collection document is not declared in topology",
+			"%w: built-in Skill Plugin document is not declared in topology",
 			spec.ErrInvalid,
 		)
 	}

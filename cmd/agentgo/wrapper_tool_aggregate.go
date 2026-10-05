@@ -6,13 +6,8 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
-	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
 
 type ToolAggregateWrapper struct {
@@ -58,56 +53,6 @@ func withToolAggregate[T any](
 	})
 }
 
-func (w *ToolAggregateWrapper) MapToolTarget(
-	ref artifactModel.ArtifactRef,
-) (composition.MappedTarget, error) {
-	return withToolAggregate(
-		w,
-		func(service *toolAggregate.Service) (composition.MappedTarget, error) {
-			return service.MapToolTarget(context.Background(), ref)
-		},
-	)
-}
-
-func (w *ToolAggregateWrapper) ResolveMappedTool(
-	target composition.MappedTarget,
-) (toolConsumerAPI.ResolvedToolView, error) {
-	return withToolAggregate(
-		w,
-		func(service *toolAggregate.Service) (
-			toolConsumerAPI.ResolvedToolView,
-			error,
-		) {
-			return service.ResolveMappedTool(
-				context.Background(),
-				target,
-			)
-		},
-	)
-}
-
-func (w *ToolAggregateWrapper) InvokeMappedTool(
-	request ToolAggregateInvokeRequest,
-) (*toolRuntime.InvokeResponse, error) {
-	return withToolAggregate(
-		w,
-		func(service *toolAggregate.Service) (
-			*toolRuntime.InvokeResponse,
-			error,
-		) {
-			args, err := toolArgumentsFromBridge(request.Args)
-			if err != nil {
-				return nil, err
-			}
-			return service.Invoke(context.Background(), toolAggregate.InvokeRequest{
-				Target:    request.Target,
-				Args:      args,
-				TimeoutMS: request.TimeoutMS,
-			})
-		},
-	)
-}
-
 func (w *ToolAggregateWrapper) HydrateInferenceToolChoice(
 	selection toolAggregate.ToolSelection,
 ) (inferenceSpec.ToolChoice, error) {
@@ -130,22 +75,6 @@ func (w *ToolAggregateWrapper) ready() error {
 		return spec.ErrClosed
 	}
 	return nil
-}
-
-// targetMappers is composition-only. The aggregate owns ArtifactRef to mapped
-// target translation because it resolves enabled Tool Artifacts and their
-// containing Tool Collections.
-func (w *ToolAggregateWrapper) targetMappers() (
-	map[declaration.Type]composition.ArtifactTargetMapper,
-	error,
-) {
-	if err := w.ready(); err != nil {
-		return nil, err
-	}
-
-	return map[declaration.Type]composition.ArtifactTargetMapper{
-		declaration.TypeTool: w.service,
-	}, nil
 }
 
 func (w *ToolAggregateWrapper) close() {

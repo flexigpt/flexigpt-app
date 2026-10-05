@@ -20,12 +20,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/mcpv1"
+	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -35,7 +34,7 @@ const managedAgentPreparedTTL = 10 * time.Minute
 
 type agentImportDestinationState struct {
 	value            AgentImportDestination
-	collection       plugin.CollectionView
+	plugin           plugin.PluginView
 	sourceGeneration string
 }
 
@@ -51,7 +50,7 @@ type preparedAgentImport struct {
 	RootID   rootModel.RootID     `json:"rootID"`
 	SourceID sourceModel.SourceID `json:"sourceID"`
 
-	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 	ExpectedSourceGeneration   string                    `json:"expectedSourceGeneration"`
 
@@ -75,7 +74,7 @@ func (a *API) ListAgentImportDestinations(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]AgentImportDestination, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return nil, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
@@ -98,7 +97,7 @@ func (a *API) ListAgentImportDestinations(
 		output = append(output, AgentImportDestination{
 			RootID:                rootID,
 			SourceID:              value.SourceID,
-			Collection:            value.Ref,
+			Plugin:                value.Ref,
 			CollectionRevision:    value.Revision,
 			CollectionName:        value.Name,
 			CollectionDisplayName: value.DisplayName,
@@ -132,7 +131,7 @@ func (a *API) PreviewAgentImport(
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return AgentImportPreview{}, fmt.Errorf(
-			"%w: expected Agent Collection revision is required",
+			"%w: expected Agent Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
@@ -150,7 +149,7 @@ func (a *API) PreviewAgentImport(
 
 	destination, err := a.agentImportDestination(
 		ctx,
-		request.Collection,
+		request.Plugin,
 		request.ExpectedCollectionRevision,
 	)
 	if err != nil {
@@ -324,7 +323,7 @@ func (a *API) PreviewAgentImport(
 		)
 	}
 
-	identities, artifacts, err := plannedImportArtifacts(entry)
+	identities, artifacts, err := a.plannedImportArtifacts(entry)
 	if err != nil {
 		return previewValidationError(
 			preview,
@@ -382,7 +381,7 @@ func (a *API) PreviewAgentImport(
 
 	restored, membershipConflicts, err := a.analyzeAgentImportMembership(
 		ctx,
-		destination.collection,
+		destination.plugin,
 		rootDefinition.LogicalName,
 		agentLocator,
 	)
@@ -436,7 +435,7 @@ func (a *API) PreviewAgentImport(
 		CanonicalDeclaration:       append(json.RawMessage(nil), rawAgent...),
 		RootID:                     destination.value.RootID,
 		SourceID:                   destination.value.SourceID,
-		Collection:                 request.Collection,
+		Plugin:                     request.Plugin,
 		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
 		ExpectedSourceGeneration:   destination.sourceGeneration,
 		Address:                    address,
@@ -514,7 +513,7 @@ func (a *API) CommitAgentImport(
 
 	destination, err := a.agentImportDestination(
 		ctx,
-		plan.Collection,
+		plan.Plugin,
 		plan.ExpectedCollectionRevision,
 	)
 	if err != nil {
@@ -607,7 +606,7 @@ func (a *API) CommitAgentImport(
 		)
 	}
 
-	identities, _, err := plannedImportArtifacts(entry)
+	identities, _, err := a.plannedImportArtifacts(entry)
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
@@ -643,10 +642,10 @@ func (a *API) CommitAgentImport(
 		)
 	}
 
-	membership, err := a.collections.EnsureMemberForCollectionSource(
+	membership, err := a.plugins.EnsureMemberForCollectionSource(
 		ctx,
 		plugin.EnsureMemberForCollectionSourceRequest{
-			Collection:       plan.Collection,
+			Plugin:           plan.Plugin,
 			ExpectedRevision: plan.ExpectedCollectionRevision,
 			Type:             declaration.TypeAgent,
 			Name:             rootDefinition.LogicalName,
@@ -667,7 +666,7 @@ func (a *API) CommitAgentImport(
 	)
 	if err != nil {
 		return AgentImportCommitResult{}, fmt.Errorf(
-			"publish Agent after Collection membership publication: %w",
+			"publish Agent after Plugin membership publication: %w",
 			err,
 		)
 	}
@@ -678,7 +677,7 @@ func (a *API) CommitAgentImport(
 	}
 	collectionView, err := a.GetAgentCollection(
 		ctx,
-		membership.Collection.Artifact.Ref(),
+		membership.Plugin.Artifact.Ref(),
 	)
 	if err != nil {
 		return AgentImportCommitResult{}, err
@@ -691,7 +690,7 @@ func (a *API) CommitAgentImport(
 	)
 	return AgentImportCommitResult{
 		Agent:               agent,
-		Collection:          collectionView,
+		Plugin:              collectionView,
 		RestoredMemberships: plan.RestoredMemberships,
 		MCPSetupDescriptors: setup,
 		PreparedFingerprint: fingerprint,
@@ -703,14 +702,14 @@ func (a *API) agentImportDestination(
 	collectionRef artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) (agentImportDestinationState, error) {
-	if a == nil || a.collections == nil {
+	if a == nil || a.plugins == nil {
 		return agentImportDestinationState{}, spec.ErrClosed
 	}
 	if err := collectionRef.Validate(); err != nil {
 		return agentImportDestinationState{}, err
 	}
 
-	value, err := a.collections.Get(ctx, collectionRef)
+	value, err := a.plugins.Get(ctx, collectionRef)
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}
@@ -720,7 +719,7 @@ func (a *API) agentImportDestination(
 	}
 	if !a.IsManagedAgentCollection(value) {
 		return agentImportDestinationState{}, fmt.Errorf(
-			"%w: selected Collection is not an editable managed Agent Collection",
+			"%w: selected Plugin is not an editable managed Agent Plugin",
 			spec.ErrUnsupported,
 		)
 	}
@@ -746,7 +745,7 @@ func (a *API) agentImportDestination(
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
 		!sourceValue.Enabled {
 		return agentImportDestinationState{}, fmt.Errorf(
-			"%w: selected Collection does not use the enabled managed Agent Source",
+			"%w: selected Plugin does not use the enabled managed Agent Source",
 			spec.ErrInvalid,
 		)
 	}
@@ -770,22 +769,26 @@ func (a *API) agentImportDestination(
 		value: AgentImportDestination{
 			RootID:                value.Artifact.RootID,
 			SourceID:              value.Artifact.Binding.SourceID,
-			Collection:            value.Artifact.Ref(),
+			Plugin:                value.Artifact.Ref(),
 			CollectionRevision:    value.Artifact.Revision,
 			CollectionName:        value.Artifact.LogicalName,
 			CollectionDisplayName: value.DisplayName,
 			Baseline:              value.Baseline,
 			Enabled:               value.Artifact.Enabled,
 		},
-		collection:       value,
+		plugin:           value,
 		sourceGeneration: inspection.State.SourceGeneration,
 	}, nil
 }
 
-func plannedImportArtifacts(
+func (a *API) plannedImportArtifacts(
 	entry declaration.Entry,
 ) ([]plannedImportIdentity, []AgentImportArtifactPreview, error) {
-	named, err := declaration.WalkNamedEntries(entry)
+	if a == nil || a.interpretations == nil {
+		return nil, nil, spec.ErrClosed
+	}
+
+	named, err := a.interpretations.WalkNamedEntries(entry)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -793,7 +796,9 @@ func plannedImportArtifacts(
 	identities := make([]plannedImportIdentity, 0, len(named))
 	preview := make([]AgentImportArtifactPreview, 0, len(named))
 	for _, namedEntry := range named {
-		value, err := decoder.DefinitionForNamedEntry(namedEntry)
+		value, err := a.interpretations.DefinitionForEntry(
+			namedEntry.Entry,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -927,7 +932,7 @@ func (a *API) managedAgentPackageConflict(
 
 func (a *API) analyzeAgentImportMembership(
 	ctx context.Context,
-	selected plugin.CollectionView,
+	selected plugin.PluginView,
 	name spec.LogicalName,
 	agentLocator spec.Locator,
 ) (
@@ -935,7 +940,7 @@ func (a *API) analyzeAgentImportMembership(
 	[]AgentImportConflict,
 	error,
 ) {
-	if _, err := a.collections.MemberForCollectionSource(
+	if _, err := a.plugins.MemberForCollectionSource(
 		ctx,
 		selected.Artifact.Ref(),
 		declaration.TypeAgent,
@@ -961,29 +966,29 @@ func (a *API) analyzeAgentImportMembership(
 			continue
 		}
 		conflicts = append(conflicts, AgentImportConflict{
-			Code:    "agent.import.collection-member-conflict",
+			Code:    "agent.import.plugin-member-conflict",
 			Path:    "members/agent/" + string(name),
-			Message: "selected Collection already contains the imported Agent name at another relationship",
+			Message: "selected Plugin already contains the imported Agent name at another relationship",
 		})
 	}
 
 	restored := make([]AgentRestoredMembership, 0)
 	if exact {
 		restored = append(restored, AgentRestoredMembership{
-			Collection: selected.Artifact.Ref(),
-			Path:       "members/agent/" + string(name),
-			Message:    "selected Collection already declares the exact Agent relationship",
+			Plugin:  selected.Artifact.Ref(),
+			Path:    "members/agent/" + string(name),
+			Message: "selected Plugin already declares the exact Agent relationship",
 		})
 	}
 
-	collections, err := a.ListAgentCollections(
+	plugins, err := a.ListAgentCollections(
 		ctx,
 		selected.Artifact.RootID,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, item := range collections {
+	for _, item := range plugins {
 		if item.Ref == selected.Artifact.Ref() {
 			continue
 		}
@@ -1004,9 +1009,9 @@ func (a *API) analyzeAgentImportMembership(
 				continue
 			}
 			restored = append(restored, AgentRestoredMembership{
-				Collection: value.Artifact.Ref(),
-				Path:       "members/agent/" + string(name),
-				Message:    "existing exact relationship will become available after import",
+				Plugin:  value.Artifact.Ref(),
+				Path:    "members/agent/" + string(name),
+				Message: "existing exact relationship will become available after import",
 			})
 		}
 	}
@@ -1173,13 +1178,9 @@ func (a *API) preflightNamedManagedDependency(
 		output.Code = target.Issue.Code
 		output.Message = target.Issue.Message
 	}
-	if target.Artifact != nil {
-		ref := *target.Artifact
-		output.Artifact = &ref
-	}
-	if target.Mapped != nil {
-		value := *target.Mapped
-		output.Mapped = &value
+	if target.Target != nil {
+		value := target.Target.Clone()
+		output.Target = &value
 	}
 
 	if target.Status != composition.ResolutionAvailable {
@@ -1195,8 +1196,10 @@ func (a *API) preflightNamedManagedDependency(
 	}
 
 	var setup *AgentMCPSetupDescriptor
-	if output.Artifact != nil {
-		ref := *output.Artifact
+	if output.Target != nil &&
+		output.Target.Form == composition.TargetFormArtifact &&
+		output.Target.Artifact != nil {
+		ref := *output.Target.Artifact
 		_, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return AgentImportRelationship{},
@@ -1264,6 +1267,14 @@ func validateManagedDependencyTarget(
 	target composition.NamedRelationshipInspection,
 	memberPath string,
 ) error {
+	if target.Target == nil {
+		return fmt.Errorf(
+			"%w: managed Agent dependency %q resolved without a capability target",
+			spec.ErrReferenceUnresolved,
+			memberPath,
+		)
+	}
+
 	if scope != declaration.LookupScopeBuiltin {
 		return fmt.Errorf(
 			"%w: managed Agent dependency %q is not normalized to built-in scope",
@@ -1272,28 +1283,34 @@ func validateManagedDependencyTarget(
 		)
 	}
 
+	isBuiltinArtifact := func() bool {
+		return target.Target.Form == composition.TargetFormArtifact &&
+			target.Target.Artifact != nil &&
+			target.Target.Artifact.RootID == agentBuiltinRootID()
+	}
+	isDirectCapability := func() bool {
+		return target.Target.Form == composition.TargetFormDirect &&
+			target.Target.Provenance ==
+				composition.TargetProvenanceDirectCapability
+	}
+
 	switch declarationType {
 	case declaration.TypeModel, declaration.TypeTool:
-		if target.Artifact != nil &&
-			target.Artifact.RootID == agentBuiltinRootID() {
-			return nil
-		}
-		if target.Mapped != nil && target.Mapped.Builtin {
+		if isBuiltinArtifact() || isDirectCapability() {
 			return nil
 		}
 
 	case declaration.TypeSkill,
 		declaration.TypeMCP,
 		declaration.TypeMCPPolicy:
-		if target.Artifact != nil &&
-			target.Artifact.RootID == agentBuiltinRootID() {
+		if isBuiltinArtifact() {
 			return nil
 		}
 	default:
 	}
 
 	return fmt.Errorf(
-		"%w: managed Agent dependency %q does not resolve to the required protected built-in or mapped target",
+		"%w: managed Agent dependency %q does not resolve to the required protected built-in Artifact or direct capability",
 		spec.ErrInvalid,
 		memberPath,
 	)
@@ -1324,7 +1341,7 @@ func (a *API) publishPreparedManagedAgent(
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
-	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
@@ -1386,10 +1403,12 @@ func (a *API) bindMCPSetupArtifacts(
 		for _, occurrence := range plan.Occurrences {
 			if occurrence.Type != declaration.TypeMCP ||
 				occurrence.Name != output[index].Name ||
-				occurrence.Artifact == nil {
+				occurrence.Target == nil ||
+				occurrence.Target.Form != composition.TargetFormArtifact ||
+				occurrence.Target.Artifact == nil {
 				continue
 			}
-			ref := *occurrence.Artifact
+			ref := *occurrence.Target.Artifact
 			output[index].Artifact = &ref
 			break
 		}

@@ -54,7 +54,7 @@ type SkillListItem struct {
 }
 
 type ManagedSkillCreateRequest struct {
-	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 	SkillName                  string                    `json:"skillName"`
 
@@ -69,12 +69,12 @@ type ManagedSkillCreateRequest struct {
 type ManagedSkillCreateResult struct {
 	Artifact          artifactModel.Artifact        `json:"artifact"`
 	Address           artifactModel.ArtifactAddress `json:"address"`
-	Collection        plugin.CollectionView         `json:"collection"`
+	Plugin            plugin.PluginView             `json:"plugin"`
 	MembershipCreated bool                          `json:"membershipCreated"`
 }
 
 type ManagedSkillReplaceRequest struct {
-	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	Plugin                     artifactModel.ArtifactRef `json:"plugin"`
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 	Artifact                   artifactModel.ArtifactRef `json:"artifact"`
 	ExpectedArtifactRevision   uint64                    `json:"expectedArtifactRevision"`
@@ -89,7 +89,7 @@ type ManagedSkillReplaceRequest struct {
 }
 
 type ManagedSkillReplaceResult struct {
-	Artifact   artifactModel.Artifact        `json:"artifact"`
-	Address    artifactModel.ArtifactAddress `json:"address"`
-	Collection plugin.CollectionView         `json:"collection"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
+	Plugin   plugin.PluginView             `json:"plugin"`
 }

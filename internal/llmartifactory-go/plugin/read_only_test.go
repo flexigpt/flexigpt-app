@@ -6,31 +6,11 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
-
-func TestReadOnlyDomainDoesNotRequireAuthoringConfiguration(t *testing.T) {
-	policy := DomainPolicy{
-		Name:        "tool",
-		ReadOnly:    true,
-		PackageKind: "tool-collection",
-		DocumentUse: topology.DocumentUseToolCollection,
-		AllowedMemberTypes: []declaration.Type{
-			declaration.TypeTool,
-		},
-		AllowedMemberForms: []declaration.MemberForm{
-			declaration.MemberNamed,
-		},
-	}
-	if err := policy.Validate(); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestReadOnlyDomainRejectsAuthoringBeforeStoreAccess(t *testing.T) {
 	api := &API{
-		domain: &DomainPolicy{
+		domain: &Profile{
 			Name:     "tool",
 			ReadOnly: true,
 		},
