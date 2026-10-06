@@ -386,7 +386,6 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
             - "github.com/flexigpt/mapstore-go"
             - "github.com/glebarez/go-sqlite"
-            - "github.com/santhosh-tekuri/jsonschema/v6"
             - "github.com/zalando/go-keyring"
 
         # Isolate the artifactory package completely
@@ -411,7 +410,6 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
             # Should be removed
-            - "github.com/santhosh-tekuri/jsonschema/v6"
             - "github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 
     embeddedstructfieldcheck:

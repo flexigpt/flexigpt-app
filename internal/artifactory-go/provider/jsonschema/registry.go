@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -18,7 +16,7 @@ import (
 
 type registeredCodec struct {
 	codec  schema.Codec
-	schema *jsonschema.Schema
+	schema jsonutil.JSONSchema
 }
 
 // Registry executes schemas selected by their complete expected key.

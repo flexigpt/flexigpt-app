@@ -25,7 +25,7 @@ type JSONSchema interface {
 
 // MustCompileJSONSchema compiles an embedded schema during package
 // initialization. Embedded source-controlled schemas are expected to be valid.
-func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
+func MustCompileJSONSchema(raw []byte) JSONSchema {
 	compiled, err := CompileJSONSchema(raw)
 	if err != nil {
 		panic(fmt.Sprintf("compile embedded JSON Schema: %v", err))
@@ -41,7 +41,7 @@ func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
 // metadata before compilation.
 func CompileJSONSchema(
 	raw []byte,
-) (*jsonschema.Schema, error) {
+) (JSONSchema, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("%w: JSON Schema is empty", errInvalid)
