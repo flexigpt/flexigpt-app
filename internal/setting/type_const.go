@@ -1,4 +1,4 @@
-package spec
+package setting
 
 import "errors"
 
@@ -52,4 +52,21 @@ type SettingsSchema struct {
 	SchemaVersion string        `json:"schemaVersion"`
 	AppTheme      AppTheme      `json:"appTheme"`
 	Debug         DebugSettings `json:"debug"`
+}
+
+// DefaultDebugSettingsData is written to disk on first start.
+var DefaultDebugSettingsData = DebugSettings{
+	LogLLMReqResp:           false,
+	DisableContentStripping: false,
+	LogLevel:                DebugLogLevelInfo,
+}
+
+// DefaultSettingsData is written to disk on first start.
+var DefaultSettingsData = SettingsSchema{
+	SchemaVersion: SchemaVersion,
+	AppTheme: AppTheme{
+		Type: ThemeSystem,
+		Name: ThemeNameSystem,
+	},
+	Debug: DefaultDebugSettingsData,
 }

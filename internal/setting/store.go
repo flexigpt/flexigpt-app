@@ -1,4 +1,4 @@
-package store
+package setting
 
 import (
 	"context"
@@ -7,20 +7,15 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
-type DebugSettingsApplier func(context.Context, settingSpec.DebugSettings) error
+type DebugSettingsApplier func(context.Context, DebugSettings) error
 
 type SettingStore struct {
 	store                *mapstore.MapFileStore
 	debugSettingsApplier DebugSettingsApplier
-}
-
-func ErrClosed() error {
-	return basespecClosedError()
 }
 
 const (
@@ -42,7 +37,7 @@ func NewSettingStore(
 		)
 	}
 
-	file := filepath.Join(baseDir, settingSpec.SettingsFile)
+	file := filepath.Join(baseDir, SettingsFile)
 	fileStore, err := mapstore.NewMapFileStore(
 		file,
 		defaultMap,
@@ -93,13 +88,9 @@ func (s *SettingStore) ApplyCurrentDebugSettings(
 	ctx context.Context,
 	forceFetch bool,
 ) error {
-	if s == nil {
-		return basespecClosedError()
-	}
-
 	response, err := s.GetSettings(
 		ctx,
-		&settingSpec.GetSettingsRequest{
+		&GetSettingsRequest{
 			ForceFetch: forceFetch,
 		},
 	)
@@ -124,7 +115,7 @@ func (s *SettingStore) Migrate(
 		return fmt.Errorf("read settings: %w", err)
 	}
 
-	var schema settingSpec.SettingsSchema
+	var schema SettingsSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return fmt.Errorf("decode settings: %w", err)
 	}
@@ -149,10 +140,10 @@ func (s *SettingStore) Migrate(
 		}
 	}
 
-	if schema.SchemaVersion != settingSpec.SchemaVersion {
+	if schema.SchemaVersion != SchemaVersion {
 		if err := s.store.SetKey(
 			[]string{settingKeySchemaVersion},
-			settingSpec.SchemaVersion,
+			SchemaVersion,
 		); err != nil {
 			return fmt.Errorf(
 				"persist settings schema version: %w",
@@ -166,16 +157,13 @@ func (s *SettingStore) Migrate(
 
 func (s *SettingStore) SetAppTheme(
 	_ context.Context,
-	request *settingSpec.SetAppThemeRequest,
-) (*settingSpec.SetAppThemeResponse, error) {
-	if s == nil || s.store == nil {
-		return nil, basespecClosedError()
-	}
+	request *SetAppThemeRequest,
+) (*SetAppThemeResponse, error) {
 	if request == nil || request.Body == nil {
-		return nil, settingSpec.ErrInvalidArgument
+		return nil, ErrInvalidArgument
 	}
 
-	theme := settingSpec.AppTheme{
+	theme := AppTheme{
 		Type: request.Body.Type,
 		Name: request.Body.Name,
 	}
@@ -199,21 +187,18 @@ func (s *SettingStore) SetAppTheme(
 		"type", theme.Type,
 		"name", theme.Name,
 	)
-	return &settingSpec.SetAppThemeResponse{}, nil
+	return &SetAppThemeResponse{}, nil
 }
 
 func (s *SettingStore) SetDebugSettings(
 	ctx context.Context,
-	request *settingSpec.SetDebugSettingsRequest,
-) (*settingSpec.SetDebugSettingsResponse, error) {
-	if s == nil || s.store == nil {
-		return nil, basespecClosedError()
-	}
+	request *SetDebugSettingsRequest,
+) (*SetDebugSettingsResponse, error) {
 	if request == nil || request.Body == nil {
-		return nil, settingSpec.ErrInvalidArgument
+		return nil, ErrInvalidArgument
 	}
 
-	settings := settingSpec.DebugSettings{
+	settings := DebugSettings{
 		LogLLMReqResp:           request.Body.LogLLMReqResp,
 		DisableContentStripping: request.Body.DisableContentStripping,
 		LogLevel:                request.Body.LogLevel,
@@ -245,17 +230,13 @@ func (s *SettingStore) SetDebugSettings(
 		"disableContentStripping", settings.DisableContentStripping,
 		"logLevel", settings.LogLevel,
 	)
-	return &settingSpec.SetDebugSettingsResponse{}, nil
+	return &SetDebugSettingsResponse{}, nil
 }
 
 func (s *SettingStore) GetSettings(
 	_ context.Context,
-	request *settingSpec.GetSettingsRequest,
-) (*settingSpec.GetSettingsResponse, error) {
-	if s == nil || s.store == nil {
-		return nil, basespecClosedError()
-	}
-
+	request *GetSettingsRequest,
+) (*GetSettingsResponse, error) {
 	forceFetch := false
 	if request != nil {
 		forceFetch = request.ForceFetch
@@ -266,14 +247,14 @@ func (s *SettingStore) GetSettings(
 		return nil, err
 	}
 
-	var schema settingSpec.SettingsSchema
+	var schema SettingsSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return nil, err
 	}
 	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
 
-	return &settingSpec.GetSettingsResponse{
-		Body: &settingSpec.GetSettingsResponseBody{
+	return &GetSettingsResponse{
+		Body: &GetSettingsResponseBody{
 			AppTheme: schema.AppTheme,
 			Debug:    schema.Debug,
 		},
@@ -282,7 +263,7 @@ func (s *SettingStore) GetSettings(
 
 func (s *SettingStore) applyDebugSettings(
 	ctx context.Context,
-	settings settingSpec.DebugSettings,
+	settings DebugSettings,
 ) error {
 	if s == nil || s.debugSettingsApplier == nil {
 		return nil
@@ -290,8 +271,82 @@ func (s *SettingStore) applyDebugSettings(
 	return s.debugSettingsApplier(ctx, settings)
 }
 
-// basespecClosedError deliberately keeps Setting Store independent from
-// Artifact Store packages.
-func basespecClosedError() error {
-	return errors.New("settings store: closed")
+// validateTheme checks a theme for correctness.
+func validateTheme(th *AppTheme) error {
+	if th == nil {
+		return ErrInvalidTheme
+	}
+	switch th.Type {
+	case ThemeSystem:
+		if th.Name != ThemeNameSystem {
+			return fmt.Errorf(
+				"%w: type and name required. input - type %s, name %s",
+				ErrInvalidTheme,
+				th.Type,
+				th.Name,
+			)
+		}
+		return nil
+	case ThemeLight:
+		if th.Name != ThemeNameLight {
+			return fmt.Errorf(
+				"%w: type and name required. input - type %s, name %s",
+				ErrInvalidTheme,
+				th.Type,
+				th.Name,
+			)
+		}
+		return nil
+	case ThemeDark:
+		if th.Name != ThemeNameDark {
+			return fmt.Errorf(
+				"%w: type and name required. input - type %s, name %s",
+				ErrInvalidTheme,
+				th.Type,
+				th.Name,
+			)
+		}
+		return nil
+	case ThemeOther:
+		if th.Name == "" {
+			return fmt.Errorf("%w: name required", ErrInvalidTheme)
+		}
+		return nil
+	default:
+		return ErrInvalidTheme
+	}
+}
+
+func normalizeDebugSettings(cfg DebugSettings) (DebugSettings, bool) {
+	normalized := cfg
+	changed := false
+
+	if normalized.LogLevel == "" {
+		normalized.LogLevel = DefaultDebugSettingsData.LogLevel
+		changed = true
+	}
+
+	if err := validateDebugSettings(&normalized); err != nil {
+		normalized = DefaultDebugSettingsData
+		changed = true
+	}
+
+	return normalized, changed
+}
+
+// validateDebugSettings checks whether debug settings are supported.
+func validateDebugSettings(cfg *DebugSettings) error {
+	if cfg == nil {
+		return ErrInvalidDebugSettings
+	}
+
+	switch cfg.LogLevel {
+	case DebugLogLevelDebug,
+		DebugLogLevelInfo,
+		DebugLogLevelWarn,
+		DebugLogLevelError:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported logLevel %q", ErrInvalidDebugSettings, cfg.LogLevel)
+	}
 }

@@ -3,12 +3,11 @@ package main
 import (
 	"context"
 
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
-	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
+	"github.com/flexigpt/flexigpt-app/internal/setting"
 )
 
 type SettingStoreWrapper struct {
-	store *settingStore.SettingStore
+	store *setting.SettingStore
 }
 
 func InitSettingStoreWrapper(
@@ -19,7 +18,7 @@ func InitSettingStoreWrapper(
 		panic("initialising SettingStoreWrapper with nil receiver")
 	}
 
-	store, err := settingStore.NewSettingStore(baseDir)
+	store, err := setting.NewSettingStore(baseDir)
 	if err != nil {
 		return err
 	}
@@ -28,34 +27,25 @@ func InitSettingStoreWrapper(
 }
 
 func (w *SettingStoreWrapper) SetAppTheme(
-	request *settingSpec.SetAppThemeRequest,
-) (*settingSpec.SetAppThemeResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.SetAppThemeResponse, error) {
-		if w == nil || w.store == nil {
-			return nil, settingStoreClosedError()
-		}
+	request *setting.SetAppThemeRequest,
+) (*setting.SetAppThemeResponse, error) {
+	return withRecoveryResp(func() (*setting.SetAppThemeResponse, error) {
 		return w.store.SetAppTheme(context.Background(), request)
 	})
 }
 
 func (w *SettingStoreWrapper) SetDebugSettings(
-	request *settingSpec.SetDebugSettingsRequest,
-) (*settingSpec.SetDebugSettingsResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.SetDebugSettingsResponse, error) {
-		if w == nil || w.store == nil {
-			return nil, settingStoreClosedError()
-		}
+	request *setting.SetDebugSettingsRequest,
+) (*setting.SetDebugSettingsResponse, error) {
+	return withRecoveryResp(func() (*setting.SetDebugSettingsResponse, error) {
 		return w.store.SetDebugSettings(context.Background(), request)
 	})
 }
 
 func (w *SettingStoreWrapper) GetSettings(
-	request *settingSpec.GetSettingsRequest,
-) (*settingSpec.GetSettingsResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.GetSettingsResponse, error) {
-		if w == nil || w.store == nil {
-			return nil, settingStoreClosedError()
-		}
+	request *setting.GetSettingsRequest,
+) (*setting.GetSettingsResponse, error) {
+	return withRecoveryResp(func() (*setting.GetSettingsResponse, error) {
 		return w.store.GetSettings(context.Background(), request)
 	})
 }
@@ -66,8 +56,4 @@ func (w *SettingStoreWrapper) close() {
 	}
 	_ = w.store.Close()
 	w.store = nil
-}
-
-func settingStoreClosedError() error {
-	return settingStore.ErrClosed()
 }

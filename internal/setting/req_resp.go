@@ -1,4 +1,4 @@
-package spec
+package setting
 
 type SetAppThemeRequestBody struct {
 	Type ThemeType `json:"type" required:"true"`

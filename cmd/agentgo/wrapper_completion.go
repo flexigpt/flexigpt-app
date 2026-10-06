@@ -17,8 +17,7 @@ import (
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
-	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
+	"github.com/flexigpt/flexigpt-app/internal/setting"
 )
 
 var appSlogLevelVar slog.LevelVar
@@ -57,7 +56,7 @@ type CompletionRequestBody struct {
 func InitCompletionWrapper(
 	w *CompletionWrapper,
 	models inferencewrapperSpec.ModelRuntime,
-	settings *settingStore.SettingStore,
+	settings *setting.SettingStore,
 	tools inferencewrapper.ToolSource,
 	skills inferencewrapperSpec.SkillSource,
 	mcpRuntime inferencewrapperSpec.MCPRuntime,
@@ -83,7 +82,7 @@ func InitCompletionWrapper(
 
 	settings.SetDebugSettingsApplier(func(
 		_ context.Context,
-		config settingSpec.DebugSettings,
+		config setting.DebugSettings,
 	) error {
 		return applyDebugSettings(providers, config)
 	})
@@ -289,7 +288,7 @@ func (w *CompletionWrapper) close() {
 
 func applyDebugSettings(
 	providerSet *inferencewrapper.ProviderSetAPI,
-	config settingSpec.DebugSettings,
+	config setting.DebugSettings,
 ) error {
 	appSlogLevelVar.Set(toSlogLevel(config.LogLevel))
 
@@ -307,13 +306,13 @@ func applyDebugSettings(
 	return nil
 }
 
-func toSlogLevel(level settingSpec.DebugLogLevel) slog.Level {
+func toSlogLevel(level setting.DebugLogLevel) slog.Level {
 	switch level {
-	case settingSpec.DebugLogLevelDebug:
+	case setting.DebugLogLevelDebug:
 		return slog.LevelDebug
-	case settingSpec.DebugLogLevelWarn:
+	case setting.DebugLogLevelWarn:
 		return slog.LevelWarn
-	case settingSpec.DebugLogLevelError:
+	case setting.DebugLogLevelError:
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
