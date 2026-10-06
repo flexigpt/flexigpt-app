@@ -193,8 +193,6 @@ Package F is application binding and runtime integration work.
   settings persistence, and Model preference persistence out of Wails setup.
 - Reduce Wails wrappers to transport/recovery concerns after runtime adapter
   construction moves into application setup.
-- Migrate outer runtime aggregate interfaces from their former Collection
-  terminology to Plugin terminology.
 
 ## Position relative to the destination
 

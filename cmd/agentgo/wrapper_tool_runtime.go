@@ -31,8 +31,7 @@ func InitToolRuntimeWrapper(
 // InvokeTool is the low-level local Go Tool runtime endpoint.
 //
 // It deliberately accepts only a Go function identity. SDK Tools are not
-// local executables: normal inference flows hydrate them through
-// ToolAggregateWrapper.HydrateInferenceToolChoice.
+// local executables: normal inference flows hydrate them through HydrateInferenceToolChoice.
 func (w *ToolRuntimeWrapper) InvokeTool(
 	req *llmtoolsutil.InvokeRequest,
 ) (*llmtoolsutil.InvokeResponse, error) {

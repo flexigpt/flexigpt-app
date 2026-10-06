@@ -17,13 +17,14 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
+
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -36,11 +37,11 @@ func init() {
 }
 
 type CompletionWrapper struct {
-	modelAggregate       *modelAggregate.Service
-	settingStore         *settingStore.SettingStore
-	toolAggregateService *toolAggregate.Service
-	artifactSkills       *skillAggregate.Service
-	providersetAPI       *inferencewrapper.ProviderSetAPI
+	modelAggregate *modelAggregate.Service
+	settingStore   *settingStore.SettingStore
+	toolService    *toolAPI.Service
+	artifactSkills *skillAggregate.Service
+	providersetAPI *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
 	completionCancelMux sync.Mutex
@@ -72,7 +73,7 @@ type CompletionRequestBody struct {
 	// History[i].ToolChoices or Current.ToolChoices, and SDK Tools must never
 	// be passed to ToolRuntimeWrapper.
 	// (Those are persisted for UI/analytics only.)
-	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
+	ToolSelections []conversationSpec.ToolSelection `json:"toolSelections,omitempty"`
 
 	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
 	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
@@ -82,7 +83,7 @@ func InitCompletionWrapper(
 	agg *CompletionWrapper,
 	models *modelAggregate.Service,
 	ss *settingStore.SettingStore,
-	ts *toolAggregate.Service,
+	ts *toolAPI.Service,
 	artifactSkills *skillAggregate.Service,
 	mr *mcpConnection.MCPRuntimeManager,
 	workspaceAPI workspaceConversation.WorkspaceSource,
@@ -91,7 +92,7 @@ func InitCompletionWrapper(
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
-	agg.toolAggregateService = ts
+	agg.toolService = ts
 	agg.modelAggregate = models
 	agg.settingStore = ss
 	agg.artifactSkills = artifactSkills
@@ -112,7 +113,7 @@ func InitCompletionWrapper(
 	)
 
 	p, err := inferencewrapper.NewProviderSetAPI(
-		agg.toolAggregateService,
+		agg.toolService,
 		agg.artifactSkills,
 		bridge,
 		workspaceBridge,

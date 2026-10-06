@@ -17,9 +17,9 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
@@ -38,7 +38,7 @@ const (
 type ProviderSetAPI struct {
 	inner *inference.ProviderSetAPI
 
-	toolAggregate      *toolAggregate.Service
+	toolsSvc           *toolAPI.Service
 	artifactSkills     *skillAggregate.Service
 	mcpInferenceBridge *MCPInferenceBridge
 	workspaceBridge    *WorkspaceInferenceBridge
@@ -80,7 +80,7 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 //   - tools: Tool Aggregate used to hydrate ToolChoices when needed.
 //   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
 func NewProviderSetAPI(
-	tools *toolAggregate.Service,
+	tools *toolAPI.Service,
 	artifactSkills *skillAggregate.Service,
 	mcpBridge *MCPInferenceBridge,
 	workspaceBridge *WorkspaceInferenceBridge,
@@ -90,7 +90,7 @@ func NewProviderSetAPI(
 		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
-		toolAggregate:      tools,
+		toolsSvc:           tools,
 		artifactSkills:     artifactSkills,
 		mcpInferenceBridge: mcpBridge,
 		workspaceBridge:    workspaceBridge,
@@ -346,7 +346,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
-	toolChoices, err := buildToolChoices(ctx, ps.toolAggregate, req.ToolSelections)
+	toolChoices, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
 	if err != nil {
 		return nil, err
 	}

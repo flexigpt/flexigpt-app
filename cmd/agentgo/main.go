@@ -107,7 +107,6 @@ func main() {
 			app.modelAggregateAPI,
 			app.toolStoreAPI,
 			app.toolRuntimeAPI,
-			app.toolAggregateAPI,
 			app.skillStoreAPI,
 			app.skillAggregateAPI,
 			app.skillRuntimeAPI,

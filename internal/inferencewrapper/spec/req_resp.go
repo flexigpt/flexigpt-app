@@ -5,7 +5,6 @@ import (
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -46,7 +45,7 @@ type CompletionRequest struct {
 
 	History        []conversationSpec.ConversationMessage  `json:"-"`
 	Current        conversationSpec.ConversationMessage    `json:"-"`
-	ToolSelections []toolAggregate.ToolSelection           `json:"-"`
+	ToolSelections []conversationSpec.ToolSelection        `json:"-"`
 	MCPContext     *mcpConversation.MCPConversationContext `json:"-"`
 	SkillSessionID string                                  `json:"-"`
 

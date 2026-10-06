@@ -35,7 +35,6 @@ type App struct {
 	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
 	toolRuntimeAPI        *ToolRuntimeWrapper
-	toolAggregateAPI      *ToolAggregateWrapper
 	toolBuiltInInstaller  installFlow.HydrationInstaller
 	modelBuiltInInstaller installFlow.HydrationInstaller
 	agentStoreAPI         *AgentStoreWrapper
@@ -121,7 +120,6 @@ func newApp() *App {
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
-	app.toolAggregateAPI = &ToolAggregateWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.agentStoreAPI = &AgentStoreWrapper{}
@@ -314,22 +312,6 @@ func (a *App) initManagers() {
 		)
 		panic(
 			"failed to initialize managers: Tool Store initialization failed\n" +
-				err.Error(),
-		)
-	}
-
-	err = InitToolAggregateWrapper(
-		a.toolAggregateAPI,
-		a.toolStoreAPI,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize artifact-backed Tool aggregate",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Tool aggregate initialization failed\n" +
 				err.Error(),
 		)
 	}
@@ -634,7 +616,7 @@ func (a *App) initManagers() {
 		a.completionAPI,
 		a.modelAggregateAPI.service,
 		a.settingStoreAPI.store,
-		a.toolAggregateAPI.service,
+		a.toolStoreAPI.api,
 		a.skillAggregateAPI.service,
 		a.mcpRuntimeAPI.runtime,
 		workspaceConversationSource,
@@ -740,9 +722,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.close()
-	}
-	if a.toolAggregateAPI != nil {
-		a.toolAggregateAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()

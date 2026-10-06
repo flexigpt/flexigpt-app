@@ -4,10 +4,13 @@ import (
 	"time"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
+
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -18,6 +21,30 @@ const (
 	DefaultPageSize           = 12
 	ConversationSchemaVersion = "v1"
 )
+
+// ToolSelection selects one source-backed Tool capability for an inference
+// request.
+//
+// UserArgSchemaInstance is SDK Tool configuration. It is interpreted only by
+// SDK Tool hydration; Go Tool argument schemas remain declaration-owned and
+// are supplied by the Tool Artifact itself.
+type ToolSelection struct {
+	ChoiceID              string                       `json:"choiceID"`
+	Target                composition.CapabilityTarget `json:"target"`
+	AutoExecute           bool                         `json:"autoExecute"`
+	UserArgSchemaInstance jsonutil.JSONRawString       `json:"userArgSchemaInstance,omitempty"`
+}
+
+func (s ToolSelection) Validate() error {
+	if err := spec.ValidateRequiredText(
+		"Tool choice ID",
+		s.ChoiceID,
+		spec.MaxURIBytes,
+	); err != nil {
+		return err
+	}
+	return s.Target.Validate()
+}
 
 // ConversationMessage represents a single *turn* in the conversation.
 //
@@ -51,8 +78,8 @@ type ConversationMessage struct {
 
 	// Tool choices that were *available* when this turn ran.
 	// For the next completion, the app can choose to reuse or override these.
-	ToolChoices    []inferenceSpec.ToolChoice    `json:"toolChoices,omitempty"`
-	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
+	ToolChoices    []inferenceSpec.ToolChoice `json:"toolChoices,omitempty"`
+	ToolSelections []ToolSelection            `json:"toolSelections,omitempty"`
 
 	MCPContext           *mcpConversation.MCPConversationContext    `json:"mcpContext,omitempty"`
 	MCPToolMappings      []mcpConversation.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
