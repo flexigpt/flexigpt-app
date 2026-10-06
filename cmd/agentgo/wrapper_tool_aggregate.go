@@ -17,20 +17,17 @@ type ToolAggregateWrapper struct {
 func InitToolAggregateWrapper(
 	wrapper *ToolAggregateWrapper,
 	storeWrapper *ToolStoreWrapper,
-	runtimeWrapper *ToolRuntimeWrapper,
 ) error {
 	if wrapper == nil ||
-		storeWrapper == nil ||
-		runtimeWrapper == nil {
+		storeWrapper == nil {
 		return errors.New("tool aggregate wrapper dependencies are incomplete")
 	}
-	if storeWrapper.api == nil || runtimeWrapper.service == nil {
+	if storeWrapper.api == nil {
 		return spec.ErrClosed
 	}
 
 	service, err := toolAggregate.New(
 		storeWrapper.api,
-		runtimeWrapper.service,
 	)
 	if err != nil {
 		return err

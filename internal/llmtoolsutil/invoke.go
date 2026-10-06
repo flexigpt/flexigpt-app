@@ -1,16 +1,18 @@
-package runtime
+package llmtoolsutil
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
-
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
+
+var errInvalid = errors.New("invalid request")
 
 type GoToolCaller interface {
 	CallGoTool(
@@ -21,26 +23,10 @@ type GoToolCaller interface {
 	) ([]llmtoolsSpec.ToolOutputUnion, error)
 }
 
-type Service struct {
-	caller GoToolCaller
-}
-
-func New(
-	caller GoToolCaller,
-) (*Service, error) {
-	if caller == nil {
-		return nil, fmt.Errorf(
-			"%w: Tool Runtime Go Tool caller is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return &Service{caller: caller}, nil
-}
-
 type InvokeRequest struct {
-	Function  string          `json:"function"`
-	Args      json.RawMessage `json:"args"`
-	TimeoutMS int             `json:"timeoutMS,omitempty"`
+	Function  string                 `json:"function"`
+	Args      jsonutil.JSONRawString `json:"args,omitempty"`
+	TimeoutMS int                    `json:"timeoutMS,omitempty"`
 }
 
 type InvokeResponse struct {
@@ -50,39 +36,43 @@ type InvokeResponse struct {
 	ErrorMessage string                         `json:"errorMessage,omitempty"`
 }
 
-func (s *Service) Invoke(
+func Invoke(
 	ctx context.Context,
+	caller GoToolCaller,
 	request InvokeRequest,
 ) (*InvokeResponse, error) {
-	if s == nil || s.caller == nil {
-		return nil, spec.ErrClosed
+	if caller == nil {
+		return nil, fmt.Errorf("%w: go caller is nil", errInvalid)
 	}
 	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Tool Runtime context is nil",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: context is nil", errInvalid)
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	function := strings.TrimSpace(request.Function)
 	if function == "" {
-		return nil, fmt.Errorf(
-			"%w: Go Tool function is required",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: go tool function is required", errInvalid)
 	}
 
-	args := request.Args
-	if len(args) == 0 {
+	var args json.RawMessage
+	var err error
+	argsRawStr := request.Args
+	if strings.TrimSpace(string(argsRawStr)) == "" {
 		args = json.RawMessage(`{}`)
+	} else {
+		args, err = jsonutil.DecodeJSONStringRawInto[json.RawMessage](argsRawStr)
 	}
+	if err != nil {
+		return nil, err
+	}
+
 	if !json.Valid(args) {
 		return nil, fmt.Errorf(
 			"%w: Tool invocation arguments are invalid JSON",
-			spec.ErrInvalid,
+			errInvalid,
 		)
 	}
 
@@ -90,7 +80,7 @@ func (s *Service) Invoke(
 		int64(request.TimeoutMS) > int64((1<<63-1)/time.Millisecond) {
 		return nil, fmt.Errorf(
 			"%w: Tool timeout is outside the supported range",
-			spec.ErrInvalid,
+			errInvalid,
 		)
 	}
 
@@ -99,7 +89,7 @@ func (s *Service) Invoke(
 		timeout = time.Duration(request.TimeoutMS) * time.Millisecond
 	}
 
-	outputs, callErr := s.caller.CallGoTool(
+	outputs, callErr := caller.CallGoTool(
 		ctx,
 		function,
 		args,

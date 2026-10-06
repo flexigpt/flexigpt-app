@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
-	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -42,8 +41,7 @@ func (s ToolSelection) Validate() error {
 }
 
 type Service struct {
-	tools   *toolAPI.Service
-	runtime *toolRuntime.Service
+	tools *toolAPI.Service
 }
 
 type InvokeRequest struct {
@@ -54,51 +52,22 @@ type InvokeRequest struct {
 
 func New(
 	tools *toolAPI.Service,
-	runtimeService *toolRuntime.Service,
 ) (*Service, error) {
-	if tools == nil || runtimeService == nil {
+	if tools == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Aggregate dependencies are incomplete",
 			spec.ErrInvalid,
 		)
 	}
 	return &Service{
-		tools:   tools,
-		runtime: runtimeService,
+		tools: tools,
 	}, nil
-}
-
-func (s *Service) Invoke(
-	ctx context.Context,
-	request InvokeRequest,
-) (*toolRuntime.InvokeResponse, error) {
-	if err := s.ready(ctx); err != nil {
-		return nil, err
-	}
-	resolved, err := s.resolveToolTarget(ctx, request.Target)
-	if err != nil {
-		return nil, err
-	}
-	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
-		return nil, fmt.Errorf(
-			"%w: SDK Tools execute through provider inference",
-			spec.ErrUnsupported,
-		)
-	}
-
-	return s.runtime.Invoke(ctx, toolRuntime.InvokeRequest{
-		Function:  resolved.Tool.Implementation.Function,
-		Args:      request.Args,
-		TimeoutMS: request.TimeoutMS,
-	})
 }
 
 // HydrateInferenceToolChoice converts either supported source-backed Tool
 // implementation into an inference ToolChoice.
 //
-// Go Tools produce ordinary function choices. SDK Tools produce provider-native
-// choices and are intentionally not sent through Service.Invoke or
-// tool/runtime.Service.
+// Go Tools produce ordinary function choices. SDK Tools produce provider-native which are not invoked.
 func (s *Service) HydrateInferenceToolChoice(
 	ctx context.Context,
 	selection ToolSelection,
@@ -184,7 +153,7 @@ func (s *Service) HydrateInferenceToolChoices(
 }
 
 func (s *Service) ready(ctx context.Context) error {
-	if s == nil || s.tools == nil || s.runtime == nil {
+	if s == nil || s.tools == nil {
 		return spec.ErrClosed
 	}
 	if ctx == nil {

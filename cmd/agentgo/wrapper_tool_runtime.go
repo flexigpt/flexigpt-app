@@ -2,41 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
-	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
-
-type ToolRuntimeInvokeRequest struct {
-	Function  string                 `json:"function"`
-	Args      jsonutil.JSONRawString `json:"args,omitempty"`
-	TimeoutMS int                    `json:"timeoutMS,omitempty"`
-}
-
-type ToolAggregateInvokeRequest struct {
-	Target    composition.CapabilityTarget `json:"target"`
-	Args      jsonutil.JSONRawString       `json:"args,omitempty"`
-	TimeoutMS int                          `json:"timeoutMS,omitempty"`
-}
-
-func toolArgumentsFromBridge(
-	value jsonutil.JSONRawString,
-) (json.RawMessage, error) {
-	if strings.TrimSpace(string(value)) == "" {
-		return json.RawMessage(`{}`), nil
-	}
-	return jsonutil.DecodeJSONStringRawInto[json.RawMessage](value)
-}
 
 type ToolRuntimeWrapper struct {
 	adapter *llmtoolsadapter.Adapter
-	service *toolRuntime.Service
 }
 
 func InitToolRuntimeWrapper(
@@ -51,27 +24,8 @@ func InitToolRuntimeWrapper(
 		return err
 	}
 
-	service, err := toolRuntime.New(adapter)
-	if err != nil {
-		return err
-	}
-
 	wrapper.adapter = adapter
-	wrapper.service = service
 	return nil
-}
-
-func withToolRuntime[T any](
-	w *ToolRuntimeWrapper,
-	fn func(*toolRuntime.Service) (T, error),
-) (T, error) {
-	return withRecoveryResp(func() (T, error) {
-		var zero T
-		if w == nil || w.service == nil {
-			return zero, spec.ErrClosed
-		}
-		return fn(w.service)
-	})
 }
 
 // InvokeTool is the low-level local Go Tool runtime endpoint.
@@ -80,34 +34,19 @@ func withToolRuntime[T any](
 // local executables: normal inference flows hydrate them through
 // ToolAggregateWrapper.HydrateInferenceToolChoice.
 func (w *ToolRuntimeWrapper) InvokeTool(
-	request *ToolRuntimeInvokeRequest,
-) (*toolRuntime.InvokeResponse, error) {
-	return withToolRuntime(
-		w,
-		func(service *toolRuntime.Service) (
-			*toolRuntime.InvokeResponse,
-			error,
-		) {
-			if request == nil {
-				return nil, errors.New("tool runtime request is required")
-			}
-			args, err := toolArgumentsFromBridge(request.Args)
-			if err != nil {
-				return nil, err
-			}
-			return service.Invoke(context.Background(), toolRuntime.InvokeRequest{
-				Function:  request.Function,
-				Args:      args,
-				TimeoutMS: request.TimeoutMS,
-			})
-		},
-	)
+	req *llmtoolsutil.InvokeRequest,
+) (*llmtoolsutil.InvokeResponse, error) {
+	return withRecoveryResp(func() (*llmtoolsutil.InvokeResponse, error) {
+		if req == nil {
+			return nil, errors.New("invalid arguments: nil request received")
+		}
+		return llmtoolsutil.Invoke(context.Background(), w.adapter, *req)
+	})
 }
 
 func (w *ToolRuntimeWrapper) close() {
 	if w == nil {
 		return
 	}
-	w.service = nil
 	w.adapter = nil
 }

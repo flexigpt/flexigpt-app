@@ -321,7 +321,6 @@ func (a *App) initManagers() {
 	err = InitToolAggregateWrapper(
 		a.toolAggregateAPI,
 		a.toolStoreAPI,
-		a.toolRuntimeAPI,
 	)
 	if err != nil {
 		slog.Error(
