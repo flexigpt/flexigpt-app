@@ -534,7 +534,7 @@ func decodeAuthentication(
 	defaultHeaderName string,
 ) (authentication, error) {
 	output := authentication{
-		Mode:       "apiKeyHeader",
+		Mode:       apiKeyHeaderStr,
 		HeaderName: defaultHeaderName,
 	}
 	if len(raw) == 0 {
@@ -544,7 +544,7 @@ func decodeAuthentication(
 		return authentication{}, err
 	}
 	if output.Mode == "" {
-		output.Mode = "apiKeyHeader"
+		output.Mode = apiKeyHeaderStr
 	}
 	if output.HeaderName == "" && output.Mode != "none" {
 		output.HeaderName = defaultHeaderName

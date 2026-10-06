@@ -1,4 +1,4 @@
-package catalog
+package inferenceadapter
 
 import (
 	"github.com/flexigpt/inference-go/modelpreset"

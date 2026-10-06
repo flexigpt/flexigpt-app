@@ -1,4 +1,4 @@
-package catalog
+package inferenceadapter
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 )
 
 const (
+	apiKeyHeaderStr = "apiKeyHeader"
+
 	adapterAnthropicMessages     = "anthropic.messages"
 	adapterOpenAIChatCompletions = "openai.chatCompletions"
 	adapterOpenAIResponses       = "openai.responses"
@@ -248,7 +250,7 @@ func providerDocumentFromInference(
 		Mode       string `json:"mode"`
 		HeaderName string `json:"headerName"`
 	}{
-		Mode:       "apiKeyHeader",
+		Mode:       apiKeyHeaderStr,
 		HeaderName: provider.APIKeyHeaderKey,
 	})
 	if err != nil {

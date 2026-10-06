@@ -1,4 +1,4 @@
-package toolcatalog
+package llmtoolsadapter
 
 import (
 	"context"

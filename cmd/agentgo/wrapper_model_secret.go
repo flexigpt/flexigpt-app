@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog/inferenceadapter"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 )
 
 type artifactModelCredentialResolver struct {

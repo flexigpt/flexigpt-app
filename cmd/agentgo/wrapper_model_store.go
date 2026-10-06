@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -26,7 +27,6 @@ import (
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
-	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 )
 
 type ModelStoreWrapper struct {
