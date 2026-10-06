@@ -40,7 +40,7 @@ type ProviderSetAPI struct {
 	toolsSvc           *toolAPI.Service
 	artifactSkills     *skillAggregate.Service
 	mcpInferenceBridge *MCPInferenceBridge
-	workspaceBridge    *WorkspaceInferenceBridge
+	workspaceSource    WorkspaceSource
 
 	logger             *slog.Logger
 	debugger           *debugclient.HTTPCompletionDebugger
@@ -82,17 +82,17 @@ func NewProviderSetAPI(
 	tools *toolAPI.Service,
 	artifactSkills *skillAggregate.Service,
 	mcpBridge *MCPInferenceBridge,
-	workspaceBridge *WorkspaceInferenceBridge,
+	workspaceSource WorkspaceSource,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if tools == nil || artifactSkills == nil || mcpBridge == nil || workspaceBridge == nil {
+	if tools == nil || artifactSkills == nil || mcpBridge == nil || workspaceSource == nil {
 		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
 		toolsSvc:           tools,
 		artifactSkills:     artifactSkills,
 		mcpInferenceBridge: mcpBridge,
-		workspaceBridge:    workspaceBridge,
+		workspaceSource:    workspaceSource,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -285,8 +285,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 	var workspaceUsage *conversationSpec.WorkspaceConversationUsage
 	if currentMessage.WorkspaceSelection != nil {
-		hydrated, workspaceErr := ps.workspaceBridge.HydrateCompletion(
+		hydrated, workspaceErr := HydrateCompletion(
 			ctx,
+			ps.workspaceSource,
 			currentMessage.WorkspaceSelection,
 		)
 		if hydrated != nil {

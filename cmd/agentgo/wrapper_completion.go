@@ -84,9 +84,9 @@ func InitCompletionWrapper(
 	ts *toolAPI.Service,
 	artifactSkills *skillAggregate.Service,
 	mr *mcpConnection.MCPRuntimeManager,
-	workspaceAPI conversationSpec.WorkspaceSource,
+	workspaceSource inferencewrapper.WorkspaceSource,
 ) error {
-	if agg == nil || ts == nil || models == nil || ss == nil || artifactSkills == nil || workspaceAPI == nil {
+	if agg == nil || ts == nil || models == nil || ss == nil || artifactSkills == nil || workspaceSource == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
@@ -102,19 +102,11 @@ func InitCompletionWrapper(
 		bridge = inferencewrapper.NewMCPInferenceBridge(mr)
 	}
 
-	cr, err := conversationSpec.NewWorkspaceConversationResolver(workspaceAPI)
-	if err != nil {
-		panic("no workspace api provided")
-	}
-	workspaceBridge := inferencewrapper.NewWorkspaceInferenceBridge(
-		cr,
-	)
-
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolService,
 		agg.artifactSkills,
 		bridge,
-		workspaceBridge,
+		workspaceSource,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 		inferencewrapper.WithSkillsRunScriptEnabled(artifactSkills.RunScriptsEnabled()),
