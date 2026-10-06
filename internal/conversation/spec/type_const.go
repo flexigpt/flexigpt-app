@@ -4,14 +4,10 @@ import (
 	"time"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 
-	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -21,30 +17,6 @@ const (
 	DefaultPageSize           = 12
 	ConversationSchemaVersion = "v1"
 )
-
-// ToolSelection selects one source-backed Tool capability for an inference
-// request.
-//
-// UserArgSchemaInstance is SDK Tool configuration. It is interpreted only by
-// SDK Tool hydration; Go Tool argument schemas remain declaration-owned and
-// are supplied by the Tool Artifact itself.
-type ToolSelection struct {
-	ChoiceID              string                       `json:"choiceID"`
-	Target                composition.CapabilityTarget `json:"target"`
-	AutoExecute           bool                         `json:"autoExecute"`
-	UserArgSchemaInstance jsonutil.JSONRawString       `json:"userArgSchemaInstance,omitempty"`
-}
-
-func (s ToolSelection) Validate() error {
-	if err := spec.ValidateRequiredText(
-		"Tool choice ID",
-		s.ChoiceID,
-		spec.MaxURIBytes,
-	); err != nil {
-		return err
-	}
-	return s.Target.Validate()
-}
 
 // ConversationMessage represents a single *turn* in the conversation.
 //
@@ -85,8 +57,8 @@ type ConversationMessage struct {
 	MCPToolMappings      []mcpConversation.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
 	MCPAppContextUpdates []mcpConversation.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
 
-	WorkspaceSelection *workspaceConversation.ConversationSelection `json:"workspaceSelection,omitempty"`
-	WorkspaceUsage     *workspaceConversation.ConversationUsage     `json:"workspaceUsage,omitempty"`
+	WorkspaceSelection *WorkspaceConversationSelection `json:"workspaceSelection,omitempty"`
+	WorkspaceUsage     *WorkspaceConversationUsage     `json:"workspaceUsage,omitempty"`
 
 	// Attachments that backed this turn's user input (files, URLs, etc).
 	// These are ref attachments; ContentBlock may or may not be hydrated.

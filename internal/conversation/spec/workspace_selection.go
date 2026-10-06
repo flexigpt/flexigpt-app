@@ -1,4 +1,4 @@
-package conversation
+package spec
 
 import (
 	"context"
@@ -12,36 +12,36 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contextengine"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
-	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
-type ConversationSelectionStatus string
+type WorkspaceConversationSelectionStatus string
 
 const (
-	ConversationSelectionReady       ConversationSelectionStatus = "ready"
-	ConversationSelectionPartial     ConversationSelectionStatus = "partial"
-	ConversationSelectionUnavailable ConversationSelectionStatus = "unavailable"
+	WorkspaceConversationSelectionReady       WorkspaceConversationSelectionStatus = "ready"
+	WorkspaceConversationSelectionPartial     WorkspaceConversationSelectionStatus = "partial"
+	WorkspaceConversationSelectionUnavailable WorkspaceConversationSelectionStatus = "unavailable"
 )
 
-type ConversationContextUsageStatus string
+type WorkspaceConversationContextUsageStatus string
 
 const (
-	ConversationContextUsageIncluded    ConversationContextUsageStatus = "included"
-	ConversationContextUsageTruncated   ConversationContextUsageStatus = "truncated"
-	ConversationContextUsageExcluded    ConversationContextUsageStatus = "excluded"
-	ConversationContextUsageDenied      ConversationContextUsageStatus = "denied"
-	ConversationContextUsageUnavailable ConversationContextUsageStatus = "unavailable"
+	WorkspaceConversationContextUsageIncluded    WorkspaceConversationContextUsageStatus = "included"
+	WorkspaceConversationContextUsageTruncated   WorkspaceConversationContextUsageStatus = "truncated"
+	WorkspaceConversationContextUsageExcluded    WorkspaceConversationContextUsageStatus = "excluded"
+	WorkspaceConversationContextUsageDenied      WorkspaceConversationContextUsageStatus = "denied"
+	WorkspaceConversationContextUsageUnavailable WorkspaceConversationContextUsageStatus = "unavailable"
 )
 
-type ConversationSkillUsageStatus string
+type WorkspaceConversationSkillUsageStatus string
 
 const (
-	ConversationSkillUsageAvailable   ConversationSkillUsageStatus = "available"
-	ConversationSkillUsageUnavailable ConversationSkillUsageStatus = "unavailable"
+	WorkspaceConversationSkillUsageAvailable   WorkspaceConversationSkillUsageStatus = "available"
+	WorkspaceConversationSkillUsageUnavailable WorkspaceConversationSkillUsageStatus = "unavailable"
 )
 
-type ConversationResourceSelectionRef struct {
+type WorkspaceConversationResourceSelectionRef struct {
 	Artifact         artifactModel.ArtifactRef `json:"artifact"`
 	Name             string                    `json:"name,omitempty"`
 	Locator          spec.Locator              `json:"locator,omitempty"`
@@ -49,60 +49,60 @@ type ConversationResourceSelectionRef struct {
 	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
 }
 
-// ConversationSelection stores one user-selected Workspace Artifact and the
+// WorkspaceConversationSelection stores one user-selected Workspace Artifact and the
 // explicitly selected Root-scoped Artifact resources for one conversation
 // turn. No Plugin or Catalog identity is persisted.
-type ConversationSelection struct {
-	Workspace         artifactModel.ArtifactRef          `json:"workspace"`
-	DisplayName       string                             `json:"displayName,omitempty"`
-	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
-	ContextRefs       []ConversationResourceSelectionRef `json:"contextRefs,omitempty"`
-	SkillRefs         []ConversationResourceSelectionRef `json:"skillRefs,omitempty"`
+type WorkspaceConversationSelection struct {
+	Workspace         artifactModel.ArtifactRef                   `json:"workspace"`
+	DisplayName       string                                      `json:"displayName,omitempty"`
+	WorkspaceRevision uint64                                      `json:"workspaceRevision,omitempty"`
+	ContextRefs       []WorkspaceConversationResourceSelectionRef `json:"contextRefs,omitempty"`
+	SkillRefs         []WorkspaceConversationResourceSelectionRef `json:"skillRefs,omitempty"`
 }
 
-type ConversationContextUsage struct {
-	Artifact                 artifactModel.ArtifactRef      `json:"artifact"`
-	Name                     string                         `json:"name,omitempty"`
-	Locator                  spec.Locator                   `json:"locator,omitempty"`
-	SelectedDefinitionDigest cryptoutil.Digest              `json:"selectedDefinitionDigest,omitempty"`
-	UsedDefinitionDigest     cryptoutil.Digest              `json:"usedDefinitionDigest,omitempty"`
-	UsedArtifactRevision     uint64                         `json:"usedArtifactRevision,omitempty"`
-	Status                   ConversationContextUsageStatus `json:"status"`
-	Code                     string                         `json:"code,omitempty"`
-	OriginalBytes            int                            `json:"originalBytes,omitempty"`
-	IncludedBytes            int                            `json:"includedBytes,omitempty"`
-	Changed                  bool                           `json:"changed,omitempty"`
-	Diagnostics              []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
+type WorkspaceConversationContextUsage struct {
+	Artifact                 artifactModel.ArtifactRef               `json:"artifact"`
+	Name                     string                                  `json:"name,omitempty"`
+	Locator                  spec.Locator                            `json:"locator,omitempty"`
+	SelectedDefinitionDigest cryptoutil.Digest                       `json:"selectedDefinitionDigest,omitempty"`
+	UsedDefinitionDigest     cryptoutil.Digest                       `json:"usedDefinitionDigest,omitempty"`
+	UsedArtifactRevision     uint64                                  `json:"usedArtifactRevision,omitempty"`
+	Status                   WorkspaceConversationContextUsageStatus `json:"status"`
+	Code                     string                                  `json:"code,omitempty"`
+	OriginalBytes            int                                     `json:"originalBytes,omitempty"`
+	IncludedBytes            int                                     `json:"includedBytes,omitempty"`
+	Changed                  bool                                    `json:"changed,omitempty"`
+	Diagnostics              []diagnostic.Diagnostic                 `json:"diagnostics,omitempty"`
 }
 
-type ConversationSkillUsage struct {
-	Artifact                 artifactModel.ArtifactRef    `json:"artifact"`
-	Name                     string                       `json:"name,omitempty"`
-	DisplayName              string                       `json:"displayName,omitempty"`
-	Locator                  spec.Locator                 `json:"locator,omitempty"`
-	SelectedDefinitionDigest cryptoutil.Digest            `json:"selectedDefinitionDigest,omitempty"`
-	UsedDefinitionDigest     cryptoutil.Digest            `json:"usedDefinitionDigest,omitempty"`
-	UsedArtifactRevision     uint64                       `json:"usedArtifactRevision,omitempty"`
-	Status                   ConversationSkillUsageStatus `json:"status"`
-	Changed                  bool                         `json:"changed,omitempty"`
-	SessionAvailable         bool                         `json:"sessionAvailable,omitempty"`
-	Active                   bool                         `json:"active,omitempty"`
-	Advertised               bool                         `json:"advertised,omitempty"`
-	Diagnostics              []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
+type WorkspaceConversationSkillUsage struct {
+	Artifact                 artifactModel.ArtifactRef             `json:"artifact"`
+	Name                     string                                `json:"name,omitempty"`
+	DisplayName              string                                `json:"displayName,omitempty"`
+	Locator                  spec.Locator                          `json:"locator,omitempty"`
+	SelectedDefinitionDigest cryptoutil.Digest                     `json:"selectedDefinitionDigest,omitempty"`
+	UsedDefinitionDigest     cryptoutil.Digest                     `json:"usedDefinitionDigest,omitempty"`
+	UsedArtifactRevision     uint64                                `json:"usedArtifactRevision,omitempty"`
+	Status                   WorkspaceConversationSkillUsageStatus `json:"status"`
+	Changed                  bool                                  `json:"changed,omitempty"`
+	SessionAvailable         bool                                  `json:"sessionAvailable,omitempty"`
+	Active                   bool                                  `json:"active,omitempty"`
+	Advertised               bool                                  `json:"advertised,omitempty"`
+	Diagnostics              []diagnostic.Diagnostic               `json:"diagnostics,omitempty"`
 }
 
-type ConversationUsage struct {
-	Workspace         artifactModel.ArtifactRef   `json:"workspace"`
-	DisplayName       string                      `json:"displayName,omitempty"`
-	WorkspaceRevision uint64                      `json:"workspaceRevision,omitempty"`
-	Status            ConversationSelectionStatus `json:"status"`
-	Contexts          []ConversationContextUsage  `json:"contexts,omitempty"`
-	Skills            []ConversationSkillUsage    `json:"skills,omitempty"`
-	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
+type WorkspaceConversationUsage struct {
+	Workspace         artifactModel.ArtifactRef            `json:"workspace"`
+	DisplayName       string                               `json:"displayName,omitempty"`
+	WorkspaceRevision uint64                               `json:"workspaceRevision,omitempty"`
+	Status            WorkspaceConversationSelectionStatus `json:"status"`
+	Contexts          []WorkspaceConversationContextUsage  `json:"contexts,omitempty"`
+	Skills            []WorkspaceConversationSkillUsage    `json:"skills,omitempty"`
+	Diagnostics       []diagnostic.Diagnostic              `json:"diagnostics,omitempty"`
 }
 
-type ConversationResolution struct {
-	Usage        ConversationUsage
+type WorkspaceConversationResolution struct {
+	Usage        WorkspaceConversationUsage
 	Instructions string
 	UserMessage  string
 }
@@ -128,32 +128,32 @@ type WorkspaceSource interface {
 	) (workspaceAPI.WorkspaceSkillLoadPlan, error)
 }
 
-type ConversationResolver struct {
+type WorkspaceConversationResolver struct {
 	workspaceAPI WorkspaceSource
 }
 
-func NewConversationResolver(
+func NewWorkspaceConversationResolver(
 	wpSource WorkspaceSource,
-) (*ConversationResolver, error) {
+) (*WorkspaceConversationResolver, error) {
 	if wpSource == nil {
 		return nil, errors.New("workspace conversation source is required")
 	}
-	return &ConversationResolver{
+	return &WorkspaceConversationResolver{
 		workspaceAPI: wpSource,
 	}, nil
 }
 
-func (r *ConversationResolver) ResolveConversationSelection(
+func (r *WorkspaceConversationResolver) ResolveWorkspaceConversationSelection(
 	ctx context.Context,
-	selection ConversationSelection,
-) (ConversationResolution, error) {
+	selection WorkspaceConversationSelection,
+) (WorkspaceConversationResolution, error) {
 	if r == nil || r.workspaceAPI == nil {
-		return ConversationResolution{}, errors.New(
+		return WorkspaceConversationResolution{}, errors.New(
 			"workspace conversation source is unavailable",
 		)
 	}
 	if err := selection.Workspace.Validate(); err != nil {
-		return ConversationResolution{}, err
+		return WorkspaceConversationResolution{}, err
 	}
 
 	workspace, err := r.workspaceAPI.ResolveWorkspace(
@@ -161,28 +161,28 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		selection.Workspace,
 	)
 	if err != nil {
-		return ConversationResolution{
-			Usage: unresolvedConversationUsage(selection, err),
+		return WorkspaceConversationResolution{
+			Usage: unresolvedWorkspaceConversationUsage(selection, err),
 		}, err
 	}
 
-	usage := ConversationUsage{
+	usage := WorkspaceConversationUsage{
 		Workspace:         selection.Workspace,
 		DisplayName:       workspace.Artifact.DisplayName,
 		WorkspaceRevision: workspace.Artifact.Revision,
-		Status:            ConversationSelectionReady,
+		Status:            WorkspaceConversationSelectionReady,
 	}
 	if usage.DisplayName == "" {
 		usage.DisplayName = selection.DisplayName
 	}
 
-	contextRefs, contextIndex, err := initializeContextUsage(
+	contextRefs, contextIndex, err := initializeWorkspaceContextUsage(
 		selection,
 		&usage,
 	)
 	if err != nil {
-		return ConversationResolution{
-			Usage: unresolvedConversationUsage(selection, err),
+		return WorkspaceConversationResolution{
+			Usage: unresolvedWorkspaceConversationUsage(selection, err),
 		}, err
 	}
 
@@ -197,7 +197,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		if composeErr != nil {
 			usage.Diagnostics = diagnostic.Append(
 				usage.Diagnostics,
-				conversationDiagnostic(
+				workspaceConversationDiagnostic(
 					"workspace.conversation.context-unavailable",
 					composeErr.Error(),
 				),
@@ -205,7 +205,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		} else {
 			instructions = plan.Instructions
 			userMessage = plan.UserMessage
-			applyContextPlan(
+			applyWorkspaceContextPlan(
 				&usage,
 				selection,
 				plan,
@@ -214,13 +214,13 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		}
 	}
 
-	skillRefs, skillIndex, err := initializeSkillUsage(
+	skillRefs, skillIndex, err := initializeWorkspaceSkillUsage(
 		selection,
 		&usage,
 	)
 	if err != nil {
-		return ConversationResolution{
-			Usage: unresolvedConversationUsage(selection, err),
+		return WorkspaceConversationResolution{
+			Usage: unresolvedWorkspaceConversationUsage(selection, err),
 		}, err
 	}
 	if len(skillRefs) != 0 {
@@ -232,13 +232,13 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		if loadErr != nil {
 			usage.Diagnostics = diagnostic.Append(
 				usage.Diagnostics,
-				conversationDiagnostic(
+				workspaceConversationDiagnostic(
 					"workspace.conversation.skills-unavailable",
 					loadErr.Error(),
 				),
 			)
 		} else {
-			applySkillPlan(
+			applyWorkspaceSkillPlan(
 				&usage,
 				selection,
 				plan,
@@ -247,23 +247,23 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		}
 	}
 
-	ResolveConversationUsageStatus(&usage)
-	if usage.Status == ConversationSelectionUnavailable &&
+	ResolveWorkspaceConversationUsageStatus(&usage)
+	if usage.Status == WorkspaceConversationSelectionUnavailable &&
 		len(usage.Contexts)+len(usage.Skills) != 0 {
-		return ConversationResolution{Usage: usage}, errors.New(
+		return WorkspaceConversationResolution{Usage: usage}, errors.New(
 			"selected Workspace has no currently usable Context, Instruction, or Skill Artifacts",
 		)
 	}
-	return ConversationResolution{
+	return WorkspaceConversationResolution{
 		Usage:        usage,
 		Instructions: instructions,
 		UserMessage:  userMessage,
 	}, nil
 }
 
-func initializeContextUsage(
-	selection ConversationSelection,
-	usage *ConversationUsage,
+func initializeWorkspaceContextUsage(
+	selection WorkspaceConversationSelection,
+	usage *WorkspaceConversationUsage,
 ) ([]artifactModel.ArtifactRef, map[artifactModel.ArtifactRef]int, error) {
 	index := make(map[artifactModel.ArtifactRef]int, len(selection.ContextRefs))
 	refs := make([]artifactModel.ArtifactRef, 0, len(selection.ContextRefs))
@@ -279,20 +279,20 @@ func initializeContextUsage(
 		}
 		index[selected.Artifact] = len(usage.Contexts)
 		refs = append(refs, selected.Artifact)
-		usage.Contexts = append(usage.Contexts, ConversationContextUsage{
+		usage.Contexts = append(usage.Contexts, WorkspaceConversationContextUsage{
 			Artifact:                 selected.Artifact,
 			Name:                     selected.Name,
 			Locator:                  selected.Locator,
 			SelectedDefinitionDigest: selected.DefinitionDigest,
-			Status:                   ConversationContextUsageUnavailable,
+			Status:                   WorkspaceConversationContextUsageUnavailable,
 		})
 	}
 	return refs, index, nil
 }
 
-func initializeSkillUsage(
-	selection ConversationSelection,
-	usage *ConversationUsage,
+func initializeWorkspaceSkillUsage(
+	selection WorkspaceConversationSelection,
+	usage *WorkspaceConversationUsage,
 ) ([]artifactModel.ArtifactRef, map[artifactModel.ArtifactRef]int, error) {
 	index := make(map[artifactModel.ArtifactRef]int, len(selection.SkillRefs))
 	refs := make([]artifactModel.ArtifactRef, 0, len(selection.SkillRefs))
@@ -308,20 +308,20 @@ func initializeSkillUsage(
 		}
 		index[selected.Artifact] = len(usage.Skills)
 		refs = append(refs, selected.Artifact)
-		usage.Skills = append(usage.Skills, ConversationSkillUsage{
+		usage.Skills = append(usage.Skills, WorkspaceConversationSkillUsage{
 			Artifact:                 selected.Artifact,
 			Name:                     selected.Name,
 			Locator:                  selected.Locator,
 			SelectedDefinitionDigest: selected.DefinitionDigest,
-			Status:                   ConversationSkillUsageUnavailable,
+			Status:                   WorkspaceConversationSkillUsageUnavailable,
 		})
 	}
 	return refs, index, nil
 }
 
-func applyContextPlan(
-	usage *ConversationUsage,
-	selection ConversationSelection,
+func applyWorkspaceContextPlan(
+	usage *WorkspaceConversationUsage,
+	selection WorkspaceConversationSelection,
 	plan workspaceAPI.WorkspacePromptPlan,
 	index map[artifactModel.ArtifactRef]int,
 ) {
@@ -342,7 +342,7 @@ func applyContextPlan(
 		current.UsedArtifactRevision = contribution.ArtifactRevision
 		current.OriginalBytes = contribution.OriginalBytes
 		current.IncludedBytes = contribution.IncludedBytes
-		current.Changed = conversationResourceChanged(
+		current.Changed = workspaceConversationResourceChanged(
 			current.SelectedDefinitionDigest,
 			current.UsedDefinitionDigest,
 			selection.ContextRefs[position].ArtifactRevision,
@@ -350,9 +350,9 @@ func applyContextPlan(
 			selection.ContextRefs[position].Locator,
 			current.Locator,
 		)
-		current.Status = ConversationContextUsageIncluded
+		current.Status = WorkspaceConversationContextUsageIncluded
 		if contribution.Truncated {
-			current.Status = ConversationContextUsageTruncated
+			current.Status = WorkspaceConversationContextUsageTruncated
 		}
 	}
 	for _, decision := range plan.Decisions {
@@ -361,16 +361,16 @@ func applyContextPlan(
 			continue
 		}
 		current := &usage.Contexts[position]
-		current.Status = contextUsageStatus(decision.Status)
+		current.Status = workspaceContextUsageStatus(decision.Status)
 		current.Code = decision.Code
 		current.OriginalBytes = decision.OriginalBytes
 		current.IncludedBytes = decision.IncludedBytes
 	}
 }
 
-func applySkillPlan(
-	usage *ConversationUsage,
-	selection ConversationSelection,
+func applyWorkspaceSkillPlan(
+	usage *WorkspaceConversationUsage,
+	selection WorkspaceConversationSelection,
 	plan workspaceAPI.WorkspaceSkillLoadPlan,
 	index map[artifactModel.ArtifactRef]int,
 ) {
@@ -385,7 +385,7 @@ func applySkillPlan(
 		current.Locator = skill.Locator
 		current.UsedDefinitionDigest = skill.DefinitionDigest
 		current.UsedArtifactRevision = skill.ArtifactRevision
-		current.Changed = conversationResourceChanged(
+		current.Changed = workspaceConversationResourceChanged(
 			current.SelectedDefinitionDigest,
 			current.UsedDefinitionDigest,
 			selection.SkillRefs[position].ArtifactRevision,
@@ -396,76 +396,76 @@ func applySkillPlan(
 		if skill.Insert != declaration.InsertInstructions {
 			current.Diagnostics = diagnostic.Append(
 				current.Diagnostics,
-				conversationDiagnostic(
+				workspaceConversationDiagnostic(
 					"workspace.conversation.skill-ineligible",
 					"only Skills with insert=\"instructions\" can enter a conversation Skill session",
 				),
 			)
 			continue
 		}
-		current.Status = ConversationSkillUsageAvailable
+		current.Status = WorkspaceConversationSkillUsageAvailable
 	}
 }
 
-func unresolvedConversationUsage(
-	selection ConversationSelection,
+func unresolvedWorkspaceConversationUsage(
+	selection WorkspaceConversationSelection,
 	cause error,
-) ConversationUsage {
+) WorkspaceConversationUsage {
 	message := "the selected Workspace is unavailable"
 	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
 		message = cause.Error()
 	}
-	usage := ConversationUsage{
+	usage := WorkspaceConversationUsage{
 		Workspace:         selection.Workspace,
 		DisplayName:       selection.DisplayName,
 		WorkspaceRevision: selection.WorkspaceRevision,
-		Status:            ConversationSelectionUnavailable,
+		Status:            WorkspaceConversationSelectionUnavailable,
 		Diagnostics: []diagnostic.Diagnostic{
-			conversationDiagnostic(
+			workspaceConversationDiagnostic(
 				"workspace.conversation.unavailable",
 				message,
 			),
 		},
 	}
 	for _, selected := range selection.ContextRefs {
-		usage.Contexts = append(usage.Contexts, ConversationContextUsage{
+		usage.Contexts = append(usage.Contexts, WorkspaceConversationContextUsage{
 			Artifact:                 selected.Artifact,
 			Name:                     selected.Name,
 			Locator:                  selected.Locator,
 			SelectedDefinitionDigest: selected.DefinitionDigest,
-			Status:                   ConversationContextUsageUnavailable,
+			Status:                   WorkspaceConversationContextUsageUnavailable,
 		})
 	}
 	for _, selected := range selection.SkillRefs {
-		usage.Skills = append(usage.Skills, ConversationSkillUsage{
+		usage.Skills = append(usage.Skills, WorkspaceConversationSkillUsage{
 			Artifact:                 selected.Artifact,
 			Name:                     selected.Name,
 			Locator:                  selected.Locator,
 			SelectedDefinitionDigest: selected.DefinitionDigest,
-			Status:                   ConversationSkillUsageUnavailable,
+			Status:                   WorkspaceConversationSkillUsageUnavailable,
 		})
 	}
 	return usage
 }
 
-func contextUsageStatus(
-	status workspaceRuntime.CompositionStatus,
-) ConversationContextUsageStatus {
+func workspaceContextUsageStatus(
+	status contextengine.CompositionStatus,
+) WorkspaceConversationContextUsageStatus {
 	switch status {
-	case workspaceRuntime.CompositionIncluded:
-		return ConversationContextUsageIncluded
-	case workspaceRuntime.CompositionTruncated:
-		return ConversationContextUsageTruncated
-	case workspaceRuntime.CompositionExcluded:
-		return ConversationContextUsageExcluded
-	case workspaceRuntime.CompositionDenied:
-		return ConversationContextUsageDenied
+	case contextengine.CompositionIncluded:
+		return WorkspaceConversationContextUsageIncluded
+	case contextengine.CompositionTruncated:
+		return WorkspaceConversationContextUsageTruncated
+	case contextengine.CompositionExcluded:
+		return WorkspaceConversationContextUsageExcluded
+	case contextengine.CompositionDenied:
+		return WorkspaceConversationContextUsageDenied
 	default:
-		return ConversationContextUsageUnavailable
+		return WorkspaceConversationContextUsageUnavailable
 	}
 }
 
-func conversationResourceChanged(
+func workspaceConversationResourceChanged(
 	selectedDigest cryptoutil.Digest,
 	usedDigest cryptoutil.Digest,
 	selectedRevision uint64,
@@ -483,41 +483,41 @@ func conversationResourceChanged(
 		selectedLocator != usedLocator
 }
 
-func ResolveConversationUsageStatus(
-	usage *ConversationUsage,
+func ResolveWorkspaceConversationUsageStatus(
+	usage *WorkspaceConversationUsage,
 ) {
 	if usage == nil {
 		return
 	}
 	total := len(usage.Contexts) + len(usage.Skills)
 	if total == 0 {
-		usage.Status = ConversationSelectionReady
+		usage.Status = WorkspaceConversationSelectionReady
 		return
 	}
 
 	usable := 0
 	for _, value := range usage.Contexts {
-		if value.Status == ConversationContextUsageIncluded ||
-			value.Status == ConversationContextUsageTruncated {
+		if value.Status == WorkspaceConversationContextUsageIncluded ||
+			value.Status == WorkspaceConversationContextUsageTruncated {
 			usable++
 		}
 	}
 	for _, value := range usage.Skills {
-		if value.Status == ConversationSkillUsageAvailable {
+		if value.Status == WorkspaceConversationSkillUsageAvailable {
 			usable++
 		}
 	}
 	switch {
 	case usable == total:
-		usage.Status = ConversationSelectionReady
+		usage.Status = WorkspaceConversationSelectionReady
 	case usable != 0:
-		usage.Status = ConversationSelectionPartial
+		usage.Status = WorkspaceConversationSelectionPartial
 	default:
-		usage.Status = ConversationSelectionUnavailable
+		usage.Status = WorkspaceConversationSelectionUnavailable
 	}
 }
 
-func conversationDiagnostic(
+func workspaceConversationDiagnostic(
 	code string,
 	message string,
 ) diagnostic.Diagnostic {

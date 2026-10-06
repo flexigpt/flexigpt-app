@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contextengine"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
-	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
 const (
@@ -106,11 +106,11 @@ type WorkspacePromptContribution struct {
 }
 
 type WorkspacePromptDecision struct {
-	Artifact      artifactModel.ArtifactRef          `json:"artifact"`
-	Status        workspaceRuntime.CompositionStatus `json:"status"`
-	Code          string                             `json:"code,omitempty"`
-	OriginalBytes int                                `json:"originalBytes"`
-	IncludedBytes int                                `json:"includedBytes"`
+	Artifact      artifactModel.ArtifactRef       `json:"artifact"`
+	Status        contextengine.CompositionStatus `json:"status"`
+	Code          string                          `json:"code,omitempty"`
+	OriginalBytes int                             `json:"originalBytes"`
+	IncludedBytes int                             `json:"includedBytes"`
 }
 
 type WorkspacePromptPlan struct {

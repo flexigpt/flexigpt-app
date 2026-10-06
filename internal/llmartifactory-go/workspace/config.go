@@ -5,8 +5,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contextengine"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
-	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
 type DefaultPolicySource struct {
@@ -38,7 +38,7 @@ func (s DefaultPolicySource) Validate() error {
 }
 
 type Config struct {
-	ContextComposition  workspaceRuntime.CompositionPolicy
+	ContextComposition  contextengine.CompositionPolicy
 	Composition         *composition.Resolver
 	MCPServers          workspacemcp.ServerResolver
 	DefaultPolicySource DefaultPolicySource
@@ -64,6 +64,6 @@ func (c Config) normalized() Config {
 
 func DefaultConfig() Config {
 	return Config{
-		ContextComposition: workspaceRuntime.DefaultCompositionPolicy(),
+		ContextComposition: contextengine.DefaultCompositionPolicy(),
 	}
 }

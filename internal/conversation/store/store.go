@@ -14,7 +14,6 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 
-	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
 	"github.com/flexigpt/mapstore-go/ftsengine"
@@ -573,7 +572,7 @@ func validateConversationToolSelections(
 
 func validateConversationSelectionRefs(
 	field string,
-	refs []workspaceConversation.ConversationResourceSelectionRef,
+	refs []conversationSpec.WorkspaceConversationResourceSelectionRef,
 	rootID rootModel.RootID,
 ) error {
 	seen := make(map[string]struct{}, len(refs))

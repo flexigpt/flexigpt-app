@@ -21,7 +21,6 @@ import (
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
-	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
 const (
@@ -284,7 +283,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}, nil
 	}
 
-	var workspaceUsage *workspaceConversation.ConversationUsage
+	var workspaceUsage *conversationSpec.WorkspaceConversationUsage
 	if currentMessage.WorkspaceSelection != nil {
 		hydrated, workspaceErr := ps.workspaceBridge.HydrateCompletion(
 			ctx,
@@ -378,7 +377,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			nil,
 			false,
 		)
-		if workspaceUsage.Status == workspaceConversation.ConversationSelectionUnavailable {
+		if workspaceUsage.Status == conversationSpec.WorkspaceConversationSelectionUnavailable {
 			return workspaceUnavailableCompletionResponse(
 				currentInputs,
 				workspaceUsage,
@@ -492,7 +491,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		)
 
 		if workspaceUsage != nil &&
-			workspaceUsage.Status == workspaceConversation.ConversationSelectionUnavailable {
+			workspaceUsage.Status == conversationSpec.WorkspaceConversationSelectionUnavailable {
 			return workspaceUnavailableCompletionResponse(
 				currentInputs,
 				workspaceUsage,
@@ -605,7 +604,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 func workspaceUnavailableCompletionResponse(
 	currentInputs []inferenceSpec.InputUnion,
-	workspaceUsage *workspaceConversation.ConversationUsage,
+	workspaceUsage *conversationSpec.WorkspaceConversationUsage,
 	message string,
 ) *inferencewrapperSpec.CompletionResponse {
 	return &inferencewrapperSpec.CompletionResponse{

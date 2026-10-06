@@ -13,8 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/materialize"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contextengine"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
-	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
 type Contribution struct {
@@ -33,11 +33,11 @@ type Contribution struct {
 }
 
 type Decision struct {
-	Artifact      artifactModel.ArtifactRef          `json:"-"`
-	Status        workspaceRuntime.CompositionStatus `json:"-"`
-	Code          string                             `json:"-"`
-	OriginalBytes int                                `json:"-"`
-	IncludedBytes int                                `json:"-"`
+	Artifact      artifactModel.ArtifactRef       `json:"-"`
+	Status        contextengine.CompositionStatus `json:"-"`
+	Code          string                          `json:"-"`
+	OriginalBytes int                             `json:"-"`
+	IncludedBytes int                             `json:"-"`
 }
 
 type Plan struct {
@@ -52,14 +52,14 @@ type Plan struct {
 type Adapter struct {
 	artifacts artifact.API
 	text      *materialize.Adapter
-	engine    *workspaceRuntime.Engine
-	policy    workspaceRuntime.CompositionPolicy
+	engine    *contextengine.Engine
+	policy    contextengine.CompositionPolicy
 }
 
 func New(
 	artifacts artifact.API,
 	resources resourceFlow.API,
-	policy workspaceRuntime.CompositionPolicy,
+	policy contextengine.CompositionPolicy,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(
@@ -78,7 +78,7 @@ func New(
 	return &Adapter{
 		artifacts: artifacts,
 		text:      t,
-		engine:    workspaceRuntime.NewEngine(),
+		engine:    contextengine.NewEngine(),
 		policy:    policy,
 	}, nil
 }
@@ -123,7 +123,7 @@ func (a *Adapter) compose(
 	}
 
 	runtimeValues := make(
-		[]workspaceRuntime.ContextContribution,
+		[]contextengine.ContextContribution,
 		0,
 		len(selected),
 	)
@@ -144,7 +144,7 @@ func (a *Adapter) compose(
 			)
 			output.Decisions = append(output.Decisions, Decision{
 				Artifact: record.Ref(),
-				Status:   workspaceRuntime.CompositionDenied,
+				Status:   contextengine.CompositionDenied,
 				Code:     workspaceDomain.DiagnosticCodeArtifactUnavailable,
 			})
 			continue
@@ -162,7 +162,7 @@ func (a *Adapter) compose(
 			)
 			output.Decisions = append(output.Decisions, Decision{
 				Artifact: record.Ref(),
-				Status:   workspaceRuntime.CompositionUnavailable,
+				Status:   contextengine.CompositionUnavailable,
 				Code:     workspaceDomain.DiagnosticCodeArtifactUnavailable,
 			})
 			continue
@@ -170,7 +170,7 @@ func (a *Adapter) compose(
 
 		id := contributionID(contribution.Artifact)
 		contributionsByID[id] = contribution
-		runtimeValues = append(runtimeValues, workspaceRuntime.ContextContribution{
+		runtimeValues = append(runtimeValues, contextengine.ContextContribution{
 			ID:      id,
 			Insert:  contribution.Insert,
 			Name:    contribution.Name,
