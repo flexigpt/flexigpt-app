@@ -9,7 +9,7 @@ import (
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
 )
 
-func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
+func TestSkillStoreWorkflowRuntimeAdapterHonorsBuiltinSkillEnablement(
 	t *testing.T,
 ) {
 	fixture := newSkillWorkflowFixture(t)
@@ -46,15 +46,16 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 	)
 	requireNoError(t, err)
 
-	aggregateService, _ := newSkillAggregateService(t, fixture)
+	runtimeAdapter, _ := newSkillRuntimeAdapter(t, fixture)
 
-	initial, err := aggregateService.ResolveArtifactSkill(
+	initial, err := resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		markdownOutput.Ref,
 	)
 	requireNoError(t, err)
 	if !initial.Enabled {
-		t.Fatal("aggregate resolved built-in Skill as disabled")
+		t.Fatal("runtime adapter resolved built-in Skill as disabled")
 	}
 
 	disabled, err := fixture.api.SetSkillEnabled(
@@ -82,10 +83,14 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 		)
 	}
 
-	_, err = aggregateService.ResolveArtifactSkill(ctx, disabled.Ref())
+	_, err = resolveWorkflowSkill(
+		ctx,
+		runtimeAdapter,
+		disabled.Ref(),
+	)
 	if !errors.Is(err, spec.ErrReferenceUnresolved) {
 		t.Fatalf(
-			"aggregate resolution after built-in disable error=%v, want ErrReferenceUnresolved",
+			"runtime adapter resolution after built-in disable error=%v, want ErrReferenceUnresolved",
 			err,
 		)
 	}
@@ -101,13 +106,14 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 		t.Fatal("built-in Skill remains disabled after enable")
 	}
 
-	restored, err := aggregateService.ResolveArtifactSkill(
+	restored, err := resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		reenabled.Ref(),
 	)
 	requireNoError(t, err)
 	if !restored.Enabled {
-		t.Fatal("aggregate resolved re-enabled built-in Skill as disabled")
+		t.Fatal("runtime adapter resolved re-enabled built-in Skill as disabled")
 	}
 	if restored.Artifact != markdownOutput.Ref {
 		t.Fatalf(

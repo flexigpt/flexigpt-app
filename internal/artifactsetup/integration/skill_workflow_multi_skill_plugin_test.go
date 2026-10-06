@@ -7,10 +7,10 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
 
 func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialCleanup(
@@ -90,17 +90,20 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("Plugin capability plan does not contain second Skill")
 	}
 
-	aggregateService, _ := newSkillAggregateService(t, fixture)
+	runtimeAdapter, runtimeService := newSkillRuntimeAdapter(t, fixture)
+	sessionID := newWorkflowSkillSession(t, runtimeService)
 
-	refs, err := aggregateService.ListArtifactSkillRefs(
+	session, err := runtimeAdapter.ResolveSkillSession(
 		ctx,
-		skillAggregate.ArtifactSkillFilter{
-			AllowArtifacts: []artifactModel.ArtifactRef{
+		inferencewrapperSpec.SkillSessionRequest{
+			SessionID: sessionID,
+			Artifacts: []artifactModel.ArtifactRef{
 				first.Artifact.Ref(),
 				second.Artifact.Ref(),
 			},
 		},
 	)
+	refs := session.AvailableArtifacts
 	requireNoError(t, err)
 	if !artifactRefSetEquals(
 		refs,
@@ -169,8 +172,9 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	secondResolved, err := aggregateService.ResolveArtifactSkill(
+	secondResolved, err := resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		secondAfterFirstReplacement.Ref(),
 	)
 	requireNoError(t, err)
@@ -232,8 +236,9 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		),
 	)
 
-	_, err = aggregateService.ResolveArtifactSkill(
+	_, err = resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		firstBeforePurge.Ref(),
 	)
 	if !errors.Is(err, spec.ErrReferenceUnresolved) {
@@ -283,8 +288,9 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		)
 	}
 
-	secondResolved, err = aggregateService.ResolveArtifactSkill(
+	secondResolved, err = resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		secondAfterFirstPurge.Ref(),
 	)
 	requireNoError(t, err)

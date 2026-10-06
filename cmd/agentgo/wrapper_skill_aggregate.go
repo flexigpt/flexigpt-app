@@ -2,165 +2,247 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	"github.com/flexigpt/agentskills-go/document"
+	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
-type SkillAggregateWrapper struct {
-	service *skillAggregate.Service
+type ArtifactSkillFilter struct {
+	Types          []string                    `json:"types,omitempty"`
+	Inserts        []document.SkillInsert      `json:"inserts,omitempty"`
+	NamePrefix     string                      `json:"namePrefix,omitempty"`
+	LocationPrefix string                      `json:"locationPrefix,omitempty"`
+	AllowArtifacts []artifactModel.ArtifactRef `json:"allowArtifacts,omitempty"`
+
+	SessionID agentskillsRuntimeSpec.SessionID     `json:"sessionID,omitempty"`
+	Activity  agentskillsRuntimeSpec.SkillActivity `json:"activity,omitempty"`
 }
 
-func withSkillAggregate[T any](
-	w *SkillAggregateWrapper,
-	fn func(*skillAggregate.Service) (T, error),
-) (T, error) {
-	return withRecoveryResp(func() (T, error) {
-		var zero T
-		if w == nil || w.service == nil {
-			return zero, spec.ErrClosed
-		}
-		return fn(w.service)
-	})
+type ArtifactSkillSummary struct {
+	Artifact     artifactModel.ArtifactRef
+	IsEnabled    bool
+	Insert       document.SkillInsert
+	HasArguments bool
+	HasResources bool
+}
+
+type skillArtifactResolver interface {
+	ResolveSkills(
+		ctx context.Context,
+		refs []artifactModel.ArtifactRef,
+	) (inferenceadapter.ResolvedSkills, error)
+}
+
+// SkillAggregateWrapper owns Artifact-aware Wails API projections.
+// It borrows the adapter and runtime; it does not own their shutdown.
+type SkillAggregateWrapper struct {
+	mu       sync.RWMutex
+	resolver skillArtifactResolver
+	runtime  *skillRuntime.Service
 }
 
 func InitSkillAggregateWrapper(
 	wrapper *SkillAggregateWrapper,
-	artifacts artifact.API,
-	cat catalog.API,
-	resources resourceFlow.API,
-	nativeResources resourceFlow.NativePathAPI,
-	runtimeWrapper *SkillRuntimeWrapper,
+	resolver skillArtifactResolver,
+	runtime *skillRuntime.Service,
 ) error {
-	if wrapper == nil ||
-		artifacts == nil ||
-		resources == nil ||
-		runtimeWrapper == nil || nativeResources == nil {
-		return errors.New("skill aggregate wrapper dependencies are incomplete")
+	if wrapper == nil || resolver == nil || runtime == nil {
+		return fmt.Errorf(
+			"%w: Skill aggregate wrapper dependencies are incomplete",
+			spec.ErrInvalid,
+		)
 	}
 
-	router, err := skillAggregate.NewArtifactRouter(
-		artifacts,
-		cat,
-		resources,
-		nativeResources,
-	)
-	if err != nil {
-		return fmt.Errorf("initialize Skill Artifact router: %w", err)
+	wrapper.mu.Lock()
+	defer wrapper.mu.Unlock()
+	if wrapper.resolver != nil || wrapper.runtime != nil {
+		return fmt.Errorf(
+			"%w: Skill aggregate wrapper is already initialized",
+			spec.ErrConflict,
+		)
 	}
-	catalogSource, err := skillAggregate.NewCatalogSource(router)
-	if err != nil {
-		return fmt.Errorf("initialize Skill Root catalog source: %w", err)
-	}
-	if err := InitSkillRuntimeWrapper(runtimeWrapper, catalogSource); err != nil {
-		return fmt.Errorf("initialize Skill runtime: %w", err)
-	}
-	service, err := skillAggregate.New(router, runtimeWrapper.service)
-	if err != nil {
-		runtimeWrapper.close()
-		return fmt.Errorf("initialize Skill aggregate: %w", err)
-	}
-	wrapper.service = service
+	wrapper.resolver = resolver
+	wrapper.runtime = runtime
 	return nil
 }
 
-// ResolveArtifactSkill maps one durable ArtifactRef to the runtime-owned
-// provider.SkillDef. The aggregate resyncs the owning Root catalog before
-// returning the value.
+func withSkillAggregate[T any](
+	w *SkillAggregateWrapper,
+	fn func(context.Context) (T, error),
+) (T, error) {
+	return withRecoveryResp(func() (T, error) {
+		var zero T
+		if w == nil {
+			return zero, spec.ErrClosed
+		}
+
+		w.mu.RLock()
+		defer w.mu.RUnlock()
+		if w.resolver == nil || w.runtime == nil {
+			return zero, spec.ErrClosed
+		}
+		return fn(context.Background())
+	})
+}
+
 func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 	ref artifactModel.ArtifactRef,
-) (skillAggregate.ResolvedArtifactSkill, error) {
-	return withSkillAggregate(
-		w,
-		func(service *skillAggregate.Service) (skillAggregate.ResolvedArtifactSkill, error) {
-			return service.ResolveArtifactSkill(
-				context.Background(),
-				ref,
-			)
-		},
-	)
+) (inferenceadapter.ResolvedArtifactSkill, error) {
+	values, err := w.ResolveArtifactSkills([]artifactModel.ArtifactRef{ref})
+	if err != nil {
+		return inferenceadapter.ResolvedArtifactSkill{}, err
+	}
+	if len(values) != 1 {
+		return inferenceadapter.ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: expected one resolved Artifact Skill",
+			spec.ErrReferenceUnresolved,
+		)
+	}
+	return values[0], nil
 }
 
-// ResolveArtifactSkills resolves several durable ArtifactRefs in one call.
-// The aggregate synchronizes each owning Root once instead of once per Skill.
 func (w *SkillAggregateWrapper) ResolveArtifactSkills(
 	refs []artifactModel.ArtifactRef,
-) ([]skillAggregate.ResolvedArtifactSkill, error) {
+) ([]inferenceadapter.ResolvedArtifactSkill, error) {
 	return withSkillAggregate(
 		w,
-		func(service *skillAggregate.Service) ([]skillAggregate.ResolvedArtifactSkill, error) {
-			return service.ResolveArtifactSkills(
-				context.Background(),
-				refs,
-			)
+		func(ctx context.Context) ([]inferenceadapter.ResolvedArtifactSkill, error) {
+			selected, err := w.resolver.ResolveSkills(ctx, refs)
+			if err != nil {
+				return nil, err
+			}
+			return selected.Values, nil
 		},
 	)
 }
 
-// GetArtifactSkillsPrompt renders an ArtifactRef-scoped Skill prompt.
-// The caller supplies Artifact Store identities; the aggregate performs
-// runtime-definition resolution and root catalog synchronization.
 func (w *SkillAggregateWrapper) GetArtifactSkillsPrompt(
-	filter skillAggregate.ArtifactSkillFilter,
+	filter ArtifactSkillFilter,
 ) (string, error) {
-	return withSkillAggregate(
-		w,
-		func(service *skillAggregate.Service) (string, error) {
-			return service.GetArtifactSkillsPrompt(
-				context.Background(),
-				filter,
-			)
-		},
-	)
+	return withSkillAggregate(w, func(ctx context.Context) (string, error) {
+		selected, err := w.resolver.ResolveSkills(ctx, filter.AllowArtifacts)
+		if err != nil {
+			return "", err
+		}
+		if len(filter.Inserts) != 0 && !containsInstructionInsert(filter.Inserts) {
+			return "", nil
+		}
+		return w.runtime.SkillsPrompt(ctx, &agentskillsRuntime.SkillFilter{
+			Types:          filter.Types,
+			NamePrefix:     filter.NamePrefix,
+			LocationPrefix: filter.LocationPrefix,
+			AllowSkills:    selected.Definitions,
+			SessionID:      filter.SessionID,
+			Activity:       filter.Activity,
+		})
+	})
 }
 
-// ListArtifactSkillRefs returns ArtifactRefs for runtime records matching an
-// Artifact-aware filter. It is intentionally distinct from runtime.ListSkills,
-// whose results use runtime-native SkillDef identities.
 func (w *SkillAggregateWrapper) ListArtifactSkillRefs(
-	filter skillAggregate.ArtifactSkillFilter,
+	filter ArtifactSkillFilter,
 ) ([]artifactModel.ArtifactRef, error) {
 	return withSkillAggregate(
 		w,
-		func(service *skillAggregate.Service) ([]artifactModel.ArtifactRef, error) {
-			return service.ListArtifactSkillRefs(
-				context.Background(),
-				filter,
+		func(ctx context.Context) ([]artifactModel.ArtifactRef, error) {
+			selected, err := w.resolver.ResolveSkills(ctx, filter.AllowArtifacts)
+			if err != nil {
+				return nil, err
+			}
+			records, err := w.runtime.ListAgentSkills(
+				ctx,
+				&agentskillsRuntime.SkillListFilter{
+					Types:          filter.Types,
+					NamePrefix:     filter.NamePrefix,
+					LocationPrefix: filter.LocationPrefix,
+					AllowSkills:    selected.Definitions,
+					Inserts:        filter.Inserts,
+					SessionID:      filter.SessionID,
+					Activity:       filter.Activity,
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			return selected.ArtifactRefs(records), nil
+		},
+	)
+}
+
+func (w *SkillAggregateWrapper) DescribeArtifactSkill(
+	ref artifactModel.ArtifactRef,
+) (ArtifactSkillSummary, error) {
+	return withSkillAggregate(
+		w,
+		func(ctx context.Context) (ArtifactSkillSummary, error) {
+			selected, err := w.resolver.ResolveSkills(
+				ctx,
+				[]artifactModel.ArtifactRef{ref},
+			)
+			if err != nil {
+				return ArtifactSkillSummary{}, err
+			}
+			if len(selected.Values) != 1 {
+				return ArtifactSkillSummary{}, fmt.Errorf(
+					"%w: expected one resolved Artifact Skill",
+					spec.ErrReferenceUnresolved,
+				)
+			}
+
+			resolved := selected.Values[0]
+			records, err := w.runtime.ListAgentSkills(
+				ctx,
+				&agentskillsRuntime.SkillListFilter{
+					AllowSkills: selected.Definitions,
+				},
+			)
+			if err != nil {
+				return ArtifactSkillSummary{}, err
+			}
+			for _, record := range records {
+				if record.Def == resolved.Definition {
+					return ArtifactSkillSummary{
+						Artifact:     ref,
+						IsEnabled:    resolved.Enabled,
+						Insert:       record.Insert,
+						HasArguments: len(record.Arguments) != 0,
+						HasResources: record.Resources.HasResources,
+					}, nil
+				}
+			}
+			return ArtifactSkillSummary{}, fmt.Errorf(
+				"%w: runtime did not index Artifact Skill %q",
+				spec.ErrReferenceUnresolved,
+				ref.ArtifactID,
 			)
 		},
 	)
 }
 
-// DescribeArtifactSkill returns the aggregate's compact Artifact-aware Skill
-// summary. It is useful for management availability checks without requiring
-// callers to parse runtime-native SkillDef values.
-func (w *SkillAggregateWrapper) DescribeArtifactSkill(
-	ref artifactModel.ArtifactRef,
-) (skillAggregate.ArtifactSkillSummary, error) {
-	return withSkillAggregate(
-		w,
-		func(service *skillAggregate.Service) (skillAggregate.ArtifactSkillSummary, error) {
-			return service.DescribeArtifactSkill(
-				context.Background(),
-				ref,
-			)
-		},
-	)
+func containsInstructionInsert(values []document.SkillInsert) bool {
+	for _, value := range values {
+		insert, supported := document.NormalizeSkillInsert(value)
+		if supported && insert == document.SkillInsertInstructions {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *SkillAggregateWrapper) close() {
 	if w == nil {
 		return
 	}
-	service := w.service
-	w.service = nil
-	if service != nil {
-		service.Close()
-	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.resolver = nil
+	w.runtime = nil
 }

@@ -14,11 +14,9 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -38,7 +36,7 @@ type ProviderSetAPI struct {
 
 	models             inferencewrapperSpec.ModelRuntime
 	toolsSvc           ToolSource
-	artifactSkills     SkillSource
+	artifactSkills     inferencewrapperSpec.SkillSource
 	mcpInferenceBridge *MCPInferenceBridge
 	workspaceSource    WorkspaceSource
 
@@ -68,8 +66,9 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	}
 }
 
-// WithSkillsRunScriptEnabled overrides the Skill source's run-script policy
-// for advertised completion tools.
+// WithSkillsRunScriptEnabled narrows the Skill source's run-script policy
+// for advertised completion tools. The source must still reject advertising
+// script execution when runtime policy disables it.
 func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }
 }
@@ -79,7 +78,7 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 func NewProviderSetAPI(
 	models inferencewrapperSpec.ModelRuntime,
 	tools ToolSource,
-	artifactSkills SkillSource,
+	artifactSkills inferencewrapperSpec.SkillSource,
 	mcpBridge *MCPInferenceBridge,
 	workspaceSource WorkspaceSource,
 	opts ...ProviderSetOption,
@@ -388,8 +387,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	if len(enabledSkillRefs) > 0 {
-		var availableSkillRefs []artifactModel.ArtifactRef
-		var activeSkillRefs []artifactModel.ArtifactRef
 		if skillSessionID == "" {
 			if workspaceUsage != nil && len(workspaceUsage.Skills) > 0 {
 				markWorkspaceSkillSessionUsage(
@@ -408,79 +405,36 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
 		}
 
-		availableSkillRefs, aerr := ps.artifactSkills.ListArtifactSkillRefs(
+		skills, skillErr := ps.artifactSkills.ResolveSkillSession(
 			ctx,
-			skillAggregate.ArtifactSkillFilter{
-				SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
-				Activity:       agentskillsRuntimeSpec.SkillActivityAny,
-				AllowArtifacts: enabledSkillRefs,
+			inferencewrapperSpec.SkillSessionRequest{
+				SessionID:        agentskillsRuntimeSpec.SessionID(skillSessionID),
+				Artifacts:        enabledSkillRefs,
+				IncludeRunScript: ps.skillsRunScriptEnabled,
 			},
 		)
-		if aerr != nil {
-			if errors.Is(aerr, agentskillsRuntimeSpec.ErrSessionNotFound) {
-				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
+		if skillErr != nil {
+			if errors.Is(skillErr, agentskillsRuntimeSpec.ErrSessionNotFound) {
+				return nil, fmt.Errorf("skill session %q not found: %w", skillSessionID, skillErr)
 			}
-			ps.logger.Warn("list artifact skills failed; Workspace Skill session availability is unknown", "err", aerr)
-			availableSkillRefs = nil
-		}
-
-		activeSkillRefs, aerr = ps.artifactSkills.ListArtifactSkillRefs(
-			ctx,
-			skillAggregate.ArtifactSkillFilter{
-				SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
-				Activity:       agentskillsRuntimeSpec.SkillActivityActive,
-				AllowArtifacts: enabledSkillRefs,
-			},
-		)
-		if aerr != nil {
-			if errors.Is(aerr, agentskillsRuntimeSpec.ErrSessionNotFound) {
-				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
+			if err := ctx.Err(); err != nil {
+				return nil, err
 			}
-			ps.logger.Warn("list active artifact skills failed; disabling skills for this turn", "err", aerr)
-			activeSkillRefs = nil
+			ps.logger.Warn("hydrate artifact skills failed; disabling skills for this turn", "err", skillErr)
+			skills = inferencewrapperSpec.SkillSession{}
 		}
-		activeCount := len(activeSkillRefs)
-
-		// Pick prompt activity:
-		// - if none active => show available-only (inactive)
-		// - else => show active + available (any).
-		promptActivity := agentskillsRuntimeSpec.SkillActivityInactive
-		if activeCount > 0 {
-			promptActivity = agentskillsRuntimeSpec.SkillActivityAny
-		}
-
-		skillsPrompt, perr := ps.artifactSkills.GetArtifactSkillsPrompt(
-			ctx,
-			skillAggregate.ArtifactSkillFilter{
-				SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
-				Activity:       promptActivity,
-				AllowArtifacts: enabledSkillRefs,
-			},
-		)
-		if perr != nil {
-			if errors.Is(perr, agentskillsRuntimeSpec.ErrSessionNotFound) {
-				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
-			}
-			ps.logger.Warn("get artifact skills prompt failed; disabling skills for this turn", "err", perr)
-		}
-		skillsPrompt = strings.TrimSpace(skillsPrompt)
+		availableSkillRefs := skills.AvailableArtifacts
+		activeSkillRefs := skills.ActiveArtifacts
+		skillsPrompt := strings.TrimSpace(skills.Prompt)
 
 		// Only expose skills tools if we also have the prompt.
 		if skillsPrompt != "" {
-			includeAllTools := activeCount > 0
 			modelParam.SystemPrompt = appendToSystemPrompt(
 				modelParam.SystemPrompt,
-				skillsRulesPrompt(includeAllTools, ps.skillsRunScriptEnabled),
+				skills.RulesPrompt,
 				skillsPrompt,
 			)
-			// Tool choices:
-			// - if none active => only skills-load
-			// - else => load/unload/readresource/runscript.
-			skillToolChoices, err := buildSkillToolChoices(activeCount > 0, ps.skillsRunScriptEnabled)
-			if err != nil {
-				return nil, fmt.Errorf("failed to build skill tool choices: %w", err)
-			}
-			toolChoices = append(toolChoices, skillToolChoices...)
+			toolChoices = append(toolChoices, skills.ToolChoices...)
 		}
 
 		markWorkspaceSkillSessionUsage(

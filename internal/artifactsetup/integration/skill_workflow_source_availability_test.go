@@ -58,15 +58,16 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		)
 	}
 
-	aggregateService, _ := newSkillAggregateService(t, fixture)
+	runtimeAdapter, _ := newSkillRuntimeAdapter(t, fixture)
 
-	initial, err := aggregateService.ResolveArtifactSkill(
+	initial, err := resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		registered.Artifact.Ref(),
 	)
 	requireNoError(t, err)
 	if !initial.Enabled {
-		t.Fatal("aggregate resolved initial external Skill as disabled")
+		t.Fatal("runtime adapter resolved initial external Skill as disabled")
 	}
 
 	disabledSource, err := fixture.store.Sources.Update(
@@ -122,10 +123,14 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		)
 	}
 
-	_, err = aggregateService.ResolveArtifactSkill(ctx, missing.Ref())
+	_, err = resolveWorkflowSkill(
+		ctx,
+		runtimeAdapter,
+		missing.Ref(),
+	)
 	if !errors.Is(err, spec.ErrReferenceUnresolved) {
 		t.Fatalf(
-			"aggregate resolution after Source disable error=%v, want ErrReferenceUnresolved",
+			"runtime adapter resolution after Source disable error=%v, want ErrReferenceUnresolved",
 			err,
 		)
 	}
@@ -177,12 +182,13 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		)
 	}
 
-	recovered, err := aggregateService.ResolveArtifactSkill(
+	recovered, err := resolveWorkflowSkill(
 		ctx,
+		runtimeAdapter,
 		restored.Ref(),
 	)
 	requireNoError(t, err)
 	if !recovered.Enabled {
-		t.Fatal("aggregate resolved recovered Skill as disabled")
+		t.Fatal("runtime adapter resolved recovered Skill as disabled")
 	}
 }

@@ -441,7 +441,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("agent built-in installer initialized")
 
-	err = InitSkillAggregateWrapper(
+	skillInference, err := initSkillRuntimeWrappers(
 		a.skillAggregateAPI,
 		artifactComposition.Artifacts,
 		artifactComposition.Catalog,
@@ -601,7 +601,7 @@ func (a *App) initManagers() {
 		modelRuntime,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.api,
-		a.skillAggregateAPI.service,
+		skillInference,
 		a.mcpRuntimeAPI.runtime,
 		workspaceConversationSource,
 	)

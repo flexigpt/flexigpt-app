@@ -4,8 +4,8 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
-const MAX_STREAMING_MARKDOWN_CHARACTERS = 16_000;
-const MAX_STREAMING_MARKDOWN_LINES = 8192;
+const MAX_STREAMING_MARKDOWN_CHARACTERS = 128_000;
+const MAX_STREAMING_MARKDOWN_LINES = 16384;
 const MAX_STREAMING_MARKDOWN_MARKERS = 8192;
 const STREAMING_MARKDOWN_INTERVAL_MS = 32;
 const STREAMING_MARKUP_CHARACTERS = '*_~`|<>[]$\\';

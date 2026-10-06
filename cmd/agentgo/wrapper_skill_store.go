@@ -5,13 +5,10 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
@@ -30,20 +27,6 @@ import (
 type SkillStoreWrapper struct {
 	api   *skillAPI.Service
 	roots root.API
-}
-
-func NewSkillBuiltInInstaller(
-	hydrator installModel.CompiledHydrationCoordinator,
-) (installFlow.HydrationInstaller, error) {
-	if hydrator == nil {
-		return nil, errors.New("skill built-in installer dependencies are incomplete")
-	}
-
-	return skillcatalog.NewInstaller(
-		skillcatalog.InstallerDependencies{
-			Hydrator: hydrator,
-		},
-	)
 }
 
 func InitSkillStoreWrapper(

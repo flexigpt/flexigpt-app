@@ -60,7 +60,7 @@ func InitCompletionWrapper(
 	models inferencewrapperSpec.ModelRuntime,
 	settings *settingStore.SettingStore,
 	tools inferencewrapper.ToolSource,
-	skills inferencewrapper.SkillSource,
+	skills inferencewrapperSpec.SkillSource,
 	mcpRuntime *mcpConnection.MCPRuntimeManager,
 	workspaceSource inferencewrapper.WorkspaceSource,
 ) error {
