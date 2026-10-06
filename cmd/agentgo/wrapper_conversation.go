@@ -3,21 +3,21 @@ package main
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/conversation"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 )
 
 type ConversationPluginWrapper struct {
-	store *conversationStore.ConversationCollection
+	store *conversation.ConversationCollection
 }
 
 func InitConversationPluginWrapper(
 	c *ConversationPluginWrapper,
 	conversationDir string,
 ) error {
-	conversationStoreAPI, err := conversationStore.NewConversationCollection(
+	conversationStoreAPI, err := conversation.NewConversationCollection(
 		conversationDir,
-		conversationStore.WithFTS(true),
+		conversation.WithFTS(true),
 	)
 	if err != nil {
 		return err

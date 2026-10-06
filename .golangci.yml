@@ -520,8 +520,6 @@ linters:
           alias: ${1}Policy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec
           alias: ${1}Spec
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store
-          alias: ${1}Store
 
     nakedret:
       # No naked returns, ever.
