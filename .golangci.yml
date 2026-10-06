@@ -474,8 +474,6 @@ linters:
           alias: agentskillsRuntimeSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
           alias: assets
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology
-          alias: documentTopology
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec
           alias: storeSpec
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)
@@ -520,58 +518,10 @@ linters:
           alias: ${1}Auth
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/policy
           alias: ${1}Policy
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts
-          alias: ${1}Consts
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec
           alias: ${1}Spec
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/schema
-          alias: ${1}Schema
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store
           alias: ${1}Store
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/conversation
-          alias: ${1}Conversation
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime
-          alias: ${1}Runtime
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
-          alias: ${1}Discovery
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/aggregate
-          alias: ${1}Aggregate
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/artifact
-          alias: ${1}Artifact
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/artifact
-          alias: ${1}Artifact
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/builtin
-          alias: ${1}Builtin
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain
-          alias: ${1}Domain
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain/server
-          alias: ${1}DomainServer
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain/bundle
-          alias: ${1}DomainBundle
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain/context
-          alias: ${1}DomainContext
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain/policy
-          alias: ${1}DomainPolicy
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/domain/secret
-          alias: ${1}DomainSecret
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/consumerapi
-          alias: ${1}ConsumerAPI
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/providerapi
-          alias: ${1}ProviderAPI
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/bundle
-          alias: ${1}Bundle
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/schemaadapter
-          alias: ${1}Schemaadapter
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/secret
-          alias: ${1}Secret
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/policy
-          alias: ${1}StorePolicy
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/overlay
-          alias: ${1}Overlay
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/server
-          alias: ${1}StoreServer
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/bundle
-          alias: ${1}Bundle
 
     nakedret:
       # No naked returns, ever.
