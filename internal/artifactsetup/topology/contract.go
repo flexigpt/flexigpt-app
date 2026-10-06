@@ -37,6 +37,7 @@ const (
 	DocumentUseAgentMarkdown                      = "agentMarkdown"
 	DocumentUseWorkspaceMarkdown                  = "workspaceMarkdown"
 	DocumentUseWorkspaceInstructions              = "workspaceInstructions"
+	DocumentUseWorkspaceManifest                  = "workspaceManifest"
 	DiscoveryUseSkill                             = "skill"
 	DiscoveryUseMCP                               = "mcp"
 	DiscoveryUseWorkspace                         = "workspace"
@@ -58,6 +59,7 @@ const (
 
 type documentAliasWire struct {
 	Locator   string         `json:"locator"`
+	Pattern   string         `json:"pattern,omitempty"`
 	Format    documentFormat `json:"format"`
 	DecoderID spec.DecoderID `json:"decoderID,omitempty"`
 }
@@ -111,6 +113,7 @@ type contractTopologyWire struct {
 
 type documentAlias struct {
 	locator   spec.Locator
+	pattern   string
 	format    documentFormat
 	decoderID spec.DecoderID
 }
@@ -152,9 +155,25 @@ func DocumentFiles(use string) ([]spec.Locator, error) {
 
 	output := make([]spec.Locator, len(value.aliases))
 	for index, alias := range value.aliases {
+		if alias.locator == "" {
+			continue
+		}
 		output[index] = alias.locator
 	}
-	return output, nil
+	return slices.DeleteFunc(output, func(value spec.Locator) bool {
+		return value == ""
+	}), nil
+}
+
+// DocumentPatterns returns every Source-discovery pattern accepted for one
+// declarative document use. Exact aliases are returned for both a Source root
+// and descendants; wildcard aliases remain application-selected YAML data.
+func DocumentPatterns(use string) ([]string, error) {
+	value, found := configuredContractTopology.documentUses[use]
+	if !found {
+		return nil, fmt.Errorf("%w: contract topology has no document use %q", spec.ErrNotFound, use)
+	}
+	return documentPatterns(value.aliases), nil
 }
 
 func MustDocumentFiles(use string) []spec.Locator {
@@ -306,27 +325,15 @@ func IsTextMarkdownDocument(locator spec.Locator) bool {
 }
 
 func IsWorkspaceManifestLocator(locator spec.Locator) bool {
-	name := strings.ToLower(path.Base(string(locator)))
-	if name == "workspace.yaml" || name == "workspace.yml" || name == "workspace.json" {
-		return true
-	}
-	for _, suffix := range []string{".workspace.yaml", ".workspace.yml", ".workspace.json"} {
-		if strings.HasSuffix(name, suffix) {
-			return true
-		}
-	}
-	return false
+	return IsDocument(locator, DocumentUseWorkspaceManifest)
 }
 
 func WorkspaceManifestPatterns() []string {
-	return []string{
-		"**/workspace.yaml",
-		"**/workspace.yml",
-		"**/workspace.json",
-		"**/*.workspace.yaml",
-		"**/*.workspace.yml",
-		"**/*.workspace.json",
+	values, err := DocumentPatterns(DocumentUseWorkspaceManifest)
+	if err != nil {
+		panic(err)
 	}
+	return values
 }
 
 func IsDefaultTextMarkdownDocument(locator spec.Locator) bool {
@@ -456,16 +463,53 @@ func (t contractTopology) matchesDocument(
 		return false
 	}
 
-	name := path.Base(string(locator))
+	name := strings.ToLower(path.Base(string(locator)))
 	for _, alias := range value.aliases {
 		if format != "" && alias.format != format {
 			continue
 		}
-		if strings.EqualFold(name, string(alias.locator)) {
+		if alias.matches(name) {
 			return true
 		}
 	}
 	return false
+}
+
+func (a documentAlias) matches(name string) bool {
+	if a.locator != "" {
+		return strings.EqualFold(name, string(a.locator))
+	}
+	matched, err := spec.MatchPathPattern(a.pattern, name)
+	return err == nil && matched
+}
+
+func (a documentAlias) identity() string {
+	if a.locator != "" {
+		return "locator:" + strings.ToLower(string(a.locator))
+	}
+	return "pattern:" + strings.ToLower(a.pattern)
+}
+
+func documentPatterns(aliases []documentAlias) []string {
+	seen := make(map[string]struct{})
+	output := make([]string, 0, len(aliases)*2)
+	appendPattern := func(value string) {
+		if _, duplicate := seen[value]; duplicate {
+			return
+		}
+		seen[value] = struct{}{}
+		output = append(output, value)
+	}
+	for _, alias := range aliases {
+		if alias.locator != "" {
+			appendPattern(string(alias.locator))
+			appendPattern("**/" + string(alias.locator))
+			continue
+		}
+		appendPattern(alias.pattern)
+		appendPattern("**/" + alias.pattern)
+	}
+	return output
 }
 
 func (t contractTopology) matchesMarkdownRule(
@@ -644,6 +688,14 @@ func parseDocumentAliases(
 	seen := make(map[string]struct{}, len(values))
 	output := make([]documentAlias, 0, len(values))
 	for index, value := range values {
+		if (value.Locator == "") == (value.Pattern == "") {
+			return nil, fmt.Errorf(
+				"%w: %s[%d] must declare exactly one of locator or pattern",
+				spec.ErrInvalid,
+				label,
+				index,
+			)
+		}
 		if err := value.Format.validate(); err != nil {
 			return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
@@ -653,34 +705,43 @@ func parseDocumentAliases(
 			}
 		}
 
-		locator := spec.Locator(value.Locator)
-		if err := locator.ValidatePortable(false); err != nil {
-			return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
+		alias := documentAlias{
+			format:    value.Format,
+			decoderID: value.DecoderID,
 		}
-		if path.Base(string(locator)) != string(locator) {
-			return nil, fmt.Errorf(
-				"%w: %s[%d] must be a package-root filename",
-				spec.ErrInvalid,
-				label,
-				index,
-			)
+		if value.Locator != "" {
+			alias.locator = spec.Locator(value.Locator)
+			if err := alias.locator.ValidatePortable(false); err != nil {
+				return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
+			}
+			if path.Base(string(alias.locator)) != string(alias.locator) {
+				return nil, fmt.Errorf(
+					"%w: %s[%d] must be a package-root filename",
+					spec.ErrInvalid,
+					label,
+					index,
+				)
+			}
+		} else {
+			alias.pattern = strings.ToLower(value.Pattern)
+			if strings.Contains(alias.pattern, "/") {
+				return nil, fmt.Errorf("%w: %s[%d] pattern must match one filename", spec.ErrInvalid, label, index)
+			}
+			if err := spec.ValidatePathPattern(alias.pattern); err != nil {
+				return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
+			}
 		}
-
-		key := strings.ToLower(string(locator))
+		key := alias.identity()
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: %s repeats document alias %q",
 				spec.ErrInvalid,
 				label,
-				locator,
+				key,
 			)
 		}
 		seen[key] = struct{}{}
-		output = append(output, documentAlias{
-			locator:   locator,
-			format:    value.Format,
-			decoderID: value.DecoderID,
-		})
+		output = append(output, alias)
 	}
 	return output, nil
 }
@@ -742,7 +803,7 @@ func parseDocumentUses(
 				)
 			}
 			for _, alias := range set {
-				key := strings.ToLower(string(alias.locator))
+				key := alias.identity()
 				if previous, duplicate := seenAliases[key]; duplicate {
 					if previous.format != alias.format {
 						return nil, fmt.Errorf(
@@ -762,6 +823,9 @@ func parseDocumentUses(
 		var defaultLocator spec.Locator
 		if value.DefaultLocator != "" {
 			for _, alias := range aliases {
+				if alias.locator == "" {
+					continue
+				}
 				if strings.EqualFold(
 					value.DefaultLocator,
 					string(alias.locator),
@@ -1228,6 +1292,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseAgentMarkdown,
 		DocumentUseWorkspaceMarkdown,
 		DocumentUseWorkspaceInstructions,
+		DocumentUseWorkspaceManifest,
 	} {
 		if _, found := value.documentUses[use]; !found {
 			return fmt.Errorf(
@@ -1376,14 +1441,12 @@ func discoveryPatterns(
 		seen[value] = struct{}{}
 		output = append(output, value)
 	}
-
 	for _, value := range base {
 		appendPattern(value)
 	}
-	for _, group := range groups {
-		for _, alias := range group {
-			appendPattern(string(alias.locator))
-			appendPattern("**/" + string(alias.locator))
+	for _, aliases := range groups {
+		for _, pattern := range documentPatterns(aliases) {
+			appendPattern(pattern)
 		}
 	}
 	return output

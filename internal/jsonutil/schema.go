@@ -17,6 +17,12 @@ const (
 	draft202012SchemaURI = "https://json-schema.org/draft/2020-12/schema"
 )
 
+// JSONSchema is the narrow compiled-schema behavior needed outside the JSON
+// Schema provider package. Consumers do not import santhosh-tekuri types.
+type JSONSchema interface {
+	Validate(v any) error
+}
+
 // MustCompileJSONSchema compiles an embedded schema during package
 // initialization. Embedded source-controlled schemas are expected to be valid.
 func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
@@ -152,7 +158,7 @@ func CompileJSONSchema(
 // ValidateJSONSchema validates a typed document against an already-compiled
 // JSON Schema. It does not canonicalize or mutate the value.
 func ValidateJSONSchema(
-	schema *jsonschema.Schema,
+	schema JSONSchema,
 	value any,
 	maximumBytes int,
 ) error {

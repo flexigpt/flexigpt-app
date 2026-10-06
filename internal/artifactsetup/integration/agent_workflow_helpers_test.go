@@ -163,7 +163,9 @@ func newWorkflowHarness(
 	})
 
 	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
-		Store:            store,
+		Artifacts:        store.Artifacts,
+		Catalog:          store.Catalog,
+		Resources:        store.Resources,
 		Interpretations:  registry,
 		LocatorFactories: locatorFactories,
 		Scope: composition.ScopeBinding{

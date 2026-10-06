@@ -11,9 +11,9 @@ import (
 
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
@@ -98,7 +98,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	_, err = adapter.ResolveSkillSession(ctx, inferencewrapperSpec.SkillSessionRequest{
 		SessionID: sessionID,
 	})
-	if !errors.Is(err, inferenceadapter.ErrArtifactSkillSelectionRequired) {
+	if !errors.Is(err, skillruntime.ErrArtifactSkillSelectionRequired) {
 		t.Fatalf("empty selection error=%v, want selection required", err)
 	}
 
@@ -209,10 +209,10 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 func newSkillRuntimeAdapter(
 	t *testing.T,
 	fixture *skillWorkflowFixture,
-) (*inferenceadapter.RuntimeAdapter, *skillRuntime.Service) {
+) (*skillruntime.RuntimeAdapter, *skillRuntime.Service) {
 	t.Helper()
 
-	adapter, err := inferenceadapter.NewRuntimeAdapter(
+	adapter, err := skillruntime.NewRuntimeAdapter(
 		fixture.store.Artifacts,
 		fixture.store.Catalog,
 		fixture.store.Resources,
@@ -255,15 +255,15 @@ func newWorkflowSkillSession(
 
 func resolveWorkflowSkill(
 	ctx context.Context,
-	adapter *inferenceadapter.RuntimeAdapter,
+	adapter *skillruntime.RuntimeAdapter,
 	ref artifactModel.ArtifactRef,
-) (inferenceadapter.ResolvedArtifactSkill, error) {
+) (skillruntime.ResolvedArtifactSkill, error) {
 	selected, err := adapter.ResolveSkills(ctx, []artifactModel.ArtifactRef{ref})
 	if err != nil {
-		return inferenceadapter.ResolvedArtifactSkill{}, err
+		return skillruntime.ResolvedArtifactSkill{}, err
 	}
 	if len(selected.Values) != 1 {
-		return inferenceadapter.ResolvedArtifactSkill{}, fmt.Errorf(
+		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
 			"expected one resolved Skill, got %d",
 			len(selected.Values),
 		)

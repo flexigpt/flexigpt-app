@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -30,7 +28,7 @@ type ManagedProfilePolicy struct {
 	id              string
 	declarationType Type
 	fingerprint     cryptoutil.Digest
-	compiled        *jsonschema.Schema
+	compiled        jsonutil.JSONSchema
 }
 
 func (p *ManagedProfilePolicy) ID() string {

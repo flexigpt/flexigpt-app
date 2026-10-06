@@ -1,4 +1,4 @@
-package inferenceadapter
+package modelruntime
 
 import (
 	"context"
@@ -196,10 +196,6 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 	ctx context.Context,
 	adapter string,
 ) (modelAPI.AdapterDescriptor, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return modelAPI.AdapterDescriptor{}, false, err
-	}
-
 	value, found := a.adapters[adapter]
 	if !found {
 		return modelAPI.AdapterDescriptor{}, false, nil
@@ -245,10 +241,6 @@ func (a *RuntimeAdapter) ResolveProviderRuntime(
 	ctx context.Context,
 	resolved modelAPI.ResolvedProvider,
 ) (inferenceSpec.ProviderParam, error) {
-	if err := ctx.Err(); err != nil {
-		return inferenceSpec.ProviderParam{}, err
-	}
-
 	value, err := a.resolveProviderRuntime(ctx, resolved, false)
 	if err != nil {
 		return inferenceSpec.ProviderParam{}, err

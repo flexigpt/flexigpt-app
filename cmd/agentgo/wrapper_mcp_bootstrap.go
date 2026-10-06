@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/sdkclient"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -25,6 +24,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsecrets"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
@@ -57,7 +59,7 @@ func initMCPWrappers(
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	resolver *composition.Resolver,
-) (installFlow.HydrationInstaller, *inferenceadapter.RuntimeAdapter, error) {
+) (installFlow.HydrationInstaller, *mcpruntime.RuntimeAdapter, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil {
@@ -65,7 +67,7 @@ func initMCPWrappers(
 	}
 
 	// Each constructor validates the dependencies it actually owns.
-	settings, err := newMCPSettingsAdapter(storeOverlays)
+	settings, err := mcpsettings.New(storeOverlays)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,7 +82,7 @@ func initMCPWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	secrets, err := newArtifactMCPSecretResolver(
+	secrets, err := mcpsecrets.New(
 		artifacts,
 		secretBindings,
 		secretRuntime,
@@ -125,16 +127,16 @@ func initMCPWrappers(
 		return nil, nil, err
 	}
 
-	adapter, err := inferenceadapter.NewRuntimeAdapter(
+	adapter, err := mcpruntime.NewRuntimeAdapter(
 		storeAPI,
 		secrets,
-		mcpEnvironmentResolver{},
+		mcpsettings.EnvironmentResolver{},
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	global, _, err := settings.getMCPSettings(ctx)
+	global, _, err := settings.Get(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -151,7 +153,7 @@ func initMCPWrappers(
 	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(
 		cause error,
-	) (installFlow.HydrationInstaller, *inferenceadapter.RuntimeAdapter, error) {
+	) (installFlow.HydrationInstaller, *mcpruntime.RuntimeAdapter, error) {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 

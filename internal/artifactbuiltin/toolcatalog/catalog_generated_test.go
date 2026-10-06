@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog/llmtoolsadapter"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
-	goTools, err := llmtoolsadapter.NewAdapter()
+	goTools, err := toolruntime.NewAdapter()
 	if err != nil {
 		t.Fatal(err)
 	}

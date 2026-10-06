@@ -127,7 +127,9 @@ func OpenArtifactStore(
 	}
 
 	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
-		Store:            store,
+		Artifacts:        store.Artifacts,
+		Catalog:          store.Catalog,
+		Resources:        store.Resources,
 		Interpretations:  registrations.Interpretations(),
 		LocatorFactories: registrations.LocatorFactories(),
 		Scope: composition.ScopeBinding{

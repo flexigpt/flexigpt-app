@@ -7,8 +7,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 )
 
@@ -18,7 +18,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("create Model catalog interpretation registry: %v", err)
 	}
 
-	prepared, err := inferenceadapter.PreparePackages(t.Context(), registry)
+	prepared, err := modelruntime.PreparePackages(t.Context(), registry)
 	if err != nil {
 		t.Fatalf("prepare inference Model catalog packages: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("fingerprint expected generated Model catalog: %v", err)
 	}
 
-	reprepared, err := inferenceadapter.PreparePackages(t.Context(), registry)
+	reprepared, err := modelruntime.PreparePackages(t.Context(), registry)
 	if err != nil {
 		t.Fatalf("prepare inference Model catalog packages again: %v", err)
 	}

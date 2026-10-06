@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
 func NewSkillBuiltInInstaller(
@@ -31,7 +31,7 @@ func initSkillRuntimeWrappers(
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	runtimeWrapper *SkillRuntimeWrapper,
-) (*inferenceadapter.RuntimeAdapter, error) {
+) (*skillruntime.RuntimeAdapter, error) {
 	if aggregateWrapper == nil || runtimeWrapper == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill wrappers are required",
@@ -45,7 +45,7 @@ func initSkillRuntimeWrappers(
 		)
 	}
 
-	adapter, err := inferenceadapter.NewRuntimeAdapter(
+	adapter, err := skillruntime.NewRuntimeAdapter(
 		artifacts,
 		cat,
 		resources,

@@ -1,7 +1,7 @@
 {
   "format": "artifact-compiled-package-set/v1",
   "hydration": {
-    "fingerprint": "sha256:a810e99cea51d412ef7afceb482b7436eed514f832adfb16368aeefb9d1dd7dc",
+    "fingerprint": "sha256:92667baec33e9fe323768eb44876b8c6a67dc7e2eeb78452f5b9af44d9a2d68d",
     "installerName": "agent.skill",
     "rootID": "0192c4c0-0000-7000-8000-000000000001",
     "sourceID": "0192c4c0-0001-7000-8000-000000000001"

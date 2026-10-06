@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -16,7 +14,7 @@ import (
 // values hidden by omitempty cannot bypass their schema constraints.
 func DecodeDocumentInto(
 	raw []byte,
-	compiled *jsonschema.Schema,
+	compiled jsonutil.JSONSchema,
 	target any,
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
@@ -44,7 +42,7 @@ func DecodeDocumentInto(
 // canonical bytes without first re-marshalling its Go representation.
 func DecodeEntryDocumentInto(
 	entry Entry,
-	compiled *jsonschema.Schema,
+	compiled jsonutil.JSONSchema,
 	target any,
 ) error {
 	if len(entry.raw) == 0 ||
@@ -70,7 +68,7 @@ func DecodeEntryDocumentInto(
 }
 
 func ValidateDocument(
-	compiled *jsonschema.Schema,
+	compiled jsonutil.JSONSchema,
 	value any,
 ) error {
 	return jsonutil.ValidateJSONSchema(

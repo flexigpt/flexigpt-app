@@ -1,7 +1,7 @@
-// Package inferenceadapter adapts source-backed MCP installations to the
+// Package mcpruntime adapts source-backed MCP installations to the
 // application MCP runtime and the inference consumer's narrow capability.
 // It supports both built-in and user-authored MCP installations.
-package inferenceadapter
+package mcpruntime
 
 import (
 	"context"
@@ -68,7 +68,7 @@ func NewRuntimeAdapter(
 func (a *RuntimeAdapter) BindRuntime(
 	runtime *mcpConnection.MCPRuntimeManager,
 ) error {
-	if a == nil || runtime == nil {
+	if runtime == nil {
 		return fmt.Errorf(
 			"%w: MCP runtime is required",
 			spec.ErrInvalid,
@@ -224,7 +224,7 @@ func (a *RuntimeAdapter) runtimeManager() (
 	*mcpConnection.MCPRuntimeManager,
 	error,
 ) {
-	if a == nil || a.runtime == nil {
+	if a.runtime == nil {
 		return nil, spec.ErrClosed
 	}
 	return a.runtime, nil

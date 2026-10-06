@@ -1,4 +1,4 @@
-package inferenceadapter
+package skillruntime
 
 import (
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"

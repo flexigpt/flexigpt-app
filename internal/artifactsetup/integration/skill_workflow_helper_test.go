@@ -68,7 +68,9 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	})
 
 	llm, err := llmartifactory.Open(t.Context(), llmartifactory.Config{
-		Store:            store,
+		Artifacts:        store.Artifacts,
+		Catalog:          store.Catalog,
+		Resources:        store.Resources,
 		Interpretations:  registry,
 		LocatorFactories: locatorFactories,
 		Scope: composition.ScopeBinding{

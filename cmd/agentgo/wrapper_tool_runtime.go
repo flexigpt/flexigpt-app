@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog/llmtoolsadapter"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 type ToolRuntimeWrapper struct {
-	adapter *llmtoolsadapter.Adapter
+	adapter *toolruntime.Adapter
 }
 
 func InitToolRuntimeWrapper(
@@ -19,7 +19,7 @@ func InitToolRuntimeWrapper(
 		return errors.New("tool runtime wrapper is required")
 	}
 
-	adapter, err := llmtoolsadapter.NewAdapter()
+	adapter, err := toolruntime.NewAdapter()
 	if err != nil {
 		return err
 	}

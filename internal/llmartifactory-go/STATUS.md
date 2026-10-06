@@ -1,6 +1,6 @@
 # LLM Artifactory status
 
-## Current boundary
+## Current boundary and Package F direction
 
 The application now has four explicit layers:
 
@@ -24,6 +24,20 @@ Install, and ArtifactCleanup behavior.
 
 `internal/llmartifactory-go` does not own generic persistence, Source-driver
 selection, filesystem layout, secret backend ownership, or protected topology.
+
+Package F additionally fixes application-binding placement:
+
+- Runtime adapters are no longer located below `artifactbuiltin`; generated
+  catalog payloads remain there, while runtime integration moves to
+  `artifactsetup`.
+- Model preference persistence, Model credential resolution, MCP secret
+  binding adaptation, and MCP global runtime settings are application setup
+  concerns rather than Wails-package implementations.
+- Wails wrappers remain where they are. They continue to own Wails transport,
+  recovery, cancellation, and lifecycle boundaries.
+- The LLM aggregate receives only Artifact, catalog, and portable resource
+  capabilities needed for composition. It no longer receives the full generic
+  `compose.Store`.
 
 ## Proposal 1 baseline
 
@@ -178,21 +192,32 @@ Package E family-service consolidation is complete.
 - Retired `collection.yaml`, `collection.yml`, and `collection.json` topology
   aliases are removed. Plugin is the only managed membership family term.
 
-## Remaining Proposal 2 Package F work
+## Proposal 2 Package F
 
-Package F is application binding and runtime integration work.
+Package F application-binding work is now in progress with the following
+completed ownership corrections:
 
-- Bind Go Tool metadata direct-capability providers where application runtime
-  policy intentionally chooses a direct capability over a source-backed
-  Artifact. This does not replace or retire source-backed SDK Tool Artifacts.
-- Bind inference adapter and Model Provider direct-capability providers.
-- Bind runtime-neutral MCP preparation providers where needed.
-- Move remaining application-selected filename and source-format selection out
-  of `artifactsetup/topology`.
-- Move the remaining application-bound MCP secret binding adapter, MCP global
-  settings persistence, and Model preference persistence out of Wails setup.
-- Reduce Wails wrappers to transport/recovery concerns after runtime adapter
-  construction moves into application setup.
+- The LLM aggregate no longer depends on the full generic Store aggregate.
+  Composition receives only Artifact, catalog, and verified portable-resource
+  capabilities.
+- LLM declaration code depends on `jsonutil.JSONSchema`, not directly on the
+  Santhosh Tekuri JSON Schema implementation.
+- Runtime adapters move from `artifactbuiltin` into `artifactsetup`:
+  Model inference, MCP runtime/source adaptation, Skill runtime adaptation,
+  and Go Tool registry adaptation are application assembly concerns.
+- MCP logical-secret to Artifact-binding translation, MCP global settings,
+  Model credential resolution, and Model preference persistence move from
+  Wails files into named `artifactsetup` packages.
+- The document catalog now supports application-declared wildcard filename
+  aliases, including forms such as `example.agent.yaml`,
+  `example.model.json`, and `project.workspace.yaml`.
+- Tool behavior continues to support both Go and SDK Tool declarations.
+
+Remaining Package F completion work is limited to support-matrix injection for
+the remaining family package-layout helpers and registration callers. That
+work must move application-selected document/package conventions out of direct
+`artifactsetup/topology` imports without introducing a global registry,
+compatibility alias, or broad aggregate facade.
 
 ## Position relative to the destination
 
@@ -213,5 +238,6 @@ Artifactory Root / Source / Definition / Artifact / local state
 
 Packages E and F remain family-service consolidation and application/runtime
 binding work. They no longer require another generic Store redesign, another
-declaration dispatcher, another membership abstraction, or another graph
-resolver.
+declaration dispatcher, another membership abstraction, another graph resolver,
+or wrapper thinning. The remaining support-matrix injection is a bounded
+dependency-inversion task, not a functional rewrite.

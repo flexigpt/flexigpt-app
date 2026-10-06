@@ -10,9 +10,9 @@ import (
 
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
@@ -156,7 +156,7 @@ func (w *MCPAggregateWrapper) GetMCPServersForRuntimeServers(
 		// deduplicates the request while retaining first-occurrence order.
 		refs := make(map[mcpServer.ServerID]artifactModel.ArtifactRef, len(servers))
 		for _, server := range servers {
-			ref, err := inferenceadapter.ArtifactRefForServerID(server)
+			ref, err := mcpruntime.ArtifactRefForServerID(server)
 			if err != nil {
 				return nil, err
 			}
@@ -492,7 +492,7 @@ func (w *MCPAggregateWrapper) serverDetails(
 		return MCPServerDetails{}, err
 	}
 
-	serverID, err := inferenceadapter.ServerIDForArtifact(read.Resolved.Server)
+	serverID, err := mcpruntime.ServerIDForArtifact(read.Resolved.Server)
 	if err != nil {
 		return MCPServerDetails{}, err
 	}
@@ -524,11 +524,11 @@ func (w *MCPAggregateWrapper) serverAuthHealth(
 		return mcpAuth.MCPAuthHealth{}, ctx.Err()
 	}
 
-	serverID, idErr := inferenceadapter.ServerIDForArtifact(resolved.Server)
+	serverID, idErr := mcpruntime.ServerIDForArtifact(resolved.Server)
 	if idErr != nil {
 		return mcpAuth.MCPAuthHealth{}, idErr
 	}
-	mode, modeErr := inferenceadapter.HTTPAuthMode(
+	mode, modeErr := mcpruntime.HTTPAuthMode(
 		resolved.Document.Configuration.Auth.Mode,
 	)
 	if modeErr != nil {
@@ -599,7 +599,7 @@ func (w *MCPAggregateWrapper) invalidateServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
-	serverID, err := inferenceadapter.ServerIDForArtifact(ref)
+	serverID, err := mcpruntime.ServerIDForArtifact(ref)
 	if err != nil {
 		return err
 	}

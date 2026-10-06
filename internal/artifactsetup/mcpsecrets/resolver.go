@@ -1,4 +1,4 @@
-package main
+package mcpsecrets
 
 import (
 	"context"
@@ -13,17 +13,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
-type artifactMCPSecretResolver struct {
+// Resolver binds MCP logical secret selectors to generic Artifact Store secret
+// bindings. It owns application assembly adaptation only; MCP owns selector
+// grammar and Artifact Store owns physical secret lifecycle.
+type Resolver struct {
 	artifacts artifact.API
 	bindings  storeSecret.API
 	runtime   storeSecret.RuntimeAPI
 }
 
-func newArtifactMCPSecretResolver(
+func New(
 	artifacts artifact.API,
 	bindings storeSecret.API,
 	runtime storeSecret.RuntimeAPI,
-) (*artifactMCPSecretResolver, error) {
+) (*Resolver, error) {
 	if artifacts == nil || bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store MCP secret dependencies are incomplete",
@@ -31,16 +34,14 @@ func newArtifactMCPSecretResolver(
 		)
 	}
 
-	return &artifactMCPSecretResolver{
+	return &Resolver{
 		artifacts: artifacts,
 		bindings:  bindings,
 		runtime:   runtime,
 	}, nil
 }
 
-// SetMCPSecret supplies application credential and OAuth-token persistence
-// through Artifact Store secret bindings.
-func (r *artifactMCPSecretResolver) SetMCPSecret(
+func (r *Resolver) SetMCPSecret(
 	ctx context.Context,
 	logicalRef string,
 	value string,
@@ -59,6 +60,7 @@ func (r *artifactMCPSecretResolver) SetMCPSecret(
 	if err != nil {
 		return "", false, err
 	}
+
 	expectedBindingRevision := uint64(0)
 	if found {
 		expectedBindingRevision = current.Revision
@@ -79,7 +81,7 @@ func (r *artifactMCPSecretResolver) SetMCPSecret(
 	return binding.SHA256, binding.Active(), nil
 }
 
-func (r *artifactMCPSecretResolver) ResolveSecret(
+func (r *Resolver) ResolveSecret(
 	ctx context.Context,
 	logicalRef string,
 ) (string, error) {
@@ -120,9 +122,9 @@ func (r *artifactMCPSecretResolver) ResolveSecret(
 	return value, nil
 }
 
-// DeleteSecret is idempotent. It is used by current-installation cleanup,
-// OAuth token cleanup, and managed MCP update flows.
-func (r *artifactMCPSecretResolver) DeleteSecret(
+// DeleteSecret is idempotent. Generic Secret lifecycle owns durable physical
+// value deletion after the binding is detached.
+func (r *Resolver) DeleteSecret(
 	ctx context.Context,
 	logicalRef string,
 ) error {
@@ -154,18 +156,14 @@ func (r *artifactMCPSecretResolver) DeleteSecret(
 	)
 }
 
-func (r *artifactMCPSecretResolver) bindingKey(
+func (r *Resolver) bindingKey(
 	logicalRef string,
 ) (secretModel.BindingKey, error) {
-	if r == nil || r.artifacts == nil ||
-		r.bindings == nil || r.runtime == nil {
-		return secretModel.BindingKey{}, spec.ErrClosed
-	}
-
 	selector, err := secret.ParseMCPSecretRef(logicalRef)
 	if err != nil {
 		return secretModel.BindingKey{}, err
 	}
+
 	slot, err := secret.ArtifactBindingSlot(selector)
 	if err != nil {
 		return secretModel.BindingKey{}, err
@@ -182,7 +180,7 @@ func (r *artifactMCPSecretResolver) bindingKey(
 	return key, nil
 }
 
-func (r *artifactMCPSecretResolver) availableServer(
+func (r *Resolver) availableServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.Artifact, error) {

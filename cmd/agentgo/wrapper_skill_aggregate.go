@@ -10,9 +10,9 @@ import (
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
 type ArtifactSkillFilter struct {
@@ -38,7 +38,7 @@ type skillArtifactResolver interface {
 	ResolveSkills(
 		ctx context.Context,
 		refs []artifactModel.ArtifactRef,
-	) (inferenceadapter.ResolvedSkills, error)
+	) (skillruntime.ResolvedSkills, error)
 }
 
 // SkillAggregateWrapper owns Artifact-aware Wails API projections.
@@ -95,13 +95,13 @@ func withSkillAggregate[T any](
 
 func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 	ref artifactModel.ArtifactRef,
-) (inferenceadapter.ResolvedArtifactSkill, error) {
+) (skillruntime.ResolvedArtifactSkill, error) {
 	values, err := w.ResolveArtifactSkills([]artifactModel.ArtifactRef{ref})
 	if err != nil {
-		return inferenceadapter.ResolvedArtifactSkill{}, err
+		return skillruntime.ResolvedArtifactSkill{}, err
 	}
 	if len(values) != 1 {
-		return inferenceadapter.ResolvedArtifactSkill{}, fmt.Errorf(
+		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: expected one resolved Artifact Skill",
 			spec.ErrReferenceUnresolved,
 		)
@@ -111,10 +111,10 @@ func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 
 func (w *SkillAggregateWrapper) ResolveArtifactSkills(
 	refs []artifactModel.ArtifactRef,
-) ([]inferenceadapter.ResolvedArtifactSkill, error) {
+) ([]skillruntime.ResolvedArtifactSkill, error) {
 	return withSkillAggregate(
 		w,
-		func(ctx context.Context) ([]inferenceadapter.ResolvedArtifactSkill, error) {
+		func(ctx context.Context) ([]skillruntime.ResolvedArtifactSkill, error) {
 			selected, err := w.resolver.ResolveSkills(ctx, refs)
 			if err != nil {
 				return nil, err

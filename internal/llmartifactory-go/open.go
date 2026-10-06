@@ -10,12 +10,15 @@ import (
 )
 
 // Open attaches the LLM artifact-domain registration set to an already opened
-// generic Artifact Store. Generic Store ownership remains with deployment
-// assembly; this constructor does not open or close provider resources.
+// generic Artifact Store capability set. Generic Store ownership remains with
+// deployment assembly; this constructor does not open or close provider
+// resources and does not receive the broad compose.Store aggregate.
 func Open(ctx context.Context, config Config) (*Artifactory, error) {
-	if config.Store == nil {
+	if config.Artifacts == nil ||
+		config.Catalog == nil ||
+		config.Resources == nil {
 		return nil, fmt.Errorf(
-			"%w: LLM Artifactory generic Store is nil",
+			"%w: LLM Artifactory generic composition dependencies are incomplete",
 			spec.ErrInvalid,
 		)
 	}
@@ -37,15 +40,15 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 
 	locatorResolver, err := composition.NewProviderLocatorResolver(
 		locators.Factories(),
-		config.Store.Catalog,
+		config.Catalog,
 	)
 	if err != nil {
 		return nil, err
 	}
 	resolver, err := composition.New(composition.ResolverOptions{
-		Artifacts:                    config.Store.Artifacts,
-		Catalog:                      config.Store.Catalog,
-		SourceEntries:                config.Store.Resources,
+		Artifacts:                    config.Artifacts,
+		Catalog:                      config.Catalog,
+		SourceEntries:                config.Resources,
 		Locators:                     locatorResolver,
 		Interpretations:              config.Interpretations,
 		Scope:                        config.Scope,

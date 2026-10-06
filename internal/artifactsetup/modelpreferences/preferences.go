@@ -1,4 +1,4 @@
-package main
+package modelpreferences
 
 import (
 	"context"
@@ -12,31 +12,31 @@ import (
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
 
-const modelPreferenceSchemaVersion = "v1"
+const schemaVersion = "v1"
 
-type modelDefaultProviderPreferencePayload struct {
+type payload struct {
 	Provider *artifactModel.ArtifactRef `json:"provider,omitempty"`
 }
 
-type artifactModelDefaultProviderPreferences struct {
+// Store owns application preference persistence. Model-family preference
+// selection remains in llmartifactory-go/model.
+type Store struct {
 	overlays overlay.StoreAPI
 }
 
-func newArtifactModelDefaultProviderPreferences(
+func New(
 	overlays overlay.StoreAPI,
-) (*artifactModelDefaultProviderPreferences, error) {
+) (*Store, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: Model preference overlay store is required",
 			spec.ErrInvalid,
 		)
 	}
-	return &artifactModelDefaultProviderPreferences{
-		overlays: overlays,
-	}, nil
+	return &Store{overlays: overlays}, nil
 }
 
-func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
+func (s *Store) GetDefaultProvider(
 	ctx context.Context,
 ) (*artifactModel.ArtifactRef, error) {
 	record, found, err := s.overlays.GetStoreOverlay(
@@ -47,10 +47,10 @@ func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 		return nil, err
 	}
 
-	var payload modelDefaultProviderPreferencePayload
+	var value payload
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
-		&payload,
+		&value,
 		spec.MaxLocalDataBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
@@ -59,22 +59,28 @@ func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 			err,
 		)
 	}
-	if payload.Provider == nil {
+	if value.Provider == nil {
 		//nolint:nilnil // Ok.
 		return nil, nil
 	}
-	if err := payload.Provider.Validate(); err != nil {
+	if err := value.Provider.Validate(); err != nil {
 		return nil, err
 	}
 
-	value := *payload.Provider
-	return &value, nil
+	output := *value.Provider
+	return &output, nil
 }
 
-func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
+func (s *Store) SetDefaultProvider(
 	ctx context.Context,
 	provider *artifactModel.ArtifactRef,
 ) error {
+	if provider != nil {
+		if err := provider.Validate(); err != nil {
+			return err
+		}
+	}
+
 	current, found, err := s.overlays.GetStoreOverlay(
 		ctx,
 		modelOverlay.PreferencesNamespace,
@@ -94,10 +100,8 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 		)
 	}
 
-	payload, err := jsonutil.MarshalCanonicalObject(
-		modelDefaultProviderPreferencePayload{
-			Provider: provider,
-		},
+	raw, err := jsonutil.MarshalCanonicalObject(
+		payload{Provider: provider},
 		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
@@ -113,8 +117,8 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 		ctx,
 		overlayModel.StorePutRequest{
 			Namespace:        modelOverlay.PreferencesNamespace,
-			SchemaVersion:    modelPreferenceSchemaVersion,
-			Payload:          payload,
+			SchemaVersion:    schemaVersion,
+			Payload:          raw,
 			ExpectedRevision: expectedRevision,
 		},
 	)

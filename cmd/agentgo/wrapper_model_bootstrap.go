@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -20,6 +19,9 @@ import (
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelcredentials"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
@@ -43,7 +45,7 @@ func initModelWrappers(
 	cat catalog.API,
 	definitions definition.API,
 	hydrator installModel.CompiledHydrationCoordinator,
-) (installFlow.HydrationInstaller, *inferenceadapter.RuntimeAdapter, error) {
+) (installFlow.HydrationInstaller, *modelruntime.RuntimeAdapter, error) {
 	if storeWrapper == nil || aggregateWrapper == nil || roots == nil {
 		return nil, nil, fmt.Errorf(
 			"%w: Model wrapper dependencies are incomplete",
@@ -51,7 +53,7 @@ func initModelWrappers(
 		)
 	}
 
-	preferences, err := newArtifactModelDefaultProviderPreferences(storeOverlays)
+	preferences, err := modelpreferences.New(storeOverlays)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,11 +69,11 @@ func initModelWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	credentials, err := newArtifactModelCredentialResolver(secretRuntime)
+	credentials, err := modelcredentials.New(secretRuntime)
 	if err != nil {
 		return nil, nil, err
 	}
-	runtimeAdapter, err := inferenceadapter.NewRuntimeAdapter(credentials)
+	runtimeAdapter, err := modelruntime.NewRuntimeAdapter(credentials)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -119,7 +121,7 @@ func initModelWrappers(
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
 	aggregateWrapper.fallbackProvider = spec.LogicalName(
-		inferenceadapter.ProviderNameOpenAIResponses,
+		modelruntime.ProviderNameOpenAIResponses,
 	)
 
 	return installer, runtimeAdapter, nil
@@ -130,7 +132,7 @@ func initModelWrappers(
 func initModelProviderRuntime(
 	ctx context.Context,
 	store *ModelStoreWrapper,
-	runtimeAdapter *inferenceadapter.RuntimeAdapter,
+	runtimeAdapter *modelruntime.RuntimeAdapter,
 	publisher providerRuntimePublisher,
 ) error {
 	if store == nil || store.api == nil ||

@@ -1,4 +1,4 @@
-package llmtoolsadapter
+package toolruntime
 
 import (
 	"context"
@@ -94,10 +94,6 @@ func (a *Adapter) LookupGoTool(
 	ctx context.Context,
 	function string,
 ) (toolDomain.GoToolDescriptor, error) {
-	if err := ctx.Err(); err != nil {
-		return toolDomain.GoToolDescriptor{}, err
-	}
-
 	function = strings.TrimSpace(function)
 	if function == "" {
 		return toolDomain.GoToolDescriptor{}, fmt.Errorf(

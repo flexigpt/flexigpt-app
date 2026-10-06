@@ -157,6 +157,11 @@ The resulting boundary is:
 
 This is an architectural split with functional preservation. The only deliberate functional narrowing is Tool support: Tool declarations and preparation retain Go implementations only. Existing SDK Tool branches are removed rather than retained as inactive extensibility.
 
+This statement is superseded. Package F preserves both source-backed Tool
+implementation families. Go Tools remain local-runtime executable; SDK Tools
+remain provider-native inference ToolChoices. Neither is removed by this
+architectural split.
+
 ## Goals
 
 ### Artifact-family ownership
@@ -222,6 +227,25 @@ Ordinary consumers receive family-oriented APIs:
 - Composition API where direct cross-family planning is required.
 
 Consumers do not construct separate locator registries, graph resolvers, Collection services, compiled-catalog readers, or generic local-state adapters.
+
+### Package F constraints
+
+Package F follows these additional constraints:
+
+- Wails wrappers remain transport entrypoints and are not moved into interior
+  packages merely to reduce file count.
+- `llmartifactory-go` must not import `artifactsetup`, Wails packages, or
+  `github.com/santhosh-tekuri/jsonschema/v6`.
+- Generic Store and LLM composition constructors receive named narrow
+  capabilities, not one broad deployment aggregate.
+- Application filename, decoder, source-format, and feature support choices
+  are declared in the support catalog. The library consumes resolved support;
+  it does not spread filename or source-kind assumptions through family code.
+- Constructor validation establishes mandatory dependencies. Internal calls do
+  not repeatedly revalidate already-normalized requests, contexts, or service
+  dependencies.
+- Direct capabilities are application-selected. A family declares the target
+  shape it can consume; application setup supplies the supported matrix.
 
 ### Preserved generic boundaries
 
@@ -472,14 +496,16 @@ The resulting Tool contract supports:
 - Version and Tool capability metadata.
 - Go Tool target preparation.
 
-The resulting Tool contract does not support:
+The resulting Tool contract also preserves:
 
-- SDK Tool implementation declarations.
-- SDK Tool type declarations.
-- SDK Tool package preparation.
-- SDK Tool target mapping.
-- SDK Tool inference hydration.
-- SDK Tool runtime execution.
+- `implementation.kind = sdk`.
+- Provider-native ToolChoice package preparation.
+- SDK Tool Plugin membership, catalog, enablement, and composition behavior.
+- SDK inference hydration and target preparation.
+
+SDK Tools remain intentionally unavailable to the local Go Tool invocation
+runtime. That is a runtime ownership boundary, not a declaration or catalog
+feature removal.
 
 #### Responsibility moves
 
@@ -1712,7 +1738,11 @@ This package completes the runtime-independent library boundary and moves applic
 - Bind Skill runtime adapters and native-path materialization.
 - Bind Workspace prompt, Skill, and MCP runtime adapters.
 - Preserve startup ordering and shutdown ordering.
-- Remove obsolete built-in installer wrappers that only forward to generic Install.
+- Keep Wails wrappers in place as transport and recovery boundaries.
+- Move application-bound adapter implementations out of Wails packages without
+  moving wrapper APIs into interior packages.
+- Do not add a broad local or LLM aggregate facade merely to route existing
+  narrow capabilities.
 
 #### Destination folders and file groups
 
@@ -1776,7 +1806,9 @@ At completion:
 - LLM Artifactory imports no application built-in content.
 - Application setup owns product topology and startup ordering.
 - Runtime integrations own execution and trusted runtime authority.
-- Wrappers no longer contain artifact business workflows.
+- Wrappers remain Wails transport entrypoints, cancellation boundaries, and
+  lifecycle participants; application-bound adapter implementation moves to
+  `artifactsetup`.
 - The reusable LLM library can be extracted without importing FlexiGPT application topology, runtime packages, content packages, or Wails wrappers.
 
 ## Alignment with the prior Artifactory proposal and retained principles

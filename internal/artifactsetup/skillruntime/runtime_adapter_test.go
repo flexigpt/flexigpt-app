@@ -1,4 +1,4 @@
-package inferenceadapter
+package skillruntime
 
 import (
 	"errors"

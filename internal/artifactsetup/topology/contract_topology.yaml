@@ -12,6 +12,12 @@ documents:
     - locator: "plugin.json"
       format: "json"
       decoderID: "artifact-declaration-json"
+    - pattern: "*.plugin.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.plugin.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
   modelProviders:
     - locator: "model-provider.yaml"
@@ -23,12 +29,24 @@ documents:
     - locator: "model-provider.json"
       format: "json"
       decoderID: "artifact-declaration-json"
+    - pattern: "*.model-provider.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.model-provider.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
   models:
     - locator: "model.yaml"
       format: "yaml"
       decoderID: "artifact-declaration-yaml"
     - locator: "model.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - pattern: "*.model.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.model.json"
       format: "json"
       decoderID: "artifact-declaration-json"
 
@@ -42,6 +60,15 @@ documents:
     - locator: "agent.json"
       format: "json"
       decoderID: "artifact-declaration-json"
+    - pattern: "*.agent.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.agent.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.agent.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
   tools:
     - locator: "tool.json"
@@ -53,6 +80,12 @@ documents:
     - locator: "tool.yml"
       format: "yaml"
       decoderID: "artifact-declaration-yaml"
+    - pattern: "*.tool.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.tool.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
   agentMarkdown:
     - locator: "AGENT.md"
@@ -85,6 +118,12 @@ documents:
       format: "yaml"
       decoderID: "artifact-declaration-yaml"
     - locator: "workspace.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - pattern: "*.workspace.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.workspace.json"
       format: "json"
       decoderID: "artifact-declaration-json"
 
@@ -198,6 +237,10 @@ documentUses:
   workspaceInstructions:
     documentSets:
       - "workspaceInstructions"
+
+  workspaceManifest:
+    documentSets:
+      - "workspaceManifests"
 
 markdownRules:
   agent:

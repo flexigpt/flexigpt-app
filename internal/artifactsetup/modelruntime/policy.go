@@ -1,4 +1,4 @@
-package inferenceadapter
+package modelruntime
 
 import (
 	"github.com/flexigpt/inference-go/modelpreset"

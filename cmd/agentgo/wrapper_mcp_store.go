@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -22,7 +23,7 @@ type MCPStoreWrapper struct {
 	api        *mcpAPI.Service
 	management *mcpAPI.MCPListService
 	roots      root.API
-	settings   *mcpSettingsAdapter
+	settings   *mcpsettings.Settings
 }
 
 func withMCPStore[T any](
@@ -100,7 +101,7 @@ func (w *MCPStoreWrapper) GetMCPSettings() (
 		if w == nil || w.settings == nil {
 			return MCPSettingsView{}, spec.ErrClosed
 		}
-		settings, revision, err := w.settings.getMCPSettings(
+		settings, revision, err := w.settings.Get(
 			context.Background(),
 		)
 		if err != nil {
@@ -121,14 +122,14 @@ func (w *MCPStoreWrapper) SaveMCPSettings(
 		if w == nil || w.settings == nil {
 			return MCPSettingsView{}, spec.ErrClosed
 		}
-		if _, err := w.settings.putMCPSettings(
+		if _, err := w.settings.Put(
 			context.Background(),
 			expectedRevision,
 			settings,
 		); err != nil {
 			return MCPSettingsView{}, err
 		}
-		value, revision, err := w.settings.getMCPSettings(context.Background())
+		value, revision, err := w.settings.Get(context.Background())
 		if err != nil {
 			return MCPSettingsView{}, err
 		}

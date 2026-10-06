@@ -1,4 +1,4 @@
-package main
+package mcpsettings
 
 import (
 	"context"
@@ -16,37 +16,33 @@ import (
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 )
 
-const mcpGlobalSettingsSchemaVersion = "v1"
+const schemaVersion = "v1"
 
-type mcpGlobalSettingsPayload struct {
+type payload struct {
 	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
 }
 
-type mcpSettingsAdapter struct {
+// Settings persists application-level MCP runtime settings through the
+// generic Store-scoped overlay capability.
+type Settings struct {
 	overlays overlay.StoreAPI
 }
 
-func newMCPSettingsAdapter(
+func New(
 	overlays overlay.StoreAPI,
-) (*mcpSettingsAdapter, error) {
+) (*Settings, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP global settings overlay store is required",
 			spec.ErrInvalid,
 		)
 	}
-	return &mcpSettingsAdapter{
-		overlays: overlays,
-	}, nil
+	return &Settings{overlays: overlays}, nil
 }
 
-func (s *mcpSettingsAdapter) getMCPSettings(
+func (s *Settings) Get(
 	ctx context.Context,
 ) (mcpAuth.MCPAuthSettings, uint64, error) {
-	if s == nil || s.overlays == nil {
-		return mcpAuth.MCPAuthSettings{}, 0, spec.ErrClosed
-	}
-
 	record, found, err := s.overlays.GetStoreOverlay(
 		ctx,
 		mcpOverlay.GlobalSettingsNamespace,
@@ -58,10 +54,10 @@ func (s *mcpSettingsAdapter) getMCPSettings(
 		return mcpAuth.MCPAuthSettings{}, 0, nil
 	}
 
-	var payload mcpGlobalSettingsPayload
+	var value payload
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
-		&payload,
+		&value,
 		spec.MaxLocalDataBytes,
 	); err != nil {
 		return mcpAuth.MCPAuthSettings{}, 0, fmt.Errorf(
@@ -71,9 +67,9 @@ func (s *mcpSettingsAdapter) getMCPSettings(
 		)
 	}
 
-	settings, err := normalizeMCPGlobalSettings(
+	settings, err := normalize(
 		mcpAuth.MCPAuthSettings{
-			OAuthLoopbackListenAddr: payload.OAuthLoopbackListenAddr,
+			OAuthLoopbackListenAddr: value.OAuthLoopbackListenAddr,
 		},
 	)
 	if err != nil {
@@ -82,22 +78,18 @@ func (s *mcpSettingsAdapter) getMCPSettings(
 	return settings, record.Revision, nil
 }
 
-func (s *mcpSettingsAdapter) putMCPSettings(
+func (s *Settings) Put(
 	ctx context.Context,
 	expectedRevision uint64,
 	value mcpAuth.MCPAuthSettings,
 ) (uint64, error) {
-	if s == nil || s.overlays == nil {
-		return 0, spec.ErrClosed
-	}
-
-	settings, err := normalizeMCPGlobalSettings(value)
+	settings, err := normalize(value)
 	if err != nil {
 		return 0, err
 	}
 
-	payload, err := jsonutil.MarshalCanonicalObject(
-		mcpGlobalSettingsPayload{
+	raw, err := jsonutil.MarshalCanonicalObject(
+		payload{
 			OAuthLoopbackListenAddr: settings.OAuthLoopbackListenAddr,
 		},
 		spec.MaxLocalDataBytes,
@@ -110,8 +102,8 @@ func (s *mcpSettingsAdapter) putMCPSettings(
 		ctx,
 		overlayModel.StorePutRequest{
 			Namespace:        mcpOverlay.GlobalSettingsNamespace,
-			SchemaVersion:    mcpGlobalSettingsSchemaVersion,
-			Payload:          payload,
+			SchemaVersion:    schemaVersion,
+			Payload:          raw,
 			ExpectedRevision: expectedRevision,
 		},
 	)
@@ -121,7 +113,7 @@ func (s *mcpSettingsAdapter) putMCPSettings(
 	return record.Revision, nil
 }
 
-func normalizeMCPGlobalSettings(
+func normalize(
 	value mcpAuth.MCPAuthSettings,
 ) (mcpAuth.MCPAuthSettings, error) {
 	value.OAuthLoopbackListenAddr = strings.TrimSpace(
@@ -140,12 +132,13 @@ func normalizeMCPGlobalSettings(
 			spec.ErrInvalid,
 		)
 	}
-	if !isLoopbackMCPSettingsHost(host) {
+	if !isLoopbackHost(host) {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen host must be loopback",
 			spec.ErrInvalid,
 		)
 	}
+
 	number, err := strconv.Atoi(port)
 	if err != nil || number <= 0 || number > 65535 {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
@@ -156,7 +149,7 @@ func normalizeMCPGlobalSettings(
 	return value, nil
 }
 
-func isLoopbackMCPSettingsHost(
+func isLoopbackHost(
 	host string,
 ) bool {
 	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
@@ -166,15 +159,14 @@ func isLoopbackMCPSettingsHost(
 	return ip != nil && ip.IsLoopback()
 }
 
-type mcpEnvironmentResolver struct{}
+// EnvironmentResolver is the application environment capability supplied to
+// trusted MCP runtime materialization. It does not own request cancellation.
+type EnvironmentResolver struct{}
 
-func (mcpEnvironmentResolver) ResolveEnvironment(
-	ctx context.Context,
+func (EnvironmentResolver) ResolveEnvironment(
+	_ context.Context,
 	name string,
 ) (value string, found bool, err error) {
-	if err := ctx.Err(); err != nil {
-		return "", false, err
-	}
 	value, found = os.LookupEnv(name)
 	return value, found, nil
 }

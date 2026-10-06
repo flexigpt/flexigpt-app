@@ -860,7 +860,10 @@ func (e *Engine) selectDecoder(
 			}
 		}
 		recognition := decoder.Recognize(
-			ctx,
+			// Recognition is bounded candidate classification. Decoders must
+			// not treat cancellation as an alternate recognition result.
+			// Long-running decode work remains responsible for honoring ctx.
+			context.WithoutCancel(ctx),
 			cloneCandidate(candidate),
 		)
 		if recognition < ingestModel.RecognitionNone ||
