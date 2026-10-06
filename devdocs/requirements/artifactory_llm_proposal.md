@@ -1711,7 +1711,6 @@ This package completes the runtime-independent library boundary and moves applic
 - Bind MCP runtime adapters and trusted plaintext secret access.
 - Bind Skill runtime adapters and native-path materialization.
 - Bind Workspace prompt, Skill, and MCP runtime adapters.
-- Reduce Wails wrappers to transport, recovery, and request/response handling.
 - Preserve startup ordering and shutdown ordering.
 - Remove obsolete built-in installer wrappers that only forward to generic Install.
 
