@@ -10,11 +10,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
-	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
-	goTools, err := llmtoolsadapter.New()
+	goTools, err := NewAdapter()
 	if err != nil {
 		t.Fatal(err)
 	}

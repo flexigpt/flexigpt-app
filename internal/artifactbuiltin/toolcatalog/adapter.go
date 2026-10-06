@@ -1,4 +1,4 @@
-package llmtoolsadapter
+package toolcatalog
 
 import (
 	"context"
@@ -41,7 +41,7 @@ type Adapter struct {
 	byName     map[spec.LogicalName]toolDomain.GoToolDescriptor
 }
 
-func New() (*Adapter, error) {
+func NewAdapter() (*Adapter, error) {
 	registry, err := llmtools.NewBuiltinRegistry()
 	if err != nil {
 		return nil, fmt.Errorf(
