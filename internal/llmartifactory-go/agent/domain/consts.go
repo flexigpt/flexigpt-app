@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
@@ -43,8 +43,8 @@ func IsAgentSchema(value schemaModel.Key) bool {
 		value.SchemaVersion == AgentSchemaVersion
 }
 
-func AgentPluginProfile() plugin.Profile {
-	return plugin.Profile{
+func AgentPluginProfile() pluginAPI.Profile {
+	return pluginAPI.Profile{
 		Name:                "agent",
 		SourceStorageKey:    AgentManagedSourceStorageKey,
 		SourceDisplayName:   AgentManagedSourceDisplayName,

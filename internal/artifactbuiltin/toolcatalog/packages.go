@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
@@ -31,11 +31,18 @@ type PreparedPackage struct {
 	ExpectedDefinition     cryptoutil.Digest
 }
 
+// PreparePackages compiles both Tool implementation families.
+//
+// A Plugin member first resolves to a static SDK Tool declaration when one is
+// present in the embedded Plugin directory. Otherwise it resolves to a Go
+// Tool descriptor supplied by the application runtime adapter. Both forms
+// become ordinary source-backed Tool Artifacts and share Plugin membership,
+// enablement, catalog, and composition behavior.
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
 	goTools toolDomain.GoToolLocator,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -91,7 +98,7 @@ func preparePluginDirectory(
 	pluginRoot spec.Locator,
 	goTools toolDomain.GoToolLocator,
 	seenTools map[spec.LogicalName]spec.Locator,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
 	pluginLocation := string(pluginRoot) + "/" +
 		string(toolDomain.ToolPluginDocumentFile())
@@ -192,6 +199,9 @@ func preparePluginDirectory(
 	return output, nil
 }
 
+// readStaticSDKTools reads provider-native SDK Tool declarations packaged
+// below one Tool Plugin directory. Go Tool declarations are generated from
+// GoToolLocator and are intentionally not read from static files.
 func readStaticSDKTools(
 	ctx context.Context,
 	packages fs.FS,
@@ -322,7 +332,7 @@ func toolDocumentFromGoDescriptor(
 func preparePluginPackage(
 	packageRoot spec.Locator,
 	document pluginv1.PluginDocument,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	raw, err := document.CanonicalJSON()
 	if err != nil {
@@ -363,7 +373,7 @@ func preparePluginPackage(
 func prepareToolPackage(
 	pluginRoot spec.Locator,
 	document toolv1.ToolDocument,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := document.Validate(); err != nil {
 		return PreparedPackage{}, err

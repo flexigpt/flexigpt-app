@@ -15,7 +15,7 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -93,7 +93,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretLifecycle, err := secret.NewLifecycleService(
+	secretLifecycle, err := storeSecret.NewLifecycleService(
 		config.SecretLifecycleRepository,
 		config.Clock,
 		config.SecretValues,
@@ -101,7 +101,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretBindings, err := secret.NewBindingService(
+	secretBindings, err := storeSecret.NewBindingService(
 		config.SecretBindingRepository,
 		artifactService,
 		config.Clock,
@@ -112,7 +112,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretRuntime, err := secret.NewRuntimeService(
+	secretRuntime, err := storeSecret.NewRuntimeService(
 		config.SecretRuntimeRepository,
 		artifactService,
 		config.ProtectedOverlayNamespaces,

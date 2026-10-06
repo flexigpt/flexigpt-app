@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:          AgentType,
 		SchemaKey:                AgentSchemaKey,
 		SelectorEligible:         true,
@@ -27,25 +27,25 @@ func Interpretation() interpretation.Registration {
 
 func agentRelationships(
 	entry declaration.Entry,
-) ([]interpretation.Relationship, error) {
+) ([]coreinterpretation.Relationship, error) {
 	document, err := DecodeAdmittedAgentEntry(entry)
 	if err != nil {
 		return nil, err
 	}
 
-	output, err := interpretation.MemberRelationships(
+	output, err := coreinterpretation.MemberRelationships(
 		[]string{"members"},
 		document.Members,
-		interpretation.MemberOptions{AllowSelector: true},
+		coreinterpretation.MemberOptions{AllowSelector: true},
 	)
 	if err != nil {
 		return nil, err
 	}
 	if document.Loop != nil {
-		value, err := interpretation.NewMemberRelationship(
+		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{"loop"},
 			*document.Loop,
-			interpretation.MemberOptions{
+			coreinterpretation.MemberOptions{
 				DirectPosition: true,
 			},
 		)
@@ -55,10 +55,10 @@ func agentRelationships(
 		output = append(output, value)
 	}
 	if document.Workflow != nil {
-		value, err := interpretation.NewMemberRelationship(
+		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{"workflow"},
 			*document.Workflow,
-			interpretation.MemberOptions{
+			coreinterpretation.MemberOptions{
 				DirectPosition: true,
 			},
 		)

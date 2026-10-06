@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 const JSONDecoderID spec.DecoderID = "artifact-declaration-json"
@@ -22,10 +22,24 @@ type JSONDecoder struct {
 	core *canonicalDecoder
 }
 
-func NewJSONDecoder(registry *interpretation.Registry) *JSONDecoder {
+func NewJSONDecoder(registry *coreinterpretation.Registry) *JSONDecoder {
 	return &JSONDecoder{
-		core: newCanonicalDecoder(registry),
+		core: newCanonicalDecoder(registry, nil),
 	}
+}
+
+// NewJSONDecoderForSchemaKeys constructs a canonical JSON decoder that
+// dispatches only the supplied complete schema keys while retaining the full
+// registry for family semantic reconstruction.
+func NewJSONDecoderForSchemaKeys(
+	registry *coreinterpretation.Registry,
+	keys []schemaModel.Key,
+) (*JSONDecoder, error) {
+	core := newCanonicalDecoder(registry, keys)
+	if core.selectionErr != nil {
+		return nil, core.selectionErr
+	}
+	return &JSONDecoder{core: core}, nil
 }
 
 func (*JSONDecoder) ID() spec.DecoderID {
@@ -76,8 +90,7 @@ func (d *JSONDecoder) Recognize(
 		}
 		return ingestModel.RecognitionNone
 	}
-	if d == nil || d.core == nil || d.core.interpretations == nil ||
-		!d.core.interpretations.SupportsType(header.Type) {
+	if d == nil || d.core == nil || !d.core.SupportsType(header.Type) {
 		if requested {
 			return ingestModel.RecognitionPossible
 		}

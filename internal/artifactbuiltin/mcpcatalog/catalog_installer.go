@@ -5,24 +5,24 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 )
 
 type InstallerDependencies struct {
 	Hydrator installModel.CompiledHydrationCoordinator
-	Cleanup  mcpConsumerAPI.BuiltinPackageCleanup
+	Cleanup  mcpAPI.BuiltinPackageCleanup
 }
 
 type Installer struct {
-	*install.CatalogInstaller
+	*installFlow.CatalogInstaller
 }
 
 type lifecycle struct {
-	cleanup mcpConsumerAPI.BuiltinPackageCleanup
+	cleanup mcpAPI.BuiltinPackageCleanup
 }
 
 type lifecycleState struct {
@@ -45,7 +45,7 @@ func NewInstaller(
 		return nil, err
 	}
 
-	value, err := install.NewCatalogInstaller(
+	value, err := installFlow.NewCatalogInstaller(
 		set,
 		dependencies.Hydrator,
 		lifecycle{

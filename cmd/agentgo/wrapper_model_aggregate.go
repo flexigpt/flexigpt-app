@@ -7,7 +7,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 )
 
@@ -42,10 +42,10 @@ func (w *ModelAggregateWrapper) ClearDefaultProvider() error {
 }
 
 func (w *ModelAggregateWrapper) SaveProviderSettings(
-	request modelConsumerAPI.SaveProviderSettingsRequest,
-) (modelConsumerAPI.ProviderView, error) {
+	request modelAPI.SaveProviderSettingsRequest,
+) (modelAPI.ProviderView, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
+		return modelAPI.ProviderView{}, spec.ErrClosed
 	}
 	return w.service.SaveProviderSettings(context.Background(), request)
 }
@@ -54,9 +54,9 @@ func (w *ModelAggregateWrapper) ResetProviderSettings(
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
-) (modelConsumerAPI.ProviderView, error) {
+) (modelAPI.ProviderView, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
+		return modelAPI.ProviderView{}, spec.ErrClosed
 	}
 	return w.service.ResetProviderSettings(
 		context.Background(),
@@ -67,10 +67,10 @@ func (w *ModelAggregateWrapper) ResetProviderSettings(
 }
 
 func (w *ModelAggregateWrapper) SetProviderAPIKey(
-	request modelConsumerAPI.SetProviderAPIKeyRequest,
-) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
+	request modelAPI.SetProviderAPIKeyRequest,
+) (modelAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
+		return modelAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
 	return w.service.SetProviderAPIKey(context.Background(), request)
 }
@@ -79,9 +79,9 @@ func (w *ModelAggregateWrapper) ClearProviderAPIKey(
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
-) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
+) (modelAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
+		return modelAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
 	return w.service.ClearProviderAPIKey(
 		context.Background(),
@@ -92,19 +92,19 @@ func (w *ModelAggregateWrapper) ClearProviderAPIKey(
 }
 
 func (w *ModelAggregateWrapper) CreateProvider(
-	request modelConsumerAPI.ManagedProviderCreateRequest,
-) (modelConsumerAPI.ManagedProviderCreateResult, error) {
+	request modelAPI.ManagedProviderCreateRequest,
+) (modelAPI.ManagedProviderCreateResult, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, spec.ErrClosed
+		return modelAPI.ManagedProviderCreateResult{}, spec.ErrClosed
 	}
 	return w.service.CreateProvider(context.Background(), request)
 }
 
 func (w *ModelAggregateWrapper) UpdateProvider(
-	request modelConsumerAPI.ManagedProviderReplaceRequest,
-) (modelConsumerAPI.ManagedProviderReplaceResult, error) {
+	request modelAPI.ManagedProviderReplaceRequest,
+) (modelAPI.ManagedProviderReplaceResult, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, spec.ErrClosed
+		return modelAPI.ManagedProviderReplaceResult{}, spec.ErrClosed
 	}
 	return w.service.UpdateProvider(context.Background(), request)
 }
@@ -164,7 +164,7 @@ func initModelProviderRuntime(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if store == nil || store.management == nil ||
+	if store == nil || store.api == nil ||
 		aggregate == nil || aggregate.service == nil {
 		return spec.ErrClosed
 	}
@@ -175,14 +175,16 @@ func initModelProviderRuntime(
 	}
 
 	var (
-		providers []modelConsumerAPI.ProviderListItem
+		providers []modelAPI.ProviderListItem
 		result    error
 	)
 	for _, rootID := range roots {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(result, err)
 		}
-		values, err := store.management.ListProviders(ctx, rootID)
+		values, err := store.api.Providers.List(ctx, modelAPI.ListProvidersRequest{
+			RootID: rootID,
+		})
 		if err != nil {
 			result = errors.Join(
 				result,

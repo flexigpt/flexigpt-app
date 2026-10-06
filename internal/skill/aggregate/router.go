@@ -15,8 +15,8 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/materialize"
+	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
 // ArtifactRouter is the flat Root-scoped Skill Artifact resolver.
@@ -71,7 +71,7 @@ func (r *ArtifactRouter) RootForArtifact(
 	if err != nil {
 		return "", err
 	}
-	if !skillDomain.IsSkillKind(value.Kind) {
+	if !skillSource.IsSkillKind(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: Artifact %q is not a Skill",
 			spec.ErrReferenceUnresolved,
@@ -111,7 +111,7 @@ func (r *ArtifactRouter) ResolveArtifactSkills(
 		return nil, err
 	}
 	for _, record := range records {
-		if !skillDomain.IsSkillKind(record.Kind) {
+		if !skillSource.IsSkillKind(record.Kind) {
 			return nil, fmt.Errorf(
 				"%w: Artifact %q is not a Skill",
 				spec.ErrReferenceUnresolved,
@@ -140,7 +140,7 @@ func (r *ArtifactRouter) ListRootSkills(
 
 	refs := make([]artifactModel.ArtifactRef, 0, len(entries))
 	for _, entry := range entries {
-		if !skillDomain.IsSkillKind(entry.Kind) ||
+		if !skillSource.IsSkillKind(entry.Kind) ||
 			entry.State != artifactModel.StateAvailable ||
 			!entry.Enabled {
 			continue

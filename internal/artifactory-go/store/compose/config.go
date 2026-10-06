@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
@@ -40,9 +40,9 @@ type Config struct {
 	RefreshPublisher refreshFlow.Repository
 
 	OverlayRepository         overlay.Repository
-	SecretBindingRepository   secret.BindingRepository
-	SecretRuntimeRepository   secret.RuntimeRepository
-	SecretLifecycleRepository secret.LifecycleRepository
+	SecretBindingRepository   storeSecret.BindingRepository
+	SecretRuntimeRepository   storeSecret.RuntimeRepository
+	SecretLifecycleRepository storeSecret.LifecycleRepository
 	ArtifactCleanupRepository artifactcleanupFlow.Repository
 	InstallationRepository    installFlow.Repository
 

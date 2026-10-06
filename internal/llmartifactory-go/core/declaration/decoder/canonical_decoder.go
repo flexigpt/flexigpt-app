@@ -10,28 +10,62 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 type canonicalDecoder struct {
 	schemas         schema.ExpectedCanonicalizer
 	dispatch        *declaration.Dispatcher
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
+	schemaKeys      []schemaModel.Key
+	selectionErr    error
 }
 
 func newCanonicalDecoder(
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
+	schemaKeys []schemaModel.Key,
 ) *canonicalDecoder {
-	return &canonicalDecoder{
+	output := &canonicalDecoder{
 		interpretations: interpretations,
 	}
+	if interpretations == nil {
+		output.selectionErr = fmt.Errorf(
+			"%w: canonical declaration interpretation registry is nil",
+			spec.ErrInvalid,
+		)
+		return output
+	}
+	if len(schemaKeys) == 0 {
+		schemaKeys = interpretations.SchemaKeys()
+	}
+	selected, err := interpretations.RequireSchemaKeys(schemaKeys)
+	if err != nil {
+		output.selectionErr = err
+		return output
+	}
+	output.schemaKeys = selected
+	return output
 }
 
 func (d *canonicalDecoder) RequiredSchemaKeys() []schemaModel.Key {
-	if d == nil || d.interpretations == nil {
+	if d == nil || d.interpretations == nil || d.selectionErr != nil {
 		return nil
 	}
-	return d.interpretations.SchemaKeys()
+	return append([]schemaModel.Key(nil), d.schemaKeys...)
+}
+
+func (d *canonicalDecoder) SupportsType(
+	value declaration.Type,
+) bool {
+	if d == nil || d.selectionErr != nil {
+		return false
+	}
+	for _, key := range d.schemaKeys {
+		if declaration.Type(key.Kind) == value {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *canonicalDecoder) BindExpectedCanonicalizer(catalog schema.Catalog) error {
@@ -41,8 +75,11 @@ func (d *canonicalDecoder) BindExpectedCanonicalizer(catalog schema.Catalog) err
 			spec.ErrInvalid,
 		)
 	}
+	if d.selectionErr != nil {
+		return d.selectionErr
+	}
 	dispatch, err := declaration.NewDispatcher(
-		d.interpretations.SchemaKeys(),
+		d.schemaKeys,
 	)
 	if err != nil {
 		return err

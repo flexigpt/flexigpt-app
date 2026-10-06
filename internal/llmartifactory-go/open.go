@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 )
 
 // Open attaches the LLM artifact-domain registration set to an already opened
@@ -58,7 +58,7 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 	}
 
 	locatorRuntime := catalogLocatorRuntime{catalog: config.Store.Catalog}
-	locators, err := locator.NewRegistry(config.LocatorFactories...)
+	locators, err := corelocator.NewRegistry(config.LocatorFactories...)
 	if err != nil {
 		return nil, err
 	}

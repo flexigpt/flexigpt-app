@@ -151,6 +151,107 @@ func (r *Registry) SchemaKeys() []schemaModel.Key {
 	return append([]schemaModel.Key(nil), r.keys...)
 }
 
+// RequireSchemaKeys verifies that every requested complete schema key belongs
+// to this immutable interpretation registry and returns a deterministic copy.
+func (r *Registry) RequireSchemaKeys(
+	keys []schemaModel.Key,
+) ([]schemaModel.Key, error) {
+	if r == nil {
+		return nil, spec.ErrClosed
+	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf(
+			"%w: declaration schema key selection is empty",
+			spec.ErrInvalid,
+		)
+	}
+
+	seen := make(map[schemaModel.Key]struct{}, len(keys))
+	output := make([]schemaModel.Key, 0, len(keys))
+	for index, key := range keys {
+		if err := key.Validate(); err != nil {
+			return nil, fmt.Errorf(
+				"declaration schema key %d: %w",
+				index,
+				err,
+			)
+		}
+		if _, duplicate := seen[key]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: declaration schema key %q/%q/%q is repeated",
+				spec.ErrConflict,
+				key.Kind,
+				key.SchemaID,
+				key.SchemaVersion,
+			)
+		}
+		if _, found := r.bySchema[key]; !found {
+			return nil, fmt.Errorf(
+				"%w: declaration schema %q/%q/%q",
+				spec.ErrUnsupported,
+				key.Kind,
+				key.SchemaID,
+				key.SchemaVersion,
+			)
+		}
+		seen[key] = struct{}{}
+		output = append(output, key)
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Kind != output[right].Kind {
+			return output[left].Kind < output[right].Kind
+		}
+		if output[left].SchemaID != output[right].SchemaID {
+			return output[left].SchemaID < output[right].SchemaID
+		}
+		return output[left].SchemaVersion < output[right].SchemaVersion
+	})
+	return output, nil
+}
+
+// SchemaKeysForArtifactKinds selects the exact registered declaration schemas
+// needed by the supplied emitted Artifact kinds.
+func (r *Registry) SchemaKeysForArtifactKinds(
+	kinds []artifactModel.ArtifactKind,
+) ([]schemaModel.Key, error) {
+	if r == nil {
+		return nil, spec.ErrClosed
+	}
+
+	keys := make([]schemaModel.Key, 0, len(kinds))
+	seen := make(map[artifactModel.ArtifactKind]struct{}, len(kinds))
+	for _, kind := range kinds {
+		if err := kind.Validate(); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[kind]; duplicate {
+			continue
+		}
+		seen[kind] = struct{}{}
+
+		registrations := r.byType[declaration.Type(kind)]
+		switch len(registrations) {
+		case 1:
+			keys = append(keys, registrations[0].SchemaKey)
+		case 0:
+			return nil, fmt.Errorf(
+				"%w: declaration interpretation for Artifact kind %q",
+				spec.ErrUnsupported,
+				kind,
+			)
+		default:
+			return nil, fmt.Errorf(
+				"%w: Artifact kind %q has %d declaration schema versions",
+				spec.ErrUnsupported,
+				kind,
+				len(registrations),
+			)
+		}
+	}
+	return r.RequireSchemaKeys(keys)
+}
+
 func (r *Registry) SupportsType(
 	value declaration.Type,
 ) bool {

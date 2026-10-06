@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 )
 
@@ -188,25 +188,25 @@ func DefaultAdapterDefinitions() []AdapterDefinition {
 func (a *RuntimeAdapter) LookupModelAdapter(
 	ctx context.Context,
 	adapter string,
-) (modelConsumerAPI.AdapterDescriptor, bool, error) {
+) (modelAPI.AdapterDescriptor, bool, error) {
 	if a == nil {
-		return modelConsumerAPI.AdapterDescriptor{}, false, spec.ErrClosed
+		return modelAPI.AdapterDescriptor{}, false, spec.ErrClosed
 	}
 	if ctx == nil {
-		return modelConsumerAPI.AdapterDescriptor{}, false, fmt.Errorf(
+		return modelAPI.AdapterDescriptor{}, false, fmt.Errorf(
 			"%w: Model adapter lookup context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return modelConsumerAPI.AdapterDescriptor{}, false, err
+		return modelAPI.AdapterDescriptor{}, false, err
 	}
 
 	value, found := a.adapters[adapter]
 	if !found {
-		return modelConsumerAPI.AdapterDescriptor{}, false, nil
+		return modelAPI.AdapterDescriptor{}, false, nil
 	}
-	return modelConsumerAPI.AdapterDescriptor{
+	return modelAPI.AdapterDescriptor{
 		ID:      value.ID,
 		Version: value.Version,
 	}, true, nil
@@ -217,7 +217,7 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 // Model Store itself.
 func (a *RuntimeAdapter) Resolve(
 	ctx context.Context,
-	resolved modelConsumerAPI.ResolvedModel,
+	resolved modelAPI.ResolvedModel,
 ) (RuntimeConfiguration, error) {
 	return a.ResolveRuntime(
 		ctx,
@@ -230,7 +230,7 @@ func (a *RuntimeAdapter) Resolve(
 // Aggregate normally prepares the typed optional patch and calls ResolveRuntime.
 func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	ctx context.Context,
-	resolved modelConsumerAPI.ResolvedModel,
+	resolved modelAPI.ResolvedModel,
 	requestPatch *modelAggregate.RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	prepared, err := requestPatch.Prepare()
@@ -245,7 +245,7 @@ func (a *RuntimeAdapter) ResolveWithRequestPatch(
 // propagation can register endpoint/header changes before a key is configured.
 func (a *RuntimeAdapter) ResolveProviderRuntime(
 	ctx context.Context,
-	resolved modelConsumerAPI.ResolvedProvider,
+	resolved modelAPI.ResolvedProvider,
 ) (inferenceSpec.ProviderParam, error) {
 	if a == nil {
 		return inferenceSpec.ProviderParam{}, spec.ErrClosed
@@ -271,7 +271,7 @@ func (a *RuntimeAdapter) ResolveProviderRuntime(
 // adapter, Provider, Provider-overlay, Model, and Model-overlay layers.
 func (a *RuntimeAdapter) ResolveRuntime(
 	ctx context.Context,
-	resolved modelConsumerAPI.ResolvedModel,
+	resolved modelAPI.ResolvedModel,
 	requestPatch modelAggregate.PreparedRuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	if a == nil {
@@ -292,7 +292,7 @@ func (a *RuntimeAdapter) ResolveRuntime(
 
 	providerRuntime, err := a.resolveProviderRuntime(
 		ctx,
-		modelConsumerAPI.ResolvedProvider{
+		modelAPI.ResolvedProvider{
 			Provider:           resolved.Provider,
 			ProviderOverlay:    resolved.ProviderOverlay,
 			ProviderCredential: resolved.ProviderCredential,
@@ -384,7 +384,7 @@ type providerRuntimeConfiguration struct {
 
 func (a *RuntimeAdapter) resolveProviderRuntime(
 	ctx context.Context,
-	resolved modelConsumerAPI.ResolvedProvider,
+	resolved modelAPI.ResolvedProvider,
 	requireCredential bool,
 ) (providerRuntimeConfiguration, error) {
 	definition, found := a.adapters[resolved.Provider.Document.Adapter]

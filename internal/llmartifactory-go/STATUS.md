@@ -132,35 +132,65 @@ Plugin and composition ownership are complete.
 - Explicit reachable discovery preparation and refresh closure remain under
   `core/composition/refresh`.
 
-## Remaining Proposal 2 Package E work
+## Proposal 2 Package E
 
-Package E remains deliberately separate from the completed A-D boundary.
+Package E family-service consolidation is complete.
 
-- Replace remaining `consumerapi` ownership with family-root services and
-  family-owned API packages.
-- Complete Text service extraction from Agent materialization entrypoints.
-- Complete Skill source-format, package, and materialization consolidation.
-- Split Model and Model Provider services into named settings, credential,
-  preference, package, and capability owners.
-- Move MCP installation and logical-secret behavior from aggregate-era
-  wrappers into `mcp/installation` and `mcp/secret`.
-- Add Team, Loop, and Workflow family plan projections.
-- Complete Go-only Tool narrowing by removing SDK Tool declaration, generated
-  inventory, target, and runtime branches.
-- Move remaining family-local package naming helpers into their family
-  package owners.
+- The remaining `consumerapi` packages were removed. Each family root is now
+  its owned application-facing API package and exposes a `Service` rather than
+  an aggregate-era generic `API` type:
+
+  ```text
+  agent  text  skill  mcp  model  tool  workspace
+  ```
+
+- Agent no longer owns Text materialization. `text.Service` owns verified Text
+  materialization and receives generic resource/protection capabilities
+  explicitly.
+- Skill source parsing, managed package layout/content, and verified runtime
+  materialization are separated under `skill/source`, `skill/package`, and
+  `skill/materialize`. The former broad Skill domain basket no longer owns
+  source-format parsing or managed-package layout.
+- Model Provider and Model behavior is exposed through named family owners:
+  Provider and Model entity services, package services, settings services,
+  Provider credential service, Provider preference policy, and capability
+  services. The former generic management/catalog facade types are removed.
+- MCP installation persistence and deterministic cleanup are owned by
+  `mcp/installation`. Logical MCP secret selector grammar is owned by
+  `mcp/secret`; it no longer lives under a generic MCP domain basket.
+- Team, Loop, and Workflow each expose a family plan projection over the
+  shared composition resolver. Their projections preserve family structure
+  while keeping resolution mechanics in `core/composition`.
+- Preserve and complete dual Tool implementation support:
+  - `implementation.kind: go` represents a local Go Tool function and is
+    invoked through `tool/runtime`.
+  - `implementation.kind: sdk` represents a provider-native ToolChoice and
+    is hydrated through `tool/aggregate` for inference-provider execution.
+  - Generated Tool catalogs intentionally combine generated Go Tool packages
+    with static SDK Tool packages under the same built-in Plugin membership,
+    Artifact, enablement, catalog, and composition model.
+  - SDK Tools are not locally invoked by `tool/runtime`; this is a runtime
+    ownership boundary, not unsupported functionality.
+  - Neither SDK declaration support, static SDK inventory, SDK ToolChoice
+    hydration, nor SDK target projection may be removed.
+- Plugin managed-package naming and layout helpers are located with Plugin
+  ownership rather than embedded in its broad service implementation.
+- Retired `collection.yaml`, `collection.yml`, and `collection.json` topology
+  aliases are removed. Plugin is the only managed membership family term.
 
 ## Remaining Proposal 2 Package F work
 
 Package F is application binding and runtime integration work.
 
-- Bind Go Tool metadata direct-capability providers.
+- Bind Go Tool metadata direct-capability providers where application runtime
+  policy intentionally chooses a direct capability over a source-backed
+  Artifact. This does not replace or retire source-backed SDK Tool Artifacts.
 - Bind inference adapter and Model Provider direct-capability providers.
 - Bind runtime-neutral MCP preparation providers where needed.
 - Move remaining application-selected filename and source-format selection out
   of `artifactsetup/topology`.
-- Move wrapper-owned MCP secret translation, MCP settings, and Model
-  preference persistence into their family owners.
+- Move the remaining application-bound MCP secret binding adapter, MCP global
+  settings persistence, and Model preference persistence out of Wails setup.
 - Reduce Wails wrappers to transport/recovery concerns after runtime adapter
   construction moves into application setup.
 - Migrate outer runtime aggregate interfaces from their former Collection
@@ -177,7 +207,8 @@ at the intended intermediate architecture:
 ```text
 application content and topology
         ↓ explicit setup registrations
-LLM declaration grammar + family contracts + Plugin + composition
+LLM declaration grammar + family contracts + family-root services +
+Plugin + composition
         ↓ generic entity and flow capabilities
 Artifactory Root / Source / Definition / Artifact / local state
 ```

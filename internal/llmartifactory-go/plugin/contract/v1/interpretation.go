@@ -2,11 +2,11 @@ package pluginv1
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:          PluginType,
 		SchemaKey:                PluginSchemaKey,
 		SelectorEligible:         true,
@@ -25,14 +25,14 @@ func Interpretation() interpretation.Registration {
 
 func pluginRelationships(
 	entry declaration.Entry,
-) ([]interpretation.Relationship, error) {
+) ([]coreinterpretation.Relationship, error) {
 	document, err := DecodeAdmittedPluginEntry(entry)
 	if err != nil {
 		return nil, err
 	}
-	return interpretation.MemberRelationships(
+	return coreinterpretation.MemberRelationships(
 		[]string{"members"},
 		document.Members,
-		interpretation.MemberOptions{AllowSelector: true},
+		coreinterpretation.MemberOptions{AllowSelector: true},
 	)
 }

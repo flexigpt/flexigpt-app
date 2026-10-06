@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
 const InstallationDataNamespace artifactModel.DataNamespace = "flexigpt.site/mcp-installation-v1"
@@ -188,7 +188,7 @@ func (value ServerData) Validate() error {
 			)
 		}
 		if binding.SecretRef != "" {
-			if _, err := secretMCPDomain.ParseMCPSecretRef(binding.SecretRef); err != nil {
+			if _, err := secret.ParseMCPSecretRef(binding.SecretRef); err != nil {
 				return fmt.Errorf("MCP input %q: %w", name, err)
 			}
 		}
@@ -323,13 +323,13 @@ func (value ServerData) ValidateFor(
 					name,
 				)
 			}
-			ref, err := secretMCPDomain.ParseMCPSecretRef(binding.SecretRef)
+			ref, err := secret.ParseMCPSecretRef(binding.SecretRef)
 			if err != nil {
 				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)
 			}
 			if err := ref.Matches(
 				server,
-				secretMCPDomain.MCPSecretKindOAuthClientCredentials,
+				secret.MCPSecretKindOAuthClientCredentials,
 				"clientCredentials",
 			); err != nil {
 				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)

@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/internal"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -26,7 +26,7 @@ type Config struct {
 	Refresh         refreshFlow.API
 	RefreshCompiled refreshFlow.CompiledDocumentRegistrar
 	Repository      Repository
-	SecretLifecycle secret.LifecycleAPI
+	SecretLifecycle storeSecret.LifecycleAPI
 	Policy          root.Policy
 }
 

@@ -11,10 +11,10 @@ import (
 
 const workflowNodeIdentityDigestLength = 16
 
-// stableWorkflowNodeSegment converts a Workflow node ID into one portable
+// NodeRelationshipSegment converts a Workflow node ID into one portable
 // relationship path segment. Workflow owns this because Workflow owns node
 // identity and node-to-member relationship semantics.
-func stableWorkflowNodeSegment(
+func NodeRelationshipSegment(
 	id string,
 ) (string, error) {
 	if err := declaration.ValidateWorkflowID(

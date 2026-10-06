@@ -16,8 +16,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
+	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
 
@@ -30,7 +30,7 @@ type Handle struct {
 	Store *compose.Store
 	LLM   *llmartifactory.Artifactory
 
-	locatorFactories []locator.Factory
+	locatorFactories []corelocator.Factory
 
 	closeOnce sync.Once
 	closeErr  error
@@ -38,11 +38,11 @@ type Handle struct {
 
 // LocatorFactories returns independently owned locator factory registrations
 // for family and runtime composition.
-func (h *Handle) LocatorFactories() []locator.Factory {
+func (h *Handle) LocatorFactories() []corelocator.Factory {
 	if h == nil {
 		return nil
 	}
-	return append([]locator.Factory(nil), h.locatorFactories...)
+	return append([]corelocator.Factory(nil), h.locatorFactories...)
 }
 
 // Close closes the LLM registration attachment before closing the local
@@ -108,11 +108,11 @@ func OpenArtifactStore(
 
 	protectedNamespaces := append(
 		modelOverlay.Namespaces(),
-		overlay.Namespaces()...,
+		mcpOverlay.Namespaces()...,
 	)
 	storeNamespaces := append(
 		modelOverlay.StoreNamespaces(),
-		overlay.StoreNamespaces()...,
+		mcpOverlay.StoreNamespaces()...,
 	)
 
 	store, err := local.Open(ctx, local.Config{

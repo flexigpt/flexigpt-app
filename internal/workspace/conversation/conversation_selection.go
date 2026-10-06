@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
@@ -119,13 +119,13 @@ type WorkspaceSource interface {
 		ctx context.Context,
 		workspace artifactModel.ArtifactRef,
 		artifacts []artifactModel.ArtifactRef,
-	) (workspaceConsumerAPI.WorkspacePromptPlan, error)
+	) (workspaceAPI.WorkspacePromptPlan, error)
 
 	LoadWorkspaceSkills(
 		ctx context.Context,
 		workspace artifactModel.ArtifactRef,
 		artifacts []artifactModel.ArtifactRef,
-	) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error)
+	) (workspaceAPI.WorkspaceSkillLoadPlan, error)
 }
 
 type ConversationResolver struct {
@@ -133,13 +133,13 @@ type ConversationResolver struct {
 }
 
 func NewConversationResolver(
-	workspaceAPI WorkspaceSource,
+	wpSource WorkspaceSource,
 ) (*ConversationResolver, error) {
-	if workspaceAPI == nil {
+	if wpSource == nil {
 		return nil, errors.New("workspace conversation source is required")
 	}
 	return &ConversationResolver{
-		workspaceAPI: workspaceAPI,
+		workspaceAPI: wpSource,
 	}, nil
 }
 
@@ -322,7 +322,7 @@ func initializeSkillUsage(
 func applyContextPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
-	plan workspaceConsumerAPI.WorkspacePromptPlan,
+	plan workspaceAPI.WorkspacePromptPlan,
 	index map[artifactModel.ArtifactRef]int,
 ) {
 	usage.Diagnostics = diagnostic.Append(
@@ -371,7 +371,7 @@ func applyContextPlan(
 func applySkillPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
-	plan workspaceConsumerAPI.WorkspaceSkillLoadPlan,
+	plan workspaceAPI.WorkspaceSkillLoadPlan,
 	index map[artifactModel.ArtifactRef]int,
 ) {
 	for _, skill := range plan.Skills {

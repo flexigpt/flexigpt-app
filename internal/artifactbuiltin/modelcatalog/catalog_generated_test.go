@@ -8,12 +8,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	artifactRegistration "github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter/catalog"
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
-	registry, err := artifactRegistration.NewLLMInterpretationRegistry()
+	registry, err := registration.NewLLMInterpretationRegistry()
 	if err != nil {
 		t.Fatalf("create Model catalog interpretation registry: %v", err)
 	}

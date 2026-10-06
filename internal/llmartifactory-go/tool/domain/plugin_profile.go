@@ -3,14 +3,14 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
-func PluginProfile() plugin.Profile {
-	return plugin.Profile{
+func PluginProfile() pluginAPI.Profile {
+	return pluginAPI.Profile{
 		Name:        "tool",
 		ReadOnly:    true,
 		PackageKind: ToolPluginPackageKind,

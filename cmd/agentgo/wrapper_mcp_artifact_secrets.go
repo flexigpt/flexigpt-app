@@ -6,23 +6,23 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
 type artifactMCPSecretResolver struct {
 	artifacts artifact.API
-	bindings  secret.API
-	runtime   secret.RuntimeAPI
+	bindings  storeSecret.API
+	runtime   storeSecret.RuntimeAPI
 }
 
 func newArtifactMCPSecretResolver(
 	artifacts artifact.API,
-	bindings secret.API,
-	runtime secret.RuntimeAPI,
+	bindings storeSecret.API,
+	runtime storeSecret.RuntimeAPI,
 ) (*artifactMCPSecretResolver, error) {
 	if artifacts == nil || bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(
@@ -96,7 +96,7 @@ func (r *artifactMCPSecretResolver) ResolveSecret(
 		return "", fmt.Errorf(
 			"%w: %w: MCP secret is unavailable",
 			spec.ErrReferenceUnresolved,
-			secretMCPDomain.ErrNotFound,
+			secret.ErrNotFound,
 		)
 	}
 
@@ -162,11 +162,11 @@ func (r *artifactMCPSecretResolver) bindingKey(
 		return secretModel.BindingKey{}, spec.ErrClosed
 	}
 
-	selector, err := secretMCPDomain.ParseMCPSecretRef(logicalRef)
+	selector, err := secret.ParseMCPSecretRef(logicalRef)
 	if err != nil {
 		return secretModel.BindingKey{}, err
 	}
-	slot, err := secretMCPDomain.ArtifactBindingSlot(selector)
+	slot, err := secret.ArtifactBindingSlot(selector)
 	if err != nil {
 		return secretModel.BindingKey{}, err
 	}

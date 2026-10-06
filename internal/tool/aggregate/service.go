@@ -11,12 +11,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
+	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+// ToolSelection selects one source-backed Tool capability for an inference
+// request.
+//
+// UserArgSchemaInstance is SDK Tool configuration. It is interpreted only by
+// SDK Tool hydration; Go Tool argument schemas remain declaration-owned and
+// are supplied by the Tool Artifact itself.
 type ToolSelection struct {
 	ChoiceID              string                       `json:"choiceID"`
 	Target                composition.CapabilityTarget `json:"target"`
@@ -36,7 +42,7 @@ func (s ToolSelection) Validate() error {
 }
 
 type Service struct {
-	tools   *toolConsumerAPI.API
+	tools   *toolAPI.Service
 	runtime *toolRuntime.Service
 }
 
@@ -47,7 +53,7 @@ type InvokeRequest struct {
 }
 
 func New(
-	tools *toolConsumerAPI.API,
+	tools *toolAPI.Service,
 	runtimeService *toolRuntime.Service,
 ) (*Service, error) {
 	if tools == nil || runtimeService == nil {
@@ -87,6 +93,12 @@ func (s *Service) Invoke(
 	})
 }
 
+// HydrateInferenceToolChoice converts either supported source-backed Tool
+// implementation into an inference ToolChoice.
+//
+// Go Tools produce ordinary function choices. SDK Tools produce provider-native
+// choices and are intentionally not sent through Service.Invoke or
+// tool/runtime.Service.
 func (s *Service) HydrateInferenceToolChoice(
 	ctx context.Context,
 	selection ToolSelection,
@@ -184,21 +196,21 @@ func (s *Service) ready(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// resolveToolTarget resolves a source-backed Tool capability target for the
-// Go Tool runtime. Direct Tool capability targets remain owned by their
+// resolveToolTarget resolves either Go or SDK source-backed Tool capability
+// target. Direct Tool capability targets remain owned by their
 // application-supplied runtime adapter and are not coerced into Artifacts.
 func (s *Service) resolveToolTarget(
 	ctx context.Context,
 	target composition.CapabilityTarget,
-) (toolConsumerAPI.ResolvedToolView, error) {
+) (toolAPI.ResolvedToolView, error) {
 	if err := s.ready(ctx); err != nil {
-		return toolConsumerAPI.ResolvedToolView{}, err
+		return toolAPI.ResolvedToolView{}, err
 	}
 	if err := target.Validate(); err != nil {
-		return toolConsumerAPI.ResolvedToolView{}, err
+		return toolAPI.ResolvedToolView{}, err
 	}
 	if target.Type != declaration.TypeTool {
-		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: capability target type is %q, expected tool",
 			spec.ErrUnsupported,
 			target.Type,
@@ -206,7 +218,7 @@ func (s *Service) resolveToolTarget(
 	}
 	if target.Form != composition.TargetFormArtifact ||
 		target.Artifact == nil {
-		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: direct Tool capability targets require an application runtime adapter",
 			spec.ErrUnsupported,
 		)
@@ -214,11 +226,11 @@ func (s *Service) resolveToolTarget(
 
 	value, err := s.tools.ResolveEnabledTool(ctx, *target.Artifact)
 	if err != nil {
-		return toolConsumerAPI.ResolvedToolView{}, err
+		return toolAPI.ResolvedToolView{}, err
 	}
 	if value.Tool.Artifact.Ref() != *target.Artifact ||
 		value.Tool.Name != target.Name {
-		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: Tool capability target no longer matches its Artifact",
 			spec.ErrReferenceUnresolved,
 		)
@@ -228,7 +240,7 @@ func (s *Service) resolveToolTarget(
 
 func hydrateSDKToolChoice(
 	choice inferenceSpec.ToolChoice,
-	document toolConsumerAPI.ToolView,
+	document toolAPI.ToolView,
 	arguments map[string]any,
 	rawUserArgs jsonutil.JSONRawString,
 ) (inferenceSpec.ToolChoice, error) {

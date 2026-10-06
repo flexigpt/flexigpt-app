@@ -18,7 +18,7 @@ import (
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -52,7 +52,7 @@ type ArtifactExpectation struct {
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -97,7 +97,7 @@ func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(ctx, packages, packageRoot)
 	if err != nil {
@@ -163,7 +163,7 @@ func canonicalPluginPackage(
 	documentFile spec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -369,7 +369,7 @@ func canonicalPluginPackage(
 
 func canonicalAgentDocument(
 	content []byte,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) (declaration.Entry, agentv1.AgentDocument, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		content,
@@ -402,7 +402,7 @@ func canonicalAgentDocument(
 func expectationsForDocument(
 	locator spec.Locator,
 	entry declaration.Entry,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) ([]ArtifactExpectation, error) {
 	namedEntries, err := interpretations.WalkNamedEntries(entry)
 	if err != nil {

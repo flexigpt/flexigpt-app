@@ -16,7 +16,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
+	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
 // ResourceReader is the narrow generic Artifact Store resource capability
@@ -129,7 +129,7 @@ func Resolve(
 			spec.ErrInvalid,
 		)
 	}
-	if !skillDomain.IsSkillKind(record.Kind) ||
+	if !skillSource.IsSkillKind(record.Kind) ||
 		record.State != artifactModel.StateAvailable ||
 		record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {
@@ -158,13 +158,13 @@ func Resolve(
 		)
 	}
 
-	declarationValue, err := skillDomain.SkillDeclarationFromDefinition(
+	declarationValue, err := skillSource.SkillDeclarationFromDefinition(
 		resolved.Definition,
 	)
 	if err != nil {
 		return ResolvedSkill{}, err
 	}
-	documentLocator, err := skillDomain.SourceDocumentLocator(
+	documentLocator, err := skillSource.SourceDocumentLocator(
 		declarationValue.Locator,
 		resolved.Artifact.Binding.Locator,
 	)
@@ -198,7 +198,7 @@ func Resolve(
 		)
 	}
 
-	documentValue, _, err := skillDomain.ParseSkillDocument(
+	documentValue, _, err := skillSource.ParseSkillDocument(
 		sourceEntry.Content,
 		string(resolved.Definition.LogicalName),
 	)
@@ -210,7 +210,7 @@ func Resolve(
 	if documentLocator != resolved.Artifact.Binding.Locator {
 		subresource = ""
 	}
-	packageLocator, err := skillDomain.RuntimePackageLocator(
+	packageLocator, err := skillSource.RuntimePackageLocator(
 		documentLocator,
 		subresource,
 	)

@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	mcpconfig "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/sourceformat/config"
 )
@@ -17,7 +17,7 @@ import (
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedMCPPackages()
 	if err != nil {
@@ -43,17 +43,17 @@ func Compile(
 
 func packageInputs(
 	values []PreparedPackage,
-) []install.PackageInput {
-	output := make([]install.PackageInput, 0, len(values))
+) []installFlow.PackageInput {
+	output := make([]installFlow.PackageInput, 0, len(values))
 
 	for _, value := range values {
 		expectations := make(
-			[]install.Expectation,
+			[]installFlow.Expectation,
 			0,
 			len(value.Expectations),
 		)
 		for _, expected := range value.Expectations {
-			expectations = append(expectations, install.Expectation{
+			expectations = append(expectations, installFlow.Expectation{
 				Locator:          expected.Locator,
 				Subresource:      expected.Subresource,
 				Kind:             expected.Kind,
@@ -63,7 +63,7 @@ func packageInputs(
 			})
 		}
 
-		output = append(output, install.PackageInput{
+		output = append(output, installFlow.PackageInput{
 			EmbeddedRoot: value.EmbeddedPackageRoot,
 			Address:      value.PackageAddress,
 			DocumentFile: value.DocumentFile,

@@ -11,7 +11,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 type LocatorRequest struct {
@@ -83,7 +83,7 @@ type ResolverOptions struct {
 	SourceEntries SourceEntryInspector
 
 	Locators        LocatorResolver
-	Interpretations *interpretation.Registry
+	Interpretations *coreinterpretation.Registry
 	Scope           ScopeBinding
 
 	// DirectCapabilities are application-supplied non-Artifact targets. They
@@ -104,7 +104,7 @@ type Resolver struct {
 	catalog         ArtifactCatalogReader
 	sourceEntries   SourceEntryInspector
 	locators        LocatorResolver
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
 	scope           ScopeBinding
 	limits          Limits
 

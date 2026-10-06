@@ -33,7 +33,7 @@ func (s *Service) GetDefaultProvider(
 	if err != nil {
 		return nil, err
 	}
-	return s.store.SelectDefaultProvider(
+	return s.store.Preferences.SelectDefaultProvider(
 		ctx,
 		value,
 		baseDefaultProviderName,
@@ -50,7 +50,7 @@ func (s *Service) SetDefaultProvider(
 	if err := s.ready(ctx); err != nil {
 		return err
 	}
-	if err := s.store.RequireSettableDefaultProvider(
+	if err := s.store.Preferences.RequireSettableDefaultProvider(
 		ctx,
 		provider,
 	); err != nil {

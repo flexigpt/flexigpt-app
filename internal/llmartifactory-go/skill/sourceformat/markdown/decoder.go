@@ -8,7 +8,7 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/domain"
+	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
 // Decoder adapts Agent Skills SKILL.md source packages to generic Skill
@@ -20,21 +20,21 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() spec.DecoderID {
-	return skillDomain.MarkdownDecoderID
+	return skillSource.MarkdownDecoderID
 }
 
 func (*Decoder) Revision() string {
-	return skillDomain.SkillSchemaVersion
+	return skillSource.SkillSchemaVersion
 }
 
 func (*Decoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
-	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
+	if !skillSource.IsSkillDefinitionFile(candidate.Locator) {
 		return ingestModel.RecognitionNone
 	}
-	if candidate.RequestsDecoder(skillDomain.MarkdownDecoderID) {
+	if candidate.RequestsDecoder(skillSource.MarkdownDecoderID) {
 		return ingestModel.RecognitionPreferred
 	}
 	return ingestModel.RecognitionPossible
@@ -44,12 +44,12 @@ func (*Decoder) Decode(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
+	if !skillSource.IsSkillDefinitionFile(candidate.Locator) {
 		return nil, nil
 	}
 
 	expectedName := expectedSkillName(candidate.Locator)
-	value, warnings, err := skillDomain.DecodeSkillDocument(
+	value, warnings, err := skillSource.DecodeSkillDocument(
 		candidate.Content,
 		expectedName,
 	)
@@ -83,7 +83,7 @@ func expectedSkillName(locator spec.Locator) string {
 	if address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(parent),
 	); err == nil &&
-		address.Kind == skillDomain.ManagedSkillPackageKind {
+		address.Kind == skillSource.ManagedSkillPackageKind {
 		return string(address.Name)
 	}
 	return path.Base(parent)

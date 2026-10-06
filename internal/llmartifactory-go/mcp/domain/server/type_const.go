@@ -10,8 +10,8 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
@@ -205,7 +205,7 @@ func (d ServerDocument) SecretInputTargets() (
 }
 
 func (d ServerDocument) AcceptsSecretTarget(
-	kind secretMCPDomain.MCPSecretKind,
+	kind secret.MCPSecretKind,
 	slot string,
 ) error {
 	if err := d.Validate(); err != nil {
@@ -217,7 +217,7 @@ func (d ServerDocument) AcceptsSecretTarget(
 	}
 
 	switch kind {
-	case secretMCPDomain.MCPSecretKindOAuthClientCredentials:
+	case secret.MCPSecretKindOAuthClientCredentials:
 		input := d.Configuration.Auth.ClientCredentialsInput
 		declaration, found := d.Configuration.Install.Inputs[input]
 		if input == "" ||
@@ -230,15 +230,15 @@ func (d ServerDocument) AcceptsSecretTarget(
 		}
 		return nil
 
-	case secretMCPDomain.MCPSecretKindStdioEnv, secretMCPDomain.MCPSecretKindHTTPHeader:
+	case secret.MCPSecretKindStdioEnv, secret.MCPSecretKindHTTPHeader:
 		targets, err := d.SecretInputTargets()
 		if err != nil {
 			return err
 		}
 		for _, target := range targets {
-			expectedKind := secretMCPDomain.MCPSecretKindStdioEnv
+			expectedKind := secret.MCPSecretKindStdioEnv
 			if target.Kind == SecretInputTargetHTTPHeader {
-				expectedKind = secretMCPDomain.MCPSecretKindHTTPHeader
+				expectedKind = secret.MCPSecretKindHTTPHeader
 			}
 			if expectedKind == kind &&
 				strings.EqualFold(target.Slot, normalizedSlot) {

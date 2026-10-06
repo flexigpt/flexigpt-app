@@ -2,11 +2,11 @@ package toolv1
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:  ToolType,
 		SchemaKey:        ToolSchemaKey,
 		SelectorEligible: true,

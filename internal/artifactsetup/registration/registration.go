@@ -3,15 +3,15 @@ package registration
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 type Selection struct {
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
 	schemaCodecs    []schema.Codec
 	decoders        []ingest.Decoder
-	locators        []locator.Factory
+	locators        []corelocator.Factory
 }
 
 func New() (*Selection, error) {
@@ -55,7 +55,7 @@ func New() (*Selection, error) {
 	if err != nil {
 		return nil, err
 	}
-	locators, err := locator.NewRegistry(factories...)
+	locators, err := corelocator.NewRegistry(factories...)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func New() (*Selection, error) {
 	}, nil
 }
 
-func (s *Selection) Interpretations() *interpretation.Registry {
+func (s *Selection) Interpretations() *coreinterpretation.Registry {
 	if s == nil {
 		return nil
 	}
@@ -89,9 +89,9 @@ func (s *Selection) Decoders() []ingest.Decoder {
 	return append([]ingest.Decoder(nil), s.decoders...)
 }
 
-func (s *Selection) LocatorFactories() []locator.Factory {
+func (s *Selection) LocatorFactories() []corelocator.Factory {
 	if s == nil {
 		return nil
 	}
-	return append([]locator.Factory(nil), s.locators...)
+	return append([]corelocator.Factory(nil), s.locators...)
 }

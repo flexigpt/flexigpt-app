@@ -64,12 +64,13 @@ type CompletionRequestBody struct {
 	// that this completion has no request-level runtime override.
 	RequestPatch *modelAggregate.RuntimeRequestPatch `json:"requestPatch,omitempty"`
 
-	// ToolSelections is the set of mapped Tool targets that should be enabled
-	// for this call.
+	// ToolSelections is the set of mapped Go or SDK Tool targets that should
+	// be enabled for this call.
 	//
-	// The aggregator always hydrates ToolChoices from Tool Aggregate based on
-	// this slice. It does not infer tools from History[i].ToolChoices or
-	// Current.ToolChoices.
+	// The inference aggregate hydrates Go Tools into local function choices
+	// and SDK Tools into provider-native choices. It does not infer tools from
+	// History[i].ToolChoices or Current.ToolChoices, and SDK Tools must never
+	// be passed to ToolRuntimeWrapper.
 	// (Those are persisted for UI/analytics only.)
 	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
 

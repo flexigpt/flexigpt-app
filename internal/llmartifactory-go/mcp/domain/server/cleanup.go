@@ -8,7 +8,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
 // SecretCleaner removes an opaque installation-local secret reference.
@@ -66,12 +66,12 @@ func CleanupUnboundServerSecrets(
 	}
 	candidates := make(map[string]struct{})
 	for _, target := range targets {
-		var kind secretMCPDomain.MCPSecretKind
+		var kind secret.MCPSecretKind
 		switch target.Kind {
 		case SecretInputTargetStdioEnv:
-			kind = secretMCPDomain.MCPSecretKindStdioEnv
+			kind = secret.MCPSecretKindStdioEnv
 		case SecretInputTargetHTTPHeader:
-			kind = secretMCPDomain.MCPSecretKindHTTPHeader
+			kind = secret.MCPSecretKindHTTPHeader
 		default:
 			return fmt.Errorf(
 				"%w: unsupported MCP secret target %q",
@@ -79,7 +79,7 @@ func CleanupUnboundServerSecrets(
 				target.Kind,
 			)
 		}
-		ref, err := secretMCPDomain.NewMCPSecretRefString(
+		ref, err := secret.NewMCPSecretRefString(
 			server,
 			kind,
 			target.Slot,
@@ -93,9 +93,9 @@ func CleanupUnboundServerSecrets(
 		if declaration.Kind != InputOAuthClientCredentials {
 			continue
 		}
-		ref, err := secretMCPDomain.NewMCPSecretRefString(
+		ref, err := secret.NewMCPSecretRefString(
 			server,
-			secretMCPDomain.MCPSecretKindOAuthClientCredentials,
+			secret.MCPSecretKindOAuthClientCredentials,
 			"clientCredentials",
 		)
 		if err != nil {
@@ -118,9 +118,9 @@ func CleanupUnboundServerSecrets(
 		output = errors.Join(output, cleaner.DeleteSecret(ctx, value))
 	}
 
-	tokenRef, err := secretMCPDomain.NewMCPSecretRefString(
+	tokenRef, err := secret.NewMCPSecretRefString(
 		server,
-		secretMCPDomain.MCPSecretKindOAuthToken,
+		secret.MCPSecretKindOAuthToken,
 		"token",
 	)
 	if err != nil {

@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 // Artifactory is the LLM-domain attachment to one assembled generic Artifact
@@ -20,8 +20,8 @@ type Artifactory struct {
 
 	schemaCodecs     []schema.Codec
 	decoders         []ingest.Decoder
-	locatorFactories []locator.Factory
-	interpretations  *interpretation.Registry
+	locatorFactories []corelocator.Factory
+	interpretations  *coreinterpretation.Registry
 	composition      *composition.Resolver
 
 	mu     sync.RWMutex
@@ -59,7 +59,7 @@ func (a *Artifactory) Decoders() []ingest.Decoder {
 // LocatorFactories returns the registered LLM declaration locator factories.
 // Family services bind these through the composition locator owner rather than
 // constructing private locator registries.
-func (a *Artifactory) LocatorFactories() []locator.Factory {
+func (a *Artifactory) LocatorFactories() []corelocator.Factory {
 	if a == nil {
 		return nil
 	}
@@ -68,10 +68,10 @@ func (a *Artifactory) LocatorFactories() []locator.Factory {
 	if a.closed {
 		return nil
 	}
-	return append([]locator.Factory(nil), a.locatorFactories...)
+	return append([]corelocator.Factory(nil), a.locatorFactories...)
 }
 
-func (a *Artifactory) Interpretations() *interpretation.Registry {
+func (a *Artifactory) Interpretations() *coreinterpretation.Registry {
 	if a == nil {
 		return nil
 	}

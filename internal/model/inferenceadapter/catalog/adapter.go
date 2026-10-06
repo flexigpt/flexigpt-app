@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
@@ -41,7 +41,7 @@ type preparedModel struct {
 // independent source-backed Model Provider and Model packages.
 func PreparePackages(
 	ctx context.Context,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) ([]modelcatalog.PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(

@@ -10,7 +10,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
@@ -54,7 +54,7 @@ type ArtifactExpectation struct {
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -102,7 +102,7 @@ func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(
 		ctx,
@@ -171,7 +171,7 @@ func preparePackage(
 func canonicalPluginExpectations(
 	documentFile spec.Locator,
 	document []byte,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) ([]ArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,

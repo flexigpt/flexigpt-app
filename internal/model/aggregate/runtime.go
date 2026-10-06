@@ -13,8 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
+	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
@@ -36,13 +36,13 @@ type RuntimeConfiguration struct {
 type RuntimeResolver interface {
 	ResolveRuntime(
 		ctx context.Context,
-		resolved modelConsumerAPI.ResolvedModel,
+		resolved modelAPI.ResolvedModel,
 		requestPatch PreparedRuntimeRequestPatch,
 	) (RuntimeConfiguration, error)
 
 	ResolveProviderRuntime(
 		ctx context.Context,
-		resolved modelConsumerAPI.ResolvedProvider,
+		resolved modelAPI.ResolvedProvider,
 	) (inferenceSpec.ProviderParam, error)
 }
 

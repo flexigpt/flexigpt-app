@@ -8,8 +8,8 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 )
 
@@ -19,15 +19,15 @@ type MCPSettingsView struct {
 }
 
 type MCPStoreWrapper struct {
-	api        *mcpConsumerAPI.API
-	management *mcpConsumerAPI.MCPListService
+	api        *mcpAPI.Service
+	management *mcpAPI.MCPListService
 	roots      root.API
 	settings   *mcpSettingsAdapter
 }
 
 func withMCPStore[T any](
 	w *MCPStoreWrapper,
-	fn func(*mcpConsumerAPI.API) (T, error),
+	fn func(*mcpAPI.Service) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -40,7 +40,7 @@ func withMCPStore[T any](
 
 func withMCPStoreManagement[T any](
 	w *MCPStoreWrapper,
-	fn func(*mcpConsumerAPI.MCPListService) (T, error),
+	fn func(*mcpAPI.MCPListService) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -53,9 +53,9 @@ func withMCPStoreManagement[T any](
 
 func (w *MCPStoreWrapper) ListMCPServers(
 	rootID rootModel.RootID,
-) ([]mcpConsumerAPI.ServerListItem, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.ServerListItem, error) {
-		return api.ListServers(context.Background(), mcpConsumerAPI.ListServersRequest{
+) ([]mcpAPI.ServerListItem, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) ([]mcpAPI.ServerListItem, error) {
+		return api.ListServers(context.Background(), mcpAPI.ListServersRequest{
 			RootID: rootID,
 		})
 	})
@@ -63,9 +63,9 @@ func (w *MCPStoreWrapper) ListMCPServers(
 
 func (w *MCPStoreWrapper) ListMCPPolicies(
 	rootID rootModel.RootID,
-) ([]mcpConsumerAPI.PolicyListItem, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.PolicyListItem, error) {
-		return api.ListPolicies(context.Background(), mcpConsumerAPI.ListPoliciesRequest{
+) ([]mcpAPI.PolicyListItem, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) ([]mcpAPI.PolicyListItem, error) {
+		return api.ListPolicies(context.Background(), mcpAPI.ListPoliciesRequest{
 			RootID: rootID,
 		})
 	})
@@ -74,10 +74,10 @@ func (w *MCPStoreWrapper) ListMCPPolicies(
 func (w *MCPStoreWrapper) ListMCPPluginsPage(
 	pageSize int,
 	pageToken string,
-) (mcpConsumerAPI.PluginPage, error) {
+) (mcpAPI.PluginPage, error) {
 	return withMCPStoreManagement(
 		w,
-		func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.PluginPage, error) {
+		func(service *mcpAPI.MCPListService) (mcpAPI.PluginPage, error) {
 			return service.ListPluginsPage(context.Background(), pageSize, pageToken)
 		},
 	)
@@ -86,8 +86,8 @@ func (w *MCPStoreWrapper) ListMCPPluginsPage(
 func (w *MCPStoreWrapper) ListMCPServersPage(
 	pageSize int,
 	pageToken string,
-) (mcpConsumerAPI.ServerPage, error) {
-	return withMCPStoreManagement(w, func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.ServerPage, error) {
+) (mcpAPI.ServerPage, error) {
+	return withMCPStoreManagement(w, func(service *mcpAPI.MCPListService) (mcpAPI.ServerPage, error) {
 		return service.ListServersPage(context.Background(), pageSize, pageToken)
 	})
 }
@@ -138,27 +138,27 @@ func (w *MCPStoreWrapper) SaveMCPSettings(
 
 func (w *MCPStoreWrapper) GetMCPServerSecrets(
 	ref artifactModel.ArtifactRef,
-) (mcpConsumerAPI.ServerSecretsView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ServerSecretsView, error) {
+) (mcpAPI.ServerSecretsView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (mcpAPI.ServerSecretsView, error) {
 		return api.GetServerSecrets(context.Background(), ref)
 	})
 }
 
 func (w *MCPStoreWrapper) GetMCPPolicy(
 	ref artifactModel.ArtifactRef,
-) (mcpConsumerAPI.PolicyView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.PolicyView, error) {
+) (mcpAPI.PolicyView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (mcpAPI.PolicyView, error) {
 		return api.GetMCPPolicy(context.Background(), ref)
 	})
 }
 
 func (w *MCPStoreWrapper) CreateMCPPlugin(
-	request plugin.CreateRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.CreateRequest,
+) (pluginAPI.PluginView, error) {
 	return withRecoveryResp(
-		func() (plugin.PluginView, error) {
+		func() (pluginAPI.PluginView, error) {
 			if w == nil || w.api == nil {
-				return plugin.PluginView{}, spec.ErrClosed
+				return pluginAPI.PluginView{}, spec.ErrClosed
 			}
 
 			// A blank RootID means "create in the retained user Root". The
@@ -166,13 +166,13 @@ func (w *MCPStoreWrapper) CreateMCPPlugin(
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {
-					return plugin.PluginView{}, spec.ErrClosed
+					return pluginAPI.PluginView{}, spec.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
 					topology.UserRootDraft(),
 				); err != nil {
-					return plugin.PluginView{}, err
+					return pluginAPI.PluginView{}, err
 				}
 				request.RootID = topology.UserRootID()
 			}
@@ -187,8 +187,8 @@ func (w *MCPStoreWrapper) CreateMCPPlugin(
 
 func (w *MCPStoreWrapper) GetMCPPlugin(
 	ref artifactModel.ArtifactRef,
-) (plugin.PluginView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 		return api.GetMCPPlugin(context.Background(), ref)
 	})
 }
@@ -197,10 +197,10 @@ func (w *MCPStoreWrapper) SetMCPPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
 	return withMCPStore(
 		w,
-		func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 			return api.SetMCPPluginEnabled(
 				context.Background(),
 				ref,
@@ -213,18 +213,18 @@ func (w *MCPStoreWrapper) SetMCPPluginEnabled(
 
 func (w *MCPStoreWrapper) ListMCPPlugins(
 	rootID rootModel.RootID,
-) ([]plugin.ListItem, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]plugin.ListItem, error) {
+) ([]pluginAPI.ListItem, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) ([]pluginAPI.ListItem, error) {
 		return api.ListMCPPlugins(context.Background(), rootID)
 	})
 }
 
 func (w *MCPStoreWrapper) ListMCPPluginMemberships(
 	ref artifactModel.ArtifactRef,
-) ([]plugin.ArtifactMembershipView, error) {
+) ([]pluginAPI.ArtifactMembershipView, error) {
 	return withMCPStore(
 		w,
-		func(api *mcpConsumerAPI.API) ([]plugin.ArtifactMembershipView, error) {
+		func(api *mcpAPI.Service) ([]pluginAPI.ArtifactMembershipView, error) {
 			return api.ListMCPPluginMemberships(
 				context.Background(),
 				ref,
@@ -234,39 +234,39 @@ func (w *MCPStoreWrapper) ListMCPPluginMemberships(
 }
 
 func (w *MCPStoreWrapper) UpdateMCPPlugin(
-	request plugin.UpdateRequest,
-) (plugin.PluginView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+	request pluginAPI.UpdateRequest,
+) (pluginAPI.PluginView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 		return api.UpdateMCPPlugin(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPPluginMember(
-	request plugin.AddMemberRequest,
-) (plugin.PluginView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+	request pluginAPI.AddMemberRequest,
+) (pluginAPI.PluginView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 		return api.AddMCPPluginMember(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) AddMCPServerToPlugin(
-	request plugin.AddArtifactMemberRequest,
-) (plugin.PluginView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+	request pluginAPI.AddArtifactMemberRequest,
+) (pluginAPI.PluginView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 		return api.AddMCPServerToPlugin(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) RemoveMCPPluginMember(
-	request plugin.RemoveMemberRequest,
-) (plugin.PluginView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (plugin.PluginView, error) {
+	request pluginAPI.RemoveMemberRequest,
+) (pluginAPI.PluginView, error) {
+	return withMCPStore(w, func(api *mcpAPI.Service) (pluginAPI.PluginView, error) {
 		return api.RemoveMCPPluginMember(context.Background(), request)
 	})
 }
 
 func (w *MCPStoreWrapper) DeleteMCPPlugin(
-	request plugin.DeleteRequest,
+	request pluginAPI.DeleteRequest,
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {

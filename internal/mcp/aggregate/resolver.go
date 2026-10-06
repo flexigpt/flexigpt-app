@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
@@ -13,11 +13,11 @@ import (
 // ArtifactServerResolver translates a runtime-owned opaque ServerID only at
 // the Aggregate boundary, then delegates Store resolution to the narrow port.
 type ArtifactServerResolver struct {
-	store mcpConsumerAPI.ServerStore
+	store mcpAPI.ServerStore
 }
 
 func NewArtifactServerResolver(
-	store mcpConsumerAPI.ServerStore,
+	store mcpAPI.ServerStore,
 ) (*ArtifactServerResolver, error) {
 	if store == nil {
 		return nil, errors.New("MCP server Store is required")

@@ -4,11 +4,11 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:          WorkflowType,
 		SchemaKey:                WorkflowSchemaKey,
 		SelectorEligible:         true,
@@ -27,7 +27,7 @@ func Interpretation() interpretation.Registration {
 
 func workflowRelationships(
 	entry declaration.Entry,
-) ([]interpretation.Relationship, error) {
+) ([]coreinterpretation.Relationship, error) {
 	document, err := DecodeAdmittedWorkflowEntry(entry)
 	if err != nil {
 		return nil, err
@@ -38,19 +38,19 @@ func workflowRelationships(
 		return nodes[left].ID < nodes[right].ID
 	})
 
-	output := make([]interpretation.Relationship, 0, len(nodes))
+	output := make([]coreinterpretation.Relationship, 0, len(nodes))
 	for _, node := range nodes {
-		segment, err := stableWorkflowNodeSegment(node.ID)
+		segment, err := NodeRelationshipSegment(node.ID)
 		if err != nil {
 			return nil, err
 		}
-		value, err := interpretation.NewMemberRelationship(
+		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{
 				"nodes",
 				segment,
 			},
 			node.Member,
-			interpretation.MemberOptions{},
+			coreinterpretation.MemberOptions{},
 		)
 		if err != nil {
 			return nil, err

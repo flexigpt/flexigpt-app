@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -23,10 +23,24 @@ type YAMLDecoder struct {
 	core *canonicalDecoder
 }
 
-func NewYAMLDecoder(registry *interpretation.Registry) *YAMLDecoder {
+func NewYAMLDecoder(registry *coreinterpretation.Registry) *YAMLDecoder {
 	return &YAMLDecoder{
-		core: newCanonicalDecoder(registry),
+		core: newCanonicalDecoder(registry, nil),
 	}
+}
+
+// NewYAMLDecoderForSchemaKeys constructs a canonical YAML decoder that
+// dispatches only the supplied complete schema keys while retaining the full
+// registry for family semantic reconstruction.
+func NewYAMLDecoderForSchemaKeys(
+	registry *coreinterpretation.Registry,
+	keys []schemaModel.Key,
+) (*YAMLDecoder, error) {
+	core := newCanonicalDecoder(registry, keys)
+	if core.selectionErr != nil {
+		return nil, core.selectionErr
+	}
+	return &YAMLDecoder{core: core}, nil
 }
 
 func (*YAMLDecoder) ID() spec.DecoderID {
@@ -86,8 +100,7 @@ func (d *YAMLDecoder) Recognize(
 		}
 		return ingestModel.RecognitionNone
 	}
-	if d == nil || d.core == nil || d.core.interpretations == nil ||
-		!d.core.interpretations.SupportsType(header.Type) {
+	if d == nil || d.core == nil || !d.core.SupportsType(header.Type) {
 		if requested {
 			return ingestModel.RecognitionPossible
 		}

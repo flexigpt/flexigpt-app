@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 )
 
@@ -30,7 +30,7 @@ func (s *Service) SetMCPServerSecret(
 		return MCPServerDetails{}, err
 	}
 
-	if kind == secretMCPDomain.MCPSecretKindOAuthClientCredentials {
+	if kind == secret.MCPSecretKindOAuthClientCredentials {
 		if err := mcpAuth.ValidateOAuthClientCredentialsSecret(
 			value,
 			resolved.Document.OAuthClientSecretRequired(),
@@ -38,7 +38,7 @@ func (s *Service) SetMCPServerSecret(
 			return MCPServerDetails{}, err
 		}
 	}
-	if kind == secretMCPDomain.MCPSecretKindHTTPHeader &&
+	if kind == secret.MCPSecretKindHTTPHeader &&
 		(strings.TrimSpace(value) == "" ||
 			strings.ContainsAny(value, "\r\n\x00")) {
 		return MCPServerDetails{}, fmt.Errorf(
@@ -47,7 +47,7 @@ func (s *Service) SetMCPServerSecret(
 		)
 	}
 
-	secretRef, err := secretMCPDomain.NewMCPSecretRefString(
+	secretRef, err := secret.NewMCPSecretRefString(
 		ref,
 		kind,
 		slot,
@@ -113,7 +113,7 @@ func (s *Service) serverSecretTarget(
 	input string,
 ) (
 	serverMCPDomain.Resolved,
-	secretMCPDomain.MCPSecretKind,
+	secret.MCPSecretKind,
 	string,
 	error,
 ) {
@@ -141,7 +141,7 @@ func (s *Service) serverSecretTarget(
 			)
 		}
 		return resolved,
-			secretMCPDomain.MCPSecretKindOAuthClientCredentials,
+			secret.MCPSecretKindOAuthClientCredentials,
 			"clientCredentials",
 			nil
 
@@ -160,12 +160,12 @@ func (s *Service) serverSecretTarget(
 		}
 		if target.Kind == serverMCPDomain.SecretInputTargetHTTPHeader {
 			return resolved,
-				secretMCPDomain.MCPSecretKindHTTPHeader,
+				secret.MCPSecretKindHTTPHeader,
 				target.Slot,
 				nil
 		}
 		return resolved,
-			secretMCPDomain.MCPSecretKindStdioEnv,
+			secret.MCPSecretKindStdioEnv,
 			target.Slot,
 			nil
 

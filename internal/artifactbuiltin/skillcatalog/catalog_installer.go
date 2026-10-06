@@ -3,7 +3,7 @@ package skillcatalog
 import (
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 )
 
@@ -12,7 +12,7 @@ type InstallerDependencies struct {
 }
 
 type Installer struct {
-	*install.CatalogInstaller
+	*installFlow.CatalogInstaller
 }
 
 func NewInstaller(
@@ -27,7 +27,7 @@ func NewInstaller(
 		return nil, err
 	}
 
-	value, err := install.NewCatalogInstaller(
+	value, err := installFlow.NewCatalogInstaller(
 		set,
 		dependencies.Hydrator,
 		nil,

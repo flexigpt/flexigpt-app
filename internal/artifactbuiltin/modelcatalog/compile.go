@@ -3,17 +3,17 @@ package modelcatalog
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 	prepared []PreparedPackage,
 ) (installModel.CompiledPackageSet, error) {
 	values, err := NormalizePreparedPackages(prepared)
@@ -36,15 +36,15 @@ func Compile(
 
 func packageInputs(
 	values []PreparedPackage,
-) []install.PackageInput {
-	output := make([]install.PackageInput, 0, len(values))
+) []installFlow.PackageInput {
+	output := make([]installFlow.PackageInput, 0, len(values))
 	for _, value := range values {
-		output = append(output, install.PackageInput{
+		output = append(output, installFlow.PackageInput{
 			EmbeddedRoot: value.EmbeddedPackageRoot,
 			Address:      value.Address,
 			DocumentFile: value.DocumentFile,
 			Files:        value.PackageFiles,
-			Expectations: []install.Expectation{{
+			Expectations: []installFlow.Expectation{{
 				Locator:          value.DocumentFile,
 				Kind:             value.ExpectedKind,
 				LogicalName:      value.ExpectedLogicalName,

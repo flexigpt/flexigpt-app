@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -22,7 +22,7 @@ type ArtifactOverlayDependencies struct {
 	Artifacts        artifact.API
 	Protection       root.ProtectionAPI
 	ProtectedOverlay overlay.API
-	Secrets          secret.API
+	Secrets          storeSecret.API
 	LocalState       artifactcleanupFlow.API
 }
 
@@ -30,7 +30,7 @@ type ArtifactOverlayRepository struct {
 	artifacts        artifact.API
 	protection       root.ProtectionAPI
 	protectedOverlay overlay.API
-	secrets          secret.API
+	secrets          storeSecret.API
 	localState       artifactcleanupFlow.API
 }
 

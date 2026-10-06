@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
@@ -16,7 +16,7 @@ func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
 	goTools toolDomain.GoToolLocator,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
 	packages, err := artifactbuiltin.EmbeddedToolPackages()
 	if err != nil {
@@ -39,16 +39,16 @@ func Compile(
 
 func packageInputs(
 	values []PreparedPackage,
-) []install.PackageInput {
-	output := make([]install.PackageInput, 0, len(values))
+) []installFlow.PackageInput {
+	output := make([]installFlow.PackageInput, 0, len(values))
 
 	for _, value := range values {
-		output = append(output, install.PackageInput{
+		output = append(output, installFlow.PackageInput{
 			EmbeddedRoot: value.EmbeddedPackageRoot,
 			Address:      value.Address,
 			DocumentFile: value.DocumentFile,
 			Files:        value.PackageFiles,
-			Expectations: []install.Expectation{{
+			Expectations: []installFlow.Expectation{{
 				Locator:          value.DocumentFile,
 				Kind:             value.ExpectedKind,
 				LogicalName:      value.ExpectedLogicalName,

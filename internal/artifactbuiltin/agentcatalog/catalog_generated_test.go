@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 )
 
@@ -19,7 +19,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile embedded Agent packages: %v", err)
 	}
 
-	_, expectedFingerprint, err := install.CanonicalGeneratedPackageSet(expected)
+	_, expectedFingerprint, err := installFlow.CanonicalGeneratedPackageSet(expected)
 	if err != nil {
 		t.Fatalf("fingerprint expected generated Agent catalog: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile embedded Agent packages again: %v", err)
 	}
 
-	_, recompiledFingerprint, err := install.CanonicalGeneratedPackageSet(recompiled)
+	_, recompiledFingerprint, err := installFlow.CanonicalGeneratedPackageSet(recompiled)
 	if err != nil {
 		t.Fatalf(
 			"fingerprint repeated generated Agent catalog: %v",

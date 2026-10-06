@@ -9,7 +9,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 const pathFactoryRevision = "artifact-path-locator/v1"
@@ -17,12 +17,12 @@ const pathFactoryRevision = "artifact-path-locator/v1"
 // PathFactory resolves portable scalar and typed path locators against the
 // declaring Artifact's Source. It reads committed catalog state only.
 type PathFactory struct {
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
 	kinds           []artifactModel.ArtifactKind
 }
 
 func NewPathFactory(
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) (*PathFactory, error) {
 	if interpretations == nil {
 		return nil, fmt.Errorf(
@@ -93,7 +93,7 @@ func (p *PathFactory) Bind(
 
 type pathResolver struct {
 	runtime         Runtime
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
 }
 
 func (r *pathResolver) Resolve(

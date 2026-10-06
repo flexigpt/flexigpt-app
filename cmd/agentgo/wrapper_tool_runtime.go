@@ -74,9 +74,11 @@ func withToolRuntime[T any](
 	})
 }
 
-// InvokeTool is the low-level runtime endpoint. Normal frontend flows should
-// usually call ToolAggregateWrapper.InvokeMappedTool so artifact identity
-// and enablement are resolved before execution.
+// InvokeTool is the low-level local Go Tool runtime endpoint.
+//
+// It deliberately accepts only a Go function identity. SDK Tools are not
+// local executables: normal inference flows hydrate them through
+// ToolAggregateWrapper.HydrateInferenceToolChoice.
 func (w *ToolRuntimeWrapper) InvokeTool(
 	request *ToolRuntimeInvokeRequest,
 ) (*toolRuntime.InvokeResponse, error) {

@@ -5,16 +5,16 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
 
 type WorkspaceRuntimeWrapper struct {
-	api *workspaceConsumerAPI.StoreAPI
+	api *workspaceAPI.Service
 }
 
 func withWorkspaceRuntime[T any](
 	w *WorkspaceRuntimeWrapper,
-	fn func(*workspaceConsumerAPI.StoreAPI) (T, error),
+	fn func(*workspaceAPI.Service) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -28,10 +28,10 @@ func withWorkspaceRuntime[T any](
 func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
-) (workspaceConsumerAPI.WorkspacePromptPlan, error) {
+) (workspaceAPI.WorkspacePromptPlan, error) {
 	return withWorkspaceRuntime(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspacePromptPlan, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspacePromptPlan, error) {
 			return api.ComposeWorkspacePrompt(
 				context.Background(),
 				workspace,
@@ -44,10 +44,10 @@ func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
-) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error) {
+) (workspaceAPI.WorkspaceSkillLoadPlan, error) {
 	return withWorkspaceRuntime(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceSkillLoadPlan, error) {
 			return api.LoadWorkspaceSkills(
 				context.Background(),
 				workspace,
@@ -60,10 +60,10 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
-) (workspaceConsumerAPI.WorkspaceMCPServerLoadPlan, error) {
+) (workspaceAPI.WorkspaceMCPServerLoadPlan, error) {
 	return withWorkspaceRuntime(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceMCPServerLoadPlan, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceMCPServerLoadPlan, error) {
 			return api.LoadWorkspaceMCPServers(
 				context.Background(),
 				workspace,
@@ -75,11 +75,11 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
 
 func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceRuntimePlan(
 	workspace artifactModel.ArtifactRef,
-	selection workspaceConsumerAPI.WorkspaceRuntimeSelection,
-) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
+	selection workspaceAPI.WorkspaceRuntimeSelection,
+) (workspaceAPI.WorkspaceRuntimePlan, error) {
 	return withWorkspaceRuntime(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceRuntimePlan, error) {
 			return api.ResolveWorkspaceRuntimePlan(
 				context.Background(),
 				workspace,

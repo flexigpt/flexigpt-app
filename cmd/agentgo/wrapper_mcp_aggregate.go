@@ -5,7 +5,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -127,22 +127,22 @@ func (w *MCPAggregateWrapper) ClearMCPServerSecret(
 }
 
 func (w *MCPAggregateWrapper) CreateMCPServer(
-	request mcpConsumerAPI.ManagedMCPCreateRequest,
-) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+	request mcpAPI.ManagedMCPCreateRequest,
+) (mcpAPI.ManagedMCPCreateResult, error) {
 	return withMCPAggregate(
 		w,
-		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+		func(service *mcpAggregate.Service) (mcpAPI.ManagedMCPCreateResult, error) {
 			return service.CreateMCPServer(context.Background(), request)
 		},
 	)
 }
 
 func (w *MCPAggregateWrapper) UpdateMCPServer(
-	request mcpConsumerAPI.ManagedMCPReplaceRequest,
-) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+	request mcpAPI.ManagedMCPReplaceRequest,
+) (mcpAPI.ManagedMCPReplaceResult, error) {
 	return withMCPAggregate(
 		w,
-		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+		func(service *mcpAggregate.Service) (mcpAPI.ManagedMCPReplaceResult, error) {
 			return service.UpdateMCPServer(context.Background(), request)
 		},
 	)
@@ -162,11 +162,11 @@ func (w *MCPAggregateWrapper) DeleteMCPServer(
 }
 
 func (w *MCPAggregateWrapper) SaveMCPPolicy(
-	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
-) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+	request mcpAPI.ManagedMCPPolicyUpsertRequest,
+) (mcpAPI.ManagedMCPPolicyUpsertResult, error) {
 	return withMCPAggregate(
 		w,
-		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+		func(service *mcpAggregate.Service) (mcpAPI.ManagedMCPPolicyUpsertResult, error) {
 			return service.SaveMCPPolicy(context.Background(), request)
 		},
 	)

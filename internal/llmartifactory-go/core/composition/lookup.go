@@ -12,14 +12,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 func (r *Resolver) resolveRelationship(
 	ctx context.Context,
 	state *resolutionState,
 	rootID rootModel.RootID,
-	fact interpretation.Relationship,
+	fact coreinterpretation.Relationship,
 	from *artifactModel.Artifact,
 	depth int,
 ) (ResolvedRelationship, error) {
@@ -549,7 +549,7 @@ func (r *Resolver) resolveContainedMember(
 	ctx context.Context,
 	state *resolutionState,
 	rootID rootModel.RootID,
-	fact interpretation.Relationship,
+	fact coreinterpretation.Relationship,
 	from *artifactModel.Artifact,
 	depth int,
 ) (*ResolvedEntry, error) {
@@ -643,7 +643,7 @@ func (r *Resolver) resolveContainedMember(
 
 func containedMemberSubresource(
 	parent artifactModel.Artifact,
-	fact interpretation.Relationship,
+	fact coreinterpretation.Relationship,
 ) (spec.SubresourceLocator, error) {
 	value := spec.SubresourceLocator(
 		strings.Join(fact.ContainedPath, "/"),

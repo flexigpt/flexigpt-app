@@ -20,6 +20,11 @@ const (
 	ToolSchemaVersion                  = declaration.SchemaVersionV1
 )
 
+// ImplementationKind identifies the runtime owner of a Tool declaration.
+//
+// Go Tools are invoked by FlexiGPT's local Tool runtime. SDK Tools are
+// provider-native inference ToolChoices and are hydrated for an inference
+// request; they are never routed through the local Go Tool runtime.
 type ImplementationKind string
 
 const (
@@ -27,6 +32,7 @@ const (
 	ImplementationKindSDK ImplementationKind = "sdk"
 )
 
+// SDKToolType identifies the provider-native ToolChoice representation.
 type SDKToolType string
 
 const (
@@ -46,6 +52,10 @@ var ToolSchemaKey = schemaModel.ArtifactKey(
 	ToolSchemaVersion,
 )
 
+// ToolImplementation declares one of the two supported Tool implementations.
+//
+// Go uses Function. SDK uses SDKType and SDKToolType. The mutually exclusive
+// shape is enforced by both the declaration schema and Validate.
 type ToolImplementation struct {
 	Kind ImplementationKind `json:"kind"`
 

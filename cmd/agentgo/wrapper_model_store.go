@@ -19,19 +19,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 )
 
 type ModelStoreWrapper struct {
-	api        *modelConsumerAPI.API
-	management *modelConsumerAPI.CatalogStore
+	api        *modelAPI.Service
 	roots      root.API
 	protection root.ProtectionAPI
 }
@@ -47,8 +46,8 @@ func initModelWrappers(
 	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	protectedOverlays overlay.API,
-	secretBindings secret.API,
-	secretRuntime secret.RuntimeAPI,
+	secretBindings storeSecret.API,
+	secretRuntime storeSecret.RuntimeAPI,
 	localState artifactcleanupFlow.API,
 	storeOverlays overlay.StoreAPI,
 	cat catalog.API,
@@ -98,7 +97,7 @@ func initModelWrappers(
 		return nil, err
 	}
 
-	api, err := modelConsumerAPI.New(modelConsumerAPI.Dependencies{
+	api, err := modelAPI.New(modelAPI.Dependencies{
 		Artifacts:   artifacts,
 		Cat:         cat,
 		Definitions: definitions,
@@ -114,23 +113,15 @@ func initModelWrappers(
 	if err != nil {
 		return nil, err
 	}
-	management, err := modelConsumerAPI.NewManagementStore(api)
-	if err != nil {
-		return nil, err
-	}
-	c, err := modelConsumerAPI.NewCatalogStore(api)
-	if err != nil {
-		return nil, err
-	}
 	aggregateService, err := modelAggregate.New(
-		management,
+		api,
 		runtimeAdapter,
 		preferences,
 	)
 	if err != nil {
 		return nil, err
 	}
-	cleanup, err := modelConsumerAPI.NewBuiltinPackageCleanup(api)
+	cleanup, err := modelAPI.NewBuiltinPackageCleanup(api)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +136,6 @@ func initModelWrappers(
 	}
 
 	storeWrapper.api = api
-	storeWrapper.management = c
 	storeWrapper.roots = roots
 	storeWrapper.protection = protection
 	aggregateWrapper.service = aggregateService
@@ -156,8 +146,8 @@ func initModelWrappers(
 
 func (w *ModelStoreWrapper) ListProviders(
 	rootID rootModel.RootID,
-) ([]modelConsumerAPI.ProviderListItem, error) {
-	if w == nil || w.management == nil {
+) ([]modelAPI.ProviderListItem, error) {
+	if w == nil || w.api == nil {
 		return nil, spec.ErrClosed
 	}
 
@@ -167,9 +157,11 @@ func (w *ModelStoreWrapper) ListProviders(
 		return nil, err
 	}
 
-	output := make([]modelConsumerAPI.ProviderListItem, 0)
+	output := make([]modelAPI.ProviderListItem, 0)
 	for _, currentRoot := range roots {
-		values, err := w.management.ListProviders(ctx, currentRoot)
+		values, err := w.api.Providers.List(ctx, modelAPI.ListProvidersRequest{
+			RootID: currentRoot,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -180,8 +172,8 @@ func (w *ModelStoreWrapper) ListProviders(
 
 func (w *ModelStoreWrapper) ListModels(
 	rootID rootModel.RootID,
-) ([]modelConsumerAPI.ModelListItem, error) {
-	if w == nil || w.management == nil {
+) ([]modelAPI.ModelListItem, error) {
+	if w == nil || w.api == nil {
 		return nil, spec.ErrClosed
 	}
 
@@ -191,9 +183,11 @@ func (w *ModelStoreWrapper) ListModels(
 		return nil, err
 	}
 
-	output := make([]modelConsumerAPI.ModelListItem, 0)
+	output := make([]modelAPI.ModelListItem, 0)
 	for _, currentRoot := range roots {
-		values, err := w.management.ListModels(ctx, currentRoot)
+		values, err := w.api.Models.List(ctx, modelAPI.ListModelsRequest{
+			RootID: currentRoot,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -204,40 +198,40 @@ func (w *ModelStoreWrapper) ListModels(
 
 func (w *ModelStoreWrapper) GetProvider(
 	ref artifactModel.ArtifactRef,
-) (modelConsumerAPI.ProviderView, error) {
+) (modelAPI.ProviderView, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
+		return modelAPI.ProviderView{}, spec.ErrClosed
 	}
-	return w.api.GetProvider(context.Background(), ref)
+	return w.api.Providers.Get(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) GetModel(
 	ref artifactModel.ArtifactRef,
-) (modelConsumerAPI.ModelView, error) {
+) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.GetModel(context.Background(), ref)
+	return w.api.Models.Get(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) SaveModelSettings(
-	request modelConsumerAPI.SaveModelSettingsRequest,
-) (modelConsumerAPI.ModelView, error) {
+	request modelAPI.SaveModelSettingsRequest,
+) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.SaveModelSettings(context.Background(), request)
+	return w.api.Models.Settings.Save(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) ResetModelSettings(
 	ref artifactModel.ArtifactRef,
 	expectedModelRevision uint64,
 	expectedSettingsRevision uint64,
-) (modelConsumerAPI.ModelView, error) {
+) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.ResetModelSettings(
+	return w.api.Models.Settings.Reset(
 		context.Background(),
 		ref,
 		expectedModelRevision,
@@ -247,18 +241,18 @@ func (w *ModelStoreWrapper) ResetModelSettings(
 
 func (w *ModelStoreWrapper) GetProviderAPIKeyStatus(
 	ref artifactModel.ArtifactRef,
-) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
+) (modelAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
+		return modelAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
-	return w.api.GetProviderAPIKeyStatus(context.Background(), ref)
+	return w.api.Providers.Credentials.Status(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) CreateModel(
-	request modelConsumerAPI.ManagedModelCreateRequest,
-) (modelConsumerAPI.ManagedModelCreateResult, error) {
+	request modelAPI.ManagedModelCreateRequest,
+) (modelAPI.ManagedModelCreateResult, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ManagedModelCreateResult{}, spec.ErrClosed
+		return modelAPI.ManagedModelCreateResult{}, spec.ErrClosed
 	}
 
 	rootID, err := w.writableManagementRoot(
@@ -266,19 +260,19 @@ func (w *ModelStoreWrapper) CreateModel(
 		request.RootID,
 	)
 	if err != nil {
-		return modelConsumerAPI.ManagedModelCreateResult{}, err
+		return modelAPI.ManagedModelCreateResult{}, err
 	}
 	request.RootID = rootID
-	return w.api.CreateModel(context.Background(), request)
+	return w.api.Models.Packages.Create(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) UpdateModel(
-	request modelConsumerAPI.ManagedModelReplaceRequest,
-) (modelConsumerAPI.ManagedModelReplaceResult, error) {
+	request modelAPI.ManagedModelReplaceRequest,
+) (modelAPI.ManagedModelReplaceResult, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ManagedModelReplaceResult{}, spec.ErrClosed
+		return modelAPI.ManagedModelReplaceResult{}, spec.ErrClosed
 	}
-	return w.api.ReplaceModel(context.Background(), request)
+	return w.api.Models.Packages.Replace(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) DeleteModel(
@@ -288,7 +282,7 @@ func (w *ModelStoreWrapper) DeleteModel(
 	if w == nil || w.api == nil {
 		return spec.ErrClosed
 	}
-	return w.api.DeleteModel(
+	return w.api.Models.Packages.Delete(
 		context.Background(),
 		ref,
 		expectedRevision,
@@ -303,7 +297,7 @@ func (w *ModelStoreWrapper) SetModelEnabled(
 	if w == nil || w.api == nil {
 		return artifactModel.Artifact{}, spec.ErrClosed
 	}
-	return w.api.SetModelEnabled(
+	return w.api.Models.SetEnabled(
 		context.Background(),
 		ref,
 		expectedRevision,
@@ -365,7 +359,6 @@ func (w *ModelStoreWrapper) close() {
 		return
 	}
 	w.api = nil
-	w.management = nil
 	w.roots = nil
 	w.protection = nil
 }

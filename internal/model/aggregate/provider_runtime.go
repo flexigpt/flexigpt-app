@@ -9,7 +9,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
 
 // ProviderRuntimePublisher owns the long-lived in-memory inference Provider
@@ -44,24 +44,24 @@ func (s *Service) SetProviderRuntimePublisher(
 
 func (s *Service) SaveProviderSettings(
 	ctx context.Context,
-	request modelConsumerAPI.SaveProviderSettingsRequest,
-) (modelConsumerAPI.ProviderView, error) {
+	request modelAPI.SaveProviderSettingsRequest,
+) (modelAPI.ProviderView, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 
-	current, err := s.store.GetProvider(ctx, request.Provider)
+	current, err := s.store.Providers.Get(ctx, request.Provider)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 
-	updated, err := s.store.SaveProviderSettings(ctx, request)
+	updated, err := s.store.Providers.Settings.Save(ctx, request)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, s.restoreProviderRuntime(
+		return modelAPI.ProviderView{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -84,28 +84,28 @@ func (s *Service) ResetProviderSettings(
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
-) (modelConsumerAPI.ProviderView, error) {
+) (modelAPI.ProviderView, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 
-	current, err := s.store.GetProvider(ctx, ref)
+	current, err := s.store.Providers.Get(ctx, ref)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, err
+		return modelAPI.ProviderView{}, err
 	}
 
-	updated, err := s.store.ResetProviderSettings(
+	updated, err := s.store.Providers.Settings.Reset(
 		ctx,
 		ref,
 		expectedProviderRevision,
 		expectedSettingsRevision,
 	)
 	if err != nil {
-		return modelConsumerAPI.ProviderView{}, s.restoreProviderRuntime(
+		return modelAPI.ProviderView{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -125,24 +125,24 @@ func (s *Service) ResetProviderSettings(
 
 func (s *Service) SetProviderAPIKey(
 	ctx context.Context,
-	request modelConsumerAPI.SetProviderAPIKeyRequest,
-) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
+	request modelAPI.SetProviderAPIKeyRequest,
+) (modelAPI.ProviderAPIKeyStatus, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 
-	current, err := s.store.GetProvider(ctx, request.Provider)
+	current, err := s.store.Providers.Get(ctx, request.Provider)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 
-	updated, err := s.store.SetProviderAPIKey(ctx, request)
+	updated, err := s.store.Providers.Credentials.Set(ctx, request)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, s.restoreProviderRuntime(
+		return modelAPI.ProviderAPIKeyStatus{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -165,28 +165,28 @@ func (s *Service) ClearProviderAPIKey(
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
-) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
+) (modelAPI.ProviderAPIKeyStatus, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 
-	current, err := s.store.GetProvider(ctx, ref)
+	current, err := s.store.Providers.Get(ctx, ref)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, err
+		return modelAPI.ProviderAPIKeyStatus{}, err
 	}
 
-	updated, err := s.store.ClearProviderAPIKey(
+	updated, err := s.store.Providers.Credentials.Clear(
 		ctx,
 		ref,
 		expectedProviderRevision,
 		expectedAPIKeyRevision,
 	)
 	if err != nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, s.restoreProviderRuntime(
+		return modelAPI.ProviderAPIKeyStatus{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -206,20 +206,20 @@ func (s *Service) ClearProviderAPIKey(
 
 func (s *Service) CreateProvider(
 	ctx context.Context,
-	request modelConsumerAPI.ManagedProviderCreateRequest,
-) (modelConsumerAPI.ManagedProviderCreateResult, error) {
+	request modelAPI.ManagedProviderCreateRequest,
+) (modelAPI.ManagedProviderCreateResult, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, err
+		return modelAPI.ManagedProviderCreateResult{}, err
 	}
 	if request.Enabled {
 		if _, err := s.providerRuntimePublisher(); err != nil {
-			return modelConsumerAPI.ManagedProviderCreateResult{}, err
+			return modelAPI.ManagedProviderCreateResult{}, err
 		}
 	}
 
-	created, err := s.store.CreateProvider(ctx, request)
+	created, err := s.store.Providers.Packages.Create(ctx, request)
 	if err != nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, err
+		return modelAPI.ManagedProviderCreateResult{}, err
 	}
 	if !created.Artifact.Enabled {
 		return created, nil
@@ -235,24 +235,24 @@ func (s *Service) CreateProvider(
 
 func (s *Service) UpdateProvider(
 	ctx context.Context,
-	request modelConsumerAPI.ManagedProviderReplaceRequest,
-) (modelConsumerAPI.ManagedProviderReplaceResult, error) {
+	request modelAPI.ManagedProviderReplaceRequest,
+) (modelAPI.ManagedProviderReplaceResult, error) {
 	if err := s.ready(ctx); err != nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, err
+		return modelAPI.ManagedProviderReplaceResult{}, err
 	}
 
-	current, err := s.store.GetProvider(ctx, request.Provider)
+	current, err := s.store.Providers.Get(ctx, request.Provider)
 	if err != nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, err
+		return modelAPI.ManagedProviderReplaceResult{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, err
+		return modelAPI.ManagedProviderReplaceResult{}, err
 	}
 
-	updated, err := s.store.ReplaceProvider(ctx, request)
+	updated, err := s.store.Providers.Packages.Replace(ctx, request)
 	if err != nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, s.restoreProviderRuntime(
+		return modelAPI.ManagedProviderReplaceResult{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -279,7 +279,7 @@ func (s *Service) DeleteProvider(
 		return err
 	}
 
-	current, err := s.store.GetProvider(ctx, ref)
+	current, err := s.store.Providers.Get(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func (s *Service) DeleteProvider(
 		return err
 	}
 
-	if err := s.store.DeleteProvider(
+	if err := s.store.Providers.Packages.Delete(
 		ctx,
 		ref,
 		expectedProviderRevision,
@@ -313,7 +313,7 @@ func (s *Service) SetProviderEnabled(
 		}
 	}
 
-	current, err := s.store.GetProvider(ctx, ref)
+	current, err := s.store.Providers.Get(ctx, ref)
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -322,7 +322,7 @@ func (s *Service) SetProviderEnabled(
 		return artifactModel.Artifact{}, err
 	}
 
-	updated, err := s.store.SetProviderEnabled(
+	updated, err := s.store.Providers.SetEnabled(
 		ctx,
 		ref,
 		expectedProviderRevision,
@@ -349,7 +349,7 @@ func (s *Service) SetProviderEnabled(
 
 func (s *Service) clearEnabledProvider(
 	ctx context.Context,
-	current modelConsumerAPI.ProviderView,
+	current modelAPI.ProviderView,
 ) (*inferenceSpec.ProviderParam, error) {
 	if !current.Artifact.Enabled {
 		//nolint:nilnil // Ok.
@@ -397,7 +397,7 @@ func (s *Service) resolveProviderRuntime(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (inferenceSpec.ProviderParam, error) {
-	resolved, err := s.store.ResolveProvider(ctx, ref)
+	resolved, err := s.store.Providers.Capabilities.Resolve(ctx, ref)
 	if err != nil {
 		return inferenceSpec.ProviderParam{}, err
 	}

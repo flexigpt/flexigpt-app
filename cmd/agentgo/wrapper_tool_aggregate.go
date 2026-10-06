@@ -53,6 +53,10 @@ func withToolAggregate[T any](
 	})
 }
 
+// HydrateInferenceToolChoice supports both Tool implementation families.
+// Go Tools become local function ToolChoices. SDK Tools become provider-native
+// ToolChoices. SDK Tools must not be routed through ToolRuntimeWrapper because
+// they are executed by the selected inference provider.
 func (w *ToolAggregateWrapper) HydrateInferenceToolChoice(
 	selection toolAggregate.ToolSelection,
 ) (inferenceSpec.ToolChoice, error) {

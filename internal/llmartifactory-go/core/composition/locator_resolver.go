@@ -8,26 +8,26 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
 type ProviderLocatorResolver struct {
-	resolvers map[locator.FactoryKey]locator.Resolver
+	resolvers map[corelocator.FactoryKey]corelocator.Resolver
 }
 
 func NewProviderLocatorResolver(
-	factories []locator.Factory,
-	runtime locator.Runtime,
+	factories []corelocator.Factory,
+	runtime corelocator.Runtime,
 ) (*ProviderLocatorResolver, error) {
 	if runtime == nil {
 		return nil, fmt.Errorf("%w: locator catalog runtime is nil", spec.ErrInvalid)
 	}
 	output := &ProviderLocatorResolver{
-		resolvers: make(map[locator.FactoryKey]locator.Resolver),
+		resolvers: make(map[corelocator.FactoryKey]corelocator.Resolver),
 	}
 	for index, factory := range factories {
-		if err := locator.ValidateFactory(factory); err != nil {
+		if err := corelocator.ValidateFactory(factory); err != nil {
 			return nil, fmt.Errorf("locator resolver factory %d: %w", index, err)
 		}
 		bound, err := factory.Bind(runtime)
@@ -38,7 +38,7 @@ func NewProviderLocatorResolver(
 			return nil, fmt.Errorf("%w: locator factory bound a nil resolver", spec.ErrInvalid)
 		}
 		for _, kind := range factory.ArtifactKinds() {
-			key := locator.FactoryKey{LocatorKind: factory.LocatorKind(), ArtifactKind: kind}
+			key := corelocator.FactoryKey{LocatorKind: factory.LocatorKind(), ArtifactKind: kind}
 			if _, duplicate := output.resolvers[key]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: duplicate locator resolver %q for %q",
@@ -65,7 +65,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	}
 
 	entry := request.Entry.Clone()
-	input := locator.Request{
+	input := corelocator.Request{
 		RootID:              request.RootID,
 		From:                cloneArtifactPointer(request.From),
 		Locator:             request.Locator.Clone(),
@@ -81,7 +81,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
-	key := locator.FactoryKey{
+	key := corelocator.FactoryKey{
 		LocatorKind:  kind,
 		ArtifactKind: input.ExpectedKind,
 	}

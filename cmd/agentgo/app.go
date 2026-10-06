@@ -12,10 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
-	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
-	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/consumerapi"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
+	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
+	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -39,6 +39,7 @@ type App struct {
 	toolBuiltInInstaller  installFlow.HydrationInstaller
 	modelBuiltInInstaller installFlow.HydrationInstaller
 	agentStoreAPI         *AgentStoreWrapper
+	textStoreAPI          *TextStoreWrapper
 	agentBuiltInInstaller installFlow.HydrationInstaller
 	skillStoreAPI         *SkillStoreWrapper
 	skillBuiltInInstaller installFlow.HydrationInstaller
@@ -124,6 +125,7 @@ func newApp() *App {
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.agentStoreAPI = &AgentStoreWrapper{}
+	app.textStoreAPI = &TextStoreWrapper{}
 	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
 	app.mcpStoreAPI = &MCPStoreWrapper{}
 	app.mcpRuntimeAPI = &MCPRuntimeWrapper{}
@@ -241,6 +243,20 @@ func (a *App) initManagers() {
 		)
 	}
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
+
+	err = InitTextStoreWrapper(
+		a.textStoreAPI,
+		artifactComposition.Resources,
+		artifactComposition.Protection,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Text service",
+			"error",
+			err,
+		)
+		panic("failed to initialize managers: Text service initialization failed\n" + err.Error())
+	}
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
@@ -389,7 +405,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store consumer API initialized")
 
-	skillBaselineEnsurer, err := skillConsumerAPI.NewBaselineEnsurer(
+	skillBaselineEnsurer, err := skillAPI.NewBaselineEnsurer(
 		a.skillStoreAPI.api,
 	)
 	if err != nil {
@@ -432,7 +448,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("agent store consumer API initialized")
 
-	agentBaselineEnsurer, err := agentConsumerAPI.NewBaselineEnsurer(
+	agentBaselineEnsurer, err := agentAPI.NewBaselineEnsurer(
 		a.agentStoreAPI.api,
 	)
 	if err != nil {
@@ -507,13 +523,13 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed mcp host initialized")
 
-	mcpBaselineEnsurer, err := mcpConsumerAPI.NewBaselineEnsurer(
+	mcpBaselineEnsurer, err := mcpAPI.NewBaselineEnsurer(
 		a.mcpStoreAPI.api,
 	)
 	if err != nil {
 		panic("failed to initialize MCP baseline port: " + err.Error())
 	}
-	mcpWorkspaceResolver, err := mcpConsumerAPI.NewWorkspaceServerResolver(
+	mcpWorkspaceResolver, err := mcpAPI.NewWorkspaceServerResolver(
 		a.mcpStoreAPI.api,
 	)
 	if err != nil {
@@ -605,7 +621,7 @@ func (a *App) initManagers() {
 		slog.Info("user Artifact baseline Plugins initialized")
 	}
 
-	workspaceConversationSource, err := workspaceConsumerAPI.NewConversationSource(
+	workspaceConversationSource, err := workspaceAPI.NewConversationSource(
 		a.workspaceStoreAPI.api,
 	)
 	if err != nil {
@@ -710,6 +726,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	if a.skillRuntimeAPI != nil {
 		a.skillRuntimeAPI.close()
+	}
+	if a.textStoreAPI != nil {
+		a.textStoreAPI.close()
 	}
 	if a.agentStoreAPI != nil {
 		a.agentStoreAPI.close()

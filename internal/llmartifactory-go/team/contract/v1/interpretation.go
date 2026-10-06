@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:          TeamType,
 		SchemaKey:                TeamSchemaKey,
 		SelectorEligible:         true,
@@ -27,24 +27,24 @@ func Interpretation() interpretation.Registration {
 
 func teamRelationships(
 	entry declaration.Entry,
-) ([]interpretation.Relationship, error) {
+) ([]coreinterpretation.Relationship, error) {
 	document, err := DecodeAdmittedTeamEntry(entry)
 	if err != nil {
 		return nil, err
 	}
-	output, err := interpretation.MemberRelationships(
+	output, err := coreinterpretation.MemberRelationships(
 		[]string{"members"},
 		document.Members,
-		interpretation.MemberOptions{AllowSelector: true},
+		coreinterpretation.MemberOptions{AllowSelector: true},
 	)
 	if err != nil {
 		return nil, err
 	}
 	if document.Loop != nil {
-		value, err := interpretation.NewMemberRelationship(
+		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{"loop"},
 			*document.Loop,
-			interpretation.MemberOptions{DirectPosition: true},
+			coreinterpretation.MemberOptions{DirectPosition: true},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("loop: %w", err)
@@ -52,10 +52,10 @@ func teamRelationships(
 		output = append(output, value)
 	}
 	if document.Workflow != nil {
-		value, err := interpretation.NewMemberRelationship(
+		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{"workflow"},
 			*document.Workflow,
-			interpretation.MemberOptions{DirectPosition: true},
+			coreinterpretation.MemberOptions{DirectPosition: true},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("workflow: %w", err)

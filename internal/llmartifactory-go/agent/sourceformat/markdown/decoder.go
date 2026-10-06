@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -29,11 +29,11 @@ const markdownMediaType = "text/markdown"
 // Instruction in Agent.members using the <agent-name>-instructions naming
 // convention.
 type AgentMarkdownDecoder struct {
-	interpretations *interpretation.Registry
+	interpretations *coreinterpretation.Registry
 }
 
 func NewAgentMarkdownDecoder(
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) (*AgentMarkdownDecoder, error) {
 	if interpretations == nil {
 		return nil, fmt.Errorf(

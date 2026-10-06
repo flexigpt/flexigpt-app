@@ -3,11 +3,11 @@ package mcpv1
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-func Interpretation() interpretation.Registration {
-	return interpretation.Registration{
+func Interpretation() coreinterpretation.Registration {
+	return coreinterpretation.Registration{
 		DeclarationType:          MCPType,
 		SchemaKey:                MCPSchemaKey,
 		SelectorEligible:         true,
@@ -26,13 +26,13 @@ func Interpretation() interpretation.Registration {
 
 func mcpRelationships(
 	entry declaration.Entry,
-) ([]interpretation.Relationship, error) {
+) ([]coreinterpretation.Relationship, error) {
 	document, err := DecodeAdmittedMCPEntry(entry)
 	if err != nil {
 		return nil, err
 	}
 	if document.Policy == nil {
-		return []interpretation.Relationship{}, nil
+		return []coreinterpretation.Relationship{}, nil
 	}
 
 	member, err := declaration.NewSymbolicEntry(
@@ -45,10 +45,10 @@ func mcpRelationships(
 
 	optional := document.Policy.Required != nil &&
 		!*document.Policy.Required
-	value, err := interpretation.NewMemberRelationship(
+	value, err := coreinterpretation.NewMemberRelationship(
 		[]string{"policy"},
 		member,
-		interpretation.MemberOptions{Optional: optional},
+		coreinterpretation.MemberOptions{Optional: optional},
 	)
 	if err != nil {
 		return nil, err
@@ -56,5 +56,5 @@ func mcpRelationships(
 	if value.Declared.Header().Name == "" {
 		return nil, spec.ErrInvalid
 	}
-	return []interpretation.Relationship{value}, nil
+	return []coreinterpretation.Relationship{value}, nil
 }

@@ -18,10 +18,10 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -53,8 +53,8 @@ func initMCPWrappers(
 	protection root.ProtectionAPI,
 	protectedOverlays overlay.API,
 	storeOverlays overlay.StoreAPI,
-	secretBindings secret.API,
-	secretRuntime secret.RuntimeAPI,
+	secretBindings storeSecret.API,
+	secretRuntime storeSecret.RuntimeAPI,
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	resolver *composition.Resolver,
@@ -105,7 +105,7 @@ func initMCPWrappers(
 		return nil, err
 	}
 
-	storeAPI, err := mcpConsumerAPI.New(
+	storeAPI, err := mcpAPI.New(
 		sources,
 		discovery,
 		artifacts,
@@ -117,35 +117,26 @@ func initMCPWrappers(
 		overlays,
 		secrets,
 		mcpPolicy.Baseline(),
-		mcpConsumerAPI.WithCompositionResolver(resolver),
+		mcpAPI.WithCompositionResolver(resolver),
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	catalogStore, err := mcpConsumerAPI.NewCatalogStore(storeAPI)
-	if err != nil {
-		return nil, err
-	}
-	managementStore, err := mcpConsumerAPI.NewManagementStore(storeAPI)
-	if err != nil {
-		return nil, err
-	}
-	builtinCleanup, err := mcpConsumerAPI.NewBuiltinPackageCleanup(storeAPI)
+	builtinCleanup, err := mcpAPI.NewBuiltinPackageCleanup(storeAPI)
 	if err != nil {
 		return nil, err
 	}
 
-	listService, err := mcpConsumerAPI.NewMCPListService(
+	listService, err := mcpAPI.NewMCPListService(
 		roots,
-		catalogStore,
+		storeAPI,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	serverResolver, err := mcpAggregate.NewArtifactServerResolver(
-		managementStore,
+		storeAPI,
 	)
 	if err != nil {
 		return nil, err
@@ -232,7 +223,7 @@ func initMCPWrappers(
 		Lifecycle: lifecycle,
 		Servers:   serverResolver,
 		Source:    s,
-		Store:     managementStore,
+		Store:     storeAPI,
 		Runtime:   runtimeManager,
 		Auth:      authManager,
 		Secrets:   secrets,
@@ -265,7 +256,7 @@ func initMCPWrappers(
 
 func newMCPBuiltInInstaller(
 	hydrator installModel.CompiledHydrationCoordinator,
-	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
+	cleanup mcpAPI.BuiltinPackageCleanup,
 ) (installFlow.HydrationInstaller, error) {
 	if hydrator == nil || cleanup == nil {
 		return nil, errors.New(

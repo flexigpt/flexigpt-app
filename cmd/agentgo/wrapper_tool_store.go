@@ -14,13 +14,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/consumerapi"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
 type ToolStoreWrapper struct {
-	api *toolConsumerAPI.API
+	api *toolAPI.Service
 }
 
 func InitToolStoreWrapper(
@@ -39,7 +39,7 @@ func InitToolStoreWrapper(
 		return errors.New("tool store wrapper is required")
 	}
 
-	api, err := toolConsumerAPI.New(
+	api, err := toolAPI.New(
 		sources,
 		discovery,
 		artifacts,
@@ -59,7 +59,7 @@ func InitToolStoreWrapper(
 
 func withToolStore[T any](
 	w *ToolStoreWrapper,
-	fn func(*toolConsumerAPI.API) (T, error),
+	fn func(*toolAPI.Service) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -71,12 +71,12 @@ func withToolStore[T any](
 }
 
 func (w *ToolStoreWrapper) ListToolPlugins() (
-	[]plugin.ListItem,
+	[]pluginAPI.ListItem,
 	error,
 ) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) ([]plugin.ListItem, error) {
+		func(api *toolAPI.Service) ([]pluginAPI.ListItem, error) {
 			return api.ListToolPlugins(context.Background())
 		},
 	)
@@ -84,10 +84,10 @@ func (w *ToolStoreWrapper) ListToolPlugins() (
 
 func (w *ToolStoreWrapper) GetToolPlugin(
 	ref artifactModel.ArtifactRef,
-) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *toolAPI.Service) (pluginAPI.PluginView, error) {
 			return api.GetToolPlugin(context.Background(), ref)
 		},
 	)
@@ -95,10 +95,10 @@ func (w *ToolStoreWrapper) GetToolPlugin(
 
 func (w *ToolStoreWrapper) ListPluginTools(
 	ref artifactModel.ArtifactRef,
-) ([]toolConsumerAPI.ToolListItem, error) {
+) ([]toolAPI.ToolListItem, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) ([]toolConsumerAPI.ToolListItem, error) {
+		func(api *toolAPI.Service) ([]toolAPI.ToolListItem, error) {
 			return api.ListTools(context.Background(), ref)
 		},
 	)
@@ -106,10 +106,10 @@ func (w *ToolStoreWrapper) ListPluginTools(
 
 func (w *ToolStoreWrapper) GetTool(
 	ref artifactModel.ArtifactRef,
-) (toolConsumerAPI.ToolView, error) {
+) (toolAPI.ToolView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (toolConsumerAPI.ToolView, error) {
+		func(api *toolAPI.Service) (toolAPI.ToolView, error) {
 			return api.GetTool(context.Background(), ref)
 		},
 	)
@@ -119,10 +119,10 @@ func (w *ToolStoreWrapper) SetToolEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolConsumerAPI.ToolView, error) {
+) (toolAPI.ToolView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (toolConsumerAPI.ToolView, error) {
+		func(api *toolAPI.Service) (toolAPI.ToolView, error) {
 			return api.SetToolEnabled(
 				context.Background(),
 				ref,
@@ -137,10 +137,10 @@ func (w *ToolStoreWrapper) SetToolPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *toolAPI.Service) (pluginAPI.PluginView, error) {
 			return api.SetToolPluginEnabled(
 				context.Background(),
 				ref,

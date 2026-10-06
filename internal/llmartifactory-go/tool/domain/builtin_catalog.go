@@ -10,10 +10,14 @@ import (
 
 // BuiltinCatalog is application-supplied generated Tool inventory.
 //
-// It identifies the protected Tool Artifact namespace and maps each generated
-// Go Tool logical name to its generated Tool Plugin logical name. It contains
-// no embedded filesystem, generated JSON payload, Tool invocation capability,
-// or application topology lookup behavior.
+// It identifies the protected Tool Artifact namespace and maps every
+// generated Tool logical name to its generated Tool Plugin logical name.
+//
+// The catalog intentionally contains both Go Tools and provider-native SDK
+// Tools. The distinction belongs to the Tool declaration implementation and
+// runtime hydration boundary, not to Plugin membership or Artifact identity.
+// It contains no embedded filesystem, generated JSON payload, Tool invocation
+// capability, or application topology lookup behavior.
 type BuiltinCatalog struct {
 	RootID   rootModel.RootID
 	SourceID sourceModel.SourceID

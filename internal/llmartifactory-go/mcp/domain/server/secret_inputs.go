@@ -7,7 +7,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	secretMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/secret"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
 type SecretInputTargetKind string
@@ -33,16 +33,16 @@ func (target SecretInputTarget) matches(
 	server artifactModel.ArtifactRef,
 	raw string,
 ) error {
-	ref, err := secretMCPDomain.ParseMCPSecretRef(raw)
+	ref, err := secret.ParseMCPSecretRef(raw)
 	if err != nil {
 		return err
 	}
 
 	switch target.Kind {
 	case SecretInputTargetStdioEnv:
-		return ref.Matches(server, secretMCPDomain.MCPSecretKindStdioEnv, target.Slot)
+		return ref.Matches(server, secret.MCPSecretKindStdioEnv, target.Slot)
 	case SecretInputTargetHTTPHeader:
-		return ref.Matches(server, secretMCPDomain.MCPSecretKindHTTPHeader, target.Slot)
+		return ref.Matches(server, secret.MCPSecretKindHTTPHeader, target.Slot)
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret input target %q",

@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
@@ -218,10 +218,10 @@ func schemasByType(t *testing.T) map[declaration.Type][]byte {
 	return output
 }
 
-func declarationTestRegistry(t *testing.T) *interpretation.Registry {
+func declarationTestRegistry(t *testing.T) *coreinterpretation.Registry {
 	t.Helper()
 
-	registry, err := interpretation.NewRegistry(
+	registry, err := coreinterpretation.NewRegistry(
 		textv1.Interpretation(),
 		modelv1.Interpretation(),
 		modelproviderv1.Interpretation(),

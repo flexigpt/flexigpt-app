@@ -9,18 +9,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/consumerapi"
+	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
 
 type Service struct {
-	store       *modelConsumerAPI.ManagementStoreFacade
+	store       *modelAPI.Service
 	runtime     RuntimeResolver
 	preferences DefaultProviderPreferences
 	providers   ProviderRuntimePublisher
 }
 
 func New(
-	store *modelConsumerAPI.ManagementStoreFacade,
+	store *modelAPI.Service,
 	runtimeResolver RuntimeResolver,
 	preferences DefaultProviderPreferences,
 ) (*Service, error) {
@@ -45,7 +45,7 @@ func New(
 // requests. Independent Provider failures are joined so others can initialize.
 func (s *Service) InitializeProviderRuntime(
 	ctx context.Context,
-	providers []modelConsumerAPI.ProviderListItem,
+	providers []modelAPI.ProviderListItem,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err
@@ -56,7 +56,7 @@ func (s *Service) InitializeProviderRuntime(
 
 	// Inference registration is keyed by logical name, not ArtifactRef. Do not
 	// silently choose one Root's settings or credentials for a colliding name.
-	candidates := make([]modelConsumerAPI.ProviderListItem, 0, len(providers))
+	candidates := make([]modelAPI.ProviderListItem, 0, len(providers))
 	seen := make(map[artifactModel.ArtifactRef]struct{}, len(providers))
 	names := make(map[spec.LogicalName]int)
 	for _, provider := range providers {
@@ -141,7 +141,7 @@ func (s *Service) ResolveRuntimeConfiguration(
 	if err := request.Validate(); err != nil {
 		return RuntimeConfiguration{}, err
 	}
-	resolved, err := s.store.ResolveModel(ctx, request.Model)
+	resolved, err := s.store.Models.Capabilities.Resolve(ctx, request.Model)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -182,7 +182,7 @@ func (s *Service) ResolveRuntimeModelTarget(
 			spec.ErrUnsupported,
 		)
 	}
-	resolved, err := s.store.ResolveModel(ctx, *target.Artifact)
+	resolved, err := s.store.Models.Capabilities.Resolve(ctx, *target.Artifact)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}

@@ -10,28 +10,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
 type SkillBaselineEnsurer interface {
 	EnsureSkillBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.PluginView, error)
+	) (pluginAPI.PluginView, error)
 }
 
 type MCPBaselineEnsurer interface {
 	EnsureMCPBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.PluginView, error)
+	) (pluginAPI.PluginView, error)
 }
 
 type AgentBaselineEnsurer interface {
 	EnsureAgentBaselinePlugin(
 		ctx context.Context,
 		rootID rootModel.RootID,
-	) (plugin.PluginView, error)
+	) (pluginAPI.PluginView, error)
 }
 
 // EnsureBuiltInTopology installs and reconciles all application-owned

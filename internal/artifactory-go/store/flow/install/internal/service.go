@@ -7,7 +7,7 @@ import (
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -30,7 +30,7 @@ type Dependencies struct {
 
 	Repository Repository
 
-	SecretLifecycle secret.LifecycleAPI
+	SecretLifecycle storeSecret.LifecycleAPI
 	Policy          root.Policy
 }
 
@@ -51,7 +51,7 @@ type Service struct {
 
 	metadata Repository
 
-	localState secret.LifecycleAPI
+	localState storeSecret.LifecycleAPI
 
 	rootMutationPolicy root.Policy
 }

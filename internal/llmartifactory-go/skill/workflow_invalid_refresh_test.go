@@ -1,0 +1,146 @@
+package skill_test
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
+)
+
+func TestSkillStoreWorkflowRefreshMarksExternalSkillInvalidAndRecovers(
+	t *testing.T,
+) {
+	fixture := newSkillWorkflowFixture(t)
+	fixture.bootstrapBuiltins(t)
+	fixture.ensureUserBaseline(t)
+
+	const skillName = "refreshable-skill"
+
+	skillDirectory := filepath.Join(t.TempDir(), skillName)
+	requireNoError(t, os.MkdirAll(skillDirectory, 0o700))
+
+	skillDocumentPath := filepath.Join(skillDirectory, "SKILL.md")
+	validDocument := workflowSkillMarkdown(
+		skillName,
+		"Recover from invalid external Skill source content.",
+		"Use the restored Skill package after refresh.",
+	)
+	requireNoError(
+		t,
+		os.WriteFile(skillDocumentPath, validDocument, 0o600),
+	)
+
+	ctx := t.Context()
+	registered, err := fixture.api.AddSkillPath(
+		ctx,
+		skillAPI.SkillPathRegistration{
+			RootID:            topology.UserRootID(),
+			Path:              skillDirectory,
+			SourceDisplayName: "Refreshable external Skill",
+			Enabled:           true,
+		},
+	)
+	requireNoError(t, err)
+
+	invalidDocument := []byte(
+		"---\n" +
+			"name: invalid skill name with spaces\n" +
+			"---\n\n" +
+			"# Broken\n",
+	)
+	requireNoError(
+		t,
+		os.WriteFile(skillDocumentPath, invalidDocument, 0o600),
+	)
+
+	requireNoError(
+		t,
+		fixture.api.RefreshSkillSource(
+			ctx,
+			registered.Artifact.RootID,
+			registered.Source.ID,
+		),
+	)
+
+	invalid, err := fixture.api.GetSkill(
+		ctx,
+		registered.Artifact.Ref(),
+	)
+	requireNoError(t, err)
+	if invalid.State != artifactModel.StateInvalid {
+		t.Fatalf(
+			"invalid external Skill state=%q, want %q",
+			invalid.State,
+			artifactModel.StateInvalid,
+		)
+	}
+	if invalid.ResolvedDefinition != nil {
+		t.Fatal("invalid external Skill retained a resolved Definition")
+	}
+
+	listedSkills, err := fixture.api.ListSkills(
+		ctx,
+		skillAPI.ListSkillsRequest{
+			RootID: topology.UserRootID(),
+		},
+	)
+	requireNoError(t, err)
+	listedInvalid, found := findSkillByName(listedSkills, skillName)
+	if !found {
+		t.Fatalf("invalid external Skill %q disappeared from ListSkills", skillName)
+	}
+	if listedInvalid.State != artifactModel.StateInvalid {
+		t.Fatalf(
+			"listed invalid external Skill state=%q, want %q",
+			listedInvalid.State,
+			artifactModel.StateInvalid,
+		)
+	}
+
+	requireNoError(
+		t,
+		os.WriteFile(skillDocumentPath, validDocument, 0o600),
+	)
+
+	requireNoError(
+		t,
+		fixture.api.RefreshSkillSource(
+			ctx,
+			registered.Artifact.RootID,
+			registered.Source.ID,
+		),
+	)
+
+	restored, err := fixture.api.GetSkill(
+		ctx,
+		registered.Artifact.Ref(),
+	)
+	requireNoError(t, err)
+	if restored.Ref() != registered.Artifact.Ref() {
+		t.Fatalf(
+			"restored Skill ref=%+v, want %+v",
+			restored.Ref(),
+			registered.Artifact.Ref(),
+		)
+	}
+	if restored.State != artifactModel.StateAvailable {
+		t.Fatalf(
+			"restored external Skill state=%q, want %q",
+			restored.State,
+			artifactModel.StateAvailable,
+		)
+	}
+	if restored.ResolvedDefinition == nil {
+		t.Fatal("restored external Skill has no resolved Definition")
+	}
+	if restored.Revision <= invalid.Revision {
+		t.Fatalf(
+			"restored Skill revision=%d, want greater than invalid revision %d",
+			restored.Revision,
+			invalid.Revision,
+		)
+	}
+}

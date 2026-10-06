@@ -14,12 +14,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
-	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/consumerapi"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
+	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 )
 
 type WorkspaceStoreWrapper struct {
-	api                     *workspaceConsumerAPI.StoreAPI
+	api                     *workspaceAPI.Service
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error
 }
 
@@ -34,8 +34,8 @@ func InitWorkspaceWrappers(
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	resolver *composition.Resolver,
-	workspaceConfig workspaceConsumerAPI.Config,
-	mcpServers mcp.ServerResolver,
+	workspaceConfig workspaceAPI.Config,
+	mcpServers workspacemcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {
 	if storeWrapper == nil ||
@@ -48,7 +48,7 @@ func InitWorkspaceWrappers(
 
 	workspaceConfig.Composition = resolver
 	workspaceConfig.MCPServers = mcpServers
-	api, err := workspaceConsumerAPI.NewStoreAPI(
+	api, err := workspaceAPI.New(
 		sources,
 		discovery,
 		artifacts,
@@ -69,7 +69,7 @@ func InitWorkspaceWrappers(
 
 func withWorkspaceStore[T any](
 	w *WorkspaceStoreWrapper,
-	fn func(*workspaceConsumerAPI.StoreAPI) (T, error),
+	fn func(*workspaceAPI.Service) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -82,7 +82,7 @@ func withWorkspaceStore[T any](
 
 func withWorkspaceStoreError(
 	w *WorkspaceStoreWrapper,
-	fn func(*workspaceConsumerAPI.StoreAPI) error,
+	fn func(*workspaceAPI.Service) error,
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
@@ -94,23 +94,23 @@ func withWorkspaceStoreError(
 
 func (w *WorkspaceStoreWrapper) RegisterWorkspaceDirectory(
 	path string,
-) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+) (workspaceAPI.WorkspaceDirectoryView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceDirectoryView, error) {
 			ctx := context.Background()
 			view, err := api.RegisterWorkspaceDirectory(ctx, path)
 			if err != nil {
-				return workspaceConsumerAPI.WorkspaceDirectoryView{}, err
+				return workspaceAPI.WorkspaceDirectoryView{}, err
 			}
 			if w.ensureArtifactBaselines == nil {
-				return workspaceConsumerAPI.WorkspaceDirectoryView{}, spec.ErrClosed
+				return workspaceAPI.WorkspaceDirectoryView{}, spec.ErrClosed
 			}
 			if err := w.ensureArtifactBaselines(
 				ctx,
 				view.Ref.RootID,
 			); err != nil {
-				return workspaceConsumerAPI.WorkspaceDirectoryView{}, err
+				return workspaceAPI.WorkspaceDirectoryView{}, err
 			}
 			return view, nil
 		},
@@ -118,65 +118,65 @@ func (w *WorkspaceStoreWrapper) RegisterWorkspaceDirectory(
 }
 
 func (w *WorkspaceStoreWrapper) GetWorkspaceDirectory(
-	ref workspaceConsumerAPI.WorkspaceDirectoryRef,
-) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+	ref workspaceAPI.WorkspaceDirectoryRef,
+) (workspaceAPI.WorkspaceDirectoryView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceDirectoryView, error) {
 			return api.GetWorkspaceDirectory(context.Background(), ref)
 		},
 	)
 }
 
 func (w *WorkspaceStoreWrapper) RefreshWorkspaceDirectory(
-	ref workspaceConsumerAPI.WorkspaceDirectoryRef,
-) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+	ref workspaceAPI.WorkspaceDirectoryRef,
+) (workspaceAPI.WorkspaceDirectoryView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceDirectoryView, error) {
 			return api.RefreshWorkspaceDirectory(context.Background(), ref)
 		},
 	)
 }
 
 func (w *WorkspaceStoreWrapper) SetWorkspaceDirectoryEnabled(
-	ref workspaceConsumerAPI.WorkspaceDirectoryRef,
+	ref workspaceAPI.WorkspaceDirectoryRef,
 	expectedRevision uint64,
 	enabled bool,
-) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+) (workspaceAPI.WorkspaceDirectoryView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
+		func(api *workspaceAPI.Service) (workspaceAPI.WorkspaceDirectoryView, error) {
 			return api.SetWorkspaceDirectoryEnabled(context.Background(), ref, expectedRevision, enabled)
 		},
 	)
 }
 
 func (w *WorkspaceStoreWrapper) RemoveWorkspaceDirectory(
-	ref workspaceConsumerAPI.WorkspaceDirectoryRef,
+	ref workspaceAPI.WorkspaceDirectoryRef,
 	expectedRevision uint64,
 ) error {
-	return withWorkspaceStoreError(w, func(api *workspaceConsumerAPI.StoreAPI) error {
+	return withWorkspaceStoreError(w, func(api *workspaceAPI.Service) error {
 		return api.RemoveWorkspaceDirectory(context.Background(), ref, expectedRevision)
 	})
 }
 
 func (w *WorkspaceStoreWrapper) ListWorkspaceDirectories(
-	request workspaceConsumerAPI.WorkspacePageRequest,
-) (workspaceConsumerAPI.WorkspacePage, error) {
-	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspacePage, error) {
+	request workspaceAPI.WorkspacePageRequest,
+) (workspaceAPI.WorkspacePage, error) {
+	return withWorkspaceStore(w, func(api *workspaceAPI.Service) (workspaceAPI.WorkspacePage, error) {
 		return api.ListWorkspaceDirectories(context.Background(), request)
 	})
 }
 
 func (w *WorkspaceStoreWrapper) GetWorkspaceDefaultPolicy() (
-	workspaceConsumerAPI.WorkspaceDefaultPolicyView,
+	workspaceAPI.WorkspaceDefaultPolicyView,
 	error,
 ) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (
-			workspaceConsumerAPI.WorkspaceDefaultPolicyView,
+		func(api *workspaceAPI.Service) (
+			workspaceAPI.WorkspaceDefaultPolicyView,
 			error,
 		) {
 			return api.WorkspaceDefaultPolicy(), nil
@@ -185,12 +185,12 @@ func (w *WorkspaceStoreWrapper) GetWorkspaceDefaultPolicy() (
 }
 
 func (w *WorkspaceStoreWrapper) ListWorkspaceDirectoryArtifacts(
-	ref workspaceConsumerAPI.WorkspaceDirectoryRef,
-) ([]workspaceConsumerAPI.WorkspaceArtifactView, error) {
+	ref workspaceAPI.WorkspaceDirectoryRef,
+) ([]workspaceAPI.WorkspaceArtifactView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (
-			[]workspaceConsumerAPI.WorkspaceArtifactView,
+		func(api *workspaceAPI.Service) (
+			[]workspaceAPI.WorkspaceArtifactView,
 			error,
 		) {
 			return api.ListWorkspaceDirectoryArtifacts(
@@ -202,15 +202,15 @@ func (w *WorkspaceStoreWrapper) ListWorkspaceDirectoryArtifacts(
 }
 
 func (w *WorkspaceStoreWrapper) SetWorkspaceDirectoryArtifactEnabled(
-	directory workspaceConsumerAPI.WorkspaceDirectoryRef,
+	directory workspaceAPI.WorkspaceDirectoryRef,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (workspaceConsumerAPI.WorkspaceArtifactView, error) {
+) (workspaceAPI.WorkspaceArtifactView, error) {
 	return withWorkspaceStore(
 		w,
-		func(api *workspaceConsumerAPI.StoreAPI) (
-			workspaceConsumerAPI.WorkspaceArtifactView,
+		func(api *workspaceAPI.Service) (
+			workspaceAPI.WorkspaceArtifactView,
 			error,
 		) {
 			return api.SetWorkspaceDirectoryArtifactEnabled(

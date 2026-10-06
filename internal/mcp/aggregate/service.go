@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/consumerapi"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -53,7 +53,7 @@ type Dependencies struct {
 	Lifecycle *Lifecycle
 	Servers   *ArtifactServerResolver
 	Source    *RuntimeServerSource
-	Store     mcpConsumerAPI.ManagementStore
+	Store     mcpAPI.ManagementStore
 	Runtime   RuntimeStatusReader
 	Auth      AuthState
 	Secrets   SecretStore
@@ -63,7 +63,7 @@ type Service struct {
 	lifecycle *Lifecycle
 	servers   *ArtifactServerResolver
 	source    *RuntimeServerSource
-	store     mcpConsumerAPI.ManagementStore
+	store     mcpAPI.ManagementStore
 	runtime   RuntimeStatusReader
 	auth      AuthState
 	secrets   SecretStore
@@ -72,10 +72,10 @@ type Service struct {
 // MCPServerDetails is the one normal server read used by management callers.
 // It intentionally composes existing Store, policy, auth, and runtime views.
 type MCPServerDetails struct {
-	Settings      mcpConsumerAPI.ServerInstallationView `json:"settings"`
-	Policy        mcpPolicy.Effective                   `json:"policy"`
-	Authorization mcpAuth.MCPAuthHealth                 `json:"authorization"`
-	Connection    mcpServer.MCPServerRuntimeSnapshot    `json:"connection"`
+	Settings      mcpAPI.ServerInstallationView      `json:"settings"`
+	Policy        mcpPolicy.Effective                `json:"policy"`
+	Authorization mcpAuth.MCPAuthHealth              `json:"authorization"`
+	Connection    mcpServer.MCPServerRuntimeSnapshot `json:"connection"`
 }
 
 // MCPServerRuntimeDetails contains only process-local runtime/auth observations.
@@ -229,18 +229,18 @@ func (s *Service) SaveMCPServerSettings(
 
 func (s *Service) CreateMCPServer(
 	ctx context.Context,
-	request mcpConsumerAPI.ManagedMCPCreateRequest,
-) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+	request mcpAPI.ManagedMCPCreateRequest,
+) (mcpAPI.ManagedMCPCreateResult, error) {
 	if err := s.ready(); err != nil {
-		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+		return mcpAPI.ManagedMCPCreateResult{}, err
 	}
 
 	result, err := s.store.CreateMCPServer(ctx, request)
 	if err != nil {
-		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+		return mcpAPI.ManagedMCPCreateResult{}, err
 	}
 	if err := s.lifecycle.InvalidateServer(ctx, result.Artifact.Ref()); err != nil {
-		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+		return mcpAPI.ManagedMCPCreateResult{}, err
 	}
 	s.clearServerAuthStatus(result.Artifact.Ref())
 	return result, nil
@@ -248,13 +248,13 @@ func (s *Service) CreateMCPServer(
 
 func (s *Service) UpdateMCPServer(
 	ctx context.Context,
-	request mcpConsumerAPI.ManagedMCPReplaceRequest,
-) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+	request mcpAPI.ManagedMCPReplaceRequest,
+) (mcpAPI.ManagedMCPReplaceResult, error) {
 	if err := s.ready(); err != nil {
-		return mcpConsumerAPI.ManagedMCPReplaceResult{}, err
+		return mcpAPI.ManagedMCPReplaceResult{}, err
 	}
 	if err := s.lifecycle.InvalidateServer(ctx, request.Artifact); err != nil {
-		return mcpConsumerAPI.ManagedMCPReplaceResult{}, err
+		return mcpAPI.ManagedMCPReplaceResult{}, err
 	}
 	s.clearServerAuthStatus(request.Artifact)
 	return s.store.UpdateMCPServer(ctx, request)
@@ -277,16 +277,16 @@ func (s *Service) DeleteMCPServer(
 
 func (s *Service) SaveMCPPolicy(
 	ctx context.Context,
-	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
-) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+	request mcpAPI.ManagedMCPPolicyUpsertRequest,
+) (mcpAPI.ManagedMCPPolicyUpsertResult, error) {
 	if err := s.ready(); err != nil {
-		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+		return mcpAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 	if err := request.Plugin.Validate(); err != nil {
-		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+		return mcpAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 	if err := request.Name.Validate(); err != nil {
-		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+		return mcpAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 
 	affected, err := s.store.ListMCPServersReferencingPolicy(
@@ -295,10 +295,10 @@ func (s *Service) SaveMCPPolicy(
 		request.Name,
 	)
 	if err != nil {
-		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+		return mcpAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 	if err := s.lifecycle.InvalidateServers(ctx, affected); err != nil {
-		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+		return mcpAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
 	return s.store.SaveMCPPolicy(ctx, request)
 }
@@ -332,7 +332,7 @@ func (s *Service) DeleteMCPPolicy(
 
 func (s *Service) serverDetails(
 	ctx context.Context,
-	read mcpConsumerAPI.ServerRead,
+	read mcpAPI.ServerRead,
 ) (MCPServerDetails, error) {
 	authorization, err := s.serverAuthHealth(ctx, read.Resolved)
 	if err != nil {

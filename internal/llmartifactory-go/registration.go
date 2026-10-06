@@ -8,14 +8,14 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
 func validateRegistrationSelection(
 	store *compose.Store,
 	codecs []schema.Codec,
 	decoders []ingest.Decoder,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) error {
 	if store == nil || store.Schemas == nil {
 		return fmt.Errorf(

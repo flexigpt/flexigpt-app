@@ -460,10 +460,18 @@ linters:
           alias: ${1}Flow
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/compose
           alias: ${1}Compose
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret
+          alias: storeSecret
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/model
           alias: ${1}Model
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/(\w+)/model
           alias: ${2}Model
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)
+          alias: ${1}API
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/source
+          alias: ${1}Source
+        - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/package
+          alias: ${1}Package
         - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/domain
           alias: ${1}Domain
         - pkg: github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/(\w+)/consumerapi

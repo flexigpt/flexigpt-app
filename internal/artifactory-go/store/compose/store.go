@@ -14,7 +14,7 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 )
 
@@ -38,9 +38,9 @@ type Store struct {
 
 	ProtectedOverlays overlay.API
 	StoreOverlays     overlay.StoreAPI
-	SecretBindings    secret.API
-	SecretRuntime     secret.RuntimeAPI
-	SecretLifecycle   secret.LifecycleAPI
+	SecretBindings    storeSecret.API
+	SecretRuntime     storeSecret.RuntimeAPI
+	SecretLifecycle   storeSecret.LifecycleAPI
 	Protection        root.ProtectionAPI
 
 	shutdown  ShutdownFunc

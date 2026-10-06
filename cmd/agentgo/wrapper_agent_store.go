@@ -18,14 +18,14 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/consumerapi"
+	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
 type AgentStoreWrapper struct {
-	api *agentConsumerAPI.API
+	api *agentAPI.Service
 }
 
 func NewAgentBuiltInInstaller(
@@ -56,7 +56,7 @@ func InitAgentStoreWrapper(
 	protection root.ProtectionAPI,
 	definitions definition.API,
 	resolver *composition.Resolver,
-	interpretations *interpretation.Registry,
+	interpretations *coreinterpretation.Registry,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -71,7 +71,7 @@ func InitAgentStoreWrapper(
 		return errors.New("agent store wrapper dependencies are incomplete")
 	}
 
-	api, err := agentConsumerAPI.New(
+	api, err := agentAPI.New(
 		sources,
 		discovery,
 		artifacts,
@@ -80,9 +80,9 @@ func InitAgentStoreWrapper(
 		managedArtifacts,
 		protection,
 		definitions,
-		agentConsumerAPI.WithRoots(roots),
-		agentConsumerAPI.WithCompositionResolver(resolver),
-		agentConsumerAPI.WithDeclarationInterpretations(
+		agentAPI.WithRoots(roots),
+		agentAPI.WithCompositionResolver(resolver),
+		agentAPI.WithDeclarationInterpretations(
 			interpretations,
 		),
 	)
@@ -96,7 +96,7 @@ func InitAgentStoreWrapper(
 
 func withAgentStore[T any](
 	w *AgentStoreWrapper,
-	fn func(*agentConsumerAPI.API) (T, error),
+	fn func(*agentAPI.Service) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
 		var zero T
@@ -108,23 +108,23 @@ func withAgentStore[T any](
 }
 
 func (w *AgentStoreWrapper) ListAgents(
-	request agentConsumerAPI.ListAgentsRequest,
-) ([]agentConsumerAPI.AgentListItem, error) {
+	request agentAPI.ListAgentsRequest,
+) ([]agentAPI.AgentListItem, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentListItem, error) {
+		func(api *agentAPI.Service) ([]agentAPI.AgentListItem, error) {
 			return api.ListAgents(context.Background(), request)
 		},
 	)
 }
 
 func (w *AgentStoreWrapper) ListAgentsForManagement() (
-	[]agentConsumerAPI.AgentListItem,
+	[]agentAPI.AgentListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentListItem, error) {
+		func(api *agentAPI.Service) ([]agentAPI.AgentListItem, error) {
 			return api.ListAgentsForManagement(context.Background())
 		},
 	)
@@ -134,12 +134,12 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 // every Root. This avoids frontend root discovery through an unrelated global
 // Agent list and ensures empty Plugins remain visible.
 func (w *AgentStoreWrapper) ListAgentPluginsForManagement() (
-	[]plugin.ListItem,
+	[]pluginAPI.ListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
+		func(api *agentAPI.Service) ([]pluginAPI.ListItem, error) {
 			return api.ListAgentPluginsForManagement(
 				context.Background(),
 			)
@@ -149,11 +149,11 @@ func (w *AgentStoreWrapper) ListAgentPluginsForManagement() (
 
 func (w *AgentStoreWrapper) GetAgent(
 	ref artifactModel.ArtifactRef,
-) (agentConsumerAPI.AgentView, error) {
+) (agentAPI.AgentView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			agentConsumerAPI.AgentView,
+		func(api *agentAPI.Service) (
+			agentAPI.AgentView,
 			error,
 		) {
 			return api.GetAgent(context.Background(), ref)
@@ -161,23 +161,12 @@ func (w *AgentStoreWrapper) GetAgent(
 	)
 }
 
-func (w *AgentStoreWrapper) MaterializeAgentText(
-	ref artifactModel.ArtifactRef,
-) (agentConsumerAPI.AgentTextMaterialization, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentTextMaterialization, error) {
-			return api.MaterializeAgentText(context.Background(), ref)
-		},
-	)
-}
-
 func (w *AgentStoreWrapper) ResolveAgent(
 	ref artifactModel.ArtifactRef,
-) (agentConsumerAPI.AgentResolution, error) {
+) (agentAPI.AgentResolution, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentResolution, error) {
+		func(api *agentAPI.Service) (agentAPI.AgentResolution, error) {
 			return api.ResolveAgent(context.Background(), ref)
 		},
 	)
@@ -185,10 +174,10 @@ func (w *AgentStoreWrapper) ResolveAgent(
 
 func (w *AgentStoreWrapper) ResolveAgentCapabilities(
 	ref artifactModel.ArtifactRef,
-) (agentConsumerAPI.AgentCapabilityPlan, error) {
+) (agentAPI.AgentCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentCapabilityPlan, error) {
+		func(api *agentAPI.Service) (agentAPI.AgentCapabilityPlan, error) {
 			return api.ResolveAgentCapabilities(context.Background(), ref)
 		},
 	)
@@ -198,10 +187,10 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (agentConsumerAPI.AgentView, error) {
+) (agentAPI.AgentView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentView, error) {
+		func(api *agentAPI.Service) (agentAPI.AgentView, error) {
 			return api.SetAgentEnabled(
 				context.Background(),
 				ref,
@@ -213,11 +202,11 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 }
 
 func (w *AgentStoreWrapper) CreateAgentPlugin(
-	request plugin.CreateRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.CreateRequest,
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
 			return api.CreateAgentPlugin(
 				context.Background(),
 				request,
@@ -228,10 +217,10 @@ func (w *AgentStoreWrapper) CreateAgentPlugin(
 
 func (w *AgentStoreWrapper) GetAgentPlugin(
 	ref artifactModel.ArtifactRef,
-) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
 			return api.GetAgentPlugin(context.Background(), ref)
 		},
 	)
@@ -239,10 +228,10 @@ func (w *AgentStoreWrapper) GetAgentPlugin(
 
 func (w *AgentStoreWrapper) ListAgentPlugins(
 	rootID rootModel.RootID,
-) ([]plugin.ListItem, error) {
+) ([]pluginAPI.ListItem, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]plugin.ListItem, error) {
+		func(api *agentAPI.Service) ([]pluginAPI.ListItem, error) {
 			return api.ListAgentPlugins(context.Background(), rootID)
 		},
 	)
@@ -250,10 +239,10 @@ func (w *AgentStoreWrapper) ListAgentPlugins(
 
 func (w *AgentStoreWrapper) ListAgentPluginMembers(
 	ref artifactModel.ArtifactRef,
-) (plugin.DirectMembership, error) {
+) (pluginAPI.DirectMembership, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.DirectMembership, error) {
+		func(api *agentAPI.Service) (pluginAPI.DirectMembership, error) {
 			return api.ListAgentPluginMembers(
 				context.Background(),
 				ref,
@@ -264,11 +253,11 @@ func (w *AgentStoreWrapper) ListAgentPluginMembers(
 
 func (w *AgentStoreWrapper) ResolveAgentPluginCapabilities(
 	ref artifactModel.ArtifactRef,
-) (plugin.PluginCapabilityPlan, error) {
+) (pluginAPI.PluginCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			plugin.PluginCapabilityPlan,
+		func(api *agentAPI.Service) (
+			pluginAPI.PluginCapabilityPlan,
 			error,
 		) {
 			return api.ResolveAgentPluginCapabilities(
@@ -280,23 +269,23 @@ func (w *AgentStoreWrapper) ResolveAgentPluginCapabilities(
 }
 
 func (w *AgentStoreWrapper) UpdateAgentPlugin(
-	request plugin.UpdateRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.UpdateRequest,
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
 			return api.UpdateAgentPlugin(context.Background(), request)
 		},
 	)
 }
 
 func (w *AgentStoreWrapper) AddAgentPluginMember(
-	request plugin.AddMemberRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.AddMemberRequest,
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			plugin.PluginView,
+		func(api *agentAPI.Service) (
+			pluginAPI.PluginView,
 			error,
 		) {
 			return api.AddAgentPluginMember(
@@ -308,12 +297,12 @@ func (w *AgentStoreWrapper) AddAgentPluginMember(
 }
 
 func (w *AgentStoreWrapper) AddAgentPluginArtifactMember(
-	request plugin.AddArtifactMemberRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.AddArtifactMemberRequest,
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			plugin.PluginView,
+		func(api *agentAPI.Service) (
+			pluginAPI.PluginView,
 			error,
 		) {
 			return api.AddAgentPluginArtifactMember(
@@ -325,12 +314,12 @@ func (w *AgentStoreWrapper) AddAgentPluginArtifactMember(
 }
 
 func (w *AgentStoreWrapper) RemoveAgentPluginMember(
-	request plugin.RemoveMemberRequest,
-) (plugin.PluginView, error) {
+	request pluginAPI.RemoveMemberRequest,
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			plugin.PluginView,
+		func(api *agentAPI.Service) (
+			pluginAPI.PluginView,
 			error,
 		) {
 			return api.RemoveAgentPluginMember(
@@ -345,10 +334,10 @@ func (w *AgentStoreWrapper) SetAgentPluginEnabled(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (plugin.PluginView, error) {
+) (pluginAPI.PluginView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (plugin.PluginView, error) {
+		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
 			return api.SetAgentPluginEnabled(
 				context.Background(),
 				ref,
@@ -376,13 +365,13 @@ func (w *AgentStoreWrapper) DeleteAgentPlugin(
 }
 
 func (w *AgentStoreWrapper) ListAgentImportDestinations() (
-	[]agentConsumerAPI.AgentImportDestination,
+	[]agentAPI.AgentImportDestination,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			[]agentConsumerAPI.AgentImportDestination,
+		func(api *agentAPI.Service) (
+			[]agentAPI.AgentImportDestination,
 			error,
 		) {
 			return api.ListAgentImportDestinationsForManagement(
@@ -393,12 +382,12 @@ func (w *AgentStoreWrapper) ListAgentImportDestinations() (
 }
 
 func (w *AgentStoreWrapper) PreviewAgentImport(
-	request agentConsumerAPI.AgentImportPreviewRequest,
-) (agentConsumerAPI.AgentImportPreview, error) {
+	request agentAPI.AgentImportPreviewRequest,
+) (agentAPI.AgentImportPreview, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			agentConsumerAPI.AgentImportPreview,
+		func(api *agentAPI.Service) (
+			agentAPI.AgentImportPreview,
 			error,
 		) {
 			return api.PreviewAgentImport(context.Background(), request)
@@ -407,12 +396,12 @@ func (w *AgentStoreWrapper) PreviewAgentImport(
 }
 
 func (w *AgentStoreWrapper) CommitAgentImport(
-	request agentConsumerAPI.AgentImportCommitRequest,
-) (agentConsumerAPI.AgentImportCommitResult, error) {
+	request agentAPI.AgentImportCommitRequest,
+) (agentAPI.AgentImportCommitResult, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			agentConsumerAPI.AgentImportCommitResult,
+		func(api *agentAPI.Service) (
+			agentAPI.AgentImportCommitResult,
 			error,
 		) {
 			return api.CommitAgentImport(context.Background(), request)
@@ -421,12 +410,12 @@ func (w *AgentStoreWrapper) CommitAgentImport(
 }
 
 func (w *AgentStoreWrapper) ExportAgent(
-	request agentConsumerAPI.AgentExportRequest,
-) (agentConsumerAPI.AgentExportResult, error) {
+	request agentAPI.AgentExportRequest,
+) (agentAPI.AgentExportResult, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (
-			agentConsumerAPI.AgentExportResult,
+		func(api *agentAPI.Service) (
+			agentAPI.AgentExportResult,
 			error,
 		) {
 			return api.ExportAgent(context.Background(), request)
@@ -435,7 +424,7 @@ func (w *AgentStoreWrapper) ExportAgent(
 }
 
 func (w *AgentStoreWrapper) DeleteManagedAgent(
-	request agentConsumerAPI.ManagedAgentDeleteRequest,
+	request agentAPI.ManagedAgentDeleteRequest,
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {

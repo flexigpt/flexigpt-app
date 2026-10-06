@@ -1648,8 +1648,22 @@ This package completes ownership moves from feature Store packages into their ar
 - Move Text materialization to Text.
 - Move Agent import/export and Agent package operations to Agent.
 - Move Skill source adaptation, package handling, and materialization to Skill.
-- Move Go Tool metadata-based capability preparation to Tool.
-- Remove SDK Tool support.
+- Preserve dual Tool implementation support.
+  - A `go` Tool declares a local Go function. Its descriptor is generated
+    from the Go Tool registry and it is executed only by the local Tool
+    runtime.
+  - An `sdk` Tool declares a provider-native ToolChoice with `sdkType` and
+    `sdkToolType`. SDK Tools are packaged as static Tool declarations and are
+    hydrated only for inference-provider execution.
+  - Both Go and SDK Tools are first-class source-backed Tool Artifacts. Both
+    participate in Tool Plugin membership, Artifact enablement, catalog
+    projection, capability resolution, and generated built-in inventory.
+  - The local Tool runtime must reject SDK execution attempts. That behavior
+    protects the ownership boundary; it does not mean SDK Tools are
+    unsupported.
+  - Do not remove SDK Tool declaration fields, static SDK Tool inventory,
+    generated catalog entries, Tool view fields, SDK inference hydration, or
+    SDK ToolChoice target handling.
 - Split Model and Model Provider services.
 - Move Model and Provider settings, credentials, and preferences to their owners.
 - Move MCP installation and secret semantics to MCP.
@@ -1679,7 +1693,6 @@ At completion:
 - Family Store wrappers no longer contain domain behavior.
 - Generic Source, Artifact, Definition, Resource, Secret, Overlay, ManagePackage, and Install contracts remain the only generic dependencies.
 - Runtime execution packages receive runtime-neutral family outputs rather than reconstructing artifact meaning themselves.
-- Tool behavior supports Go implementations only.
 
 ### Package F: Bind supplied content, direct capabilities, application setup, runtime adapters, and wrappers
 
@@ -1693,7 +1706,7 @@ This package completes the runtime-independent library boundary and moves applic
 - Move application Root, Source, retention, protection, baseline, and installation setup into `artifactsetup`.
 - Bind generic generated-content preload to application-supplied content registrations.
 - Bind immutable embedded filesystem registrations.
-- Bind Go Tool metadata provider.
+- Bind Tool metadata provider.
 - Bind Model target and adapter providers.
 - Bind MCP runtime adapters and trusted plaintext secret access.
 - Bind Skill runtime adapters and native-path materialization.

@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
@@ -35,7 +35,7 @@ type PreparedPackage struct {
 func PrepareProviderPackage(
 	ctx context.Context,
 	document modelproviderv1.ProviderDocument,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := requirePreparationContext(ctx); err != nil {
 		return PreparedPackage{}, err
@@ -92,7 +92,7 @@ func PrepareProviderPackage(
 func PrepareModelPackage(
 	ctx context.Context,
 	document modelv1.ModelDocument,
-	registry *interpretation.Registry,
+	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	if err := requirePreparationContext(ctx); err != nil {
 		return PreparedPackage{}, err
