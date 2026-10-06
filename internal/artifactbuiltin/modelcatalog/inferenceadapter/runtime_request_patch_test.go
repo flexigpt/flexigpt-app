@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 

@@ -12,8 +12,8 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 )
 
 const runtimeProviderCleanupTimeout = 5 * time.Second

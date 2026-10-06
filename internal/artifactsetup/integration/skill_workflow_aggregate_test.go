@@ -9,14 +9,14 @@ import (
 
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
 func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {

@@ -13,10 +13,10 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 )

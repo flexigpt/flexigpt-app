@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
 const skillRuntimeCloseTimeout = 30 * time.Second

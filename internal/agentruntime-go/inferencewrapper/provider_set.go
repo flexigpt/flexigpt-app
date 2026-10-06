@@ -14,8 +14,8 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )

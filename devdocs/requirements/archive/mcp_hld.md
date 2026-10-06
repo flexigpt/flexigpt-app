@@ -1597,7 +1597,7 @@ Update conversation specs:
 
 ```text
 internal/conversation/spec/req_resp.go
-internal/inferencewrapper/spec/req_resp.go
+internal/agentruntime-go/inferencewrapper/spec/req_resp.go
 ```
 
 ### Composer state
@@ -1733,8 +1733,8 @@ internal/mcp/inferencebridge/
 Update:
 
 ```text
-internal/inferencewrapper/provider_set.go
-internal/inferencewrapper/spec/req_resp.go
+internal/agentruntime-go/inferencewrapper/provider_set.go
+internal/agentruntime-go/inferencewrapper/spec/req_resp.go
 ```
 
 ### Request model update
