@@ -19,9 +19,6 @@ func (c *Service) RegisterCompiledPackages(
 	ctx context.Context,
 	values []installModel.CompiledRegistration,
 ) error {
-	if c == nil || c.Refresh == nil {
-		return spec.ErrClosed
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}

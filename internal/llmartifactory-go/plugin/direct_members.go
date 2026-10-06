@@ -56,7 +56,7 @@ func (a *API) ResolveDirectMembers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (DirectMembership, error) {
-	if a == nil || a.resolver == nil || a.artifacts == nil {
+	if a.resolver == nil || a.artifacts == nil {
 		return DirectMembership{}, spec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {

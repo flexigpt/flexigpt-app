@@ -20,9 +20,6 @@ func (r *ArtifactCleanupRepository) CleanupArtifactLocalState(
 	request artifactcleanupFlow.PurgeRequest,
 	now time.Time,
 ) (artifactModel.Artifact, error) {
-	if r == nil || r.store == nil {
-		return artifactModel.Artifact{}, spec.ErrClosed
-	}
 	if now.IsZero() {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact cleanup time is required",

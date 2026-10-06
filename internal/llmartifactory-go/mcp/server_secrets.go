@@ -4,16 +4,12 @@ import (
 	"context"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (a *Service) GetServerSecrets(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ServerSecretsView, error) {
-	if a == nil || a.installation == nil {
-		return ServerSecretsView{}, spec.ErrClosed
-	}
 	inputs, err := a.installation.SecretInputs(ctx, ref)
 	if err != nil {
 		return ServerSecretsView{}, err

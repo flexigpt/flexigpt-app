@@ -25,9 +25,6 @@ func (a *Service) AddSkillPath(
 	ctx context.Context,
 	request SkillPathRegistration,
 ) (SkillPathRegistrationResult, error) {
-	if a == nil {
-		return SkillPathRegistrationResult{}, spec.ErrClosed
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return SkillPathRegistrationResult{}, err
 	}

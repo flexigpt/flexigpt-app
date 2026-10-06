@@ -137,9 +137,6 @@ func (e *Engine) DecoderFingerprint() (
 	cryptoutil.Digest,
 	error,
 ) {
-	if e == nil || e.decoders == nil {
-		return "", spec.ErrClosed
-	}
 	return e.decoders.Fingerprint()
 }
 

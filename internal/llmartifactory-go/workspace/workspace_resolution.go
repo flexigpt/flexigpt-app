@@ -19,11 +19,6 @@ func (a *Service) resolveCurrentWorkspace(
 	*composition.ResolvedEntry,
 	error,
 ) {
-	if a == nil || a.resolver == nil {
-		return workspaceDomain.Workspace{},
-			nil,
-			spec.ErrClosed
-	}
 	workspace, err := a.resolveWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err

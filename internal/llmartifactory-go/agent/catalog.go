@@ -68,9 +68,6 @@ func (a *Service) ResolveAgent(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (AgentResolution, error) {
-	if a == nil || a.declarationResolver == nil {
-		return AgentResolution{}, spec.ErrClosed
-	}
 	plan, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
 	if err != nil {
 		return AgentResolution{}, err
@@ -99,9 +96,6 @@ func (a *Service) ResolveAgentCapabilities(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (AgentCapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
-		return AgentCapabilityPlan{}, spec.ErrClosed
-	}
 	value, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
 	if err != nil {
 		return AgentCapabilityPlan{}, err
@@ -209,9 +203,6 @@ func (a *Service) listPluginAgentRefs(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) ([]artifactModel.ArtifactRef, error) {
-	if a == nil || a.plugins == nil || a.declarationResolver == nil {
-		return nil, spec.ErrClosed
-	}
 	if _, err := a.plugins.Read(ctx, ref); err != nil {
 		return nil, err
 	}

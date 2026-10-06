@@ -56,9 +56,6 @@ func (s *Synchronizer) Synchronize(
 	seenLocators []spec.Locator,
 	existing []artifactModel.Artifact,
 ) (Synchronization, error) {
-	if s == nil || s.clock == nil || s.ids == nil {
-		return Synchronization{}, spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return Synchronization{}, err
 	}

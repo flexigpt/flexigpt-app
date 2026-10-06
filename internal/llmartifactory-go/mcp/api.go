@@ -161,7 +161,7 @@ func (a *Service) SaveServerSettings(
 	expectedSettingsRevision uint64,
 	data serverMCPDomain.ServerData,
 ) error {
-	if a == nil || a.installation == nil {
+	if a.installation == nil {
 		return spec.ErrClosed
 	}
 	_, err := a.installation.Save(
@@ -180,8 +180,7 @@ func (a *Service) ListMCPPluginServers(
 	ctx context.Context,
 	pluginRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	if a == nil ||
-		a.plugins == nil ||
+	if a.plugins == nil ||
 		a.resources == nil ||
 		a.declarationResolver == nil {
 		return nil, spec.ErrClosed
@@ -247,7 +246,7 @@ func (a *Service) ResolveMCPServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ServerRead, error) {
-	if a == nil || a.resources == nil {
+	if a.resources == nil {
 		return ServerRead{}, spec.ErrClosed
 	}
 	return resourceFlow.WithVerificationSession(
@@ -429,7 +428,7 @@ func (a *Service) resolveServerMaterial(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (installation.Material, error) {
-	if a == nil || a.installation == nil {
+	if a.installation == nil {
 		return installation.Material{}, spec.ErrClosed
 	}
 	return a.installation.Resolve(ctx, ref)
@@ -439,7 +438,7 @@ func (a *Service) resolveDeclarationArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.ArtifactRef, error) {
-	if a == nil || a.declarationResolver == nil {
+	if a.declarationResolver == nil {
 		return artifactModel.ArtifactRef{}, spec.ErrClosed
 	}
 	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)

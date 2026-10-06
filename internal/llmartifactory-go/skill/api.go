@@ -231,9 +231,6 @@ func (a *Service) CreateManagedSkill(
 	ctx context.Context,
 	request ManagedSkillCreateRequest,
 ) (ManagedSkillCreateResult, error) {
-	if a == nil || a.plugins == nil {
-		return ManagedSkillCreateResult{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
@@ -378,9 +375,6 @@ func (a *Service) ReplaceManagedSkill(
 	ctx context.Context,
 	request ManagedSkillReplaceRequest,
 ) (ManagedSkillReplaceResult, error) {
-	if a == nil || a.plugins == nil {
-		return ManagedSkillReplaceResult{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
@@ -606,9 +600,6 @@ func (a *Service) GetManagedSkillDocument(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (skillSource.ManagedSkillDocument, error) {
-	if a == nil || a.resources == nil {
-		return skillSource.ManagedSkillDocument{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -729,9 +720,6 @@ func (a *Service) EnsureSkillBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 

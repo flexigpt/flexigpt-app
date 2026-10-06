@@ -100,9 +100,6 @@ func (c *Service) GetTopologyHydration(
 	ctx context.Context,
 	installerName string,
 ) (installModel.Hydration, bool, error) {
-	if c == nil || c.metadata == nil {
-		return installModel.Hydration{}, false, spec.ErrClosed
-	}
 	return c.metadata.GetTopologyHydration(ctx, installerName)
 }
 

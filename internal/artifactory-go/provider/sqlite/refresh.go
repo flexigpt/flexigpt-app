@@ -55,9 +55,6 @@ func (p *Publisher) Publish(
 	ctx context.Context,
 	publication refreshFlow.Publication,
 ) (refreshModel.State, error) {
-	if p == nil || p.store == nil {
-		return refreshModel.State{}, spec.ErrClosed
-	}
 	if err := publication.Validate(); err != nil {
 		return refreshModel.State{}, err
 	}

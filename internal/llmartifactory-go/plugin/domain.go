@@ -250,7 +250,7 @@ func (a *API) domainManagedSource(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (sourceModel.Summary, error) {
-	if a == nil || a.domain == nil {
+	if a.domain == nil {
 		return sourceModel.Summary{}, spec.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
@@ -549,9 +549,6 @@ func (a *API) Read(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	ref, err := a.resolvePluginRef(ctx, ref)
 	if err != nil {
 		return PluginView{}, err

@@ -71,9 +71,6 @@ func (s *Service) ResolvePlan(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (Plan, error) {
-	if s == nil || s.resolver == nil {
-		return Plan{}, spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return Plan{}, err
 	}

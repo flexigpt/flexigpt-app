@@ -243,10 +243,6 @@ func (a *Service) refreshEffectiveWorkspaces(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if a == nil || a.refresher == nil {
-		return spec.ErrClosed
-	}
-
 	values, err := a.workspaceSources.required(ctx, rootID)
 	if err != nil {
 		return err

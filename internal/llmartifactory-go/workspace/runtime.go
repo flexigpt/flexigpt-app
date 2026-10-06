@@ -19,9 +19,6 @@ func (a *Service) ComposeWorkspacePrompt(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
-	if a == nil || a.resources == nil {
-		return WorkspacePromptPlan{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -73,9 +70,6 @@ func (a *Service) LoadWorkspaceSkills(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
-	if a == nil || a.resources == nil {
-		return WorkspaceSkillLoadPlan{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -127,9 +121,6 @@ func (a *Service) LoadWorkspaceMCPServers(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceMCPServerLoadPlan, error) {
-	if a == nil || a.resources == nil {
-		return WorkspaceMCPServerLoadPlan{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -181,7 +172,7 @@ func (a *Service) ResolveWorkspaceRuntimePlan(
 	workspace artifactModel.ArtifactRef,
 	selection WorkspaceRuntimeSelection,
 ) (WorkspaceRuntimePlan, error) {
-	if a == nil || a.resources == nil {
+	if a.resources == nil {
 		return WorkspaceRuntimePlan{}, spec.ErrClosed
 	}
 	return resourceFlow.WithVerificationSession(

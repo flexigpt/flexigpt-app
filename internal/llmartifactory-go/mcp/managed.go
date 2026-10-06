@@ -20,9 +20,6 @@ func (a *Service) CreateMCPServer(
 	ctx context.Context,
 	request ManagedMCPCreateRequest,
 ) (ManagedMCPCreateResult, error) {
-	if a == nil || a.plugins == nil {
-		return ManagedMCPCreateResult{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
@@ -144,9 +141,6 @@ func (a *Service) UpdateMCPServer(
 	ctx context.Context,
 	request ManagedMCPReplaceRequest,
 ) (ManagedMCPReplaceResult, error) {
-	if a == nil || a.plugins == nil {
-		return ManagedMCPReplaceResult{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
@@ -403,9 +397,6 @@ func (a *Service) DeleteMCPServer(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected MCP Artifact revision is required",

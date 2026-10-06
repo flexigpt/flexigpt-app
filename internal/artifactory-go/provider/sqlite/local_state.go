@@ -24,9 +24,6 @@ func (r *OverlayRepository) GetOverlay(
 	ref artifactModel.ArtifactRef,
 	namespace overlayModel.Namespace,
 ) (overlayModel.Record, bool, error) {
-	if r == nil || r.store == nil {
-		return overlayModel.Record{}, false, spec.ErrClosed
-	}
 	if err := r.store.requireActiveRoot(ctx, ref.RootID); err != nil {
 		return overlayModel.Record{}, false, err
 	}
@@ -51,9 +48,6 @@ func (r *OverlayRepository) PutOverlay(
 	request overlayModel.PutRequest,
 	now time.Time,
 ) (overlayModel.Record, error) {
-	if r == nil || r.store == nil {
-		return overlayModel.Record{}, spec.ErrClosed
-	}
 	if now.IsZero() {
 		return overlayModel.Record{}, fmt.Errorf(
 			"%w: protected overlay time is required",
@@ -184,10 +178,6 @@ func (r *OverlayRepository) DeleteOverlay(
 	expectedOverlayRevision uint64,
 	now time.Time,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
-
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -259,9 +249,6 @@ func (r *SecretRepository) GetBinding(
 	ctx context.Context,
 	key secretModel.BindingKey,
 ) (secretModel.Binding, bool, error) {
-	if r == nil || r.store == nil {
-		return secretModel.Binding{}, false, spec.ErrClosed
-	}
 	if err := r.store.requireActiveRoot(
 		ctx,
 		key.Artifact.RootID,
@@ -283,9 +270,6 @@ func (r *SecretRepository) CreatePendingSecret(
 	ctx context.Context,
 	record secretModel.Record,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if record.State != secretModel.RecordStatePending {
 		return fmt.Errorf(
 			"%w: new secret record must begin pending",
@@ -313,9 +297,6 @@ func (r *SecretRepository) AttachSecretBinding(
 	request storeSecret.AttachBindingRequest,
 	now time.Time,
 ) (secretModel.Binding, error) {
-	if r == nil || r.store == nil {
-		return secretModel.Binding{}, spec.ErrClosed
-	}
 	if request.Record.State != secretModel.RecordStatePending {
 		return secretModel.Binding{}, fmt.Errorf(
 			"%w: attached secret record must be pending",
@@ -511,9 +492,6 @@ func (r *SecretRepository) ClearSecretBinding(
 	request secretModel.ClearBindingRequest,
 	now time.Time,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret binding time is required",
@@ -606,9 +584,6 @@ func (r *SecretRepository) QueueSecretForCleanup(
 	ref secretModel.Ref,
 	now time.Time,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}
@@ -635,9 +610,6 @@ func (r *SecretRepository) RecoverPendingSecrets(
 	ctx context.Context,
 	now time.Time,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret recovery time is required",
@@ -693,9 +665,6 @@ func (r *SecretRepository) ListSecretCleanup(
 	ctx context.Context,
 	maximum int,
 ) ([]secretModel.Cleanup, error) {
-	if r == nil || r.store == nil {
-		return nil, spec.ErrClosed
-	}
 	if maximum <= 0 || maximum > spec.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: secret cleanup limit is invalid",
@@ -761,9 +730,6 @@ func (r *SecretRepository) CompleteSecretCleanup(
 	ctx context.Context,
 	ref secretModel.Ref,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}
@@ -825,9 +791,6 @@ func (r *SecretRepository) RecordSecretCleanupFailure(
 	reason string,
 	now time.Time,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}

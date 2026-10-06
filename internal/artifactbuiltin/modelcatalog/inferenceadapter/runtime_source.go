@@ -19,9 +19,6 @@ import (
 // this adapter's lookup capability. Call exactly once, before serving requests.
 // Direct conversion of already-resolved values does not require this binding.
 func (a *RuntimeAdapter) BindModelStore(store *modelAPI.Service) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if store == nil {
 		return fmt.Errorf(
 			"%w: Model runtime store is required",

@@ -49,9 +49,6 @@ func (s *Service) Publish(
 	ctx context.Context,
 	request managepackageModel.PublishRequest,
 ) (result managepackageModel.PublishResult, returnErr error) {
-	if s == nil {
-		return managepackageModel.PublishResult{}, spec.ErrClosed
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
@@ -321,9 +318,6 @@ func (s *Service) remove(
 	ctx context.Context,
 	request managepackageModel.RemoveRequest,
 ) error {
-	if s == nil {
-		return spec.ErrClosed
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return err
 	}

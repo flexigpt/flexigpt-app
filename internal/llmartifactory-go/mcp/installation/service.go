@@ -213,9 +213,6 @@ func (s *Service) Purge(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
-	if s == nil || s.overlays == nil {
-		return spec.ErrClosed
-	}
 	return s.overlays.PurgeServerLocalState(ctx, ref)
 }
 

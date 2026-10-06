@@ -32,9 +32,6 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (serverMCPDomain.Resolved, error) {
-	if r == nil || r.api == nil {
-		return serverMCPDomain.Resolved{}, spec.ErrClosed
-	}
 	read, err := r.api.ResolveMCPServer(ctx, ref)
 	if err != nil {
 		return serverMCPDomain.Resolved{}, err

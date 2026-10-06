@@ -17,9 +17,6 @@ func (c *Service) EnsureProtectedTopology(
 	ctx context.Context,
 	declaration installModel.Declaration,
 ) (installModel.Installed, error) {
-	if c == nil || c.Roots == nil || c.Sources == nil {
-		return installModel.Installed{}, spec.ErrClosed
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return installModel.Installed{}, err
 	}

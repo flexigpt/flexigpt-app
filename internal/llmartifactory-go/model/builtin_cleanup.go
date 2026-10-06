@@ -70,9 +70,6 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	sourceID sourceModel.SourceID,
 	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]BuiltinArtifactSnapshot, error) {
-	if c == nil || c.api == nil {
-		return nil, spec.ErrClosed
-	}
 	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
 		return nil, fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
@@ -134,9 +131,6 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	addresses []managedpackageModel.ManagedPackageAddress,
 	previous []BuiltinArtifactSnapshot,
 ) error {
-	if c == nil || c.api == nil {
-		return spec.ErrClosed
-	}
 	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
 		return fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",

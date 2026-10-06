@@ -24,7 +24,7 @@ func (a *Service) ListMCPServersReferencingPolicy(
 	rootID rootModel.RootID,
 	policyName spec.LogicalName,
 ) ([]artifactModel.ArtifactRef, error) {
-	if a == nil || a.resources == nil {
+	if a.resources == nil {
 		return nil, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {

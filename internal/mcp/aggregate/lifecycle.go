@@ -53,7 +53,7 @@ func (l *Lifecycle) InvalidateServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
-	if l == nil || l.runtime == nil {
+	if l.runtime == nil {
 		return mcpServer.ErrClosed
 	}
 	serverID, err := runtimeServerIDForArtifact(ref)
@@ -70,7 +70,7 @@ func (l *Lifecycle) InvalidateServers(
 	ctx context.Context,
 	refs []artifactModel.ArtifactRef,
 ) error {
-	if l == nil || l.runtime == nil {
+	if l.runtime == nil {
 		return mcpServer.ErrClosed
 	}
 

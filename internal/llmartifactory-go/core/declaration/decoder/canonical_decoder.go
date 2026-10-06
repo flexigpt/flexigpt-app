@@ -94,7 +94,7 @@ func (d *canonicalDecoder) Decode(
 	candidate ingestModel.Candidate,
 	raw []byte,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	if d == nil || d.schemas == nil || d.dispatch == nil {
+	if d.schemas == nil || d.dispatch == nil {
 		return nil, decodeDiagnostic(
 			candidate,
 			"artifact.declaration-schema-unavailable",

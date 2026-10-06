@@ -17,9 +17,6 @@ import (
 // checks current applicability and commits Source, refresh-state, and Artifact
 // changes as one transaction; it never chooses lifecycle policy itself.
 func (p *Publisher) PublishLifecycle(ctx context.Context, publication refreshFlow.LifecyclePublication) error {
-	if p == nil || p.store == nil {
-		return spec.ErrClosed
-	}
 	if err := publication.Validate(); err != nil {
 		return err
 	}

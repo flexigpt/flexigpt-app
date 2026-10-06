@@ -19,10 +19,6 @@ func (r *OverlayRepository) GetStoreOverlay(
 	ctx context.Context,
 	namespace overlayModel.Namespace,
 ) (overlayModel.StoreRecord, bool, error) {
-	if r == nil || r.store == nil {
-		return overlayModel.StoreRecord{}, false, spec.ErrClosed
-	}
-
 	value, err := getStoreOverlayTx(
 		ctx,
 		r.store.db,
@@ -42,9 +38,6 @@ func (r *OverlayRepository) PutStoreOverlay(
 	request overlayModel.StorePutRequest,
 	now time.Time,
 ) (overlayModel.StoreRecord, error) {
-	if r == nil || r.store == nil {
-		return overlayModel.StoreRecord{}, spec.ErrClosed
-	}
 	if now.IsZero() {
 		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay time is required",
@@ -155,10 +148,6 @@ func (r *OverlayRepository) DeleteStoreOverlay(
 	namespace overlayModel.Namespace,
 	expectedRevision uint64,
 ) error {
-	if r == nil || r.store == nil {
-		return spec.ErrClosed
-	}
-
 	result, err := r.store.db.ExecContext(
 		ctx,
 		`DELETE FROM artifact_store_overlays

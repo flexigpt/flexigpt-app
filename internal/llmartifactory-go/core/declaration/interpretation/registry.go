@@ -156,9 +156,6 @@ func (r *Registry) SchemaKeys() []schemaModel.Key {
 func (r *Registry) RequireSchemaKeys(
 	keys []schemaModel.Key,
 ) ([]schemaModel.Key, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
 	if len(keys) == 0 {
 		return nil, fmt.Errorf(
 			"%w: declaration schema key selection is empty",
@@ -215,10 +212,6 @@ func (r *Registry) RequireSchemaKeys(
 func (r *Registry) SchemaKeysForArtifactKinds(
 	kinds []artifactModel.ArtifactKind,
 ) ([]schemaModel.Key, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
-
 	keys := make([]schemaModel.Key, 0, len(kinds))
 	seen := make(map[artifactModel.ArtifactKind]struct{}, len(kinds))
 	for _, kind := range kinds {
@@ -290,9 +283,6 @@ func (r *Registry) LocatorCandidates(
 	kind artifactModel.ArtifactKind,
 	target spec.Locator,
 ) ([]spec.Locator, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
 	declarationType := declaration.Type(kind)
 	values := r.byType[declarationType]
 	if len(values) == 0 {
@@ -516,9 +506,6 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 	root declaration.Entry,
 	rootSchemaValidated bool,
 ) ([]NamedEntry, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := root.Validate(); err != nil {
 		return nil, err
 	}
@@ -717,9 +704,6 @@ func (r *Registry) definitionsForDocument(
 func (r *Registry) registrationForSchema(
 	key schemaModel.Key,
 ) (Registration, error) {
-	if r == nil {
-		return Registration{}, spec.ErrClosed
-	}
 	value, found := r.bySchema[key]
 	if !found {
 		return Registration{}, fmt.Errorf(
@@ -736,9 +720,6 @@ func (r *Registry) registrationForSchema(
 func (r *Registry) registrationForEntry(
 	entry declaration.Entry,
 ) (Registration, error) {
-	if r == nil {
-		return Registration{}, spec.ErrClosed
-	}
 	header := entry.Header()
 	values := r.byType[header.Type]
 	if len(values) == 0 {

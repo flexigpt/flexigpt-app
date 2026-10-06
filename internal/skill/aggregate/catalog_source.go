@@ -34,12 +34,6 @@ func (s *CatalogSource) Skills(
 	ctx context.Context,
 	catalogID skillRuntime.CatalogID,
 ) ([]skillRuntime.SkillRegistration, error) {
-	if s == nil || s.router == nil {
-		return nil, fmt.Errorf(
-			"%w: Artifact Skill catalog source is unavailable",
-			spec.ErrClosed,
-		)
-	}
 	rootID, err := RootCatalogIDRoot(catalogID)
 	if err != nil {
 		return nil, err

@@ -20,10 +20,6 @@ func (a *API) EnsureMemberForPluginSource(
 	ctx context.Context,
 	request EnsureMemberForPluginSourceRequest,
 ) (MemberMutationResult, error) {
-	if a == nil {
-		return MemberMutationResult{}, spec.ErrClosed
-	}
-
 	member, err := a.MemberForPluginSource(
 		ctx,
 		request.Plugin,

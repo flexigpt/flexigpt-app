@@ -83,9 +83,6 @@ func (s *Store) PutTopologyHydration(
 func (s *Store) ListTopologyPackageHydrations(
 	ctx context.Context,
 ) ([]installModel.PackageHydration, error) {
-	if s == nil || s.db == nil {
-		return nil, spec.ErrClosed
-	}
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT installer_name, package_scope, root_id, source_id, fingerprint

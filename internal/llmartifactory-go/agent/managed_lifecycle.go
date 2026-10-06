@@ -28,9 +28,6 @@ func (a *Service) DeleteManagedAgent(
 	ctx context.Context,
 	request ManagedAgentDeleteRequest,
 ) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Agent Artifact revision is required",
@@ -74,10 +71,6 @@ func (a *Service) purgeRemovedManagedAgentArtifacts(
 	current artifactModel.Artifact,
 	rootRef artifactModel.ArtifactRef,
 ) error {
-	if a == nil || a.artifacts == nil {
-		return spec.ErrClosed
-	}
-
 	records, err := a.cat.ListBySource(
 		ctx,
 		current.RootID,
@@ -148,9 +141,6 @@ func (a *Service) loadManagedAgent(
 	expectedRevision uint64,
 	requireCurrentSource bool,
 ) (editableManagedAgent, error) {
-	if a == nil {
-		return editableManagedAgent{}, spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return editableManagedAgent{}, err
 	}

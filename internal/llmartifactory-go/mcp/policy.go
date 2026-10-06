@@ -22,12 +22,6 @@ func (a *Service) SaveMCPPolicy(
 	ctx context.Context,
 	request ManagedMCPPolicyUpsertRequest,
 ) (ManagedMCPPolicyUpsertResult, error) {
-	if a == nil {
-		return ManagedMCPPolicyUpsertResult{}, spec.ErrClosed
-	}
-	if a.plugins == nil {
-		return ManagedMCPPolicyUpsertResult{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
@@ -164,9 +158,6 @@ func (a *Service) DeleteMCPPolicy(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected MCP Policy Artifact revision is required",

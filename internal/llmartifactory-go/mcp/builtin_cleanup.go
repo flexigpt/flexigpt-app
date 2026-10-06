@@ -57,7 +57,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	sourceID sourceModel.SourceID,
 	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]artifactModel.ArtifactRef, error) {
-	if c == nil || c.api == nil {
+	if c.api == nil {
 		return nil, spec.ErrClosed
 	}
 	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
@@ -121,7 +121,7 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 	ctx context.Context,
 	refs []artifactModel.ArtifactRef,
 ) error {
-	if c == nil || c.api == nil {
+	if c.api == nil {
 		return spec.ErrClosed
 	}
 

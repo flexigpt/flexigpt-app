@@ -32,9 +32,6 @@ func (s *ConversationSource) ResolveWorkspace(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (workspaceDomain.WorkspaceView, error) {
-	if s == nil || s.api == nil {
-		return workspaceDomain.WorkspaceView{}, spec.ErrClosed
-	}
 	value, err := s.api.resolveWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.WorkspaceView{}, err
@@ -47,9 +44,6 @@ func (s *ConversationSource) ComposeWorkspacePrompt(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
-	if s == nil || s.api == nil {
-		return WorkspacePromptPlan{}, spec.ErrClosed
-	}
 	return s.api.ComposeWorkspacePrompt(ctx, workspace, artifacts)
 }
 
@@ -58,8 +52,5 @@ func (s *ConversationSource) LoadWorkspaceSkills(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
-	if s == nil || s.api == nil {
-		return WorkspaceSkillLoadPlan{}, spec.ErrClosed
-	}
 	return s.api.LoadWorkspaceSkills(ctx, workspace, artifacts)
 }

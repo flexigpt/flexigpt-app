@@ -74,9 +74,6 @@ func (a *Service) ListAgentImportDestinations(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]AgentImportDestination, error) {
-	if a == nil || a.plugins == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -679,9 +676,6 @@ func (a *Service) agentImportDestination(
 	pluginRef artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) (agentImportDestinationState, error) {
-	if a == nil || a.plugins == nil {
-		return agentImportDestinationState{}, spec.ErrClosed
-	}
 	if err := pluginRef.Validate(); err != nil {
 		return agentImportDestinationState{}, err
 	}
@@ -761,10 +755,6 @@ func (a *Service) agentImportDestination(
 func (a *Service) plannedImportArtifacts(
 	entry declaration.Entry,
 ) ([]plannedImportIdentity, []AgentImportArtifactPreview, error) {
-	if a == nil || a.interpretations == nil {
-		return nil, nil, spec.ErrClosed
-	}
-
 	named, err := a.interpretations.WalkNamedEntries(entry)
 	if err != nil {
 		return nil, nil, err
@@ -867,10 +857,6 @@ func (a *Service) managedAgentPackageConflict(
 	sourceID sourceModel.SourceID,
 	address managedpackageModel.ManagedPackageAddress,
 ) (*AgentImportConflict, error) {
-	if a == nil || a.resources == nil {
-		return nil, spec.ErrClosed
-	}
-
 	directory, err := address.Directory()
 	if err != nil {
 		return nil, err

@@ -76,9 +76,6 @@ func (*PathFactory) Revision() string {
 func (p *PathFactory) Bind(
 	runtime Runtime,
 ) (Resolver, error) {
-	if p == nil || p.interpretations == nil {
-		return nil, spec.ErrClosed
-	}
 	if runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator runtime is nil",

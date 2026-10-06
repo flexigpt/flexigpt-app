@@ -20,10 +20,6 @@ func (a *Service) ExportAgent(
 	ctx context.Context,
 	request AgentExportRequest,
 ) (AgentExportResult, error) {
-	if a == nil || a.artifacts == nil {
-		return AgentExportResult{}, spec.ErrClosed
-	}
-
 	record, err := a.getAgentRecord(ctx, request.Agent)
 	if err != nil {
 		return AgentExportResult{}, err

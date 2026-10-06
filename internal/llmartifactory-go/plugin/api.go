@@ -209,9 +209,6 @@ func (a *API) Get(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	return a.Read(ctx, ref)
 }
 
@@ -226,9 +223,6 @@ func (a *API) SetEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	if expectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
@@ -268,9 +262,6 @@ func (a *API) Update(
 	ctx context.Context,
 	request UpdateRequest,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	if request.ExpectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
@@ -332,9 +323,6 @@ func (a *API) RemoveMember(
 	ctx context.Context,
 	request RemoveMemberRequest,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	if request.ExpectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
@@ -413,9 +401,6 @@ func (a *API) AddArtifactMember(
 	ctx context.Context,
 	request AddArtifactMemberRequest,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	if err := request.Plugin.Validate(); err != nil {
 		return PluginView{}, err
 	}
@@ -481,9 +466,6 @@ func (a *API) MemberForPluginSource(
 	name spec.LogicalName,
 	target spec.Locator,
 ) (MemberReference, error) {
-	if a == nil {
-		return MemberReference{}, spec.ErrClosed
-	}
 	if err := declarationType.Validate(); err != nil {
 		return MemberReference{}, err
 	}
@@ -521,9 +503,6 @@ func (a *API) Delete(
 	ctx context.Context,
 	request DeleteRequest,
 ) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Plugin revision is required",
@@ -617,9 +596,6 @@ func (a *API) create(
 	request CreateRequest,
 	allowBaseline bool,
 ) (PluginView, error) {
-	if a == nil {
-		return PluginView{}, spec.ErrClosed
-	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return PluginView{}, err
 	}
@@ -731,10 +707,6 @@ func (a *API) mutateMember(
 	request AddMemberRequest,
 	ensure bool,
 ) (MemberMutationResult, error) {
-	if a == nil {
-		return MemberMutationResult{}, spec.ErrClosed
-	}
-
 	if err := a.validateDomainMember(request.Member); err != nil {
 		return MemberMutationResult{}, err
 	}
@@ -758,9 +730,6 @@ func (a *API) mutateEntry(
 	request AddEntryRequest,
 	ensure bool,
 ) (MemberMutationResult, error) {
-	if a == nil {
-		return MemberMutationResult{}, spec.ErrClosed
-	}
 	if request.ExpectedRevision == 0 {
 		return MemberMutationResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
@@ -1275,9 +1244,6 @@ func (a *API) isBaselineEditablePlugin(
 func (a *API) creationMembershipPolicy(
 	requested *pluginDomain.MembershipPolicy,
 ) (pluginDomain.MembershipPolicy, error) {
-	if a == nil {
-		return pluginDomain.MembershipPolicy{}, spec.ErrClosed
-	}
 	if a.domain != nil {
 		if requested != nil {
 			return pluginDomain.MembershipPolicy{}, fmt.Errorf(

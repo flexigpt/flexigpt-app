@@ -60,7 +60,7 @@ func (p *ManagedProfilePolicy) Fingerprint() cryptoutil.Digest {
 func (p *ManagedProfilePolicy) Validate(
 	raw []byte,
 ) ([]byte, error) {
-	if p == nil || p.compiled == nil {
+	if p.compiled == nil {
 		return nil, spec.ErrClosed
 	}
 
@@ -128,9 +128,6 @@ func NewManagedProfileRegistry(
 func (r *ManagedProfileRegistry) ManagedProfilePolicyFor(
 	declarationType Type,
 ) (*ManagedProfilePolicy, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := declarationType.Validate(); err != nil {
 		return nil, err
 	}

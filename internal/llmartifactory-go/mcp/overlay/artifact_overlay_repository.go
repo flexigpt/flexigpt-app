@@ -164,9 +164,6 @@ func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
-	if r == nil || r.localState == nil {
-		return spec.ErrClosed
-	}
 	record, err := r.artifact(ctx, ref)
 	if err != nil {
 		return err

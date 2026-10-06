@@ -74,7 +74,7 @@ func (a *Adapter) LoadSelected(
 	workspace workspaceDomain.Workspace,
 	refs []artifactModel.ArtifactRef,
 ) (LoadPlan, error) {
-	if a == nil || a.artifacts == nil || a.resources == nil {
+	if a.artifacts == nil || a.resources == nil {
 		return LoadPlan{}, spec.ErrClosed
 	}
 	return a.loadSelected(ctx, workspace, refs)

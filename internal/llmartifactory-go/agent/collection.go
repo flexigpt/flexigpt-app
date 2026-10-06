@@ -16,9 +16,6 @@ func (a *Service) CreateAgentPlugin(
 	ctx context.Context,
 	request pluginAPI.CreateRequest,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	if request.RootID == "" {
 		rootID, err := a.ensureDefaultAgentPluginRoot(ctx)
 		if err != nil {
@@ -33,9 +30,6 @@ func (a *Service) EnsureAgentBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
@@ -43,9 +37,6 @@ func (a *Service) GetAgentPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.Read(ctx, ref)
 }
 
@@ -53,9 +44,6 @@ func (a *Service) ListAgentPlugins(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]pluginAPI.ListItem, error) {
-	if a == nil || a.plugins == nil {
-		return nil, spec.ErrClosed
-	}
 	return a.plugins.ListDomain(ctx, pluginAPI.ListRequest{RootID: rootID})
 }
 
@@ -63,9 +51,6 @@ func (a *Service) UpdateAgentPlugin(
 	ctx context.Context,
 	request pluginAPI.UpdateRequest,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.Update(ctx, request)
 }
 
@@ -76,9 +61,6 @@ func (a *Service) AddAgentPluginMember(
 	ctx context.Context,
 	request pluginAPI.AddMemberRequest,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.AddMember(ctx, request)
 }
 
@@ -90,10 +72,6 @@ func (a *Service) AddAgentPluginArtifactMember(
 	ctx context.Context,
 	request pluginAPI.AddArtifactMemberRequest,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
-
 	target, err := a.getAgentRecord(ctx, request.Artifact)
 	if err != nil {
 		return pluginAPI.PluginView{}, err
@@ -121,9 +99,6 @@ func (a *Service) RemoveAgentPluginMember(
 	ctx context.Context,
 	request pluginAPI.RemoveMemberRequest,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.RemoveMember(
 		ctx,
 		request,
@@ -136,9 +111,6 @@ func (a *Service) SetAgentPluginEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
 	return a.plugins.SetEnabled(
 		ctx,
 		ref,
@@ -152,9 +124,6 @@ func (a *Service) DeleteAgentPlugin(
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if a == nil || a.plugins == nil {
-		return spec.ErrClosed
-	}
 	return a.plugins.Delete(
 		ctx,
 		pluginAPI.DeleteRequest{
@@ -168,9 +137,6 @@ func (a *Service) ListAgentPluginMembers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (pluginAPI.DirectMembership, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.DirectMembership{}, spec.ErrClosed
-	}
 	return a.plugins.ResolveDirectMembers(ctx, ref)
 }
 
@@ -181,9 +147,6 @@ func (a *Service) ResolveAgentPluginCapabilities(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (pluginAPI.PluginCapabilityPlan, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginCapabilityPlan{}, spec.ErrClosed
-	}
 	return a.plugins.ResolveCapabilities(ctx, ref)
 }
 

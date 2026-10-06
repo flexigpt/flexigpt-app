@@ -266,10 +266,6 @@ func (s *verificationSession) withSource(
 	key verificationSessionSourceKey,
 	fn func(*verificationSessionSource) error,
 ) error {
-	if s == nil {
-		return spec.ErrClosed
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

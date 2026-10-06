@@ -190,9 +190,6 @@ func (a *Service) requireMutable(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if a == nil || a.protection == nil {
-		return spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return err
 	}

@@ -7,7 +7,6 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // RegisterCompiledDocuments accepts only trusted installer work and passes
@@ -18,9 +17,6 @@ func (s *Service) RegisterCompiledDocuments(
 	sourceID sourceModel.SourceID,
 	documents []ingest.CompiledDocument,
 ) error {
-	if s == nil || s.compiled == nil {
-		return spec.ErrClosed
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}

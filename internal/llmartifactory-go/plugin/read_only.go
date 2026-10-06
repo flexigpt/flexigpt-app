@@ -39,9 +39,6 @@ func (p Profile) validateAuthoringConfiguration() error {
 }
 
 func (a *API) requireDeclarationAuthoring() error {
-	if a == nil {
-		return spec.ErrClosed
-	}
 	if a.domain != nil && a.domain.ReadOnly {
 		return fmt.Errorf(
 			"%w: %s Plugin declarations are read-only",
