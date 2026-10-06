@@ -205,16 +205,6 @@ func New(options ResolverOptions) (*Resolver, error) {
 	}, nil
 }
 
-func (r *Resolver) ready() error {
-	if r == nil ||
-		r.artifacts == nil ||
-		r.catalog == nil ||
-		r.interpretations == nil {
-		return spec.ErrClosed
-	}
-	return nil
-}
-
 type ResolutionStatus string
 
 const (
@@ -365,14 +355,4 @@ func cloneResolvedRelationship(
 	}
 	output.Selector = &selector
 	return output
-}
-
-func validateResolutionContext(ctx context.Context) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: Artifact composition context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }

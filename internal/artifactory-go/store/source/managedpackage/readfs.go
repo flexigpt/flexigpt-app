@@ -27,15 +27,6 @@ func ReadPackageFiles(
 	packages fs.FS,
 	packageRoot spec.Locator,
 ) ([]managedpackageModel.ManagedPackageFile, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: embedded package context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package filesystem is nil",
@@ -210,9 +201,7 @@ func readPackageFile(
 	if readErr != nil || closeErr != nil {
 		return nil, errors.Join(readErr, closeErr)
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+
 	if int64(len(content)) != expectedSize {
 		return nil, fmt.Errorf(
 			"%w: embedded package file %q changed while being read",

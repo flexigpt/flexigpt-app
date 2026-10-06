@@ -16,21 +16,6 @@ func (s *Service) pruneDiscoveryLocator(
 	expectedSourceRevision uint64,
 	locator spec.Locator,
 ) (SourceState, error) {
-	if s == nil ||
-		s.dependencies.Sources == nil ||
-		s.dependencies.Runtime == nil ||
-		s.dependencies.Packages == nil {
-		return SourceState{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return SourceState{}, fmt.Errorf(
-			"%w: managed discovery pruning context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return SourceState{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return SourceState{}, err
 	}

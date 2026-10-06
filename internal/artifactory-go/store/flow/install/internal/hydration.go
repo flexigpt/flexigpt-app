@@ -19,18 +19,6 @@ func (c *Service) PrepareTopologyHydrations(
 	ctx context.Context,
 	desiredValues []installModel.Hydration,
 ) (map[string]bool, error) {
-	if c == nil || c.metadata == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: topology hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return nil, err
 	}
@@ -134,21 +122,6 @@ func (c *Service) PutTopologyHydration(
 	ctx context.Context,
 	value installModel.Hydration,
 ) error {
-	if c == nil ||
-		c.metadata == nil ||
-		c.Roots == nil ||
-		c.Sources == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
@@ -195,21 +168,6 @@ func (c *Service) ResetTopologyHydration(
 	installerName string,
 	rootID rootModel.RootID,
 ) error {
-	if c == nil ||
-		c.metadata == nil ||
-		c.Roots == nil ||
-		c.managedSources == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology reset context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}

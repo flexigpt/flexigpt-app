@@ -44,15 +44,6 @@ func PreparePackages(
 	goTools toolDomain.GoToolLocator,
 	registry *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Tool package preparation context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool package interpretation registry is nil",

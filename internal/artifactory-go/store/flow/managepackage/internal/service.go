@@ -488,12 +488,6 @@ func (s *Service) requireMutation(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: manage package context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := rootID.Validate(); err != nil {
 		return err
 	}

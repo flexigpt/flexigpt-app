@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -18,27 +18,22 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+type ToolSource interface {
+	ResolveEnabledTool(
+		ctx context.Context,
+		ref artifactModel.ArtifactRef,
+	) (toolAPI.ResolvedToolView, error)
+}
+
 func buildToolChoices(
 	ctx context.Context,
-	toolsSvc *toolAPI.Service,
+	toolsSvc ToolSource,
 	selections []conversationSpec.ToolSelection,
 ) ([]inferenceSpec.ToolChoice, error) {
 	if len(selections) == 0 {
 		return nil, nil
 	}
-	if toolsSvc == nil {
-		return nil, errors.New(
-			"tool aggregate is not configured for provider set",
-		)
-	}
-	return hydrateInferenceToolChoices(ctx, toolsSvc, selections)
-}
 
-func hydrateInferenceToolChoices(
-	ctx context.Context,
-	toolsSvc *toolAPI.Service,
-	selections []conversationSpec.ToolSelection,
-) ([]inferenceSpec.ToolChoice, error) {
 	output := make([]inferenceSpec.ToolChoice, 0, len(selections))
 	seen := make(map[string]struct{}, len(selections))
 
@@ -75,7 +70,7 @@ func hydrateInferenceToolChoices(
 // Go Tools produce ordinary function choices. SDK Tools produce provider-native which are not invoked.
 func hydrateInferenceToolChoice(
 	ctx context.Context,
-	toolsSvc *toolAPI.Service,
+	toolsSvc ToolSource,
 	selection conversationSpec.ToolSelection,
 ) (inferenceSpec.ToolChoice, error) {
 	if err := selection.Validate(); err != nil {
@@ -127,7 +122,7 @@ func hydrateInferenceToolChoice(
 // application-supplied runtime adapter and are not coerced into Artifacts.
 func resolveToolTarget(
 	ctx context.Context,
-	toolsSvc *toolAPI.Service,
+	toolsSvc ToolSource,
 	target composition.CapabilityTarget,
 ) (toolAPI.ResolvedToolView, error) {
 	if err := target.Validate(); err != nil {

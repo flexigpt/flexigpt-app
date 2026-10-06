@@ -300,9 +300,6 @@ func readCompiledPackageFiles(
 	ctx context.Context,
 	value installModel.CompiledPackage,
 ) ([]managedpackageModel.ManagedPackageFile, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: compiled package context is nil", spec.ErrInvalid)
-	}
 	if len(value.Files) == 0 || len(value.Files) > spec.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: compiled package has an invalid file count",

@@ -41,12 +41,6 @@ func EnsureBuiltInTopology(
 	topo installFlow.API,
 	installers ...installFlow.Installer,
 ) error {
-	if ctx == nil {
-		return errors.New("built-in topology context is nil")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if topo == nil || len(installers) == 0 {
 		return errors.New("built-in topology dependencies are incomplete")
 	}

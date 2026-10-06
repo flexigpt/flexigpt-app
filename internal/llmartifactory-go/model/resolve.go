@@ -21,10 +21,6 @@ func (a *Service) resolveProviderArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ResolvedProvider, error) {
-	if err := a.ready(ctx); err != nil {
-		return ResolvedProvider{}, err
-	}
-
 	provider, err := a.loadProvider(ctx, ref)
 	if err != nil {
 		return ResolvedProvider{}, err
@@ -36,10 +32,6 @@ func (a *Service) resolveModelArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ResolvedModel, error) {
-	if err := a.ready(ctx); err != nil {
-		return ResolvedModel{}, err
-	}
-
 	m, err := a.loadModel(ctx, ref)
 	if err != nil {
 		return ResolvedModel{}, err
@@ -256,10 +248,6 @@ func (a *Service) resolveProviderDefaultModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (DefaultModelResolution, error) {
-	if err := a.ready(ctx); err != nil {
-		return DefaultModelResolution{}, err
-	}
-
 	provider, err := a.loadProvider(ctx, ref)
 	if err != nil {
 		return DefaultModelResolution{}, err

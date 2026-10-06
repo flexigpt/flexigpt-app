@@ -49,15 +49,6 @@ func (r *Registry) NormalizeConfig(
 	kind sourceModel.SourceKind,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	if r == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: Source configuration context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if err := kind.Validate(); err != nil {
 		return nil, err
 	}
@@ -180,15 +171,6 @@ func (r *Registry) RemoveManagedRoot(
 	ctx context.Context,
 	rootStorageKey spec.StorageKey,
 ) error {
-	if r == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: managed root removal context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := rootStorageKey.Validate(); err != nil {
 		return err
 	}

@@ -13,12 +13,12 @@ import (
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
-	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 )
 
-// Credential is one resolved non-secret credential metadata/value pair.
+// Credential is one runtime-only credential value and version pair.
 //
 // APIKey is runtime-only and must never be logged, serialized, stored in
 // Artifact Data, stored in overlays, or included in fingerprints.
@@ -30,8 +30,8 @@ type Credential struct {
 // CredentialResolver owns Artifact Store secret-binding resolution.
 //
 // Model Store resolves a Provider credential binding through Artifact Store.
-// The resolver receives public-safe binding metadata and returns a runtime-only
-// plaintext credential.
+// The runtime adapter passes an active, store-validated binding. The resolver
+// returns a runtime-only credential and checks that the binding has not changed.
 type CredentialResolver interface {
 	ResolveModelCredential(
 		ctx context.Context,
@@ -89,19 +89,26 @@ func (d AdapterDefinition) Validate() error {
 	return nil
 }
 
-// RuntimeConfiguration remains an alias for callers that use the runtime
-// adapter directly. Model Aggregate owns the runtime result contract.
-type RuntimeConfiguration = modelAggregate.RuntimeConfiguration
+// RuntimeConfiguration is the inference consumer's runtime result contract.
+type RuntimeConfiguration = inferencewrapperSpec.RuntimeConfiguration
 
 type RuntimeAdapter struct {
 	credentials CredentialResolver
 	adapters    map[string]AdapterDefinition
+
+	store *modelAPI.Service
 }
 
 func NewRuntimeAdapter(
 	credentials CredentialResolver,
 	definitions ...AdapterDefinition,
 ) (*RuntimeAdapter, error) {
+	if credentials == nil {
+		return nil, fmt.Errorf(
+			"%w: Model credential resolver is required",
+			spec.ErrInvalid,
+		)
+	}
 	if len(definitions) == 0 {
 		definitions = DefaultAdapterDefinitions()
 	}
@@ -189,15 +196,6 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 	ctx context.Context,
 	adapter string,
 ) (modelAPI.AdapterDescriptor, bool, error) {
-	if a == nil {
-		return modelAPI.AdapterDescriptor{}, false, spec.ErrClosed
-	}
-	if ctx == nil {
-		return modelAPI.AdapterDescriptor{}, false, fmt.Errorf(
-			"%w: Model adapter lookup context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return modelAPI.AdapterDescriptor{}, false, err
 	}
@@ -219,25 +217,25 @@ func (a *RuntimeAdapter) Resolve(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
 ) (RuntimeConfiguration, error) {
-	return a.ResolveRuntime(
+	return a.resolveRuntime(
 		ctx,
 		resolved,
-		modelAggregate.PreparedRuntimeRequestPatch{},
+		preparedRuntimeRequestPatch{},
 	)
 }
 
-// ResolveWithRequestPatch is the direct-adapter convenience entry point. Model
-// Aggregate normally prepares the typed optional patch and calls ResolveRuntime.
+// ResolveWithRequestPatch converts an already-resolved Model with a typed
+// request patch. Preparation remains owned by the runtime adapter.
 func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
-	requestPatch *modelAggregate.RuntimeRequestPatch,
+	requestPatch *inferencewrapperSpec.RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
-	prepared, err := requestPatch.Prepare()
+	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
-	return a.ResolveRuntime(ctx, resolved, prepared)
+	return a.resolveRuntime(ctx, resolved, prepared)
 }
 
 // ResolveProviderRuntime resolves only the Provider portion of an installed
@@ -247,15 +245,6 @@ func (a *RuntimeAdapter) ResolveProviderRuntime(
 	ctx context.Context,
 	resolved modelAPI.ResolvedProvider,
 ) (inferenceSpec.ProviderParam, error) {
-	if a == nil {
-		return inferenceSpec.ProviderParam{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return inferenceSpec.ProviderParam{}, fmt.Errorf(
-			"%w: Model Provider runtime resolution context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return inferenceSpec.ProviderParam{}, err
 	}
@@ -267,25 +256,13 @@ func (a *RuntimeAdapter) ResolveProviderRuntime(
 	return value.param, nil
 }
 
-// ResolveRuntime applies an aggregate-prepared portable defaults patch after
+// resolveRuntime applies an adapter-prepared portable defaults patch after
 // adapter, Provider, Provider-overlay, Model, and Model-overlay layers.
-func (a *RuntimeAdapter) ResolveRuntime(
+func (a *RuntimeAdapter) resolveRuntime(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
-	requestPatch modelAggregate.PreparedRuntimeRequestPatch,
+	requestPatch preparedRuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
-	if a == nil {
-		return RuntimeConfiguration{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return RuntimeConfiguration{}, fmt.Errorf(
-			"%w: Model runtime resolution context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return RuntimeConfiguration{}, err
-	}
 	if err := cryptoutil.ValidateDigest(resolved.Fingerprint); err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -331,7 +308,7 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		defaults["adapterParameters"] = value
 	}
 
-	if err := requestPatch.Apply(defaults); err != nil {
+	if err := requestPatch.apply(defaults); err != nil {
 		return RuntimeConfiguration{}, err
 	}
 
@@ -362,7 +339,7 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		ResolvedFingerprint: resolved.Fingerprint,
 		AdapterVersion:      providerRuntime.adapterVersion,
 		CredentialVersion:   providerRuntime.credentialVersion,
-		RequestPatch:        requestPatch.Digest(),
+		RequestPatch:        requestPatch.digest,
 	})
 	if err != nil {
 		return RuntimeConfiguration{}, err
@@ -415,12 +392,6 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 	var credential Credential
 	if resolved.ProviderCredential != nil &&
 		resolved.ProviderCredential.Active() {
-		if a.credentials == nil {
-			return providerRuntimeConfiguration{}, fmt.Errorf(
-				"%w: Model credential resolver is unavailable",
-				spec.ErrReferenceUnresolved,
-			)
-		}
 		credential, err = a.credentials.ResolveModelCredential(
 			ctx,
 			resolved.ProviderCredential.Clone(),
@@ -492,6 +463,9 @@ func resolveConnection(
 		Path:    definition.Path,
 		Headers: maps.Clone(definition.DefaultHeaders),
 	}
+	if output.Headers == nil {
+		output.Headers = make(map[string]string)
+	}
 
 	for _, raw := range []json.RawMessage{providerRaw, overlayRaw} {
 		if len(raw) == 0 {
@@ -522,9 +496,6 @@ func resolveConnection(
 			"%w: effective Model Provider connection is incomplete",
 			spec.ErrReferenceUnresolved,
 		)
-	}
-	if output.Headers == nil {
-		output.Headers = map[string]string{}
 	}
 	return output, nil
 }
@@ -563,10 +534,6 @@ func applyHeaderPatch(
 	set map[string]string,
 	remove []string,
 ) {
-	if headers == nil {
-		return
-	}
-
 	for _, name := range remove {
 		deleteHeaderFold(headers, name)
 	}
@@ -600,7 +567,7 @@ func mergeDefaultLayers(
 		if err != nil {
 			return nil, err
 		}
-		if err := modelAggregate.ApplyRuntimeDefaults(output, next); err != nil {
+		if err := applyRuntimeDefaults(output, next); err != nil {
 			return nil, err
 		}
 	}
@@ -761,7 +728,7 @@ func timeoutSeconds(milliseconds int) int {
 	if milliseconds <= 0 {
 		return 0
 	}
-	return (milliseconds + 999) / 1000
+	return 1 + (milliseconds-1)/1000
 }
 
 func collectCapabilityOverrides(

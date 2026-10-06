@@ -116,16 +116,6 @@ func (a *Service) PreviewAgentImport(
 	ctx context.Context,
 	request AgentImportPreviewRequest,
 ) (AgentImportPreview, error) {
-	if a == nil || a.managedAgentProfile == nil ||
-		a.importSigner == nil {
-		return AgentImportPreview{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return AgentImportPreview{}, fmt.Errorf(
-			"%w: Agent import preview context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return AgentImportPreview{}, err
 	}
@@ -460,19 +450,6 @@ func (a *Service) CommitAgentImport(
 	ctx context.Context,
 	request AgentImportCommitRequest,
 ) (AgentImportCommitResult, error) {
-	if a == nil || a.managedAgentProfile == nil ||
-		a.importSigner == nil {
-		return AgentImportCommitResult{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return AgentImportCommitResult{}, fmt.Errorf(
-			"%w: Agent import commit context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return AgentImportCommitResult{}, err
-	}
 	if request.Prepared == "" {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import is required",

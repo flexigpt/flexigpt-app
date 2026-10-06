@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
@@ -15,15 +13,6 @@ import (
 // generic Artifact Store. Generic Store ownership remains with deployment
 // assembly; this constructor does not open or close provider resources.
 func Open(ctx context.Context, config Config) (*Artifactory, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: LLM Artifactory construction context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if config.Store == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM Artifactory generic Store is nil",
@@ -37,27 +26,10 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 		)
 	}
 
-	codecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
-	if err != nil {
-		return nil, err
-	}
-	decoders, err := ingest.NormalizeDecoders(config.Decoders)
-	if err != nil {
-		return nil, err
-	}
 	if err := config.Scope.Validate(); err != nil {
 		return nil, err
 	}
-	if err := validateRegistrationSelection(
-		config.Store,
-		codecs,
-		decoders,
-		config.Interpretations,
-	); err != nil {
-		return nil, err
-	}
 
-	locatorRuntime := catalogLocatorRuntime{catalog: config.Store.Catalog}
 	locators, err := corelocator.NewRegistry(config.LocatorFactories...)
 	if err != nil {
 		return nil, err
@@ -65,7 +37,7 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 
 	locatorResolver, err := composition.NewProviderLocatorResolver(
 		locators.Factories(),
-		locatorRuntime,
+		config.Store.Catalog,
 	)
 	if err != nil {
 		return nil, err
@@ -85,11 +57,7 @@ func Open(ctx context.Context, config Config) (*Artifactory, error) {
 		return nil, err
 	}
 	return &Artifactory{
-		store:            config.Store,
-		schemaCodecs:     codecs,
-		decoders:         decoders,
-		locatorFactories: locators.Factories(),
-		interpretations:  config.Interpretations,
-		composition:      resolver,
+		interpretations: config.Interpretations,
+		composition:     resolver,
 	}, nil
 }

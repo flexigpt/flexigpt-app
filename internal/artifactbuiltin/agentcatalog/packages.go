@@ -54,18 +54,10 @@ func PreparePackages(
 	packages fs.FS,
 	interpretations *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: built-in Agent package preparation context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if interpretations == nil {
 		return nil, fmt.Errorf("%w: Agent package interpretation registry is nil", spec.ErrInvalid)
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded Agent package filesystem is nil",

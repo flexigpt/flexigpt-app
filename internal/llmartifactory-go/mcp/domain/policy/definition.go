@@ -15,9 +15,6 @@ import (
 func BodyFromDefinition(
 	input definitionModel.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
-	if err := definitionModel.ValidateAdmitted(input); err != nil {
-		return mcpPolicy.MCPPolicy{}, err
-	}
 	if input.Kind != mcpDomain.MCPPolicyArtifactKind ||
 		input.SchemaID != mcppolicyv1.MCPPolicySchemaKey.SchemaID ||
 		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {

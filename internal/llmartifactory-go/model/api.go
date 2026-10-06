@@ -113,10 +113,6 @@ func (a *Service) listProviders(
 	ctx context.Context,
 	request ListProvidersRequest,
 ) ([]ProviderListItem, error) {
-	if err := a.ready(ctx); err != nil {
-		return nil, err
-	}
-
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
@@ -176,10 +172,6 @@ func (a *Service) listModels(
 	ctx context.Context,
 	request ListModelsRequest,
 ) ([]ModelListItem, error) {
-	if err := a.ready(ctx); err != nil {
-		return nil, err
-	}
-
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
@@ -271,9 +263,6 @@ func (a *Service) setProviderEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (artifactModel.Artifact, error) {
-	if err := a.ready(ctx); err != nil {
-		return artifactModel.Artifact{}, err
-	}
 	if err := validateExpectedArtifactRevision(expectedRevision); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -300,9 +289,6 @@ func (a *Service) setModelEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (artifactModel.Artifact, error) {
-	if err := a.ready(ctx); err != nil {
-		return artifactModel.Artifact{}, err
-	}
 	if err := validateExpectedArtifactRevision(expectedRevision); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -319,27 +305,6 @@ func (a *Service) setModelEnabled(
 		expectedRevision,
 		enabled,
 	)
-}
-
-func (a *Service) ready(ctx context.Context) error {
-	if a == nil ||
-		a.sources == nil ||
-		a.discovery == nil ||
-		a.artifacts == nil ||
-		a.managedArtifacts == nil ||
-		a.protection == nil ||
-		a.overlays == nil ||
-		a.adapters == nil ||
-		a.builtinRoot == "" {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: Model Store context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }
 
 func (a *Service) requireKind(
@@ -370,10 +335,6 @@ func (a *Service) loadProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (modelDomain.Provider, error) {
-	if err := a.ready(ctx); err != nil {
-		return modelDomain.Provider{}, err
-	}
-
 	record, err := a.requireKind(
 		ctx,
 		ref,
@@ -393,10 +354,6 @@ func (a *Service) loadModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (modelDomain.Model, error) {
-	if err := a.ready(ctx); err != nil {
-		return modelDomain.Model{}, err
-	}
-
 	record, err := a.requireKind(
 		ctx,
 		ref,

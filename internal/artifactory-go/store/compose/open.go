@@ -26,12 +26,6 @@ import (
 // not close resources when construction fails: a deployment retains ownership
 // until this function successfully returns a Store.
 func Open(ctx context.Context, config Config) (*Store, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: Artifact Store composition context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if err := validateConfig(config); err != nil {
 		return nil, err
 	}

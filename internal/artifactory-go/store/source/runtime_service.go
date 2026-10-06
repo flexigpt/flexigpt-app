@@ -42,12 +42,6 @@ func ReadSnapshotEntry(
 	entry sourceModel.Entry,
 	maximumBytes int64,
 ) ([]byte, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: source snapshot read context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if snapshot == nil {
 		return nil, fmt.Errorf("%w: source snapshot is nil", spec.ErrInvalid)
 	}
@@ -94,15 +88,6 @@ func ReadVerifiedSnapshotEntry(
 	expectedGeneration string,
 	maximumBytes int64,
 ) (content []byte, digest cryptoutil.Digest, returnErr error) {
-	if ctx == nil {
-		return nil, "", fmt.Errorf("%w: verified source read context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, "", err
-	}
-	if runtime == nil {
-		return nil, "", fmt.Errorf("%w: verified source read runtime is nil", spec.ErrInvalid)
-	}
 	if err := value.ValidateRead(); err != nil {
 		return nil, "", err
 	}
@@ -165,21 +150,6 @@ func (r *runtime) Get(
 	rootID rootModel.RootID,
 	id sourceModel.SourceID,
 ) (sourceModel.Source, error) {
-	if r == nil || r.reader == nil {
-		return sourceModel.Source{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return sourceModel.Source{}, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Source{}, err
-	}
-	if err := rootID.Validate(); err != nil {
-		return sourceModel.Source{}, err
-	}
-	if err := id.Validate(); err != nil {
-		return sourceModel.Source{}, err
-	}
 	value, err := r.reader.Get(ctx, rootID, id)
 	if err != nil {
 		return sourceModel.Source{}, err
@@ -194,18 +164,6 @@ func (r *runtime) Get(
 }
 
 func (r *runtime) List(ctx context.Context, rootID rootModel.RootID) ([]sourceModel.Source, error) {
-	if r == nil || r.reader == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
 	values, err := r.reader.List(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -224,18 +182,6 @@ func (r *runtime) List(ctx context.Context, rootID rootModel.RootID) ([]sourceMo
 }
 
 func (r *runtime) Open(ctx context.Context, value sourceModel.Source) (driver.Snapshot, error) {
-	if r == nil || r.opener == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return nil, err
-	}
 	snapshot, err := r.opener.Open(ctx, value.Clone())
 	if err != nil {
 		return nil, err
@@ -254,18 +200,6 @@ func (r *runtime) ResolveLocalPath(
 	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
-	if ctx == nil {
-		return "", fmt.Errorf("%w: source local-path context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return "", err
-	}
-	if err := locator.Validate(true); err != nil {
-		return "", err
-	}
 	if r.localPaths == nil || !r.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf("%w: source runtime has no native path resolver", spec.ErrUnsupported)
 	}
@@ -273,7 +207,7 @@ func (r *runtime) ResolveLocalPath(
 }
 
 func (r *runtime) SupportsLocalPath(kind sourceModel.SourceKind) bool {
-	return r != nil && r.localKinds != nil && r.localKinds.SupportsLocalPath(kind)
+	return r.localKinds != nil && r.localKinds.SupportsLocalPath(kind)
 }
 
 func validateSnapshot(snapshot driver.Snapshot) error {

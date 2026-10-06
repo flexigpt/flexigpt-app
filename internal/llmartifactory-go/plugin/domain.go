@@ -189,21 +189,6 @@ func (a *API) EnsureBaseline(
 	// existing baseline. This is cheap on the steady path and repairs an
 	// incomplete discovery configuration without forcing a Source scan.
 	existing, err := a.artifacts.FindByOrigin(
-		ctx,
-		rootID,
-		artifactModel.SourceBinding{
-			SourceID: sourceValue.ID,
-			Locator:  locator,
-		},
-		artifactModel.ArtifactKind(pluginv1.PluginType),
-	)
-	if err != nil && !errors.Is(err, spec.ErrArtifactNotFound) && !errors.Is(err, spec.ErrNotFound) {
-		return PluginView{}, err
-	} else if existing.State == artifactModel.StateAvailable {
-		return a.Read(ctx, existing.Ref())
-	}
-
-	existing, err = a.artifacts.FindByOrigin(
 		ctx, rootID, artifactModel.SourceBinding{SourceID: sourceValue.ID, Locator: locator},
 		artifactModel.ArtifactKind(pluginv1.PluginType),
 	)

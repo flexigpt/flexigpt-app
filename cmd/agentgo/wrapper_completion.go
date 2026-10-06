@@ -17,12 +17,9 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
 
 var appSlogLevelVar slog.LevelVar
@@ -34,42 +31,24 @@ func init() {
 }
 
 type CompletionWrapper struct {
-	modelAggregate *modelAggregate.Service
-	settingStore   *settingStore.SettingStore
-	toolService    *toolAPI.Service
-	artifactSkills *skillAggregate.Service
 	providersetAPI *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
 	completionCancelMux sync.Mutex
 	completionCancels   map[string]context.CancelFunc
 	preCanceled         map[string]time.Time
+	completionWG        sync.WaitGroup
+	closed              bool
 }
 
 type CompletionRequestBody struct {
-	// Past turns of the conversation, already persisted.
 	History []conversationSpec.ConversationMessage `json:"history"`
+	Current conversationSpec.ConversationMessage   `json:"current"`
 
-	// New user turn to complete. Must have Role=user. Typically will have:
-	//   - Attachments (ref attachments),
-	//   - either:
-	//       * pre-built InputUnion(s) in Inputs, or
-	//       * just Messages + Attachments and let the aggregator build
-	//         the InputUnion for this turn.
-	Current conversationSpec.ConversationMessage `json:"current"`
+	// Applied after Provider/Model source and overlay defaults.
+	RequestPatch *inferencewrapperSpec.RuntimeRequestPatch `json:"requestPatch,omitempty"`
 
-	// After all Provider and Model source and overlay layers. A nil value means
-	// that this completion has no request-level runtime override.
-	RequestPatch *modelAggregate.RuntimeRequestPatch `json:"requestPatch,omitempty"`
-
-	// ToolSelections is the set of mapped Go or SDK Tool targets that should
-	// be enabled for this call.
-	//
-	// The inference aggregate hydrates Go Tools into local function choices
-	// and SDK Tools into provider-native choices. It does not infer tools from
-	// History[i].ToolChoices or Current.ToolChoices, and SDK Tools must never
-	// be passed to ToolRuntimeWrapper.
-	// (Those are persisted for UI/analytics only.)
+	// These are current-call selections, not persisted historical ToolChoices.
 	ToolSelections []conversationSpec.ToolSelection `json:"toolSelections,omitempty"`
 
 	MCPContext     *conversationSpec.MCPConversationContext `json:"mcpContext,omitempty"`
@@ -77,61 +56,62 @@ type CompletionRequestBody struct {
 }
 
 func InitCompletionWrapper(
-	agg *CompletionWrapper,
-	models *modelAggregate.Service,
-	ss *settingStore.SettingStore,
-	ts *toolAPI.Service,
-	artifactSkills *skillAggregate.Service,
-	mr *mcpConnection.MCPRuntimeManager,
+	w *CompletionWrapper,
+	models inferencewrapperSpec.ModelRuntime,
+	settings *settingStore.SettingStore,
+	tools inferencewrapper.ToolSource,
+	skills inferencewrapper.SkillSource,
+	mcpRuntime *mcpConnection.MCPRuntimeManager,
 	workspaceSource inferencewrapper.WorkspaceSource,
 ) error {
-	if agg == nil || ts == nil || models == nil || ss == nil || artifactSkills == nil || workspaceSource == nil {
-		panic("initializing aggregate store wrapper on nil receivers")
+	if w == nil || settings == nil {
+		return errors.New("completion wrapper dependencies are incomplete")
 	}
-
-	agg.toolService = ts
-	agg.modelAggregate = models
-	agg.settingStore = ss
-	agg.artifactSkills = artifactSkills
-
-	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
 
 	var bridge *inferencewrapper.MCPInferenceBridge
-	if mr != nil {
-		bridge = inferencewrapper.NewMCPInferenceBridge(mr)
+	if mcpRuntime != nil {
+		bridge = inferencewrapper.NewMCPInferenceBridge(mcpRuntime)
 	}
 
-	p, err := inferencewrapper.NewProviderSetAPI(
-		agg.toolService,
-		agg.artifactSkills,
+	debugConfig := inferencewrapper.DefaultDebugConfig()
+	providers, err := inferencewrapper.NewProviderSetAPI(
+		models,
+		tools,
+		skills,
 		bridge,
 		workspaceSource,
 		inferencewrapper.WithLogger(slog.Default()),
-		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
-		inferencewrapper.WithSkillsRunScriptEnabled(artifactSkills.RunScriptsEnabled()),
+		inferencewrapper.WithDebugConfig(&debugConfig),
 	)
 	if err != nil {
-		return errors.Join(err, errors.New("invalid default provider"))
+		return fmt.Errorf("initialize completion inference: %w", err)
 	}
-	agg.providersetAPI = p
-	agg.completionCancels = map[string]context.CancelFunc{}
-	agg.preCanceled = map[string]time.Time{}
 
-	agg.settingStore.SetDebugSettingsApplier(func(_ context.Context, cfg settingSpec.DebugSettings) error {
-		return applyDebugSettings(agg.providersetAPI, cfg)
+	settings.SetDebugSettingsApplier(func(
+		_ context.Context,
+		config settingSpec.DebugSettings,
+	) error {
+		return applyDebugSettings(providers, config)
 	})
-	if err := agg.settingStore.ApplyCurrentDebugSettings(context.Background(), true); err != nil {
-		slog.Error("couldn't apply persisted debug settings", "error", err)
-		return err
+	if err := settings.ApplyCurrentDebugSettings(context.Background(), true); err != nil {
+		return fmt.Errorf("apply persisted completion debug settings: %w", err)
 	}
+
+	w.providersetAPI = providers
+	w.completionCancels = make(map[string]context.CancelFunc)
+	w.preCanceled = make(map[string]time.Time)
 	return nil
 }
 
 func SetWrappedProviderAppContext(w *CompletionWrapper, ctx context.Context) {
+	w.completionCancelMux.Lock()
+	defer w.completionCancelMux.Unlock()
+
 	w.appContext = ctx
 }
 
-// FetchCompletion handles the completion request and streams data back to the frontend.
+// FetchCompletion owns Wails request admission, cancellation, and event delivery.
+// Model resolution and inference preparation belong to ProviderSetAPI.
 func (w *CompletionWrapper) FetchCompletion(
 	model artifactModel.ArtifactRef,
 	completionData *CompletionRequestBody,
@@ -140,61 +120,53 @@ func (w *CompletionWrapper) FetchCompletion(
 	requestID string,
 ) (*inferencewrapperSpec.CompletionResponse, error) {
 	return withRecoveryResp(func() (*inferencewrapperSpec.CompletionResponse, error) {
+		if w == nil {
+			return nil, errors.New("completion wrapper is unavailable")
+		}
 		if requestID == "" {
 			return nil, errors.New("requestID is empty")
-		}
-		if w.appContext == nil {
-			return nil, errors.New("appContext is not set (call SetWrappedProviderAppContext during startup)")
 		}
 		if completionData == nil {
 			return nil, errors.New("completionData is nil")
 		}
 
-		ctx, cancel := context.WithCancel(w.appContext)
-		defer cancel()
-
 		w.completionCancelMux.Lock()
-		w.ensureCompletionStateLocked()
+		if w.closed || w.providersetAPI == nil || w.appContext == nil {
+			w.completionCancelMux.Unlock()
+			return nil, errors.New("completion wrapper is not ready")
+		}
 		w.prunePreCanceledLocked(time.Now().UTC())
 
-		// If a cancel arrived before the fetch registered, honor it.
-		if _, ok := w.preCanceled[requestID]; ok {
+		if _, canceled := w.preCanceled[requestID]; canceled {
 			delete(w.preCanceled, requestID)
 			w.completionCancelMux.Unlock()
 			return nil, context.Canceled
 		}
-		// Protect against requestID reuse while in-flight.
 		if _, exists := w.completionCancels[requestID]; exists {
 			w.completionCancelMux.Unlock()
 			return nil, errors.New("duplicate requestID: a completion with this id is already in flight")
 		}
 
+		appContext := w.appContext
+		ctx, cancel := context.WithCancel(appContext)
 		w.completionCancels[requestID] = cancel
+		// Admission and shutdown share this mutex, so Add cannot race Wait
+		// after shutdown has stopped accepting requests.
+		w.completionWG.Add(1)
 		w.completionCancelMux.Unlock()
 
 		defer func() {
+			cancel()
 			w.completionCancelMux.Lock()
 			delete(w.completionCancels, requestID)
 			w.completionCancelMux.Unlock()
+			w.completionWG.Done()
 		}()
 
-		runtimeModel, err := w.modelAggregate.ResolveRuntimeConfiguration(
-			ctx,
-			modelAggregate.RuntimeModelRequest{
+		request := &inferencewrapperSpec.CompletionRequest{
+			Model: inferencewrapperSpec.RuntimeModelRequest{
 				Model:        model,
 				RequestPatch: completionData.RequestPatch,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		req := &inferencewrapperSpec.CompletionRequest{
-			Runtime: &inferencewrapperSpec.RuntimeModel{
-				ProviderParam:            runtimeModel.ProviderParam,
-				ModelParam:               runtimeModel.ModelParam,
-				CapabilityOverrides:      runtimeModel.CapabilityOverrides,
-				ConfigurationFingerprint: runtimeModel.Fingerprint,
 			},
 			History:        completionData.History,
 			Current:        completionData.Current,
@@ -204,114 +176,98 @@ func (w *CompletionWrapper) FetchCompletion(
 		}
 
 		if textCallbackID != "" {
-			req.OnStreamText = func(textData string) error {
+			request.OnStreamText = func(text string) error {
+				// This is a cancellation boundary, not another dependency
+				// validation. Do not emit more events after cancellation.
 				if err := ctx.Err(); err != nil {
 					return err
 				}
-				if textData == "" {
-					// Empty deltas are valid no-ops. They do not indicate that
-					// the stream has finished or failed.
-					return nil
-				}
-
-				runtime.EventsEmit(w.appContext, textCallbackID, textData)
+				runtime.EventsEmit(appContext, textCallbackID, text)
 				return nil
 			}
 		}
 		if thinkingCallbackID != "" {
-			req.OnStreamThinking = func(thinkingData string) error {
+			request.OnStreamThinking = func(thinking string) error {
 				if err := ctx.Err(); err != nil {
 					return err
 				}
-				if thinkingData == "" {
-					return nil
-				}
-
-				runtime.EventsEmit(w.appContext, thinkingCallbackID, thinkingData)
+				runtime.EventsEmit(appContext, thinkingCallbackID, thinking)
 				return nil
 			}
 		}
-		resp, err := w.providersetAPI.FetchCompletion(
-			ctx,
-			req,
-		)
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				// Expected lifecycle event; return partial resp if present without noisy error logging.
-				if resp != nil {
-					return resp, nil
-				}
-				return nil, err
+
+		response, err := w.providersetAPI.FetchCompletion(ctx, request)
+		if err == nil {
+			return response, nil
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			if response != nil {
+				return response, nil
 			}
-			// Preserve hydration metadata even when the provider failed before
-			// producing an inference response. In particular, Workspace Context
-			// hydration must not disappear from the persisted user message.
-			if resp != nil && resp.Body != nil {
-				if resp.Body.InferenceResponse == nil {
-					resp.Body.InferenceResponse = &inferenceSpec.FetchCompletionResponse{
-						Error: &inferenceSpec.Error{
-							Code:    "completion_failed",
-							Message: err.Error(),
-						},
-					}
-				} else if resp.Body.InferenceResponse.Error == nil {
-					resp.Body.InferenceResponse.Error = &inferenceSpec.Error{
-						Code:    "completion_failed",
-						Message: err.Error(),
-					}
-				}
-				slog.Error("fetchCompletion failed", "model", model, "err", err)
-				return resp, nil
-			}
-			// No response at all => infrastructure error.
 			return nil, err
 		}
 
-		return resp, nil
+		// Preserve hydration metadata even when inference produced no result.
+		if response != nil && response.Body != nil {
+			if response.Body.InferenceResponse == nil {
+				response.Body.InferenceResponse = &inferenceSpec.FetchCompletionResponse{
+					Error: &inferenceSpec.Error{
+						Code:    "completion_failed",
+						Message: err.Error(),
+					},
+				}
+			} else if response.Body.InferenceResponse.Error == nil {
+				response.Body.InferenceResponse.Error = &inferenceSpec.Error{
+					Code:    "completion_failed",
+					Message: err.Error(),
+				}
+			}
+			slog.Error("fetchCompletion failed", "model", model, "err", err)
+			return response, nil
+		}
+		return nil, err
 	})
 }
 
 func (w *CompletionWrapper) CancelCompletion(id string) (err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("panic recovered",
-				slog.Any("panic", r),
+		if recovered := recover(); recovered != nil {
+			slog.Error(
+				"panic recovered",
+				slog.Any("panic", recovered),
 				slog.String("stacktrace", string(debug.Stack())),
 			)
-			err = fmt.Errorf("panic recovered: %v", r)
+			err = fmt.Errorf("panic recovered: %v", recovered)
 		}
 	}()
 
 	if id == "" {
 		return nil
 	}
+	if w == nil {
+		return errors.New("completion wrapper is unavailable")
+	}
 
 	w.completionCancelMux.Lock()
 	defer w.completionCancelMux.Unlock()
 
-	w.ensureCompletionStateLocked()
-	w.prunePreCanceledLocked(time.Now().UTC())
+	if w.closed {
+		return nil
+	}
+	if w.providersetAPI == nil {
+		return errors.New("completion wrapper is not ready")
+	}
 
-	if c, ok := w.completionCancels[id]; ok {
-		c()
-		// Keep the entry until FetchCompletion exits. This prevents request-ID
-		// reuse from registering another request while the original one is still
-		// unwinding after cancellation.
+	w.prunePreCanceledLocked(time.Now().UTC())
+	if cancel, exists := w.completionCancels[id]; exists {
+		cancel()
+		// Keep the entry until FetchCompletion exits to prevent ID reuse
+		// while the canceled request is still unwinding.
 		return nil
 	}
 
-	// Cancel arrived before FetchCompletion registered the cancel func.
 	w.preCanceled[id] = time.Now().UTC()
 	return nil
-}
-
-func (w *CompletionWrapper) ensureCompletionStateLocked() {
-	if w.completionCancels == nil {
-		w.completionCancels = map[string]context.CancelFunc{}
-	}
-	if w.preCanceled == nil {
-		w.preCanceled = map[string]time.Time{}
-	}
 }
 
 func (w *CompletionWrapper) prunePreCanceledLocked(now time.Time) {
@@ -323,22 +279,36 @@ func (w *CompletionWrapper) prunePreCanceledLocked(now time.Time) {
 	}
 }
 
-func applyDebugSettings(providerSet *inferencewrapper.ProviderSetAPI, cfg settingSpec.DebugSettings) error {
-	appSlogLevelVar.Set(toSlogLevel(cfg.LogLevel))
-	if providerSet != nil {
-		clone := providerSet.GetDebugConfig()
-		if clone != nil {
-			clone.LogToSlog = cfg.LogLLMReqResp
-			clone.DisableContentStripping = cfg.DisableContentStripping
-			providerSet.SetDebugConfig(clone)
-		}
+// close stops admission and drains in-flight work before its Model, Workspace,
+// Tool, Skill, MCP, or settings dependencies are closed.
+func (w *CompletionWrapper) close() {
+	w.completionCancelMux.Lock()
+	w.closed = true
+	for _, cancel := range w.completionCancels {
+		cancel()
 	}
+	clear(w.preCanceled)
+	w.completionCancelMux.Unlock()
+
+	w.completionWG.Wait()
+}
+
+func applyDebugSettings(
+	providerSet *inferencewrapper.ProviderSetAPI,
+	config settingSpec.DebugSettings,
+) error {
+	appSlogLevelVar.Set(toSlogLevel(config.LogLevel))
+
+	debugConfig := providerSet.GetDebugConfig()
+	debugConfig.LogToSlog = config.LogLLMReqResp
+	debugConfig.DisableContentStripping = config.DisableContentStripping
+	providerSet.SetDebugConfig(debugConfig)
 
 	slog.Info(
 		"applied debug settings",
-		"logLLMReqResp", cfg.LogLLMReqResp,
-		"disableContentStripping", cfg.DisableContentStripping,
-		"logLevel", cfg.LogLevel,
+		"logLLMReqResp", config.LogLLMReqResp,
+		"disableContentStripping", config.DisableContentStripping,
+		"logLevel", config.LogLevel,
 	)
 	return nil
 }

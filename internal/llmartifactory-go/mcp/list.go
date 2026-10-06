@@ -177,19 +177,6 @@ func (s *MCPListService) ListServersPage(
 func (s *MCPListService) orderedRoots(
 	ctx context.Context,
 ) ([]rootModel.Root, error) {
-	if s == nil || s.roots == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: MCP management context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
 	values, err := s.roots.List(ctx)
 	if err != nil {
 		return nil, err

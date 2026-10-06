@@ -111,9 +111,6 @@ func SkillDeclarationFromDefinition(
 func ValidateDefinition(
 	value definitionModel.Definition,
 ) error {
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return err
-	}
 	if value.Kind != SkillArtifactKind {
 		return fmt.Errorf(
 			"%w: Skill Definition kind must be %q",

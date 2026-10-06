@@ -22,16 +22,6 @@ func materializeValidated(
 	environment EnvironmentResolver,
 	resolveSecrets bool,
 ) (MaterializedServer, error) {
-	if ctx == nil {
-		return MaterializedServer{}, fmt.Errorf(
-			"%w: MCP materialization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return MaterializedServer{}, err
-	}
-
 	core, err := selectProfile(
 		document.MCPServer,
 		document.Configuration.ConnectionProfiles,

@@ -96,12 +96,6 @@ func CompilePackageSet(
 			spec.ErrInvalid,
 		)
 	}
-	if ctx == nil {
-		return installModel.CompiledPackageSet{}, fmt.Errorf("%w: compilation context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return installModel.CompiledPackageSet{}, err
-	}
 
 	inputs, validation, hydration, err := prepareCompilation(config)
 	if err != nil {

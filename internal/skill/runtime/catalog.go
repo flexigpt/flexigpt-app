@@ -20,12 +20,6 @@ func (s *Service) SyncCatalog(
 	ctx context.Context,
 	id CatalogID,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: catalog context is nil", ErrInvalidRequest)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if id == "" {
 		return fmt.Errorf("%w: catalog ID is required", ErrInvalidRequest)
 	}
@@ -52,12 +46,6 @@ func (s *Service) reconcileCatalogAtGeneration(
 	generation uint64,
 	values []SkillRegistration,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: catalog context is nil", ErrInvalidRequest)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if id == "" {
 		return fmt.Errorf("%w: catalog ID is required", ErrInvalidRequest)
 	}
@@ -91,12 +79,6 @@ func (s *Service) RemoveCatalog(
 	ctx context.Context,
 	id CatalogID,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: catalog context is nil", ErrInvalidRequest)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if id == "" {
 		return fmt.Errorf("%w: catalog ID is required", ErrInvalidRequest)
 	}
@@ -150,13 +132,6 @@ func (s *Service) IsRegistered(value SkillRegistration) bool {
 }
 
 func (s *Service) Close(ctx context.Context) error {
-	if s == nil {
-		return nil
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: close context is nil", ErrInvalidRequest)
-	}
-
 	s.lifecycleMu.Lock()
 	if s.closed {
 		s.lifecycleMu.Unlock()

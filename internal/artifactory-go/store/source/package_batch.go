@@ -16,12 +16,6 @@ func (r *Registry) ApplyPackageBatch(
 	publications []managedpackageModel.ManagedPackagePublication,
 	removals []managedpackageModel.ManagedPackageAddress,
 ) error {
-	if r == nil {
-		return spec.ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := value.ValidateRead(); err != nil {
 		return err
 	}

@@ -12,10 +12,6 @@ func (a *Service) ResolveEnabledTool(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ResolvedToolView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ResolvedToolView{}, err
-	}
-
 	value, err := a.getTool(ctx, ref)
 	if err != nil {
 		return ResolvedToolView{}, err

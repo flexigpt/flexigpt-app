@@ -51,12 +51,6 @@ func NewWorkspace(
 	record artifactModel.Artifact,
 	value definitionModel.Definition,
 ) (Workspace, error) {
-	if err := record.Validate(); err != nil {
-		return Workspace{}, err
-	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return Workspace{}, err
-	}
 	if record.Kind != WorkspaceArtifactKind {
 		return Workspace{}, fmt.Errorf(
 			"%w: Artifact %q has kind %q",

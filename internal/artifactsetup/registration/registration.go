@@ -24,10 +24,6 @@ func New() (*Selection, error) {
 	if err != nil {
 		return nil, err
 	}
-	codecs, err = schema.NormalizeCodecs(codecs)
-	if err != nil {
-		return nil, err
-	}
 
 	canonicalDecoders, err := LLMCanonicalDeclarationDecoders(
 		interpretations,

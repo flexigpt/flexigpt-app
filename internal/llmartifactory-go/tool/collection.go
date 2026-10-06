@@ -14,9 +14,6 @@ import (
 func (a *Service) ListToolPlugins(
 	ctx context.Context,
 ) ([]pluginAPI.ListItem, error) {
-	if err := a.ready(ctx); err != nil {
-		return nil, err
-	}
 	return a.plugins.ListDomain(ctx, pluginAPI.ListRequest{
 		RootID: a.builtinRoot,
 	})
@@ -26,9 +23,6 @@ func (a *Service) GetToolPlugin(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (pluginAPI.PluginView, error) {
-	if err := a.ready(ctx); err != nil {
-		return pluginAPI.PluginView{}, err
-	}
 	if err := a.requireBuiltinRef(ref); err != nil {
 		return pluginAPI.PluginView{}, err
 	}

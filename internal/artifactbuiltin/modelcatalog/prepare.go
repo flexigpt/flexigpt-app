@@ -37,9 +37,6 @@ func PrepareProviderPackage(
 	document modelproviderv1.ProviderDocument,
 	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
-	if err := requirePreparationContext(ctx); err != nil {
-		return PreparedPackage{}, err
-	}
 	if registry == nil {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: Model package interpretation registry is nil",
@@ -94,9 +91,6 @@ func PrepareModelPackage(
 	document modelv1.ModelDocument,
 	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
-	if err := requirePreparationContext(ctx); err != nil {
-		return PreparedPackage{}, err
-	}
 	if registry == nil {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: Model package interpretation registry is nil",
@@ -225,14 +219,4 @@ func clonePreparedPackage(value PreparedPackage) PreparedPackage {
 		}
 	}
 	return output
-}
-
-func requirePreparationContext(ctx context.Context) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: generated Model package preparation context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }

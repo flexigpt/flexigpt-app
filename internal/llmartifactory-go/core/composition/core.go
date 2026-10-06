@@ -141,12 +141,6 @@ func (r *Resolver) ResolveWorkspaceWithCompositionSource(
 	ref artifactModel.ArtifactRef,
 	compositionSourceID sourceModel.SourceID,
 ) (*ResolvedEntry, error) {
-	if err := r.ready(); err != nil {
-		return nil, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return nil, err
-	}
 	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
@@ -175,12 +169,6 @@ func (r *Resolver) ResolveTerminalArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.ArtifactRef, error) {
-	if err := r.ready(); err != nil {
-		return artifactModel.ArtifactRef{}, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return artifactModel.ArtifactRef{}, err
-	}
 	if err := ref.Validate(); err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
@@ -193,12 +181,6 @@ func (r *Resolver) resolveTyped(
 	ref artifactModel.ArtifactRef,
 	expected declaration.Type,
 ) (*ResolvedEntry, error) {
-	if err := r.ready(); err != nil {
-		return nil, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return nil, err
-	}
 	if err := ref.Validate(); err != nil {
 		return nil, err
 	}

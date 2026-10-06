@@ -46,12 +46,6 @@ func Open(
 	ctx context.Context,
 	path string,
 ) (*Store, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: SQLite context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf(
 			"%w: SQLite path is empty",

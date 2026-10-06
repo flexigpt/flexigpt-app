@@ -725,6 +725,16 @@ func (a *Service) ResolveSkillCapabilities(
 	)
 }
 
+func (a *Service) EnsureSkillBaselinePlugin(
+	ctx context.Context,
+	rootID rootModel.RootID,
+) (pluginAPI.PluginView, error) {
+	if a == nil || a.plugins == nil {
+		return pluginAPI.PluginView{}, spec.ErrClosed
+	}
+	return a.plugins.EnsureBaseline(ctx, rootID)
+}
+
 func (a *Service) getManagedSkillDocument(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
@@ -802,16 +812,6 @@ func (a *Service) getManagedSkillDocument(
 		Artifact: value,
 		Document: doc,
 	}, nil
-}
-
-func (a *Service) ensureSkillBaselinePlugin(
-	ctx context.Context,
-	rootID rootModel.RootID,
-) (pluginAPI.PluginView, error) {
-	if a == nil || a.plugins == nil {
-		return pluginAPI.PluginView{}, spec.ErrClosed
-	}
-	return a.plugins.EnsureBaseline(ctx, rootID)
 }
 
 func (a *Service) requireMutable(

@@ -100,13 +100,6 @@ func (a *Adapter) compose(
 	workspace workspaceDomain.Workspace,
 	refs []artifactModel.ArtifactRef,
 ) (Plan, error) {
-	if a == nil || a.artifacts == nil || a.engine == nil {
-		return Plan{}, spec.ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
-		return Plan{}, err
-	}
-
 	selected, err := a.selection(
 		ctx,
 		workspace,

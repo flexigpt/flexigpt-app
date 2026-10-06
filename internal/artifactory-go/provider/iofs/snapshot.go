@@ -30,7 +30,7 @@ func (s *snapshot) Stat(
 	ctx context.Context,
 	locator spec.Locator,
 ) (sourceModel.Entry, error) {
-	if err := s.ensureOpen(ctx); err != nil {
+	if err := s.ensureOpen(); err != nil {
 		return sourceModel.Entry{}, err
 	}
 	name, err := fsName(locator)
@@ -55,7 +55,7 @@ func (s *snapshot) ReadDir(
 	ctx context.Context,
 	locator spec.Locator,
 ) ([]sourceModel.Entry, error) {
-	if err := s.ensureOpen(ctx); err != nil {
+	if err := s.ensureOpen(); err != nil {
 		return nil, err
 	}
 	name, err := fsName(locator)
@@ -99,7 +99,7 @@ func (s *snapshot) Open(
 	ctx context.Context,
 	locator spec.Locator,
 ) (io.ReadCloser, error) {
-	if err := s.ensureOpen(ctx); err != nil {
+	if err := s.ensureOpen(); err != nil {
 		return nil, err
 	}
 	name, err := fsName(locator)
@@ -125,7 +125,7 @@ func (s *snapshot) Open(
 }
 
 func (s *snapshot) Confirm(ctx context.Context) error {
-	if err := s.ensureOpen(ctx); err != nil {
+	if err := s.ensureOpen(); err != nil {
 		return err
 	}
 	if s.immutable {
@@ -149,11 +149,11 @@ func (s *snapshot) Close() error {
 	return nil
 }
 
-func (s *snapshot) ensureOpen(ctx context.Context) error {
-	if s == nil || s.closed.Load() {
+func (s *snapshot) ensureOpen() error {
+	if s.closed.Load() {
 		return spec.ErrClosed
 	}
-	return ctx.Err()
+	return nil
 }
 
 func fsName(locator spec.Locator) (string, error) {

@@ -102,9 +102,6 @@ func (a *Adapter) ResolveLocalPath(
 	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
-	if err := a.validateSource(ctx, value); err != nil {
-		return "", err
-	}
 	root, err := a.sourceRootPath(value, false)
 	if err != nil {
 		return "", err
@@ -120,13 +117,6 @@ func (a *Adapter) BootstrapManagedSource(
 	ctx context.Context,
 	value sourceModel.Source,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := a.validateSource(ctx, value); err != nil {
-		return err
-	}
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -143,19 +133,6 @@ func (a *Adapter) RemoveManagedRoot(
 	ctx context.Context,
 	rootStorageKey spec.StorageKey,
 ) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: managed root removal context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -177,13 +154,6 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	ctx context.Context,
 	value sourceModel.Source,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := a.validateSource(ctx, value); err != nil {
-		return err
-	}
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -246,12 +216,6 @@ func (a *Adapter) PublishPackage(
 	value sourceModel.Source,
 	publication managedpackageModel.ManagedPackagePublication,
 ) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	if err := a.validateSource(ctx, value); err != nil {
-		return "", err
-	}
 	files := publication.Files
 	directory, err := publication.Address.Directory()
 	if err != nil {
@@ -414,20 +378,8 @@ func (a *Adapter) RemovePackage(
 	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := a.validateSource(ctx, value); err != nil {
-		return err
-	}
-	if err := address.Validate(); err != nil {
-		return err
-	}
 	directory, err := address.Directory()
 	if err != nil {
-		return err
-	}
-	if err := spec.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return err
 	}
 
@@ -507,9 +459,6 @@ func (*Adapter) NormalizeConfig(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
 		spec.MaxConfigBytes,
@@ -540,9 +489,6 @@ func (a *Adapter) Open(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (driver.Snapshot, error) {
-	if err := a.validateSource(ctx, value); err != nil {
-		return nil, err
-	}
 	root, err := a.sourceRootPath(value, false)
 	if err != nil {
 		return nil, err
@@ -552,13 +498,6 @@ func (a *Adapter) Open(
 		return nil, err
 	}
 	return a.filesystem.Open(ctx, filesystemValue)
-}
-
-func (a *Adapter) validateSource(ctx context.Context, value sourceModel.Source) error {
-	if a == nil || a.filesystem == nil {
-		return spec.ErrClosed
-	}
-	return nil
 }
 
 func (a *Adapter) sourceRootPath(

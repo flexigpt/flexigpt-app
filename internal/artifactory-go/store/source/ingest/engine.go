@@ -148,18 +148,6 @@ func (e *Engine) Discover(
 	value sourceModel.Source,
 	snapshot driver.Snapshot,
 ) (Result, error) {
-	if e == nil || e.decoders == nil {
-		return Result{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return Result{}, fmt.Errorf(
-			"%w: discovery context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return Result{}, err
-	}
 	if err := value.ValidateRead(); err != nil {
 		return Result{}, err
 	}

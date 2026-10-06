@@ -62,15 +62,6 @@ func (m *ApprovalManager) Create(
 	ctx context.Context,
 	summary mcpServer.MCPApprovalSummary,
 ) (string, error) {
-	if err := validateApprovalContext(ctx); err != nil {
-		return "", err
-	}
-	if m == nil {
-		return "", fmt.Errorf(
-			"%w: MCP approval manager is unavailable",
-			mcpServer.ErrMCPRuntimeNotReady,
-		)
-	}
 	if err := validateApprovalSummary(summary); err != nil {
 		return "", err
 	}
@@ -100,15 +91,6 @@ func (m *ApprovalManager) Resolve(
 	id string,
 	resolution mcpServer.MCPApprovalResolution,
 ) (mcpServer.MCPApprovalResolutionResult, error) {
-	if err := validateApprovalContext(ctx); err != nil {
-		return mcpServer.MCPApprovalResolutionResult{}, err
-	}
-	if m == nil {
-		return mcpServer.MCPApprovalResolutionResult{}, fmt.Errorf(
-			"%w: MCP approval manager is unavailable",
-			mcpServer.ErrMCPRuntimeNotReady,
-		)
-	}
 	if strings.TrimSpace(id) == "" {
 		return mcpServer.MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: approval ID is required",
@@ -254,15 +236,6 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 	token string,
 	expected mcpServer.MCPApprovalSummary,
 ) (string, error) {
-	if err := validateApprovalContext(ctx); err != nil {
-		return "", err
-	}
-	if m == nil {
-		return "", fmt.Errorf(
-			"%w: MCP approval manager is unavailable",
-			mcpServer.ErrMCPRuntimeNotReady,
-		)
-	}
 	if strings.TrimSpace(token) == "" {
 		return "", fmt.Errorf(
 			"%w: approval token is required",
@@ -364,16 +337,6 @@ func normalizeApprovalArguments(value jsonutil.JSONRawString) jsonutil.JSONRawSt
 		return jsonutil.JSONRawString(trimmed)
 	}
 	return jsonutil.JSONRawString(normalized)
-}
-
-func validateApprovalContext(ctx context.Context) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP approval context is nil",
-			mcpServer.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }
 
 func validateApprovalSummary(value mcpServer.MCPApprovalSummary) error {

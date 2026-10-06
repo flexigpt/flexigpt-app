@@ -144,12 +144,6 @@ func NewBootstrap(
 }
 
 func (b *Bootstrap) Ensure(ctx context.Context) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: bootstrap context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}

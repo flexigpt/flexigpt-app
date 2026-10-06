@@ -318,12 +318,7 @@ func newManagedImportFixture(
 	harness := newWorkflowHarness(t)
 	harness.installBundledAgents(t)
 
-	baselineEnsurer, err := agentAPI.NewBaselineEnsurer(
-		harness.api,
-	)
-	requireNoError(t, err)
-
-	_, err = baselineEnsurer.EnsureAgentBaselinePlugin(
+	_, err := harness.api.EnsureAgentBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)

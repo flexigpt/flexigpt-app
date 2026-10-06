@@ -22,12 +22,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return sourceModel.Summary{}, err
 	}
-	if ctx == nil {
-		return sourceModel.Summary{}, fmt.Errorf("%w: declaration discovery context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Summary{}, err
-	}
+
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Summary{}, err
 	}

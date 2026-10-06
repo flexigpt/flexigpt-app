@@ -47,13 +47,6 @@ func (a *Adapter) Resolve(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (Document, error) {
-	if a == nil || a.resources == nil {
-		return Document{}, spec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return Document{}, err
-	}
-
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
@@ -103,18 +96,6 @@ func (a *Adapter) ResolveWithContentSource(
 	contentRootID rootModel.RootID,
 	contentSourceID sourceModel.SourceID,
 ) (Document, error) {
-	if a == nil || a.resources == nil {
-		return Document{}, spec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return Document{}, err
-	}
-	if err := contentRootID.Validate(); err != nil {
-		return Document{}, err
-	}
-	if err := contentSourceID.Validate(); err != nil {
-		return Document{}, err
-	}
 	if contentRootID != ref.RootID {
 		return Document{}, fmt.Errorf(
 			"%w: Text content Source belongs to another Root",

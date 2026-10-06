@@ -14,18 +14,6 @@ func (c *Service) PrepareTopologyPackageHydrations(
 	installerNames []string,
 	desiredValues []installModel.PackageHydration,
 ) (installModel.PackageHydrationPreparation, error) {
-	if c == nil || c.metadata == nil {
-		return installModel.PackageHydrationPreparation{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return installModel.PackageHydrationPreparation{}, fmt.Errorf(
-			"%w: topology package hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return installModel.PackageHydrationPreparation{}, err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return installModel.PackageHydrationPreparation{}, err
 	}
@@ -118,18 +106,6 @@ func (c *Service) CommitTopologyPackageHydration(
 	ctx context.Context,
 	value installModel.PackageHydration,
 ) error {
-	if c == nil || c.metadata == nil || c.Roots == nil || c.Sources == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology package hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
@@ -156,18 +132,6 @@ func (c *Service) DeleteTopologyPackageHydration(
 	ctx context.Context,
 	value installModel.PackageHydration,
 ) error {
-	if c == nil || c.metadata == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology package hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}

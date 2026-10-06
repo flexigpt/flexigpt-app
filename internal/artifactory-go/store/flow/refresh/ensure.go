@@ -54,15 +54,7 @@ func EnsureAndRefreshSource(
 			spec.ErrInvalid,
 		)
 	}
-	if ctx == nil {
-		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: Source lifecycle context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Summary{}, err
-	}
+
 	if err := request.RootID.Validate(); err != nil {
 		return sourceModel.Summary{}, err
 	}

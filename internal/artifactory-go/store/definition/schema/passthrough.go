@@ -47,9 +47,6 @@ func (c *PassthroughCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schemaModel.ParsedDocument, error) {
-	if err := ctx.Err(); err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
 	return schemaModel.ParsedDocument{
 		Key:    c.key,
 		Digest: cryptoutil.DigestBytes(raw),

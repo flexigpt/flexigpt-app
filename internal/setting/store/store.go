@@ -119,16 +119,6 @@ func (s *SettingStore) ApplyCurrentDebugSettings(
 func (s *SettingStore) Migrate(
 	ctx context.Context,
 ) error {
-	if s == nil || s.store == nil {
-		return basespecClosedError()
-	}
-	if ctx == nil {
-		return errors.New("settings migration context is nil")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	raw, err := s.store.GetAll(true)
 	if err != nil {
 		return fmt.Errorf("read settings: %w", err)

@@ -18,13 +18,6 @@ func (a *Adapter) ApplyPackageBatch(
 	publications []managedpackageModel.ManagedPackagePublication,
 	removals []managedpackageModel.ManagedPackageAddress,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := a.validateSource(ctx, value); err != nil {
-		return err
-	}
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
 

@@ -94,15 +94,6 @@ func (a *Adapter) LookupGoTool(
 	ctx context.Context,
 	function string,
 ) (toolDomain.GoToolDescriptor, error) {
-	if a == nil || a.registry == nil {
-		return toolDomain.GoToolDescriptor{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
-			"%w: Go Tool lookup context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return toolDomain.GoToolDescriptor{}, err
 	}
@@ -130,19 +121,7 @@ func (a *Adapter) LookupGoToolByName(
 	ctx context.Context,
 	name spec.LogicalName,
 ) (toolDomain.GoToolDescriptor, error) {
-	if a == nil || a.registry == nil {
-		return toolDomain.GoToolDescriptor{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
-			"%w: Go Tool lookup context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := name.Validate(); err != nil {
-		return toolDomain.GoToolDescriptor{}, err
-	}
-	if err := ctx.Err(); err != nil {
 		return toolDomain.GoToolDescriptor{}, err
 	}
 

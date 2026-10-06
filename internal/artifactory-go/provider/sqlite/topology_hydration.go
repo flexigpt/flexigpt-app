@@ -18,18 +18,6 @@ func (s *Store) GetTopologyHydration(
 	ctx context.Context,
 	installerName string,
 ) (installModel.Hydration, bool, error) {
-	if s == nil || s.db == nil {
-		return installModel.Hydration{}, false, spec.ErrClosed
-	}
-	if ctx == nil {
-		return installModel.Hydration{}, false, fmt.Errorf(
-			"%w: topology hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return installModel.Hydration{}, false, err
-	}
 	if err := installModel.ValidateHydrationInstallerName(installerName); err != nil {
 		return installModel.Hydration{}, false, err
 	}
@@ -69,18 +57,6 @@ func (s *Store) PutTopologyHydration(
 	ctx context.Context,
 	value installModel.Hydration,
 ) error {
-	if s == nil || s.db == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology hydration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := value.Validate(); err != nil {
 		return err
 	}
@@ -207,18 +183,6 @@ func (s *Store) PurgeTopologyRoot(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if s == nil || s.db == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology purge context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := rootID.Validate(); err != nil {
 		return err
 	}

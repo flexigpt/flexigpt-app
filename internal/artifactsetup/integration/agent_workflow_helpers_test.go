@@ -69,15 +69,6 @@ func (p workflowDirectCapabilityProvider) ResolveDirectCapability(
 	ctx context.Context,
 	request composition.DirectCapabilityRequest,
 ) (composition.CapabilityTarget, bool, error) {
-	if ctx == nil {
-		return composition.CapabilityTarget{}, false, fmt.Errorf(
-			"%w: workflow direct capability context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return composition.CapabilityTarget{}, false, err
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return composition.CapabilityTarget{}, false, err
 	}
@@ -173,8 +164,6 @@ func newWorkflowHarness(
 
 	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
 		Store:            store,
-		SchemaCodecs:     schemaCodecs,
-		Decoders:         decoders,
 		Interpretations:  registry,
 		LocatorFactories: locatorFactories,
 		Scope: composition.ScopeBinding{

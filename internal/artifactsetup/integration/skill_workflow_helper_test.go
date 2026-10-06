@@ -24,8 +24,7 @@ type skillWorkflowFixture struct {
 	store *compose.Store
 	api   *skillAPI.Service
 
-	bootstrap       *installFlow.Bootstrap
-	baselineEnsurer skillAPI.BaselineEnsurer
+	bootstrap *installFlow.Bootstrap
 }
 
 func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
@@ -70,8 +69,6 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 
 	llm, err := llmartifactory.Open(t.Context(), llmartifactory.Config{
 		Store:            store,
-		SchemaCodecs:     schemaCodecs,
-		Decoders:         decoders,
 		Interpretations:  registry,
 		LocatorFactories: locatorFactories,
 		Scope: composition.ScopeBinding{
@@ -112,14 +109,10 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	)
 	requireNoError(t, err)
 
-	baselineEnsurer, err := skillAPI.NewBaselineEnsurer(api)
-	requireNoError(t, err)
-
 	return &skillWorkflowFixture{
-		store:           store,
-		api:             api,
-		bootstrap:       bootstrap,
-		baselineEnsurer: baselineEnsurer,
+		store:     store,
+		api:       api,
+		bootstrap: bootstrap,
 	}
 }
 
@@ -133,7 +126,7 @@ func (f *skillWorkflowFixture) ensureUserBaseline(
 ) pluginAPI.PluginView {
 	t.Helper()
 
-	value, err := f.baselineEnsurer.EnsureSkillBaselinePlugin(
+	value, err := f.api.EnsureSkillBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)

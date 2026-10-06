@@ -76,9 +76,6 @@ func (r borrowedTreeRuntime) Get(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (sourceModel.Source, error) {
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Source{}, err
-	}
 	if rootID != r.source.RootID || sourceID != r.source.ID {
 		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
@@ -94,9 +91,6 @@ func (r borrowedTreeRuntime) List(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) ([]sourceModel.Source, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if rootID != r.source.RootID {
 		return []sourceModel.Source{}, nil
 	}
@@ -107,9 +101,6 @@ func (r borrowedTreeRuntime) Open(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (driver.Snapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if value.RootID != r.source.RootID ||
 		value.ID != r.source.ID ||
 		value.Revision != r.source.Revision {
@@ -181,12 +172,6 @@ func (s *Service) readSourceTreeInSession(
 func (s *Service) BeginVerificationSession(
 	ctx context.Context,
 ) (context.Context, resourceModel.VerificationSession, error) {
-	if err := validateContext(ctx, "resource verification session"); err != nil {
-		return nil, nil, err
-	}
-	if s == nil {
-		return nil, nil, spec.ErrClosed
-	}
 	if existing := verificationSessionFromContext(ctx); existing != nil {
 		if existing.service != s {
 			return nil, nil, fmt.Errorf(
@@ -212,16 +197,6 @@ func (s *Service) BeginVerificationSession(
 }
 
 func (s *verificationSession) Close(ctx context.Context) error {
-	if s == nil {
-		return nil
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: resource verification session close context is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -280,9 +255,6 @@ func (s *verificationSession) Close(ctx context.Context) error {
 func verificationSessionFromContext(
 	ctx context.Context,
 ) *verificationSession {
-	if ctx == nil {
-		return nil
-	}
 	value, _ := ctx.Value(
 		verificationSessionContextKey{},
 	).(*verificationSession)

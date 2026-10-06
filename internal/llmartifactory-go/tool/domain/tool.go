@@ -38,9 +38,6 @@ func DecodeTool(
 			record.ID,
 		)
 	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return Tool{}, err
-	}
 	if value.Kind != ToolArtifactKind ||
 		value.SchemaID != toolv1.ToolSchemaKey.SchemaID ||
 		value.SchemaVersion != toolv1.ToolSchemaKey.SchemaVersion {

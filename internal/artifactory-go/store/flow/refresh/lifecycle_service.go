@@ -3,7 +3,6 @@ package refresh
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -21,12 +20,7 @@ func (s *Service) PublishSourceLifecycle(
 		s.states == nil || s.synchronizer == nil || s.publisher == nil {
 		return spec.ErrClosed
 	}
-	if ctx == nil {
-		return fmt.Errorf("%w: Source lifecycle publication context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+
 	if err := transition.Validate(); err != nil {
 		return err
 	}

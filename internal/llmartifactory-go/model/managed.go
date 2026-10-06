@@ -24,9 +24,6 @@ func (a *Service) createProvider(
 	ctx context.Context,
 	request ManagedProviderCreateRequest,
 ) (ManagedProviderCreateResult, error) {
-	if err := a.ready(ctx); err != nil {
-		return ManagedProviderCreateResult{}, err
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return ManagedProviderCreateResult{}, err
 	}
@@ -108,9 +105,6 @@ func (a *Service) replaceProvider(
 	ctx context.Context,
 	request ManagedProviderReplaceRequest,
 ) (ManagedProviderReplaceResult, error) {
-	if err := a.ready(ctx); err != nil {
-		return ManagedProviderReplaceResult{}, err
-	}
 	if err := request.Provider.Validate(); err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
@@ -255,9 +249,6 @@ func (a *Service) deleteProvider(
 	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
-	if err := a.ready(ctx); err != nil {
-		return err
-	}
 	if err := validateExpectedArtifactRevision(
 		expectedArtifactRevision,
 	); err != nil {
@@ -339,9 +330,6 @@ func (a *Service) createModel(
 	ctx context.Context,
 	request ManagedModelCreateRequest,
 ) (ManagedModelCreateResult, error) {
-	if err := a.ready(ctx); err != nil {
-		return ManagedModelCreateResult{}, err
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return ManagedModelCreateResult{}, err
 	}
@@ -423,9 +411,6 @@ func (a *Service) replaceModel(
 	ctx context.Context,
 	request ManagedModelReplaceRequest,
 ) (ManagedModelReplaceResult, error) {
-	if err := a.ready(ctx); err != nil {
-		return ManagedModelReplaceResult{}, err
-	}
 	if err := request.Model.Validate(); err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
@@ -568,9 +553,6 @@ func (a *Service) deleteModel(
 	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
-	if err := a.ready(ctx); err != nil {
-		return err
-	}
 	if err := validateExpectedArtifactRevision(
 		expectedArtifactRevision,
 	); err != nil {

@@ -17,9 +17,6 @@ func (a *Service) saveProviderSettings(
 	ctx context.Context,
 	request SaveProviderSettingsRequest,
 ) (ProviderView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ProviderView{}, err
-	}
 	if err := request.Provider.Validate(); err != nil {
 		return ProviderView{}, err
 	}
@@ -131,9 +128,6 @@ func (a *Service) resetProviderSettings(
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
 ) (ProviderView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ProviderView{}, err
-	}
 	if err := ref.Validate(); err != nil {
 		return ProviderView{}, err
 	}
@@ -172,10 +166,6 @@ func (a *Service) getProviderAPIKeyStatus(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ProviderAPIKeyStatus, error) {
-	if err := a.ready(ctx); err != nil {
-		return ProviderAPIKeyStatus{}, err
-	}
-
 	record, err := a.requireKind(
 		ctx,
 		ref,
@@ -211,9 +201,6 @@ func (a *Service) setProviderAPIKey(
 	ctx context.Context,
 	request SetProviderAPIKeyRequest,
 ) (ProviderAPIKeyStatus, error) {
-	if err := a.ready(ctx); err != nil {
-		return ProviderAPIKeyStatus{}, err
-	}
 	if err := request.Provider.Validate(); err != nil {
 		return ProviderAPIKeyStatus{}, err
 	}
@@ -271,9 +258,6 @@ func (a *Service) clearProviderAPIKey(
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
 ) (ProviderAPIKeyStatus, error) {
-	if err := a.ready(ctx); err != nil {
-		return ProviderAPIKeyStatus{}, err
-	}
 	if err := ref.Validate(); err != nil {
 		return ProviderAPIKeyStatus{}, err
 	}
@@ -336,9 +320,6 @@ func (a *Service) saveModelSettings(
 	ctx context.Context,
 	request SaveModelSettingsRequest,
 ) (ModelView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ModelView{}, err
-	}
 	if err := request.Model.Validate(); err != nil {
 		return ModelView{}, err
 	}
@@ -436,9 +417,6 @@ func (a *Service) resetModelSettings(
 	expectedModelRevision uint64,
 	expectedSettingsRevision uint64,
 ) (ModelView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ModelView{}, err
-	}
 	if err := ref.Validate(); err != nil {
 		return ModelView{}, err
 	}

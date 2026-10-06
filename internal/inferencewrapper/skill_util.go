@@ -1,13 +1,31 @@
 package inferencewrapper
 
 import (
+	"context"
+
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
+
+type SkillSource interface {
+	ListArtifactSkillRefs(
+		ctx context.Context,
+		f skillAggregate.ArtifactSkillFilter,
+	) ([]artifactModel.ArtifactRef, error)
+
+	GetArtifactSkillsPrompt(
+		ctx context.Context,
+		f skillAggregate.ArtifactSkillFilter,
+	) (string, error)
+
+	RunScriptsEnabled() bool
+}
 
 func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.ToolChoice, error) {
 	mk := func(choiceID, toolName string, t llmtoolsSpec.Tool) (inferenceSpec.ToolChoice, error) {

@@ -29,7 +29,7 @@ func (a *Service) CreateAgentPlugin(
 	return a.plugins.Create(ctx, request)
 }
 
-func (a *Service) ensureAgentBaselinePlugin(
+func (a *Service) EnsureAgentBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (pluginAPI.PluginView, error) {

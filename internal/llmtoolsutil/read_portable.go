@@ -19,15 +19,6 @@ func ReadPortableTextFile(
 	selectedPath string,
 	maximumBytes int,
 ) ([]byte, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: portable file read context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if selectedPath == "" {
 		return nil, fmt.Errorf(
 			"%w: selected file path is required",
@@ -84,8 +75,6 @@ func ReadPortableTextFile(
 			spec.ErrInvalid,
 		)
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+
 	return append([]byte(nil), value...), nil
 }

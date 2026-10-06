@@ -63,15 +63,6 @@ func NewService(
 }
 
 func (s *Service) RefreshRoot(ctx context.Context, rootID rootModel.RootID) (refreshModel.RefreshRootResult, error) {
-	if s == nil {
-		return refreshModel.RefreshRootResult{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return refreshModel.RefreshRootResult{}, fmt.Errorf("%w: Root refresh context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return refreshModel.RefreshRootResult{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return refreshModel.RefreshRootResult{}, err
 	}
@@ -106,15 +97,6 @@ func (s *Service) RefreshSource(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (refreshModel.RefreshSourceResult, error) {
-	if s == nil {
-		return refreshModel.RefreshSourceResult{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return refreshModel.RefreshSourceResult{}, fmt.Errorf("%w: Source refresh context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return refreshModel.RefreshSourceResult{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return refreshModel.RefreshSourceResult{}, err
 	}
@@ -252,15 +234,6 @@ func (s *Service) InspectSource(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (refreshModel.Inspection, error) {
-	if s == nil {
-		return refreshModel.Inspection{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return refreshModel.Inspection{}, fmt.Errorf("%w: Source refresh inspection context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return refreshModel.Inspection{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return refreshModel.Inspection{}, err
 	}
@@ -285,15 +258,6 @@ func (s *Service) InspectSourceMetadata(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (refreshModel.Inspection, error) {
-	if s == nil {
-		return refreshModel.Inspection{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return refreshModel.Inspection{}, spec.ErrInvalid
-	}
-	if err := ctx.Err(); err != nil {
-		return refreshModel.Inspection{}, err
-	}
 	state, err := s.states.GetRefreshState(ctx, value.RootID, value.ID)
 	if err != nil {
 		return refreshModel.Inspection{}, err

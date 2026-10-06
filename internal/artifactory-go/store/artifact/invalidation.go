@@ -20,15 +20,6 @@ func (s *Synchronizer) DeriveLifecycleInvalidation(
 	transition source.LifecycleTransition,
 	existing []artifactModel.Artifact,
 ) ([]SourceStateUpdate, error) {
-	if s == nil || s.clock == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: Artifact lifecycle invalidation context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if err := transition.Validate(); err != nil {
 		return nil, err
 	}

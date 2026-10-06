@@ -32,19 +32,6 @@ func (r *artifactModelCredentialResolver) ResolveModelCredential(
 	ctx context.Context,
 	binding secretModel.Binding,
 ) (inferenceadapter.Credential, error) {
-	if r == nil || r.secrets == nil {
-		return inferenceadapter.Credential{}, spec.ErrClosed
-	}
-	if err := binding.Validate(); err != nil {
-		return inferenceadapter.Credential{}, err
-	}
-	if !binding.Active() {
-		return inferenceadapter.Credential{}, fmt.Errorf(
-			"%w: Model Provider credential is not configured",
-			spec.ErrReferenceUnresolved,
-		)
-	}
-
 	value, current, err := r.secrets.ReadBinding(
 		ctx,
 		binding.Key,

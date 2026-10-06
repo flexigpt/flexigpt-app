@@ -29,12 +29,6 @@ func (r *Resolver) InspectNamedRelationship(
 	ctx context.Context,
 	request NamedRelationshipRequest,
 ) (NamedRelationshipInspection, error) {
-	if err := r.ready(); err != nil {
-		return NamedRelationshipInspection{}, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return NamedRelationshipInspection{}, err
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return NamedRelationshipInspection{}, err
 	}

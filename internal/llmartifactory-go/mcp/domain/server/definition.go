@@ -59,9 +59,6 @@ func DefinitionForDocument(
 func ServerDocumentFromDefinition(
 	input definitionModel.Definition,
 ) (ServerDocument, error) {
-	if err := definitionModel.ValidateAdmitted(input); err != nil {
-		return ServerDocument{}, err
-	}
 	if input.Kind != mcpDomain.MCPArtifactKind ||
 		input.SchemaID != mcpv1.MCPSchemaKey.SchemaID ||
 		input.SchemaVersion != mcpv1.MCPSchemaKey.SchemaVersion {

@@ -66,12 +66,6 @@ func (s *Service) Ensure(
 	rootID rootModel.RootID,
 	draft sourceModel.Draft,
 ) (sourceModel.Summary, bool, error) {
-	if ctx == nil {
-		return sourceModel.Summary{}, false, fmt.Errorf("%w: Source ensure context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Summary{}, false, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
@@ -132,12 +126,6 @@ func (s *Service) CreateWithStatus(
 	rootID rootModel.RootID,
 	draft sourceModel.Draft,
 ) (sourceModel.Summary, bool, error) {
-	if ctx == nil {
-		return sourceModel.Summary{}, false, fmt.Errorf("%w: source creation context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Summary{}, false, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
@@ -447,12 +435,6 @@ func (s *Service) Discard(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: source discard context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return err
 	}
@@ -510,12 +492,6 @@ func (s *Service) MarkContentChanged(
 	expectedRevision uint64,
 ) (sourceModel.Summary, error) {
 	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return sourceModel.Summary{}, err
-	}
-	if ctx == nil {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source content-change context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {

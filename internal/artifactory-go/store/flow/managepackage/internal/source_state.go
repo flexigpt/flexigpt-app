@@ -17,20 +17,6 @@ func (s *Service) sourceState(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (SourceState, error) {
-	if s == nil ||
-		s.dependencies.Runtime == nil ||
-		s.dependencies.Packages == nil {
-		return SourceState{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return SourceState{}, fmt.Errorf(
-			"%w: managed Source state context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return SourceState{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return SourceState{}, err
 	}

@@ -64,18 +64,6 @@ func (a *API) listPlugins(
 	request ListRequest,
 	domainOnly bool,
 ) ([]ListItem, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Plugin list context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return nil, err
 	}

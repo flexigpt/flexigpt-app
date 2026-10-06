@@ -51,7 +51,3 @@ func (r *deploymentResources) transferSecretOwnership() {
 		r.secretOwnershipTransferred = true
 	}
 }
-
-func joinOpenFailure(primary, cleanup error) error {
-	return errors.Join(primary, cleanup)
-}

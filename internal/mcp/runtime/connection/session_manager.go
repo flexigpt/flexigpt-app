@@ -167,7 +167,7 @@ func (m *MCPRuntimeManager) Connect(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -198,7 +198,7 @@ func (m *MCPRuntimeManager) StartConnect(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -231,7 +231,7 @@ func (m *MCPRuntimeManager) Disconnect(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) error {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return err
 	}
 	state, timer, cancelAttempt := m.disconnectSession(ref)
@@ -252,7 +252,7 @@ func (m *MCPRuntimeManager) InvalidateCatalog(
 	ctx context.Context,
 	ref mcpServer.CatalogID,
 ) error {
-	if err := validateRuntimePluginRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return err
 	}
 
@@ -278,7 +278,7 @@ func (m *MCPRuntimeManager) ListTools(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) ([]MCPToolCapability, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -298,7 +298,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 	pageSize int,
 	pageToken string,
 ) (MCPToolCapabilityPage, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return MCPToolCapabilityPage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -333,7 +333,7 @@ func (m *MCPRuntimeManager) ListResources(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) ([]MCPResourceRef, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -353,7 +353,7 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 	pageSize int,
 	pageToken string,
 ) (MCPResourcePage, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return MCPResourcePage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -381,7 +381,7 @@ func (m *MCPRuntimeManager) ListResourceTemplates(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) ([]MCPResourceTemplateRef, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -404,7 +404,7 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 	pageSize int,
 	pageToken string,
 ) (MCPResourceTemplatePage, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return MCPResourceTemplatePage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -435,7 +435,7 @@ func (m *MCPRuntimeManager) ListPrompts(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) ([]MCPPromptRef, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -455,7 +455,7 @@ func (m *MCPRuntimeManager) ListPromptsPage(
 	pageSize int,
 	pageToken string,
 ) (MCPPromptPage, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return MCPPromptPage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
@@ -484,7 +484,7 @@ func (m *MCPRuntimeManager) ReadResource(
 	ref mcpServer.ServerID,
 	uri string,
 ) (*MCPReadResourceResponseBody, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	if uri == "" {
@@ -520,7 +520,7 @@ func (m *MCPRuntimeManager) GetPrompt(
 	name string,
 	arguments map[string]string,
 ) (*MCPGetPromptResponseBody, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 	if name == "" {
@@ -559,7 +559,7 @@ func (m *MCPRuntimeManager) Complete(
 	ref mcpServer.ServerID,
 	request MCPCompleteArgumentRequestBody,
 ) (*MCPCompletionResult, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -588,7 +588,7 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 	ref mcpServer.ServerID,
 	request InvokeMCPToolRequestBody,
 ) (mcpServer.RuntimeConfig, MCPToolCapability, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return mcpServer.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 	if request.ToolName == "" {
@@ -627,7 +627,7 @@ func (m *MCPRuntimeManager) CallTool(
 	ref mcpServer.ServerID,
 	request InvokeMCPToolRequestBody,
 ) (*InvokeMCPToolResponseBody, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -798,7 +798,7 @@ func (m *MCPRuntimeManager) Refresh(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -877,7 +877,7 @@ func (m *MCPRuntimeManager) Invalidate(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) error {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return err
 	}
 
@@ -904,7 +904,7 @@ func (m *MCPRuntimeManager) Status(
 	ctx context.Context,
 	ref mcpServer.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
-	if err := validateRuntimeRef(ctx, ref); err != nil {
+	if err := ref.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -1437,38 +1437,6 @@ func (m *MCPRuntimeManager) scheduleRefresh(
 		_, _ = m.Refresh(refreshCtx, ref)
 	})
 	m.timers[ref] = timer
-}
-
-func validateRuntimeRef(
-	ctx context.Context,
-	ref mcpServer.ServerID,
-) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP runtime context is nil",
-			mcpServer.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return ref.Validate()
-}
-
-func validateRuntimePluginRef(
-	ctx context.Context,
-	ref mcpServer.CatalogID,
-) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP runtime context is nil",
-			mcpServer.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return ref.Validate()
 }
 
 func runtimeSnapshot(

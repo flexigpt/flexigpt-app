@@ -47,15 +47,6 @@ func (c *schemaCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schemaModel.ParsedDocument, error) {
-	if ctx == nil {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: declaration schema canonicalization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
 	if err := declaration.ValidateSchemaHeader(
 		c.registration.SchemaKey,
 		raw,

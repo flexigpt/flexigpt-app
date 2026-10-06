@@ -2,8 +2,6 @@ package llmartifactory
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -18,8 +16,6 @@ import (
 type Config struct {
 	Store *compose.Store
 
-	SchemaCodecs     []schema.Codec
-	Decoders         []ingest.Decoder
 	Interpretations  *coreinterpretation.Registry
 	LocatorFactories []corelocator.Factory
 

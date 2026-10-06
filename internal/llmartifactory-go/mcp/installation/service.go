@@ -94,15 +94,7 @@ func (s *Service) Resolve(
 		s.secretCleaner == nil {
 		return Material{}, spec.ErrClosed
 	}
-	if ctx == nil {
-		return Material{}, fmt.Errorf(
-			"%w: MCP installation resolution context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return Material{}, err
-	}
+
 	if err := ref.Validate(); err != nil {
 		return Material{}, err
 	}

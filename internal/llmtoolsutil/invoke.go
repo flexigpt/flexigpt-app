@@ -44,14 +44,6 @@ func Invoke(
 	if caller == nil {
 		return nil, fmt.Errorf("%w: go caller is nil", errInvalid)
 	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: context is nil", errInvalid)
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
 	function := strings.TrimSpace(request.Function)
 	if function == "" {
 		return nil, fmt.Errorf("%w: go tool function is required", errInvalid)

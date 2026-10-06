@@ -17,7 +17,6 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -37,8 +36,9 @@ const (
 type ProviderSetAPI struct {
 	inner *inference.ProviderSetAPI
 
-	toolsSvc           *toolAPI.Service
-	artifactSkills     *skillAggregate.Service
+	models             inferencewrapperSpec.ModelRuntime
+	toolsSvc           ToolSource
+	artifactSkills     SkillSource
 	mcpInferenceBridge *MCPInferenceBridge
 	workspaceSource    WorkspaceSource
 
@@ -68,31 +68,33 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	}
 }
 
-// WithSkillsRunScriptEnabled controls whether skills-runscript is advertised to the spec.
-// Default: false (safer; matches the default fsskillprovider which disables scripts).
+// WithSkillsRunScriptEnabled overrides the Skill source's run-script policy
+// for advertised completion tools.
 func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }
 }
 
-// NewProviderSetAPI creates a new ProviderSetAPI wrapper.
-//
-//   - tools: Tool Aggregate used to hydrate ToolChoices when needed.
-//   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
+// NewProviderSetAPI validates required capabilities once during assembly.
+// MCP hydration is optional; the other capabilities are required.
 func NewProviderSetAPI(
-	tools *toolAPI.Service,
-	artifactSkills *skillAggregate.Service,
+	models inferencewrapperSpec.ModelRuntime,
+	tools ToolSource,
+	artifactSkills SkillSource,
 	mcpBridge *MCPInferenceBridge,
 	workspaceSource WorkspaceSource,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if tools == nil || artifactSkills == nil || mcpBridge == nil || workspaceSource == nil {
-		return nil, errors.New("inferencewrapper: missing input")
+	if models == nil || tools == nil || artifactSkills == nil || workspaceSource == nil {
+		return nil, errors.New("inferencewrapper: required capabilities are incomplete")
 	}
 	ps := &ProviderSetAPI{
+		models:             models,
 		toolsSvc:           tools,
 		artifactSkills:     artifactSkills,
 		mcpInferenceBridge: mcpBridge,
 		workspaceSource:    workspaceSource,
+
+		skillsRunScriptEnabled: artifactSkills.RunScriptsEnabled(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -216,24 +218,27 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if req == nil {
 		return nil, errors.New("got empty completion input")
 	}
-	if req.Runtime == nil {
-		return nil, errors.New("missing resolved runtime model")
+	if req.Current.Role != inferenceSpec.RoleUser {
+		return nil, errors.New("current turn must have role=user")
 	}
-	if err := req.Runtime.Validate(); err != nil {
-		return nil, err
-	}
-
-	modelParam := req.Runtime.ModelParam
-
 	if len(req.Current.ToolChoices) > 0 {
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
 	}
+
+	runtimeModel, err := ps.models.ResolveRuntimeConfiguration(ctx, req.Model)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtimeModel.Validate(); err != nil {
+		return nil, err
+	}
+	modelParam := runtimeModel.ModelParam
 
 	ck := uuidutil.NewUUIDv7()
 	currentMessage := req.Current
 	runtimeProvider, release, err := ps.registerRuntimeProvider(
 		ctx,
-		*req.Runtime,
+		runtimeModel,
 		ck,
 	)
 	if err != nil {
@@ -244,7 +249,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	capabilityResolver, err := ps.newRuntimeCapabilityResolver(
 		ctx,
 		runtimeProvider,
-		*req.Runtime,
+		runtimeModel,
 		ck,
 	)
 	if err != nil {
@@ -255,10 +260,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	inputs, currentInputs, err := ps.buildInputs(ctx, req.History, currentMessage)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(inputs) == 0 {
-		return nil, errors.New("no usable inputs to send to inference-go")
 	}
 
 	inputs, currentInputs = stripGeneratedCurrentContextInputs(
@@ -369,7 +370,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	// completely unavailable.
 	if workspaceUsage != nil &&
 		len(workspaceUsage.Skills) > 0 &&
-		(ps.artifactSkills == nil || len(enabledSkillRefs) == 0) {
+		len(enabledSkillRefs) == 0 {
 		markWorkspaceSkillSessionUsage(
 			workspaceUsage,
 			enabledSkillRefs,
@@ -386,7 +387,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
-	if ps.artifactSkills != nil && len(enabledSkillRefs) > 0 {
+	if len(enabledSkillRefs) > 0 {
 		var availableSkillRefs []artifactModel.ArtifactRef
 		var activeSkillRefs []artifactModel.ArtifactRef
 		if skillSessionID == "" {
@@ -648,9 +649,6 @@ func (ps *ProviderSetAPI) buildInputs(
 	}
 
 	cur := inCurrent
-	if cur.Role != inferenceSpec.RoleUser {
-		return nil, nil, errors.New("current turn must have role=user")
-	}
 
 	// If the caller already provided normalized InputUnions, just reuse them.
 	currentOut := make([]inferenceSpec.InputUnion, 0)

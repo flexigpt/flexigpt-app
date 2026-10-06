@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
@@ -30,19 +29,8 @@ type Handle struct {
 	Store *compose.Store
 	LLM   *llmartifactory.Artifactory
 
-	locatorFactories []corelocator.Factory
-
 	closeOnce sync.Once
 	closeErr  error
-}
-
-// LocatorFactories returns independently owned locator factory registrations
-// for family and runtime composition.
-func (h *Handle) LocatorFactories() []corelocator.Factory {
-	if h == nil {
-		return nil
-	}
-	return append([]corelocator.Factory(nil), h.locatorFactories...)
 }
 
 // Close closes the LLM registration attachment before closing the local
@@ -60,7 +48,6 @@ func (h *Handle) Close() error {
 			h.closeErr = errors.Join(h.closeErr, h.Store.Close())
 			h.Store = nil
 		}
-		h.locatorFactories = nil
 	})
 	return h.closeErr
 }
@@ -141,8 +128,6 @@ func OpenArtifactStore(
 
 	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
 		Store:            store,
-		SchemaCodecs:     registrations.SchemaCodecs(),
-		Decoders:         registrations.Decoders(),
 		Interpretations:  registrations.Interpretations(),
 		LocatorFactories: registrations.LocatorFactories(),
 		Scope: composition.ScopeBinding{
@@ -154,8 +139,7 @@ func OpenArtifactStore(
 	}
 
 	return &Handle{
-		Store:            store,
-		LLM:              llm,
-		locatorFactories: registrations.LocatorFactories(),
+		Store: store,
+		LLM:   llm,
 	}, nil
 }

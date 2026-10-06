@@ -61,12 +61,6 @@ func (s *Service) ResolveArtifact(
 	ref artifactModel.ArtifactRef,
 	_ resourceModel.ResolveOptions,
 ) (resourceModel.ResolvedArtifact, error) {
-	if err := validateContext(ctx, "Artifact resolution"); err != nil {
-		return resourceModel.ResolvedArtifact{}, err
-	}
-	if s == nil {
-		return resourceModel.ResolvedArtifact{}, spec.ErrClosed
-	}
 	if err := ref.Validate(); err != nil {
 		return resourceModel.ResolvedArtifact{}, err
 	}
@@ -115,15 +109,6 @@ func (s *Service) ResolveVerifiedLocalPath(
 	resolved resourceModel.ResolvedArtifact,
 	localLocator spec.Locator,
 ) (string, error) {
-	if err := validateContext(
-		ctx,
-		"verified local-path resolution",
-	); err != nil {
-		return "", err
-	}
-	if s == nil {
-		return "", spec.ErrClosed
-	}
 	if err := resolved.Validate(); err != nil {
 		return "", err
 	}
@@ -164,12 +149,6 @@ func (s *Service) ReadSourceEntry(
 	locator spec.Locator,
 	maximumBytes int64,
 ) (_ resourceModel.VerifiedEntry, returnErr error) {
-	if err := validateContext(ctx, "Source entry read"); err != nil {
-		return resourceModel.VerifiedEntry{}, err
-	}
-	if s == nil {
-		return resourceModel.VerifiedEntry{}, spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return resourceModel.VerifiedEntry{}, err
 	}
@@ -261,12 +240,6 @@ func (s *Service) StatSourceEntry(
 	sourceID sourceModel.SourceID,
 	locator spec.Locator,
 ) (sourceModel.Entry, error) {
-	if err := validateContext(ctx, "Source entry stat"); err != nil {
-		return sourceModel.Entry{}, err
-	}
-	if s == nil {
-		return sourceModel.Entry{}, spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Entry{}, err
 	}
@@ -344,12 +317,6 @@ func (s *Service) ReadSourceTree(
 	maximumEntries int,
 	maximumBytes int64,
 ) (_ []resourceModel.VerifiedEntry, returnErr error) {
-	if err := validateContext(ctx, "Source tree read"); err != nil {
-		return nil, err
-	}
-	if s == nil || s.sources == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -655,18 +622,4 @@ func (s *Service) SupportsLocalPath(
 	}
 	localPaths, supported := s.sources.(source.LocalPathRuntime)
 	return supported && localPaths.SupportsLocalPath(kind)
-}
-
-func validateContext(
-	ctx context.Context,
-	operation string,
-) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: %s context is nil",
-			spec.ErrInvalid,
-			operation,
-		)
-	}
-	return ctx.Err()
 }

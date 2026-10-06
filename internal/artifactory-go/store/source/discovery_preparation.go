@@ -78,18 +78,6 @@ func (s *Service) PrepareDiscovery(
 	sourceID sourceModel.SourceID,
 	preparation sourceModel.DiscoveryPreparation,
 ) (sourceModel.Summary, error) {
-	if s == nil || s.repository == nil {
-		return sourceModel.Summary{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: declaration discovery preparation context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return sourceModel.Summary{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Summary{}, err
 	}

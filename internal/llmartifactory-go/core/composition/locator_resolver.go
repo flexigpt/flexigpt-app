@@ -57,9 +57,6 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	ctx context.Context,
 	request LocatorRequest,
 ) (artifactModel.ArtifactRef, error) {
-	if err := validateResolutionContext(ctx); err != nil {
-		return artifactModel.ArtifactRef{}, err
-	}
 	if err := request.ExpectedType.Validate(); err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}

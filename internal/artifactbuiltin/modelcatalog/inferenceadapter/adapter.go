@@ -45,20 +45,11 @@ func PreparePackages(
 	ctx context.Context,
 	registry *coreinterpretation.Registry,
 ) ([]modelcatalog.PreparedPackage, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Model catalog conversion context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: Model catalog interpretation registry is nil",
 			spec.ErrInvalid,
 		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
 	}
 
 	catalog := modelpreset.DefaultCatalog()

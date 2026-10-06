@@ -474,14 +474,10 @@ linters:
           alias: agentskillsRuntimeSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
           alias: assets
-        - pkg: "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology
           alias: documentTopology
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/impl
-          alias: ${1}impl
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/impl
-          alias: ${1}impl
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/(\w+)/impl
-          alias: ${1}impl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec
+          alias: storeSpec
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)
           alias: ${1}Flow
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/compose

@@ -95,12 +95,6 @@ func (p *ReachableDiscoveryPlanner) ReachableRequirements(
 	ctx context.Context,
 	root artifactModel.ArtifactRef,
 ) ([]corerefresh.Requirement, error) {
-	if p == nil || p.resolveRoot == nil || p.requirements == nil {
-		return nil, spec.ErrClosed
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return nil, err
-	}
 	if err := root.Validate(); err != nil {
 		return nil, err
 	}

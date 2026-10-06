@@ -5,6 +5,7 @@ import (
 	"errors"
 	"maps"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/capabilityoverride"
@@ -15,82 +16,102 @@ import (
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 )
 
-// registerRuntimeProvider creates one ephemeral inference-go provider for one
-// resolved Model runtime configuration.
-//
-// The provider name is completion-scoped, preventing one request from
-// replacing another request's Provider configuration or API key. The
-// ProviderSetAPI is intentionally used as an inference-go execution engine,
-// not as a persistence layer.
-func (ps *ProviderSetAPI) registerRuntimeProvider(
+const runtimeProviderCleanupTimeout = 5 * time.Second
+
+// PublishProvider implements the application provider-lifecycle publication
+// capability. The supplied configuration has already been resolved by the
+// runtime adapter; no store or credential resolution happens here.
+func (ps *ProviderSetAPI) PublishProvider(
 	ctx context.Context,
-	runtimeModel inferencewrapperSpec.RuntimeModel,
-	completionKey string,
-) (
-	inferenceSpec.ProviderName,
-	func(),
-	error,
-) {
-	if ps == nil || ps.inner == nil {
-		return "", nil, errors.New("provider set is not initialized")
+	provider inferenceSpec.ProviderParam,
+) error {
+	return ps.publishRuntimeProvider(ctx, provider.Name, provider)
+}
+
+// ClearProvider implements the application provider-lifecycle removal
+// capability. Completion-scoped providers use separate generated names.
+func (ps *ProviderSetAPI) ClearProvider(
+	ctx context.Context,
+	provider inferenceSpec.ProviderName,
+) error {
+	return ps.inner.DeleteProvider(ctx, provider)
+}
+
+// publishRuntimeProvider is shared by long-lived provider publication and
+// completion-scoped provider registration.
+func (ps *ProviderSetAPI) publishRuntimeProvider(
+	ctx context.Context,
+	name inferenceSpec.ProviderName,
+	provider inferenceSpec.ProviderParam,
+) error {
+	config := &inference.AddProviderConfig{
+		SDKType:                  provider.SDKType,
+		Origin:                   provider.Origin,
+		ChatCompletionPathPrefix: provider.ChatCompletionPathPrefix,
+		APIKeyHeaderKey:          provider.APIKeyHeaderKey,
+		DefaultHeaders:           maps.Clone(provider.DefaultHeaders),
 	}
-	if err := runtimeModel.Validate(); err != nil {
-		return "", nil, err
+	if _, err := ps.inner.AddProvider(ctx, name, config); err != nil {
+		return err
 	}
 
+	// An empty key is intentional, including after a credential is cleared.
+	if err := ps.inner.SetProviderAPIKey(ctx, name, provider.APIKey); err != nil {
+		return errors.Join(
+			err,
+			ps.removeRuntimeProvider(ctx, name),
+		)
+	}
+	return nil
+}
+
+func (ps *ProviderSetAPI) removeRuntimeProvider(
+	ctx context.Context,
+	name inferenceSpec.ProviderName,
+) error {
+	cleanupCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		runtimeProviderCleanupTimeout,
+	)
+	defer cancel()
+
+	return ps.inner.DeleteProvider(cleanupCtx, name)
+}
+
+// registerRuntimeProvider consumes the configuration already checked by
+// FetchCompletion. Each completion receives an isolated provider name so
+// concurrent requests cannot replace each other's credentials or settings.
+func (ps *ProviderSetAPI) registerRuntimeProvider(
+	ctx context.Context,
+	runtimeModel inferencewrapperSpec.RuntimeConfiguration,
+	completionKey string,
+) (inferenceSpec.ProviderName, func(), error) {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(
 			completionKey+"\x00"+
 				string(runtimeModel.ProviderParam.Name)+"\x00"+
-				string(runtimeModel.ConfigurationFingerprint),
+				string(runtimeModel.Fingerprint),
 		))),
 		cryptoutil.DigestSHA256Prefix,
 	)
-	if len(digest) > 24 {
-		digest = digest[:24]
-	}
+	providerName := inferenceSpec.ProviderName("runtime-" + digest[:24])
 
-	providerName := inferenceSpec.ProviderName(
-		"runtime-" + digest,
-	)
-	config := &inference.AddProviderConfig{
-		SDKType: runtimeModel.ProviderParam.SDKType,
-		Origin:  runtimeModel.ProviderParam.Origin,
-		ChatCompletionPathPrefix: runtimeModel.ProviderParam.
-			ChatCompletionPathPrefix,
-		APIKeyHeaderKey: runtimeModel.ProviderParam.APIKeyHeaderKey,
-		DefaultHeaders: cloneStringMap(
-			runtimeModel.ProviderParam.DefaultHeaders,
-		),
-	}
-
-	if _, err := ps.inner.AddProvider(
+	if err := ps.publishRuntimeProvider(
 		ctx,
 		providerName,
-		config,
+		runtimeModel.ProviderParam,
 	); err != nil {
 		return "", nil, err
 	}
-	if runtimeModel.ProviderParam.APIKey != "" {
-		if err := ps.inner.SetProviderAPIKey(
-			ctx,
-			providerName,
-			runtimeModel.ProviderParam.APIKey,
-		); err != nil {
-			_ = ps.inner.DeleteProvider(
-				context.WithoutCancel(ctx),
-				providerName,
-			)
-			return "", nil, err
-		}
-	}
 
-	//nolint:contextcheck // Ok.
 	release := func() {
-		_ = ps.inner.DeleteProvider(
-			context.Background(),
-			providerName,
-		)
+		if err := ps.removeRuntimeProvider(ctx, providerName); err != nil {
+			ps.logger.Warn(
+				"could not remove completion-scoped Provider",
+				"provider", providerName,
+				"error", err,
+			)
+		}
 	}
 	return providerName, release, nil
 }
@@ -100,11 +121,11 @@ func (ps *ProviderSetAPI) registerRuntimeProvider(
 func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	runtimeModel inferencewrapperSpec.RuntimeModel,
+	runtimeModel inferencewrapperSpec.RuntimeConfiguration,
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
 	if len(runtimeModel.CapabilityOverrides) == 0 {
-		//nolint:nilnil // Explicit.
+		//nolint:nilnil // No override resolver is needed.
 		return nil, nil
 	}
 
@@ -119,7 +140,7 @@ func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 			Origin:                   p.Origin,
 			ChatCompletionPathPrefix: p.ChatCompletionPathPrefix,
 			APIKeyHeaderKey:          p.APIKeyHeaderKey,
-			DefaultHeaders:           cloneStringMap(p.DefaultHeaders),
+			DefaultHeaders:           maps.Clone(p.DefaultHeaders),
 		},
 		modelpreset.ModelPreset{
 			ID:          modelpreset.ModelPresetID("runtime"),
@@ -150,19 +171,9 @@ func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 		return nil, errors.New("inference-go returned nil SDK capabilities")
 	}
 
-	// Override semantics and application are owned by inference-go.
 	effective := capabilityoverride.DeriveModelCapabilities(
 		*base,
 		runtimeModel.CapabilityOverrides...,
 	)
 	return capabilityoverride.NewCompletionKeyResolver(completionKey, &effective), nil
-}
-
-func cloneStringMap(input map[string]string) map[string]string {
-	if input == nil {
-		return nil
-	}
-	output := make(map[string]string, len(input))
-	maps.Copy(output, input)
-	return output
 }

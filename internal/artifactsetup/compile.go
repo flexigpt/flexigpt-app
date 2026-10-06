@@ -86,15 +86,6 @@ func CompileBuiltInPackageSet(
 	temporaryDirectory string,
 	config CompileConfig,
 ) (_ installModel.CompiledPackageSet, returnErr error) {
-	if ctx == nil {
-		return installModel.CompiledPackageSet{}, fmt.Errorf(
-			"%w: built-in compilation context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return installModel.CompiledPackageSet{}, err
-	}
 	if temporaryDirectory == "" {
 		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in compilation directory is empty",

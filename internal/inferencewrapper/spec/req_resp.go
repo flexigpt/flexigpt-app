@@ -39,7 +39,7 @@ type SetProviderAPIKeyRequest struct {
 type SetProviderAPIKeyResponse struct{}
 
 type CompletionRequest struct {
-	Runtime *RuntimeModel `json:"-"`
+	Model RuntimeModelRequest `json:"-"`
 
 	History        []conversationSpec.ConversationMessage   `json:"-"`
 	Current        conversationSpec.ConversationMessage     `json:"-"`

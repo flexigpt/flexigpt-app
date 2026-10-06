@@ -49,9 +49,6 @@ func FromDefinition(value definitionModel.Definition) (PluginDocument, error) {
 			spec.ErrUnsupported,
 		)
 	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return PluginDocument{}, err
-	}
 	entry, err := declaration.DecodeCanonicalEntryJSON(value.Body)
 	if err != nil {
 		return PluginDocument{}, err

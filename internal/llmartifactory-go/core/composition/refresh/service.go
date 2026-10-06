@@ -79,18 +79,6 @@ func (s *Service) Refresh(
 	ctx context.Context,
 	root artifactModel.ArtifactRef,
 ) error {
-	if s == nil || s.sources == nil || s.refresh == nil || s.planner == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: composition refresh context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := root.Validate(); err != nil {
 		return err
 	}

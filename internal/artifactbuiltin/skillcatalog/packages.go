@@ -49,15 +49,6 @@ func PreparePackages(
 	packages fs.FS,
 	registry *coreinterpretation.Registry,
 ) ([]PreparedPackage, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: built-in Skill package preparation context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill package interpretation registry is nil",

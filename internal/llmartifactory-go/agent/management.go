@@ -111,19 +111,6 @@ func (a *Service) ListAgentImportDestinationsForManagement(
 func (a *Service) ensureDefaultAgentPluginRoot(
 	ctx context.Context,
 ) (rootModel.RootID, error) {
-	if a == nil || a.roots == nil {
-		return "", spec.ErrClosed
-	}
-	if ctx == nil {
-		return "", fmt.Errorf(
-			"%w: default Agent Plugin Root context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-
 	value, err := a.roots.Create(
 		ctx,
 		topology.UserRootDraft(),
@@ -144,19 +131,6 @@ func (a *Service) ensureDefaultAgentPluginRoot(
 func (a *Service) managementRoots(
 	ctx context.Context,
 ) ([]rootModel.Root, error) {
-	if a == nil || a.roots == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Agent management Root list context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
 	values, err := a.roots.List(ctx)
 	if err != nil {
 		return nil, err

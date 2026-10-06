@@ -60,22 +60,6 @@ func (s *Service) Materialize(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (Materialization, error) {
-	if s == nil || s.materializer == nil || s.protection == nil {
-		return Materialization{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return Materialization{}, fmt.Errorf(
-			"%w: Text materialization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return Materialization{}, err
-	}
-	if err := ref.Validate(); err != nil {
-		return Materialization{}, err
-	}
-
 	value, err := s.materializer.Resolve(ctx, ref)
 	if err != nil {
 		return Materialization{}, err

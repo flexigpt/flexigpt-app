@@ -94,15 +94,6 @@ func (r *Registry) CanonicalizeExpected(
 	expected schemaModel.Key,
 	raw []byte,
 ) (schemaModel.ParsedDocument, error) {
-	if ctx == nil {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: schema canonicalization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
 	if err := expected.Validate(); err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}

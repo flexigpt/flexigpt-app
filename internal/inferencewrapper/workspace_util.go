@@ -59,6 +59,9 @@ func HydrateCompletion(
 	if sel == nil {
 		return output, nil
 	}
+	if workspaceSource == nil {
+		return output, errors.New("workspace conversation source is unavailable")
+	}
 	if err := sel.Workspace.Validate(); err != nil {
 		return output, fmt.Errorf("invalid Workspace selection: %w", err)
 	}
@@ -100,15 +103,6 @@ func resolveWorkspaceConversationSelection(
 	r WorkspaceSource,
 	selection conversationSpec.WorkspaceConversationSelection,
 ) (conversationSpec.WorkspaceConversationResolution, error) {
-	if r == nil {
-		return conversationSpec.WorkspaceConversationResolution{}, errors.New(
-			"workspace conversation source is unavailable",
-		)
-	}
-	if err := selection.Workspace.Validate(); err != nil {
-		return conversationSpec.WorkspaceConversationResolution{}, err
-	}
-
 	workspace, err := r.ResolveWorkspace(
 		ctx,
 		selection.Workspace,

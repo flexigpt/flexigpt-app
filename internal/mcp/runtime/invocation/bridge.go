@@ -602,15 +602,6 @@ func validateBridgeRequest(
 	serverRef mcpServer.ServerID,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP tool invocation context is nil",
-			mcpServer.ErrMCPInvalidRuntimeRequest,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := serverRef.Validate(); err != nil {
 		return err
 	}

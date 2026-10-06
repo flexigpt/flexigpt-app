@@ -100,18 +100,6 @@ func (r *pathResolver) Resolve(
 	ctx context.Context,
 	request Request,
 ) (artifactModel.ArtifactRef, error) {
-	if r == nil || r.runtime == nil || r.interpretations == nil {
-		return artifactModel.ArtifactRef{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return artifactModel.ArtifactRef{}, fmt.Errorf(
-			"%w: path locator context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return artifactModel.ArtifactRef{}, err
-	}
 	if err := request.Validate(); err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}

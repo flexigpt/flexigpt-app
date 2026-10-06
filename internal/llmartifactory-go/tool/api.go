@@ -129,9 +129,6 @@ func (a *Service) SetToolEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (ToolView, error) {
-	if err := a.ready(ctx); err != nil {
-		return ToolView{}, err
-	}
 	if expectedRevision == 0 {
 		return ToolView{}, fmt.Errorf(
 			"%w: expected Tool revision is required",
@@ -164,9 +161,6 @@ func (a *Service) getTool(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (toolDomain.Tool, error) {
-	if err := a.ready(ctx); err != nil {
-		return toolDomain.Tool{}, err
-	}
 	if err := a.requireBuiltinRef(ref); err != nil {
 		return toolDomain.Tool{}, err
 	}
@@ -208,19 +202,6 @@ func (a *Service) getTool(
 		)
 	}
 	return value, nil
-}
-
-func (a *Service) ready(ctx context.Context) error {
-	if a == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: Tool Store context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }
 
 func (a *Service) requireBuiltinRef(ref artifactModel.ArtifactRef) error {

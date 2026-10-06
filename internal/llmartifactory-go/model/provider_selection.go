@@ -19,13 +19,6 @@ func (s *ProviderPreferenceService) SelectDefaultProvider(
 	preferred *artifactModel.ArtifactRef,
 	baseName spec.LogicalName,
 ) (*artifactModel.ArtifactRef, error) {
-	if s == nil || s.owner == nil {
-		return nil, spec.ErrClosed
-	}
-	if err := s.owner.ready(ctx); err != nil {
-		return nil, err
-	}
-
 	if preferred != nil {
 		record, err := s.owner.artifacts.Get(ctx, *preferred)
 		if err != nil {
@@ -84,12 +77,6 @@ func (s *ProviderPreferenceService) RequireSettableDefaultProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
-	if s == nil || s.owner == nil {
-		return spec.ErrClosed
-	}
-	if err := s.owner.ready(ctx); err != nil {
-		return err
-	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}

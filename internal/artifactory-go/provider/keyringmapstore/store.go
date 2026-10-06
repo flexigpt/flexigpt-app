@@ -133,9 +133,6 @@ func (s *Store) Put(
 	ref secretModel.Ref,
 	v string,
 ) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if err := secretModel.ValidateValue(v); err != nil {
 		return err
 	}
@@ -174,10 +171,6 @@ func (s *Store) Get(
 	ctx context.Context,
 	ref secretModel.Ref,
 ) (string, error) {
-	if err := s.ready(ctx); err != nil {
-		return "", err
-	}
-
 	id, err := ref.ID()
 	if err != nil {
 		return "", err
@@ -217,10 +210,6 @@ func (s *Store) Delete(
 	ctx context.Context,
 	ref secretModel.Ref,
 ) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
-
 	id, err := ref.ID()
 	if err != nil {
 		return err
@@ -251,21 +240,6 @@ func (s *Store) Close() error {
 		return nil
 	}
 	return s.store.Close()
-}
-
-func (s *Store) ready(
-	ctx context.Context,
-) error {
-	if s == nil || s.store == nil || s.encEncrypt == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: Artifact Store secret MapStore context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	return ctx.Err()
 }
 
 func (s *Store) values(

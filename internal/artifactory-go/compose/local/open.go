@@ -8,6 +8,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -27,12 +28,6 @@ import (
 // opened SQLite resources and the caller-supplied SecretValues backend. On
 // failure, caller-supplied SecretValues remains caller-owned.
 func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: Artifact Store local-open context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if config.BaseDirectory == "" {
 		return nil, fmt.Errorf("%w: Artifact Store local base directory is empty", spec.ErrInvalid)
 	}
@@ -60,7 +55,7 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 	}
 	defer func() {
 		if returnErr != nil {
-			returnErr = joinOpenFailure(returnErr, resources.closeAfterFailure())
+			returnErr = errors.Join(returnErr, resources.closeAfterFailure())
 		}
 	}()
 
@@ -91,7 +86,7 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 		ArtifactCleanupRepository:  metadata.ArtifactCleanup(),
 		InstallationRepository:     metadata,
 		SourceDrivers:              drivers,
-		SchemaFactory:              jsonschema.NewFactory(),
+		SchemaFactory:              jsonschema.Factory{},
 		SchemaCodecs:               append([]schema.Codec(nil), config.SchemaCodecs...),
 		Decoders:                   append([]ingest.Decoder(nil), config.Decoders...),
 		Clock:                      config.Clock,
@@ -108,7 +103,7 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 
 	for _, draft := range config.RetainedRoots {
 		if _, err := assembled.Roots.Create(ctx, draft); err != nil {
-			return nil, joinOpenFailure(
+			return nil, errors.Join(
 				fmt.Errorf("ensure retained application Root %q: %w", draft.ID, err),
 				assembled.Close(),
 			)
@@ -121,12 +116,9 @@ func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error
 }
 
 func localRootPolicy(config Config) (root.Policy, error) {
-	retained := make([]rootModel.RootID, 0, len(config.RetainedRoots))
+	retained := make([]rootModel.RootID, len(config.RetainedRoots))
 	for index, draft := range config.RetainedRoots {
-		if err := draft.ID.Validate(); err != nil {
-			return nil, fmt.Errorf("retained Root declaration %d: %w", index, err)
-		}
-		retained = append(retained, draft.ID)
+		retained[index] = draft.ID
 	}
 	return root.NewSetRootPolicy(
 		append([]rootModel.RootID(nil), config.ProtectedRootIDs...),

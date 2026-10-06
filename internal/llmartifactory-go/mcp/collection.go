@@ -19,7 +19,7 @@ func (a *Service) CreateMCPPlugin(
 	return a.plugins.Create(ctx, request)
 }
 
-func (a *Service) ensureMCPBaselinePlugin(
+func (a *Service) EnsureMCPBaselinePlugin(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) (pluginAPI.PluginView, error) {

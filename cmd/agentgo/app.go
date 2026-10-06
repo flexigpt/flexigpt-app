@@ -12,9 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
-	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
-	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -332,8 +330,8 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Tool store, runtime, and aggregate initialized")
 
-	a.modelBuiltInInstaller, err = initModelWrappers(
-		context.Background(),
+	modelInstaller, modelRuntime, err := initModelWrappers(
+		a.ctx,
 		a.modelStoreAPI,
 		a.modelAggregateAPI,
 		artifactComposition.Sources,
@@ -362,6 +360,7 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
+	a.modelBuiltInInstaller = modelInstaller
 	slog.Info("artifact-backed Model Store and aggregate initialized")
 
 	err = InitSkillStoreWrapper(
@@ -386,12 +385,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store consumer API initialized")
 
-	skillBaselineEnsurer, err := skillAPI.NewBaselineEnsurer(
-		a.skillStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize Skill baseline port: " + err.Error())
-	}
+	skillBaselineEnsurer := a.skillStoreAPI.api
 
 	a.skillBuiltInInstaller, err = NewSkillBuiltInInstaller(
 		artifactComposition.Topology,
@@ -429,12 +423,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("agent store consumer API initialized")
 
-	agentBaselineEnsurer, err := agentAPI.NewBaselineEnsurer(
-		a.agentStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize Agent baseline port: " + err.Error())
-	}
+	agentBaselineEnsurer := a.agentStoreAPI.api
 
 	a.agentBuiltInInstaller, err = NewAgentBuiltInInstaller(
 		artifactComposition.Topology,
@@ -504,12 +493,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed mcp host initialized")
 
-	mcpBaselineEnsurer, err := mcpAPI.NewBaselineEnsurer(
-		a.mcpStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize MCP baseline port: " + err.Error())
-	}
+	mcpBaselineEnsurer := a.mcpStoreAPI.api
 	mcpWorkspaceResolver, err := mcpAPI.NewWorkspaceServerResolver(
 		a.mcpStoreAPI.api,
 	)
@@ -614,7 +598,7 @@ func (a *App) initManagers() {
 
 	err = InitCompletionWrapper(
 		a.completionAPI,
-		a.modelAggregateAPI.service,
+		modelRuntime,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.api,
 		a.skillAggregateAPI.service,
@@ -629,15 +613,7 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
 	}
 
-	providerPublisher, err := newInferenceProviderRuntimePublisher(
-		a.completionAPI.providersetAPI,
-	)
-	if err != nil {
-		panic(
-			"failed to initialize managers: Model Provider runtime publisher failed\n" +
-				err.Error(),
-		)
-	}
+	providerPublisher := a.completionAPI.providersetAPI
 	if err := a.modelAggregateAPI.setProviderRuntimePublisher(
 		providerPublisher,
 	); err != nil {
@@ -651,7 +627,8 @@ func (a *App) initManagers() {
 	err = initModelProviderRuntime(
 		context.Background(),
 		a.modelStoreAPI,
-		a.modelAggregateAPI,
+		modelRuntime,
+		providerPublisher,
 	)
 	if err != nil {
 		slog.Error("couldn't initialize Model Provider runtime", "error", err)
@@ -690,6 +667,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
+	if a.completionAPI != nil {
+		a.completionAPI.close()
+	}
 	if a.mcpAggregateAPI != nil {
 		a.mcpAggregateAPI.close()
 	}

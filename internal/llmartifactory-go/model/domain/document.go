@@ -46,9 +46,6 @@ func DecodeProvider(
 			record.ID,
 		)
 	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return Provider{}, err
-	}
 	if value.Kind != ModelProviderArtifactKind ||
 		value.SchemaID != modelproviderv1.ModelProviderSchemaKey.SchemaID ||
 		value.SchemaVersion != modelproviderv1.ModelProviderSchemaKey.SchemaVersion {
@@ -101,9 +98,6 @@ func DecodeModel(
 			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
-	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return Model{}, err
 	}
 	if value.Kind != ModelArtifactKind ||
 		value.SchemaID != modelv1.ModelSchemaKey.SchemaID ||

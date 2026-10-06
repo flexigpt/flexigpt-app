@@ -69,15 +69,6 @@ func ResolveAll(
 	resources ResourceReader,
 	records []artifactModel.Artifact,
 ) ([]ResolvedSkill, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Skill batch materialization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill materializer ResourceReader is nil",
@@ -114,15 +105,6 @@ func Resolve(
 	resources ResourceReader,
 	record artifactModel.Artifact,
 ) (ResolvedSkill, error) {
-	if ctx == nil {
-		return ResolvedSkill{}, fmt.Errorf(
-			"%w: Skill materialization context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return ResolvedSkill{}, err
-	}
 	if resources == nil {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill materializer ResourceReader is nil",

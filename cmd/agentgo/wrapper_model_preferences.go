@@ -39,10 +39,6 @@ func newArtifactModelDefaultProviderPreferences(
 func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 	ctx context.Context,
 ) (*artifactModel.ArtifactRef, error) {
-	if s == nil || s.overlays == nil {
-		return nil, spec.ErrClosed
-	}
-
 	record, found, err := s.overlays.GetStoreOverlay(
 		ctx,
 		modelOverlay.PreferencesNamespace,
@@ -79,15 +75,6 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 	ctx context.Context,
 	provider *artifactModel.ArtifactRef,
 ) error {
-	if s == nil || s.overlays == nil {
-		return spec.ErrClosed
-	}
-	if provider != nil {
-		if err := provider.Validate(); err != nil {
-			return err
-		}
-	}
-
 	current, found, err := s.overlays.GetStoreOverlay(
 		ctx,
 		modelOverlay.PreferencesNamespace,

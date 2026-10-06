@@ -38,15 +38,6 @@ func ContentDigest(
 	ctx context.Context,
 	provider fs.FS,
 ) (cryptoutil.Digest, error) {
-	if ctx == nil {
-		return "", fmt.Errorf(
-			"%w: embedded content digest context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
 	if provider == nil {
 		return "", fmt.Errorf(
 			"%w: embedded content filesystem is nil",
@@ -64,16 +55,6 @@ func NewWithRegistrations(
 	ctx context.Context,
 	registrations map[string]ProviderRegistration,
 ) (*Adapter, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: embedded provider registration context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
 	providers := make(map[string]fs.FS, len(registrations))
 	immutable := make(map[string]immutableProvider)
 

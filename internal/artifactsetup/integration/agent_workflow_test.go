@@ -130,16 +130,12 @@ func TestWorkflow_UserPlugin_ManagedAgentCRUD(
 	harness := newWorkflowHarness(t)
 	harness.installBundledAgents(t)
 
-	baselineEnsurer, err := agentAPI.NewBaselineEnsurer(
-		harness.api,
-	)
-	requireNoError(t, err)
-
-	baseline, err := baselineEnsurer.EnsureAgentBaselinePlugin(
+	baseline, err := harness.api.EnsureAgentBaselinePlugin(
 		t.Context(),
 		topology.UserRootID(),
 	)
 	requireNoError(t, err)
+
 	if !baseline.Baseline {
 		t.Fatalf("Agent baseline Plugin is not marked as baseline")
 	}

@@ -20,12 +20,6 @@ func (r *Resolver) ResolvePluginMembers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
-	if err := r.ready(); err != nil {
-		return nil, err
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return nil, err
-	}
 	if err := ref.Validate(); err != nil {
 		return nil, err
 	}

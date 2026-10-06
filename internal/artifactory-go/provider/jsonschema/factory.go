@@ -9,7 +9,3 @@ func (Factory) NewCatalog(
 ) (schema.Catalog, error) {
 	return NewRegistry(codecs...)
 }
-
-func NewFactory() schema.Factory {
-	return Factory{}
-}

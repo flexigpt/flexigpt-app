@@ -18,9 +18,6 @@ func (s fixedCatalogSource) Skills(
 	ctx context.Context,
 	catalogID CatalogID,
 ) ([]SkillRegistration, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	return append([]SkillRegistration(nil), s[catalogID]...), nil
 }
 

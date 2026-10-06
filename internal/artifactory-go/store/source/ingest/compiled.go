@@ -128,15 +128,6 @@ func (e *Engine) RegisterCompiledDocuments(
 	sourceID sourceModel.SourceID,
 	documents []CompiledDocument,
 ) error {
-	if e == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: compiled document registration context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := rootID.Validate(); err != nil {
 		return err
 	}

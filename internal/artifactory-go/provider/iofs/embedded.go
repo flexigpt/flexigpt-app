@@ -49,9 +49,6 @@ func (a *Adapter) NormalizeConfig(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	config, err := decodeConfig(raw)
 	if err != nil {
 		return nil, err

@@ -61,9 +61,6 @@ func (a *Adapter) NormalizeConfig(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxConfigBytes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: filesystem source config: %w", spec.ErrInvalid, err)
@@ -120,10 +117,6 @@ func (a *Adapter) ResolveLocalPath(
 	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-
 	if a.traversalPolicy.excludesLocator(string(locator)) {
 		return "", fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",

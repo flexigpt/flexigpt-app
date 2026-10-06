@@ -753,15 +753,6 @@ func validateArtifactAuthInput(
 	ctx context.Context,
 	config mcpServer.RuntimeConfig,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP auth context is nil",
-			mcpServer.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := config.Server.Validate(); err != nil {
 		return err
 	}
