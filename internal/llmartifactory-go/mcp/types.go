@@ -185,6 +185,13 @@ type ServerStore interface {
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,
 	) (ServerInstallationView, error)
+
+	SaveServerSettings(
+		ctx context.Context,
+		ref artifactModel.ArtifactRef,
+		expectedSettingsRevision uint64,
+		data serverMCPDomain.ServerData,
+	) error
 }
 
 // ManagementStore is the aggregate-facing MCP persistence port. It includes

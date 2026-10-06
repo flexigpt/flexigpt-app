@@ -48,8 +48,8 @@ func withMCPRuntimeError(
 	})
 }
 
-// ConnectMCPServer starts the managed asynchronous connection flow. The
-// current connection state is returned by aggregate.GetMCPServer.
+// ConnectMCPServer starts the managed asynchronous connection flow.
+// MCPAggregateWrapper.GetMCPServer returns the current connection state.
 func (w *MCPRuntimeWrapper) ConnectMCPServer(
 	server mcpServer.ServerID,
 ) (*mcpServer.MCPServerRuntimeSnapshot, error) {

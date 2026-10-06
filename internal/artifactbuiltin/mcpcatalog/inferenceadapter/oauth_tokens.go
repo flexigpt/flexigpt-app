@@ -1,4 +1,4 @@
-package aggregate
+package inferenceadapter
 
 import (
 	"context"
@@ -12,20 +12,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// OAuthTokenStore translates runtime-owned opaque ServerID values at the
-// Aggregate boundary before using artifact-scoped secret references.
-type OAuthTokenStore struct {
-	secrets SecretStore
-}
-
-func NewOAuthTokenStore(secrets SecretStore) (*OAuthTokenStore, error) {
-	if secrets == nil {
-		return nil, errors.New("MCP OAuth token secret store is required")
-	}
-	return &OAuthTokenStore{secrets: secrets}, nil
-}
-
-func (s *OAuthTokenStore) LoadOAuthToken(
+// LoadOAuthToken translates the opaque runtime identity before using the
+// application's Artifact-scoped secret persistence capability.
+func (a *RuntimeAdapter) LoadOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 ) (*oauth2.Token, error) {
@@ -33,7 +22,7 @@ func (s *OAuthTokenStore) LoadOAuthToken(
 	if err != nil {
 		return nil, err
 	}
-	raw, err := s.secrets.ResolveSecret(ctx, ref)
+	raw, err := a.secrets.ResolveSecret(ctx, ref)
 	if err != nil {
 		if errors.Is(err, secret.ErrNotFound) {
 			return nil, mcpAuth.ErrOAuthTokenNotFound
@@ -48,7 +37,7 @@ func (s *OAuthTokenStore) LoadOAuthToken(
 	return &token, nil
 }
 
-func (s *OAuthTokenStore) SaveOAuthToken(
+func (a *RuntimeAdapter) SaveOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 	token *oauth2.Token,
@@ -60,16 +49,17 @@ func (s *OAuthTokenStore) SaveOAuthToken(
 	if err != nil {
 		return err
 	}
-	//nolint:gosec // Access token.
+
+	//nolint:gosec // Access token is written only through secret persistence.
 	raw, err := json.Marshal(token)
 	if err != nil {
 		return err
 	}
-	_, _, err = s.secrets.SetMCPSecret(ctx, ref, string(raw))
+	_, _, err = a.secrets.SetMCPSecret(ctx, ref, string(raw))
 	return err
 }
 
-func (s *OAuthTokenStore) DeleteOAuthToken(
+func (a *RuntimeAdapter) DeleteOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 ) error {
@@ -77,11 +67,11 @@ func (s *OAuthTokenStore) DeleteOAuthToken(
 	if err != nil {
 		return err
 	}
-	return s.secrets.DeleteSecret(ctx, ref)
+	return a.secrets.DeleteSecret(ctx, ref)
 }
 
 func oauthTokenSecretRef(serverID mcpServer.ServerID) (string, error) {
-	ref, err := artifactRefForRuntimeServerID(serverID)
+	ref, err := ArtifactRefForServerID(serverID)
 	if err != nil {
 		return "", err
 	}

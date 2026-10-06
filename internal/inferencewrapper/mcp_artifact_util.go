@@ -14,6 +14,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -25,51 +26,13 @@ var simpleMCPURITemplateVariableRE = regexp.MustCompile(
 	`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`,
 )
 
-type MCPRuntime interface {
-	Status(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) (*mcpServer.MCPServerRuntimeSnapshot, error)
-
-	ListTools(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) ([]mcpServer.MCPToolCapability, error)
-
-	ListResources(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) ([]mcpServer.MCPResourceRef, error)
-
-	ListResourceTemplates(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) ([]mcpServer.MCPResourceTemplateRef, error)
-
-	ListPrompts(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) ([]mcpServer.MCPPromptRef, error)
-
-	ReadResource(
-		ctx context.Context,
-		server mcpServer.ServerID,
-		uri string,
-	) (*mcpServer.MCPReadResourceResponseBody, error)
-
-	GetPrompt(
-		ctx context.Context,
-		server mcpServer.ServerID,
-		name string,
-		arguments map[string]string,
-	) (*mcpServer.MCPGetPromptResponseBody, error)
-}
-
 type MCPInferenceBridge struct {
-	runtime MCPRuntime
+	runtime inferencewrapperSpec.MCPRuntime
 }
 
-func NewMCPInferenceBridge(rt MCPRuntime) *MCPInferenceBridge {
+func NewMCPInferenceBridge(
+	rt inferencewrapperSpec.MCPRuntime,
+) *MCPInferenceBridge {
 	return &MCPInferenceBridge{runtime: rt}
 }
 

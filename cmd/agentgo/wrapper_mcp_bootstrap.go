@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -23,7 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
-	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
@@ -58,32 +57,17 @@ func initMCPWrappers(
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	resolver *composition.Resolver,
-) (installFlow.HydrationInstaller, error) {
+) (installFlow.HydrationInstaller, *inferenceadapter.RuntimeAdapter, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil {
-		return nil, errors.New("MCP wrapper receivers are incomplete")
-	}
-	if roots == nil ||
-		sources == nil ||
-		discovery == nil ||
-		artifacts == nil ||
-		cat == nil || definitions == nil ||
-		resources == nil ||
-		managedArtifacts == nil ||
-		protection == nil ||
-		protectedOverlays == nil ||
-		storeOverlays == nil ||
-		secretBindings == nil ||
-		secretRuntime == nil ||
-		localState == nil ||
-		hydrator == nil {
-		return nil, errors.New("MCP wrapper dependencies are incomplete")
+		return nil, nil, errors.New("MCP wrapper receivers are incomplete")
 	}
 
+	// Each constructor validates the dependencies it actually owns.
 	settings, err := newMCPSettingsAdapter(storeOverlays)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	overlays, err := mcpOverlay.NewArtifactOverlayRepository(
 		mcpOverlay.ArtifactOverlayDependencies{
@@ -94,7 +78,7 @@ func initMCPWrappers(
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	secrets, err := newArtifactMCPSecretResolver(
 		artifacts,
@@ -102,7 +86,7 @@ func initMCPWrappers(
 		secretRuntime,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	storeAPI, err := mcpAPI.New(
@@ -120,77 +104,70 @@ func initMCPWrappers(
 		mcpAPI.WithCompositionResolver(resolver),
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	listService, err := mcpAPI.NewMCPListService(roots, storeAPI)
+	if err != nil {
+		return nil, nil, err
 	}
 	builtinCleanup, err := mcpAPI.NewBuiltinPackageCleanup(storeAPI)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	listService, err := mcpAPI.NewMCPListService(
-		roots,
-		storeAPI,
+	builtIns, err := mcpcatalog.NewInstaller(
+		mcpcatalog.InstallerDependencies{
+			Hydrator: hydrator,
+			Cleanup:  builtinCleanup,
+		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	serverResolver, err := mcpAggregate.NewArtifactServerResolver(
+	adapter, err := inferenceadapter.NewRuntimeAdapter(
 		storeAPI,
-	)
-	if err != nil {
-		return nil, err
-	}
-	s, err := mcpAggregate.NewRuntimeServerSource(
-		serverResolver,
 		secrets,
 		mcpEnvironmentResolver{},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	global, _, err := settings.getMCPSettings(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	configuredLoopback := strings.TrimSpace(
-		global.OAuthLoopbackListenAddr,
-	)
 	broker, err := mcpAuth.NewOAuthLoopbackBroker(
 		ctx,
 		&mcpAuth.OAuthLoopbackBrokerOptions{
-			ListenAddr: configuredLoopback,
+			ListenAddr: global.OAuthLoopbackListenAddr,
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(
 		cause error,
-	) (installFlow.HydrationInstaller, error) {
+	) (installFlow.HydrationInstaller, *inferenceadapter.RuntimeAdapter, error) {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		if runtimeManager != nil {
-			_ = runtimeManager.Close(context.Background())
+			cause = errors.Join(cause, runtimeManager.Close(cleanupCtx))
 		}
-		_ = broker.Close()
-		return nil, cause
+		cause = errors.Join(cause, broker.Close())
+		return nil, nil, cause
 	}
 
-	tokenStore, err := mcpAggregate.NewOAuthTokenStore(secrets)
-	if err != nil {
-		return cleanup(err)
-	}
 	authManager := mcpAuth.NewAuthManager(
 		secrets,
 		mcpAuth.WithOAuthAuthorizationBroker(broker),
 		mcpAuth.WithOAuthRedirectURL(broker.RedirectURL()),
-		mcpAuth.WithOAuthTokenStore(tokenStore),
-		mcpAuth.WithClientInfo(
-			mcpHostName,
-			mcpHostVersion,
-		),
+		mcpAuth.WithOAuthTokenStore(adapter),
+		mcpAuth.WithClientInfo(mcpHostName, mcpHostVersion),
 	)
 	clientFactory, err := sdkclient.NewFactory(mcpServer.ClientInfo{
 		Name:    mcpHostName,
@@ -200,7 +177,7 @@ func initMCPWrappers(
 		return cleanup(err)
 	}
 	runtimeManager, err = mcpConnection.NewMCPRuntimeManager(
-		s,
+		adapter,
 		authManager,
 		clientFactory,
 	)
@@ -208,38 +185,16 @@ func initMCPWrappers(
 		return cleanup(err)
 	}
 
+	// Management and completion share one approval/invocation owner.
 	toolBridge := invocation.NewToolBridge(
 		runtimeManager,
 		invocation.NewApprovalManager(5*time.Minute),
 	)
-	lifecycle, err := mcpAggregate.NewLifecycle(
-		storeAPI,
-		runtimeManager,
-	)
-	if err != nil {
-		return cleanup(err)
-	}
-	service, err := mcpAggregate.NewService(mcpAggregate.Dependencies{
-		Lifecycle: lifecycle,
-		Servers:   serverResolver,
-		Source:    s,
-		Store:     storeAPI,
-		Runtime:   runtimeManager,
-		Auth:      authManager,
-		Secrets:   secrets,
-	})
-	if err != nil {
+	if err := adapter.BindRuntime(runtimeManager); err != nil {
 		return cleanup(err)
 	}
 
-	builtIns, err := newMCPBuiltInInstaller(
-		hydrator,
-		builtinCleanup,
-	)
-	if err != nil {
-		return cleanup(err)
-	}
-
+	// Publish only after the entire construction and binding phase succeeds.
 	storeWrapper.api = storeAPI
 	storeWrapper.management = listService
 	storeWrapper.roots = roots
@@ -250,23 +205,11 @@ func initMCPWrappers(
 	runtimeWrapper.auth = authManager
 	runtimeWrapper.oauthBroker = broker
 
-	aggregateWrapper.service = service
-	return builtIns, nil
-}
+	aggregateWrapper.store = storeAPI
+	aggregateWrapper.source = adapter
+	aggregateWrapper.runtime = runtimeManager
+	aggregateWrapper.auth = authManager
+	aggregateWrapper.secrets = secrets
 
-func newMCPBuiltInInstaller(
-	hydrator installModel.CompiledHydrationCoordinator,
-	cleanup mcpAPI.BuiltinPackageCleanup,
-) (installFlow.HydrationInstaller, error) {
-	if hydrator == nil || cleanup == nil {
-		return nil, errors.New(
-			"MCP generated built-in installer dependencies are incomplete",
-		)
-	}
-	return mcpcatalog.NewInstaller(
-		mcpcatalog.InstallerDependencies{
-			Hydrator: hydrator,
-			Cleanup:  cleanup,
-		},
-	)
+	return builtIns, adapter, nil
 }

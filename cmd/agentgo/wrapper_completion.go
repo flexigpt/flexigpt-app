@@ -17,7 +17,6 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 )
@@ -61,16 +60,11 @@ func InitCompletionWrapper(
 	settings *settingStore.SettingStore,
 	tools inferencewrapper.ToolSource,
 	skills inferencewrapperSpec.SkillSource,
-	mcpRuntime *mcpConnection.MCPRuntimeManager,
+	mcpRuntime inferencewrapperSpec.MCPRuntime,
 	workspaceSource inferencewrapper.WorkspaceSource,
 ) error {
 	if w == nil || settings == nil {
 		return errors.New("completion wrapper dependencies are incomplete")
-	}
-
-	var bridge *inferencewrapper.MCPInferenceBridge
-	if mcpRuntime != nil {
-		bridge = inferencewrapper.NewMCPInferenceBridge(mcpRuntime)
 	}
 
 	debugConfig := inferencewrapper.DefaultDebugConfig()
@@ -78,7 +72,7 @@ func InitCompletionWrapper(
 		models,
 		tools,
 		skills,
-		bridge,
+		mcpRuntime,
 		workspaceSource,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&debugConfig),

@@ -461,7 +461,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill aggregate and runtime initialized")
 
-	a.mcpBuiltInInstaller, err = initMCPWrappers(
+	mcpInstaller, mcpRuntime, err := initMCPWrappers(
 		context.Background(),
 		a.mcpStoreAPI,
 		a.mcpRuntimeAPI,
@@ -491,6 +491,7 @@ func (a *App) initManagers() {
 		)
 		panic("failed to initialize managers: artifact-backed mcp initialization failed\n" + err.Error())
 	}
+	a.mcpBuiltInInstaller = mcpInstaller
 	slog.Info("artifact-backed mcp host initialized")
 
 	mcpBaselineEnsurer := a.mcpStoreAPI.api
@@ -602,7 +603,7 @@ func (a *App) initManagers() {
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.api,
 		skillInference,
-		a.mcpRuntimeAPI.runtime,
+		mcpRuntime,
 		workspaceConversationSource,
 	)
 	if err != nil {

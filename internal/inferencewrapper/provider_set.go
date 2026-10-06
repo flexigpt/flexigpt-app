@@ -74,18 +74,29 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 }
 
 // NewProviderSetAPI validates required capabilities once during assembly.
-// MCP hydration is optional; the other capabilities are required.
+// MCP hydration is optional. When supplied, the narrow inference consumer
+// capability is wrapped here rather than forcing application composition to
+// construct an inference-owned bridge.
 func NewProviderSetAPI(
 	models inferencewrapperSpec.ModelRuntime,
 	tools ToolSource,
 	artifactSkills inferencewrapperSpec.SkillSource,
-	mcpBridge *MCPInferenceBridge,
+	mcpRuntime inferencewrapperSpec.MCPRuntime,
 	workspaceSource WorkspaceSource,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if models == nil || tools == nil || artifactSkills == nil || workspaceSource == nil {
+	if models == nil ||
+		tools == nil ||
+		artifactSkills == nil ||
+		workspaceSource == nil {
 		return nil, errors.New("inferencewrapper: required capabilities are incomplete")
 	}
+
+	var mcpBridge *MCPInferenceBridge
+	if mcpRuntime != nil {
+		mcpBridge = NewMCPInferenceBridge(mcpRuntime)
+	}
+
 	ps := &ProviderSetAPI{
 		models:             models,
 		toolsSvc:           tools,
@@ -95,11 +106,13 @@ func NewProviderSetAPI(
 
 		skillsRunScriptEnabled: artifactSkills.RunScriptsEnabled(),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(ps)
 		}
 	}
+
 	allOpts := make([]inference.ProviderSetOption, 0, 2)
 	if ps.logger == nil {
 		ps.logger = slog.Default()

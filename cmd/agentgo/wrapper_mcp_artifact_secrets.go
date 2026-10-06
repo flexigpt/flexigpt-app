@@ -38,8 +38,8 @@ func newArtifactMCPSecretResolver(
 	}, nil
 }
 
-// SetMCPSecret preserves the existing MCP aggregate/runtime secret writer
-// contract while storing the value through Artifact Store secret bindings.
+// SetMCPSecret supplies application credential and OAuth-token persistence
+// through Artifact Store secret bindings.
 func (r *artifactMCPSecretResolver) SetMCPSecret(
 	ctx context.Context,
 	logicalRef string,

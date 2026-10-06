@@ -1,100 +1,21 @@
-package aggregate
+package inferenceadapter
 
 import (
-	"context"
-	"encoding/base64"
 	"errors"
 	"maps"
 	"slices"
 
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
-// RuntimeServerSource is the Store-to-Runtime anti-corruption adapter.
-// Runtime receives only runtime/spec values and never Store values.
-type RuntimeServerSource struct {
-	servers     *ArtifactServerResolver
-	secrets     serverMCPDomain.SecretResolver
-	environment serverMCPDomain.EnvironmentResolver
-}
-
-func NewRuntimeServerSource(
-	servers *ArtifactServerResolver,
-	secrets serverMCPDomain.SecretResolver,
-	environment serverMCPDomain.EnvironmentResolver,
-) (*RuntimeServerSource, error) {
-	if servers == nil {
-		return nil, errors.New("MCP Artifact server resolver is required")
-	}
-	return &RuntimeServerSource{
-		servers:     servers,
-		secrets:     secrets,
-		environment: environment,
-	}, nil
-}
-
-func (s *RuntimeServerSource) ResolveServer(
-	ctx context.Context,
-	serverID mcpServer.ServerID,
-) (mcpServer.ResolvedServer, error) {
-	if s == nil || s.servers == nil {
-		return mcpServer.ResolvedServer{}, mcpServer.ErrClosed
-	}
-	resolved, err := s.servers.ResolveMCPServer(ctx, serverID)
-	if err != nil {
-		return mcpServer.ResolvedServer{}, err
-	}
-	materialized, err := resolved.MaterializeTrusted(
-		ctx,
-		s.secrets,
-		s.environment,
-	)
-	if err != nil {
-		return mcpServer.ResolvedServer{}, err
-	}
-	config, err := runtimeConfig(resolved, materialized)
-	if err != nil {
-		return mcpServer.ResolvedServer{}, err
-	}
-
-	output := mcpServer.ResolvedServer{
-		Server:  config.Server,
-		Catalog: config.Catalog,
-		Version: mcpServer.Digest(resolved.Version),
-		Config:  config,
-	}
-	if err := output.Validate(); err != nil {
-		return mcpServer.ResolvedServer{}, err
-	}
-	return output, nil
-}
-
-func (s *RuntimeServerSource) InspectRuntimeConfig(
-	ctx context.Context,
-	resolved serverMCPDomain.Resolved,
-) (mcpServer.RuntimeConfig, error) {
-	if s == nil {
-		return mcpServer.RuntimeConfig{}, mcpServer.ErrClosed
-	}
-	materialized, err := resolved.MaterializeForInspection(
-		ctx,
-		s.environment,
-	)
-	if err != nil {
-		return mcpServer.RuntimeConfig{}, err
-	}
-	return runtimeConfig(resolved, materialized)
-}
-
 func runtimeConfig(
 	resolved serverMCPDomain.Resolved,
 	input serverMCPDomain.MaterializedServer,
 ) (mcpServer.RuntimeConfig, error) {
-	serverID, err := runtimeServerIDForArtifact(resolved.Server)
+	serverID, err := ServerIDForArtifact(resolved.Server)
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}
@@ -115,11 +36,8 @@ func runtimeConfig(
 			ToolPolicies:  mcpPolicy.Clone(resolved.Policy.Body).ToolPolicies,
 			AppsPolicy:    resolved.Policy.Body.AppsPolicy,
 		},
-		SensitiveValues: append(
-			[]string(nil),
-			input.SensitiveValues...,
-		),
-		Include: runtimeInclude(resolved.Document.Include),
+		SensitiveValues: slices.Clone(input.SensitiveValues),
+		Include:         runtimeInclude(resolved.Document.Include),
 	}
 
 	switch input.Core.Type {
@@ -127,13 +45,13 @@ func runtimeConfig(
 		output.Transport = mcpServer.MCPTransportStdio
 		output.Stdio = &mcpServer.MCPRuntimeStdioConfig{
 			Command:          input.Core.Command,
-			Args:             append([]string(nil), input.Core.Args...),
+			Args:             slices.Clone(input.Core.Args),
 			Env:              maps.Clone(input.Core.Env),
 			StartupTimeoutMS: input.TimeoutMS,
 		}
 
 	case serverMCPDomain.ServerTypeHTTP:
-		authMode, err := runtimeHTTPAuthMode(input.Auth.Mode)
+		authMode, err := HTTPAuthMode(input.Auth.Mode)
 		if err != nil {
 			return mcpServer.RuntimeConfig{}, err
 		}
@@ -159,18 +77,6 @@ func runtimeConfig(
 	return output, nil
 }
 
-func runtimeCatalogIDForRoot(
-	rootID rootModel.RootID,
-) (mcpServer.CatalogID, error) {
-	if err := rootID.Validate(); err != nil {
-		return "", err
-	}
-	return mcpServer.CatalogID(
-		artifactCatalogIDPrefix +
-			base64.RawURLEncoding.EncodeToString([]byte(rootID)),
-	), nil
-}
-
 func runtimeInclude(
 	input *serverMCPDomain.Include,
 ) *mcpServer.MCPInclude {
@@ -184,7 +90,9 @@ func runtimeInclude(
 	}
 }
 
-func runtimeHTTPAuthMode(
+// HTTPAuthMode converts the declaration enum without materializing an
+// installation. Management also uses it for incomplete-installation health.
+func HTTPAuthMode(
 	input mcpv1.HTTPAuthMode,
 ) (mcpServer.MCPHTTPAuthMode, error) {
 	switch input {

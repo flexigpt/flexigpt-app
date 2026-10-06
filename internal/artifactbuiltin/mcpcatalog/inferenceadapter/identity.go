@@ -1,4 +1,4 @@
-package aggregate
+package inferenceadapter
 
 import (
 	"encoding/base64"
@@ -16,7 +16,8 @@ const (
 	artifactCatalogIDPrefix = "artifact-root:v1:"
 )
 
-func runtimeServerIDForArtifact(
+// ServerIDForArtifact preserves the existing opaque runtime identity format.
+func ServerIDForArtifact(
 	ref artifactModel.ArtifactRef,
 ) (mcpServer.ServerID, error) {
 	if err := ref.Validate(); err != nil {
@@ -29,7 +30,7 @@ func runtimeServerIDForArtifact(
 	), nil
 }
 
-func artifactRefForRuntimeServerID(
+func ArtifactRefForServerID(
 	id mcpServer.ServerID,
 ) (artifactModel.ArtifactRef, error) {
 	if err := id.Validate(); err != nil {
@@ -57,6 +58,7 @@ func artifactRefForRuntimeServerID(
 			spec.ErrInvalid,
 		)
 	}
+
 	ref := artifactModel.ArtifactRef{
 		RootID:     rootModel.RootID(rootID),
 		ArtifactID: artifactModel.ArtifactID(artifactID),
@@ -65,4 +67,16 @@ func artifactRefForRuntimeServerID(
 		return artifactModel.ArtifactRef{}, err
 	}
 	return ref, nil
+}
+
+func runtimeCatalogIDForRoot(
+	rootID rootModel.RootID,
+) (mcpServer.CatalogID, error) {
+	if err := rootID.Validate(); err != nil {
+		return "", err
+	}
+	return mcpServer.CatalogID(
+		artifactCatalogIDPrefix +
+			base64.RawURLEncoding.EncodeToString([]byte(rootID)),
+	), nil
 }
