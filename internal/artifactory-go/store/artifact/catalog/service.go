@@ -32,9 +32,6 @@ func (s *Service) ListByRoot(
 	rootID rootModel.RootID,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := s.validateContext(ctx, "Artifact catalog list"); err != nil {
-		return nil, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -54,9 +51,6 @@ func (s *Service) ListBySource(
 	sourceID sourceModel.SourceID,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := s.validateContext(ctx, "Artifact catalog list"); err != nil {
-		return nil, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -80,9 +74,6 @@ func (s *Service) FindByIdentity(
 	logicalName spec.LogicalName,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := s.validateContext(ctx, "Artifact identity query"); err != nil {
-		return nil, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -154,16 +145,6 @@ func (s *Service) attachDocuments(
 		output[index].Document = &copyValue
 	}
 	return output, nil
-}
-
-func (s *Service) validateContext(ctx context.Context, operation string) error {
-	if s == nil || s.repository == nil || s.definitions == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: %s context is nil", spec.ErrInvalid, operation)
-	}
-	return ctx.Err()
 }
 
 func validateListOptions(options catalogModel.ListOptions) error {

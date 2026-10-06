@@ -2,13 +2,11 @@ package skill
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -20,22 +18,6 @@ func (a *Service) ListSkills(
 	ctx context.Context,
 	request ListSkillsRequest,
 ) ([]SkillListItem, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Skill list context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
@@ -50,13 +32,6 @@ func (a *Service) ListSkills(
 
 	output := make([]SkillListItem, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Kind != skillSource.SkillArtifactKind {
-			continue
-		}
-		if request.Enabled != nil && entry.Enabled != *request.Enabled {
-			continue
-		}
-
 		item := skillListItem(entry)
 		output = append(output, item)
 	}

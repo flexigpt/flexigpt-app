@@ -12,10 +12,6 @@ func (a *Service) listServers(
 	ctx context.Context,
 	request ListServersRequest,
 ) ([]ServerListItem, error) {
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
@@ -30,13 +26,6 @@ func (a *Service) listServers(
 
 	output := make([]ServerListItem, 0)
 	for _, entry := range entries {
-		if entry.Kind != mcpDomain.MCPArtifactKind {
-			continue
-		}
-		if request.Enabled != nil && entry.Enabled != *request.Enabled {
-			continue
-		}
-
 		item := ServerListItem{
 			Ref:         entry.Ref(),
 			Name:        entry.LogicalName,
@@ -67,10 +56,6 @@ func (a *Service) listPolicies(
 	ctx context.Context,
 	request ListPoliciesRequest,
 ) ([]PolicyListItem, error) {
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
@@ -85,13 +70,6 @@ func (a *Service) listPolicies(
 
 	output := make([]PolicyListItem, 0)
 	for _, entry := range entries {
-		if entry.Kind != mcpDomain.MCPPolicyArtifactKind {
-			continue
-		}
-		if request.Enabled != nil && entry.Enabled != *request.Enabled {
-			continue
-		}
-
 		item := PolicyListItem{
 			Ref:         entry.Ref(),
 			Name:        entry.LogicalName,

@@ -28,15 +28,6 @@ func (s *Service) GetDefinition(
 	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
 ) (definitionModel.Definition, error) {
-	if s == nil || s.repository == nil {
-		return definitionModel.Definition{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return definitionModel.Definition{}, fmt.Errorf("%w: Definition read context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return definitionModel.Definition{}, err
-	}
 	if err := rootID.Validate(); err != nil {
 		return definitionModel.Definition{}, err
 	}
@@ -57,15 +48,6 @@ func (s *Service) GetDefinitions(
 	ctx context.Context,
 	keys []definitionModel.Key,
 ) ([]definitionModel.Definition, error) {
-	if s == nil || s.repository == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: definition batch read context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if len(keys) == 0 {
 		return []definitionModel.Definition{}, nil
 	}

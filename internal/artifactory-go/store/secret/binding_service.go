@@ -61,9 +61,6 @@ func (s *BindingService) GetBinding(
 	ctx context.Context,
 	key secretModel.BindingKey,
 ) (secretModel.Binding, bool, error) {
-	if err := s.ready(ctx); err != nil {
-		return secretModel.Binding{}, false, err
-	}
 	if err := key.Validate(); err != nil {
 		return secretModel.Binding{}, false, err
 	}
@@ -80,9 +77,6 @@ func (s *BindingService) ReplaceBinding(
 	ctx context.Context,
 	request secretModel.ReplaceBindingRequest,
 ) (secretModel.Binding, error) {
-	if err := s.ready(ctx); err != nil {
-		return secretModel.Binding{}, err
-	}
 	if err := request.Validate(); err != nil {
 		return secretModel.Binding{}, err
 	}
@@ -140,9 +134,6 @@ func (s *BindingService) ReplaceBinding(
 }
 
 func (s *BindingService) ClearBinding(ctx context.Context, request secretModel.ClearBindingRequest) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if err := request.Validate(); err != nil {
 		return err
 	}
@@ -161,16 +152,6 @@ func (s *BindingService) ClearBinding(ctx context.Context, request secretModel.C
 	}
 	s.drainBestEffort(ctx)
 	return nil
-}
-
-func (s *BindingService) ready(ctx context.Context) error {
-	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: secret binding context is nil", spec.ErrInvalid)
-	}
-	return ctx.Err()
 }
 
 func (s *BindingService) availableArtifact(

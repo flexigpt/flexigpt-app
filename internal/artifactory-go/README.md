@@ -759,15 +759,15 @@ Transparent private caching is compatible with read-only behavior. Durable repai
 
 Validation is neither “repeat everything everywhere” nor “validate at startup and trust all future state.”
 
-| Boundary                      | Responsibility                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Construction                  | Required dependencies, valid configuration, namespace policies, and mandatory capability relationships. |
-| Registration                  | Valid identifiers and revisions, duplicate detection, schema bindings, and dispatch consistency.        |
-| Public operation entry        | Request structure, identity, bounds, expectations, context, and applicable authority.                   |
-| Driver configuration          | Physical configuration validation and normalization.                                                    |
-| Decoder and schema output     | Output shape, canonical representation, identity linkage, digest evidence, and diagnostics.             |
-| Persistence commit            | Current revisions, liveness, uniqueness, references, and immutable-key conflicts.                       |
-| Verified operation completion | Snapshot confirmation and time-dependent Source consistency.                                            |
+| Boundary                      | Responsibility                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Construction                  | Required dependencies, valid configuration, namespace policies, and mandatory capability relationships.                                                 |
+| Registration                  | Valid identifiers and revisions, duplicate detection, schema bindings, and dispatch consistency.                                                        |
+| Public operation entry        | Transport/application entrypoints validate request and context shape; constructed internal capabilities assume valid dependencies and non-nil contexts. |
+| Driver configuration          | Physical configuration validation and normalization.                                                                                                    |
+| Decoder and schema output     | Output shape, canonical representation, identity linkage, digest evidence, and diagnostics.                                                             |
+| Persistence commit            | Current revisions, liveness, uniqueness, references, and immutable-key conflicts.                                                                       |
+| Verified operation completion | Snapshot confirmation and time-dependent Source consistency.                                                                                            |
 
 After successful construction, private methods may assume mandatory dependencies exist.
 

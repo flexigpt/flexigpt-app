@@ -30,39 +30,8 @@ func (a *Service) ListAgents(
 	ctx context.Context,
 	request ListAgentsRequest,
 ) ([]AgentListItem, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Agent list context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-
-	names := make(map[spec.LogicalName]struct{}, len(request.LogicalNames))
-	for index, name := range request.LogicalNames {
-		if err := name.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"agent list logicalNames[%d]: %w",
-				index,
-				err,
-			)
-		}
-		names[name] = struct{}{}
-	}
-
 	allowedRefs := map[artifactModel.ArtifactRef]struct{}(nil)
 	if request.Plugin != nil {
-		if err := request.Plugin.Validate(); err != nil {
-			return nil, err
-		}
 		if request.Plugin.RootID != request.RootID {
 			return nil, fmt.Errorf(
 				"%w: Agent Plugin belongs to another Root",
@@ -112,17 +81,6 @@ func (a *Service) ListAgents(
 	seen := make(map[artifactModel.ArtifactRef]struct{}, len(entries))
 	output := make([]AgentListItem, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Kind != agentDomain.AgentArtifactKind {
-			continue
-		}
-		if len(names) != 0 {
-			if _, found := names[entry.LogicalName]; !found {
-				continue
-			}
-		}
-		if request.Enabled != nil && entry.Enabled != *request.Enabled {
-			continue
-		}
 		if allowedRefs != nil {
 			if _, found := allowedRefs[entry.Ref()]; !found {
 				continue

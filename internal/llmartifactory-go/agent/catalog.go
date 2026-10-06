@@ -29,13 +29,6 @@ func (a *Service) getAgentRecord(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.Artifact, error) {
-	if a == nil || a.artifacts == nil {
-		return artifactModel.Artifact{}, spec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
-
 	value, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
 		return artifactModel.Artifact{}, err
@@ -56,12 +49,6 @@ func (a *Service) SetAgentEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (AgentView, error) {
-	if expectedRevision == 0 {
-		return AgentView{}, fmt.Errorf(
-			"%w: expected Agent Artifact revision is required",
-			spec.ErrInvalid,
-		)
-	}
 	if _, err := a.getAgentRecord(ctx, ref); err != nil {
 		return AgentView{}, err
 	}

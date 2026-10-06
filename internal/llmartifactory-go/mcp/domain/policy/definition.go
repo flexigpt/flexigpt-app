@@ -74,9 +74,6 @@ func BodyFromDocument(
 func DefinitionForDocument(
 	input mcppolicyv1.MCPPolicyDocument,
 ) (definitionModel.Definition, error) {
-	if err := input.Validate(); err != nil {
-		return definitionModel.Definition{}, err
-	}
 	body, err := input.CanonicalJSON()
 	if err != nil {
 		return definitionModel.Definition{}, err

@@ -48,18 +48,6 @@ func NewService(
 }
 
 func (s *Service) PurgeArtifactLocalState(ctx context.Context, ref artifactModel.ArtifactRef) error {
-	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: Artifact cleanup context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
 	value, err := s.artifacts.Get(ctx, ref)
 	if err != nil {
 		return err
@@ -76,18 +64,6 @@ func (s *Service) CleanupArtifactLocalState(
 	ctx context.Context,
 	request PurgeRequest,
 ) (PurgeResult, error) {
-	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
-		return PurgeResult{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return PurgeResult{}, fmt.Errorf(
-			"%w: Artifact cleanup context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return PurgeResult{}, err
-	}
 	if err := request.Validate(); err != nil {
 		return PurgeResult{}, err
 	}

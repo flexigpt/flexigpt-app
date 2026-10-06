@@ -11,15 +11,6 @@ import (
 // GetMany loads complete Artifact entities in caller order. Catalog consumers
 // should use catalog.API unless they explicitly need full local state.
 func (s *Service) GetMany(ctx context.Context, refs []artifactModel.ArtifactRef) ([]artifactModel.Artifact, error) {
-	if s == nil || s.repository == nil {
-		return nil, spec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: artifact batch get context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if len(refs) == 0 {
 		return []artifactModel.Artifact{}, nil
 	}

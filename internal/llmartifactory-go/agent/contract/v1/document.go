@@ -96,9 +96,6 @@ func DecodeAdmittedAgentEntry(
 func DefinitionForDocument(
 	document AgentDocument,
 ) (definitionModel.Definition, error) {
-	if err := document.Validate(); err != nil {
-		return definitionModel.Definition{}, err
-	}
 	body, err := document.CanonicalJSON()
 	if err != nil {
 		return definitionModel.Definition{}, err

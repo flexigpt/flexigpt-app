@@ -50,15 +50,6 @@ func (s *RuntimeService) ReadBinding(
 	key secretModel.BindingKey,
 	expectedRef secretModel.Ref,
 ) (string, secretModel.Binding, error) {
-	if s == nil || s.repository == nil || s.artifacts == nil {
-		return "", secretModel.Binding{}, spec.ErrClosed
-	}
-	if ctx == nil {
-		return "", secretModel.Binding{}, fmt.Errorf("%w: secret runtime context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", secretModel.Binding{}, err
-	}
 	if err := key.Validate(); err != nil {
 		return "", secretModel.Binding{}, err
 	}

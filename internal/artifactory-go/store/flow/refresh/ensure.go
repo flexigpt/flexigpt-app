@@ -17,28 +17,6 @@ func EnsureSourceCurrent(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) error {
-	if refreshes == nil {
-		return fmt.Errorf(
-			"%w: Source refresh API is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: Source refresh context is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return err
-	}
-
 	inspection, err := refreshes.InspectSource(ctx, rootID, sourceID)
 	if err == nil && inspection.IsCurrent() {
 		return nil

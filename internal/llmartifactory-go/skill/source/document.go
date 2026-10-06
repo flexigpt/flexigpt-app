@@ -72,9 +72,6 @@ func DecodeSkillDocument(
 func DefinitionForSkillDeclaration(
 	doc skillv1.SkillDocument,
 ) (definitionModel.Definition, error) {
-	if err := doc.Validate(); err != nil {
-		return definitionModel.Definition{}, err
-	}
 	body, err := doc.CanonicalJSON()
 	if err != nil {
 		return definitionModel.Definition{}, err

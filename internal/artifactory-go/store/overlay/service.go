@@ -67,9 +67,6 @@ func (s *Service) Get(
 	ref artifactModel.ArtifactRef,
 	namespace overlayModel.Namespace,
 ) (overlayModel.Record, bool, error) {
-	if err := s.ready(ctx); err != nil {
-		return overlayModel.Record{}, false, err
-	}
 	if err := ref.Validate(); err != nil {
 		return overlayModel.Record{}, false, err
 	}
@@ -87,9 +84,6 @@ func (s *Service) Get(
 }
 
 func (s *Service) Put(ctx context.Context, request overlayModel.PutRequest) (overlayModel.Record, error) {
-	if err := s.ready(ctx); err != nil {
-		return overlayModel.Record{}, err
-	}
 	if err := request.Validate(); err != nil {
 		return overlayModel.Record{}, err
 	}
@@ -120,9 +114,6 @@ func (s *Service) Delete(
 	namespace overlayModel.Namespace,
 	expectedArtifactRevision, expectedOverlayRevision uint64,
 ) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}
@@ -160,9 +151,6 @@ func (s *Service) GetStoreOverlay(
 	ctx context.Context,
 	namespace overlayModel.Namespace,
 ) (overlayModel.StoreRecord, bool, error) {
-	if err := s.ready(ctx); err != nil {
-		return overlayModel.StoreRecord{}, false, err
-	}
 	if err := s.requireStoreNamespace(namespace); err != nil {
 		return overlayModel.StoreRecord{}, false, err
 	}
@@ -173,9 +161,6 @@ func (s *Service) PutStoreOverlay(
 	ctx context.Context,
 	request overlayModel.StorePutRequest,
 ) (overlayModel.StoreRecord, error) {
-	if err := s.ready(ctx); err != nil {
-		return overlayModel.StoreRecord{}, err
-	}
 	if err := request.Validate(); err != nil {
 		return overlayModel.StoreRecord{}, err
 	}
@@ -195,9 +180,6 @@ func (s *Service) DeleteStoreOverlay(
 	namespace overlayModel.Namespace,
 	expectedRevision uint64,
 ) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if err := s.requireStoreNamespace(namespace); err != nil {
 		return err
 	}
@@ -205,16 +187,6 @@ func (s *Service) DeleteStoreOverlay(
 		return fmt.Errorf("%w: expected store overlay revision is required", spec.ErrInvalid)
 	}
 	return s.repository.DeleteStoreOverlay(ctx, namespace, expectedRevision)
-}
-
-func (s *Service) ready(ctx context.Context) error {
-	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: Overlay context is nil", spec.ErrInvalid)
-	}
-	return ctx.Err()
 }
 
 func (s *Service) availableArtifact(

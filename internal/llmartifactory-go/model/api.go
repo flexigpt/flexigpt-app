@@ -116,9 +116,6 @@ func (a *Service) listProviders(
 	if err := a.ready(ctx); err != nil {
 		return nil, err
 	}
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
 
 	entries, err := a.cat.ListByRoot(
 		ctx,
@@ -135,10 +132,6 @@ func (a *Service) listProviders(
 
 	output := make([]ProviderListItem, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Kind != modelDomain.ModelProviderArtifactKind {
-			continue
-		}
-
 		item := ProviderListItem{
 			Ref:         entry.Ref(),
 			Name:        entry.LogicalName,
@@ -186,9 +179,6 @@ func (a *Service) listModels(
 	if err := a.ready(ctx); err != nil {
 		return nil, err
 	}
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
 
 	entries, err := a.cat.ListByRoot(
 		ctx,
@@ -205,10 +195,6 @@ func (a *Service) listModels(
 
 	output := make([]ModelListItem, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Kind != modelDomain.ModelArtifactKind {
-			continue
-		}
-
 		item := ModelListItem{
 			Ref:         entry.Ref(),
 			Name:        entry.LogicalName,

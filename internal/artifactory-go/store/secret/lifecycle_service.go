@@ -42,9 +42,6 @@ func NewLifecycleService(
 }
 
 func (s *LifecycleService) DrainSecretGarbage(ctx context.Context) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if s.values == nil {
 		return fmt.Errorf("%w: Artifact Store secret value backend is not configured", spec.ErrUnsupported)
 	}
@@ -85,9 +82,6 @@ func (s *LifecycleService) DrainSecretGarbage(ctx context.Context) error {
 }
 
 func (s *LifecycleService) RecoverPending(ctx context.Context) error {
-	if err := s.ready(ctx); err != nil {
-		return err
-	}
 	if err := s.repository.RecoverPendingSecrets(ctx, clockutil.NowUTC(s.clock)); err != nil {
 		return err
 	}
@@ -96,14 +90,4 @@ func (s *LifecycleService) RecoverPending(ctx context.Context) error {
 	}
 	_ = s.DrainSecretGarbage(context.WithoutCancel(ctx))
 	return nil
-}
-
-func (s *LifecycleService) ready(ctx context.Context) error {
-	if s == nil || s.repository == nil || s.clock == nil {
-		return spec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf("%w: secret lifecycle context is nil", spec.ErrInvalid)
-	}
-	return ctx.Err()
 }
