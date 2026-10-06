@@ -145,9 +145,6 @@ func (s *Store) listArtifactCatalogByRoot(
 	rootID rootModel.RootID,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -176,12 +173,6 @@ func (s *Store) listArtifactCatalogBySource(
 	sourceID sourceModel.SourceID,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -214,15 +205,6 @@ func (s *Store) findArtifactCatalogByIdentity(
 	logicalName spec.LogicalName,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := kind.Validate(); err != nil {
-		return nil, err
-	}
-	if err := logicalName.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -296,17 +278,8 @@ func (s *Store) getArtifactsByReferences(
 func catalogListFilterArguments(
 	options catalogModel.ListOptions,
 ) ([]any, error) {
-	if options.Kind != "" {
-		if err := options.Kind.Validate(); err != nil {
-			return nil, err
-		}
-	}
-
 	names := make(map[string]struct{}, len(options.LogicalNames))
 	for _, name := range options.LogicalNames {
-		if err := name.Validate(); err != nil {
-			return nil, err
-		}
 		names[string(name)] = struct{}{}
 	}
 	orderedNames := make([]string, 0, len(names))

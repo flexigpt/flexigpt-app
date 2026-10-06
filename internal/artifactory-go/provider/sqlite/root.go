@@ -18,9 +18,6 @@ func (s *Store) createRoot(
 	ctx context.Context,
 	value rootModel.Root,
 ) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO artifact_roots (
@@ -91,9 +88,6 @@ func (s *Store) updateRoot(
 	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
@@ -125,9 +119,6 @@ func (s *Store) retireRoot(
 	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	if value.RetiredAt == nil ||
 		value.Revision != expectedRevision+1 {
 		return fmt.Errorf("%w: invalid root retirement", spec.ErrInvalid)
@@ -138,18 +129,6 @@ func (s *Store) retireRoot(
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-
-	activeChildren, err := rootHasActiveChildrenTx(ctx, tx, value.ID)
-	if err != nil {
-		return err
-	}
-	if activeChildren {
-		return fmt.Errorf(
-			"%w: Root %q still owns Sources or Artifact records",
-			spec.ErrConflict,
-			value.ID,
-		)
-	}
 
 	result, err := tx.ExecContext(
 		ctx,
@@ -176,27 +155,11 @@ func (s *Store) purgeRoot(
 	id rootModel.RootID,
 	expectedRevision uint64,
 ) error {
-	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected root revision is required", spec.ErrInvalid)
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-
-	activeChildren, err := rootHasActiveChildrenTx(ctx, tx, id)
-	if err != nil {
-		return err
-	}
-	if activeChildren {
-		return fmt.Errorf(
-			"%w: Root %q still owns Sources or Artifact records",
-			spec.ErrConflict,
-			id,
-		)
-	}
 
 	result, err := tx.ExecContext(
 		ctx,
@@ -257,32 +220,6 @@ func getActiveRootTx(
 	return value, err
 }
 
-func rootHasActiveChildrenTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	id rootModel.RootID,
-) (bool, error) {
-	var exists int
-	err := tx.QueryRowContext(
-		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM artifact_sources
-			WHERE root_id = ? AND retired_at IS NULL
-			UNION ALL
-			SELECT 1
-			FROM artifact_artifacts
-			WHERE root_id = ?
-		)`,
-		string(id),
-		string(id),
-	).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists != 0, nil
-}
-
 func scanRoot(row scanner) (rootModel.Root, error) {
 	var (
 		id, storageKey, displayName, description string
@@ -290,12 +227,6 @@ func scanRoot(row scanner) (rootModel.Root, error) {
 		createdAt, modifiedAt                    int64
 		retiredAt                                sql.NullInt64
 	)
-	if row == nil {
-		return rootModel.Root{}, fmt.Errorf(
-			"%w: Root row is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := row.Scan(
 		&id,
 		&storageKey,

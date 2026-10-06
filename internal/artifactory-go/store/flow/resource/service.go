@@ -2,7 +2,6 @@ package resource
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -32,9 +31,6 @@ func NewService(
 	refresh refreshInspector,
 	sources source.Runtime,
 ) (API, NativePathAPI, error) {
-	if artifacts == nil || definitions == nil || refresh == nil || sources == nil {
-		return nil, nil, fmt.Errorf("%w: Artifact resource service dependencies are incomplete", spec.ErrInvalid)
-	}
 	service, err := internal.NewService(artifacts, definitions, refresh, sources)
 	if err != nil {
 		return nil, nil, err

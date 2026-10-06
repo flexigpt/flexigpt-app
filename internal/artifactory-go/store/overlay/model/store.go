@@ -95,6 +95,6 @@ func (r StorePutRequest) Validate() error {
 	); err != nil {
 		return err
 	}
-	_, err := CanonicalPayload(r.Payload)
-	return err
+
+	return nil
 }

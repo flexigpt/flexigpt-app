@@ -47,9 +47,6 @@ func (s *Service) GetDefinition(
 	if err != nil {
 		return definitionModel.Definition{}, err
 	}
-	if err := validateRepositoryDefinition(value, digest); err != nil {
-		return definitionModel.Definition{}, err
-	}
 	// Repository values are contractually independently owned. Avoid a second
 	// deep copy on every immutable read after its persistence boundary has
 	// already established ownership.
@@ -90,20 +87,5 @@ func (s *Service) GetDefinitions(
 			len(ownedKeys),
 		)
 	}
-	for index, value := range values {
-		if err := validateRepositoryDefinition(value, ownedKeys[index].Digest); err != nil {
-			return nil, fmt.Errorf("definition repository value %d: %w", index, err)
-		}
-	}
 	return values, nil
-}
-
-func validateRepositoryDefinition(value definitionModel.Definition, expected cryptoutil.Digest) error {
-	if value.Digest != expected {
-		return fmt.Errorf("%w: Definition repository returned another digest", spec.ErrInvalid)
-	}
-	if err := definitionModel.ValidateAdmitted(value); err != nil {
-		return fmt.Errorf("%w: Definition repository returned invalid admitted value: %w", spec.ErrInvalid, err)
-	}
-	return nil
 }

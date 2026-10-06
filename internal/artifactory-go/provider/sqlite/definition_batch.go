@@ -34,9 +34,6 @@ func (s *Store) getDefinitions(
 	roots := make(map[rootModel.RootID]struct{})
 	unique := make(map[definitionModel.Key]struct{}, len(keys))
 	for _, key := range keys {
-		if err := key.Validate(); err != nil {
-			return nil, err
-		}
 		roots[key.RootID] = struct{}{}
 		unique[key] = struct{}{}
 	}

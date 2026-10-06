@@ -24,12 +24,6 @@ func (s *Store) getRefreshState(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (refreshModel.State, error) {
-	if err := rootID.Validate(); err != nil {
-		return refreshModel.State{}, err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return refreshModel.State{}, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return refreshModel.State{}, err
 	}
@@ -95,13 +89,6 @@ func (p *Publisher) Publish(
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source changed or was disabled during refresh",
 			spec.ErrConflict,
-		)
-	}
-	if currentSource.RootID != publication.RootID ||
-		currentSource.ID != publication.SourceID {
-		return refreshModel.State{}, fmt.Errorf(
-			"%w: Source refresh publisher loaded another Source",
-			spec.ErrInvalid,
 		)
 	}
 	if currentSource.Discovery.Empty() {
@@ -230,12 +217,6 @@ func scanRefreshState(
 		refreshedAt                              int64
 		diagnosticsRaw                           []byte
 	)
-	if row == nil {
-		return refreshModel.State{}, fmt.Errorf(
-			"%w: Source refresh state row is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := row.Scan(
 		&rootID,
 		&sourceID,

@@ -27,12 +27,6 @@ func (r *OverlayRepository) GetOverlay(
 	if r == nil || r.store == nil {
 		return overlayModel.Record{}, false, spec.ErrClosed
 	}
-	if err := ref.Validate(); err != nil {
-		return overlayModel.Record{}, false, err
-	}
-	if err := namespace.Validate(); err != nil {
-		return overlayModel.Record{}, false, err
-	}
 	if err := r.store.requireActiveRoot(ctx, ref.RootID); err != nil {
 		return overlayModel.Record{}, false, err
 	}
@@ -60,21 +54,12 @@ func (r *OverlayRepository) PutOverlay(
 	if r == nil || r.store == nil {
 		return overlayModel.Record{}, spec.ErrClosed
 	}
-	if err := request.Validate(); err != nil {
-		return overlayModel.Record{}, err
-	}
 	if now.IsZero() {
 		return overlayModel.Record{}, fmt.Errorf(
 			"%w: protected overlay time is required",
 			spec.ErrInvalid,
 		)
 	}
-
-	payload, err := overlayModel.CanonicalPayload(request.Payload)
-	if err != nil {
-		return overlayModel.Record{}, err
-	}
-	request.Payload = payload
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -113,9 +98,6 @@ func (r *OverlayRepository) PutOverlay(
 			Revision:      1,
 			CreatedAt:     now.UTC(),
 			ModifiedAt:    now.UTC(),
-		}
-		if err := output.Validate(); err != nil {
-			return overlayModel.Record{}, err
 		}
 
 		_, err = tx.ExecContext(
@@ -156,10 +138,6 @@ func (r *OverlayRepository) PutOverlay(
 		output.Payload = append([]byte(nil), request.Payload...)
 		output.Revision++
 		output.ModifiedAt = now.UTC()
-
-		if err := output.Validate(); err != nil {
-			return overlayModel.Record{}, err
-		}
 
 		result, err := tx.ExecContext(
 			ctx,
@@ -208,20 +186,6 @@ func (r *OverlayRepository) DeleteOverlay(
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-	if err := namespace.Validate(); err != nil {
-		return err
-	}
-	if expectedArtifactRevision == 0 ||
-		expectedOverlayRevision == 0 ||
-		now.IsZero() {
-		return fmt.Errorf(
-			"%w: invalid protected overlay deletion request",
-			spec.ErrInvalid,
-		)
 	}
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
@@ -298,9 +262,6 @@ func (r *SecretRepository) GetBinding(
 	if r == nil || r.store == nil {
 		return secretModel.Binding{}, false, spec.ErrClosed
 	}
-	if err := key.Validate(); err != nil {
-		return secretModel.Binding{}, false, err
-	}
 	if err := r.store.requireActiveRoot(
 		ctx,
 		key.Artifact.RootID,
@@ -324,9 +285,6 @@ func (r *SecretRepository) CreatePendingSecret(
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
-	}
-	if err := record.Validate(); err != nil {
-		return err
 	}
 	if record.State != secretModel.RecordStatePending {
 		return fmt.Errorf(
@@ -357,18 +315,6 @@ func (r *SecretRepository) AttachSecretBinding(
 ) (secretModel.Binding, error) {
 	if r == nil || r.store == nil {
 		return secretModel.Binding{}, spec.ErrClosed
-	}
-	if err := request.Key.Validate(); err != nil {
-		return secretModel.Binding{}, err
-	}
-	if request.ExpectedArtifactRevision == 0 {
-		return secretModel.Binding{}, fmt.Errorf(
-			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
-		)
-	}
-	if err := request.Record.Validate(); err != nil {
-		return secretModel.Binding{}, err
 	}
 	if request.Record.State != secretModel.RecordStatePending {
 		return secretModel.Binding{}, fmt.Errorf(
@@ -567,9 +513,6 @@ func (r *SecretRepository) ClearSecretBinding(
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
-	}
-	if err := request.Validate(); err != nil {
-		return err
 	}
 	if now.IsZero() {
 		return fmt.Errorf(
@@ -946,13 +889,6 @@ func getProtectedOverlayTx(
 func scanProtectedOverlay(
 	row scanner,
 ) (overlayModel.Record, error) {
-	if row == nil {
-		return overlayModel.Record{}, fmt.Errorf(
-			"%w: protected overlay row is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	var (
 		rootID, artifactID, namespace, schemaVersion string
 		payload                                      []byte
@@ -1026,13 +962,6 @@ func getSecretBindingTx(
 func scanSecretBinding(
 	row scanner,
 ) (secretModel.Binding, error) {
-	if row == nil {
-		return secretModel.Binding{}, fmt.Errorf(
-			"%w: secret binding row is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	var (
 		rootID, artifactID, namespace, slot string
 		secretRef, sha256Value              sql.NullString
@@ -1103,13 +1032,6 @@ func getSecretRecordTx(
 func scanSecretRecord(
 	row scanner,
 ) (secretModel.Record, error) {
-	if row == nil {
-		return secretModel.Record{}, fmt.Errorf(
-			"%w: secret record row is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	var (
 		ref, storeName, sha256Value, state string
 		createdAt, modifiedAt              int64

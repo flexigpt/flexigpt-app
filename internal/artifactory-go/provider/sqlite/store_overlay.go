@@ -22,9 +22,6 @@ func (r *OverlayRepository) GetStoreOverlay(
 	if r == nil || r.store == nil {
 		return overlayModel.StoreRecord{}, false, spec.ErrClosed
 	}
-	if err := namespace.Validate(); err != nil {
-		return overlayModel.StoreRecord{}, false, err
-	}
 
 	value, err := getStoreOverlayTx(
 		ctx,
@@ -48,21 +45,12 @@ func (r *OverlayRepository) PutStoreOverlay(
 	if r == nil || r.store == nil {
 		return overlayModel.StoreRecord{}, spec.ErrClosed
 	}
-	if err := request.Validate(); err != nil {
-		return overlayModel.StoreRecord{}, err
-	}
 	if now.IsZero() {
 		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay time is required",
 			spec.ErrInvalid,
 		)
 	}
-
-	payload, err := overlayModel.CanonicalPayload(request.Payload)
-	if err != nil {
-		return overlayModel.StoreRecord{}, err
-	}
-	request.Payload = payload
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -90,9 +78,6 @@ func (r *OverlayRepository) PutStoreOverlay(
 			Revision:      1,
 			CreatedAt:     now.UTC(),
 			ModifiedAt:    now.UTC(),
-		}
-		if err := output.Validate(); err != nil {
-			return overlayModel.StoreRecord{}, err
 		}
 
 		_, err = tx.ExecContext(
@@ -131,10 +116,6 @@ func (r *OverlayRepository) PutStoreOverlay(
 		output.Payload = append([]byte(nil), request.Payload...)
 		output.Revision++
 		output.ModifiedAt = now.UTC()
-
-		if err := output.Validate(); err != nil {
-			return overlayModel.StoreRecord{}, err
-		}
 
 		result, err := tx.ExecContext(
 			ctx,
@@ -176,15 +157,6 @@ func (r *OverlayRepository) DeleteStoreOverlay(
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
-	}
-	if err := namespace.Validate(); err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf(
-			"%w: expected store overlay revision is required",
-			spec.ErrInvalid,
-		)
 	}
 
 	result, err := r.store.db.ExecContext(
@@ -229,13 +201,6 @@ func getStoreOverlayTx(
 func scanStoreOverlay(
 	row scanner,
 ) (overlayModel.StoreRecord, error) {
-	if row == nil {
-		return overlayModel.StoreRecord{}, fmt.Errorf(
-			"%w: store overlay row is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	var (
 		namespace, schemaVersion string
 		payload                  []byte

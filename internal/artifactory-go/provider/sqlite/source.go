@@ -17,9 +17,6 @@ const sourceColumns = `
 	revision, created_at, modified_at, retired_at`
 
 func (s *Store) createSource(ctx context.Context, value sourceModel.Source) error {
-	if err := value.ValidateRead(); err != nil {
-		return err
-	}
 	discoveryRaw, err := encodeJSON(value.Discovery.Normalized())
 	if err != nil {
 		return err
@@ -86,12 +83,6 @@ func (s *Store) findSourceByStorageKey(
 	rootID rootModel.RootID,
 	storageKey spec.StorageKey,
 ) (sourceModel.Source, error) {
-	if err := rootID.Validate(); err != nil {
-		return sourceModel.Source{}, err
-	}
-	if err := storageKey.Validate(); err != nil {
-		return sourceModel.Source{}, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return sourceModel.Source{}, err
 	}
@@ -141,9 +132,6 @@ func (s *Store) listSources(ctx context.Context, rootID rootModel.RootID) ([]sou
 // updateSource executes an explicit ordinary Source update only. Lifecycle
 // invalidation is deliberately published by Refresh through Publisher.
 func (s *Store) updateSource(ctx context.Context, value sourceModel.Source, expectedRevision uint64) error {
-	if err := value.ValidateRead(); err != nil {
-		return err
-	}
 	if expectedRevision == 0 || value.Revision != expectedRevision+1 || value.RetiredAt != nil {
 		return fmt.Errorf("%w: invalid Source update", spec.ErrInvalid)
 	}
@@ -191,9 +179,6 @@ func (s *Store) updateSource(ctx context.Context, value sourceModel.Source, expe
 // retireSource executes an explicit retirement only. Entity/flow policy must
 // issue an aggregate lifecycle publication before invoking this low-level port.
 func (s *Store) retireSource(ctx context.Context, value sourceModel.Source, expectedRevision uint64) error {
-	if err := value.ValidateRead(); err != nil {
-		return err
-	}
 	if value.RetiredAt == nil || value.Enabled || expectedRevision == 0 || value.Revision != expectedRevision+1 {
 		return fmt.Errorf("%w: invalid Source retirement", spec.ErrInvalid)
 	}
@@ -241,15 +226,6 @@ func (s *Store) discardSource(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
-	if err := id.Validate(); err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected Source revision is required", spec.ErrInvalid)
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -284,15 +260,6 @@ func (s *Store) purgeSource(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
-	if err := id.Validate(); err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected Source revision is required", spec.ErrInvalid)
-	}
 	result, err := s.db.ExecContext(
 		ctx,
 		`DELETE FROM artifact_sources WHERE root_id = ? AND id = ? AND revision = ? AND retired_at IS NOT NULL`,
@@ -345,9 +312,6 @@ func scanSource(row scanner) (sourceModel.Source, error) {
 	var revision uint64
 	var createdAt, modifiedAt int64
 	var retiredAt sql.NullInt64
-	if row == nil {
-		return sourceModel.Source{}, fmt.Errorf("%w: Source row is nil", spec.ErrInvalid)
-	}
 	if err := row.Scan(
 		&id,
 		&rootID,

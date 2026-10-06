@@ -549,8 +549,6 @@ func (s *Service) MarkContentChanged(
 	return next.Summary(), nil
 }
 
-func (s *Service) Kinds() []sourceModel.SourceKind { return s.registry.Kinds() }
-
 func (s *Service) discardManagedStorage(ctx context.Context, value sourceModel.Source) error {
 	adapter, exists := s.registry.adapter(value.Kind)
 	if !exists {

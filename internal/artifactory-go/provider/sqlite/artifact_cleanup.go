@@ -23,9 +23,6 @@ func (r *ArtifactCleanupRepository) CleanupArtifactLocalState(
 	if r == nil || r.store == nil {
 		return artifactModel.Artifact{}, spec.ErrClosed
 	}
-	if err := request.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
 	if now.IsZero() {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact cleanup time is required",

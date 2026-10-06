@@ -6,7 +6,6 @@ import (
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -50,28 +49,7 @@ func (c *Service) EnsureProtectedTopology(
 		if err != nil {
 			return installModel.Installed{}, err
 		}
-		if !protectedSourceIntentMatches(value, rootValue.ID, draft) {
-			return installModel.Installed{}, fmt.Errorf(
-				"%w: protected Source %q declaration differs from stored topology",
-				spec.ErrConflict,
-				draft.ID,
-			)
-		}
 		output.Sources = append(output.Sources, value)
 	}
 	return output, nil
-}
-
-func protectedSourceIntentMatches(
-	value sourceModel.Summary,
-	rootID rootModel.RootID,
-	draft sourceModel.Draft,
-) bool {
-	return value.ID == draft.ID &&
-		value.RootID == rootID &&
-		value.StorageKey == draft.StorageKey &&
-		value.Kind == draft.Kind &&
-		value.DisplayName == draft.DisplayName &&
-		value.Enabled == draft.Enabled &&
-		value.Discovery.Equal(draft.Discovery)
 }

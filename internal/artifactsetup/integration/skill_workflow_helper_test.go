@@ -1,4 +1,4 @@
-package skill_test
+package integration
 
 import (
 	"fmt"
@@ -236,14 +236,4 @@ func skillRevisionSnapshot(
 		output[value.Ref] = value.Revision
 	}
 	return output
-}
-
-func requireNoError(
-	t *testing.T,
-	err error,
-) {
-	t.Helper()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 }

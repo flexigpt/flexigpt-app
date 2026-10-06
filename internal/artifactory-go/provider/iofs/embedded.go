@@ -74,13 +74,6 @@ func (a *Adapter) Open(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (driver.Snapshot, error) {
-	if value.Kind != Kind {
-		return nil, fmt.Errorf(
-			"%w: embedded adapter received source kind %q",
-			spec.ErrInvalid,
-			value.Kind,
-		)
-	}
 	config, err := decodeConfig(value.Config)
 	if err != nil {
 		return nil, err

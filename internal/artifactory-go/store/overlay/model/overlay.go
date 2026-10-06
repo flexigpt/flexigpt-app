@@ -123,9 +123,6 @@ func (r PutRequest) Validate() error {
 	); err != nil {
 		return err
 	}
-	if _, err := CanonicalPayload(r.Payload); err != nil {
-		return err
-	}
 	if r.ExpectedArtifactRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",

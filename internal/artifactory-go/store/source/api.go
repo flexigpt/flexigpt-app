@@ -41,5 +41,4 @@ type API interface {
 		expectedRevision uint64,
 	) (sourceModel.Summary, error)
 	Purge(ctx context.Context, rootID rootModel.RootID, sourceID sourceModel.SourceID, expectedRevision uint64) error
-	Kinds() []sourceModel.SourceKind
 }

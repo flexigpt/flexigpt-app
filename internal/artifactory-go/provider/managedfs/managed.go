@@ -558,23 +558,6 @@ func (a *Adapter) validateSource(ctx context.Context, value sourceModel.Source) 
 	if a == nil || a.filesystem == nil {
 		return spec.ErrClosed
 	}
-	if err := value.ValidateRead(); err != nil {
-		return err
-	}
-	if value.Kind != Kind {
-		return fmt.Errorf(
-			"%w: managed adapter received source kind %q",
-			spec.ErrInvalid,
-			value.Kind,
-		)
-	}
-	if _, err := jsonutil.DecodeJSONRaw[config](value.Config); err != nil {
-		return fmt.Errorf(
-			"%w: invalid managed Source config: %w",
-			spec.ErrInvalid,
-			err,
-		)
-	}
 	return nil
 }
 
@@ -582,7 +565,6 @@ func (a *Adapter) sourceRootPath(
 	value sourceModel.Source,
 	create bool,
 ) (string, error) {
-	// Every caller has already passed value through validateSource.
 	root, err := a.managedRootPath(value.RootStorageKey)
 	if err != nil {
 		return "", err
@@ -601,7 +583,6 @@ func (a *Adapter) sourceStagingPath(
 	value sourceModel.Source,
 	create bool,
 ) (string, error) {
-	// Every caller has already passed value through validateSource.
 	root, err := a.managedStagingRootPath(value.RootStorageKey)
 	if err != nil {
 		return "", err

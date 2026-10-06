@@ -25,9 +25,6 @@ const artifactColumns = `
 	revision, created_at, modified_at`
 
 func (s *Store) getArtifact(ctx context.Context, ref artifactModel.ArtifactRef) (artifactModel.Artifact, error) {
-	if err := ref.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
 	if err := s.requireActiveRoot(ctx, ref.RootID); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -47,9 +44,6 @@ func (s *Store) getArtifact(ctx context.Context, ref artifactModel.ArtifactRef) 
 }
 
 func (s *Store) listArtifactsByRoot(ctx context.Context, rootID rootModel.RootID) ([]artifactModel.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -70,12 +64,6 @@ func (s *Store) listArtifactsBySource(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) ([]artifactModel.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -98,15 +86,6 @@ func (s *Store) findArtifactsByIdentity(
 	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
 ) ([]artifactModel.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := kind.Validate(); err != nil {
-		return nil, err
-	}
-	if err := logicalName.Validate(); err != nil {
-		return nil, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -130,15 +109,6 @@ func (s *Store) findArtifactByOrigin(
 	binding artifactModel.SourceBinding,
 	kind artifactModel.ArtifactKind,
 ) (artifactModel.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
-	if err := binding.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
-	if err := kind.Validate(); err != nil {
-		return artifactModel.Artifact{}, err
-	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -169,9 +139,6 @@ func (s *Store) findArtifactByOrigin(
 }
 
 func (s *Store) createArtifact(ctx context.Context, value artifactModel.Artifact) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	if value.Revision != 1 {
 		return fmt.Errorf("%w: initial Artifact revision must be one", spec.ErrInvalid)
 	}
@@ -193,9 +160,6 @@ func (s *Store) createArtifact(ctx context.Context, value artifactModel.Artifact
 }
 
 func (s *Store) updateArtifactLocal(ctx context.Context, value artifactModel.Artifact, expectedRevision uint64) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	if expectedRevision == 0 || value.Revision != expectedRevision+1 {
 		return fmt.Errorf("%w: invalid Artifact local update", spec.ErrInvalid)
 	}
@@ -213,9 +177,6 @@ func (s *Store) updateArtifactLocal(ctx context.Context, value artifactModel.Art
 	}
 	if current.Revision != expectedRevision {
 		return spec.ErrConflict
-	}
-	if current.RootID != value.RootID || current.ID != value.ID {
-		return fmt.Errorf("%w: Artifact local update changed Artifact identity", spec.ErrInvalid)
 	}
 	if !value.ModifiedAt.After(current.ModifiedAt) {
 		return fmt.Errorf("%w: Artifact update time must advance current state", spec.ErrInvalid)
@@ -245,9 +206,6 @@ func (s *Store) updateArtifactLocal(ctx context.Context, value artifactModel.Art
 }
 
 func (s *Store) updateArtifactSourceState(ctx context.Context, update artifact.SourceStateUpdate) error {
-	if err := update.Validate(); err != nil {
-		return err
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -274,9 +232,6 @@ func updateArtifactSourceStateTx(ctx context.Context, tx *sql.Tx, update artifac
 	if current.Binding != update.Binding {
 		return fmt.Errorf("%w: source-derived Artifact update changed binding", spec.ErrInvalid)
 	}
-	if current.RootID != update.RootID || current.Binding.SourceID != update.Binding.SourceID {
-		return fmt.Errorf("%w: source-derived Artifact update changed Source identity", spec.ErrInvalid)
-	}
 	if !update.ModifiedAt.After(current.ModifiedAt) {
 		return fmt.Errorf("%w: source-derived Artifact update time must advance", spec.ErrInvalid)
 	}
@@ -287,9 +242,6 @@ func updateArtifactSourceStateTx(ctx context.Context, tx *sql.Tx, update artifac
 	next.State, next.Diagnostics, next.Revision, next.ModifiedAt = update.State, diagnostic.Clone(
 		update.Diagnostics,
 	), update.Revision, update.ModifiedAt
-	if err := next.ValidateRead(); err != nil {
-		return err
-	}
 	diagnostics, err := encodeJSON(next.Diagnostics)
 	if err != nil {
 		return err
@@ -316,12 +268,6 @@ func updateArtifactSourceStateTx(ctx context.Context, tx *sql.Tx, update artifac
 }
 
 func (s *Store) purgeArtifact(ctx context.Context, ref artifactModel.ArtifactRef, expectedRevision uint64) error {
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected Artifact revision is required", spec.ErrInvalid)
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -350,9 +296,6 @@ func (s *Store) purgeArtifact(ctx context.Context, ref artifactModel.ArtifactRef
 }
 
 func insertArtifactTx(ctx context.Context, tx *sql.Tx, value artifactModel.Artifact) error {
-	if err := value.Validate(); err != nil {
-		return err
-	}
 	diagnostics, err := encodeJSON(value.Diagnostics)
 	if err != nil {
 		return err
@@ -425,9 +368,6 @@ func scanArtifact(row scanner) (artifactModel.Artifact, error) {
 	var enabled int
 	var revision uint64
 	var createdAt, modifiedAt int64
-	if row == nil {
-		return artifactModel.Artifact{}, fmt.Errorf("%w: Artifact row is nil", spec.ErrInvalid)
-	}
 	if err := row.Scan(
 		&id,
 		&rootID,

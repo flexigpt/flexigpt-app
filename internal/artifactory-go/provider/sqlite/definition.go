@@ -119,9 +119,6 @@ func scanDefinition(row scanner) (definitionModel.Definition, error) {
 	var displayName, description string
 	var labelsRaw, bodyRaw, dependenciesRaw []byte
 	var createdAt int64
-	if row == nil {
-		return definitionModel.Definition{}, fmt.Errorf("%w: Definition row is nil", spec.ErrInvalid)
-	}
 	if err := row.Scan(
 		&rootID,
 		&digest,

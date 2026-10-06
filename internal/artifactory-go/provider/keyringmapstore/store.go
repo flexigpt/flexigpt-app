@@ -136,9 +136,6 @@ func (s *Store) Put(
 	if err := s.ready(ctx); err != nil {
 		return err
 	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
 	if err := secretModel.ValidateValue(v); err != nil {
 		return err
 	}
@@ -178,9 +175,6 @@ func (s *Store) Get(
 	ref secretModel.Ref,
 ) (string, error) {
 	if err := s.ready(ctx); err != nil {
-		return "", err
-	}
-	if err := ref.Validate(); err != nil {
 		return "", err
 	}
 
@@ -224,9 +218,6 @@ func (s *Store) Delete(
 	ref secretModel.Ref,
 ) error {
 	if err := s.ready(ctx); err != nil {
-		return err
-	}
-	if err := ref.Validate(); err != nil {
 		return err
 	}
 

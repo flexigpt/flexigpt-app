@@ -94,13 +94,6 @@ func (a *Adapter) Open(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (driver.Snapshot, error) {
-	if value.Kind != Kind {
-		return nil, fmt.Errorf(
-			"%w: filesystem adapter received source kind %q",
-			spec.ErrInvalid,
-			value.Kind,
-		)
-	}
 	config, err := decodeConfig(value.Config)
 	if err != nil {
 		return nil, err
@@ -129,13 +122,6 @@ func (a *Adapter) ResolveLocalPath(
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
-	}
-	if value.Kind != Kind {
-		return "", fmt.Errorf(
-			"%w: filesystem adapter received source kind %q",
-			spec.ErrInvalid,
-			value.Kind,
-		)
 	}
 
 	if a.traversalPolicy.excludesLocator(string(locator)) {

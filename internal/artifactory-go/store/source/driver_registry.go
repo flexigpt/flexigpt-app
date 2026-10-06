@@ -80,15 +80,6 @@ func (r *Registry) Open(
 	ctx context.Context,
 	value sourceModel.Source,
 ) (driver.Snapshot, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("%w: Source open context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return nil, err
-	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return nil, fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
@@ -97,12 +88,7 @@ func (r *Registry) Open(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateSnapshot(snapshot); err != nil {
-		if snapshot != nil {
-			_ = snapshot.Close()
-		}
-		return nil, err
-	}
+
 	return snapshot, nil
 }
 
@@ -132,18 +118,6 @@ func (r *Registry) ResolveLocalPath(
 	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
-	if ctx == nil {
-		return "", fmt.Errorf("%w: source local-path context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return "", err
-	}
-	if err := locator.Validate(true); err != nil {
-		return "", err
-	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return "", fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
@@ -160,15 +134,6 @@ func (r *Registry) PublishPackage(
 	value sourceModel.Source,
 	publication managedpackageModel.ManagedPackagePublication,
 ) (string, error) {
-	if ctx == nil {
-		return "", fmt.Errorf("%w: managed Source publication context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return "", err
-	}
 	normalized, err := managedpackageModel.NormalizeManagedPackagePublication(publication)
 	if err != nil {
 		return "", err
@@ -197,21 +162,6 @@ func (r *Registry) RemovePackage(
 	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf("%w: managed Source removal context is nil", spec.ErrInvalid)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := value.ValidateRead(); err != nil {
-		return err
-	}
-	if err := address.Validate(); err != nil {
-		return err
-	}
-	if err := spec.ValidateSourceGeneration(expectedGeneration); err != nil {
-		return err
-	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
