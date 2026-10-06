@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -25,6 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/installation"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 type Service struct {
@@ -37,7 +37,7 @@ type Service struct {
 	protection       root.ProtectionAPI
 	definitions      definition.API
 
-	baselinePolicy      mcpPolicy.MCPPolicy
+	baselinePolicy      mcppolicy.MCPPolicy
 	installation        *installation.Service
 	declarationResolver *composition.Resolver
 	plugins             *pluginAPI.API
@@ -54,7 +54,7 @@ func New(
 	definitions definition.API,
 	overlays mcpOverlay.OverlayRepository,
 	secretCleaner serverMCPDomain.SecretCleaner,
-	baselinePolicy mcpPolicy.MCPPolicy,
+	baselinePolicy mcppolicy.MCPPolicy,
 	options ...Option,
 ) (*Service, error) {
 	if sources == nil ||
@@ -468,15 +468,15 @@ func (a *Service) effectivePolicy(
 	serverRef artifactModel.ArtifactRef,
 	server serverMCPDomain.ServerDocument,
 	additional []artifactModel.ArtifactRef,
-) (mcpPolicy.Effective, error) {
-	values := make([]mcpPolicy.MCPPolicy, 0, 1+len(additional))
+) (mcppolicy.Effective, error) {
+	values := make([]mcppolicy.MCPPolicy, 0, 1+len(additional))
 	if reference := server.Configuration.Policy; reference != nil {
 		resolvedServer, err := a.declarationResolver.ResolveMCP(
 			ctx,
 			serverRef,
 		)
 		if err != nil {
-			return mcpPolicy.Effective{}, err
+			return mcppolicy.Effective{}, err
 		}
 		policyResult, found := resolvedMCPPolicyRelationship(
 			resolvedServer,
@@ -484,7 +484,7 @@ func (a *Service) effectivePolicy(
 		)
 		if !found {
 			if reference.Required {
-				return mcpPolicy.Effective{}, fmt.Errorf(
+				return mcppolicy.Effective{}, fmt.Errorf(
 					"%w: required MCP Policy %q did not resolve",
 					spec.ErrReferenceUnresolved,
 					reference.Name,
@@ -493,7 +493,7 @@ func (a *Service) effectivePolicy(
 		} else {
 			if !policyResult.IsAvailable() {
 				if reference.Required {
-					return mcpPolicy.Effective{}, fmt.Errorf(
+					return mcppolicy.Effective{}, fmt.Errorf(
 						"%w: required MCP Policy %q is %s",
 						spec.ErrReferenceUnresolved,
 						reference.Name,
@@ -506,7 +506,7 @@ func (a *Service) effectivePolicy(
 					policyResult.Resolved.Target.Form !=
 						composition.TargetFormArtifact ||
 					policyResult.Resolved.Target.Artifact == nil {
-					return mcpPolicy.Effective{}, fmt.Errorf(
+					return mcppolicy.Effective{}, fmt.Errorf(
 						"%w: MCP Policy %q did not resolve to a source-backed Artifact",
 						spec.ErrReferenceUnresolved,
 						reference.Name,
@@ -515,7 +515,7 @@ func (a *Service) effectivePolicy(
 				policyRef := *policyResult.Resolved.Target.Artifact
 				policy, err := a.policyBodyForArtifact(ctx, policyRef)
 				if err != nil {
-					return mcpPolicy.Effective{}, err
+					return mcppolicy.Effective{}, err
 				}
 				values = append(values, policy)
 			}
@@ -524,18 +524,18 @@ func (a *Service) effectivePolicy(
 
 	for _, ref := range additional {
 		if ref.RootID != serverRef.RootID {
-			return mcpPolicy.Effective{}, fmt.Errorf(
+			return mcppolicy.Effective{}, fmt.Errorf(
 				"%w: additional MCP Policy belongs to another Root",
 				spec.ErrInvalid,
 			)
 		}
 		terminal, err := a.resolveDeclarationArtifact(ctx, ref)
 		if err != nil {
-			return mcpPolicy.Effective{}, err
+			return mcppolicy.Effective{}, err
 		}
 		policy, err := a.policyBodyForArtifact(ctx, terminal)
 		if err != nil {
-			return mcpPolicy.Effective{}, fmt.Errorf(
+			return mcppolicy.Effective{}, fmt.Errorf(
 				"resolve additional MCP Policy %q: %w",
 				ref.ArtifactID,
 				err,
@@ -544,23 +544,23 @@ func (a *Service) effectivePolicy(
 		values = append(values, policy)
 	}
 
-	return mcpPolicy.Compose(a.baselinePolicy, values...)
+	return mcppolicy.Compose(a.baselinePolicy, values...)
 }
 
 func (a *Service) policyBodyForArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (mcpPolicy.MCPPolicy, error) {
+) (mcppolicy.MCPPolicy, error) {
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
 		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
-		return mcpPolicy.MCPPolicy{}, err
+		return mcppolicy.MCPPolicy{}, err
 	}
 	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
-		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Artifact %q is not an MCP Policy",
 			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,

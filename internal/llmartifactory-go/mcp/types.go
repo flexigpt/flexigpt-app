@@ -3,13 +3,13 @@ package mcp
 import (
 	"context"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 type ListServersRequest struct {
@@ -118,7 +118,7 @@ type ServerRead struct {
 
 type PolicyView struct {
 	Artifact artifactModel.Artifact `json:"artifact"`
-	Body     mcpPolicy.MCPPolicy    `json:"body"`
+	Body     mcppolicy.MCPPolicy    `json:"body"`
 	BuiltIn  bool                   `json:"builtIn"`
 }
 
@@ -127,7 +127,7 @@ type ManagedMCPPolicyUpsertRequest struct {
 	ExpectedPluginRevision uint64                    `json:"expectedPluginRevision"`
 	Name                   spec.LogicalName          `json:"name"`
 	Description            string                    `json:"description,omitempty"`
-	Policy                 mcpPolicy.MCPPolicy       `json:"policy"`
+	Policy                 mcppolicy.MCPPolicy       `json:"policy"`
 	Enabled                bool                      `json:"enabled"`
 }
 

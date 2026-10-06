@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
@@ -16,6 +15,7 @@ import (
 	policyMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/policy"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 func (a *Service) SaveMCPPolicy(
@@ -239,7 +239,7 @@ func (a *Service) DeleteMCPPolicy(
 func (a *Service) policyBodyForResolvedArtifact(
 	ctx context.Context,
 	resolved resourceModel.ResolvedArtifact,
-) (mcpPolicy.MCPPolicy, error) {
+) (mcppolicy.MCPPolicy, error) {
 	_ = ctx
 	return policyMCPDomain.BodyFromDefinition(resolved.Definition)
 }

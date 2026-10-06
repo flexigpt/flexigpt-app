@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const (
@@ -1734,7 +1734,7 @@ func cloneRuntimeConfig(input mcpServer.RuntimeConfig) mcpServer.RuntimeConfig {
 		value.Prompts = append([]string(nil), input.Include.Prompts...)
 		output.Include = &value
 	}
-	output.Policy = mcpPolicy.Clone(input.Policy)
+	output.Policy = mcppolicy.Clone(input.Policy)
 	output.SensitiveValues = append([]string(nil), input.SensitiveValues...)
 	return output
 }

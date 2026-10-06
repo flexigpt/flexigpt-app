@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog/inferenceadapter"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -17,6 +16,7 @@ import (
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 type mcpAggregateRuntime interface {
@@ -73,7 +73,7 @@ type MCPAggregateWrapper struct {
 
 type MCPServerDetails struct {
 	Settings      mcpAPI.ServerInstallationView      `json:"settings"`
-	Policy        mcpPolicy.Effective                `json:"policy"`
+	Policy        mcppolicy.Effective                `json:"policy"`
 	Authorization mcpAuth.MCPAuthHealth              `json:"authorization"`
 	Connection    mcpServer.MCPServerRuntimeSnapshot `json:"connection"`
 }

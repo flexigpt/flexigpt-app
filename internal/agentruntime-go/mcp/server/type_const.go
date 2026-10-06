@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 var (
@@ -173,8 +173,8 @@ type MCPToolCapability struct {
 	Annotations  *MCPToolAnnotations `json:"annotations,omitempty"`
 	InferredRisk MCPToolRisk         `json:"inferredRisk"`
 
-	ApprovalRule  mcpPolicy.MCPApprovalRule  `json:"approvalRule"`
-	ExecutionMode mcpPolicy.MCPExecutionMode `json:"executionMode"`
+	ApprovalRule  mcppolicy.MCPApprovalRule  `json:"approvalRule"`
+	ExecutionMode mcppolicy.MCPExecutionMode `json:"executionMode"`
 
 	TaskSupport MCPTaskSupport `json:"taskSupport"`
 

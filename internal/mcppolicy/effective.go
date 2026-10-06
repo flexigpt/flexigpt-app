@@ -1,4 +1,4 @@
-package policy
+package mcppolicy
 
 import (
 	"encoding/json"

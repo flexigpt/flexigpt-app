@@ -15,9 +15,9 @@ import (
 
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const mcpContextInputID = "mcp-context"
@@ -661,8 +661,8 @@ func constrainSelectedTool(
 	output := tool
 
 	if selection.ApprovalRule != nil {
-		if mcpPolicy.ApprovalRuleRank(*selection.ApprovalRule) <
-			mcpPolicy.ApprovalRuleRank(mcpPolicy.NormalizedApprovalRule(tool.ApprovalRule)) {
+		if mcppolicy.ApprovalRuleRank(*selection.ApprovalRule) <
+			mcppolicy.ApprovalRuleRank(mcppolicy.NormalizedApprovalRule(tool.ApprovalRule)) {
 			return mcpServer.MCPToolCapability{}, errors.New(
 				"conversation approval override weakens effective policy",
 			)
@@ -671,8 +671,8 @@ func constrainSelectedTool(
 	}
 
 	if selection.ExecutionMode != nil {
-		if mcpPolicy.ExecutionModeRank(*selection.ExecutionMode) <
-			mcpPolicy.ExecutionModeRank(mcpPolicy.NormalizedExecutionMode(tool.ExecutionMode)) {
+		if mcppolicy.ExecutionModeRank(*selection.ExecutionMode) <
+			mcppolicy.ExecutionModeRank(mcppolicy.NormalizedExecutionMode(tool.ExecutionMode)) {
 			return mcpServer.MCPToolCapability{}, errors.New(
 				"conversation execution override weakens effective policy",
 			)

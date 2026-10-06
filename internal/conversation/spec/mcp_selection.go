@@ -7,9 +7,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 type MCPAppModelContextUpdate struct {
@@ -36,8 +36,8 @@ type MCPToolSelection struct {
 	ChoiceID         string             `json:"choiceID,omitempty"`
 	Digest           string             `json:"digest,omitempty"`
 
-	ApprovalRule  *mcpPolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode *mcpPolicy.MCPExecutionMode `json:"executionMode,omitempty"`
+	ApprovalRule  *mcppolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode *mcppolicy.MCPExecutionMode `json:"executionMode,omitempty"`
 
 	AppResourceURI string   `json:"appResourceUri,omitempty"`
 	Visibility     []string `json:"visibility,omitempty"`
@@ -122,8 +122,8 @@ type MCPProviderToolMapping struct {
 	ToolName   string `json:"toolName"`
 	ToolDigest string `json:"toolDigest"`
 
-	ApprovalRule   mcpPolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode  mcpPolicy.MCPExecutionMode `json:"executionMode,omitempty"`
+	ApprovalRule   mcppolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  mcppolicy.MCPExecutionMode `json:"executionMode,omitempty"`
 	AppResourceURI string                     `json:"appResourceUri,omitempty"`
 	Visibility     []string                   `json:"visibility,omitempty"`
 }
@@ -211,16 +211,16 @@ func (value MCPProviderToolMapping) validateAgainst(
 		)
 	}
 	if selection.ApprovalRule != nil &&
-		mcpPolicy.ApprovalRuleRank(value.ApprovalRule) <
-			mcpPolicy.ApprovalRuleRank(*selection.ApprovalRule) {
+		mcppolicy.ApprovalRuleRank(value.ApprovalRule) <
+			mcppolicy.ApprovalRuleRank(*selection.ApprovalRule) {
 		return fmt.Errorf(
 			"%w: mapped MCP approval rule weakens conversation policy",
 			mcpServer.ErrInvalid,
 		)
 	}
 	if selection.ExecutionMode != nil &&
-		mcpPolicy.ExecutionModeRank(value.ExecutionMode) <
-			mcpPolicy.ExecutionModeRank(*selection.ExecutionMode) {
+		mcppolicy.ExecutionModeRank(value.ExecutionMode) <
+			mcppolicy.ExecutionModeRank(*selection.ExecutionMode) {
 		return fmt.Errorf(
 			"%w: mapped MCP execution mode weakens conversation policy",
 			mcpServer.ErrInvalid,

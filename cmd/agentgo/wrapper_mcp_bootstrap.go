@@ -8,7 +8,6 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/sdkclient"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
@@ -29,6 +28,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const (
@@ -100,7 +100,7 @@ func initMCPWrappers(
 		definitions,
 		overlays,
 		secrets,
-		mcpPolicy.Baseline(),
+		mcppolicy.Baseline(),
 		mcpAPI.WithCompositionResolver(resolver),
 	)
 	if err != nil {

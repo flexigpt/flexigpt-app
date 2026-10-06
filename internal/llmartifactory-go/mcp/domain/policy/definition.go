@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 func BodyFromDefinition(
 	input definitionModel.Definition,
-) (mcpPolicy.MCPPolicy, error) {
+) (mcppolicy.MCPPolicy, error) {
 	if input.Kind != mcpDomain.MCPPolicyArtifactKind ||
 		input.SchemaID != mcppolicyv1.MCPPolicySchemaKey.SchemaID ||
 		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {
-		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
 			spec.ErrInvalid,
 		)
@@ -26,7 +26,7 @@ func BodyFromDefinition(
 
 	document, err := mcppolicyv1.DecodeAdmittedMCPPolicyJSON(input.Body)
 	if err != nil {
-		return mcpPolicy.MCPPolicy{}, err
+		return mcppolicy.MCPPolicy{}, err
 	}
 	return BodyFromDocument(document)
 }
@@ -35,7 +35,7 @@ func BodyFromDefinition(
 // the normalized MCP runtime policy spec.
 func BodyFromDocument(
 	document mcppolicyv1.MCPPolicyDocument,
-) (mcpPolicy.MCPPolicy, error) {
+) (mcppolicy.MCPPolicy, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		struct {
 			TrustLevel    string                                             `json:"trustLevel,omitempty"`
@@ -51,19 +51,19 @@ func BodyFromDocument(
 		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
-		return mcpPolicy.MCPPolicy{}, err
+		return mcppolicy.MCPPolicy{}, err
 	}
-	var body mcpPolicy.MCPPolicy
+	var body mcppolicy.MCPPolicy
 	if err := json.Unmarshal(raw, &body); err != nil {
-		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: decode MCP Policy body: %w",
 			spec.ErrInvalid,
 			err,
 		)
 	}
-	body = mcpPolicy.Normalize(body)
+	body = mcppolicy.Normalize(body)
 	if err := body.Validate(); err != nil {
-		return mcpPolicy.MCPPolicy{}, err
+		return mcppolicy.MCPPolicy{}, err
 	}
 	return body, nil
 }
@@ -92,7 +92,7 @@ func DefinitionForDocument(
 func DocumentFromPolicy(
 	name spec.LogicalName,
 	description string,
-	body mcpPolicy.MCPPolicy,
+	body mcppolicy.MCPPolicy,
 ) (mcppolicyv1.MCPPolicyDocument, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		body,

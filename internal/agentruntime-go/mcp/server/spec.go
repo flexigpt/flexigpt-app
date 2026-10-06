@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 var (
@@ -164,7 +164,7 @@ type RuntimeConfig struct {
 	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
-	Policy  mcpPolicy.MCPPolicy
+	Policy  mcppolicy.MCPPolicy
 	Include *MCPInclude
 
 	SensitiveValues []string

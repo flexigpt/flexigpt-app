@@ -17,8 +17,8 @@ import (
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const (
@@ -304,7 +304,7 @@ func newStreamableHTTPClient(headers map[string]string) *http.Client {
 // buildClientCapabilities returns the client capability set advertised on
 // MCP initialize. FlexiGPT does not advertise roots, sampling, or elicitation.
 func buildClientCapabilities(
-	p mcpPolicy.MCPAppsPolicy,
+	p mcppolicy.MCPAppsPolicy,
 ) *mcpSDK.ClientCapabilities {
 	c := &mcpSDK.ClientCapabilities{}
 	if p.Enabled {

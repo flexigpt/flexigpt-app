@@ -8,15 +8,15 @@ import (
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 const (
-	toolDigestChangedReason = mcpPolicy.ToolDigestChangedReason
+	toolDigestChangedReason = mcppolicy.ToolDigestChangedReason
 	toolPolicyDeniesReason  = "server/tool policy denies this tool"
 	policyAllowedReason     = "policy allowed"
 )
@@ -462,7 +462,7 @@ func applyMappedPolicyConstraints(
 ) (mcpServer.RuntimeConfig, error) {
 	currentApproval, currentExecution := currentToolConstraints(config, tool)
 
-	effective, err := mcpPolicy.TightenToolPolicy(
+	effective, err := mcppolicy.TightenToolPolicy(
 		config.Policy,
 		tool.ToolName,
 		currentApproval,
@@ -486,8 +486,8 @@ func applyMappedPolicyConstraints(
 func currentToolConstraints(
 	config mcpServer.RuntimeConfig,
 	tool mcpServer.MCPToolCapability,
-) (mcpPolicy.MCPApprovalRule, mcpPolicy.MCPExecutionMode) {
-	return mcpPolicy.EffectiveToolConstraints(
+) (mcppolicy.MCPApprovalRule, mcppolicy.MCPExecutionMode) {
+	return mcppolicy.EffectiveToolConstraints(
 		config.Policy,
 		tool.ToolName,
 		tool.ApprovalRule,
@@ -503,9 +503,9 @@ func evaluateTool(
 	approvalRule, executionMode := currentToolConstraints(config, tool)
 	override := config.Policy.ToolPolicies[tool.ToolName]
 
-	outcome := mcpPolicy.EvaluateTool(
+	outcome := mcppolicy.EvaluateTool(
 		config.Policy,
-		mcpPolicy.ToolEvaluationInput{
+		mcppolicy.ToolEvaluationInput{
 			Enabled:             tool.Enabled,
 			TaskSupportRequired: tool.TaskSupport == mcpServer.MCPTaskSupportRequired,
 			ToolDigest:          tool.Digest,
@@ -521,9 +521,9 @@ func evaluateTool(
 
 	decision := mcpServer.MCPApprovalDecisionDenied
 	switch outcome.Decision {
-	case mcpPolicy.ToolDecisionAllowed:
+	case mcppolicy.ToolDecisionAllowed:
 		decision = mcpServer.MCPApprovalDecisionAllowed
-	case mcpPolicy.ToolDecisionApprovalRequired:
+	case mcppolicy.ToolDecisionApprovalRequired:
 		decision = mcpServer.MCPApprovalDecisionApprovalRequired
 	default:
 	}

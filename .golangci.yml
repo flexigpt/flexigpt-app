@@ -409,10 +409,10 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
             - "github.com/flexigpt/agentskills-go"
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
             # Should be removed
             - "github.com/santhosh-tekuri/jsonschema/v6"
             - "github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-            - "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
@@ -516,8 +516,6 @@ linters:
           alias: ${1}Server
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/auth
           alias: ${1}Auth
-        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/policy
-          alias: ${1}Policy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec
           alias: ${1}Spec
 

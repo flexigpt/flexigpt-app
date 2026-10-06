@@ -5,10 +5,10 @@ import (
 	"maps"
 	"slices"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 func runtimeConfig(
@@ -30,10 +30,10 @@ func runtimeConfig(
 		LogicalName:               string(resolved.Document.LogicalName),
 		DisplayName:               resolved.Document.DisplayName,
 		OAuthClientSecretRequired: input.ClientCredentialSecretRequired,
-		Policy: mcpPolicy.MCPPolicy{
+		Policy: mcppolicy.MCPPolicy{
 			TrustLevel:    resolved.Policy.Body.TrustLevel,
 			DefaultPolicy: resolved.Policy.Body.DefaultPolicy,
-			ToolPolicies:  mcpPolicy.Clone(resolved.Policy.Body).ToolPolicies,
+			ToolPolicies:  mcppolicy.Clone(resolved.Policy.Body).ToolPolicies,
 			AppsPolicy:    resolved.Policy.Body.AppsPolicy,
 		},
 		SensitiveValues: slices.Clone(input.SensitiveValues),
