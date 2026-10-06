@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"time"
 
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 // MCPRuntimeWrapper exposes only pure runtime operations. Store and aggregate

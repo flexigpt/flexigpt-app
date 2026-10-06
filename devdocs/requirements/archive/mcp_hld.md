@@ -993,7 +993,7 @@ internal/mcp/session/
 Update:
 
 ```text
-internal/mcp/runtime/
+internal/agentruntime-go/mcp/
   runtime.go
 
 cmd/agentgo/app.go
@@ -1346,7 +1346,7 @@ Do not implement Enterprise-Managed Authorization in this HLD. Keep `internal/mc
 Add:
 
 ```text
-internal/mcp/runtime/
+internal/agentruntime-go/mcp/
   discovery.go
   tools.go
   resources.go
@@ -1887,7 +1887,7 @@ internal/mcp/toolbridge/
 Update:
 
 ```text
-internal/mcp/runtime/tools.go
+internal/agentruntime-go/mcp/tools.go
 cmd/agentgo/wrapper_mcp.go
 ```
 
@@ -2066,7 +2066,7 @@ Update:
 
 ```text
 internal/mcp/session/capabilities.go
-internal/mcp/runtime/resources.go
+internal/agentruntime-go/mcp/resources.go
 internal/mcp/toolbridge/result.go
 cmd/agentgo/wrapper_mcp.go
 ```

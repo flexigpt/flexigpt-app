@@ -3,7 +3,7 @@ package spec
 import (
 	"context"
 
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 // MCPRuntime is the MCP capability consumed by inference preparation and

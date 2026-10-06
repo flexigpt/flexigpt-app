@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 const (

@@ -14,10 +14,10 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const mcpContextInputID = "mcp-context"

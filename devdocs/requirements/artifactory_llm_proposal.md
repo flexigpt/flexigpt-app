@@ -1747,7 +1747,7 @@ The implementation input set for this package is limited to:
   - `internal/model/aggregate/**`
   - `internal/model/inferenceadapter/**`
   - `internal/mcp/aggregate/**`
-  - `internal/mcp/runtime/**`
+  - `internal/agentruntime-go/mcp/**`
   - `internal/workspace/runtime/**`
   - `internal/workspace/conversation/**`
   - `internal/workspace/store/adapter/**`

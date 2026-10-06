@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 )
 
 const mcpGlobalSettingsSchemaVersion = "v1"

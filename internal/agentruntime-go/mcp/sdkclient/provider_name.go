@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 var providerNameUnsafe = regexp.MustCompile(`[^A-Za-z0-9_]`)

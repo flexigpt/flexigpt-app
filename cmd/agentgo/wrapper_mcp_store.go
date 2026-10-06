@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -10,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 )
 
 type MCPSettingsView struct {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"golang.org/x/oauth2"
 )
 

@@ -412,7 +412,7 @@ linters:
             # Should be removed
             - "github.com/santhosh-tekuri/jsonschema/v6"
             - "github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-            - "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
+            - "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
@@ -510,6 +510,16 @@ linters:
           alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/spec
           alias: ${1}Spec
+        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/apps
+          alias: ${1}Apps
+        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/connection
+          alias: ${1}Connection
+        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/server
+          alias: ${1}Server
+        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/auth
+          alias: ${1}Auth
+        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/policy
+          alias: ${1}Policy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts
           alias: ${1}Consts
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec
@@ -518,20 +528,10 @@ linters:
           alias: ${1}Schema
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store
           alias: ${1}Store
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime
-          alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/conversation
           alias: ${1}Conversation
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/apps
-          alias: ${1}Apps
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/connection
-          alias: ${1}Connection
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/server
-          alias: ${1}Server
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/auth
-          alias: ${1}Auth
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/policy
-          alias: ${1}Policy
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime
+          alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
           alias: ${1}Discovery
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/aggregate

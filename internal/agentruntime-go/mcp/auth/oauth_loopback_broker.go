@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 const (

@@ -3,7 +3,7 @@ package connection
 import (
 	"context"
 
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 // PreparedConnection is the runtime-owned result of authorization

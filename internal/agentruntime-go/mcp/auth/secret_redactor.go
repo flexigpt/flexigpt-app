@@ -3,7 +3,7 @@ package auth
 import (
 	"strings"
 
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 )
 
 type SecretRedactor struct {

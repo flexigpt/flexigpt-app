@@ -9,10 +9,10 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
-	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 const (

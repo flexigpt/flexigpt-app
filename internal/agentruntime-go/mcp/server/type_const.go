@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
 var (

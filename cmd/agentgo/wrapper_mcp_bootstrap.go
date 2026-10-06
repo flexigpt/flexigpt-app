@@ -5,6 +5,12 @@ import (
 	"errors"
 	"time"
 
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/sdkclient"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog/inferenceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
@@ -23,12 +29,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/sdkclient"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (

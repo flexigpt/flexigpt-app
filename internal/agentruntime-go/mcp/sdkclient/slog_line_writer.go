@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 )
 
 type slogLineWriter struct {

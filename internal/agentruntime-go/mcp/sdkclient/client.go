@@ -14,11 +14,11 @@ import (
 	mcpSDKAuth "github.com/modelcontextprotocol/go-sdk/auth"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 )
 
 const (

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

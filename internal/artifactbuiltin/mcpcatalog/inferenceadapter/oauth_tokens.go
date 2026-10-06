@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	"golang.org/x/oauth2"
 )
 

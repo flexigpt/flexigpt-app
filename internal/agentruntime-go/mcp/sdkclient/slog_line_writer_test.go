@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 )
 
 func TestSlogLineWriterRedactsStdioSecretAcrossWrites(t *testing.T) {

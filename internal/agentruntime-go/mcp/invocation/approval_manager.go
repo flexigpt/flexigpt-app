@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const defaultApprovalTTL = 5 * time.Minute
