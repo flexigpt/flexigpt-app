@@ -13,7 +13,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -74,7 +74,7 @@ func NewMCPInferenceBridge(rt MCPRuntime) *MCPInferenceBridge {
 }
 
 type MCPCompletionHydrationRequest struct {
-	Context *mcpConversation.MCPConversationContext
+	Context *conversationSpec.MCPConversationContext
 
 	// ExistingToolChoices are parent-created choices. MCP hydration uses them
 	// only to reject duplicate provider names and choice IDs.
@@ -85,7 +85,7 @@ type MCPCompletionHydrationResult struct {
 	SystemPromptParts []string
 	CurrentInputs     []inferenceSpec.InputUnion
 	ToolChoices       []inferenceSpec.ToolChoice
-	ToolMappings      []mcpConversation.MCPProviderToolMapping
+	ToolMappings      []conversationSpec.MCPProviderToolMapping
 
 	DebugDetails map[string]any
 }
@@ -108,7 +108,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		output.DebugDetails = nil
 		return output, nil
 	}
-	if err := mcpConversation.ValidateMCPConversationContext(*request.Context); err != nil {
+	if err := request.Context.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -180,7 +180,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			}
 		}
 
-		if selection.ToolExposure == mcpConversation.MCPToolExposureNone {
+		if selection.ToolExposure == conversationSpec.MCPToolExposureNone {
 			continue
 		}
 
@@ -213,7 +213,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 
-			mapping := mcpConversation.MCPProviderToolMapping{
+			mapping := conversationSpec.MCPProviderToolMapping{
 				Server:           tool.Server,
 				ProviderToolName: tool.ProviderToolName,
 				ChoiceID:         tool.ChoiceID,
@@ -229,7 +229,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 					tool.App.Visibility...,
 				)
 			}
-			if err := mcpConversation.ValidateMCPProviderToolMapping(mapping); err != nil {
+			if err := mapping.Validate(); err != nil {
 				warnings = append(warnings, fmt.Sprintf(
 					"MCP tool %q was skipped because its invocation mapping is invalid: %v",
 					tool.ToolName,
@@ -544,7 +544,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 	if len(output.ToolMappings) != 0 {
 		output.DebugDetails["toolMappings"] = append(
-			[]mcpConversation.MCPProviderToolMapping(nil),
+			[]conversationSpec.MCPProviderToolMapping(nil),
 			output.ToolMappings...,
 		)
 	}
@@ -581,7 +581,7 @@ func (b *MCPInferenceBridge) serverInstructions(
 
 func (b *MCPInferenceBridge) toolsForSelection(
 	ctx context.Context,
-	selection mcpConversation.MCPServerSelection,
+	selection conversationSpec.MCPServerSelection,
 ) (toolList []mcpServer.MCPToolCapability, warnings []string) {
 	status, err := b.runtime.Status(ctx, selection.Server)
 	if err != nil {
@@ -613,7 +613,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 	}
 
 	switch selection.ToolExposure {
-	case mcpConversation.MCPToolExposureAll:
+	case conversationSpec.MCPToolExposureAll:
 		output := make([]mcpServer.MCPToolCapability, 0, len(tools))
 		for _, tool := range tools {
 			if !tool.Enabled ||
@@ -625,7 +625,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		}
 		return output, nil
 
-	case mcpConversation.MCPToolExposureSelected:
+	case conversationSpec.MCPToolExposureSelected:
 		output := make(
 			[]mcpServer.MCPToolCapability,
 			0,
@@ -693,7 +693,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 
 func constrainSelectedTool(
 	tool mcpServer.MCPToolCapability,
-	selection mcpConversation.MCPToolSelection,
+	selection conversationSpec.MCPToolSelection,
 ) (mcpServer.MCPToolCapability, error) {
 	output := tool
 
@@ -905,7 +905,7 @@ func resolveMCPResourceTemplateURI(
 }
 
 func buildMCPAppContextInput(
-	updates []mcpConversation.MCPAppModelContextUpdate,
+	updates []conversationSpec.MCPAppModelContextUpdate,
 ) *inferenceSpec.InputUnion {
 	if len(updates) == 0 {
 		return nil

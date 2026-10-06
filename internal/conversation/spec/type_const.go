@@ -6,8 +6,6 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -53,9 +51,9 @@ type ConversationMessage struct {
 	ToolChoices    []inferenceSpec.ToolChoice `json:"toolChoices,omitempty"`
 	ToolSelections []ToolSelection            `json:"toolSelections,omitempty"`
 
-	MCPContext           *mcpConversation.MCPConversationContext    `json:"mcpContext,omitempty"`
-	MCPToolMappings      []mcpConversation.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
-	MCPAppContextUpdates []mcpConversation.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
+	MCPContext           *MCPConversationContext    `json:"mcpContext,omitempty"`
+	MCPToolMappings      []MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
+	MCPAppContextUpdates []MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
 
 	WorkspaceSelection *WorkspaceConversationSelection `json:"workspaceSelection,omitempty"`
 	WorkspaceUsage     *WorkspaceConversationUsage     `json:"workspaceUsage,omitempty"`

@@ -19,8 +19,6 @@ import (
 	"github.com/flexigpt/mapstore-go/ftsengine"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
-
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 )
 
 type ConversationCollection struct {
@@ -459,23 +457,19 @@ func validateConversationV1(value *conversationSpec.Conversation) error {
 			return err
 		}
 		if message.MCPContext != nil {
-			if err := mcpConversation.ValidateMCPConversationContext(
-				*message.MCPContext,
-			); err != nil {
+			if err := message.MCPContext.Validate(); err != nil {
 				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
 			}
 		}
 		if len(message.MCPToolMappings) != 0 && message.MCPContext != nil {
-			if err := mcpConversation.ValidateMCPProviderToolMappingsForContext(
-				*message.MCPContext,
+			if err := message.MCPContext.ValidateProviderToolMappings(
 				message.MCPToolMappings,
 			); err != nil {
 				return fmt.Errorf("messages[%d].mcpToolMappings: %w", index, err)
 			}
 		}
 		if len(message.MCPAppContextUpdates) != 0 && message.MCPContext != nil {
-			if err := mcpConversation.ValidateMCPAppContextUpdatesForContext(
-				*message.MCPContext,
+			if err := message.MCPContext.ValidateAppContextUpdates(
 				message.MCPAppContextUpdates,
 			); err != nil {
 				return fmt.Errorf("messages[%d].mcpAppContextUpdates: %w", index, err)

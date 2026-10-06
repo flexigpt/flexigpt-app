@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
+
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -119,7 +120,7 @@ func (b *ToolBridge) Evaluate(
 // discovered digest, and any conversation policy tightening.
 func (b *ToolBridge) EvaluateMapped(
 	ctx context.Context,
-	mapping mcpConversation.MCPProviderToolMapping,
+	mapping conversationSpec.MCPProviderToolMapping,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (*mcpServer.MCPApprovalEvaluation, error) {
 	config, tool, normalized, err := b.mappedDryRun(
@@ -168,7 +169,7 @@ func (b *ToolBridge) EvaluateMapped(
 // connected runtime snapshot and applying only policy-tightening constraints.
 func (b *ToolBridge) InvokeMapped(
 	ctx context.Context,
-	mapping mcpConversation.MCPProviderToolMapping,
+	mapping conversationSpec.MCPProviderToolMapping,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (*mcpServer.InvokeMCPToolResponseBody, error) {
 	config, tool, normalized, err := b.mappedDryRun(
@@ -329,7 +330,7 @@ func (b *ToolBridge) Invoke(
 
 func (b *ToolBridge) mappedDryRun(
 	ctx context.Context,
-	mapping mcpConversation.MCPProviderToolMapping,
+	mapping conversationSpec.MCPProviderToolMapping,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (
 	config mcpServer.RuntimeConfig,
@@ -400,10 +401,10 @@ func (b *ToolBridge) mappedDryRun(
 }
 
 func normalizeMappedToolRequest(
-	mapping mcpConversation.MCPProviderToolMapping,
+	mapping conversationSpec.MCPProviderToolMapping,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (mcpServer.InvokeMCPToolRequestBody, error) {
-	if err := mcpConversation.ValidateMCPProviderToolMapping(mapping); err != nil {
+	if err := mapping.Validate(); err != nil {
 		return mcpServer.InvokeMCPToolRequestBody{}, err
 	}
 
@@ -457,7 +458,7 @@ func normalizeMappedToolRequest(
 func applyMappedPolicyConstraints(
 	config mcpServer.RuntimeConfig,
 	tool mcpServer.MCPToolCapability,
-	mapping mcpConversation.MCPProviderToolMapping,
+	mapping conversationSpec.MCPProviderToolMapping,
 ) (mcpServer.RuntimeConfig, error) {
 	currentApproval, currentExecution := currentToolConstraints(config, tool)
 

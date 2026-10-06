@@ -4,7 +4,6 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 )
 
 type AddProviderRequestBody struct {
@@ -42,11 +41,11 @@ type SetProviderAPIKeyResponse struct{}
 type CompletionRequest struct {
 	Runtime *RuntimeModel `json:"-"`
 
-	History        []conversationSpec.ConversationMessage  `json:"-"`
-	Current        conversationSpec.ConversationMessage    `json:"-"`
-	ToolSelections []conversationSpec.ToolSelection        `json:"-"`
-	MCPContext     *mcpConversation.MCPConversationContext `json:"-"`
-	SkillSessionID string                                  `json:"-"`
+	History        []conversationSpec.ConversationMessage   `json:"-"`
+	Current        conversationSpec.ConversationMessage     `json:"-"`
+	ToolSelections []conversationSpec.ToolSelection         `json:"-"`
+	MCPContext     *conversationSpec.MCPConversationContext `json:"-"`
+	SkillSessionID string                                   `json:"-"`
 
 	OnStreamText     func(text string) error     `json:"-"`
 	OnStreamThinking func(thinking string) error `json:"-"`
@@ -60,7 +59,7 @@ type CompletionResponseBody struct {
 	// user turn before a later provider-tool call is routed through
 	// InvokeMappedMCPTool. Conversation storage validates the mappings against
 	// that turn's MCPContext.
-	MCPToolMappings []mcpConversation.MCPProviderToolMapping     `json:"mcpToolMappings,omitempty"`
+	MCPToolMappings []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
 	WorkspaceUsage  *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
 }
 

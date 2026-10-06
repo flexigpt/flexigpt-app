@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
@@ -73,8 +72,8 @@ type CompletionRequestBody struct {
 	// (Those are persisted for UI/analytics only.)
 	ToolSelections []conversationSpec.ToolSelection `json:"toolSelections,omitempty"`
 
-	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
-	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
+	MCPContext     *conversationSpec.MCPConversationContext `json:"mcpContext,omitempty"`
+	SkillSessionID string                                   `json:"skillSessionID,omitempty"`
 }
 
 func InitCompletionWrapper(
