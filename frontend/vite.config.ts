@@ -64,6 +64,10 @@ export default defineConfig(({ mode }) => {
 	return {
 		// App-wide global settings remain at the top level
 		envDir: false,
+		server: {
+			port: 5173,
+			strictPort: true,
+		},
 		plugins: [reactRouter(), tailwindcss()],
 		resolve: {
 			tsconfigPaths: true,

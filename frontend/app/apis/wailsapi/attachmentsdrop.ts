@@ -13,6 +13,7 @@ import { MAX_DIRECTORY_FILES_TO_SCAN } from '@/chats/composer/attachments/attach
 type DropTarget = (payload: AttachmentsDroppedPayload) => void;
 
 const FILE_DROP_EVENT = 'wails:file-drop';
+const nativeFileDropSupported = import.meta.env.VITE_WAILS_NATIVE_FILE_DROP !== 'disabled';
 
 let inited = false;
 let listenerUsers = 0;
@@ -95,6 +96,10 @@ function initWailsDropListener(): () => void {
 
 export class WailsAttachmentsDropAPI implements IAttachmentsDropAPI {
 	startListener(): () => void {
+		if (!nativeFileDropSupported) {
+			return () => undefined;
+		}
+
 		return initWailsDropListener();
 	}
 

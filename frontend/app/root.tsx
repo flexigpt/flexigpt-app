@@ -32,6 +32,8 @@ import '@/globals.css';
 
 import type { Route } from './+types/root';
 
+const manualInjectWailsRuntime = IS_WAILS_PLATFORM && import.meta.env.VITE_WAILS_RUNTIME_INJECTION !== 'auto';
+
 export function CustomThemeProvider({ children }: { children: ReactNode }) {
 	const startup: AppTheme = (() => {
 		try {
@@ -65,7 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				{IS_WAILS_PLATFORM && (
+				{manualInjectWailsRuntime && (
 					<>
 						<meta name="wails-options" content="noautoinject" />
 						<script src="/wails/ipc.js" />
