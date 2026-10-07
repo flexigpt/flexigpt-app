@@ -69,7 +69,7 @@ func (a *RuntimeAdapter) ResolveRuntimeConfiguration(
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
-	resolved, err := a.store.Models.Capabilities.Resolve(ctx, request.Model)
+	resolved, err := a.store.ResolveModel(ctx, request.Model)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -99,7 +99,7 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 		)
 	}
 
-	resolved, err := a.store.Models.Capabilities.Resolve(ctx, *target.Artifact)
+	resolved, err := a.store.ResolveModel(ctx, *target.Artifact)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -119,7 +119,7 @@ func (a *RuntimeAdapter) ResolveProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (inferenceSpec.ProviderParam, error) {
-	resolved, err := a.store.Providers.Capabilities.Resolve(ctx, ref)
+	resolved, err := a.store.ResolveProvider(ctx, ref)
 	if err != nil {
 		return inferenceSpec.ProviderParam{}, err
 	}

@@ -16,6 +16,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
@@ -67,6 +68,7 @@ type ResolvedSkill struct {
 func ResolveAll(
 	ctx context.Context,
 	resources ResourceReader,
+	documents support.Documents,
 	records []artifactModel.Artifact,
 ) ([]ResolvedSkill, error) {
 	if resources == nil {
@@ -74,6 +76,9 @@ func ResolveAll(
 			"%w: Skill materializer ResourceReader is nil",
 			spec.ErrInvalid,
 		)
+	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
 	}
 	if len(records) == 0 {
 		return []ResolvedSkill{}, nil
@@ -85,9 +90,10 @@ func ResolveAll(
 		func(sessionCtx context.Context) ([]ResolvedSkill, error) {
 			output := make([]ResolvedSkill, 0, len(records))
 			for _, record := range records {
-				value, err := Resolve(
+				value, err := resolve(
 					sessionCtx,
 					resources,
+					documents,
 					record,
 				)
 				if err != nil {
@@ -103,6 +109,7 @@ func ResolveAll(
 func Resolve(
 	ctx context.Context,
 	resources ResourceReader,
+	documents support.Documents,
 	record artifactModel.Artifact,
 ) (ResolvedSkill, error) {
 	if resources == nil {
@@ -111,6 +118,18 @@ func Resolve(
 			spec.ErrInvalid,
 		)
 	}
+	if err := documents.Validate(); err != nil {
+		return ResolvedSkill{}, err
+	}
+	return resolve(ctx, resources, documents, record)
+}
+
+func resolve(
+	ctx context.Context,
+	resources ResourceReader,
+	documents support.Documents,
+	record artifactModel.Artifact,
+) (ResolvedSkill, error) {
 	if !skillSource.IsSkillKind(record.Kind) ||
 		record.State != artifactModel.StateAvailable ||
 		record.ResolvedDefinition == nil ||
@@ -147,6 +166,7 @@ func Resolve(
 		return ResolvedSkill{}, err
 	}
 	documentLocator, err := skillSource.SourceDocumentLocator(
+		documents,
 		declarationValue.Locator,
 		resolved.Artifact.Binding.Locator,
 	)

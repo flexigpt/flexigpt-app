@@ -1,20 +1,8 @@
 package llmartifactory
 
-// Close releases only LLM-owned in-memory registrations. It intentionally
-// does not close the borrowed generic Artifact Store or any provider resource.
+// Close intentionally does not close the borrowed generic Artifact Store or
+// provider resources. LLM Artifactory owns no independently closable resource;
+// deployment shutdown owns the generic Store after all consumers stop.
 func (a *Artifactory) Close() error {
-	if a == nil {
-		return nil
-	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.closed {
-		return nil
-	}
-	a.closed = true
-	a.interpretations = nil
-	a.composition = nil
 	return nil
 }

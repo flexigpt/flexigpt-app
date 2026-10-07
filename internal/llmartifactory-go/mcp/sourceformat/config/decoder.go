@@ -7,14 +7,20 @@ import (
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
-type Decoder struct{}
+type Decoder struct {
+	candidates support.Candidates
+}
 
-func NewDecoder() *Decoder {
-	return &Decoder{}
+func NewDecoder(
+	candidates support.Candidates,
+) *Decoder {
+	return &Decoder{
+		candidates: candidates.Clone(),
+	}
 }
 
 func (*Decoder) ID() spec.DecoderID {
@@ -25,7 +31,7 @@ func (*Decoder) Revision() string {
 	return "mcp-source-decoder-v1"
 }
 
-func (*Decoder) Recognize(
+func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
@@ -34,22 +40,11 @@ func (*Decoder) Recognize(
 		return ingestModel.RecognitionPreferred
 	case IsMCPConfig(candidate.Content):
 		return ingestModel.RecognitionPreferred
-	case isMCPConfigCandidate(candidate):
+	case d.isMCPConfigCandidate(candidate):
 		return ingestModel.RecognitionPossible
 	default:
 		return ingestModel.RecognitionNone
 	}
-}
-
-func isMCPConfigCandidate(
-	candidate ingestModel.Candidate,
-) bool {
-	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
-		return true
-	}
-	return topology.IsMCPConfigDocument(
-		candidate.Locator,
-	)
 }
 
 func (d *Decoder) Decode(
@@ -76,7 +71,7 @@ func (d *Decoder) Decode(
 		}
 		return decodedValues(values), nil
 
-	case isMCPConfigCandidate(candidate):
+	case d.isMCPConfigCandidate(candidate):
 		return nil, decoderError(
 			candidate.Locator,
 			"",
@@ -88,6 +83,15 @@ func (d *Decoder) Decode(
 
 	}
 	return nil, nil
+}
+
+func (d *Decoder) isMCPConfigCandidate(
+	candidate ingestModel.Candidate,
+) bool {
+	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
+		return true
+	}
+	return d.candidates.Matches(candidate.Locator)
 }
 
 func decodedValues(

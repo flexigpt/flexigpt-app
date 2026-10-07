@@ -2,46 +2,33 @@ package plugin
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"slices"
-	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
-)
-
-const (
-	SkillManagedPluginSourceStorageKey spec.StorageKey = "user-skills"
-	MCPManagedPluginSourceStorageKey   spec.StorageKey = "user-mcps"
-
-	SkillBaselinePluginName spec.LogicalName = "skill-baseline"
-	MCPBaselinePluginName   spec.LogicalName = "mcp-baseline"
 )
 
 // Profile is supplied by the owning family. Plugin owns enforcement of the
 // profile at managed Plugin boundaries but does not invent Agent, Skill, MCP,
 // or Tool membership policy itself.
 type Profile struct {
-	Name                string
-	SourceStorageKey    spec.StorageKey
-	SourceDisplayName   string
+	Name        string
+	BuiltinRoot rootModel.RootID
+	Source      *support.SourceProfile
+	Package     support.PackageLayout
+
 	BaselineName        spec.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
-	PackageKind         managedpackageModel.PackageKind
-	DocumentUse         string
 	MembershipPolicy    pluginDomain.MembershipPolicy
 
 	// ReadOnly prohibits declaration authoring and baseline provisioning.
@@ -54,6 +41,24 @@ type Profile struct {
 	ValidateDocument func(pluginv1.PluginDocument) error
 }
 
+func (p Profile) Clone() Profile {
+	output := p
+	if p.Source != nil {
+		source := *p.Source
+		source.Config = append([]byte(nil), p.Source.Config...)
+		output.Source = &source
+	}
+	output.MembershipPolicy.AllowedTypes = append(
+		[]declaration.Type(nil),
+		p.MembershipPolicy.AllowedTypes...,
+	)
+	output.MembershipPolicy.AllowedForms = append(
+		[]declaration.MemberForm(nil),
+		p.MembershipPolicy.AllowedForms...,
+	)
+	return output
+}
+
 func (p Profile) Validate() error {
 	if err := spec.ValidateIdentifier(
 		"Plugin family profile name",
@@ -62,40 +67,26 @@ func (p Profile) Validate() error {
 	); err != nil {
 		return err
 	}
+	if err := p.BuiltinRoot.Validate(); err != nil {
+		return err
+	}
+	if err := p.Package.Validate(); err != nil {
+		return err
+	}
 	if err := p.validateAuthoringConfiguration(); err != nil {
 		return err
-	}
-	if err := p.managedPluginPackageKind().Validate(); err != nil {
-		return err
-	}
-	documentFile, err := topology.DefaultDocumentFile(
-		p.managedPluginDocumentUse(),
-	)
-	if err != nil {
-		return err
-	}
-	if err := documentFile.ValidatePortable(false); err != nil {
-		return err
-	}
-	if path.Base(string(documentFile)) != string(documentFile) {
-		return fmt.Errorf(
-			"%w: plugin domain document file must be a package-root file",
-			spec.ErrInvalid,
-		)
-	}
-	switch strings.ToLower(path.Ext(string(documentFile))) {
-	case ".json", ".yaml", ".yml":
-	default:
-		return fmt.Errorf(
-			"%w: plugin domain document file %q has an unsupported extension",
-			spec.ErrInvalid,
-			documentFile,
-		)
 	}
 	if err := p.MembershipPolicy.Validate(); err != nil {
 		return fmt.Errorf("plugin membership policy: %w", err)
 	}
 	return nil
+}
+
+func (p Profile) managedPluginBaselineDisplayName() string {
+	if p.BaselineDisplayName != "" {
+		return p.BaselineDisplayName
+	}
+	return string(p.BaselineName)
 }
 
 func (p Profile) allowsMemberForm(
@@ -118,27 +109,6 @@ func (p Profile) allows(
 		p.MembershipPolicy.AllowedTypes,
 		value,
 	)
-}
-
-func (p Profile) managedPluginPackageKind() managedpackageModel.PackageKind {
-	if p.PackageKind != "" {
-		return p.PackageKind
-	}
-	return ManagedPluginPackageKind
-}
-
-func (p Profile) managedPluginDocumentUse() string {
-	if p.DocumentUse != "" {
-		return p.DocumentUse
-	}
-	return topology.DocumentUseManagedPlugin
-}
-
-func (p Profile) managedPluginBaselineDisplayName() string {
-	if p.BaselineDisplayName != "" {
-		return p.BaselineDisplayName
-	}
-	return string(p.BaselineName)
 }
 
 func (a *API) EnsureBaseline(
@@ -261,8 +231,7 @@ func (a *API) domainManagedSource(
 		if err != nil {
 			return sourceModel.Summary{}, err
 		}
-		if value.Kind != managedfs.Kind ||
-			value.StorageKey != a.domain.SourceStorageKey {
+		if !a.domain.Source.Matches(value) {
 			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Plugin belongs to another managed domain Source",
 				spec.ErrUnsupported,
@@ -277,23 +246,11 @@ func (a *API) domainManagedSource(
 		return value, nil
 	}
 
-	value, _, err := a.sources.Ensure(
-		ctx,
-		rootID,
-		sourceModel.Draft{
-			ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  a.domain.SourceStorageKey,
-			Kind:        managedfs.Kind,
-			DisplayName: a.domain.SourceDisplayName,
-			Enabled:     true,
-			Config:      json.RawMessage(`{}`),
-			Discovery:   sourceModel.DiscoverySpec{},
-		},
-	)
+	value, _, err := a.sources.Ensure(ctx, rootID, a.domain.Source.Draft(sourceModel.SourceID(uuidutil.NewUUIDv7())))
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	if value.Enabled && value.DisplayName == a.domain.SourceDisplayName {
+	if value.Enabled && a.domain.Source.Matches(value) {
 		return value, nil
 	}
 	return a.sources.Update(
@@ -302,7 +259,7 @@ func (a *API) domainManagedSource(
 		value.ID,
 		sourceModel.Update{
 			ExpectedRevision: value.Revision,
-			DisplayName:      a.domain.SourceDisplayName,
+			DisplayName:      a.domain.Source.DisplayName,
 			Enabled:          true,
 		},
 	)
@@ -389,19 +346,13 @@ func (a *API) isBaselinePlugin(
 	record artifactModel.Artifact,
 	sourceValue sourceModel.Summary,
 ) bool {
-	if a == nil || a.domain == nil {
-		return IsBaselinePluginArtifactForSource(
-			record,
-			sourceValue,
-		)
-	}
 	if a.domain.ReadOnly ||
 		record.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
 		record.RootID != sourceValue.RootID ||
 		record.Binding.SourceID != sourceValue.ID ||
 		record.Binding.SubresourceLocator != "" ||
-		sourceValue.Kind != managedfs.Kind ||
-		sourceValue.StorageKey != a.domain.SourceStorageKey {
+		a.domain.Source == nil ||
+		!a.domain.Source.Matches(sourceValue) {
 		return false
 	}
 
@@ -413,48 +364,6 @@ func (a *API) isBaselinePlugin(
 	}
 	return record.LogicalName == a.domain.BaselineName &&
 		address.Name == a.domain.BaselineName
-}
-
-func IsBaselinePluginArtifact(
-	value artifactModel.Artifact,
-) bool {
-	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
-		return false
-	}
-	address, err := managedPluginAddressFromLocator(
-		value.Binding.Locator,
-	)
-	if err != nil {
-		return false
-	}
-	return (value.LogicalName == SkillBaselinePluginName &&
-		address.Name == SkillBaselinePluginName) ||
-		(value.LogicalName == MCPBaselinePluginName &&
-			address.Name == MCPBaselinePluginName)
-}
-
-func IsBaselinePluginArtifactForSource(
-	value artifactModel.Artifact,
-	sourceValue sourceModel.Summary,
-) bool {
-	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
-		value.RootID != sourceValue.RootID ||
-		value.Binding.SourceID != sourceValue.ID ||
-		sourceValue.Kind != managedfs.Kind {
-		return false
-	}
-	address, err := managedPluginAddressFromLocator(
-		value.Binding.Locator,
-	)
-	if err != nil {
-		return false
-	}
-	return (value.LogicalName == SkillBaselinePluginName &&
-		address.Name == SkillBaselinePluginName &&
-		sourceValue.StorageKey == SkillManagedPluginSourceStorageKey) ||
-		(value.LogicalName == MCPBaselinePluginName &&
-			address.Name == MCPBaselinePluginName &&
-			sourceValue.StorageKey == MCPManagedPluginSourceStorageKey)
 }
 
 func (a *API) readPluginDocument(
@@ -473,8 +382,7 @@ func (a *API) readPluginDocument(
 			record.ID,
 		)
 	}
-	if a.domain != nil &&
-		a.domain.ReadOnly &&
+	if a.domain.ReadOnly &&
 		!a.readOnlyDomainOrigin(record) {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin does not belong to this read-only domain",
@@ -512,10 +420,6 @@ func (a *API) domainPluginVisible(
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 ) (bool, error) {
-	if a.domain == nil {
-		return true, nil
-	}
-
 	sourceValue, err := a.sources.Get(
 		ctx,
 		record.RootID,
@@ -525,13 +429,12 @@ func (a *API) domainPluginVisible(
 		return false, err
 	}
 	if a.domain.ReadOnly {
-		if sourceValue.Kind != managedfs.Kind ||
-			!a.readOnlyDomainOrigin(record) {
+		if !a.readOnlyDomainOrigin(record) {
 			return false, nil
 		}
 		return true, a.validateEditableDomainDocument(document)
 	}
-	if sourceValue.StorageKey == a.domain.SourceStorageKey {
+	if a.domain.Source.Matches(sourceValue) {
 		return true, a.validateEditableDomainDocument(document)
 	}
 	if len(document.Members) == 0 {
@@ -583,10 +486,9 @@ func (a *API) Read(
 		return PluginView{}, err
 	}
 	if record.Binding.SubresourceLocator == "" &&
-		(a.domain == nil || !a.domain.ReadOnly) &&
-		sourceValue.Kind == managedfs.Kind &&
-		(a.domain == nil ||
-			sourceValue.StorageKey == a.domain.SourceStorageKey) {
+		!a.domain.ReadOnly &&
+		a.domain.Source != nil &&
+		a.domain.Source.Matches(sourceValue) {
 		if _, err := a.managedPluginAddressFromLocator(
 			record.Binding.Locator,
 		); err == nil &&

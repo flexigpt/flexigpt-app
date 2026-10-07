@@ -10,6 +10,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
@@ -44,12 +45,17 @@ func initSkillRuntimeWrappers(
 			spec.ErrConflict,
 		)
 	}
+	support, err := llmsupport.Skill()
+	if err != nil {
+		return nil, err
+	}
 
 	adapter, err := skillruntime.NewRuntimeAdapter(
 		artifacts,
 		cat,
 		resources,
 		nativeResources,
+		support.Documents,
 	)
 	if err != nil {
 		return nil, err

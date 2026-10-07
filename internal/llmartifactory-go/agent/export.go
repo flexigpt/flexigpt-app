@@ -53,16 +53,20 @@ func (a *Service) ExportAgent(
 		return AgentExportResult{}, err
 	}
 
+	suggestedFileName, err := a.support.ManagedPackage.Document.NamedFile(record.LogicalName)
+	if err != nil {
+		return AgentExportResult{}, err
+	}
 	return AgentExportResult{
 		Type:              declaration.TypeAgent,
 		Name:              record.LogicalName,
 		MediaType:         "application/yaml",
-		SuggestedFileName: string(record.LogicalName) + ".agent.yaml",
+		SuggestedFileName: suggestedFileName,
 		Content:           string(content),
 		ContentDigest:     cryptoutil.DigestBytes(content),
 		DefinitionDigest:  definitionValue.Digest,
 		ArtifactRevision:  record.Revision,
-		BuiltIn:           record.RootID == agentBuiltinRootID(),
+		BuiltIn:           record.RootID == a.support.BuiltinRoot,
 		Managed:           managed,
 	}, nil
 }

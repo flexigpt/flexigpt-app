@@ -10,42 +10,30 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-// managedAgentImportFormat selects exactly one input parser. The source path
+// ImportFormat selects exactly one input parser. The source path
 // remains transient and is never included in a prepared import payload.
-type managedAgentImportFormat string
-
-const (
-	managedAgentImportFormatJSON managedAgentImportFormat = "json"
-	managedAgentImportFormatYAML managedAgentImportFormat = "yaml"
-)
-
 func managedAgentImportFormatForPath(
 	value string,
-) (managedAgentImportFormat, error) {
-	switch strings.ToLower(filepath.Ext(value)) {
-	case ".json":
-		return managedAgentImportFormatJSON, nil
-	case ".yaml", ".yml":
-		return managedAgentImportFormatYAML, nil
-	default:
-		return "", fmt.Errorf(
-			"%w: managed Agent import accepts .json, .yaml, or .yml files",
-			spec.ErrInvalid,
-		)
+	formats map[string]ImportFormat,
+) (ImportFormat, error) {
+	extension := strings.ToLower(filepath.Ext(value))
+	if format, found := formats[extension]; found {
+		return format, nil
 	}
+	return "", fmt.Errorf("%w: managed Agent import format %q is not supported", spec.ErrInvalid, extension)
 }
 
 func canonicalManagedAgentImportDocument(
-	format managedAgentImportFormat,
+	format ImportFormat,
 	raw []byte,
 ) ([]byte, error) {
 	switch format {
-	case managedAgentImportFormatJSON:
+	case ImportFormatJSON:
 		return jsonutil.CanonicalizeObject(
 			raw,
 			spec.MaxDefinitionBytes,
 		)
-	case managedAgentImportFormatYAML:
+	case ImportFormatYAML:
 		return yamlutil.CanonicalObjectJSON(
 			raw,
 			spec.MaxDefinitionBytes,
@@ -59,11 +47,11 @@ func canonicalManagedAgentImportDocument(
 	}
 }
 
-func (format managedAgentImportFormat) invalidDocumentIssueCode() string {
+func (format ImportFormat) invalidDocumentIssueCode() string {
 	switch format {
-	case managedAgentImportFormatJSON:
+	case ImportFormatJSON:
 		return "agent.import.json-invalid"
-	case managedAgentImportFormatYAML:
+	case ImportFormatYAML:
 		return "agent.import.yaml-invalid"
 	default:
 		return "agent.import.document-invalid"

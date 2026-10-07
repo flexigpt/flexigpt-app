@@ -1,44 +1,28 @@
 package llmartifactory
 
 import (
-	"sync"
-
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
-// Artifactory owns only LLM in-memory composition and interpretation state.
-// Generic Store ownership remains with deployment assembly.
+// Artifactory owns immutable LLM declaration interpretation and composition
+// state attached to an already-open generic Artifact Store.
+//
+// It deliberately exposes only the two shared LLM capabilities required by
+// family construction. It does not mirror generic Store APIs, application
+// topology, runtime adapters, content inventory, or Wails transport.
 type Artifactory struct {
 	interpretations *coreinterpretation.Registry
 	composition     *composition.Resolver
-	mu              sync.RWMutex
-	closed          bool
 }
 
 func (a *Artifactory) Interpretations() *coreinterpretation.Registry {
-	if a == nil {
-		return nil
-	}
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if a.closed {
-		return nil
-	}
 	return a.interpretations
 }
 
-// Composition exposes the one LLM composition owner assembled for this
-// Artifactory attachment. Families consume this shared resolver rather than
-// constructing private graph resolvers.
+// Composition returns the one composition owner assembled for this LLM
+// attachment. Families consume this resolver rather than creating private
+// locator registries or graph resolvers.
 func (a *Artifactory) Composition() *composition.Resolver {
-	if a == nil {
-		return nil
-	}
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if a.closed {
-		return nil
-	}
 	return a.composition
 }

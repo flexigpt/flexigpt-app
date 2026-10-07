@@ -14,13 +14,13 @@ import (
 // SelectDefaultProvider reads Artifact metadata only. Built-in Providers are
 // the fallback pool; selecting a user Provider does not require listing its
 // Root or resolving any Models.
-func (s *ProviderPreferenceService) SelectDefaultProvider(
+func (a *Service) SelectDefaultProvider(
 	ctx context.Context,
 	preferred *artifactModel.ArtifactRef,
 	baseName spec.LogicalName,
 ) (*artifactModel.ArtifactRef, error) {
 	if preferred != nil {
-		record, err := s.owner.artifacts.Get(ctx, *preferred)
+		record, err := a.artifacts.Get(ctx, *preferred)
 		if err != nil {
 			if !errors.Is(err, spec.ErrArtifactNotFound) &&
 				!errors.Is(err, spec.ErrRootNotFound) &&
@@ -40,9 +40,9 @@ func (s *ProviderPreferenceService) SelectDefaultProvider(
 		Kind:    modelDomain.ModelProviderArtifactKind,
 		Enabled: &enabled,
 	}
-	entries, err := s.owner.cat.FindByIdentity(
+	entries, err := a.cat.FindByIdentity(
 		ctx,
-		s.owner.builtinRoot,
+		a.builtinRoot,
 		modelDomain.ModelProviderArtifactKind,
 		baseName,
 		options,
@@ -56,9 +56,9 @@ func (s *ProviderPreferenceService) SelectDefaultProvider(
 
 	// The baseline Provider may be disabled. Respect that choice and inspect
 	// only built-in Provider metadata, not documents, overlays, or Models.
-	entries, err = s.owner.cat.ListByRoot(
+	entries, err = a.cat.ListByRoot(
 		ctx,
-		s.owner.builtinRoot,
+		a.builtinRoot,
 		options,
 	)
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *ProviderPreferenceService) SelectDefaultProvider(
 //
 // A later Provider disablement or credential removal does not alter the saved
 // preference. Default-provider reads retain their normal fallback behavior.
-func (s *ProviderPreferenceService) RequireSettableDefaultProvider(
+func (a *Service) RequireSettableDefaultProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) error {
@@ -81,7 +81,7 @@ func (s *ProviderPreferenceService) RequireSettableDefaultProvider(
 		return err
 	}
 
-	record, err := s.owner.requireKind(
+	record, err := a.requireKind(
 		ctx,
 		ref,
 		modelDomain.ModelProviderArtifactKind,
@@ -97,7 +97,7 @@ func (s *ProviderPreferenceService) RequireSettableDefaultProvider(
 		)
 	}
 
-	credential, found, err := s.owner.overlays.GetProviderCredential(
+	credential, found, err := a.overlays.GetProviderCredential(
 		ctx,
 		ref,
 	)

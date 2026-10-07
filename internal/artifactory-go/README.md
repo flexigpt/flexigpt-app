@@ -763,7 +763,7 @@ Validation is neither “repeat everything everywhere” nor “validate at star
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Construction                  | Required dependencies, valid configuration, namespace policies, and mandatory capability relationships.                                                 |
 | Registration                  | Valid identifiers and revisions, duplicate detection, schema bindings, and dispatch consistency.                                                        |
-| Public operation entry        | Transport/application entrypoints validate request and context shape; constructed internal capabilities assume valid dependencies and non-nil contexts. |
+| Public operation entry        | Transport/application entrypoints validate request shape; constructed internal capabilities assume valid dependencies and non-nil contexts.             |
 | Driver configuration          | Physical configuration validation and normalization.                                                                                                    |
 | Decoder and schema output     | Output shape, canonical representation, identity linkage, digest evidence, and diagnostics.                                                             |
 | Persistence commit            | Current revisions, liveness, uniqueness, references, and immutable-key conflicts.                                                                       |
@@ -774,6 +774,10 @@ After successful construction, private methods may assume mandatory dependencies
 After request validation, private helpers should receive owned normalized values or an operation plan—not repeatedly reinterpret the same raw request.
 
 Expensive admission steps have one owner:
+
+Foreground request cancellation is owned by the transport boundary. Interior
+services inspect contexts only where cancellation is part of a real
+long-running workflow, provider operation, or session-completion contract.
 
 - Source reading and ingestion establish source-content evidence.
 - The schema catalog executes the selected schema.

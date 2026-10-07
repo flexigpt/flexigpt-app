@@ -13,7 +13,7 @@ import (
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
 
-func (a *Service) saveProviderSettings(
+func (a *Service) SaveProviderSettings(
 	ctx context.Context,
 	request SaveProviderSettingsRequest,
 ) (ProviderView, error) {
@@ -119,10 +119,10 @@ func (a *Service) saveProviderSettings(
 		return ProviderView{}, err
 	}
 
-	return a.getProvider(ctx, request.Provider)
+	return a.GetProvider(ctx, request.Provider)
 }
 
-func (a *Service) resetProviderSettings(
+func (a *Service) ResetProviderSettings(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
@@ -159,10 +159,10 @@ func (a *Service) resetProviderSettings(
 		return ProviderView{}, err
 	}
 
-	return a.getProvider(ctx, ref)
+	return a.GetProvider(ctx, ref)
 }
 
-func (a *Service) getProviderAPIKeyStatus(
+func (a *Service) GetProviderAPIKeyStatus(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ProviderAPIKeyStatus, error) {
@@ -197,7 +197,7 @@ func (a *Service) getProviderAPIKeyStatus(
 	return output, nil
 }
 
-func (a *Service) setProviderAPIKey(
+func (a *Service) SetProviderAPIKey(
 	ctx context.Context,
 	request SetProviderAPIKeyRequest,
 ) (ProviderAPIKeyStatus, error) {
@@ -249,10 +249,10 @@ func (a *Service) setProviderAPIKey(
 		return ProviderAPIKeyStatus{}, err
 	}
 
-	return a.getProviderAPIKeyStatus(ctx, request.Provider)
+	return a.GetProviderAPIKeyStatus(ctx, request.Provider)
 }
 
-func (a *Service) clearProviderAPIKey(
+func (a *Service) ClearProviderAPIKey(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
@@ -313,10 +313,10 @@ func (a *Service) clearProviderAPIKey(
 		return ProviderAPIKeyStatus{}, err
 	}
 
-	return a.getProviderAPIKeyStatus(ctx, ref)
+	return a.GetProviderAPIKeyStatus(ctx, ref)
 }
 
-func (a *Service) saveModelSettings(
+func (a *Service) SaveModelSettings(
 	ctx context.Context,
 	request SaveModelSettingsRequest,
 ) (ModelView, error) {
@@ -408,10 +408,10 @@ func (a *Service) saveModelSettings(
 		return ModelView{}, err
 	}
 
-	return a.getModel(ctx, request.Model)
+	return a.GetModel(ctx, request.Model)
 }
 
-func (a *Service) resetModelSettings(
+func (a *Service) ResetModelSettings(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedModelRevision uint64,
@@ -444,7 +444,7 @@ func (a *Service) resetModelSettings(
 		return ModelView{}, err
 	}
 
-	return a.getModel(ctx, ref)
+	return a.GetModel(ctx, ref)
 }
 
 func (a *Service) providerSettings(

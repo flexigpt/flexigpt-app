@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 )
@@ -57,8 +55,8 @@ func (a *Service) ListAgents(
 
 	rootIDs := []rootModel.RootID{request.RootID}
 	if request.IncludeBuiltin &&
-		request.RootID != topology.BuiltinRootID() {
-		rootIDs = append(rootIDs, topology.BuiltinRootID())
+		request.RootID != a.support.BuiltinRoot {
+		rootIDs = append(rootIDs, a.support.BuiltinRoot)
 	}
 
 	entries := make([]catalogModel.Entry, 0)
@@ -92,7 +90,7 @@ func (a *Service) ListAgents(
 		seen[entry.Ref()] = struct{}{}
 
 		item := AgentListItem{
-			AgentView: agentViewFromCatalog(entry),
+			AgentView: a.agentViewFromCatalog(entry),
 		}
 		output = append(output, item)
 	}
@@ -110,7 +108,7 @@ func (a *Service) ListAgents(
 	return output, nil
 }
 
-func agentViewFromCatalog(
+func (a *Service) agentViewFromCatalog(
 	entry catalogModel.Entry,
 ) AgentView {
 	digest := cryptoutil.Digest("")
@@ -122,10 +120,9 @@ func agentViewFromCatalog(
 
 	managed := false
 	if entry.State == artifactModel.StateAvailable &&
-		entry.Source.Kind == managedfs.Kind &&
-		entry.Source.StorageKey == agentDomain.AgentManagedSourceStorageKey &&
+		a.support.PluginProfile.Source.MatchesSourceMetadata(entry.Source) &&
 		entry.Binding.SubresourceLocator == "" {
-		_, err := agentDomain.ManagedPackageAddressFromAgentLocator(
+		_, err := a.support.ManagedPackage.AddressFromLocator(
 			entry.Binding.Locator,
 		)
 		managed = err == nil
@@ -140,7 +137,7 @@ func agentViewFromCatalog(
 		Enabled:          entry.Enabled,
 		Revision:         entry.Revision,
 		DefinitionDigest: digest,
-		BuiltIn:          entry.RootID == agentBuiltinRootID(),
+		BuiltIn:          entry.RootID == a.support.BuiltinRoot,
 		Managed:          managed,
 	}
 }

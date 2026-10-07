@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
@@ -13,14 +12,13 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
-func (a *Service) createProvider(
+func (a *Service) CreateProvider(
 	ctx context.Context,
 	request ManagedProviderCreateRequest,
 ) (ManagedProviderCreateResult, error) {
@@ -39,11 +37,11 @@ func (a *Service) createProvider(
 		return ManagedProviderCreateResult{}, err
 	}
 	name := request.Document.Name
-	address, err := modelDomain.ModelProviderPackageAddress(name)
+	address, err := a.support.ProviderPackage.Address(name, "")
 	if err != nil {
 		return ManagedProviderCreateResult{}, err
 	}
-	locator, err := modelDomain.ModelProviderPackageLocator(address)
+	locator, err := a.support.ProviderPackage.Locator(address)
 	if err != nil {
 		return ManagedProviderCreateResult{}, err
 	}
@@ -52,7 +50,7 @@ func (a *Service) createProvider(
 		ctx,
 		request.RootID,
 		locator,
-		topology.DocumentUseManagedModelProvider,
+		a.support.ProviderPackage.Document.DecoderID,
 	)
 	if err != nil {
 		return ManagedProviderCreateResult{}, err
@@ -72,7 +70,7 @@ func (a *Service) createProvider(
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: modelDomain.ModelProviderDocumentFile(),
+					Locator: a.support.ProviderPackage.Document.Locator,
 					Content: raw,
 				}},
 			},
@@ -101,7 +99,7 @@ func (a *Service) createProvider(
 	}, nil
 }
 
-func (a *Service) replaceProvider(
+func (a *Service) ReplaceProvider(
 	ctx context.Context,
 	request ManagedProviderReplaceRequest,
 ) (ManagedProviderReplaceResult, error) {
@@ -149,13 +147,13 @@ func (a *Service) replaceProvider(
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
-	currentAddress, err := modelDomain.ModelProviderPackageAddressFromLocator(
+	currentAddress, err := a.support.ProviderPackage.AddressFromLocator(
 		current.Binding.Locator,
 	)
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
-	requestedAddress, err := modelDomain.ModelProviderPackageAddress(request.Document.Name)
+	requestedAddress, err := a.support.ProviderPackage.Address(request.Document.Name, "")
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
@@ -170,7 +168,7 @@ func (a *Service) replaceProvider(
 		ctx,
 		current.RootID,
 		current.Binding.Locator,
-		topology.DocumentUseManagedModelProvider,
+		a.support.ProviderPackage.Document.DecoderID,
 	); err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
@@ -207,7 +205,7 @@ func (a *Service) replaceProvider(
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: modelDomain.ModelProviderDocumentFile(),
+					Locator: a.support.ProviderPackage.Document.Locator,
 					Content: raw,
 				}},
 			},
@@ -242,9 +240,9 @@ func (a *Service) replaceProvider(
 	}, nil
 }
 
-// deleteProvider removes only the Provider package. It intentionally does not
+// DeleteProvider removes only the Provider package. It intentionally does not
 // inspect, mutate, disable, delete, or purge Models that reference it.
-func (a *Service) deleteProvider(
+func (a *Service) DeleteProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
@@ -273,7 +271,7 @@ func (a *Service) deleteProvider(
 		return spec.ErrConflict
 	}
 
-	address, err := modelDomain.ModelProviderPackageAddressFromLocator(
+	address, err := a.support.ProviderPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -326,7 +324,7 @@ func (a *Service) deleteProvider(
 	return nil
 }
 
-func (a *Service) createModel(
+func (a *Service) CreateModel(
 	ctx context.Context,
 	request ManagedModelCreateRequest,
 ) (ManagedModelCreateResult, error) {
@@ -345,11 +343,11 @@ func (a *Service) createModel(
 		return ManagedModelCreateResult{}, err
 	}
 	name := request.Document.Name
-	address, err := modelDomain.ModelPackageAddress(name)
+	address, err := a.support.ModelPackage.Address(name, "")
 	if err != nil {
 		return ManagedModelCreateResult{}, err
 	}
-	locator, err := modelDomain.ModelPackageLocator(address)
+	locator, err := a.support.ModelPackage.Locator(address)
 	if err != nil {
 		return ManagedModelCreateResult{}, err
 	}
@@ -358,7 +356,7 @@ func (a *Service) createModel(
 		ctx,
 		request.RootID,
 		locator,
-		topology.DocumentUseManagedModel,
+		a.support.ModelPackage.Document.DecoderID,
 	)
 	if err != nil {
 		return ManagedModelCreateResult{}, err
@@ -378,7 +376,7 @@ func (a *Service) createModel(
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: modelDomain.ModelDocumentFile(),
+					Locator: a.support.ModelPackage.Document.Locator,
 					Content: raw,
 				}},
 			},
@@ -407,7 +405,7 @@ func (a *Service) createModel(
 	}, nil
 }
 
-func (a *Service) replaceModel(
+func (a *Service) ReplaceModel(
 	ctx context.Context,
 	request ManagedModelReplaceRequest,
 ) (ManagedModelReplaceResult, error) {
@@ -455,13 +453,13 @@ func (a *Service) replaceModel(
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
-	currentAddress, err := modelDomain.ModelPackageAddressFromLocator(
+	currentAddress, err := a.support.ModelPackage.AddressFromLocator(
 		current.Binding.Locator,
 	)
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
-	requestedAddress, err := modelDomain.ModelPackageAddress(request.Document.Name)
+	requestedAddress, err := a.support.ModelPackage.Address(request.Document.Name, "")
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
@@ -476,7 +474,7 @@ func (a *Service) replaceModel(
 		ctx,
 		current.RootID,
 		current.Binding.Locator,
-		topology.DocumentUseManagedModel,
+		a.support.ModelPackage.Document.DecoderID,
 	); err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
@@ -513,7 +511,7 @@ func (a *Service) replaceModel(
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: modelDomain.ModelDocumentFile(),
+					Locator: a.support.ModelPackage.Document.Locator,
 					Content: raw,
 				}},
 			},
@@ -548,7 +546,7 @@ func (a *Service) replaceModel(
 	}, nil
 }
 
-func (a *Service) deleteModel(
+func (a *Service) DeleteModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
@@ -577,7 +575,7 @@ func (a *Service) deleteModel(
 		return spec.ErrConflict
 	}
 
-	address, err := modelDomain.ModelPackageAddressFromLocator(
+	address, err := a.support.ModelPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -641,15 +639,14 @@ func (a *Service) ensureManagedSource(
 		)
 	}
 
-	draft := modelDomain.ManagedSourceDraft(
+	draft := a.support.ManagedSource.Draft(
 		sourceModel.SourceID(uuidutil.NewUUIDv7()),
 	)
 	summary, _, err := a.sources.Ensure(ctx, rootID, draft)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	if summary.StorageKey != draft.StorageKey ||
-		summary.Kind != managedfs.Kind {
+	if !a.support.ManagedSource.Matches(summary) {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Root %q has an incompatible managed Model Source",
 			spec.ErrConflict,
@@ -669,20 +666,13 @@ func (a *Service) ensureManagedDeclarationDiscovery(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	locator spec.Locator,
-	documentUse string,
+	requiredDecoder spec.DecoderID,
 ) (sourceModel.Summary, error) {
 	summary, err := a.ensureManagedSource(ctx, rootID)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
 
-	required, err := topology.DiscoverySpecForLocatorForUse(
-		documentUse,
-		locator,
-	)
-	if err != nil {
-		return sourceModel.Summary{}, err
-	}
 	if !summary.Enabled {
 		summary, err = a.sources.Update(
 			ctx,
@@ -707,19 +697,12 @@ func (a *Service) ensureManagedDeclarationDiscovery(
 			ExpectedRevision: summary.Revision,
 			Intent:           sourceModel.DiscoveryPreparationAdditive,
 			Requirement: sourceModel.DiscoveryRequirement{
-				ExplicitLocators: append(
-					[]spec.Locator(nil),
-					required.ExplicitLocators...,
-				),
-				DirectoryRoots: append(
-					[]sourceModel.DirectoryRoot(nil),
-					required.DirectoryRoots...,
-				),
-				DecoderHints: append(
-					[]sourceModel.DecoderHint(nil),
-					required.DecoderHints...,
-				),
-				RequireAuthoritative: required.Authoritative,
+				ExplicitLocators: []spec.Locator{locator},
+				DecoderHints: []sourceModel.DecoderHint{{
+					Locator:    locator,
+					DecoderIDs: []spec.DecoderID{requiredDecoder},
+				}},
+				RequireAuthoritative: true,
 			},
 		},
 	)
@@ -775,7 +758,6 @@ func (a *Service) managedRecord(
 			spec.ErrProtected,
 		)
 	}
-
 	summary, err := a.sources.Get(
 		ctx,
 		record.RootID,
@@ -784,8 +766,7 @@ func (a *Service) managedRecord(
 	if err != nil {
 		return artifactModel.Artifact{}, sourceModel.Summary{}, err
 	}
-	if summary.Kind != managedfs.Kind ||
-		summary.StorageKey != modelDomain.ManagedSourceStorageKey {
+	if !a.support.ManagedSource.Matches(summary) {
 		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not backed by the expected managed Source",
 			spec.ErrUnsupported,

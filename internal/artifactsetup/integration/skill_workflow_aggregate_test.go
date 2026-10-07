@@ -13,6 +13,7 @@ import (
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -212,11 +213,15 @@ func newSkillRuntimeAdapter(
 ) (*skillruntime.RuntimeAdapter, *skillRuntime.Service) {
 	t.Helper()
 
+	support, err := llmsupport.Skill()
+	requireNoError(t, err)
+
 	adapter, err := skillruntime.NewRuntimeAdapter(
 		fixture.store.Artifacts,
 		fixture.store.Catalog,
 		fixture.store.Resources,
 		fixture.store.TrustedNativeResources,
+		support.Documents,
 	)
 	requireNoError(t, err)
 

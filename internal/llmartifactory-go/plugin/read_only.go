@@ -9,16 +9,15 @@ import (
 
 func (p Profile) validateAuthoringConfiguration() error {
 	if p.ReadOnly {
+		if p.Source != nil {
+			return fmt.Errorf("%w: read-only Plugin profile cannot define a managed Source", spec.ErrInvalid)
+		}
 		return nil
 	}
-	if err := p.SourceStorageKey.Validate(); err != nil {
-		return err
+	if p.Source == nil {
+		return fmt.Errorf("%w: managed Plugin profile requires a Source profile", spec.ErrInvalid)
 	}
-	if err := spec.ValidateRequiredText(
-		"Plugin domain Source display name",
-		p.SourceDisplayName,
-		spec.MaxDisplayNameBytes,
-	); err != nil {
+	if err := p.Source.Validate(); err != nil {
 		return err
 	}
 	if err := p.BaselineName.Validate(); err != nil {
@@ -49,14 +48,14 @@ func (a *API) requireDeclarationAuthoring() error {
 	return nil
 }
 
-// A read-only domain has no managed user Source or baseline through which
-// an empty Plugin can be classified. Its declared package origin is
-// therefore part of domain visibility.
-func (a *API) readOnlyDomainOrigin(record artifactModel.Artifact) bool {
-	if a == nil || a.domain == nil || !a.domain.ReadOnly {
-		return false
-	}
-	if record.Binding.SubresourceLocator != "" {
+// A read-only family has no mutable managed Source. Its package origin is
+// therefore part of family visibility, but the package layout remains
+// application-supplied through Profile.Package.
+func (a *API) readOnlyDomainOrigin(
+	record artifactModel.Artifact,
+) bool {
+	if !a.domain.ReadOnly ||
+		record.Binding.SubresourceLocator != "" {
 		return false
 	}
 

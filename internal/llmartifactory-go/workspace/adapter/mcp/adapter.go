@@ -7,6 +7,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 )
@@ -18,14 +19,14 @@ type ArtifactReader interface {
 	) (artifactModel.Artifact, error)
 }
 
-// ServerResolver is satisfied by mcp/store/consumerapi.API. Workspace only
-// needs resolved server material and does not own MCP installation or runtime
-// connection behavior.
+// ServerResolver is satisfied directly by mcp.Service. Workspace reads the
+// existing MCP service result and projects only the runtime-neutral portion it
+// needs; there is no MCP-to-Workspace forwarding method.
 type ServerResolver interface {
 	ResolveMCPServer(
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,
-	) (serverMCPDomain.Resolved, error)
+	) (mcpAPI.ServerRead, error)
 }
 
 type WorkspaceServer struct {
@@ -92,7 +93,7 @@ func (a *Adapter) Load(
 			continue
 		}
 
-		server, err := a.servers.ResolveMCPServer(ctx, ref)
+		read, err := a.servers.ResolveMCPServer(ctx, ref)
 		if err != nil {
 			if fatal := fatalLoadError(ctx, err); fatal != nil {
 				return LoadPlan{}, fatal
@@ -101,7 +102,7 @@ func (a *Adapter) Load(
 		}
 		output.Servers = append(output.Servers, WorkspaceServer{
 			Artifact: ref,
-			Server:   server,
+			Server:   read.Resolved,
 		})
 	}
 	return output, nil

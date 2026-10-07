@@ -12,7 +12,6 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
@@ -149,7 +148,7 @@ func (a *API) listPlugins(
 			Enabled:     entry.Enabled,
 			Revision:    entry.Revision,
 			MemberCount: len(projection.members),
-			BuiltIn:     entry.Ref().RootID == topology.BuiltinRootID(),
+			BuiltIn:     entry.Ref().RootID == a.domain.BuiltinRoot,
 			Editable:    editable,
 			Deletable:   editable && !baseline && len(projection.members) == 0,
 			Baseline:    baseline,
@@ -305,7 +304,7 @@ func (a *API) pluginVisibleInList(
 		return true, a.validateEditableProjection(projection)
 	}
 
-	if entry.Source.StorageKey == a.domain.SourceStorageKey {
+	if a.domain.Source != nil && a.domain.Source.MatchesSourceMetadata(entry.Source) {
 		return true, a.validateEditableProjection(projection)
 	}
 	if len(projection.members) == 0 {
@@ -323,13 +322,12 @@ func (a *API) pluginListEditability(
 	entry catalogModel.Entry,
 	projection pluginProjection,
 ) (editable, baseline bool) {
-	if entry.Ref().RootID == topology.BuiltinRootID() ||
-		entry.Source.Kind != managedfs.Kind ||
+	if entry.Ref().RootID == a.domain.BuiltinRoot ||
 		!entry.Source.Enabled ||
 		entry.Binding.SubresourceLocator != "" ||
-		(a.domain != nil &&
-			(a.domain.ReadOnly ||
-				entry.Source.StorageKey != a.domain.SourceStorageKey)) {
+		a.domain.ReadOnly ||
+		a.domain.Source == nil ||
+		!a.domain.Source.MatchesSourceMetadata(entry.Source) {
 		return false, false
 	}
 

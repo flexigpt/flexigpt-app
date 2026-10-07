@@ -19,10 +19,10 @@ import (
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelcredentials"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
@@ -51,6 +51,11 @@ func initModelWrappers(
 			"%w: Model wrapper dependencies are incomplete",
 			spec.ErrInvalid,
 		)
+	}
+
+	modelSupport, err := llmsupport.Model()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	preferences, err := modelpreferences.New(storeOverlays)
@@ -89,7 +94,7 @@ func initModelWrappers(
 		Protection:       protection,
 		Overlays:         overlays,
 		Adapters:         runtimeAdapter,
-		BuiltinRoot:      topology.BuiltinRootID(),
+		Support:          modelSupport,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -150,7 +155,7 @@ func initModelProviderRuntime(
 		result    error
 	)
 	for _, rootID := range roots {
-		values, err := store.api.Providers.List(ctx, modelAPI.ListProvidersRequest{
+		values, err := store.api.ListProviders(ctx, modelAPI.ListProvidersRequest{
 			RootID: rootID,
 		})
 		if err != nil {

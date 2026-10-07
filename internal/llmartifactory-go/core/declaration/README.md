@@ -1,6 +1,7 @@
 # Artifact contracts
 
-`internal/artifactcontract/declaration` contains portable artifact declaration contracts.
+`internal/llmartifactory-go/core/declaration` contains portable shared
+declaration grammar and contract support.
 
 The generic Artifact Store does not import concrete declaration contracts. It
 stores generic Definitions, source-backed Artifacts, Source refresh state, and

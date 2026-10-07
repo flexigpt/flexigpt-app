@@ -1,14 +1,12 @@
 package mcp
 
 import (
-	"fmt"
-
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 )
 
 type apiOptions struct {
 	resolver *composition.Resolver
+	support  Support
 }
 
 type Option func(*apiOptions)
@@ -23,14 +21,8 @@ func WithCompositionResolver(
 	}
 }
 
-func requiredCompositionResolver(
-	value *composition.Resolver,
-) (*composition.Resolver, error) {
-	if value == nil {
-		return nil, fmt.Errorf(
-			"%w: MCP composition resolver is required",
-			spec.ErrInvalid,
-		)
+func WithSupport(value Support) Option {
+	return func(options *apiOptions) {
+		options.support = value
 	}
-	return value, nil
 }

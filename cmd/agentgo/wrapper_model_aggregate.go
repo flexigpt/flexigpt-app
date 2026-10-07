@@ -65,7 +65,7 @@ func (w *ModelAggregateWrapper) GetDefaultProvider() (
 	if err != nil {
 		return nil, err
 	}
-	return w.store.Preferences.SelectDefaultProvider(
+	return w.store.SelectDefaultProvider(
 		ctx,
 		preference,
 		w.fallbackProvider,
@@ -81,7 +81,7 @@ func (w *ModelAggregateWrapper) SetDefaultProvider(
 	defer w.mu.Unlock()
 
 	ctx := context.Background()
-	if err := w.store.Preferences.RequireSettableDefaultProvider(
+	if err := w.store.RequireSettableDefaultProvider(
 		ctx,
 		provider,
 	); err != nil {
@@ -111,7 +111,7 @@ func (w *ModelAggregateWrapper) SaveProviderSettings(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.Settings.Save(ctx, request)
+			value, err := w.store.SaveProviderSettings(ctx, request)
 			return value, value.Artifact, err
 		},
 	)
@@ -131,7 +131,7 @@ func (w *ModelAggregateWrapper) ResetProviderSettings(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.Settings.Reset(
+			value, err := w.store.ResetProviderSettings(
 				ctx,
 				ref,
 				expectedProviderRevision,
@@ -154,7 +154,7 @@ func (w *ModelAggregateWrapper) SetProviderAPIKey(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.Credentials.Set(ctx, request)
+			value, err := w.store.SetProviderAPIKey(ctx, request)
 			return value, current.Artifact, err
 		},
 	)
@@ -174,7 +174,7 @@ func (w *ModelAggregateWrapper) ClearProviderAPIKey(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.Credentials.Clear(
+			value, err := w.store.ClearProviderAPIKey(
 				ctx,
 				ref,
 				expectedProviderRevision,
@@ -202,7 +202,7 @@ func (w *ModelAggregateWrapper) CreateProvider(
 				return modelAPI.ManagedProviderCreateResult{}, artifactModel.Artifact{}, err
 			}
 			request.RootID = rootID
-			value, err := w.store.Providers.Packages.Create(ctx, request)
+			value, err := w.store.CreateProvider(ctx, request)
 			return value, value.Artifact, err
 		},
 	)
@@ -220,7 +220,7 @@ func (w *ModelAggregateWrapper) UpdateProvider(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.Packages.Replace(ctx, request)
+			value, err := w.store.ReplaceProvider(ctx, request)
 			return value, value.Artifact, err
 		},
 	)
@@ -239,7 +239,7 @@ func (w *ModelAggregateWrapper) DeleteProvider(
 			artifactModel.Artifact,
 			error,
 		) {
-			err := w.store.Providers.Packages.Delete(
+			err := w.store.DeleteProvider(
 				ctx,
 				ref,
 				expectedProviderRevision,
@@ -265,7 +265,7 @@ func (w *ModelAggregateWrapper) SetProviderEnabled(
 			artifactModel.Artifact,
 			error,
 		) {
-			value, err := w.store.Providers.SetEnabled(
+			value, err := w.store.SetProviderEnabled(
 				ctx,
 				ref,
 				expectedProviderRevision,
@@ -308,7 +308,7 @@ func mutateModelProvider[T any](
 	)
 	if ref != nil {
 		var err error
-		current, err = w.store.Providers.Get(ctx, *ref)
+		current, err = w.store.GetProvider(ctx, *ref)
 		if err != nil {
 			return zero, err
 		}

@@ -12,7 +12,6 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
@@ -57,10 +56,8 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	sourceID sourceModel.SourceID,
 	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]artifactModel.ArtifactRef, error) {
-	if c.api == nil {
-		return nil, spec.ErrClosed
-	}
-	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
+	if rootID != c.api.support.BuiltinRoot ||
+		sourceID != c.api.support.BuiltinPackageSource {
 		return nil, fmt.Errorf(
 			"%w: MCP cleanup does not target the built-in package Source",
 			spec.ErrProtected,
@@ -103,8 +100,8 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 		if _, found := directories[spec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
 			continue
 		}
-		if !topology.IsPluginDocumentFile(
-			spec.Locator(path.Base(string(entry.Binding.Locator))),
+		if !c.api.support.BuiltinPluginDocument.Matches(
+			entry.Binding.Locator,
 		) {
 			continue
 		}
@@ -121,10 +118,6 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 	ctx context.Context,
 	refs []artifactModel.ArtifactRef,
 ) error {
-	if c.api == nil {
-		return spec.ErrClosed
-	}
-
 	for _, ref := range refs {
 		record, err := c.api.artifacts.Get(ctx, ref)
 		if err != nil &&

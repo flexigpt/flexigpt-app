@@ -13,7 +13,6 @@ import (
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -29,7 +28,7 @@ func (a *Service) AddSkillPath(
 		return SkillPathRegistrationResult{}, err
 	}
 
-	rootPath, skillLocator, err := normalizeSkillPath(request.Path)
+	rootPath, skillLocator, err := a.normalizeSkillPath(request.Path)
 	if err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
@@ -45,7 +44,7 @@ func (a *Service) AddSkillPath(
 		return SkillPathRegistrationResult{}, err
 	}
 
-	discovery, err := skillFileDiscovery(skillLocator)
+	discovery, err := a.skillFileDiscovery(skillLocator)
 	if err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
@@ -122,7 +121,7 @@ func (a *Service) AddSkillPath(
 	}, nil
 }
 
-func normalizeSkillPath(
+func (a *Service) normalizeSkillPath(
 	raw string,
 ) (string, spec.Locator, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
@@ -141,7 +140,7 @@ func normalizeSkillPath(
 		return "", "", err
 	}
 	if info.IsDir() {
-		_, locator, err := findSkillDefinitionPath(absolute)
+		_, locator, err := a.findSkillDefinitionPath(absolute)
 		if err != nil {
 			return "", "", err
 		}
@@ -149,6 +148,7 @@ func normalizeSkillPath(
 	}
 	if !info.Mode().IsRegular() ||
 		!skillSource.IsSkillDefinitionFile(
+			a.support.Documents,
 			spec.Locator(filepath.Base(absolute)),
 		) {
 		return "", "", fmt.Errorf(
@@ -161,14 +161,14 @@ func normalizeSkillPath(
 		nil
 }
 
-func findSkillDefinitionPath(
+func (a *Service) findSkillDefinitionPath(
 	directory string,
 ) (string, spec.Locator, error) {
 	var (
 		selectedPath    string
 		selectedLocator spec.Locator
 	)
-	for _, candidate := range skillSource.SkillDefinitionFiles() {
+	for _, candidate := range skillSource.SkillDefinitionFiles(a.support.Documents) {
 		candidatePath := filepath.Join(directory, string(candidate))
 		info, err := os.Stat(candidatePath)
 		if err != nil {
@@ -198,11 +198,24 @@ func findSkillDefinitionPath(
 	return selectedPath, selectedLocator, nil
 }
 
-func skillFileDiscovery(
+func (a *Service) skillFileDiscovery(
 	locator spec.Locator,
 ) (sourceModel.DiscoverySpec, error) {
-	return topology.DiscoverySpecForLocatorForUse(
-		topology.DiscoveryUseSkill,
-		locator,
-	)
+	value := sourceModel.DiscoverySpec{
+		ExplicitLocators: []spec.Locator{locator},
+		DecoderHints: []sourceModel.DecoderHint{{
+			Locator: locator,
+			DecoderIDs: []spec.DecoderID{
+				a.support.Package.Document.DecoderID,
+			},
+		}},
+		AllowedDecoderIDs: []spec.DecoderID{
+			a.support.Package.Document.DecoderID,
+		},
+		Authoritative: a.support.Discovery.Authoritative,
+	}.Normalized()
+	if err := value.Validate(); err != nil {
+		return sourceModel.DiscoverySpec{}, err
+	}
+	return value, nil
 }

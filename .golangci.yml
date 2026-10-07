@@ -409,8 +409,6 @@ linters:
             - "github.com/flexigpt/agentskills-go"
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
-            # Should be removed
-            - "github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.

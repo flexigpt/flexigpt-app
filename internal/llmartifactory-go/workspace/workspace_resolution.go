@@ -41,6 +41,20 @@ func (a *Service) resolveCurrentWorkspace(
 	return workspace, resolved, nil
 }
 
+// ResolveWorkspace is the narrow consumer-facing Workspace read capability.
+// Conversation and inference consumers depend on this concrete landing method
+// through their own narrow interfaces; no forwarding facade is required.
+func (a *Service) ResolveWorkspace(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (workspaceDomain.WorkspaceView, error) {
+	value, err := a.resolveWorkspace(ctx, ref)
+	if err != nil {
+		return workspaceDomain.WorkspaceView{}, err
+	}
+	return value.View(), nil
+}
+
 // ResolveWorkspace is the runtime read boundary. It accepts only a currently
 // effective and enabled Workspace. Management projections use workspaceForRef.
 func (a *Service) resolveWorkspace(

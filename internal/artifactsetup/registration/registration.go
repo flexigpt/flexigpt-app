@@ -1,9 +1,13 @@
 package registration
 
 import (
+	"maps"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
 
@@ -12,6 +16,8 @@ type Selection struct {
 	schemaCodecs    []schema.Codec
 	decoders        []ingest.Decoder
 	locators        []corelocator.Factory
+	direct          []composition.DirectCapabilityProvider
+	projectors      map[declaration.Type]composition.ArtifactCapabilityProjector
 }
 
 func New() (*Selection, error) {
@@ -61,6 +67,8 @@ func New() (*Selection, error) {
 		schemaCodecs:    codecs,
 		decoders:        decoders,
 		locators:        locators.Factories(),
+		direct:          []composition.DirectCapabilityProvider{},
+		projectors:      map[declaration.Type]composition.ArtifactCapabilityProjector{},
 	}, nil
 }
 
@@ -90,4 +98,18 @@ func (s *Selection) LocatorFactories() []corelocator.Factory {
 		return nil
 	}
 	return append([]corelocator.Factory(nil), s.locators...)
+}
+
+func (s *Selection) DirectCapabilities() []composition.DirectCapabilityProvider {
+	if s == nil {
+		return nil
+	}
+	return append([]composition.DirectCapabilityProvider(nil), s.direct...)
+}
+
+func (s *Selection) ArtifactCapabilityProjectors() map[declaration.Type]composition.ArtifactCapabilityProjector {
+	if s == nil {
+		return nil
+	}
+	return maps.Clone(s.projectors)
 }

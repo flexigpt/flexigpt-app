@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
@@ -67,7 +68,7 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		}
 	})
 
-	llm, err := llmartifactory.Open(t.Context(), llmartifactory.Config{
+	llm, err := llmartifactory.Open(llmartifactory.Config{
 		Artifacts:        store.Artifacts,
 		Catalog:          store.Catalog,
 		Resources:        store.Resources,
@@ -84,6 +85,9 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		}
 	})
 
+	support, err := llmsupport.Skill()
+	requireNoError(t, err)
+
 	api, err := skillAPI.New(
 		store.Sources,
 		store.Refresh,
@@ -94,6 +98,7 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		store.Catalog,
 		store.Definitions,
 		skillAPI.WithCompositionResolver(llm.Composition()),
+		skillAPI.WithSupport(support),
 	)
 	requireNoError(t, err)
 
@@ -221,6 +226,14 @@ func findPluginByName(
 		}
 	}
 	return pluginAPI.ListItem{}, false
+}
+
+func skillBaselineName(t *testing.T) spec.LogicalName {
+	t.Helper()
+
+	support, err := llmsupport.Skill()
+	requireNoError(t, err)
+	return support.PluginProfile.BaselineName
 }
 
 func skillRevisionSnapshot(

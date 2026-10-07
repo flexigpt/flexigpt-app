@@ -22,7 +22,6 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -43,6 +42,7 @@ type Service struct {
 	plugins          *pluginAPI.API
 
 	declarationResolver *composition.Resolver
+	support             Support
 }
 
 func New(
@@ -74,10 +74,16 @@ func New(
 			option(&config)
 		}
 	}
-	graphResolver, err := requiredCompositionResolver(config.resolver)
-	if err != nil {
+	if config.resolver == nil {
+		return nil, fmt.Errorf(
+			"%w: Skill composition resolver is required",
+			spec.ErrInvalid,
+		)
+	}
+	if err := config.support.Validate(); err != nil {
 		return nil, err
 	}
+	graphResolver := config.resolver
 
 	output := &Service{
 		sources:          sources,
@@ -88,6 +94,7 @@ func New(
 		protection:       protection,
 		cat:              cat,
 		definitions:      definitions,
+		support:          config.support.Clone(),
 	}
 	plugins, err := pluginAPI.New(
 		artifacts,
@@ -97,7 +104,7 @@ func New(
 		managedArtifacts,
 		definitions,
 		graphResolver,
-		skillPluginProfile(),
+		config.support.PluginProfile,
 	)
 	if err != nil {
 		return nil, err
@@ -105,18 +112,6 @@ func New(
 	output.plugins = plugins
 	output.declarationResolver = graphResolver
 	return output, nil
-}
-
-func SkillDiscoverySpec(
-	r spec.Locator,
-) (sourceModel.DiscoverySpec, error) {
-	if r == "" {
-		r = "."
-	}
-	return topology.DiscoverySpecAtForUse(
-		topology.DiscoveryUseSkill,
-		r,
-	)
 }
 
 func (a *Service) RegisterSkillDirectory(
@@ -142,10 +137,7 @@ func (a *Service) RegisterSkillDirectory(
 		return sourceModel.Summary{}, err
 	}
 
-	discovery, err := SkillDiscoverySpec(".")
-	if err != nil {
-		return sourceModel.Summary{}, err
-	}
+	discovery := a.support.Discovery.Clone()
 	config, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
 	}{
@@ -253,11 +245,13 @@ func (a *Service) CreateManagedSkill(
 	files, skillMD, err := skillPackage.NormalizeManagedSkillFiles(
 		request.SKILLMD,
 		request.Files,
+		a.support.Documents,
 	)
 	if err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
 	definitionValue, _, err := skillSource.DecodeSkillDocument(
+		a.support.Documents,
 		skillMD,
 		request.SkillName,
 	)
@@ -272,6 +266,7 @@ func (a *Service) CreateManagedSkill(
 	}
 
 	packageAddress, err := skillPackage.ManagedPackageAddressForSkill(
+		a.support.Package,
 		definitionValue.LogicalName,
 		definitionValue.LogicalVersion,
 	)
@@ -279,6 +274,7 @@ func (a *Service) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 	storageFiles, err := skillPackage.ManagedSkillStorageFiles(
+		a.support.Documents,
 		packageAddress,
 		files,
 	)
@@ -286,6 +282,7 @@ func (a *Service) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 	locator, err := skillPackage.ManagedPackageLocatorForSkill(
+		a.support.Package,
 		packageAddress,
 	)
 	if err != nil {
@@ -312,18 +309,12 @@ func (a *Service) CreateManagedSkill(
 	}
 	rootID := membership.Plugin.Artifact.RootID
 	sourceID := membership.Plugin.Artifact.Binding.SourceID
-	decoderID, err := topology.DefaultDocumentDecoderID(
-		topology.DocumentUseSkillPackage,
-	)
-	if err != nil {
-		return result, err
-	}
 	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoderID,
+		a.support.Package.Document.DecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -426,7 +417,10 @@ func (a *Service) ReplaceManagedSkill(
 		return ManagedSkillReplaceResult{}, spec.ErrConflict
 	}
 	if current.Binding.SubresourceLocator != "" ||
-		!skillSource.IsSkillDefinitionFile(current.Binding.Locator) {
+		!skillSource.IsSkillDefinitionFile(
+			a.support.Documents,
+			current.Binding.Locator,
+		) {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not a replaceable managed Skill package",
 			spec.ErrUnsupported,
@@ -480,11 +474,13 @@ func (a *Service) ReplaceManagedSkill(
 	files, skillMD, err := skillPackage.NormalizeManagedSkillFiles(
 		request.SKILLMD,
 		request.Files,
+		a.support.Documents,
 	)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
 	definitionValue, _, err := skillSource.DecodeSkillDocument(
+		a.support.Documents,
 		skillMD,
 		request.SkillName,
 	)
@@ -500,12 +496,14 @@ func (a *Service) ReplaceManagedSkill(
 	}
 
 	currentAddress, err := skillPackage.ManagedPackageAddressFromSkillLocator(
+		a.support.Package,
 		current.Binding.Locator,
 	)
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
 	requestedAddress, err := skillPackage.ManagedPackageAddressForSkill(
+		a.support.Package,
 		definitionValue.LogicalName,
 		definitionValue.LogicalVersion,
 	)
@@ -520,6 +518,7 @@ func (a *Service) ReplaceManagedSkill(
 	}
 
 	storageFiles, err := skillPackage.ManagedSkillStorageFiles(
+		a.support.Documents,
 		currentAddress,
 		files,
 	)
@@ -647,6 +646,7 @@ func (a *Service) PurgeSkill(
 	}
 	if value.Binding.SubresourceLocator != "" ||
 		!skillSource.IsSkillDefinitionFile(
+			a.support.Documents,
 			value.Binding.Locator,
 		) {
 		return fmt.Errorf(
@@ -656,6 +656,7 @@ func (a *Service) PurgeSkill(
 	}
 
 	packageAddress, err := skillPackage.ManagedPackageAddressFromSkillLocator(
+		a.support.Package,
 		value.Binding.Locator,
 	)
 	if err != nil {
@@ -667,7 +668,8 @@ func (a *Service) PurgeSkill(
 		Package:          packageAddress,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == pluginAPI.SkillManagedPluginSourceStorageKey {
+	if a.support.PluginProfile.Source != nil &&
+		sourceValue.StorageKey == a.support.PluginProfile.Source.StorageKey {
 		locator := value.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}
@@ -699,11 +701,6 @@ func (a *Service) ResolveSkillCapabilities(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (composition.CapabilityPlan, error) {
-	if a == nil ||
-		a.resources == nil ||
-		a.declarationResolver == nil {
-		return composition.CapabilityPlan{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -752,6 +749,7 @@ func (a *Service) getManagedSkillDocument(
 		)
 	}
 	if _, err := skillPackage.ManagedPackageAddressFromSkillLocator(
+		a.support.Package,
 		value.Binding.Locator,
 	); err != nil {
 		return skillSource.ManagedSkillDocument{}, fmt.Errorf(
@@ -806,9 +804,6 @@ func (a *Service) requireMutable(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
 	if !a.protection.IsProtectedRoot(rootID) {
 		return nil
 	}

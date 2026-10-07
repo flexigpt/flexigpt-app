@@ -12,8 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
+
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
@@ -33,6 +35,16 @@ const contractFixtureDirectory = "testdata/contracts"
 
 //go:embed testdata/contracts/*.yaml
 var contractFixtures embed.FS
+
+var fixturePackageLayout = support.PackageLayout{
+	Kind:           "fixture",
+	DefaultVersion: spec.LogicalVersion("unversioned"),
+	FixedVersion:   true,
+	Document: support.Document{
+		Locator:   "fixture.yaml",
+		DecoderID: "fixture-decoder",
+	},
+}
 
 func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 	schemas := schemasByType(t)
@@ -220,13 +232,16 @@ func schemasByType(t *testing.T) map[declaration.Type][]byte {
 
 func declarationTestRegistry(t *testing.T) *coreinterpretation.Registry {
 	t.Helper()
-
+	skillDocuments, err := fixtureDocumentSupport()
+	if err != nil {
+		t.Fatalf("create declaration interpretation registry: %v", err)
+	}
 	registry, err := coreinterpretation.NewRegistry(
 		textv1.Interpretation(),
 		modelv1.Interpretation(),
 		modelproviderv1.Interpretation(),
 		toolv1.Interpretation(),
-		skillv1.Interpretation(),
+		skillv1.Interpretation(skillDocuments),
 		mcpv1.Interpretation(),
 		mcppolicyv1.Interpretation(),
 		pluginv1.Interpretation(),
@@ -240,6 +255,16 @@ func declarationTestRegistry(t *testing.T) *coreinterpretation.Registry {
 		t.Fatalf("create declaration interpretation registry: %v", err)
 	}
 	return registry
+}
+
+func fixtureDocumentSupport() (support.Documents, error) {
+	value := support.Documents{
+		Default: fixturePackageLayout.Document,
+		Files: []spec.Locator{
+			fixturePackageLayout.Document.Locator,
+		},
+	}
+	return value, value.Validate()
 }
 
 func canonicalConcreteDocument(

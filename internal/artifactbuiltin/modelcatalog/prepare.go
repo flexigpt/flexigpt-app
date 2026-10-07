@@ -8,6 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -47,6 +48,11 @@ func PrepareProviderPackage(
 		return PreparedPackage{}, err
 	}
 
+	support, err := llmsupport.Model()
+	if err != nil {
+		return PreparedPackage{}, err
+	}
+
 	raw, err := document.CanonicalJSON()
 	if err != nil {
 		return PreparedPackage{}, err
@@ -60,9 +66,7 @@ func PrepareProviderPackage(
 		return PreparedPackage{}, err
 	}
 
-	address, err := modelDomain.ModelProviderPackageAddress(
-		spec.LogicalName(document.Name),
-	)
+	address, err := support.ProviderPackage.Address(spec.LogicalName(document.Name), "")
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -74,9 +78,9 @@ func PrepareProviderPackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: root,
 		Address:             address,
-		DocumentFile:        modelDomain.ModelProviderDocumentFile(),
+		DocumentFile:        support.ProviderPackage.Document.Locator,
 		PackageFiles: []managedpackageModel.ManagedPackageFile{{
-			Locator: modelDomain.ModelProviderDocumentFile(),
+			Locator: support.ProviderPackage.Document.Locator,
 			Content: raw,
 		}},
 		ExpectedKind:           modelDomain.ModelProviderArtifactKind,
@@ -101,6 +105,11 @@ func PrepareModelPackage(
 		return PreparedPackage{}, err
 	}
 
+	support, err := llmsupport.Model()
+	if err != nil {
+		return PreparedPackage{}, err
+	}
+
 	raw, err := document.CanonicalJSON()
 	if err != nil {
 		return PreparedPackage{}, err
@@ -114,9 +123,7 @@ func PrepareModelPackage(
 		return PreparedPackage{}, err
 	}
 
-	address, err := modelDomain.ModelPackageAddress(
-		spec.LogicalName(document.Name),
-	)
+	address, err := support.ModelPackage.Address(spec.LogicalName(document.Name), "")
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -128,9 +135,9 @@ func PrepareModelPackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: root,
 		Address:             address,
-		DocumentFile:        modelDomain.ModelDocumentFile(),
+		DocumentFile:        support.ModelPackage.Document.Locator,
 		PackageFiles: []managedpackageModel.ManagedPackageFile{{
-			Locator: modelDomain.ModelDocumentFile(),
+			Locator: support.ModelPackage.Document.Locator,
 			Content: raw,
 		}},
 		ExpectedKind:           modelDomain.ModelArtifactKind,

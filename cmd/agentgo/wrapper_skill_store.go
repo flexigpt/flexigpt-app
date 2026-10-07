@@ -17,6 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -54,6 +55,11 @@ func InitSkillStoreWrapper(
 		return errors.New("skill Store wrapper dependencies are incomplete")
 	}
 
+	support, err := llmsupport.Skill()
+	if err != nil {
+		return err
+	}
+
 	api, err := skillAPI.New(
 		sources,
 		discovery,
@@ -66,6 +72,7 @@ func InitSkillStoreWrapper(
 		skillAPI.WithCompositionResolver(
 			resolver,
 		),
+		skillAPI.WithSupport(support),
 	)
 	if err != nil {
 		return err

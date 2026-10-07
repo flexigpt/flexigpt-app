@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -23,6 +24,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -31,6 +33,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 )
 
@@ -162,7 +165,7 @@ func newWorkflowHarness(
 		}
 	})
 
-	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
+	llm, err := llmartifactory.Open(llmartifactory.Config{
 		Artifacts:        store.Artifacts,
 		Catalog:          store.Catalog,
 		Resources:        store.Resources,
@@ -180,6 +183,9 @@ func newWorkflowHarness(
 		}
 	})
 
+	agentSupport, err := llmsupport.Agent()
+	requireNoError(t, err)
+
 	api, err := agentAPI.New(
 		store.Sources,
 		store.Refresh,
@@ -189,9 +195,9 @@ func newWorkflowHarness(
 		store.ManagedPackages,
 		store.Protection,
 		store.Definitions,
-		agentAPI.WithRoots(store.Roots),
 		agentAPI.WithCompositionResolver(llm.Composition()),
 		agentAPI.WithDeclarationInterpretations(registry),
+		agentAPI.WithSupport(agentSupport),
 	)
 	requireNoError(t, err)
 
@@ -252,6 +258,74 @@ func (h *workflowHarness) ensureBundledAgents(
 	ctx := root.WithInstallerPrivilege(t.Context())
 	requireNoError(t, h.agentBootstrap.Ensure(ctx))
 	h.addMissingBuiltinDependencies(t, ctx)
+}
+
+func (h *workflowHarness) listAgentsForManagement(
+	ctx context.Context,
+) ([]agentAPI.AgentListItem, error) {
+	roots, err := h.store.Roots.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(roots, func(left, right int) bool {
+		return roots[left].ID < roots[right].ID
+	})
+
+	output := make([]agentAPI.AgentListItem, 0)
+	for _, rootValue := range roots {
+		values, err := h.api.ListAgents(ctx, agentAPI.ListAgentsRequest{
+			RootID: rootValue.ID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, values...)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Ref.RootID != output[right].Ref.RootID {
+			return output[left].Ref.RootID < output[right].Ref.RootID
+		}
+		if output[left].Name != output[right].Name {
+			return output[left].Name < output[right].Name
+		}
+		return output[left].Ref.ArtifactID < output[right].Ref.ArtifactID
+	})
+	return output, nil
+}
+
+func (h *workflowHarness) listAgentImportDestinationsForManagement(
+	ctx context.Context,
+) ([]agentAPI.AgentImportDestination, error) {
+	roots, err := h.store.Roots.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(roots, func(left, right int) bool {
+		return roots[left].ID < roots[right].ID
+	})
+
+	output := make([]agentAPI.AgentImportDestination, 0)
+	for _, rootValue := range roots {
+		values, err := h.api.ListAgentImportDestinations(ctx, rootValue.ID)
+		if err != nil {
+			return nil, err
+		}
+		for index := range values {
+			values[index].RootDisplayName = rootValue.DisplayName
+		}
+		output = append(output, values...)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].RootID != output[right].RootID {
+			return output[left].RootID < output[right].RootID
+		}
+		if output[left].PluginName != output[right].PluginName {
+			return output[left].PluginName < output[right].PluginName
+		}
+		return output[left].Plugin.ArtifactID <
+			output[right].Plugin.ArtifactID
+	})
+	return output, nil
 }
 
 // addMissingBuiltinDependencies keeps this package-level workflow test focused
@@ -382,34 +456,42 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		h.dependencyDirectory = t.TempDir()
 	}
 
+	skillSupport, err := llmsupport.Skill()
+	requireNoError(t, err)
+
 	wrote := false
 	for _, dependency := range dependencies {
 		if _, found := h.dependencyFiles[dependency]; found {
 			continue
 		}
 
-		content, err := workflowDependencyDocument(dependency)
+		locator, content, err := workflowDependencySourceFile(
+			dependency,
+			h.nextDependencyFile,
+			skillSupport.Documents,
+		)
 		requireNoError(t, err)
 
-		loc := spec.Locator(fmt.Sprintf(
-			"dependency-%04d.yaml",
-			h.nextDependencyFile,
-		))
 		h.nextDependencyFile++
 
+		location := filepath.Join(
+			h.dependencyDirectory,
+			string(locator),
+		)
+		requireNoError(
+			t,
+			os.MkdirAll(filepath.Dir(location), 0o700),
+		)
 		requireNoError(
 			t,
 			os.WriteFile(
-				filepath.Join(
-					h.dependencyDirectory,
-					string(loc),
-				),
+				location,
 				content,
 				0o600,
 			),
 		)
 
-		h.dependencyFiles[dependency] = loc
+		h.dependencyFiles[dependency] = locator
 		wrote = true
 	}
 
@@ -423,17 +505,10 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		})
 		requireNoError(t, err)
 
-		discovery := sourceModel.DiscoverySpec{
-			DirectoryRoots: []sourceModel.DirectoryRoot{{
-				Root:            ".",
-				Recursive:       true,
-				IncludePatterns: []string{"**/*.yaml"},
-			}},
-			AllowedDecoderIDs: []spec.DecoderID{
-				coredecoder.YAMLDecoderID,
-			},
-			Authoritative: true,
-		}.Normalized()
+		discovery, err := workflowDependencyDiscovery(
+			skillSupport.Documents,
+		)
+		requireNoError(t, err)
 
 		_, err = h.store.Sources.Create(
 			ctx,
@@ -471,6 +546,110 @@ func (h *workflowHarness) publishBuiltinDependencies(
 	return true
 }
 
+// workflowDependencyDiscovery deliberately includes direct-root patterns as
+// well as recursive patterns. A globstar descendant pattern alone must not be
+// relied on to include a Source-root file.
+//
+// Skills are emitted as actual configured Skill package documents rather than
+// canonical YAML declarations with a synthetic dangling locator. This keeps
+// the Agent workflow fixture aligned with the real Skill source-format path.
+func workflowDependencyDiscovery(
+	documents support.Documents,
+) (sourceModel.DiscoverySpec, error) {
+	if err := documents.Validate(); err != nil {
+		return sourceModel.DiscoverySpec{}, err
+	}
+
+	patterns := []string{
+		"*.yaml",
+		"**/*.yaml",
+	}
+	for _, document := range documents.Files {
+		patterns = append(
+			patterns,
+			string(document),
+			"**/"+string(document),
+		)
+	}
+
+	decoderIDs := []spec.DecoderID{
+		coredecoder.YAMLDecoderID,
+	}
+	if documents.Default.DecoderID != coredecoder.YAMLDecoderID {
+		decoderIDs = append(
+			decoderIDs,
+			documents.Default.DecoderID,
+		)
+	}
+
+	value := sourceModel.DiscoverySpec{
+		DirectoryRoots: []sourceModel.DirectoryRoot{{
+			Root:            ".",
+			Recursive:       true,
+			IncludePatterns: patterns,
+		}},
+		AllowedDecoderIDs: decoderIDs,
+		Authoritative:     true,
+	}.Normalized()
+	return value, value.Validate()
+}
+
+func workflowDependencySourceFile(
+	dependency workflowDependency,
+	index int,
+	documents support.Documents,
+) (spec.Locator, []byte, error) {
+	if dependency.Type == declaration.TypeSkill {
+		locator := spec.Locator(path.Join(
+			string(dependency.Name),
+			string(documents.Default.Locator),
+		))
+		if err := locator.ValidatePortable(false); err != nil {
+			return "", nil, err
+		}
+		content, err := workflowDependencySkillDocument(dependency)
+		if err != nil {
+			return "", nil, err
+		}
+		return locator, content, nil
+	}
+
+	locator := spec.Locator(fmt.Sprintf(
+		"dependency-%04d.yaml",
+		index,
+	))
+	if err := locator.ValidatePortable(false); err != nil {
+		return "", nil, err
+	}
+	content, err := workflowDependencyDocument(dependency)
+	if err != nil {
+		return "", nil, err
+	}
+	return locator, content, nil
+}
+
+func workflowDependencySkillDocument(
+	dependency workflowDependency,
+) ([]byte, error) {
+	if err := dependency.Name.Validate(); err != nil {
+		return nil, err
+	}
+	return fmt.Appendf(
+		nil,
+		"---\n"+
+			"name: %s\n"+
+			"description: %s\n"+
+			"insert: %s\n"+
+			"---\n\n"+
+			"# %s\n\n"+
+			"Workflow fixture dependency Skill.\n",
+		workflowYAMLQuote(string(dependency.Name)),
+		workflowYAMLQuote("Workflow fixture dependency Skill."),
+		workflowYAMLQuote(string(declaration.InsertInstructions)),
+		dependency.Name,
+	), nil
+}
+
 func workflowDependencyDocument(
 	dependency workflowDependency,
 ) ([]byte, error) {
@@ -490,12 +669,10 @@ func workflowDependencyDocument(
 		), nil
 
 	case declaration.TypeSkill:
-		return fmt.Appendf(nil,
-			"type: %s\nname: %s\nlocator: %s\n",
-			workflowYAMLQuote(string(declaration.TypeSkill)),
-			name,
-			workflowYAMLQuote("./placeholder"),
-		), nil
+		return nil, fmt.Errorf(
+			"workflow dependency Skill %q must be published as a Skill package document",
+			dependency.Name,
+		)
 
 	case declaration.TypeMCP:
 		return fmt.Appendf(nil,

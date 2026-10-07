@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
-	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	agentsigner "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/import/signer"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -23,8 +22,14 @@ import (
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
+type ImportFormat string
+
+const (
+	ImportFormatJSON ImportFormat = "json"
+	ImportFormatYAML ImportFormat = "yaml"
+)
+
 type Service struct {
-	roots            root.API
 	cat              catalog.API
 	sources          source.API
 	discovery        refreshFlow.API
@@ -39,13 +44,14 @@ type Service struct {
 	managedAgentProfile *declaration.ManagedProfilePolicy
 	importSigner        *agentsigner.Signer
 	interpretations     *coreinterpretation.Registry
+	support             Support
 }
 
 type apiOptions struct {
-	roots           root.API
 	resolver        *composition.Resolver
 	importSigner    *agentsigner.Signer
 	interpretations *coreinterpretation.Registry
+	support         *Support
 }
 
 type Option func(*apiOptions)
@@ -60,17 +66,6 @@ func WithDeclarationInterpretations(
 	}
 }
 
-// WithRoots enables consumer-facing cross-Root management operations and
-// default user-Root Plugin creation. Explicit Root-scoped operations do
-// not require this option.
-func WithRoots(
-	value root.API,
-) Option {
-	return func(options *apiOptions) {
-		options.roots = value
-	}
-}
-
 // WithCompositionResolver supplies the one LLM Artifactory composition owner.
 // Agent does not construct a private locator registry or graph resolver.
 func WithCompositionResolver(
@@ -78,6 +73,12 @@ func WithCompositionResolver(
 ) Option {
 	return func(options *apiOptions) {
 		options.resolver = value
+	}
+}
+
+func WithSupport(value Support) Option {
+	return func(options *apiOptions) {
+		options.support = &value
 	}
 }
 
@@ -130,6 +131,15 @@ func New(
 			spec.ErrInvalid,
 		)
 	}
+	if config.support == nil {
+		return nil, fmt.Errorf(
+			"%w: Agent support is required",
+			spec.ErrInvalid,
+		)
+	}
+	if err := config.support.Validate(); err != nil {
+		return nil, err
+	}
 
 	profiles, err := declaration.NewManagedProfileRegistry(
 		agentv1.ManagedAgentImportProfileDescriptor(),
@@ -153,7 +163,6 @@ func New(
 	}
 
 	output := &Service{
-		roots:               config.roots,
 		sources:             sources,
 		cat:                 cat,
 		discovery:           discovery,
@@ -166,6 +175,7 @@ func New(
 		importSigner:        importSigner,
 		declarationResolver: config.resolver,
 		interpretations:     config.interpretations,
+		support:             config.support.Clone(),
 	}
 
 	plugins, err := pluginAPI.New(
@@ -176,7 +186,7 @@ func New(
 		managedArtifacts,
 		definitions,
 		config.resolver,
-		agentDomain.AgentPluginProfile(),
+		config.support.PluginProfile,
 	)
 	if err != nil {
 		return nil, err
@@ -190,9 +200,6 @@ func (a *Service) requireMutable(
 	ctx context.Context,
 	rootID rootModel.RootID,
 ) error {
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
 	if !a.protection.IsProtectedRoot(rootID) {
 		return nil
 	}

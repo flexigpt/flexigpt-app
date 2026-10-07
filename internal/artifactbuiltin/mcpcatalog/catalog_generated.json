@@ -1,7 +1,7 @@
 {
   "format": "artifact-compiled-package-set/v1",
   "hydration": {
-    "fingerprint": "sha256:077610ff1e1064c36515bc178bf9a7e5218616ac737cc07d62f4357e70958fe2",
+    "fingerprint": "sha256:9a6fe4872e5a509b4cabc03f1996245c916bbfeebdaaf06ff2465a1a90e3a39b",
     "installerName": "mcp",
     "rootID": "0192c4c0-0000-7000-8000-000000000001",
     "sourceID": "0192c4c0-0001-7000-8000-000000000001"

@@ -5,20 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 )
-
-func agentBuiltinRootID() rootModel.RootID {
-	return topology.BuiltinRootID()
-}
 
 type agentSourceCacheKey struct {
 	rootID   rootModel.RootID
@@ -269,7 +263,7 @@ func (a *Service) agentViewWithSourceCache(
 		State:       record.State,
 		Enabled:     record.Enabled,
 		Revision:    record.Revision,
-		BuiltIn:     record.RootID == agentBuiltinRootID(),
+		BuiltIn:     record.RootID == a.support.BuiltinRoot,
 	}
 	if record.ResolvedDefinition != nil {
 		view.DefinitionDigest = *record.ResolvedDefinition
@@ -297,7 +291,7 @@ func (a *Service) agentManaged(
 	record artifactModel.Artifact,
 	sourceCache map[agentSourceCacheKey]sourceModel.Summary,
 ) (bool, error) {
-	if record.RootID == agentBuiltinRootID() ||
+	if record.RootID == a.support.BuiltinRoot ||
 		record.State != artifactModel.StateAvailable ||
 		record.Binding.SubresourceLocator != "" {
 		return false, nil
@@ -320,13 +314,10 @@ func (a *Service) agentManaged(
 			sourceCache[key] = sourceValue
 		}
 	}
-	if sourceValue.Kind != managedfs.Kind ||
-		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return false, nil
 	}
-	if _, err := agentDomain.ManagedPackageAddressFromAgentLocator(
-		record.Binding.Locator,
-	); err == nil {
+	if _, err := a.support.ManagedPackage.AddressFromLocator(record.Binding.Locator); err == nil {
 		return true, nil
 	}
 	return false, nil

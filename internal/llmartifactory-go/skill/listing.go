@@ -4,13 +4,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	skillPackage "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/package"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
@@ -32,7 +28,7 @@ func (a *Service) ListSkills(
 
 	output := make([]SkillListItem, 0, len(entries))
 	for _, entry := range entries {
-		item := skillListItem(entry)
+		item := a.skillListItem(entry)
 		output = append(output, item)
 	}
 
@@ -46,7 +42,7 @@ func (a *Service) ListSkills(
 	return output, nil
 }
 
-func skillListItem(
+func (a *Service) skillListItem(
 	entry catalogModel.Entry,
 ) SkillListItem {
 	digest := cryptoutil.Digest("")
@@ -58,10 +54,9 @@ func skillListItem(
 
 	managed := false
 	if entry.State == artifactModel.StateAvailable &&
-		entry.Source.Kind == managedfs.Kind &&
-		entry.Source.StorageKey == pluginAPI.SkillManagedPluginSourceStorageKey &&
+		a.support.PluginProfile.Source.MatchesSourceMetadata(entry.Source) &&
 		entry.Binding.SubresourceLocator == "" {
-		_, err := skillPackage.ManagedPackageAddressFromSkillLocator(
+		_, err := a.support.Package.AddressFromLocator(
 			entry.Binding.Locator,
 		)
 		managed = err == nil
@@ -76,7 +71,7 @@ func skillListItem(
 		Enabled:          entry.Enabled,
 		Revision:         entry.Revision,
 		DefinitionDigest: digest,
-		BuiltIn:          entry.Ref().RootID == topology.BuiltinRootID(),
+		BuiltIn:          entry.Ref().RootID == a.support.BuiltinRoot,
 		Managed:          managed,
 	}
 }

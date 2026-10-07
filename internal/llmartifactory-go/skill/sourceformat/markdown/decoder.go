@@ -2,21 +2,50 @@ package markdown
 
 import (
 	"context"
+	"fmt"
 	"path"
 
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
 
-// Decoder adapts Agent Skills SKILL.md source packages to generic Skill
-// Artifact Store Definitions.
-type Decoder struct{}
+// Decoder adapts application-supported Skill package documents to generic
+// Skill Artifact Store Definitions.
+type Decoder struct {
+	candidates support.Candidates
+	documents  support.Documents
+	layout     support.PackageLayout
+}
 
-func NewDecoder() *Decoder {
-	return &Decoder{}
+func NewDecoder(
+	candidates support.Candidates,
+	documents support.Documents,
+	layout support.PackageLayout,
+) (*Decoder, error) {
+	if err := candidates.Validate(); err != nil {
+		return nil, err
+	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
+	}
+	if err := layout.Validate(); err != nil {
+		return nil, err
+	}
+	if layout.Document != documents.Default {
+		return nil, fmt.Errorf(
+			"%w: Skill package layout document differs from Skill documents",
+			spec.ErrInvalid,
+		)
+	}
+	return &Decoder{
+		candidates: candidates.Clone(),
+		documents:  documents.Clone(),
+		layout:     layout,
+	}, nil
 }
 
 func (*Decoder) ID() spec.DecoderID {
@@ -27,11 +56,15 @@ func (*Decoder) Revision() string {
 	return skillSource.SkillSchemaVersion
 }
 
-func (*Decoder) Recognize(
+func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
-	if !skillSource.IsSkillDefinitionFile(candidate.Locator) {
+	if !d.documents.Matches(candidate.Locator) {
+		return ingestModel.RecognitionNone
+	}
+	if !candidate.RequestsDecoder(skillSource.MarkdownDecoderID) &&
+		!d.candidates.Matches(candidate.Locator) {
 		return ingestModel.RecognitionNone
 	}
 	if candidate.RequestsDecoder(skillSource.MarkdownDecoderID) {
@@ -40,16 +73,17 @@ func (*Decoder) Recognize(
 	return ingestModel.RecognitionPossible
 }
 
-func (*Decoder) Decode(
+func (d *Decoder) Decode(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	if !skillSource.IsSkillDefinitionFile(candidate.Locator) {
+	if !d.documents.Matches(candidate.Locator) {
 		return nil, nil
 	}
 
-	expectedName := expectedSkillName(candidate.Locator)
+	expectedName := expectedSkillName(d.layout, candidate.Locator)
 	value, warnings, err := skillSource.DecodeSkillDocument(
+		d.documents,
 		candidate.Content,
 		expectedName,
 	)
@@ -75,16 +109,21 @@ func (*Decoder) Decode(
 	}}, warnings
 }
 
-func expectedSkillName(locator spec.Locator) string {
-	parent := path.Dir(string(locator))
-	if parent == "." {
+func expectedSkillName(
+	layout support.PackageLayout,
+	locator spec.Locator,
+) string {
+	skillDirectory := path.Dir(string(locator))
+	if skillDirectory == "." {
 		return ""
 	}
+	packageDirectory := spec.Locator(path.Dir(skillDirectory))
 	if address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
-		spec.Locator(parent),
+		packageDirectory,
 	); err == nil &&
-		address.Kind == skillSource.ManagedSkillPackageKind {
+		address.Kind == layout.Kind &&
+		path.Base(skillDirectory) == string(address.Name) {
 		return string(address.Name)
 	}
-	return path.Base(parent)
+	return path.Base(skillDirectory)
 }

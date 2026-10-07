@@ -89,18 +89,12 @@ func EnsureRootBaselines(
 			fmt.Errorf("ensure Skill baseline Plugin: %w", err),
 		)
 	}
-	if ctx.Err() != nil {
-		return errors.Join(result, ctx.Err())
-	}
 
 	if _, err := mcp.EnsureMCPBaselinePlugin(ctx, rootID); err != nil {
 		result = errors.Join(
 			result,
 			fmt.Errorf("ensure MCP baseline Plugin: %w", err),
 		)
-	}
-	if ctx.Err() != nil {
-		return errors.Join(result, ctx.Err())
 	}
 
 	if _, err := agents.EnsureAgentBaselinePlugin(ctx, rootID); err != nil {
@@ -140,9 +134,6 @@ func EnsureMutableRootBaselines(
 			continue
 		}
 		if err := EnsureRootBaselines(ctx, value.ID, skills, mcp, agents); err != nil {
-			if ctx.Err() != nil {
-				return errors.Join(result, ctx.Err())
-			}
 			result = errors.Join(
 				result,
 				fmt.Errorf(

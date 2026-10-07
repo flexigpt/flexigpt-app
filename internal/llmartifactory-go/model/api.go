@@ -34,10 +34,7 @@ type Service struct {
 	overlays    modelOverlay.OverlayRepository
 	adapters    AdapterRegistry
 	builtinRoot rootModel.RootID
-
-	Providers   *ProviderService
-	Models      *ModelService
-	Preferences *ProviderPreferenceService
+	support     Support
 }
 
 func New(
@@ -57,11 +54,11 @@ func New(
 			spec.ErrInvalid,
 		)
 	}
-	if err := dependencies.BuiltinRoot.Validate(); err != nil {
+	if err := dependencies.Support.Validate(); err != nil {
 		return nil, err
 	}
 	if !dependencies.Protection.IsProtectedRoot(
-		dependencies.BuiltinRoot,
+		dependencies.Support.BuiltinRoot,
 	) {
 		return nil, fmt.Errorf(
 			"%w: Model Store built-in Root must be protected",
@@ -79,15 +76,13 @@ func New(
 		managedArtifacts: dependencies.ManagedArtifacts,
 		overlays:         dependencies.Overlays,
 		adapters:         dependencies.Adapters,
-		builtinRoot:      dependencies.BuiltinRoot,
+		builtinRoot:      dependencies.Support.BuiltinRoot,
+		support:          dependencies.Support,
 	}
-	output.Providers = newProviderService(output)
-	output.Models = newModelService(output)
-	output.Preferences = &ProviderPreferenceService{owner: output}
 	return output, nil
 }
 
-func (a *Service) getProvider(
+func (a *Service) GetProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ProviderView, error) {
@@ -98,7 +93,7 @@ func (a *Service) getProvider(
 	return a.providerView(ctx, value)
 }
 
-func (a *Service) getModel(
+func (a *Service) GetModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ModelView, error) {
@@ -109,7 +104,7 @@ func (a *Service) getModel(
 	return a.modelView(ctx, value)
 }
 
-func (a *Service) listProviders(
+func (a *Service) ListProviders(
 	ctx context.Context,
 	request ListProvidersRequest,
 ) ([]ProviderListItem, error) {
@@ -168,7 +163,7 @@ func (a *Service) listProviders(
 	return output, nil
 }
 
-func (a *Service) listModels(
+func (a *Service) ListModels(
 	ctx context.Context,
 	request ListModelsRequest,
 ) ([]ModelListItem, error) {
@@ -227,7 +222,7 @@ func (a *Service) listModels(
 	return output, nil
 }
 
-func (a *Service) listModelsByProvider(
+func (a *Service) ListModelsByProvider(
 	ctx context.Context,
 	request ListModelsByProviderRequest,
 ) ([]ModelListItem, error) {
@@ -235,7 +230,7 @@ func (a *Service) listModelsByProvider(
 		return nil, err
 	}
 
-	values, err := a.listModels(ctx, ListModelsRequest{
+	values, err := a.ListModels(ctx, ListModelsRequest{
 		RootID:  request.RootID,
 		Enabled: request.Enabled,
 	})
@@ -255,9 +250,9 @@ func (a *Service) listModelsByProvider(
 	return output, nil
 }
 
-// setProviderEnabled wraps universal Artifact enablement. It is valid for
+// SetProviderEnabled wraps universal Artifact enablement. It is valid for
 // protected built-ins and mutable user-owned Provider Artifacts alike.
-func (a *Service) setProviderEnabled(
+func (a *Service) SetProviderEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
@@ -281,9 +276,9 @@ func (a *Service) setProviderEnabled(
 	)
 }
 
-// setModelEnabled wraps universal Artifact enablement. It is independent from
+// SetModelEnabled wraps universal Artifact enablement. It is independent from
 // Provider enablement and never changes any linked Provider state.
-func (a *Service) setModelEnabled(
+func (a *Service) SetModelEnabled(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,

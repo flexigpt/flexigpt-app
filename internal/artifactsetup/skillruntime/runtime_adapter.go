@@ -22,6 +22,7 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/materialize"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
@@ -77,6 +78,7 @@ type RuntimeAdapter struct {
 	cat             catalog.API
 	resources       resourceFlow.API
 	nativeResources resourceFlow.NativePathAPI
+	documents       support.Documents
 	runtime         *skillRuntime.Service
 
 	syncMu  sync.Mutex
@@ -93,6 +95,7 @@ func NewRuntimeAdapter(
 	cat catalog.API,
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
+	documents support.Documents,
 ) (*RuntimeAdapter, error) {
 	if artifacts == nil || cat == nil ||
 		resources == nil || nativeResources == nil {
@@ -101,12 +104,16 @@ func NewRuntimeAdapter(
 			spec.ErrInvalid,
 		)
 	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &RuntimeAdapter{
 		artifacts:       artifacts,
 		cat:             cat,
 		resources:       resources,
 		nativeResources: nativeResources,
+		documents:       documents.Clone(),
 		syncing:         make(map[rootModel.RootID]*rootCatalogSync),
 	}, nil
 }
@@ -432,6 +439,7 @@ func (a *RuntimeAdapter) materializeRecords(
 			API:           a.resources,
 			NativePathAPI: a.nativeResources,
 		},
+		a.documents,
 		records,
 	)
 	if err != nil {

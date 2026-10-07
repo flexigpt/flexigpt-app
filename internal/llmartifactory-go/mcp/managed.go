@@ -9,7 +9,6 @@ import (
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
@@ -42,14 +41,14 @@ func (a *Service) CreateMCPServer(
 	if err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
-	address, err := mcpDomain.ManagedPackageAddressForMCP(
+	address, err := a.support.ServerPackage.Address(
 		request.Document.LogicalName,
 		request.Document.LogicalVersion,
 	)
 	if err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
-	locator, err := mcpDomain.ManagedPackageLocatorForMCP(address)
+	locator, err := a.support.ServerPackage.Locator(address)
 	if err != nil {
 		return ManagedMCPCreateResult{}, err
 	}
@@ -74,18 +73,12 @@ func (a *Service) CreateMCPServer(
 	}
 	rootID := membership.Plugin.Artifact.RootID
 	sourceID := membership.Plugin.Artifact.Binding.SourceID
-	decoderID, err := topology.DefaultDocumentDecoderID(
-		topology.DocumentUseManagedMCP,
-	)
-	if err != nil {
-		return result, err
-	}
 	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoderID,
+		a.support.ServerPackage.Document.DecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -104,7 +97,7 @@ func (a *Service) CreateMCPServer(
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: mcpDomain.ManagedMCPDocumentFile(),
+					Locator: a.support.ServerPackage.Document.Locator,
 					Content: append([]byte(nil), definitionValue.Body...),
 				}},
 			},
@@ -266,13 +259,13 @@ func (a *Service) UpdateMCPServer(
 		return ManagedMCPReplaceResult{}, err
 	}
 
-	currentAddress, err := mcpDomain.ManagedPackageAddressFromMCPLocator(
+	currentAddress, err := a.support.ServerPackage.AddressFromLocator(
 		current.Binding.Locator,
 	)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	requestedAddress, err := mcpDomain.ManagedPackageAddressForMCP(
+	requestedAddress, err := a.support.ServerPackage.Address(
 		request.Document.LogicalName,
 		request.Document.LogicalVersion,
 	)
@@ -318,19 +311,12 @@ func (a *Service) UpdateMCPServer(
 			spec.ErrRefreshRequired,
 		)
 	}
-
-	decoderID, err := topology.DefaultDocumentDecoderID(
-		topology.DocumentUseManagedMCP,
-	)
-	if err != nil {
-		return ManagedMCPReplaceResult{}, err
-	}
 	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		current.RootID,
 		current.Binding.SourceID,
 		current.Binding.Locator,
-		decoderID,
+		a.support.ServerPackage.Document.DecoderID,
 	); err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
@@ -350,7 +336,7 @@ func (a *Service) UpdateMCPServer(
 				Address:            currentAddress,
 				ExpectedGeneration: inspection.State.SourceGeneration,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: mcpDomain.ManagedMCPDocumentFile(),
+					Locator: a.support.ServerPackage.Document.Locator,
 					Content: append([]byte(nil), definitionValue.Body...),
 				}},
 			},
@@ -444,7 +430,7 @@ func (a *Service) DeleteMCPServer(
 			spec.ErrUnsupported,
 		)
 	}
-	address, err := mcpDomain.ManagedPackageAddressFromMCPLocator(
+	address, err := a.support.ServerPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -457,7 +443,8 @@ func (a *Service) DeleteMCPServer(
 		Package:          address,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == pluginAPI.MCPManagedPluginSourceStorageKey {
+	if a.support.PluginProfile.Source != nil &&
+		sourceValue.StorageKey == a.support.PluginProfile.Source.StorageKey {
 		locator := record.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}

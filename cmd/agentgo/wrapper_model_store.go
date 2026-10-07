@@ -33,7 +33,7 @@ func (w *ModelStoreWrapper) ListProviders(
 
 	output := make([]modelAPI.ProviderListItem, 0)
 	for _, currentRoot := range roots {
-		values, err := w.api.Providers.List(ctx, modelAPI.ListProvidersRequest{
+		values, err := w.api.ListProviders(ctx, modelAPI.ListProvidersRequest{
 			RootID: currentRoot,
 		})
 		if err != nil {
@@ -59,7 +59,7 @@ func (w *ModelStoreWrapper) ListModels(
 
 	output := make([]modelAPI.ModelListItem, 0)
 	for _, currentRoot := range roots {
-		values, err := w.api.Models.List(ctx, modelAPI.ListModelsRequest{
+		values, err := w.api.ListModels(ctx, modelAPI.ListModelsRequest{
 			RootID: currentRoot,
 		})
 		if err != nil {
@@ -76,7 +76,7 @@ func (w *ModelStoreWrapper) GetProvider(
 	if w == nil || w.api == nil {
 		return modelAPI.ProviderView{}, spec.ErrClosed
 	}
-	return w.api.Providers.Get(context.Background(), ref)
+	return w.api.GetProvider(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) GetModel(
@@ -85,7 +85,7 @@ func (w *ModelStoreWrapper) GetModel(
 	if w == nil || w.api == nil {
 		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.Models.Get(context.Background(), ref)
+	return w.api.GetModel(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) SaveModelSettings(
@@ -94,7 +94,7 @@ func (w *ModelStoreWrapper) SaveModelSettings(
 	if w == nil || w.api == nil {
 		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.Models.Settings.Save(context.Background(), request)
+	return w.api.SaveModelSettings(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) ResetModelSettings(
@@ -105,7 +105,7 @@ func (w *ModelStoreWrapper) ResetModelSettings(
 	if w == nil || w.api == nil {
 		return modelAPI.ModelView{}, spec.ErrClosed
 	}
-	return w.api.Models.Settings.Reset(
+	return w.api.ResetModelSettings(
 		context.Background(),
 		ref,
 		expectedModelRevision,
@@ -119,7 +119,7 @@ func (w *ModelStoreWrapper) GetProviderAPIKeyStatus(
 	if w == nil || w.api == nil {
 		return modelAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
-	return w.api.Providers.Credentials.Status(context.Background(), ref)
+	return w.api.GetProviderAPIKeyStatus(context.Background(), ref)
 }
 
 func (w *ModelStoreWrapper) CreateModel(
@@ -137,7 +137,7 @@ func (w *ModelStoreWrapper) CreateModel(
 		return modelAPI.ManagedModelCreateResult{}, err
 	}
 	request.RootID = rootID
-	return w.api.Models.Packages.Create(context.Background(), request)
+	return w.api.CreateModel(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) UpdateModel(
@@ -146,7 +146,7 @@ func (w *ModelStoreWrapper) UpdateModel(
 	if w == nil || w.api == nil {
 		return modelAPI.ManagedModelReplaceResult{}, spec.ErrClosed
 	}
-	return w.api.Models.Packages.Replace(context.Background(), request)
+	return w.api.ReplaceModel(context.Background(), request)
 }
 
 func (w *ModelStoreWrapper) DeleteModel(
@@ -156,7 +156,7 @@ func (w *ModelStoreWrapper) DeleteModel(
 	if w == nil || w.api == nil {
 		return spec.ErrClosed
 	}
-	return w.api.Models.Packages.Delete(
+	return w.api.DeleteModel(
 		context.Background(),
 		ref,
 		expectedRevision,
@@ -171,7 +171,7 @@ func (w *ModelStoreWrapper) SetModelEnabled(
 	if w == nil || w.api == nil {
 		return artifactModel.Artifact{}, spec.ErrClosed
 	}
-	return w.api.Models.SetEnabled(
+	return w.api.SetModelEnabled(
 		context.Background(),
 		ref,
 		expectedRevision,

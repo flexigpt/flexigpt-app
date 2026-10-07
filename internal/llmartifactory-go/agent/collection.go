@@ -16,13 +16,6 @@ func (a *Service) CreateAgentPlugin(
 	ctx context.Context,
 	request pluginAPI.CreateRequest,
 ) (pluginAPI.PluginView, error) {
-	if request.RootID == "" {
-		rootID, err := a.ensureDefaultAgentPluginRoot(ctx)
-		if err != nil {
-			return pluginAPI.PluginView{}, err
-		}
-		request.RootID = rootID
-	}
 	return a.plugins.Create(ctx, request)
 }
 
@@ -164,7 +157,7 @@ func (a *Service) IsManagedAgentPlugin(
 	return value.Baseline ||
 		value.Editable &&
 			value.Artifact.LogicalName != "" &&
-			value.Artifact.RootID != agentBuiltinRootID() &&
+			value.Artifact.RootID != a.support.BuiltinRoot &&
 			value.Artifact.Binding.Locator != ""
 }
 

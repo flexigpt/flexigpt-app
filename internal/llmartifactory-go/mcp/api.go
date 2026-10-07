@@ -41,6 +41,7 @@ type Service struct {
 	installation        *installation.Service
 	declarationResolver *composition.Resolver
 	plugins             *pluginAPI.API
+	support             Support
 }
 
 func New(
@@ -78,16 +79,21 @@ func New(
 			option(&config)
 		}
 	}
-	aliases, err := requiredCompositionResolver(config.resolver)
-	if err != nil {
+	if err := config.support.Validate(); err != nil {
 		return nil, err
+	}
+	if config.resolver == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP composition resolver is required",
+			spec.ErrInvalid,
+		)
 	}
 	installations, err := installation.New(installation.Dependencies{
 		Artifacts:     artifacts,
 		Resources:     resources,
 		Protection:    protection,
 		Overlays:      overlays,
-		Declarations:  aliases,
+		Declarations:  config.resolver,
 		SecretCleaner: secretCleaner,
 	})
 	if err != nil {
@@ -105,6 +111,7 @@ func New(
 		cat:              cat,
 		definitions:      definitions,
 		installation:     installations,
+		support:          config.support.Clone(),
 	}
 	plugins, err := pluginAPI.New(
 		artifacts,
@@ -113,13 +120,13 @@ func New(
 		discovery,
 		managedArtifacts,
 		definitions,
-		aliases,
-		mcpDomain.PluginProfile(),
+		config.resolver,
+		config.support.PluginProfile,
 	)
 	if err != nil {
 		return nil, err
 	}
-	output.declarationResolver = aliases
+	output.declarationResolver = config.resolver
 	output.plugins = plugins
 	return output, nil
 }
@@ -161,9 +168,6 @@ func (a *Service) SaveServerSettings(
 	expectedSettingsRevision uint64,
 	data serverMCPDomain.ServerData,
 ) error {
-	if a.installation == nil {
-		return spec.ErrClosed
-	}
 	_, err := a.installation.Save(
 		ctx,
 		ref,
@@ -180,15 +184,6 @@ func (a *Service) ListMCPPluginServers(
 	ctx context.Context,
 	pluginRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	if a.plugins == nil ||
-		a.resources == nil ||
-		a.declarationResolver == nil {
-		return nil, spec.ErrClosed
-	}
-	if err := pluginRef.Validate(); err != nil {
-		return nil, err
-	}
-
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -205,9 +200,6 @@ func (a *Service) GetMCPPolicy(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (PolicyView, error) {
-	if a == nil {
-		return PolicyView{}, spec.ErrClosed
-	}
 	terminal, err := a.resolveDeclarationArtifact(ctx, ref)
 	if err != nil {
 		return PolicyView{}, err
@@ -246,9 +238,13 @@ func (a *Service) ResolveMCPServer(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ServerRead, error) {
-	if a.resources == nil {
-		return ServerRead{}, spec.ErrClosed
-	}
+	return a.resolveMCPServer(ctx, ref)
+}
+
+func (a *Service) resolveMCPServer(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (ServerRead, error) {
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
@@ -266,10 +262,6 @@ func (a *Service) listMCPPluginServers(
 	ctx context.Context,
 	pluginRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
-	if _, err := a.plugins.Read(ctx, pluginRef); err != nil {
-		return nil, err
-	}
-
 	p, err := a.declarationResolver.ResolvePluginMembers(
 		ctx,
 		pluginRef,
@@ -428,9 +420,6 @@ func (a *Service) resolveServerMaterial(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (installation.Material, error) {
-	if a.installation == nil {
-		return installation.Material{}, spec.ErrClosed
-	}
 	return a.installation.Resolve(ctx, ref)
 }
 
@@ -438,9 +427,6 @@ func (a *Service) resolveDeclarationArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.ArtifactRef, error) {
-	if a.declarationResolver == nil {
-		return artifactModel.ArtifactRef{}, spec.ErrClosed
-	}
 	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)
 }
 

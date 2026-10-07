@@ -17,7 +17,7 @@ import (
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
 
-func (a *Service) resolveProviderArtifact(
+func (a *Service) ResolveProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ResolvedProvider, error) {
@@ -28,7 +28,7 @@ func (a *Service) resolveProviderArtifact(
 	return a.resolveProvider(ctx, provider)
 }
 
-func (a *Service) resolveModelArtifact(
+func (a *Service) ResolveModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (ResolvedModel, error) {
@@ -240,11 +240,11 @@ func (a *Service) availableIdentityCandidates(
 	return output, nil
 }
 
-// resolveProviderDefaultModel resolves the Provider's best-effort default
+// ResolveProviderDefaultModel resolves the Provider's best-effort default
 // Model. A stale or unavailable explicit default does not invalidate the
 // Provider. The deterministic first enabled linked Model fallback is used when
 // possible.
-func (a *Service) resolveProviderDefaultModel(
+func (a *Service) ResolveProviderDefaultModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (DefaultModelResolution, error) {
@@ -348,7 +348,7 @@ func (a *Service) resolveNamedModelForProvider(
 		case 0:
 			continue
 		case 1:
-			resolved, err := a.resolveModelArtifact(ctx, candidates[0])
+			resolved, err := a.ResolveModel(ctx, candidates[0])
 			if err != nil {
 				lastErr = err
 				continue
@@ -387,7 +387,7 @@ func (a *Service) firstEnabledModelForProvider(
 	ctx context.Context,
 	provider modelDomain.Provider,
 ) (ResolvedModel, error) {
-	items, err := a.listModels(ctx, ListModelsRequest{
+	items, err := a.ListModels(ctx, ListModelsRequest{
 		RootID: provider.Artifact.RootID,
 	})
 	if err != nil {
@@ -398,7 +398,7 @@ func (a *Service) firstEnabledModelForProvider(
 		if item.State != artifactModel.StateAvailable || !item.Enabled {
 			continue
 		}
-		resolved, err := a.resolveModelArtifact(ctx, item.Ref)
+		resolved, err := a.ResolveModel(ctx, item.Ref)
 		if err != nil {
 			if bestEffortDefaultFailure(err) {
 				continue

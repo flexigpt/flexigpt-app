@@ -20,7 +20,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 ) {
 	harness := newWorkflowHarness(t)
 
-	initial, err := harness.api.ListAgentsForManagement(t.Context())
+	initial, err := harness.listAgentsForManagement(t.Context())
 	requireNoError(t, err)
 	if len(initial) != 0 {
 		t.Fatalf("initial management Agent list = %#v, want empty", initial)
@@ -146,6 +146,7 @@ func TestWorkflow_UserPlugin_ManagedAgentCRUD(
 	created, err := harness.api.CreateAgentPlugin(
 		t.Context(),
 		pluginAPI.CreateRequest{
+			RootID:      topology.UserRootID(),
 			Name:        "workflow-plugin",
 			DisplayName: "Workflow Plugin",
 			Description: "Initial workflow Plugin description.",
@@ -245,7 +246,7 @@ func TestWorkflow_UserPlugin_ManagedAgentCRUD(
 		)
 	}
 
-	allDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
+	allDestinations, err := harness.listAgentImportDestinationsForManagement(
 		t.Context(),
 	)
 	requireNoError(t, err)
@@ -556,7 +557,7 @@ members:
 		t.Fatalf("deleted custom Plugin remains in Plugin list")
 	}
 
-	remainingDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
+	remainingDestinations, err := harness.listAgentImportDestinationsForManagement(
 		t.Context(),
 	)
 	requireNoError(t, err)

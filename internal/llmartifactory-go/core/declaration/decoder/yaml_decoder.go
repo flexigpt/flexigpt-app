@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
@@ -14,18 +12,24 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
 const YAMLDecoderID spec.DecoderID = "artifact-declaration-yaml"
 
 type YAMLDecoder struct {
-	core *canonicalDecoder
+	core       *canonicalDecoder
+	candidates support.Candidates
 }
 
-func NewYAMLDecoder(registry *coreinterpretation.Registry) *YAMLDecoder {
+func NewYAMLDecoder(
+	registry *coreinterpretation.Registry,
+	candidates support.Candidates,
+) *YAMLDecoder {
 	return &YAMLDecoder{
-		core: newCanonicalDecoder(registry, nil),
+		core:       newCanonicalDecoder(registry, nil),
+		candidates: candidates.Clone(),
 	}
 }
 
@@ -35,12 +39,19 @@ func NewYAMLDecoder(registry *coreinterpretation.Registry) *YAMLDecoder {
 func NewYAMLDecoderForSchemaKeys(
 	registry *coreinterpretation.Registry,
 	keys []schemaModel.Key,
+	candidates support.Candidates,
 ) (*YAMLDecoder, error) {
 	core := newCanonicalDecoder(registry, keys)
 	if core.selectionErr != nil {
 		return nil, core.selectionErr
 	}
-	return &YAMLDecoder{core: core}, nil
+	if err := candidates.Validate(); err != nil {
+		return nil, err
+	}
+	return &YAMLDecoder{
+		core:       core,
+		candidates: candidates.Clone(),
+	}, nil
 }
 
 func (*YAMLDecoder) ID() spec.DecoderID {
@@ -75,10 +86,7 @@ func (d *YAMLDecoder) Recognize(
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	requested := candidate.RequestsDecoder(YAMLDecoderID)
-	extension := strings.ToLower(path.Ext(string(candidate.Locator)))
-	if extension != ".yaml" &&
-		extension != ".yml" &&
-		!requested {
+	if !requested && !d.candidates.Matches(candidate.Locator) {
 		return ingestModel.RecognitionNone
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(

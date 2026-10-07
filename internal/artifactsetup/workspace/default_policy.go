@@ -3,6 +3,7 @@ package workspace
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
@@ -18,9 +19,13 @@ func DefaultWorkspaceConfig() (
 	if err != nil {
 		return workspaceAPI.Config{}, err
 	}
-
+	support, err := llmsupport.Workspace()
+	if err != nil {
+		return workspaceAPI.Config{}, err
+	}
 	config := workspaceAPI.DefaultConfig()
 	config.DefaultPolicySource = source
+	config.Support = support
 	return config, nil
 }
 

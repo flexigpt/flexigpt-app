@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
@@ -14,17 +12,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
 const JSONDecoderID spec.DecoderID = "artifact-declaration-json"
 
 type JSONDecoder struct {
-	core *canonicalDecoder
+	core       *canonicalDecoder
+	candidates support.Candidates
 }
 
-func NewJSONDecoder(registry *coreinterpretation.Registry) *JSONDecoder {
+func NewJSONDecoder(
+	registry *coreinterpretation.Registry,
+	candidates support.Candidates,
+) *JSONDecoder {
 	return &JSONDecoder{
-		core: newCanonicalDecoder(registry, nil),
+		core:       newCanonicalDecoder(registry, nil),
+		candidates: candidates.Clone(),
 	}
 }
 
@@ -34,12 +38,19 @@ func NewJSONDecoder(registry *coreinterpretation.Registry) *JSONDecoder {
 func NewJSONDecoderForSchemaKeys(
 	registry *coreinterpretation.Registry,
 	keys []schemaModel.Key,
+	candidates support.Candidates,
 ) (*JSONDecoder, error) {
 	core := newCanonicalDecoder(registry, keys)
 	if core.selectionErr != nil {
 		return nil, core.selectionErr
 	}
-	return &JSONDecoder{core: core}, nil
+	if err := candidates.Validate(); err != nil {
+		return nil, err
+	}
+	return &JSONDecoder{
+		core:       core,
+		candidates: candidates.Clone(),
+	}, nil
 }
 
 func (*JSONDecoder) ID() spec.DecoderID {
@@ -74,10 +85,7 @@ func (d *JSONDecoder) Recognize(
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	requested := candidate.RequestsDecoder(JSONDecoderID)
-	extension := strings.ToLower(
-		path.Ext(string(candidate.Locator)),
-	)
-	if extension != ".json" && !requested {
+	if !requested && !d.candidates.Matches(candidate.Locator) {
 		return ingestModel.RecognitionNone
 	}
 

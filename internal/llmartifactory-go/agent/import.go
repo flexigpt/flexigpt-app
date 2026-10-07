@@ -9,7 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
@@ -18,7 +17,6 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
@@ -113,16 +111,16 @@ func (a *Service) PreviewAgentImport(
 	ctx context.Context,
 	request AgentImportPreviewRequest,
 ) (AgentImportPreview, error) {
-	if err := ctx.Err(); err != nil {
-		return AgentImportPreview{}, err
-	}
 	if request.ExpectedPluginRevision == 0 {
 		return AgentImportPreview{}, fmt.Errorf(
 			"%w: expected Agent Plugin revision is required",
 			spec.ErrInvalid,
 		)
 	}
-	inputFormat, err := managedAgentImportFormatForPath(request.Path)
+	inputFormat, err := managedAgentImportFormatForPath(
+		request.Path,
+		a.support.ImportFormats,
+	)
 	if err != nil {
 		return AgentImportPreview{}, err
 	}
@@ -289,8 +287,9 @@ func (a *Service) PreviewAgentImport(
 	}
 	preview.DefinitionDigest = rootDefinition.Digest
 
-	address, err := agentDomain.ManagedPackageAddressForAgent(
+	address, err := a.support.ManagedPackage.Address(
 		rootDefinition.LogicalName,
+		rootDefinition.LogicalVersion,
 	)
 	if err != nil {
 		return previewValidationError(
@@ -300,7 +299,7 @@ func (a *Service) PreviewAgentImport(
 			err,
 		)
 	}
-	agentLocator, err := agentDomain.ManagedPackageLocatorForAgent(address)
+	agentLocator, err := a.support.ManagedPackage.Locator(address)
 	if err != nil {
 		return previewValidationError(
 			preview,
@@ -557,8 +556,9 @@ func (a *Service) CommitAgentImport(
 			spec.ErrConflict,
 		)
 	}
-	address, err := agentDomain.ManagedPackageAddressForAgent(
+	address, err := a.support.ManagedPackage.Address(
 		rootDefinition.LogicalName,
+		rootDefinition.LogicalVersion,
 	)
 	if err != nil {
 		return AgentImportCommitResult{}, err
@@ -569,7 +569,7 @@ func (a *Service) CommitAgentImport(
 			spec.ErrConflict,
 		)
 	}
-	agentLocator, err := agentDomain.ManagedPackageLocatorForAgent(address)
+	agentLocator, err := a.support.ManagedPackage.Locator(address)
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
@@ -712,9 +712,7 @@ func (a *Service) agentImportDestination(
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}
-	if sourceValue.Kind != managedfs.Kind ||
-		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
-		!sourceValue.Enabled {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) || !sourceValue.Enabled {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected Plugin does not use the enabled managed Agent Source",
 			spec.ErrInvalid,
@@ -823,13 +821,13 @@ func (a *Service) agentImportIdentityConflicts(
 
 		if identity.OccurrencePath != "" ||
 			identity.Type != declaration.TypeAgent ||
-			rootID == agentBuiltinRootID() {
+			rootID == a.support.BuiltinRoot {
 			continue
 		}
 
 		builtinRecords, err := a.cat.FindByIdentity(
 			ctx,
-			agentBuiltinRootID(),
+			a.support.BuiltinRoot,
 			artifactModel.ArtifactKind(identity.Type),
 			identity.Name,
 			catalogModel.ListOptions{},
@@ -1149,7 +1147,7 @@ func (a *Service) preflightNamedManagedDependency(
 	if target.Status != composition.ResolutionAvailable {
 		return output, nil, managedDependencyIssue(output), nil
 	}
-	if err := validateManagedDependencyTarget(
+	if err := a.validateManagedDependencyTarget(
 		header.Type,
 		relationshipFields.Scope,
 		target,
@@ -1224,7 +1222,7 @@ func managedDependencyIssue(
 	}
 }
 
-func validateManagedDependencyTarget(
+func (a *Service) validateManagedDependencyTarget(
 	declarationType declaration.Type,
 	scope declaration.LookupScope,
 	target composition.NamedRelationshipInspection,
@@ -1249,7 +1247,7 @@ func validateManagedDependencyTarget(
 	isBuiltinArtifact := func() bool {
 		return target.Target.Form == composition.TargetFormArtifact &&
 			target.Target.Artifact != nil &&
-			target.Target.Artifact.RootID == agentBuiltinRootID()
+			target.Target.Artifact.RootID == a.support.BuiltinRoot
 	}
 	isDirectCapability := func() bool {
 		return target.Target.Form == composition.TargetFormDirect &&
@@ -1290,17 +1288,7 @@ func (a *Service) publishPreparedManagedAgent(
 	if err := a.requireMutable(ctx, rootID); err != nil {
 		return artifactModel.Artifact{}, err
 	}
-	if err := agentDomain.ValidateManagedAgentPackageAddress(address); err != nil {
-		return artifactModel.Artifact{}, err
-	}
-
-	locator, err := agentDomain.ManagedPackageLocatorForAgent(address)
-	if err != nil {
-		return artifactModel.Artifact{}, err
-	}
-	decoderID, err := topology.DefaultDocumentDecoderID(
-		topology.DocumentUseManagedAgent,
-	)
+	locator, err := a.support.ManagedPackage.Locator(address)
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -1309,7 +1297,7 @@ func (a *Service) publishPreparedManagedAgent(
 		rootID,
 		sourceID,
 		locator,
-		decoderID,
+		a.support.ManagedPackage.Document.DecoderID,
 	); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -1328,7 +1316,7 @@ func (a *Service) publishPreparedManagedAgent(
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: agentDomain.ManagedAgentDocumentFile(),
+					Locator: a.support.ManagedPackage.Document.Locator,
 					Content: append([]byte(nil), raw...),
 				}},
 			},

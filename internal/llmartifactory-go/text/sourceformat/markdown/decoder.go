@@ -7,8 +7,8 @@ import (
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 )
 
@@ -16,46 +16,52 @@ const markdownMediaType = "text/markdown"
 
 const TextMarkdownDecoderID spec.DecoderID = "text-markdown"
 
-type TextDecoder struct{}
-
-func NewTextDecoder() *TextDecoder {
-	return &TextDecoder{}
+type TextDecoder struct {
+	candidates   support.Candidates
+	instructions support.Candidates
 }
 
-func (*TextDecoder) ID() spec.DecoderID {
+func NewTextDecoder(
+	candidates support.Candidates,
+	instructions support.Candidates,
+) *TextDecoder {
+	return &TextDecoder{
+		candidates:   candidates.Clone(),
+		instructions: instructions.Clone(),
+	}
+}
+
+func (t *TextDecoder) ID() spec.DecoderID {
 	return TextMarkdownDecoderID
 }
 
-func (*TextDecoder) Revision() string {
+func (t *TextDecoder) Revision() string {
 	return "artifact-text-markdown/v1"
 }
 
-func (*TextDecoder) Recognize(
+func (t *TextDecoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
-	if isInstructionFile(candidate.Locator) ||
-		isDefaultTextFile(candidate.Locator) {
+	if candidate.RequestsDecoder(TextMarkdownDecoderID) ||
+		t.candidates.Matches(candidate.Locator) {
 		return ingestModel.RecognitionPreferred
-	}
-	if candidate.RequestsDecoder(TextMarkdownDecoderID) &&
-		isTextCandidate(candidate.Locator) {
-		return ingestModel.RecognitionPossible
 	}
 	return ingestModel.RecognitionNone
 }
 
-func (*TextDecoder) Decode(
+func (t *TextDecoder) Decode(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	if !isTextCandidate(candidate.Locator) {
+	if !t.candidates.Matches(candidate.Locator) &&
+		!candidate.RequestsDecoder(TextMarkdownDecoderID) {
 		return nil, nil
 	}
 
 	insert := declaration.InsertUserMessage
 	prefix := "text"
-	if isInstructionFile(candidate.Locator) {
+	if t.instructions.Matches(candidate.Locator) {
 		insert = declaration.InsertInstructions
 		prefix = "instructions"
 	}
@@ -80,18 +86,6 @@ func (*TextDecoder) Decode(
 		return nil, textDiagnostics(candidate.Locator, err)
 	}
 	return []ingestModel.Decoded{{Definition: value}}, nil
-}
-
-func isTextCandidate(locator spec.Locator) bool {
-	return topology.IsTextMarkdownDocument(locator)
-}
-
-func isDefaultTextFile(locator spec.Locator) bool {
-	return topology.IsDefaultTextMarkdownDocument(locator)
-}
-
-func isInstructionFile(locator spec.Locator) bool {
-	return topology.IsInstructionMarkdownDocument(locator)
 }
 
 func textDiagnostics(

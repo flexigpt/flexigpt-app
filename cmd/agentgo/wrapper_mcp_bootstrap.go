@@ -24,6 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsecrets"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
@@ -66,6 +67,11 @@ func initMCPWrappers(
 		return nil, nil, errors.New("MCP wrapper receivers are incomplete")
 	}
 
+	support, err := llmsupport.MCP()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Each constructor validates the dependencies it actually owns.
 	settings, err := mcpsettings.New(storeOverlays)
 	if err != nil {
@@ -104,6 +110,7 @@ func initMCPWrappers(
 		secrets,
 		mcppolicy.Baseline(),
 		mcpAPI.WithCompositionResolver(resolver),
+		mcpAPI.WithSupport(support),
 	)
 	if err != nil {
 		return nil, nil, err

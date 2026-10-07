@@ -8,6 +8,7 @@ Artifact-family ownership, shared declaration core, supplied content, and runtim
   - [A limited shared LLM core](#a-limited-shared-llm-core)
   - [Application-supplied content and capabilities](#application-supplied-content-and-capabilities)
   - [Minimal consumer surface](#minimal-consumer-surface)
+  - [Package F constraints](#package-f-constraints)
   - [Preserved generic boundaries](#preserved-generic-boundaries)
 - [Non-goals](#non-goals)
 - [Destination layout](#destination-layout)
@@ -157,10 +158,14 @@ The resulting boundary is:
 
 This is an architectural split with functional preservation. The only deliberate functional narrowing is Tool support: Tool declarations and preparation retain Go implementations only. Existing SDK Tool branches are removed rather than retained as inactive extensibility.
 
-This statement is superseded. Package F preserves both source-backed Tool
-implementation families. Go Tools remain local-runtime executable; SDK Tools
-remain provider-native inference ToolChoices. Neither is removed by this
-architectural split.
+This is an architectural split with functional preservation. Tool support
+retains both source-backed implementation families: Go Tools remain
+local-runtime executable, while SDK Tools remain provider-native inference
+ToolChoices. The local Go Tool runtime rejects SDK invocation attempts because
+execution ownership differs, not because SDK Tool Artifacts are unsupported.
+
+The implementation status is maintained in
+`internal/llmartifactory-go/STATUS.md`.
 
 ## Goals
 
@@ -246,6 +251,25 @@ Package F follows these additional constraints:
   dependencies.
 - Direct capabilities are application-selected. A family declares the target
   shape it can consume; application setup supplies the supported matrix.
+- Application-selected document names, filename patterns, decoder IDs,
+  package layouts, managed Source profiles, and built-in scope bindings are
+  supplied as immutable support values.
+- Family code must not import `artifactsetup`, topology YAML packages, Wails,
+  or application embedded-content packages.
+- Wails wrappers remain at the transport boundary. They do not become interior
+  forwarding packages and interior packages do not become Wails APIs.
+- Wrapper-local cross-root aggregation remains in wrappers. Family services
+  expose Root-scoped operations unless cross-root semantics are intrinsic to
+  the family itself.
+- Do not create owner-service facades whose methods only redirect to an
+  enclosing service. Public operations belong on the actual responsibility
+  owner and private helpers stay private to that owner.
+- The generic Store aggregate is a deployment assembly concern. It must not be
+  mirrored through a second broad LLM or application facade merely to route
+  narrow dependencies.
+- Constructor validation establishes mandatory dependencies once. Repeated
+  internal nil checks and foreground context checks are not substitutes for
+  explicit lifecycle boundaries.
 
 ### Preserved generic boundaries
 
@@ -375,7 +399,7 @@ Each artifact family uses the same ownership pattern where the responsibility ex
 | `<family>/local/`              | Explicit local deployment integration using concrete filesystem or embedded Source adapters.                                                                                             |
 | `<family>/internal/`           | Private implementation only when a real family-local implementation boundary exists.                                                                                                     |
 
-The artifact-family root remains the owner of the family service. The design does not create a forwarding `<family>/compose`, `<family>/impl`, or `<family>/manager` package.
+The artifact-family root remains the owner of the family service. The design does not create a forwarding `<family>/compose`, `<family>/impl`, `<family>/manager`, or owner-interface redirect package.
 
 ## Detailed artifact-family layout and responsibility assignments
 
@@ -491,6 +515,7 @@ The resulting Tool contract supports:
 
 - `implementation.kind = go`.
 - Registered Go function identity.
+- `implementation.kind = sdk`.
 - Registered Go Tool metadata.
 - Input and output JSON Schema.
 - Version and Tool capability metadata.
@@ -506,6 +531,10 @@ The resulting Tool contract also preserves:
 SDK Tools remain intentionally unavailable to the local Go Tool invocation
 runtime. That is a runtime ownership boundary, not a declaration or catalog
 feature removal.
+
+The generated Tool inventory retains both Go and SDK Tool declarations.
+Generated Tool Plugin membership and Tool artifact identity are independent of
+whether the implementation is local Go execution or provider-native SDK use.
 
 #### Responsibility moves
 
@@ -1311,22 +1340,28 @@ For example:
 The LLM aggregate construction sequence is:
 
 1. Receive an assembled generic Store.
-2. Validate all selected schema codecs.
-3. Validate all selected Source decoders.
-4. Build the generic schema catalog through Artifactory.
-5. Bind expected-key schema canonicalization to relevant declaration decoders.
-6. Validate family interpretation registrations.
-7. Build the composition registry.
-8. Bind locator handlers.
-9. Construct family services with narrow generic capabilities.
-10. Construct the aggregate family surface.
-11. Retain only LLM-owned in-memory state and close behavior.
+2. Receive application-selected immutable support values.
+3. Validate all selected schema codecs.
+4. Validate all selected Source decoders.
+5. Build the generic schema catalog through Artifactory.
+6. Bind expected-key schema canonicalization to relevant declaration decoders.
+7. Validate family interpretation registrations.
+8. Build the composition registry.
+9. Bind locator handlers.
+10. Construct family services with narrow generic capabilities.
+11. Construct the aggregate family surface.
+12. Retain only LLM-owned in-memory state and close behavior.
 
-The generic Store remains owned by the deployment that opened it.
+The generic Store remains owned by the deployment that opened it. The LLM
+attachment receives named generic capabilities and does not receive, expose,
+or mirror the generic Store aggregate.
 
 ### Local deployment
 
-No second LLM-specific local opener is introduced.
+No second LLM-specific local opener or application-wide forwarding aggregate
+is introduced. The generic Store aggregate remains an internal deployment
+assembly value. Family services and wrappers receive named capabilities rather
+than a mirrored Store-shaped handle.
 
 The existing `artifactory-go/compose/local` package remains the owner of:
 
@@ -1739,8 +1774,9 @@ This package completes the runtime-independent library boundary and moves applic
 - Bind Workspace prompt, Skill, and MCP runtime adapters.
 - Preserve startup ordering and shutdown ordering.
 - Keep Wails wrappers in place as transport and recovery boundaries.
-- Move application-bound adapter implementations out of Wails packages without
-  moving wrapper APIs into interior packages.
+- Keep wrapper-local transport and lifecycle coordination in wrappers.
+- Move only application-bound adapter implementation into `artifactsetup`;
+  do not move wrapper methods into interior packages.
 - Do not add a broad local or LLM aggregate facade merely to route existing
   narrow capabilities.
 
@@ -1806,9 +1842,16 @@ At completion:
 - LLM Artifactory imports no application built-in content.
 - Application setup owns product topology and startup ordering.
 - Runtime integrations own execution and trusted runtime authority.
-- Wrappers remain Wails transport entrypoints, cancellation boundaries, and
-  lifecycle participants; application-bound adapter implementation moves to
-  `artifactsetup`.
+- Wrappers remain Wails transport entrypoints, recovery boundaries,
+  cancellation boundaries where relevant, and lifecycle participants.
+- Wrapper-local management aggregation remains in wrappers rather than being
+  added as a family-service forwarding method.
+- No one-line owner-service forwarding facades are introduced for Model,
+  Workspace, MCP, or another family.
+- Application-bound adapter implementation moves to `artifactsetup` only when
+  it is not transport behavior.
+- LLM family support is resolved from the application support catalog rather
+  than hard-coded by family packages.
 - The reusable LLM library can be extracted without importing FlexiGPT application topology, runtime packages, content packages, or Wails wrappers.
 
 ## Alignment with the prior Artifactory proposal and retained principles

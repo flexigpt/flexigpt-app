@@ -803,12 +803,19 @@ It is also not “validate once at startup and trust all future state.”
 | --------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Service construction              | Required dependencies, supported configuration, registered namespaces, mandatory capability relationships | Repeated dependency-nil checks in every method                              |
 | Registration                      | Decoder IDs/revisions, schema keys, duplicate registrations, required schema bindings                     | Registry completeness checks during every candidate decode                  |
-| Public operation entry            | Request structure, IDs, bounds, required expectations, context contract, authorization                    | Identical request validation in each private helper                         |
+| Public operation entry            | Request structure, IDs, bounds, required expectations, and authorization                                  | Identical request validation in each private helper                         |
 | Driver configuration entry        | Provider-specific configuration and normalization                                                         | Re-normalizing unchanged configuration during unrelated metadata operations |
 | Decoder/schema output boundary    | Output shape, identity linkage, canonical representation, digest evidence, diagnostics                    | Rehashing the same admitted Definition at every staging step                |
 | Snapshot/provider result boundary | Required provider-result invariants and source evidence                                                   | Unrelated domain validation of already established values                   |
 | Transaction commit                | Current revisions, liveness, uniqueness, references, immutable-key conflicts                              | Business decisions already expressed in the command                         |
 | Resource/session completion       | Source consistency and snapshot confirmation                                                              | Nothing: this is a new time-dependent check, not redundant validation       |
+
+Wails owns request context admission and cancellation for ordinary foreground
+operations. Interior services do not repeatedly inspect `ctx.Err()` merely
+because a context was supplied. Context inspection remains appropriate for
+explicit long-running background coordination, bounded loops whose work must
+stop promptly, snapshot/session completion, and provider calls that directly
+honor cancellation.
 
 ### Construction guarantees
 
@@ -822,6 +829,11 @@ After successful construction:
 Private methods may assume those facts.
 
 Optional capabilities are represented and handled intentionally. They are not treated as incompletely initialized mandatory dependencies.
+
+After construction, internal methods assume mandatory services, stores,
+registries, and support values are non-nil. Closed-state behavior belongs at
+the explicit lifecycle boundary, not as repeated nil checks in every private
+helper.
 
 ### Request guarantees
 
@@ -956,6 +968,12 @@ It receives explicit contracts such as:
 - Root and namespace policies.
 
 There is no generic `Metadata` or `LocalState` dependency.
+
+The composed generic Store is a deployment-assembly value. Applications must
+not mirror it through a second broad façade merely to make it convenient for
+domain or transport callers. Domain services receive the named entity and flow
+capabilities they require; wrappers retain only transport, lifecycle, and
+application aggregation responsibilities.
 
 ### Local deployment — `compose/local`
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
 // SourceDocumentLocator resolves the SKILL.md document used by a canonical
@@ -16,9 +17,13 @@ import (
 // URL, Git, package, archive, and command locators remain the responsibility
 // of a locator resolver outside the local Skill runtime path.
 func SourceDocumentLocator(
+	documents support.Documents,
 	locator *declaration.Locator,
 	declarationLocator spec.Locator,
 ) (spec.Locator, error) {
+	if err := documents.Validate(); err != nil {
+		return "", err
+	}
 	if locator == nil {
 		if err := declarationLocator.Validate(false); err != nil {
 			return "", err
@@ -33,10 +38,10 @@ func SourceDocumentLocator(
 	if err != nil {
 		return "", err
 	}
-	if !IsSkillDefinitionFile(target) {
+	if !IsSkillDefinitionFile(documents, target) {
 		target = spec.Locator(path.Join(
 			string(target),
-			string(SkillDefinitionFileName()),
+			string(SkillDefinitionFileName(documents)),
 		))
 	}
 	if err := target.Validate(false); err != nil {
@@ -46,8 +51,8 @@ func SourceDocumentLocator(
 }
 
 // RuntimePackageLocator derives the Skill package directory from a verified
-// SKILL.md Artifact binding. Artifact Store verifies source generation and the
-// source content digest before exposing the returned local path.
+// configured Skill document Artifact binding. Artifact Store verifies source
+// generation and source content evidence before exposing the local path.
 func RuntimePackageLocator(
 	locator spec.Locator,
 	subresource spec.SubresourceLocator,
@@ -59,13 +64,6 @@ func RuntimePackageLocator(
 		return "", fmt.Errorf(
 			"%w: Skill bindings cannot target a subresource",
 			spec.ErrUnsupported,
-		)
-	}
-	if !IsSkillDefinitionFile(locator) {
-		return "", fmt.Errorf(
-			"%w: Skill locator %q is not a configured Skill package document",
-			spec.ErrInvalid,
-			locator,
 		)
 	}
 

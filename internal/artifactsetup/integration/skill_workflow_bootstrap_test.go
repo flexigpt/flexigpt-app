@@ -132,11 +132,12 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	}
 
 	baseline := fixture.ensureUserBaseline(t)
-	if baseline.Name != pluginAPI.SkillBaselinePluginName {
+	baselineName := skillBaselineName(t)
+	if baseline.Name != baselineName {
 		t.Fatalf(
 			"baseline name=%q, want %q",
 			baseline.Name,
-			pluginAPI.SkillBaselinePluginName,
+			baselineName,
 		)
 	}
 	if !baseline.Baseline {
@@ -162,7 +163,7 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	requireNoError(t, err)
 	listedBaseline, found := findPluginByName(
 		userPlugins,
-		string(pluginAPI.SkillBaselinePluginName),
+		string(baselineName),
 	)
 	if !found {
 		t.Fatal("user Skill baseline is absent from Plugin listing")

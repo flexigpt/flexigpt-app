@@ -13,12 +13,6 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 )
 
-const (
-	WorkspaceDirectorySourceStorageKey  = "workspace-directory"
-	WorkspaceBasePolicySourceStorageKey = "workspace-base-policy"
-	WorkspaceRootStorageKeyPrefix       = "workspace-directory-root-"
-)
-
 type WorkspaceDirectoryRef struct {
 	RootID rootModel.RootID `json:"rootID"`
 }

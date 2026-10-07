@@ -539,7 +539,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 
 	remainingBaseline, found := findPluginByName(
 		remainingPlugins,
-		string(pluginAPI.SkillBaselinePluginName),
+		string(skillBaselineName(t)),
 	)
 	if !found {
 		t.Fatal("baseline Plugin disappeared during managed Skill cleanup")

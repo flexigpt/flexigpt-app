@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
 // NormalizeManagedSkillFiles returns a complete portable Skill package and
@@ -17,16 +17,22 @@ import (
 func NormalizeManagedSkillFiles(
 	skillMD []byte,
 	input []managedpackageModel.ManagedPackageFile,
+	documents support.Documents,
 ) ([]managedpackageModel.ManagedPackageFile, []byte, error) {
+	if err := documents.Validate(); err != nil {
+		return nil, nil, err
+	}
+
+	documentFile := documents.Default.Locator
 	if len(input) == 0 {
 		if len(skillMD) == 0 {
 			return nil, nil, fmt.Errorf(
-				"%w: SKILL.md content is required",
+				"%w: configured Skill document content is required",
 				spec.ErrInvalid,
 			)
 		}
 		return []managedpackageModel.ManagedPackageFile{{
-			Locator: skillSource.SkillDefinitionFileName(),
+			Locator: documentFile,
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
@@ -36,21 +42,36 @@ func NormalizeManagedSkillFiles(
 		return nil, nil, err
 	}
 
-	documentFile := skillSource.SkillDefinitionFileName()
-	var packageSkillMD []byte
-	for _, file := range normalized {
-		if file.Locator != documentFile {
+	documentIndex := -1
+	for index, file := range normalized {
+		if path.Dir(string(file.Locator)) != "." ||
+			!documents.Matches(file.Locator) {
 			continue
 		}
-		packageSkillMD = append([]byte(nil), file.Content...)
-		break
+		if documentIndex != -1 {
+			return nil, nil, fmt.Errorf(
+				"%w: managed Skill package has multiple configured Skill documents",
+				spec.ErrIdentityConflict,
+			)
+		}
+		documentIndex = index
 	}
-	if len(packageSkillMD) == 0 {
+	if documentIndex == -1 {
 		return nil, nil, fmt.Errorf(
-			"%w: managed Skill package must contain %q",
+			"%w: managed Skill package must contain a configured Skill document",
 			spec.ErrInvalid,
-			documentFile,
 		)
+	}
+
+	packageSkillMD := append([]byte(nil), normalized[documentIndex].Content...)
+	if normalized[documentIndex].Locator != documentFile {
+		normalized[documentIndex].Locator = documentFile
+		normalized, err = managedpackageModel.NormalizeManagedPackageFiles(
+			normalized,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if len(skillMD) != 0 &&
 		!bytes.Equal(skillMD, packageSkillMD) {
@@ -79,10 +100,14 @@ func NormalizeManagedSkillFiles(
 //	<skill-name>/references/example.md
 //	<skill-name>/scripts/check.py
 func ManagedSkillStorageFiles(
+	documents support.Documents,
 	address managedpackageModel.ManagedPackageAddress,
 	input []managedpackageModel.ManagedPackageFile,
 ) ([]managedpackageModel.ManagedPackageFile, error) {
-	if err := validateManagedSkillPackageAddress(address); err != nil {
+	if err := documents.Validate(); err != nil {
+		return nil, err
+	}
+	if err := address.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -91,7 +116,7 @@ func ManagedSkillStorageFiles(
 		return nil, err
 	}
 
-	documentFile := skillSource.SkillDefinitionFileName()
+	documentFile := documents.Default.Locator
 	documentFound := false
 	output := make([]managedpackageModel.ManagedPackageFile, 0, len(files))
 	for _, file := range files {

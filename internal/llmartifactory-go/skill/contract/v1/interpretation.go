@@ -6,9 +6,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
-func Interpretation() coreinterpretation.Registration {
+func Interpretation(
+	documents support.Documents,
+) coreinterpretation.Registration {
 	return coreinterpretation.Registration{
 		DeclarationType:  SkillType,
 		SchemaKey:        SkillSchemaKey,
@@ -28,16 +31,23 @@ func Interpretation() coreinterpretation.Registration {
 			if err := target.Validate(false); err != nil {
 				return nil, err
 			}
-			if path.Base(string(target)) == "SKILL.md" {
+			if documents.Matches(target) {
 				return []spec.Locator{target}, nil
 			}
-			document := spec.Locator(
-				path.Join(string(target), "SKILL.md"),
-			)
-			if err := document.Validate(false); err != nil {
-				return nil, err
+
+			output := make([]spec.Locator, 0, len(documents.Files)+1)
+			output = append(output, target)
+			for _, documentName := range documents.Files {
+				document := spec.Locator(path.Join(
+					string(target),
+					string(documentName),
+				))
+				if err := document.Validate(false); err != nil {
+					return nil, err
+				}
+				output = append(output, document)
 			}
-			return []spec.Locator{target, document}, nil
+			return output, nil
 		},
 	}
 }

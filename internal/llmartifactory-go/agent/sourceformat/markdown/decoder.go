@@ -11,11 +11,11 @@ import (
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -27,13 +27,15 @@ const markdownMediaType = "text/markdown"
 // AgentMarkdownDecoder adapts AGENT.md and *.agent.md files. YAML front
 // matter provides Agent declaration fields. The Markdown body becomes a named
 // Instruction in Agent.members using the <agent-name>-instructions naming
-// convention.
+// convention. Candidate support is supplied by application registration.
 type AgentMarkdownDecoder struct {
 	interpretations *coreinterpretation.Registry
+	candidates      support.Candidates
 }
 
 func NewAgentMarkdownDecoder(
 	interpretations *coreinterpretation.Registry,
+	candidates support.Candidates,
 ) (*AgentMarkdownDecoder, error) {
 	if interpretations == nil {
 		return nil, fmt.Errorf(
@@ -41,22 +43,28 @@ func NewAgentMarkdownDecoder(
 			spec.ErrInvalid,
 		)
 	}
-	return &AgentMarkdownDecoder{interpretations: interpretations}, nil
+	if err := candidates.Validate(); err != nil {
+		return nil, err
+	}
+	return &AgentMarkdownDecoder{
+		interpretations: interpretations,
+		candidates:      candidates.Clone(),
+	}, nil
 }
 
-func (*AgentMarkdownDecoder) ID() spec.DecoderID {
+func (d *AgentMarkdownDecoder) ID() spec.DecoderID {
 	return AgentMarkdownDecoderID
 }
 
-func (*AgentMarkdownDecoder) Revision() string {
+func (d *AgentMarkdownDecoder) Revision() string {
 	return "artifact-agent-markdown/v1"
 }
 
-func (*AgentMarkdownDecoder) Recognize(
+func (d *AgentMarkdownDecoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
-	if !isAgentMarkdownCandidate(candidate.Locator) {
+	if !d.candidates.Matches(candidate.Locator) {
 		return ingestModel.RecognitionNone
 	}
 	return ingestModel.RecognitionPreferred
@@ -135,12 +143,6 @@ func (d *AgentMarkdownDecoder) Decode(
 		})
 	}
 	return output, nil
-}
-
-func isAgentMarkdownCandidate(
-	locator spec.Locator,
-) bool {
-	return topology.IsAgentMarkdownDocument(locator)
 }
 
 func decodeAgentMarkdown(

@@ -172,9 +172,6 @@ func (a *Service) ResolveWorkspaceRuntimePlan(
 	workspace artifactModel.ArtifactRef,
 	selection WorkspaceRuntimeSelection,
 ) (WorkspaceRuntimePlan, error) {
-	if a.resources == nil {
-		return WorkspaceRuntimePlan{}, spec.ErrClosed
-	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,

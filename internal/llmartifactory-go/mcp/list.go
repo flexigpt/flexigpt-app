@@ -215,9 +215,6 @@ func pageAcrossRoots[T any](
 		})
 
 		for _, value := range values {
-			if err := ctx.Err(); err != nil {
-				return nil, "", err
-			}
 			if !afterCursor(key(value), cursor) {
 				continue
 			}

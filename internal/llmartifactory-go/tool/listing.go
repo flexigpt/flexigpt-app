@@ -24,7 +24,7 @@ func (a *Service) listPluginTools(
 
 	entries, err := a.cat.ListByRoot(
 		ctx,
-		a.builtinRoot,
+		a.builtin.RootID,
 		catalogModel.ListOptions{Kind: toolDomain.ToolArtifactKind},
 	)
 	if err != nil {

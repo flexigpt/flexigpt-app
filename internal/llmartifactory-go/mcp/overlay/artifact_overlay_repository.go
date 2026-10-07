@@ -191,13 +191,6 @@ func (r *ArtifactOverlayRepository) artifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (artifactModel.Artifact, error) {
-	if r == nil ||
-		r.artifacts == nil ||
-		r.protection == nil ||
-		r.protectedOverlay == nil ||
-		r.localState == nil {
-		return artifactModel.Artifact{}, spec.ErrClosed
-	}
 	return r.artifacts.Get(ctx, ref)
 }
 

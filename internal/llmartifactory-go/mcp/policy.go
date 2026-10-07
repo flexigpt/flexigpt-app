@@ -10,7 +10,6 @@ import (
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	policyMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/policy"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
@@ -58,17 +57,14 @@ func (a *Service) SaveMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	address, err := managedpackageModel.NewManagedPackageAddress(
-		mcpDomain.ManagedMCPPolicyPackageKind,
+	address, err := a.support.PolicyPackage.Address(
 		request.Name,
-		topology.UnversionedPackageVersion(),
+		"",
 	)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	locator, err := address.FileLocator(
-		mcpDomain.ManagedMCPPolicyDocumentFile(),
-	)
+	locator, err := a.support.PolicyPackage.Locator(address)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
@@ -93,18 +89,12 @@ func (a *Service) SaveMCPPolicy(
 	}
 	rootID := membership.Plugin.Artifact.RootID
 	sourceID := membership.Plugin.Artifact.Binding.SourceID
-	decoderID, err := topology.DefaultDocumentDecoderID(
-		topology.DocumentUseManagedMCPPolicy,
-	)
-	if err != nil {
-		return result, err
-	}
 	if _, err := a.plugins.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoderID,
+		a.support.PolicyPackage.Document.DecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -123,7 +113,7 @@ func (a *Service) SaveMCPPolicy(
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
 				Files: []managedpackageModel.ManagedPackageFile{{
-					Locator: mcpDomain.ManagedMCPPolicyDocumentFile(),
+					Locator: a.support.PolicyPackage.Document.Locator,
 					Content: raw,
 				}},
 			},
@@ -204,7 +194,7 @@ func (a *Service) DeleteMCPPolicy(
 			spec.ErrUnsupported,
 		)
 	}
-	address, err := mcpDomain.ManagedPackageAddressFromMCPPolicyLocator(
+	address, err := a.support.PolicyPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -216,7 +206,8 @@ func (a *Service) DeleteMCPPolicy(
 		Package:          address,
 		ExpectedArtifact: &ref,
 	}
-	if sourceValue.StorageKey == pluginAPI.MCPManagedPluginSourceStorageKey {
+	if a.support.PluginProfile.Source != nil &&
+		sourceValue.StorageKey == a.support.PluginProfile.Source.StorageKey {
 		locator := record.Binding.Locator
 		removeRequest.PruneDiscoveryLocator = &locator
 	}

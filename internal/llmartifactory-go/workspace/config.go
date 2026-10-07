@@ -4,6 +4,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contextengine"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
@@ -37,11 +38,50 @@ func (s DefaultPolicySource) Validate() error {
 	return s.Policy.Validate()
 }
 
+type Support struct {
+	DirectorySource         support.SourceProfile
+	PolicySource            support.SourceProfile
+	RootStorageKeyPrefix    spec.StorageKey
+	DirectoryDiscovery      sourceModel.DiscoverySpec
+	ManifestPatterns        []string
+	SelectorIncludePatterns []string
+	SkillDocuments          support.Documents
+}
+
+func (s Support) Validate() error {
+	if err := s.DirectorySource.Validate(); err != nil {
+		return err
+	}
+	if err := s.PolicySource.Validate(); err != nil {
+		return err
+	}
+	if err := s.RootStorageKeyPrefix.Validate(); err != nil {
+		return err
+	}
+	if err := s.DirectoryDiscovery.Validate(); err != nil {
+		return err
+	}
+	if err := spec.ValidatePathPatterns(
+		"Workspace manifest patterns",
+		s.ManifestPatterns,
+	); err != nil {
+		return err
+	}
+	if err := spec.ValidatePathPatterns(
+		"Workspace selector patterns",
+		s.SelectorIncludePatterns,
+	); err != nil {
+		return err
+	}
+	return s.SkillDocuments.Validate()
+}
+
 type Config struct {
 	ContextComposition  contextengine.CompositionPolicy
 	Composition         *composition.Resolver
 	MCPServers          workspacemcp.ServerResolver
 	DefaultPolicySource DefaultPolicySource
+	Support             Support
 
 	// AdditionalDecoderHints lets application composition add dedicated
 	// decoders without making Workspace import unrelated family services.
@@ -59,6 +99,7 @@ func (c Config) normalized() Config {
 		output.AdditionalDecoderHints[index] = hint.Clone()
 	}
 	output.DefaultPolicySource = c.DefaultPolicySource
+	output.Support = c.Support
 	return output
 }
 

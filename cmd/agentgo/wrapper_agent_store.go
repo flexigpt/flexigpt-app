@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/agentcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
@@ -18,6 +19,8 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -25,7 +28,8 @@ import (
 )
 
 type AgentStoreWrapper struct {
-	api *agentAPI.Service
+	api   *agentAPI.Service
+	roots root.API
 }
 
 func NewAgentBuiltInInstaller(
@@ -71,6 +75,11 @@ func InitAgentStoreWrapper(
 		return errors.New("agent store wrapper dependencies are incomplete")
 	}
 
+	support, err := llmsupport.Agent()
+	if err != nil {
+		return err
+	}
+
 	api, err := agentAPI.New(
 		sources,
 		discovery,
@@ -80,17 +89,18 @@ func InitAgentStoreWrapper(
 		managedArtifacts,
 		protection,
 		definitions,
-		agentAPI.WithRoots(roots),
 		agentAPI.WithCompositionResolver(resolver),
 		agentAPI.WithDeclarationInterpretations(
 			interpretations,
 		),
+		agentAPI.WithSupport(support),
 	)
 	if err != nil {
 		return err
 	}
 
 	wrapper.api = api
+	wrapper.roots = roots
 	return nil
 }
 
@@ -122,12 +132,37 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 	[]agentAPI.AgentListItem,
 	error,
 ) {
-	return withAgentStore(
-		w,
-		func(api *agentAPI.Service) ([]agentAPI.AgentListItem, error) {
-			return api.ListAgentsForManagement(context.Background())
-		},
-	)
+	return withRecoveryResp(func() ([]agentAPI.AgentListItem, error) {
+		if w == nil || w.api == nil || w.roots == nil {
+			return nil, spec.ErrClosed
+		}
+		ctx := context.Background()
+		roots, err := w.roots.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		output := make([]agentAPI.AgentListItem, 0)
+		for _, rootValue := range roots {
+			values, err := w.api.ListAgents(
+				ctx,
+				agentAPI.ListAgentsRequest{RootID: rootValue.ID},
+			)
+			if err != nil {
+				return nil, err
+			}
+			output = append(output, values...)
+		}
+		sort.Slice(output, func(left, right int) bool {
+			if output[left].Ref.RootID != output[right].Ref.RootID {
+				return output[left].Ref.RootID < output[right].Ref.RootID
+			}
+			if output[left].Name != output[right].Name {
+				return output[left].Name < output[right].Name
+			}
+			return output[left].Ref.ArtifactID < output[right].Ref.ArtifactID
+		})
+		return output, nil
+	})
 }
 
 // ListAgentPluginsForManagement returns every Agent Plugin across
@@ -137,14 +172,34 @@ func (w *AgentStoreWrapper) ListAgentPluginsForManagement() (
 	[]pluginAPI.ListItem,
 	error,
 ) {
-	return withAgentStore(
-		w,
-		func(api *agentAPI.Service) ([]pluginAPI.ListItem, error) {
-			return api.ListAgentPluginsForManagement(
-				context.Background(),
-			)
-		},
-	)
+	return withRecoveryResp(func() ([]pluginAPI.ListItem, error) {
+		if w == nil || w.api == nil || w.roots == nil {
+			return nil, spec.ErrClosed
+		}
+		ctx := context.Background()
+		roots, err := w.roots.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		output := make([]pluginAPI.ListItem, 0)
+		for _, rootValue := range roots {
+			values, err := w.api.ListAgentPlugins(ctx, rootValue.ID)
+			if err != nil {
+				return nil, err
+			}
+			output = append(output, values...)
+		}
+		sort.Slice(output, func(left, right int) bool {
+			if output[left].Ref.RootID != output[right].Ref.RootID {
+				return output[left].Ref.RootID < output[right].Ref.RootID
+			}
+			if output[left].Name != output[right].Name {
+				return output[left].Name < output[right].Name
+			}
+			return output[left].Ref.ArtifactID < output[right].Ref.ArtifactID
+		})
+		return output, nil
+	})
 }
 
 func (w *AgentStoreWrapper) GetAgent(
@@ -207,6 +262,18 @@ func (w *AgentStoreWrapper) CreateAgentPlugin(
 	return withAgentStore(
 		w,
 		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
+			if request.RootID == "" {
+				if w.roots == nil {
+					return pluginAPI.PluginView{}, spec.ErrClosed
+				}
+				if _, err := w.roots.Create(
+					context.Background(),
+					topology.UserRootDraft(),
+				); err != nil {
+					return pluginAPI.PluginView{}, err
+				}
+				request.RootID = topology.UserRootID()
+			}
 			return api.CreateAgentPlugin(
 				context.Background(),
 				request,
@@ -368,17 +435,46 @@ func (w *AgentStoreWrapper) ListAgentImportDestinations() (
 	[]agentAPI.AgentImportDestination,
 	error,
 ) {
-	return withAgentStore(
-		w,
-		func(api *agentAPI.Service) (
-			[]agentAPI.AgentImportDestination,
-			error,
-		) {
-			return api.ListAgentImportDestinationsForManagement(
-				context.Background(),
+	return withRecoveryResp(func() ([]agentAPI.AgentImportDestination, error) {
+		if w == nil || w.api == nil || w.roots == nil {
+			return nil, spec.ErrClosed
+		}
+
+		ctx := context.Background()
+		roots, err := w.roots.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sort.Slice(roots, func(left, right int) bool {
+			return roots[left].ID < roots[right].ID
+		})
+
+		output := make([]agentAPI.AgentImportDestination, 0)
+		for _, rootValue := range roots {
+			values, err := w.api.ListAgentImportDestinations(
+				ctx,
+				rootValue.ID,
 			)
-		},
-	)
+			if err != nil {
+				return nil, err
+			}
+			for index := range values {
+				values[index].RootDisplayName = rootValue.DisplayName
+			}
+			output = append(output, values...)
+		}
+		sort.Slice(output, func(left, right int) bool {
+			if output[left].RootID != output[right].RootID {
+				return output[left].RootID < output[right].RootID
+			}
+			if output[left].PluginName != output[right].PluginName {
+				return output[left].PluginName < output[right].PluginName
+			}
+			return output[left].Plugin.ArtifactID <
+				output[right].Plugin.ArtifactID
+		})
+		return output, nil
+	})
 }
 
 func (w *AgentStoreWrapper) PreviewAgentImport(
@@ -439,4 +535,5 @@ func (w *AgentStoreWrapper) close() {
 		return
 	}
 	w.api = nil
+	w.roots = nil
 }

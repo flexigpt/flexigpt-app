@@ -6,6 +6,8 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
+	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
 // BuiltinCatalog is application-supplied generated Tool inventory.
@@ -22,6 +24,9 @@ type BuiltinCatalog struct {
 	RootID   rootModel.RootID
 	SourceID sourceModel.SourceID
 
+	ToolPackage   support.PackageLayout
+	PluginProfile pluginAPI.Profile
+
 	PluginByTool map[spec.LogicalName]spec.LogicalName
 }
 
@@ -30,6 +35,12 @@ func (c BuiltinCatalog) Validate() error {
 		return err
 	}
 	if err := c.SourceID.Validate(); err != nil {
+		return err
+	}
+	if err := c.ToolPackage.Validate(); err != nil {
+		return err
+	}
+	if err := c.PluginProfile.Validate(); err != nil {
 		return err
 	}
 	if c.PluginByTool == nil {

@@ -5,7 +5,7 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 )
 
@@ -24,16 +24,23 @@ const (
 	HydrationSchemaVersion = "agent.skill.builtin-hydration/v1"
 )
 
-func SkillDefinitionFileName() spec.Locator {
-	return topology.DefaultSkillPackageDocumentFile()
+func SkillDefinitionFileName(
+	documents support.Documents,
+) spec.Locator {
+	return documents.Default.Locator
 }
 
-func SkillDefinitionFiles() []spec.Locator {
-	return topology.SkillPackageDocumentFiles()
+func SkillDefinitionFiles(
+	documents support.Documents,
+) []spec.Locator {
+	return append([]spec.Locator(nil), documents.Files...)
 }
 
-func IsSkillDefinitionFile(locator spec.Locator) bool {
-	return topology.IsSkillPackageDocument(locator)
+func IsSkillDefinitionFile(
+	documents support.Documents,
+	locator spec.Locator,
+) bool {
+	return documents.Matches(locator)
 }
 
 func IsSkillKind(value artifactModel.ArtifactKind) bool {

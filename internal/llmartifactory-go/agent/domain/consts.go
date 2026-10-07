@@ -4,12 +4,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
-	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
 const (
@@ -19,17 +14,11 @@ const (
 
 	ManagedAgentPackageKind       managedpackageModel.PackageKind = "agent"
 	BuiltinAgentPluginPackageKind managedpackageModel.PackageKind = "agent-plugin"
-	AgentManagedSourceStorageKey  spec.StorageKey                 = "user-agents"
-	AgentManagedPluginPackageKind managedpackageModel.PackageKind = "plugin"
-	AgentBaselinePluginName       spec.LogicalName                = "agent-baseline"
 	AgentSchemaID                 schemaModel.SchemaID            = agentv1.AgentSchemaID
 
-	AgentSchemaVersion            = agentv1.AgentSchemaVersion
-	AgentManagedSourceDisplayName = "User-managed Agents"
-	AgentBaselineDisplayName      = "Agent Baseline"
-	AgentBaselineDescription      = "Application-provisioned editable Agent Plugin."
-	BuiltInInstallerName          = "agent.agent"
-	HydrationSchemaVersion        = "agent.agent.builtin-hydration/v1"
+	AgentSchemaVersion     = agentv1.AgentSchemaVersion
+	BuiltInInstallerName   = "agent.agent"
+	HydrationSchemaVersion = "agent.agent.builtin-hydration/v1"
 )
 
 func IsAgentKind(value artifactModel.ArtifactKind) bool {
@@ -41,26 +30,4 @@ func IsAgentSchema(value schemaModel.Key) bool {
 		value.Kind == schemaModel.Kind(AgentArtifactKind) &&
 		value.SchemaID == AgentSchemaID &&
 		value.SchemaVersion == AgentSchemaVersion
-}
-
-func AgentPluginProfile() pluginAPI.Profile {
-	return pluginAPI.Profile{
-		Name:                "agent",
-		SourceStorageKey:    AgentManagedSourceStorageKey,
-		SourceDisplayName:   AgentManagedSourceDisplayName,
-		BaselineName:        AgentBaselinePluginName,
-		BaselineDisplayName: AgentBaselineDisplayName,
-		BaselineDescription: AgentBaselineDescription,
-		PackageKind:         AgentManagedPluginPackageKind,
-		DocumentUse:         topology.DocumentUseAgentManagedPlugin,
-		MembershipPolicy: pluginDomain.MembershipPolicy{
-			Mode: pluginDomain.MembershipModeSingleType,
-			AllowedTypes: []declaration.Type{
-				agentv1.AgentType,
-			},
-			AllowedForms: []declaration.MemberForm{
-				declaration.MemberNamed,
-			},
-		},
-	}
 }

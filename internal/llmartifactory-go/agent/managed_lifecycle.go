@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
-	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 )
 
 type editableManagedAgent struct {
@@ -183,8 +181,7 @@ func (a *Service) loadManagedAgent(
 	if err != nil {
 		return editableManagedAgent{}, err
 	}
-	if sourceValue.Kind != managedfs.Kind ||
-		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent is not backed by the managed Agent Source",
 			spec.ErrUnsupported,
@@ -197,7 +194,7 @@ func (a *Service) loadManagedAgent(
 		)
 	}
 
-	address, err := agentDomain.ManagedPackageAddressFromAgentLocator(
+	address, err := a.support.ManagedPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {

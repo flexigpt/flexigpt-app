@@ -15,7 +15,7 @@ func (a *Service) ListToolPlugins(
 	ctx context.Context,
 ) ([]pluginAPI.ListItem, error) {
 	return a.plugins.ListDomain(ctx, pluginAPI.ListRequest{
-		RootID: a.builtinRoot,
+		RootID: a.builtin.RootID,
 	})
 }
 
@@ -53,7 +53,7 @@ func (a *Service) pluginForTool(
 	ctx context.Context,
 	name spec.LogicalName,
 ) (pluginAPI.PluginView, error) {
-	pluginName, found := a.pluginByTool[name]
+	pluginName, found := a.builtin.PluginByTool[name]
 	if !found {
 		return pluginAPI.PluginView{}, fmt.Errorf(
 			"%w: Tool %q has no generated Tool Plugin",
@@ -64,7 +64,7 @@ func (a *Service) pluginForTool(
 
 	entries, err := a.cat.FindByIdentity(
 		ctx,
-		a.builtinRoot,
+		a.builtin.RootID,
 		artifactModel.ArtifactKind(pluginv1.PluginType),
 		pluginName,
 		catalogModel.ListOptions{},
@@ -76,7 +76,7 @@ func (a *Service) pluginForTool(
 	matches := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, entry := range entries {
 		if entry.State != artifactModel.StateAvailable ||
-			entry.Binding.SourceID != a.builtinSource ||
+			entry.Binding.SourceID != a.builtin.SourceID ||
 			entry.Binding.SubresourceLocator != "" {
 			continue
 		}

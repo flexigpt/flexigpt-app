@@ -8,6 +8,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
@@ -19,12 +20,36 @@ func Compile(
 	temporaryDirectory string,
 	registry *coreinterpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
+	support, err := llmsupport.Skill()
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
 	packages, err := artifactbuiltin.EmbeddedSkillPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages, registry)
+	prepared, err := PreparePackages(
+		ctx,
+		packages,
+		registry,
+		support.Documents,
+	)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
+	candidates, err := llmsupport.Candidates(skillSource.MarkdownDecoderID)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
+	skillDecoder, err := skillmarkdown.NewDecoder(
+		candidates,
+		support.Documents,
+		support.Package,
+	)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
@@ -36,7 +61,7 @@ func Compile(
 		SchemaVersion:      skillSource.HydrationSchemaVersion,
 		InstallerName:      skillSource.BuiltInInstallerName,
 		Interpretations:    registry,
-		AdditionalDecoders: []ingest.Decoder{skillmarkdown.NewDecoder()},
+		AdditionalDecoders: []ingest.Decoder{skillDecoder},
 		Packages:           packageInputs(prepared),
 	})
 }

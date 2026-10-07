@@ -10,19 +10,24 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/sourceformat/markdown"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	mcpconfig "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/sourceformat/config"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
+	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 	skillmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/sourceformat/markdown"
 	teamv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/team/contract/v1"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
@@ -35,14 +40,22 @@ import (
 // NewLLMInterpretationRegistry assembles the selected application declaration
 // families. Family semantics remain owned by the family contract packages.
 func NewLLMInterpretationRegistry() (*coreinterpretation.Registry, error) {
-	return coreinterpretation.NewRegistry(llmFamilyRegistrations()...)
+	registrations, err := applicationFamilyRegistrations()
+	if err != nil {
+		return nil, err
+	}
+	return coreinterpretation.NewRegistry(registrations...)
 }
 
 // LLMDeclarationSchemaCodecs returns the selected family schema codecs. Schema
 // registration is separate from decoder and locator selection.
 func LLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
-	keys := make([]schemaModel.Key, 0, len(llmFamilyRegistrations()))
-	for _, registration := range llmFamilyRegistrations() {
+	registrations, err := applicationFamilyRegistrations()
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]schemaModel.Key, 0, len(registrations))
+	for _, registration := range registrations {
 		keys = append(keys, registration.SchemaKey)
 	}
 	return LLMDeclarationSchemaCodecsForSchemaKeys(keys)
@@ -103,7 +116,11 @@ func LLMDeclarationSchemaCodecsForSchemaKeys(
 }
 
 func allLLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
-	output := make([]schema.Codec, 0, len(llmFamilyRegistrations()))
+	registrations, err := applicationFamilyRegistrations()
+	if err != nil {
+		return nil, err
+	}
+	output := make([]schema.Codec, 0, len(registrations))
 	add := func(
 		registration coreinterpretation.Registration,
 		raw []byte,
@@ -134,7 +151,11 @@ func allLLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
 	if err := add(toolv1.Interpretation(), toolv1.ToolJSONSchema()); err != nil {
 		return nil, fmt.Errorf("create Tool schema codec: %w", err)
 	}
-	if err := add(skillv1.Interpretation(), skillv1.SkillJSONSchema()); err != nil {
+	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
+	if err != nil {
+		return nil, err
+	}
+	if err := add(skillv1.Interpretation(skillDocuments), skillv1.SkillJSONSchema()); err != nil {
 		return nil, fmt.Errorf("create Skill schema codec: %w", err)
 	}
 	if err := add(mcpv1.Interpretation(), mcpv1.MCPJSONSchema()); err != nil {
@@ -209,10 +230,19 @@ func LLMCanonicalDeclarationDecodersForSchemaKeys(
 	if err != nil {
 		return nil, err
 	}
+	jsonCandidates, err := decoderCandidates(coredecoder.JSONDecoderID)
+	if err != nil {
+		return nil, err
+	}
+	yamlCandidates, err := decoderCandidates(coredecoder.YAMLDecoderID)
+	if err != nil {
+		return nil, err
+	}
 
 	jsonDecoder, err := coredecoder.NewJSONDecoderForSchemaKeys(
 		registry,
 		selected,
+		jsonCandidates,
 	)
 	if err != nil {
 		return nil, err
@@ -220,6 +250,7 @@ func LLMCanonicalDeclarationDecodersForSchemaKeys(
 	yamlDecoder, err := coredecoder.NewYAMLDecoderForSchemaKeys(
 		registry,
 		selected,
+		yamlCandidates,
 	)
 	if err != nil {
 		return nil, err
@@ -239,17 +270,64 @@ func LLMSourceFormatDecoders(
 			spec.ErrInvalid,
 		)
 	}
-
-	agentDecoder, err := agentmarkdown.NewAgentMarkdownDecoder(registry)
+	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
+	if err != nil {
+		return nil, err
+	}
+	agentCandidates, err := decoderCandidates(
+		agentmarkdown.AgentMarkdownDecoderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	textCandidates, err := decoderCandidates(
+		textmarkdown.TextMarkdownDecoderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	instructionCandidates, err := documentUseCandidates(
+		topology.DocumentUseWorkspaceInstructions,
+	)
+	if err != nil {
+		return nil, err
+	}
+	skillCandidates, err := decoderCandidates(skillSource.MarkdownDecoderID)
+	if err != nil {
+		return nil, err
+	}
+	mcpCandidates, err := decoderCandidates(mcpDomain.SourceDecoderID)
+	if err != nil {
+		return nil, err
+	}
+	skillSupport, err := llmsupport.Skill()
 	if err != nil {
 		return nil, err
 	}
 
+	agentDecoder, err := agentmarkdown.NewAgentMarkdownDecoder(
+		registry,
+		agentCandidates,
+	)
+	if err != nil {
+		return nil, err
+	}
+	skillDecoder, err := skillmarkdown.NewDecoder(
+		skillCandidates,
+		skillDocuments,
+		skillSupport.Package,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return []ingest.Decoder{
 		agentDecoder,
-		textmarkdown.NewTextDecoder(),
-		skillmarkdown.NewDecoder(),
-		mcpconfig.NewDecoder(),
+		textmarkdown.NewTextDecoder(
+			textCandidates,
+			instructionCandidates,
+		),
+		skillDecoder,
+		mcpconfig.NewDecoder(mcpCandidates),
 	}, nil
 }
 
@@ -265,13 +343,21 @@ func LLMPathLocatorFactories(
 	return []corelocator.Factory{factory}, nil
 }
 
-func llmFamilyRegistrations() []coreinterpretation.Registration {
+func applicationFamilyRegistrations() ([]coreinterpretation.Registration, error) {
+	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
+	if err != nil {
+		return nil, err
+	}
+	return llmFamilyRegistrations(skillDocuments), nil
+}
+
+func llmFamilyRegistrations(skillDocuments support.Documents) []coreinterpretation.Registration {
 	return []coreinterpretation.Registration{
 		textv1.Interpretation(),
 		modelv1.Interpretation(),
 		modelproviderv1.Interpretation(),
 		toolv1.Interpretation(),
-		skillv1.Interpretation(),
+		skillv1.Interpretation(skillDocuments),
 		mcpv1.Interpretation(),
 		mcppolicyv1.Interpretation(),
 		pluginv1.Interpretation(),
@@ -281,4 +367,60 @@ func llmFamilyRegistrations() []coreinterpretation.Registration {
 		workflowv1.Interpretation(),
 		workspacev1.Interpretation(),
 	}
+}
+
+func decoderCandidates(
+	decoderID spec.DecoderID,
+) (support.Candidates, error) {
+	patterns, err := topology.DocumentPatternsForDecoder(decoderID)
+	if err != nil {
+		return support.Candidates{}, err
+	}
+	value := support.Candidates{Patterns: patterns}
+	if err := value.Validate(); err != nil {
+		return support.Candidates{}, err
+	}
+	return value, nil
+}
+
+func documentSupport(
+	use string,
+) (support.Documents, error) {
+	locator, err := topology.DefaultDocumentFile(use)
+	if err != nil {
+		return support.Documents{}, err
+	}
+	decoderID, err := topology.DefaultDocumentDecoderID(use)
+	if err != nil {
+		return support.Documents{}, err
+	}
+	files, err := topology.DocumentFiles(use)
+	if err != nil {
+		return support.Documents{}, err
+	}
+	patterns, err := topology.DocumentPatterns(use)
+	if err != nil {
+		return support.Documents{}, err
+	}
+
+	value := support.Documents{
+		Default:  support.Document{Locator: locator, DecoderID: decoderID},
+		Files:    files,
+		Patterns: patterns,
+	}
+	return value, value.Validate()
+}
+
+func documentUseCandidates(
+	use string,
+) (support.Candidates, error) {
+	patterns, err := topology.DocumentPatterns(use)
+	if err != nil {
+		return support.Candidates{}, err
+	}
+	value := support.Candidates{Patterns: patterns}
+	if err := value.Validate(); err != nil {
+		return support.Candidates{}, err
+	}
+	return value, nil
 }

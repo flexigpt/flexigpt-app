@@ -85,16 +85,6 @@ func (s *Service) Resolve(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (Material, error) {
-	if s == nil ||
-		s.artifacts == nil ||
-		s.resources == nil ||
-		s.protection == nil ||
-		s.overlays == nil ||
-		s.declarations == nil ||
-		s.secretCleaner == nil {
-		return Material{}, spec.ErrClosed
-	}
-
 	if err := ref.Validate(); err != nil {
 		return Material{}, err
 	}

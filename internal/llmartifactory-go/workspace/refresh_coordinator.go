@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -17,15 +16,18 @@ import (
 type workspaceRefreshCoordinator struct {
 	sources          source.API
 	workspaceSources workspaceSourceRegistry
+	support          Support
 }
 
 func newWorkspaceRefreshCoordinator(
 	sources source.API,
 	workspaceSources workspaceSourceRegistry,
+	support Support,
 ) *workspaceRefreshCoordinator {
 	return &workspaceRefreshCoordinator{
 		sources:          sources,
 		workspaceSources: workspaceSources,
+		support:          support,
 	}
 }
 
@@ -59,13 +61,7 @@ func (c *workspaceRefreshCoordinator) RequirementsForSelector(
 
 	include := append([]string(nil), request.Selector.Include...)
 	if len(include) == 0 {
-		defaultInclude, err := topology.DiscoveryIncludePatternsForUse(
-			topology.DiscoveryUseSelector,
-		)
-		if err != nil {
-			return nil, err
-		}
-		include = defaultInclude
+		include = append([]string(nil), c.support.SelectorIncludePatterns...)
 	}
 	return []corerefresh.Requirement{{
 		RootID:   current.RootID,
@@ -123,7 +119,7 @@ func (c *workspaceRefreshCoordinator) RequirementsForLocatedMember(
 	requirement := sourceModel.DiscoveryRequirement{
 		RequireAuthoritative: true,
 	}
-	candidates := locatedRefreshCandidates(header.Type, target)
+	candidates := c.locatedRefreshCandidates(header.Type, target)
 	for _, candidate := range candidates {
 		inScope, err := current.Discovery.InScope(candidate)
 		if err != nil {
@@ -174,12 +170,12 @@ func localRefreshLocator(
 	return value, true, err
 }
 
-func locatedRefreshCandidates(
+func (c *workspaceRefreshCoordinator) locatedRefreshCandidates(
 	declarationType declaration.Type,
 	target spec.Locator,
 ) []spec.Locator {
 	if declarationType != declaration.TypeSkill ||
-		topology.IsSkillPackageDocument(target) {
+		c.support.SkillDocuments.Matches(target) {
 		return []spec.Locator{target}
 	}
 
@@ -187,7 +183,7 @@ func locatedRefreshCandidates(
 	seen := map[spec.Locator]struct{}{
 		target: {},
 	}
-	for _, skillDocument := range topology.SkillPackageDocumentFiles() {
+	for _, skillDocument := range c.support.SkillDocuments.Files {
 		candidate := spec.Locator(path.Join(
 			string(target),
 			string(skillDocument),

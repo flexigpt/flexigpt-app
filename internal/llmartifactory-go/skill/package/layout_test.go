@@ -6,6 +6,7 @@ import (
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillPackage "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/package"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 )
@@ -13,8 +14,21 @@ import (
 func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	t *testing.T,
 ) {
+	layout := support.PackageLayout{
+		Kind:           skillSource.ManagedSkillPackageKind,
+		DefaultVersion: "unversioned",
+		Document: support.Document{
+			Locator:   "SKILL.md",
+			DecoderID: skillSource.MarkdownDecoderID,
+		},
+	}
+	documents := support.Documents{
+		Default: layout.Document,
+		Files:   []spec.Locator{"SKILL.md"},
+	}
+
 	address, err := managedpackageModel.NewManagedPackageAddress(
-		skillSource.ManagedSkillPackageKind,
+		layout.Kind,
 		"release-notes",
 		"unversioned",
 	)
@@ -22,7 +36,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 		t.Fatalf("NewManagedPackageAddress: %v", err)
 	}
 
-	directory, err := skillPackage.ManagedSkillDirectoryLocator(address)
+	directory, err := skillPackage.ManagedSkillDirectoryLocator(layout, address)
 	if err != nil {
 		t.Fatalf("ManagedSkillDirectoryLocator: %v", err)
 	}
@@ -38,6 +52,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	}
 
 	documentLocator, err := skillPackage.ManagedPackageLocatorForSkill(
+		layout,
 		address,
 	)
 	if err != nil {
@@ -55,6 +70,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	}
 
 	roundTripped, err := skillPackage.ManagedPackageAddressFromSkillLocator(
+		layout,
 		documentLocator,
 	)
 	if err != nil {
@@ -69,6 +85,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	}
 
 	files, err := skillPackage.ManagedSkillStorageFiles(
+		documents,
 		address,
 		[]managedpackageModel.ManagedPackageFile{
 			{
@@ -107,6 +124,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	}
 
 	_, err = skillPackage.ManagedPackageAddressFromSkillLocator(
+		layout,
 		"skill/release-notes/unversioned/not-release-notes/SKILL.md",
 	)
 	if !errors.Is(err, spec.ErrInvalid) {

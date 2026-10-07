@@ -1,7 +1,6 @@
 package llmartifactory
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -10,10 +9,9 @@ import (
 )
 
 // Open attaches the LLM artifact-domain registration set to an already opened
-// generic Artifact Store capability set. Generic Store ownership remains with
-// deployment assembly; this constructor does not open or close provider
-// resources and does not receive the broad compose.Store aggregate.
-func Open(ctx context.Context, config Config) (*Artifactory, error) {
+// generic Artifact Store capability set. It receives named capabilities rather
+// than the broad compose.Store aggregate and owns no provider resource.
+func Open(config Config) (*Artifactory, error) {
 	if config.Artifacts == nil ||
 		config.Catalog == nil ||
 		config.Resources == nil {

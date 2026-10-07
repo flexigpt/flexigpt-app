@@ -11,9 +11,7 @@ import (
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -29,10 +27,7 @@ type Service struct {
 	resolver         *composition.Resolver
 	cat              catalog.API
 	definitions      definition.API
-
-	builtinRoot   rootModel.RootID
-	builtinSource sourceModel.SourceID
-	pluginByTool  map[spec.LogicalName]spec.LogicalName
+	builtin          toolDomain.BuiltinCatalog
 }
 
 func New(
@@ -79,7 +74,7 @@ func New(
 		managedArtifacts,
 		definitions,
 		resolver,
-		toolDomain.PluginProfile(),
+		ownedBuiltin.PluginProfile,
 	)
 	if err != nil {
 		return nil, err
@@ -92,11 +87,9 @@ func New(
 		plugins:          plugins,
 		discovery:        discovery,
 		resolver:         resolver,
-		builtinRoot:      ownedBuiltin.RootID,
-		builtinSource:    ownedBuiltin.SourceID,
-		pluginByTool:     ownedBuiltin.PluginByTool,
 		cat:              cat,
 		definitions:      definitions,
+		builtin:          ownedBuiltin,
 	}, nil
 }
 
@@ -182,13 +175,13 @@ func (a *Service) getTool(
 		return toolDomain.Tool{}, err
 	}
 
-	actual, err := toolDomain.ToolPackageAddressFromLocator(
+	actual, err := a.builtin.ToolPackage.AddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
 		return toolDomain.Tool{}, err
 	}
-	expected, err := toolDomain.ToolPackageAddress(
+	expected, err := a.builtin.ToolPackage.Address(
 		record.LogicalName,
 		value.Document.Version,
 	)
@@ -208,7 +201,7 @@ func (a *Service) requireBuiltinRef(ref artifactModel.ArtifactRef) error {
 	if err := ref.Validate(); err != nil {
 		return err
 	}
-	if ref.RootID != a.builtinRoot ||
+	if ref.RootID != a.builtin.RootID ||
 		!a.protection.IsProtectedRoot(ref.RootID) {
 		return fmt.Errorf(
 			"%w: Tool Artifact is not in the protected built-in Root",
@@ -222,7 +215,7 @@ func (a *Service) requireBuiltinArtifact(record artifactModel.Artifact) error {
 	if err := a.requireBuiltinRef(record.Ref()); err != nil {
 		return err
 	}
-	if record.Binding.SourceID != a.builtinSource ||
+	if record.Binding.SourceID != a.builtin.SourceID ||
 		record.Binding.SubresourceLocator != "" {
 		return fmt.Errorf(
 			"%w: Tool catalog Artifact has an unsupported origin",

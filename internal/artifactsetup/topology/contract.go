@@ -176,6 +176,49 @@ func DocumentPatterns(use string) ([]string, error) {
 	return documentPatterns(value.aliases), nil
 }
 
+// DocumentPatternsForDecoder returns every application-declared source
+// filename or pattern for one decoder. LLM decoder packages consume this
+// support declaration rather than inferring support from filename extensions.
+func DocumentPatternsForDecoder(
+	decoderID spec.DecoderID,
+) ([]string, error) {
+	if err := decoderID.Validate(); err != nil {
+		return nil, err
+	}
+
+	uses := make([]string, 0, len(configuredContractTopology.documentUses))
+	for use := range configuredContractTopology.documentUses {
+		uses = append(uses, use)
+	}
+	slices.Sort(uses)
+
+	seen := make(map[string]struct{})
+	output := make([]string, 0)
+	for _, useName := range uses {
+		use := configuredContractTopology.documentUses[useName]
+		for _, alias := range use.aliases {
+			effectiveDecoder := alias.decoderID
+			if effectiveDecoder == "" {
+				effectiveDecoder = use.decoderID
+			}
+
+			if effectiveDecoder != decoderID {
+				continue
+			}
+			for _, pattern := range documentPatterns(
+				[]documentAlias{alias},
+			) {
+				if _, duplicate := seen[pattern]; duplicate {
+					continue
+				}
+				seen[pattern] = struct{}{}
+				output = append(output, pattern)
+			}
+		}
+	}
+	return output, nil
+}
+
 func MustDocumentFiles(use string) []spec.Locator {
 	value, err := DocumentFiles(use)
 	if err != nil {

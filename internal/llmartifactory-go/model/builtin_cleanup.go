@@ -14,7 +14,6 @@ import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
@@ -70,7 +69,8 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	sourceID sourceModel.SourceID,
 	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]BuiltinArtifactSnapshot, error) {
-	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
+	if rootID != c.api.support.BuiltinRoot ||
+		sourceID != c.api.support.BuiltinPackageSource {
 		return nil, fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
 			spec.ErrProtected,
@@ -131,7 +131,8 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	addresses []managedpackageModel.ManagedPackageAddress,
 	previous []BuiltinArtifactSnapshot,
 ) error {
-	if !topology.IsBuiltinPackageSource(rootID, sourceID) {
+	if rootID != c.api.support.BuiltinRoot ||
+		sourceID != c.api.support.BuiltinPackageSource {
 		return fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
 			spec.ErrProtected,

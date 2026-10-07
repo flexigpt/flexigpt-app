@@ -7,6 +7,7 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -17,12 +18,22 @@ func Compile(
 	temporaryDirectory string,
 	interpretations *coreinterpretation.Registry,
 ) (installModel.CompiledPackageSet, error) {
+	agentSupport, err := llmsupport.Agent()
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
 	packages, err := artifactbuiltin.EmbeddedAgentPackages()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	prepared, err := PreparePackages(ctx, packages, interpretations)
+	prepared, err := PreparePackages(
+		ctx,
+		packages,
+		interpretations,
+		agentSupport.Documents,
+	)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}

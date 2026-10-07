@@ -19,6 +19,7 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -53,9 +54,13 @@ func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
 	interpretations *coreinterpretation.Registry,
+	documents support.Documents,
 ) ([]PreparedPackage, error) {
 	if interpretations == nil {
 		return nil, fmt.Errorf("%w: Agent package interpretation registry is nil", spec.ErrInvalid)
+	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
 	}
 
 	if packages == nil {
@@ -72,7 +77,13 @@ func PreparePackages(
 
 	output := make([]PreparedPackage, 0, len(roots))
 	for _, packageRoot := range roots {
-		value, err := preparePackage(ctx, packages, packageRoot, interpretations)
+		value, err := preparePackage(
+			ctx,
+			packages,
+			packageRoot,
+			interpretations,
+			documents,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -90,6 +101,7 @@ func preparePackage(
 	packages fs.FS,
 	packageRoot spec.Locator,
 	interpretations *coreinterpretation.Registry,
+	documents support.Documents,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(ctx, packages, packageRoot)
 	if err != nil {
@@ -120,6 +132,7 @@ func preparePackage(
 		document,
 		files,
 		interpretations,
+		documents,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -156,6 +169,7 @@ func canonicalPluginPackage(
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
 	interpretations *coreinterpretation.Registry,
+	documents support.Documents,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -259,7 +273,7 @@ func canonicalPluginPackage(
 			)
 		}
 
-		documentName, err := packageAgentDocumentName(documentLocator)
+		documentName, err := packageAgentDocumentName(documents, documentLocator)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, err
 		}
@@ -339,10 +353,13 @@ func canonicalPluginPackage(
 
 	for locator := range filesByLocator {
 		documentFile := spec.Locator(path.Base(string(locator)))
-		if !agentDomain.IsAgentDeclarationDocument(documentFile) {
+		if !agentDomain.IsAgentDeclarationDocument(
+			documents,
+			documentFile,
+		) {
 			continue
 		}
-		if _, err := packageAgentDocumentName(locator); err != nil {
+		if _, err := packageAgentDocumentName(documents, locator); err != nil {
 			return pluginv1.PluginDocument{}, nil, err
 		}
 		if _, found := seenDocuments[locator]; !found {
@@ -424,6 +441,7 @@ func expectationsForDocument(
 }
 
 func packageAgentDocumentName(
+	documents support.Documents,
 	locator spec.Locator,
 ) (spec.LogicalName, error) {
 	if err := locator.ValidatePortable(false); err != nil {
@@ -433,6 +451,7 @@ func packageAgentDocumentName(
 	segments := strings.Split(string(locator), "/")
 	if len(segments) != 2 ||
 		!agentDomain.IsAgentDeclarationDocument(
+			documents,
 			spec.Locator(segments[1]),
 		) {
 		return "", fmt.Errorf(

@@ -16,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -48,12 +49,16 @@ func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
 	registry *coreinterpretation.Registry,
+	documents support.Documents,
 ) ([]PreparedPackage, error) {
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill package interpretation registry is nil",
 			spec.ErrInvalid,
 		)
+	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
 	}
 	if packages == nil {
 		return nil, fmt.Errorf(
@@ -74,6 +79,7 @@ func PreparePackages(
 			packages,
 			packageRoot,
 			registry,
+			documents,
 		)
 		if err != nil {
 			return nil, err
@@ -92,6 +98,7 @@ func preparePackage(
 	packages fs.FS,
 	packageRoot spec.Locator,
 	registry *coreinterpretation.Registry,
+	documents support.Documents,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(
 		ctx,
@@ -126,6 +133,7 @@ func preparePackage(
 		document,
 		files,
 		registry,
+		documents,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -173,6 +181,7 @@ func canonicalPluginPackage(
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
 	registry *coreinterpretation.Registry,
+	documents support.Documents,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -265,6 +274,7 @@ func canonicalPluginPackage(
 		}
 
 		documentLocator, err := skillSource.SourceDocumentLocator(
+			documents,
 			header.Locator,
 			documentFile,
 		)
@@ -281,7 +291,7 @@ func canonicalPluginPackage(
 				"%w: built-in Skill %q locator does not identify packaged %q",
 				spec.ErrInvalid,
 				header.Name,
-				skillSource.SkillDefinitionFileName(),
+				skillSource.SkillDefinitionFileName(documents),
 			)
 		}
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
@@ -293,6 +303,7 @@ func canonicalPluginPackage(
 		}
 
 		definitionValue, _, err := skillSource.DecodeSkillDocument(
+			documents,
 			content,
 			header.Name,
 		)
@@ -323,7 +334,7 @@ func canonicalPluginPackage(
 	}
 
 	for locator := range filesByLocator {
-		if !skillSource.IsSkillDefinitionFile(locator) {
+		if !skillSource.IsSkillDefinitionFile(documents, locator) {
 			continue
 		}
 		if _, found := seenDocuments[locator]; !found {

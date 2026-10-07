@@ -33,10 +33,6 @@ import (
 	pluginDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/domain"
 )
 
-const (
-	ManagedPluginPackageKind managedpackageModel.PackageKind = "plugin"
-)
-
 type API struct {
 	artifacts        artifact.API
 	cat              catalog.API
@@ -60,7 +56,7 @@ func New(
 	managedArtifacts managepackageFlow.API,
 	definitions definition.API,
 	resolver *composition.Resolver,
-	profiles ...Profile,
+	profile Profile,
 ) (*API, error) {
 	if artifacts == nil ||
 		cat == nil ||
@@ -73,11 +69,14 @@ func New(
 			spec.ErrInvalid,
 		)
 	}
-	if len(profiles) > 1 {
+	if resolver == nil {
 		return nil, fmt.Errorf(
-			"%w: Plugin API has multiple domain policies",
+			"%w: managed Plugin composition resolver is required",
 			spec.ErrInvalid,
 		)
+	}
+	if err := profile.Validate(); err != nil {
+		return nil, err
 	}
 	output := &API{
 		artifacts:        artifacts,
@@ -88,18 +87,15 @@ func New(
 		definitions:      definitions,
 		resolver:         resolver,
 	}
-	if len(profiles) == 1 {
-		value := profiles[0]
-		if err := value.Validate(); err != nil {
-			return nil, err
-		}
-		value.MembershipPolicy.AllowedTypes = append([]declaration.Type(nil), value.MembershipPolicy.AllowedTypes...)
-		value.MembershipPolicy.AllowedForms = append(
-			[]declaration.MemberForm(nil),
-			value.MembershipPolicy.AllowedForms...,
-		)
-		output.domain = &value
-	}
+	profile.MembershipPolicy.AllowedTypes = append(
+		[]declaration.Type(nil),
+		profile.MembershipPolicy.AllowedTypes...,
+	)
+	profile.MembershipPolicy.AllowedForms = append(
+		[]declaration.MemberForm(nil),
+		profile.MembershipPolicy.AllowedForms...,
+	)
+	output.domain = &profile
 	return output, nil
 }
 
@@ -574,9 +570,6 @@ func (a *API) resolvePluginRef(
 	if err := ref.Validate(); err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
-	if a == nil || a.resolver == nil {
-		return ref, nil
-	}
 	resolved, err := a.resolver.ResolvePlugin(ctx, ref)
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
@@ -979,14 +972,13 @@ func (a *API) loadEditablePlugin(
 			spec.ErrReferenceUnresolved,
 		)
 	}
-	if a.domain != nil &&
-		sourceValue.StorageKey != a.domain.SourceStorageKey {
+	if a.domain.Source == nil ||
+		!a.domain.Source.Matches(sourceValue) {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin belongs to another managed domain Source",
 			spec.ErrReferenceUnresolved,
 		)
 	}
-
 	address, err := a.managedPluginAddressFromLocator(
 		record.Binding.Locator,
 	)
@@ -1066,8 +1058,8 @@ func (a *API) pluginViewOf(
 	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 ) (PluginView, error) {
-	baseline := IsBaselinePluginArtifact(record)
-	if a != nil && a.domain != nil {
+	baseline := false
+	if a.domain != nil {
 		address, err := a.managedPluginAddressFromLocator(
 			record.Binding.Locator,
 		)

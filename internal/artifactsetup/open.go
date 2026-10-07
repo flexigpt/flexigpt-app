@@ -126,12 +126,15 @@ func OpenArtifactStore(
 		return nil, errors.Join(err, values.Close())
 	}
 
-	llm, err := llmartifactory.Open(ctx, llmartifactory.Config{
-		Artifacts:        store.Artifacts,
-		Catalog:          store.Catalog,
-		Resources:        store.Resources,
-		Interpretations:  registrations.Interpretations(),
-		LocatorFactories: registrations.LocatorFactories(),
+	llm, err := llmartifactory.Open(llmartifactory.Config{
+		Artifacts:          store.Artifacts,
+		Catalog:            store.Catalog,
+		Resources:          store.Resources,
+		Interpretations:    registrations.Interpretations(),
+		LocatorFactories:   registrations.LocatorFactories(),
+		DirectCapabilities: registrations.DirectCapabilities(),
+		ArtifactCapabilityProjectors: registrations.
+			ArtifactCapabilityProjectors(),
 		Scope: composition.ScopeBinding{
 			BuiltinRoot: topology.BuiltinRootID(),
 		},

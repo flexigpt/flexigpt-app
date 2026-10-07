@@ -9,19 +9,25 @@ func TestManagedAgentImportFormatForPath(t *testing.T) {
 	tests := []struct {
 		name    string
 		path    string
-		want    managedAgentImportFormat
+		want    ImportFormat
 		wantErr bool
 	}{
-		{name: "json", path: "reviewer.json", want: managedAgentImportFormatJSON},
-		{name: "yaml", path: "reviewer.yaml", want: managedAgentImportFormatYAML},
-		{name: "yml", path: "reviewer.yml", want: managedAgentImportFormatYAML},
-		{name: "uppercase", path: "reviewer.JSON", want: managedAgentImportFormatJSON},
+		{name: "json", path: "reviewer.json", want: ImportFormatJSON},
+		{name: "yaml", path: "reviewer.yaml", want: ImportFormatYAML},
+		{name: "yml", path: "reviewer.yml", want: ImportFormatYAML},
+		{name: "uppercase", path: "reviewer.JSON", want: ImportFormatJSON},
 		{name: "unsupported", path: "reviewer.md", wantErr: true},
+	}
+
+	formats := map[string]ImportFormat{
+		".json": ImportFormatJSON,
+		".yaml": ImportFormatYAML,
+		".yml":  ImportFormatYAML,
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := managedAgentImportFormatForPath(test.path)
+			got, err := managedAgentImportFormatForPath(test.path, formats)
 			if test.wantErr {
 				if err == nil {
 					t.Fatal("managedAgentImportFormatForPath() returned no error")
@@ -43,7 +49,7 @@ func TestCanonicalManagedAgentImportDocumentSelectsParser(t *testing.T) {
 	yamlSource := []byte("type: agent\nname: json-agent\n")
 
 	jsonCanonical, err := canonicalManagedAgentImportDocument(
-		managedAgentImportFormatJSON,
+		ImportFormatJSON,
 		jsonSource,
 	)
 	if err != nil {
@@ -51,7 +57,7 @@ func TestCanonicalManagedAgentImportDocumentSelectsParser(t *testing.T) {
 	}
 
 	yamlCanonical, err := canonicalManagedAgentImportDocument(
-		managedAgentImportFormatYAML,
+		ImportFormatYAML,
 		yamlSource,
 	)
 	if err != nil {
@@ -67,7 +73,7 @@ func TestCanonicalManagedAgentImportDocumentSelectsParser(t *testing.T) {
 	}
 
 	if _, err := canonicalManagedAgentImportDocument(
-		managedAgentImportFormatJSON,
+		ImportFormatJSON,
 		yamlSource,
 	); err == nil {
 		t.Fatal("JSON import parser accepted YAML-only syntax")

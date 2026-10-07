@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -18,6 +16,7 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -30,13 +29,21 @@ type workspaceSourceSet struct {
 }
 
 type workspaceSourceRegistry struct {
-	sources source.API
+	sources   source.API
+	directory support.SourceProfile
+	policy    support.SourceProfile
 }
 
 func newWorkspaceSourceRegistry(
 	sources source.API,
+	directory support.SourceProfile,
+	policy support.SourceProfile,
 ) workspaceSourceRegistry {
-	return workspaceSourceRegistry{sources: sources}
+	return workspaceSourceRegistry{
+		sources:   sources,
+		directory: directory,
+		policy:    policy,
+	}
 }
 
 func (r workspaceSourceRegistry) load(
@@ -51,7 +58,7 @@ func (r workspaceSourceRegistry) load(
 	var output workspaceSourceSet
 	for _, value := range values {
 		switch string(value.StorageKey) {
-		case WorkspaceDirectorySourceStorageKey:
+		case string(r.directory.StorageKey):
 			if output.HasDirectory {
 				return workspaceSourceSet{}, fmt.Errorf(
 					"%w: Root %q has multiple Workspace directory Sources",
@@ -62,7 +69,7 @@ func (r workspaceSourceRegistry) load(
 			output.Directory = value
 			output.HasDirectory = true
 
-		case WorkspaceBasePolicySourceStorageKey:
+		case string(r.policy.StorageKey):
 			if output.HasPolicy {
 				return workspaceSourceSet{}, fmt.Errorf(
 					"%w: Root %q has multiple Workspace policy Sources",
@@ -76,7 +83,7 @@ func (r workspaceSourceRegistry) load(
 	}
 
 	if output.HasDirectory &&
-		output.Directory.Kind != fsdir.Kind {
+		!r.directory.Matches(output.Directory) {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace directory Source has kind %q",
 			spec.ErrInvalid,
@@ -84,7 +91,7 @@ func (r workspaceSourceRegistry) load(
 		)
 	}
 	if output.HasPolicy &&
-		output.Policy.Kind != iofs.Kind {
+		!r.policy.Matches(output.Policy) {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace policy Source has kind %q",
 			spec.ErrInvalid,
@@ -116,7 +123,7 @@ func (r workspaceSourceRegistry) refreshSource(
 	ctx context.Context,
 	current sourceModel.Summary,
 ) (sourceModel.Summary, error) {
-	if string(current.StorageKey) != WorkspaceBasePolicySourceStorageKey {
+	if !r.policy.Matches(current) {
 		return current, nil
 	}
 	values, err := r.required(ctx, current.RootID)
@@ -130,7 +137,7 @@ func (a *Service) findWorkspaceRoot(
 	ctx context.Context,
 	rootPath string,
 ) (rootModel.Root, bool, error) {
-	storageKey := workspaceRootStorageKey(rootPath)
+	storageKey := a.workspaceRootStorageKey(rootPath)
 	values, err := a.roots.List(ctx)
 	if err != nil {
 		return rootModel.Root{}, false, err
@@ -177,7 +184,7 @@ func (a *Service) ensureWorkspaceRoot(
 
 	created, err := a.roots.Create(ctx, rootModel.RootDraft{
 		ID:          rootModel.RootID(uuidutil.NewUUIDv7()),
-		StorageKey:  workspaceRootStorageKey(rootPath),
+		StorageKey:  a.workspaceRootStorageKey(rootPath),
 		DisplayName: displayName,
 		Description: "Workspace directory",
 	})
@@ -411,9 +418,6 @@ func (a *Service) isEffectivePhysicalWorkspace(
 			record.Ref(),
 		)
 		if err != nil {
-			if contextErr := ctx.Err(); contextErr != nil {
-				return false, contextErr
-			}
 			continue
 		}
 		if terminal == ref {
@@ -435,7 +439,7 @@ func (a *Service) workspaceDirectoryRootIDs(
 	for _, value := range values {
 		if !strings.HasPrefix(
 			string(value.StorageKey),
-			WorkspaceRootStorageKeyPrefix,
+			string(a.config.Support.RootStorageKeyPrefix),
 		) {
 			continue
 		}

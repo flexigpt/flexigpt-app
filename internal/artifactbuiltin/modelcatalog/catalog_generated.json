@@ -1,7 +1,7 @@
 {
   "format": "artifact-compiled-package-set/v1",
   "hydration": {
-    "fingerprint": "sha256:059f791efba7e2e9136c2d2f5b2f17fe5ef48076161fabeb06b30e07c74666a7",
+    "fingerprint": "sha256:69b7df4c1a765c28f80aec753ad983bfc534dc28d56bc10c64c2cf6fdf5c35f0",
     "installerName": "model",
     "rootID": "0192c4c0-0000-7000-8000-000000000001",
     "sourceID": "0192c4c0-0001-7000-8000-000000000001"

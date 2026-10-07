@@ -2,105 +2,23 @@ package domain
 
 import (
 	"fmt"
-	"path"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
-func ManagedAgentDocumentFile() spec.Locator {
-	return topology.MustDefaultDocumentFile(
-		topology.DocumentUseManagedAgent,
-	)
-}
-
-func IsAgentDeclarationDocument(locator spec.Locator) bool {
-	return topology.IsAgentDeclarationDocument(locator)
-}
-
-func ManagedPackageAddressForAgent(
-	name spec.LogicalName,
-) (managedpackageModel.ManagedPackageAddress, error) {
-	if err := name.Validate(); err != nil {
-		return managedpackageModel.ManagedPackageAddress{}, err
-	}
-
-	return managedpackageModel.NewManagedPackageAddress(
-		ManagedAgentPackageKind,
-		name,
-		topology.UnversionedPackageVersion(),
-	)
-}
-
-func ManagedPackageLocatorForAgent(
-	address managedpackageModel.ManagedPackageAddress,
-) (spec.Locator, error) {
-	if err := ValidateManagedAgentPackageAddress(address); err != nil {
-		return "", err
-	}
-	return address.FileLocator(ManagedAgentDocumentFile())
-}
-
-func ManagedPackageAddressFromAgentLocator(
+func IsAgentDeclarationDocument(
+	documents support.Documents,
 	locator spec.Locator,
-) (managedpackageModel.ManagedPackageAddress, error) {
-	if err := locator.ValidatePortable(false); err != nil {
-		return managedpackageModel.ManagedPackageAddress{}, err
-	}
-	if path.Base(string(locator)) != string(ManagedAgentDocumentFile()) {
-		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
-			"%w: Agent locator %q is not %q",
-			spec.ErrInvalid,
-			locator,
-			ManagedAgentDocumentFile(),
-		)
-	}
-
-	address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
-		spec.Locator(path.Dir(string(locator))),
-	)
-	if err != nil {
-		return managedpackageModel.ManagedPackageAddress{}, err
-	}
-	if err := ValidateManagedAgentPackageAddress(address); err != nil {
-		return managedpackageModel.ManagedPackageAddress{}, err
-	}
-	return address, nil
-}
-
-func ValidateManagedAgentPackageAddress(
-	address managedpackageModel.ManagedPackageAddress,
-) error {
-	if err := address.Validate(); err != nil {
-		return err
-	}
-	if address.Kind != ManagedAgentPackageKind {
-		return fmt.Errorf(
-			"%w: Agent package kind must be %q",
-			spec.ErrInvalid,
-			ManagedAgentPackageKind,
-		)
-	}
-	if address.Version != topology.UnversionedPackageVersion() {
-		return fmt.Errorf(
-			"%w: Agent package version must be %q",
-			spec.ErrInvalid,
-			topology.UnversionedPackageVersion(),
-		)
-	}
-	return nil
+) bool {
+	return documents.Matches(locator)
 }
 
 // ManagedAgentEntryPayload projects one concrete canonical Agent Entry into
 // managed package bytes and an immutable Definition.
-//
-// Strict managed-import profile validation belongs to the managed import
-// domain. This package owns the invariant that a managed package root is a
-// concrete Agent declaration rather than a source-selected alias.
 func ManagedAgentEntryPayload(
 	entry declaration.Entry,
 ) ([]byte, definitionModel.Definition, error) {
@@ -137,6 +55,5 @@ func ManagedAgentEntryPayload(
 			spec.ErrInvalid,
 		)
 	}
-
 	return raw, value, nil
 }

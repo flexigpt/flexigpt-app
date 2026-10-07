@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 )
 
@@ -49,14 +50,19 @@ func ParseSkillDocument(
 // DecodeSkillDocument parses SKILL.md and projects its source-derived
 // identity into the independent portable skillv1 declaration contract.
 func DecodeSkillDocument(
+	documents support.Documents,
 	content []byte,
 	expectedName string,
 ) (definitionModel.Definition, []diagnostic.Diagnostic, error) {
+	if err := documents.Validate(); err != nil {
+		return definitionModel.Definition{}, nil, err
+	}
+
 	doc, warnings, err := ParseSkillDocument(content, expectedName)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
-	value, err := definitionForSkillDocument(doc)
+	value, err := definitionForSkillDocument(documents, doc)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
@@ -159,9 +165,10 @@ func ValidateDefinition(
 }
 
 func definitionForSkillDocument(
+	documents support.Documents,
 	doc document.SkillDocument,
 ) (definitionModel.Definition, error) {
-	documentFile := SkillDefinitionFileName()
+	documentFile := SkillDefinitionFileName(documents)
 	sourceLocator := declaration.ScalarLocator(
 		"./" + string(documentFile),
 	)

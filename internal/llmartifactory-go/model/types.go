@@ -64,7 +64,7 @@ type Dependencies struct {
 	Protection       root.ProtectionAPI
 	Overlays         modelOverlay.OverlayRepository
 	Adapters         AdapterRegistry
-	BuiltinRoot      rootModel.RootID
+	Support          Support
 }
 
 type ListProvidersRequest struct {

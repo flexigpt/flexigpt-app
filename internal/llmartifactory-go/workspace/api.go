@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
@@ -22,7 +21,6 @@ import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
@@ -62,7 +60,8 @@ func New(
 	cat catalog.API,
 	config Config,
 ) (*Service, error) {
-	if sources == nil || discovery == nil || artifacts == nil || resources == nil || roots == nil || cat == nil {
+	if sources == nil || discovery == nil || artifacts == nil ||
+		resources == nil || nativeResources == nil || roots == nil || cat == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Store dependencies are incomplete",
 			workspaceDomain.ErrInvalidWorkspace,
@@ -73,6 +72,9 @@ func New(
 		return nil, err
 	}
 	if err := config.ContextComposition.Validate(); err != nil {
+		return nil, err
+	}
+	if err := config.Support.Validate(); err != nil {
 		return nil, err
 	}
 	if config.Composition == nil {
@@ -86,8 +88,16 @@ func New(
 		return nil, err
 	}
 
-	workspaceSources := newWorkspaceSourceRegistry(sources)
-	refreshCoordinator := newWorkspaceRefreshCoordinator(sources, workspaceSources)
+	workspaceSources := newWorkspaceSourceRegistry(
+		sources,
+		config.Support.DirectorySource,
+		config.Support.PolicySource,
+	)
+	refreshCoordinator := newWorkspaceRefreshCoordinator(
+		sources,
+		workspaceSources,
+		config.Support,
+	)
 
 	output := &Service{
 		roots:            roots,
@@ -110,7 +120,12 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	skillAdapter, err := workspaceskill.New(artifacts, resources, nativeResources)
+	skillAdapter, err := workspaceskill.New(
+		artifacts,
+		resources,
+		nativeResources,
+		config.Support.SkillDocuments,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -282,8 +297,8 @@ func (a *Service) SetWorkspaceDirectoryArtifactEnabled(
 	return workspaceArtifactViewOf(updated), nil
 }
 
-func (a *Service) RegisterWorkspaceDirectory(ctx context.Context, path string) (WorkspaceDirectoryView, error) {
-	rootPath, err := normalizeWorkspaceDirectoryPath(path)
+func (a *Service) RegisterWorkspaceDirectory(ctx context.Context, p string) (WorkspaceDirectoryView, error) {
+	rootPath, err := normalizeWorkspaceDirectoryPath(p)
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
@@ -573,9 +588,9 @@ func (a *Service) ensureWorkspaceSources(
 			RootID: rootID,
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
-				StorageKey:  WorkspaceDirectorySourceStorageKey,
-				Kind:        fsdir.Kind,
-				DisplayName: "Workspace directory source",
+				StorageKey:  a.config.Support.DirectorySource.StorageKey,
+				Kind:        a.config.Support.DirectorySource.Kind,
+				DisplayName: a.config.Support.DirectorySource.DisplayName,
 				Enabled:     true,
 				Config:      directoryConfig,
 				Discovery:   directoryDiscovery,
@@ -608,9 +623,9 @@ func (a *Service) ensureWorkspaceSources(
 			RootID: rootID,
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
-				StorageKey:  WorkspaceBasePolicySourceStorageKey,
-				Kind:        iofs.Kind,
-				DisplayName: "Workspace base policy source",
+				StorageKey:  a.config.Support.PolicySource.StorageKey,
+				Kind:        a.config.Support.PolicySource.Kind,
+				DisplayName: a.config.Support.PolicySource.DisplayName,
 				Enabled:     true,
 				Config:      policyConfig,
 				Discovery:   policyDiscovery,
@@ -629,12 +644,7 @@ func (a *Service) defaultDiscovery() (
 	sourceModel.DiscoverySpec,
 	error,
 ) {
-	value, err := topology.DiscoverySpecForUse(
-		topology.DiscoveryUseWorkspace,
-	)
-	if err != nil {
-		return sourceModel.DiscoverySpec{}, err
-	}
+	value := a.config.Support.DirectoryDiscovery.Clone()
 	for _, hint := range a.config.AdditionalDecoderHints {
 		value.DecoderHints = source.AppendDecoderHint(
 			value.DecoderHints,
@@ -658,7 +668,7 @@ func (a *Service) listManifestIntent(
 		rootID,
 		directoryID,
 		".",
-		topology.WorkspaceManifestPatterns(),
+		a.config.Support.ManifestPatterns,
 		nil,
 		spec.DefaultMaxEntries,
 		spec.MaxScanBytes,
@@ -694,7 +704,7 @@ func (a *Service) listPhysicalWorkspaces(
 			continue
 		}
 		if entry.Binding.SubresourceLocator != "" ||
-			!topology.IsWorkspaceManifestLocator(entry.Binding.Locator) {
+			!a.isWorkspaceManifestLocator(entry.Binding.Locator) {
 			continue
 		}
 		if entry.State != artifactModel.StateAvailable {
@@ -929,12 +939,32 @@ func (a *Service) isWorkspaceDirectoryCatalogArtifact(
 		string(value.LogicalName) == a.policy.ID
 }
 
-func workspaceRootStorageKey(rootPath string) spec.StorageKey {
+func (a *Service) isWorkspaceManifestLocator(
+	locator spec.Locator,
+) bool {
+	value := string(locator)
+	name := path.Base(value)
+	for _, pattern := range a.config.Support.ManifestPatterns {
+		matched, err := spec.MatchPathPattern(pattern, value)
+		if err == nil && matched {
+			return true
+		}
+		matched, err = spec.MatchPathPattern(pattern, name)
+		if err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Service) workspaceRootStorageKey(rootPath string) spec.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
-	return spec.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
+	return spec.StorageKey(
+		string(a.config.Support.RootStorageKeyPrefix) + digest,
+	)
 }
 
 func (a *Service) policySourceDiscovery() (sourceModel.DiscoverySpec, error) {

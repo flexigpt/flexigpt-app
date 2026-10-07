@@ -12,8 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
-	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
-	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -216,28 +214,12 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
-	if artifactSetup.Store == nil || artifactSetup.LLM == nil {
-		_ = artifactSetup.Close()
-		panic(
-			"failed to initialize managers: Artifact Store setup returned an incomplete handle",
-		)
-	}
 
 	a.artifactStoreSetup = artifactSetup
 	artifactComposition := artifactSetup.Store
 
 	artifactCompositionResolver := artifactSetup.LLM.Composition()
 	artifactInterpretations := artifactSetup.LLM.Interpretations()
-	if artifactCompositionResolver == nil {
-		panic(
-			"failed to initialize managers: LLM Artifactory composition resolver is unavailable",
-		)
-	}
-	if artifactInterpretations == nil {
-		panic(
-			"failed to initialize managers: LLM Artifactory declaration interpretation registry is unavailable",
-		)
-	}
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
 	err = InitTextStoreWrapper(
@@ -495,12 +477,6 @@ func (a *App) initManagers() {
 	slog.Info("artifact-backed mcp host initialized")
 
 	mcpBaselineEnsurer := a.mcpStoreAPI.api
-	mcpWorkspaceResolver, err := mcpAPI.NewWorkspaceServerResolver(
-		a.mcpStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize Workspace MCP resolver: " + err.Error())
-	}
 
 	workspaceConfig, err := workspace.DefaultWorkspaceConfig()
 	if err != nil {
@@ -522,7 +498,7 @@ func (a *App) initManagers() {
 		artifactComposition.TrustedNativeResources,
 		artifactCompositionResolver,
 		workspaceConfig,
-		mcpWorkspaceResolver,
+		a.mcpStoreAPI.api,
 		func(ctx context.Context, rootID rootModel.RootID) error {
 			return artifactsetup.EnsureRootBaselines(
 				ctx,
@@ -587,15 +563,7 @@ func (a *App) initManagers() {
 		slog.Info("user Artifact baseline Plugins initialized")
 	}
 
-	workspaceConversationSource, err := workspaceAPI.NewConversationSource(
-		a.workspaceStoreAPI.api,
-	)
-	if err != nil {
-		panic(
-			"failed to initialize managers: Workspace conversation source failed\n" +
-				err.Error(),
-		)
-	}
+	workspaceConversationSource := a.workspaceStoreAPI.api
 
 	err = InitCompletionWrapper(
 		a.completionAPI,

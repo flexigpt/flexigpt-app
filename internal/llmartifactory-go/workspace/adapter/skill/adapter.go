@@ -11,6 +11,7 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/materialize"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 )
@@ -36,12 +37,14 @@ type Adapter struct {
 	artifacts       artifact.API
 	resources       resourceFlow.API
 	nativeResources resourceFlow.NativePathAPI
+	documents       support.Documents
 }
 
 func New(
 	artifacts artifact.API,
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
+	documents support.Documents,
 ) (*Adapter, error) {
 	if artifacts == nil ||
 		resources == nil ||
@@ -51,10 +54,14 @@ func New(
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
+	if err := documents.Validate(); err != nil {
+		return nil, err
+	}
 	return &Adapter{
 		artifacts:       artifacts,
 		resources:       resources,
 		nativeResources: nativeResources,
+		documents:       documents.Clone(),
 	}, nil
 }
 
@@ -118,6 +125,7 @@ func (a *Adapter) resolve(
 			API:           a.resources,
 			NativePathAPI: a.nativeResources,
 		},
+		a.documents,
 		record,
 	)
 	if err != nil {
