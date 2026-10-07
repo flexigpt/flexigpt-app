@@ -2,7 +2,7 @@ import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
 
-import type { MCPBundleView, MCPServerDraft, MCPServerView, MCPStdioSecretDraft } from '@/spec/mcp';
+import type { MCPPluginView, MCPServerDraft, MCPServerView, MCPStdioSecretDraft } from '@/spec/mcp';
 import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
 
 import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
@@ -31,7 +31,7 @@ import {
 
 interface AddEditMCPServerModalProps {
 	isOpen: boolean;
-	bundle: MCPBundleView;
+	plugin: MCPPluginView;
 	initialServer?: MCPServerView;
 	existingLogicalNames: string[];
 	onClose: () => void;
@@ -356,7 +356,7 @@ function formToDraft(form: FormState, initial: MCPServerDraft): MCPServerDraft {
 }
 
 function AddEditMCPServerModalContent({
-	bundle,
+	plugin,
 	initialServer,
 	existingLogicalNames,
 	onSubmit,
@@ -612,7 +612,7 @@ function AddEditMCPServerModalContent({
 					description={
 						isEdit
 							? 'Update the server definition and its locally stored credentials.'
-							: `Add a server to ${bundle.displayName}. Secrets are stored locally and separately from the server definition.`
+							: `Add a server to ${plugin.displayName}. Secrets are stored locally and separately from the server definition.`
 					}
 					onClose={() => {
 						requestClose();

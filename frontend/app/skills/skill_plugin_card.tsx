@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
-import type { Skill, SkillBundle } from '@/spec/skill';
+import type { Skill, SkillPlugin } from '@/spec/skill';
 import { SkillInsert, SkillPresenceStatus } from '@/spec/skill';
 
 import { getErrorMessage } from '@/lib/error_utils';
@@ -12,9 +12,9 @@ import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
@@ -36,13 +36,13 @@ import {
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
-import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
-import { SkillBundleEditModal } from '@/skills/skill_bundle_edit_modal';
+import { SkillPluginDetailsModal } from '@/skills/skill_plugin_details_modal';
+import { SkillPluginEditModal } from '@/skills/skill_plugin_edit_modal';
 
 type SkillModalMode = 'add' | 'edit' | 'view' | 'fork';
 
-interface SkillBundleCardProps {
-	bundle: SkillBundle;
+interface SkillPluginCardProps {
+	plugin: SkillPlugin;
 	skills: Skill[];
 	skillLoadError?: string;
 	runtimeMetadataLoaded: boolean;
@@ -51,12 +51,12 @@ interface SkillBundleCardProps {
 	insertFilter: SkillInsertFilter;
 	searchQuery: string;
 	tagFilters: string[];
-	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
-	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
-	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
-	onSubmitSkill: (bundleID: string, partial: SkillUpsertInput, existingSkillID?: string) => Promise<void>;
-	onRequestBundleDelete: (bundle: SkillBundle) => void;
-	onEditBundle: (bundleID: string, displayName: string, description?: string) => Promise<void>;
+	onTogglePluginEnable: (pluginID: string, nextEnabled: boolean) => Promise<void>;
+	onToggleSkillEnable: (pluginID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
+	onDeleteSkill: (pluginID: string, skillID: string, skillSlug: string) => Promise<void>;
+	onSubmitSkill: (pluginID: string, partial: SkillUpsertInput, existingSkillID?: string) => Promise<void>;
+	onRequestPluginDelete: (plugin: SkillPlugin) => void;
+	onEditPlugin: (pluginID: string, displayName: string, description?: string) => Promise<void>;
 }
 
 function PresenceStatusBadge({ skill }: { skill: Skill }) {
@@ -93,8 +93,8 @@ function PresenceStatusBadge({ skill }: { skill: Skill }) {
 	);
 }
 
-export function SkillBundleCard({
-	bundle,
+export function SkillPluginCard({
+	plugin,
 	skills,
 	skillLoadError,
 	runtimeMetadataLoaded,
@@ -103,13 +103,13 @@ export function SkillBundleCard({
 	insertFilter,
 	searchQuery,
 	tagFilters,
-	onToggleBundleEnable,
+	onTogglePluginEnable,
 	onToggleSkillEnable,
 	onDeleteSkill,
 	onSubmitSkill,
-	onRequestBundleDelete,
-	onEditBundle,
-}: SkillBundleCardProps) {
+	onRequestPluginDelete,
+	onEditPlugin,
+}: SkillPluginCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	const [isDeleteSkillModalOpen, setIsDeleteSkillModalOpen] = useState(false);
@@ -119,8 +119,8 @@ export function SkillBundleCard({
 	const [skillModalMode, setSkillModalMode] = useState<SkillModalMode>('add');
 	const [skillToEdit, setSkillToEdit] = useState<Skill | undefined>(undefined);
 
-	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
-	const [isBundleEditOpen, setIsBundleEditOpen] = useState(false);
+	const [isPluginDetailsOpen, setIsPluginDetailsOpen] = useState(false);
+	const [isPluginEditOpen, setIsPluginEditOpen] = useState(false);
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -131,10 +131,10 @@ export function SkillBundleCard({
 		() =>
 			skills.map(skill => ({
 				skill,
-				bundleID: bundle.id,
+				pluginID: plugin.id,
 				skillSlug: skill.slug,
 			})),
-		[skills, bundle.id]
+		[skills, plugin.id]
 	);
 
 	const visibleSkills = useMemo(
@@ -160,24 +160,24 @@ export function SkillBundleCard({
 		}
 	};
 
-	const toggleBundleEnable = (nextEnabled: boolean) => {
+	const togglePluginEnable = (nextEnabled: boolean) => {
 		void runActionWithAlert(
-			'bundle:toggle',
-			() => onToggleBundleEnable(bundle.id, nextEnabled),
-			'Failed to toggle bundle enable state.'
+			'plugin:toggle',
+			() => onTogglePluginEnable(plugin.id, nextEnabled),
+			'Failed to toggle plugin enable state.'
 		).catch(() => undefined);
 	};
 
 	const patchSkillEnable = (skill: Skill, nextEnabled: boolean) => {
 		void runActionWithAlert(
 			`${skill.id}:toggle`,
-			() => onToggleSkillEnable(bundle.id, skill.id, skill.slug, nextEnabled),
+			() => onToggleSkillEnable(plugin.id, skill.id, skill.slug, nextEnabled),
 			'Failed to toggle skill.'
 		).catch(() => undefined);
 	};
 
 	const requestDeleteSkill = (skill: Skill) => {
-		if (!bundle.isEditable) {
+		if (!plugin.isEditable) {
 			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
@@ -195,7 +195,7 @@ export function SkillBundleCard({
 		try {
 			await runActionWithAlert(
 				`${skillToDelete.id}:delete`,
-				() => onDeleteSkill(bundle.id, skillToDelete.id, skillToDelete.slug),
+				() => onDeleteSkill(plugin.id, skillToDelete.id, skillToDelete.slug),
 				'Failed to delete skill.'
 			);
 			setIsDeleteSkillModalOpen(false);
@@ -206,13 +206,13 @@ export function SkillBundleCard({
 	};
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
-		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEnabled) {
+		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !plugin.isEnabled) {
 			setAlertMsg('Enable the Plugin before creating, editing, or forking a skill.');
 			setShowAlert(true);
 			return;
 		}
 
-		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEditable) {
+		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !plugin.isEditable) {
 			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
@@ -231,7 +231,7 @@ export function SkillBundleCard({
 
 	const refreshSkills = async () => {
 		try {
-			await runAction('bundle:refresh', onRefreshSkills);
+			await runAction('plugin:refresh', onRefreshSkills);
 		} catch (error) {
 			setAlertMsg(getErrorMessage(error, 'Failed to reload Plugin skills.'));
 			setShowAlert(true);
@@ -240,25 +240,25 @@ export function SkillBundleCard({
 
 	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
 		const existingSkillID = skillModalMode === 'edit' ? skillToEdit?.id : undefined;
-		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(bundle.id, partial, existingSkillID));
+		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(plugin.id, partial, existingSkillID));
 	};
 
 	return (
 		<>
-			<ManagementBundleCard
-				title={bundle.displayName || bundle.slug}
+			<ManagementPluginCard
+				title={plugin.displayName || plugin.slug}
 				identity={
-					bundle.displayName && bundle.displayName !== bundle.slug ? (
-						<span className="font-mono">{bundle.slug}</span>
+					plugin.displayName && plugin.displayName !== plugin.slug ? (
+						<span className="font-mono">{plugin.slug}</span>
 					) : null
 				}
-				description={bundle.description}
+				description={plugin.description}
 				status={
 					<>
-						<StatusBadge tone={bundle.isEnabled ? 'success' : 'neutral'}>
-							{bundle.isEnabled ? 'Enabled' : 'Disabled'}
+						<StatusBadge tone={plugin.isEnabled ? 'success' : 'neutral'}>
+							{plugin.isEnabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
-						<StatusBadge>{bundle.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						<StatusBadge>{plugin.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
 						{!runtimeMetadataLoaded && !skillLoadError ? (
 							<StatusBadge tone="neutral">Loading details</StatusBadge>
 						) : null}
@@ -282,10 +282,10 @@ export function SkillBundleCard({
 				}
 				actionLeading={
 					<EnabledControl
-						id={`skill-bundle-${bundle.id}`}
-						checked={bundle.isEnabled}
-						onChange={toggleBundleEnable}
-						busy={isPending('bundle:toggle')}
+						id={`skill-plugin-${plugin.id}`}
+						checked={plugin.isEnabled}
+						onChange={togglePluginEnable}
+						busy={isPending('plugin:toggle')}
 						compact={false}
 					/>
 				}
@@ -295,20 +295,20 @@ export function SkillBundleCard({
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
 							onClick={() => {
-								setIsBundleDetailsOpen(true);
+								setIsPluginDetailsOpen(true);
 							}}
 						>
 							<FiEye size={16} />
 							<span>Details</span>
 						</button>
-						{bundle.isEditable ? (
+						{plugin.isEditable ? (
 							<>
-								{!bundle.isBaseline ? (
+								{!plugin.isBaseline ? (
 									<button
 										type="button"
 										className="btn btn-sm btn-ghost rounded-xl"
 										onClick={() => {
-											setIsBundleEditOpen(true);
+											setIsPluginEditOpen(true);
 										}}
 									>
 										<FiEdit2 size={16} />
@@ -318,16 +318,16 @@ export function SkillBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={isPending('bundle:refresh') || !bundle.isEnabled}
+									disabled={isPending('plugin:refresh') || !plugin.isEnabled}
 									onClick={() => void refreshSkills()}
 								>
 									<FiRefreshCw size={16} />
-									<span>{isPending('bundle:refresh') ? 'Refreshing...' : 'Refresh'}</span>
+									<span>{isPending('plugin:refresh') ? 'Refreshing...' : 'Refresh'}</span>
 								</button>
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.isEnabled || Boolean(skillLoadError)}
+									disabled={!plugin.isEnabled || Boolean(skillLoadError)}
 									onClick={() => {
 										openSkillModal('add');
 									}}
@@ -338,13 +338,13 @@ export function SkillBundleCard({
 							</>
 						) : null}
 
-						{bundle.isDeletable ? (
+						{plugin.isDeletable ? (
 							<button
 								type="button"
 								className="btn btn-sm btn-ghost rounded-xl"
 								disabled={skills.length > 0 || Boolean(skillLoadError)}
 								onClick={() => {
-									onRequestBundleDelete(bundle);
+									onRequestPluginDelete(plugin);
 								}}
 							>
 								<FiTrash2 size={16} />
@@ -364,9 +364,9 @@ export function SkillBundleCard({
 							type="button"
 							className="btn btn-sm rounded-xl"
 							onClick={() => void refreshSkills()}
-							disabled={isPending('bundle:refresh')}
+							disabled={isPending('plugin:refresh')}
 						>
-							{isPending('bundle:refresh') ? 'Reloading…' : 'Retry'}
+							{isPending('plugin:refresh') ? 'Reloading…' : 'Retry'}
 						</button>
 					</div>
 				) : null}
@@ -453,14 +453,14 @@ export function SkillBundleCard({
 										<ActionRow
 											leading={
 												<EnabledControl
-													id={`skill-${bundle.id}-${skill.id}`}
+													id={`skill-${plugin.id}-${skill.id}`}
 													checked={skill.isEnabled}
 													onChange={enabled => {
 														patchSkillEnable(skill, enabled);
 													}}
-													disabled={!bundle.isEnabled}
+													disabled={!plugin.isEnabled}
 													busy={isPending(`${skill.id}:toggle`)}
-													title={!bundle.isEnabled ? 'Enable the Plugin first.' : undefined}
+													title={!plugin.isEnabled ? 'Enable the Plugin first.' : undefined}
 												/>
 											}
 										>
@@ -481,9 +481,9 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('edit', skill);
 												}}
-												disabled={!bundle.isEditable || !skill.isManaged || skillHasResources(skill)}
+												disabled={!plugin.isEditable || !skill.isManaged || skillHasResources(skill)}
 												title={
-													!bundle.isEditable
+													!plugin.isEditable
 														? 'This Skill Plugin only supports enable and disable actions.'
 														: !skill.isManaged
 															? 'Only managed Skills can be edited. Fork this Skill to create a managed copy.'
@@ -501,8 +501,8 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('fork', skill);
 												}}
-												disabled={!bundle.isEditable || !bundle.isEnabled}
-												title={!bundle.isEnabled ? 'Enable the bundle before forking.' : 'Fork skill'}
+												disabled={!plugin.isEditable || !plugin.isEnabled}
+												title={!plugin.isEnabled ? 'Enable the plugin before forking.' : 'Fork skill'}
 											>
 												<FiGitBranch size={15} />
 												<span>Fork</span>
@@ -513,8 +513,8 @@ export function SkillBundleCard({
 												onClick={() => {
 													requestDeleteSkill(skill);
 												}}
-												disabled={!bundle.isEditable || isPending(`${skill.id}:delete`)}
-												title={!bundle.isEditable ? 'This Skill Bundle is read-only' : 'Delete'}
+												disabled={!plugin.isEditable || isPending(`${skill.id}:delete`)}
+												title={!plugin.isEditable ? 'This Skill Plugin is read-only' : 'Delete'}
 											>
 												<FiTrash2 size={15} />
 												<span>Delete</span>
@@ -532,7 +532,7 @@ export function SkillBundleCard({
 						</div>
 					</div>
 				)}
-			</ManagementBundleCard>
+			</ManagementPluginCard>
 
 			<DeleteConfirmationModal
 				isOpen={isDeleteSkillModalOpen}
@@ -556,27 +556,27 @@ export function SkillBundleCard({
 				}}
 				onSubmit={handleSubmitSkill}
 				mode={skillModalMode}
-				initialData={skillToEdit ? { skill: skillToEdit, bundleID: bundle.id, skillSlug: skillToEdit.slug } : undefined}
+				initialData={skillToEdit ? { skill: skillToEdit, pluginID: plugin.id, skillSlug: skillToEdit.slug } : undefined}
 				existingSkills={existingSkillItems}
 				prefillSkills={prefillSkills}
 			/>
 
-			<SkillBundleDetailsModal
-				isOpen={isBundleDetailsOpen}
+			<SkillPluginDetailsModal
+				isOpen={isPluginDetailsOpen}
 				onClose={() => {
-					setIsBundleDetailsOpen(false);
+					setIsPluginDetailsOpen(false);
 				}}
-				bundle={bundle}
+				plugin={plugin}
 				skills={skills}
 			/>
 
-			<SkillBundleEditModal
-				isOpen={isBundleEditOpen}
+			<SkillPluginEditModal
+				isOpen={isPluginEditOpen}
 				onClose={() => {
-					setIsBundleEditOpen(false);
+					setIsPluginEditOpen(false);
 				}}
-				bundle={bundle}
-				onSubmit={onEditBundle}
+				plugin={plugin}
+				onSubmit={onEditPlugin}
 			/>
 
 			<ActionDeniedAlertModal

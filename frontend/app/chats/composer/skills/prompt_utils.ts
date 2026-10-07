@@ -5,13 +5,13 @@ const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
 export interface SystemInstructionSource {
 	identityKey: string;
 	sourceKind: 'restored-conversation' | 'skill' | 'agent';
-	bundleID: string;
+	pluginID: string;
 	sourceSlug: string;
 	displayName: string;
 	text: string;
 	sourceTags?: string[];
-	bundleDisplayName: string;
-	bundleSlug?: string;
+	pluginDisplayName: string;
+	pluginSlug?: string;
 	isBuiltIn: boolean;
 	skillRef?: SkillRef;
 }

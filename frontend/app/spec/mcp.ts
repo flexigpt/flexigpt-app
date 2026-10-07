@@ -817,7 +817,7 @@ export interface ManagedMCPReplaceResult {
 /**
  * UI-facing projection over a Plugin-backed MCP grouping.
  */
-export interface MCPBundleView {
+export interface MCPPluginView {
 	plugin: PluginListItem;
 	ref: ArtifactRef;
 	displayName: string;

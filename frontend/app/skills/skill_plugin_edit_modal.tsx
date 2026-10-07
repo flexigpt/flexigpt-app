@@ -2,7 +2,7 @@ import type { SubmitEventHandler } from 'react';
 import { useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { SkillBundle } from '@/spec/skill';
+import type { SkillPlugin } from '@/spec/skill';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -12,17 +12,17 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-interface SkillBundleEditModalProps {
+interface SkillPluginEditModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	bundle: SkillBundle;
-	onSubmit: (bundleID: string, displayName: string, description?: string) => Promise<void>;
+	plugin: SkillPlugin;
+	onSubmit: (pluginID: string, displayName: string, description?: string) => Promise<void>;
 }
 
-function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditModalProps, 'isOpen' | 'onClose'>) {
+function SkillPluginEditModalContent({ plugin, onSubmit }: Omit<SkillPluginEditModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose, unmountingRef } = useModalDialogController();
-	const [displayName, setDisplayName] = useState(bundle.displayName || bundle.slug);
-	const [description, setDescription] = useState(bundle.description || '');
+	const [displayName, setDisplayName] = useState(plugin.displayName || plugin.slug);
+	const [description, setDescription] = useState(plugin.description || '');
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,7 +38,7 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 
 		setSubmitError('');
 		setIsSubmitting(true);
-		void onSubmit(bundle.id, normalizedName, description.trim() || undefined)
+		void onSubmit(plugin.id, normalizedName, description.trim() || undefined)
 			.then(() => {
 				if (!unmountingRef.current) {
 					requestClose(true);
@@ -79,12 +79,12 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 
 				<ModalSection title="Plugin details">
 					<ModalField label="Name">
-						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{bundle.slug}</div>
+						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.slug}</div>
 					</ModalField>
 
-					<ModalField label="Display name" htmlFor="skill-bundle-display-name" required>
+					<ModalField label="Display name" htmlFor="skill-plugin-display-name" required>
 						<input
-							id="skill-bundle-display-name"
+							id="skill-plugin-display-name"
 							type="text"
 							className="input w-full rounded-xl"
 							value={displayName}
@@ -97,9 +97,9 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 						/>
 					</ModalField>
 
-					<ModalField label="Description" htmlFor="skill-bundle-description" align="start">
+					<ModalField label="Description" htmlFor="skill-plugin-description" align="start">
 						<textarea
-							id="skill-bundle-description"
+							id="skill-plugin-description"
 							className="textarea min-h-28 w-full rounded-xl"
 							value={description}
 							disabled={isSubmitting}
@@ -130,16 +130,16 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 	);
 }
 
-export function SkillBundleEditModal(props: SkillBundleEditModalProps) {
+export function SkillPluginEditModal(props: SkillPluginEditModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
 
 	return (
 		<ModalDialog isOpen onClose={props.onClose} blockCancel>
-			<SkillBundleEditModalContent
-				key={`${props.bundle.id}:${props.bundle.revision}`}
-				bundle={props.bundle}
+			<SkillPluginEditModalContent
+				key={`${props.plugin.id}:${props.plugin.revision}`}
+				plugin={props.plugin}
 				onSubmit={props.onSubmit}
 			/>
 		</ModalDialog>

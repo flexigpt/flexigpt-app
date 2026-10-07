@@ -4,7 +4,7 @@ import { FiPlus, FiSettings } from 'react-icons/fi';
 import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPAuthHealth,
-	MCPBundleView,
+	MCPPluginView,
 	MCPServerDraft,
 	MCPServerRuntimeSnapshot,
 	MCPServerView,
@@ -22,18 +22,18 @@ import { getAuthMode, isServerOperational, requireMCPRuntimeServerID } from '@/a
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementPluginCreateModal } from '@/components/managementui/management_plugin_create_modal';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
-import { MCPBundleCard } from '@/mcpservers/mcp_bundle_card';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
+import { MCPPluginCard } from '@/mcpservers/mcp_plugin_card';
 import { MCPSettingsModal } from '@/mcpservers/mcp_settings_modal';
 
-interface BundleData {
-	bundle: MCPBundleView;
+interface PluginData {
+	plugin: MCPPluginView;
 	servers: MCPServerView[];
 	runtimeByArtifactID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByArtifactID: Record<string, MCPAuthHealth | undefined>;
@@ -49,7 +49,7 @@ interface OAuthTarget {
 }
 
 const STATUS_READ_CONCURRENCY = 4;
-const BUNDLE_PREFETCH_CONCURRENCY = 3;
+const PLUGIN_PREFETCH_CONCURRENCY = 3;
 
 function artifactKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
@@ -84,30 +84,30 @@ function getMatchingRuntimeSnapshot(
 
 // oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
-	const [bundles, setBundles] = useState<BundleData[]>([]);
+	const [plugins, setPlugins] = useState<PluginData[]>([]);
 	const [settings, setSettings] = useState<MCPSettings>();
 	const [isInitialLoading, setIsInitialLoading] = useState(true);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [pageLoadError, setPageLoadError] = useState<unknown>();
 	const [warnings, setWarnings] = useState<string[]>([]);
 
-	const [isAddBundleOpen, setIsAddBundleOpen] = useState(false);
+	const [isAddPluginOpen, setIsAddPluginOpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-	const [bundleToDelete, setBundleToDelete] = useState<MCPBundleView | null>(null);
-	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
+	const [pluginToDelete, setPluginToDelete] = useState<MCPPluginView | null>(null);
+	const [isDeletingPlugin, setIsDeletingPlugin] = useState(false);
 	const [oauthTarget, setOAuthTarget] = useState<OAuthTarget | null>(null);
 	const [alertMessage, setAlertMessage] = useState('');
 
 	const mountedRef = useRef(false);
 	const loadIDRef = useRef(0);
 	const loadedOnceRef = useRef(false);
-	const bundlesRef = useRef<BundleData[]>([]);
+	const pluginsRef = useRef<PluginData[]>([]);
 	const openedAuthorizationURLsRef = useRef(new Set<string>());
-	const bundleLoadsRef = useRef(new Map<string, Promise<void>>());
+	const pluginLoadsRef = useRef(new Map<string, Promise<void>>());
 
 	useEffect(() => {
-		bundlesRef.current = bundles;
-	}, [bundles]);
+		pluginsRef.current = plugins;
+	}, [plugins]);
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -116,7 +116,7 @@ export default function MCPServersPage() {
 			mountedRef.current = false;
 			loadIDRef.current += 1;
 			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			bundleLoadsRef.current.clear();
+			pluginLoadsRef.current.clear();
 		};
 	}, []);
 
@@ -173,10 +173,10 @@ export default function MCPServersPage() {
 		[]
 	);
 
-	const applyStatus = useCallback((bundleRef: ArtifactRef, statuses: Awaited<ReturnType<typeof readServerStatus>>) => {
-		setBundles(previous =>
+	const applyStatus = useCallback((pluginRef: ArtifactRef, statuses: Awaited<ReturnType<typeof readServerStatus>>) => {
+		setPlugins(previous =>
 			previous.map(item => {
-				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
+				if (item.plugin.ref.rootID !== pluginRef.rootID || item.plugin.ref.artifactID !== pluginRef.artifactID) {
 					return item;
 				}
 
@@ -199,11 +199,11 @@ export default function MCPServersPage() {
 		);
 	}, []);
 
-	const loadBundleServerList = useCallback(async (bundle: MCPBundleView): Promise<BundleData> => {
-		const servers = await mcpManagementAPI.listMCPServers(bundle);
+	const loadPluginServerList = useCallback(async (plugin: MCPPluginView): Promise<PluginData> => {
+		const servers = await mcpManagementAPI.listMCPServers(plugin);
 
 		return {
-			bundle,
+			plugin,
 			servers,
 			runtimeByArtifactID: Object.fromEntries(servers.map(server => [server.ref.artifactID, server.runtime])),
 			authHealthByArtifactID: Object.fromEntries(servers.map(server => [server.ref.artifactID, server.authHealth])),
@@ -226,48 +226,48 @@ export default function MCPServersPage() {
 		setPageLoadError(undefined);
 
 		try {
-			const [bundleResult, settingsResult] = await Promise.allSettled([
-				mcpManagementAPI.listMCPBundles(),
+			const [pluginResult, settingsResult] = await Promise.allSettled([
+				mcpManagementAPI.listMCPPlugins(),
 				mcpManagementAPI.getMCPSettings(),
 			]);
 
-			if (bundleResult.status === 'rejected') {
-				throw bundleResult.reason;
+			if (pluginResult.status === 'rejected') {
+				throw pluginResult.reason;
 			}
 
 			if (!mountedRef.current || loadIDRef.current !== requestID) {
 				return;
 			}
 
-			const incomingBundles = bundleResult.value ?? [];
-			const nextBundles = incomingBundles.map(bundle => {
-				const existing = bundlesRef.current.find(
-					item => item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
+			const incomingPlugins = pluginResult.value ?? [];
+			const nextPlugins = incomingPlugins.map(plugin => {
+				const existing = pluginsRef.current.find(
+					item => item.plugin.ref.rootID === plugin.ref.rootID && item.plugin.ref.artifactID === plugin.ref.artifactID
 				);
 
-				const sameRevision = existing?.bundle.plugin.revision === bundle.plugin.revision;
+				const sameRevision = existing?.plugin.plugin.revision === plugin.plugin.revision;
 
 				if (existing && sameRevision && existing.serversLoaded) {
 					return {
 						...existing,
-						bundle,
+						plugin,
 						isLoadingServers: false,
 					};
 				}
 
 				return {
-					bundle,
+					plugin,
 					servers: [],
 					runtimeByArtifactID: {},
 					authHealthByArtifactID: {},
 					readErrorsByArtifactID: {},
 					serversLoaded: false,
 					isLoadingServers: false,
-				} satisfies BundleData;
+				} satisfies PluginData;
 			});
 
-			bundlesRef.current = nextBundles;
-			setBundles(nextBundles);
+			pluginsRef.current = nextPlugins;
+			setPlugins(nextPlugins);
 
 			setWarnings(
 				settingsResult.status === 'rejected'
@@ -299,27 +299,27 @@ export default function MCPServersPage() {
 		void fetchAll();
 	}, [fetchAll]);
 
-	const loadBundleServers = useCallback(
-		(bundleRef: ArtifactRef, refreshStatus = true): Promise<void> => {
-			const key = artifactKey(bundleRef);
-			const existingLoad = bundleLoadsRef.current.get(key);
+	const loadPluginServers = useCallback(
+		(pluginRef: ArtifactRef, refreshStatus = true): Promise<void> => {
+			const key = artifactKey(pluginRef);
+			const existingLoad = pluginLoadsRef.current.get(key);
 
 			if (existingLoad) {
 				return existingLoad;
 			}
 
 			const load = (async () => {
-				const current = bundlesRef.current.find(
-					item => item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
+				const current = pluginsRef.current.find(
+					item => item.plugin.ref.rootID === pluginRef.rootID && item.plugin.ref.artifactID === pluginRef.artifactID
 				);
 
 				if (!current) {
 					throw new Error('MCP Plugin is no longer available.');
 				}
 
-				setBundles(previous =>
+				setPlugins(previous =>
 					previous.map(item =>
-						item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
+						item.plugin.ref.rootID === pluginRef.rootID && item.plugin.ref.artifactID === pluginRef.artifactID
 							? {
 									...item,
 									isLoadingServers: true,
@@ -330,16 +330,16 @@ export default function MCPServersPage() {
 				);
 
 				try {
-					const bundle = await mcpManagementAPI.getMCPBundle(bundleRef);
-					const loaded = await loadBundleServerList(bundle);
+					const plugin = await mcpManagementAPI.getMCPPlugin(pluginRef);
+					const loaded = await loadPluginServerList(plugin);
 
 					if (!mountedRef.current) {
 						return;
 					}
 
-					setBundles(previous =>
+					setPlugins(previous =>
 						previous.map(item =>
-							item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
+							item.plugin.ref.rootID === pluginRef.rootID && item.plugin.ref.artifactID === pluginRef.artifactID
 								? loaded
 								: item
 						)
@@ -352,16 +352,16 @@ export default function MCPServersPage() {
 					const statuses = await readServerStatus(loaded.servers);
 
 					if (mountedRef.current) {
-						applyStatus(bundleRef, statuses);
+						applyStatus(pluginRef, statuses);
 					}
 				} catch (error) {
 					if (!mountedRef.current) {
 						return;
 					}
 
-					setBundles(previous =>
+					setPlugins(previous =>
 						previous.map(item =>
-							item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
+							item.plugin.ref.rootID === pluginRef.rootID && item.plugin.ref.artifactID === pluginRef.artifactID
 								? {
 										...item,
 										servers: [],
@@ -380,17 +380,17 @@ export default function MCPServersPage() {
 				}
 			})();
 
-			bundleLoadsRef.current.set(key, load);
+			pluginLoadsRef.current.set(key, load);
 
 			void load.finally(() => {
-				if (bundleLoadsRef.current.get(key) === load) {
-					bundleLoadsRef.current.delete(key);
+				if (pluginLoadsRef.current.get(key) === load) {
+					pluginLoadsRef.current.delete(key);
 				}
 			});
 
 			return load;
 		},
-		[applyStatus, loadBundleServerList, readServerStatus]
+		[applyStatus, loadPluginServerList, readServerStatus]
 	);
 
 	useEffect(() => {
@@ -398,16 +398,16 @@ export default function MCPServersPage() {
 			return;
 		}
 
-		const pending = bundles
-			.filter(bundle => !bundle.serversLoaded && !bundle.isLoadingServers && !bundle.serverLoadError)
-			.map(bundle => bundle.bundle.ref);
+		const pending = plugins
+			.filter(plugin => !plugin.serversLoaded && !plugin.isLoadingServers && !plugin.serverLoadError)
+			.map(plugin => plugin.plugin.ref);
 
 		if (pending.length === 0) {
 			return;
 		}
 
 		const timer = window.setTimeout(() => {
-			void mapWithConcurrency(pending, BUNDLE_PREFETCH_CONCURRENCY, ref => loadBundleServers(ref, false)).catch(
+			void mapWithConcurrency(pending, PLUGIN_PREFETCH_CONCURRENCY, ref => loadPluginServers(ref, false)).catch(
 				() => undefined
 			);
 		}, 0);
@@ -415,13 +415,13 @@ export default function MCPServersPage() {
 		return () => {
 			window.clearTimeout(timer);
 		};
-	}, [bundles, isInitialLoading, isRefreshing, loadBundleServers, pageLoadError]);
+	}, [plugins, isInitialLoading, isRefreshing, loadPluginServers, pageLoadError]);
 
-	const refreshBundle = useCallback(
-		async (bundleRef: ArtifactRef) => {
-			await loadBundleServers(bundleRef, true);
+	const refreshPlugin = useCallback(
+		async (pluginRef: ArtifactRef) => {
+			await loadPluginServers(pluginRef, true);
 		},
-		[loadBundleServers]
+		[loadPluginServers]
 	);
 
 	const refreshSingleServer = useCallback(
@@ -438,11 +438,11 @@ export default function MCPServersPage() {
 			return;
 		}
 
-		setBundles(previous =>
+		setPlugins(previous =>
 			previous.map(item => {
 				if (
-					item.bundle.ref.rootID !== server.plugin.rootID ||
-					item.bundle.ref.artifactID !== server.plugin.artifactID
+					item.plugin.ref.rootID !== server.plugin.rootID ||
+					item.plugin.ref.artifactID !== server.plugin.artifactID
 				) {
 					return item;
 				}
@@ -477,9 +477,9 @@ export default function MCPServersPage() {
 			throw new Error('The MCP backend returned a runtime snapshot for another server.');
 		}
 
-		setBundles(previous =>
+		setPlugins(previous =>
 			previous.map(item =>
-				item.bundle.ref.rootID === server.plugin.rootID && item.bundle.ref.artifactID === server.plugin.artifactID
+				item.plugin.ref.rootID === server.plugin.rootID && item.plugin.ref.artifactID === server.plugin.artifactID
 					? {
 							...item,
 							runtimeByArtifactID: {
@@ -523,11 +523,11 @@ export default function MCPServersPage() {
 	const connectionPollKey = useMemo(
 		() =>
 			JSON.stringify(
-				bundles.flatMap(bundle =>
-					bundle.servers
+				plugins.flatMap(plugin =>
+					plugin.servers
 						.filter(server => {
-							const runtime = bundle.runtimeByArtifactID[server.ref.artifactID];
-							const auth = bundle.authHealthByArtifactID[server.ref.artifactID];
+							const runtime = plugin.runtimeByArtifactID[server.ref.artifactID];
+							const auth = plugin.authHealthByArtifactID[server.ref.artifactID];
 
 							return (
 								runtime?.status === MCPServerStatus.Connecting ||
@@ -537,7 +537,7 @@ export default function MCPServersPage() {
 						.map(server => server.ref)
 				)
 			),
-		[bundles]
+		[plugins]
 	);
 
 	useEffect(() => {
@@ -553,10 +553,10 @@ export default function MCPServersPage() {
 		const poll = async () => {
 			try {
 				await mapWithConcurrency(refs, STATUS_READ_CONCURRENCY, async ref => {
-					const bundle = bundlesRef.current.find(item =>
+					const plugin = pluginsRef.current.find(item =>
 						item.servers.some(server => artifactKey(server.ref) === artifactKey(ref))
 					);
-					const server = bundle?.servers.find(item => artifactKey(item.ref) === artifactKey(ref));
+					const server = plugin?.servers.find(item => artifactKey(item.ref) === artifactKey(ref));
 
 					if (!cancelled && server) {
 						await refreshSingleServer(server);
@@ -581,44 +581,44 @@ export default function MCPServersPage() {
 		};
 	}, [connectionPollKey, refreshSingleServer]);
 
-	const handleSaveBundle = useCallback(
+	const handleSavePlugin = useCallback(
 		async (logicalName: string, displayName: string, description?: string) => {
-			await mcpManagementAPI.createMCPBundle(logicalName, displayName, description);
+			await mcpManagementAPI.createMCPPlugin(logicalName, displayName, description);
 			await fetchAll();
 		},
 		[fetchAll]
 	);
 
 	const handleSaveServer = useCallback(
-		async (bundle: MCPBundleView, server: MCPServerView | undefined, draft: MCPServerDraft) => {
-			await mcpManagementAPI.saveMCPServer(bundle, server, draft);
-			await refreshBundle(bundle.ref);
+		async (plugin: MCPPluginView, server: MCPServerView | undefined, draft: MCPServerDraft) => {
+			await mcpManagementAPI.saveMCPServer(plugin, server, draft);
+			await refreshPlugin(plugin.ref);
 		},
-		[refreshBundle]
+		[refreshPlugin]
 	);
 
 	const handleSaveSetup = useCallback(
 		async (server: MCPServerView, values: Record<string, MCPSetupSubmissionValue>, reset: boolean) => {
 			await mcpManagementAPI.applyMCPServerSetup(server, values, reset);
-			await refreshBundle(server.plugin);
+			await refreshPlugin(server.plugin);
 		},
-		[refreshBundle]
+		[refreshPlugin]
 	);
 
-	const patchBundleEnabled = useCallback((bundleRef: ArtifactRef, enabled: boolean) => {
-		setBundles(previous =>
+	const patchPluginEnabled = useCallback((pluginRef: ArtifactRef, enabled: boolean) => {
+		setPlugins(previous =>
 			previous.map(item => {
-				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
+				if (item.plugin.ref.rootID !== pluginRef.rootID || item.plugin.ref.artifactID !== pluginRef.artifactID) {
 					return item;
 				}
 
 				return {
 					...item,
-					bundle: {
-						...item.bundle,
+					plugin: {
+						...item.plugin,
 						enabled,
 						plugin: {
-							...item.bundle.plugin,
+							...item.plugin.plugin,
 							enabled,
 						},
 					},
@@ -651,20 +651,20 @@ export default function MCPServersPage() {
 			return undefined;
 		}
 
-		for (const bundle of bundles) {
-			const server = bundle.servers.find(item => artifactKey(item.ref) === artifactKey(oauthTarget.server));
+		for (const plugin of plugins) {
+			const server = plugin.servers.find(item => artifactKey(item.ref) === artifactKey(oauthTarget.server));
 
 			if (server) {
 				return {
 					server,
-					authHealth: bundle.authHealthByArtifactID[server.ref.artifactID],
-					runtime: bundle.runtimeByArtifactID[server.ref.artifactID],
+					authHealth: plugin.authHealthByArtifactID[server.ref.artifactID],
+					runtime: plugin.runtimeByArtifactID[server.ref.artifactID],
 				};
 			}
 		}
 
 		return undefined;
-	}, [bundles, oauthTarget]);
+	}, [plugins, oauthTarget]);
 
 	useEffect(() => {
 		if (!oauthTarget?.openAutomatically || !selectedOAuth) {
@@ -718,7 +718,7 @@ export default function MCPServersPage() {
 							type="button"
 							className="btn btn-ghost rounded-xl"
 							onClick={() => {
-								setIsAddBundleOpen(true);
+								setIsAddPluginOpen(true);
 							}}
 						>
 							<FiPlus size={18} />
@@ -745,44 +745,44 @@ export default function MCPServersPage() {
 						</div>
 					))}
 
-					{!isInitialLoading && bundles.length === 0 ? (
+					{!isInitialLoading && plugins.length === 0 ? (
 						<p className="mt-8 text-center text-sm">No MCP Plugins configured yet.</p>
 					) : null}
 
-					{bundles.map(bundleData => (
-						<MCPBundleCard
-							key={`${bundleData.bundle.ref.rootID}:${bundleData.bundle.ref.artifactID}`}
-							bundle={bundleData.bundle}
-							servers={bundleData.servers}
-							existingLogicalNames={bundleData.servers.map(server => server.logicalName)}
-							runtimeByArtifactID={bundleData.runtimeByArtifactID}
-							authHealthByArtifactID={bundleData.authHealthByArtifactID}
-							readErrorsByArtifactID={bundleData.readErrorsByArtifactID}
-							serverLoadError={bundleData.serverLoadError}
-							isLoadingServers={bundleData.isLoadingServers}
-							serversLoaded={bundleData.serversLoaded}
-							onLoadServers={() => loadBundleServers(bundleData.bundle.ref)}
-							onRefreshServers={() => refreshBundle(bundleData.bundle.ref)}
-							onToggleBundleEnabled={async (bundle, enabled) => {
-								const previous = bundle.enabled;
-								patchBundleEnabled(bundle.ref, enabled);
+					{plugins.map(pluginData => (
+						<MCPPluginCard
+							key={`${pluginData.plugin.ref.rootID}:${pluginData.plugin.ref.artifactID}`}
+							plugin={pluginData.plugin}
+							servers={pluginData.servers}
+							existingLogicalNames={pluginData.servers.map(server => server.logicalName)}
+							runtimeByArtifactID={pluginData.runtimeByArtifactID}
+							authHealthByArtifactID={pluginData.authHealthByArtifactID}
+							readErrorsByArtifactID={pluginData.readErrorsByArtifactID}
+							serverLoadError={pluginData.serverLoadError}
+							isLoadingServers={pluginData.isLoadingServers}
+							serversLoaded={pluginData.serversLoaded}
+							onLoadServers={() => loadPluginServers(pluginData.plugin.ref)}
+							onRefreshServers={() => refreshPlugin(pluginData.plugin.ref)}
+							onTogglePluginEnabled={async (plugin, enabled) => {
+								const previous = plugin.enabled;
+								patchPluginEnabled(plugin.ref, enabled);
 
 								try {
-									await mcpManagementAPI.setMCPBundleEnabled(bundle, enabled);
+									await mcpManagementAPI.setMCPPluginEnabled(plugin, enabled);
 								} catch (error) {
-									patchBundleEnabled(bundle.ref, previous);
+									patchPluginEnabled(plugin.ref, previous);
 									throw error;
 								}
 
-								if (bundleData.serversLoaded) {
-									await refreshBundle(bundle.ref);
+								if (pluginData.serversLoaded) {
+									await refreshPlugin(plugin.ref);
 								}
 							}}
 							onSaveServer={handleSaveServer}
 							onSaveSetup={handleSaveSetup}
-							onDeleteServer={async (bundle, server) => {
-								await mcpManagementAPI.deleteMCPServer(bundle, server);
-								await refreshBundle(bundle.ref);
+							onDeleteServer={async (plugin, server) => {
+								await mcpManagementAPI.deleteMCPServer(plugin, server);
+								await refreshPlugin(plugin.ref);
 							}}
 							onConnectServer={handleConnectServer}
 							onDisconnectServer={async server => {
@@ -803,29 +803,29 @@ export default function MCPServersPage() {
 									openAutomatically: false,
 								});
 							}}
-							onDeleteBundleRequested={bundle => {
-								setBundleToDelete(bundle);
+							onDeletePluginRequested={plugin => {
+								setPluginToDelete(plugin);
 							}}
 						/>
 					))}
 				</ManagementPageContent>
 
 				<DeleteConfirmationModal
-					isOpen={bundleToDelete !== null}
+					isOpen={pluginToDelete !== null}
 					onClose={() => {
-						if (!isDeletingBundle) {
-							setBundleToDelete(null);
+						if (!isDeletingPlugin) {
+							setPluginToDelete(null);
 						}
 					}}
 					onConfirm={async () => {
-						if (!bundleToDelete || isDeletingBundle) {
+						if (!pluginToDelete || isDeletingPlugin) {
 							return;
 						}
 
-						const current = bundlesRef.current.find(
+						const current = pluginsRef.current.find(
 							item =>
-								item.bundle.ref.rootID === bundleToDelete.ref.rootID &&
-								item.bundle.ref.artifactID === bundleToDelete.ref.artifactID
+								item.plugin.ref.rootID === pluginToDelete.ref.rootID &&
+								item.plugin.ref.artifactID === pluginToDelete.ref.artifactID
 						);
 
 						if (!current?.serversLoaded || current.serverLoadError || current.servers.length > 0) {
@@ -833,32 +833,32 @@ export default function MCPServersPage() {
 							return;
 						}
 
-						setIsDeletingBundle(true);
+						setIsDeletingPlugin(true);
 
 						try {
-							await mcpManagementAPI.deleteMCPBundle(bundleToDelete);
-							setBundleToDelete(null);
+							await mcpManagementAPI.deleteMCPPlugin(pluginToDelete);
+							setPluginToDelete(null);
 							await fetchAll();
 						} catch (error) {
 							setAlertMessage(getErrorMessage(error, 'Failed to delete MCP Plugin.'));
 						} finally {
-							setIsDeletingBundle(false);
+							setIsDeletingPlugin(false);
 						}
 					}}
 					title="Delete MCP Plugin"
-					message={`Delete empty MCP Plugin "${bundleToDelete?.displayName ?? ''}"? Remove all servers first.`}
-					confirmButtonText={isDeletingBundle ? 'Deleting...' : 'Delete'}
+					message={`Delete empty MCP Plugin "${pluginToDelete?.displayName ?? ''}"? Remove all servers first.`}
+					confirmButtonText={isDeletingPlugin ? 'Deleting...' : 'Delete'}
 				/>
 
-				<ManagementBundleCreateModal
-					isOpen={isAddBundleOpen}
+				<ManagementPluginCreateModal
+					isOpen={isAddPluginOpen}
 					title="Add MCP Plugin"
 					entityLabel="MCP Plugin"
 					onClose={() => {
-						setIsAddBundleOpen(false);
+						setIsAddPluginOpen(false);
 					}}
-					onSubmit={handleSaveBundle}
-					existingSlugs={bundles.map(bundle => bundle.bundle.logicalName)}
+					onSubmit={handleSavePlugin}
+					existingSlugs={plugins.map(plugin => plugin.plugin.logicalName)}
 					failureMessage="Failed to create MCP Plugin."
 				/>
 

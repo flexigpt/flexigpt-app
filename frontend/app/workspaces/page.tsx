@@ -13,10 +13,10 @@ import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
@@ -53,7 +53,7 @@ function WorkspaceDirectorySummaryCard({
 	onRequestRemove: () => void;
 }) {
 	return (
-		<ManagementBundleCard
+		<ManagementPluginCard
 			title={directory.rootDisplayName}
 			identity={<span className="font-mono text-xs">{directory.rootID}</span>}
 			description="Repository-oriented Workspace directory"
@@ -79,7 +79,7 @@ function WorkspaceDirectorySummaryCard({
 			}
 		>
 			{error ? <div className="alert alert-warning mt-3 rounded-2xl text-sm">{error}</div> : null}
-		</ManagementBundleCard>
+		</ManagementPluginCard>
 	);
 }
 

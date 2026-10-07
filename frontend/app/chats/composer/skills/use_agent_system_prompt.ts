@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
-import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID, PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY } from '@/spec/model';
+import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 
@@ -44,9 +44,9 @@ function previousConversationPrompt(prompt: string): SystemInstructionSource {
 	return {
 		identityKey: PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
 		sourceKind: 'restored-conversation',
-		bundleID: PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
-		bundleDisplayName: 'Conversation',
-		bundleSlug: 'conversation',
+		pluginID: PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID,
+		pluginDisplayName: 'Conversation',
+		pluginSlug: 'conversation',
 		displayName: 'Previous conversation prompt',
 		sourceSlug: 'previous-conversation-prompt',
 		text: prompt,
@@ -58,9 +58,9 @@ function instructionSkillSource(source: RenderedInstructionSkillSource): SystemI
 	return {
 		identityKey: source.identityKey ?? `skill-instructions:${skillRefKey(source.skillRef)}`,
 		sourceKind: 'skill',
-		bundleID: source.skillRef.rootID,
-		bundleDisplayName: 'Skill instructions',
-		bundleSlug: source.skillRef.rootID,
+		pluginID: source.skillRef.rootID,
+		pluginDisplayName: 'Skill instructions',
+		pluginSlug: source.skillRef.rootID,
 		displayName: source.displayName,
 		sourceSlug: source.skillRef.artifactID,
 		text: source.prompt,

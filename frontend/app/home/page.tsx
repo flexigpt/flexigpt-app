@@ -207,7 +207,7 @@ export default function HomePage() {
 								</div>
 							</Link>
 							<p className="text-base-content/70 text-xs">
-								Bundled guide for getting started, Chats, Agents, Workspaces, reusable context, providers, privacy, and
+								Plugind guide for getting started, Chats, Agents, Workspaces, reusable context, providers, privacy, and
 								everyday tasks.
 							</p>
 						</div>

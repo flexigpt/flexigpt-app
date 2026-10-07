@@ -12,7 +12,7 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-interface ManagementBundleCreateModalProps {
+interface ManagementPluginCreateModalProps {
 	isOpen: boolean;
 	title: string;
 	entityLabel: string;
@@ -23,24 +23,24 @@ interface ManagementBundleCreateModalProps {
 	failureMessage: string;
 }
 
-interface BundleFormData {
+interface PluginFormData {
 	slug: string;
 	displayName: string;
 	description: string;
 }
 
-interface BundleValidationErrors {
+interface PluginValidationErrors {
 	slug?: string;
 	displayName?: string;
 }
 
-const EMPTY_FORM: BundleFormData = {
+const EMPTY_FORM: PluginFormData = {
 	slug: '',
 	displayName: '',
 	description: '',
 };
 
-function normalizeBundleSlugInput(value: string): string {
+function normalizePluginSlugInput(value: string): string {
 	return value
 		.toLowerCase()
 		.replaceAll(/[^a-z0-9]+/g, '-')
@@ -53,12 +53,12 @@ function normalizeIdentity(value: string): string {
 	return value.trim().toLowerCase();
 }
 
-function validateBundleForm(
-	formData: BundleFormData,
+function validatePluginForm(
+	formData: PluginFormData,
 	existingSlugs: readonly string[],
 	existingDisplayNames: readonly string[]
-): BundleValidationErrors {
-	const errors: BundleValidationErrors = {};
+): PluginValidationErrors {
+	const errors: PluginValidationErrors = {};
 	const slug = formData.slug.trim();
 	const displayName = formData.displayName.trim();
 
@@ -76,22 +76,22 @@ function validateBundleForm(
 	if (!displayName) {
 		errors.displayName = 'This field is required.';
 	} else if (existingDisplayNames.some(existing => normalizeIdentity(existing) === normalizeIdentity(displayName))) {
-		errors.displayName = `${formData.displayName.trim()} is already used by another bundle.`;
+		errors.displayName = `${formData.displayName.trim()} is already used by another plugin.`;
 	}
 
 	return errors;
 }
 
-function ManagementBundleCreateModalContent({
+function ManagementPluginCreateModalContent({
 	title,
 	entityLabel,
 	onSubmit,
 	existingSlugs,
 	existingDisplayNames = [],
 	failureMessage,
-}: ManagementBundleCreateModalProps) {
-	const [formData, setFormData] = useState<BundleFormData>(EMPTY_FORM);
-	const [touched, setTouched] = useState<Partial<Record<keyof BundleFormData, boolean>>>({});
+}: ManagementPluginCreateModalProps) {
+	const [formData, setFormData] = useState<PluginFormData>(EMPTY_FORM);
+	const [touched, setTouched] = useState<Partial<Record<keyof PluginFormData, boolean>>>({});
 	const [submitted, setSubmitted] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,7 +103,7 @@ function ManagementBundleCreateModalContent({
 	const descriptionID = useId();
 
 	const validationErrors = useMemo(
-		() => validateBundleForm(formData, existingSlugs, existingDisplayNames),
+		() => validatePluginForm(formData, existingSlugs, existingDisplayNames),
 		[existingDisplayNames, existingSlugs, formData]
 	);
 
@@ -119,8 +119,8 @@ function ManagementBundleCreateModalContent({
 		};
 	}, []);
 
-	const updateField = (field: keyof BundleFormData, value: string) => {
-		const nextValue = field === 'slug' ? normalizeBundleSlugInput(value) : value;
+	const updateField = (field: keyof PluginFormData, value: string) => {
+		const nextValue = field === 'slug' ? normalizePluginSlugInput(value) : value;
 
 		setFormData(previous => ({ ...previous, [field]: nextValue }));
 		if (submitError) {
@@ -128,11 +128,11 @@ function ManagementBundleCreateModalContent({
 		}
 	};
 
-	const markTouched = (field: keyof BundleFormData) => {
+	const markTouched = (field: keyof PluginFormData) => {
 		setTouched(previous => ({ ...previous, [field]: true }));
 	};
 
-	const visibleError = (field: keyof BundleValidationErrors): string | undefined =>
+	const visibleError = (field: keyof PluginValidationErrors): string | undefined =>
 		submitted || touched[field] ? validationErrors[field] : undefined;
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async event => {
@@ -194,7 +194,7 @@ function ManagementBundleCreateModalContent({
 					) : null}
 
 					<ModalField
-						label="Bundle Slug"
+						label="Plugin Slug"
 						htmlFor={slugID}
 						required
 						hint="Lower-case, URL-friendly identifier."
@@ -213,7 +213,7 @@ function ManagementBundleCreateModalContent({
 							onBlur={() => {
 								markTouched('slug');
 							}}
-							placeholder="my-custom-bundle"
+							placeholder="my-custom-plugin"
 							spellCheck="false"
 							autoComplete="off"
 							disabled={isSubmitting}
@@ -278,14 +278,14 @@ function ManagementBundleCreateModalContent({
 	);
 }
 
-export function ManagementBundleCreateModal(props: ManagementBundleCreateModalProps) {
+export function ManagementPluginCreateModal(props: ManagementPluginCreateModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
 
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
-			<ManagementBundleCreateModalContent key={`${props.entityLabel}:create-bundle`} {...props} />
+			<ManagementPluginCreateModalContent key={`${props.entityLabel}:create-plugin`} {...props} />
 		</ModalDialog>
 	);
 }

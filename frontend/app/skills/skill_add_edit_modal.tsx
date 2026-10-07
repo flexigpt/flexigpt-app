@@ -52,7 +52,7 @@ function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, st
 
 export interface SkillItem {
 	skill: Skill;
-	bundleID: string;
+	pluginID: string;
 	skillSlug: string;
 }
 
@@ -199,7 +199,7 @@ function makeUniqueSkillArtifactName(seed: string, existingSkills: SkillItem[]):
 }
 
 function buildSkillPrefillKey(item: SkillItem): string {
-	return `${item.bundleID}:${item.skill.id}`;
+	return `${item.pluginID}:${item.skill.id}`;
 }
 
 function parseScaffoldArgumentLines(text: string): SkillArgument[] {
@@ -379,7 +379,7 @@ function AddEditSkillModalContent({
 				}
 			}
 		} else if (field === 'name') {
-			// Constraint: within a bundle, skill.name cannot be duplicated
+			// Constraint: within a plugin, skill.name cannot be duplicated
 			const norm = normalizeForUniq(v);
 			const clash = existingSkills.some(
 				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
@@ -487,7 +487,7 @@ function AddEditSkillModalContent({
 		let cancelled = false;
 
 		void skillManagementAPI
-			.getManagedSkillDocument(initialData.bundleID, initialData.skill.id)
+			.getManagedSkillDocument(initialData.pluginID, initialData.skill.id)
 			.then(view => {
 				if (cancelled) {
 					return;
@@ -1521,7 +1521,7 @@ export function AddEditSkillModal(props: AddEditSkillModalProps) {
 	}
 
 	const remountKey = props.initialData
-		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.skill.id}:${
+		? `${props.mode ?? 'auto'}:${props.initialData.pluginID}:${props.initialData.skill.id}:${
 				props.initialData.skill.modifiedAt
 			}:${props.initialData.skill.type}:${props.initialData.skill.isBuiltIn ? '1' : '0'}`
 		: `${props.mode ?? 'auto'}:new`;

@@ -18,10 +18,10 @@ import type {
 	Skill,
 	SkillArtifactCreateInput,
 	SkillArtifactView,
-	SkillBundle,
 	SkillDocumentInput,
 	SkillListItem,
 	SkillManagementView,
+	SkillPlugin,
 	SkillPluginManagementView,
 	SkillPresenceStatus,
 	StoreSkillListItem,
@@ -30,8 +30,8 @@ import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactAdoptionMode, ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import {
 	RuntimeSkillActivity,
-	SkillBundleAttachmentRole,
 	SkillInsert,
+	SkillPluginAttachmentRole,
 	SkillPresenceStatus as SkillPresenceStatusValue,
 	SkillType,
 } from '@/spec/skill';
@@ -74,7 +74,7 @@ interface PrefetchedRuntimeMetadata {
 }
 
 export interface SkillManagementPageData {
-	skillBundles: SkillBundle[];
+	skillPlugins: SkillPlugin[];
 	skillListItems: SkillListItem[];
 }
 
@@ -123,7 +123,7 @@ function presenceStatusFor(artifact: Pick<StoreSkillListItem, 'state'>): SkillPr
 	}
 }
 
-function toSkillBundle(plugin: PluginListItem): SkillBundle {
+function toSkillPlugin(plugin: PluginListItem): SkillPlugin {
 	const builtIn = plugin.builtIn;
 
 	return {
@@ -149,7 +149,7 @@ function toSkillBundle(plugin: PluginListItem): SkillBundle {
 			{
 				sourceID: plugin.sourceID,
 				revision: plugin.revision,
-				role: builtIn ? SkillBundleAttachmentRole.BuiltIn : SkillBundleAttachmentRole.Managed,
+				role: builtIn ? SkillPluginAttachmentRole.BuiltIn : SkillPluginAttachmentRole.Managed,
 				enabled: plugin.enabled,
 			},
 		],
@@ -428,9 +428,9 @@ export class SkillManagementAPI {
 			this.store.listSkillPluginsForManagement(),
 			this.store.listSkillsForManagement(),
 		]);
-		const skillBundles = this.skillBundlesFromPlugins(plugins, undefined, includeDisabled);
+		const skillPlugins = this.skillPluginsFromPlugins(plugins, undefined, includeDisabled);
 		const skillListItems = await this.listSkillsFromPlugins(
-			skillBundles,
+			skillPlugins,
 			plugins,
 			artifacts,
 			includeDisabled,
@@ -438,7 +438,7 @@ export class SkillManagementAPI {
 		);
 
 		return {
-			skillBundles,
+			skillPlugins,
 			skillListItems,
 		};
 	}
@@ -447,28 +447,28 @@ export class SkillManagementAPI {
 		return this.composerSkillsCatalog.load(force);
 	}
 
-	async listSkillBundles(bundleIDs?: string[], includeDisabled = true): Promise<SkillBundle[]> {
+	async listSkillPlugins(pluginIDs?: string[], includeDisabled = true): Promise<SkillPlugin[]> {
 		const plugins = await this.store.listSkillPluginsForManagement();
 
-		return this.skillBundlesFromPlugins(plugins, bundleIDs, includeDisabled);
+		return this.skillPluginsFromPlugins(plugins, pluginIDs, includeDisabled);
 	}
 
 	async listSkills(
-		bundleIDs?: string[],
+		pluginIDs?: string[],
 		includeDisabled = true,
 		includeRuntimeMetadata = true
 	): Promise<SkillListItem[]> {
-		const [plugins, artifacts] = await Promise.all([
+		const [pluginItems, artifacts] = await Promise.all([
 			this.store.listSkillPluginsForManagement(),
 			this.store.listSkillsForManagement(),
 		]);
-		const bundles = this.skillBundlesFromPlugins(plugins, bundleIDs, includeDisabled);
+		const plugins = this.skillPluginsFromPlugins(pluginItems, pluginIDs, includeDisabled);
 
-		return this.listSkillsFromPlugins(bundles, plugins, artifacts, includeDisabled, includeRuntimeMetadata);
+		return this.listSkillsFromPlugins(plugins, pluginItems, artifacts, includeDisabled, includeRuntimeMetadata);
 	}
 
-	async putSkillBundle(
-		_bundleID: string,
+	async putSkillPlugin(
+		_pluginID: string,
 		rootID: string,
 		slug: string,
 		displayName: string,
@@ -498,15 +498,15 @@ export class SkillManagementAPI {
 		void created;
 	}
 
-	async patchSkillBundle(bundleID: string, enabled: boolean): Promise<void> {
-		const plugin = await this.resolveBundlePlugin(bundleID);
+	async patchSkillPlugin(pluginID: string, enabled: boolean): Promise<void> {
+		const plugin = await this.resolvePluginPlugin(pluginID);
 
 		await this.store.setSkillPluginEnabled(plugin.ref, plugin.revision, enabled);
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async updateSkillBundleMetadata(bundleID: string, displayName: string, description?: string): Promise<void> {
-		const plugin = await this.requireUserMutableBundle(bundleID);
+	async updateSkillPluginMetadata(pluginID: string, displayName: string, description?: string): Promise<void> {
+		const plugin = await this.requireUserMutablePlugin(pluginID);
 
 		if (plugin.baseline || !plugin.editable) {
 			throw new Error('Baseline Skill Plugin metadata is application-managed.');
@@ -521,8 +521,8 @@ export class SkillManagementAPI {
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async refreshSkillBundle(bundleID: string): Promise<void> {
-		const plugin = await this.resolveBundlePlugin(bundleID);
+	async refreshSkillPlugin(pluginID: string): Promise<void> {
+		const plugin = await this.resolvePluginPlugin(pluginID);
 		const listedArtifacts = await this.listPluginSkillItemsForRead(plugin);
 		const sourceRefs = new Map<string, { rootID: string; sourceID: string }>();
 
@@ -555,8 +555,8 @@ export class SkillManagementAPI {
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async deleteSkillBundle(bundleID: string): Promise<void> {
-		const plugin = await this.resolveBundlePlugin(bundleID);
+	async deleteSkillPlugin(pluginID: string): Promise<void> {
+		const plugin = await this.resolvePluginPlugin(pluginID);
 
 		if (!plugin.deletable || plugin.baseline) {
 			throw new Error('This Skill Plugin cannot be deleted.');
@@ -569,8 +569,8 @@ export class SkillManagementAPI {
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async putSkillArtifact(bundleID: string, _artifactID: string, input: SkillArtifactCreateInput): Promise<Skill> {
-		const plugin = await this.requireUserMutableBundle(bundleID);
+	async putSkillArtifact(pluginID: string, _artifactID: string, input: SkillArtifactCreateInput): Promise<Skill> {
+		const plugin = await this.requireUserMutablePlugin(pluginID);
 		const skillMD = this.encodeManagedSkillMarkdown(input);
 
 		const result = await this.store.createManagedSkill({
@@ -584,7 +584,7 @@ export class SkillManagementAPI {
 		this.invalidateComposerSkillsCatalog();
 
 		return this.projectSkill(
-			toSkillBundle(this.pluginListItemFromView(result.plugin, false)),
+			toSkillPlugin(this.pluginListItemFromView(result.plugin, false)),
 			storeSkillListItemFromArtifact(result.artifact, {
 				builtIn: false,
 				managed: true,
@@ -595,11 +595,11 @@ export class SkillManagementAPI {
 		);
 	}
 
-	async replaceManagedSkill(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<void> {
-		const plugin = await this.requireUserMutableBundle(bundleID);
-		const artifact = await this.findPluginSkillItem(plugin, artifactID);
-		const bundle = toSkillBundle(plugin);
-		const current = await this.projectSkill(bundle, artifact, true, undefined, true);
+	async replaceManagedSkill(pluginID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<void> {
+		const p = await this.requireUserMutablePlugin(pluginID);
+		const artifact = await this.findPluginSkillItem(p, artifactID);
+		const plugin = toSkillPlugin(p);
+		const current = await this.projectSkill(plugin, artifact, true, undefined, true);
 
 		if (!artifact.managed || !current.isManaged) {
 			throw new Error('Only managed Skills can be edited.');
@@ -624,8 +624,8 @@ export class SkillManagementAPI {
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async getManagedSkillDocument(bundleID: string, artifactID: string): Promise<ManagedSkillDocumentView> {
-		const plugin = await this.resolveBundlePlugin(bundleID);
+	async getManagedSkillDocument(pluginID: string, artifactID: string): Promise<ManagedSkillDocumentView> {
+		const plugin = await this.resolvePluginPlugin(pluginID);
 		const artifact = await this.findPluginSkillItem(plugin, artifactID);
 
 		if (!artifact.managed) {
@@ -640,8 +640,8 @@ export class SkillManagementAPI {
 		};
 	}
 
-	async registerFilesystemSkills(bundleID: string, rootPath: string, sourceDisplayName: string): Promise<void> {
-		let plugin = await this.requireUserMutableBundle(bundleID);
+	async registerFilesystemSkills(pluginID: string, rootPath: string, sourceDisplayName: string): Promise<void> {
+		let plugin = await this.requireUserMutablePlugin(pluginID);
 
 		const source = await this.store.registerSkillDirectory({
 			rootID: plugin.ref.rootID,
@@ -670,7 +670,7 @@ export class SkillManagementAPI {
 	}
 
 	async patchSkill(
-		bundleID: string,
+		pluginID: string,
 		artifactID: string,
 		isEnabled?: boolean,
 		_location?: string,
@@ -679,7 +679,7 @@ export class SkillManagementAPI {
 		tags?: string[]
 	): Promise<void> {
 		if (displayName !== undefined || description !== undefined || tags !== undefined) {
-			const plugin = await this.requireUserMutableBundle(bundleID);
+			const plugin = await this.requireUserMutablePlugin(pluginID);
 			const artifact = await this.findPluginSkillItem(plugin, artifactID);
 
 			if (!artifact.managed) {
@@ -687,7 +687,7 @@ export class SkillManagementAPI {
 			}
 
 			const managed = await this.store.getManagedSkillDocument(artifact.ref);
-			const current = await this.projectSkill(toSkillBundle(plugin), artifact, true, undefined, true);
+			const current = await this.projectSkill(toSkillPlugin(plugin), artifact, true, undefined, true);
 
 			if (current.resources.hasResources || current.resources.totalCount > 0) {
 				throw new Error(
@@ -695,7 +695,7 @@ export class SkillManagementAPI {
 				);
 			}
 
-			await this.replaceManagedSkill(bundleID, artifactID, {
+			await this.replaceManagedSkill(pluginID, artifactID, {
 				name: managed.document.name,
 				displayName: displayName === undefined ? managed.document.displayName : displayName || undefined,
 				description: description === undefined ? managed.document.description : description,
@@ -712,15 +712,15 @@ export class SkillManagementAPI {
 			return;
 		}
 
-		const plugin = await this.resolveBundlePlugin(bundleID);
+		const plugin = await this.resolvePluginPlugin(pluginID);
 		const artifact = await this.findPluginSkillItem(plugin, artifactID);
 
 		await this.store.setSkillEnabled(artifact.ref, artifact.revision, isEnabled);
 		this.invalidateComposerSkillsCatalog();
 	}
 
-	async deleteSkill(bundleID: string, artifactID: string): Promise<void> {
-		const plugin = await this.requireUserMutableBundle(bundleID);
+	async deleteSkill(pluginID: string, artifactID: string): Promise<void> {
+		const plugin = await this.requireUserMutablePlugin(pluginID);
 		const artifact = await this.findPluginSkillItem(plugin, artifactID);
 		const memberships = await this.store.listSkillPluginMemberships(artifact.ref);
 		const membership = memberships.find(
@@ -777,18 +777,18 @@ export class SkillManagementAPI {
 		return this.models.resolveMappedModelTarget(target);
 	}
 
-	private skillBundlesFromPlugins(
+	private skillPluginsFromPlugins(
 		plugins: PluginListItem[],
-		bundleIDs?: string[],
+		pluginIDs?: string[],
 		includeDisabled = true
-	): SkillBundle[] {
-		const requested = bundleIDs ? new Set(bundleIDs) : undefined;
+	): SkillPlugin[] {
+		const requested = pluginIDs ? new Set(pluginIDs) : undefined;
 
 		return plugins
 			.filter(plugin => requested === undefined || requested.has(plugin.ref.artifactID))
 			.filter(plugin => includeDisabled || plugin.enabled)
 			.map(b => {
-				return toSkillBundle(b);
+				return toSkillPlugin(b);
 			})
 			.toSorted((left, right) => {
 				if (left.isBuiltIn !== right.isBuiltIn) {
@@ -802,26 +802,26 @@ export class SkillManagementAPI {
 	}
 
 	private async listSkillsFromPlugins(
-		bundles: SkillBundle[],
-		plugins: PluginListItem[],
+		plugins: SkillPlugin[],
+		pluginListItems: PluginListItem[],
 		artifacts: StoreSkillListItem[],
 		includeDisabled: boolean,
 		includeRuntimeMetadata: boolean
 	): Promise<SkillListItem[]> {
-		const pluginsByID = new Map(plugins.map(plugin => [plugin.ref.artifactID, plugin] as const));
+		const pluginListItemsByID = new Map(pluginListItems.map(p => [p.ref.artifactID, p] as const));
 		const artifactsByRef = new Map(artifacts.map(artifact => [artifactRefKey(artifact.ref), artifact] as const));
 
-		const candidateGroups = await mapWithConcurrency(bundles, SKILL_READ_CONCURRENCY, async bundle => {
-			const plugin = pluginsByID.get(bundle.id);
+		const candidateGroups = await mapWithConcurrency(plugins, SKILL_READ_CONCURRENCY, async plugin => {
+			const p = pluginListItemsByID.get(plugin.id);
 
-			if (!plugin) {
-				throw new Error(`Skill Plugin ${bundle.id} disappeared while loading Skills.`);
+			if (!p) {
+				throw new Error(`Skill Plugin ${plugin.id} disappeared while loading Skills.`);
 			}
 
-			const members = await this.listPluginSkillItems(plugin, artifactsByRef);
+			const members = await this.listPluginSkillItems(p, artifactsByRef);
 
 			return members.map(artifact => ({
-				bundle,
+				plugin,
 				artifact,
 			}));
 		});
@@ -832,8 +832,8 @@ export class SkillManagementAPI {
 			: new Map<string, PrefetchedRuntimeMetadata>();
 
 		const projected = await Promise.all(
-			candidates.map(({ bundle, artifact }) =>
-				this.projectSkill(bundle, artifact, includeRuntimeMetadata, runtimeMetadata.get(artifactRefKey(artifact.ref)))
+			candidates.map(({ plugin, artifact }) =>
+				this.projectSkill(plugin, artifact, includeRuntimeMetadata, runtimeMetadata.get(artifactRefKey(artifact.ref)))
 			)
 		);
 
@@ -844,10 +844,10 @@ export class SkillManagementAPI {
 				continue;
 			}
 
-			const bundle = candidates[index].bundle;
+			const plugin = candidates[index].plugin;
 			output.push({
-				bundleID: bundle.id,
-				bundleSlug: bundle.slug,
+				pluginID: plugin.id,
+				pluginSlug: plugin.slug,
 				skillSlug: skill.slug,
 				skillDefinition: skill,
 			});
@@ -863,9 +863,9 @@ export class SkillManagementAPI {
 		});
 	}
 
-	private async resolveBundlePlugin(bundleID: string): Promise<PluginListItem> {
+	private async resolvePluginPlugin(pluginID: string): Promise<PluginListItem> {
 		const plugins = await this.store.listSkillPluginsForManagement();
-		const plugin = plugins.find(value => value.ref.artifactID === bundleID);
+		const plugin = plugins.find(value => value.ref.artifactID === pluginID);
 
 		if (!plugin) {
 			throw new Error('Skill Plugin not found.');
@@ -874,8 +874,8 @@ export class SkillManagementAPI {
 		return plugin;
 	}
 
-	private async requireUserMutableBundle(bundleID: string): Promise<PluginListItem> {
-		const plugin = await this.resolveBundlePlugin(bundleID);
+	private async requireUserMutablePlugin(pluginID: string): Promise<PluginListItem> {
+		const plugin = await this.resolvePluginPlugin(pluginID);
 
 		if (!isUserMutablePlugin(plugin)) {
 			throw new Error('This Skill Plugin only supports enable and disable actions.');
@@ -937,14 +937,14 @@ export class SkillManagementAPI {
 	}
 
 	private async projectSkill(
-		bundle: SkillBundle,
+		plugin: SkillPlugin,
 		artifact: StoreSkillListItem,
 		includeRuntimeMetadata: boolean,
 		prefetchedRuntime?: PrefetchedRuntimeMetadata,
 		loadManagedDocument = false
 	): Promise<Skill> {
 		const ref = artifact.ref;
-		const isManaged = artifact.managed && !bundle.isBuiltIn;
+		const isManaged = artifact.managed && !plugin.isBuiltIn;
 		let managedDocument: SkillDocumentInput | undefined;
 
 		if (isManaged && loadManagedDocument) {

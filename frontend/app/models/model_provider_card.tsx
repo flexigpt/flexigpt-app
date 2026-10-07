@@ -12,10 +12,10 @@ import type { ModelManagementItem, ModelProviderManagementItem } from '@/apis/mo
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
@@ -100,7 +100,7 @@ export function ModelProviderCard({
 
 	return (
 		<>
-			<ManagementBundleCard
+			<ManagementPluginCard
 				title={provider.list.displayName || 'Provider'}
 				status={
 					<>
@@ -260,7 +260,7 @@ export function ModelProviderCard({
 						)}
 					</div>
 				) : null}
-			</ManagementBundleCard>
+			</ManagementPluginCard>
 
 			<ActionDeniedAlertModal
 				isOpen={showDenied}

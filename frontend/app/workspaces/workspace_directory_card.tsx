@@ -7,9 +7,9 @@ import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { ActionRow } from '@/components/managementui/action_row';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
@@ -121,7 +121,7 @@ export function WorkspaceDirectoryCard({
 			: directory.directorySource.displayName;
 
 	return (
-		<ManagementBundleCard
+		<ManagementPluginCard
 			title={directory.root.displayName}
 			identity={directoryIdentity ? <span className="text-xs">{directoryIdentity}</span> : null}
 			description="Repository-oriented Workspace directory"
@@ -396,6 +396,6 @@ export function WorkspaceDirectoryCard({
 					) : null}
 				</div>
 			) : null}
-		</ManagementBundleCard>
+		</ManagementPluginCard>
 	);
 }

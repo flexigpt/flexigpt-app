@@ -5,7 +5,7 @@ import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, F
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { SkillBundle, SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillListItem, SkillPlugin, SkillRef } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -46,7 +46,7 @@ const skillRowActionButtonClasses = 'btn btn-ghost btn-xs rounded-lg';
 const skillRowRemoveActionButtonClasses = `${skillRowActionButtonClasses} text-error`;
 
 interface InstructionSkillDraft {
-	bundleID?: string;
+	pluginID?: string;
 	displayName: string;
 	name: string;
 	body: string;
@@ -82,14 +82,14 @@ function getInstructionSourceIdentityKey(item: SkillListItem): string {
 }
 
 function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
-	const bundleSlugCompare = skillDropdownCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) {
-		return bundleSlugCompare;
+	const pluginSlugCompare = skillDropdownCollator.compare(a.pluginSlug, b.pluginSlug);
+	if (pluginSlugCompare !== 0) {
+		return pluginSlugCompare;
 	}
 
-	const bundleIDCompare = skillDropdownCollator.compare(a.bundleID, b.bundleID);
-	if (bundleIDCompare !== 0) {
-		return bundleIDCompare;
+	const pluginIDCompare = skillDropdownCollator.compare(a.pluginID, b.pluginID);
+	if (pluginIDCompare !== 0) {
+		return pluginIDCompare;
 	}
 
 	const skillSlugCompare = skillDropdownCollator.compare(a.skillSlug, b.skillSlug);
@@ -110,8 +110,8 @@ function getSkillSearchFields(item: SkillListItem) {
 		{ value: getSkillDisplayLabel(item), weight: 6 },
 		{ value: item.skillSlug, weight: 5 },
 		{ value: item.skillDefinition.name, weight: 4 },
-		{ value: item.bundleSlug, weight: 3 },
-		{ value: item.bundleID, weight: 2 },
+		{ value: item.pluginSlug, weight: 3 },
+		{ value: item.pluginID, weight: 2 },
 		{ value: item.skillDefinition.description, weight: 2 },
 		{ value: item.skillDefinition.type, weight: 1 },
 		{ value: item.skillDefinition.location, weight: 1 },
@@ -139,8 +139,8 @@ function resourceCount(item: SkillListItem): number {
 	return resources?.hasResources ? resources.totalCount : 0;
 }
 
-function getDefaultCustomBundle(bundles: SkillBundle[]): string {
-	return bundles.find(bundle => !bundle.isBuiltIn && bundle.isEnabled)?.id ?? '';
+function getDefaultCustomPlugin(plugins: SkillPlugin[]): string {
+	return plugins.find(plugin => !plugin.isBuiltIn && plugin.isEnabled)?.id ?? '';
 }
 
 function makeUniqueSimpleSkillName(seed: string, allSkills: SkillListItem[]): string {
@@ -200,8 +200,8 @@ function AddInstructionSkillModalContent({
 	onCreated,
 }: Omit<AddInstructionSkillModalProps, 'isOpen' | 'onClose'>) {
 	const initial = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
-	const [bundles, setBundles] = useState<SkillBundle[]>([]);
-	const [bundleID, setBundleID] = useState(initial.bundleID ?? '');
+	const [plugins, setPlugins] = useState<SkillPlugin[]>([]);
+	const [pluginID, setPluginID] = useState(initial.pluginID ?? '');
 	const [displayName, setDisplayName] = useState(initial.displayName);
 	const [name, setName] = useState(initial.name);
 	const [body, setBody] = useState(initial.body);
@@ -212,23 +212,23 @@ function AddInstructionSkillModalContent({
 	useEffect(() => {
 		let cancelled = false;
 		void skillManagementAPI
-			.listSkillBundles(undefined, true)
-			.then(nextBundles => {
+			.listSkillPlugins(undefined, true)
+			.then(nextPlugins => {
 				if (cancelled) {
 					return;
 				}
-				const custom = nextBundles.filter(bundle => !bundle.isBuiltIn);
-				setBundles(custom);
-				const preferredBundleID =
-					initialDraft?.bundleID && custom.some(bundle => bundle.id === initialDraft.bundleID && bundle.isEnabled)
-						? initialDraft.bundleID
-						: getDefaultCustomBundle(custom);
-				setBundleID(preferredBundleID);
+				const custom = nextPlugins.filter(plugin => !plugin.isBuiltIn);
+				setPlugins(custom);
+				const preferredPluginID =
+					initialDraft?.pluginID && custom.some(plugin => plugin.id === initialDraft.pluginID && plugin.isEnabled)
+						? initialDraft.pluginID
+						: getDefaultCustomPlugin(custom);
+				setPluginID(preferredPluginID);
 			})
 			.catch((error: unknown) => {
-				console.error('Failed to load skill bundles:', error);
+				console.error('Failed to load skill plugins:', error);
 				if (!cancelled) {
-					setBundles([]);
+					setPlugins([]);
 				}
 			});
 		return () => {
@@ -236,26 +236,26 @@ function AddInstructionSkillModalContent({
 		};
 	}, [initialDraft]);
 
-	const existingSlugsForBundle = useMemo(
-		() => new Set(allSkills.filter(item => item.bundleID === bundleID).map(item => item.skillSlug)),
-		[allSkills, bundleID]
+	const existingSlugsForPlugin = useMemo(
+		() => new Set(allSkills.filter(item => item.pluginID === pluginID).map(item => item.skillSlug)),
+		[allSkills, pluginID]
 	);
 	const normalizedName = slugifySkillName(name);
 	const nameError = !normalizedName
 		? 'Name is required.'
 		: !SIMPLE_SKILL_NAME_RE.test(normalizedName)
 			? 'Use lowercase letters, numbers, and hyphens. Maximum 64 characters.'
-			: existingSlugsForBundle.has(normalizedName)
-				? 'A skill with this slug already exists in the selected bundle.'
+			: existingSlugsForPlugin.has(normalizedName)
+				? 'A skill with this slug already exists in the selected plugin.'
 				: '';
 	const bodyError = body.trim() ? '' : 'Instruction body is required.';
-	const selectedBundle = bundles.find(bundle => bundle.id === bundleID);
-	const bundleError = !bundleID
-		? 'Select a custom enabled skill bundle.'
-		: selectedBundle?.isEnabled
+	const selectedPlugin = plugins.find(plugin => plugin.id === pluginID);
+	const pluginError = !pluginID
+		? 'Select a custom enabled skill plugin.'
+		: selectedPlugin?.isEnabled
 			? ''
-			: 'The selected custom skill bundle is disabled.';
-	const canSubmit = !nameError && !bodyError && !bundleError && !isSubmitting;
+			: 'The selected custom skill plugin is disabled.';
+	const canSubmit = !nameError && !bodyError && !pluginError && !isSubmitting;
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
 		event.preventDefault();
@@ -269,7 +269,7 @@ function AddInstructionSkillModalContent({
 		setSubmitError('');
 
 		void skillManagementAPI
-			.putSkillArtifact(bundleID, normalizedName, {
+			.putSkillArtifact(pluginID, normalizedName, {
 				name: normalizedName,
 				displayName: displayName.trim() || normalizedName,
 				description:
@@ -282,10 +282,10 @@ function AddInstructionSkillModalContent({
 				isEnabled: true,
 			})
 			.then(async createdSkill => {
-				const bundle = bundles.find(item => item.id === bundleID);
+				const plugin = plugins.find(item => item.id === pluginID);
 				await onCreated({
-					bundleID,
-					bundleSlug: bundle?.slug ?? bundleID,
+					pluginID,
+					pluginSlug: plugin?.slug ?? pluginID,
 					skillSlug: normalizedName,
 					skillDefinition: createdSkill,
 				});
@@ -305,8 +305,8 @@ function AddInstructionSkillModalContent({
 			});
 	};
 
-	const bundleDropdownItems = Object.fromEntries(
-		bundles.map(bundle => [bundle.id, { isEnabled: bundle.isEnabled }] as const)
+	const pluginDropdownItems = Object.fromEntries(
+		plugins.map(plugin => [plugin.id, { isEnabled: plugin.isEnabled }] as const)
 	);
 
 	return (
@@ -333,28 +333,28 @@ function AddInstructionSkillModalContent({
 					) : (
 						<span>
 							This creates a managed filesystem skill with <span className="font-mono">insert: instructions</span>. For
-							arguments, scripts, resources, or user-message templates, use the Skill Bundles page.
+							arguments, scripts, resources, or user-message templates, use the Skill Plugins page.
 						</span>
 					)}
 				</div>
 
 				<div>
 					<div className="label py-1">
-						<span className="text-sm">Bundle</span>
+						<span className="text-sm">Plugin</span>
 					</div>
 					<Dropdown<string>
-						dropdownItems={bundleDropdownItems}
-						orderedKeys={bundles.map(bundle => bundle.id)}
-						selectedKey={bundleID}
-						onChange={setBundleID}
+						dropdownItems={pluginDropdownItems}
+						orderedKeys={plugins.map(plugin => plugin.id)}
+						selectedKey={pluginID}
+						onChange={setPluginID}
 						filterDisabled={true}
-						title="Select skill bundle"
+						title="Select skill plugin"
 						getDisplayName={key => {
-							const bundle = bundles.find(item => item.id === key);
-							return bundle ? `${bundle.displayName || bundle.slug} (${bundle.slug})` : key;
+							const plugin = plugins.find(item => item.id === key);
+							return plugin ? `${plugin.displayName || plugin.slug} (${plugin.slug})` : key;
 						}}
 					/>
-					{bundleError ? <div className="text-error mt-1 text-xs">{bundleError}</div> : null}
+					{pluginError ? <div className="text-error mt-1 text-xs">{pluginError}</div> : null}
 				</div>
 
 				<div>
@@ -516,7 +516,7 @@ export function SkillsBottomBarChip({
 
 	const displayedGroups = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
-			return [{ bundleID: 'flat', bundleSlug: 'skills', skills: sortedSkills }];
+			return [{ pluginID: 'flat', pluginSlug: 'skills', skills: sortedSkills }];
 		}
 
 		const ranked = rankSearchableItems(sortedSkills, {
@@ -525,7 +525,7 @@ export function SkillsBottomBarChip({
 			getFields: getSkillSearchFields,
 			fallbackCompare: compareSkillRows,
 		});
-		return [{ bundleID: 'flat', bundleSlug: 'skills', skills: ranked }];
+		return [{ pluginID: 'flat', pluginSlug: 'skills', skills: ranked }];
 	}, [searchQuery, sortedSkills]);
 
 	const displayedSkillCount = displayedGroups.reduce((sum, group) => sum + group.skills.length, 0);
@@ -703,7 +703,7 @@ export function SkillsBottomBarChip({
 
 				setInstructionModalMode('fork');
 				setInstructionDraft({
-					bundleID: item.skillDefinition.isBuiltIn ? undefined : item.bundleID,
+					pluginID: item.skillDefinition.isBuiltIn ? undefined : item.pluginID,
 					displayName: `${sourceLabel} Copy`,
 					name: nextName,
 					body: rendered.text || `Forked from "${sourceLabel}". Replace this placeholder with instructions.`,
@@ -756,8 +756,8 @@ export function SkillsBottomBarChip({
 				} ${!isInstruction ? 'opacity-75' : ''}`}
 				title={
 					isInstruction
-						? `${item.bundleSlug}/${item.skillSlug}\nEnable makes it available. Enable + active loads its instructions now.`
-						: `${item.bundleSlug}/${item.skillSlug}\nThis is a user-message template. Use the Templates menu.`
+						? `${item.pluginSlug}/${item.skillSlug}\nEnable makes it available. Enable + active loads its instructions now.`
+						: `${item.pluginSlug}/${item.skillSlug}\nThis is a user-message template. Use the Templates menu.`
 				}
 				onClick={() => {
 					if (isInputLocked || !isInstruction) {
@@ -779,7 +779,7 @@ export function SkillsBottomBarChip({
 						) : null}
 					</div>
 					<div className="text-base-content/60 truncate text-xs">
-						{item.bundleSlug}/{item.skillSlug} • {item.skillDefinition.name}
+						{item.pluginSlug}/{item.skillSlug} • {item.skillDefinition.name}
 					</div>
 
 					<div className="mt-1 flex flex-wrap items-center justify-end gap-1">

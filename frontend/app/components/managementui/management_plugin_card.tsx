@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { ActionRow } from '@/components/managementui/action_row';
 
-interface ManagementBundleCardProps {
+interface ManagementPluginCardProps {
 	title: ReactNode;
 	identity?: ReactNode;
 	subtitle?: ReactNode;
@@ -18,12 +18,12 @@ interface ManagementBundleCardProps {
 }
 
 /**
- * Header actions are retained for compatibility. New bundle cards should use
+ * Header actions are retained for compatibility. New plugin cards should use
  * `status` and `disclosure` in the header, then `actionLeading` and `actions`
  * for mutations in the bottom row.
  *
  */
-export function ManagementBundleCard({
+export function ManagementPluginCard({
 	title,
 	identity,
 	subtitle,
@@ -36,7 +36,7 @@ export function ManagementBundleCard({
 	headerActions,
 	children,
 	className = '',
-}: ManagementBundleCardProps) {
+}: ManagementPluginCardProps) {
 	const effectiveIdentity = identity ?? subtitle;
 
 	return (

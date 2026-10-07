@@ -105,7 +105,7 @@ function hasOptionPatchChanges(option: MCPComposerServerOption, patch: Partial<M
 }
 
 function optionFromServer(
-	bundle: MCPComposerServerOption['bundle'],
+	plugin: MCPComposerServerOption['plugin'],
 	server: MCPComposerServerOption['server'],
 	runtime: MCPComposerServerOption['runtime'],
 	authHealth: MCPComposerServerOption['authHealth']
@@ -116,7 +116,7 @@ function optionFromServer(
 	}
 
 	return {
-		bundle,
+		plugin,
 		server,
 		runtimeServerID,
 		transport:
@@ -272,14 +272,14 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 					return;
 				}
 				const unique = new Map<string, MCPComposerServerOption>();
-				for (const { bundle, servers } of declarations) {
+				for (const { plugin, servers } of declarations) {
 					for (const server of servers) {
-						const option = optionFromServer(bundle, server, server.runtime, server.authHealth);
+						const option = optionFromServer(plugin, server, server.runtime, server.authHealth);
 						if (!option) {
 							continue;
 						}
 						const existing = unique.get(optionKey(option));
-						if (!existing || (!existing.bundle.enabled && option.bundle.enabled)) {
+						if (!existing || (!existing.plugin.enabled && option.plugin.enabled)) {
 							unique.set(optionKey(option), option);
 						}
 					}
@@ -780,7 +780,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 
 			const option = optionsRef.current.find(item => optionKey(item) === key);
 
-			if (!option || !option.bundle.enabled || !option.server.artifact.enabled || !isServerOperational(option.server)) {
+			if (!option || !option.plugin.enabled || !option.server.artifact.enabled || !isServerOperational(option.server)) {
 				return false;
 			}
 
@@ -1042,7 +1042,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 			const option = optionsRef.current.find(item => optionKey(item) === key);
 			if (
 				!option ||
-				!option.bundle.enabled ||
+				!option.plugin.enabled ||
 				!option.server.enabled ||
 				option.runtime?.status !== MCPServerStatus.Ready
 			) {

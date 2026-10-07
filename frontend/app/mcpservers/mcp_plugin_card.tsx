@@ -16,7 +16,7 @@ import {
 
 import type {
 	MCPAuthHealth,
-	MCPBundleView,
+	MCPPluginView,
 	MCPServerDraft,
 	MCPServerRuntimeSnapshot,
 	MCPServerView,
@@ -34,9 +34,9 @@ import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
@@ -47,7 +47,7 @@ import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 } from '@/mcpservers/lib/mcp_server_utils';
-import { MCPBundleDetailsModal } from '@/mcpservers/mcp_bundle_details_modal';
+import { MCPPluginDetailsModal } from '@/mcpservers/mcp_plugin_details_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
 import { MCPServerSetupModal } from '@/mcpservers/mcp_server_setup_modal';
@@ -57,8 +57,8 @@ interface MCPServerReadErrors {
 	auth?: string;
 }
 
-interface MCPBundleCardProps {
-	bundle: MCPBundleView;
+interface MCPPluginCardProps {
+	plugin: MCPPluginView;
 	servers: MCPServerView[];
 	existingLogicalNames: string[];
 	runtimeByArtifactID: Record<string, MCPServerRuntimeSnapshot | undefined>;
@@ -70,19 +70,19 @@ interface MCPBundleCardProps {
 
 	onLoadServers: () => Promise<void>;
 	onRefreshServers: () => Promise<void>;
-	onToggleBundleEnabled: (bundle: MCPBundleView, enabled: boolean) => Promise<void>;
-	onSaveServer: (bundle: MCPBundleView, server: MCPServerView | undefined, draft: MCPServerDraft) => Promise<void>;
+	onTogglePluginEnabled: (plugin: MCPPluginView, enabled: boolean) => Promise<void>;
+	onSaveServer: (plugin: MCPPluginView, server: MCPServerView | undefined, draft: MCPServerDraft) => Promise<void>;
 	onSaveSetup: (
 		server: MCPServerView,
 		values: Record<string, MCPSetupSubmissionValue>,
 		reset: boolean
 	) => Promise<void>;
-	onDeleteServer: (bundle: MCPBundleView, server: MCPServerView) => Promise<void>;
+	onDeleteServer: (plugin: MCPPluginView, server: MCPServerView) => Promise<void>;
 	onConnectServer: (server: MCPServerView) => Promise<void>;
 	onDisconnectServer: (server: MCPServerView) => Promise<void>;
 	onRefreshServer: (server: MCPServerView) => Promise<void>;
 	onCancelOAuth: (server: MCPServerView) => Promise<void>;
-	onDeleteBundleRequested: (bundle: MCPBundleView) => void;
+	onDeletePluginRequested: (plugin: MCPPluginView) => void;
 	onRequestOAuthAuthorization: (server: MCPServerView) => void;
 }
 
@@ -95,8 +95,8 @@ interface MCPSetupTarget {
 	connectAfterSave: boolean;
 }
 
-export function MCPBundleCard({
-	bundle,
+export function MCPPluginCard({
+	plugin,
 	servers,
 	existingLogicalNames,
 	runtimeByArtifactID,
@@ -107,7 +107,7 @@ export function MCPBundleCard({
 	serversLoaded,
 	onLoadServers,
 	onRefreshServers,
-	onToggleBundleEnabled,
+	onTogglePluginEnabled,
 	onSaveServer,
 	onSaveSetup,
 	onDeleteServer,
@@ -115,15 +115,15 @@ export function MCPBundleCard({
 	onDisconnectServer,
 	onRefreshServer,
 	onCancelOAuth,
-	onDeleteBundleRequested,
+	onDeletePluginRequested,
 	onRequestOAuthAuthorization,
-}: MCPBundleCardProps) {
+}: MCPPluginCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [serverToDelete, setServerToDelete] = useState<MCPServerView | null>(null);
 	const [serverEditor, setServerEditor] = useState<MCPServerEditorState | null>(null);
 	const [serverDetails, setServerDetails] = useState<MCPServerView | null>(null);
 	const [setupTarget, setSetupTarget] = useState<MCPSetupTarget | null>(null);
-	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
+	const [isPluginDetailsOpen, setIsPluginDetailsOpen] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
 
 	const { isPending, runAction } = usePendingActions();
@@ -135,16 +135,16 @@ export function MCPBundleCard({
 	const clearAlert = () => {
 		setAlertMessage('');
 	};
-	const bundleIdentity = bundle.displayName === bundle.logicalName ? undefined : bundle.logicalName;
+	const pluginIdentity = plugin.displayName === plugin.logicalName ? undefined : plugin.logicalName;
 
 	const refresh = () => {
-		void runAction('bundle:refresh', onRefreshServers).catch((error: unknown) => {
+		void runAction('plugin:refresh', onRefreshServers).catch((error: unknown) => {
 			showAlert(getErrorMessage(error, 'Failed to reload MCP servers.'));
 		});
 	};
 
 	const loadServers = () => {
-		void runAction('bundle:load', onLoadServers).catch((error: unknown) => {
+		void runAction('plugin:load', onLoadServers).catch((error: unknown) => {
 			showAlert(getErrorMessage(error, 'Failed to load MCP servers.'));
 		});
 	};
@@ -162,16 +162,16 @@ export function MCPBundleCard({
 
 	return (
 		<>
-			<ManagementBundleCard
-				title={bundle.displayName}
-				identity={bundleIdentity ? <span className="font-mono">{bundleIdentity}</span> : null}
-				description={bundle.description}
+			<ManagementPluginCard
+				title={plugin.displayName}
+				identity={pluginIdentity ? <span className="font-mono">{pluginIdentity}</span> : null}
+				description={plugin.description}
 				status={
 					<>
-						<StatusBadge tone={bundle.enabled ? 'success' : 'neutral'}>
-							{bundle.enabled ? 'Enabled' : 'Disabled'}
+						<StatusBadge tone={plugin.enabled ? 'success' : 'neutral'}>
+							{plugin.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
-						<StatusBadge>{bundle.builtIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						<StatusBadge>{plugin.builtIn ? 'Built-in' : 'Custom'}</StatusBadge>
 					</>
 				}
 				disclosure={
@@ -199,12 +199,12 @@ export function MCPBundleCard({
 				}
 				actionLeading={
 					<EnabledControl
-						id={`mcp-bundle-${bundle.ref.artifactID}`}
-						checked={bundle.enabled}
+						id={`mcp-plugin-${plugin.ref.artifactID}`}
+						checked={plugin.enabled}
 						compact={false}
-						busy={isPending('bundle:toggle')}
+						busy={isPending('plugin:toggle')}
 						onChange={enabled => {
-							void runAction('bundle:toggle', () => onToggleBundleEnabled(bundle, enabled)).catch((error: unknown) => {
+							void runAction('plugin:toggle', () => onTogglePluginEnabled(plugin, enabled)).catch((error: unknown) => {
 								showAlert(getErrorMessage(error, 'Failed to change MCP Plugin state.'));
 							});
 						}}
@@ -216,19 +216,19 @@ export function MCPBundleCard({
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
 							onClick={() => {
-								setIsBundleDetailsOpen(true);
+								setIsPluginDetailsOpen(true);
 							}}
 						>
 							<FiEye size={16} />
 							<span>Details</span>
 						</button>
 
-						{!bundle.builtIn ? (
+						{!plugin.builtIn ? (
 							<>
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.editable || !serversLoaded || Boolean(serverLoadError)}
+									disabled={!plugin.editable || !serversLoaded || Boolean(serverLoadError)}
 									onClick={() => {
 										setServerEditor({});
 									}}
@@ -240,9 +240,9 @@ export function MCPBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.deletable || !serversLoaded || servers.length > 0 || Boolean(serverLoadError)}
+									disabled={!plugin.deletable || !serversLoaded || servers.length > 0 || Boolean(serverLoadError)}
 									onClick={() => {
-										onDeleteBundleRequested(bundle);
+										onDeletePluginRequested(plugin);
 									}}
 								>
 									<FiTrash2 size={16} />
@@ -262,11 +262,11 @@ export function MCPBundleCard({
 						<button
 							type="button"
 							className="btn btn-sm rounded-xl"
-							disabled={isPending('bundle:refresh')}
+							disabled={isPending('plugin:refresh')}
 							onClick={refresh}
 						>
 							<FiRefreshCw size={14} />
-							<span>{isPending('bundle:refresh') ? 'Reloading' : 'Retry'}</span>
+							<span>{isPending('plugin:refresh') ? 'Reloading' : 'Retry'}</span>
 						</button>
 					</output>
 				) : null}
@@ -383,7 +383,7 @@ export function MCPBundleCard({
 												<button
 													type="button"
 													className="btn btn-sm btn-ghost rounded-xl"
-													disabled={!bundle.enabled || !operational}
+													disabled={!plugin.enabled || !operational}
 													onClick={() => {
 														setServerEditor({
 															server,
@@ -507,7 +507,7 @@ export function MCPBundleCard({
 						) : null}
 					</div>
 				) : null}
-			</ManagementBundleCard>
+			</ManagementPluginCard>
 
 			<DeleteConfirmationModal
 				isOpen={serverToDelete !== null}
@@ -519,7 +519,7 @@ export function MCPBundleCard({
 						return;
 					}
 
-					await runAction(`${serverToDelete.ref.artifactID}:delete`, () => onDeleteServer(bundle, serverToDelete));
+					await runAction(`${serverToDelete.ref.artifactID}:delete`, () => onDeleteServer(plugin, serverToDelete));
 					setServerToDelete(null);
 				}}
 				title="Delete MCP Server"
@@ -529,23 +529,23 @@ export function MCPBundleCard({
 
 			<AddEditMCPServerModal
 				isOpen={serverEditor !== null}
-				bundle={bundle}
+				plugin={plugin}
 				initialServer={serverEditor?.server}
 				existingLogicalNames={existingLogicalNames}
 				onClose={() => {
 					setServerEditor(null);
 				}}
 				onSubmit={async draft => {
-					await onSaveServer(bundle, serverEditor?.server, draft);
+					await onSaveServer(plugin, serverEditor?.server, draft);
 				}}
 			/>
 
-			<MCPBundleDetailsModal
-				isOpen={isBundleDetailsOpen}
+			<MCPPluginDetailsModal
+				isOpen={isPluginDetailsOpen}
 				onClose={() => {
-					setIsBundleDetailsOpen(false);
+					setIsPluginDetailsOpen(false);
 				}}
-				bundle={bundle}
+				plugin={plugin}
 				serverCount={servers.length}
 				serversLoaded={serversLoaded}
 			/>
@@ -555,7 +555,7 @@ export function MCPBundleCard({
 				onClose={() => {
 					setServerDetails(null);
 				}}
-				bundle={bundle}
+				plugin={plugin}
 				server={serverDetails}
 				runtime={serverDetails ? runtimeByArtifactID[serverDetails.ref.artifactID] : undefined}
 				authHealth={serverDetails ? authHealthByArtifactID[serverDetails.ref.artifactID] : undefined}

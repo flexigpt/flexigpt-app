@@ -39,8 +39,8 @@ interface SkillTemplateInsertArgs {
 }
 
 interface SkillTemplateGroup {
-	bundleID: string;
-	bundleSlug: string;
+	pluginID: string;
+	pluginSlug: string;
 	options: SkillListItem[];
 }
 
@@ -104,9 +104,9 @@ function skillTemplateKey(item: SkillListItem): string {
 }
 
 function compareSkillTemplateListItems(a: SkillListItem, b: SkillListItem): number {
-	const bundleSlugCompare = skillTemplateCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) {
-		return bundleSlugCompare;
+	const pluginSlugCompare = skillTemplateCollator.compare(a.pluginSlug, b.pluginSlug);
+	if (pluginSlugCompare !== 0) {
+		return pluginSlugCompare;
 	}
 
 	const labelCompare = skillTemplateCollator.compare(getSkillTemplateLabel(a), getSkillTemplateLabel(b));
@@ -123,25 +123,25 @@ function compareSkillTemplateListItems(a: SkillListItem, b: SkillListItem): numb
 }
 
 function groupSkillTemplates(items: SkillListItem[]): SkillTemplateGroup[] {
-	const groupsByBundle = new Map<string, SkillTemplateGroup>();
+	const groupsByPlugin = new Map<string, SkillTemplateGroup>();
 
 	for (const item of [...items].toSorted(compareSkillTemplateListItems)) {
-		const groupKey = item.bundleID || item.bundleSlug;
-		let group = groupsByBundle.get(groupKey);
+		const groupKey = item.pluginID || item.pluginSlug;
+		let group = groupsByPlugin.get(groupKey);
 
 		if (!group) {
 			group = {
-				bundleID: item.bundleID,
-				bundleSlug: item.bundleSlug || item.bundleID,
+				pluginID: item.pluginID,
+				pluginSlug: item.pluginSlug || item.pluginID,
 				options: [],
 			};
-			groupsByBundle.set(groupKey, group);
+			groupsByPlugin.set(groupKey, group);
 		}
 
 		group.options.push(item);
 	}
 
-	return [...groupsByBundle.values()];
+	return [...groupsByPlugin.values()];
 }
 
 function getTemplateArguments(item: SkillListItem | null): SkillArgument[] {
@@ -259,7 +259,7 @@ function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillLi
 				onPick(item);
 			}}
 			className={`${actionTriggerMenuItemClasses} items-start`}
-			title={`${item.bundleSlug}/${item.skillSlug}\n${item.skillDefinition.description ?? ''}`}
+			title={`${item.pluginSlug}/${item.skillSlug}\n${item.skillDefinition.description ?? ''}`}
 		>
 			<FiFilePlus size={14} className="text-warning mt-0.5 shrink-0" />
 
@@ -318,7 +318,7 @@ function SkillTemplateDropdown({
 				{ value: getSkillTemplateLabel(item), weight: 7 },
 				{ value: item.skillSlug, weight: 6 },
 				{ value: item.skillDefinition.name, weight: 5 },
-				{ value: item.bundleSlug, weight: 4 },
+				{ value: item.pluginSlug, weight: 4 },
 				{ value: item.skillDefinition.description, weight: 3 },
 				{ value: item.skillDefinition.location, weight: 2 },
 				...(item.skillDefinition.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
@@ -410,9 +410,9 @@ function SkillTemplateDropdown({
 				<div className="space-y-2">
 					{groupedTemplates.map((group, groupIndex) => (
 						<GroupedMenuSection
-							key={group.bundleID || group.bundleSlug}
-							title={group.bundleSlug}
-							ariaLabel={`${group.bundleSlug} user-message skill templates`}
+							key={group.pluginID || group.pluginSlug}
+							title={group.pluginSlug}
+							ariaLabel={`${group.pluginSlug} user-message skill templates`}
 							separatorBefore={groupIndex > 0}
 							meta={<span className="badge badge-ghost badge-xs">{group.options.length}</span>}
 						>

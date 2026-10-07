@@ -37,7 +37,7 @@ export enum SkillInsert {
 	UserMessage = 'user-message',
 }
 
-export enum SkillBundleAttachmentRole {
+export enum SkillPluginAttachmentRole {
 	Managed = 'managed',
 	BuiltIn = 'builtin',
 	External = 'external',
@@ -51,10 +51,10 @@ export interface SkillArgument {
 	default?: string;
 }
 
-interface SkillBundleAttachmentView {
+interface SkillPluginAttachmentView {
 	sourceID: ArtifactSourceID;
 	revision: number;
-	role: SkillBundleAttachmentRole;
+	role: SkillPluginAttachmentRole;
 	enabled: boolean;
 	sourceDisplayName?: string;
 	sourceKind?: string;
@@ -227,7 +227,7 @@ export interface InvokeSkillToolResponse {
  *
  * Durable identity remains `ArtifactRef` and `ArtifactPluginRef`. These views
  * exist so management components do not need to duplicate joins between
- * Bundle, Artifact, and runtime metadata.
+ * Plugin, Artifact, and runtime metadata.
  */
 export enum SkillType {
 	FS = 'fs',
@@ -293,10 +293,10 @@ export interface Skill {
 /**
  * Frontend management projection over one backend Plugin.
  *
- * The retained "Bundle" wording is UI-only. Durable backend identity is an
+ * The retained "Plugin" wording is UI-only. Durable backend identity is an
  * ArtifactRef for a Plugin, never an ArtifactPluginRef.
  */
-export interface SkillBundle {
+export interface SkillPlugin {
 	schemaVersion: string;
 	id: string;
 	rootID: string;
@@ -315,14 +315,14 @@ export interface SkillBundle {
 	isBaseline: boolean;
 	sourceID: ArtifactSourceID;
 
-	attachments: SkillBundleAttachmentView[];
+	attachments: SkillPluginAttachmentView[];
 	createdAt?: string;
 	modifiedAt?: string;
 }
 
 export interface SkillListItem {
-	bundleID: string;
-	bundleSlug: string;
+	pluginID: string;
+	pluginSlug: string;
 	skillSlug: string;
 	skillDefinition: Skill;
 }

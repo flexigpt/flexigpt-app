@@ -1,8 +1,8 @@
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
-	MCPBundleView,
 	MCPConversationContext,
+	MCPPluginView,
 	MCPPromptRef,
 	MCPPromptSelection,
 	MCPResourceRef,
@@ -19,7 +19,7 @@ import type {
 import { MCPToolExposure } from '@/spec/mcp';
 
 export interface MCPComposerServerOption {
-	bundle: MCPBundleView;
+	plugin: MCPPluginView;
 	server: MCPServerView;
 	runtimeServerID: MCPRuntimeServerID;
 	transport: MCPTransportType;

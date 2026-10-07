@@ -4,7 +4,7 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import type {
 	MCPAuthHealth,
-	MCPBundleView,
+	MCPPluginView,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
@@ -44,7 +44,7 @@ import {
 interface MCPServerDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	bundle: MCPBundleView | null;
+	plugin: MCPPluginView | null;
 	server: MCPServerView | null;
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
@@ -87,13 +87,13 @@ function ArgumentSummary({
 
 function MCPServerDetailsModalContent({
 	onClose,
-	bundle,
+	plugin,
 	server,
 	runtime,
 	authHealth,
 }: {
 	onClose: () => void;
-	bundle: MCPBundleView;
+	plugin: MCPPluginView;
 	server: MCPServerView;
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
@@ -181,7 +181,7 @@ function MCPServerDetailsModalContent({
 			isOpen={true}
 			onClose={onClose}
 			title={server.displayName}
-			description={`MCP server in ${bundle.displayName}`}
+			description={`MCP server in ${plugin.displayName}`}
 			modalKey={`mcp-server:${server.ref.rootID}:${server.ref.artifactID}:${server.artifact.revision}`}
 			width="wide"
 			height="tall"
@@ -197,7 +197,7 @@ function MCPServerDetailsModalContent({
 				<ManagementInfoGrid>
 					<Field label="Display Name">{server.displayName}</Field>
 					<Field label="Name">{server.logicalName}</Field>
-					<Field label="Plugin">{bundle.displayName}</Field>
+					<Field label="Plugin">{plugin.displayName}</Field>
 					<Field label="Description">{server.document?.description || 'No description'}</Field>
 					<Field label="Transport">{transport}</Field>
 					<Field label="Authentication">{getMCPHTTPAuthModeLabel(getAuthMode(server))}</Field>
@@ -386,7 +386,7 @@ function MCPServerDetailsModalContent({
 }
 
 export function MCPServerDetailsModal(props: MCPServerDetailsModalProps) {
-	if (!props.isOpen || !props.bundle || !props.server) {
+	if (!props.isOpen || !props.plugin || !props.server) {
 		return null;
 	}
 
@@ -394,7 +394,7 @@ export function MCPServerDetailsModal(props: MCPServerDetailsModalProps) {
 		<MCPServerDetailsModalContent
 			key={`${props.server.ref.rootID}:${props.server.ref.artifactID}:${props.server.artifact.revision}`}
 			onClose={props.onClose}
-			bundle={props.bundle}
+			plugin={props.plugin}
 			server={props.server}
 			runtime={props.runtime}
 			authHealth={props.authHealth}

@@ -9,13 +9,13 @@ import type {
 	MCPAuthHealth,
 	MCPAuthHealthState,
 	MCPAuthSettings,
-	MCPBundleView,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
 	MCPHTTPAuthMode,
 	MCPHTTPSecretDraft,
+	MCPPluginView,
 	MCPPolicy,
 	MCPPromptRef,
 	MCPReadResourceResponseBody,
@@ -83,7 +83,7 @@ interface RuntimeRead {
 }
 
 export interface MCPComposerDeclarations {
-	bundle: MCPBundleView;
+	plugin: MCPPluginView;
 	servers: MCPServerView[];
 }
 
@@ -659,11 +659,11 @@ export class MCPManagementAPI {
 	private readonly connectionRequests = new Map<MCPRuntimeServerID, Promise<MCPServerRuntimeSnapshot>>();
 
 	private readonly composerMCPDeclarationsCatalog = createSharedAsyncCatalog<MCPComposerDeclarations[]>(async () => {
-		const bundles = await this.listMCPBundles();
+		const plugins = await this.listMCPPlugins();
 
-		return mapWithConcurrency(bundles, MCP_SERVER_MANAGEMENT_CONCURRENCY, async bundle => ({
-			bundle,
-			servers: await this.listMCPServers(bundle),
+		return mapWithConcurrency(plugins, MCP_SERVER_MANAGEMENT_CONCURRENCY, async plugin => ({
+			plugin,
+			servers: await this.listMCPServers(plugin),
 		}));
 	});
 
@@ -684,9 +684,9 @@ export class MCPManagementAPI {
 		return this.collectPages(pageToken => this.store.listMCPServersPage(MANAGEMENT_PAGE_SIZE, pageToken));
 	}
 
-	async listMCPBundles(): Promise<MCPBundleView[]> {
+	async listMCPPlugins(): Promise<MCPPluginView[]> {
 		return (await this.listMCPPluginsForManagement())
-			.map(value => this.toBundleView(value))
+			.map(value => this.toPluginView(value))
 			.toSorted((left, right) => {
 				if (left.builtIn !== right.builtIn) {
 					return left.builtIn ? -1 : 1;
@@ -695,13 +695,13 @@ export class MCPManagementAPI {
 			});
 	}
 
-	async getMCPBundle(plugin: ArtifactRef): Promise<MCPBundleView> {
+	async getMCPPlugin(plugin: ArtifactRef): Promise<MCPPluginView> {
 		const s = await this.store.getMCPPlugin(plugin);
-		return this.toBundleView(pluginListItemFromPluginView(s, false));
+		return this.toPluginView(pluginListItemFromPluginView(s, false));
 	}
 
-	async getMCPServer(server: ArtifactRef, bundle: ArtifactRef): Promise<MCPServerView> {
-		return this.toServerView(await this.aggregate.getMCPServer(server), bundle);
+	async getMCPServer(server: ArtifactRef, plugin: ArtifactRef): Promise<MCPServerView> {
+		return this.toServerView(await this.aggregate.getMCPServer(server), plugin);
 	}
 
 	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerView> {
@@ -806,9 +806,9 @@ export class MCPManagementAPI {
 		return this.store.saveMCPSettings(expectedRevision, settings);
 	}
 
-	async listMCPServers(bundle: MCPBundleView): Promise<MCPServerView[]> {
-		const records = await this.aggregate.listMCPPluginServers(bundle.ref);
-		const values = records.map(record => this.toServerView(record, bundle.ref));
+	async listMCPServers(plugin: MCPPluginView): Promise<MCPServerView[]> {
+		const records = await this.aggregate.listMCPPluginServers(plugin.ref);
+		const values = records.map(record => this.toServerView(record, plugin.ref));
 
 		return values.toSorted((left, right) =>
 			serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, { sensitivity: 'base' })
@@ -870,7 +870,7 @@ export class MCPManagementAPI {
 		return find(refreshed);
 	}
 
-	async createMCPBundle(logicalName: string, displayName: string, description?: string): Promise<MCPBundleView> {
+	async createMCPPlugin(logicalName: string, displayName: string, description?: string): Promise<MCPPluginView> {
 		const plugin = await this.store.createMCPPlugin({
 			rootID: '',
 			name: logicalName,
@@ -880,7 +880,7 @@ export class MCPManagementAPI {
 
 		this.invalidateComposerMCPDeclarations();
 
-		return this.toBundleView({
+		return this.toPluginView({
 			ref: { rootID: plugin.artifact.rootID, artifactID: plugin.artifact.id },
 			sourceID: plugin.artifact.binding.sourceID,
 			name: plugin.name,
@@ -898,11 +898,11 @@ export class MCPManagementAPI {
 	}
 
 	async saveMCPServer(
-		bundle: MCPBundleView,
+		plugin: MCPPluginView,
 		existing: MCPServerView | undefined,
 		draft: MCPServerDraft
 	): Promise<MCPServerView> {
-		if (bundle.builtIn || !bundle.editable || existing?.builtIn) {
+		if (plugin.builtIn || !plugin.editable || existing?.builtIn) {
 			throw new Error('Built-in MCP servers cannot be edited.');
 		}
 
@@ -910,8 +910,8 @@ export class MCPManagementAPI {
 		const built = buildServerDocument(existing, draft, policyName);
 
 		const policy = await this.aggregate.saveMCPPolicy({
-			plugin: bundle.ref,
-			expectedPluginRevision: bundle.plugin.revision,
+			plugin: plugin.ref,
+			expectedPluginRevision: plugin.plugin.revision,
 			name: policyName,
 			description: `${draft.displayName.trim()} policy`,
 			policy: {
@@ -931,7 +931,7 @@ export class MCPManagementAPI {
 
 		const result = existing
 			? await this.aggregate.updateMCPServer({
-					plugin: bundle.ref,
+					plugin: plugin.ref,
 					expectedPluginRevision: policy.plugin.artifact.revision,
 					artifact: existing.ref,
 					expectedArtifactRevision: existing.artifact.revision,
@@ -939,7 +939,7 @@ export class MCPManagementAPI {
 					enabled: draft.enabled,
 				})
 			: await this.aggregate.createMCPServer({
-					plugin: bundle.ref,
+					plugin: plugin.ref,
 					expectedPluginRevision: policy.plugin.artifact.revision,
 					document: built.document,
 					enabled: draft.enabled,
@@ -956,21 +956,21 @@ export class MCPManagementAPI {
 
 		this.invalidateComposerMCPDeclarations();
 
-		return this.getMCPServer(serverRef, bundle.ref);
+		return this.getMCPServer(serverRef, plugin.ref);
 	}
 
-	async setMCPBundleEnabled(bundle: MCPBundleView, enabled: boolean): Promise<void> {
-		await this.store.setMCPPluginEnabled(bundle.ref, bundle.plugin.revision, enabled);
+	async setMCPPluginEnabled(plugin: MCPPluginView, enabled: boolean): Promise<void> {
+		await this.store.setMCPPluginEnabled(plugin.ref, plugin.plugin.revision, enabled);
 		this.invalidateComposerMCPDeclarations();
 	}
 
-	async deleteMCPServer(bundle: MCPBundleView, server: MCPServerView): Promise<void> {
-		if (bundle.builtIn || !bundle.editable || server.builtIn) {
+	async deleteMCPServer(plugin: MCPPluginView, server: MCPServerView): Promise<void> {
+		if (plugin.builtIn || !plugin.editable || server.builtIn) {
 			throw new Error('Built-in MCP servers cannot be deleted.');
 		}
 
 		const memberships = await this.store.listMCPPluginMemberships(server.ref);
-		const membership = memberships.find(value => artifactRefKey(value.plugin) === artifactRefKey(bundle.ref));
+		const membership = memberships.find(value => artifactRefKey(value.plugin) === artifactRefKey(plugin.ref));
 
 		if (!membership) {
 			throw new Error('MCP server is not a direct member of this Plugin.');
@@ -991,21 +991,21 @@ export class MCPManagementAPI {
 		this.invalidateComposerMCPDeclarations();
 	}
 
-	async deleteMCPBundle(bundle: MCPBundleView): Promise<void> {
-		if (bundle.builtIn || !bundle.deletable) {
+	async deleteMCPPlugin(plugin: MCPPluginView): Promise<void> {
+		if (plugin.builtIn || !plugin.deletable) {
 			throw new Error('This MCP Plugin cannot be deleted.');
 		}
 
-		const servers = await this.listMCPServers(bundle);
+		const servers = await this.listMCPServers(plugin);
 		if (servers.length > 0) {
 			throw new Error('Remove all MCP servers before deleting this Plugin.');
 		}
 
-		const policies = await this.store.listMCPPolicies(bundle.ref.rootID);
+		const policies = await this.store.listMCPPolicies(plugin.ref.rootID);
 
 		for (const policy of policies) {
 			const memberships = await this.store.listMCPPluginMemberships(policy.ref);
-			const membership = memberships.find(value => artifactRefKey(value.plugin) === artifactRefKey(bundle.ref));
+			const membership = memberships.find(value => artifactRefKey(value.plugin) === artifactRefKey(plugin.ref));
 
 			if (!membership) {
 				continue;
@@ -1018,10 +1018,10 @@ export class MCPManagementAPI {
 			});
 		}
 
-		const current = await this.store.getMCPPlugin(bundle.ref);
+		const current = await this.store.getMCPPlugin(plugin.ref);
 
 		await this.store.deleteMCPPlugin({
-			plugin: bundle.ref,
+			plugin: plugin.ref,
 			expectedRevision: current.artifact.revision,
 		});
 
@@ -1221,7 +1221,7 @@ export class MCPManagementAPI {
 		return this.models.resolveMappedModelTarget(target);
 	}
 
-	private toBundleView(plugin: PluginListItem): MCPBundleView {
+	private toPluginView(plugin: PluginListItem): MCPPluginView {
 		const builtIn = plugin.builtIn;
 
 		return {
@@ -1251,7 +1251,7 @@ export class MCPManagementAPI {
 		};
 	}
 
-	private toServerView(details: MCPServerDetails, bundle: ArtifactRef): MCPServerView {
+	private toServerView(details: MCPServerDetails, plugin: ArtifactRef): MCPServerView {
 		const settings = details.settings;
 
 		return {
@@ -1261,7 +1261,7 @@ export class MCPManagementAPI {
 			},
 			runtimeServerID: details.connection.server,
 			artifact: settings.artifact,
-			plugin: bundle,
+			plugin: plugin,
 			logicalName: settings.document.logicalName,
 			displayName: settings.document.displayName || settings.artifact.displayName,
 			document: settings.document,

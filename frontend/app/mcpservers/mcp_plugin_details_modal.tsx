@@ -1,25 +1,25 @@
-import type { MCPBundleView } from '@/spec/mcp';
+import type { MCPPluginView } from '@/spec/mcp';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 
-interface MCPBundleDetailsModalProps {
+interface MCPPluginDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	bundle: MCPBundleView | null;
+	plugin: MCPPluginView | null;
 	serverCount: number;
 	serversLoaded: boolean;
 }
 
-export function MCPBundleDetailsModal({
+export function MCPPluginDetailsModal({
 	isOpen,
 	onClose,
-	bundle,
+	plugin,
 	serverCount,
 	serversLoaded,
-}: MCPBundleDetailsModalProps) {
-	if (!isOpen || !bundle) {
+}: MCPPluginDetailsModalProps) {
+	if (!isOpen || !plugin) {
 		return null;
 	}
 
@@ -31,21 +31,21 @@ export function MCPBundleDetailsModal({
 			description={
 				serversLoaded ? `${serverCount} configured server${serverCount === 1 ? '' : 's'}` : 'Server contents not loaded'
 			}
-			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.plugin.revision}`}
+			modalKey={`mcp-plugin:${plugin.ref.rootID}:${plugin.ref.artifactID}:${plugin.plugin.revision}`}
 		>
 			<ManagementInfoGrid>
-				<ManagementInfoRow label="Display Name">{bundle.displayName}</ManagementInfoRow>
+				<ManagementInfoRow label="Display Name">{plugin.displayName}</ManagementInfoRow>
 				<ManagementInfoRow label="Logical Name" mono>
-					{bundle.logicalName}
+					{plugin.logicalName}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Baseline">{bundle.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="State">{bundle.plugin.state}</ManagementInfoRow>
-				<ManagementInfoRow label="Revision">{bundle.plugin.revision}</ManagementInfoRow>
+				<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Built-in">{plugin.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Enabled">{plugin.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="State">{plugin.plugin.state}</ManagementInfoRow>
+				<ManagementInfoRow label="Revision">{plugin.plugin.revision}</ManagementInfoRow>
 				<ManagementInfoRow label="Servers">{serversLoaded ? serverCount : 'Not loaded'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
-					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
+					<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
 		</ManagementDetailsModal>

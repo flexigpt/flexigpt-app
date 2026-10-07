@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
-import type { SkillBundle } from '@/spec/skill';
+import type { SkillPlugin } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -15,14 +15,14 @@ import { skillManagementAPI } from '@/apis/baseapi';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementPluginCreateModal } from '@/components/managementui/management_plugin_create_modal';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
-import type { BundleData } from '@/skills/lib/skill_bundle_utils';
+import type { PluginData } from '@/skills/lib/skill_plugin_utils';
 import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import {
 	getAllSkillTags,
@@ -32,67 +32,67 @@ import {
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
-import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
-import { SkillBundleCard } from '@/skills/skill_bundle_card';
+import { sortPluginData } from '@/skills/lib/skill_plugin_utils';
+import { SkillPluginCard } from '@/skills/skill_plugin_card';
 
-const SKILL_BUNDLE_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
+const SKILL_PLUGIN_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 
-interface SkillBundleDataCache {
-	data: BundleData[];
+interface SkillPluginDataCache {
+	data: PluginData[];
 	loadedAt: number;
 }
 
-interface SkillBundleDataLoad {
+interface SkillPluginDataLoad {
 	generation: number;
-	promise: Promise<BundleData[]>;
+	promise: Promise<PluginData[]>;
 }
 
 interface SkillRuntimeMetadataLoad {
 	generation: number;
-	promise: Promise<BundleData[]>;
+	promise: Promise<PluginData[]>;
 }
 
-let skillBundleDataCache: SkillBundleDataCache | undefined;
-let skillBundleDataLoad: SkillBundleDataLoad | undefined;
-let skillBundleDataCacheGeneration = 0;
+let skillPluginDataCache: SkillPluginDataCache | undefined;
+let skillPluginDataLoad: SkillPluginDataLoad | undefined;
+let skillPluginDataCacheGeneration = 0;
 let skillRuntimeMetadataLoad: SkillRuntimeMetadataLoad | undefined;
 let skillRuntimeMetadataGeneration = 0;
 
-function invalidateSkillBundleDataCache() {
-	skillBundleDataCacheGeneration += 1;
+function invalidateSkillPluginDataCache() {
+	skillPluginDataCacheGeneration += 1;
 	skillRuntimeMetadataGeneration += 1;
-	skillBundleDataCache = undefined;
+	skillPluginDataCache = undefined;
 	skillRuntimeMetadataLoad = undefined;
 }
 
-function rememberSkillBundleData(data: BundleData[]) {
+function rememberSkillPluginData(data: PluginData[]) {
 	// Invalidate any older request which is still completing after a local
 	// mutation changed the page state.
-	skillBundleDataCacheGeneration += 1;
-	skillBundleDataCache = {
+	skillPluginDataCacheGeneration += 1;
+	skillPluginDataCache = {
 		data,
 		loadedAt: Date.now(),
 	};
 }
 
-function buildSkillBundleData(
-	skillBundles: SkillBundle[],
+function buildSkillPluginData(
+	skillPlugins: SkillPlugin[],
 	skillListItems: Awaited<ReturnType<typeof skillManagementAPI.listSkills>>,
 	runtimeMetadataLoaded: boolean
-): BundleData[] {
-	const skillsByBundleID = new Map<string, BundleData['skills']>();
+): PluginData[] {
+	const skillsByPluginID = new Map<string, PluginData['skills']>();
 
-	for (const bundle of skillBundles) {
-		skillsByBundleID.set(bundle.id, []);
+	for (const plugin of skillPlugins) {
+		skillsByPluginID.set(plugin.id, []);
 	}
 	for (const item of skillListItems) {
-		skillsByBundleID.get(item.bundleID)?.push(item.skillDefinition);
+		skillsByPluginID.get(item.pluginID)?.push(item.skillDefinition);
 	}
 
-	return sortBundleData(
-		skillBundles.map(bundle => ({
-			bundle,
-			skills: skillsByBundleID.get(bundle.id) ?? [],
+	return sortPluginData(
+		skillPlugins.map(plugin => ({
+			plugin,
+			skills: skillsByPluginID.get(plugin.id) ?? [],
 			runtimeMetadataLoaded,
 		}))
 	);
@@ -103,15 +103,15 @@ function buildSkillBundleData(
  * Skills are Workspace Artifacts and are shown only in Workspace management
  * and in the conversation Workspace selector.
  */
-async function fetchSkillBundleData(): Promise<BundleData[]> {
+async function fetchSkillPluginData(): Promise<PluginData[]> {
 	// Load durable plugin and Artifact state first. Runtime materialization
-	// is enriched per bundle after the page has rendered.
-	const { skillBundles, skillListItems } = await skillManagementAPI.loadManagementPageData(true, false);
-	if (skillBundles.length === 0) {
+	// is enriched per plugin after the page has rendered.
+	const { skillPlugins, skillListItems } = await skillManagementAPI.loadManagementPageData(true, false);
+	if (skillPlugins.length === 0) {
 		return [];
 	}
 
-	return buildSkillBundleData(skillBundles, skillListItems, false);
+	return buildSkillPluginData(skillPlugins, skillListItems, false);
 }
 
 function loadSkillRuntimeMetadata(): SkillRuntimeMetadataLoad {
@@ -121,7 +121,7 @@ function loadSkillRuntimeMetadata(): SkillRuntimeMetadataLoad {
 	if (!load || load.generation !== generation) {
 		const promise = skillManagementAPI
 			.loadManagementPageData(true, true)
-			.then(({ skillBundles, skillListItems }) => buildSkillBundleData(skillBundles, skillListItems, true));
+			.then(({ skillPlugins, skillListItems }) => buildSkillPluginData(skillPlugins, skillListItems, true));
 
 		load = {
 			generation,
@@ -140,20 +140,20 @@ function loadSkillRuntimeMetadata(): SkillRuntimeMetadataLoad {
 	return load;
 }
 
-async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
+async function loadSkillPluginData(signal: AbortSignal): Promise<PluginData[]> {
 	throwIfAborted(signal);
 
-	const cached = skillBundleDataCache;
-	if (cached && Date.now() - cached.loadedAt <= SKILL_BUNDLE_DATA_CACHE_TTL_MS) {
+	const cached = skillPluginDataCache;
+	if (cached && Date.now() - cached.loadedAt <= SKILL_PLUGIN_DATA_CACHE_TTL_MS) {
 		return cached.data;
 	}
 
-	const generation = skillBundleDataCacheGeneration;
-	let load = skillBundleDataLoad;
+	const generation = skillPluginDataCacheGeneration;
+	let load = skillPluginDataLoad;
 	if (!load || load.generation !== generation) {
-		const promise = fetchSkillBundleData().then(data => {
-			if (skillBundleDataCacheGeneration === generation) {
-				skillBundleDataCache = {
+		const promise = fetchSkillPluginData().then(data => {
+			if (skillPluginDataCacheGeneration === generation) {
+				skillPluginDataCache = {
 					data,
 					loadedAt: Date.now(),
 				};
@@ -162,11 +162,11 @@ async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
 		});
 
 		load = { generation, promise };
-		skillBundleDataLoad = load;
+		skillPluginDataLoad = load;
 
 		const clearLoad = () => {
-			if (skillBundleDataLoad?.promise === promise) {
-				skillBundleDataLoad = undefined;
+			if (skillPluginDataLoad?.promise === promise) {
+				skillPluginDataLoad = undefined;
 			}
 		};
 		void promise.then(clearLoad, clearLoad);
@@ -182,21 +182,21 @@ async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
 
 // oxlint-disable-next-line no-restricted-exports
 export default function SkillsPage() {
-	const loadPageData = useCallback((signal: AbortSignal) => loadSkillBundleData(signal), []);
+	const loadPageData = useCallback((signal: AbortSignal) => loadSkillPluginData(signal), []);
 	const {
-		data: bundles,
+		data: plugins,
 		error: pageLoadError,
 		isLoading,
 		isRefreshing,
 		hasResolved,
 		reloadOrThrow,
-		setData: setBundles,
+		setData: setPlugins,
 	} = useAsyncResource(loadPageData, {
-		initialData: skillBundleDataCache?.data ?? ([] as BundleData[]),
+		initialData: skillPluginDataCache?.data ?? ([] as PluginData[]),
 	});
 
 	const reloadPageData = useCallback(async () => {
-		invalidateSkillBundleDataCache();
+		invalidateSkillPluginDataCache();
 		await reloadOrThrow();
 	}, [reloadOrThrow]);
 
@@ -207,64 +207,64 @@ export default function SkillsPage() {
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
-	const [bundleToDelete, setBundleToDelete] = useState<SkillBundle | null>(null);
-	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
+	const [pluginToDelete, setPluginToDelete] = useState<SkillPlugin | null>(null);
+	const [isDeletingPlugin, setIsDeletingPlugin] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [creationRootID, setCreationRootID] = useState('');
 
 	const isMountedRef = useRef(false);
-	const bundleRefreshRequestIdRef = useRef<Record<string, number>>({});
+	const pluginRefreshRequestIdRef = useRef<Record<string, number>>({});
 	const runtimeMetadataRequestIDRef = useRef(0);
 
 	const creationRoots = useMemo(
 		() =>
 			[
 				...new Map(
-					bundles
-						.filter(bundleData => bundleData.bundle.isBaseline && !bundleData.bundle.isBuiltIn)
+					plugins
+						.filter(pluginData => pluginData.plugin.isBaseline && !pluginData.plugin.isBuiltIn)
 						.map(
-							bundleData =>
+							pluginData =>
 								[
-									bundleData.bundle.rootID,
+									pluginData.plugin.rootID,
 									{
-										rootID: bundleData.bundle.rootID,
-										label: bundleData.bundle.displayName || bundleData.bundle.slug,
+										rootID: pluginData.plugin.rootID,
+										label: pluginData.plugin.displayName || pluginData.plugin.slug,
 									},
 								] as const
 						)
 				).values(),
 			].toSorted((left, right) => left.label.localeCompare(right.label)),
-		[bundles]
+		[plugins]
 	);
 	const effectiveCreationRootID = creationRoots.some(value => value.rootID === creationRootID)
 		? creationRootID
 		: (creationRoots[0]?.rootID ?? '');
 
-	const existingBundleSlugs = useMemo(
+	const existingPluginSlugs = useMemo(
 		() =>
-			bundles
-				.filter(bundleData => bundleData.bundle.rootID === effectiveCreationRootID)
-				.map(bundleData => bundleData.bundle.slug),
-		[bundles, effectiveCreationRootID]
+			plugins
+				.filter(pluginData => pluginData.plugin.rootID === effectiveCreationRootID)
+				.map(pluginData => pluginData.plugin.slug),
+		[plugins, effectiveCreationRootID]
 	);
-	const existingBundleNames = useMemo(
+	const existingPluginNames = useMemo(
 		() =>
-			bundles
-				.filter(bundleData => bundleData.bundle.rootID === effectiveCreationRootID)
-				.map(bundleData => (bundleData.bundle.displayName ?? bundleData.bundle.slug).trim()),
-		[bundles, effectiveCreationRootID]
+			plugins
+				.filter(pluginData => pluginData.plugin.rootID === effectiveCreationRootID)
+				.map(pluginData => (pluginData.plugin.displayName ?? pluginData.plugin.slug).trim()),
+		[plugins, effectiveCreationRootID]
 	);
-	const allSkills = useMemo(() => bundles.flatMap(bundleData => bundleData.skills), [bundles]);
+	const allSkills = useMemo(() => plugins.flatMap(pluginData => pluginData.skills), [plugins]);
 	const allSkillItems = useMemo<SkillItem[]>(
 		() =>
-			bundles.flatMap(bundleData =>
-				bundleData.skills.map(skill => ({
+			plugins.flatMap(pluginData =>
+				pluginData.skills.map(skill => ({
 					skill,
-					bundleID: bundleData.bundle.id,
+					pluginID: pluginData.plugin.id,
 					skillSlug: skill.slug,
 				}))
 			),
-		[bundles]
+		[plugins]
 	);
 	const insertCounts = useMemo(() => getSkillInsertCounts(allSkills), [allSkills]);
 	const allTags = useMemo(() => getAllSkillTags(allSkills), [allSkills]);
@@ -311,42 +311,42 @@ export default function SkillsPage() {
 		[allSkills.length, insertCounts]
 	);
 
-	const refreshBundleSkills = useCallback(
-		async (bundleID: string, refreshSource = true) => {
-			const requestId = (bundleRefreshRequestIdRef.current[bundleID] ?? 0) + 1;
-			bundleRefreshRequestIdRef.current[bundleID] = requestId;
+	const refreshPluginSkills = useCallback(
+		async (pluginID: string, refreshSource = true) => {
+			const requestId = (pluginRefreshRequestIdRef.current[pluginID] ?? 0) + 1;
+			pluginRefreshRequestIdRef.current[pluginID] = requestId;
 
 			try {
 				if (refreshSource) {
-					await skillManagementAPI.refreshSkillBundle(bundleID);
+					await skillManagementAPI.refreshSkillPlugin(pluginID);
 				}
-				const skillListItems = await skillManagementAPI.listSkills([bundleID], true, true);
+				const skillListItems = await skillManagementAPI.listSkills([pluginID], true, true);
 				const freshSkills = skillListItems.map(item => item.skillDefinition);
 
-				if (!isMountedRef.current || bundleRefreshRequestIdRef.current[bundleID] !== requestId) {
+				if (!isMountedRef.current || pluginRefreshRequestIdRef.current[pluginID] !== requestId) {
 					return;
 				}
 
-				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
+				setPlugins(prev =>
+					prev.map(pluginData =>
+						pluginData.plugin.id === pluginID
 							? {
-									...bundleData,
+									...pluginData,
 									skills: freshSkills,
 									runtimeMetadataLoaded: true,
 									skillLoadError: undefined,
 								}
-							: bundleData
+							: pluginData
 					)
 				);
 			} catch (err) {
-				console.error('Refresh bundle skills failed:', err);
+				console.error('Refresh plugin skills failed:', err);
 				const message = getErrorMessage(err, 'Failed to load this Plugin’s skills.');
 
-				if (isMountedRef.current && bundleRefreshRequestIdRef.current[bundleID] === requestId) {
-					setBundles(previous =>
-						previous.map(bundleData =>
-							bundleData.bundle.id === bundleID ? { ...bundleData, skillLoadError: message } : bundleData
+				if (isMountedRef.current && pluginRefreshRequestIdRef.current[pluginID] === requestId) {
+					setPlugins(previous =>
+						previous.map(pluginData =>
+							pluginData.plugin.id === pluginID ? { ...pluginData, skillLoadError: message } : pluginData
 						)
 					);
 				}
@@ -354,7 +354,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[setBundles]
+		[setPlugins]
 	);
 
 	useEffect(() => {
@@ -367,12 +367,12 @@ export default function SkillsPage() {
 
 	useEffect(() => {
 		if (hasResolved && !pageLoadError && !isLoading && !isRefreshing) {
-			rememberSkillBundleData(bundles);
+			rememberSkillPluginData(plugins);
 		}
-	}, [bundles, hasResolved, isLoading, isRefreshing, pageLoadError]);
+	}, [plugins, hasResolved, isLoading, isRefreshing, pageLoadError]);
 
 	useEffect(() => {
-		if (!hasResolved || pageLoadError || bundles.every(bundle => bundle.runtimeMetadataLoaded)) {
+		if (!hasResolved || pageLoadError || plugins.every(plugin => plugin.runtimeMetadataLoaded)) {
 			return;
 		}
 
@@ -390,17 +390,17 @@ export default function SkillsPage() {
 					return;
 				}
 
-				const byBundleID = new Map(hydrated.map(bundle => [bundle.bundle.id, bundle] as const));
+				const byPluginID = new Map(hydrated.map(plugin => [plugin.plugin.id, plugin] as const));
 
-				setBundles(current =>
-					current.map(bundle => {
-						const next = byBundleID.get(bundle.bundle.id);
+				setPlugins(current =>
+					current.map(plugin => {
+						const next = byPluginID.get(plugin.plugin.id);
 						if (!next) {
-							return bundle;
+							return plugin;
 						}
 
 						const nextSkillsByID = new Map(next.skills.map(skill => [skill.id, skill] as const));
-						const skills = bundle.skills.map(skill => {
+						const skills = plugin.skills.map(skill => {
 							const hydratedSkill = nextSkillsByID.get(skill.id);
 							if (!hydratedSkill || hydratedSkill.revision < skill.revision) {
 								return skill;
@@ -409,8 +409,8 @@ export default function SkillsPage() {
 						});
 
 						return {
-							...bundle,
-							bundle: next.bundle.revision >= bundle.bundle.revision ? next.bundle : bundle.bundle,
+							...plugin,
+							plugin: next.plugin.revision >= plugin.plugin.revision ? next.plugin : plugin.plugin,
 							skills,
 							runtimeMetadataLoaded: skills.length === next.skills.length,
 						};
@@ -424,58 +424,58 @@ export default function SkillsPage() {
 				setAlertMsg(getErrorMessage(error, 'Skill runtime details could not be loaded.'));
 				setShowAlert(true);
 			});
-	}, [bundles, hasResolved, pageLoadError, setBundles]);
+	}, [plugins, hasResolved, pageLoadError, setPlugins]);
 
-	const handleBundleEnableChange = useCallback(
-		async (bundleID: string, nextEnabled: boolean) => {
+	const handlePluginEnableChange = useCallback(
+		async (pluginID: string, nextEnabled: boolean) => {
 			try {
-				await skillManagementAPI.patchSkillBundle(bundleID, nextEnabled);
+				await skillManagementAPI.patchSkillPlugin(pluginID, nextEnabled);
 
 				if (!isMountedRef.current) {
 					return;
 				}
 
-				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
+				setPlugins(prev =>
+					prev.map(pluginData =>
+						pluginData.plugin.id === pluginID
 							? {
-									...bundleData,
-									bundle: { ...bundleData.bundle, isEnabled: nextEnabled },
+									...pluginData,
+									plugin: { ...pluginData.plugin, isEnabled: nextEnabled },
 								}
-							: bundleData
+							: pluginData
 					)
 				);
 			} catch (err) {
-				console.error('Toggle skill bundle enable failed:', err);
+				console.error('Toggle skill plugin enable failed:', err);
 				throw err;
 			}
 		},
-		[setBundles]
+		[setPlugins]
 	);
 
 	const handleSkillEnableChange = useCallback(
-		async (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => {
-			const bundleData = bundles.find(item => item.bundle.id === bundleID);
-			if (!bundleData) {
-				throw new Error('Skill bundle not found.');
+		async (pluginID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => {
+			const pluginData = plugins.find(item => item.plugin.id === pluginID);
+			if (!pluginData) {
+				throw new Error('Skill plugin not found.');
 			}
-			if (!bundleData.bundle.isEnabled) {
-				throw new Error('Enable the skill bundle before changing a skill.');
+			if (!pluginData.plugin.isEnabled) {
+				throw new Error('Enable the skill plugin before changing a skill.');
 			}
-			if (!bundleData.skills.some(skill => skill.id === skillID && skill.slug === skillSlug)) {
+			if (!pluginData.skills.some(skill => skill.id === skillID && skill.slug === skillSlug)) {
 				throw new Error('Skill not found.');
 			}
 
 			try {
-				await skillManagementAPI.patchSkill(bundleID, skillID, nextEnabled);
+				await skillManagementAPI.patchSkill(pluginID, skillID, nextEnabled);
 
 				if (!isMountedRef.current) {
 					return;
 				}
 
-				setBundles(prev =>
+				setPlugins(prev =>
 					prev.map(b =>
-						b.bundle.id === bundleID
+						b.plugin.id === pluginID
 							? {
 									...b,
 									skills: b.skills.map(existingSkill =>
@@ -490,19 +490,19 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[bundles, setBundles]
+		[plugins, setPlugins]
 	);
 
 	const handleDeleteSkill = useCallback(
-		async (bundleID: string, skillID: string, skillSlug: string) => {
-			const bundleData = bundles.find(item => item.bundle.id === bundleID);
-			if (!bundleData) {
-				throw new Error('Skill bundle not found.');
+		async (pluginID: string, skillID: string, skillSlug: string) => {
+			const pluginData = plugins.find(item => item.plugin.id === pluginID);
+			if (!pluginData) {
+				throw new Error('Skill plugin not found.');
 			}
-			if (!bundleData.bundle.isEditable) {
-				throw new Error('This Skill Bundle only supports enable and disable actions.');
+			if (!pluginData.plugin.isEditable) {
+				throw new Error('This Skill Plugin only supports enable and disable actions.');
 			}
-			const skill = bundleData.skills.find(item => item.id === skillID && item.slug === skillSlug);
+			const skill = pluginData.skills.find(item => item.id === skillID && item.slug === skillSlug);
 			if (!skill) {
 				throw new Error('Skill not found.');
 			}
@@ -511,15 +511,15 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await skillManagementAPI.deleteSkill(bundleID, skillID);
+				await skillManagementAPI.deleteSkill(pluginID, skillID);
 
 				if (!isMountedRef.current) {
 					return;
 				}
 
-				setBundles(prev =>
+				setPlugins(prev =>
 					prev.map(b =>
-						b.bundle.id === bundleID
+						b.plugin.id === pluginID
 							? {
 									...b,
 									skills: b.skills.filter(existingSkill => existingSkill.id !== skillID),
@@ -532,28 +532,28 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[bundles, setBundles]
+		[plugins, setPlugins]
 	);
 
 	const handleSubmitSkill = useCallback(
-		async (bundleID: string, partial: SkillUpsertInput, existingSkillID?: string) => {
-			const bundleData = bundles.find(item => item.bundle.id === bundleID);
-			if (!bundleData) {
-				throw new Error('Skill bundle not found.');
+		async (pluginID: string, partial: SkillUpsertInput, existingSkillID?: string) => {
+			const pluginData = plugins.find(item => item.plugin.id === pluginID);
+			if (!pluginData) {
+				throw new Error('Skill plugin not found.');
 			}
-			if (bundleData.bundle.isBuiltIn) {
-				throw new Error('Cannot add or edit skills in a built-in bundle.');
+			if (pluginData.plugin.isBuiltIn) {
+				throw new Error('Cannot add or edit skills in a built-in plugin.');
 			}
-			if (!bundleData.bundle.isEnabled) {
-				throw new Error('Enable the skill bundle before adding or editing skills.');
+			if (!pluginData.plugin.isEnabled) {
+				throw new Error('Enable the skill plugin before adding or editing skills.');
 			}
 
 			if (existingSkillID) {
-				if (!bundleData.bundle.isEditable) {
-					throw new Error('This Skill Bundle only supports enable and disable actions.');
+				if (!pluginData.plugin.isEditable) {
+					throw new Error('This Skill Plugin only supports enable and disable actions.');
 				}
 
-				const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillID);
+				const existingSkill = pluginData.skills.find(skill => skill.id === existingSkillID);
 				if (!existingSkill) {
 					throw new Error('Skill not found.');
 				}
@@ -567,7 +567,7 @@ export default function SkillsPage() {
 
 			try {
 				if (existingSkillID && partial.artifactCreate) {
-					await skillManagementAPI.replaceManagedSkill(bundleID, existingSkillID, partial.artifactCreate);
+					await skillManagementAPI.replaceManagedSkill(pluginID, existingSkillID, partial.artifactCreate);
 				} else if (partial.artifactCreate) {
 					const slug = (partial.name ?? partial.slug ?? '').trim();
 					const create = partial.artifactCreate;
@@ -576,7 +576,7 @@ export default function SkillsPage() {
 						throw new Error('Missing skill slug.');
 					}
 
-					await skillManagementAPI.putSkillArtifact(bundleID, partial.artifactID ?? getUUIDv7(), {
+					await skillManagementAPI.putSkillArtifact(pluginID, partial.artifactID ?? getUUIDv7(), {
 						name: create.name,
 						displayName: create.displayName,
 						description: create.description,
@@ -597,7 +597,7 @@ export default function SkillsPage() {
 						throw new Error('Missing source display name.');
 					}
 
-					await skillManagementAPI.registerFilesystemSkills(bundleID, location, sourceDisplayName);
+					await skillManagementAPI.registerFilesystemSkills(pluginID, location, sourceDisplayName);
 				}
 			} catch (err) {
 				console.error(existingSkillID ? 'Edit skill failed:' : 'Add skill failed:', err);
@@ -605,80 +605,80 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await refreshBundleSkills(bundleID, false);
+				await refreshPluginSkills(pluginID, false);
 			} catch (err) {
-				console.error('Skill was saved but bundle refresh failed:', err);
+				console.error('Skill was saved but plugin refresh failed:', err);
 				if (isMountedRef.current) {
 					setAlertMsg(
-						'The skill was saved, but the bundle could not be refreshed. Use Retry on the bundle before making further changes.'
+						'The skill was saved, but the plugin could not be refreshed. Use Retry on the plugin before making further changes.'
 					);
 					setShowAlert(true);
 				}
 			}
 		},
-		[bundles, refreshBundleSkills]
+		[plugins, refreshPluginSkills]
 	);
 
-	const handleBundleDelete = useCallback(async () => {
-		const deletingBundle = bundleToDelete;
+	const handlePluginDelete = useCallback(async () => {
+		const deletingPlugin = pluginToDelete;
 
-		if (!deletingBundle || isDeletingBundle) {
+		if (!deletingPlugin || isDeletingPlugin) {
 			return;
 		}
 
-		const bundleData = bundles.find(item => item.bundle.id === deletingBundle.id);
-		if (!bundleData?.bundle.isDeletable) {
-			setBundleToDelete(null);
-			setAlertMsg('This Skill Bundle cannot be deleted.');
+		const pluginData = plugins.find(item => item.plugin.id === deletingPlugin.id);
+		if (!pluginData?.plugin.isDeletable) {
+			setPluginToDelete(null);
+			setAlertMsg('This Skill Plugin cannot be deleted.');
 			setShowAlert(true);
 			return;
 		}
 
-		if (!bundleData || bundleData.skillLoadError || bundleData.skills.length > 0) {
-			setBundleToDelete(null);
+		if (!pluginData || pluginData.skillLoadError || pluginData.skills.length > 0) {
+			setPluginToDelete(null);
 			setAlertMsg(
-				bundleData?.skillLoadError
-					? 'Reload this bundle’s skills before deleting it.'
-					: 'Remove all skills from this bundle before deleting it.'
+				pluginData?.skillLoadError
+					? 'Reload this plugin’s skills before deleting it.'
+					: 'Remove all skills from this plugin before deleting it.'
 			);
 			setShowAlert(true);
 			return;
 		}
 
-		setIsDeletingBundle(true);
+		setIsDeletingPlugin(true);
 
 		try {
-			await skillManagementAPI.deleteSkillBundle(deletingBundle.id);
+			await skillManagementAPI.deleteSkillPlugin(deletingPlugin.id);
 
 			if (!isMountedRef.current) {
 				return;
 			}
 
-			setBundles(prev => prev.filter(b => b.bundle.id !== deletingBundle.id));
+			setPlugins(prev => prev.filter(b => b.plugin.id !== deletingPlugin.id));
 		} catch (err) {
-			console.error('Delete skill bundle failed:', err);
+			console.error('Delete skill plugin failed:', err);
 
 			if (isMountedRef.current) {
-				setAlertMsg(err instanceof Error ? err.message : 'Failed to delete skill bundle.');
+				setAlertMsg(err instanceof Error ? err.message : 'Failed to delete skill plugin.');
 				setShowAlert(true);
 			}
 		} finally {
 			if (isMountedRef.current) {
-				setIsDeletingBundle(false);
-				setBundleToDelete(null);
+				setIsDeletingPlugin(false);
+				setPluginToDelete(null);
 			}
 		}
-	}, [bundleToDelete, bundles, isDeletingBundle, setBundles]);
+	}, [pluginToDelete, plugins, isDeletingPlugin, setPlugins]);
 
-	const handleAddBundle = useCallback(
+	const handleAddPlugin = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
 				const id = getUUIDv7();
-				await skillManagementAPI.putSkillBundle(id, effectiveCreationRootID, slug, display, true, description);
+				await skillManagementAPI.putSkillPlugin(id, effectiveCreationRootID, slug, display, true, description);
 				try {
 					await reloadPageData();
 				} catch (refreshError) {
-					console.error('Skill bundle was created but refresh failed:', refreshError);
+					console.error('Skill plugin was created but refresh failed:', refreshError);
 					if (isMountedRef.current) {
 						setAlertMsg(
 							'Skill Plugin was created, but the page could not be refreshed. Reload before making destructive changes.'
@@ -687,36 +687,36 @@ export default function SkillsPage() {
 					}
 				}
 			} catch (err) {
-				console.error('Add skill bundle failed:', err);
+				console.error('Add skill plugin failed:', err);
 				throw err;
 			}
 		},
 		[effectiveCreationRootID, reloadPageData]
 	);
 
-	const handleEditBundle = useCallback(
-		async (bundleID: string, displayName: string, description?: string) => {
-			await skillManagementAPI.updateSkillBundleMetadata(bundleID, displayName, description);
+	const handleEditPlugin = useCallback(
+		async (pluginID: string, displayName: string, description?: string) => {
+			await skillManagementAPI.updateSkillPluginMetadata(pluginID, displayName, description);
 
 			if (!isMountedRef.current) {
 				return;
 			}
 
-			setBundles(previous =>
+			setPlugins(previous =>
 				previous.map(item =>
-					item.bundle.id === bundleID
+					item.plugin.id === pluginID
 						? {
 								...item,
-								bundle: { ...item.bundle, displayName, description },
+								plugin: { ...item.plugin, displayName, description },
 							}
 						: item
 				)
 			);
 		},
-		[setBundles]
+		[setPlugins]
 	);
 
-	if (isLoading && !hasResolved && bundles.length === 0) {
+	if (isLoading && !hasResolved && plugins.length === 0) {
 		return <Loader text="Loading Skill Plugins..." />;
 	}
 
@@ -762,7 +762,7 @@ export default function SkillsPage() {
 				<ManagementPageContent>
 					{pageLoadError ? (
 						<ManagementResourceError
-							title="Skill bundles could not be loaded"
+							title="Skill plugins could not be loaded"
 							error={pageLoadError}
 							isRetrying={isRefreshing}
 							onRetry={async () => {
@@ -849,8 +849,8 @@ export default function SkillsPage() {
 						</label>
 
 						<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
-							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} Plugin
-							{bundles.length === 1 ? '' : 's'}
+							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {plugins.length} Plugin
+							{plugins.length === 1 ? '' : 's'}
 						</div>
 
 						<div className="flex flex-wrap items-center gap-2 lg:col-span-12">
@@ -905,29 +905,29 @@ export default function SkillsPage() {
 					</div>
 
 					<div className="flex flex-col space-y-4 pb-8">
-						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No Skill Plugins configured yet.</p>}
+						{plugins.length === 0 && <p className="mt-8 text-center text-sm">No Skill Plugins configured yet.</p>}
 
-						{bundles.map(bundleData => (
-							<SkillBundleCard
-								key={bundleData.bundle.id}
-								bundle={bundleData.bundle}
-								skills={bundleData.skills}
-								skillLoadError={bundleData.skillLoadError}
-								runtimeMetadataLoaded={Boolean(bundleData.runtimeMetadataLoaded)}
+						{plugins.map(pluginData => (
+							<SkillPluginCard
+								key={pluginData.plugin.id}
+								plugin={pluginData.plugin}
+								skills={pluginData.skills}
+								skillLoadError={pluginData.skillLoadError}
+								runtimeMetadataLoaded={Boolean(pluginData.runtimeMetadataLoaded)}
 								prefillSkills={allSkillItems}
 								onRefreshSkills={() => {
-									return refreshBundleSkills(bundleData.bundle.id, !bundleData.bundle.isBuiltIn);
+									return refreshPluginSkills(pluginData.plugin.id, !pluginData.plugin.isBuiltIn);
 								}}
 								insertFilter={insertFilter}
 								searchQuery={searchQuery}
 								tagFilters={activeTagFilters}
-								onToggleBundleEnable={handleBundleEnableChange}
+								onTogglePluginEnable={handlePluginEnableChange}
 								onToggleSkillEnable={handleSkillEnableChange}
 								onDeleteSkill={handleDeleteSkill}
 								onSubmitSkill={handleSubmitSkill}
-								onEditBundle={handleEditBundle}
-								onRequestBundleDelete={bundle => {
-									setBundleToDelete(bundle);
+								onEditPlugin={handleEditPlugin}
+								onRequestPluginDelete={plugin => {
+									setPluginToDelete(plugin);
 								}}
 							/>
 						))}
@@ -935,32 +935,32 @@ export default function SkillsPage() {
 				</ManagementPageContent>
 
 				<DeleteConfirmationModal
-					isOpen={bundleToDelete !== null}
+					isOpen={pluginToDelete !== null}
 					onClose={() => {
-						if (!isDeletingBundle) {
-							setBundleToDelete(null);
+						if (!isDeletingPlugin) {
+							setPluginToDelete(null);
 						}
 					}}
-					onConfirm={handleBundleDelete}
-					title="Delete Skill Bundle"
+					onConfirm={handlePluginDelete}
+					title="Delete Skill Plugin"
 					message={
-						bundleToDelete
-							? `Delete empty Plugin "${bundleToDelete.displayName || bundleToDelete.slug}"? Remove all skills from the Plugin first.`
+						pluginToDelete
+							? `Delete empty Plugin "${pluginToDelete.displayName || pluginToDelete.slug}"? Remove all skills from the Plugin first.`
 							: 'Delete this empty Skill Plugin?'
 					}
 					confirmButtonText="Delete"
 				/>
 
-				<ManagementBundleCreateModal
+				<ManagementPluginCreateModal
 					isOpen={isAddModalOpen}
 					title="Add Skill Plugin"
 					entityLabel="Skill Plugin"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
-					onSubmit={handleAddBundle}
-					existingSlugs={existingBundleSlugs}
-					existingDisplayNames={existingBundleNames}
+					onSubmit={handleAddPlugin}
+					existingSlugs={existingPluginSlugs}
+					existingDisplayNames={existingPluginNames}
 					failureMessage="Failed to create Skill Plugin."
 				/>
 

@@ -36,8 +36,6 @@ func (d *Decoder) Recognize(
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
 	switch {
-	case IsRetiredMCPPlugin(candidate.Content):
-		return ingestModel.RecognitionPreferred
 	case IsMCPConfig(candidate.Content):
 		return ingestModel.RecognitionPreferred
 	case d.isMCPConfigCandidate(candidate):
@@ -52,16 +50,6 @@ func (d *Decoder) Decode(
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	switch {
-	case IsRetiredMCPPlugin(candidate.Content):
-		return nil, decoderError(
-			candidate.Locator,
-			"",
-			fmt.Errorf(
-				"%w: proprietary MCP plugin manifests are retired; use a canonical type: plugin declaration",
-				spec.ErrUnsupported,
-			),
-		)
-
 	case IsMCPConfig(candidate.Content):
 		values, err := DecodeMCPConfig(
 			candidate.Content,

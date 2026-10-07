@@ -40,8 +40,6 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { Loader } from '@/components/loader';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
-import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -49,6 +47,8 @@ import { ManagementInfoRow } from '@/components/managementui/management_info_row
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
+import { ManagementPluginCreateModal } from '@/components/managementui/management_plugin_create_modal';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
@@ -212,7 +212,7 @@ function AgentPluginCard({
 	};
 
 	return (
-		<ManagementBundleCard
+		<ManagementPluginCard
 			title={displayName}
 			identity={secondaryName ? <span className="font-mono">{secondaryName}</span> : null}
 			description={plugin.description}
@@ -454,7 +454,7 @@ function AgentPluginCard({
 					) : null}
 				</div>
 			) : null}
-		</ManagementBundleCard>
+		</ManagementPluginCard>
 	);
 }
 
@@ -1113,7 +1113,7 @@ export default function AgentsPage() {
 					))}
 				</ManagementPageContent>
 
-				<ManagementBundleCreateModal
+				<ManagementPluginCreateModal
 					isOpen={isCreatePluginOpen}
 					title="Add Agent Plugin"
 					entityLabel="Agent Plugin"

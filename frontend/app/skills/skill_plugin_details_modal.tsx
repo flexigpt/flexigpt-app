@@ -1,4 +1,4 @@
-import type { Skill, SkillBundle } from '@/spec/skill';
+import type { Skill, SkillPlugin } from '@/spec/skill';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -8,21 +8,21 @@ import { ModalSection } from '@/components/modal/modal_section';
 
 import { getSkillInsertCounts, getSkillInsertDescription, skillHasResources } from '@/skills/lib/skill_artifact_utils';
 
-interface SkillBundleDetailsModalProps {
+interface SkillPluginDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	bundle: SkillBundle | null;
+	plugin: SkillPlugin | null;
 	skills: Skill[];
 }
 
-export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: SkillBundleDetailsModalProps) {
+export function SkillPluginDetailsModal({ isOpen, onClose, plugin, skills }: SkillPluginDetailsModalProps) {
 	const skillCounts = getSkillInsertCounts(skills);
 
 	const totalSkills = skills.length;
 	const resourceSkillCount = skills.filter(s => {
 		return skillHasResources(s);
 	}).length;
-	if (!isOpen || !bundle) {
+	if (!isOpen || !plugin) {
 		return null;
 	}
 
@@ -31,28 +31,28 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 			isOpen={isOpen}
 			onClose={onClose}
 			title="Skill Plugin Details"
-			modalKey={`skill-bundle:${bundle.id}:${bundle.modifiedAt}`}
+			modalKey={`skill-plugin:${plugin.id}:${plugin.modifiedAt}`}
 		>
 			<ModalSection title="Plugin details">
 				<ManagementInfoGrid>
-					<ManagementInfoRow label="Display Name">{bundle.displayName || '—'}</ManagementInfoRow>
+					<ManagementInfoRow label="Display Name">{plugin.displayName || '—'}</ManagementInfoRow>
 					<ManagementInfoRow label="Name" mono>
-						{bundle.slug}
+						{plugin.slug}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Built-in">{bundle.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Enabled">{bundle.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Built-in">{plugin.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Enabled">{plugin.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">
-						<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
+						<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Created">{bundle.createdAt}</ManagementInfoRow>
-					<ManagementInfoRow label="Modified">{bundle.modifiedAt}</ManagementInfoRow>
+					<ManagementInfoRow label="Created">{plugin.createdAt}</ManagementInfoRow>
+					<ManagementInfoRow label="Modified">{plugin.modifiedAt}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
 
 			<ModalSection title="Sources">
-				{bundle.attachments.length > 0 ? (
+				{plugin.attachments.length > 0 ? (
 					<div className="space-y-2">
-						{bundle.attachments.map(attachment => (
+						{plugin.attachments.map(attachment => (
 							<div key={attachment.sourceID} className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
 								<div className="flex flex-wrap gap-2">
 									<MetadataPill label="Role">{attachment.role}</MetadataPill>

@@ -84,7 +84,7 @@ function stop(e: MouseEvent) {
 }
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
-	return option.bundle.enabled && option.server.enabled && isServerOperational(option.server);
+	return option.plugin.enabled && option.server.enabled && isServerOperational(option.server);
 }
 
 function isConfiguredOrConnectionPendingMCPOption(option: MCPComposerServerOption) {
@@ -756,7 +756,7 @@ function ServerRow({
 					className="checkbox checkbox-xs mt-1 rounded-sm"
 					checked={selected}
 					disabled={isInputLocked || (!selected && !selectable)}
-					title={!selectable ? 'Enable the MCP bundle and server before selecting it.' : undefined}
+					title={!selectable ? 'Enable the MCP plugin and server before selecting it.' : undefined}
 					onChange={e => {
 						if (e.currentTarget.checked && !selectable) {
 							return;
@@ -790,7 +790,7 @@ function ServerRow({
 					</div>
 
 					<div className="text-base-content/60 truncate text-xs">
-						{option.bundle.displayName || 'MCP Plugin'} / {getMCPTransportLabel(option.transport)}
+						{option.plugin.displayName || 'MCP Plugin'} / {getMCPTransportLabel(option.transport)}
 					</div>
 
 					{option.runtime?.lastError ? <div className="text-error mt-1 text-xs">{option.runtime.lastError}</div> : null}
@@ -879,7 +879,7 @@ function ServerRow({
 function getMCPOptionSearchFields(option: MCPComposerServerOption) {
 	return [
 		{ value: option.server.displayName, weight: 8 },
-		{ value: option.bundle.displayName, weight: 5 },
+		{ value: option.plugin.displayName, weight: 5 },
 		{ value: getMCPTransportLabel(option.transport), weight: 3 },
 		{ value: option.runtime?.lastError, weight: 2 },
 		{ value: option.authHealth?.lastError, weight: 2 },
@@ -940,10 +940,10 @@ export function MCPBottomBarChip({
 	);
 	const configurationPendingServerCount = enabledOperationalOptions.length - visibleOptions.length;
 	const hiddenDisabledServerCount = state.options.filter(
-		option => !option.bundle.enabled || !option.server.enabled
+		option => !option.plugin.enabled || !option.server.enabled
 	).length;
 	const hiddenUnavailableServerCount = state.options.filter(
-		option => option.bundle.enabled && option.server.enabled && !isServerOperational(option.server)
+		option => option.plugin.enabled && option.server.enabled && !isServerOperational(option.server)
 	).length;
 	const hasManagementHint =
 		state.options.length === 0 ||

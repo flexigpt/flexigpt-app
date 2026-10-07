@@ -320,7 +320,7 @@ export default function DocsPage() {
 				<div className="flex h-full items-center justify-center p-6">
 					<div className="bg-base-100 rounded-2xl p-8 shadow-lg">
 						<h1 className="text-xl font-semibold">Docs unavailable</h1>
-						<p className="mt-2 text-sm opacity-70">No bundled documentation sections were found.</p>
+						<p className="mt-2 text-sm opacity-70">No plugind documentation sections were found.</p>
 					</div>
 				</div>
 			</PageFrame>

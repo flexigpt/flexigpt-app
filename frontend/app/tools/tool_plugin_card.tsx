@@ -10,9 +10,9 @@ import { toolDisplayName, toolPluginDisplayName } from '@/apis/tool_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard as ManagementPluginCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 

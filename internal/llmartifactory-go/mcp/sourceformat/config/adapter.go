@@ -32,25 +32,6 @@ type configServer struct {
 	Headers   map[string]string `json:"headers,omitempty"`
 }
 
-// IsRetiredMCPPlugin identifies only the removed proprietary source
-// format. It is retained solely to produce an explicit unsupported-format
-// diagnostic, never to decode or convert the document.
-func IsRetiredMCPPlugin(
-	raw []byte,
-) bool {
-	var header struct {
-		Kind string `json:"kind"`
-	}
-	return json.Unmarshal(raw, &header) == nil &&
-		isRetiredMCPPluginKind(header.Kind)
-}
-
-func isRetiredMCPPluginKind(
-	kind string,
-) bool {
-	return kind == "mcp.plugin" || kind == "mcp.bundle"
-}
-
 // IsMCPConfig identifies the standard .mcp.json / mcp.json multi-server
 // shape. Retired proprietary plugin documents are explicitly excluded.
 func IsMCPConfig(
@@ -63,8 +44,7 @@ func IsMCPConfig(
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return false
 	}
-	return !isRetiredMCPPluginKind(value.Kind) &&
-		len(value.MCPServers) != 0
+	return len(value.MCPServers) != 0
 }
 
 // DecodeMCPConfig decodes the standard multi-server .mcp.json source shape.
@@ -164,11 +144,6 @@ func decodeMCPConfigDocument(
 	if err := json.Unmarshal(canonical, &value); err != nil {
 		return configDocument{}, err
 	}
-	if isRetiredMCPPluginKind(value.Kind) {
-		return configDocument{}, fmt.Errorf(
-			"%w: proprietary MCP plugin manifests are not supported",
-			spec.ErrUnsupported,
-		)
-	}
+
 	return value, nil
 }

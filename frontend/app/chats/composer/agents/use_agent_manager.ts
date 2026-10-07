@@ -276,9 +276,9 @@ export function useAgentManager(
 					systemPrompt.upsertAndSelectInstructionSource({
 						identityKey,
 						sourceKind: 'agent',
-						bundleID: agentKey(option.ref),
-						bundleDisplayName: option.displayName,
-						bundleSlug: option.agent.name,
+						pluginID: agentKey(option.ref),
+						pluginDisplayName: option.displayName,
+						pluginSlug: option.agent.name,
 						displayName: source.displayName,
 						sourceSlug: source.artifact.artifactID,
 						text: source.text,
