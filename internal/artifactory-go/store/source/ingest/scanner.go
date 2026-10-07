@@ -24,9 +24,14 @@ type Scanner interface {
 // CompiledDocumentRegistrar is the trusted generated-declaration registration
 // capability. Install translates its package plans into these Ingest-owned
 // source-relative witnesses before calling it.
+//
+// "registrationID" identifies one complete generated evidence owner for one
+// Source. Re-registering the same ID replaces that owner's prior witnesses,
+// including when the supplied document set is empty.
 type CompiledDocumentRegistrar interface {
 	RegisterCompiledDocuments(
 		ctx context.Context,
+		registrationID string,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
 		documents []CompiledDocument,

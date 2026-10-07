@@ -1,5 +1,7 @@
 //go:build generated_catalog
 
+// Package modelcatalog_test is intentionally behind generated_catalog flag. this takes a lot of time to run and is run
+// specially when needed.
 package modelcatalog_test
 
 import (

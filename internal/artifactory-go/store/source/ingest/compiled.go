@@ -3,7 +3,6 @@ package ingest
 import (
 	"context"
 	"fmt"
-	"maps"
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -117,17 +116,33 @@ type compiledDocumentKey struct {
 	locator  spec.Locator
 }
 
-type compiledDocumentRegistry struct {
-	mu     sync.RWMutex
-	values map[compiledDocumentKey]CompiledDocument
+type registeredCompiledDocument struct {
+	registrationID string
+	document       CompiledDocument
 }
 
+type compiledDocumentRegistry struct {
+	mu     sync.RWMutex
+	values map[compiledDocumentKey]registeredCompiledDocument
+}
+
+// RegisterCompiledDocuments replaces all compiled evidence owned by
+// registrationID for one Root/Source pair. This prevents a generated catalog
+// update from leaving removed documents eligible for the trusted fast path.
 func (e *Engine) RegisterCompiledDocuments(
 	ctx context.Context,
+	registrationID string,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	documents []CompiledDocument,
 ) error {
+	if err := spec.ValidateIdentifier(
+		"compiled document registration ID",
+		registrationID,
+		spec.MaxKindBytes,
+	); err != nil {
+		return err
+	}
 	if err := rootID.Validate(); err != nil {
 		return err
 	}
@@ -160,9 +175,40 @@ func (e *Engine) RegisterCompiledDocuments(
 	e.compiled.mu.Lock()
 	defer e.compiled.mu.Unlock()
 	if e.compiled.values == nil {
-		e.compiled.values = make(map[compiledDocumentKey]CompiledDocument)
+		e.compiled.values = make(
+			map[compiledDocumentKey]registeredCompiledDocument,
+		)
 	}
-	maps.Copy(e.compiled.values, pending)
+
+	for key := range pending {
+		current, found := e.compiled.values[key]
+		if !found || current.registrationID == registrationID {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: compiled source locator %q is registered by both %q and %q",
+			spec.ErrIdentityConflict,
+			key.locator,
+			current.registrationID,
+			registrationID,
+		)
+	}
+
+	for key, current := range e.compiled.values {
+		if key.rootID != rootID ||
+			key.sourceID != sourceID ||
+			current.registrationID != registrationID {
+			continue
+		}
+		delete(e.compiled.values, key)
+	}
+
+	for key, document := range pending {
+		e.compiled.values[key] = registeredCompiledDocument{
+			registrationID: registrationID,
+			document:       document.Clone(),
+		}
+	}
 	return nil
 }
 
@@ -177,5 +223,5 @@ func (e *Engine) compiledDocument(
 	if !found {
 		return CompiledDocument{}, false
 	}
-	return value.Clone(), true
+	return value.document.Clone(), true
 }

@@ -400,15 +400,32 @@ func Tool() (toolAPI.Support, error) {
 		return toolAPI.Support{}, err
 	}
 
+	builtinSource, err := topology.BuiltinSource(
+		topology.BuiltinSourceRolePackages,
+	)
+	if err != nil {
+		return toolAPI.Support{}, err
+	}
+	readOnlySource := support.SourceProfile{
+		StorageKey:  builtinSource.StorageKey,
+		Kind:        builtinSource.Kind,
+		DisplayName: builtinSource.DisplayName,
+		Config:      append(json.RawMessage(nil), builtinSource.Config...),
+	}
+	if err := readOnlySource.Validate(); err != nil {
+		return toolAPI.Support{}, err
+	}
+
 	value := toolAPI.Support{
 		ToolPackage:     toolPackage,
 		Documents:       toolDocuments,
 		PluginDocuments: pluginDocuments,
 		PluginProfile: pluginAPI.Profile{
-			Name:        "tool",
-			BuiltinRoot: topology.BuiltinRootID(),
-			ReadOnly:    true,
-			Package:     pluginPackage,
+			Name:           "tool",
+			BuiltinRoot:    topology.BuiltinRootID(),
+			ReadOnly:       true,
+			ReadOnlySource: &readOnlySource,
+			Package:        pluginPackage,
 			MembershipPolicy: pluginDomain.MembershipPolicy{
 				Mode: pluginDomain.MembershipModeSingleType,
 				AllowedTypes: []declaration.Type{

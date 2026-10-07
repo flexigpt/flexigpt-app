@@ -18,6 +18,7 @@ import (
 type CompiledDocumentRegistrar interface {
 	RegisterCompiledDocuments(
 		ctx context.Context,
+		registrationID string,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
 		documents []ingest.CompiledDocument,

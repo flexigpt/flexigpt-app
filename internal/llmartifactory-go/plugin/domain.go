@@ -26,6 +26,11 @@ type Profile struct {
 	Source      *support.SourceProfile
 	Package     support.PackageLayout
 
+	// ReadOnlySource identifies the application-selected Source profile whose
+	// declarations are visible to a read-only Plugin family. It is distinct
+	// from Source, which is the mutable authoring Source profile.
+	ReadOnlySource *support.SourceProfile
+
 	BaselineName        spec.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
@@ -47,6 +52,11 @@ func (p Profile) Clone() Profile {
 		source := *p.Source
 		source.Config = append([]byte(nil), p.Source.Config...)
 		output.Source = &source
+	}
+	if p.ReadOnlySource != nil {
+		source := *p.ReadOnlySource
+		source.Config = append([]byte(nil), p.ReadOnlySource.Config...)
+		output.ReadOnlySource = &source
 	}
 	output.MembershipPolicy.AllowedTypes = append(
 		[]declaration.Type(nil),
@@ -382,13 +392,7 @@ func (a *API) readPluginDocument(
 			record.ID,
 		)
 	}
-	if a.domain.ReadOnly &&
-		!a.readOnlyDomainOrigin(record) {
-		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
-			"%w: Plugin does not belong to this read-only domain",
-			spec.ErrUnsupported,
-		)
-	}
+
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, err
@@ -429,7 +433,7 @@ func (a *API) domainPluginVisible(
 		return false, err
 	}
 	if a.domain.ReadOnly {
-		if !a.readOnlyDomainOrigin(record) {
+		if !a.readOnlyDomainOrigin(record, sourceValue) {
 			return false, nil
 		}
 		return true, a.validateEditableDomainDocument(document)

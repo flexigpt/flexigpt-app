@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
@@ -214,9 +213,9 @@ func (a *Service) UpdateMCPServer(
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
-			"%w: MCP Server is not backed by a managed Source",
+			"%w: MCP Server is not backed by the configured managed MCP Source",
 			spec.ErrUnsupported,
 		)
 	}
@@ -424,9 +423,9 @@ func (a *Service) DeleteMCPServer(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return fmt.Errorf(
-			"%w: MCP Server is not backed by a managed Source",
+			"%w: MCP Server is not backed by the configured managed MCP Source",
 			spec.ErrUnsupported,
 		)
 	}

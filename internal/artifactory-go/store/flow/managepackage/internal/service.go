@@ -245,6 +245,10 @@ func (s *Service) RemoveWithOutcome(
 	ctx context.Context,
 	request managepackageModel.RemoveRequest,
 ) (outcome managepackageModel.RemovalOutcome, returnErr error) {
+	if err := validateRemoveRequest(request); err != nil {
+		return managepackageModel.RemovalOutcome{}, err
+	}
+
 	before, beforeErr := s.sourceState(
 		ctx,
 		request.RootID,
@@ -311,11 +315,10 @@ func (s *Service) RemoveWithOutcome(
 		}
 	}()
 
-	return outcome, s.remove(ctx, request)
+	return outcome, s.removeValidated(ctx, request)
 }
 
-func (s *Service) remove(
-	ctx context.Context,
+func validateRemoveRequest(
 	request managepackageModel.RemoveRequest,
 ) error {
 	if err := request.RootID.Validate(); err != nil {
@@ -350,6 +353,16 @@ func (s *Service) remove(
 			return err
 		}
 	}
+	return nil
+}
+
+// removeValidated receives a request already validated by RemoveWithOutcome.
+// It begins only after public request validation has completed and a stable
+// pre-operation Source state has been captured for the outcome record.
+func (s *Service) removeValidated(
+	ctx context.Context,
+	request managepackageModel.RemoveRequest,
+) error {
 	if err := s.requireMutation(ctx, request.RootID); err != nil {
 		return err
 	}

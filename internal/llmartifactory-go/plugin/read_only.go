@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -12,7 +13,19 @@ func (p Profile) validateAuthoringConfiguration() error {
 		if p.Source != nil {
 			return fmt.Errorf("%w: read-only Plugin profile cannot define a managed Source", spec.ErrInvalid)
 		}
-		return nil
+		if p.ReadOnlySource == nil {
+			return fmt.Errorf(
+				"%w: read-only Plugin profile requires a Source profile",
+				spec.ErrInvalid,
+			)
+		}
+		return p.ReadOnlySource.Validate()
+	}
+	if p.ReadOnlySource != nil {
+		return fmt.Errorf(
+			"%w: writable Plugin profile cannot define a read-only Source",
+			spec.ErrInvalid,
+		)
 	}
 	if p.Source == nil {
 		return fmt.Errorf("%w: managed Plugin profile requires a Source profile", spec.ErrInvalid)
@@ -53,9 +66,16 @@ func (a *API) requireDeclarationAuthoring() error {
 // application-supplied through Profile.Package.
 func (a *API) readOnlyDomainOrigin(
 	record artifactModel.Artifact,
+	sourceValue sourceModel.Summary,
 ) bool {
-	if !a.domain.ReadOnly ||
+	if a == nil ||
+		a.domain == nil ||
+		!a.domain.ReadOnly ||
 		record.Binding.SubresourceLocator != "" {
+		return false
+	}
+	if a.domain.ReadOnlySource == nil ||
+		!a.domain.ReadOnlySource.Matches(sourceValue) {
 		return false
 	}
 

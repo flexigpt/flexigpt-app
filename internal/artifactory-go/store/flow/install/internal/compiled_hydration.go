@@ -34,13 +34,15 @@ func (c *Service) RegisterCompiledPackages(
 		// This is the runtime trust boundary. Catalog values are generated
 		// from the ordinary parser and Store admission path, then compared
 		// against that path in tests. Runtime only registers their source
-		// locator and file digest witnesses.
+		// locator and file digest witnesses under one installer-owned
+		// registration identity.
 		documents, err := compiledDocumentsFromPackages(value.Set.Packages)
 		if err != nil {
 			return err
 		}
 		if err := c.refreshCompiled.RegisterCompiledDocuments(
 			ctx,
+			value.Set.Hydration.InstallerName,
 			value.Set.Hydration.RootID,
 			value.Set.Hydration.SourceID,
 			documents,

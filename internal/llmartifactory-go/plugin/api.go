@@ -414,6 +414,19 @@ func (a *API) AddArtifactMember(
 	if err != nil {
 		return PluginView{}, err
 	}
+	if target.State != artifactModel.StateAvailable {
+		return PluginView{}, fmt.Errorf(
+			"%w: Plugin member Artifact %q is unavailable",
+			spec.ErrReferenceUnresolved,
+			target.ID,
+		)
+	}
+	if target.Binding.SubresourceLocator != "" {
+		return PluginView{}, fmt.Errorf(
+			"%w: contained Artifact declarations cannot be direct Plugin members",
+			spec.ErrUnsupported,
+		)
+	}
 	declarationType := declaration.Type(target.Kind)
 	if err := declarationType.Validate(); err != nil {
 		return PluginView{}, err
@@ -825,28 +838,10 @@ func (a *API) managedSource(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (sourceModel.Summary, error) {
-	if a.domain != nil {
-		return a.domainManagedSource(ctx, rootID, sourceID)
-	}
-
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return sourceModel.Summary{}, err
-	}
-	if value.Kind != managedfs.Kind {
-		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: editable Plugin Source must have kind %q",
-			spec.ErrUnsupported,
-			managedfs.Kind,
-		)
-	}
-	if !value.Enabled {
-		return sourceModel.Summary{}, fmt.Errorf(
-			"%w: editable Plugin Source is disabled",
-			spec.ErrConflict,
-		)
-	}
-	return value, nil
+	// Every constructed Plugin API has an immutable application-supplied
+	// profile. The profile, rather than a concrete Source provider kind,
+	// defines the eligible managed Source.
+	return a.domainManagedSource(ctx, rootID, sourceID)
 }
 
 func (a *API) publishDocument(

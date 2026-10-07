@@ -120,12 +120,16 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 ) error {
 	for _, ref := range refs {
 		record, err := c.api.artifacts.Get(ctx, ref)
-		if err != nil &&
-			!errors.Is(err, spec.ErrArtifactNotFound) &&
-			!errors.Is(err, spec.ErrRootNotFound) {
+		if errors.Is(err, spec.ErrArtifactNotFound) ||
+			errors.Is(err, spec.ErrRootNotFound) {
+			// Protected topology reset may already have removed the Artifact
+			// and its local state in the same installation attempt.
+			continue
+		}
+		if err != nil {
 			return err
 		}
-		if err == nil && record.State == artifactModel.StateAvailable {
+		if record.State == artifactModel.StateAvailable {
 			continue
 		}
 		if err := c.api.purgeBuiltInServerInstallation(ctx, ref); err != nil {

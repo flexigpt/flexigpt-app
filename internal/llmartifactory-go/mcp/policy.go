@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
@@ -188,9 +187,9 @@ func (a *Service) DeleteMCPPolicy(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return fmt.Errorf(
-			"%w: MCP Policy is not backed by a managed Source",
+			"%w: MCP Policy is not backed by the configured managed MCP Source",
 			spec.ErrUnsupported,
 		)
 	}

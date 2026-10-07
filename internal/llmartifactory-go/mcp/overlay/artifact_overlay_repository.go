@@ -172,7 +172,9 @@ func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 	request := artifactcleanupFlow.PurgeRequest{
 		Artifact:                 ref,
 		ExpectedArtifactRevision: record.Revision,
-		AllNamespaces:            true,
+		Namespaces: []overlayModel.Namespace{
+			InstallationNamespace,
+		},
 	}
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		request.DataNamespaces = []artifactModel.DataNamespace{

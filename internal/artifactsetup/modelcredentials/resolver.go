@@ -32,6 +32,16 @@ func (r *Resolver) ResolveModelCredential(
 	ctx context.Context,
 	binding secretModel.Binding,
 ) (modelruntime.Credential, error) {
+	if err := binding.Validate(); err != nil {
+		return modelruntime.Credential{}, err
+	}
+	if !binding.Active() {
+		return modelruntime.Credential{}, fmt.Errorf(
+			"%w: Model Provider credential binding is not configured",
+			spec.ErrReferenceUnresolved,
+		)
+	}
+
 	value, current, err := r.secrets.ReadBinding(
 		ctx,
 		binding.Key,

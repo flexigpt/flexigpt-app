@@ -25,6 +25,9 @@ func (a *RuntimeAdapter) BindModelStore(store *modelAPI.Service) error {
 			spec.ErrInvalid,
 		)
 	}
+	if a == nil {
+		return spec.ErrClosed
+	}
 	if a.store != nil {
 		return fmt.Errorf(
 			"%w: Model runtime store is already bound",
@@ -69,7 +72,11 @@ func (a *RuntimeAdapter) ResolveRuntimeConfiguration(
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
-	resolved, err := a.store.ResolveModel(ctx, request.Model)
+	store, err := a.modelStore()
+	if err != nil {
+		return RuntimeConfiguration{}, err
+	}
+	resolved, err := store.ResolveModel(ctx, request.Model)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -99,7 +106,11 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 		)
 	}
 
-	resolved, err := a.store.ResolveModel(ctx, *target.Artifact)
+	store, err := a.modelStore()
+	if err != nil {
+		return RuntimeConfiguration{}, err
+	}
+	resolved, err := store.ResolveModel(ctx, *target.Artifact)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
@@ -119,11 +130,22 @@ func (a *RuntimeAdapter) ResolveProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (inferenceSpec.ProviderParam, error) {
-	resolved, err := a.store.ResolveProvider(ctx, ref)
+	store, err := a.modelStore()
+	if err != nil {
+		return inferenceSpec.ProviderParam{}, err
+	}
+	resolved, err := store.ResolveProvider(ctx, ref)
 	if err != nil {
 		return inferenceSpec.ProviderParam{}, err
 	}
 	return a.ResolveProviderRuntime(ctx, resolved)
+}
+
+func (a *RuntimeAdapter) modelStore() (*modelAPI.Service, error) {
+	if a == nil || a.store == nil {
+		return nil, spec.ErrClosed
+	}
+	return a.store, nil
 }
 
 // InitializeProviderRuntime registers available enabled Providers after

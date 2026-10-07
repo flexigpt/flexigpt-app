@@ -2,11 +2,9 @@ package agent
 
 import (
 	"context"
-	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
@@ -65,24 +63,12 @@ func (a *Service) AddAgentPluginArtifactMember(
 	ctx context.Context,
 	request pluginAPI.AddArtifactMemberRequest,
 ) (pluginAPI.PluginView, error) {
-	target, err := a.getAgentRecord(ctx, request.Artifact)
-	if err != nil {
+	if _, err := a.getAgentRecord(ctx, request.Artifact); err != nil {
 		return pluginAPI.PluginView{}, err
 	}
-	if target.State != artifactModel.StateAvailable {
-		return pluginAPI.PluginView{}, fmt.Errorf(
-			"%w: Agent Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
-			target.ID,
-		)
-	}
-	if target.Binding.SubresourceLocator != "" {
-		return pluginAPI.PluginView{}, fmt.Errorf(
-			"%w: contained Agent Artifacts cannot be direct Plugin members",
-			spec.ErrUnsupported,
-		)
-	}
 
+	// Plugin owns the generic availability and root-origin requirements for
+	// direct Artifact membership after Agent has established family type.
 	return a.plugins.AddArtifactMember(ctx, request)
 }
 

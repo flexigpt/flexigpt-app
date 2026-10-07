@@ -86,9 +86,12 @@ type OverlayRepository interface {
 		expectedOverlayRevision uint64,
 	) error
 
-	// PurgeServerLocalState removes protected overlays and all Artifact Store
-	// secret bindings for a removed MCP server. It is used by managed package
-	// deletion and built-in compiled package lifecycle cleanup.
+	// PurgeServerLocalState removes MCP-owned local state only: the MCP
+	// installation overlay, MCP installation bindings, and mutable MCP data
+	// where applicable. Unrelated Artifact namespaces remain untouched.
+	//
+	// It is used by managed package deletion and built-in compiled package
+	// lifecycle cleanup.
 	PurgeServerLocalState(
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,

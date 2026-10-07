@@ -180,6 +180,24 @@ func (a *App) GetArtifactInitializationError() string {
 	return a.artifactInitializationError.Error()
 }
 
+// stopAfterArtifactInitializationFailure leaves the application in a
+// fail-closed state. Protected topology installation and mutable-root
+// baseline provisioning must complete before ordinary Artifact writers can be
+// exposed through Wails wrappers.
+//
+// GetArtifactInitializationError remains available to the frontend after the
+// dependent wrappers and Store have been closed.
+func (a *App) stopAfterArtifactInitializationFailure(cause error) {
+	if a == nil || cause == nil {
+		return
+	}
+	a.artifactInitializationError = errors.Join(
+		a.artifactInitializationError,
+		cause,
+	)
+	a.shutdown(context.Background())
+}
+
 func ensureAppPrivateDirectory(location string) error {
 	return os.MkdirAll(
 		location,
@@ -533,13 +551,10 @@ func (a *App) initManagers() {
 			"error",
 			err,
 		)
-		a.artifactInitializationError = errors.Join(
-			a.artifactInitializationError,
-			err,
-		)
-	} else {
-		slog.Info("shared built-in artifact topology initialized")
+		a.stopAfterArtifactInitializationFailure(err)
+		return
 	}
+	slog.Info("shared built-in artifact topology initialized")
 
 	err = artifactsetup.EnsureMutableRootBaselines(
 		context.Background(),
@@ -555,13 +570,10 @@ func (a *App) initManagers() {
 			"error",
 			err,
 		)
-		a.artifactInitializationError = errors.Join(
-			a.artifactInitializationError,
-			err,
-		)
-	} else {
-		slog.Info("user Artifact baseline Plugins initialized")
+		a.stopAfterArtifactInitializationFailure(err)
+		return
 	}
+	slog.Info("user Artifact baseline Plugins initialized")
 
 	workspaceConversationSource := a.workspaceStoreAPI.api
 

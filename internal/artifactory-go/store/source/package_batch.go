@@ -38,19 +38,43 @@ func (r *Registry) ApplyPackageBatch(
 		)
 	}
 
-	for _, publication := range publications {
-		if err := publication.Address.Validate(); err != nil {
+	normalizedPublications := make(
+		[]managedpackageModel.ManagedPackagePublication,
+		len(publications),
+	)
+	seenPublications := make(
+		map[managedpackageModel.ManagedPackageAddress]struct{},
+		len(publications),
+	)
+	for index, publication := range publications {
+		normalized, err := managedpackageModel.NormalizeManagedPackagePublication(
+			publication,
+		)
+		if err != nil {
 			return err
 		}
-		if publication.ExpectedGeneration != "" {
+		if normalized.ExpectedGeneration != "" {
 			return fmt.Errorf(
 				"%w: compiled package batches do not use per-package generations",
 				spec.ErrInvalid,
 			)
 		}
+		if _, duplicate := seenPublications[normalized.Address]; duplicate {
+			return fmt.Errorf(
+				"%w: compiled package batch repeats publication %v",
+				spec.ErrConflict,
+				normalized.Address,
+			)
+		}
+		seenPublications[normalized.Address] = struct{}{}
+		normalizedPublications[index] = normalized
 	}
 
-	for _, address := range removals {
+	normalizedRemovals := append(
+		[]managedpackageModel.ManagedPackageAddress(nil),
+		removals...,
+	)
+	for _, address := range normalizedRemovals {
 		if err := address.Validate(); err != nil {
 			return err
 		}
@@ -59,7 +83,7 @@ func (r *Registry) ApplyPackageBatch(
 	return writer.ApplyPackageBatch(
 		ctx,
 		value.Clone(),
-		publications,
-		removals,
+		normalizedPublications,
+		normalizedRemovals,
 	)
 }

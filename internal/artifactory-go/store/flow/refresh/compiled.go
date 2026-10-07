@@ -13,6 +13,7 @@ import (
 // Ingest-owned source witnesses to the owner-local scanner implementation.
 func (s *Service) RegisterCompiledDocuments(
 	ctx context.Context,
+	registrationID string,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	documents []ingest.CompiledDocument,
@@ -20,5 +21,11 @@ func (s *Service) RegisterCompiledDocuments(
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
-	return s.compiled.RegisterCompiledDocuments(ctx, rootID, sourceID, documents)
+	return s.compiled.RegisterCompiledDocuments(
+		ctx,
+		registrationID,
+		rootID,
+		sourceID,
+		documents,
+	)
 }

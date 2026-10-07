@@ -13,7 +13,10 @@ func Interpretation() coreinterpretation.Registration {
 		LogicalVersion: func(
 			entry declaration.Entry,
 		) (spec.LogicalVersion, error) {
-			document, err := DecodeTextEntry(entry)
+			// Definition reconstruction has already crossed expected-key
+			// schema admission. Do not execute the Text schema again solely
+			// to recover the family-owned logical version.
+			document, err := DecodeAdmittedTextEntry(entry)
 			if err != nil {
 				return "", err
 			}

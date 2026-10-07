@@ -393,6 +393,7 @@ func (r *ArtifactOverlayRepository) PurgeProviderLocalState(
 		ctx,
 		ref,
 		ProviderRuntimeDataNamespace,
+		ProviderRuntimeNamespace,
 	)
 }
 
@@ -404,6 +405,7 @@ func (r *ArtifactOverlayRepository) PurgeModelLocalState(
 		ctx,
 		ref,
 		ModelRuntimeDataNamespace,
+		ModelRuntimeNamespace,
 	)
 }
 
@@ -411,6 +413,7 @@ func (r *ArtifactOverlayRepository) purgeLocalState(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	dataNamespace string,
+	overlayNamespace overlayModel.Namespace,
 ) error {
 	record, err := r.artifact(ctx, ref)
 	if err != nil {
@@ -420,7 +423,9 @@ func (r *ArtifactOverlayRepository) purgeLocalState(
 	request := artifactcleanupFlow.PurgeRequest{
 		Artifact:                 ref,
 		ExpectedArtifactRevision: record.Revision,
-		AllNamespaces:            true,
+		Namespaces: []overlayModel.Namespace{
+			overlayNamespace,
+		},
 	}
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		request.DataNamespaces = []artifactModel.DataNamespace{

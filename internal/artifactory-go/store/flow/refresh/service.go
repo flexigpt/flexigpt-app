@@ -96,7 +96,7 @@ func (s *Service) RefreshSource(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-) (refreshModel.RefreshSourceResult, error) {
+) (_ refreshModel.RefreshSourceResult, returnErr error) {
 	if err := rootID.Validate(); err != nil {
 		return refreshModel.RefreshSourceResult{}, err
 	}
@@ -136,7 +136,10 @@ func (s *Service) RefreshSource(
 	snapshotOpen := true
 	defer func() {
 		if snapshotOpen {
-			_ = snapshot.Close()
+			returnErr = errors.Join(
+				returnErr,
+				snapshot.Close(),
+			)
 		}
 	}()
 	sourceGeneration := snapshot.Generation()
@@ -162,10 +165,11 @@ func (s *Service) RefreshSource(
 	if err := snapshot.Confirm(ctx); err != nil {
 		return refreshModel.RefreshSourceResult{}, err
 	}
-	if err := snapshot.Close(); err != nil {
-		return refreshModel.RefreshSourceResult{}, err
-	}
+	closeErr := snapshot.Close()
 	snapshotOpen = false
+	if closeErr != nil {
+		return refreshModel.RefreshSourceResult{}, closeErr
+	}
 	discoveryFingerprint, err := value.Discovery.Fingerprint()
 	if err != nil {
 		return refreshModel.RefreshSourceResult{}, err

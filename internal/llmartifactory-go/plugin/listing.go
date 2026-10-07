@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
@@ -290,7 +289,8 @@ func (a *API) pluginVisibleInList(
 	}
 
 	if a.domain.ReadOnly {
-		if entry.Source.Kind != managedfs.Kind ||
+		if a.domain.ReadOnlySource == nil ||
+			!a.domain.ReadOnlySource.MatchesSourceMetadata(entry.Source) ||
 			entry.Binding.SubresourceLocator != "" {
 			return false, nil
 		}

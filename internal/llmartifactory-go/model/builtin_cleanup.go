@@ -257,12 +257,16 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 	value BuiltinArtifactSnapshot,
 ) error {
 	record, err := c.api.artifacts.Get(ctx, value.Ref)
-	if err != nil &&
-		!errors.Is(err, spec.ErrArtifactNotFound) &&
-		!errors.Is(err, spec.ErrRootNotFound) {
+	if errors.Is(err, spec.ErrArtifactNotFound) ||
+		errors.Is(err, spec.ErrRootNotFound) {
+		// A protected-root reset already removes family local state before
+		// deleting Artifact metadata. Cleanup must remain idempotent.
+		return nil
+	}
+	if err != nil {
 		return err
 	}
-	if err == nil && record.State == artifactModel.StateAvailable {
+	if record.State == artifactModel.StateAvailable {
 		return nil
 	}
 
