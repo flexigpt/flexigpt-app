@@ -10,6 +10,9 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
+	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 	"golang.org/x/oauth2"
 )
@@ -100,8 +103,14 @@ func TestOAuthTokenPersistenceUsesArtifactScopedReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	secrets := &memoryMCPSecrets{values: map[string]string{}}
-	adapter := &RuntimeAdapter{secrets: secrets}
+	state := &memoryMCPSecretState{
+		values: map[string]string{},
+	}
+	adapter := newTestRuntimeAdapter(
+		t,
+		&memoryMCPSecretResolver{state: state},
+		&memoryOAuthTokenStore{state: state},
+	)
 	status := mcpAuth.MCPAuthStatus{Server: server}
 
 	if _, err := adapter.LoadOAuthToken(ctx, status); !errors.Is(
@@ -120,7 +129,7 @@ func TestOAuthTokenPersistenceUsesArtifactScopedReference(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if len(secrets.values) != 0 {
+	if len(state.values) != 0 {
 		t.Fatal("nil or invalid token was persisted")
 	}
 
@@ -133,7 +142,7 @@ func TestOAuthTokenPersistenceUsesArtifactScopedReference(t *testing.T) {
 	if err := adapter.SaveOAuthToken(ctx, status, token); err != nil {
 		t.Fatal(err)
 	}
-	if _, found := secrets.values[expectedSecretRef]; !found {
+	if _, found := state.values[expectedSecretRef]; !found {
 		t.Fatal("OAuth token was not stored at the existing Artifact-scoped reference")
 	}
 
@@ -169,9 +178,13 @@ func TestOAuthTokenLoadPreservesPersistenceError(t *testing.T) {
 	}
 
 	cause := errors.New("secret persistence unavailable")
-	adapter := &RuntimeAdapter{
-		secrets: &memoryMCPSecrets{readErr: cause},
-	}
+	adapter := newTestRuntimeAdapter(
+		t,
+		&memoryMCPSecretResolver{
+			state: &memoryMCPSecretState{readErr: cause},
+		},
+		&memoryOAuthTokenStore{},
+	)
 	_, err = adapter.LoadOAuthToken(
 		t.Context(),
 		mcpAuth.MCPAuthStatus{Server: server},
@@ -184,38 +197,140 @@ func TestOAuthTokenLoadPreservesPersistenceError(t *testing.T) {
 	}
 }
 
-type memoryMCPSecrets struct {
+func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
+	state := &memoryMCPSecretState{
+		values: map[string]string{},
+	}
+	resolver := &memoryMCPSecretResolver{state: state}
+	tokens := &memoryOAuthTokenStore{state: state}
+
+	if _, err := NewRuntimeAdapter(
+		nil,
+		resolver,
+		tokens,
+		nil,
+	); !errors.Is(err, spec.ErrInvalid) {
+		t.Fatalf("nil MCP server store error: %v", err)
+	}
+
+	if _, err := NewRuntimeAdapter(
+		testMCPServerStore{},
+		nil,
+		tokens,
+		nil,
+	); !errors.Is(err, spec.ErrInvalid) {
+		t.Fatalf("nil MCP secret resolver error: %v", err)
+	}
+
+	if _, err := NewRuntimeAdapter(
+		testMCPServerStore{},
+		resolver,
+		nil,
+		nil,
+	); !errors.Is(err, spec.ErrInvalid) {
+		t.Fatalf("nil OAuth token store error: %v", err)
+	}
+}
+
+func newTestRuntimeAdapter(
+	t *testing.T,
+	resolver serverMCPDomain.SecretResolver,
+	oauthTokens OAuthTokenStore,
+) *RuntimeAdapter {
+	t.Helper()
+
+	adapter, err := NewRuntimeAdapter(
+		testMCPServerStore{},
+		resolver,
+		oauthTokens,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create MCP runtime adapter: %v", err)
+	}
+	return adapter
+}
+
+type testMCPServerStore struct{}
+
+func (testMCPServerStore) ResolveMCPServer(
+	context.Context,
+	artifactModel.ArtifactRef,
+) (mcpAPI.ServerRead, error) {
+	return mcpAPI.ServerRead{}, errors.New(
+		"unexpected MCP server resolution",
+	)
+}
+
+func (testMCPServerStore) GetServerSettings(
+	context.Context,
+	artifactModel.ArtifactRef,
+) (mcpAPI.ServerInstallationView, error) {
+	return mcpAPI.ServerInstallationView{}, errors.New(
+		"unexpected MCP settings read",
+	)
+}
+
+func (testMCPServerStore) SaveServerSettings(
+	context.Context,
+	artifactModel.ArtifactRef,
+	uint64,
+	serverMCPDomain.ServerData,
+) error {
+	return errors.New("unexpected MCP settings write")
+}
+
+type memoryMCPSecretState struct {
 	values  map[string]string
 	readErr error
 }
 
-func (s *memoryMCPSecrets) ResolveSecret(
+type memoryMCPSecretResolver struct {
+	state *memoryMCPSecretState
+}
+
+func (s *memoryMCPSecretResolver) ResolveSecret(
 	_ context.Context,
 	ref string,
 ) (string, error) {
-	if s.readErr != nil {
-		return "", s.readErr
+	if s.state == nil {
+		return "", secret.ErrNotFound
 	}
-	value, found := s.values[ref]
+	if s.state.readErr != nil {
+		return "", s.state.readErr
+	}
+	value, found := s.state.values[ref]
 	if !found {
 		return "", secret.ErrNotFound
 	}
 	return value, nil
 }
 
-func (s *memoryMCPSecrets) SetMCPSecret(
+type memoryOAuthTokenStore struct {
+	state *memoryMCPSecretState
+}
+
+func (s *memoryOAuthTokenStore) SetMCPSecret(
 	_ context.Context,
 	ref string,
 	value string,
 ) (a string, v bool, err error) {
-	s.values[ref] = value
+	if s.state == nil {
+		s.state = &memoryMCPSecretState{}
+	}
+	if s.state.values == nil {
+		s.state.values = make(map[string]string)
+	}
+	s.state.values[ref] = value
 	return "", value != "", nil
 }
 
-func (s *memoryMCPSecrets) DeleteSecret(
+func (s *memoryOAuthTokenStore) DeleteSecret(
 	_ context.Context,
 	ref string,
 ) error {
-	delete(s.values, ref)
+	if s.state != nil {
+		delete(s.state.values, ref)
+	}
 	return nil
 }
