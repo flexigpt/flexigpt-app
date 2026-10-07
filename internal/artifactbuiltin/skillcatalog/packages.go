@@ -204,10 +204,6 @@ func canonicalPluginPackage(
 			spec.ErrInvalid,
 		)
 	}
-	if err := registry.ValidateTree(root); err != nil {
-		return pluginv1.PluginDocument{}, nil, err
-	}
-
 	plugin, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err

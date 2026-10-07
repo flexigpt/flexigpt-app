@@ -14,12 +14,10 @@ import (
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 )
 
-// SecretStore is supplied by application assembly. The adapter reads
-// installation secrets and persists OAuth tokens; it does not implement
-// Artifact Store secret binding or credential-management policy.
-type SecretStore interface {
-	serverMCPDomain.SecretResolver
-
+// OAuthTokenStore is the narrow mutation capability needed for app-managed
+// OAuth tokens. Installation-secret plaintext is supplied separately through
+// serverMCPDomain.SecretResolver.
+type OAuthTokenStore interface {
 	SetMCPSecret(
 		ctx context.Context,
 		ref string,
@@ -37,7 +35,8 @@ type SecretStore interface {
 // adapter until BindRuntime succeeds.
 type RuntimeAdapter struct {
 	store       mcpAPI.ServerStore
-	secrets     SecretStore
+	secrets     serverMCPDomain.SecretResolver
+	oauthTokens OAuthTokenStore
 	environment serverMCPDomain.EnvironmentResolver
 
 	runtime *mcpConnection.MCPRuntimeManager
@@ -45,11 +44,13 @@ type RuntimeAdapter struct {
 
 func NewRuntimeAdapter(
 	store mcpAPI.ServerStore,
-	secrets SecretStore,
+	secrets serverMCPDomain.SecretResolver,
+	oauthTokens OAuthTokenStore,
 	environment serverMCPDomain.EnvironmentResolver,
 ) (*RuntimeAdapter, error) {
 	if store == nil ||
-		secrets == nil {
+		secrets == nil ||
+		oauthTokens == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP runtime adapter dependencies are incomplete",
 			spec.ErrInvalid,
@@ -59,6 +60,7 @@ func NewRuntimeAdapter(
 	return &RuntimeAdapter{
 		store:       store,
 		secrets:     secrets,
+		oauthTokens: oauthTokens,
 		environment: environment,
 	}, nil
 }

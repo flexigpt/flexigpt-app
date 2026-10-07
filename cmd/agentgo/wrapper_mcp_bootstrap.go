@@ -26,11 +26,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsecrets"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
@@ -88,10 +88,25 @@ func initMCPWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	secrets, err := mcpsecrets.New(
+	bindingSecrets, err := secret.NewBindingService(
 		artifacts,
 		secretBindings,
+		mcpOverlay.InstallationNamespace,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	runtimeSecrets, err := secret.NewRuntimeResolver(
+		secretBindings,
 		secretRuntime,
+		mcpOverlay.InstallationNamespace,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	trustedSecrets, err := secret.NewTrustedRuntimeStore(
+		bindingSecrets,
+		runtimeSecrets,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -107,7 +122,7 @@ func initMCPWrappers(
 		cat,
 		definitions,
 		overlays,
-		secrets,
+		bindingSecrets,
 		mcppolicy.Baseline(),
 		mcpAPI.WithCompositionResolver(resolver),
 		mcpAPI.WithSupport(support),
@@ -136,7 +151,8 @@ func initMCPWrappers(
 
 	adapter, err := mcpruntime.NewRuntimeAdapter(
 		storeAPI,
-		secrets,
+		runtimeSecrets,
+		bindingSecrets,
 		mcpsettings.EnvironmentResolver{},
 	)
 	if err != nil {
@@ -172,7 +188,7 @@ func initMCPWrappers(
 	}
 
 	authManager := mcpAuth.NewAuthManager(
-		secrets,
+		trustedSecrets,
 		mcpAuth.WithOAuthAuthorizationBroker(broker),
 		mcpAuth.WithOAuthRedirectURL(broker.RedirectURL()),
 		mcpAuth.WithOAuthTokenStore(adapter),
@@ -218,7 +234,7 @@ func initMCPWrappers(
 	aggregateWrapper.source = adapter
 	aggregateWrapper.runtime = runtimeManager
 	aggregateWrapper.auth = authManager
-	aggregateWrapper.secrets = secrets
+	aggregateWrapper.secrets = bindingSecrets
 
 	return builtIns, adapter, nil
 }

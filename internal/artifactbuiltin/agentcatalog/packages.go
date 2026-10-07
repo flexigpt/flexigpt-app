@@ -193,10 +193,6 @@ func canonicalPluginPackage(
 			spec.ErrInvalid,
 		)
 	}
-	if err := interpretations.ValidateTree(r); err != nil {
-		return pluginv1.PluginDocument{}, nil, err
-	}
-
 	plugin, err := pluginv1.DecodePluginEntry(r)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
@@ -315,7 +311,7 @@ func canonicalPluginPackage(
 			)
 		}
 
-		agentRoot, agentDocument, err := canonicalAgentDocument(content, interpretations)
+		agentRoot, agentDocument, err := canonicalAgentDocument(content)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"validate built-in Agent %q: %w",
@@ -378,7 +374,6 @@ func canonicalPluginPackage(
 
 func canonicalAgentDocument(
 	content []byte,
-	interpretations *coreinterpretation.Registry,
 ) (declaration.Entry, agentv1.AgentDocument, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		content,
@@ -397,9 +392,6 @@ func canonicalAgentDocument(
 			spec.ErrInvalid,
 			declaration.TypeAgent,
 		)
-	}
-	if err := interpretations.ValidateTree(r); err != nil {
-		return declaration.Entry{}, agentv1.AgentDocument{}, err
 	}
 	document, err := agentv1.DecodeAgentEntry(r)
 	if err != nil {

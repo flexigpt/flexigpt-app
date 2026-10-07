@@ -55,7 +55,7 @@ func (a *RuntimeAdapter) SaveOAuthToken(
 	if err != nil {
 		return err
 	}
-	_, _, err = a.secrets.SetMCPSecret(ctx, ref, string(raw))
+	_, _, err = a.oauthTokens.SetMCPSecret(ctx, ref, string(raw))
 	return err
 }
 
@@ -67,7 +67,7 @@ func (a *RuntimeAdapter) DeleteOAuthToken(
 	if err != nil {
 		return err
 	}
-	return a.secrets.DeleteSecret(ctx, ref)
+	return a.oauthTokens.DeleteSecret(ctx, ref)
 }
 
 func oauthTokenSecretRef(serverID mcpServer.ServerID) (string, error) {

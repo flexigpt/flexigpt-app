@@ -67,7 +67,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		)
 	}
 
-	_, actualErr := GeneratedCatalogSet()
+	actualFingerprint, actualErr := generatedCatalog.Fingerprint()
 
 	candidate, err := catalogtest.CandidatePath(
 		"catalog_generated.next.json",
@@ -82,7 +82,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	if err := catalogtest.AssertGeneratedPackageSetMatches(
 		expected,
 		actualErr,
-		GeneratedCatalogFingerprint(),
+		actualFingerprint,
 		"internal/artifactbuiltin/toolcatalog/catalog_generated.json",
 		candidate,
 	); err != nil {

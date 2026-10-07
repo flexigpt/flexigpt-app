@@ -1,7 +1,6 @@
 package modelcatalog
 
 import (
-	"context"
 	"fmt"
 	"sort"
 
@@ -10,8 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
@@ -34,37 +31,20 @@ type PreparedPackage struct {
 }
 
 func PrepareProviderPackage(
-	ctx context.Context,
 	document modelproviderv1.ProviderDocument,
-	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
-	if registry == nil {
-		return PreparedPackage{}, fmt.Errorf(
-			"%w: Model package interpretation registry is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := document.Validate(); err != nil {
-		return PreparedPackage{}, err
-	}
-
 	support, err := llmsupport.Model()
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 
-	raw, err := document.CanonicalJSON()
+	definitionValue, err := modelproviderv1.DefinitionForDocument(
+		document,
+	)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	entry, err := declaration.NewEntry(document)
-	if err != nil {
-		return PreparedPackage{}, err
-	}
-	definitionValue, err := registry.DefinitionForEntry(entry)
-	if err != nil {
-		return PreparedPackage{}, err
-	}
+	raw := append([]byte(nil), definitionValue.Body...)
 
 	address, err := support.ProviderPackage.Address(spec.LogicalName(document.Name), "")
 	if err != nil {
@@ -91,37 +71,18 @@ func PrepareProviderPackage(
 }
 
 func PrepareModelPackage(
-	ctx context.Context,
 	document modelv1.ModelDocument,
-	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
-	if registry == nil {
-		return PreparedPackage{}, fmt.Errorf(
-			"%w: Model package interpretation registry is nil",
-			spec.ErrInvalid,
-		)
-	}
-	if err := document.Validate(); err != nil {
-		return PreparedPackage{}, err
-	}
-
 	support, err := llmsupport.Model()
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 
-	raw, err := document.CanonicalJSON()
+	definitionValue, err := modelv1.DefinitionForDocument(document)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	entry, err := declaration.NewEntry(document)
-	if err != nil {
-		return PreparedPackage{}, err
-	}
-	definitionValue, err := registry.DefinitionForEntry(entry)
-	if err != nil {
-		return PreparedPackage{}, err
-	}
+	raw := append([]byte(nil), definitionValue.Body...)
 
 	address, err := support.ModelPackage.Address(spec.LogicalName(document.Name), "")
 	if err != nil {

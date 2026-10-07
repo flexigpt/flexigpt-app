@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
@@ -43,15 +42,7 @@ type preparedModel struct {
 // independent source-backed Model Provider and Model packages.
 func PreparePackages(
 	ctx context.Context,
-	registry *coreinterpretation.Registry,
 ) ([]modelcatalog.PreparedPackage, error) {
-	if registry == nil {
-		return nil, fmt.Errorf(
-			"%w: Model catalog interpretation registry is nil",
-			spec.ErrInvalid,
-		)
-	}
-
 	catalog := modelpreset.DefaultCatalog()
 	if err := modelpreset.ValidateCatalog(catalog); err != nil {
 		return nil, fmt.Errorf(
@@ -172,11 +163,7 @@ func PreparePackages(
 				err,
 			)
 		}
-		preparedProvider, err := modelcatalog.PrepareProviderPackage(
-			ctx,
-			providerDocument,
-			registry,
-		)
+		preparedProvider, err := modelcatalog.PrepareProviderPackage(providerDocument)
 		if err != nil {
 			return nil, err
 		}
@@ -197,11 +184,7 @@ func PreparePackages(
 					err,
 				)
 			}
-			preparedModel, err := modelcatalog.PrepareModelPackage(
-				ctx,
-				document,
-				registry,
-			)
+			preparedModel, err := modelcatalog.PrepareModelPackage(document)
 			if err != nil {
 				return nil, err
 			}
@@ -209,7 +192,9 @@ func PreparePackages(
 		}
 	}
 
-	return modelcatalog.NormalizePreparedPackages(output)
+	// Provider names and per-provider Model IDs were sorted before conversion.
+	// Compile owns final package-set normalization and duplicate detection.
+	return output, nil
 }
 
 func providerDocumentFromInference(

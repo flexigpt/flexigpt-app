@@ -79,11 +79,6 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		},
 	})
 	requireNoError(t, err)
-	t.Cleanup(func() {
-		if err := llm.Close(); err != nil {
-			t.Errorf("close Skill workflow LLM Artifactory: %v", err)
-		}
-	})
 
 	support, err := llmsupport.Skill()
 	requireNoError(t, err)

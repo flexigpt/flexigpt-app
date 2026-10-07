@@ -17,10 +17,6 @@ type InstallerDependencies struct {
 	Cleanup  mcpAPI.BuiltinPackageCleanup
 }
 
-type Installer struct {
-	*installFlow.CatalogInstaller
-}
-
 type lifecycle struct {
 	cleanup mcpAPI.BuiltinPackageCleanup
 }
@@ -31,7 +27,7 @@ type lifecycleState struct {
 
 func NewInstaller(
 	dependencies InstallerDependencies,
-) (*Installer, error) {
+) (*installFlow.CatalogInstaller, error) {
 	if dependencies.Hydrator == nil ||
 		dependencies.Cleanup == nil {
 		return nil, fmt.Errorf(
@@ -55,7 +51,7 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	return &Installer{CatalogInstaller: value}, nil
+	return value, nil
 }
 
 func (l lifecycle) PrepareCompiledHydration(

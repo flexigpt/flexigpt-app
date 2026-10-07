@@ -33,15 +33,16 @@ type Handle struct {
 	closeErr  error
 }
 
-// Close closes the LLM registration attachment before closing the local
-// generic Store deployment and its owned provider resources.
+// Close drops the borrowed LLM registration attachment before closing the
+// local generic Store deployment and its owned provider resources.
 func (h *Handle) Close() error {
 	if h == nil {
 		return nil
 	}
 	h.closeOnce.Do(func() {
+		// LLM Artifactory owns immutable registration/composition state only.
+		// It borrows the generic Store and has no independent shutdown work.
 		if h.LLM != nil {
-			h.closeErr = errors.Join(h.closeErr, h.LLM.Close())
 			h.LLM = nil
 		}
 		if h.Store != nil {

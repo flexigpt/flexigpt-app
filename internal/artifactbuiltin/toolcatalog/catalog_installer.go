@@ -12,13 +12,9 @@ type InstallerDependencies struct {
 	Hydrator installModel.CompiledHydrationCoordinator
 }
 
-type Installer struct {
-	*installFlow.CatalogInstaller
-}
-
 func NewInstaller(
 	dependencies InstallerDependencies,
-) (*Installer, error) {
+) (*installFlow.CatalogInstaller, error) {
 	if dependencies.Hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool generated catalog installer dependencies are incomplete",
@@ -39,5 +35,5 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	return &Installer{CatalogInstaller: value}, nil
+	return value, nil
 }

@@ -181,9 +181,6 @@ func canonicalPluginExpectations(
 			spec.ErrInvalid,
 		)
 	}
-	if err := registry.ValidateTree(root); err != nil {
-		return nil, err
-	}
 	plugin, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
 		return nil, err

@@ -50,7 +50,7 @@ type workflowHarness struct {
 	nextDependencyFile      int
 
 	agentBootstrap *installFlow.Bootstrap
-	agentInstaller *agentcatalog.Installer
+	agentInstaller *installFlow.CatalogInstaller
 }
 
 type workflowDependency struct {
@@ -177,11 +177,6 @@ func newWorkflowHarness(
 		DirectCapabilities: workflowDirectCapabilities(),
 	})
 	requireNoError(t, err)
-	t.Cleanup(func() {
-		if closeErr := llm.Close(); closeErr != nil {
-			t.Errorf("close workflow LLM Artifactory: %v", closeErr)
-		}
-	})
 
 	agentSupport, err := llmsupport.Agent()
 	requireNoError(t, err)
@@ -217,7 +212,7 @@ func newWorkflowHarness(
 
 func (h *workflowHarness) installBundledAgents(
 	t *testing.T,
-) *agentcatalog.Installer {
+) *installFlow.CatalogInstaller {
 	t.Helper()
 
 	if h.agentBootstrap == nil {

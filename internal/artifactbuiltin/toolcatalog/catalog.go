@@ -6,10 +6,9 @@ import (
 	"maps"
 	"sync"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
@@ -17,51 +16,20 @@ import (
 var generatedCatalogJSON []byte
 
 var (
-	generatedCatalogOnce sync.Once
-	generatedCatalog     *installFlow.PreloadedGeneratedPackageSet
-	errGeneratedCatalog  error
+	generatedCatalog = artifactbuiltin.NewGeneratedPackageCatalog(
+		generatedCatalogJSON,
+	)
 
 	generatedPluginIndexOnce sync.Once
 	generatedPluginIndex     map[spec.LogicalName]spec.LogicalName
 	errGeneratedPluginIndex  error
 )
 
-func generatedCatalogPreload() (
-	*installFlow.PreloadedGeneratedPackageSet,
-	error,
-) {
-	generatedCatalogOnce.Do(func() {
-		generatedCatalog, errGeneratedCatalog = installFlow.PreloadGeneratedPackageSet(
-			generatedCatalogJSON,
-		)
-	})
-	if errGeneratedCatalog != nil {
-		return nil, errGeneratedCatalog
-	}
-	return generatedCatalog, nil
-}
-
 func generatedCatalogValue() (
 	installModel.CompiledPackageSet,
 	error,
 ) {
-	preloaded, err := generatedCatalogPreload()
-	if err != nil {
-		return installModel.CompiledPackageSet{}, err
-	}
-	return preloaded.PackageSet()
-}
-
-func GeneratedCatalogSet() (installModel.CompiledPackageSet, error) {
-	return generatedCatalogValue()
-}
-
-func GeneratedCatalogFingerprint() cryptoutil.Digest {
-	preloaded, err := generatedCatalogPreload()
-	if err != nil {
-		return ""
-	}
-	return preloaded.Fingerprint()
+	return generatedCatalog.PackageSet()
 }
 
 // GeneratedToolPluginIndex maps a generated Tool name to its generated

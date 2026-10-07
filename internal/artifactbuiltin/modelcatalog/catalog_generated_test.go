@@ -1,14 +1,13 @@
 //go:build generated_catalog
 
-// Package modelcatalog_test is intentionally behind generated_catalog flag. this takes a lot of time to run and is run
+// Package modelcatalog is intentionally behind generated_catalog flag. This takes a lot of time to run and is run
 // specially when needed.
-package modelcatalog_test
+package modelcatalog
 
 import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
@@ -20,12 +19,12 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("create Model catalog interpretation registry: %v", err)
 	}
 
-	prepared, err := modelruntime.PreparePackages(t.Context(), registry)
+	prepared, err := modelruntime.PreparePackages(t.Context())
 	if err != nil {
 		t.Fatalf("prepare inference Model catalog packages: %v", err)
 	}
 
-	expected, err := modelcatalog.Compile(
+	expected, err := Compile(
 		t.Context(),
 		t.TempDir(),
 		registry,
@@ -42,11 +41,11 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("fingerprint expected generated Model catalog: %v", err)
 	}
 
-	reprepared, err := modelruntime.PreparePackages(t.Context(), registry)
+	reprepared, err := modelruntime.PreparePackages(t.Context())
 	if err != nil {
 		t.Fatalf("prepare inference Model catalog packages again: %v", err)
 	}
-	recompiled, err := modelcatalog.Compile(
+	recompiled, err := Compile(
 		t.Context(),
 		t.TempDir(),
 		registry,
@@ -70,7 +69,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		)
 	}
 
-	_, actualErr := modelcatalog.GeneratedCatalogSet()
+	actualFingerprint, actualErr := generatedCatalog.Fingerprint()
 
 	candidate, err := catalogtest.CandidatePath(
 		"catalog_generated.next.json",
@@ -85,7 +84,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	if err := catalogtest.AssertGeneratedPackageSetMatches(
 		expected,
 		actualErr,
-		modelcatalog.GeneratedCatalogFingerprint(),
+		actualFingerprint,
 		"internal/artifactbuiltin/modelcatalog/catalog_generated.json",
 		candidate,
 	); err != nil {
