@@ -221,8 +221,8 @@ Skills can fill three roles:
 Steps:
 
 1. Open **Skills**.
-2. Confirm the skill bundle and skill are enabled.
-3. If creating a custom skill, use a custom bundle and filesystem skill location.
+2. Confirm the skill plugin and skill are enabled.
+3. If creating a custom skill, use a custom plugin and filesystem skill location.
 4. Open **Chats**.
 5. Open the **Skills** menu in the composer bottom bar.
 6. Enable one relevant skill.
@@ -255,7 +255,7 @@ Suggested setup:
 Steps:
 
 1. Open **MCP Servers**.
-2. Create or choose a bundle.
+2. Create or choose a plugin.
 3. Add one server, or copy an existing server if it is a close fit.
 4. Set transport, trust level, auth mode, and any required setup inputs.
 5. Connect the server and confirm that discovery is loaded.
@@ -278,7 +278,7 @@ Expected result:
 
 Troubleshooting:
 
-- check bundle enabled
+- check plugin enabled
 - check server enabled
 - check auth health
 - refresh discovery after changing server config

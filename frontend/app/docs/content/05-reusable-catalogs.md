@@ -57,13 +57,13 @@ The available tools are built-in Go implementations or provider-bound capabiliti
 
 ## Skills
 
-The **Skills** page manages skill bundles and skills.
+The **Skills** page manages skill plugins and skills.
 
 Important behavior:
 
 - built-in embedded skills are generally read-only
 - user-created skills are filesystem skills
-- skill names must be unique within a bundle
+- skill names must be unique within a plugin
 - skill refs include a skill ID to avoid stale identity confusion
 - skills can be enabled or disabled
 - skills can show presence status such as present, missing, error, or unknown

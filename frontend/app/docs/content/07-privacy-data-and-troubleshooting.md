@@ -109,7 +109,7 @@ The app also stores local data for:
 - built-in tool availability and related local configuration
 - Agent Plugins and Agent files
 - Workspace setup
-- skill bundles and skills
+- skill plugins and skills
 - bundled docs shipped inside the app
 - logs and local indexes
 

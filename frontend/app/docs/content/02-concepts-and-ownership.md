@@ -43,7 +43,7 @@ When a result changes, compare these layers one at a time.
 | **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                      |
 | **Tool**                     | A built-in Go capability the model can request during a conversation.                                                                                                                              |
 | **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                      |
-| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                       |
+| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a plugin, including transport, auth, trust, setup, discovery, and runtime state.                                                       |
 | **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                               |
 | **Previous user turns**      | The history window for the next request.                                                                                                                                                           |
 

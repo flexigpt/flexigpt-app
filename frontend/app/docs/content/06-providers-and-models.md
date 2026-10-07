@@ -292,7 +292,7 @@ If tools or web search do not appear, check:
 - selected provider SDK type
 - tool/provider compatibility
 - web-search tool compatibility
-- tool bundle enabled
+- tool plugin enabled
 - tool enabled
 - Agent availability reason
 - model capability support

@@ -527,7 +527,7 @@ linters:
 
     sloglint:
       msg-style: "lowercased"
-      # Doesnt support things like bundleID, can enable and just check for discovery, once in a while.
+      # Doesnt support things like artifactID, can enable and just check for discovery, once in a while.
       # key-naming-case: "camel"
 
     staticcheck:

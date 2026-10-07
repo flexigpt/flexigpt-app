@@ -14,15 +14,15 @@ Use this page to understand what the MCP Servers page owns and how it fits into 
 
 ## What MCP servers are
 
-A bundle groups one or more MCP servers.
+A plugin groups one or more MCP servers.
 
-Use bundles when you want to keep related servers together.
+Use plugins when you want to keep related servers together.
 
 Important points:
 
-- built-in bundles and servers ship with the app and are usually read-only
-- custom bundles and servers are local content and can be created, edited, copied, or deleted
-- the backend keeps the bundle, server, auth, setup, and runtime metadata on your machine
+- built-in plugins and servers ship with the app and are usually read-only
+- custom plugins and servers are local content and can be created, edited, copied, or deleted
+- the backend keeps the plugin, server, auth, setup, and runtime metadata on your machine
 - the server itself may still be a local or remote endpoint
 - discovery is separate from the composer selection you make for one chat turn
 
@@ -30,14 +30,14 @@ Important points:
 
 | Area    | What it controls                                                                                         |
 | ------- | -------------------------------------------------------------------------------------------------------- |
-| Bundle  | Group servers together and control the bundle enabled state.                                             |
+| Plugin  | Group servers together and control the plugin enabled state.                                             |
 | Server  | Transport, trust level, auth mode, setup inputs, default policy, apps policy, and tool policy overrides. |
 | Runtime | Connect, disconnect, refresh, auth health, and discovery snapshots.                                      |
 | Secrets | Store auth values and setup secrets through the normal MCP secret flow.                                  |
 
 Common page actions:
 
-- add a bundle
+- add a plugin
 - add or edit a server
 - copy an existing server as a starting point
 - configure setup inputs
