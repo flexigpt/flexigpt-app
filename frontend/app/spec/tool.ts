@@ -1,5 +1,5 @@
-import type { ArtifactRef, ArtifactState, MappedTarget, StoreArtifact } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
+import type { ArtifactRef, ArtifactState, CapabilityTarget, StoreArtifact } from '@/spec/artifact';
+import type { PluginView } from '@/spec/plugin';
 
 import type { JSONObject, JSONRawString } from '@/lib/jsonschema_utils';
 
@@ -58,7 +58,7 @@ export interface ToolView {
 
 export interface ResolvedToolView {
 	tool: ToolView;
-	collection: CollectionView;
+	plugin: PluginView;
 }
 
 /**
@@ -99,7 +99,7 @@ export function toolStoreListItemFromView(tool: ToolView): ToolStoreListItem {
 /** Exact aggregate.ToolSelection wire and persistence contract. */
 export interface ToolSelection {
 	choiceID: string;
-	target: MappedTarget;
+	target: CapabilityTarget;
 	autoExecute: boolean;
 	userArgSchemaInstance?: JSONRawString;
 }
@@ -123,8 +123,8 @@ export interface ToolStoreChoice extends ToolSelection {
 	description?: string;
 	toolVersion?: string;
 
-	collectionRef?: ArtifactRef;
-	collectionName?: string;
+	pluginRef?: ArtifactRef;
+	pluginName?: string;
 }
 
 export interface UIToolStoreChoice extends ToolStoreChoice {
@@ -132,13 +132,12 @@ export interface UIToolStoreChoice extends ToolStoreChoice {
 }
 
 /**
- * Frontend-only composer catalog entry. This is hydrated from a
- * `ToolStoreListItem` plus `GetTool` and `MapToolTarget`.
+ * Frontend-only composer catalog entry. This is hydrated from a `ToolStoreListItem` plus `GetTool` and `MapToolTarget`.
  */
 export interface ToolListItem {
-	target: MappedTarget;
-	collectionRef: ArtifactRef;
-	collectionName: string;
+	target: CapabilityTarget;
+	pluginRef: ArtifactRef;
+	pluginName: string;
 	toolDefinition: ToolView;
 }
 

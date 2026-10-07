@@ -2,7 +2,7 @@ import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
+import type { setting as wailsSettingSpec } from '@/apis/wailsjs/go/models';
 import {
 	enumFromWails,
 	optionalWailsBody,
@@ -27,9 +27,9 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 			Body: {
 				type: theme.type,
 				name: theme.name,
-			} as wailsSpec.SetAppThemeRequestBody,
+			} as wailsSettingSpec.SetAppThemeRequestBody,
 		};
-		await SetAppTheme(r as wailsSpec.SetAppThemeRequest);
+		await SetAppTheme(r as wailsSettingSpec.SetAppThemeRequest);
 	}
 
 	async setDebugSettings(settings: DebugSettings): Promise<void> {
@@ -39,20 +39,20 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 				disableContentStripping: settings.disableContentStripping,
 				logLevel: settings.logLevel,
 			},
-		} as wailsSpec.SetDebugSettingsRequest;
+		} as wailsSettingSpec.SetDebugSettingsRequest;
 		await SetDebugSettings(r);
 	}
 
 	async getSettings(forceFetch?: boolean): Promise<SettingsSchema> {
-		const r: wailsSpec.GetSettingsRequest = {
+		const r: wailsSettingSpec.GetSettingsRequest = {
 			ForceFetch: !!forceFetch,
 		};
-		const body = requiredWailsResponseBody<{ appTheme: wailsSpec.AppTheme; debug?: wailsSpec.DebugSettings }>(
-			await GetSettings(r),
-			'GetSettings'
-		);
-		const appTheme = requireWailsBody<wailsSpec.AppTheme>(body.appTheme, 'GetSettings.appTheme');
-		const debug = optionalWailsBody<wailsSpec.DebugSettings>(body.debug, 'GetSettings.debug');
+		const body = requiredWailsResponseBody<{
+			appTheme: wailsSettingSpec.AppTheme;
+			debug?: wailsSettingSpec.DebugSettings;
+		}>(await GetSettings(r), 'GetSettings');
+		const appTheme = requireWailsBody<wailsSettingSpec.AppTheme>(body.appTheme, 'GetSettings.appTheme');
+		const debug = optionalWailsBody<wailsSettingSpec.DebugSettings>(body.debug, 'GetSettings.debug');
 
 		return {
 			appTheme: {

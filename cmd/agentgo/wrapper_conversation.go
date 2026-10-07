@@ -7,12 +7,12 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 )
 
-type ConversationPluginWrapper struct {
+type ConversationCollectionWrapper struct {
 	store *conversation.ConversationCollection
 }
 
-func InitConversationPluginWrapper(
-	c *ConversationPluginWrapper,
+func InitConversationCollectionWrapper(
+	c *ConversationCollectionWrapper,
 	conversationDir string,
 ) error {
 	conversationStoreAPI, err := conversation.NewConversationCollection(
@@ -26,7 +26,7 @@ func InitConversationPluginWrapper(
 	return nil
 }
 
-func (ccw *ConversationPluginWrapper) PutConversation(
+func (ccw *ConversationCollectionWrapper) PutConversation(
 	req *conversationSpec.PutConversationRequest,
 ) (*conversationSpec.PutConversationResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.PutConversationResponse, error) {
@@ -34,7 +34,7 @@ func (ccw *ConversationPluginWrapper) PutConversation(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) DeleteConversation(
+func (ccw *ConversationCollectionWrapper) DeleteConversation(
 	req *conversationSpec.DeleteConversationRequest,
 ) (*conversationSpec.DeleteConversationResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.DeleteConversationResponse, error) {
@@ -42,7 +42,7 @@ func (ccw *ConversationPluginWrapper) DeleteConversation(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) GetConversation(
+func (ccw *ConversationCollectionWrapper) GetConversation(
 	req *conversationSpec.GetConversationRequest,
 ) (*conversationSpec.GetConversationResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.GetConversationResponse, error) {
@@ -50,7 +50,7 @@ func (ccw *ConversationPluginWrapper) GetConversation(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) ListConversations(
+func (ccw *ConversationCollectionWrapper) ListConversations(
 	req *conversationSpec.ListConversationsRequest,
 ) (*conversationSpec.ListConversationsResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.ListConversationsResponse, error) {
@@ -58,7 +58,7 @@ func (ccw *ConversationPluginWrapper) ListConversations(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) SearchConversations(
+func (ccw *ConversationCollectionWrapper) SearchConversations(
 	req *conversationSpec.SearchConversationsRequest,
 ) (*conversationSpec.SearchConversationsResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.SearchConversationsResponse, error) {
@@ -66,7 +66,7 @@ func (ccw *ConversationPluginWrapper) SearchConversations(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) PutMessagesToConversation(
+func (ccw *ConversationCollectionWrapper) PutMessagesToConversation(
 	req *conversationSpec.PutMessagesToConversationRequest,
 ) (*conversationSpec.PutMessagesToConversationResponse, error) {
 	return withRecoveryResp(func() (*conversationSpec.PutMessagesToConversationResponse, error) {
@@ -74,7 +74,7 @@ func (ccw *ConversationPluginWrapper) PutMessagesToConversation(
 	})
 }
 
-func (ccw *ConversationPluginWrapper) close() {
+func (ccw *ConversationCollectionWrapper) close() {
 	if ccw == nil || ccw.store == nil {
 		return
 	}

@@ -14,7 +14,7 @@ export * from './settingstore';
 export * from './skill_aggregate';
 export * from './skill_runtime';
 export * from './skill_store';
-export * from './tool_aggregate';
+export * from './text_store';
 export * from './tool_runtime';
 export * from './tool_store';
 export * from './workspace_runtime';

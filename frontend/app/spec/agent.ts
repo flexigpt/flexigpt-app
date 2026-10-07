@@ -4,23 +4,17 @@ import type {
 	ArtifactRootID,
 	ArtifactSourceID,
 	ArtifactState,
-	MappedTarget,
+	CapabilityResolutionStatus,
+	CapabilityTarget,
 } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
 import type { MCPHTTPAuthMode, MCPInputKind, MCPTransportType } from '@/spec/mcp';
+import type { PluginView } from '@/spec/plugin';
 
 export enum AgentImportIssueSeverity {
 	Error = 'error',
 	Confirmation = 'confirmation',
 	Warning = 'warning',
 	Information = 'information',
-}
-
-export enum AgentTextInsert {
-	Instructions = 'instructions',
-	Warning = 'warning',
-	Information = 'information',
-	UserMessage = 'user-message',
 }
 
 export enum AgentImportRelationshipStatus {
@@ -52,10 +46,9 @@ export interface AgentCapabilityOccurrence {
 	path: string;
 	type: string;
 	name?: string;
-	status: string;
+	status: CapabilityResolutionStatus;
 	required: boolean;
-	artifact?: ArtifactRef;
-	mapped?: MappedTarget;
+	target?: CapabilityTarget;
 	autoExecute?: boolean;
 	includeSystemPrompt?: boolean;
 	skillUseMode?: AgentSkillUseMode;
@@ -73,22 +66,10 @@ export interface AgentResolution {
 	capabilities: AgentCapabilityPlan;
 }
 
-export interface AgentTextMaterialization {
-	artifact: ArtifactRef;
-	artifactRevision: number;
-	definitionDigest: ArtifactDigest;
-	name: string;
-	insert: AgentTextInsert;
-	mediaType?: string;
-	content: string;
-	locator: string;
-	builtIn: boolean;
-}
-
 export interface ListAgentsRequest {
 	rootID: ArtifactRootID;
 	logicalNames?: string[];
-	collection?: ArtifactRef;
+	plugin?: ArtifactRef;
 	includeBuiltin?: boolean;
 	enabled?: boolean;
 }
@@ -104,11 +85,11 @@ export interface AgentImportDestination {
 	rootID: ArtifactRootID;
 	rootDisplayName?: string;
 	sourceID: ArtifactSourceID;
-	collection: ArtifactRef;
+	plugin: ArtifactRef;
 
-	collectionRevision: number;
-	collectionName: string;
-	collectionDisplayName: string;
+	pluginRevision: number;
+	pluginName: string;
+	pluginDisplayName: string;
 	baseline: boolean;
 	enabled: boolean;
 }
@@ -119,8 +100,8 @@ export interface AgentImportPreviewRequest {
 	 * and `.yml`, selecting the parser from this extension.
 	 */
 	path: string;
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	expectedSourceDigest?: ArtifactDigest;
 }
 
@@ -139,8 +120,7 @@ interface AgentImportRelationship {
 	scope?: string;
 	status: AgentImportRelationshipStatus;
 
-	artifact?: ArtifactRef;
-	mapped?: MappedTarget;
+	target?: CapabilityTarget;
 
 	code?: string;
 	message?: string;
@@ -153,7 +133,7 @@ interface AgentImportConflict {
 }
 
 interface AgentRestoredMembership {
-	collection: ArtifactRef;
+	plugin: ArtifactRef;
 	path: string;
 	message: string;
 }
@@ -215,7 +195,7 @@ export interface AgentImportCommitRequest {
 
 export interface AgentImportCommitResult {
 	agent: AgentView;
-	collection: CollectionView;
+	plugin: PluginView;
 	restoredMemberships?: AgentRestoredMembership[];
 	mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
 	preparedFingerprint: ArtifactDigest;

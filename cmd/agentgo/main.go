@@ -117,6 +117,7 @@ func main() {
 			app.mcpAggregateAPI,
 			app.completionAPI,
 			app.agentStoreAPI,
+			app.textStoreAPI,
 		},
 
 		Windows: &windows.Options{

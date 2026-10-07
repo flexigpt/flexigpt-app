@@ -39,7 +39,7 @@ Stored locally by default:
 
 - conversations and local history search data
 - models and provider metadata
-- Agent Collections and Agent files
+- Agent Plugins and Agent files
 - Workspace setup
 - tool definitions
 - skill definitions and hydrated built-in skill files when needed
@@ -107,7 +107,7 @@ The app also stores local data for:
 - settings metadata
 - providers and models
 - built-in tool availability and related local configuration
-- Agent Collections and Agent files
+- Agent Plugins and Agent files
 - Workspace setup
 - skill bundles and skills
 - bundled docs shipped inside the app

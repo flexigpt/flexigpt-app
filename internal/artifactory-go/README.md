@@ -15,6 +15,7 @@ Artifactory does not assign product meaning to an artifact. Your application sup
 - [Why this exists](#why-this-exists)
 - [Who it is for](#who-it-is-for)
 - [What it is not](#what-it-is-not)
+- [Related LLM layer](#related-llm-layer)
 - [The mental model](#the-mental-model)
   - [1. Source truth](#1-source-truth)
   - [2. Committed catalog truth](#2-committed-catalog-truth)
@@ -124,6 +125,18 @@ It does not decide what a Model, Tool, Skill, Plugin, or other domain artifact m
 
 Those responsibilities belong to the consuming domain and application.
 
+## Related LLM layer
+
+`LLM Artifactory Go` is FlexiGPT's
+declaration and artifact-family layer above this generic Store. It owns LLM
+declaration grammar, family contracts, typed Definition reconstruction,
+composition, Plugin membership, and family-specific package or local-state
+meaning.
+
+It consumes named generic Artifact Store capabilities. It does not replace this
+Store, select persistence or Source providers, own application topology or
+built-in content, or execute LLM runtimes.
+
 ## The mental model
 
 There are three different kinds of truth.
@@ -205,7 +218,7 @@ Each entity owns a distinct responsibility. Ownership means deciding its invaria
 
 ### Root: namespace, protection, and retention
 
-A Root is a lifecycle and identity boundary. It does not inherently represent a feature, tenant, workspace, or built-in collection. Applications may assign those meanings.
+A Root is a lifecycle and identity boundary. It does not inherently represent a feature, tenant, workspace, or built-in plugin. Applications may assign those meanings.
 
 Two policies are intentionally different:
 
@@ -625,7 +638,7 @@ Its public boundary should make it possible to answer:
 - What must commit atomically?
 - Which operations require trusted access?
 
-There is no requirement for every entity to have the same collection of interfaces, factories, or supporting types.
+There is no requirement for every entity to have the same group of interfaces, factories, or supporting types.
 
 Construction establishes the entity's actual responsibility. It is not another architectural layer.
 
@@ -759,25 +772,25 @@ Transparent private caching is compatible with read-only behavior. Durable repai
 
 Validation is neither “repeat everything everywhere” nor “validate at startup and trust all future state.”
 
-| Boundary                      | Responsibility                                                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Construction                  | Required dependencies, valid configuration, namespace policies, and mandatory capability relationships.                                                 |
-| Registration                  | Valid identifiers and revisions, duplicate detection, schema bindings, and dispatch consistency.                                                        |
-| Public operation entry        | Transport/application entrypoints validate request shape; constructed internal capabilities assume valid dependencies and non-nil contexts.             |
-| Driver configuration          | Physical configuration validation and normalization.                                                                                                    |
-| Decoder and schema output     | Output shape, canonical representation, identity linkage, digest evidence, and diagnostics.                                                             |
-| Persistence commit            | Current revisions, liveness, uniqueness, references, and immutable-key conflicts.                                                                       |
-| Verified operation completion | Snapshot confirmation and time-dependent Source consistency.                                                                                            |
+| Boundary                      | Responsibility                                                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Construction                  | Required dependencies, valid configuration, namespace policies, and mandatory capability relationships.                                     |
+| Registration                  | Valid identifiers and revisions, duplicate detection, schema bindings, and dispatch consistency.                                            |
+| Public operation entry        | Transport/application entrypoints validate request shape; constructed internal capabilities assume valid dependencies and non-nil contexts. |
+| Driver configuration          | Physical configuration validation and normalization.                                                                                        |
+| Decoder and schema output     | Output shape, canonical representation, identity linkage, digest evidence, and diagnostics.                                                 |
+| Persistence commit            | Current revisions, liveness, uniqueness, references, and immutable-key conflicts.                                                           |
+| Verified operation completion | Snapshot confirmation and time-dependent Source consistency.                                                                                |
 
 After successful construction, private methods may assume mandatory dependencies exist.
 
 After request validation, private helpers should receive owned normalized values or an operation plan—not repeatedly reinterpret the same raw request.
 
-Expensive admission steps have one owner:
-
 Foreground request cancellation is owned by the transport boundary. Interior
 services inspect contexts only where cancellation is part of a real
 long-running workflow, provider operation, or session-completion contract.
+
+Expensive admission steps have one owner:
 
 - Source reading and ingestion establish source-content evidence.
 - The schema catalog executes the selected schema.

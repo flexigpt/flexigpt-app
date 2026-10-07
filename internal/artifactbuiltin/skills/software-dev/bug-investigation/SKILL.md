@@ -24,7 +24,7 @@ Diagnose root cause from available evidence. Separate confirmed from suspected. 
 
 Workflow phases:
 
-    scope -> evidence collection -> hypotheses -> root cause assessment -> missing evidence -> fix direction -> verification plan
+    scope -> evidence group -> hypotheses -> root cause assessment -> missing evidence -> fix direction -> verification plan
 
 Evidence first. Start from attached logs, stack traces, error messages, failing outputs, and provided code. Identify the failure mode in concrete terms (input, expected, observed) before forming hypotheses.
 

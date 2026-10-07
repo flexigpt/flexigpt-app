@@ -125,7 +125,7 @@ Goal:
 Steps:
 
 1. Open **Agents**.
-2. Create or choose a Collection.
+2. Create or choose a Plugin.
 3. Select **Import Agent**.
 4. Choose an Agent `.yaml` or `.yml` file.
 5. Review the preview.

@@ -30,10 +30,10 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 		<ManagementDetailsModal
 			isOpen={isOpen}
 			onClose={onClose}
-			title="Skill Collection Details"
+			title="Skill Plugin Details"
 			modalKey={`skill-bundle:${bundle.id}:${bundle.modifiedAt}`}
 		>
-			<ModalSection title="Collection details">
+			<ModalSection title="Plugin details">
 				<ManagementInfoGrid>
 					<ManagementInfoRow label="Display Name">{bundle.displayName || '—'}</ManagementInfoRow>
 					<ManagementInfoRow label="Name" mono>
@@ -97,7 +97,7 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 					</ManagementInfoRow>
 					<ManagementInfoRow label="Resource note">
 						Managed creation writes only SKILL.md. Add extra resources to the skill folder, then re-enable the skill or
-						refresh the owning Skill Collection.
+						refresh the owning Skill Plugin.
 					</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>

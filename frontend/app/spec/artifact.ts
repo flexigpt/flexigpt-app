@@ -1,6 +1,5 @@
 export type ArtifactRootID = string;
 export type ArtifactSourceID = string;
-type ArtifactCollectionID = string;
 type ArtifactID = string;
 type ArtifactStorageKey = string;
 
@@ -36,11 +35,6 @@ export interface ArtifactRef {
 	artifactID: ArtifactID;
 }
 
-export interface ArtifactCollectionRef {
-	rootID: ArtifactRootID;
-	collectionID: ArtifactCollectionID;
-}
-
 export interface ArtifactAddress extends ArtifactRef {
 	kind: ArtifactKind;
 	logicalName: string;
@@ -64,19 +58,12 @@ export interface ArtifactSourceBinding {
 	sourceID: ArtifactSourceID;
 	locator: ArtifactLocator;
 	subresourceLocator?: ArtifactLocator;
-	expectedKind: ArtifactKind;
-}
-
-interface StoreArtifactBinding {
-	sourceID: ArtifactSourceID;
-	locator: ArtifactLocator;
-	subresourceLocator?: ArtifactLocator;
 }
 
 export interface StoreArtifact {
 	id: string;
 	rootID: ArtifactRootID;
-	binding: StoreArtifactBinding;
+	binding: ArtifactSourceBinding;
 	kind: ArtifactKind;
 	logicalName: string;
 	logicalVersion?: string;
@@ -156,12 +143,40 @@ export interface StoreManagedPackageFile {
 	content: number[];
 }
 
-export interface MappedTarget {
-	provider: string;
-	identifier: string;
-	type: string;
+export enum CapabilityTargetForm {
+	Artifact = 'artifact',
+	Direct = 'direct',
+}
+
+export enum CapabilityTargetProvenance {
+	CurrentRoot = 'currentRoot',
+	BuiltinScope = 'builtinScope',
+	CompositionSource = 'compositionSource',
+	DirectCapability = 'directCapability',
+}
+
+/**
+ * Exact frontend projection of generated `composition.CapabilityTarget`.
+ *
+ * Artifact targets preserve the source-backed Artifact identity. Direct
+ * targets are runtime-owned and must not be converted into fabricated
+ * ArtifactRefs.
+ */
+export interface CapabilityTarget {
+	form: CapabilityTargetForm;
+	type: ArtifactKind;
 	name: string;
-	builtin: boolean;
+	provenance: CapabilityTargetProvenance;
+	artifact?: ArtifactRef;
+	providerIdentity?: string;
+	providerLocalID?: string;
+	evidence?: ArtifactDigest;
+}
+
+export enum CapabilityResolutionStatus {
+	Available = 'available',
+	Unavailable = 'unavailable',
+	Ambiguous = 'ambiguous',
 }
 
 export interface CapabilityOccurrence {
@@ -169,11 +184,10 @@ export interface CapabilityOccurrence {
 	kind: string;
 	type: string;
 	name?: string;
-	status: string;
+	status: CapabilityResolutionStatus;
 	required: boolean;
 	scope?: string;
-	artifact?: ArtifactRef;
-	mapped?: MappedTarget;
+	target?: CapabilityTarget;
 	overrides?: Record<string, number[]>;
 	use?: Record<string, number[]>;
 	code?: string;
@@ -182,7 +196,7 @@ export interface CapabilityOccurrence {
 
 export interface CapabilityPlan {
 	rootArtifact?: ArtifactRef;
-	rootMapped?: MappedTarget;
+	rootTarget?: CapabilityTarget;
 	rootType: string;
 	rootName: string;
 	occurrences: CapabilityOccurrence[];

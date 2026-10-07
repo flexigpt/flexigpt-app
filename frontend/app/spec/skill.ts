@@ -1,7 +1,6 @@
 import type {
 	ArtifactAddress,
 	ArtifactAdoptionMode,
-	ArtifactCollectionRef,
 	ArtifactDiagnostic,
 	ArtifactDigest,
 	ArtifactKind,
@@ -16,7 +15,7 @@ import type {
 	StoreArtifactSourceSummary,
 	StoreManagedPackageFile,
 } from '@/spec/artifact';
-import type { ArtifactMembershipView, CollectionCapabilityPlan, CollectionView } from '@/spec/collection';
+import type { ArtifactPluginMembershipView, PluginCapabilityPlan, PluginView } from '@/spec/plugin';
 import type { ToolOutputUnion } from '@/spec/tool';
 
 export type SkillRef = ArtifactRef;
@@ -226,7 +225,7 @@ export interface InvokeSkillToolResponse {
 /**
  * Management-only projection over Artifact Store Skill entities.
  *
- * Durable identity remains `ArtifactRef` and `ArtifactCollectionRef`. These views
+ * Durable identity remains `ArtifactRef` and `ArtifactPluginRef`. These views
  * exist so management components do not need to duplicate joins between
  * Bundle, Artifact, and runtime metadata.
  */
@@ -291,11 +290,17 @@ export interface Skill {
 	modifiedAt?: string;
 }
 
+/**
+ * Frontend management projection over one backend Plugin.
+ *
+ * The retained "Bundle" wording is UI-only. Durable backend identity is an
+ * ArtifactRef for a Plugin, never an ArtifactPluginRef.
+ */
 export interface SkillBundle {
 	schemaVersion: string;
 	id: string;
 	rootID: string;
-	ref: ArtifactCollectionRef;
+	ref: ArtifactRef;
 	revision: number;
 	slug: string;
 	logicalVersion?: string;
@@ -323,8 +328,8 @@ export interface SkillListItem {
 }
 
 export interface ManagedSkillCreateRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	skillName: string;
 	skillMD?: number[];
 	files?: StoreManagedPackageFile[];
@@ -334,13 +339,13 @@ export interface ManagedSkillCreateRequest {
 export interface ManagedSkillCreateResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-	collection: CollectionView;
+	plugin: PluginView;
 	membershipCreated: boolean;
 }
 
 export interface ManagedSkillReplaceRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	artifact: ArtifactRef;
 	expectedArtifactRevision: number;
 	skillName: string;
@@ -352,7 +357,7 @@ export interface ManagedSkillReplaceRequest {
 export interface ManagedSkillReplaceResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-	collection: CollectionView;
+	plugin: PluginView;
 }
 
 export interface StoreManagedSkillDocument {
@@ -471,14 +476,14 @@ export interface ArtifactRuntimeSkillListItem extends RuntimeSkillListItem {
 	skillRef: ArtifactRef;
 }
 
-export interface SkillCollectionManagementView {
-	collection: CollectionView;
-	capabilities: CollectionCapabilityPlan;
+export interface SkillPluginManagementView {
+	plugin: PluginView;
+	capabilities: PluginCapabilityPlan;
 }
 
 export interface SkillManagementView {
 	artifact: StoreArtifact;
-	memberships: ArtifactMembershipView[];
+	memberships: ArtifactPluginMembershipView[];
 	capabilities: CapabilityPlan;
 	runtimeSummary?: ArtifactSkillSummary;
 	runtimeError?: string;

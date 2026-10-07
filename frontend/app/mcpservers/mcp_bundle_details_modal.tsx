@@ -27,11 +27,11 @@ export function MCPBundleDetailsModal({
 		<ManagementDetailsModal
 			isOpen={isOpen}
 			onClose={onClose}
-			title="MCP Collection Details"
+			title="MCP Plugin Details"
 			description={
 				serversLoaded ? `${serverCount} configured server${serverCount === 1 ? '' : 's'}` : 'Server contents not loaded'
 			}
-			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.collection.revision}`}
+			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.plugin.revision}`}
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{bundle.displayName}</ManagementInfoRow>
@@ -41,8 +41,8 @@ export function MCPBundleDetailsModal({
 				<ManagementInfoRow label="Baseline">{bundle.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="State">{bundle.collection.state}</ManagementInfoRow>
-				<ManagementInfoRow label="Revision">{bundle.collection.revision}</ManagementInfoRow>
+				<ManagementInfoRow label="State">{bundle.plugin.state}</ManagementInfoRow>
+				<ManagementInfoRow label="Revision">{bundle.plugin.revision}</ManagementInfoRow>
 				<ManagementInfoRow label="Servers">{serversLoaded ? serverCount : 'Not loaded'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>

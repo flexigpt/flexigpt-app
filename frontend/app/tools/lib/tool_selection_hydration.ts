@@ -1,4 +1,4 @@
-import type { MappedTarget } from '@/spec/artifact';
+import type { CapabilityTarget } from '@/spec/artifact';
 import type { ResolvedToolView, ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
@@ -29,7 +29,7 @@ export async function hydrateToolSelectionsForUI(
 		return undefined;
 	}
 
-	const targets = new Map<string, MappedTarget>();
+	const targets = new Map<string, CapabilityTarget>();
 	for (const selection of selections) {
 		targets.set(toolIdentityKey(selection.target), selection.target);
 	}
@@ -39,7 +39,7 @@ export async function hydrateToolSelectionsForUI(
 		4,
 		async ([key, target]): Promise<TargetResolution> => {
 			try {
-				const resolved = await toolManagementAPI.resolveMappedTool(target);
+				const resolved = await toolManagementAPI.resolveToolTarget(target);
 				return { key, resolved };
 			} catch (error) {
 				return {

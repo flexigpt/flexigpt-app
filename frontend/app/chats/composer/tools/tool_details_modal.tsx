@@ -87,9 +87,7 @@ interface ToolDetailsModalProps {
 
 function getChoiceDisplayInfo(c: ToolStoreChoice) {
 	const display = c.displayName || c.target.name || 'Tool';
-	const slug = `${c.collectionName ? `${c.collectionName}/` : ''}${c.target.name}${
-		c.toolVersion ? `@${c.toolVersion}` : ''
-	}`;
+	const slug = `${c.pluginName ? `${c.pluginName}/` : ''}${c.target.name}${c.toolVersion ? `@${c.toolVersion}` : ''}`;
 	return { display, slug };
 }
 

@@ -456,7 +456,7 @@ export async function executeComposerToolCall({
 
 	try {
 		const resp = await withTimeout(
-			toolManagementAPI.invokeMappedTool(target, args, TOOL_CALL_TIMEOUT_MS),
+			toolManagementAPI.invokeGoToolTarget(target, args, TOOL_CALL_TIMEOUT_MS),
 			TOOL_CALL_TIMEOUT_MS,
 			`Tool call "${toolCall.name}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
 		);

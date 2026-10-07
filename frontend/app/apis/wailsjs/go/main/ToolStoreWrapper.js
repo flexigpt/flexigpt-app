@@ -6,22 +6,34 @@ export function GetTool(arg1) {
   return window['go']['main']['ToolStoreWrapper']['GetTool'](arg1);
 }
 
-export function GetToolCollection(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['GetToolCollection'](arg1);
+export function GetToolPlugin(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['GetToolPlugin'](arg1);
 }
 
-export function ListCollectionTools(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['ListCollectionTools'](arg1);
+export function InvokeGoToolTarget(arg1, arg2, arg3) {
+  return window['go']['main']['ToolStoreWrapper']['InvokeGoToolTarget'](arg1, arg2, arg3);
 }
 
-export function ListToolCollections() {
-  return window['go']['main']['ToolStoreWrapper']['ListToolCollections']();
+export function ListPluginTools(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['ListPluginTools'](arg1);
 }
 
-export function SetToolCollectionEnabled(arg1, arg2, arg3) {
-  return window['go']['main']['ToolStoreWrapper']['SetToolCollectionEnabled'](arg1, arg2, arg3);
+export function ListToolPlugins() {
+  return window['go']['main']['ToolStoreWrapper']['ListToolPlugins']();
+}
+
+export function MapToolTarget(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['MapToolTarget'](arg1);
+}
+
+export function ResolveToolTarget(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['ResolveToolTarget'](arg1);
 }
 
 export function SetToolEnabled(arg1, arg2, arg3) {
   return window['go']['main']['ToolStoreWrapper']['SetToolEnabled'](arg1, arg2, arg3);
+}
+
+export function SetToolPluginEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['ToolStoreWrapper']['SetToolPluginEnabled'](arg1, arg2, arg3);
 }

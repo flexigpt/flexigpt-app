@@ -23,7 +23,7 @@ Use a Workspace when you often work with:
 - one repository
 - one product folder
 - one documentation site
-- one collection of notes
+- one group of notes
 - one local project with recurring context
 
 A Workspace can help you bring the right local material into Chats without attaching the same files every time.

@@ -30,7 +30,7 @@ Use Chats to load an Agent and apply reusable setup to a conversation. Use the a
 
 Agents are reusable starting points for a type of work. An Agent can prepare a model choice, instructions, opening text, tools, Skills, and connected services without locking the chat.
 
-Use **Chats -> Agent** to load an Agent. Use [Agents](/docs?doc=agents) to manage Collections, import or export Agent files, inspect setup, and enable or disable Agents.
+Use **Chats -> Agent** to load an Agent. Use [Agents](/docs?doc=agents) to manage Plugins, import or export Agent files, inspect setup, and enable or disable Agents.
 
 After loading an Agent, you can still change the model, draft, instructions, Skills, tools, connected services, attachments, Workspaces, and previous user turns. See [What an Agent can set up](/docs?doc=agents#what-an-agent-can-set-up) and [Manage Agents](/docs?doc=agents#manage-agents) for details.
 

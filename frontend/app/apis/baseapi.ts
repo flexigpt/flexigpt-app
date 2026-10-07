@@ -18,7 +18,7 @@ import type {
 	ISkillAggregateAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
-	IToolAggregateAPI,
+	ITextStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceRuntimeAPI,
@@ -40,7 +40,6 @@ import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
-import { WailsToolAggregateAPI } from '@/apis/wailsapi/tool_aggregate';
 import { WailsToolRuntimeAPI } from '@/apis/wailsapi/tool_runtime';
 import { WailsToolStoreAPI } from '@/apis/wailsapi/tool_store';
 import { WailsWorkspaceRuntimeAPI } from '@/apis/wailsapi/workspace_runtime';
@@ -60,7 +59,6 @@ let modelAggregateAPI: IModelAggregateAPI;
 export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
-let toolAggregateAPI: IToolAggregateAPI;
 let toolRuntimeAPI: IToolRuntimeAPI;
 export let toolManagementAPI: ToolManagementAPI;
 
@@ -79,6 +77,8 @@ let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 export let workspaceManagementAPI: WorkspaceManagementAPI;
 
 export let agentStoreAPI: IAgentStoreAPI;
+/** @public */
+export let textStoreAPI: ITextStoreAPI;
 export let agentManagementAPI: AgentManagementAPI;
 
 // Conditional initialization
@@ -98,11 +98,11 @@ if (IS_WAILS_PLATFORM) {
 	modelManagementAPI = new ModelManagementAPI(modelStoreAPI, modelAggregateAPI);
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
+	textStoreAPI = new wailsImpl.WailsTextStoreAPI();
 
 	toolStoreAPI = new WailsToolStoreAPI();
-	toolAggregateAPI = new WailsToolAggregateAPI();
 	toolRuntimeAPI = new WailsToolRuntimeAPI();
-	toolManagementAPI = new ToolManagementAPI(toolStoreAPI, toolAggregateAPI, toolRuntimeAPI);
+	toolManagementAPI = new ToolManagementAPI(toolStoreAPI, toolRuntimeAPI);
 
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
@@ -131,7 +131,8 @@ if (IS_WAILS_PLATFORM) {
 		toolManagementAPI,
 		modelManagementAPI,
 		mcpManagementAPI,
-		skillManagementAPI
+		skillManagementAPI,
+		textStoreAPI
 	);
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();

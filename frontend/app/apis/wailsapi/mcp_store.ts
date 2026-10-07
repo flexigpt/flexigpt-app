@@ -1,51 +1,53 @@
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
-	AddArtifactMemberRequest,
-	AddMemberRequest,
-	ArtifactMembershipView,
-	CollectionListItem,
-	CollectionView,
-	CreateCollectionRequest,
-	DeleteCollectionRequest,
-	RemoveMemberRequest,
-	UpdateCollectionRequest,
-} from '@/spec/collection';
-import type {
-	MCPManagementPage,
+	MCPPluginPage,
 	MCPPolicyListItem,
+	MCPPolicyView,
 	MCPServerListItem,
+	MCPServerPage,
 	MCPServerSecretsView,
 	MCPSettings,
-	MCPStorePolicyView,
 } from '@/spec/mcp';
+import type {
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
+	ArtifactPluginMembershipView,
+	CreatePluginRequest,
+	DeletePluginRequest,
+	PluginListItem,
+	PluginView,
+	RemovePluginMemberRequest,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
 import {
-	collectionListItemFromWails,
-	collectionViewFromWails,
+	artifactPluginMembershipFromWails,
 	mcpPolicyListItemFromWails,
 	mcpServerListItemFromWails,
+	pluginListItemFromWails,
+	pluginViewFromWails,
 } from '@/apis/wailsapi/list_item_projection';
 import { optionalWailsString, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
-	AddMCPCollectionMember,
-	AddMCPServerToCollection,
-	CreateMCPCollection,
-	DeleteMCPCollection,
-	GetMCPCollection,
+	AddMCPPluginMember,
+	AddMCPServerToPlugin,
+	CreateMCPPlugin,
+	DeleteMCPPlugin,
+	GetMCPPlugin,
 	GetMCPPolicy,
 	GetMCPServerSecrets,
 	GetMCPSettings,
-	ListMCPCollectionMemberships,
-	ListMCPCollections,
-	ListMCPCollectionsPage,
+	ListMCPPluginMemberships,
+	ListMCPPlugins,
+	ListMCPPluginsPage,
 	ListMCPPolicies,
 	ListMCPServers,
 	ListMCPServersPage,
-	RemoveMCPCollectionMember,
+	RemoveMCPPluginMember,
 	SaveMCPSettings,
-	SetMCPCollectionEnabled,
-	UpdateMCPCollection,
+	SetMCPPluginEnabled,
+	UpdateMCPPlugin,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
 
 function mcpServerSecretsViewFromWails(value: unknown, operation: string): MCPServerSecretsView {
@@ -58,40 +60,37 @@ function mcpServerSecretsViewFromWails(value: unknown, operation: string): MCPSe
 }
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
-	async addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await AddMCPCollectionMember(request as Parameters<typeof AddMCPCollectionMember>[0]),
-			'AddMCPCollectionMember'
+	async addMCPPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AddMCPPluginMember(request as Parameters<typeof AddMCPPluginMember>[0]),
+			'AddMCPPluginMember'
 		);
 	}
 
-	async addMCPServerToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await AddMCPServerToCollection(request as Parameters<typeof AddMCPServerToCollection>[0]),
-			'AddMCPServerToCollection'
+	async addMCPServerToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AddMCPServerToPlugin(request as Parameters<typeof AddMCPServerToPlugin>[0]),
+			'AddMCPServerToPlugin'
 		);
 	}
 
-	async createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await CreateMCPCollection(request as Parameters<typeof CreateMCPCollection>[0]),
-			'CreateMCPCollection'
+	async createMCPPlugin(request: CreatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await CreateMCPPlugin(request as Parameters<typeof CreateMCPPlugin>[0]),
+			'CreateMCPPlugin'
 		);
 	}
 
-	async deleteMCPCollection(request: DeleteCollectionRequest): Promise<void> {
-		await DeleteMCPCollection(request as Parameters<typeof DeleteMCPCollection>[0]);
+	async deleteMCPPlugin(request: DeletePluginRequest): Promise<void> {
+		await DeleteMCPPlugin(request as Parameters<typeof DeleteMCPPlugin>[0]);
 	}
 
-	async getMCPCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await GetMCPCollection(collection as Parameters<typeof GetMCPCollection>[0]),
-			'GetMCPCollection'
-		);
+	async getMCPPlugin(plugin: ArtifactRef): Promise<PluginView> {
+		return pluginViewFromWails(await GetMCPPlugin(plugin as Parameters<typeof GetMCPPlugin>[0]), 'GetMCPPlugin');
 	}
 
-	async getMCPPolicy(policy: ArtifactRef): Promise<MCPStorePolicyView> {
-		return requiredObject<MCPStorePolicyView>(
+	async getMCPPolicy(policy: ArtifactRef): Promise<MCPPolicyView> {
+		return requiredObject<MCPPolicyView>(
 			await GetMCPPolicy(policy as Parameters<typeof GetMCPPolicy>[0]),
 			'GetMCPPolicy'
 		);
@@ -112,31 +111,31 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		return { revision: value.revision, oauthLoopbackListenAddr: value.settings.oauthLoopbackListenAddr };
 	}
 
-	async listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]> {
-		return wailsObjectArrayOrEmpty<ArtifactMembershipView>(
-			await ListMCPCollectionMemberships(artifact as Parameters<typeof ListMCPCollectionMemberships>[0]),
-			'ListMCPCollectionMemberships'
-		);
-	}
-
-	async listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+	async listMCPPluginMemberships(artifact: ArtifactRef): Promise<ArtifactPluginMembershipView[]> {
 		return wailsObjectArrayOrEmpty(
-			await ListMCPCollections(rootID as Parameters<typeof ListMCPCollections>[0]),
-			'ListMCPCollections'
-		).map((value, index) => collectionListItemFromWails(value, `ListMCPCollections[${index}]`));
+			await ListMCPPluginMemberships(artifact as Parameters<typeof ListMCPPluginMemberships>[0]),
+			'ListMCPPluginMemberships'
+		).map((value, index) => artifactPluginMembershipFromWails(value, `ListMCPPluginMemberships[${index}]`));
 	}
 
-	async listMCPCollectionsPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<CollectionListItem>> {
+	async listMCPPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]> {
+		return wailsObjectArrayOrEmpty(
+			await ListMCPPlugins(rootID as Parameters<typeof ListMCPPlugins>[0]),
+			'ListMCPPlugins'
+		).map((value, index) => pluginListItemFromWails(value, `ListMCPPlugins[${index}]`));
+	}
+
+	async listMCPPluginsPage(pageSize: number, pageToken = ''): Promise<MCPPluginPage> {
 		const page = requiredObject<Record<string, unknown>>(
-			await ListMCPCollectionsPage(pageSize, pageToken),
-			'ListMCPCollectionsPage'
+			await ListMCPPluginsPage(pageSize, pageToken),
+			'ListMCPPluginsPage'
 		);
 
 		return {
-			items: wailsObjectArrayOrEmpty(page.items, 'ListMCPCollectionsPage.items').map((value, index) =>
-				collectionListItemFromWails(value, `ListMCPCollectionsPage.items[${index}]`)
+			items: wailsObjectArrayOrEmpty(page.items, 'ListMCPPluginsPage.items').map((value, index) =>
+				pluginListItemFromWails(value, `ListMCPPluginsPage.items[${index}]`)
 			),
-			nextPageToken: optionalWailsString(page.nextPageToken, 'ListMCPCollectionsPage.nextPageToken') || undefined,
+			nextPageToken: optionalWailsString(page.nextPageToken, 'ListMCPPluginsPage.nextPageToken') || undefined,
 		};
 	}
 
@@ -154,7 +153,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		).map((value, index) => mcpServerListItemFromWails(value, `ListMCPServers[${index}]`));
 	}
 
-	async listMCPServersPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<MCPServerListItem>> {
+	async listMCPServersPage(pageSize: number, pageToken = ''): Promise<MCPServerPage> {
 		const page = requiredObject<Record<string, unknown>>(
 			await ListMCPServersPage(pageSize, pageToken),
 			'ListMCPServersPage'
@@ -168,25 +167,17 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		};
 	}
 
-	async removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await RemoveMCPCollectionMember(request as Parameters<typeof RemoveMCPCollectionMember>[0]),
-			'RemoveMCPCollectionMember'
+	async removeMCPPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await RemoveMCPPluginMember(request as Parameters<typeof RemoveMCPPluginMember>[0]),
+			'RemoveMCPPluginMember'
 		);
 	}
 
-	async setMCPCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await SetMCPCollectionEnabled(
-				collection as Parameters<typeof SetMCPCollectionEnabled>[0],
-				expectedRevision,
-				enabled
-			),
-			'SetMCPCollectionEnabled'
+	async setMCPPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
+		return pluginViewFromWails(
+			await SetMCPPluginEnabled(plugin as Parameters<typeof SetMCPPluginEnabled>[0], expectedRevision, enabled),
+			'SetMCPPluginEnabled'
 		);
 	}
 
@@ -201,10 +192,10 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		return { revision: value.revision, oauthLoopbackListenAddr: value.settings.oauthLoopbackListenAddr };
 	}
 
-	async updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
-			'UpdateMCPCollection'
+	async updateMCPPlugin(request: UpdatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await UpdateMCPPlugin(request as Parameters<typeof UpdateMCPPlugin>[0]),
+			'UpdateMCPPlugin'
 		);
 	}
 }

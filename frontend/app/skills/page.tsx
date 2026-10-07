@@ -104,7 +104,7 @@ function buildSkillBundleData(
  * and in the conversation Workspace selector.
  */
 async function fetchSkillBundleData(): Promise<BundleData[]> {
-	// Load durable collection and Artifact state first. Runtime materialization
+	// Load durable plugin and Artifact state first. Runtime materialization
 	// is enriched per bundle after the page has rendered.
 	const { skillBundles, skillListItems } = await skillManagementAPI.loadManagementPageData(true, false);
 	if (skillBundles.length === 0) {
@@ -293,7 +293,7 @@ export default function SkillsPage() {
 				value: 'all' as const,
 				label: 'All skills',
 				count: allSkills.length,
-				description: 'Show every skill in every Collection.',
+				description: 'Show every skill in every Plugin.',
 			},
 			{
 				value: SkillInsert.Instructions,
@@ -341,7 +341,7 @@ export default function SkillsPage() {
 				);
 			} catch (err) {
 				console.error('Refresh bundle skills failed:', err);
-				const message = getErrorMessage(err, 'Failed to load this Collection’s skills.');
+				const message = getErrorMessage(err, 'Failed to load this Plugin’s skills.');
 
 				if (isMountedRef.current && bundleRefreshRequestIdRef.current[bundleID] === requestId) {
 					setBundles(previous =>
@@ -681,7 +681,7 @@ export default function SkillsPage() {
 					console.error('Skill bundle was created but refresh failed:', refreshError);
 					if (isMountedRef.current) {
 						setAlertMsg(
-							'Skill Collection was created, but the page could not be refreshed. Reload before making destructive changes.'
+							'Skill Plugin was created, but the page could not be refreshed. Reload before making destructive changes.'
 						);
 						setShowAlert(true);
 					}
@@ -717,7 +717,7 @@ export default function SkillsPage() {
 	);
 
 	if (isLoading && !hasResolved && bundles.length === 0) {
-		return <Loader text="Loading Skill Collections..." />;
+		return <Loader text="Loading Skill Plugins..." />;
 	}
 
 	return (
@@ -731,7 +731,7 @@ export default function SkillsPage() {
 							{creationRoots.length > 1 ? (
 								<select
 									className="select select-sm max-w-72 rounded-xl"
-									aria-label="Skill Collection group"
+									aria-label="Skill Plugin group"
 									value={effectiveCreationRootID}
 									onChange={event => {
 										setCreationRootID(event.currentTarget.value);
@@ -753,7 +753,7 @@ export default function SkillsPage() {
 								}}
 							>
 								<FiPlus size={18} />
-								<span>Add Collection</span>
+								<span>Add Plugin</span>
 							</button>
 						</>
 					}
@@ -849,7 +849,7 @@ export default function SkillsPage() {
 						</label>
 
 						<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
-							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} Collection
+							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} Plugin
 							{bundles.length === 1 ? '' : 's'}
 						</div>
 
@@ -905,7 +905,7 @@ export default function SkillsPage() {
 					</div>
 
 					<div className="flex flex-col space-y-4 pb-8">
-						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No Skill Collections configured yet.</p>}
+						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No Skill Plugins configured yet.</p>}
 
 						{bundles.map(bundleData => (
 							<SkillBundleCard
@@ -945,23 +945,23 @@ export default function SkillsPage() {
 					title="Delete Skill Bundle"
 					message={
 						bundleToDelete
-							? `Delete empty Collection "${bundleToDelete.displayName || bundleToDelete.slug}"? Remove all skills from the Collection first.`
-							: 'Delete this empty Skill Collection?'
+							? `Delete empty Plugin "${bundleToDelete.displayName || bundleToDelete.slug}"? Remove all skills from the Plugin first.`
+							: 'Delete this empty Skill Plugin?'
 					}
 					confirmButtonText="Delete"
 				/>
 
 				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
-					title="Add Skill Collection"
-					entityLabel="Skill Collection"
+					title="Add Skill Plugin"
+					entityLabel="Skill Plugin"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={existingBundleSlugs}
 					existingDisplayNames={existingBundleNames}
-					failureMessage="Failed to create Skill Collection."
+					failureMessage="Failed to create Skill Plugin."
 				/>
 
 				<ActionDeniedAlertModal

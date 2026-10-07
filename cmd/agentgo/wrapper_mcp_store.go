@@ -163,7 +163,7 @@ func (w *MCPStoreWrapper) CreateMCPPlugin(
 			}
 
 			// A blank RootID means "create in the retained user Root". The
-			// management page must not be unable to create a custom MCP Bundle
+			// management page must not be unable to create a custom MCP Plugin
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {

@@ -373,7 +373,7 @@ function AddEditSkillModalContent({
 			} else {
 				const clash = existingSkills.some(x => x.skill.slug === v && x.skill.id !== initialData?.skill.id);
 				if (clash) {
-					nextErrors.slug = 'Name already in use in this Collection.';
+					nextErrors.slug = 'Name already in use in this Plugin.';
 				} else {
 					nextErrors = omitManyKeys(nextErrors, ['slug']);
 				}
@@ -385,7 +385,7 @@ function AddEditSkillModalContent({
 				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
 			);
 			if (clash) {
-				nextErrors.name = 'Skill name must be unique within the Collection.';
+				nextErrors.name = 'Skill name must be unique within the Plugin.';
 			} else if (!SKILL_ARTIFACT_NAME_RE.test(v)) {
 				nextErrors.name =
 					'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.';
@@ -1089,7 +1089,7 @@ function AddEditSkillModalContent({
 										label="Slug"
 										htmlFor="skill-slug"
 										required
-										hint="Stable name within this Collection."
+										hint="Stable name within this Plugin."
 										error={errors.slug}
 									>
 										<input
@@ -1335,7 +1335,7 @@ function AddEditSkillModalContent({
 												</div>
 												<div className="text-base-content/70 mt-1 text-xs">
 													To update resources or edit SKILL.md directly, change files in this folder and then use
-													Refresh on the owning Skill Collection.
+													Refresh on the owning Skill Plugin.
 												</div>
 											</div>
 										</ManagementInfoRow>

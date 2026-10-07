@@ -141,7 +141,7 @@ export default function MCPServersPage() {
 				}
 
 				try {
-					const refreshed = await mcpManagementAPI.getMCPServer(server.ref, server.bundle);
+					const refreshed = await mcpManagementAPI.getMCPServer(server.ref, server.plugin);
 
 					return {
 						key,
@@ -245,7 +245,7 @@ export default function MCPServersPage() {
 					item => item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
 				);
 
-				const sameRevision = existing?.bundle.collection.revision === bundle.collection.revision;
+				const sameRevision = existing?.bundle.plugin.revision === bundle.plugin.revision;
 
 				if (existing && sameRevision && existing.serversLoaded) {
 					return {
@@ -286,7 +286,7 @@ export default function MCPServersPage() {
 			}
 
 			setPageLoadError(error);
-			setAlertMessage(getErrorMessage(error, 'Failed to load MCP Collections.'));
+			setAlertMessage(getErrorMessage(error, 'Failed to load MCP Plugins.'));
 		} finally {
 			if (mountedRef.current && loadIDRef.current === requestID) {
 				setIsInitialLoading(false);
@@ -314,7 +314,7 @@ export default function MCPServersPage() {
 				);
 
 				if (!current) {
-					throw new Error('MCP Collection is no longer available.');
+					throw new Error('MCP Plugin is no longer available.');
 				}
 
 				setBundles(previous =>
@@ -370,7 +370,7 @@ export default function MCPServersPage() {
 										readErrorsByArtifactID: {},
 										serversLoaded: false,
 										isLoadingServers: false,
-										serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Collection.'),
+										serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Plugin.'),
 									}
 								: item
 						)
@@ -427,7 +427,7 @@ export default function MCPServersPage() {
 	const refreshSingleServer = useCallback(
 		async (server: MCPServerView) => {
 			const statuses = await readServerStatus([server]);
-			applyStatus(server.bundle, statuses);
+			applyStatus(server.plugin, statuses);
 		},
 		[applyStatus, readServerStatus]
 	);
@@ -441,8 +441,8 @@ export default function MCPServersPage() {
 		setBundles(previous =>
 			previous.map(item => {
 				if (
-					item.bundle.ref.rootID !== server.bundle.rootID ||
-					item.bundle.ref.artifactID !== server.bundle.artifactID
+					item.bundle.ref.rootID !== server.plugin.rootID ||
+					item.bundle.ref.artifactID !== server.plugin.artifactID
 				) {
 					return item;
 				}
@@ -479,7 +479,7 @@ export default function MCPServersPage() {
 
 		setBundles(previous =>
 			previous.map(item =>
-				item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.artifactID === server.bundle.artifactID
+				item.bundle.ref.rootID === server.plugin.rootID && item.bundle.ref.artifactID === server.plugin.artifactID
 					? {
 							...item,
 							runtimeByArtifactID: {
@@ -600,7 +600,7 @@ export default function MCPServersPage() {
 	const handleSaveSetup = useCallback(
 		async (server: MCPServerView, values: Record<string, MCPSetupSubmissionValue>, reset: boolean) => {
 			await mcpManagementAPI.applyMCPServerSetup(server, values, reset);
-			await refreshBundle(server.bundle);
+			await refreshBundle(server.plugin);
 		},
 		[refreshBundle]
 	);
@@ -617,8 +617,8 @@ export default function MCPServersPage() {
 					bundle: {
 						...item.bundle,
 						enabled,
-						collection: {
-							...item.bundle.collection,
+						plugin: {
+							...item.bundle.plugin,
 							enabled,
 						},
 					},
@@ -699,7 +699,7 @@ export default function MCPServersPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="MCP Servers"
-					description="Organize MCP servers in Collections and configure their connections, credentials, runtime state, and tool policies."
+					description="Organize MCP servers in Plugins and configure their connections, credentials, runtime state, and tool policies."
 					width="wide"
 					leadingActions={
 						<button
@@ -722,13 +722,13 @@ export default function MCPServersPage() {
 							}}
 						>
 							<FiPlus size={18} />
-							<span>Add Collection</span>
+							<span>Add Plugin</span>
 						</button>
 					}
 				/>
 
 				<ManagementPageContent width="wide">
-					{isInitialLoading ? <Loader text="Loading MCP Collections..." /> : null}
+					{isInitialLoading ? <Loader text="Loading MCP Plugins..." /> : null}
 
 					{pageLoadError ? (
 						<ManagementResourceError
@@ -746,7 +746,7 @@ export default function MCPServersPage() {
 					))}
 
 					{!isInitialLoading && bundles.length === 0 ? (
-						<p className="mt-8 text-center text-sm">No MCP Collections configured yet.</p>
+						<p className="mt-8 text-center text-sm">No MCP Plugins configured yet.</p>
 					) : null}
 
 					{bundles.map(bundleData => (
@@ -829,7 +829,7 @@ export default function MCPServersPage() {
 						);
 
 						if (!current?.serversLoaded || current.serverLoadError || current.servers.length > 0) {
-							setAlertMessage('Load the Collection and remove all currently available MCP servers before deleting it.');
+							setAlertMessage('Load the Plugin and remove all currently available MCP servers before deleting it.');
 							return;
 						}
 
@@ -840,26 +840,26 @@ export default function MCPServersPage() {
 							setBundleToDelete(null);
 							await fetchAll();
 						} catch (error) {
-							setAlertMessage(getErrorMessage(error, 'Failed to delete MCP Collection.'));
+							setAlertMessage(getErrorMessage(error, 'Failed to delete MCP Plugin.'));
 						} finally {
 							setIsDeletingBundle(false);
 						}
 					}}
-					title="Delete MCP Collection"
-					message={`Delete empty MCP Collection "${bundleToDelete?.displayName ?? ''}"? Remove all servers first.`}
+					title="Delete MCP Plugin"
+					message={`Delete empty MCP Plugin "${bundleToDelete?.displayName ?? ''}"? Remove all servers first.`}
 					confirmButtonText={isDeletingBundle ? 'Deleting...' : 'Delete'}
 				/>
 
 				<ManagementBundleCreateModal
 					isOpen={isAddBundleOpen}
-					title="Add MCP Collection"
-					entityLabel="MCP Collection"
+					title="Add MCP Plugin"
+					entityLabel="MCP Plugin"
 					onClose={() => {
 						setIsAddBundleOpen(false);
 					}}
 					onSubmit={handleSaveBundle}
 					existingSlugs={bundles.map(bundle => bundle.bundle.logicalName)}
-					failureMessage="Failed to create MCP Collection."
+					failureMessage="Failed to create MCP Plugin."
 				/>
 
 				<MCPSettingsModal

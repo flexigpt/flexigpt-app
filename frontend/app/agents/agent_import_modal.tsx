@@ -44,14 +44,14 @@ function getIssueClass(severity: AgentImportIssueSeverity): string {
 }
 
 function getDestinationLabel(destination: AgentImportDestination): string {
-	const collectionName = destination.collectionDisplayName || destination.collectionName;
+	const pluginName = destination.pluginDisplayName || destination.pluginName;
 	const rootName = destination.rootDisplayName?.trim();
 
-	if (!rootName || rootName === collectionName) {
-		return collectionName;
+	if (!rootName || rootName === pluginName) {
+		return pluginName;
 	}
 
-	return `${rootName} / ${collectionName}`;
+	return `${rootName} / ${pluginName}`;
 }
 
 function getConfirmationMessage(preview: AgentImportPreview, code: string): string {
@@ -88,7 +88,7 @@ function AgentImportModalContent({
 			new Map(
 				destinations.map(
 					destination =>
-						[`${destination.collection.rootID}:${destination.collection.artifactID}` as string, destination] as const
+						[`${destination.plugin.rootID}:${destination.plugin.artifactID}` as string, destination] as const
 				)
 			),
 		[destinations]
@@ -98,8 +98,7 @@ function AgentImportModalContent({
 		() =>
 			Object.fromEntries(
 				destinations.map(
-					destination =>
-						[`${destination.collection.rootID}:${destination.collection.artifactID}`, { isEnabled: true }] as const
+					destination => [`${destination.plugin.rootID}:${destination.plugin.artifactID}`, { isEnabled: true }] as const
 				)
 			),
 		[destinations]
@@ -147,7 +146,7 @@ function AgentImportModalContent({
 
 	const previewImport = async () => {
 		if (!selectedDestination) {
-			setError('Select an Agent Collection destination.');
+			setError('Select an Agent Plugin destination.');
 			return;
 		}
 
@@ -164,8 +163,8 @@ function AgentImportModalContent({
 		try {
 			const value = await agentStoreAPI.previewAgentImport({
 				path: path.trim(),
-				collection: selectedDestination.collection,
-				expectedCollectionRevision: selectedDestination.collectionRevision,
+				plugin: selectedDestination.plugin,
+				expectedPluginRevision: selectedDestination.pluginRevision,
 			});
 
 			setPreview(value);
@@ -211,7 +210,7 @@ function AgentImportModalContent({
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title="Import Managed Agent"
-						description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Collection."
+						description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Plugin."
 						onClose={onClose}
 						closeDisabled={isPreviewing || isCommitting}
 					/>
@@ -225,23 +224,23 @@ function AgentImportModalContent({
 						) : null}
 
 						<ModalSection title="Import destination">
-							<ModalField label="Agent Collection" htmlFor="agent-import-destination" required>
+							<ModalField label="Agent Plugin" htmlFor="agent-import-destination" required>
 								<Dropdown<string>
 									dropdownItems={dropdownItems}
-									orderedKeys={destinations.map(destination => agentArtifactRefKey(destination.collection))}
+									orderedKeys={destinations.map(destination => agentArtifactRefKey(destination.plugin))}
 									selectedKey={destinationKey}
 									onChange={value => {
 										setDestinationKey(value);
 										resetPreview();
 									}}
 									disabled={destinations.length === 0 || isPreviewing || isCommitting}
-									placeholderLabel="No editable Agent Collections are available"
-									title="Select an Agent Collection"
+									placeholderLabel="No editable Agent Plugins are available"
+									title="Select an Agent Plugin"
 									getDisplayName={value => {
 										const destination = destinationByKey.get(value);
 
 										if (!destination) {
-											return 'Select an Agent Collection';
+											return 'Select an Agent Plugin';
 										}
 
 										return getDestinationLabel(destination);
@@ -250,7 +249,7 @@ function AgentImportModalContent({
 							</ModalField>
 
 							{selectedDestination?.baseline ? (
-								<div className="text-base-content/70 text-xs">Baseline Collection</div>
+								<div className="text-base-content/70 text-xs">Baseline Plugin</div>
 							) : null}
 						</ModalSection>
 
@@ -475,9 +474,9 @@ export function AgentImportModal({
 	}
 
 	const initialDestinationKey = initialDestination
-		? `${initialDestination.collection.rootID}:${initialDestination.collection.artifactID}`
+		? `${initialDestination.plugin.rootID}:${initialDestination.plugin.artifactID}`
 		: destinations[0]
-			? `${destinations[0].collection.rootID}:${destinations[0].collection.artifactID}`
+			? `${destinations[0].plugin.rootID}:${destinations[0].plugin.artifactID}`
 			: '';
 
 	return (

@@ -197,7 +197,7 @@ function MCPServerDetailsModalContent({
 				<ManagementInfoGrid>
 					<Field label="Display Name">{server.displayName}</Field>
 					<Field label="Name">{server.logicalName}</Field>
-					<Field label="Collection">{bundle.displayName}</Field>
+					<Field label="Plugin">{bundle.displayName}</Field>
 					<Field label="Description">{server.document?.description || 'No description'}</Field>
 					<Field label="Transport">{transport}</Field>
 					<Field label="Authentication">{getMCPHTTPAuthModeLabel(getAuthMode(server))}</Field>

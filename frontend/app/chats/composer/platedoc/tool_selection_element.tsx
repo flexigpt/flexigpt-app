@@ -11,7 +11,7 @@ export function ToolSelectionElement(props: PlateElementProps<any>) {
 	const el = element as ToolSelectionElementNode;
 
 	const display = el.overrides?.displayName ?? el.displayName ?? el.target.name;
-	const label = `${el.collectionName ? `${el.collectionName}/` : ''}${el.target.name}${
+	const label = `${el.pluginName ? `${el.pluginName}/` : ''}${el.target.name}${
 		el.toolVersion ? `@${el.toolVersion}` : ''
 	}`;
 

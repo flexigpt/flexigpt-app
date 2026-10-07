@@ -11,7 +11,7 @@ import (
 )
 
 // Config contains the concrete named capabilities used by Install; it is not
-// a generic component bundle.
+// a generic component group.
 type Config struct {
 	Roots           root.API
 	RootSystem      root.System

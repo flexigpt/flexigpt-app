@@ -182,9 +182,10 @@ func ValidateIdentifier(label, value string, maximum int) error {
 		len(value) > maximum ||
 		!identifierPattern.MatchString(value) {
 		return fmt.Errorf(
-			"%w: %s must start lowercase and use lower-camel segments separated by dots or hyphens",
+			"%w: %s must start lowercase and use lower-camel segments separated by dots or hyphens. value: %s",
 			ErrInvalid,
 			label,
+			value,
 		)
 	}
 	return nil

@@ -82,12 +82,12 @@ After loading one, you can:
 
 Open **Agents** from the sidebar to manage reusable Agent files.
 
-Agents are grouped into Collections.
+Agents are grouped into Plugins.
 
 On this page you can:
 
-- create a Collection
-- rename or describe your own Collection
+- create a Plugin
+- rename or describe your own Plugin
 - import an Agent file
 - inspect an Agent's setup
 - export an Agent file
@@ -113,7 +113,7 @@ Or:
 ## Import an Agent file
 
 1. Open **Agents**.
-2. Create or choose a Collection.
+2. Create or choose a Plugin.
 3. Select **Import Agent**.
 4. Choose an Agent `.yaml` or `.yml` file.
 5. Review the preview.
@@ -136,7 +136,7 @@ Export is available for:
 
 The exported file keeps its original structure. Inline instructions and inline connected-service details stay inside the exported Agent file.
 
-Exporting a built-in Agent does not make the built-in copy editable. Import the exported file into one of your Collections when you want your own version.
+Exporting a built-in Agent does not make the built-in copy editable. Import the exported file into one of your Plugins when you want your own version.
 
 ## Connected service setup
 
@@ -162,9 +162,9 @@ Built-in Agents ship with FlexiGPT.
 
 You can inspect and export them, but you cannot edit their original definitions.
 
-Your own Agents live in your local Collections. You can enable, disable, export, remove, and re-import them.
+Your own Agents live in your local Plugins. You can enable, disable, export, remove, and re-import them.
 
-A Collection can still show an unavailable entry after an Agent is removed. That records the original choice and becomes available again if you restore a matching Agent later.
+A Plugin can still show an unavailable entry after an Agent is removed. That records the original choice and becomes available again if you restore a matching Agent later.
 
 ## Troubleshooting
 
@@ -173,7 +173,7 @@ A Collection can still show an unavailable entry after an Agent is removed. That
 Check:
 
 - the Agent is enabled
-- its Collection is enabled
+- its Plugin is enabled
 - the Agent is available on the **Agents** page
 - the Agent file imported successfully
 - any required setup warnings have been addressed

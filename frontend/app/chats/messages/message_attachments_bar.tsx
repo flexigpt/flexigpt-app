@@ -133,7 +133,7 @@ interface MessageBarGroupChipProps<T> {
 }
 
 /**
- * Shared one-or-many behavior for attachment-bar collections. A single item
+ * Shared one-or-many behavior for attachment-bar groups. A single item
  * renders directly; multiple items use the same lazy Ariakit menu.
  */
 function MessageBarGroupChip<T>({
@@ -283,7 +283,7 @@ interface MessageToolChoiceChipProps {
  */
 function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
 	const name = tool.displayName || tool.target.name;
-	const slug = `${tool.collectionName ? `${tool.collectionName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
+	const slug = `${tool.pluginName ? `${tool.pluginName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
 	const tooltipLines: string[] = [name, slug];
 	if (tool.description) {
 		tooltipLines.push(tool.description);
@@ -446,7 +446,7 @@ function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageW
 
 function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
 	const name = tool.displayName || tool.target.name;
-	const slug = `${tool.collectionName ? `${tool.collectionName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
+	const slug = `${tool.pluginName ? `${tool.pluginName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
 	const title = [name, slug, tool.description].filter(Boolean).join('\n');
 
 	return (

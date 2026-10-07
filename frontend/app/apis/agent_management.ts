@@ -1,15 +1,16 @@
 // oxlint-disable typescript/parameter-properties
 import type { AgentCapabilityOccurrence, AgentImportDestination, AgentResolution, AgentView } from '@/spec/agent';
-import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
-import type { CollectionListItem, CollectionView } from '@/spec/collection';
+import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
+import type { PluginListItem, PluginView } from '@/spec/plugin';
 import type { ArtifactSkillSummary, RuntimeSkillRenderResult, SkillRef } from '@/spec/skill';
+import type { TextMaterialization } from '@/spec/text';
 import type { ToolStoreChoice } from '@/spec/tool';
-import { AgentSkillUseMode, AgentTextInsert } from '@/spec/agent';
-import { ArtifactState } from '@/spec/artifact';
-import { collectionListItemFromCollectionView } from '@/spec/collection';
+import { AgentSkillUseMode } from '@/spec/agent';
+import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { MCPToolExposure } from '@/spec/mcp';
 import { SkillInsert } from '@/spec/skill';
+import { TextInsert } from '@/spec/text';
 import { ToolImplType } from '@/spec/tool';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -25,7 +26,7 @@ import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 type AgentStarterIssueSeverity = 'error' | 'warning';
 
-type AgentCollection = CollectionListItem | CollectionView;
+type AgentPlugin = PluginListItem | PluginView;
 
 interface AgentMCPRuntimeResolver {
 	resolveMCPRuntimeServerIDs(artifacts: ArtifactRef[]): Promise<Map<string, MCPRuntimeServerID>>;
@@ -36,8 +37,12 @@ interface AgentSkillResolver {
 	renderArtifactSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RuntimeSkillRenderResult>;
 }
 
-export interface AgentCollectionData {
-	collection: CollectionListItem;
+interface AgentTextResolver {
+	materializeText(text: ArtifactRef): Promise<TextMaterialization>;
+}
+
+export interface AgentPluginData {
+	plugin: PluginListItem;
 	agents: AgentView[];
 	agentsLoaded: boolean;
 	isLoadingAgents: boolean;
@@ -46,12 +51,12 @@ export interface AgentCollectionData {
 }
 
 export interface AgentManagementPageData {
-	collections: AgentCollectionData[];
+	plugins: AgentPluginData[];
 	importDestinations: AgentImportDestination[];
 }
 
 export const EMPTY_AGENT_MANAGEMENT_PAGE_DATA: AgentManagementPageData = {
-	collections: [],
+	plugins: [],
 	importDestinations: [],
 };
 
@@ -119,35 +124,47 @@ function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
 }
 
-function mappedTargetLabel(target: MappedTarget): string {
-	return `${target.provider}/${target.identifier}`;
+function capabilityTargetLabel(target: CapabilityTarget): string {
+	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
+		return `${target.name} (${target.artifact.rootID}/${target.artifact.artifactID})`;
+	}
+
+	return `${target.name} (${target.providerIdentity ?? 'unknown'}/${target.providerLocalID ?? 'unknown'})`;
 }
 
-function collectionRef(collection: AgentCollection): ArtifactRef {
-	if ('ref' in collection) {
-		return collection.ref;
+function artifactRefFromTarget(target?: CapabilityTarget): ArtifactRef | undefined {
+	if (target?.form !== CapabilityTargetForm.Artifact) {
+		return undefined;
+	}
+
+	return target.artifact;
+}
+
+function pluginRef(plugin: AgentPlugin): ArtifactRef {
+	if ('ref' in plugin) {
+		return plugin.ref;
 	}
 
 	return {
-		rootID: collection.artifact.rootID,
-		artifactID: collection.artifact.id,
+		rootID: plugin.artifact.rootID,
+		artifactID: plugin.artifact.id,
 	};
 }
 
-function collectionBuiltIn(collection: AgentCollection): boolean {
-	if ('builtIn' in collection) {
-		return collection.builtIn;
+function pluginBuiltIn(plugin: AgentPlugin): boolean {
+	if ('builtIn' in plugin) {
+		return plugin.builtIn;
 	}
 
-	return !collection.baseline && !collection.editable && !collection.deletable;
+	return !plugin.baseline && !plugin.editable && !plugin.deletable;
 }
 
-function compareCollections(left: CollectionListItem, right: CollectionListItem): number {
+function comparePlugins(left: PluginListItem, right: PluginListItem): number {
 	if (left.builtIn !== right.builtIn) {
 		return left.builtIn ? -1 : 1;
 	}
 
-	const displayNameCompare = collectionDisplayName(left).localeCompare(collectionDisplayName(right), undefined, {
+	const displayNameCompare = pluginDisplayName(left).localeCompare(pluginDisplayName(right), undefined, {
 		sensitivity: 'base',
 	});
 
@@ -155,7 +172,7 @@ function compareCollections(left: CollectionListItem, right: CollectionListItem)
 		return displayNameCompare;
 	}
 
-	return agentCollectionKey(left).localeCompare(agentCollectionKey(right));
+	return agentPluginKey(left).localeCompare(agentPluginKey(right));
 }
 
 function issue(
@@ -174,7 +191,7 @@ function issue(
 }
 
 function isAvailableOccurrence(occurrence: AgentCapabilityOccurrence): boolean {
-	return occurrence.status === 'available';
+	return occurrence.status === CapabilityResolutionStatus.Available;
 }
 
 function availabilityIssueForOccurrence(occurrence: AgentCapabilityOccurrence): AgentStarterIssue {
@@ -204,32 +221,32 @@ export function agentArtifactRef(agent: AgentView): ArtifactRef {
 	return agent.ref;
 }
 
-export function agentCollectionKey(collection: AgentCollection): string {
-	return artifactRefKey(collectionRef(collection));
+export function agentPluginKey(plugin: AgentPlugin): string {
+	return artifactRefKey(pluginRef(plugin));
 }
 
 export function agentDisplayName(agent: AgentView): string {
 	return agent.displayName || agent.name;
 }
 
-export function collectionDisplayName(collection: Pick<AgentCollection, 'displayName' | 'name'>): string {
-	return collection.displayName || collection.name;
+export function pluginDisplayName(plugin: Pick<AgentPlugin, 'displayName' | 'name'>): string {
+	return plugin.displayName || plugin.name;
 }
 
-export function isBuiltInAgentCollection(collection: AgentCollection): boolean {
-	return collectionBuiltIn(collection);
+export function isBuiltInAgentPlugin(plugin: AgentPlugin): boolean {
+	return pluginBuiltIn(plugin);
 }
 
-export function canEditAgentCollectionMetadata(collection: AgentCollection): boolean {
-	return collection.editable && !collection.baseline;
+export function canEditAgentPluginMetadata(plugin: AgentPlugin): boolean {
+	return plugin.editable && !plugin.baseline;
 }
 
-export function canDeleteAgentCollection(collection: AgentCollection): boolean {
-	return collection.deletable && !collection.baseline;
+export function canDeleteAgentPlugin(plugin: AgentPlugin): boolean {
+	return plugin.deletable && !plugin.baseline;
 }
 
 export class AgentManagementAPI {
-	private readonly collectionAgentLoads = new Map<string, Promise<AgentView[]>>();
+	private readonly pluginAgentLoads = new Map<string, Promise<AgentView[]>>();
 
 	private readonly composerAgentCatalog = createSharedAsyncCatalog<AgentView[]>(async () => {
 		return (await this.agents.listAgentsForManagement()) ?? [];
@@ -240,11 +257,12 @@ export class AgentManagementAPI {
 		private readonly tools: IToolTargetResolver,
 		private readonly models: ModelManagementAPI,
 		private readonly mcp: AgentMCPRuntimeResolver,
-		private readonly skills: AgentSkillResolver
+		private readonly skills: AgentSkillResolver,
+		private readonly texts: AgentTextResolver
 	) {}
 
 	invalidateAgentCatalog(): void {
-		this.collectionAgentLoads.clear();
+		this.pluginAgentLoads.clear();
 		this.composerAgentCatalog.invalidate();
 	}
 
@@ -257,52 +275,65 @@ export class AgentManagementAPI {
 	}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
-		const [collectionResult, destinationResult] = await Promise.all([
-			this.agents.listAgentCollectionsForManagement(),
+		const [pluginResult, destinationResult] = await Promise.all([
+			this.agents.listAgentPluginsForManagement(),
 			this.agents.listAgentImportDestinations(),
 		]);
 		throwIfAborted(signal);
 
-		const collectionsByKey = new Map<string, CollectionListItem>();
+		const pluginsByKey = new Map<string, PluginListItem>();
 
-		for (const collection of collectionResult ?? []) {
-			collectionsByKey.set(agentCollectionKey(collection), collection);
+		for (const plugin of pluginResult ?? []) {
+			pluginsByKey.set(agentPluginKey(plugin), plugin);
 		}
 
-		const missingDestinationCollections = (destinationResult ?? []).filter(
-			destination => !collectionsByKey.has(artifactRefKey(destination.collection))
+		const missingDestinationPlugins = (destinationResult ?? []).filter(
+			destination => !pluginsByKey.has(artifactRefKey(destination.plugin))
 		);
 
-		if (missingDestinationCollections.length > 0) {
+		if (missingDestinationPlugins.length > 0) {
 			const hydrated = await Promise.all(
-				missingDestinationCollections.map(async destination => {
-					const collection = await this.agents.getAgentCollection(destination.collection);
-
-					return collectionListItemFromCollectionView(collection);
+				missingDestinationPlugins.map(async destination => {
+					const plugin = await this.agents.getAgentPlugin(destination.plugin);
+					return {
+						ref: pluginRef(plugin),
+						sourceID: plugin.artifact.binding.sourceID,
+						name: plugin.name,
+						displayName: plugin.displayName,
+						description: plugin.description,
+						state: plugin.artifact.state,
+						enabled: plugin.artifact.enabled,
+						revision: plugin.artifact.revision,
+						memberCount: plugin.members.length,
+						builtIn: false,
+						editable: plugin.editable,
+						deletable: plugin.deletable,
+						baseline: plugin.baseline,
+					} satisfies PluginListItem;
 				})
 			);
 			throwIfAborted(signal);
 
-			for (const collection of hydrated) {
-				collectionsByKey.set(agentCollectionKey(collection), collection);
+			for (const plugin of hydrated) {
+				pluginsByKey.set(agentPluginKey(plugin), plugin);
 			}
 		}
 
 		const importDestinations = destinationResult ?? [];
-		const destinationByCollectionKey = new Map(
-			importDestinations.map(destination => [artifactRefKey(destination.collection), destination] as const)
+		const destinationByPluginKey = new Map(
+			importDestinations.map(destination => [artifactRefKey(destination.plugin), destination] as const)
 		);
 
 		return {
-			collections: [...collectionsByKey.values()]
-				.map(collection => ({
-					collection,
+			plugins: [...pluginsByKey.values()]
+				.map(plugin => ({
+					plugin,
 					agents: [],
 					agentsLoaded: false,
 					isLoadingAgents: false,
-					importDestination: destinationByCollectionKey.get(artifactRefKey(collection.ref)),
+					importDestination: destinationByPluginKey.get(artifactRefKey(plugin.ref)),
 				}))
-				.toSorted((left, right) => compareCollections(left.collection, right.collection)),
+				.toSorted((left, right) => comparePlugins(left.plugin, right.plugin)),
 			importDestinations: [...importDestinations].toSorted((left, right) => {
 				const rootCompare = (left.rootDisplayName || left.rootID).localeCompare(
 					right.rootDisplayName || right.rootID,
@@ -316,7 +347,7 @@ export class AgentManagementAPI {
 					return rootCompare;
 				}
 
-				return left.collectionDisplayName.localeCompare(right.collectionDisplayName, undefined, {
+				return left.pluginDisplayName.localeCompare(right.pluginDisplayName, undefined, {
 					sensitivity: 'base',
 				});
 			}),
@@ -324,52 +355,60 @@ export class AgentManagementAPI {
 	}
 
 	/**
-	 * Collection-filtered `ListAgents` cannot include built-ins from another
-	 * Root. Resolve the Collection membership graph and join its ArtifactRefs
+	 * Plugin-filtered `ListAgents` cannot include built-ins from another
+	 * Root. Resolve the Plugin membership graph and join its ArtifactRefs
 	 * against the shared management catalog instead. This retains direct
 	 * cross-Root built-in memberships without issuing one `GetAgent` per row.
 	 */
-	async loadCollectionAgents(
-		collection: CollectionListItem,
+	async loadPluginAgents(
+		plugin: PluginListItem,
 		signal: AbortSignal
-	): Promise<Pick<AgentCollectionData, 'agents' | 'agentsLoaded' | 'agentLoadError'>> {
-		const key = agentCollectionKey(collection);
-		let load = this.collectionAgentLoads.get(key);
+	): Promise<Pick<AgentPluginData, 'agents' | 'agentsLoaded' | 'agentLoadError'>> {
+		const key = agentPluginKey(plugin);
+		let load = this.pluginAgentLoads.get(key);
 
 		if (!load) {
-			load = Promise.all([
-				this.agents.listAgentCollectionMembers(collection.ref),
-				this.composerAgentCatalog.load(false),
-			]).then(([membershipPlan, catalog]) => {
-				const selectedRefs = new Set<string>();
+			load = Promise.all([this.agents.listAgentPluginMembers(plugin.ref), this.composerAgentCatalog.load(false)]).then(
+				([membership, catalog]) => {
+					const selectedRefs = new Set<string>();
 
-				for (const occurrence of membershipPlan.occurrences ?? []) {
-					if (occurrence.type !== 'agent' || !occurrence.artifact) {
-						continue;
-					}
-
-					selectedRefs.add(artifactRefKey(occurrence.artifact));
-				}
-
-				return catalog
-					.filter(agent => selectedRefs.has(artifactRefKey(agent.ref)))
-					.toSorted((left, right) => {
-						const displayCompare = agentDisplayName(left).localeCompare(agentDisplayName(right), undefined, {
-							sensitivity: 'base',
-						});
-
-						if (displayCompare !== 0) {
-							return displayCompare;
+					for (const member of membership.members) {
+						if (member.entry.type !== 'agent') {
+							continue;
 						}
 
-						return artifactRefKey(left.ref).localeCompare(artifactRefKey(right.ref));
-					});
-			});
-			this.collectionAgentLoads.set(key, load);
+						const ref = artifactRefFromTarget(member.target);
+						if (ref) {
+							selectedRefs.add(artifactRefKey(ref));
+						}
+						for (const match of member.selectorMatches ?? []) {
+							const selected = artifactRefFromTarget(match.target);
+							if (selected) {
+								selectedRefs.add(artifactRefKey(selected));
+							}
+						}
+					}
+
+					return catalog
+						.filter(agent => selectedRefs.has(artifactRefKey(agent.ref)))
+						.toSorted((left, right) => {
+							const displayCompare = agentDisplayName(left).localeCompare(agentDisplayName(right), undefined, {
+								sensitivity: 'base',
+							});
+
+							if (displayCompare !== 0) {
+								return displayCompare;
+							}
+
+							return artifactRefKey(left.ref).localeCompare(artifactRefKey(right.ref));
+						});
+				}
+			);
+			this.pluginAgentLoads.set(key, load);
 
 			const clear = () => {
-				if (this.collectionAgentLoads.get(key) === load) {
-					this.collectionAgentLoads.delete(key);
+				if (this.pluginAgentLoads.get(key) === load) {
+					this.pluginAgentLoads.delete(key);
 				}
 			};
 			void load.then(clear, clear);
@@ -389,7 +428,7 @@ export class AgentManagementAPI {
 			return {
 				agents: [],
 				agentsLoaded: false,
-				agentLoadError: getErrorMessage(error, 'Agents could not be loaded for this Collection.'),
+				agentLoadError: getErrorMessage(error, 'Agents could not be loaded for this Plugin.'),
 			};
 		}
 	}
@@ -421,19 +460,19 @@ export class AgentManagementAPI {
 
 			switch (occurrence.type) {
 				case 'model': {
-					if (!occurrence.mapped) {
+					if (!occurrence.target) {
 						issue(
 							issues,
 							'error',
 							'agent.recipe.model-target-missing',
-							'Resolved Agent Model is missing its mapped model target.',
+							'Resolved Agent Model is missing its capability target.',
 							occurrence.path
 						);
 						continue;
 					}
 
 					try {
-						const resolvedModel = await this.models.resolveMappedModelTarget(occurrence.mapped);
+						const resolvedModel = await this.models.resolveMappedModelTarget(occurrence.target);
 						const includeOverride = occurrence.includeSystemPrompt;
 						const resolvedRef = resolvedModel.list.ref;
 
@@ -470,7 +509,7 @@ export class AgentManagementAPI {
 							issues,
 							'error',
 							'agent.recipe.model-mapping-failed',
-							`Could not map Model target "${mappedTargetLabel(occurrence.mapped)}": ${
+							`Could not resolve Model target "${capabilityTargetLabel(occurrence.target)}": ${
 								error instanceof Error ? error.message : 'unknown error'
 							}`,
 							occurrence.path
@@ -480,19 +519,19 @@ export class AgentManagementAPI {
 				}
 
 				case 'tool': {
-					if (!occurrence.mapped) {
+					if (!occurrence.target) {
 						issue(
 							issues,
 							'error',
-							'agent.recipe.tool-mapped-target-missing',
-							'Resolved Agent Tool is missing its aggregate-mapped target.',
+							'agent.recipe.tool-target-missing',
+							'Resolved Agent Tool is missing its capability target.',
 							occurrence.path
 						);
 						continue;
 					}
 
 					try {
-						const resolved = await this.tools.resolveMappedTool(occurrence.mapped);
+						const resolved = await this.tools.resolveToolTarget(occurrence.target);
 						const tool = resolved.tool;
 						const implementation = tool.implementation;
 						const requiredSDKType =
@@ -512,7 +551,7 @@ export class AgentManagementAPI {
 						const choice = toolStoreChoiceFromSelection(
 							{
 								choiceID: getUUIDv7(),
-								target: occurrence.mapped,
+								target: occurrence.target,
 								autoExecute: toolAutoExecute(occurrence, tool.autoExecute),
 							},
 							resolved
@@ -544,7 +583,7 @@ export class AgentManagementAPI {
 							issues,
 							'error',
 							'agent.recipe.tool-mapping-failed',
-							`Could not resolve Tool target "${mappedTargetLabel(occurrence.mapped)}": ${
+							`Could not resolve Tool target "${capabilityTargetLabel(occurrence.target)}": ${
 								error instanceof Error ? error.message : 'unknown error'
 							}`,
 							occurrence.path
@@ -554,7 +593,8 @@ export class AgentManagementAPI {
 				}
 
 				case 'skill': {
-					if (!occurrence.artifact) {
+					const skillRef = artifactRefFromTarget(occurrence.target);
+					if (!skillRef) {
 						issue(
 							issues,
 							'error',
@@ -565,7 +605,6 @@ export class AgentManagementAPI {
 						continue;
 					}
 
-					const skillRef = occurrence.artifact;
 					const key = artifactRefKey(skillRef);
 					const useMode = skillUseMode(occurrence);
 
@@ -652,7 +691,8 @@ export class AgentManagementAPI {
 				}
 
 				case 'mcp': {
-					if (!occurrence.artifact) {
+					const serverRef = artifactRefFromTarget(occurrence.target);
+					if (!serverRef) {
 						issue(
 							issues,
 							'error',
@@ -662,12 +702,13 @@ export class AgentManagementAPI {
 						);
 						continue;
 					}
-					mcpArtifactRefs.push(occurrence.artifact);
+					mcpArtifactRefs.push(serverRef);
 					break;
 				}
 
 				case 'text': {
-					if (!occurrence.artifact) {
+					const textRef = artifactRefFromTarget(occurrence.target);
+					if (!textRef) {
 						issue(
 							issues,
 							'error',
@@ -678,17 +719,17 @@ export class AgentManagementAPI {
 						continue;
 					}
 
-					const key = artifactRefKey(occurrence.artifact);
+					const key = artifactRefKey(textRef);
 					if (textArtifacts.has(key)) {
 						continue;
 					}
 
 					try {
-						const text = await this.agents.materializeAgentText(occurrence.artifact);
+						const text = await this.texts.materializeText(textRef);
 						textArtifacts.set(key, text.artifact);
 
 						switch (text.insert) {
-							case AgentTextInsert.Instructions:
+							case TextInsert.Instructions:
 								if (text.content.trim()) {
 									instructionSources.set(`text:${key}`, {
 										kind: 'text',
@@ -699,20 +740,11 @@ export class AgentManagementAPI {
 								}
 								break;
 
-							case AgentTextInsert.UserMessage:
+							case TextInsert.UserMessage:
 								if (text.content.trim()) {
 									startingTextParts.push(text.content.trim());
 								}
 								break;
-
-							default:
-								issue(
-									issues,
-									'warning',
-									'agent.recipe.text-insert-not-composer-material',
-									`Agent Text "${text.name}" uses "${text.insert}", which is materialized for diagnostics but is not inserted into Composer state.`,
-									occurrence.path
-								);
 						}
 					} catch (error) {
 						issue(

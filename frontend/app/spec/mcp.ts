@@ -1,5 +1,5 @@
 import type { ArtifactRef, ArtifactState, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
-import type { CollectionListItem, CollectionView } from '@/spec/collection';
+import type { PluginListItem, PluginView } from '@/spec/plugin';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
@@ -15,8 +15,13 @@ type MCPTimestamp = string;
 export type MCPRuntimeServerID = string;
 type MCPRuntimeCatalogID = string;
 
-export interface MCPManagementPage<T> {
-	items: T[];
+export interface MCPPluginPage {
+	items: PluginListItem[];
+	nextPageToken?: string;
+}
+
+export interface MCPServerPage {
+	items: MCPServerListItem[];
 	nextPageToken?: string;
 }
 
@@ -630,8 +635,8 @@ export interface MCPServerDocument {
 }
 
 export interface ManagedMCPCreateRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	document: MCPServerDocument;
 	enabled: boolean;
 }
@@ -639,13 +644,13 @@ export interface ManagedMCPCreateRequest {
 export interface ManagedMCPCreateResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-	collection: CollectionView;
+	plugin: PluginView;
 	membershipCreated: boolean;
 }
 
 export interface ManagedMCPPolicyUpsertRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	name: string;
 	description?: string;
 	policy: MCPPolicy;
@@ -655,11 +660,11 @@ export interface ManagedMCPPolicyUpsertRequest {
 export interface ManagedMCPPolicyUpsertResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-	collection: CollectionView;
+	plugin: PluginView;
 	membershipCreated: boolean;
 }
 
-export interface MCPStoreServerInstallationView {
+export interface MCPServerInstallationView {
 	artifact: StoreArtifact;
 	document: MCPServerDocument;
 	installation: MCPServerInstallationDataView;
@@ -667,7 +672,7 @@ export interface MCPStoreServerInstallationView {
 	builtIn: boolean;
 }
 
-export interface MCPStorePolicyView {
+export interface MCPPolicyView {
 	artifact: StoreArtifact;
 	body: MCPPolicy;
 	builtIn: boolean;
@@ -683,8 +688,8 @@ interface MCPEffectivePolicy {
  * Bridge-facing aggregate response. Components should use MCPServerView or
  * MCPRuntimeServerView, both created by MCPManagementAPI.
  */
-export interface MCPServerAggregateDetails {
-	settings: MCPStoreServerInstallationView;
+export interface MCPServerDetails {
+	settings: MCPServerInstallationView;
 	policy: MCPEffectivePolicy;
 	authorization: MCPAuthHealth;
 	connection: MCPServerRuntimeSnapshot;
@@ -795,8 +800,8 @@ export interface MCPAuthSettings {
 }
 
 export interface ManagedMCPReplaceRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
 	artifact: ArtifactRef;
 	expectedArtifactRevision: number;
 	document: MCPServerDocument;
@@ -806,11 +811,14 @@ export interface ManagedMCPReplaceRequest {
 export interface ManagedMCPReplaceResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-	collection: CollectionView;
+	plugin: PluginView;
 }
 
+/**
+ * UI-facing projection over a Plugin-backed MCP grouping.
+ */
 export interface MCPBundleView {
-	collection: CollectionListItem;
+	plugin: PluginListItem;
 	ref: ArtifactRef;
 	displayName: string;
 	logicalName: string;
@@ -826,7 +834,7 @@ export interface MCPServerView {
 	ref: ArtifactRef;
 	runtimeServerID?: MCPRuntimeServerID;
 	artifact: StoreArtifact;
-	bundle: ArtifactRef;
+	plugin: ArtifactRef;
 	logicalName: string;
 	displayName: string;
 	document?: MCPServerDocument;

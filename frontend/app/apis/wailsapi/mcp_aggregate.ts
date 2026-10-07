@@ -7,15 +7,15 @@ import type {
 	ManagedMCPReplaceRequest,
 	ManagedMCPReplaceResult,
 	MCPRuntimeServerID,
-	MCPServerAggregateDetails,
 	MCPServerData,
+	MCPServerDetails,
 	MCPServerInstallationDataView,
+	MCPServerInstallationView,
 	MCPServerRuntimeDetails,
-	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
-import { collectionResultFromWails } from '@/apis/wailsapi/list_item_projection';
+import { pluginResultFromWails } from '@/apis/wailsapi/list_item_projection';
 import {
 	optionalWailsString,
 	requiredObject,
@@ -30,7 +30,7 @@ import {
 	DeleteMCPServer,
 	GetMCPServer,
 	GetMCPServersForRuntimeServers,
-	ListMCPCollectionServers,
+	ListMCPPluginServers,
 	SaveMCPPolicy,
 	SaveMCPServerSettings,
 	SetMCPServerSecret,
@@ -38,15 +38,15 @@ import {
 } from '@/apis/wailsjs/go/main/MCPAggregateWrapper';
 
 export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
-	async getMCPServer(server: ArtifactRef): Promise<MCPServerAggregateDetails> {
+	async getMCPServer(server: ArtifactRef): Promise<MCPServerDetails> {
 		return serverDetailsFromWails(await GetMCPServer(server as Parameters<typeof GetMCPServer>[0]), 'GetMCPServer');
 	}
 
-	async listMCPCollectionServers(collection: ArtifactRef): Promise<MCPServerAggregateDetails[]> {
+	async listMCPPluginServers(plugin: ArtifactRef): Promise<MCPServerDetails[]> {
 		return wailsObjectArrayOrEmpty(
-			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
-			'ListMCPCollectionServers'
-		).map((value, index) => serverDetailsFromWails(value, `ListMCPCollectionServers[${index}]`));
+			await ListMCPPluginServers(plugin as Parameters<typeof ListMCPPluginServers>[0]),
+			'ListMCPPluginServers'
+		).map((value, index) => serverDetailsFromWails(value, `ListMCPPluginServers[${index}]`));
 	}
 
 	async getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPServerRuntimeDetails[]> {
@@ -57,14 +57,14 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
-		return collectionResultFromWails<ManagedMCPCreateResult>(
+		return pluginResultFromWails<ManagedMCPCreateResult>(
 			await CreateMCPServer(request as Parameters<typeof CreateMCPServer>[0]),
 			'CreateMCPServer'
 		);
 	}
 
 	async updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult> {
-		return collectionResultFromWails<ManagedMCPReplaceResult>(
+		return pluginResultFromWails<ManagedMCPReplaceResult>(
 			await UpdateMCPServer(request as Parameters<typeof UpdateMCPServer>[0]),
 			'UpdateMCPServer'
 		);
@@ -75,7 +75,7 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async saveMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult> {
-		return collectionResultFromWails<ManagedMCPPolicyUpsertResult>(
+		return pluginResultFromWails<ManagedMCPPolicyUpsertResult>(
 			await SaveMCPPolicy(request as Parameters<typeof SaveMCPPolicy>[0]),
 			'SaveMCPPolicy'
 		);
@@ -89,7 +89,7 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		server: ArtifactRef,
 		expectedSettingsRevision: number,
 		data: MCPServerData
-	): Promise<MCPServerAggregateDetails> {
+	): Promise<MCPServerDetails> {
 		return serverDetailsFromWails(
 			await SaveMCPServerSettings(
 				server as Parameters<typeof SaveMCPServerSettings>[0],
@@ -100,14 +100,14 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		);
 	}
 
-	async setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerAggregateDetails> {
+	async setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerDetails> {
 		return serverDetailsFromWails(
 			await SetMCPServerSecret(server as Parameters<typeof SetMCPServerSecret>[0], input, secret),
 			'SetMCPServerSecret'
 		);
 	}
 
-	async clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerAggregateDetails> {
+	async clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerDetails> {
 		return serverDetailsFromWails(
 			await ClearMCPServerSecret(server as Parameters<typeof ClearMCPServerSecret>[0], input),
 			'ClearMCPServerSecret'
@@ -115,16 +115,16 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 }
 
-function serverDetailsFromWails(value: unknown, operation: string): MCPServerAggregateDetails {
-	const details = requiredObject<MCPServerAggregateDetails>(value, operation);
+function serverDetailsFromWails(value: unknown, operation: string): MCPServerDetails {
+	const details = requiredObject<MCPServerDetails>(value, operation);
 	return {
 		...details,
 		settings: installationViewFromWails(details.settings, `${operation}.settings`),
 	};
 }
 
-function installationViewFromWails(value: unknown, operation: string): MCPStoreServerInstallationView {
-	const view = requiredObject<MCPStoreServerInstallationView>(value, operation);
+function installationViewFromWails(value: unknown, operation: string): MCPServerInstallationView {
+	const view = requiredObject<MCPServerInstallationView>(value, operation);
 	const rawInstallation = requiredObject<Record<string, unknown>>(view.installation, `${operation}.installation`);
 	const rawInputs = wailsRecordOrEmpty(rawInstallation.inputs, `${operation}.installation.inputs`);
 	const inputs = Object.fromEntries(

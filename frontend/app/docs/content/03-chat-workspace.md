@@ -71,7 +71,7 @@ In Chats, the **Agent** menu lets you:
 - inspect its setup and diagnostics
 - review the draft and context it adds before sending
 
-Use the [Agents](/docs?doc=agents) page to manage Collections, import or export Agent files, and enable or disable Agents.
+Use the [Agents](/docs?doc=agents) page to manage Plugins, import or export Agent files, and enable or disable Agents.
 
 Depending on its contents, loading an Agent can:
 

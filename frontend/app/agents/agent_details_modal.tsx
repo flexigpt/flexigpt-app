@@ -115,7 +115,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 		.map(occurrence => ({
 			occurrencePath: occurrence.path,
 			name: occurrence.name || 'MCP server',
-			artifact: occurrence.artifact,
+			artifact: occurrence.target?.artifact,
 		}));
 
 	return (

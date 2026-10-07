@@ -466,8 +466,7 @@ export function useComposerAttachments({
 
 			setAttachments(prev => prev.filter(a => uiAttachmentKey(a) !== targetKey));
 
-			// A global removal also moves the file into the "not attached"
-			// collection of every directory that referenced it.
+			// A global removal also moves the file into the "not attached" group of every directory that referenced it.
 			setDirectoryGroups(prevGroups => {
 				return prevGroups.map(group => {
 					if (!group.attachmentKeys.includes(targetKey)) {

@@ -7,17 +7,17 @@ import type {
 	StoreArtifactSourceSummary,
 } from '@/spec/artifact';
 import type {
-	AddArtifactMemberRequest,
-	AddMemberRequest,
-	ArtifactMembershipView,
-	CollectionCapabilityPlan,
-	CollectionListItem,
-	CollectionView,
-	CreateCollectionRequest,
-	DeleteCollectionRequest,
-	RemoveMemberRequest,
-	UpdateCollectionRequest,
-} from '@/spec/collection';
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
+	ArtifactPluginMembershipView,
+	CreatePluginRequest,
+	DeletePluginRequest,
+	PluginCapabilityPlan,
+	PluginListItem,
+	PluginView,
+	RemovePluginMemberRequest,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
 import type {
 	ManagedSkillCreateRequest,
 	ManagedSkillCreateResult,
@@ -32,46 +32,47 @@ import type {
 
 import type { ISkillStoreAPI } from '@/apis/interface';
 import {
+	artifactPluginMembershipFromWails,
 	capabilityPlanFromWails,
-	collectionCapabilityPlanFromWails,
-	collectionListItemFromWails,
-	collectionResultFromWails,
-	collectionViewFromWails,
+	pluginCapabilityPlanFromWails,
+	pluginListItemFromWails,
+	pluginResultFromWails,
+	pluginViewFromWails,
 	storeSkillListItemFromWails,
 } from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
-	AddSkillCollectionMember,
 	AddSkillPath,
-	AttachSkillArtifactToCollection,
+	AddSkillPluginMember,
+	AttachSkillArtifactToPlugin,
 	CreateManagedSkill,
-	CreateSkillCollection,
-	DeleteSkillCollection,
+	CreateSkillPlugin,
+	DeleteSkillPlugin,
 	GetManagedSkillDocument,
 	GetSkill,
-	GetSkillCollection,
-	ListSkillCollectionMemberships,
-	ListSkillCollections,
-	ListSkillCollectionsForManagement,
+	GetSkillPlugin,
+	ListSkillPluginMemberships,
+	ListSkillPlugins,
+	ListSkillPluginsForManagement,
 	ListSkills,
 	ListSkillsForManagement,
 	PurgeSkill,
 	RefreshSkillSource,
 	RegisterSkillDirectory,
-	RemoveSkillCollectionMember,
+	RemoveSkillPluginMember,
 	ReplaceManagedSkill,
 	ResolveSkillCapabilities,
-	ResolveSkillCollection,
-	SetSkillCollectionEnabled,
+	ResolveSkillPlugin,
 	SetSkillEnabled,
-	UpdateSkillCollection,
+	SetSkillPluginEnabled,
+	UpdateSkillPlugin,
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
 
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
-	async addSkillCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await AddSkillCollectionMember(request as Parameters<typeof AddSkillCollectionMember>[0]),
-			'AddSkillCollectionMember'
+	async addSkillPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AddSkillPluginMember(request as Parameters<typeof AddSkillPluginMember>[0]),
+			'AddSkillPluginMember'
 		);
 	}
 
@@ -82,36 +83,36 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		);
 	}
 
-	async attachSkillArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await AttachSkillArtifactToCollection(request as Parameters<typeof AttachSkillArtifactToCollection>[0]),
-			'AttachSkillArtifactToCollection'
+	async attachSkillArtifactToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AttachSkillArtifactToPlugin(request as Parameters<typeof AttachSkillArtifactToPlugin>[0]),
+			'AttachSkillArtifactToPlugin'
 		);
 	}
 
 	async createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult> {
-		return collectionResultFromWails<ManagedSkillCreateResult>(
+		return pluginResultFromWails<ManagedSkillCreateResult>(
 			await CreateManagedSkill(request as Parameters<typeof CreateManagedSkill>[0]),
 			'CreateManagedSkill'
 		);
 	}
 
 	async replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult> {
-		return collectionResultFromWails<ManagedSkillReplaceResult>(
+		return pluginResultFromWails<ManagedSkillReplaceResult>(
 			await ReplaceManagedSkill(request as Parameters<typeof ReplaceManagedSkill>[0]),
 			'ReplaceManagedSkill'
 		);
 	}
 
-	async createSkillCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await CreateSkillCollection(request as Parameters<typeof CreateSkillCollection>[0]),
-			'CreateSkillCollection'
+	async createSkillPlugin(request: CreatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await CreateSkillPlugin(request as Parameters<typeof CreateSkillPlugin>[0]),
+			'CreateSkillPlugin'
 		);
 	}
 
-	async deleteSkillCollection(request: DeleteCollectionRequest): Promise<void> {
-		await DeleteSkillCollection(request as Parameters<typeof DeleteSkillCollection>[0]);
+	async deleteSkillPlugin(request: DeletePluginRequest): Promise<void> {
+		await DeleteSkillPlugin(request as Parameters<typeof DeleteSkillPlugin>[0]);
 	}
 
 	async getManagedSkillDocument(skill: ArtifactRef): Promise<StoreManagedSkillDocument> {
@@ -125,30 +126,27 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		return requiredObject<StoreArtifact>(await GetSkill(skill as Parameters<typeof GetSkill>[0]), 'GetSkill');
 	}
 
-	async getSkillCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await GetSkillCollection(collection as Parameters<typeof GetSkillCollection>[0]),
-			'GetSkillCollection'
-		);
+	async getSkillPlugin(plugin: ArtifactRef): Promise<PluginView> {
+		return pluginViewFromWails(await GetSkillPlugin(plugin as Parameters<typeof GetSkillPlugin>[0]), 'GetSkillPlugin');
 	}
 
-	async listSkillCollectionMemberships(skill: ArtifactRef): Promise<ArtifactMembershipView[]> {
-		return wailsObjectArrayOrEmpty<ArtifactMembershipView>(
-			await ListSkillCollectionMemberships(skill as Parameters<typeof ListSkillCollectionMemberships>[0]),
-			'ListSkillCollectionMemberships'
-		);
-	}
-
-	async listSkillCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+	async listSkillPluginMemberships(skill: ArtifactRef): Promise<ArtifactPluginMembershipView[]> {
 		return wailsObjectArrayOrEmpty(
-			await ListSkillCollections(rootID as Parameters<typeof ListSkillCollections>[0]),
-			'ListSkillCollections'
-		).map((value, index) => collectionListItemFromWails(value, `ListSkillCollections[${index}]`));
+			await ListSkillPluginMemberships(skill as Parameters<typeof ListSkillPluginMemberships>[0]),
+			'ListSkillPluginMemberships'
+		).map((value, index) => artifactPluginMembershipFromWails(value, `ListSkillPluginMemberships[${index}]`));
 	}
 
-	async listSkillCollectionsForManagement(): Promise<CollectionListItem[]> {
-		return wailsObjectArrayOrEmpty(await ListSkillCollectionsForManagement(), 'ListSkillCollectionsForManagement').map(
-			(value, index) => collectionListItemFromWails(value, `ListSkillCollectionsForManagement[${index}]`)
+	async listSkillPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]> {
+		return wailsObjectArrayOrEmpty(
+			await ListSkillPlugins(rootID as Parameters<typeof ListSkillPlugins>[0]),
+			'ListSkillPlugins'
+		).map((value, index) => pluginListItemFromWails(value, `ListSkillPlugins[${index}]`));
+	}
+
+	async listSkillPluginsForManagement(): Promise<PluginListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListSkillPluginsForManagement(), 'ListSkillPluginsForManagement').map(
+			(value, index) => pluginListItemFromWails(value, `ListSkillPluginsForManagement[${index}]`)
 		);
 	}
 
@@ -182,10 +180,10 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		);
 	}
 
-	async removeSkillCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await RemoveSkillCollectionMember(request as Parameters<typeof RemoveSkillCollectionMember>[0]),
-			'RemoveSkillCollectionMember'
+	async removeSkillPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await RemoveSkillPluginMember(request as Parameters<typeof RemoveSkillPluginMember>[0]),
+			'RemoveSkillPluginMember'
 		);
 	}
 
@@ -196,25 +194,17 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		);
 	}
 
-	async resolveSkillCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
-		return collectionCapabilityPlanFromWails(
-			await ResolveSkillCollection(collection as Parameters<typeof ResolveSkillCollection>[0]),
-			'ResolveSkillCollection'
+	async resolveSkillPlugin(plugin: ArtifactRef): Promise<PluginCapabilityPlan> {
+		return pluginCapabilityPlanFromWails(
+			await ResolveSkillPlugin(plugin as Parameters<typeof ResolveSkillPlugin>[0]),
+			'ResolveSkillPlugin'
 		);
 	}
 
-	async setSkillCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await SetSkillCollectionEnabled(
-				collection as Parameters<typeof SetSkillCollectionEnabled>[0],
-				expectedRevision,
-				enabled
-			),
-			'SetSkillCollectionEnabled'
+	async setSkillPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
+		return pluginViewFromWails(
+			await SetSkillPluginEnabled(plugin as Parameters<typeof SetSkillPluginEnabled>[0], expectedRevision, enabled),
+			'SetSkillPluginEnabled'
 		);
 	}
 
@@ -225,10 +215,10 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		);
 	}
 
-	async updateSkillCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await UpdateSkillCollection(request as Parameters<typeof UpdateSkillCollection>[0]),
-			'UpdateSkillCollection'
+	async updateSkillPlugin(request: UpdatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await UpdateSkillPlugin(request as Parameters<typeof UpdateSkillPlugin>[0]),
+			'UpdateSkillPlugin'
 		);
 	}
 }

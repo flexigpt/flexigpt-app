@@ -1,5 +1,5 @@
 // oxlint-disable typescript/parameter-properties
-import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
+import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { ResolvedToolView } from '@/spec/tool';
 import type {
 	WorkspaceArtifactView,
@@ -165,11 +165,11 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 		return this.runtime.resolveWorkspaceRuntimePlan(workspace, selection);
 	}
 
-	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView> {
-		return this.tools.resolveMappedTool(target);
+	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView> {
+		return this.tools.resolveToolTarget(target);
 	}
 
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelManagementItem> {
+	resolveMappedModelTarget(target: CapabilityTarget): Promise<ModelManagementItem> {
 		return this.models.resolveMappedModelTarget(target);
 	}
 }

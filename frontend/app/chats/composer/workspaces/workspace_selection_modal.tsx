@@ -47,19 +47,19 @@ function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSe
 	const targets = new Map<string, WorkspaceMCPSetupTarget>();
 
 	for (const occurrence of plan.capabilities.occurrences) {
-		if (occurrence.type !== 'mcp' || !occurrence.artifact) {
+		if (occurrence.type !== 'mcp' || !occurrence.target?.artifact) {
 			continue;
 		}
 
-		const key = artifactRefKey(occurrence.artifact);
+		const key = artifactRefKey(occurrence.target?.artifact);
 		if (targets.has(key)) {
 			continue;
 		}
 
 		const loaded = loadedByArtifact.get(key);
 		targets.set(key, {
-			artifact: occurrence.artifact,
-			displayName: loaded?.displayName || loaded?.name || occurrence.name || occurrence.artifact.artifactID,
+			artifact: occurrence.target?.artifact,
+			displayName: loaded?.displayName || loaded?.name || occurrence.name || occurrence.target?.artifact.artifactID,
 			status: occurrence.status,
 			runtimeLoaded: loaded !== undefined,
 		});

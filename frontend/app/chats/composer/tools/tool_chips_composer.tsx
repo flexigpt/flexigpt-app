@@ -283,8 +283,8 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 
 	const hasResolvableStoredTool =
 		output.toolStoreChoice?.implementationKind === ToolImplType.Go &&
-		!!output.toolStoreChoice.target.provider &&
-		!!output.toolStoreChoice.target.identifier;
+		!!output.toolStoreChoice.target.providerIdentity &&
+		!!output.toolStoreChoice.target.providerLocalID;
 	const canRunAgain =
 		(isError || isSkipped) && (isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
 	const titleLines = [

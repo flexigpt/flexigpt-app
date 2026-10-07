@@ -55,9 +55,6 @@ func (s Support) Validate() error {
 	if err := s.PolicySource.Validate(); err != nil {
 		return err
 	}
-	if err := s.RootStorageKeyPrefix.Validate(); err != nil {
-		return err
-	}
 	if err := s.DirectoryDiscovery.Validate(); err != nil {
 		return err
 	}

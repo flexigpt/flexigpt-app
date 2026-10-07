@@ -431,7 +431,7 @@ export function useComposerToolRuntime({
 				}
 
 				const { target, implementationKind } = output.toolStoreChoice;
-				if (!target?.provider || !target.identifier || implementationKind !== ToolImplType.Go) {
+				if (!target?.providerLocalID || !target.providerIdentity || implementationKind !== ToolImplType.Go) {
 					return;
 				}
 			} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {

@@ -120,7 +120,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Local conversation storage and full-text search.
 - File, folder, image, PDF, and URL attachments.
 - Bundled offline docs shipped inside the app.
-- Conversations, Agent Collections, Agent files, Workspace setup, MCP server catalogs, and configuration are stored locally.
+- Conversations, Agent Plugins, Agent files, Workspace setup, MCP server catalogs, and configuration are stored locally.
 - Selected request context is sent to the provider or endpoint you choose when you send.
 - Use your own provider accounts. FlexiGPT does not proxy or bill model usage.
 

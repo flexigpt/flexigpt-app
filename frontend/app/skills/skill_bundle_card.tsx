@@ -178,7 +178,7 @@ export function SkillBundleCard({
 
 	const requestDeleteSkill = (skill: Skill) => {
 		if (!bundle.isEditable) {
-			setAlertMsg('This Skill Collection only supports enable and disable actions.');
+			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
@@ -207,13 +207,13 @@ export function SkillBundleCard({
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
 		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEnabled) {
-			setAlertMsg('Enable the Collection before creating, editing, or forking a skill.');
+			setAlertMsg('Enable the Plugin before creating, editing, or forking a skill.');
 			setShowAlert(true);
 			return;
 		}
 
 		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEditable) {
-			setAlertMsg('This Skill Collection only supports enable and disable actions.');
+			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
@@ -233,7 +233,7 @@ export function SkillBundleCard({
 		try {
 			await runAction('bundle:refresh', onRefreshSkills);
 		} catch (error) {
-			setAlertMsg(getErrorMessage(error, 'Failed to reload Collection skills.'));
+			setAlertMsg(getErrorMessage(error, 'Failed to reload Plugin skills.'));
 			setShowAlert(true);
 		}
 	};
@@ -312,7 +312,7 @@ export function SkillBundleCard({
 										}}
 									>
 										<FiEdit2 size={16} />
-										<span>Edit Collection</span>
+										<span>Edit Plugin</span>
 									</button>
 								) : null}
 								<button
@@ -348,7 +348,7 @@ export function SkillBundleCard({
 								}}
 							>
 								<FiTrash2 size={16} />
-								<span>Delete Collection</span>
+								<span>Delete Plugin</span>
 							</button>
 						) : null}
 					</>
@@ -357,7 +357,7 @@ export function SkillBundleCard({
 				{skillLoadError ? (
 					<div className="alert alert-warning mt-3 rounded-2xl text-sm">
 						<div className="grow">
-							<div className="font-semibold">Skills could not be loaded for this Collection</div>
+							<div className="font-semibold">Skills could not be loaded for this Plugin</div>
 							<div>{skillLoadError}</div>
 						</div>
 						<button
@@ -460,7 +460,7 @@ export function SkillBundleCard({
 													}}
 													disabled={!bundle.isEnabled}
 													busy={isPending(`${skill.id}:toggle`)}
-													title={!bundle.isEnabled ? 'Enable the Collection first.' : undefined}
+													title={!bundle.isEnabled ? 'Enable the Plugin first.' : undefined}
 												/>
 											}
 										>
@@ -484,7 +484,7 @@ export function SkillBundleCard({
 												disabled={!bundle.isEditable || !skill.isManaged || skillHasResources(skill)}
 												title={
 													!bundle.isEditable
-														? 'This Skill Collection only supports enable and disable actions.'
+														? 'This Skill Plugin only supports enable and disable actions.'
 														: !skill.isManaged
 															? 'Only managed Skills can be edited. Fork this Skill to create a managed copy.'
 															: skillHasResources(skill)
@@ -524,7 +524,7 @@ export function SkillBundleCard({
 								);
 							})}
 
-							{skills.length === 0 ? <ManagementEmptyState>No skills in this Collection.</ManagementEmptyState> : null}
+							{skills.length === 0 ? <ManagementEmptyState>No skills in this Plugin.</ManagementEmptyState> : null}
 
 							{skills.length > 0 && visibleSkills.length === 0 ? (
 								<ManagementEmptyState>No skills match the current filters.</ManagementEmptyState>

@@ -1,44 +1,44 @@
 import { useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiRefreshCw } from 'react-icons/fi';
 
-import type { CollectionListItem } from '@/spec/collection';
+import type { PluginListItem } from '@/spec/plugin';
 import type { ToolStoreListItem } from '@/spec/tool';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
-import { toolCollectionDisplayName, toolDisplayName } from '@/apis/tool_management';
+import { toolDisplayName, toolPluginDisplayName } from '@/apis/tool_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { EnabledControl } from '@/components/managementui/enabled_control';
-import { ManagementBundleCard as ManagementCollectionCard } from '@/components/managementui/management_bundle_card';
+import { ManagementBundleCard as ManagementPluginCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
-interface ToolCollectionCardProps {
-	collection: CollectionListItem;
+interface ToolPluginCardProps {
+	plugin: PluginListItem;
 	tools: ToolStoreListItem[];
 	toolsLoaded: boolean;
 	isLoadingTools: boolean;
 	toolLoadError?: string;
 	onLoadTools: () => Promise<void>;
 	onRefreshTools: () => Promise<void>;
-	onToggleCollectionEnable: (collection: CollectionListItem, enabled: boolean) => Promise<void>;
-	onToggleToolEnable: (collection: CollectionListItem, tool: ToolStoreListItem, enabled: boolean) => Promise<void>;
+	onTogglePluginEnable: (plugin: PluginListItem, enabled: boolean) => Promise<void>;
+	onToggleToolEnable: (plugin: PluginListItem, tool: ToolStoreListItem, enabled: boolean) => Promise<void>;
 }
 
-export function ToolCollectionCard({
-	collection,
+export function ToolPluginCard({
+	plugin,
 	tools,
 	toolsLoaded,
 	isLoadingTools,
 	toolLoadError,
 	onLoadTools,
 	onRefreshTools,
-	onToggleCollectionEnable,
+	onTogglePluginEnable,
 	onToggleToolEnable,
-}: ToolCollectionCardProps) {
+}: ToolPluginCardProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
 	const { isPending, runAction } = usePendingActions();
@@ -61,16 +61,16 @@ export function ToolCollectionCard({
 
 	return (
 		<>
-			<ManagementCollectionCard
-				title={toolCollectionDisplayName(collection)}
-				identity={<span className="font-mono">{collection.name}</span>}
-				description={collection.description}
+			<ManagementPluginCard
+				title={toolPluginDisplayName(plugin)}
+				identity={<span className="font-mono">{plugin.name}</span>}
+				description={plugin.description}
 				status={
 					<>
-						<StatusBadge tone={collection.enabled ? 'success' : 'neutral'}>
-							{collection.enabled ? 'Enabled' : 'Disabled'}
+						<StatusBadge tone={plugin.enabled ? 'success' : 'neutral'}>
+							{plugin.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
-						{collection.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+						{plugin.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
 					</>
 				}
 				disclosure={
@@ -82,19 +82,19 @@ export function ToolCollectionCard({
 							toggleExpanded();
 						}}
 					>
-						<span>{toolsLoaded ? `Tools: ${tools.length}` : `Tools: ${collection.memberCount}`}</span>
+						<span>{toolsLoaded ? `Tools: ${tools.length}` : `Tools: ${plugin.memberCount}`}</span>
 						{expanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
 				}
 				actionLeading={
 					<EnabledControl
-						id={`tool-collection-${collection.ref.rootID}-${collection.ref.artifactID}`}
-						checked={collection.enabled}
+						id={`tool-plugin-${plugin.ref.rootID}-${plugin.ref.artifactID}`}
+						checked={plugin.enabled}
 						onChange={enabled => {
-							void run('collection:toggle', () => onToggleCollectionEnable(collection, enabled));
+							void run('plugin:toggle', () => onTogglePluginEnable(plugin, enabled));
 						}}
-						disabled={isPending('collection:toggle')}
-						busy={isPending('collection:toggle')}
+						disabled={isPending('plugin:toggle')}
+						busy={isPending('plugin:toggle')}
 						compact={false}
 					/>
 				}
@@ -102,12 +102,12 @@ export function ToolCollectionCard({
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
-						disabled={isPending('collection:refresh')}
+						disabled={isPending('plugin:refresh')}
 						onClick={() => {
-							void run('collection:refresh', onRefreshTools);
+							void run('plugin:refresh', onRefreshTools);
 						}}
 					>
-						<FiRefreshCw className={isPending('collection:refresh') ? 'animate-spin' : undefined} size={15} />
+						<FiRefreshCw className={isPending('plugin:refresh') ? 'animate-spin' : undefined} size={15} />
 						<span>Refresh</span>
 					</button>
 				}
@@ -121,9 +121,9 @@ export function ToolCollectionCard({
 						<button
 							type="button"
 							className="btn btn-sm rounded-xl"
-							disabled={isPending('collection:refresh')}
+							disabled={isPending('plugin:refresh')}
 							onClick={() => {
-								void run('collection:refresh', onRefreshTools);
+								void run('plugin:refresh', onRefreshTools);
 							}}
 						>
 							Retry
@@ -133,7 +133,7 @@ export function ToolCollectionCard({
 
 				{expanded && !toolsLoaded && !toolLoadError ? (
 					<ManagementEmptyState>
-						{isLoadingTools ? 'Loading tools in this Collection...' : 'Tool contents have not been loaded.'}
+						{isLoadingTools ? 'Loading tools in this Plugin...' : 'Tool contents have not been loaded.'}
 					</ManagementEmptyState>
 				) : null}
 
@@ -141,7 +141,7 @@ export function ToolCollectionCard({
 					<div className="mt-6 space-y-3">
 						{tools.map(tool => {
 							const toggleKey = `${tool.ref.artifactID}:toggle`;
-							const effectiveEnabled = collection.enabled && tool.enabled;
+							const effectiveEnabled = plugin.enabled && tool.enabled;
 
 							return (
 								<ManagementItemCard
@@ -152,7 +152,7 @@ export function ToolCollectionCard({
 									status={
 										<>
 											<StatusBadge tone={effectiveEnabled ? 'success' : 'neutral'}>
-												{effectiveEnabled ? 'Enabled' : tool.enabled ? 'Collection disabled' : 'Disabled'}
+												{effectiveEnabled ? 'Enabled' : tool.enabled ? 'Plugin disabled' : 'Disabled'}
 											</StatusBadge>
 											{tool.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
 										</>
@@ -169,7 +169,7 @@ export function ToolCollectionCard({
 											id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}
 											checked={tool.enabled}
 											onChange={enabled => {
-												void run(toggleKey, () => onToggleToolEnable(collection, tool, enabled));
+												void run(toggleKey, () => onToggleToolEnable(plugin, tool, enabled));
 											}}
 											disabled={isPending(toggleKey)}
 											busy={isPending(toggleKey)}
@@ -182,11 +182,11 @@ export function ToolCollectionCard({
 						})}
 
 						{toolsLoaded && tools.length === 0 && !toolLoadError ? (
-							<ManagementEmptyState>No tools are registered in this Collection.</ManagementEmptyState>
+							<ManagementEmptyState>No tools are registered in this Plugin.</ManagementEmptyState>
 						) : null}
 					</div>
 				) : null}
-			</ManagementCollectionCard>
+			</ManagementPluginCard>
 
 			<ActionDeniedAlertModal
 				isOpen={Boolean(alertMessage)}

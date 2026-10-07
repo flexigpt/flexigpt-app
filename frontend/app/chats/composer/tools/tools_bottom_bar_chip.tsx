@@ -66,7 +66,7 @@ interface ToolsBottomBarChipProps {
 	isInputLocked?: boolean;
 }
 
-interface ToolCollectionGroup {
+interface ToolPluginGroup {
 	key: string;
 	name: string;
 	available: ToolListItem[];
@@ -85,13 +85,13 @@ function itemKey(item: ToolListItem): string {
 }
 
 function choiceLabel(choice: Omit<ToolStoreChoice, 'choiceID'>): string {
-	return `${choice.collectionName ? `${choice.collectionName}/` : ''}${choice.target.name}${
+	return `${choice.pluginName ? `${choice.pluginName}/` : ''}${choice.target.name}${
 		choice.toolVersion ? `@${choice.toolVersion}` : ''
 	}`;
 }
 
 function itemLabel(item: ToolListItem): string {
-	return `${item.collectionName}/${item.toolDefinition.name}@${item.toolDefinition.version}`;
+	return `${item.pluginName}/${item.toolDefinition.name}@${item.toolDefinition.version}`;
 }
 
 function compareItems(left: ToolListItem, right: ToolListItem): number {
@@ -103,7 +103,7 @@ function itemSearchFields(item: ToolListItem) {
 		{ value: item.toolDefinition.displayName, weight: 7 },
 		{ value: item.toolDefinition.name, weight: 6 },
 		{ value: item.toolDefinition.version, weight: 4 },
-		{ value: item.collectionName, weight: 3 },
+		{ value: item.pluginName, weight: 3 },
 		{ value: item.toolDefinition.description, weight: 2 },
 		{ value: item.toolDefinition.tags, weight: 1 },
 	];
@@ -114,7 +114,7 @@ function choiceSearchFields(choice: ToolStoreChoice) {
 		{ value: choice.displayName, weight: 7 },
 		{ value: choice.target.name, weight: 6 },
 		{ value: choice.toolVersion, weight: 4 },
-		{ value: choice.collectionName, weight: 3 },
+		{ value: choice.pluginName, weight: 3 },
 		{ value: choice.description, weight: 2 },
 	];
 }
@@ -250,7 +250,7 @@ export function ToolsBottomBarChip({
 	);
 
 	const groups = useMemo(() => {
-		const result = new Map<string, ToolCollectionGroup>();
+		const result = new Map<string, ToolPluginGroup>();
 		const conversationKeys = new Set(
 			conversationToolsState.map(entry => toolIdentityKey(entry.toolStoreChoice.target))
 		);
@@ -268,15 +268,15 @@ export function ToolsBottomBarChip({
 			if (conversationKeys.has(key) && !attachedByKey.has(key)) {
 				continue;
 			}
-			ensure(toolArtifactKey(item.collectionRef), item.collectionName).available.push(item);
+			ensure(toolArtifactKey(item.pluginRef), item.pluginName).available.push(item);
 		}
 		for (const entry of visibleConversation) {
 			const choice = entry.toolStoreChoice;
 			if (attachedByKey.has(toolIdentityKey(choice.target))) {
 				continue;
 			}
-			const key = choice.collectionRef ? toolArtifactKey(choice.collectionRef) : `unresolved:${choice.target.provider}`;
-			ensure(key, choice.collectionName || 'Conversation tools').conversation.push(entry);
+			const key = choice.pluginRef ? toolArtifactKey(choice.pluginRef) : `unresolved:${choice.target.providerIdentity}`;
+			ensure(key, choice.pluginName || 'Conversation tools').conversation.push(entry);
 		}
 		return [...result.values()].toSorted((left, right) => collator.compare(left.name, right.name));
 	}, [visibleAvailable, visibleConversation, conversationToolsState, attachedByKey]);
@@ -652,7 +652,7 @@ export function ToolsBottomBarChip({
 						/>
 
 						<div className="flex items-center justify-between px-2 py-1 text-xs">
-							<span>{isLoading || isRefreshing ? 'Loading tools...' : 'Built-in Tool Collections'}</span>
+							<span>{isLoading || isRefreshing ? 'Loading tools...' : 'Built-in Tool Plugins'}</span>
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs"

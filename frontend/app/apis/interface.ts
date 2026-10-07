@@ -7,7 +7,6 @@ import type {
 	AgentImportPreview,
 	AgentImportPreviewRequest,
 	AgentResolution,
-	AgentTextMaterialization,
 	AgentView,
 	ListAgentsRequest,
 } from '@/spec/agent';
@@ -16,7 +15,7 @@ import type {
 	ArtifactRootID,
 	ArtifactSourceID,
 	CapabilityPlan,
-	MappedTarget,
+	CapabilityTarget,
 	StoreArtifact,
 	StoreArtifactSourceSummary,
 } from '@/spec/artifact';
@@ -27,20 +26,8 @@ import type {
 	FileFilter,
 	PathAttachmentsResult,
 } from '@/spec/attachment';
-import type {
-	AddArtifactMemberRequest,
-	AddMemberRequest,
-	ArtifactMembershipView,
-	CollectionCapabilityPlan,
-	CollectionListItem,
-	CollectionView,
-	CreateCollectionRequest,
-	DeleteCollectionRequest,
-	RemoveMemberRequest,
-	UpdateCollectionRequest,
-} from '@/spec/collection';
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ToolChoice } from '@/spec/inference';
+import type { CompletionResponseBody } from '@/spec/inference';
 import type {
 	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
@@ -58,22 +45,23 @@ import type {
 	MCPConversationContext,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
-	MCPManagementPage,
+	MCPPluginPage,
 	MCPPolicyListItem,
+	MCPPolicyView,
 	MCPPromptRef,
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
-	MCPServerAggregateDetails,
 	MCPServerData,
+	MCPServerDetails,
 	MCPServerListItem,
+	MCPServerPage,
 	MCPServerRuntimeDetails,
 	MCPServerRuntimeSnapshot,
 	MCPServerSecretsView,
 	MCPSettings,
-	MCPStorePolicyView,
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
@@ -93,6 +81,19 @@ import type {
 	SaveProviderSettingsRequest,
 	SetProviderAPIKeyRequest,
 } from '@/spec/model';
+import type {
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
+	ArtifactPluginMembershipView,
+	CreatePluginRequest,
+	DeletePluginRequest,
+	PluginCapabilityPlan,
+	PluginDirectMembership,
+	PluginListItem,
+	PluginView,
+	RemovePluginMemberRequest,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
 import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	ArtifactSkillFilter,
@@ -116,6 +117,7 @@ import type {
 	StoreManagedSkillDocument,
 	StoreSkillListItem,
 } from '@/spec/skill';
+import type { TextMaterialization } from '@/spec/text';
 import type { ResolvedToolView, ToolSelection, ToolStoreListItem, ToolView } from '@/spec/tool';
 import type { InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
@@ -254,33 +256,27 @@ export interface IToolRuntimeAPI {
 }
 
 export interface IToolStoreAPI {
-	listToolCollections(): Promise<CollectionListItem[]>;
+	listToolPlugins(): Promise<PluginListItem[]>;
 
-	getToolCollection(collection: ArtifactRef): Promise<CollectionView>;
+	getToolPlugin(plugin: ArtifactRef): Promise<PluginView>;
 
-	listCollectionTools(collection: ArtifactRef): Promise<ToolStoreListItem[]>;
+	listPluginTools(plugin: ArtifactRef): Promise<ToolStoreListItem[]>;
 
 	getTool(tool: ArtifactRef): Promise<ToolView>;
 
 	setToolEnabled(tool: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<ToolView>;
 
-	setToolCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView>;
+	setToolPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView>;
+
+	mapToolTarget(tool: ArtifactRef): Promise<CapabilityTarget>;
+
+	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView>;
+
+	invokeGoToolTarget(target: CapabilityTarget, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
 }
 
 export interface IToolTargetResolver {
-	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView>;
-}
-
-export interface IToolAggregateAPI extends IToolTargetResolver {
-	mapToolTarget(tool: ArtifactRef): Promise<MappedTarget>;
-
-	invokeMappedTool(target: MappedTarget, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
-
-	hydrateInferenceToolChoice(selection: ToolSelection): Promise<ToolChoice>;
+	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView>;
 }
 
 export interface IAgentStoreAPI {
@@ -290,33 +286,27 @@ export interface IAgentStoreAPI {
 
 	getAgent(agent: ArtifactRef): Promise<AgentView>;
 
-	materializeAgentText(text: ArtifactRef): Promise<AgentTextMaterialization>;
-
 	resolveAgent(agent: ArtifactRef): Promise<AgentResolution>;
 
 	resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan>;
 
 	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView>;
 
-	listAgentCollectionMembers(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;
+	listAgentPluginMembers(plugin: ArtifactRef): Promise<PluginDirectMembership>;
 
-	createAgentCollection(request: CreateCollectionRequest): Promise<CollectionView>;
+	createAgentPlugin(request: CreatePluginRequest): Promise<PluginView>;
 
-	getAgentCollection(collection: ArtifactRef): Promise<CollectionView>;
+	getAgentPlugin(plugin: ArtifactRef): Promise<PluginView>;
 
-	listAgentCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
+	listAgentPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]>;
 
-	listAgentCollectionsForManagement(): Promise<CollectionListItem[]>;
+	listAgentPluginsForManagement(): Promise<PluginListItem[]>;
 
-	updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
+	updateAgentPlugin(request: UpdatePluginRequest): Promise<PluginView>;
 
-	setAgentCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView>;
+	setAgentPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView>;
 
-	deleteAgentCollection(collection: ArtifactRef, expectedRevision: number): Promise<void>;
+	deleteAgentPlugin(plugin: ArtifactRef, expectedRevision: number): Promise<void>;
 
 	listAgentImportDestinations(): Promise<AgentImportDestination[]>;
 
@@ -329,32 +319,36 @@ export interface IAgentStoreAPI {
 	deleteManagedAgent(agent: ArtifactRef, expectedRevision: number): Promise<void>;
 }
 
+export interface ITextStoreAPI {
+	materializeText(text: ArtifactRef): Promise<TextMaterialization>;
+}
+
 export interface ISkillStoreAPI {
-	addSkillCollectionMember(request: AddMemberRequest): Promise<CollectionView>;
+	addSkillPluginMember(request: AddPluginMemberRequest): Promise<PluginView>;
 
 	addSkillPath(request: SkillPathRegistration): Promise<SkillPathRegistrationResult>;
 
-	attachSkillArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView>;
+	attachSkillArtifactToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView>;
 
 	createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult>;
 
 	replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult>;
 
-	createSkillCollection(request: CreateCollectionRequest): Promise<CollectionView>;
+	createSkillPlugin(request: CreatePluginRequest): Promise<PluginView>;
 
-	deleteSkillCollection(request: DeleteCollectionRequest): Promise<void>;
+	deleteSkillPlugin(request: DeletePluginRequest): Promise<void>;
 
 	getManagedSkillDocument(skill: ArtifactRef): Promise<StoreManagedSkillDocument>;
 
 	getSkill(skill: ArtifactRef): Promise<StoreArtifact>;
 
-	getSkillCollection(collection: ArtifactRef): Promise<CollectionView>;
+	getSkillPlugin(plugin: ArtifactRef): Promise<PluginView>;
 
-	listSkillCollectionMemberships(skill: ArtifactRef): Promise<ArtifactMembershipView[]>;
+	listSkillPluginMemberships(skill: ArtifactRef): Promise<ArtifactPluginMembershipView[]>;
 
-	listSkillCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
+	listSkillPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]>;
 
-	listSkillCollectionsForManagement(): Promise<CollectionListItem[]>;
+	listSkillPluginsForManagement(): Promise<PluginListItem[]>;
 
 	listSkills(rootID: ArtifactRootID): Promise<StoreSkillListItem[]>;
 
@@ -366,21 +360,17 @@ export interface ISkillStoreAPI {
 
 	registerSkillDirectory(request: SkillDirectoryRegistration): Promise<StoreArtifactSourceSummary>;
 
-	removeSkillCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
+	removeSkillPluginMember(request: RemovePluginMemberRequest): Promise<PluginView>;
 
 	resolveSkillCapabilities(skill: ArtifactRef): Promise<CapabilityPlan>;
 
-	resolveSkillCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;
+	resolveSkillPlugin(plugin: ArtifactRef): Promise<PluginCapabilityPlan>;
 
-	setSkillCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView>;
+	setSkillPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView>;
 
 	setSkillEnabled(skill: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
 
-	updateSkillCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
+	updateSkillPlugin(request: UpdatePluginRequest): Promise<PluginView>;
 }
 
 export interface ISkillAggregateAPI {
@@ -525,39 +515,39 @@ export interface IAttachmentsDropAPI {
 }
 
 export interface IMCPStoreAPI {
-	addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView>;
+	addMCPPluginMember(request: AddPluginMemberRequest): Promise<PluginView>;
 
-	removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
+	removeMCPPluginMember(request: RemovePluginMemberRequest): Promise<PluginView>;
 
-	addMCPServerToCollection(request: AddArtifactMemberRequest): Promise<CollectionView>;
+	addMCPServerToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView>;
 
-	createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView>;
+	createMCPPlugin(request: CreatePluginRequest): Promise<PluginView>;
 
-	deleteMCPCollection(request: DeleteCollectionRequest): Promise<void>;
+	deleteMCPPlugin(request: DeletePluginRequest): Promise<void>;
 
-	getMCPCollection(collection: ArtifactRef): Promise<CollectionView>;
-	getMCPPolicy(policy: ArtifactRef): Promise<MCPStorePolicyView>;
+	getMCPPlugin(plugin: ArtifactRef): Promise<PluginView>;
+	getMCPPolicy(policy: ArtifactRef): Promise<MCPPolicyView>;
 	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView>;
 	getMCPSettings(): Promise<MCPSettings>;
 
-	listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]>;
-	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
+	listMCPPluginMemberships(artifact: ArtifactRef): Promise<ArtifactPluginMembershipView[]>;
+	listMCPPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]>;
 	listMCPPolicies(rootID: ArtifactRootID): Promise<MCPPolicyListItem[]>;
 	listMCPServers(rootID: ArtifactRootID): Promise<MCPServerListItem[]>;
-	listMCPCollectionsPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<CollectionListItem>>;
-	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<MCPServerListItem>>;
+	listMCPPluginsPage(pageSize: number, pageToken?: string): Promise<MCPPluginPage>;
+	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPServerPage>;
 
-	setMCPCollectionEnabled(collection: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<CollectionView>;
+	setMCPPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView>;
 	saveMCPSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<MCPSettings>;
-	updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
+	updateMCPPlugin(request: UpdatePluginRequest): Promise<PluginView>;
 }
 
 export interface IMCPAggregateAPI {
-	listMCPCollectionServers(collection: ArtifactRef): Promise<MCPServerAggregateDetails[]>;
+	listMCPPluginServers(plugin: ArtifactRef): Promise<MCPServerDetails[]>;
 
 	getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPServerRuntimeDetails[]>;
 
-	getMCPServer(server: ArtifactRef): Promise<MCPServerAggregateDetails>;
+	getMCPServer(server: ArtifactRef): Promise<MCPServerDetails>;
 	createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
 	updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult>;
 	deleteMCPServer(server: ArtifactRef, expectedRevision: number): Promise<void>;
@@ -567,9 +557,9 @@ export interface IMCPAggregateAPI {
 		server: ArtifactRef,
 		expectedSettingsRevision: number,
 		data: MCPServerData
-	): Promise<MCPServerAggregateDetails>;
-	setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerAggregateDetails>;
-	clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerAggregateDetails>;
+	): Promise<MCPServerDetails>;
+	setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerDetails>;
+	clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerDetails>;
 }
 
 export interface IMCPRuntimeAPI {

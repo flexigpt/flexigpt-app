@@ -1,7 +1,7 @@
-import type { MappedTarget } from '@/spec/artifact';
+import type { CapabilityTarget } from '@/spec/artifact';
 
-export function toolIdentityKey(target: MappedTarget): string {
-	return JSON.stringify([target.provider, target.identifier, target.type, target.name, target.builtin]);
+export function toolIdentityKey(target: CapabilityTarget): string {
+	return JSON.stringify([target.providerIdentity, target.providerLocalID, target.type, target.name]);
 }
 
 /** Formats provider-facing tool names, not mapped target identifiers. */

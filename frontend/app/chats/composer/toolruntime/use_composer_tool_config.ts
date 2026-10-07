@@ -88,7 +88,7 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 				inFlightRef.current.add(key);
 				void (async () => {
 					try {
-						const resolved = await toolManagementAPI.resolveMappedTool(target);
+						const resolved = await toolManagementAPI.resolveToolTarget(target);
 						if (!mountedRef.current) {
 							return;
 						}

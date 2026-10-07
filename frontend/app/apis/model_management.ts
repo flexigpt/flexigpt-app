@@ -1,5 +1,5 @@
 // oxlint-disable max-classes-per-file
-import type { ArtifactRef } from '@/spec/artifact';
+import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { CacheControl } from '@/spec/inference';
 import type {
 	ManagedModelCreateRequest,
@@ -18,7 +18,7 @@ import type {
 	ProviderAPIKeyStatus,
 	UIModelOption,
 } from '@/spec/model';
-import { ArtifactState } from '@/spec/artifact';
+import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
 import { ModelLookupScope } from '@/spec/model';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
@@ -405,27 +405,27 @@ export class ModelManagementAPI {
 	 * This resolves UI display data only. It never decodes an opaque mapped
 	 * target identifier and never executes a mapped target.
 	 */
-	async resolveMappedModelTarget(target: {
-		type: string;
-		name: string;
-		builtin: boolean;
-	}): Promise<ModelManagementItem> {
+	async resolveMappedModelTarget(target: CapabilityTarget): Promise<ModelManagementItem> {
 		if (target.type !== 'model') {
 			throw new Error(`Target ${target.name} is not a model target.`);
 		}
+		if (target.form !== CapabilityTargetForm.Artifact || !target.artifact) {
+			throw new Error(`Model target "${target.name}" is runtime-direct and cannot be opened by Model management.`);
+		}
 
 		const snapshot = await this.loadSnapshot();
-		const matches = snapshot.models.filter(
-			model => model.list.name === target.name && model.list.builtIn === target.builtin
+		const model = snapshot.models.find(
+			value =>
+				value.list.ref.rootID === target.artifact?.rootID && value.list.ref.artifactID === target.artifact?.artifactID
 		);
 
-		if (matches.length === 0) {
+		if (!model) {
 			throw new Error(`Model target ${target.name} is unavailable.`);
 		}
-		if (matches.length > 1) {
-			throw new Error(`Model target ${target.name} is ambiguous.`);
+		if (model.list.name !== target.name) {
+			throw new Error(`Model target ${target.name} no longer matches its Artifact identity.`);
 		}
-		return matches[0];
+		return model;
 	}
 
 	private async loadCatalog(): Promise<ModelCatalog> {

@@ -473,9 +473,7 @@ func Workspace() (workspaceAPI.Support, error) {
 			Kind:        iofs.Kind,
 			DisplayName: "Workspace base policy source",
 		},
-		RootStorageKeyPrefix: spec.StorageKey(
-			"workspace-directory-root-",
-		),
+		RootStorageKeyPrefix:    spec.StorageKey("workspace-directory-root-"),
 		DirectoryDiscovery:      discovery,
 		ManifestPatterns:        append([]string(nil), manifestPatterns...),
 		SelectorIncludePatterns: append([]string(nil), selectorPatterns...),

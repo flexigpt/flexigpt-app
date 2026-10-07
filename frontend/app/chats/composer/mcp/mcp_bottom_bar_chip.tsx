@@ -790,7 +790,7 @@ function ServerRow({
 					</div>
 
 					<div className="text-base-content/60 truncate text-xs">
-						{option.bundle.displayName || 'MCP Collection'} / {getMCPTransportLabel(option.transport)}
+						{option.bundle.displayName || 'MCP Plugin'} / {getMCPTransportLabel(option.transport)}
 					</div>
 
 					{option.runtime?.lastError ? <div className="text-error mt-1 text-xs">{option.runtime.lastError}</div> : null}

@@ -648,7 +648,7 @@ function AddEditMCPServerModalContent({
 								label="Name"
 								htmlFor="mcp-logical-name"
 								required
-								hint="Stable name inside this MCP Collection. It cannot be changed after creation."
+								hint="Stable name inside this MCP Plugin. It cannot be changed after creation."
 								error={errors.logicalName}
 							>
 								<input

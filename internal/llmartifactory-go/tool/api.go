@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
@@ -147,6 +148,100 @@ func (a *Service) SetToolEnabled(
 		return ToolView{}, err
 	}
 	value.Artifact = updated.Clone()
+	return value, nil
+}
+
+// MapToolTarget resolves one enabled Tool into the same source-backed
+// CapabilityTarget used by Agent, Plugin, Skill, and Workspace composition.
+//
+// The Tool family remains Artifact-backed. A direct capability target is not
+// actionable through Tool Store because it has no Tool Artifact or Plugin
+// state to inspect.
+func (a *Service) MapToolTarget(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (composition.CapabilityTarget, error) {
+	value, err := a.ResolveEnabledTool(ctx, ref)
+	if err != nil {
+		return composition.CapabilityTarget{}, err
+	}
+	if a == nil || a.resolver == nil {
+		return composition.CapabilityTarget{}, spec.ErrClosed
+	}
+
+	resolved, err := a.resolver.ResolveTool(ctx, ref)
+	if err != nil {
+		return composition.CapabilityTarget{}, err
+	}
+	target, found := resolved.TargetValue()
+	if !found {
+		return composition.CapabilityTarget{}, fmt.Errorf(
+			"%w: Tool %q resolved without a capability target",
+			spec.ErrReferenceUnresolved,
+			value.Tool.Name,
+		)
+	}
+	if err := target.Validate(); err != nil {
+		return composition.CapabilityTarget{}, err
+	}
+	if target.Type != declaration.TypeTool ||
+		target.Name != value.Tool.Name {
+		return composition.CapabilityTarget{}, fmt.Errorf(
+			"%w: Tool capability target identity differs from Tool Artifact",
+			spec.ErrDigestMismatch,
+		)
+	}
+	if target.Form != composition.TargetFormArtifact ||
+		target.Artifact == nil ||
+		*target.Artifact != value.Tool.Artifact.Ref() {
+		return composition.CapabilityTarget{}, fmt.Errorf(
+			"%w: Tool Store requires an Artifact-backed Tool target",
+			spec.ErrUnsupported,
+		)
+	}
+	return target.Clone(), nil
+}
+
+// ResolveToolTarget resolves an Artifact-backed Tool CapabilityTarget into
+// the Tool view plus the owning Tool Plugin. It verifies that the target still
+// identifies the current enabled Tool Artifact before returning it.
+//
+// Direct Tool capabilities deliberately remain owned by their runtime
+// provider. Tool Store must not fabricate an Artifact-backed Tool projection
+// for them.
+func (a *Service) ResolveToolTarget(
+	ctx context.Context,
+	target composition.CapabilityTarget,
+) (ResolvedToolView, error) {
+	if err := target.Validate(); err != nil {
+		return ResolvedToolView{}, err
+	}
+	if target.Type != declaration.TypeTool {
+		return ResolvedToolView{}, fmt.Errorf(
+			"%w: capability target type is %q, expected tool",
+			spec.ErrUnsupported,
+			target.Type,
+		)
+	}
+	if target.Form != composition.TargetFormArtifact ||
+		target.Artifact == nil {
+		return ResolvedToolView{}, fmt.Errorf(
+			"%w: direct Tool capability targets require their owning runtime adapter",
+			spec.ErrUnsupported,
+		)
+	}
+
+	value, err := a.ResolveEnabledTool(ctx, *target.Artifact)
+	if err != nil {
+		return ResolvedToolView{}, err
+	}
+	if value.Tool.Artifact.Ref() != *target.Artifact ||
+		value.Tool.Name != target.Name {
+		return ResolvedToolView{}, fmt.Errorf(
+			"%w: Tool capability target no longer matches the Tool Artifact",
+			spec.ErrReferenceUnresolved,
+		)
+	}
 	return value, nil
 }
 

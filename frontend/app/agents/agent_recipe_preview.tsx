@@ -59,7 +59,7 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 	}
 
 	const modelRelationship = (recipe.resolution.capabilities?.occurrences ?? []).find(
-		occurrence => occurrence.type === 'model' && occurrence.status === 'available'
+		occurrence => occurrence.type === 'model' && occurrence.status.toString() === 'available'
 	);
 	const modelLabel = modelRelationship?.name;
 

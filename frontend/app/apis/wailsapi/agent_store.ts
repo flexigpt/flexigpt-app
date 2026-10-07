@@ -7,49 +7,48 @@ import type {
 	AgentImportPreview,
 	AgentImportPreviewRequest,
 	AgentResolution,
-	AgentTextMaterialization,
 	AgentView,
 	ListAgentsRequest,
 } from '@/spec/agent';
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
-	CollectionCapabilityPlan,
-	CollectionListItem,
-	CollectionView,
-	CreateCollectionRequest,
-	UpdateCollectionRequest,
-} from '@/spec/collection';
+	CreatePluginRequest,
+	PluginDirectMembership,
+	PluginListItem,
+	PluginView,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
 
 import type { IAgentStoreAPI } from '@/apis/interface';
 import {
 	agentViewFromWails,
-	collectionCapabilityPlanFromWails,
-	collectionListItemFromWails,
-	collectionResultFromWails,
-	collectionViewFromWails,
+	capabilityTargetFromWails,
+	pluginDirectMembershipFromWails,
+	pluginListItemFromWails,
+	pluginResultFromWails,
+	pluginViewFromWails,
 } from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CommitAgentImport,
-	CreateAgentCollection,
-	DeleteAgentCollection,
+	CreateAgentPlugin,
+	DeleteAgentPlugin,
 	DeleteManagedAgent,
 	ExportAgent,
 	GetAgent,
-	GetAgentCollection,
-	ListAgentCollectionMembers,
-	ListAgentCollections,
-	ListAgentCollectionsForManagement,
+	GetAgentPlugin,
 	ListAgentImportDestinations,
+	ListAgentPluginMembers,
+	ListAgentPlugins,
+	ListAgentPluginsForManagement,
 	ListAgents,
 	ListAgentsForManagement,
-	MaterializeAgentText,
 	PreviewAgentImport,
 	ResolveAgent,
 	ResolveAgentCapabilities,
-	SetAgentCollectionEnabled,
 	SetAgentEnabled,
-	UpdateAgentCollection,
+	SetAgentPluginEnabled,
+	UpdateAgentPlugin,
 } from '@/apis/wailsjs/go/main/AgentStoreWrapper';
 
 function agentCapabilityPlanFromWails(value: unknown, operation: string): AgentCapabilityPlan {
@@ -60,7 +59,13 @@ function agentCapabilityPlanFromWails(value: unknown, operation: string): AgentC
 		occurrences: wailsObjectArrayOrEmpty<AgentCapabilityPlan['occurrences'][number]>(
 			plan.occurrences,
 			`${operation}.occurrences`
-		),
+		).map((occurrence, index) => ({
+			...occurrence,
+			target:
+				occurrence.target === null || occurrence.target === undefined
+					? undefined
+					: capabilityTargetFromWails(occurrence.target, `${operation}.occurrences[${index}].target`),
+		})),
 	};
 }
 
@@ -91,13 +96,6 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		return agentViewFromWails(await GetAgent(agent as Parameters<typeof GetAgent>[0]), 'GetAgent');
 	}
 
-	async materializeAgentText(text: ArtifactRef): Promise<AgentTextMaterialization> {
-		return requiredObject<AgentTextMaterialization>(
-			await MaterializeAgentText(text as Parameters<typeof MaterializeAgentText>[0]),
-			'MaterializeAgentText'
-		);
-	}
-
 	async resolveAgent(agent: ArtifactRef): Promise<AgentResolution> {
 		return agentResolutionFromWails(await ResolveAgent(agent as Parameters<typeof ResolveAgent>[0]), 'ResolveAgent');
 	}
@@ -116,64 +114,53 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		);
 	}
 
-	async listAgentCollectionMembers(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
-		return collectionCapabilityPlanFromWails(
-			await ListAgentCollectionMembers(collection as Parameters<typeof ListAgentCollectionMembers>[0]),
-			'ListAgentCollectionMembers'
+	async listAgentPluginMembers(plugin: ArtifactRef): Promise<PluginDirectMembership> {
+		return pluginDirectMembershipFromWails(
+			await ListAgentPluginMembers(plugin as Parameters<typeof ListAgentPluginMembers>[0]),
+			'ListAgentPluginMembers'
 		);
 	}
 
-	async createAgentCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await CreateAgentCollection(request as Parameters<typeof CreateAgentCollection>[0]),
-			'CreateAgentCollection'
+	async createAgentPlugin(request: CreatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await CreateAgentPlugin(request as Parameters<typeof CreateAgentPlugin>[0]),
+			'CreateAgentPlugin'
 		);
 	}
 
-	async getAgentCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await GetAgentCollection(collection as Parameters<typeof GetAgentCollection>[0]),
-			'GetAgentCollection'
-		);
+	async getAgentPlugin(plugin: ArtifactRef): Promise<PluginView> {
+		return pluginViewFromWails(await GetAgentPlugin(plugin as Parameters<typeof GetAgentPlugin>[0]), 'GetAgentPlugin');
 	}
 
-	async listAgentCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+	async listAgentPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]> {
 		return wailsObjectArrayOrEmpty(
-			await ListAgentCollections(rootID as Parameters<typeof ListAgentCollections>[0]),
-			'ListAgentCollections'
-		).map((value, index) => collectionListItemFromWails(value, `ListAgentCollections[${index}]`));
+			await ListAgentPlugins(rootID as Parameters<typeof ListAgentPlugins>[0]),
+			'ListAgentPlugins'
+		).map((value, index) => pluginListItemFromWails(value, `ListAgentPlugins[${index}]`));
 	}
 
-	async listAgentCollectionsForManagement(): Promise<CollectionListItem[]> {
-		return wailsObjectArrayOrEmpty(await ListAgentCollectionsForManagement(), 'ListAgentCollectionsForManagement').map(
-			(value, index) => collectionListItemFromWails(value, `ListAgentCollectionsForManagement[${index}]`)
+	async listAgentPluginsForManagement(): Promise<PluginListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListAgentPluginsForManagement(), 'ListAgentPluginsForManagement').map(
+			(value, index) => pluginListItemFromWails(value, `ListAgentPluginsForManagement[${index}]`)
 		);
 	}
 
-	async updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await UpdateAgentCollection(request as Parameters<typeof UpdateAgentCollection>[0]),
-			'UpdateAgentCollection'
+	async updateAgentPlugin(request: UpdatePluginRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await UpdateAgentPlugin(request as Parameters<typeof UpdateAgentPlugin>[0]),
+			'UpdateAgentPlugin'
 		);
 	}
 
-	async setAgentCollectionEnabled(
-		collection: ArtifactRef,
-		expectedRevision: number,
-		enabled: boolean
-	): Promise<CollectionView> {
-		return collectionViewFromWails(
-			await SetAgentCollectionEnabled(
-				collection as Parameters<typeof SetAgentCollectionEnabled>[0],
-				expectedRevision,
-				enabled
-			),
-			'SetAgentCollectionEnabled'
+	async setAgentPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
+		return pluginViewFromWails(
+			await SetAgentPluginEnabled(plugin as Parameters<typeof SetAgentPluginEnabled>[0], expectedRevision, enabled),
+			'SetAgentPluginEnabled'
 		);
 	}
 
-	async deleteAgentCollection(collection: ArtifactRef, expectedRevision: number): Promise<void> {
-		await DeleteAgentCollection(collection as Parameters<typeof DeleteAgentCollection>[0], expectedRevision);
+	async deleteAgentPlugin(plugin: ArtifactRef, expectedRevision: number): Promise<void> {
+		await DeleteAgentPlugin(plugin as Parameters<typeof DeleteAgentPlugin>[0], expectedRevision);
 	}
 
 	async listAgentImportDestinations(): Promise<AgentImportDestination[]> {
@@ -191,7 +178,7 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	}
 
 	async commitAgentImport(request: AgentImportCommitRequest): Promise<AgentImportCommitResult> {
-		const result = collectionResultFromWails<AgentImportCommitResult>(
+		const result = pluginResultFromWails<AgentImportCommitResult>(
 			await CommitAgentImport(request as Parameters<typeof CommitAgentImport>[0]),
 			'CommitAgentImport'
 		);

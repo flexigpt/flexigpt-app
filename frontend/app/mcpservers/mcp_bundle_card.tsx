@@ -205,7 +205,7 @@ export function MCPBundleCard({
 						busy={isPending('bundle:toggle')}
 						onChange={enabled => {
 							void runAction('bundle:toggle', () => onToggleBundleEnabled(bundle, enabled)).catch((error: unknown) => {
-								showAlert(getErrorMessage(error, 'Failed to change MCP Collection state.'));
+								showAlert(getErrorMessage(error, 'Failed to change MCP Plugin state.'));
 							});
 						}}
 					/>
@@ -246,7 +246,7 @@ export function MCPBundleCard({
 									}}
 								>
 									<FiTrash2 size={16} />
-									<span>Delete Collection</span>
+									<span>Delete Plugin</span>
 								</button>
 							</>
 						) : null}
@@ -289,7 +289,7 @@ export function MCPBundleCard({
 									? 'Loading MCP servers...'
 									: serverLoadError
 										? 'Server contents are unavailable.'
-										: 'No MCP servers in this Collection.'}
+										: 'No MCP servers in this Plugin.'}
 							</ManagementEmptyState>
 						) : serversLoaded ? (
 							servers.map(server => {

@@ -15,8 +15,8 @@ export function uiToolChoiceToToolStoreChoice(att: UIToolStoreChoice): ToolStore
 		displayName: att.displayName,
 		description: att.description,
 		toolVersion: att.toolVersion,
-		collectionRef: att.collectionRef,
-		collectionName: att.collectionName,
+		pluginRef: att.pluginRef,
+		pluginName: att.pluginName,
 	};
 }
 
