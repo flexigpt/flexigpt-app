@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -441,9 +440,10 @@ func (a *Service) ReplaceManagedSkill(
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if a.support.PluginProfile.Source == nil ||
+		!a.support.PluginProfile.Source.Matches(sourceValue) {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
-			"%w: Skill is not backed by a managed Source",
+			"%w: Skill is not backed by the configured managed Skill Source",
 			spec.ErrUnsupported,
 		)
 	}
@@ -638,9 +638,10 @@ func (a *Service) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if a.support.PluginProfile.Source == nil ||
+		!a.support.PluginProfile.Source.Matches(sourceValue) {
 		return fmt.Errorf(
-			"%w: source-backed Skill removal must update or unregister its Source",
+			"%w: Skill is not backed by the configured managed Skill Source",
 			spec.ErrUnsupported,
 		)
 	}
@@ -668,11 +669,8 @@ func (a *Service) PurgeSkill(
 		Package:          packageAddress,
 		ExpectedArtifact: &ref,
 	}
-	if a.support.PluginProfile.Source != nil &&
-		sourceValue.StorageKey == a.support.PluginProfile.Source.StorageKey {
-		locator := value.Binding.Locator
-		removeRequest.PruneDiscoveryLocator = &locator
-	}
+	locator := value.Binding.Locator
+	removeRequest.PruneDiscoveryLocator = &locator
 	if err := a.managedArtifacts.Remove(ctx, removeRequest); err != nil {
 		return err
 	}
@@ -736,9 +734,10 @@ func (a *Service) getManagedSkillDocument(
 	if err != nil {
 		return skillSource.ManagedSkillDocument{}, err
 	}
-	if sourceValue.Kind != managedfs.Kind {
+	if a.support.PluginProfile.Source == nil ||
+		!a.support.PluginProfile.Source.Matches(sourceValue) {
 		return skillSource.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: only managed Skills expose editable Skill documents",
+			"%w: only configured managed Skills expose editable documents",
 			spec.ErrUnsupported,
 		)
 	}

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -214,7 +215,7 @@ func (e *Engine) Discover(
 	seenLocators := make(map[spec.Locator]struct{}, len(entries))
 	validOrigins := make(map[typedOrigin]Observation)
 	invalidBindings := make(map[artifactModel.SourceBinding]struct{})
-	var consumed int64
+	budget := scanByteBudget{maximum: sp.MaxTotalBytes}
 
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
@@ -249,11 +250,8 @@ func (e *Engine) Discover(
 			)
 			continue
 		}
-		if entry.SizeBytes > sp.MaxTotalBytes-consumed {
-			return Result{}, fmt.Errorf(
-				"%w: discovery exceeds total byte limit",
-				spec.ErrInvalid,
-			)
+		if err := budget.reserve(entry.SizeBytes); err != nil {
+			return Result{}, err
 		}
 
 		content, err := source.ReadSnapshotEntry(
@@ -263,14 +261,8 @@ func (e *Engine) Discover(
 			spec.MaxCandidateBytes,
 		)
 		if err != nil {
+			budget.release(entry.SizeBytes)
 			return Result{}, err
-		}
-		consumed += int64(len(content))
-		if consumed > sp.MaxTotalBytes {
-			return Result{}, fmt.Errorf(
-				"%w: discovery exceeds total byte limit",
-				spec.ErrInvalid,
-			)
 		}
 
 		sourceDigest := cryptoutil.DigestBytes(content)
@@ -400,6 +392,7 @@ func (e *Engine) Discover(
 				snapshotEntryReader{
 					snapshot:     snapshot,
 					maximumBytes: spec.MaxCandidateBytes,
+					budget:       &budget,
 				},
 			)
 		} else {
@@ -736,9 +729,56 @@ func deleteValidOriginsForBinding(
 	}
 }
 
+type scanByteBudget struct {
+	mu       sync.Mutex
+	maximum  int64
+	consumed int64
+}
+
+func (b *scanByteBudget) reserve(
+	size int64,
+) error {
+	if size < 0 {
+		return fmt.Errorf(
+			"%w: discovery entry has a negative size",
+			spec.ErrInvalid,
+		)
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if size > b.maximum-b.consumed {
+		return fmt.Errorf(
+			"%w: discovery exceeds total byte limit",
+			spec.ErrInvalid,
+		)
+	}
+	b.consumed += size
+	return nil
+}
+
+func (b *scanByteBudget) release(
+	size int64,
+) {
+	if size <= 0 {
+		return
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if size >= b.consumed {
+		b.consumed = 0
+		return
+	}
+	b.consumed -= size
+}
+
 type snapshotEntryReader struct {
 	snapshot     driver.Snapshot
 	maximumBytes int64
+	budget       *scanByteBudget
 }
 
 func (r snapshotEntryReader) ReadSourceEntry(
@@ -749,6 +789,13 @@ func (r snapshotEntryReader) ReadSourceEntry(
 	if err != nil {
 		return ingestModel.SourceContent{}, err
 	}
+	reserved := false
+	if r.budget != nil {
+		if err := r.budget.reserve(entry.SizeBytes); err != nil {
+			return ingestModel.SourceContent{}, err
+		}
+		reserved = true
+	}
 	content, err := source.ReadSnapshotEntry(
 		ctx,
 		r.snapshot,
@@ -756,6 +803,9 @@ func (r snapshotEntryReader) ReadSourceEntry(
 		r.maximumBytes,
 	)
 	if err != nil {
+		if reserved {
+			r.budget.release(entry.SizeBytes)
+		}
 		return ingestModel.SourceContent{}, err
 	}
 	return ingestModel.SourceContent{

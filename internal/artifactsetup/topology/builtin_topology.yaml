@@ -4,11 +4,6 @@ application:
     settingsDirectory: "settings_v2"
     conversationsDirectory: "conversations_v2"
     artifactStoreDirectory: "artifacts_v2"
-    artifactStoreManifestFile: "store.json"
-    artifactStoreMetadataFile: "app.sqlite"
-    artifactStoreContentDirectory: "content"
-    artifactStoreStagingDirectory: "staging"
-    artifactStoreManifestTemporaryName: "store.json.tmp-"
 
   userRoot:
     id: "0192c4c0-0000-7000-8000-000000000002"

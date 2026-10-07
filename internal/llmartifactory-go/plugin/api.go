@@ -13,7 +13,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -954,12 +953,6 @@ func (a *API) loadEditablePlugin(
 	)
 	if err != nil {
 		return editablePlugin{}, err
-	}
-	if sourceValue.Kind != managedfs.Kind {
-		return editablePlugin{}, fmt.Errorf(
-			"%w: Plugin is not backed by a managed Source",
-			spec.ErrUnsupported,
-		)
 	}
 	if !sourceValue.Enabled {
 		return editablePlugin{}, fmt.Errorf(

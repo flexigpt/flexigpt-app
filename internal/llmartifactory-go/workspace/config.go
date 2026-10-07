@@ -76,6 +76,20 @@ func (s Support) Validate() error {
 	return s.SkillDocuments.Validate()
 }
 
+func (s Support) Clone() Support {
+	output := s
+	output.DirectorySource = s.DirectorySource.Clone()
+	output.PolicySource = s.PolicySource.Clone()
+	output.DirectoryDiscovery = s.DirectoryDiscovery.Clone()
+	output.ManifestPatterns = append([]string(nil), s.ManifestPatterns...)
+	output.SelectorIncludePatterns = append(
+		[]string(nil),
+		s.SelectorIncludePatterns...,
+	)
+	output.SkillDocuments = s.SkillDocuments.Clone()
+	return output
+}
+
 type Config struct {
 	ContextComposition  contextengine.CompositionPolicy
 	Composition         *composition.Resolver
@@ -99,7 +113,7 @@ func (c Config) normalized() Config {
 		output.AdditionalDecoderHints[index] = hint.Clone()
 	}
 	output.DefaultPolicySource = c.DefaultPolicySource
-	output.Support = c.Support
+	output.Support = c.Support.Clone()
 	return output
 }
 

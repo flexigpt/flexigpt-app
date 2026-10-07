@@ -66,16 +66,26 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	stagingAbsolute, err := filepath.Abs(stagingBase)
-	if err != nil {
-		return nil, err
-	}
 	if strings.TrimSpace(stagingBase) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source staging directory is empty",
 			spec.ErrInvalid,
 		)
 	}
+	stagingAbsolute, err := filepath.Abs(stagingBase)
+	if err != nil {
+		return nil, err
+	}
+
+	contentBase := filepath.Clean(absolute)
+	stagingDirectory := filepath.Clean(stagingAbsolute)
+	if managedDirectoriesOverlap(contentBase, stagingDirectory) {
+		return nil, fmt.Errorf(
+			"%w: managed Source content and staging directories must not overlap",
+			spec.ErrInvalid,
+		)
+	}
+
 	// Staging is outside the portable Source tree. Managed package generation
 	// must therefore include every regular file below the content root.
 	policy := fsdir.TraversalPolicy{
@@ -87,10 +97,35 @@ func New(
 		return nil, err
 	}
 	return &Adapter{
-		base:        filepath.Clean(absolute),
-		stagingBase: filepath.Clean(stagingAbsolute),
+		base:        contentBase,
+		stagingBase: stagingDirectory,
 		filesystem:  filesystem,
 	}, nil
+}
+
+func managedDirectoriesOverlap(
+	left string,
+	right string,
+) bool {
+	return managedDirectoryContains(left, right) ||
+		managedDirectoryContains(right, left)
+}
+
+func managedDirectoryContains(
+	parent string,
+	candidate string,
+) bool {
+	relative, err := filepath.Rel(parent, candidate)
+	if err != nil {
+		return false
+	}
+	return relative == "." ||
+		(relative != ".." &&
+			!strings.HasPrefix(
+				relative,
+				".."+string(filepath.Separator),
+			) &&
+			!filepath.IsAbs(relative))
 }
 
 func (*Adapter) Kind() sourceModel.SourceKind {
@@ -686,7 +721,7 @@ func equivalentPackage(
 	}
 	err = filepath.WalkDir(root, func(
 		location string,
-		_ os.DirEntry,
+		entry os.DirEntry,
 		walkErr error,
 	) error {
 		if walkErr != nil {
@@ -694,6 +729,13 @@ func equivalentPackage(
 		}
 		if location == root {
 			return nil
+		}
+		if entry == nil {
+			return fmt.Errorf(
+				"%w: managed package walk returned no entry for %q",
+				spec.ErrInvalid,
+				location,
+			)
 		}
 		entries++
 		if entries > spec.MaxDiscoveryEntries {
@@ -713,9 +755,15 @@ func equivalentPackage(
 				spec.ErrInvalid,
 			)
 		}
-		info, err := os.Stat(location)
+		info, err := entry.Info()
 		if err != nil {
 			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf(
+				"%w: managed package contains a symbolic link",
+				spec.ErrInvalid,
+			)
 		}
 		if info.IsDir() {
 			return nil

@@ -86,7 +86,7 @@ func (a *Adapter) ApplyPackageBatch(
 		if err != nil {
 			return err
 		}
-		if err := writeStagedPackageFiles(
+		if err := writeManagedPackageFiles(
 			ctx,
 			temporary,
 			publication.Files,
@@ -157,36 +157,6 @@ func (a *Adapter) ApplyPackageBatch(
 			root,
 			filepath.Dir(target),
 		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeStagedPackageFiles(
-	ctx context.Context,
-	root string,
-	files []managedpackageModel.ManagedPackageFile,
-) error {
-	for _, file := range files {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := file.Locator.ValidatePortable(false); err != nil {
-			return err
-		}
-
-		location := filepath.Join(
-			root,
-			filepath.FromSlash(string(file.Locator)),
-		)
-		if err := os.MkdirAll(
-			filepath.Dir(location),
-			managedDirectoryMode,
-		); err != nil {
-			return err
-		}
-		if err := os.WriteFile(location, file.Content, 0o600); err != nil {
 			return err
 		}
 	}

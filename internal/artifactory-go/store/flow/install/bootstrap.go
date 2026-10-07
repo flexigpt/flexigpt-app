@@ -113,22 +113,6 @@ func NewBootstrap(
 		if err != nil {
 			return nil, err
 		}
-		for _, previous := range entries {
-			for _, scope := range scopes {
-				for _, existing := range previous.scopes {
-					if packageScopesOverlap(scope, existing) {
-						return nil, fmt.Errorf(
-							"%w: installer %q scope %q overlaps installer %q scope %q",
-							spec.ErrConflict,
-							name,
-							scope,
-							previous.name,
-							existing,
-						)
-					}
-				}
-			}
-		}
 		entries = append(entries, bootstrapInstaller{
 			name: name, scopes: scopes, installer: installer,
 		})
@@ -414,7 +398,51 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 		}
 		output = append(output, plan)
 	}
+	if err := validatePlannedPackageScopes(output); err != nil {
+		return nil, err
+	}
 	return output, nil
+}
+
+// validatePlannedPackageScopes rejects only physical package conflicts.
+// Managed-package addresses are Source-relative, so identical paths in
+// independent Roots or Sources are valid and must not be rejected globally.
+func validatePlannedPackageScopes(
+	plans []bootstrapPlan,
+) error {
+	for currentIndex, current := range plans {
+		if current.hydration == nil {
+			continue
+		}
+
+		for previousIndex := range currentIndex {
+			previous := plans[previousIndex]
+			if previous.hydration == nil ||
+				current.desired.RootID != previous.desired.RootID ||
+				current.desired.SourceID != previous.desired.SourceID {
+				continue
+			}
+
+			for _, scope := range current.entry.scopes {
+				for _, existing := range previous.entry.scopes {
+					if !packageScopesOverlap(scope, existing) {
+						continue
+					}
+					return fmt.Errorf(
+						"%w: installer %q scope %q overlaps installer %q scope %q in Root %q Source %q",
+						spec.ErrConflict,
+						current.entry.name,
+						scope,
+						previous.entry.name,
+						existing,
+						current.desired.RootID,
+						current.desired.SourceID,
+					)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (p bootstrapPlan) needsPackageMutation() bool {

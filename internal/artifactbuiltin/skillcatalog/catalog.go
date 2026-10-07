@@ -14,41 +14,44 @@ var generatedCatalogJSON []byte
 
 var (
 	generatedCatalogOnce sync.Once
-	generatedCatalog     installModel.CompiledPackageSet
+	generatedCatalog     *installFlow.PreloadedGeneratedPackageSet
 	errGeneratedCatalog  error
-
-	generatedCatalogFingerprintOnce sync.Once
-	generatedCatalogFingerprint     cryptoutil.Digest
 )
+
+func generatedCatalogPreload() (
+	*installFlow.PreloadedGeneratedPackageSet,
+	error,
+) {
+	generatedCatalogOnce.Do(func() {
+		generatedCatalog, errGeneratedCatalog = installFlow.PreloadGeneratedPackageSet(
+			generatedCatalogJSON,
+		)
+	})
+	if errGeneratedCatalog != nil {
+		return nil, errGeneratedCatalog
+	}
+	return generatedCatalog, nil
+}
 
 func generatedCatalogValue() (
 	installModel.CompiledPackageSet,
 	error,
 ) {
-	generatedCatalogOnce.Do(func() {
-		generatedCatalog, errGeneratedCatalog = installFlow.DecodeGeneratedPackageSet(generatedCatalogJSON)
-	})
-	if errGeneratedCatalog != nil {
-		return installModel.CompiledPackageSet{}, errGeneratedCatalog
-	}
-	return generatedCatalog, nil
-}
-
-func GeneratedCatalogSet() (installModel.CompiledPackageSet, error) {
-	value, err := generatedCatalogValue()
+	preloaded, err := generatedCatalogPreload()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
-	return value.Clone(), nil
+	return preloaded.PackageSet()
+}
+
+func GeneratedCatalogSet() (installModel.CompiledPackageSet, error) {
+	return generatedCatalogValue()
 }
 
 func GeneratedCatalogFingerprint() cryptoutil.Digest {
-	generatedCatalogFingerprintOnce.Do(func() {
-		value, err := generatedCatalogValue()
-		if err != nil {
-			return
-		}
-		_, generatedCatalogFingerprint, _ = installFlow.CanonicalGeneratedPackageSet(value)
-	})
-	return generatedCatalogFingerprint
+	preloaded, err := generatedCatalogPreload()
+	if err != nil {
+		return ""
+	}
+	return preloaded.Fingerprint()
 }

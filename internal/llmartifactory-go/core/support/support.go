@@ -322,6 +322,12 @@ func (p SourceProfile) Validate() error {
 	return err
 }
 
+func (p SourceProfile) Clone() SourceProfile {
+	output := p
+	output.Config = append(json.RawMessage(nil), p.Config...)
+	return output
+}
+
 func (p SourceProfile) Draft(
 	id sourceModel.SourceID,
 ) sourceModel.Draft {

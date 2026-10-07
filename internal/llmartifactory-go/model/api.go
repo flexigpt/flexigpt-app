@@ -77,7 +77,7 @@ func New(
 		overlays:         dependencies.Overlays,
 		adapters:         dependencies.Adapters,
 		builtinRoot:      dependencies.Support.BuiltinRoot,
-		support:          dependencies.Support,
+		support:          dependencies.Support.Clone(),
 	}
 	return output, nil
 }

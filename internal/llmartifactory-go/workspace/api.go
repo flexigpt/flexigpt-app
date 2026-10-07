@@ -87,6 +87,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+	config.DefaultPolicySource.Policy = policy
 
 	workspaceSources := newWorkspaceSourceRegistry(
 		sources,

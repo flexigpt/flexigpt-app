@@ -29,3 +29,9 @@ func (s Support) Validate() error {
 	}
 	return s.ModelPackage.Validate()
 }
+
+func (s Support) Clone() Support {
+	output := s
+	output.ManagedSource = s.ManagedSource.Clone()
+	return output
+}

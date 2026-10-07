@@ -220,6 +220,9 @@ func (s *Service) ReadSourceEntry(
 	if err := snapshot.Confirm(ctx); err != nil {
 		return resourceModel.VerifiedEntry{}, err
 	}
+	if err := s.confirmSourceCurrent(ctx, value); err != nil {
+		return resourceModel.VerifiedEntry{}, err
+	}
 	output := resourceModel.VerifiedEntry{
 		RootID:           rootID,
 		SourceID:         sourceID,
@@ -283,8 +286,17 @@ func (s *Service) StatSourceEntry(
 
 	entry, statErr := snapshot.Stat(ctx, locator)
 	confirmErr := snapshot.Confirm(ctx)
+	var sourceErr error
+	if statErr == nil && confirmErr == nil {
+		sourceErr = s.confirmSourceCurrent(ctx, value)
+	}
 	closeErr := snapshot.Close()
-	if err := errors.Join(statErr, confirmErr, closeErr); err != nil {
+	if err := errors.Join(
+		statErr,
+		confirmErr,
+		sourceErr,
+		closeErr,
+	); err != nil {
 		return sourceModel.Entry{}, err
 	}
 	if err := entry.Validate(); err != nil {
@@ -571,7 +583,20 @@ func (s *Service) ReadSourceTree(
 	if err := snapshot.Confirm(ctx); err != nil {
 		return nil, err
 	}
+	if err := s.confirmSourceCurrent(ctx, value); err != nil {
+		return nil, err
+	}
 	return output, nil
+}
+
+func (s *Service) SupportsLocalPath(
+	kind sourceModel.SourceKind,
+) bool {
+	if s == nil {
+		return false
+	}
+	localPaths, supported := s.sources.(source.LocalPathRuntime)
+	return supported && localPaths.SupportsLocalPath(kind)
 }
 
 func sourceTreeDirectChild(
@@ -614,12 +639,28 @@ func sourceTreeRelativeLocator(
 	return relative, nil
 }
 
-func (s *Service) SupportsLocalPath(
-	kind sourceModel.SourceKind,
-) bool {
-	if s == nil {
-		return false
+// confirmSourceCurrent closes the metadata race left after a physical snapshot
+// confirms its bytes. A successful resource-only read must not be returned as
+// valid if Source lifecycle or discovery metadata changed during that read.
+func (s *Service) confirmSourceCurrent(
+	ctx context.Context,
+	observed sourceModel.Source,
+) error {
+	current, err := s.sources.Get(
+		ctx,
+		observed.RootID,
+		observed.ID,
+	)
+	if err != nil {
+		return err
 	}
-	localPaths, supported := s.sources.(source.LocalPathRuntime)
-	return supported && localPaths.SupportsLocalPath(kind)
+	if !current.Enabled ||
+		current.Revision != observed.Revision {
+		return fmt.Errorf(
+			"%w: Source %q changed during verified read",
+			spec.ErrRefreshRequired,
+			observed.ID,
+		)
+	}
+	return nil
 }

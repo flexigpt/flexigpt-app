@@ -30,15 +30,10 @@ const (
 type ApplicationStorageKey string
 
 const (
-	ApplicationStorageDataDirectory              ApplicationStorageKey = "dataDirectory"
-	ApplicationStorageSettingsDirectory          ApplicationStorageKey = "settingsDirectory"
-	ApplicationStorageConversationsDirectory     ApplicationStorageKey = "conversationsDirectory"
-	ApplicationStorageArtifactStoreDirectory     ApplicationStorageKey = "artifactStoreDirectory"
-	ApplicationStorageArtifactStoreManifestFile  ApplicationStorageKey = "artifactStoreManifestFile"
-	ApplicationStorageArtifactStoreMetadataFile  ApplicationStorageKey = "artifactStoreMetadataFile"
-	ApplicationStorageArtifactStoreContentDir    ApplicationStorageKey = "artifactStoreContentDirectory"
-	ApplicationStorageArtifactStoreStagingDir    ApplicationStorageKey = "artifactStoreStagingDirectory"
-	ApplicationStorageArtifactStoreTemporaryName ApplicationStorageKey = "artifactStoreManifestTemporaryName"
+	ApplicationStorageDataDirectory          ApplicationStorageKey = "dataDirectory"
+	ApplicationStorageSettingsDirectory      ApplicationStorageKey = "settingsDirectory"
+	ApplicationStorageConversationsDirectory ApplicationStorageKey = "conversationsDirectory"
+	ApplicationStorageArtifactStoreDirectory ApplicationStorageKey = "artifactStoreDirectory"
 )
 
 type builtinRootWire struct {
@@ -633,11 +628,6 @@ func parseApplicationStorage(
 		ApplicationStorageSettingsDirectory,
 		ApplicationStorageConversationsDirectory,
 		ApplicationStorageArtifactStoreDirectory,
-		ApplicationStorageArtifactStoreManifestFile,
-		ApplicationStorageArtifactStoreMetadataFile,
-		ApplicationStorageArtifactStoreContentDir,
-		ApplicationStorageArtifactStoreStagingDir,
-		ApplicationStorageArtifactStoreTemporaryName,
 	} {
 		if _, found := output[key]; found {
 			continue

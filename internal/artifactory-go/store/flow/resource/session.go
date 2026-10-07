@@ -24,6 +24,14 @@ func WithVerificationSession[T any](
 	if sessionCtx == nil || session == nil {
 		return zero, fmt.Errorf("%w: resource verification session is incomplete", spec.ErrInvalid)
 	}
-	defer func() { returnErr = errors.Join(returnErr, session.Close(context.WithoutCancel(sessionCtx))) }()
+	defer func() {
+		returnErr = errors.Join(
+			returnErr,
+			session.Close(context.WithoutCancel(sessionCtx)),
+		)
+		if returnErr != nil {
+			value = zero
+		}
+	}()
 	return fn(sessionCtx)
 }
