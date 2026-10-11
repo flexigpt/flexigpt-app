@@ -96,6 +96,7 @@ var disabledModelsByProvider = map[inferenceSpec.ProviderName]map[modelpreset.Mo
 		modelpreset.PresetClaudeOpus41:   {},
 		modelpreset.PresetClaudeSonnet45: {},
 		modelpreset.PresetClaudeSonnet4:  {},
+		modelpreset.PresetClaudeHaiku45:  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
 		modelpreset.PresetGemini37Flash:     {},

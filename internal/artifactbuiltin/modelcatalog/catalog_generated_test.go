@@ -1,17 +1,23 @@
 //go:build generated_catalog
 
-// Package modelcatalog is intentionally behind generated_catalog flag. This takes a lot of time to run and is run
-// specially when needed.
-package modelcatalog
+// Package modelcatalog_test contains the expensive source/snapshot comparison,
+// run explicitly with the generated_catalog build tag.
+package modelcatalog_test
 
 import (
+	_ "embed"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 )
+
+//go:embed catalog_generated.json
+var generatedCatalogJSON []byte
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	registry, err := registration.NewLLMInterpretationRegistry()
@@ -24,7 +30,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("prepare inference Model catalog packages: %v", err)
 	}
 
-	expected, err := Compile(
+	expected, err := modelcatalog.Compile(
 		t.Context(),
 		t.TempDir(),
 		registry,
@@ -45,7 +51,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare inference Model catalog packages again: %v", err)
 	}
-	recompiled, err := Compile(
+	recompiled, err := modelcatalog.Compile(
 		t.Context(),
 		t.TempDir(),
 		registry,
@@ -69,7 +75,10 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		)
 	}
 
-	actualFingerprint, actualErr := generatedCatalog.Fingerprint()
+	actualCatalog := artifactbuiltin.NewGeneratedPackageCatalog(
+		generatedCatalogJSON,
+	)
+	actualFingerprint, actualErr := actualCatalog.Fingerprint()
 
 	candidate, err := catalogtest.CandidatePath(
 		"catalog_generated.next.json",

@@ -2751,6 +2751,9 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Claude Haiku 4.5",
+                  "labels": {
+                    "model.initialEnabled": "false"
+                  },
                   "name": "anthropic-claude-haiku-4-5-20251001",
                   "provider": {
                     "name": "anthropic",
@@ -2759,29 +2762,108 @@
                   "providerModelID": "claude-haiku-4-5-20251001",
                   "type": "model"
                 },
-                "digest": "sha256:871a0ae9af2e8d8def5dd23e773202856e302ab2d77e0343858bb08cc077e40c",
+                "digest": "sha256:0a37ea14496fb04660213b799132e7ce837e57c7f1b937adcb2f0b96d1e8c921",
                 "displayName": "Claude Haiku 4.5",
                 "kind": "model",
+                "labels": {
+                  "model.initialEnabled": "false"
+                },
                 "logicalName": "anthropic-claude-haiku-4-5-20251001",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:be3e2d8f7cdff68de381ad85cda7b024fefa9097f6415de65d1a73ad2f424959",
+          "digest": "sha256:587355b7c5429abe3f11c621f2f8f38ee791691c04dc3373772f119a57d29b1c",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/anthropic-claude-haiku-4-5-20251001/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbImh5YnJpZFdpdGhUb2tlbnMiXX19LCJkZWZhdWx0cyI6eyJjYWNoZUNvbnRyb2wiOnsia2luZCI6ImVwaGVtZXJhbCIsInR0bCI6IjVtIn0sIm1heE91dHB1dFRva2VucyI6NjQwMDAsIm1heFByb21wdFRva2VucyI6MjAwMDAwLCJyZWFzb25pbmciOnsibGV2ZWwiOiIiLCJ0b2tlbnMiOjEwMjQsInR5cGUiOiJoeWJyaWRXaXRoVG9rZW5zIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjFlLTEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiQ2xhdWRlIEhhaWt1IDQuNSIsIm5hbWUiOiJhbnRocm9waWMtY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMSIsInByb3ZpZGVyIjp7Im5hbWUiOiJhbnRocm9waWMiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMSIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:be3e2d8f7cdff68de381ad85cda7b024fefa9097f6415de65d1a73ad2f424959",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbImh5YnJpZFdpdGhUb2tlbnMiXX19LCJkZWZhdWx0cyI6eyJjYWNoZUNvbnRyb2wiOnsia2luZCI6ImVwaGVtZXJhbCIsInR0bCI6IjVtIn0sIm1heE91dHB1dFRva2VucyI6NjQwMDAsIm1heFByb21wdFRva2VucyI6MjAwMDAwLCJyZWFzb25pbmciOnsibGV2ZWwiOiIiLCJ0b2tlbnMiOjEwMjQsInR5cGUiOiJoeWJyaWRXaXRoVG9rZW5zIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjFlLTEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiQ2xhdWRlIEhhaWt1IDQuNSIsImxhYmVscyI6eyJtb2RlbC5pbml0aWFsRW5hYmxlZCI6ImZhbHNlIn0sIm5hbWUiOiJhbnRocm9waWMtY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMSIsInByb3ZpZGVyIjp7Im5hbWUiOiJhbnRocm9waWMiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMSIsInR5cGUiOiJtb2RlbCJ9",
+          "digest": "sha256:587355b7c5429abe3f11c621f2f8f38ee791691c04dc3373772f119a57d29b1c",
           "locator": "model.yaml",
-          "size": 525
+          "size": 567
         }
       ],
-      "fingerprint": "sha256:7da6a7b1035364a54c33c5702f16728a21204222b6f83ccd9410524048bd56bd"
+      "fingerprint": "sha256:d3d0e1649995301e72ee3edaae708b89f2ed6ce2f79290006ae59348f132d839"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "anthropic-claude-haiku-5-5",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ]
+                    }
+                  },
+                  "defaults": {
+                    "cacheControl": {
+                      "kind": "ephemeral",
+                      "ttl": "5m"
+                    },
+                    "maxOutputTokens": 128000,
+                    "maxPromptTokens": 1000000,
+                    "reasoning": {
+                      "level": "high",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "temperature": 1e-1,
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "Claude Haiku 5.5",
+                  "name": "anthropic-claude-haiku-5-5",
+                  "provider": {
+                    "name": "anthropic",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "claude-haiku-5-5",
+                  "type": "model"
+                },
+                "digest": "sha256:1ef052427c4cc9510a6eab29e395b9c7063011c6324ba13af5c5f561f335a18e",
+                "displayName": "Claude Haiku 5.5",
+                "kind": "model",
+                "logicalName": "anthropic-claude-haiku-5-5",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:113f40bea6544cc19320685b7d1a04d989caa455de28ba27c56f717003af391c",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/anthropic-claude-haiku-5-5/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdfX0sImRlZmF1bHRzIjp7ImNhY2hlQ29udHJvbCI6eyJraW5kIjoiZXBoZW1lcmFsIiwidHRsIjoiNW0ifSwibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MWUtMSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJDbGF1ZGUgSGFpa3UgNS41IiwibmFtZSI6ImFudGhyb3BpYy1jbGF1ZGUtaGFpa3UtNS01IiwicHJvdmlkZXIiOnsibmFtZSI6ImFudGhyb3BpYyIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJjbGF1ZGUtaGFpa3UtNS01IiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:113f40bea6544cc19320685b7d1a04d989caa455de28ba27c56f717003af391c",
+          "locator": "model.yaml",
+          "size": 575
+        }
+      ],
+      "fingerprint": "sha256:9a436fe513c52389653d3147faf6767c2974b5a29bf65f28f4a403de314d5bf4"
     },
     {
       "address": {
