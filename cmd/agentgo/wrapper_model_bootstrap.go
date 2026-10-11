@@ -28,7 +28,7 @@ import (
 )
 
 func initModelWrappers(
-	ctx context.Context,
+	_ context.Context,
 	storeWrapper *ModelStoreWrapper,
 	aggregateWrapper *ModelAggregateWrapper,
 	sources source.API,
