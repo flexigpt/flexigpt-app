@@ -2,185 +2,421 @@
 
 ## Purpose
 
-Introduce a Go runtime that owns agent execution while retaining the current chat interface and its interaction model.
+Introduce a Go agent runtime that owns execution while retaining the current chat interface and interaction model.
 
 The runtime will coordinate:
 
-- Model requests and tool execution.
-- Automatic execution and continuation.
+- Model requests and streamed output.
+- Tool execution and tool-result handling.
+- Automatic execution and automatic continuation.
 - Manual execution, retries, skips, and error-result submission.
-- Approval and other human interventions.
-- Context preparation and skill-session lifecycle.
-- Cancellation, persistence, and recovery.
+- Approvals and other human interventions.
+- Skill-session, MCP, workspace, attachment, and configuration preparation.
+- Cancellation, pausing, and execution limits.
+- Optional checkpointing and optional recovery.
 
-The same runtime will support interactive chat and delegated tasks. Its execution structure will allow graph workflows, subagent runs, and agent-to-agent transfers to be added later without replacing the command, event, persistence, or execution-control model.
+The same runtime will support:
 
-The initial implementation will move the existing chat loop into Go. It will not introduce a graph interpreter or multi-agent execution system immediately.
+- The current interactive chat interface.
+- Delegated or handoff tasks that continue in the backend.
+- A terminal UI.
+- Other internal applications that need agent execution without reproducing chat behavior.
+
+The initial implementation moves the current chat loop into Go. It does not introduce graph execution, subagent execution, or agent-to-agent transfer immediately. The runtime model is structured so those capabilities can be added without replacing the execution, control, event, or optional recovery model.
 
 ## Scope
 
 This is a transfer of execution ownership, not a frontend or backend overhaul.
 
-The existing model, tool, skill, MCP, workspace, artifact, and policy services remain the underlying services. The runtime coordinates them through Go interfaces.
+Existing model, tool, skill, MCP, workspace, artifact, and policy services remain the underlying services. The runtime coordinates them through Go interfaces.
 
 The frontend retains:
 
 - The Plate editor and local authoring state.
-- Tabs, navigation, focus, menus, and keyboard behavior.
-- Attachment grouping and selection controls.
-- Message, tool-chip, Markdown, and citation presentation.
-- Approval dialogs and input forms.
+- Tabs, navigation, focus, menus, keyboard shortcuts, and scroll state.
+- Attachment grouping and draft-editing controls.
+- Message, tool-chip, Markdown, citation, and debug rendering.
+- Approval dialogs and user-input forms.
 - MCP App iframe hosting and browser isolation.
-- Display buffering and rendering optimizations.
+- Rendering throttling and display-oriented stream buffering.
 
-The frontend stops owning the transitions that make an accepted task progress.
+The frontend no longer owns the transitions that make an accepted task progress.
 
-Immediate frontend validation remains useful for authoring. It is not the authority for execution eligibility or permission.
+Management pages and catalog APIs remain predominantly request/response based.
 
-Management and catalog APIs remain predominantly request/response based.
+## Design principles
 
-## Execution ownership
+### Execution is independent of UI lifetime
 
-The runtime is the sole owner of accepted execution state.
-
-Once a submission is accepted, its progress must not depend on:
+Once a task is accepted, progress must not depend on:
 
 - A composer remaining mounted.
 - A tab remaining open.
 - React committing a state update.
-- A browser timer or animation frame firing.
-- A frontend receiving a notification and making the next execution call.
+- A browser timer, animation frame, or effect running.
+- A frontend callback deciding whether to run the next tool or model request.
+- A Wails event reaching the frontend.
 
-The frontend expresses user intent and presents runtime state. Go validates that intent, records it, and performs the resulting transitions.
+The frontend expresses user intent and presents runtime state. Go validates that intent, owns the live execution state, and applies the resulting transitions.
 
-## Minimal state model
+### Persistence is optional
 
-### Addressable execution objects
+The runtime is not a database-backed workflow engine by definition.
 
-The runtime needs two application-level state roots.
+It runs correctly with only in-memory state. Checkpointing and recovery are optional host capabilities supplied through an interface.
 
-| State root  | Purpose                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Session** | The durable conversation or task context: identity, transcript, configuration defaults, selections, and associated runs. |
-| **Run**     | One accepted unit of work, including its execution position, pending operations, results, controls, and waits.           |
+A deployment may use:
 
-For chat, a Session is the conversation. The existing conversation ID becomes the Session ID. No additional persistent Context entity is required.
+- No store.
+- An in-memory store.
+- A file-backed store.
+- A database-backed store.
+- A store that writes snapshots.
+- A store that writes events.
+- A store that maintains conversation/search projections.
+- A store that retains only selected terminal results.
 
-A non-chat application can use a Session without rendering a chat transcript. For example, an internal application can create a Session for a research task, code change, report, or operations workflow.
+The runtime does not require any particular persistence mechanism, file layout, database schema, event format, transaction model, or retention policy.
 
-A tab is not a Session. A tab is one frontend view of a Session. Multiple views or clients may observe the same Session.
+### Session is the runtime term for a conversation
 
-Agent definitions, tools, workspaces, skills, MCP servers, and other capabilities remain existing artifacts or service resources. They are not duplicated as new runtime entities.
+In this proposal, **Session** is the runtime synonym for a conversation.
 
-### Why a Run is necessary
+For the existing chat product:
 
-A single user task may involve:
+- A Session is the conversation.
+- The existing conversation ID becomes the Session ID where one already exists.
+- A tab is only a frontend view of a Session.
+- Multiple views or clients may observe the same Session.
+
+A non-chat application may use a Session without presenting a conversation UI.
+
+The term **skill session** remains separate and refers to the existing skill-runtime session concept.
+
+### Runs own work
+
+A **Run** is one accepted unit of work inside a Session.
+
+A Run may include multiple model requests, tool calls, approvals, user interactions, and continuation cycles.
+
+A manually submitted tool follow-up continues the existing Run. It does not become unrelated work merely because the visible conversation may represent it as another user message.
+
+### Physical state roots remain minimal
+
+The runtime has two application-level state roots:
+
+| State root  | Purpose                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| **Session** | Conversation or task context, transcript, default configuration, selections, and associated Runs. |
+| **Run**     | One accepted task and its active execution state, controls, waits, operations, and results.       |
+
+There is no separately addressable `ModelStep` entity.
+
+A model request, tool attempt, approval request, or graph node activation is an operation or record owned by a Run. It may have an identity and history because execution requires it, but it is not another top-level runtime object.
+
+## Minimal runtime state model
+
+### Session
+
+A Session contains the live state needed to represent a conversation or task context:
+
+- Session identity.
+- Visible transcript or task history.
+- Default model and capability selections.
+- Agent selection and applied configuration provenance.
+- Instruction-source selections.
+- Installed skill selections.
+- Workspace and MCP selection intent.
+- Associated Runs.
+- A revision for optimistic commands and view synchronization.
+
+The Session stores defaults for future Runs. A dispatched model request always uses a captured snapshot of the configuration that applied when that request began.
+
+### Run
+
+A Run owns one accepted task from admission through completion, cancellation, failure, or waiting.
+
+A Run contains:
+
+- Run identity.
+- Session identity.
+- Lifecycle state.
+- Driver kind and logical driver state.
+- Active model and tool operations.
+- Proposed tool calls and recorded results.
+- Pending intervention requests.
+- Automation and pause controls.
+- Limits and accumulated usage.
+- Versioned continuation input.
+- Execution history needed for diagnostics and optional recovery.
+
+A Run lifecycle may be represented as:
 
 ```text
-User input
-  → model request
-  → tool calls
-  → approval
-  → tool results
-  → another model request
-  → further tool calls
-  → final response
+queued
+running
+waiting
+paused
+cancelling
+completed
+failed
+cancelled
 ```
 
-The task needs one identity and one execution owner throughout this sequence, including while it waits for a person, a tool, or an external service.
+The lifecycle state is not sufficient by itself to describe execution. The Run also has a logical driver position and owned operation records.
 
-The Run owns that continuity.
+For example, a Run may be `waiting` because:
 
-A Run is not equivalent to a provider completion request. It may contain multiple provider completion requests and multiple tool executions.
+- A tool approval is required.
+- A tool is waiting for manual execution.
+- A user answer is required.
+- A selected MCP server is not ready.
+- A recovery decision is required.
+- Automatic continuation is intentionally held.
 
-A manually submitted tool follow-up continues the existing Run. It does not create unrelated work merely because the current conversation format represents the follow-up as another user message.
+### Model operations
 
-A new ordinary user turn, after the prior task has reached a terminal state, normally creates a new Run.
+A model operation is a record inside a Run.
 
-### Model requests are operations, not another state root
+It exists because the runtime must know:
 
-There will be no independently addressable `ModelStep` entity.
-
-Each model invocation needs an operation record inside its Run because the runtime must know:
-
-- Which provider request is active.
-- Which input and configuration were used.
-- Where streamed output belongs.
+- Which request is in flight.
+- Which model and request configuration were used.
+- Which history and materialized inputs were used.
 - Which cancellation handle applies.
-- Which response produced a tool call.
-- What completed, failed, or was interrupted.
+- Where streamed text and reasoning belong.
+- Which tool calls originated from the response.
+- Whether the operation completed, failed, stopped, or was interrupted.
 
-The existing completion request ID can serve as the model-operation ID.
+The existing completion request ID can serve as the model-operation identity.
 
-This does not require a separate lifecycle API, persistent root, or user-facing entity called a model step.
+A model operation is not a top-level application entity and does not require a separate user-facing lifecycle API.
 
-The same principle applies to tool attempts and waiting requests: they are records owned by the Run rather than separate application state roots.
+### Tool calls, attempts, and results
 
-### Records owned by a Run
+A tool call is a logical request produced by a model operation.
 
-A Run contains a current-state checkpoint and an execution journal.
+A tool attempt is one execution of that call.
 
-Its owned records include:
+A tool result is the response selected for that call when the Run proceeds.
 
-| Record             | Necessary state                                                                 |
-| ------------------ | ------------------------------------------------------------------------------- |
-| Model operation    | Input snapshot, request identity, output, usage, and outcome.                   |
-| Tool call          | Originating operation, arguments, executable binding, and response requirement. |
-| Tool attempt       | Dispatch identity, authorization, deadline, and known or uncertain outcome.     |
-| Tool result        | Typed result, error/skip state, metadata, and consumption state.                |
-| Waiting request    | Approval, input, manual action, configuration, or recovery requirement.         |
-| Continuation input | User additions and configuration changes staged for a subsequent request.       |
-| Control state      | Automatic-execution holds, continuation holds, pause, and cancellation.         |
+This distinction is necessary for retries and side-effect safety:
 
-These records are persisted where required for execution or recovery. They are not independent resources whose lifetimes need separate management.
+- Retrying does not erase the previous attempt.
+- Skipping creates a deliberate result rather than deleting the call.
+- A tool error result is different from an execution failure with no result.
+- A timeout may leave the external outcome unknown.
+- A result can be recorded before a later model request consumes it.
 
-The storage implementation may normalize records internally, but ownership remains with the Run.
+### Waiting requests
 
-## Runtime structure
+A waiting request is a Run-owned record for work the runtime cannot resolve independently.
 
-The execution system consists of three parts:
+Examples include:
 
-- A **coordinator** that owns Run state and applies commands and operation results.
-- An **execution driver** that determines the next logical work.
-- **Operation executors** that invoke existing services.
+- Tool approval.
+- User input.
+- Required configuration repair.
+- Authentication action.
+- Manual tool execution.
+- Continuation review.
+- Recovery of uncertain external work.
+
+The frontend renders waiting requests. It does not own the promise whose existence keeps execution alive.
+
+## Runtime architecture
 
 ```mermaid
 flowchart TB
-    UI["Chat / terminal / application client"]
-    API["Commands, queries, and events"]
-    Coordinator["Go Run coordinator"]
-    Driver["Chat-loop driver"]
-    Future["Future graph or agent drivers"]
-    Executors["Operation executors"]
-    Services["Existing model, tool, skill, MCP, workspace, and policy services"]
-    Store["Session and Run repository"]
+    Client["Chat UI / terminal UI / internal application"]
+    API["Commands, queries, and runtime events"]
 
-    UI <--> API
-    API <--> Coordinator
-    Coordinator <--> Store
-    Coordinator <--> Driver
-    Coordinator -. extension .-> Future
-    Coordinator --> Executors
+    Runtime["Go Agent Runtime"]
+    Registry["Live Session and Run registry"]
+    Driver["Chat-loop driver"]
+    FutureDrivers["Future graph and agent drivers"]
+    Executors["Model, tool, skill, MCP, workspace executors"]
+
+    Services["Existing model, tool, skill, MCP, workspace, artifact, and policy services"]
+
+    Checkpoint["Optional checkpoint sink"]
+    Recovery["Optional recovery source"]
+
+    Client <--> API
+    API <--> Runtime
+
+    Runtime <--> Registry
+    Runtime <--> Driver
+    Runtime -. extension .-> FutureDrivers
+    Runtime --> Executors
     Executors --> Services
-    Executors --> Coordinator
+    Executors --> Runtime
+
+    Runtime -. checkpoint notices .-> Checkpoint
+    Recovery -. restore inputs at startup .-> Runtime
 ```
 
-The coordinator owns guarantees common to every execution form:
+The runtime consists of:
 
-- Command ordering and deduplication.
-- Persistence.
-- Operation identity.
-- Permission checks.
-- Dispatch gates.
-- Cancellation.
-- Limits.
-- Waiting requests.
-- Result recording.
-- Event publication.
+- A live in-memory Session and Run registry.
+- A Run coordinator that serializes state transitions.
+- An execution driver that determines the next logical work.
+- Executors that invoke existing application services.
+- A command/query/event interface for clients.
+- Optional checkpoint and recovery adapters.
 
-The initial chat-loop driver owns the existing chat-specific progression rules.
+The initial driver is a sequential chat-loop driver.
 
-An execution driver does not call a tool or model directly. It proposes work to the coordinator, which applies the same safeguards regardless of the driver.
+Future graph, loop, subagent, and transfer behavior can be implemented as additional drivers using the same coordinator and executors.
+
+## Optional store, checkpointing, and recovery
+
+### Runtime state is live in memory by default
+
+The runtime maintains Sessions and Runs in memory while the process is running.
+
+No persistence provider is required for:
+
+- Creating a Session.
+- Starting a Run.
+- Streaming a response.
+- Executing tools.
+- Waiting for approval.
+- Continuing a task.
+- Cancelling a task.
+- Rendering current runtime state to a client.
+
+A process without a store can run the complete interactive chat loop.
+
+If that process exits, active in-memory Sessions and Runs are lost unless a recovery provider was configured. This is an explicit deployment property, not a runtime failure.
+
+### Store providers are optional adapters
+
+A store provider may consume runtime checkpoints and later supply recovery input.
+
+Conceptually:
+
+```go
+type CheckpointSink interface {
+    HandleCheckpoint(context.Context, RuntimeCheckpointView) error
+}
+
+type RecoverySource interface {
+    Restore(context.Context, RuntimeRestorer) error
+}
+
+type RuntimeStore interface {
+    CheckpointSink
+    RecoverySource
+}
+```
+
+These interfaces are conceptual. Their final names and exact Go signatures can follow existing application conventions.
+
+The important boundary is:
+
+- The runtime provides semantic checkpoint views.
+- The provider decides what to store.
+- The provider decides how to encode it.
+- The provider decides when to compact, snapshot, index, encrypt, or discard it.
+- The provider later supplies semantic restore input.
+- The runtime does not own the provider’s storage format.
+
+A checkpoint view is not a mandated database schema or serialized file format. A provider may represent the same runtime state as:
+
+- Rows across several tables.
+- A JSON or protobuf snapshot.
+- An append-only event log.
+- A compressed encrypted blob.
+- A conversation projection plus a separate execution journal.
+- A terminal-result archive only.
+- Nothing at all.
+
+### Checkpoint notices
+
+The runtime emits checkpoint notices after meaningful live transitions, such as:
+
+- Session configuration changes.
+- Run acceptance.
+- Model operation start or terminal outcome.
+- Tool dispatch.
+- Tool result.
+- Waiting request creation or resolution.
+- Automation-control changes.
+- Run terminal state.
+
+A store may consume every notice, coalesce them, retain only selected notices, or ignore them.
+
+The runtime does not require the provider to persist every event and does not require the provider to use event sourcing.
+
+A store may also consume the public runtime event stream if that is more appropriate for its design. The runtime does not require persistence to use either a particular checkpoint representation or the public event representation.
+
+### Recovery input
+
+At initialization, an optional recovery source can provide Session and Run restore input.
+
+The provider may restore:
+
+- Nothing.
+- Idle Sessions only.
+- Completed Runs.
+- Waiting Runs.
+- Paused Runs.
+- Fully resumable Runs.
+- A subset selected by application policy.
+
+The provider controls which records it retained and which Sessions or Runs it wants restored.
+
+The runtime validates restore input and reconstructs live in-memory state.
+
+Recovery input is semantic, not raw storage data. A provider may reconstruct it from any internal representation.
+
+### Recovery of active external work
+
+A recovered Run does not blindly replay in-flight operations.
+
+Recovery distinguishes:
+
+- Work accepted but never dispatched.
+- Completed work with a recorded result.
+- Waiting approval or user input.
+- Interrupted model operations.
+- Tool attempts whose external outcome is uncertain.
+- Invalidated skill, MCP, workspace, or model state.
+
+A completed recorded tool result is reused.
+
+A tool whose side effect may have occurred but whose final result was not retained is not automatically treated as unexecuted. The Run enters a visible recovery state or waits for an explicit decision where necessary.
+
+External exactly-once execution is not assumed. Tool adapters may use idempotency keys or remote operation identities where available.
+
+### In-memory, file, and database implementations
+
+The runtime may provide standard implementations:
+
+| Store implementation | Behavior                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| No store             | Runtime keeps only live in-memory state. No restart recovery.                                                   |
+| In-memory store      | Useful for tests, local host abstractions, and controlled lifecycle behavior. It does not survive process exit. |
+| File store           | Persists provider-defined snapshots or logs to local files.                                                     |
+| Database store       | Persists provider-defined records and may also maintain search or conversation projections.                     |
+
+The live runtime registry is not required to be implemented through the store interface. The store is an optional observer and recovery source.
+
+### Checkpoint failure behavior
+
+By default, checkpointing is observational.
+
+A checkpoint sink failure:
+
+- Is reported through diagnostics or runtime events.
+- Does not invalidate the live Run.
+- Does not cancel already accepted work.
+- Does not prevent in-memory progression.
+
+A host that requires storage acknowledgment before accepting or dispatching a particular class of work may add an admission or dispatch policy around the runtime.
+
+That stricter behavior is a host policy. It is not a requirement of the core runtime.
 
 ## Current chat execution model
 
@@ -188,52 +424,81 @@ An execution driver does not call a tool or model directly. It proposes work to 
 
 Submission remains an explicit user action.
 
-For normal chat submission, Go performs the send-time preparation currently distributed across the composer and conversation hooks:
+For a normal chat submission, Go performs the send-time preparation currently distributed across composer and conversation hooks:
 
 - Validate that there is content to submit.
-- Resolve the model and request preferences.
-- Resolve selected tools and their user configuration.
+- Resolve the selected model and request preferences.
+- Resolve selected tools and user-provided tool configuration.
 - Verify provider-specific tool compatibility.
 - Resolve instruction sources.
-- Ensure the required skill state.
+- Ensure required skill-session state.
 - Validate workspace selection.
 - Validate MCP readiness and required arguments.
-- Construct the history and current inputs.
+- Construct history and current inputs.
 
 Preparation may involve asynchronous service calls. The frontend displays the existing submitting state while awaiting the result.
 
 Failures that currently prevent submission continue to reject submission. The draft remains available for correction.
 
-Examples include unavailable selected tools, incompatible provider tools, missing MCP arguments, and an unavailable selected workspace.
+Examples include:
 
-Existing warning-versus-blocking distinctions are retained. Partial workspace capability diagnostics do not automatically become a blanket rejection of otherwise usable content.
+- An unavailable saved tool selection.
+- Incompatible provider tools.
+- Missing required tool arguments.
+- Missing MCP prompt or resource-template arguments.
+- An unavailable selected workspace.
+- A required skill session that cannot be prepared.
 
-Acceptance commits:
+Existing warning-versus-blocking distinctions remain. Partial workspace diagnostics do not become a blanket rejection of otherwise usable content.
 
-- The submitted input.
-- Its accepted configuration.
-- The Run identity and initial state.
-- The associated Session conversation update.
-- The command receipt.
+When accepted, the runtime applies a live transition that:
 
-The first model request cannot be dispatched before this commit.
+- Adds submitted input to the Session transcript.
+- Captures the accepted configuration for the Run.
+- Creates or advances the Run.
+- Creates the first model operation.
+- Returns an acceptance receipt.
 
-The frontend clears the submitted draft only after receiving an accepted receipt. A resolved frontend promise or a queued save is no longer treated as acceptance.
+The frontend clears the submitted draft only after receiving that receipt.
+
+Acceptance means the live runtime owns the work. It does not inherently claim that a persistence provider has written the work to disk or a database.
 
 ### Model invocation
 
-Before each model invocation, the coordinator records the actual input snapshot and applicable configuration.
+Before each model invocation, the runtime captures:
 
-History construction preserves the existing behavior:
+- The effective model and request configuration.
+- The selected history.
+- Materialized attachments and context.
+- Selected tools and bindings.
+- Skill and workspace state.
+- MCP selections and resolved capability state.
 
-- N previous pure user turns, excluding the current turn.
-- Tool-output follow-ups remain part of their originating execution sequence.
-- The full selected suffix is retained.
-- Earlier system and developer messages remain pinned.
+History construction preserves the current behavior:
 
-The model executor uses the existing completion service. Streaming and final responses return to the coordinator under the operation ID.
+- Include the current turn plus N previous pure user turns.
+- Do not count tool-output follow-ups as independent pure user turns.
+- Retain the full selected suffix.
+- Preserve earlier system and developer messages.
 
-The coordinator owns response accumulation and finalization.
+The Go runtime calls the underlying Go completion service directly. It does not call the frontend `WailsCompletionAPI` as part of internal execution.
+
+The Wails completion binding may remain as a compatibility adapter where needed, but the runtime model executor uses the service behind `CompletionWrapper.FetchCompletion` directly.
+
+### Streamed output
+
+The runtime owns authoritative output accumulation for an active model operation.
+
+The frontend may still:
+
+- Batch display updates.
+- Delay expensive Markdown rendering.
+- Render only the active tab.
+- Preserve a last visible stream snapshot during rendering transitions.
+
+Empty stream chunks remain no-ops, not end-of-stream signals.
+
+A client missing stream events can request a current Run snapshot. The event stream is not the sole source of truth.
 
 ### Response handling
 
@@ -246,21 +511,19 @@ The runtime preserves the current meaningful outcome distinctions:
 - User cancellation before output.
 - User cancellation after partial output.
 
-Empty stream chunks remain no-ops, not end-of-stream signals.
+Streamed text alone does not establish a successful outcome if the provider ends without a usable final response.
 
-Streamed content alone does not establish successful completion if the backend ends without a usable final outcome.
-
-An error response containing usable tool calls does not cause those calls to disappear. Their treatment follows the chat-loop rules and recorded diagnostics rather than an unconditional terminal-failure shortcut.
+A response error containing usable tool calls does not cause those calls to disappear. The calls remain part of the Run and are handled by the chat-loop driver.
 
 Partial output remains available after interruption.
 
-The existing stopped-generation and error presentation can remain. Its runtime meaning is recorded separately from assistant text, so cancellation is not stored as a successful completion merely because a stopped-generation line was added.
+The existing stopped-generation and error presentation can remain. Its runtime meaning is recorded separately from assistant text, so cancellation is not represented as successful completion merely because a terminal line was appended for display.
 
 ### Tool-call preparation
 
 Calls requiring local execution are bound to the capabilities used by their originating model operation.
 
-A binding records enough information to identify:
+A tool binding identifies:
 
 - A selected Go tool.
 - An MCP tool and server.
@@ -268,26 +531,26 @@ A binding records enough information to identify:
 - A provider-managed tool.
 - An unresolved call.
 
-Provider-managed tools remain provider-managed. They are not sent through the local execution scheduler.
+Provider-managed tools remain provider-managed. They are not sent through the local tool scheduler.
 
-Unresolved calls remain visible and actionable as failures. They are not silently omitted.
+Runtime-injected skill tools are registered bindings, not merely tool names that happen to match a prefix.
 
-Current catalogs may determine whether an operation is still available or permitted. They do not rewrite the identity of a historical call.
+Unresolved calls remain visible and actionable as failures. They are not silently dropped.
 
-Debug details are diagnostic data, not a required source of executable tool mappings.
+Current catalogs may determine whether rerunning a call is possible or allowed. They do not rewrite what the original call meant.
 
 ### Tool execution
 
-The initial implementation retains sequential execution for the current chat loop.
+The initial implementation retains sequential execution for the existing chat loop.
 
 For each permitted execution:
 
 - The coordinator checks current Run controls.
 - Authorization is evaluated.
-- Any required approval is recorded.
-- The dispatch record is committed.
+- Any required approval becomes a waiting request.
+- The runtime records a live dispatch attempt.
 - The executor invokes the appropriate service.
-- The result or failure is recorded.
+- The result or failure is applied to the Run.
 - The chat driver reevaluates progression.
 
 Tool execution retains the distinction between:
@@ -301,11 +564,15 @@ These distinctions determine what the user can do next.
 
 ### Continuation
 
-A new model request is permitted only when all required tool responses for the current request have been resolved.
+A new model operation is permitted only when all required tool responses for the current operation have been resolved.
 
-The next request consumes selected recorded results and accepted continuation input.
+The next model operation consumes:
 
-Consumption is recorded atomically with creation of the next model operation. Repeated events or commands cannot cause the same continuation to be submitted twice.
+- Selected recorded tool results.
+- Accepted continuation input.
+- Configuration changes accepted for the next execution boundary.
+
+The runtime applies result consumption and creation of the next model operation as one ordered live transition. Duplicate events or repeated commands cannot cause the same continuation to begin twice.
 
 When no further work or intervention is required, the Run reaches a terminal state.
 
@@ -313,160 +580,170 @@ When no further work or intervention is required, the Run reaches a terminal sta
 
 ### Manual and automatic behavior are separate
 
-The runtime maintains separate decisions for:
+The runtime keeps separate decisions for:
 
 - Whether an operation is authorized.
 - Whether a tool may execute automatically.
-- Whether results may be submitted automatically.
+- Whether results may continue automatically.
 - Whether the user explicitly requested continuation.
 
-An auto-execute flag is not an approval.
+An auto-execute preference is not approval.
 
-An approval does not necessarily request execution or continuation.
+Approval is not a request to execute or continue.
 
 ### Action semantics
 
-| Current action            | Backend execution semantics                                                                                                                             |
+| Current action            | Runtime semantics                                                                                                                                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Send**                  | Submit current input, or continue the current Run using recorded results and user additions. Pending or running required calls still block this action. |
 | **Enter / Fast-forward**  | Execute pending runnable calls, then request continuation once all required responses are available.                                                    |
 | **Play: run tools only**  | Execute pending calls without creating a new explicit continuation request. Existing automatic-batch policy remains applicable.                         |
-| **Run one call**          | Create one attempt for that call. It does not grant unrelated execution or invent a continuation request.                                               |
+| **Run one call**          | Create one attempt for that call. It does not grant unrelated execution or create a continuation request.                                               |
 | **Retry failed call**     | Create another attempt for the same unresolved logical call.                                                                                            |
-| **Retry an error result** | Retain the previous attempt and create a replacement attempt before the result is consumed.                                                             |
+| **Retry an error result** | Retain the prior attempt and create a replacement attempt before the result is consumed.                                                                |
 | **Skip**                  | Record that the call was intentionally not executed and create the corresponding tool response.                                                         |
 | **Submit error**          | Create a response for a failed call so the model protocol can continue without claiming successful execution.                                           |
-| **Stop response**         | Cancel the current Run’s further progression and request cancellation of its active operation.                                                          |
-| **Stop automatic tools**  | Prevent the next eligible automatic dispatches at the current or next applicable batch boundary.                                                        |
+| **Stop response**         | Cancel further Run progression and request cancellation of the active operation where supported.                                                        |
+| **Stop automatic tools**  | Prevent covered automatic dispatches at the current or next applicable batch boundary.                                                                  |
 
-The Play behavior requires particular care. In the current implementation, Play does not directly request another model submission, but the independent automatic-submission logic may still continue a wholly automatic, successful batch.
+### Play behavior
 
-The backend preserves that behavior. It does not silently redefine Play as a permanent continuation hold.
+The current Play action does not directly request another model submission. However, the existing frontend can automatically continue a wholly automatic successful batch through separate auto-submit behavior.
 
-A stricter “execute and always wait” action can be added separately if desired.
+The backend preserves that behavior.
+
+Play does not become a permanent continuation hold merely because execution ownership moved into Go.
+
+A separate future action may explicitly mean “execute and always wait.”
 
 ### Automatic continuation rule
 
-The initial chat driver preserves the existing rule:
+The initial chat driver preserves the current rule:
 
-- The batch has been observed and recorded.
+- The relevant batch has been observed.
 - Every relevant call is automatic-eligible.
-- No required calls remain unresolved.
+- No required call remains unresolved.
 - Every selected result is successful.
-- There is no automatic-execution or continuation hold.
-- Configuration and other submission requirements are satisfied.
-- This batch has not already been consumed.
+- No automation hold or pause applies.
+- Configuration and other continuation requirements are satisfied.
+- The batch has not already been consumed.
 
-Mixed manual/automatic batches do not automatically continue.
+Mixed manual and automatic batches do not automatically continue.
 
 Error and skipped results remain valid protocol responses, but do not satisfy the successful automatic-batch rule.
 
-Explicit Fast-forward or Send may continue with error results once the required calls have corresponding responses. Calls that failed without a response still require retry or explicit error-result creation.
+Explicit Fast-forward or Send may continue with error results once each required call has a corresponding response. Calls that failed without a response still require retry or explicit error-result creation.
 
 ### Stopping the next scheduled automatic execution
 
-The existing ability to prevent subsequent automatic calls is retained as a backend control.
+The existing ability to stop upcoming automatic work is retained as a backend control.
 
 The control targets:
 
-- Undispatched automatic calls in the current batch, when such a batch exists.
-- Otherwise, the next applicable batch proposed by the active model request.
+- Undispatched automatic calls in the current batch, when one exists.
+- Otherwise, the next applicable batch proposed by the active model operation.
 
 It also prevents automatic continuation at the affected boundary where applicable.
 
 Pending calls remain visible and can be run manually. An already executing call may finish; this control does not falsely report that it was cancelled.
 
-The coordinator checks this hold before every automatic dispatch. There is no frontend drainer with a separate understanding of the hold.
+The coordinator checks the hold before every automatic dispatch. There is no frontend drainer with a separate understanding of the hold.
 
-After the command is acknowledged, no later automatic dispatch covered by its scope may begin.
+After the command is accepted, no later automatic dispatch covered by its scope may begin.
 
-If a call was already dispatched before the command was accepted, the receipt identifies that fact. The system cannot promise to undo work that has already started.
+If a call was already dispatched before the command was accepted, the receipt identifies that fact. The system cannot undo work that has already started.
 
 For the existing one-batch stop behavior, explicit completion of the held batch permits subsequent batches to use their normal settings. An indefinite hold is a separate control.
 
-### Explicit pause controls
+### Pause and cancellation
 
-The underlying model also supports:
+The runtime distinguishes:
 
-- Hold automatic model continuation.
-- Hold automatic tool execution until resumed.
-- Pause all new dispatch at a safe boundary.
+| Control                     | Effect                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| Hold automatic tools        | Prevent automatic tool dispatch; manual actions remain possible.             |
+| Hold automatic continuation | Prevent automatic model continuation after tools settle.                     |
+| Pause Run                   | Prevent all new dispatch at a safe boundary until resumed.                   |
+| Cancel Run                  | Prevent future work and request cancellation of active work where supported. |
 
-These are distinct from cancellation.
+A pause does not claim that already dispatched external work was stopped.
 
-A whole-Run pause prevents new dispatch, including manually requested continuation, until resumed. The existing automatic-tool stop affects automatic progression rather than cancelling an explicit manual batch already requested by the user.
+Cancellation is not rollback. If an external tool may have performed a side effect despite timeout or cancellation, that uncertainty remains visible in the Run.
 
 ## Continuation input and configuration changes
 
-### Preserve additions made during tool execution
+### Preserving additions made while tools are active
 
-The current composer can collect text, attachments, and configuration changes while tools are executing. Its automatic-submit path reads that authoring state when it submits results.
+The current composer can collect text, attachments, and configuration changes while tool work is pending.
 
-Moving continuation into Go requires an explicit representation of those additions. Otherwise, a backend loop would ignore data that exists only in the editor.
+Moving continuation into Go requires an explicit representation of those additions. Otherwise, automatic continuation would ignore authoring state that exists only in the frontend.
 
-The Run therefore supports a versioned **continuation input** record.
+A Run therefore supports a versioned **continuation input**.
 
-While a Run is in its tool/continuation portion, the frontend publishes meaningful authoring changes through `UpdateContinuationInput`. The record contains normalized input and selection intent, not Plate nodes or runtime tool-result payloads.
+While a Run is awaiting tool completion or continuation, the frontend may publish `UpdateContinuationInput` commands containing normalized authoring intent.
 
-It can include:
+A continuation input may include:
 
 - Text.
 - Attachments.
 - Instruction selections.
 - Tool-selection changes.
-- Model/request preferences.
+- Model and request preferences.
 - MCP context and approved App contributions.
 - Workspace and skill-selection intent.
 
-Automatic continuation consumes the latest accepted continuation-input revision.
+The runtime consumes the latest accepted continuation-input revision when it begins the next model operation.
 
-The UI clears only the revision confirmed as consumed. A newer local edit is not erased because an older revision was submitted.
+The frontend clears only the revision confirmed as consumed. A newer edit is not erased because an earlier revision was used.
 
-An update arriving after a model request has started does not alter that request. It remains staged for a later boundary or remains an unsent draft if the Run finishes.
+An update received after a model operation starts does not alter that operation. It remains staged for the next boundary or remains a draft if the Run completes.
 
-This introduces an explicit acceptance cutoff: automatic continuation includes acknowledged input, not arbitrary frontend state that Go has not received. Unacknowledged edits remain available rather than being silently discarded.
+This creates a clear acceptance cutoff:
 
-The backend never requests a React callback to determine whether it may continue.
+- Acknowledged continuation input may be consumed.
+- Unacknowledged frontend edits remain local and are not silently lost.
+
+If there is no continuation input, automatic continuation proceeds with the same no-addition behavior available today.
 
 ### Configuration applies at execution boundaries
 
-Configuration is not permanently frozen for an entire interactive Run.
+Configuration is not frozen for the entire interactive Run.
 
-That would change the current ability to alter the model or context before a tool-result follow-up.
+That would remove the current ability to change model, instructions, tools, MCP context, or workspace settings before a tool-result follow-up.
 
 Instead:
 
-- Each dispatched model operation has an immutable input/configuration snapshot.
+- Each dispatched model operation has an immutable input and configuration snapshot.
 - Accepted changes may apply to the next model operation.
-- Changes do not alter a model operation already in flight.
+- Changes do not alter an operation already in flight.
 - Changes do not rewrite an existing tool call’s original binding.
-- Skill-session replacement waits until active users of the previous session have settled.
-- Capability expansion and permission changes remain subject to backend policy.
+- Skill-session replacement waits until active use of the prior session has settled.
+- Capability expansion remains subject to backend policy.
 
-Configuration updates with blocking issues prevent continuation until corrected, rather than causing the runtime to continue using an older valid configuration without explanation.
+Blocking configuration changes prevent continuation until corrected. The runtime does not silently continue with a stale configuration without exposing the reason.
 
 ### Agent application
 
 Applying an Agent remains a configuration action, not task execution.
 
-Backend application preserves the current semantics:
+Backend application preserves current semantics:
 
 - Empty recipe selections clear corresponding selections.
 - Obsolete Agent-owned instruction sources are removed.
 - Unrelated instruction sources remain.
-- Workspace selection is retained unless explicitly changed.
+- Workspace selection remains unless explicitly changed.
 - Installed and workspace-owned skill membership remain separate.
 - Starter text is offered only for an empty draft.
 
 The frontend inserts starter text into its local editor. Agent application never overwrites existing user text or automatically submits a task.
 
-New Runs record Agent identity and revision alongside effective user-modified configuration. Historical conversations without that provenance can retain the current tracked-versus-applied distinction.
+New Runs record Agent identity and revision alongside effective user-modified configuration. Historical Sessions without that provenance can retain the current tracked-versus-applied distinction.
 
 ## Approvals and intervention
 
 ### Run-owned waiting requests
 
-A waiting request is an owned Run record containing:
+A waiting request contains:
 
 - Request identity.
 - Kind.
@@ -474,7 +751,7 @@ A waiting request is an owned Run record containing:
 - Public summary or input schema.
 - Allowed resolutions.
 - Revision and status.
-- Expiry where applicable.
+- Optional expiry.
 
 It may represent:
 
@@ -482,11 +759,11 @@ It may represent:
 - User input.
 - Required configuration.
 - Authentication action.
-- Manual execution.
+- Manual tool execution.
 - Continuation review.
-- Recovery of an uncertain operation.
+- Recovery of uncertain work.
 
-The frontend renders these requests. It does not own the promise whose existence keeps execution alive.
+The frontend renders waiting requests. It does not own the promise that keeps execution alive.
 
 ### Approval behavior
 
@@ -495,48 +772,53 @@ The current approval choices remain available with their actual backend scopes.
 The runtime:
 
 - Evaluates the exact operation.
-- Records the pending request.
-- Accepts the user’s resolution.
-- Revalidates the operation’s scope.
+- Creates a pending waiting request.
+- Accepts a user resolution.
+- Revalidates the operation scope.
 - Obtains and consumes any required execution authorization.
 - Proceeds or records a denial result.
 
-Approval is associated with the actual tool, arguments, definition, and execution scope. Changing material execution details invalidates the prior authorization.
+Approval is associated with the exact tool, arguments, definition, and execution scope. Changing material execution details invalidates prior authorization.
 
-Allow-once tokens remain in Go. The frontend submits the decision, not a token that it later forwards into tool invocation.
+Allow-once tokens remain in Go. The frontend submits a decision, not a token that it later forwards into invocation.
 
 Policy evaluation remains in the existing policy services. The runtime does not create a second policy implementation.
 
-### Intervention and automatic scheduling
+### Approval and automation controls
 
 A pending approval does not remove the user’s ability to stop later automatic calls.
 
-An automatic-execution hold is recorded independently of approval state.
+An automation hold is recorded independently of approval state.
 
-If the user approves a call while such a hold is active, approval alone does not dispatch that call. The call remains authorized but held unless the user explicitly requested its manual execution.
+If a user approves a call while an automatic-execution hold is active:
 
-This separates consent from scheduling and avoids a delayed approval unexpectedly restarting automatic work.
+- The call becomes authorized.
+- The call does not automatically dispatch.
+- The call remains visible and may be run manually.
+- Automatic execution resumes only if the hold is removed or its scope ends.
+
+This separates consent from scheduling and avoids delayed approval unexpectedly restarting automatic work.
 
 ### Disconnect and dismissal
 
-A deliberate dismissal of an approval dialog may retain the current deny-once behavior.
+A deliberate dismissal of an approval dialog may preserve the current deny-once behavior.
 
-Unmounting the dialog because of navigation, tab closure, or frontend reload is not treated as a user decision.
+Unmounting a dialog because of navigation, tab closure, frontend reload, or client disconnection is not treated as a user decision.
 
-Run-owned requests remain pending until resolved, expired, cancelled, or invalidated.
+Run-owned waiting requests remain pending until resolved, expired, cancelled, or invalidated.
 
-If two clients resolve the same request, the first valid committed resolution wins. Subsequent clients receive its resolved state.
+If two clients resolve the same request, the first valid resolution wins. Subsequent clients receive the resolved state.
 
 ## Delegated tasks
 
-Delegating work starts a Run with an execution policy that permits backend progression without repeated manual continuation.
+Delegating work starts or updates a Run with an execution policy that permits backend progression without repeated manual continuation.
 
-It uses the same:
+Delegated execution uses the same:
 
 - Configuration preparation.
 - Model and tool executors.
 - Permission checks.
-- Operation records.
+- Run operation records.
 - Limits.
 - Intervention requests.
 - Cancellation controls.
@@ -544,13 +826,13 @@ It uses the same:
 
 There is no separate delegated-task scheduler.
 
-An existing interactive Run can be delegated at a safe boundary by changing its progression policy. The same task is not submitted again under another identity.
+An existing interactive Run can be delegated at a safe boundary by changing progression policy. The same task is not submitted again under another identity.
 
 A delegated Run can still wait for approval or user input. Absence of a connected client is neither approval nor denial.
 
 Non-chat clients can consume structured results and output artifacts without interpreting chat presentation.
 
-Backend-owned execution continues only while the Go process is running. Continuing after the Wails application exits would require a separate host process; that deployment change is outside the initial scope.
+Backend-owned execution continues only while the Go process is running. Continuing after the Wails application exits requires a separate host process and is outside the initial scope.
 
 ## Extensibility for loops, graphs, and subagents
 
@@ -558,12 +840,7 @@ Backend-owned execution continues only while the Go process is running. Continui
 
 The chat loop is the first execution driver.
 
-The coordinator accepts driver transitions that contain:
-
-- Updated logical execution position.
-- Proposed operations.
-- Required waits.
-- An optional terminal outcome.
+A driver determines logical progression. It proposes work; it does not directly invoke tools or models.
 
 Conceptually:
 
@@ -584,23 +861,28 @@ type DriverTransition struct {
 
 This is an internal Go boundary, not a frontend workflow language.
 
-The driver’s state is versioned, serializable data owned by the Run. It cannot depend on a live closure, component, or goroutine stack to resume.
+Driver state is versioned and owned by the Run. It cannot depend on a live closure, component, or goroutine stack to resume.
 
-The coordinator commits the driver transition and its operation intents together.
-
-Only supported operation kinds are executable. The initial implementation supports the operations needed by the current chat loop. Adding another driver does not grant access to arbitrary services or bypass dispatch checks.
+The coordinator applies the driver transition, validates proposed work, and dispatches only supported operation kinds.
 
 ### Agent loops
 
 The initial chat driver already supports repeated model/tool cycles.
 
-Loop progression is represented by its logical execution position and recorded operations. It does not create a new Run for every iteration.
+Loop progression is represented by:
 
-Limits apply across the entire Run, not independently to each provider request.
+- Run-owned logical driver state.
+- Model-operation records.
+- Tool-call and result records.
+- Automation and continuation controls.
+
+It does not create a new Run for every iteration.
+
+Limits apply across the entire Run rather than independently to each provider request.
 
 ### Graph workflows
 
-A future graph driver records its logical position inside the existing Run:
+A future graph driver can store its logical position inside the existing Run:
 
 - Active node activations.
 - Loop counters.
@@ -608,67 +890,74 @@ A future graph driver records its logical position inside the existing Run:
 - Join dependencies.
 - Pending operation associations.
 
-A graph node is not automatically another persistent execution entity.
+A graph node is not automatically a new persistent runtime entity.
 
-A node activation receives distinct operation identities where it performs work, including repeated visits to the same node.
+A node activation receives distinct operation identities when it performs work, including repeated visits to the same node.
 
-Waiting requests are associated with operations or dependencies rather than implemented as an unconditional global freeze. A graph may continue independent branches while another branch waits, unless the Run is globally paused or constrained.
+Waiting requests can belong to individual operations or dependencies rather than freezing all work by definition. A future graph may continue independent branches while another branch waits, unless the Run is globally paused or constrained.
 
-The current chat driver remains sequential. Supporting future concurrency does not change its present behavior.
+The current chat driver remains sequential. Supporting graph concurrency later does not change current chat behavior.
 
-The graph driver uses the same operation records, approvals, controls, journal, and event protocol. It does not require a new execution system.
+The graph driver uses the same coordinator, controls, waiting requests, executors, events, and optional checkpoint/recovery interfaces.
 
 ### Subagent runs
 
-A subagent becomes a child Run when it represents independently progressing work with its own outcome, waits, and cancellation state.
+A subagent becomes a child Run only when it represents independently progressing work with its own:
+
+- Outcome.
+- Waiting state.
+- Cancellation behavior.
+- Limits.
+- Capability scope.
 
 That is a justified additional Run, not a new entity type.
 
 A child Run has:
 
-- A parent and root Run identity.
-- Explicit input and Session context.
+- Parent and root Run identity.
+- Explicit input and Session-derived context.
 - A bounded capability scope.
 - An allocated budget.
 - A typed result returned to its parent.
 
-The parent’s driver decides whether to wait, continue other work, or incorporate the result.
+The parent driver decides whether to wait, continue other work, or incorporate the child result.
 
 Children do not append directly to the parent Session transcript as competing writers. The parent records and projects their results deliberately.
 
-Permissions cannot expand merely because work is delegated. Child limits and consumption remain accountable to root limits rather than resetting the task’s budget at every delegation.
+Permissions cannot expand merely because work is delegated. Child consumption remains accountable to root limits.
 
-Child-Run relationships can be added to the existing Run schema and event envelope. The initial implementation need not support spawning children.
+Child-Run relationships can be added to the Run schema and event envelope later. The initial implementation does not need to spawn children.
 
-### Agent-to-agent transfers
+### Agent-to-agent transfer
 
 Transferring the same task to another Agent differs from spawning a subagent.
 
 A transfer can remain within the existing Run:
 
 - Record the transfer.
-- Change the active Agent/configuration scope at a boundary.
+- Change Agent or configuration scope at a safe boundary.
 - Preserve task identity and execution history.
-- Continue under the new driver/configuration state.
+- Continue under the updated driver or configuration state.
 
-A new child Run is required only when separate execution is actually being created.
+A child Run is needed only when separate concurrent or independently managed execution is actually created.
 
 ### Extension constraints
 
 The initial runtime must not hard-code:
 
 - One provider request per Run.
-- One permanently blocking interaction per Run.
+- One permanently blocking waiting request per Run.
 - One static Agent for the entire Run.
 - One global phase as the sole representation of execution position.
 - Direct tool invocation from driver code.
-- A new Run for every logical workflow node.
+- A new Run for every workflow node.
+- Database persistence as a prerequisite for execution.
 
-It may deliberately implement only sequential chat behavior today while keeping these boundaries intact.
+It may deliberately implement only sequential chat behavior while retaining these boundaries.
 
 ## Commands, queries, and events
 
-### Command interface
+### Commands
 
 Representative commands are:
 
@@ -677,9 +966,9 @@ Representative commands are:
 | `ApplyAgent`                       | Prepare and apply a coherent Session configuration selection.              |
 | `StartRun`                         | Prepare and accept a new user turn or task.                                |
 | `UpdateContinuationInput`          | Stage versioned user additions and next-request configuration.             |
-| `ContinueRun`                      | Explicitly request the next model invocation.                              |
+| `ContinueRun`                      | Explicitly request the next model operation.                               |
 | `ExecuteCalls`                     | Execute selected calls with an explicit continuation intention.            |
-| `RetryCall`                        | Create another attempt for an unresolved call.                             |
+| `RetryCall`                        | Create another attempt for an unresolved logical call.                     |
 | `SkipCall` / `CompleteCallAsError` | Record a protocol-completing response.                                     |
 | `ResolveWait`                      | Supply approval, input, or another requested decision.                     |
 | `SetAutomationHold`                | Hold automatic tools or automatic continuation with a defined scope.       |
@@ -690,13 +979,13 @@ Representative commands are:
 Commands carry:
 
 - A unique command ID.
-- Session/Run identity where relevant.
-- The expected revision of the state being changed.
+- Session and Run identity where relevant.
+- The expected revision of state being changed.
 - Typed user intent.
 
-Repeated command IDs with identical payloads return the original receipt. Reusing an ID with another payload is rejected.
+Repeated command IDs with identical payloads return the original receipt. Reusing a command ID with different payload is rejected.
 
-Execution commands return accepted or rejected receipts. They do not remain open for the lifetime of the Run.
+Execution commands return accepted or rejected receipts. They do not remain open for the lifetime of a Run.
 
 ### Queries
 
@@ -706,140 +995,48 @@ Queries include:
 - Run snapshot.
 - Pending calls, results, and waits.
 - Available actions and blocking reasons.
-- Execution records.
-- Events after a cursor.
+- Active operations.
+- Execution diagnostics.
+- Current streamed output.
 - Active and recently completed Runs.
 - Final result and output artifacts.
 
-Catalog and management queries remain unchanged in principle.
+Catalog and management queries remain request/response operations.
 
 Snapshots provide enough information to render the current UI without replaying every event.
 
 ### Events
 
-Events describe recorded transitions, including:
+Runtime events describe live transitions, including:
 
-- Accepted submission.
+- Submission accepted.
 - Model operation started.
 - Output appended or finalized.
 - Tool calls proposed.
 - Tool attempt dispatched.
-- Result recorded.
+- Tool result recorded.
 - Wait requested or resolved.
-- Input revision consumed.
+- Continuation input consumed.
 - Automation hold changed.
 - Run paused, cancelled, failed, or completed.
 
 Each event carries:
 
+- Session identity.
 - Run identity.
 - A monotonically increasing Run sequence.
 - Relevant operation and command identities.
-- Session identity.
 - Parent/root correlation when applicable.
 
-Wails events are transport notifications. The journal and snapshots remain authoritative.
+Wails events are transport notifications. They are not the authority for live runtime state.
 
-A client registers its listener, obtains a snapshot and cursor, and reconciles subsequent events. Duplicate delivery and gaps are handled using sequence information.
+Without a persistent event store, a client handles missed notifications by requesting a fresh Session or Run snapshot.
 
-Foregrounding, reconnection, and bounded reconciliation queries protect against a missed final notification.
-
-UI display throttling remains independent of authoritative output recording.
-
-## Persistence and recovery
-
-### Commit ordering
-
-The following transitions must be durable before dependent work proceeds:
-
-| Transition                     | Required ordering                                                                               |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Submission accepted            | Input and initial Run state recorded before model dispatch.                                     |
-| Tool authorized and dispatched | Attempt identity and dispatch decision recorded before invocation.                              |
-| Tool result obtained           | Result recorded before model continuation.                                                      |
-| Wait resolved                  | Decision recorded before dispatch based on it.                                                  |
-| Continuation started           | Consumed input/results and new model operation recorded together.                               |
-| Run terminal                   | Final outcome and associated Session transcript changes committed before terminal notification. |
-
-The existing conversation store may participate in this repository boundary if it supports the necessary operations.
-
-If it cannot, the runtime can use a small transactional store for Run state and execution mutations, with the existing conversation/search storage updated as an idempotent projection.
-
-There must not be two competing writers of execution state.
-
-### Recovery behavior
-
-Recovery distinguishes:
-
-- Work accepted but not dispatched.
-- Completed work with recorded results.
-- Pending intervention.
-- Interrupted model requests.
-- External tool operations with uncertain outcomes.
-- Invalidated server or skill-session state.
-
-A completed recorded tool result is reused, not re-executed because a view reopened.
-
-A tool whose side effect may have occurred but whose result was not recorded is not automatically classified as “not executed.”
-
-External exactly-once execution is not assumed. Adapter idempotency keys and remote operation identities are used where available; otherwise uncertainty remains visible.
-
-Recovery reconstructs state from checkpoints and records. It does not rerun arbitrary workflow code that performs external effects.
-
-### Session and result fidelity
-
-Execution records preserve the data currently vulnerable to UI-to-store conversion loss:
-
-- Typed tool results.
-- MCP structured content.
-- MCP App render metadata.
-- Skill runtime metadata.
-- Explicit skipped/error distinctions.
-- Actual tool identity and originating binding.
-- Effective configuration and context usage.
-
-Large or binary content may use artifact references.
-
-Where repeatability is required, materialized inputs use recorded content or immutable references rather than assuming a mutable path still contains the same data.
-
-Reasoning and diagnostics retain explicit persistence policies. Moving accumulation to Go does not automatically make all transient data permanent.
-
-## Go coordinator behavior
-
-The coordinator serializes state transitions for a Run.
-
-It handles:
-
-- User commands.
-- Driver decisions.
-- Executor progress and results.
-- Deadline expiry.
-- Policy or resource invalidation.
-- Wait resolution.
-
-External I/O occurs outside its state lock.
-
-Executors receive operation identities and cancellation contexts. Their results return through the coordinator rather than mutating Session conversation state directly.
-
-Before every dispatch, the coordinator checks:
-
-- Cancellation and pause.
-- Automatic-execution holds where applicable.
-- Operation eligibility.
-- Required authorization.
-- Configuration validity.
-- Dependencies and required tool responses.
-- Remaining limits.
-
-Controls are checked at each dispatch boundary, not only when a batch is initially scheduled.
-
-Run contexts are owned by the Go runtime, not by the Wails method call or frontend subscription.
-
-Inactive and waiting Runs do not require permanently running goroutines. Their state remains queryable and can be activated when work or a command arrives.
+A store provider may retain events if it chooses, but durable event retention is not required by the runtime.
 
 ## MCP, skills, workspace, and App integration
 
-### Reuse existing service authority
+### Existing service authority remains intact
 
 The runtime uses existing services for:
 
@@ -848,32 +1045,41 @@ The runtime uses existing services for:
 - Workspace resolution and materialization.
 - Attachment and filesystem access.
 - Tool invocation.
+- Artifact and model resolution.
 
-It does not duplicate their catalogs, secret stores, or policy implementations.
+The runtime does not duplicate catalogs, secret stores, or policy implementations.
 
-Connection readiness and discovery needed for execution are supervised in Go. A picker no longer has to remain mounted and poll for execution to become possible.
+Connection readiness and discovery needed for execution are supervised in Go. A picker no longer needs to remain mounted and poll for execution to become possible.
 
-### Skill and workspace state
+### Skills and workspace state
 
 Installed and workspace-owned skill membership remain distinguishable.
 
 Removing or replacing one source preserves membership retained by another source.
 
-Skill lifecycle results update active state through the coordinator. The frontend does not need a post-tool callback to list active skills and repair its own session state.
+Skill lifecycle results update active state through the coordinator. The frontend does not need a post-tool callback to list active skills and repair local session state.
 
-Workspace selections preserve recorded references until the user chooses current contents. Refresh reports changes rather than silently selecting newly discovered content.
+Workspace selections preserve recorded references until the user chooses current contents. Refresh reports changed or unavailable references rather than silently selecting newly discovered content.
 
-Requested selection and actual model-request usage remain separately visible.
+Requested workspace selection and actual model-request usage remain separately visible.
 
 Workspace-discovered MCP declarations do not automatically authorize installation, expose every tool, or provide credentials.
 
 ### MCP Apps
 
-The existing iframe sandbox and browser bridge remain.
+The existing iframe sandbox and browser bridge remain frontend responsibilities.
 
-Each view is associated with its owning Session, originating result, server, and view lifetime. Requests are not routed according to the selected tab.
+Each App view is associated with:
 
-App requests remain distinct:
+- Its owning Session.
+- Its originating result or tool call.
+- Its MCP server.
+- Its view lifetime.
+- Its allowed host operations.
+
+Requests are not routed according to whichever tab happens to be selected.
+
+App operations remain distinct:
 
 - Tool invocation.
 - Resource read.
@@ -881,21 +1087,21 @@ App requests remain distinct:
 - Model-context update.
 - External-link request.
 
-Tracked App tool execution can use a tool-only Run through the same coordinator and executors. It does not automatically advance an agent conversation.
+Tracked App tool execution can use a tool-only Run through the same coordinator and executors. It does not automatically advance an unrelated agent conversation.
 
-A draft proposal remains an authoring action. It does not load and replace unrelated runtime configuration.
+A draft proposal remains an authoring action. It does not replace unrelated runtime configuration.
 
-Approved model-context updates target an explicit execution boundary or future submission. Opening historical content does not re-queue an already consumed update.
+Approved model-context updates target an explicit Run boundary or future submission. Opening historical content does not re-queue already consumed updates.
 
-View-scoped operations may be invalidated on iframe teardown. Run-owned approvals and waits are not invalidated merely because a renderer disappeared.
+View-scoped operations may be invalidated when an iframe is removed. Run-owned approvals and waiting requests are not invalidated merely because a renderer disappeared.
 
-A terminal client can display typed tool output without an App. A genuinely required graphical interaction produces a client-capability wait rather than a fabricated response.
+A terminal client can display typed tool output without rendering an App. A genuinely required graphical interaction produces a client-capability wait rather than a fabricated response.
 
 ## Current UX preservation and deliberate changes
 
 ### Preserved behavior
 
-The implementation must retain:
+The implementation retains:
 
 - Send, Enter, Play, and Fast-forward controls.
 - Per-call Run, Retry, Skip, and Submit error actions.
@@ -905,106 +1111,140 @@ The implementation must retain:
 - Stop controls for upcoming automatic work.
 - Approval choices and explicit denial.
 - User text and attachments added before continuation.
-- Configuration changes between model requests.
+- Configuration changes between model operations.
 - Agent starter behavior and empty-selection clearing.
 - Workspace partial-usage diagnostics.
 - Skill enabled/active distinctions.
 - MCP prompt and resource-template argument requirements.
 - Partial output and stopped-generation presentation.
 - Existing message editing and visible suffix replacement.
-- Conversation/tool-chip grouping.
+- Conversation and tool-chip grouping.
 - Frontend streaming and rich-rendering optimizations.
 
 ### Deliberate changes
 
-| Change                                                                                  | Current UX effect                                                                                         |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Accepted input and tool results become durable immediately                              | No additional user action is required to preserve an executed tool’s result.                              |
-| Closing or evicting a tab detaches its view rather than inherently destroying execution | Stop remains available; a close-and-stop action can retain deliberate cancellation behavior.              |
-| Navigation or frontend reload does not imply denial of Run-owned approvals              | The same request can be presented after reattachment.                                                     |
-| Automatic continuation consumes acknowledged continuation-input revisions               | Newer or unacknowledged draft edits are retained rather than cleared by an older submission.              |
-| Cancellation is recorded as cancellation                                                | The UI can retain the current stopped-generation wording without storing a misleading successful outcome. |
-| Historical hydration does not reconstruct execution                                     | Opening a Session cannot accidentally rerun a tool.                                                       |
-| Editing history retains prior execution records                                         | The visible suffix can still be replaced, but external side effects are not represented as undone.        |
-| App operations use their originating Session                                            | Switching tabs cannot redirect a delayed App request into another conversation.                           |
-| Limits apply across the Run                                                             | Exhaustion produces a visible stop/wait reason rather than an unbounded loop or silent truncation.        |
-
-Active and waiting Runs remain discoverable even when their chat tab is closed. They cannot become inaccessible merely because the UI’s tab limit was reached.
+| Change                                                                                | Current UX effect                                                                                      |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Accepted input and tool results become Run-owned live state immediately               | A later frontend action is not required for the runtime to know that work occurred.                    |
+| Optional stores receive checkpoints independently                                     | Storage policy can vary without changing chat execution behavior.                                      |
+| Closing or evicting a tab detaches a view rather than inherently destroying execution | Stop remains available; a deliberate close-and-stop action can preserve cancellation behavior.         |
+| Navigation or frontend reload does not imply denial of Run-owned approvals            | The same waiting request can be presented after reattachment.                                          |
+| Automatic continuation consumes acknowledged continuation-input revisions             | Newer or unacknowledged draft edits remain available rather than being cleared by an older submission. |
+| Cancellation is represented as cancellation                                           | The UI can retain current stopped-generation wording without storing a misleading successful outcome.  |
+| Historical Session loading does not reconstruct execution                             | Opening a conversation cannot accidentally rerun a tool.                                               |
+| Editing history retains prior execution history                                       | The visible suffix can still be replaced, but external effects are not represented as undone.          |
+| App operations use their originating Session                                          | Switching tabs cannot redirect a delayed App request into another conversation.                        |
+| Limits apply across a Run                                                             | Exhaustion produces a visible stop or wait reason rather than an unbounded loop or silent truncation.  |
 
 ### Editing while work exists
 
-Beginning an edit changes authoring state; it does not discard accepted results or attempts.
+Beginning an edit changes authoring state. It does not discard Run-owned results or attempts.
 
 Submitting the replacement uses `EditAndResend`, which checks active work. Any required cancellation or safe-boundary wait is explicit.
 
-Cancel Edit restores the authoring context without resetting Run-owned execution.
+Cancel Edit restores authoring state without resetting Run-owned execution.
 
-The visible chat behavior remains replacement of the selected message and later suffix. The audit history remains intact.
+The visible chat behavior remains replacement of the selected message and later suffix. The execution history remains available to the runtime and optional store provider.
 
-## Code responsibility transfer
+## Existing code responsibility transfer
 
 The existing components can remain while their hooks become runtime clients.
 
-| Current area                                         | New responsibility                                                                          |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `composer/editor/editor_area.tsx`                    | Author input, publish continuation revisions, render available actions, and issue commands. |
-| `composer/toolruntime/use_tool_runtime.ts`           | Replace its execution reducer with a projection of Run-owned calls and results.             |
-| `composer/toolruntime/use_tool_auto_exec_drainer.ts` | Remove frontend scheduling; progression belongs to the chat driver and coordinator.         |
-| `composer/toolruntime/execute_tool_call.ts`          | Move execution coordination into Go executors using existing services.                      |
-| `composer/skills/use_composer_skills.ts`             | Render and edit selections; Go owns runtime-session coordination.                           |
-| `composer/mcp/use_composer_mcp.ts`                   | Render catalog/selection state; Go owns execution-dependent preparation and readiness.      |
-| `composer/mcp/use_mcp_approval.ts`                   | Present waiting requests and submit resolutions rather than own execution promises.         |
-| `conversation/use_send_message.ts`                   | Submit commands and apply accepted receipts; remove model/tool lifecycle ownership.         |
-| `conversation/completion_finalizer.ts`               | Move canonical outcome handling into Go; retain presentation helpers where needed.          |
-| `conversation/use_streaming_runtime.ts`              | Keep display buffering; remove tab-owned request and cancellation authority.                |
-| `conversation/use_input_registry.ts`                 | Retain focus, menus, drops, and draft delivery; remove assistant-turn scheduling delivery.  |
-| `tabs/use_chats_controller.ts`                       | Manage views and Session subscriptions; remove canonical execution save queues.             |
-| `mcpapps/mcp_app_rpc_router.ts`                      | Adapt browser requests to explicitly scoped backend operations.                             |
-| `messages/`, `platedoc/`, scrolling, and search UI   | Retain presentation and authoring responsibilities.                                         |
-
-The Wails completion API remains usable by the Go model executor’s underlying service path. Chat no longer uses a completion response as the signal to reconstruct and restart the loop in the editor.
+| Current area                                         | New responsibility                                                                                                   |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `composer/editor/editor_area.tsx`                    | Author input, publish continuation revisions, render available actions, and issue runtime commands.                  |
+| `composer/toolruntime/use_tool_runtime.ts`           | Replace local execution reducer behavior with a projection of Run-owned calls and results.                           |
+| `composer/toolruntime/use_tool_auto_exec_drainer.ts` | Remove frontend scheduling; progression belongs to the chat driver and coordinator.                                  |
+| `composer/toolruntime/execute_tool_call.ts`          | Move execution coordination into Go executors using existing services.                                               |
+| `composer/skills/use_composer_skills.ts`             | Render and edit skill selections; Go owns skill-session coordination for active Runs.                                |
+| `composer/mcp/use_composer_mcp.ts`                   | Render catalog and selection state; Go owns execution-time preparation and readiness.                                |
+| `composer/mcp/use_mcp_approval.ts`                   | Present waiting requests and submit resolutions rather than own execution promises.                                  |
+| `conversation/use_send_message.ts`                   | Submit commands and apply receipts; remove model and tool lifecycle ownership.                                       |
+| `conversation/completion_finalizer.ts`               | Move canonical outcome handling into Go; retain display-oriented helpers where useful.                               |
+| `conversation/use_streaming_runtime.ts`              | Keep display buffering; remove tab-owned request and cancellation authority.                                         |
+| `conversation/use_input_registry.ts`                 | Retain focus, menus, drops, and draft delivery; remove assistant-turn scheduling delivery.                           |
+| `conversation/conversation_persistence_mapper.ts`    | Become an optional Session projection or historical import/export adapter rather than the canonical execution owner. |
+| `tabs/use_chats_controller.ts`                       | Manage views and Session subscriptions; remove canonical execution save queues.                                      |
+| `tabs/tabs_persistence.ts`                           | Continue storing local tab layout if desired; it remains UI state, not runtime state.                                |
+| `mcpapps/mcp_app_rpc_router.ts`                      | Adapt browser requests to explicitly scoped backend operations.                                                      |
+| `frontend/app/apis/wailsapi/completion.ts`           | Remain a frontend compatibility binding where needed; not the internal runtime execution path.                       |
+| `messages/`, `platedoc/`, scrolling, and search UI   | Retain presentation and authoring responsibilities.                                                                  |
 
 At integration, each accepted Run has one execution owner. The frontend drainer and backend coordinator do not both schedule the same calls.
 
+## Optional projection and existing conversation storage
+
+The existing conversation store can remain useful without becoming a runtime dependency.
+
+A store or projection adapter may consume Session and Run checkpoints to:
+
+- Preserve the existing conversation document format.
+- Maintain search indexes.
+- Maintain exported chat JSON.
+- Populate conversation listings.
+- Store message projections.
+- Retain tool details and usage.
+- Support reopening historical Sessions.
+
+That adapter owns conversion between runtime semantics and the existing storage format.
+
+The runtime itself does not require that projection to exist.
+
+Historical conversations that only contain transcript data can be restored as idle Sessions. They do not imply that historical tool calls should execute again.
+
 ## Acceptance criteria
 
-The implementation is complete when the existing chat loop can be exercised through Go commands and fake service adapters without React or Wails rendering.
+The implementation is complete when the current chat loop can be exercised through Go commands and fake service adapters without React or Wails rendering.
 
-Verification must include:
+Verification includes:
 
-- Duplicate submission and lost acknowledgment.
+- Running the complete chat loop with no store configured.
+- Running the complete chat loop with an in-memory store.
+- Running with a file or database test store that chooses its own serialization.
+- Checkpoint sink failure not stopping execution in the default observational mode.
+- Recovery source restoring selected Sessions and Runs into live memory.
+- Recovery of waiting and paused Runs without blind re-execution.
+- Recovery of uncertain external tool attempts as visible uncertain state.
+- Duplicate submission and lost command receipts.
 - Empty, invalid, and partially usable submissions.
 - Current history-window behavior.
 - Agent switching with empty selections and preserved user text.
-- Sequential automatic tools and mixed batches.
+- Sequential automatic tools and mixed manual/automatic batches.
 - Play, Fast-forward, and Send behavior.
 - Error results versus failures without results.
 - Retry, skip, and explicit error-result submission.
 - Automatic-execution stop before a batch and between calls.
 - Automatic-execution stop while approval is pending.
-- No covered dispatch after the stop acknowledgment.
+- No covered automatic dispatch after the stop acknowledgment.
 - Continuation input changed before and after consumption.
 - Configuration changes applied only to subsequent model operations.
 - Approval dismissal, navigation, reconnect, expiry, and competing resolutions.
 - Cancellation with no output, partial output, and active tool work.
-- Durable tool results before the next model request.
-- Recovery without blind re-execution.
+- Tool results applied to live Run state before continuation.
 - Skill and workspace membership invariants.
 - MCP App ownership across tab changes.
 - Event duplication, gaps, and missed terminal notifications.
 - Tab closure, route changes, frontend reload, and process restart.
 
-The extension boundary should also be verified with a small test driver that branches, waits, and rejoins using ordinary operation records. This is a contract test of the coordinator, not delivery of a production graph-workflow feature.
+The extension boundary is also verified with a small test driver that branches, waits, and rejoins using ordinary Run operation records. This validates the coordinator contract without delivering a production graph-workflow feature.
 
 ## Proposed outcome
 
-The initial implementation delivers the current chat execution model in Go with its manual, automatic, approval, and intervention behavior intact.
+The initial implementation delivers the current chat execution model in Go with manual, automatic, approval, and intervention behavior intact.
 
-The durable state remains small:
+The live runtime state remains small:
 
 - Sessions, which are conversations or task contexts.
 - Runs, which own execution records and versioned logical position.
 
-Model invocations are recorded operations, not additional execution entities.
+Model invocations, tool attempts, approvals, and future graph-node activations are Run-owned operations rather than new top-level runtime entities.
 
-Future graphs, agent transfers, and subagent tasks extend execution drivers and operation handling while retaining the same coordination, permission, control, persistence, and client protocols.
+Persistence remains optional:
+
+- The runtime works in memory.
+- A store provider may observe checkpoints.
+- A recovery provider may restore state.
+- Storage format and retention remain provider-controlled.
+- Stronger storage guarantees, where needed, are host policy rather than a requirement of the agent runtime itself.
+
+Future graphs, agent transfers, and subagent tasks extend execution drivers and operation handling while retaining the same Session/Run model, controls, events, optional store interfaces, and client protocols.
