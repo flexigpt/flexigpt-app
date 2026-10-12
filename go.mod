@@ -2,7 +2,8 @@ module github.com/flexigpt/flexigpt-app
 
 go 1.27
 
-// Tools: These are installed via the taskfile. check the associated task.
+// Tools are installed via the taskfile. Check the associated task.
+
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.21.5
