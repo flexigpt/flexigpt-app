@@ -3,15 +3,12 @@ package conversation
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 
 	"github.com/flexigpt/mapstore-go"
@@ -425,6 +422,11 @@ func (cc *ConversationCollection) fileNameFromConversation(c conversationSpec.Co
 	return info.FileName, nil
 }
 
+// validateConversationV1 validates the persisted conversation envelope only.
+//
+// Tool selections, Artifact references, MCP mappings, and Workspace selections
+// are historical metadata. Their semantics, resolution, and authorization
+// belong to the runtime consuming them, not conversation persistence.
 func validateConversationV1(value *conversationSpec.Conversation) error {
 	if value == nil {
 		return errors.New("conversation is nil")
@@ -434,159 +436,6 @@ func validateConversationV1(value *conversationSpec.Conversation) error {
 	}
 	if strings.TrimSpace(value.ID) == "" {
 		return errors.New("conversation ID is empty")
-	}
-
-	for index := range value.Messages {
-		message := &value.Messages[index]
-		if err := validateConversationArtifactRefs(
-			fmt.Sprintf("messages[%d].enabledSkillRefs", index),
-			message.EnabledSkillRefs,
-		); err != nil {
-			return err
-		}
-		if err := validateConversationArtifactRefs(
-			fmt.Sprintf("messages[%d].activeSkillRefs", index),
-			message.ActiveSkillRefs,
-		); err != nil {
-			return err
-		}
-		if err := validateConversationToolSelections(
-			fmt.Sprintf("messages[%d].toolSelections", index),
-			message.ToolSelections,
-		); err != nil {
-			return err
-		}
-		if message.MCPContext != nil {
-			if err := message.MCPContext.Validate(); err != nil {
-				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
-			}
-		}
-		if len(message.MCPToolMappings) != 0 && message.MCPContext != nil {
-			if err := message.MCPContext.ValidateProviderToolMappings(
-				message.MCPToolMappings,
-			); err != nil {
-				return fmt.Errorf("messages[%d].mcpToolMappings: %w", index, err)
-			}
-		}
-		if len(message.MCPAppContextUpdates) != 0 && message.MCPContext != nil {
-			if err := message.MCPContext.ValidateAppContextUpdates(
-				message.MCPAppContextUpdates,
-			); err != nil {
-				return fmt.Errorf("messages[%d].mcpAppContextUpdates: %w", index, err)
-			}
-		}
-		if message.WorkspaceSelection == nil {
-			continue
-		}
-
-		selected := message.WorkspaceSelection
-		if err := selected.Workspace.Validate(); err != nil {
-			return fmt.Errorf(
-				"messages[%d].workspaceSelection.workspace: %w",
-				index,
-				err,
-			)
-		}
-		if err := validateConversationSelectionRefs(
-			fmt.Sprintf(
-				"messages[%d].workspaceSelection.contextRefs",
-				index,
-			),
-			selected.ContextRefs,
-			selected.Workspace.RootID,
-		); err != nil {
-			return err
-		}
-		if err := validateConversationSelectionRefs(
-			fmt.Sprintf(
-				"messages[%d].workspaceSelection.skillRefs",
-				index,
-			),
-			selected.SkillRefs,
-			selected.Workspace.RootID,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateConversationArtifactRefs(
-	field string,
-	refs []artifactModel.ArtifactRef,
-) error {
-	seen := make(map[string]struct{}, len(refs))
-	for index, ref := range refs {
-		if err := ref.Validate(); err != nil {
-			return fmt.Errorf("%s[%d]: %w", field, index, err)
-		}
-		key := string(ref.RootID) + "\x00" + string(ref.ArtifactID)
-		if _, duplicate := seen[key]; duplicate {
-			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
-		}
-		seen[key] = struct{}{}
-	}
-	return nil
-}
-
-func validateConversationToolSelections(
-	field string,
-	values []conversationSpec.ToolSelection,
-) error {
-	choiceIDs := make(map[string]struct{}, len(values))
-	targets := make(map[string]struct{}, len(values))
-
-	for index, value := range values {
-		if err := value.Validate(); err != nil {
-			return fmt.Errorf("%s[%d]: %w", field, index, err)
-		}
-		if _, duplicate := choiceIDs[value.ChoiceID]; duplicate {
-			return fmt.Errorf(
-				"%s[%d]: duplicate Tool choice ID %q",
-				field,
-				index,
-				value.ChoiceID,
-			)
-		}
-		choiceIDs[value.ChoiceID] = struct{}{}
-
-		key := value.Target.ProviderIdentity + "\x00" +
-			value.Target.ProviderLocalID
-		if _, duplicate := targets[key]; duplicate {
-			return fmt.Errorf(
-				"%s[%d]: duplicate Tool target",
-				field,
-				index,
-			)
-		}
-		targets[key] = struct{}{}
-	}
-	return nil
-}
-
-func validateConversationSelectionRefs(
-	field string,
-	refs []conversationSpec.WorkspaceConversationResourceSelectionRef,
-	rootID rootModel.RootID,
-) error {
-	seen := make(map[string]struct{}, len(refs))
-	for index, ref := range refs {
-		if err := ref.Artifact.Validate(); err != nil {
-			return fmt.Errorf("%s[%d].artifact: %w", field, index, err)
-		}
-		if ref.Artifact.RootID != rootID {
-			return fmt.Errorf(
-				"%s[%d].artifact: Artifact belongs to another Root",
-				field,
-				index,
-			)
-		}
-		key := string(ref.Artifact.RootID) + "\x00" +
-			string(ref.Artifact.ArtifactID)
-		if _, duplicate := seen[key]; duplicate {
-			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
-		}
-		seen[key] = struct{}{}
 	}
 	return nil
 }

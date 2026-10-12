@@ -57,8 +57,8 @@ type CompletionResponseBody struct {
 
 	// MCPToolMappings must be persisted on the corresponding conversation
 	// user turn before a later provider-tool call is routed through
-	// InvokeMappedMCPTool. Conversation storage validates the mappings against
-	// that turn's MCPContext.
+	// InvokeMappedMCPTool. Conversation storage preserves this metadata;
+	// mapping/context validation and authorization belong at runtime.
 	MCPToolMappings []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
 	WorkspaceUsage  *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
 }

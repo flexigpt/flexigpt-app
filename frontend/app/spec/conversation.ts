@@ -19,7 +19,7 @@ import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
 /** Keep in sync with Go's ConversationSchemaVersion. */
-export const CONVERSATION_SCHEMA_VERSION = 'v1.0.0';
+export const CONVERSATION_SCHEMA_VERSION = 'v1';
 
 export interface StoreConversationMessage {
 	id: string;

@@ -216,6 +216,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const persistNowRef = useRef<() => void>(() => {});
 	const schedulePersistRef = useRef<() => void>(() => {});
 	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
+	// Backend-acknowledged storage state for this controller lifetime.
+	//
+	// tab.isPersisted is UI state and must not decide whether the next write
+	// can use PutMessagesToConversation. In particular, a failed initial
+	// PutConversation must not be followed by a message-only update.
+	const acknowledgedConversationTitleByIDRef = useRef(new Map<string, string>());
 	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
 	const tabLoadVersionRef = useRef(new Map<string, number>());
 
@@ -395,6 +401,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						return;
 					}
 
+					acknowledgedConversationTitleByIDRef.current.set(hydrated.id, hydrated.title);
 					conversationAreaRef.current?.clearStreamForTab(tabId);
 
 					updateTab(tabId, prev => ({
@@ -608,28 +615,48 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}
 
 			const titleChangedByFunction = newTitle !== updatedConv.title;
-			const titleChanged = titleWasExternallyChanged || titleChangedByFunction;
 			const conversationToSave = titleChangedByFunction
 				? {
 						...updatedConv,
 						title: newTitle,
 					}
 				: updatedConv;
-			const needsFullSave = !tab.isPersisted || titleChanged;
 
 			updateTab(tabId, current => ({
 				...current,
 				conversation: conversationToSave,
 				isLoaded: true,
-				isPersisted: true,
+				isPersisted: current.isPersisted || acknowledgedConversationTitleByIDRef.current.has(conversationToSave.id),
 				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,
 				isHydrating: false,
 			}));
 
 			enqueueSaveForTab(tabId, async () => {
 				const storeConversation = await toStoreConversationAsync(conversationToSave);
+
+				// Decide at execution time, after prior queued writes have
+				// completed. This is essential when an initial PutConversation
+				// failed: there is no file to update yet.
+				const acknowledgedTitle = acknowledgedConversationTitleByIDRef.current.get(storeConversation.id);
+				const needsFullSave = acknowledgedTitle !== storeConversation.title;
+
 				if (needsFullSave) {
 					await conversationStoreAPI.putConversation(storeConversation);
+
+					// Only a successful full write proves that a corresponding
+					// conversation file exists.
+					acknowledgedConversationTitleByIDRef.current.set(storeConversation.id, storeConversation.title);
+
+					updateTab(tabId, current => {
+						if (current.conversation.id !== storeConversation.id || current.isPersisted) {
+							return current;
+						}
+						return {
+							...current,
+							isPersisted: true,
+						};
+					});
+
 					await bumpSearchKey();
 					persistNowRef.current();
 					return;
@@ -825,6 +852,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					return;
 				}
 
+				acknowledgedConversationTitleByIDRef.current.set(hydrated.id, hydrated.title);
 				conversationAreaRef.current?.clearStreamForTab(tabId);
 				conversationAreaRef.current?.resetScrollToTop(tabId);
 
