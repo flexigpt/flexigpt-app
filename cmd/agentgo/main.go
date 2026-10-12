@@ -25,9 +25,6 @@ import (
 var Version string
 
 func main() {
-	// Start pprof
-	// Go startpprof().
-
 	appDisplayTitle := "FlexiGPT - " + Version
 	wailsLogLevel := logger.INFO
 	wailsProdLogLevel := logger.INFO
