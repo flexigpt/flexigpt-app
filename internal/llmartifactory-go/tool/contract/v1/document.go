@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -68,9 +68,9 @@ type ToolImplementation struct {
 type ToolDocument struct {
 	declaration.Header
 
-	Version     spec.LogicalVersion `json:"version"`
-	Tags        []string            `json:"tags,omitempty"`
-	AutoExecute bool                `json:"autoExecute"`
+	Version     storeSpec.LogicalVersion `json:"version"`
+	Tags        []string                 `json:"tags,omitempty"`
+	AutoExecute bool                     `json:"autoExecute"`
 
 	InputSchema   json.RawMessage  `json:"inputSchema"`
 	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`
@@ -156,7 +156,7 @@ func DefinitionForDocument(
 		Kind:           artifactModel.ArtifactKind(ToolType),
 		SchemaID:       ToolSchemaKey.SchemaID,
 		SchemaVersion:  ToolSchemaKey.SchemaVersion,
-		LogicalName:    spec.LogicalName(document.Name),
+		LogicalName:    storeSpec.LogicalName(document.Name),
 		LogicalVersion: document.Version,
 		DisplayName:    displayName,
 		Description:    document.Description,
@@ -211,10 +211,10 @@ func (v ToolDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: Tool declarations do not support locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidatePortableName(
+	if err := storeSpec.ValidatePortableName(
 		"Tool version",
 		string(v.Version),
 	); err != nil {
@@ -252,7 +252,7 @@ func (v ToolDocument) validateFields() error {
 		v.UserArgSchema != nil {
 		return fmt.Errorf(
 			"%w: Tool userArgSchema is supported only for sdk Tools",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -261,26 +261,26 @@ func (v ToolDocument) validateFields() error {
 func (v ToolImplementation) Validate() error {
 	switch v.Kind {
 	case ImplementationKindGo:
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"Go Tool function",
 			v.Function,
-			spec.MaxURIBytes,
+			storeSpec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
 		if v.SDKType != "" || v.SDKToolType != "" {
 			return fmt.Errorf(
 				"%w: Go Tool implementation cannot contain SDK fields",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return nil
 
 	case ImplementationKindSDK:
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"SDK Tool type",
 			v.SDKType,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
@@ -290,7 +290,7 @@ func (v ToolImplementation) Validate() error {
 		if v.Function != "" {
 			return fmt.Errorf(
 				"%w: SDK Tool implementation cannot contain Go function",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return nil
@@ -298,7 +298,7 @@ func (v ToolImplementation) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Tool implementation kind %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			v.Kind,
 		)
 	}
@@ -313,34 +313,34 @@ func (v SDKToolType) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported SDK Tool type %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			v,
 		)
 	}
 }
 
 func validateTags(values []string) error {
-	if len(values) > spec.MaxDefinitionDependencies {
+	if len(values) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: Tool tags exceed %d entries",
-			spec.ErrInvalid,
-			spec.MaxDefinitionDependencies,
+			storeSpec.ErrInvalid,
+			storeSpec.MaxDefinitionDependencies,
 		)
 	}
 
 	seen := make(map[string]struct{}, len(values))
 	for index, value := range values {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"Tool tag",
 			value,
-			spec.MaxLogicalNameBytes,
+			storeSpec.MaxLogicalNameBytes,
 		); err != nil {
 			return fmt.Errorf("tool tags[%d]: %w", index, err)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Tool tag %q is repeated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				value,
 			)
 		}

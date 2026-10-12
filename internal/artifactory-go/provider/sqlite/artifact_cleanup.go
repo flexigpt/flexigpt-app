@@ -11,7 +11,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -23,7 +23,7 @@ func (r *ArtifactCleanupRepository) CleanupArtifactLocalState(
 	if now.IsZero() {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact cleanup time is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -102,7 +102,7 @@ func (r *ArtifactCleanupRepository) CleanupArtifactLocalState(
 		if current.Revision == ^uint64(0) {
 			return artifactModel.Artifact{}, fmt.Errorf(
 				"%w: Artifact revision is exhausted",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		next.Data = nextData

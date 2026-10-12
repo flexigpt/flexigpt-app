@@ -8,7 +8,7 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 )
@@ -33,13 +33,13 @@ func (a *Service) ListAgents(
 		if request.Plugin.RootID != request.RootID {
 			return nil, fmt.Errorf(
 				"%w: Agent Plugin belongs to another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if request.IncludeBuiltin {
 			return nil, fmt.Errorf(
 				"%w: plugin-filtered Agent lists cannot include another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 )
 
@@ -50,7 +50,7 @@ func materializeValidated(
 				if declaration.Required {
 					return MaterializedServer{}, fmt.Errorf(
 						"%w: required secret input %q is not bound",
-						spec.ErrReferenceUnresolved,
+						storeSpec.ErrReferenceUnresolved,
 						name,
 					)
 				}
@@ -64,7 +64,7 @@ func materializeValidated(
 			if secrets == nil {
 				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret resolver is unavailable",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 				)
 			}
 			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
@@ -74,7 +74,7 @@ func materializeValidated(
 			if value == "" {
 				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret input %q is empty",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 					name,
 				)
 			}
@@ -86,7 +86,7 @@ func materializeValidated(
 				if declaration.Required {
 					return MaterializedServer{}, fmt.Errorf(
 						"%w: OAuth client input %q is not bound",
-						spec.ErrReferenceUnresolved,
+						storeSpec.ErrReferenceUnresolved,
 						name,
 					)
 				}
@@ -102,7 +102,7 @@ func materializeValidated(
 			if secrets == nil {
 				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret resolver is unavailable",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 				)
 			}
 			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
@@ -112,7 +112,7 @@ func materializeValidated(
 			if strings.TrimSpace(value) == "" {
 				return MaterializedServer{}, fmt.Errorf(
 					"%w: OAuth client input %q is empty",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 					name,
 				)
 			}
@@ -127,7 +127,7 @@ func materializeValidated(
 			case declaration.Required:
 				return MaterializedServer{}, fmt.Errorf(
 					"%w: required MCP input %q is not bound",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 					name,
 				)
 			default:
@@ -137,7 +137,7 @@ func materializeValidated(
 		default:
 			return MaterializedServer{}, fmt.Errorf(
 				"%w: unsupported MCP input kind %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				declaration.Kind,
 			)
 		}
@@ -179,7 +179,7 @@ func materializeValidated(
 		auth.Mode == mcpv1.HTTPAuthModeClientCredentials {
 		return MaterializedServer{}, fmt.Errorf(
 			"%w: required OAuth client credentials are not configured",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	sensitive := make([]string, 0, len(secretValues))
@@ -218,7 +218,7 @@ func selectProfile(
 		if len(matches) > 1 {
 			return CoreServer{}, fmt.Errorf(
 				"%w: multiple MCP connection profiles match platform %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				runtime.GOOS,
 			)
 		}
@@ -234,7 +234,7 @@ func selectProfile(
 	if !found {
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP connection profile %q does not exist",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			selected,
 		)
 	}
@@ -242,7 +242,7 @@ func selectProfile(
 		!slices.Contains(profile.Platforms, runtime.GOOS) {
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP connection profile %q does not support %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			selected,
 			runtime.GOOS,
 		)
@@ -255,7 +255,7 @@ func selectProfile(
 			if profile.Stdio.Command == nil {
 				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing stdio profile requires command",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 			output = CoreServer{
@@ -282,7 +282,7 @@ func selectProfile(
 			if profile.HTTP.URL == nil {
 				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing HTTP profile requires URL",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 			output = CoreServer{
@@ -304,7 +304,7 @@ func selectProfile(
 	default:
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP profile has no connection overlay",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return output, nil
@@ -456,7 +456,7 @@ func placeholderOnly(value string) bool {
 func unresolvedInputError(name string) error {
 	return fmt.Errorf(
 		"%w: MCP input %q is unresolved",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 		name,
 	)
 }

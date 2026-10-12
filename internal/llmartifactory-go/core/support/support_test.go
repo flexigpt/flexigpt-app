@@ -3,7 +3,7 @@ package support
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func TestDocumentsMatchesDeclaredNamedPatterns(t *testing.T) {
@@ -14,7 +14,7 @@ func TestDocumentsMatchesDeclaredNamedPatterns(t *testing.T) {
 			Locator:   "agent.yaml",
 			DecoderID: "artifact-declaration-yaml",
 		},
-		Files: []spec.Locator{
+		Files: []storeSpec.Locator{
 			"agent.yaml",
 			"agent.yml",
 			"agent.json",
@@ -29,7 +29,7 @@ func TestDocumentsMatchesDeclaredNamedPatterns(t *testing.T) {
 		t.Fatalf("validate document support: %v", err)
 	}
 
-	for _, locator := range []spec.Locator{
+	for _, locator := range []storeSpec.Locator{
 		"agent.yaml",
 		"nested/reviewer.agent.yaml",
 		"nested/reviewer.agent.yml",

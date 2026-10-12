@@ -12,15 +12,15 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // Document identifies one application-selected package-root declaration file
 // and the decoder that must be used for that file.
 type Document struct {
-	Locator   spec.Locator
-	DecoderID spec.DecoderID
+	Locator   storeSpec.Locator
+	DecoderID storeSpec.DecoderID
 }
 
 func (d Document) Validate() error {
@@ -30,21 +30,21 @@ func (d Document) Validate() error {
 	if path.Base(string(d.Locator)) != string(d.Locator) {
 		return fmt.Errorf(
 			"%w: supported document %q must be a package-root filename",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			d.Locator,
 		)
 	}
 	return d.DecoderID.Validate()
 }
 
-func (d Document) Matches(locator spec.Locator) bool {
+func (d Document) Matches(locator storeSpec.Locator) bool {
 	return path.Base(string(locator)) == string(d.Locator)
 }
 
 // NamedFile derives a portable export filename from an application-selected
 // package document filename. For example, document "agent.yaml" yields
 // "<name>.agent.yaml"; the family does not hard-code that suffix.
-func (d Document) NamedFile(name spec.LogicalName) (string, error) {
+func (d Document) NamedFile(name storeSpec.LogicalName) (string, error) {
 	if err := d.Validate(); err != nil {
 		return "", err
 	}
@@ -53,7 +53,7 @@ func (d Document) NamedFile(name spec.LogicalName) (string, error) {
 	}
 
 	value := string(name) + "." + string(d.Locator)
-	if err := spec.Locator(value).ValidatePortable(false); err != nil {
+	if err := storeSpec.Locator(value).ValidatePortable(false); err != nil {
 		return "", err
 	}
 	return value, nil
@@ -66,7 +66,7 @@ func (d Document) NamedFile(name spec.LogicalName) (string, error) {
 // family which filename conventions the application selected.
 type Documents struct {
 	Default  Document
-	Files    []spec.Locator
+	Files    []storeSpec.Locator
 	Patterns []string
 }
 
@@ -78,11 +78,11 @@ func (d Documents) Validate() error {
 	if len(d.Files) == 0 {
 		return fmt.Errorf(
 			"%w: supported document set is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
-	seen := make(map[spec.Locator]struct{}, len(d.Files))
+	seen := make(map[storeSpec.Locator]struct{}, len(d.Files))
 	defaultFound := false
 	for _, value := range d.Files {
 		if err := value.ValidatePortable(false); err != nil {
@@ -91,14 +91,14 @@ func (d Documents) Validate() error {
 		if path.Base(string(value)) != string(value) {
 			return fmt.Errorf(
 				"%w: supported document %q must be a package-root filename",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				value,
 			)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: supported document %q is repeated",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value,
 			)
 		}
@@ -110,13 +110,13 @@ func (d Documents) Validate() error {
 	if !defaultFound {
 		return fmt.Errorf(
 			"%w: default document %q is not in the supported document set",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			d.Default.Locator,
 		)
 	}
 
 	if len(d.Patterns) != 0 {
-		if err := spec.ValidatePathPatterns(
+		if err := storeSpec.ValidatePathPatterns(
 			"supported document patterns",
 			d.Patterns,
 		); err != nil {
@@ -129,7 +129,7 @@ func (d Documents) Validate() error {
 			if _, duplicate := seenPatterns[key]; duplicate {
 				return fmt.Errorf(
 					"%w: supported document pattern %q is repeated",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					pattern,
 				)
 			}
@@ -139,7 +139,7 @@ func (d Documents) Validate() error {
 	return nil
 }
 
-func (d Documents) Matches(locator spec.Locator) bool {
+func (d Documents) Matches(locator storeSpec.Locator) bool {
 	value := strings.ToLower(string(locator))
 	name := strings.ToLower(path.Base(value))
 
@@ -150,11 +150,11 @@ func (d Documents) Matches(locator spec.Locator) bool {
 	}
 	for _, pattern := range d.Patterns {
 		pattern = strings.ToLower(pattern)
-		if matched, err := spec.MatchPathPattern(pattern, value); err == nil &&
+		if matched, err := storeSpec.MatchPathPattern(pattern, value); err == nil &&
 			matched {
 			return true
 		}
-		if matched, err := spec.MatchPathPattern(pattern, name); err == nil &&
+		if matched, err := storeSpec.MatchPathPattern(pattern, name); err == nil &&
 			matched {
 			return true
 		}
@@ -164,7 +164,7 @@ func (d Documents) Matches(locator spec.Locator) bool {
 
 func (d Documents) Clone() Documents {
 	output := d
-	output.Files = append([]spec.Locator(nil), d.Files...)
+	output.Files = append([]storeSpec.Locator(nil), d.Files...)
 	output.Patterns = append([]string(nil), d.Patterns...)
 	return output
 }
@@ -174,7 +174,7 @@ func (d Documents) Clone() Documents {
 // actual package kind, version policy, document filename, and decoder choice.
 type PackageLayout struct {
 	Kind           managedpackageModel.PackageKind
-	DefaultVersion spec.LogicalVersion
+	DefaultVersion storeSpec.LogicalVersion
 	FixedVersion   bool
 	Document       Document
 }
@@ -190,8 +190,8 @@ func (p PackageLayout) Validate() error {
 }
 
 func (p PackageLayout) Address(
-	name spec.LogicalName,
-	version spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	version storeSpec.LogicalVersion,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := p.Validate(); err != nil {
 		return managedpackageModel.ManagedPackageAddress{}, err
@@ -202,7 +202,7 @@ func (p PackageLayout) Address(
 	if p.FixedVersion && version != p.DefaultVersion {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package kind %q requires version %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			p.Kind,
 			p.DefaultVersion,
 		)
@@ -216,7 +216,7 @@ func (p PackageLayout) Address(
 
 func (p PackageLayout) Locator(
 	address managedpackageModel.ManagedPackageAddress,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
 	}
@@ -226,7 +226,7 @@ func (p PackageLayout) Locator(
 	if address.Kind != p.Kind {
 		return "", fmt.Errorf(
 			"%w: package kind is %q, expected %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			address.Kind,
 			p.Kind,
 		)
@@ -234,7 +234,7 @@ func (p PackageLayout) Locator(
 	if p.FixedVersion && address.Version != p.DefaultVersion {
 		return "", fmt.Errorf(
 			"%w: package version is %q, expected %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			address.Version,
 			p.DefaultVersion,
 		)
@@ -243,7 +243,7 @@ func (p PackageLayout) Locator(
 }
 
 func (p PackageLayout) AddressFromLocator(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := p.Validate(); err != nil {
 		return managedpackageModel.ManagedPackageAddress{}, err
@@ -254,14 +254,14 @@ func (p PackageLayout) AddressFromLocator(
 	if path.Base(string(locator)) != string(p.Document.Locator) {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package locator %q is not %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			locator,
 			p.Document.Locator,
 		)
 	}
 
 	address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
-		spec.Locator(path.Dir(string(locator))),
+		storeSpec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return managedpackageModel.ManagedPackageAddress{}, err
@@ -269,7 +269,7 @@ func (p PackageLayout) AddressFromLocator(
 	if address.Kind != p.Kind {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package kind is %q, expected %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			address.Kind,
 			p.Kind,
 		)
@@ -277,7 +277,7 @@ func (p PackageLayout) AddressFromLocator(
 	if p.FixedVersion && address.Version != p.DefaultVersion {
 		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package version is %q, expected %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			address.Version,
 			p.DefaultVersion,
 		)
@@ -288,7 +288,7 @@ func (p PackageLayout) AddressFromLocator(
 // SourceProfile is a product-selected managed Source declaration. It is not a
 // Source driver and does not open, mutate, or inspect storage by itself.
 type SourceProfile struct {
-	StorageKey  spec.StorageKey
+	StorageKey  storeSpec.StorageKey
 	Kind        sourceModel.SourceKind
 	DisplayName string
 	Config      json.RawMessage
@@ -298,17 +298,17 @@ func (p SourceProfile) Validate() error {
 	if err := p.StorageKey.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"managed Source kind",
 		string(p.Kind),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"managed Source display name",
 		p.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func (p SourceProfile) Validate() error {
 	}
 	_, err := jsonutil.CanonicalizeObject(
 		p.Config,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	return err
 }
@@ -370,10 +370,10 @@ func (c Candidates) Validate() error {
 	if len(c.Patterns) == 0 {
 		return fmt.Errorf(
 			"%w: decoder candidate support is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidatePathPatterns(
+	if err := storeSpec.ValidatePathPatterns(
 		"decoder candidate patterns",
 		c.Patterns,
 	); err != nil {
@@ -386,7 +386,7 @@ func (c Candidates) Validate() error {
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: decoder candidate pattern %q is repeated",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value,
 			)
 		}
@@ -396,16 +396,16 @@ func (c Candidates) Validate() error {
 }
 
 func (c Candidates) Matches(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) bool {
 	value := strings.ToLower(string(locator))
 	name := strings.ToLower(path.Base(value))
 	for _, pattern := range c.Patterns {
 		pattern = strings.ToLower(pattern)
-		if matched, err := spec.MatchPathPattern(pattern, value); err == nil && matched {
+		if matched, err := storeSpec.MatchPathPattern(pattern, value); err == nil && matched {
 			return true
 		}
-		if matched, err := spec.MatchPathPattern(pattern, name); err == nil && matched {
+		if matched, err := storeSpec.MatchPathPattern(pattern, name); err == nil && matched {
 			return true
 		}
 	}

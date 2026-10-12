@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -144,8 +144,8 @@ func (c *workspaceRefreshCoordinator) RequirementsForLocatedMember(
 
 func localRefreshLocator(
 	locator declaration.Locator,
-	declarationLocator spec.Locator,
-) (spec.Locator, bool, error) {
+	declarationLocator storeSpec.Locator,
+) (storeSpec.Locator, bool, error) {
 	if err := locator.Validate(); err != nil {
 		return "", false, err
 	}
@@ -172,19 +172,19 @@ func localRefreshLocator(
 
 func (c *workspaceRefreshCoordinator) locatedRefreshCandidates(
 	declarationType declaration.Type,
-	target spec.Locator,
-) []spec.Locator {
+	target storeSpec.Locator,
+) []storeSpec.Locator {
 	if declarationType != declaration.TypeSkill ||
 		c.support.SkillDocuments.Matches(target) {
-		return []spec.Locator{target}
+		return []storeSpec.Locator{target}
 	}
 
-	output := []spec.Locator{target}
-	seen := map[spec.Locator]struct{}{
+	output := []storeSpec.Locator{target}
+	seen := map[storeSpec.Locator]struct{}{
 		target: {},
 	}
 	for _, skillDocument := range c.support.SkillDocuments.Files {
-		candidate := spec.Locator(path.Join(
+		candidate := storeSpec.Locator(path.Join(
 			string(target),
 			string(skillDocument),
 		))

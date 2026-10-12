@@ -10,7 +10,7 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
@@ -209,7 +209,7 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 		resolver,
 		tokens,
 		nil,
-	); !errors.Is(err, spec.ErrInvalid) {
+	); !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("nil MCP server store error: %v", err)
 	}
 
@@ -218,7 +218,7 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 		nil,
 		tokens,
 		nil,
-	); !errors.Is(err, spec.ErrInvalid) {
+	); !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("nil MCP secret resolver error: %v", err)
 	}
 
@@ -227,7 +227,7 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 		resolver,
 		nil,
 		nil,
-	); !errors.Is(err, spec.ErrInvalid) {
+	); !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("nil OAuth token store error: %v", err)
 	}
 }

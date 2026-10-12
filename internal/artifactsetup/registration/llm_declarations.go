@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -71,7 +71,7 @@ func LLMDeclarationSchemaCodecsForSchemaKeys(
 	if len(keys) == 0 {
 		return nil, fmt.Errorf(
 			"%w: LLM declaration schema selection is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -93,7 +93,7 @@ func LLMDeclarationSchemaCodecsForSchemaKeys(
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: LLM declaration schema %q/%q/%q is repeated",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
@@ -103,7 +103,7 @@ func LLMDeclarationSchemaCodecsForSchemaKeys(
 		if !found {
 			return nil, fmt.Errorf(
 				"%w: LLM declaration schema %q/%q/%q",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
@@ -202,7 +202,7 @@ func LLMCanonicalDeclarationDecoders(
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM declaration interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -223,7 +223,7 @@ func LLMCanonicalDeclarationDecodersForSchemaKeys(
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM declaration interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	selected, err := registry.RequireSchemaKeys(keys)
@@ -267,7 +267,7 @@ func LLMSourceFormatDecoders(
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM declaration interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
@@ -370,7 +370,7 @@ func llmFamilyRegistrations(skillDocuments support.Documents) []coreinterpretati
 }
 
 func decoderCandidates(
-	decoderID spec.DecoderID,
+	decoderID storeSpec.DecoderID,
 ) (support.Candidates, error) {
 	patterns, err := topology.DocumentPatternsForDecoder(decoderID)
 	if err != nil {

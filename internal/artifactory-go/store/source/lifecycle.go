@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // LifecycleInvalidation identifies the Source-owned transition that makes its
@@ -35,32 +35,32 @@ func (t LifecycleTransition) Validate() error {
 	if t.ExpectedSourceRevision == 0 ||
 		t.ExpectedSourceRevision == ^uint64(0) ||
 		t.Source.Revision != t.ExpectedSourceRevision+1 {
-		return fmt.Errorf("%w: invalid Source lifecycle revision transition", spec.ErrInvalid)
+		return fmt.Errorf("%w: invalid Source lifecycle revision transition", storeSpec.ErrInvalid)
 	}
 	switch t.Invalidation {
 	case LifecycleInvalidationDisabled:
 		if t.Source.Enabled || t.Source.RetiredAt != nil {
 			return fmt.Errorf(
 				"%w: disabled Source lifecycle transition must retain an active disabled Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	case LifecycleInvalidationDiscoveryRemoved:
 		if !t.Source.Enabled || t.Source.RetiredAt != nil || !t.Source.Discovery.Empty() {
 			return fmt.Errorf(
 				"%w: discovery-removal lifecycle transition must retain an enabled Source with empty discovery",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	case LifecycleInvalidationRetired:
 		if t.Source.Enabled || t.Source.RetiredAt == nil {
 			return fmt.Errorf(
 				"%w: retired Source lifecycle transition must retire and disable the Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	default:
-		return fmt.Errorf("%w: unsupported Source lifecycle invalidation %q", spec.ErrInvalid, t.Invalidation)
+		return fmt.Errorf("%w: unsupported Source lifecycle invalidation %q", storeSpec.ErrInvalid, t.Invalidation)
 	}
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillPackage "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/package"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
@@ -24,7 +24,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	}
 	documents := support.Documents{
 		Default: layout.Document,
-		Files:   []spec.Locator{"SKILL.md"},
+		Files:   []storeSpec.Locator{"SKILL.md"},
 	}
 
 	address, err := managedpackageModel.NewManagedPackageAddress(
@@ -40,7 +40,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	if err != nil {
 		t.Fatalf("ManagedSkillDirectoryLocator: %v", err)
 	}
-	wantDirectory := spec.Locator(
+	wantDirectory := storeSpec.Locator(
 		"skill/release-notes/unversioned/release-notes",
 	)
 	if directory != wantDirectory {
@@ -58,7 +58,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	if err != nil {
 		t.Fatalf("ManagedPackageLocatorForSkill: %v", err)
 	}
-	wantDocumentLocator := spec.Locator(
+	wantDocumentLocator := storeSpec.Locator(
 		"skill/release-notes/unversioned/release-notes/SKILL.md",
 	)
 	if documentLocator != wantDocumentLocator {
@@ -104,7 +104,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 		t.Fatalf("ManagedSkillStorageFiles: %v", err)
 	}
 
-	contents := make(map[spec.Locator]string, len(files))
+	contents := make(map[storeSpec.Locator]string, len(files))
 	for _, file := range files {
 		contents[file.Locator] = string(file.Content)
 	}
@@ -127,7 +127,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 		layout,
 		"skill/release-notes/unversioned/not-release-notes/SKILL.md",
 	)
-	if !errors.Is(err, spec.ErrInvalid) {
+	if !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf(
 			"mismatched runtime directory error=%v, want ErrInvalid",
 			err,

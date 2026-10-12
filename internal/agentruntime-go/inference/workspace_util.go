@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -19,7 +19,10 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
 )
 
-const workspaceContextInputIDPrefix = "workspace-context:"
+const (
+	workspaceContextInputIDPrefix = "workspace-context:"
+	workspaceDebugStatusKey       = "status"
+)
 
 // WorkspaceSource is the narrow Root-scoped Workspace consumer port used by
 // conversation inference hydration.
@@ -70,13 +73,13 @@ func HydrateCompletion(
 	usage := resolution.Usage
 	output.Usage = &usage
 	output.DebugDetails = map[string]any{
-		"workspace":         sel.Workspace,
-		"resolvedWorkspace": usage.Workspace,
-		"workspaceRevision": usage.WorkspaceRevision,
-		"status":            usage.Status,
-		"contexts":          usage.Contexts,
-		"skills":            usage.Skills,
-		"diagnostics":       usage.Diagnostics,
+		"workspace":             sel.Workspace,
+		"resolvedWorkspace":     usage.Workspace,
+		"workspaceRevision":     usage.WorkspaceRevision,
+		workspaceDebugStatusKey: usage.Status,
+		"contexts":              usage.Contexts,
+		"skills":                usage.Skills,
+		"diagnostics":           usage.Diagnostics,
 	}
 
 	if instructions := buildWorkspaceInstructionsSystemPromptPart(
@@ -440,7 +443,7 @@ func initializeWorkspaceContextUsage(
 		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Context Artifact",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		index[selected.Artifact] = len(usage.Contexts)
@@ -469,7 +472,7 @@ func initializeWorkspaceSkillUsage(
 		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Skill Artifact",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		index[selected.Artifact] = len(usage.Skills)
@@ -636,8 +639,8 @@ func workspaceConversationResourceChanged(
 	usedDigest cryptoutil.Digest,
 	selectedRevision uint64,
 	usedRevision uint64,
-	selectedLocator spec.Locator,
-	usedLocator spec.Locator,
+	selectedLocator storeSpec.Locator,
+	usedLocator storeSpec.Locator,
 ) bool {
 	if selectedDigest != "" && selectedDigest != usedDigest {
 		return true

@@ -6,7 +6,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 )
 
@@ -20,7 +20,7 @@ func InitTextStoreWrapper(
 	protection root.ProtectionAPI,
 ) error {
 	if wrapper == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	service, err := textAPI.New(resources, protection)
 	if err != nil {
@@ -35,7 +35,7 @@ func (w *TextStoreWrapper) MaterializeText(
 ) (textAPI.Materialization, error) {
 	return withRecoveryResp(func() (textAPI.Materialization, error) {
 		if w == nil || w.service == nil {
-			return textAPI.Materialization{}, spec.ErrClosed
+			return textAPI.Materialization{}, storeSpec.ErrClosed
 		}
 		return w.service.Materialize(context.Background(), ref)
 	})

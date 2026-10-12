@@ -6,7 +6,7 @@ import (
 	"time"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -29,10 +29,10 @@ func (v ArtifactID) Validate() error {
 // Artifact Store does not enumerate, interpret, or otherwise know typed
 // declaration vocabulary.
 func (v ArtifactKind) Validate() error {
-	return spec.ValidateIdentifier(
+	return storeSpec.ValidateIdentifier(
 		"Artifact kind",
 		string(v),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	)
 }
 
@@ -49,10 +49,10 @@ func (r ArtifactRef) Validate() error {
 }
 
 type ArtifactAddress struct {
-	RootID      rootModel.RootID `json:"rootID"`
-	ArtifactID  ArtifactID       `json:"artifactID"`
-	Kind        ArtifactKind     `json:"kind"`
-	LogicalName spec.LogicalName `json:"logicalName"`
+	RootID      rootModel.RootID      `json:"rootID"`
+	ArtifactID  ArtifactID            `json:"artifactID"`
+	Kind        ArtifactKind          `json:"kind"`
+	LogicalName storeSpec.LogicalName `json:"logicalName"`
 }
 
 func (a ArtifactAddress) Validate() error {
@@ -82,9 +82,9 @@ type Artifact struct {
 	RootID  rootModel.RootID `json:"rootID"`
 	Binding SourceBinding    `json:"binding"`
 
-	Kind           ArtifactKind        `json:"kind"`
-	LogicalName    spec.LogicalName    `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion `json:"logicalVersion,omitempty"`
+	Kind           ArtifactKind             `json:"kind"`
+	LogicalName    storeSpec.LogicalName    `json:"logicalName"`
+	LogicalVersion storeSpec.LogicalVersion `json:"logicalVersion,omitempty"`
 
 	ResolvedDefinition  *cryptoutil.Digest `json:"resolvedDefinition,omitempty"`
 	SourceContentDigest *cryptoutil.Digest `json:"sourceContentDigest,omitempty"`
@@ -126,11 +126,11 @@ func (a Artifact) Validate() error {
 	}
 	if _, err := jsonutil.CanonicalizeObject(
 		a.Data,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return fmt.Errorf(
 			"%w: Artifact local data: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}

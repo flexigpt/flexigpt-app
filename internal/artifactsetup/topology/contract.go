@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -18,35 +18,35 @@ import (
 var contractTopologyYAML []byte
 
 const (
-	DocumentUsePlugin                             = "plugin"
-	DocumentUseCanonicalYAML                      = "canonicalYAML"
-	DocumentUseCanonicalJSON                      = "canonicalJSON"
-	DocumentUseMCPConfig                          = "mcpConfig"
-	DocumentUseSkillPackage                       = "skillPackage"
-	DocumentUseModelProviderPackage               = "modelProviderPackage"
-	DocumentUseModelPackage                       = "modelPackage"
-	DocumentUseToolPackage                        = "toolPackage"
-	DocumentUseToolPlugin                         = "toolPlugin"
-	DocumentUseManagedPlugin                      = "managedPlugin"
-	DocumentUseManagedModelProvider               = "managedModelProvider"
-	DocumentUseManagedModel                       = "managedModel"
-	DocumentUseAgentManagedPlugin                 = "agentManagedPlugin"
-	DocumentUseManagedAgent                       = "managedAgent"
-	DocumentUseManagedMCP                         = "managedMCP"
-	DocumentUseManagedMCPPolicy                   = "managedMCPPolicy"
-	DocumentUseAgentMarkdown                      = "agentMarkdown"
-	DocumentUseWorkspaceMarkdown                  = "workspaceMarkdown"
-	DocumentUseWorkspaceInstructions              = "workspaceInstructions"
-	DocumentUseWorkspaceManifest                  = "workspaceManifest"
-	DiscoveryUseSkill                             = "skill"
-	DiscoveryUseMCP                               = "mcp"
-	DiscoveryUseWorkspace                         = "workspace"
-	DiscoveryUseSelector                          = "selector"
-	MarkdownRuleAgent                             = "agent"
-	MarkdownRuleText                              = "text"
-	MarkdownRuleDefaultText                       = "defaultText"
-	MarkdownRuleInstructionText                   = "instructionText"
-	RepositoryRootLocator            spec.Locator = "."
+	DocumentUsePlugin                                  = "plugin"
+	DocumentUseCanonicalYAML                           = "canonicalYAML"
+	DocumentUseCanonicalJSON                           = "canonicalJSON"
+	DocumentUseMCPConfig                               = "mcpConfig"
+	DocumentUseSkillPackage                            = "skillPackage"
+	DocumentUseModelProviderPackage                    = "modelProviderPackage"
+	DocumentUseModelPackage                            = "modelPackage"
+	DocumentUseToolPackage                             = "toolPackage"
+	DocumentUseToolPlugin                              = "toolPlugin"
+	DocumentUseManagedPlugin                           = "managedPlugin"
+	DocumentUseManagedModelProvider                    = "managedModelProvider"
+	DocumentUseManagedModel                            = "managedModel"
+	DocumentUseAgentManagedPlugin                      = "agentManagedPlugin"
+	DocumentUseManagedAgent                            = "managedAgent"
+	DocumentUseManagedMCP                              = "managedMCP"
+	DocumentUseManagedMCPPolicy                        = "managedMCPPolicy"
+	DocumentUseAgentMarkdown                           = "agentMarkdown"
+	DocumentUseWorkspaceMarkdown                       = "workspaceMarkdown"
+	DocumentUseWorkspaceInstructions                   = "workspaceInstructions"
+	DocumentUseWorkspaceManifest                       = "workspaceManifest"
+	DiscoveryUseSkill                                  = "skill"
+	DiscoveryUseMCP                                    = "mcp"
+	DiscoveryUseWorkspace                              = "workspace"
+	DiscoveryUseSelector                               = "selector"
+	MarkdownRuleAgent                                  = "agent"
+	MarkdownRuleText                                   = "text"
+	MarkdownRuleDefaultText                            = "defaultText"
+	MarkdownRuleInstructionText                        = "instructionText"
+	RepositoryRootLocator            storeSpec.Locator = "."
 )
 
 type documentFormat string
@@ -58,16 +58,16 @@ const (
 )
 
 type documentAliasWire struct {
-	Locator   string         `json:"locator"`
-	Pattern   string         `json:"pattern,omitempty"`
-	Format    documentFormat `json:"format"`
-	DecoderID spec.DecoderID `json:"decoderID,omitempty"`
+	Locator   string              `json:"locator"`
+	Pattern   string              `json:"pattern,omitempty"`
+	Format    documentFormat      `json:"format"`
+	DecoderID storeSpec.DecoderID `json:"decoderID,omitempty"`
 }
 
 type documentUseWire struct {
-	DocumentSets   []string       `json:"documentSets"`
-	DefaultLocator string         `json:"defaultLocator,omitempty"`
-	DecoderID      spec.DecoderID `json:"decoderID,omitempty"`
+	DocumentSets   []string            `json:"documentSets"`
+	DefaultLocator string              `json:"defaultLocator,omitempty"`
+	DecoderID      storeSpec.DecoderID `json:"decoderID,omitempty"`
 }
 
 type markdownRuleWire struct {
@@ -79,20 +79,20 @@ type markdownRuleWire struct {
 }
 
 type decoderHintWire struct {
-	Locator    spec.Locator     `json:"locator"`
-	Recursive  bool             `json:"recursive"`
-	DecoderIDs []spec.DecoderID `json:"decoderIDs"`
+	Locator    storeSpec.Locator     `json:"locator"`
+	Recursive  bool                  `json:"recursive"`
+	DecoderIDs []storeSpec.DecoderID `json:"decoderIDs"`
 }
 
 type discoveryProfileWire struct {
-	Root              spec.Locator      `json:"root"`
-	Recursive         bool              `json:"recursive"`
-	Authoritative     bool              `json:"authoritative"`
-	IncludePatterns   []string          `json:"includePatterns"`
-	ExcludePatterns   []string          `json:"excludePatterns"`
-	DocumentSets      []string          `json:"documentSets"`
-	DecoderHints      []decoderHintWire `json:"decoderHints"`
-	AllowedDecoderIDs []spec.DecoderID  `json:"allowedDecoderIDs"`
+	Root              storeSpec.Locator     `json:"root"`
+	Recursive         bool                  `json:"recursive"`
+	Authoritative     bool                  `json:"authoritative"`
+	IncludePatterns   []string              `json:"includePatterns"`
+	ExcludePatterns   []string              `json:"excludePatterns"`
+	DocumentSets      []string              `json:"documentSets"`
+	DecoderHints      []decoderHintWire     `json:"decoderHints"`
+	AllowedDecoderIDs []storeSpec.DecoderID `json:"allowedDecoderIDs"`
 }
 
 type discoveryUseWire struct {
@@ -101,7 +101,7 @@ type discoveryUseWire struct {
 
 type contractTopologyWire struct {
 	PackageVersions struct {
-		Unversioned spec.LogicalVersion `json:"unversioned"`
+		Unversioned storeSpec.LogicalVersion `json:"unversioned"`
 	} `json:"packageVersions"`
 
 	Documents     map[string][]documentAliasWire  `json:"documents"`
@@ -112,16 +112,16 @@ type contractTopologyWire struct {
 }
 
 type documentAlias struct {
-	locator   spec.Locator
+	locator   storeSpec.Locator
 	pattern   string
 	format    documentFormat
-	decoderID spec.DecoderID
+	decoderID storeSpec.DecoderID
 }
 
 type documentUse struct {
 	aliases        []documentAlias
-	defaultLocator spec.Locator
-	decoderID      spec.DecoderID
+	defaultLocator storeSpec.Locator
+	decoderID      storeSpec.DecoderID
 }
 
 type markdownRule struct {
@@ -138,29 +138,29 @@ type contractTopology struct {
 	markdownRules             map[string]markdownRule
 	discoveryProfiles         map[string]sourceModel.DiscoverySpec
 	discoveryUses             map[string]sourceModel.DiscoverySpec
-	unversionedPackageVersion spec.LogicalVersion
+	unversionedPackageVersion storeSpec.LogicalVersion
 }
 
 var configuredContractTopology = mustLoadContractTopology(contractTopologyYAML)
 
-func DocumentFiles(use string) ([]spec.Locator, error) {
+func DocumentFiles(use string) ([]storeSpec.Locator, error) {
 	value, found := configuredContractTopology.documentUses[use]
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no document use %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			use,
 		)
 	}
 
-	output := make([]spec.Locator, len(value.aliases))
+	output := make([]storeSpec.Locator, len(value.aliases))
 	for index, alias := range value.aliases {
 		if alias.locator == "" {
 			continue
 		}
 		output[index] = alias.locator
 	}
-	return slices.DeleteFunc(output, func(value spec.Locator) bool {
+	return slices.DeleteFunc(output, func(value storeSpec.Locator) bool {
 		return value == ""
 	}), nil
 }
@@ -171,7 +171,7 @@ func DocumentFiles(use string) ([]spec.Locator, error) {
 func DocumentPatterns(use string) ([]string, error) {
 	value, found := configuredContractTopology.documentUses[use]
 	if !found {
-		return nil, fmt.Errorf("%w: contract topology has no document use %q", spec.ErrNotFound, use)
+		return nil, fmt.Errorf("%w: contract topology has no document use %q", storeSpec.ErrNotFound, use)
 	}
 	return documentPatterns(value.aliases), nil
 }
@@ -180,7 +180,7 @@ func DocumentPatterns(use string) ([]string, error) {
 // filename or pattern for one decoder. LLM decoder packages consume this
 // support declaration rather than inferring support from filename extensions.
 func DocumentPatternsForDecoder(
-	decoderID spec.DecoderID,
+	decoderID storeSpec.DecoderID,
 ) ([]string, error) {
 	if err := decoderID.Validate(); err != nil {
 		return nil, err
@@ -219,7 +219,7 @@ func DocumentPatternsForDecoder(
 	return output, nil
 }
 
-func MustDocumentFiles(use string) []spec.Locator {
+func MustDocumentFiles(use string) []storeSpec.Locator {
 	value, err := DocumentFiles(use)
 	if err != nil {
 		panic(err)
@@ -227,26 +227,26 @@ func MustDocumentFiles(use string) []spec.Locator {
 	return value
 }
 
-func DefaultDocumentFile(use string) (spec.Locator, error) {
+func DefaultDocumentFile(use string) (storeSpec.Locator, error) {
 	value, found := configuredContractTopology.documentUses[use]
 	if !found {
 		return "", fmt.Errorf(
 			"%w: contract topology has no document use %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			use,
 		)
 	}
 	if value.defaultLocator == "" {
 		return "", fmt.Errorf(
 			"%w: document use %q has no default locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			use,
 		)
 	}
 	return value.defaultLocator, nil
 }
 
-func MustDefaultDocumentFile(use string) spec.Locator {
+func MustDefaultDocumentFile(use string) storeSpec.Locator {
 	value, err := DefaultDocumentFile(use)
 	if err != nil {
 		panic(err)
@@ -254,12 +254,12 @@ func MustDefaultDocumentFile(use string) spec.Locator {
 	return value
 }
 
-func DefaultDocumentDecoderID(use string) (spec.DecoderID, error) {
+func DefaultDocumentDecoderID(use string) (storeSpec.DecoderID, error) {
 	value, found := configuredContractTopology.documentUses[use]
 	if !found {
 		return "", fmt.Errorf(
 			"%w: contract topology has no document use %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			use,
 		)
 	}
@@ -273,101 +273,101 @@ func DefaultDocumentDecoderID(use string) (spec.DecoderID, error) {
 	}
 	return "", fmt.Errorf(
 		"%w: document use %q has no default decoder",
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 		use,
 	)
 }
 
-func IsDocument(locator spec.Locator, use string) bool {
+func IsDocument(locator storeSpec.Locator, use string) bool {
 	return configuredContractTopology.matchesDocument(locator, use, "")
 }
 
 func IsDocumentFormat(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	use string,
 	format documentFormat,
 ) bool {
 	return configuredContractTopology.matchesDocument(locator, use, format)
 }
 
-func PluginDocumentFiles() []spec.Locator {
+func PluginDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUsePlugin)
 }
 
-func IsPluginDocumentFile(value spec.Locator) bool {
+func IsPluginDocumentFile(value storeSpec.Locator) bool {
 	return path.Base(string(value)) == string(value) &&
 		IsDocument(value, DocumentUsePlugin)
 }
 
-func IsMCPConfigDocument(locator spec.Locator) bool {
+func IsMCPConfigDocument(locator storeSpec.Locator) bool {
 	return IsDocumentFormat(locator, DocumentUseMCPConfig, formatJSON)
 }
 
-func IsCanonicalYAMLDocument(locator spec.Locator) bool {
+func IsCanonicalYAMLDocument(locator storeSpec.Locator) bool {
 	return IsDocumentFormat(locator, DocumentUseCanonicalYAML, formatYAML)
 }
 
-func IsCanonicalJSONDocument(locator spec.Locator) bool {
+func IsCanonicalJSONDocument(locator storeSpec.Locator) bool {
 	return IsDocumentFormat(locator, DocumentUseCanonicalJSON, formatJSON)
 }
 
-func SkillPackageDocumentFiles() []spec.Locator {
+func SkillPackageDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUseSkillPackage)
 }
 
-func DefaultSkillPackageDocumentFile() spec.Locator {
+func DefaultSkillPackageDocumentFile() storeSpec.Locator {
 	return MustDefaultDocumentFile(DocumentUseSkillPackage)
 }
 
-func IsSkillPackageDocument(locator spec.Locator) bool {
+func IsSkillPackageDocument(locator storeSpec.Locator) bool {
 	return IsDocument(locator, DocumentUseSkillPackage)
 }
 
-func ToolPackageDocumentFiles() []spec.Locator {
+func ToolPackageDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUseToolPackage)
 }
 
-func DefaultToolPackageDocumentFile() spec.Locator {
+func DefaultToolPackageDocumentFile() storeSpec.Locator {
 	return MustDefaultDocumentFile(DocumentUseToolPackage)
 }
 
-func IsToolPackageDocument(locator spec.Locator) bool {
+func IsToolPackageDocument(locator storeSpec.Locator) bool {
 	return IsDocument(locator, DocumentUseToolPackage)
 }
 
-func ModelProviderDocumentFiles() []spec.Locator {
+func ModelProviderDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUseModelProviderPackage)
 }
 
-func ModelProviderDocumentFile() spec.Locator {
+func ModelProviderDocumentFile() storeSpec.Locator {
 	return MustDefaultDocumentFile(DocumentUseModelProviderPackage)
 }
 
-func ModelDocumentFiles() []spec.Locator {
+func ModelDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUseModelPackage)
 }
 
-func ModelDocumentFile() spec.Locator {
+func ModelDocumentFile() storeSpec.Locator {
 	return MustDefaultDocumentFile(DocumentUseModelPackage)
 }
 
-func AgentDeclarationDocumentFiles() []spec.Locator {
+func AgentDeclarationDocumentFiles() []storeSpec.Locator {
 	return MustDocumentFiles(DocumentUseManagedAgent)
 }
 
-func IsAgentDeclarationDocument(locator spec.Locator) bool {
+func IsAgentDeclarationDocument(locator storeSpec.Locator) bool {
 	return IsDocument(locator, DocumentUseManagedAgent)
 }
 
-func IsAgentMarkdownDocument(locator spec.Locator) bool {
+func IsAgentMarkdownDocument(locator storeSpec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleAgent, locator)
 }
 
-func IsTextMarkdownDocument(locator spec.Locator) bool {
+func IsTextMarkdownDocument(locator storeSpec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleText, locator)
 }
 
-func IsWorkspaceManifestLocator(locator spec.Locator) bool {
+func IsWorkspaceManifestLocator(locator storeSpec.Locator) bool {
 	return IsDocument(locator, DocumentUseWorkspaceManifest)
 }
 
@@ -379,15 +379,15 @@ func WorkspaceManifestPatterns() []string {
 	return values
 }
 
-func IsDefaultTextMarkdownDocument(locator spec.Locator) bool {
+func IsDefaultTextMarkdownDocument(locator storeSpec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleDefaultText, locator)
 }
 
-func IsInstructionMarkdownDocument(locator spec.Locator) bool {
+func IsInstructionMarkdownDocument(locator storeSpec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleInstructionText, locator)
 }
 
-func MatchesMarkdownRule(rule string, locator spec.Locator) bool {
+func MatchesMarkdownRule(rule string, locator storeSpec.Locator) bool {
 	return configuredContractTopology.matchesMarkdownRule(
 		rule,
 		locator,
@@ -395,7 +395,7 @@ func MatchesMarkdownRule(rule string, locator spec.Locator) bool {
 	)
 }
 
-func UnversionedPackageVersion() spec.LogicalVersion {
+func UnversionedPackageVersion() storeSpec.LogicalVersion {
 	return configuredContractTopology.unversionedPackageVersion
 }
 
@@ -404,7 +404,7 @@ func DiscoverySpecForUse(name string) (sourceModel.DiscoverySpec, error) {
 	if !found {
 		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: contract topology has no discovery use %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			name,
 		)
 	}
@@ -413,7 +413,7 @@ func DiscoverySpecForUse(name string) (sourceModel.DiscoverySpec, error) {
 
 func DiscoverySpecAtForUse(
 	name string,
-	root spec.Locator,
+	root storeSpec.Locator,
 ) (sourceModel.DiscoverySpec, error) {
 	if err := root.Validate(true); err != nil {
 		return sourceModel.DiscoverySpec{}, err
@@ -426,7 +426,7 @@ func DiscoverySpecAtForUse(
 	if len(value.DirectoryRoots) != 1 {
 		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery use %q cannot be rooted dynamically",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -441,7 +441,7 @@ func DiscoverySpecAtForUse(
 
 func DiscoverySpecForLocatorForUse(
 	name string,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.DiscoverySpec, error) {
 	if err := locator.Validate(false); err != nil {
 		return sourceModel.DiscoverySpec{}, err
@@ -454,19 +454,19 @@ func DiscoverySpecForLocatorForUse(
 	if len(profile.AllowedDecoderIDs) != 1 {
 		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery use %q must define exactly one decoder",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
 
 	value := sourceModel.DiscoverySpec{
-		ExplicitLocators: []spec.Locator{locator},
+		ExplicitLocators: []storeSpec.Locator{locator},
 		DecoderHints: []sourceModel.DecoderHint{{
 			Locator:    locator,
 			Recursive:  false,
-			DecoderIDs: append([]spec.DecoderID(nil), profile.AllowedDecoderIDs...),
+			DecoderIDs: append([]storeSpec.DecoderID(nil), profile.AllowedDecoderIDs...),
 		}},
-		AllowedDecoderIDs: append([]spec.DecoderID(nil), profile.AllowedDecoderIDs...),
+		AllowedDecoderIDs: append([]storeSpec.DecoderID(nil), profile.AllowedDecoderIDs...),
 		Authoritative:     profile.Authoritative,
 	}
 	value = value.Normalized()
@@ -497,7 +497,7 @@ func DiscoveryIncludePatternsForUse(name string) ([]string, error) {
 }
 
 func (t contractTopology) matchesDocument(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	use string,
 	format documentFormat,
 ) bool {
@@ -522,7 +522,7 @@ func (a documentAlias) matches(name string) bool {
 	if a.locator != "" {
 		return strings.EqualFold(name, string(a.locator))
 	}
-	matched, err := spec.MatchPathPattern(a.pattern, name)
+	matched, err := storeSpec.MatchPathPattern(a.pattern, name)
 	return err == nil && matched
 }
 
@@ -557,7 +557,7 @@ func documentPatterns(aliases []documentAlias) []string {
 
 func (t contractTopology) matchesMarkdownRule(
 	name string,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	active map[string]struct{},
 ) bool {
 	rule, found := t.markdownRules[name]
@@ -620,7 +620,7 @@ func mustLoadContractTopology(raw []byte) contractTopology {
 func loadContractTopology(raw []byte) (contractTopology, error) {
 	canonical, err := yamlutil.CanonicalObjectJSON(
 		raw,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return contractTopology{}, err
@@ -630,14 +630,14 @@ func loadContractTopology(raw []byte) (contractTopology, error) {
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&wire,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	); err != nil {
 		return contractTopology{}, err
 	}
 	if wire.PackageVersions.Unversioned == "" {
 		return contractTopology{}, fmt.Errorf(
 			"%w: contract topology requires an unversioned package version",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := wire.PackageVersions.Unversioned.Validate(false); err != nil {
@@ -691,16 +691,16 @@ func parseDocumentSets(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no document sets",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make(map[string][]documentAlias, len(values))
 	for name, aliases := range values {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"document set name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -723,7 +723,7 @@ func parseDocumentAliases(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: %s must contain at least one document alias",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 		)
 	}
@@ -734,7 +734,7 @@ func parseDocumentAliases(
 		if (value.Locator == "") == (value.Pattern == "") {
 			return nil, fmt.Errorf(
 				"%w: %s[%d] must declare exactly one of locator or pattern",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				index,
 			)
@@ -753,14 +753,14 @@ func parseDocumentAliases(
 			decoderID: value.DecoderID,
 		}
 		if value.Locator != "" {
-			alias.locator = spec.Locator(value.Locator)
+			alias.locator = storeSpec.Locator(value.Locator)
 			if err := alias.locator.ValidatePortable(false); err != nil {
 				return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
 			}
 			if path.Base(string(alias.locator)) != string(alias.locator) {
 				return nil, fmt.Errorf(
 					"%w: %s[%d] must be a package-root filename",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					label,
 					index,
 				)
@@ -768,9 +768,9 @@ func parseDocumentAliases(
 		} else {
 			alias.pattern = strings.ToLower(value.Pattern)
 			if strings.Contains(alias.pattern, "/") {
-				return nil, fmt.Errorf("%w: %s[%d] pattern must match one filename", spec.ErrInvalid, label, index)
+				return nil, fmt.Errorf("%w: %s[%d] pattern must match one filename", storeSpec.ErrInvalid, label, index)
 			}
-			if err := spec.ValidatePathPattern(alias.pattern); err != nil {
+			if err := storeSpec.ValidatePathPattern(alias.pattern); err != nil {
 				return nil, fmt.Errorf("%s[%d]: %w", label, index, err)
 			}
 		}
@@ -778,7 +778,7 @@ func parseDocumentAliases(
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: %s repeats document alias %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				key,
 			)
@@ -796,23 +796,23 @@ func parseDocumentUses(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no document uses",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make(map[string]documentUse, len(values))
 	for name, value := range values {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"document use name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if len(value.DocumentSets) == 0 {
 			return nil, fmt.Errorf(
 				"%w: document use %q has no document sets",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -829,7 +829,7 @@ func parseDocumentUses(
 			if _, duplicate := seenSets[setName]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: document use %q repeats set %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					setName,
 				)
@@ -840,7 +840,7 @@ func parseDocumentUses(
 			if !found {
 				return nil, fmt.Errorf(
 					"%w: document use %q references unknown set %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					setName,
 				)
@@ -851,7 +851,7 @@ func parseDocumentUses(
 					if previous.format != alias.format {
 						return nil, fmt.Errorf(
 							"%w: document use %q has conflicting formats for %q",
-							spec.ErrInvalid,
+							storeSpec.ErrInvalid,
 							name,
 							alias.locator,
 						)
@@ -863,7 +863,7 @@ func parseDocumentUses(
 			}
 		}
 
-		var defaultLocator spec.Locator
+		var defaultLocator storeSpec.Locator
 		if value.DefaultLocator != "" {
 			for _, alias := range aliases {
 				if alias.locator == "" {
@@ -880,7 +880,7 @@ func parseDocumentUses(
 			if defaultLocator == "" {
 				return nil, fmt.Errorf(
 					"%w: document use %q default %q is not declared",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					value.DefaultLocator,
 				)
@@ -903,16 +903,16 @@ func parseMarkdownRules(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no markdown rules",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make(map[string]markdownRule, len(values))
 	for name, value := range values {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"markdown rule name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -921,7 +921,7 @@ func parseMarkdownRules(
 			if _, found := documentUses[use]; !found {
 				return fmt.Errorf(
 					"%w: markdown rule %q references document use %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					use,
 				)
@@ -943,7 +943,7 @@ func parseMarkdownRules(
 			len(value.Extensions) == 0 {
 			return nil, fmt.Errorf(
 				"%w: markdown rule %q has no positive matcher",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -966,7 +966,7 @@ func parseMarkdownRules(
 			if !strings.HasPrefix(extension, ".") {
 				return nil, fmt.Errorf(
 					"%w: markdown extension %q must begin with a dot",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					extension,
 				)
 			}
@@ -994,17 +994,17 @@ func normalizeMarkdownMatchers(
 	output := make([]string, 0, len(values))
 	for _, value := range values {
 		value = strings.ToLower(value)
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			label,
 			value,
-			spec.MaxLogicalNameBytes,
+			storeSpec.MaxLogicalNameBytes,
 		); err != nil {
 			return nil, err
 		}
 		if strings.Contains(value, "/") {
 			return nil, fmt.Errorf(
 				"%w: %s %q cannot contain a path separator",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				value,
 			)
@@ -1012,7 +1012,7 @@ func normalizeMarkdownMatchers(
 		if _, duplicate := seen[value]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate %s %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				value,
 			)
@@ -1033,7 +1033,7 @@ func validateMarkdownRuleGraph(
 		case 1:
 			return fmt.Errorf(
 				"%w: markdown rule exclusion cycle at %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		case 2:
@@ -1044,7 +1044,7 @@ func validateMarkdownRuleGraph(
 		if !found {
 			return fmt.Errorf(
 				"%w: markdown rule references unknown rule %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -1073,16 +1073,16 @@ func parseDiscoveryProfiles(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no discovery profiles",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make(map[string]sourceModel.DiscoverySpec, len(values))
 	for name, value := range values {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"discovery profile name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -1119,7 +1119,7 @@ func parseDiscoveryProfile(
 			return sourceModel.DiscoverySpec{}, err
 		}
 	}
-	if err := spec.ValidatePathPatterns(
+	if err := storeSpec.ValidatePathPatterns(
 		name+" discovery exclude patterns",
 		value.ExcludePatterns,
 	); err != nil {
@@ -1132,7 +1132,7 @@ func parseDiscoveryProfile(
 		if _, duplicate := seenSets[setName]; duplicate {
 			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery profile %q repeats document set %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				setName,
 			)
@@ -1143,7 +1143,7 @@ func parseDiscoveryProfile(
 		if !found {
 			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery profile %q references unknown document set %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				setName,
 			)
@@ -1155,7 +1155,7 @@ func parseDiscoveryProfile(
 	if len(includePatterns) == 0 {
 		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery profile %q has no include patterns",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -1165,7 +1165,7 @@ func parseDiscoveryProfile(
 		hints = append(hints, sourceModel.DecoderHint{
 			Locator:    hint.Locator,
 			Recursive:  hint.Recursive,
-			DecoderIDs: append([]spec.DecoderID(nil), hint.DecoderIDs...),
+			DecoderIDs: append([]storeSpec.DecoderID(nil), hint.DecoderIDs...),
 		})
 	}
 
@@ -1177,7 +1177,7 @@ func parseDiscoveryProfile(
 			ExcludePatterns: append([]string(nil), value.ExcludePatterns...),
 		}},
 		DecoderHints:      hints,
-		AllowedDecoderIDs: append([]spec.DecoderID(nil), value.AllowedDecoderIDs...),
+		AllowedDecoderIDs: append([]storeSpec.DecoderID(nil), value.AllowedDecoderIDs...),
 		Authoritative:     value.Authoritative,
 	}
 	output = output.Normalized()
@@ -1191,7 +1191,7 @@ func parseDiscoveryPatterns(
 	label string,
 	values []string,
 ) ([]string, error) {
-	if err := spec.ValidatePathPatterns(label, values); err != nil {
+	if err := storeSpec.ValidatePathPatterns(label, values); err != nil {
 		return nil, err
 	}
 
@@ -1201,7 +1201,7 @@ func parseDiscoveryPatterns(
 		if _, duplicate := seen[value]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: %s repeats pattern %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				value,
 			)
@@ -1219,23 +1219,23 @@ func parseDiscoveryUses(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no discovery uses",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make(map[string]sourceModel.DiscoverySpec, len(values))
 	for name, value := range values {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"discovery use name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if len(value.Profiles) == 0 {
 			return nil, fmt.Errorf(
 				"%w: discovery use %q has no profiles",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -1246,7 +1246,7 @@ func parseDiscoveryUses(
 			if _, duplicate := seen[profileName]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: discovery use %q repeats profile %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					profileName,
 				)
@@ -1256,7 +1256,7 @@ func parseDiscoveryUses(
 			if !found {
 				return nil, fmt.Errorf(
 					"%w: discovery use %q references unknown profile %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					profileName,
 				)
@@ -1289,7 +1289,7 @@ func mergeDiscoveryProfiles(
 		} else if *authoritative != value.Authoritative {
 			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery use %q mixes authoritative and non-authoritative profiles",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -1340,7 +1340,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		if _, found := value.documentUses[use]; !found {
 			return fmt.Errorf(
 				"%w: required document use %q is missing",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				use,
 			)
 		}
@@ -1396,7 +1396,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		if _, found := value.markdownRules[name]; !found {
 			return fmt.Errorf(
 				"%w: required markdown rule %q is missing",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -1410,7 +1410,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		if _, found := value.discoveryUses[name]; !found {
 			return fmt.Errorf(
 				"%w: required discovery use %q is missing",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -1420,12 +1420,12 @@ func validateRequiredContractBindings(value contractTopology) error {
 
 func (t contractTopology) defaultDocumentFile(
 	use string,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	value, found := t.documentUses[use]
 	if !found || value.defaultLocator == "" {
 		return "", fmt.Errorf(
 			"%w: document use %q has no default locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			use,
 		)
 	}
@@ -1434,12 +1434,12 @@ func (t contractTopology) defaultDocumentFile(
 
 func (t contractTopology) defaultDocumentDecoderID(
 	use string,
-) (spec.DecoderID, error) {
+) (storeSpec.DecoderID, error) {
 	value, found := t.documentUses[use]
 	if !found {
 		return "", fmt.Errorf(
 			"%w: document use %q is unknown",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			use,
 		)
 	}
@@ -1453,7 +1453,7 @@ func (t contractTopology) defaultDocumentDecoderID(
 	}
 	return "", fmt.Errorf(
 		"%w: document use %q has no default decoder",
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 		use,
 	)
 }
@@ -1465,7 +1465,7 @@ func (f documentFormat) validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported document format %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			f,
 		)
 	}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const skillRuntimeCloseTimeout = 30 * time.Second
@@ -23,12 +23,12 @@ func withSkillRuntime[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 
 		service := w.service
 		if service == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(service)
 	})

@@ -9,7 +9,7 @@ import (
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (a *Adapter) ApplyPackageBatch(
@@ -51,7 +51,7 @@ func (a *Adapter) ApplyPackageBatch(
 		if _, duplicate := published[publication.Address]; duplicate {
 			return fmt.Errorf(
 				"%w: repeated package publication %q/%q/%q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				publication.Address.Kind,
 				publication.Address.Name,
 				publication.Address.Version,
@@ -147,7 +147,7 @@ func (a *Adapter) ApplyPackageBatch(
 		if !info.IsDir() {
 			return fmt.Errorf(
 				"%w: managed package target is not a directory",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if err := os.RemoveAll(target); err != nil {
@@ -176,7 +176,7 @@ func replaceStagedPackage(
 		if !info.IsDir() {
 			return fmt.Errorf(
 				"%w: managed package target is not a directory",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		previous, err = os.MkdirTemp(

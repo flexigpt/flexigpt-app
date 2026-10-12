@@ -7,7 +7,7 @@ import (
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // SessionAPI starts an ordinary request-scoped verification session. It is
@@ -32,20 +32,20 @@ type API interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 		maximumBytes int64,
 	) (resourceModel.VerifiedEntry, error)
 	StatSourceEntry(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (sourceModel.Entry, error)
 	ReadSourceTree(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		base spec.Locator,
+		base storeSpec.Locator,
 		include, exclude []string,
 		maximumEntries int,
 		maximumBytes int64,

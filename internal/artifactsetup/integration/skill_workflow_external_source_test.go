@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
@@ -229,7 +229,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 			Enabled: true,
 		},
 	)
-	if !errors.Is(err, spec.ErrUnsupported) {
+	if !errors.Is(err, storeSpec.ErrUnsupported) {
 		t.Fatalf(
 			"replace external Skill error=%v, want ErrUnsupported",
 			err,
@@ -241,7 +241,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		external.Artifact.Ref(),
 		external.Artifact.Revision,
 	)
-	if !errors.Is(err, spec.ErrUnsupported) {
+	if !errors.Is(err, storeSpec.ErrUnsupported) {
 		t.Fatalf(
 			"purge external Skill error=%v, want ErrUnsupported",
 			err,

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type installerPrivilegeContextKey struct{}
@@ -31,7 +31,7 @@ func RequireInstallerPrivilege(ctx context.Context) error {
 	if ctx == nil || !IsInstallerPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected topology installation requires trusted installer access",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 	return nil

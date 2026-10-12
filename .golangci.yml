@@ -503,7 +503,7 @@ linters:
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)
           alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/spec
-          alias: ${1}Spec
+          alias: ${1}RuntimeSpec
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/apps
           alias: ${1}Apps
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/connection

@@ -14,7 +14,7 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -28,7 +28,7 @@ type ListOptions struct {
 	IncludeDocument bool
 	Kind            artifactModel.ArtifactKind
 	Enabled         *bool
-	LogicalNames    []spec.LogicalName
+	LogicalNames    []storeSpec.LogicalName
 }
 
 // DefinitionMetadata is the small Definition projection needed by ordinary
@@ -46,7 +46,7 @@ type DefinitionMetadata struct {
 type SourceMetadata struct {
 	ID         sourceModel.SourceID
 	Kind       sourceModel.SourceKind
-	StorageKey spec.StorageKey
+	StorageKey storeSpec.StorageKey
 	Enabled    bool
 }
 
@@ -61,8 +61,8 @@ type Entry struct {
 	Binding artifactModel.SourceBinding
 
 	Kind           artifactModel.ArtifactKind
-	LogicalName    spec.LogicalName
-	LogicalVersion spec.LogicalVersion
+	LogicalName    storeSpec.LogicalName
+	LogicalVersion storeSpec.LogicalVersion
 
 	DisplayName string
 	State       artifactModel.State

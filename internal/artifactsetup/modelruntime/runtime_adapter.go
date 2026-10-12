@@ -10,9 +10,9 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
@@ -51,38 +51,38 @@ type AdapterDefinition struct {
 }
 
 func (d AdapterDefinition) Validate() error {
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"Model adapter ID",
 		d.ID,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Model adapter version",
 		d.Version,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Model adapter origin",
 		d.Origin,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Model adapter path",
 		d.Path,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Model adapter API key header",
 		d.APIKeyHeaderKey,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (d AdapterDefinition) Validate() error {
 }
 
 // RuntimeConfiguration is the inference consumer's runtime result contract.
-type RuntimeConfiguration = inferencewrapperSpec.RuntimeConfiguration
+type RuntimeConfiguration = inferenceRuntimeSpec.RuntimeConfiguration
 
 type RuntimeAdapter struct {
 	credentials CredentialResolver
@@ -106,7 +106,7 @@ func NewRuntimeAdapter(
 	if credentials == nil {
 		return nil, fmt.Errorf(
 			"%w: Model credential resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if len(definitions) == 0 {
@@ -128,7 +128,7 @@ func NewRuntimeAdapter(
 		if _, duplicate := output.adapters[definition.ID]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Model runtime adapter %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				definition.ID,
 			)
 		}
@@ -225,7 +225,7 @@ func (a *RuntimeAdapter) Resolve(
 func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
-	requestPatch *inferencewrapperSpec.RuntimeRequestPatch,
+	requestPatch *inferenceRuntimeSpec.RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
@@ -360,7 +360,7 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 	if !found {
 		return providerRuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model adapter %q is not installed",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			resolved.Provider.Document.Adapter,
 		)
 	}
@@ -394,13 +394,13 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 		if credential.APIKey == "" {
 			return providerRuntimeConfiguration{}, fmt.Errorf(
 				"%w: Model credential binding resolved to an empty value",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 	} else if requireCredential && authentication.Mode != "none" {
 		return providerRuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model Provider %q has no configured credential",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			resolved.Provider.Artifact.LogicalName,
 		)
 	}
@@ -486,7 +486,7 @@ func resolveConnection(
 		strings.TrimSpace(output.Path) == "" {
 		return resolvedConnection{}, fmt.Errorf(
 			"%w: effective Model Provider connection is incomplete",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return output, nil
@@ -515,7 +515,7 @@ func decodeAuthentication(
 	if output.Prefix != nil && *output.Prefix != "" {
 		return authentication{}, fmt.Errorf(
 			"%w: Model Provider authentication prefixes are not supported by inference-go ProviderParam",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	return output, nil
@@ -571,7 +571,7 @@ func decodeObjectMap(
 ) (map[string]any, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -590,7 +590,7 @@ func decodeObject(
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return err
@@ -645,13 +645,13 @@ func modelParamFromDefaults(
 	if modelName == "" {
 		return inferenceSpec.ModelParam{}, fmt.Errorf(
 			"%w: Model providerModelID is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if wire.TimeoutMS < 0 {
 		return inferenceSpec.ModelParam{}, fmt.Errorf(
 			"%w: Model timeoutMS cannot be negative",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -704,7 +704,7 @@ func modelParamFromDefaults(
 	if len(wire.AdapterParameters) != 0 {
 		canonical, err := jsonutil.CanonicalizeObject(
 			wire.AdapterParameters,
-			spec.MaxDefinitionBodyBytes,
+			storeSpec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return inferenceSpec.ModelParam{}, err
@@ -737,7 +737,7 @@ func collectCapabilityOverrides(
 		}
 		canonical, err := jsonutil.CanonicalizeObject(
 			raw,
-			spec.MaxDefinitionBodyBytes,
+			storeSpec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return nil, err

@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // DiscoveryPreparationIntent records the caller's non-destructive discovery
@@ -19,9 +19,9 @@ const (
 // It contains no Source driver configuration, package policy, artifact kind,
 // decoder implementation, or refresh behavior.
 type DiscoveryRequirement struct {
-	ExplicitLocators []spec.Locator  `json:"explicitLocators,omitempty"`
-	DirectoryRoots   []DirectoryRoot `json:"directoryRoots,omitempty"`
-	DecoderHints     []DecoderHint   `json:"decoderHints,omitempty"`
+	ExplicitLocators []storeSpec.Locator `json:"explicitLocators,omitempty"`
+	DirectoryRoots   []DirectoryRoot     `json:"directoryRoots,omitempty"`
+	DecoderHints     []DecoderHint       `json:"decoderHints,omitempty"`
 
 	RequireAuthoritative bool `json:"requireAuthoritative,omitempty"`
 }
@@ -29,7 +29,7 @@ type DiscoveryRequirement struct {
 func (r DiscoveryRequirement) Clone() DiscoveryRequirement {
 	output := r
 	output.ExplicitLocators = append(
-		[]spec.Locator(nil),
+		[]storeSpec.Locator(nil),
 		r.ExplicitLocators...,
 	)
 	output.DirectoryRoots = make(
@@ -54,15 +54,15 @@ func (r DiscoveryRequirement) Validate() error {
 		len(r.DirectoryRoots) == 0 {
 		return fmt.Errorf(
 			"%w: declaration discovery preparation requires a locator or directory scope",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if len(r.ExplicitLocators) > spec.MaxDiscoveryCandidates ||
-		len(r.DirectoryRoots) > spec.MaxDiscoveryCandidates ||
-		len(r.DecoderHints) > spec.MaxDecoderHints {
+	if len(r.ExplicitLocators) > storeSpec.MaxDiscoveryCandidates ||
+		len(r.DirectoryRoots) > storeSpec.MaxDiscoveryCandidates ||
+		len(r.DecoderHints) > storeSpec.MaxDecoderHints {
 		return fmt.Errorf(
 			"%w: declaration discovery preparation exceeds Store limits",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for index, locator := range r.ExplicitLocators {
@@ -108,13 +108,13 @@ func (p DiscoveryPreparation) Validate() error {
 		p.ExpectedRevision == ^uint64(0) {
 		return fmt.Errorf(
 			"%w: expected Source revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if p.Intent != DiscoveryPreparationAdditive {
 		return fmt.Errorf(
 			"%w: unsupported declaration discovery preparation intent %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			p.Intent,
 		)
 	}

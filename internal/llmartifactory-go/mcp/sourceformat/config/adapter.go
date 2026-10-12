@@ -7,13 +7,13 @@ import (
 	"sort"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 )
 
 type Decoded struct {
-	SubresourceLocator spec.SubresourceLocator
+	SubresourceLocator storeSpec.SubresourceLocator
 	Definition         definitionModel.Definition
 }
 
@@ -66,7 +66,7 @@ func DecodeMCPConfig(
 
 	output := make([]Decoded, 0, len(names))
 	for _, name := range names {
-		logicalName := spec.LogicalName(name)
+		logicalName := storeSpec.LogicalName(name)
 		if err := logicalName.Validate(); err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func DecodeMCPConfig(
 		default:
 			return nil, fmt.Errorf(
 				"%w: MCP config server %q has unsupported type %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				transport,
 			)
@@ -120,7 +120,7 @@ func DecodeMCPConfig(
 		}
 
 		output = append(output, Decoded{
-			SubresourceLocator: spec.SubresourceLocator(
+			SubresourceLocator: storeSpec.SubresourceLocator(
 				"mcpServers/" + name,
 			),
 			Definition: definitionValue,
@@ -134,7 +134,7 @@ func decodeMCPConfigDocument(
 ) (configDocument, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return configDocument{}, err

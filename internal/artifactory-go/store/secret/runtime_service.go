@@ -8,7 +8,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type runtimeArtifactReader interface {
@@ -31,7 +31,7 @@ func NewRuntimeService(
 	values value.ValueStore,
 ) (*RuntimeService, error) {
 	if repository == nil || artifacts == nil {
-		return nil, fmt.Errorf("%w: secret runtime dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: secret runtime dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	if values != nil {
 		if err := value.ValidateValueStore(values); err != nil {
@@ -62,7 +62,7 @@ func (s *RuntimeService) ReadBinding(
 	if s.values == nil {
 		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	artifactValue, err := s.artifacts.Get(ctx, key.Artifact)
@@ -72,7 +72,7 @@ func (s *RuntimeService) ReadBinding(
 	if artifactValue.State != artifactModel.StateAvailable {
 		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			artifactValue.ID,
 		)
 	}
@@ -83,13 +83,13 @@ func (s *RuntimeService) ReadBinding(
 	if !found || !binding.Active() {
 		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding is not configured",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if *binding.Ref != expectedRef {
 		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding changed during runtime resolution",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	plaintext, err := s.values.Get(ctx, expectedRef)
@@ -99,7 +99,7 @@ func (s *RuntimeService) ReadBinding(
 	if secretModel.SHA256(plaintext) != binding.SHA256 {
 		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: physical secret value does not match binding SHA-256",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return plaintext, binding.Clone(), nil

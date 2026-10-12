@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -14,7 +14,7 @@ type CapabilityOccurrence struct {
 	Path     string                  `json:"path"`
 	Kind     string                  `json:"kind"`
 	Type     declaration.Type        `json:"type"`
-	Name     spec.LogicalName        `json:"name,omitempty"`
+	Name     storeSpec.LogicalName   `json:"name,omitempty"`
 	Status   ResolutionStatus        `json:"status"`
 	Required bool                    `json:"required"`
 	Scope    declaration.LookupScope `json:"scope,omitempty"`
@@ -32,7 +32,7 @@ type CapabilityPlan struct {
 	RootArtifact *artifactModel.ArtifactRef `json:"rootArtifact,omitempty"`
 	RootTarget   *CapabilityTarget          `json:"rootTarget,omitempty"`
 	RootType     declaration.Type           `json:"rootType"`
-	RootName     spec.LogicalName           `json:"rootName"`
+	RootName     storeSpec.LogicalName      `json:"rootName"`
 	Occurrences  []CapabilityOccurrence     `json:"occurrences"`
 	Complete     bool                       `json:"complete"`
 }
@@ -141,7 +141,7 @@ func capabilityPlanFor(
 	if root == nil {
 		return CapabilityPlan{}, fmt.Errorf(
 			"%w: capability plan has no root",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -163,7 +163,7 @@ func capabilityPlanFor(
 	if plan.RootName == "" {
 		return CapabilityPlan{}, fmt.Errorf(
 			"%w: capability root has no identity",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -186,7 +186,7 @@ func RequireComplete(
 		}
 		return fmt.Errorf(
 			"%w: capability %q (%s/%s) is %s: %s",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			occurrence.Path,
 			occurrence.Type,
 			occurrence.Name,
@@ -233,7 +233,7 @@ func (c *capabilityCollector) collectRelationship(
 		Path:      path,
 		Kind:      "member",
 		Type:      header.Type,
-		Name:      spec.LogicalName(header.Name),
+		Name:      storeSpec.LogicalName(header.Name),
 		Status:    relationship.Status,
 		Required:  relationship.Required,
 		Scope:     relationship.Scope,
@@ -326,7 +326,7 @@ func resolvedEntryKey(
 
 func resolvedEntryName(
 	entry *ResolvedEntry,
-) spec.LogicalName {
+) storeSpec.LogicalName {
 	if entry == nil {
 		return ""
 	}

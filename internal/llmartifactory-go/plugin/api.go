@@ -24,7 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -65,13 +65,13 @@ func New(
 		managedArtifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: managed Plugin dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: managed Plugin composition resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := profile.Validate(); err != nil {
@@ -100,7 +100,7 @@ func New(
 
 type PluginView struct {
 	Artifact    artifactModel.Artifact        `json:"artifact"`
-	Name        spec.LogicalName              `json:"name"`
+	Name        storeSpec.LogicalName         `json:"name"`
 	DisplayName string                        `json:"displayName"`
 	Description string                        `json:"description,omitempty"`
 	Members     []MemberReference             `json:"members"`
@@ -113,10 +113,10 @@ type PluginView struct {
 
 type PluginMemberView struct {
 	Type      declaration.Type         `json:"type"`
-	Name      spec.LogicalName         `json:"name,omitempty"`
+	Name      storeSpec.LogicalName    `json:"name,omitempty"`
 	Insert    declaration.InsertTarget `json:"insert,omitempty"`
 	Locator   *declaration.Locator     `json:"locator,omitempty"`
-	Server    spec.LogicalName         `json:"server,omitempty"`
+	Server    storeSpec.LogicalName    `json:"server,omitempty"`
 	Contained bool                     `json:"contained"`
 	Selector  bool                     `json:"selector"`
 }
@@ -125,17 +125,17 @@ type PluginMemberView struct {
 // cannot express a contained declaration.
 type MemberReference struct {
 	Type    declaration.Type         `json:"type"`
-	Name    spec.LogicalName         `json:"name"`
+	Name    storeSpec.LogicalName    `json:"name"`
 	Insert  declaration.InsertTarget `json:"insert,omitempty"`
 	Locator *declaration.Locator     `json:"locator,omitempty"`
 	Scope   declaration.LookupScope  `json:"scope,omitempty"`
-	Server  spec.LogicalName         `json:"server,omitempty"`
+	Server  storeSpec.LogicalName    `json:"server,omitempty"`
 }
 
 type CreateRequest struct {
 	RootID           rootModel.RootID               `json:"rootID"`
 	SourceID         sourceModel.SourceID           `json:"sourceID,omitempty"`
-	Name             spec.LogicalName               `json:"name"`
+	Name             storeSpec.LogicalName          `json:"name"`
 	DisplayName      string                         `json:"displayName,omitempty"`
 	Description      string                         `json:"description,omitempty"`
 	MembershipPolicy *pluginDomain.MembershipPolicy `json:"membershipPolicy,omitempty"`
@@ -221,7 +221,7 @@ func (a *API) SetEnabled(
 	if expectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -230,7 +230,7 @@ func (a *API) SetEnabled(
 		return PluginView{}, err
 	}
 	if view.Artifact.Revision != expectedRevision {
-		return PluginView{}, spec.ErrConflict
+		return PluginView{}, storeSpec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -260,7 +260,7 @@ func (a *API) Update(
 	if request.ExpectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -321,7 +321,7 @@ func (a *API) RemoveMember(
 	if request.ExpectedRevision == 0 {
 		return PluginView{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -339,7 +339,7 @@ func (a *API) RemoveMember(
 	if request.Index < 0 || request.Index >= len(value.document.Members) {
 		return PluginView{}, fmt.Errorf(
 			"%w: Plugin member index %d is out of range",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			request.Index,
 		)
 	}
@@ -405,7 +405,7 @@ func (a *API) AddArtifactMember(
 	if request.Plugin.RootID != request.Artifact.RootID {
 		return PluginView{}, fmt.Errorf(
 			"%w: Plugin member Artifact belongs to another Root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -416,14 +416,14 @@ func (a *API) AddArtifactMember(
 	if target.State != artifactModel.StateAvailable {
 		return PluginView{}, fmt.Errorf(
 			"%w: Plugin member Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			target.ID,
 		)
 	}
 	if target.Binding.SubresourceLocator != "" {
 		return PluginView{}, fmt.Errorf(
 			"%w: contained Artifact declarations cannot be direct Plugin members",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	declarationType := declaration.Type(target.Kind)
@@ -471,8 +471,8 @@ func (a *API) MemberForPluginSource(
 	ctx context.Context,
 	pluginRef artifactModel.ArtifactRef,
 	declarationType declaration.Type,
-	name spec.LogicalName,
-	target spec.Locator,
+	name storeSpec.LogicalName,
+	target storeSpec.Locator,
 ) (MemberReference, error) {
 	if err := declarationType.Validate(); err != nil {
 		return MemberReference{}, err
@@ -514,7 +514,7 @@ func (a *API) Delete(
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -529,14 +529,14 @@ func (a *API) Delete(
 	if a.isBaselineEditablePlugin(value) {
 		return fmt.Errorf(
 			"%w: baseline Plugin %q cannot be deleted",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			value.artifact.LogicalName,
 		)
 	}
 	if len(value.document.Members) != 0 {
 		return fmt.Errorf(
 			"%w: Plugin %q has %d direct members; detach them before deletion",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			value.artifact.LogicalName,
 			len(value.document.Members),
 		)
@@ -564,7 +564,7 @@ func (a *API) Delete(
 	if missing.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Plugin Artifact is not missing",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -590,7 +590,7 @@ func (a *API) resolvePluginRef(
 	if !found {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: plugin did not resolve to a source-backed Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return terminal, nil
@@ -623,7 +623,7 @@ func (a *API) create(
 		!allowBaseline {
 		return PluginView{}, fmt.Errorf(
 			"%w: baseline Plugin %q is application-provisioned",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			request.Name,
 		)
 	}
@@ -682,12 +682,12 @@ func (a *API) create(
 		}
 		return PluginView{}, fmt.Errorf(
 			"%w: managed Plugin %q already exists",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			request.Name,
 		)
 
-	case errors.Is(err, spec.ErrArtifactNotFound),
-		errors.Is(err, spec.ErrNotFound):
+	case errors.Is(err, storeSpec.ErrArtifactNotFound),
+		errors.Is(err, storeSpec.ErrNotFound):
 	default:
 		return PluginView{}, err
 	}
@@ -738,7 +738,7 @@ func (a *API) mutateEntry(
 	if request.ExpectedRevision == 0 {
 		return MemberMutationResult{}, fmt.Errorf(
 			"%w: expected Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := a.validateDomainEntry(request.Entry); err != nil {
@@ -887,7 +887,7 @@ func (a *API) publishDocument(
 			ExpectedKind: artifactModel.ArtifactKind(
 				pluginv1.PluginType,
 			),
-			ExpectedLogicalName: spec.LogicalName(document.Name),
+			ExpectedLogicalName: storeSpec.LogicalName(document.Name),
 			ExpectedDefinition:  digest,
 			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            address,
@@ -925,24 +925,24 @@ func (a *API) loadEditablePlugin(
 	if record.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Artifact %q is not a Plugin",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if expectedRevision != 0 && record.Revision != expectedRevision {
-		return editablePlugin{}, spec.ErrConflict
+		return editablePlugin{}, storeSpec.ErrConflict
 	}
 	if record.State != artifactModel.StateAvailable {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: contained Plugin declarations are not editable managed Plugins",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
@@ -957,14 +957,14 @@ func (a *API) loadEditablePlugin(
 	if !sourceValue.Enabled {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin Source is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if a.domain.Source == nil ||
 		!a.domain.Source.Matches(sourceValue) {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin belongs to another managed domain Source",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	address, err := a.managedPluginAddressFromLocator(
@@ -976,7 +976,7 @@ func (a *API) loadEditablePlugin(
 	if address.Name != record.LogicalName {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: managed Plugin package name does not match Artifact identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -991,7 +991,7 @@ func (a *API) loadEditablePlugin(
 	if !inspection.IsCurrent() {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: managed Plugin Source requires refresh",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 
@@ -1008,13 +1008,13 @@ func (a *API) loadEditablePlugin(
 	if document.Name != string(record.LogicalName) {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if document.Locator != nil {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: located Plugin aliases are not editable managed Plugins",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if err := a.validateEditableDomainDocument(document); err != nil {
@@ -1102,7 +1102,7 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 	if form != declaration.MemberNamed {
 		return declaration.Entry{}, fmt.Errorf(
 			"%w: managed Plugin member must be a named external member",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	return entry, nil
@@ -1118,14 +1118,14 @@ func memberReferenceFromEntry(
 	if form != declaration.MemberNamed {
 		return MemberReference{}, fmt.Errorf(
 			"%w: editable Plugin members must be named external references",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
 	header := entry.Header()
 	output := MemberReference{
 		Type: header.Type,
-		Name: spec.LogicalName(header.Name),
+		Name: storeSpec.LogicalName(header.Name),
 	}
 	if header.Locator != nil {
 		locator := header.Locator.Clone()
@@ -1155,7 +1155,7 @@ func memberReferenceFromEntry(
 		return MemberReference{}, err
 	}
 	if selector.Server != "" {
-		output.Server = spec.LogicalName(selector.Server)
+		output.Server = storeSpec.LogicalName(selector.Server)
 		if err := output.Server.Validate(); err != nil {
 			return MemberReference{}, err
 		}
@@ -1164,8 +1164,8 @@ func memberReferenceFromEntry(
 }
 
 func relativeSourceLocator(
-	from spec.Locator,
-	target spec.Locator,
+	from storeSpec.Locator,
+	target storeSpec.Locator,
 ) (declaration.Locator, error) {
 	if err := from.Validate(false); err != nil {
 		return declaration.Locator{}, err
@@ -1228,7 +1228,7 @@ func (a *API) creationMembershipPolicy(
 		if requested != nil {
 			return pluginDomain.MembershipPolicy{}, fmt.Errorf(
 				"%w: Plugin family profile owns membership policy",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		value := a.domain.MembershipPolicy
@@ -1249,7 +1249,7 @@ func (a *API) creationMembershipPolicy(
 	if requested == nil {
 		return pluginDomain.MembershipPolicy{}, fmt.Errorf(
 			"%w: generic Plugin creation requires an explicit membership policy",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	value := *requested
@@ -1267,7 +1267,7 @@ func (a *API) creationMembershipPolicy(
 	if value.Mode == pluginDomain.MembershipModeLegacyUnconstrained {
 		return pluginDomain.MembershipPolicy{}, fmt.Errorf(
 			"%w: new generic Plugins cannot use legacy-unconstrained membership",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return value, nil
@@ -1295,7 +1295,7 @@ func normalizedMemberIndex(
 			return index, nil
 		}
 	}
-	return 0, fmt.Errorf("%w: Plugin member does not exist", spec.ErrNotFound)
+	return 0, fmt.Errorf("%w: Plugin member does not exist", storeSpec.ErrNotFound)
 }
 
 func normalizedMemberIndexForEntry(
@@ -1324,6 +1324,6 @@ func normalizedMemberIndexForEntry(
 	}
 	return 0, fmt.Errorf(
 		"%w: Plugin member does not exist",
-		spec.ErrNotFound,
+		storeSpec.ErrNotFound,
 	)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (r *Registry) ApplyPackageBatch(
@@ -24,7 +24,7 @@ func (r *Registry) ApplyPackageBatch(
 	if !found {
 		return fmt.Errorf(
 			"%w: source adapter %q",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -33,7 +33,7 @@ func (r *Registry) ApplyPackageBatch(
 	if !supported {
 		return fmt.Errorf(
 			"%w: source kind %q has no package batch writer",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -56,13 +56,13 @@ func (r *Registry) ApplyPackageBatch(
 		if normalized.ExpectedGeneration != "" {
 			return fmt.Errorf(
 				"%w: compiled package batches do not use per-package generations",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seenPublications[normalized.Address]; duplicate {
 			return fmt.Errorf(
 				"%w: compiled package batch repeats publication %v",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				normalized.Address,
 			)
 		}

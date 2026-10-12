@@ -13,7 +13,7 @@ import (
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -21,7 +21,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/materialize"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
@@ -35,7 +35,7 @@ var ErrArtifactSkillSelectionRequired = errors.New(
 
 var (
 	_ skillRuntime.CatalogSource       = (*RuntimeAdapter)(nil)
-	_ inferencewrapperSpec.SkillSource = (*RuntimeAdapter)(nil)
+	_ inferenceRuntimeSpec.SkillSource = (*RuntimeAdapter)(nil)
 )
 
 type ResolvedArtifactSkill struct {
@@ -101,7 +101,7 @@ func NewRuntimeAdapter(
 		resources == nil || nativeResources == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill runtime adapter dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := documents.Validate(); err != nil {
@@ -122,10 +122,10 @@ func NewRuntimeAdapter(
 // as its CatalogSource. Call once, before serving requests.
 func (a *RuntimeAdapter) BindRuntime(runtime *skillRuntime.Service) error {
 	if runtime == nil {
-		return fmt.Errorf("%w: Skill runtime is required", spec.ErrInvalid)
+		return fmt.Errorf("%w: Skill runtime is required", storeSpec.ErrInvalid)
 	}
 	if a.runtime != nil {
-		return fmt.Errorf("%w: Skill runtime is already bound", spec.ErrConflict)
+		return fmt.Errorf("%w: Skill runtime is already bound", storeSpec.ErrConflict)
 	}
 	a.runtime = runtime
 	return nil
@@ -172,7 +172,7 @@ func (a *RuntimeAdapter) Skills(
 		if record.RootID != rootID {
 			return nil, fmt.Errorf(
 				"%w: Skill catalog returned an Artifact from another Root",
-				spec.ErrRefreshRequired,
+				storeSpec.ErrRefreshRequired,
 			)
 		}
 		if skillSource.IsSkillKind(record.Kind) &&
@@ -210,7 +210,7 @@ func (a *RuntimeAdapter) ResolveSkills(
 	refs []artifactModel.ArtifactRef,
 ) (ResolvedSkills, error) {
 	if a == nil || a.runtime == nil {
-		return ResolvedSkills{}, spec.ErrClosed
+		return ResolvedSkills{}, storeSpec.ErrClosed
 	}
 
 	roots, err := selectionRoots(refs)
@@ -224,7 +224,7 @@ func (a *RuntimeAdapter) ResolveSkills(
 		if err := a.syncRoot(ctx, rootID); err != nil {
 			return ResolvedSkills{}, fmt.Errorf(
 				"%w: synchronize Skill Root %q: %w",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				rootID,
 				err,
 			)
@@ -235,7 +235,7 @@ func (a *RuntimeAdapter) ResolveSkills(
 	if err != nil {
 		return ResolvedSkills{}, fmt.Errorf(
 			"%w: read selected Skill Artifacts: %w",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			err,
 		)
 	}
@@ -251,7 +251,7 @@ func (a *RuntimeAdapter) ResolveSkills(
 		}) {
 			return ResolvedSkills{}, fmt.Errorf(
 				"%w: Skill %s/%s revision %q is not registered",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				value.Artifact.RootID,
 				value.Artifact.ArtifactID,
 				value.Version,
@@ -266,7 +266,7 @@ func (a *RuntimeAdapter) SyncRootCatalog(
 	rootID rootModel.RootID,
 ) error {
 	if a == nil || a.runtime == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return err
@@ -278,10 +278,10 @@ func (a *RuntimeAdapter) SyncRootCatalog(
 // selection. Errors return no partially advertised Skill capability.
 func (a *RuntimeAdapter) ResolveSkillSession(
 	ctx context.Context,
-	request inferencewrapperSpec.SkillSessionRequest,
-) (inferencewrapperSpec.SkillSession, error) {
+	request inferenceRuntimeSpec.SkillSessionRequest,
+) (inferenceRuntimeSpec.SkillSession, error) {
 	if strings.TrimSpace(string(request.SessionID)) == "" {
-		return inferencewrapperSpec.SkillSession{}, fmt.Errorf(
+		return inferenceRuntimeSpec.SkillSession{}, fmt.Errorf(
 			"%w: Skill session ID is required",
 			skillRuntime.ErrInvalidRequest,
 		)
@@ -289,7 +289,7 @@ func (a *RuntimeAdapter) ResolveSkillSession(
 
 	selected, err := a.ResolveSkills(ctx, request.Artifacts)
 	if err != nil {
-		return inferencewrapperSpec.SkillSession{}, err
+		return inferenceRuntimeSpec.SkillSession{}, err
 	}
 
 	filter := agentskillsRuntime.SkillListFilter{
@@ -299,13 +299,13 @@ func (a *RuntimeAdapter) ResolveSkillSession(
 	}
 	available, err := a.runtime.ListAgentSkills(ctx, &filter)
 	if err != nil {
-		return inferencewrapperSpec.SkillSession{}, err
+		return inferenceRuntimeSpec.SkillSession{}, err
 	}
 
 	filter.Activity = agentskillsRuntimeSpec.SkillActivityActive
 	active, err := a.runtime.ListAgentSkills(ctx, &filter)
 	if err != nil {
-		return inferencewrapperSpec.SkillSession{}, err
+		return inferenceRuntimeSpec.SkillSession{}, err
 	}
 
 	activity := agentskillsRuntimeSpec.SkillActivityInactive
@@ -318,10 +318,10 @@ func (a *RuntimeAdapter) ResolveSkillSession(
 		Activity:    activity,
 	})
 	if err != nil {
-		return inferencewrapperSpec.SkillSession{}, err
+		return inferenceRuntimeSpec.SkillSession{}, err
 	}
 
-	output := inferencewrapperSpec.SkillSession{
+	output := inferenceRuntimeSpec.SkillSession{
 		AvailableArtifacts: selected.ArtifactRefs(available),
 		ActiveArtifacts:    selected.ArtifactRefs(active),
 		Prompt:             strings.TrimSpace(prompt),
@@ -335,7 +335,7 @@ func (a *RuntimeAdapter) ResolveSkillSession(
 	output.RulesPrompt = skillsRulesPrompt(includeAll, includeRunScript)
 	output.ToolChoices, err = buildSkillToolChoices(includeAll, includeRunScript)
 	if err != nil {
-		return inferencewrapperSpec.SkillSession{}, err
+		return inferenceRuntimeSpec.SkillSession{}, err
 	}
 	return output, nil
 }
@@ -393,14 +393,14 @@ func (a *RuntimeAdapter) readRecords(
 	if len(records) != len(refs) {
 		return nil, fmt.Errorf(
 			"%w: Skill Artifact batch returned an unexpected result count",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for index, record := range records {
 		if record.Ref() != refs[index] {
 			return nil, fmt.Errorf(
 				"%w: Skill Artifact batch returned another Artifact",
-				spec.ErrRefreshRequired,
+				storeSpec.ErrRefreshRequired,
 			)
 		}
 	}
@@ -426,7 +426,7 @@ func (a *RuntimeAdapter) materializeRecords(
 			!record.Enabled {
 			return nil, fmt.Errorf(
 				"%w: Artifact %s/%s is not an available enabled Skill",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				record.RootID,
 				record.ID,
 			)
@@ -448,7 +448,7 @@ func (a *RuntimeAdapter) materializeRecords(
 	if len(materials) != len(records) {
 		return nil, fmt.Errorf(
 			"%w: Skill materializer returned an unexpected result count",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -458,7 +458,7 @@ func (a *RuntimeAdapter) materializeRecords(
 		if material.Artifact != record.Ref() {
 			return nil, fmt.Errorf(
 				"%w: Skill materializer resolved another Artifact",
-				spec.ErrRefreshRequired,
+				storeSpec.ErrRefreshRequired,
 			)
 		}
 		if material.Document.Name == "" ||
@@ -466,7 +466,7 @@ func (a *RuntimeAdapter) materializeRecords(
 			material.VersionDigest == "" {
 			return nil, fmt.Errorf(
 				"%w: materialized Skill definition or revision is incomplete",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -495,7 +495,7 @@ func selectionFromValues(values []ResolvedArtifactSkill) (ResolvedSkills, error)
 			previous != value.Artifact {
 			return ResolvedSkills{}, fmt.Errorf(
 				"%w: Skill Artifacts %s/%s and %s/%s resolve to one runtime definition",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				previous.RootID,
 				previous.ArtifactID,
 				value.Artifact.RootID,
@@ -523,7 +523,7 @@ func selectionRoots(
 			return nil, err
 		}
 		if _, duplicate := seenRefs[ref]; duplicate {
-			return nil, fmt.Errorf("%w: duplicate Skill ArtifactRef", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: duplicate Skill ArtifactRef", storeSpec.ErrInvalid)
 		}
 		seenRefs[ref] = struct{}{}
 		if _, found := seenRoots[ref.RootID]; !found {
@@ -541,7 +541,7 @@ func rootForCatalogID(
 	if !found {
 		return "", fmt.Errorf(
 			"%w: unsupported Skill catalog ID %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			catalogID,
 		)
 	}

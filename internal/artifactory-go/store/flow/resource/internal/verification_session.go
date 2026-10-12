@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -56,7 +56,7 @@ func (borrowedSnapshot) Confirm(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: borrowed verification snapshot context is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -79,7 +79,7 @@ func (r borrowedTreeRuntime) Get(
 	if rootID != r.source.RootID || sourceID != r.source.ID {
 		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
-			spec.ErrSourceNotFound,
+			storeSpec.ErrSourceNotFound,
 			sourceID,
 			rootID,
 		)
@@ -106,7 +106,7 @@ func (r borrowedTreeRuntime) Open(
 		value.Revision != r.source.Revision {
 		return nil, fmt.Errorf(
 			"%w: borrowed verification snapshot Source changed",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return borrowedSnapshot{Snapshot: r.snapshot}, nil
@@ -117,7 +117,7 @@ func (s *Service) readSourceTreeInSession(
 	session *verificationSession,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	base spec.Locator,
+	base storeSpec.Locator,
 	include, exclude []string,
 	maximumEntries int,
 	maximumBytes int64,
@@ -176,7 +176,7 @@ func (s *Service) BeginVerificationSession(
 		if existing.service != s {
 			return nil, nil, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -237,7 +237,7 @@ func (s *verificationSession) Close(ctx context.Context) error {
 				current.Revision != value.source.Revision) {
 			currentErr = fmt.Errorf(
 				"%w: Artifact Source %q changed during batch",
-				spec.ErrRefreshRequired,
+				storeSpec.ErrRefreshRequired,
 				key.sourceID,
 			)
 		}
@@ -270,7 +270,7 @@ func (s *verificationSession) withSource(
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 
 	value, err := s.sourceLocked(ctx, key)
@@ -300,7 +300,7 @@ func (s *verificationSession) sourceLocked(
 	if !value.Enabled {
 		return nil, fmt.Errorf(
 			"%w: Artifact Source %q is disabled",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 			value.ID,
 		)
 	}
@@ -323,7 +323,7 @@ func (s *verificationSession) ensureRefreshCurrentLocked(
 	current *verificationSessionSource,
 ) (refreshModel.Inspection, error) {
 	if current == nil {
-		return refreshModel.Inspection{}, spec.ErrClosed
+		return refreshModel.Inspection{}, storeSpec.ErrClosed
 	}
 	if current.inspection != nil {
 		return current.inspection.Clone(), nil
@@ -340,7 +340,7 @@ func (s *verificationSession) ensureRefreshCurrentLocked(
 		current.snapshot.Generation() != inspection.State.SourceGeneration {
 		return refreshModel.Inspection{}, fmt.Errorf(
 			"%w: Artifact Source %q changed during batch setup",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 			current.source.ID,
 		)
 	}
@@ -353,7 +353,7 @@ func (s *verificationSession) ensureRefreshCurrentLocked(
 func readVerificationSessionEntry(
 	ctx context.Context,
 	snapshot driver.Snapshot,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	maximumBytes int64,
 ) ([]byte, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -366,7 +366,7 @@ func readVerificationSessionEntry(
 	if entry.Locator != locator {
 		return nil, fmt.Errorf(
 			"%w: Source snapshot stat for %q returned %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -388,7 +388,7 @@ func (s *Service) resolveArtifactInSession(
 		record.SourceContentDigest == nil {
 		return resourceModel.ResolvedArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not currently available",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -424,7 +424,7 @@ func (s *Service) resolveArtifactInSession(
 				ctx,
 				current.snapshot,
 				record.Binding.Locator,
-				spec.MaxCandidateBytes,
+				storeSpec.MaxCandidateBytes,
 			)
 			if err != nil {
 				return err
@@ -433,7 +433,7 @@ func (s *Service) resolveArtifactInSession(
 				*record.SourceContentDigest {
 				return fmt.Errorf(
 					"%w: Source content for %q changed since refresh",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					record.Binding.Locator,
 				)
 			}
@@ -464,7 +464,7 @@ func (s *Service) readSourceEntryInSession(
 	session *verificationSession,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	maximumBytes int64,
 ) (resourceModel.VerifiedEntry, error) {
 	var output resourceModel.VerifiedEntry
@@ -508,13 +508,13 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 	ctx context.Context,
 	session *verificationSession,
 	resolved resourceModel.ResolvedArtifact,
-	localLocator spec.Locator,
+	localLocator storeSpec.Locator,
 ) (string, error) {
 	localPaths, supported := s.sources.(source.LocalPathRuntime)
 	if !supported || !localPaths.SupportsLocalPath(resolved.Source.Kind) {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no trusted native path",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			resolved.Source.Kind,
 		)
 	}
@@ -533,7 +533,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 					resolved.RefreshState.SourceGeneration {
 				return fmt.Errorf(
 					"%w: Source changed after Artifact resolution",
-					spec.ErrRefreshRequired,
+					storeSpec.ErrRefreshRequired,
 				)
 			}
 
@@ -541,7 +541,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 				ctx,
 				current.snapshot,
 				resolved.Artifact.Binding.Locator,
-				spec.MaxCandidateBytes,
+				storeSpec.MaxCandidateBytes,
 			)
 			if err != nil {
 				return err
@@ -550,7 +550,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 				*resolved.Artifact.SourceContentDigest {
 				return fmt.Errorf(
 					"%w: Source content for %q changed since refresh",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					resolved.Artifact.Binding.Locator,
 				)
 			}
@@ -578,7 +578,7 @@ func (s *Service) statSourceEntryInSession(
 	session *verificationSession,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.Entry, error) {
 	var output sourceModel.Entry
 
@@ -599,7 +599,7 @@ func (s *Service) statSourceEntryInSession(
 			if entry.Locator != locator {
 				return fmt.Errorf(
 					"%w: Source stat for %q returned %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					locator,
 					entry.Locator,
 				)

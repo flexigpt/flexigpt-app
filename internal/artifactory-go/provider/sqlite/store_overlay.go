@@ -8,7 +8,7 @@ import (
 	"time"
 
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const storeOverlayColumns = `
@@ -41,7 +41,7 @@ func (r *OverlayRepository) PutStoreOverlay(
 	if now.IsZero() {
 		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay time is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -61,7 +61,7 @@ func (r *OverlayRepository) PutStoreOverlay(
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if request.ExpectedRevision != 0 {
-			return overlayModel.StoreRecord{}, spec.ErrConflict
+			return overlayModel.StoreRecord{}, storeSpec.ErrConflict
 		}
 
 		output = overlayModel.StoreRecord{
@@ -95,12 +95,12 @@ func (r *OverlayRepository) PutStoreOverlay(
 
 	default:
 		if current.Revision != request.ExpectedRevision {
-			return overlayModel.StoreRecord{}, spec.ErrConflict
+			return overlayModel.StoreRecord{}, storeSpec.ErrConflict
 		}
 		if current.Revision == ^uint64(0) {
 			return overlayModel.StoreRecord{}, fmt.Errorf(
 				"%w: store overlay revision is exhausted",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 

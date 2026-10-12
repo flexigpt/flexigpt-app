@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 )
@@ -23,7 +23,7 @@ func (value MaterializedServer) Validate() error {
 	if len(placeholdersInServer(core, auth, nil)) != 0 {
 		return fmt.Errorf(
 			"%w: materialized MCP server still contains placeholders",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if err := validateCoreServer(core); err != nil {
@@ -140,7 +140,7 @@ func validateParts(
 		if !placeholderInputNameValid(inputName) {
 			return fmt.Errorf(
 				"%w: invalid installation input name %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}
@@ -153,7 +153,7 @@ func validateParts(
 		default:
 			return fmt.Errorf(
 				"%w: invalid installation input kind %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				declaration.Kind,
 			)
 		}
@@ -162,7 +162,7 @@ func validateParts(
 			if declaration.Default != nil {
 				return fmt.Errorf(
 					"%w: secret installation input %q cannot declare a default",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					inputName,
 				)
 			}
@@ -176,14 +176,14 @@ func validateParts(
 		if !placeholderInputNameValid(inputName) {
 			return fmt.Errorf(
 				"%w: invalid allowed environment input %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}
 		if _, duplicate := seenAllowedEnvironment[inputName]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate allowed environment input %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}
@@ -193,7 +193,7 @@ func validateParts(
 				declaration.Kind == InputOAuthClientCredentials) {
 			return fmt.Errorf(
 				"%w: secret input %q cannot resolve from process environment",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}
@@ -210,7 +210,7 @@ func validateParts(
 			declaration.Kind == InputOAuthClientCredentials {
 			return fmt.Errorf(
 				"%w: OAuth client credentials input %q cannot be substituted into connection fields",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}
@@ -222,7 +222,7 @@ func validateParts(
 		}
 		return fmt.Errorf(
 			"%w: placeholder %q has no installation input declaration",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			inputName,
 		)
 	}
@@ -256,7 +256,7 @@ func validateParts(
 		if extension.Auth.ClientCredentialsInput != "" {
 			return fmt.Errorf(
 				"%w: no-auth server cannot declare OAuth credentials",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -264,7 +264,7 @@ func validateParts(
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: API-key authentication requires HTTP transport",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if !coreUsesRequiredSecretInput(
@@ -274,7 +274,7 @@ func validateParts(
 		) {
 			return fmt.Errorf(
 				"%w: API-key authentication requires a required secret header placeholder",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -282,7 +282,7 @@ func validateParts(
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: OAuth requires HTTP transport",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if inputName := extension.Auth.ClientCredentialsInput; inputName != "" {
@@ -291,7 +291,7 @@ func validateParts(
 				declaration.Kind != InputOAuthClientCredentials {
 				return fmt.Errorf(
 					"%w: OAuth clientCredentialsInput %q is invalid",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					inputName,
 				)
 			}
@@ -301,7 +301,7 @@ func validateParts(
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: client credentials requires HTTP transport",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		inputName := extension.Auth.ClientCredentialsInput
@@ -312,20 +312,20 @@ func validateParts(
 			!declaration.Required {
 			return fmt.Errorf(
 				"%w: client credentials requires a required oauthClientCredentials input",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
 			"%w: invalid MCP auth mode %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			extension.Auth.Mode,
 		)
 	}
 
 	if extension.Policy != nil {
-		if err := spec.ValidatePortableName(
+		if err := storeSpec.ValidatePortableName(
 			"MCP policy reference",
 			string(extension.Policy.Name),
 		); err != nil {
@@ -334,7 +334,7 @@ func validateParts(
 	}
 
 	for profileName, profile := range extension.ConnectionProfiles {
-		if err := spec.ValidatePortableName(
+		if err := storeSpec.ValidatePortableName(
 			"MCP connection profile",
 			profileName,
 		); err != nil {
@@ -352,7 +352,7 @@ func validateParts(
 			default:
 				return fmt.Errorf(
 					"%w: unsupported portable platform %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					platform,
 				)
 			}
@@ -369,39 +369,39 @@ func validateInputDeclaration(
 	name string,
 	value InputDeclaration,
 ) error {
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP installation input label",
 		value.Label,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP installation input description",
 		value.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP installation input note",
 		value.Note,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP installation input placeholder",
 		value.Placeholder,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
 	if value.Default != nil {
-		if err := spec.ValidateOptionalText(
+		if err := storeSpec.ValidateOptionalText(
 			"MCP installation input default",
 			*value.Default,
-			spec.MaxDescriptionBytes,
+			storeSpec.MaxDescriptionBytes,
 		); err != nil {
 			return err
 		}
@@ -410,7 +410,7 @@ func validateInputDeclaration(
 		value.Kind != InputOAuthClientCredentials {
 		return fmt.Errorf(
 			"%w: only oauthClientCredentials input %q may require clientSecret",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -424,14 +424,14 @@ func validateConnectionProfile(
 	if profile.Stdio == nil && profile.HTTP == nil {
 		return fmt.Errorf(
 			"%w: connection profile %q has no transport overlay",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
 	if profile.Stdio != nil && profile.HTTP != nil {
 		return fmt.Errorf(
 			"%w: connection profile %q has two transport overlays",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -441,7 +441,7 @@ func validateConnectionProfile(
 		if _, duplicate := seenPlatforms[platform]; duplicate {
 			return fmt.Errorf(
 				"%w: connection profile %q repeats platform %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				platform,
 			)
@@ -451,10 +451,10 @@ func validateConnectionProfile(
 
 	if profile.Stdio != nil {
 		if profile.Stdio.Command != nil {
-			if err := spec.ValidateRequiredText(
+			if err := storeSpec.ValidateRequiredText(
 				"MCP profile stdio command",
 				*profile.Stdio.Command,
-				spec.MaxLocatorBytes,
+				storeSpec.MaxLocatorBytes,
 			); err != nil {
 				return err
 			}
@@ -484,7 +484,7 @@ func validateConnectionProfile(
 			if strings.ContainsAny(value, "\r\n\x00") {
 				return fmt.Errorf(
 					"%w: MCP profile %q header %q contains CR, LF, or NUL",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 					key,
 				)
@@ -502,17 +502,17 @@ func validateConnectionProfile(
 func validateCoreServer(value CoreServer) error {
 	switch value.Type {
 	case ServerTypeStdio:
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"MCP stdio command",
 			value.Command,
-			spec.MaxLocatorBytes,
+			storeSpec.MaxLocatorBytes,
 		); err != nil {
 			return err
 		}
 		if value.URL != "" || len(value.Headers) != 0 {
 			return fmt.Errorf(
 				"%w: stdio MCP server cannot contain HTTP fields",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -528,7 +528,7 @@ func validateCoreServer(value CoreServer) error {
 			len(value.Env) != 0 {
 			return fmt.Errorf(
 				"%w: HTTP MCP server cannot contain stdio fields",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if err := validateURLTemplate(value.URL); err != nil {
@@ -541,7 +541,7 @@ func validateCoreServer(value CoreServer) error {
 			if strings.ContainsAny(headerValue, "\r\n\x00") {
 				return fmt.Errorf(
 					"%w: MCP HTTP header %q contains CR, LF, or NUL",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
@@ -550,7 +550,7 @@ func validateCoreServer(value CoreServer) error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP server type %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			value.Type,
 		)
 	}
@@ -582,17 +582,17 @@ func validateIncludeValues(
 ) error {
 	seen := make(map[string]struct{}, len(values))
 	for index, value := range values {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			label,
 			value,
-			spec.MaxURIBytes,
+			storeSpec.MaxURIBytes,
 		); err != nil {
 			return fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: %s repeats %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				value,
 			)
@@ -606,7 +606,7 @@ func validateConnectionTimeoutMS(value int) error {
 	if value < 0 || value > MaxConnectionTimeoutMS {
 		return fmt.Errorf(
 			"%w: MCP connection timeout must be between zero and %d milliseconds",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			MaxConnectionTimeoutMS,
 		)
 	}
@@ -718,10 +718,10 @@ func coreUsesRequiredSecretInput(
 func validateURLTemplate(raw string) error {
 	if strings.TrimSpace(raw) == "" ||
 		strings.TrimSpace(raw) != raw ||
-		len(raw) > spec.MaxURIBytes {
+		len(raw) > storeSpec.MaxURIBytes {
 		return fmt.Errorf(
 			"%w: MCP HTTP URL is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if _, whole := wholeURLPlaceholderName(raw); whole {
@@ -730,12 +730,12 @@ func validateURLTemplate(raw string) error {
 	probe := placeholderPattern.ReplaceAllString(raw, "example")
 	value, err := url.Parse(probe)
 	if err != nil {
-		return fmt.Errorf("%w: invalid MCP HTTP URL: %w", spec.ErrInvalid, err)
+		return fmt.Errorf("%w: invalid MCP HTTP URL: %w", storeSpec.ErrInvalid, err)
 	}
 	if value.User != nil || value.Fragment != "" || value.Host == "" {
 		return fmt.Errorf(
 			"%w: MCP HTTP URL has disallowed components",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	switch strings.ToLower(value.Scheme) {
@@ -745,7 +745,7 @@ func validateURLTemplate(raw string) error {
 	default:
 		return fmt.Errorf(
 			"%w: MCP HTTP URL must use HTTP or HTTPS",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 }
@@ -763,7 +763,7 @@ func validateWholeURLInputReference(
 	if !found || input.Kind != InputText {
 		return fmt.Errorf(
 			"%w: whole MCP URL placeholder in %s requires a text installation input",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			field,
 		)
 	}
@@ -785,10 +785,10 @@ func validateClientIDMetadataDocumentURLTemplate(
 		return nil
 	}
 	if strings.TrimSpace(raw) != raw ||
-		len(raw) > spec.MaxURIBytes {
+		len(raw) > storeSpec.MaxURIBytes {
 		return fmt.Errorf(
 			"%w: invalid OAuth client metadata URL template",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	probe := placeholderPattern.ReplaceAllString(
@@ -803,7 +803,7 @@ func validateClientIDMetadataDocumentURL(raw string) error {
 	if err != nil {
 		return fmt.Errorf(
 			"%w: invalid OAuth client metadata URL: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -815,7 +815,7 @@ func validateClientIDMetadataDocumentURL(raw string) error {
 		value.Path == "/" {
 		return fmt.Errorf(
 			"%w: invalid OAuth client metadata URL",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -825,7 +825,7 @@ func validateHeaderName(name string) error {
 	if name == "" || strings.TrimSpace(name) != name {
 		return fmt.Errorf(
 			"%w: invalid MCP HTTP header name",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for _, character := range name {
@@ -839,7 +839,7 @@ func validateHeaderName(name string) error {
 		}
 		return fmt.Errorf(
 			"%w: invalid MCP HTTP header character %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			character,
 		)
 	}
@@ -852,14 +852,14 @@ func validateEnvironmentName(name string) error {
 		strings.ContainsAny(name, "=\x00") {
 		return fmt.Errorf(
 			"%w: invalid MCP environment name",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for _, character := range name {
 		if character < 0x20 || character == 0x7f {
 			return fmt.Errorf(
 				"%w: invalid MCP environment name",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	}

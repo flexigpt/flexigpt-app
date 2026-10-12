@@ -5,7 +5,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -27,7 +27,7 @@ func DefinitionForDocument(
 		Kind:          artifactModel.ArtifactKind(PluginType),
 		SchemaID:      PluginSchemaKey.SchemaID,
 		SchemaVersion: PluginSchemaKey.SchemaVersion,
-		LogicalName:   spec.LogicalName(document.Name),
+		LogicalName:   storeSpec.LogicalName(document.Name),
 		DisplayName:   displayName,
 		Description:   document.Description,
 		Labels:        declaration.CloneStringMap(document.Labels),
@@ -46,7 +46,7 @@ func FromDefinition(value definitionModel.Definition) (PluginDocument, error) {
 		value.SchemaVersion != PluginSchemaKey.SchemaVersion {
 		return PluginDocument{}, fmt.Errorf(
 			"%w: Definition is not a supported Plugin declaration",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	entry, err := declaration.DecodeCanonicalEntryJSON(value.Body)
@@ -61,7 +61,7 @@ func FromDefinition(value definitionModel.Definition) (PluginDocument, error) {
 		document.Name != string(value.LogicalName) {
 		return PluginDocument{}, fmt.Errorf(
 			"%w: Plugin body identity differs from Definition metadata",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return document, nil

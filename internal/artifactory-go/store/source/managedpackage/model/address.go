@@ -5,13 +5,13 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type PackageKind string
 
 func (v PackageKind) Validate() error {
-	return spec.ValidateIdentifier("package kind", string(v), spec.MaxKindBytes)
+	return storeSpec.ValidateIdentifier("package kind", string(v), storeSpec.MaxKindBytes)
 }
 
 // ManagedPackageAddress is the generic semantic address of one complete
@@ -24,15 +24,15 @@ func (v PackageKind) Validate() error {
 // Artifact families own the values of Kind, Name, Version, all primary file
 // names, and all package-relative resource conventions.
 type ManagedPackageAddress struct {
-	Kind    PackageKind         `json:"kind"`
-	Name    spec.LogicalName    `json:"name"`
-	Version spec.LogicalVersion `json:"version"`
+	Kind    PackageKind              `json:"kind"`
+	Name    storeSpec.LogicalName    `json:"name"`
+	Version storeSpec.LogicalVersion `json:"version"`
 }
 
 func NewManagedPackageAddress(
 	kind PackageKind,
-	name spec.LogicalName,
-	version spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	version storeSpec.LogicalVersion,
 ) (ManagedPackageAddress, error) {
 	value := ManagedPackageAddress{
 		Kind:    kind,
@@ -48,7 +48,7 @@ func NewManagedPackageAddress(
 // ParseManagedPackageAddressDirectory decodes an address previously derived
 // through Directory. It accepts no extra namespace or implementation segments.
 func ParseManagedPackageAddressDirectory(
-	directory spec.Locator,
+	directory storeSpec.Locator,
 ) (ManagedPackageAddress, error) {
 	if err := directory.ValidatePortable(false); err != nil {
 		return ManagedPackageAddress{}, err
@@ -58,15 +58,15 @@ func ParseManagedPackageAddressDirectory(
 	if len(segments) != 3 {
 		return ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed package directory %q must contain kind, name, and version",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			directory,
 		)
 	}
 
 	return NewManagedPackageAddress(
 		PackageKind(segments[0]),
-		spec.LogicalName(segments[1]),
-		spec.LogicalVersion(segments[2]),
+		storeSpec.LogicalName(segments[1]),
+		storeSpec.LogicalVersion(segments[2]),
 	)
 }
 
@@ -74,20 +74,20 @@ func (a ManagedPackageAddress) Validate() error {
 	if err := a.Kind.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidatePortableName("package name", string(a.Name)); err != nil {
+	if err := storeSpec.ValidatePortableName("package name", string(a.Name)); err != nil {
 		return err
 	}
-	return spec.ValidatePortableName("package version", string(a.Version))
+	return storeSpec.ValidatePortableName("package version", string(a.Version))
 }
 
 // Directory returns the source-relative directory used by MapStore and normal
 // filesystem users. It is derived from semantic package identity and never
 // caller-supplied as an arbitrary directory.
-func (a ManagedPackageAddress) Directory() (spec.Locator, error) {
+func (a ManagedPackageAddress) Directory() (storeSpec.Locator, error) {
 	if err := a.Validate(); err != nil {
 		return "", err
 	}
-	return spec.Locator(path.Join(
+	return storeSpec.Locator(path.Join(
 		string(a.Kind),
 		string(a.Name),
 		string(a.Version),
@@ -97,8 +97,8 @@ func (a ManagedPackageAddress) Directory() (spec.Locator, error) {
 // FileLocator returns a source-relative locator for one package-relative
 // regular file.
 func (a ManagedPackageAddress) FileLocator(
-	relative spec.Locator,
-) (spec.Locator, error) {
+	relative storeSpec.Locator,
+) (storeSpec.Locator, error) {
 	if err := relative.ValidatePortable(false); err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (a ManagedPackageAddress) FileLocator(
 	if err != nil {
 		return "", err
 	}
-	return spec.Locator(
+	return storeSpec.Locator(
 		string(directory) + "/" + string(relative),
 	), nil
 }

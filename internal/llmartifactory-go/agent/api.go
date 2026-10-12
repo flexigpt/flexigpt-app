@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentsigner "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/import/signer"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -109,7 +109,7 @@ func New(
 		protection == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent Store dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -122,19 +122,19 @@ func New(
 	if config.resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent composition resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if config.interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent declaration interpretation registry is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if config.support == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent support is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := config.support.Validate(); err != nil {

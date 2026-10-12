@@ -19,7 +19,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -282,7 +282,7 @@ func (a *Service) SetWorkspaceDirectoryArtifactEnabled(
 	if record.Ref() != ref {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: Artifact lookup returned another occurrence",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -379,7 +379,7 @@ func (a *Service) SetWorkspaceDirectoryEnabled(
 	}
 	if expectedRevision != 0 &&
 		values.Directory.Revision != expectedRevision {
-		return WorkspaceDirectoryView{}, spec.ErrConflict
+		return WorkspaceDirectoryView{}, storeSpec.ErrConflict
 	}
 
 	update := func(current sourceModel.Summary) error {
@@ -430,13 +430,13 @@ func (a *Service) RemoveWorkspaceDirectory(
 	if !values.HasDirectory && !values.HasPolicy {
 		return fmt.Errorf(
 			"%w: Workspace directory is not registered",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if expectedRevision != 0 &&
 		values.HasDirectory &&
 		values.Directory.Revision != expectedRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	ownedSources := make(map[sourceModel.SourceID]struct{}, 2)
@@ -478,7 +478,7 @@ func (a *Service) RemoveWorkspaceDirectory(
 		if record.State != artifactModel.StateMissing {
 			return fmt.Errorf(
 				"%w: retired Workspace Source still has a non-missing Artifact",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 		if err := a.artifacts.Purge(ctx, record.Ref(), record.Revision); err != nil {
@@ -663,7 +663,7 @@ func (a *Service) listManifestIntent(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	directoryID sourceModel.SourceID,
-) ([]spec.Locator, error) {
+) ([]storeSpec.Locator, error) {
 	entries, err := a.resources.ReadSourceTree(
 		ctx,
 		rootID,
@@ -671,13 +671,13 @@ func (a *Service) listManifestIntent(
 		".",
 		a.config.Support.ManifestPatterns,
 		nil,
-		spec.DefaultMaxEntries,
-		spec.MaxScanBytes,
+		storeSpec.DefaultMaxEntries,
+		storeSpec.MaxScanBytes,
 	)
 	if err != nil {
 		return nil, err
 	}
-	output := make([]spec.Locator, 0, len(entries))
+	output := make([]storeSpec.Locator, 0, len(entries))
 	for _, entry := range entries {
 		output = append(output, entry.Locator)
 	}
@@ -772,7 +772,7 @@ func (a *Service) effectiveWorkspaces(
 			if cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
 				return nil, nil, fmt.Errorf(
 					"%w: default Workspace Definition differs from the loaded policy",
-					spec.ErrDigestMismatch,
+					storeSpec.ErrDigestMismatch,
 				)
 			}
 			return []WorkspaceDirectoryWorkspace{{
@@ -830,10 +830,10 @@ func (a *Service) effectiveWorkspaces(
 }
 
 func invalidWorkspaceManifestDiagnostics(
-	intent []spec.Locator,
+	intent []storeSpec.Locator,
 	physical []artifactModel.Artifact,
 ) []diagnostic.Diagnostic {
-	available := make(map[spec.Locator]struct{}, len(physical))
+	available := make(map[storeSpec.Locator]struct{}, len(physical))
 	for _, record := range physical {
 		available[record.Binding.Locator] = struct{}{}
 	}
@@ -941,16 +941,16 @@ func (a *Service) isWorkspaceDirectoryCatalogArtifact(
 }
 
 func (a *Service) isWorkspaceManifestLocator(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) bool {
 	value := string(locator)
 	name := path.Base(value)
 	for _, pattern := range a.config.Support.ManifestPatterns {
-		matched, err := spec.MatchPathPattern(pattern, value)
+		matched, err := storeSpec.MatchPathPattern(pattern, value)
 		if err == nil && matched {
 			return true
 		}
-		matched, err = spec.MatchPathPattern(pattern, name)
+		matched, err = storeSpec.MatchPathPattern(pattern, name)
 		if err == nil && matched {
 			return true
 		}
@@ -958,25 +958,25 @@ func (a *Service) isWorkspaceManifestLocator(
 	return false
 }
 
-func (a *Service) workspaceRootStorageKey(rootPath string) spec.StorageKey {
+func (a *Service) workspaceRootStorageKey(rootPath string) storeSpec.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
-	return spec.StorageKey(
+	return storeSpec.StorageKey(
 		string(a.config.Support.RootStorageKeyPrefix) + digest,
 	)
 }
 
 func (a *Service) policySourceDiscovery() (sourceModel.DiscoverySpec, error) {
 	value := sourceModel.DiscoverySpec{
-		ExplicitLocators: []spec.Locator{a.policySource.Locator},
+		ExplicitLocators: []storeSpec.Locator{a.policySource.Locator},
 		DecoderHints: []sourceModel.DecoderHint{{
 			Locator:    a.policySource.Locator,
 			Recursive:  false,
-			DecoderIDs: []spec.DecoderID{a.policySource.DecoderID},
+			DecoderIDs: []storeSpec.DecoderID{a.policySource.DecoderID},
 		}},
-		AllowedDecoderIDs: []spec.DecoderID{a.policySource.DecoderID},
+		AllowedDecoderIDs: []storeSpec.DecoderID{a.policySource.DecoderID},
 		Authoritative:     true,
 	}
 	value = value.Normalized()

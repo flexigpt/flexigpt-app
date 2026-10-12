@@ -6,7 +6,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -25,12 +25,12 @@ type Observation struct {
 	Binding artifactModel.SourceBinding `json:"binding"`
 
 	Kind           artifactModel.ArtifactKind  `json:"kind,omitempty"`
-	LogicalName    spec.LogicalName            `json:"logicalName,omitempty"`
-	LogicalVersion spec.LogicalVersion         `json:"logicalVersion,omitempty"`
+	LogicalName    storeSpec.LogicalName       `json:"logicalName,omitempty"`
+	LogicalVersion storeSpec.LogicalVersion    `json:"logicalVersion,omitempty"`
 	Definition     *definitionModel.Definition `json:"-"`
 
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
-	DecoderID           spec.DecoderID          `json:"decoderID,omitempty"`
+	DecoderID           storeSpec.DecoderID     `json:"decoderID,omitempty"`
 	State               ObservationState        `json:"state"`
 	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
@@ -74,7 +74,7 @@ func (o Observation) Validate() error {
 			o.DecoderID == "" {
 			return fmt.Errorf(
 				"%w: valid Source observation requires Definition, source digest, and decoder",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		// Definition admission belongs to the decoder/generated boundary and
@@ -87,7 +87,7 @@ func (o Observation) Validate() error {
 			o.Definition.LogicalVersion != o.LogicalVersion {
 			return fmt.Errorf(
 				"%w: valid Source observation Definition does not match observation identity",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -98,14 +98,14 @@ func (o Observation) Validate() error {
 			o.Definition != nil {
 			return fmt.Errorf(
 				"%w: invalid Source observation cannot retain declaration identity",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
 			"%w: invalid Source observation state %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			o.State,
 		)
 	}

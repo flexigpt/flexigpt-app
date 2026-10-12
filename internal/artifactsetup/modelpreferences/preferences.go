@@ -7,7 +7,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
@@ -30,7 +30,7 @@ func New(
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: Model preference overlay store is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Store{overlays: overlays}, nil
@@ -51,11 +51,11 @@ func (s *Store) GetDefaultProvider(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"%w: decode Model default-provider preference: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -102,7 +102,7 @@ func (s *Store) SetDefaultProvider(
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		payload{Provider: provider},
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return err

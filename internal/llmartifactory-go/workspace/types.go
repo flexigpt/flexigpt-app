@@ -4,7 +4,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -27,7 +27,7 @@ const (
 type WorkspaceDirectoryWorkspace struct {
 	Workspace       workspaceDomain.WorkspaceView `json:"workspace"`
 	Origin          WorkspaceDirectoryOrigin      `json:"origin"`
-	ManifestLocator spec.Locator                  `json:"manifestLocator,omitempty"`
+	ManifestLocator storeSpec.Locator             `json:"manifestLocator,omitempty"`
 }
 
 type WorkspaceDirectoryView struct {
@@ -93,7 +93,7 @@ type WorkspacePromptContribution struct {
 	Name             string                     `json:"name"`
 	Insert           declaration.InsertTarget   `json:"insert"`
 	MediaType        string                     `json:"mediaType,omitempty"`
-	Locator          spec.Locator               `json:"locator,omitempty"`
+	Locator          storeSpec.Locator          `json:"locator,omitempty"`
 	OriginalBytes    int                        `json:"originalBytes"`
 	IncludedBytes    int                        `json:"includedBytes"`
 	Truncated        bool                       `json:"truncated"`
@@ -123,7 +123,7 @@ type WorkspaceSkill struct {
 	Name             string                    `json:"name"`
 	DisplayName      string                    `json:"displayName,omitempty"`
 	Insert           declaration.InsertTarget  `json:"insert,omitempty"`
-	Locator          spec.Locator              `json:"locator,omitempty"`
+	Locator          storeSpec.Locator         `json:"locator,omitempty"`
 	Version          string                    `json:"version"`
 }
 
@@ -136,7 +136,7 @@ type WorkspaceMCPServer struct {
 	Artifact         artifactModel.ArtifactRef `json:"artifact"`
 	ArtifactRevision uint64                    `json:"artifactRevision"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-	Name             spec.LogicalName          `json:"name"`
+	Name             storeSpec.LogicalName     `json:"name"`
 	DisplayName      string                    `json:"displayName,omitempty"`
 	BuiltIn          bool                      `json:"builtIn"`
 	Version          cryptoutil.Digest         `json:"version"`
@@ -159,15 +159,15 @@ type WorkspaceRuntimePlan struct {
 }
 
 type WorkspaceArtifactView struct {
-	Artifact           artifactModel.ArtifactRef  `json:"artifact"`
-	Revision           uint64                     `json:"revision"`
-	DisplayName        string                     `json:"displayName"`
-	Kind               artifactModel.ArtifactKind `json:"kind"`
-	LogicalName        spec.LogicalName           `json:"logicalName"`
-	LogicalVersion     spec.LogicalVersion        `json:"logicalVersion,omitempty"`
-	Enabled            bool                       `json:"enabled"`
-	State              artifactModel.State        `json:"state"`
-	SourceID           sourceModel.SourceID       `json:"sourceID"`
-	Locator            spec.Locator               `json:"locator"`
-	SubresourceLocator spec.SubresourceLocator    `json:"subresourceLocator,omitempty"`
+	Artifact           artifactModel.ArtifactRef    `json:"artifact"`
+	Revision           uint64                       `json:"revision"`
+	DisplayName        string                       `json:"displayName"`
+	Kind               artifactModel.ArtifactKind   `json:"kind"`
+	LogicalName        storeSpec.LogicalName        `json:"logicalName"`
+	LogicalVersion     storeSpec.LogicalVersion     `json:"logicalVersion,omitempty"`
+	Enabled            bool                         `json:"enabled"`
+	State              artifactModel.State          `json:"state"`
+	SourceID           sourceModel.SourceID         `json:"sourceID"`
+	Locator            storeSpec.Locator            `json:"locator"`
+	SubresourceLocator storeSpec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }

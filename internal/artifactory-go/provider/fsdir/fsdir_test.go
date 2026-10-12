@@ -10,7 +10,7 @@ import (
 	"time"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func TestFilesystemAdapterUsesPortableLocatorsAndDetectsChanges(t *testing.T) {
@@ -71,13 +71,13 @@ func TestFilesystemAdapterUsesPortableLocatorsAndDetectsChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "document.txt"), []byte("second"), 0o600); err != nil {
 		t.Fatalf("rewrite document: %v", err)
 	}
-	if err := snapshot.Confirm(t.Context()); !errors.Is(err, spec.ErrConflict) {
+	if err := snapshot.Confirm(t.Context()); !errors.Is(err, storeSpec.ErrConflict) {
 		t.Fatalf("Confirm after mutation error=%v, want ErrConflict", err)
 	}
 	if err := snapshot.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if _, err := snapshot.Stat(t.Context(), "document.txt"); !errors.Is(err, spec.ErrClosed) {
+	if _, err := snapshot.Stat(t.Context(), "document.txt"); !errors.Is(err, storeSpec.ErrClosed) {
 		t.Fatalf("Stat after Close error=%v, want ErrClosed", err)
 	}
 }
@@ -91,7 +91,7 @@ func TestFilesystemAdapterRejectsUnportableConfigurationAndPolicy(t *testing.T) 
 		[]byte(`{"rootPath":"relative"}`),
 	); !errors.Is(
 		err,
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 	) {
 		t.Fatalf("relative config error=%v, want ErrInvalid", err)
 	}

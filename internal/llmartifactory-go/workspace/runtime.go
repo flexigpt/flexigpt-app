@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 	workspaceprompt "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/prompt"
@@ -286,7 +286,7 @@ func (a *Service) loadWorkspaceMCPServers(
 	if a == nil || a.mcpAdapter == nil {
 		return workspacemcp.LoadPlan{}, fmt.Errorf(
 			"%w: Workspace MCP resolver is unavailable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	return a.mcpAdapter.Load(ctx, workspace, refs)

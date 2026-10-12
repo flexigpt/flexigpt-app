@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -14,7 +14,7 @@ func NormalizeFilesystemSourceRoot(
 	label string,
 ) (string, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
-		return "", fmt.Errorf("%w: %s is required", spec.ErrInvalid, label)
+		return "", fmt.Errorf("%w: %s is required", storeSpec.ErrInvalid, label)
 	}
 	absolute, err := filepath.Abs(raw)
 	if err != nil {
@@ -26,11 +26,11 @@ func NormalizeFilesystemSourceRoot(
 func FilesystemSourceStorageKey(
 	prefix string,
 	rootPath string,
-) spec.StorageKey {
+) storeSpec.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
 
-	return spec.StorageKey(prefix + "-hash" + digest[:24])
+	return storeSpec.StorageKey(prefix + "-hash" + digest[:24])
 }

@@ -47,6 +47,7 @@ type App struct {
 	completionAPI         *CompletionWrapper
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
+	sessionRuntimeAPI     *SessionRuntimeWrapper
 
 	artifactStoreSetup *artifactsetup.Handle
 
@@ -127,6 +128,7 @@ func newApp() *App {
 	app.completionAPI = &CompletionWrapper{}
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
+	app.sessionRuntimeAPI = &SessionRuntimeWrapper{}
 
 	if err := ensureAppPrivateDirectory(app.settingsDirPath); err != nil {
 		slog.Error(
@@ -621,6 +623,31 @@ func (a *App) initManagers() {
 	} else {
 		slog.Info("model Provider runtime initialized")
 	}
+
+	err = InitComposedSessionRuntime(
+		a.ctx,
+		a.sessionRuntimeAPI,
+		a.completionAPI,
+		a.toolStoreAPI,
+		a.mcpRuntimeAPI,
+		a.skillAggregateAPI,
+		a.skillRuntimeAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Session/Run runtime",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Session/Run runtime initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("session runtime initialized")
+	if a.ctx != nil {
+		a.sessionRuntimeAPI.setAppContext(a.ctx)
+	}
 }
 
 // startup is called at application startup.
@@ -628,6 +655,9 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
 
 	SetWrappedProviderAppContext(a.completionAPI, a.ctx)
+	if a.sessionRuntimeAPI != nil {
+		a.sessionRuntimeAPI.setAppContext(a.ctx)
+	}
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)
@@ -649,6 +679,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
+	if a.sessionRuntimeAPI != nil {
+		a.sessionRuntimeAPI.close()
+	}
 	if a.completionAPI != nil {
 		a.completionAPI.close()
 	}

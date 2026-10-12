@@ -7,7 +7,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
@@ -33,7 +33,7 @@ func withMCPStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -46,7 +46,7 @@ func withMCPStoreManagement[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.management == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(w.management)
 	})
@@ -99,7 +99,7 @@ func (w *MCPStoreWrapper) GetMCPSettings() (
 ) {
 	return withRecoveryResp(func() (MCPSettingsView, error) {
 		if w == nil || w.settings == nil {
-			return MCPSettingsView{}, spec.ErrClosed
+			return MCPSettingsView{}, storeSpec.ErrClosed
 		}
 		settings, revision, err := w.settings.Get(
 			context.Background(),
@@ -120,7 +120,7 @@ func (w *MCPStoreWrapper) SaveMCPSettings(
 ) (MCPSettingsView, error) {
 	return withRecoveryResp(func() (MCPSettingsView, error) {
 		if w == nil || w.settings == nil {
-			return MCPSettingsView{}, spec.ErrClosed
+			return MCPSettingsView{}, storeSpec.ErrClosed
 		}
 		if _, err := w.settings.Put(
 			context.Background(),
@@ -159,7 +159,7 @@ func (w *MCPStoreWrapper) CreateMCPPlugin(
 	return withRecoveryResp(
 		func() (pluginAPI.PluginView, error) {
 			if w == nil || w.api == nil {
-				return pluginAPI.PluginView{}, spec.ErrClosed
+				return pluginAPI.PluginView{}, storeSpec.ErrClosed
 			}
 
 			// A blank RootID means "create in the retained user Root". The
@@ -167,7 +167,7 @@ func (w *MCPStoreWrapper) CreateMCPPlugin(
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {
-					return pluginAPI.PluginView{}, spec.ErrClosed
+					return pluginAPI.PluginView{}, storeSpec.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
@@ -271,7 +271,7 @@ func (w *MCPStoreWrapper) DeleteMCPPlugin(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return spec.ErrClosed
+			return storeSpec.ErrClosed
 		}
 		return w.api.DeleteMCPPlugin(context.Background(), request)
 	})

@@ -12,7 +12,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -36,10 +36,10 @@ func (a *Service) AddSkillPath(
 	if displayName == "" {
 		displayName = "Skill source " + filepath.Base(rootPath)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Skill Source display name",
 		displayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
@@ -96,7 +96,7 @@ func (a *Service) AddSkillPath(
 	if record.State != artifactModel.StateAvailable {
 		return SkillPathRegistrationResult{}, fmt.Errorf(
 			"%w: Skill path did not produce an available Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if record.Enabled != request.Enabled {
@@ -123,11 +123,11 @@ func (a *Service) AddSkillPath(
 
 func (a *Service) normalizeSkillPath(
 	raw string,
-) (string, spec.Locator, error) {
+) (string, storeSpec.Locator, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
 		return "", "", fmt.Errorf(
 			"%w: Skill path is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(raw)
@@ -149,24 +149,24 @@ func (a *Service) normalizeSkillPath(
 	if !info.Mode().IsRegular() ||
 		!skillSource.IsSkillDefinitionFile(
 			a.support.Documents,
-			spec.Locator(filepath.Base(absolute)),
+			storeSpec.Locator(filepath.Base(absolute)),
 		) {
 		return "", "", fmt.Errorf(
 			"%w: Skill path must identify a Skill directory or configured Skill document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return filepath.Dir(absolute),
-		spec.Locator(filepath.Base(absolute)),
+		storeSpec.Locator(filepath.Base(absolute)),
 		nil
 }
 
 func (a *Service) findSkillDefinitionPath(
 	directory string,
-) (string, spec.Locator, error) {
+) (string, storeSpec.Locator, error) {
 	var (
 		selectedPath    string
-		selectedLocator spec.Locator
+		selectedLocator storeSpec.Locator
 	)
 	for _, candidate := range skillSource.SkillDefinitionFiles(a.support.Documents) {
 		candidatePath := filepath.Join(directory, string(candidate))
@@ -183,7 +183,7 @@ func (a *Service) findSkillDefinitionPath(
 		if selectedPath != "" {
 			return "", "", fmt.Errorf(
 				"%w: Skill directory has multiple configured Skill documents",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 			)
 		}
 		selectedPath = candidatePath
@@ -192,24 +192,24 @@ func (a *Service) findSkillDefinitionPath(
 	if selectedPath == "" {
 		return "", "", fmt.Errorf(
 			"%w: Skill directory lacks a configured Skill document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return selectedPath, selectedLocator, nil
 }
 
 func (a *Service) skillFileDiscovery(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.DiscoverySpec, error) {
 	value := sourceModel.DiscoverySpec{
-		ExplicitLocators: []spec.Locator{locator},
+		ExplicitLocators: []storeSpec.Locator{locator},
 		DecoderHints: []sourceModel.DecoderHint{{
 			Locator: locator,
-			DecoderIDs: []spec.DecoderID{
+			DecoderIDs: []storeSpec.DecoderID{
 				a.support.Package.Document.DecoderID,
 			},
 		}},
-		AllowedDecoderIDs: []spec.DecoderID{
+		AllowedDecoderIDs: []storeSpec.DecoderID{
 			a.support.Package.Document.DecoderID,
 		},
 		Authoritative: a.support.Discovery.Authoritative,

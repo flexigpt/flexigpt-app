@@ -10,7 +10,7 @@ import (
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // MCPRuntimeWrapper exposes only pure runtime operations. Store and aggregate
@@ -233,7 +233,7 @@ func (w *MCPRuntimeWrapper) ready() error {
 		w.toolBridge == nil ||
 		w.auth == nil ||
 		w.oauthBroker == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return nil
 }

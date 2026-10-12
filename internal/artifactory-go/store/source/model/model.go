@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Draft struct {
-	ID          SourceID        `json:"id"`
-	StorageKey  spec.StorageKey `json:"storageKey"`
-	Kind        SourceKind      `json:"kind"`
-	DisplayName string          `json:"displayName"`
-	Enabled     bool            `json:"enabled"`
-	Config      json.RawMessage `json:"config"`
-	Discovery   DiscoverySpec   `json:"discovery"`
+	ID          SourceID             `json:"id"`
+	StorageKey  storeSpec.StorageKey `json:"storageKey"`
+	Kind        SourceKind           `json:"kind"`
+	DisplayName string               `json:"displayName"`
+	Enabled     bool                 `json:"enabled"`
+	Config      json.RawMessage      `json:"config"`
+	Discovery   DiscoverySpec        `json:"discovery"`
 }
 
 type Update struct {

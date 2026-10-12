@@ -10,7 +10,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -46,7 +46,7 @@ func (s *Store) GetTopologyHydration(
 	if err := value.Validate(); err != nil {
 		return installModel.Hydration{}, false, fmt.Errorf(
 			"%w: invalid persisted topology hydration: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -109,7 +109,7 @@ func (s *Store) ListTopologyPackageHydrations(
 		value := installModel.PackageHydration{
 			Key: installModel.PackageHydrationKey{
 				InstallerName: installerName,
-				Scope:         spec.Locator(scope),
+				Scope:         storeSpec.Locator(scope),
 			},
 			RootID:      rootModel.RootID(rootID),
 			SourceID:    sourceModel.SourceID(sourceID),
@@ -118,7 +118,7 @@ func (s *Store) ListTopologyPackageHydrations(
 		if err := value.Validate(); err != nil {
 			return nil, fmt.Errorf(
 				"%w: invalid persisted package hydration: %w",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				err,
 			)
 		}

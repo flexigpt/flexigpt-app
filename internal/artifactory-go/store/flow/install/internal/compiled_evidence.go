@@ -5,7 +5,7 @@ import (
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
@@ -14,7 +14,7 @@ import (
 // evidence before scanner registration.
 func compiledDocumentsFromPackages(values []installModel.CompiledPackage) ([]ingest.CompiledDocument, error) {
 	output := make([]ingest.CompiledDocument, 0)
-	seen := make(map[spec.Locator]struct{})
+	seen := make(map[storeSpec.Locator]struct{})
 	for _, packageValue := range values {
 		for _, document := range packageValue.Documents {
 			locator, err := packageValue.Address.FileLocator(document.Locator)
@@ -24,7 +24,7 @@ func compiledDocumentsFromPackages(values []installModel.CompiledPackage) ([]ing
 			if _, duplicate := seen[locator]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: compiled package catalog repeats source locator %q",
-					spec.ErrIdentityConflict,
+					storeSpec.ErrIdentityConflict,
 					locator,
 				)
 			}

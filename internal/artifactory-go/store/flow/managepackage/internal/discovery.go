@@ -6,7 +6,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Service) pruneDiscoveryLocator(
@@ -14,7 +14,7 @@ func (s *Service) pruneDiscoveryLocator(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (SourceState, error) {
 	if err := rootID.Validate(); err != nil {
 		return SourceState{}, err
@@ -28,7 +28,7 @@ func (s *Service) pruneDiscoveryLocator(
 	if expectedSourceRevision == 0 {
 		return SourceState{}, fmt.Errorf(
 			"%w: expected Source revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -41,25 +41,25 @@ func (s *Service) pruneDiscoveryLocator(
 		return SourceState{}, err
 	}
 	if current.Revision != expectedSourceRevision {
-		return SourceState{}, spec.ErrConflict
+		return SourceState{}, storeSpec.ErrConflict
 	}
 	if !current.Enabled {
 		return SourceState{}, fmt.Errorf(
 			"%w: managed Source is disabled",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	if !s.dependencies.Packages.SupportsManagedPackages(current.Kind) {
 		return SourceState{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			current.Kind,
 		)
 	}
 	if !current.Discovery.Authoritative {
 		return SourceState{}, fmt.Errorf(
 			"%w: managed discovery pruning requires an authoritative Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -67,7 +67,7 @@ func (s *Service) pruneDiscoveryLocator(
 	changed := false
 
 	locators := make(
-		[]spec.Locator,
+		[]storeSpec.Locator,
 		0,
 		len(next.ExplicitLocators),
 	)

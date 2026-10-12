@@ -7,7 +7,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
@@ -37,12 +37,12 @@ func (a *Service) SaveProviderSettings(
 	if record.State != artifactModel.StateAvailable {
 		return ProviderView{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Revision != request.ExpectedProviderRevision {
-		return ProviderView{}, spec.ErrConflict
+		return ProviderView{}, storeSpec.ErrConflict
 	}
 
 	current, found, err := a.overlays.GetProviderOverlay(
@@ -54,16 +54,16 @@ func (a *Service) SaveProviderSettings(
 	}
 	if found {
 		if current.Revision != request.ExpectedSettingsRevision {
-			return ProviderView{}, spec.ErrConflict
+			return ProviderView{}, storeSpec.ErrConflict
 		}
 	} else if request.ExpectedSettingsRevision != 0 {
-		return ProviderView{}, spec.ErrConflict
+		return ProviderView{}, storeSpec.ErrConflict
 	}
 
 	if request.ExpectedSettingsRevision == ^uint64(0) {
 		return ProviderView{}, fmt.Errorf(
 			"%w: Model Provider settings revision is exhausted",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -134,7 +134,7 @@ func (a *Service) ResetProviderSettings(
 	if expectedProviderRevision == 0 || expectedSettingsRevision == 0 {
 		return ProviderView{}, fmt.Errorf(
 			"%w: expected Provider and Provider settings revisions are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -147,7 +147,7 @@ func (a *Service) ResetProviderSettings(
 		return ProviderView{}, err
 	}
 	if record.Revision != expectedProviderRevision {
-		return ProviderView{}, spec.ErrConflict
+		return ProviderView{}, storeSpec.ErrConflict
 	}
 
 	if err := a.overlays.DeleteProviderOverlay(
@@ -177,7 +177,7 @@ func (a *Service) GetProviderAPIKeyStatus(
 	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -212,7 +212,7 @@ func (a *Service) SetProviderAPIKey(
 	if request.APIKey == "" {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Provider API key is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -227,12 +227,12 @@ func (a *Service) SetProviderAPIKey(
 	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Revision != request.ExpectedProviderRevision {
-		return ProviderAPIKeyStatus{}, spec.ErrConflict
+		return ProviderAPIKeyStatus{}, storeSpec.ErrConflict
 	}
 
 	if _, err := a.overlays.ReplaceProviderCredential(
@@ -278,12 +278,12 @@ func (a *Service) ClearProviderAPIKey(
 	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Revision != expectedProviderRevision {
-		return ProviderAPIKeyStatus{}, spec.ErrConflict
+		return ProviderAPIKeyStatus{}, storeSpec.ErrConflict
 	}
 
 	current, found, err := a.overlays.GetProviderCredential(ctx, ref)
@@ -292,14 +292,14 @@ func (a *Service) ClearProviderAPIKey(
 	}
 	if !found {
 		if expectedAPIKeyRevision != 0 {
-			return ProviderAPIKeyStatus{}, spec.ErrConflict
+			return ProviderAPIKeyStatus{}, storeSpec.ErrConflict
 		}
 		return ProviderAPIKeyStatus{
 			ProviderRevision: record.Revision,
 		}, nil
 	}
 	if current.Revision != expectedAPIKeyRevision {
-		return ProviderAPIKeyStatus{}, spec.ErrConflict
+		return ProviderAPIKeyStatus{}, storeSpec.ErrConflict
 	}
 
 	if err := a.overlays.ClearProviderCredential(
@@ -340,12 +340,12 @@ func (a *Service) SaveModelSettings(
 	if record.State != artifactModel.StateAvailable {
 		return ModelView{}, fmt.Errorf(
 			"%w: Model Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Revision != request.ExpectedModelRevision {
-		return ModelView{}, spec.ErrConflict
+		return ModelView{}, storeSpec.ErrConflict
 	}
 
 	current, found, err := a.overlays.GetModelOverlay(ctx, request.Model)
@@ -354,16 +354,16 @@ func (a *Service) SaveModelSettings(
 	}
 	if found {
 		if current.Revision != request.ExpectedSettingsRevision {
-			return ModelView{}, spec.ErrConflict
+			return ModelView{}, storeSpec.ErrConflict
 		}
 	} else if request.ExpectedSettingsRevision != 0 {
-		return ModelView{}, spec.ErrConflict
+		return ModelView{}, storeSpec.ErrConflict
 	}
 
 	if request.ExpectedSettingsRevision == ^uint64(0) {
 		return ModelView{}, fmt.Errorf(
 			"%w: Model settings revision is exhausted",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -423,7 +423,7 @@ func (a *Service) ResetModelSettings(
 	if expectedModelRevision == 0 || expectedSettingsRevision == 0 {
 		return ModelView{}, fmt.Errorf(
 			"%w: expected Model and Model settings revisions are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -432,7 +432,7 @@ func (a *Service) ResetModelSettings(
 		return ModelView{}, err
 	}
 	if record.Revision != expectedModelRevision {
-		return ModelView{}, spec.ErrConflict
+		return ModelView{}, storeSpec.ErrConflict
 	}
 
 	if err := a.overlays.DeleteModelOverlay(
@@ -536,7 +536,7 @@ func encodeOptionalObject[T any](
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -556,7 +556,7 @@ func decodeOptionalObject[T any](
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		raw,
 		&output,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"decode typed Model local settings: %w",

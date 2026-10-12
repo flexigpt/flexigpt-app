@@ -2,7 +2,7 @@ package workspace
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
@@ -43,8 +43,8 @@ func DefaultPolicySource() (
 
 	value := workspaceAPI.DefaultPolicySource{
 		ProviderKey: defaultpolicy.ProviderKey,
-		Root:        spec.Locator(defaultpolicy.PolicyRoot),
-		Locator:     spec.Locator(defaultpolicy.PolicyLocator),
+		Root:        storeSpec.Locator(defaultpolicy.PolicyRoot),
+		Locator:     storeSpec.Locator(defaultpolicy.PolicyLocator),
 		DecoderID:   coredecoder.YAMLDecoderID,
 		Policy:      policy,
 	}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -23,10 +23,10 @@ func NewPassthroughCodec(
 	if err := key.Validate(); err != nil {
 		return nil, err
 	}
-	if len(jsonSchema) == 0 || len(jsonSchema) > spec.MaxDefinitionBytes {
+	if len(jsonSchema) == 0 || len(jsonSchema) > storeSpec.MaxDefinitionBytes {
 		return nil, fmt.Errorf(
 			"%w: passthrough JSON Schema is empty or exceeds the size limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &PassthroughCodec{

@@ -6,19 +6,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
 type SourceEntryReader interface {
 	ReadSourceEntry(
 		ctx context.Context,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (ingestModel.SourceContent, error)
 }
 
 type Decoder interface {
-	ID() spec.DecoderID
+	ID() storeSpec.DecoderID
 	Revision() string
 
 	Recognize(

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ReadPackageFiles reads a complete portable package directory from an fs.FS.
@@ -25,18 +25,18 @@ import (
 func ReadPackageFiles(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 ) ([]managedpackageModel.ManagedPackageFile, error) {
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package filesystem is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if packageRoot == "" {
 		return nil, fmt.Errorf(
 			"%w: embedded package root is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if packageRoot != "." {
@@ -56,13 +56,13 @@ func ReadPackageFiles(
 	if !info.IsDir() {
 		return nil, fmt.Errorf(
 			"%w: embedded package %q is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			packageRoot,
 		)
 	}
 
 	files := make([]managedpackageModel.ManagedPackageFile, 0)
-	seen := make(map[spec.Locator]struct{})
+	seen := make(map[storeSpec.Locator]struct{})
 	var totalBytes int64
 
 	err = fs.WalkDir(
@@ -78,7 +78,7 @@ func ReadPackageFiles(
 			if entry == nil {
 				return fmt.Errorf(
 					"%w: embedded package walk returned no entry for %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					location,
 				)
 			}
@@ -88,14 +88,14 @@ func ReadPackageFiles(
 			if !entry.Type().IsRegular() {
 				return fmt.Errorf(
 					"%w: embedded package file %q is not regular",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					location,
 				)
 			}
-			if len(files) >= spec.MaxDiscoveryEntries {
+			if len(files) >= storeSpec.MaxDiscoveryEntries {
 				return fmt.Errorf(
 					"%w: embedded package exceeds the file count limit",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 
@@ -106,7 +106,7 @@ func ReadPackageFiles(
 			if _, duplicate := seen[relative]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded package contains duplicate file %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					relative,
 				)
 			}
@@ -118,10 +118,10 @@ func ReadPackageFiles(
 			}
 			if !fileInfo.Mode().IsRegular() ||
 				fileInfo.Size() < 0 ||
-				fileInfo.Size() > spec.MaxScanBytes-totalBytes {
+				fileInfo.Size() > storeSpec.MaxScanBytes-totalBytes {
 				return fmt.Errorf(
 					"%w: embedded package exceeds the byte limit",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 
@@ -153,9 +153,9 @@ func ReadPackageFiles(
 }
 
 func packageRelativeLocator(
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 	location string,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	relative := location
 	if packageRoot != "." {
 		prefix := string(packageRoot) + "/"
@@ -164,14 +164,14 @@ func packageRelativeLocator(
 		if !found || relative == "" {
 			return "", fmt.Errorf(
 				"%w: embedded package file %q is outside package root %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				location,
 				packageRoot,
 			)
 		}
 	}
 
-	value := spec.Locator(relative)
+	value := storeSpec.Locator(relative)
 	if err := value.ValidatePortable(false); err != nil {
 		return "", err
 	}
@@ -184,10 +184,10 @@ func readPackageFile(
 	location string,
 	expectedSize int64,
 ) ([]byte, error) {
-	if expectedSize < 0 || expectedSize > spec.MaxScanBytes {
+	if expectedSize < 0 || expectedSize > storeSpec.MaxScanBytes {
 		return nil, fmt.Errorf(
 			"%w: embedded package file %q has invalid size",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			location,
 		)
 	}
@@ -205,7 +205,7 @@ func readPackageFile(
 	if int64(len(content)) != expectedSize {
 		return nil, fmt.Errorf(
 			"%w: embedded package file %q changed while being read",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			location,
 		)
 	}

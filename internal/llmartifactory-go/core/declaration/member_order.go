@@ -7,7 +7,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -54,7 +54,7 @@ func normalizedMemberIdentityJSON(
 
 	identity, err = jsonutil.MarshalCanonicalObject(
 		fields,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return "", nil, nil, err
@@ -179,7 +179,7 @@ func ValidateMemberUniqueness(
 		if previous, duplicate := exact[string(identity)]; duplicate {
 			return fmt.Errorf(
 				"%w: %s[%d] duplicates normalized %s[%d]",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				label,
 				index,
 				label,
@@ -204,7 +204,7 @@ func ValidateMemberUniqueness(
 		if previous, duplicate := contained[key]; duplicate {
 			return fmt.Errorf(
 				"%w: %s[%d] duplicates contained declaration identity from %s[%d]",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				label,
 				index,
 				label,
@@ -258,7 +258,7 @@ func ValidateMemberTypes(
 		if _, found := accepted[value.Header().Type]; !found {
 			return fmt.Errorf(
 				"%w: %s[%d] has incompatible type %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				index,
 				value.Header().Type,

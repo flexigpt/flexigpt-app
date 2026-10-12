@@ -3,7 +3,7 @@ package agent
 import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -12,9 +12,9 @@ import (
 type AgentView struct {
 	Ref artifactModel.ArtifactRef `json:"ref"`
 
-	Name        spec.LogicalName `json:"name"`
-	DisplayName string           `json:"displayName"`
-	Description string           `json:"description,omitempty"`
+	Name        storeSpec.LogicalName `json:"name"`
+	DisplayName string                `json:"displayName"`
+	Description string                `json:"description,omitempty"`
 
 	State            artifactModel.State `json:"state"`
 	Enabled          bool                `json:"enabled"`
@@ -41,7 +41,7 @@ const (
 type AgentCapabilityOccurrence struct {
 	Path     string                       `json:"path"`
 	Type     declaration.Type             `json:"type"`
-	Name     spec.LogicalName             `json:"name,omitempty"`
+	Name     storeSpec.LogicalName        `json:"name,omitempty"`
 	Status   composition.ResolutionStatus `json:"status"`
 	Required bool                         `json:"required"`
 
@@ -66,7 +66,7 @@ type AgentResolution struct {
 type ListAgentsRequest struct {
 	RootID rootModel.RootID `json:"rootID"`
 
-	LogicalNames []spec.LogicalName `json:"logicalNames,omitempty"`
+	LogicalNames []storeSpec.LogicalName `json:"logicalNames,omitempty"`
 
 	// Plugin limits the result to currently available direct Agent
 	// relationships selected by one Agent Plugin Plugin.

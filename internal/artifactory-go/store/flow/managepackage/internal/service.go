@@ -12,7 +12,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -36,7 +36,7 @@ func NewService(
 		dependencies.Packages == nil {
 		return nil, fmt.Errorf(
 			"%w: manage package service dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -209,7 +209,7 @@ func (s *Service) Publish(
 	if !matchesPublishExpectation(resolved, request) {
 		return managepackageModel.PublishResult{}, fmt.Errorf(
 			"%w: managed package did not resolve to its expected Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -331,7 +331,7 @@ func validateRemoveRequest(
 		return err
 	}
 	if request.ExpectedGeneration != "" {
-		if err := spec.ValidateSourceGeneration(
+		if err := storeSpec.ValidateSourceGeneration(
 			request.ExpectedGeneration,
 		); err != nil {
 			return err
@@ -344,7 +344,7 @@ func validateRemoveRequest(
 		if request.ExpectedArtifact.RootID != request.RootID {
 			return fmt.Errorf(
 				"%w: expected Artifact belongs to another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	}
@@ -388,7 +388,7 @@ func (s *Service) removeValidated(
 		request.ExpectedGeneration != state.Generation {
 		return fmt.Errorf(
 			"%w: managed Source changed before package removal",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -401,7 +401,7 @@ func (s *Service) removeValidated(
 		!state.Source.Discovery.Authoritative {
 		return fmt.Errorf(
 			"%w: managed discovery locator pruning requires an authoritative Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -474,7 +474,7 @@ func (s *Service) removeValidated(
 		value.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: managed package removal did not make expected Artifact missing",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -510,7 +510,7 @@ func validateManagedSourceState(
 	if err := state.Source.Validate(); err != nil {
 		return fmt.Errorf(
 			"%w: managed Source state: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -518,16 +518,16 @@ func validateManagedSourceState(
 		state.Source.ID != sourceID {
 		return fmt.Errorf(
 			"%w: managed Source state does not match request",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateSourceGeneration(state.Generation); err != nil {
+	if err := storeSpec.ValidateSourceGeneration(state.Generation); err != nil {
 		return err
 	}
 	if requireEnabled && !state.Source.Enabled {
 		return fmt.Errorf(
 			"%w: managed Source is disabled",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return nil

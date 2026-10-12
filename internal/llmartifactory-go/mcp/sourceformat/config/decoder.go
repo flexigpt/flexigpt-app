@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
@@ -23,7 +23,7 @@ func NewDecoder(
 	}
 }
 
-func (*Decoder) ID() spec.DecoderID {
+func (*Decoder) ID() storeSpec.DecoderID {
 	return mcpDomain.SourceDecoderID
 }
 
@@ -65,7 +65,7 @@ func (d *Decoder) Decode(
 			"",
 			fmt.Errorf(
 				"%w: MCP configuration requires mcpServers",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			),
 		)
 
@@ -96,8 +96,8 @@ func decodedValues(
 }
 
 func decoderError(
-	locator spec.Locator,
-	subresource spec.SubresourceLocator,
+	locator storeSpec.Locator,
+	subresource storeSpec.SubresourceLocator,
 	err error,
 ) []diagnostic.Diagnostic {
 	location := &diagnostic.Location{

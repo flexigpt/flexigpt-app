@@ -6,7 +6,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Runtime is a trusted composition capability. It intentionally exposes the
@@ -21,6 +21,6 @@ type Runtime interface {
 // LocalPathRuntime is a trusted runtime extension. Native paths are never
 // exposed through source.API or Source summaries.
 type LocalPathRuntime interface {
-	ResolveLocalPath(ctx context.Context, value sourceModel.Source, locator spec.Locator) (string, error)
+	ResolveLocalPath(ctx context.Context, value sourceModel.Source, locator storeSpec.Locator) (string, error)
 	SupportsLocalPath(kind sourceModel.SourceKind) bool
 }

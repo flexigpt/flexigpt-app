@@ -8,7 +8,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -194,7 +194,7 @@ func (r *Resolver) resolveArtifact(
 	state *resolutionState,
 	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion spec.LogicalVersion,
+	expectedVersion storeSpec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if err := r.reserve(state, depth); err != nil {
@@ -215,7 +215,7 @@ func (r *Resolver) resolveArtifact(
 	if _, active := state.active[ref]; active {
 		return nil, fmt.Errorf(
 			"%w: declaration composition cycle at Artifact %q",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
@@ -292,7 +292,7 @@ func (r *Resolver) targetForLoadedArtifact(
 		projected.Name != loaded.record.LogicalName {
 		return CapabilityTarget{}, fmt.Errorf(
 			"%w: projected capability target does not match Artifact identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -302,7 +302,7 @@ func (r *Resolver) targetForLoadedArtifact(
 			*projected.Artifact != loaded.record.Ref() {
 			return CapabilityTarget{}, fmt.Errorf(
 				"%w: projected Artifact capability target changed Artifact identity",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -310,14 +310,14 @@ func (r *Resolver) targetForLoadedArtifact(
 		if projected.Provenance != TargetProvenanceDirectCapability {
 			return CapabilityTarget{}, fmt.Errorf(
 				"%w: projected direct capability target has invalid provenance",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 	default:
 		return CapabilityTarget{}, fmt.Errorf(
 			"%w: projected capability target has unsupported form",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return projected.Clone(), nil
@@ -327,7 +327,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion spec.LogicalVersion,
+	expectedVersion storeSpec.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
 	record, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
@@ -336,13 +336,13 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if record.Ref() != ref {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact reader returned another Artifact",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if record.State != artifactModel.StateAvailable {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not available",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -351,7 +351,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if err := declarationType.Validate(); err != nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has unsupported declaration type: %w",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 			err,
 		)
@@ -359,7 +359,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if expectedType != "" && declarationType != expectedType {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has type %q, expected %q",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 			declarationType,
 			expectedType,
@@ -369,7 +369,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		record.LogicalVersion != expectedVersion {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has logical version %q, expected %q",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 			record.LogicalVersion,
 			expectedVersion,
@@ -378,7 +378,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if record.ResolvedDefinition == nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has no current Definition",
-			spec.ErrDefinitionNotFound,
+			storeSpec.ErrDefinitionNotFound,
 			record.ID,
 		)
 	}
@@ -390,7 +390,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if definitionValue.Digest != *record.ResolvedDefinition {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition changed during resolution",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 	if definitionValue.Kind != record.Kind ||
@@ -398,7 +398,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		definitionValue.LogicalVersion != record.LogicalVersion {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition identity differs from Artifact state",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 
@@ -406,7 +406,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if err != nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition interpretation: %w",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 			err,
 		)
 	}
@@ -415,7 +415,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		header.Name != string(record.LogicalName) {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition declaration identity differs from Artifact state",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 
@@ -431,7 +431,7 @@ func (r *Resolver) resolveTerminalArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion spec.LogicalVersion,
+	expectedVersion storeSpec.LogicalVersion,
 ) (artifactModel.ArtifactRef, error) {
 	loaded, err := r.resolveTerminalDeclaration(
 		ctx,
@@ -449,24 +449,24 @@ func (r *Resolver) resolveTerminalDeclaration(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion spec.LogicalVersion,
+	expectedVersion storeSpec.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
 	current := ref
-	expectedName := spec.LogicalName("")
+	expectedName := storeSpec.LogicalName("")
 	seen := make(map[artifactModel.ArtifactRef]struct{})
 
 	for depth := 0; depth <= r.limits.MaxDepth; depth++ {
 		if _, duplicate := seen[current]; duplicate {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: declaration alias cycle at Artifact %q",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				current.ArtifactID,
 			)
 		}
 		if len(seen) >= r.limits.MaxNodes {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: declaration alias limit exceeded",
-				spec.ErrLocatorLimitExceeded,
+				storeSpec.ErrLocatorLimitExceeded,
 			)
 		}
 		seen[current] = struct{}{}
@@ -484,7 +484,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 			loaded.record.LogicalName != expectedName {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: declaration alias resolved to another logical name",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 
@@ -497,7 +497,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 		if r.locators == nil {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: declaration alias requires a locator resolver",
-				spec.ErrLocatorUnresolved,
+				storeSpec.ErrLocatorUnresolved,
 			)
 		}
 
@@ -509,7 +509,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 				Entry:               loaded.entry.Clone(),
 				Locator:             header.Locator.Clone(),
 				ExpectedType:        header.Type,
-				ExpectedLogicalName: spec.LogicalName(header.Name),
+				ExpectedLogicalName: storeSpec.LogicalName(header.Name),
 			},
 		)
 		if err != nil {
@@ -521,18 +521,18 @@ func (r *Resolver) resolveTerminalDeclaration(
 		if next.RootID != loaded.record.RootID {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: locator resolver returned an Artifact from another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 		expectedType = header.Type
-		expectedName = spec.LogicalName(header.Name)
+		expectedName = storeSpec.LogicalName(header.Name)
 		current = next
 	}
 
 	return loadedDeclarationArtifact{}, fmt.Errorf(
 		"%w: declaration alias depth exceeded",
-		spec.ErrLocatorLimitExceeded,
+		storeSpec.ErrLocatorLimitExceeded,
 	)
 }
 
@@ -543,7 +543,7 @@ func (r *Resolver) reserve(
 	if depth > r.limits.MaxDepth {
 		return fmt.Errorf(
 			"%w: Artifact composition exceeds depth %d",
-			spec.ErrLocatorLimitExceeded,
+			storeSpec.ErrLocatorLimitExceeded,
 			r.limits.MaxDepth,
 		)
 	}
@@ -551,7 +551,7 @@ func (r *Resolver) reserve(
 	if state.nodes > r.limits.MaxNodes {
 		return fmt.Errorf(
 			"%w: Artifact composition exceeds %d nodes",
-			spec.ErrLocatorLimitExceeded,
+			storeSpec.ErrLocatorLimitExceeded,
 			r.limits.MaxNodes,
 		)
 	}

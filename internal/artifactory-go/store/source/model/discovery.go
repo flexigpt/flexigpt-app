@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -17,10 +17,10 @@ import (
 // IncludePatterns and ExcludePatterns are evaluated relative to Root.
 // Exclusions are evaluated after inclusions.
 type DirectoryRoot struct {
-	Root            spec.Locator `json:"root"`
-	Recursive       bool         `json:"recursive,omitempty"`
-	IncludePatterns []string     `json:"includePatterns,omitempty"`
-	ExcludePatterns []string     `json:"excludePatterns,omitempty"`
+	Root            storeSpec.Locator `json:"root"`
+	Recursive       bool              `json:"recursive,omitempty"`
+	IncludePatterns []string          `json:"includePatterns,omitempty"`
+	ExcludePatterns []string          `json:"excludePatterns,omitempty"`
 }
 
 func (r DirectoryRoot) Clone() DirectoryRoot {
@@ -40,13 +40,13 @@ func (r DirectoryRoot) Validate() error {
 	if err := r.Root.Validate(true); err != nil {
 		return err
 	}
-	if err := spec.ValidatePathPatterns(
+	if err := storeSpec.ValidatePathPatterns(
 		"Source discovery include patterns",
 		r.IncludePatterns,
 	); err != nil {
 		return err
 	}
-	return spec.ValidatePathPatterns(
+	return storeSpec.ValidatePathPatterns(
 		"Source discovery exclude patterns",
 		r.ExcludePatterns,
 	)
@@ -54,7 +54,7 @@ func (r DirectoryRoot) Validate() error {
 
 // Matches reports whether locator is selected by this directory scope.
 func (r DirectoryRoot) Matches(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (bool, error) {
 	if err := r.Root.Validate(true); err != nil {
 		return false, err
@@ -62,7 +62,7 @@ func (r DirectoryRoot) Matches(
 	if err := locator.Validate(false); err != nil {
 		return false, err
 	}
-	selection, err := spec.NewPathSelection(
+	selection, err := storeSpec.NewPathSelection(
 		r.IncludePatterns,
 		r.ExcludePatterns,
 	)
@@ -94,15 +94,15 @@ func (r DirectoryRoot) Matches(
 // Hints do not override AllowedDecoderIDs. The discovery engine checks both
 // before invoking a decoder.
 type DecoderHint struct {
-	Locator    spec.Locator     `json:"locator"`
-	Recursive  bool             `json:"recursive,omitempty"`
-	DecoderIDs []spec.DecoderID `json:"decoderIDs"`
+	Locator    storeSpec.Locator     `json:"locator"`
+	Recursive  bool                  `json:"recursive,omitempty"`
+	DecoderIDs []storeSpec.DecoderID `json:"decoderIDs"`
 }
 
 func (h DecoderHint) Clone() DecoderHint {
 	output := h
 	output.DecoderIDs = append(
-		[]spec.DecoderID(nil),
+		[]storeSpec.DecoderID(nil),
 		h.DecoderIDs...,
 	)
 	return output
@@ -115,7 +115,7 @@ func (h DecoderHint) Validate() error {
 	if len(h.DecoderIDs) == 0 {
 		return fmt.Errorf(
 			"%w: Source decoder hint requires at least one decoder ID",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -137,12 +137,12 @@ func (h DecoderHint) Validate() error {
 // A zero DiscoverySpec is valid. Such a Source is available for Resource
 // access but is skipped by Root refresh.
 type DiscoverySpec struct {
-	ExplicitLocators       []spec.Locator                     `json:"explicitLocators,omitempty"`
-	DirectoryRoots         []DirectoryRoot                    `json:"directoryRoots,omitempty"`
-	DecoderHints           []DecoderHint                      `json:"decoderHints,omitempty"`
-	AllowedDecoderIDs      []spec.DecoderID                   `json:"allowedDecoderIDs,omitempty"`
-	ExpectedContentDigests map[spec.Locator]cryptoutil.Digest `json:"expectedContentDigests,omitempty"`
-	Authoritative          bool                               `json:"authoritative,omitempty"`
+	ExplicitLocators       []storeSpec.Locator                     `json:"explicitLocators,omitempty"`
+	DirectoryRoots         []DirectoryRoot                         `json:"directoryRoots,omitempty"`
+	DecoderHints           []DecoderHint                           `json:"decoderHints,omitempty"`
+	AllowedDecoderIDs      []storeSpec.DecoderID                   `json:"allowedDecoderIDs,omitempty"`
+	ExpectedContentDigests map[storeSpec.Locator]cryptoutil.Digest `json:"expectedContentDigests,omitempty"`
+	Authoritative          bool                                    `json:"authoritative,omitempty"`
 
 	MaxCandidateBytes int64 `json:"maxCandidateBytes,omitempty"`
 	MaxTotalBytes     int64 `json:"maxTotalBytes,omitempty"`
@@ -159,7 +159,7 @@ func (s DiscoverySpec) Empty() bool {
 func (s DiscoverySpec) Clone() DiscoverySpec {
 	output := s
 	output.ExplicitLocators = append(
-		[]spec.Locator(nil),
+		[]storeSpec.Locator(nil),
 		s.ExplicitLocators...,
 	)
 	output.DirectoryRoots = make(
@@ -177,7 +177,7 @@ func (s DiscoverySpec) Clone() DiscoverySpec {
 		output.DecoderHints[index] = hint.Clone()
 	}
 	output.AllowedDecoderIDs = append(
-		[]spec.DecoderID(nil),
+		[]storeSpec.DecoderID(nil),
 		s.AllowedDecoderIDs...,
 	)
 	output.ExpectedContentDigests = maps.Clone(
@@ -250,19 +250,19 @@ func (s DiscoverySpec) Effective() DiscoverySpec {
 		return output
 	}
 	if output.MaxCandidateBytes == 0 {
-		output.MaxCandidateBytes = spec.MaxCandidateBytes
+		output.MaxCandidateBytes = storeSpec.MaxCandidateBytes
 	}
 	if output.MaxTotalBytes == 0 {
-		output.MaxTotalBytes = spec.MaxScanBytes
+		output.MaxTotalBytes = storeSpec.MaxScanBytes
 	}
 	if output.MaxCandidates == 0 {
-		output.MaxCandidates = spec.DefaultMaxCandidates
+		output.MaxCandidates = storeSpec.DefaultMaxCandidates
 	}
 	if output.MaxEntries == 0 {
-		output.MaxEntries = spec.DefaultMaxEntries
+		output.MaxEntries = storeSpec.DefaultMaxEntries
 	}
 	if output.MaxDepth == 0 {
-		output.MaxDepth = spec.DefaultMaxDepth
+		output.MaxDepth = storeSpec.DefaultMaxDepth
 	}
 	return output
 }
@@ -275,17 +275,17 @@ func (s DiscoverySpec) Validate() error {
 		s.MaxDepth < 0 {
 		return fmt.Errorf(
 			"%w: Source discovery limits cannot be negative",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if s.MaxCandidateBytes > spec.MaxCandidateBytes ||
-		s.MaxTotalBytes > spec.MaxScanBytes ||
-		s.MaxCandidates > spec.MaxDiscoveryCandidates ||
-		s.MaxEntries > spec.MaxDiscoveryEntries ||
-		s.MaxDepth > spec.MaxDiscoveryDepth {
+	if s.MaxCandidateBytes > storeSpec.MaxCandidateBytes ||
+		s.MaxTotalBytes > storeSpec.MaxScanBytes ||
+		s.MaxCandidates > storeSpec.MaxDiscoveryCandidates ||
+		s.MaxEntries > storeSpec.MaxDiscoveryEntries ||
+		s.MaxDepth > storeSpec.MaxDiscoveryDepth {
 		return fmt.Errorf(
 			"%w: Source discovery limits exceed Store safety limits",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -296,30 +296,30 @@ func (s DiscoverySpec) Validate() error {
 			s.Authoritative {
 			return fmt.Errorf(
 				"%w: empty Source discovery cannot contain decoder, digest, or authority configuration",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return nil
 	}
 
 	if len(s.ExplicitLocators) >
-		spec.MaxDiscoveryCandidates {
+		storeSpec.MaxDiscoveryCandidates {
 		return fmt.Errorf(
 			"%w: Source explicit locator count exceeds limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if len(s.DirectoryRoots) >
-		spec.MaxDiscoveryCandidates {
+		storeSpec.MaxDiscoveryCandidates {
 		return fmt.Errorf(
 			"%w: Source directory root count exceeds limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if len(s.DecoderHints) > spec.MaxDecoderHints {
+	if len(s.DecoderHints) > storeSpec.MaxDecoderHints {
 		return fmt.Errorf(
 			"%w: Source decoder hint count exceeds limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -364,10 +364,10 @@ func (s DiscoverySpec) Validate() error {
 	}
 
 	if len(s.ExpectedContentDigests) >
-		spec.MaxDiscoveryCandidates {
+		storeSpec.MaxDiscoveryCandidates {
 		return fmt.Errorf(
 			"%w: Source expected content digest count exceeds limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for locator, digest := range s.ExpectedContentDigests {
@@ -388,7 +388,7 @@ func (s DiscoverySpec) Validate() error {
 		if !inScope {
 			return fmt.Errorf(
 				"%w: Source expected digest locator %q is outside discovery scope",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				locator,
 			)
 		}
@@ -400,7 +400,7 @@ func (s DiscoverySpec) Validate() error {
 // InScope reports whether a regular Source entry is selected by this
 // discovery configuration.
 func (s DiscoverySpec) InScope(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (bool, error) {
 	if err := locator.Validate(false); err != nil {
 		return false, err
@@ -423,9 +423,9 @@ func (s DiscoverySpec) InScope(
 // RequestedDecoderIDs returns a deterministic union of decoder hints
 // matching locator.
 func (s DiscoverySpec) RequestedDecoderIDs(
-	locator spec.Locator,
-) []spec.DecoderID {
-	seen := make(map[spec.DecoderID]struct{})
+	locator storeSpec.Locator,
+) []storeSpec.DecoderID {
+	seen := make(map[storeSpec.DecoderID]struct{})
 	for _, hint := range s.DecoderHints {
 		if !decoderHintMatchesLocator(hint, locator) {
 			continue
@@ -435,7 +435,7 @@ func (s DiscoverySpec) RequestedDecoderIDs(
 		}
 	}
 
-	output := make([]spec.DecoderID, 0, len(seen))
+	output := make([]storeSpec.DecoderID, 0, len(seen))
 	for decoderID := range seen {
 		output = append(output, decoderID)
 	}
@@ -465,7 +465,7 @@ func (s DiscoverySpec) Equal(
 
 func decoderHintMatchesLocator(
 	hint DecoderHint,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) bool {
 	if locator == hint.Locator {
 		return true

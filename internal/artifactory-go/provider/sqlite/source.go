@@ -8,7 +8,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const sourceColumns = `
@@ -31,7 +31,7 @@ func (s *Store) createSource(ctx context.Context, value sourceModel.Source) erro
 		return err
 	}
 	if rootValue.StorageKey != value.RootStorageKey {
-		return fmt.Errorf("%w: Source Root storage key does not match Root metadata", spec.ErrInvalid)
+		return fmt.Errorf("%w: Source Root storage key does not match Root metadata", storeSpec.ErrInvalid)
 	}
 	_, err = tx.ExecContext(
 		ctx,
@@ -73,7 +73,7 @@ func (s *Store) getSource(
 		),
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return sourceModel.Source{}, fmt.Errorf("%w: Source %q in Root %q", spec.ErrSourceNotFound, id, rootID)
+		return sourceModel.Source{}, fmt.Errorf("%w: Source %q in Root %q", storeSpec.ErrSourceNotFound, id, rootID)
 	}
 	return value, err
 }
@@ -81,7 +81,7 @@ func (s *Store) getSource(
 func (s *Store) findSourceByStorageKey(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	storageKey spec.StorageKey,
+	storageKey storeSpec.StorageKey,
 ) (sourceModel.Source, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return sourceModel.Source{}, err
@@ -97,7 +97,7 @@ func (s *Store) findSourceByStorageKey(
 	if errors.Is(err, sql.ErrNoRows) {
 		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source storage key %q in Root %q",
-			spec.ErrSourceNotFound,
+			storeSpec.ErrSourceNotFound,
 			storageKey,
 			rootID,
 		)
@@ -133,7 +133,7 @@ func (s *Store) listSources(ctx context.Context, rootID rootModel.RootID) ([]sou
 // invalidation is deliberately published by Refresh through Publisher.
 func (s *Store) updateSource(ctx context.Context, value sourceModel.Source, expectedRevision uint64) error {
 	if expectedRevision == 0 || value.Revision != expectedRevision+1 || value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid Source update", spec.ErrInvalid)
+		return fmt.Errorf("%w: invalid Source update", storeSpec.ErrInvalid)
 	}
 	discoveryRaw, err := encodeJSON(value.Discovery.Normalized())
 	if err != nil {
@@ -152,7 +152,7 @@ func (s *Store) updateSource(ctx context.Context, value sourceModel.Source, expe
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	result, err := tx.ExecContext(
 		ctx,
@@ -180,7 +180,7 @@ func (s *Store) updateSource(ctx context.Context, value sourceModel.Source, expe
 // issue an aggregate lifecycle publication before invoking this low-level port.
 func (s *Store) retireSource(ctx context.Context, value sourceModel.Source, expectedRevision uint64) error {
 	if value.RetiredAt == nil || value.Enabled || expectedRevision == 0 || value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid Source retirement", spec.ErrInvalid)
+		return fmt.Errorf("%w: invalid Source retirement", storeSpec.ErrInvalid)
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -195,11 +195,11 @@ func (s *Store) retireSource(ctx context.Context, value sourceModel.Source, expe
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	if current.RootStorageKey != value.RootStorageKey || current.StorageKey != value.StorageKey ||
 		current.Kind != value.Kind {
-		return fmt.Errorf("%w: Source retirement changed Source identity", spec.ErrInvalid)
+		return fmt.Errorf("%w: Source retirement changed Source identity", storeSpec.ErrInvalid)
 	}
 	result, err := tx.ExecContext(
 		ctx,
@@ -298,7 +298,12 @@ func getActiveSourceTx(
 		),
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return sourceModel.Source{}, fmt.Errorf("%w: Source %q in Root %q", spec.ErrSourceNotFound, sourceID, rootID)
+		return sourceModel.Source{}, fmt.Errorf(
+			"%w: Source %q in Root %q",
+			storeSpec.ErrSourceNotFound,
+			sourceID,
+			rootID,
+		)
 	}
 	return value, err
 }
@@ -336,8 +341,8 @@ func scanSource(row scanner) (sourceModel.Source, error) {
 	value := sourceModel.Source{
 		ID:             sourceModel.SourceID(id),
 		RootID:         rootModel.RootID(rootID),
-		RootStorageKey: spec.StorageKey(rootStorageKey),
-		StorageKey:     spec.StorageKey(storageKey),
+		RootStorageKey: storeSpec.StorageKey(rootStorageKey),
+		StorageKey:     storeSpec.StorageKey(storageKey),
 		Kind:           sourceModel.SourceKind(kind),
 		DisplayName:    displayName,
 		Enabled:        enabled != 0,

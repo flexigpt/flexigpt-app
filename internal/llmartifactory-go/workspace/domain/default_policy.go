@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 )
@@ -34,17 +34,17 @@ func (p DefaultPolicy) Clone() (DefaultPolicy, error) {
 }
 
 func (p DefaultPolicy) Validate() error {
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Workspace default policy ID",
 		p.ID,
-		spec.MaxLogicalNameBytes,
+		storeSpec.MaxLogicalNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Workspace default policy version",
 		p.Version,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (p DefaultPolicy) Validate() error {
 	if len(p.RawYAML) == 0 || len(p.CanonicalJSON) == 0 {
 		return fmt.Errorf(
 			"%w: Workspace default policy content is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := p.Document.Validate(); err != nil {
@@ -63,7 +63,7 @@ func (p DefaultPolicy) Validate() error {
 	if p.Document.Name != p.ID {
 		return fmt.Errorf(
 			"%w: Workspace default policy document identity is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -75,7 +75,7 @@ func (p DefaultPolicy) Validate() error {
 		cryptoutil.DigestBytes(canonical) != p.Digest {
 		return fmt.Errorf(
 			"%w: Workspace default policy bytes or digest do not match its document",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return nil

@@ -5,22 +5,22 @@ import (
 	"time"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Summary struct {
-	ID             SourceID         `json:"id"`
-	RootID         rootModel.RootID `json:"rootID"`
-	RootStorageKey spec.StorageKey  `json:"rootStorageKey"`
-	StorageKey     spec.StorageKey  `json:"storageKey"`
-	Kind           SourceKind       `json:"kind"`
-	DisplayName    string           `json:"displayName"`
-	Enabled        bool             `json:"enabled"`
-	Discovery      DiscoverySpec    `json:"discovery"`
-	Revision       uint64           `json:"revision"`
-	CreatedAt      time.Time        `json:"createdAt"`
-	ModifiedAt     time.Time        `json:"modifiedAt"`
-	RetiredAt      *time.Time       `json:"retiredAt,omitempty"`
+	ID             SourceID             `json:"id"`
+	RootID         rootModel.RootID     `json:"rootID"`
+	RootStorageKey storeSpec.StorageKey `json:"rootStorageKey"`
+	StorageKey     storeSpec.StorageKey `json:"storageKey"`
+	Kind           SourceKind           `json:"kind"`
+	DisplayName    string               `json:"displayName"`
+	Enabled        bool                 `json:"enabled"`
+	Discovery      DiscoverySpec        `json:"discovery"`
+	Revision       uint64               `json:"revision"`
+	CreatedAt      time.Time            `json:"createdAt"`
+	ModifiedAt     time.Time            `json:"modifiedAt"`
+	RetiredAt      *time.Time           `json:"retiredAt,omitempty"`
 }
 
 func (s Summary) Validate() error {
@@ -40,10 +40,10 @@ func (s Summary) Validate() error {
 	if err := s.Kind.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"source display name",
 		s.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
@@ -51,22 +51,22 @@ func (s Summary) Validate() error {
 		return fmt.Errorf("source discovery: %w", err)
 	}
 	if s.Revision == 0 {
-		return fmt.Errorf("%w: source revision must be greater than zero", spec.ErrInvalid)
+		return fmt.Errorf("%w: source revision must be greater than zero", storeSpec.ErrInvalid)
 	}
 	if s.CreatedAt.IsZero() || s.ModifiedAt.IsZero() {
-		return fmt.Errorf("%w: source timestamps are required", spec.ErrInvalid)
+		return fmt.Errorf("%w: source timestamps are required", storeSpec.ErrInvalid)
 	}
 	if s.ModifiedAt.Before(s.CreatedAt) {
-		return fmt.Errorf("%w: source modified time precedes creation", spec.ErrInvalid)
+		return fmt.Errorf("%w: source modified time precedes creation", storeSpec.ErrInvalid)
 	}
 	if s.RetiredAt != nil {
 		if s.RetiredAt.IsZero() ||
 			s.RetiredAt.Before(s.CreatedAt) ||
 			s.RetiredAt.Before(s.ModifiedAt) {
-			return fmt.Errorf("%w: source retirement time is invalid", spec.ErrInvalid)
+			return fmt.Errorf("%w: source retirement time is invalid", storeSpec.ErrInvalid)
 		}
 		if s.Enabled {
-			return fmt.Errorf("%w: retired source cannot be enabled", spec.ErrInvalid)
+			return fmt.Errorf("%w: retired source cannot be enabled", storeSpec.ErrInvalid)
 		}
 	}
 	return nil

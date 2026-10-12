@@ -1,0 +1,1712 @@
+package session
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+)
+
+var errStaleDispatch = errors.New("runtime dispatch became stale")
+
+func (r *Runtime) dispatchWork(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	switch work.Kind {
+	case workModel:
+		r.dispatchModel(ctx, work)
+
+	case workToolEvaluate:
+		r.dispatchToolEvaluation(ctx, work)
+
+	case workToolExecute:
+		r.dispatchToolExecution(ctx, work)
+
+	case workResolveWait:
+		r.dispatchWaitResolution(ctx, work)
+
+	case workCloseSkill:
+		r.dispatchSkillClose(ctx, work)
+
+	default:
+		r.reportDiagnostic(ctx, RuntimeDiagnostic{
+			SessionID: work.SessionID,
+			RunID:     work.RunID,
+			Operation: "dispatch runtime work",
+			Message:   "runtime work has an unsupported kind",
+			Cause:     string(work.Kind),
+			At:        r.now(),
+		})
+	}
+}
+
+func (r *Runtime) dispatchModel(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	operationCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	operation := findModelOperation(run, work.OperationID)
+	if operation == nil ||
+		operation.State != OperationStateQueued ||
+		run.Controls.Paused ||
+		run.Controls.CancellationRequested ||
+		run.State.Terminal() {
+		r.mu.Unlock()
+		return
+	}
+
+	operation.State = OperationStatePreparing
+	r.cancels[modelCancelKey(run.ID, operation.ID)] = cancel
+	r.touchRunLocked(sessionValue, run)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventModelOperationStarted,
+		operation.ID,
+		"",
+		"",
+		"",
+		map[string]string{
+			runtimeEventStateKey: string(OperationStatePreparing),
+		},
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventModelOperationStarted,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(operationCtx, effects)
+
+	if err := r.ensureSkillSessionForModel(
+		operationCtx,
+		work.SessionID,
+		work.RunID,
+		work.OperationID,
+	); err != nil {
+		if errors.Is(err, errStaleDispatch) {
+			return
+		}
+
+		r.finishModelExecution(
+			operationCtx,
+			work,
+			ModelExecutionResult{
+				Error: &OperationError{
+					Code:    "skill_session_unavailable",
+					Message: err.Error(),
+				},
+			},
+			err,
+		)
+		return
+	}
+
+	r.mu.Lock()
+	sessionValue, run, err = r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	operation = findModelOperation(run, work.OperationID)
+	if operation == nil ||
+		operation.State != OperationStatePreparing ||
+		run.Controls.Paused ||
+		run.Controls.CancellationRequested ||
+		run.State.Terminal() {
+		r.mu.Unlock()
+		return
+	}
+
+	operation.State = OperationStateRunning
+	operation.StartedAt = r.now()
+
+	request := ModelExecutionRequest{
+		SessionID:      sessionValue.ID,
+		RunID:          run.ID,
+		OperationID:    operation.ID,
+		Configuration:  cloneJSON(operation.Request.Configuration),
+		History:        cloneJSON(operation.Request.History),
+		Current:        cloneJSON(operation.Request.Current),
+		SkillSessionID: run.SkillSession.ID,
+	}
+	r.touchRunLocked(sessionValue, run)
+
+	effects = runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventModelOperationStarted,
+		operation.ID,
+		"",
+		"",
+		"",
+		map[string]string{
+			runtimeEventStateKey: string(OperationStateRunning),
+		},
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventModelOperationStarted,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(operationCtx, effects)
+
+	result, executeErr := r.deps.Model.ExecuteModel(
+		operationCtx,
+		request,
+		ModelStream{
+			OnText: func(text string) error {
+				r.appendModelStream(
+					operationCtx,
+					work.SessionID,
+					work.RunID,
+					work.OperationID,
+					text,
+					false,
+				)
+				return operationCtx.Err()
+			},
+			OnThinking: func(thinking string) error {
+				r.appendModelStream(
+					operationCtx,
+					work.SessionID,
+					work.RunID,
+					work.OperationID,
+					thinking,
+					true,
+				)
+				return operationCtx.Err()
+			},
+		},
+	)
+
+	r.finishModelExecution(
+		operationCtx,
+		work,
+		result,
+		executeErr,
+	)
+}
+
+func (r *Runtime) ensureSkillSessionForModel(
+	ctx context.Context,
+	sessionID SessionID,
+	runID RunID,
+	operationID OperationID,
+) error {
+	r.mu.RLock()
+	sessionValue, run, err := r.sessionAndRunLocked(
+		sessionID,
+		runID,
+	)
+	if err != nil {
+		r.mu.RUnlock()
+		return err
+	}
+
+	operation := findModelOperation(run, operationID)
+	if operation == nil ||
+		operation.State != OperationStatePreparing {
+		r.mu.RUnlock()
+		return errStaleDispatch
+	}
+
+	enabled := cloneJSON(run.SkillSession.Enabled)
+	active := cloneJSON(run.SkillSession.Active)
+	previousID := run.SkillSession.ID
+	generation := run.SkillSession.Generation
+	_ = sessionValue
+	r.mu.RUnlock()
+
+	if len(enabled) == 0 {
+		if previousID == "" {
+			return nil
+		}
+
+		r.mu.Lock()
+		sessionValue, run, err := r.sessionAndRunLocked(
+			sessionID,
+			runID,
+		)
+		if err != nil {
+			r.mu.Unlock()
+			return err
+		}
+		if run.SkillSession.Generation != generation {
+			r.mu.Unlock()
+			return errStaleDispatch
+		}
+
+		run.SkillSession.ID = ""
+		r.touchRunLocked(sessionValue, run)
+
+		effects := runtimeEffects{
+			work: []runtimeWork{
+				{
+					Kind:      workCloseSkill,
+					SessionID: sessionID,
+					RunID:     runID,
+					SkillID:   previousID,
+				},
+			},
+		}
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventRunStateChanged,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
+
+		return nil
+	}
+
+	if r.deps.Skills == nil {
+		return errors.New(
+			"run selects skills but no skill-session controller is configured",
+		)
+	}
+
+	result, ensureErr := r.deps.Skills.EnsureSkillSession(
+		ctx,
+		SkillSessionRequest{
+			SessionID: previousID,
+			Enabled:   enabled,
+			Active:    active,
+		},
+	)
+	if ensureErr != nil {
+		return ensureErr
+	}
+	if result.SessionID == "" {
+		return errors.New(
+			"skill-session controller returned an empty session ID",
+		)
+	}
+
+	r.mu.Lock()
+	sessionValue, run, err = r.sessionAndRunLocked(
+		sessionID,
+		runID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		if result.SessionID != previousID {
+			go r.closeSkillSession(
+				context.WithoutCancel(ctx),
+				result.SessionID,
+				sessionID,
+				runID,
+			)
+		}
+		return err
+	}
+
+	operation = findModelOperation(run, operationID)
+	if operation == nil ||
+		operation.State != OperationStatePreparing ||
+		run.SkillSession.Generation != generation ||
+		run.Controls.CancellationRequested {
+		r.mu.Unlock()
+		if result.SessionID != previousID {
+			go r.closeSkillSession(
+				context.WithoutCancel(ctx),
+				result.SessionID,
+				sessionID,
+				runID,
+			)
+		}
+		return errStaleDispatch
+	}
+
+	run.SkillSession.ID = result.SessionID
+	run.SkillSession.Active = cloneJSON(result.Active)
+	r.touchRunLocked(sessionValue, run)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventRunStateChanged,
+		operationID,
+		"",
+		"",
+		"",
+		map[string]any{
+			"skillSessionID": result.SessionID,
+			"activeSkills":   result.Active,
+		},
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventRunStateChanged,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+
+	return nil
+}
+
+func (r *Runtime) finishModelExecution(
+	ctx context.Context,
+	work runtimeWork,
+	result ModelExecutionResult,
+	executeErr error,
+) {
+	r.mu.Lock()
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	operation := findModelOperation(run, work.OperationID)
+	if operation == nil || operation.State.Terminal() {
+		r.mu.Unlock()
+		return
+	}
+
+	delete(r.cancels, modelCancelKey(run.ID, operation.ID))
+	operation.FinishedAt = r.now()
+	run.ActiveModelOperationID = ""
+
+	if result.Text == "" {
+		result.Text = operation.StreamedText
+	}
+	if result.Thinking == "" {
+		result.Thinking = operation.StreamedThinking
+	}
+
+	if executeErr != nil && result.Error == nil {
+		result.Error = &OperationError{
+			Code:    "model_execution_failed",
+			Message: executeErr.Error(),
+		}
+	}
+
+	//nolint:gocritic // Not suitable for switch.
+	if run.Controls.CancellationRequested ||
+		errors.Is(executeErr, context.Canceled) {
+		operation.State = OperationStateCancelled
+		if result.Error == nil {
+			operation.Error = &OperationError{
+				Code:    string(RunStateCancelled),
+				Message: "model operation was cancelled",
+			}
+		} else {
+			operation.Error = cloneOperationError(result.Error)
+		}
+	} else if result.Error != nil &&
+		!result.Usable &&
+		len(result.ToolCalls) == 0 {
+		operation.State = OperationStateFailed
+		operation.Error = cloneOperationError(result.Error)
+	} else {
+		operation.State = OperationStateCompleted
+		operation.Error = cloneOperationError(result.Error)
+	}
+
+	operation.Usable = result.Usable
+	operation.ProtocolOutputs = cloneJSON(result.ProtocolOutputs)
+	operation.Metadata = cloneRaw(result.Metadata)
+	operation.StreamedText = result.Text
+	operation.StreamedThinking = result.Thinking
+
+	currentIndex := transcriptMessageIndex(
+		sessionValue.Transcript,
+		operation.Request.Current.ID,
+	)
+	if currentIndex >= 0 {
+		if len(result.HydratedCurrentInputs) != 0 {
+			sessionValue.Transcript[currentIndex].ProtocolInputs = cloneJSON(
+				result.HydratedCurrentInputs,
+			)
+		}
+		if len(result.Metadata) != 0 {
+			sessionValue.Transcript[currentIndex].Metadata = cloneRaw(
+				result.Metadata,
+			)
+		}
+	}
+
+	if len(result.ProtocolOutputs) != 0 ||
+		strings.TrimSpace(result.Text) != "" ||
+		result.Error != nil ||
+		len(result.ToolCalls) != 0 {
+		status := "completed"
+		if result.Error != nil {
+			status = "failed"
+		}
+
+		sessionValue.Transcript = append(
+			sessionValue.Transcript,
+			TranscriptMessage{
+				ID:              r.newID("message"),
+				CreatedAt:       r.now(),
+				Role:            MessageRoleAssistant,
+				Status:          status,
+				Text:            result.Text,
+				ProtocolOutputs: cloneJSON(result.ProtocolOutputs),
+				OperationID:     operation.ID,
+				Error:           cloneOperationError(result.Error),
+				Metadata:        cloneRaw(result.Metadata),
+			},
+		)
+	}
+
+	effects := runtimeEffects{}
+	for _, proposal := range result.ToolCalls {
+		call := r.registerToolCallLocked(
+			sessionValue,
+			run,
+			operation,
+			proposal,
+			&effects,
+		)
+		operation.ToolCallIDs = append(
+			operation.ToolCallIDs,
+			call.ID,
+		)
+	}
+
+	r.touchRunLocked(sessionValue, run)
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventModelOperationFinished,
+		operation.ID,
+		"",
+		"",
+		"",
+		map[string]any{
+			runtimeEventStateKey: operation.State,
+			"usable":             result.Usable,
+			runtimeEventErrorKey: result.Error,
+		},
+	)
+
+	if run.Controls.CancellationRequested {
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeCancelled,
+				Code:    string(RunStateCancelled),
+				Message: "run cancellation was requested",
+			},
+			&effects,
+		)
+	} else {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:              DriverEventModelFinished,
+				OperationID:       operation.ID,
+				ModelUsable:       result.Usable,
+				ModelHasToolCalls: len(result.ToolCalls) != 0,
+			},
+			&effects,
+		)
+	}
+
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventModelOperationFinished,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
+func (r *Runtime) appendModelStream(
+	ctx context.Context,
+	sessionID SessionID,
+	runID RunID,
+	operationID OperationID,
+	value string,
+	thinking bool,
+) {
+	if value == "" {
+		return
+	}
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		sessionID,
+		runID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	operation := findModelOperation(run, operationID)
+	if operation == nil ||
+		(operation.State != OperationStatePreparing &&
+			operation.State != OperationStateRunning) ||
+		run.Controls.CancellationRequested {
+		r.mu.Unlock()
+		return
+	}
+
+	if thinking {
+		operation.StreamedThinking += value
+	} else {
+		operation.StreamedText += value
+	}
+	r.touchRunLocked(sessionValue, run)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventModelOutputAppended,
+		operationID,
+		"",
+		"",
+		"",
+		map[string]any{
+			"thinking": thinking,
+			"text":     value,
+		},
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventModelOutputAppended,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
+func (r *Runtime) registerToolCallLocked(
+	sessionValue *Session,
+	run *Run,
+	operation *ModelOperation,
+	proposal ToolCallProposal,
+	effects *runtimeEffects,
+) ToolCall {
+	callID := proposal.ID
+	if callID == "" {
+		callID = ToolCallID(r.newID("tool-call"))
+	}
+
+	call := ToolCall{
+		ID:                callID,
+		OriginOperationID: operation.ID,
+		ProviderCallID:    proposal.ProviderCallID,
+		Name:              proposal.Name,
+		ChoiceID:          proposal.ChoiceID,
+		Type:              proposal.Type,
+		Arguments:         cloneRaw(proposal.Arguments),
+		Binding:           cloneJSON(proposal.Binding),
+		Required:          proposal.Required,
+		ProviderManaged:   proposal.ProviderManaged,
+		Automatic:         proposal.Automatic,
+		State:             ToolCallStatePending,
+	}
+
+	if call.ProviderManaged || !call.Required {
+		call.State = ToolCallStateObserved
+	}
+	if call.Binding.Kind == ToolBindingKindUnresolved && call.Required {
+		call.State = ToolCallStateFailed
+		call.LastFailure = proposal.Error
+		if call.LastFailure == "" {
+			call.LastFailure = "model tool call could not be resolved to an execution binding"
+		}
+	}
+
+	run.ToolCalls = append(run.ToolCalls, call)
+	r.recordRunEventLocked(
+		effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolCallProposed,
+		operation.ID,
+		call.ID,
+		"",
+		"",
+		call,
+	)
+
+	return call
+}
+
+func (r *Runtime) dispatchToolEvaluation(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	if r.deps.Tools == nil {
+		r.failToolWithoutResult(
+			ctx,
+			work,
+			"tool executor is not configured",
+		)
+		return
+	}
+
+	evaluationCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call := findToolCall(run, work.ToolCallID)
+	if call == nil ||
+		call.State != ToolCallStatePending ||
+		run.Controls.CancellationRequested ||
+		run.Controls.Paused ||
+		run.State.Terminal() ||
+		(work.Automatic &&
+			automationHoldApplies(
+				run.Controls.AutomaticTools,
+				call.OriginOperationID,
+			)) {
+		r.mu.Unlock()
+		return
+	}
+
+	call.State = ToolCallStateEvaluating
+	r.cancels[toolEvaluationCancelKey(run.ID, call.ID)] = cancel
+	r.touchRunLocked(sessionValue, run)
+
+	request := ToolExecutionRequest{
+		SessionID:      sessionValue.ID,
+		RunID:          run.ID,
+		ToolCall:       cloneJSON(*call),
+		SkillSessionID: run.SkillSession.ID,
+	}
+	request.Authorization = cloneRaw(call.Authorization)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolEvaluationStarted,
+		call.OriginOperationID,
+		call.ID,
+		"",
+		"",
+		map[string]bool{
+			"automatic": work.Automatic,
+		},
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventToolEvaluationStarted,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(evaluationCtx, effects)
+
+	evaluation, evaluationErr := r.deps.Tools.EvaluateTool(
+		evaluationCtx,
+		request,
+	)
+
+	r.mu.Lock()
+	sessionValue, run, err = r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call = findToolCall(run, work.ToolCallID)
+	if call == nil {
+		r.mu.Unlock()
+		return
+	}
+
+	delete(r.cancels, toolEvaluationCancelKey(run.ID, call.ID))
+	if call.State != ToolCallStateEvaluating {
+		r.mu.Unlock()
+		return
+	}
+
+	effects = runtimeEffects{}
+	if evaluationErr != nil {
+		call.State = ToolCallStateFailed
+		call.LastFailure = evaluationErr.Error()
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventToolCallFailed,
+			call.OriginOperationID,
+			call.ID,
+			"",
+			"",
+			map[string]string{
+				runtimeEventErrorKey: evaluationErr.Error(),
+			},
+		)
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventToolCallFailed,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(evaluationCtx, effects)
+		return
+	}
+
+	advance := false
+	switch evaluation.Decision {
+	case ToolEvaluationWait:
+		if evaluation.Wait == nil {
+			call.State = ToolCallStateFailed
+			call.LastFailure = "tool evaluator required a wait without wait details"
+			r.touchRunLocked(sessionValue, run)
+
+			r.recordRunEventLocked(
+				&effects,
+				sessionValue,
+				run,
+				"",
+				RuntimeEventToolCallFailed,
+				call.OriginOperationID,
+				call.ID,
+				"",
+				"",
+				map[string]string{
+					runtimeEventErrorKey: call.LastFailure,
+				},
+			)
+			advance = true
+			break
+		}
+
+		wait := WaitingRequest{
+			ID:                 WaitID(r.newID("wait")),
+			Kind:               evaluation.Wait.Kind,
+			Status:             WaitStatusPending,
+			OperationID:        call.OriginOperationID,
+			ToolCallID:         call.ID,
+			Summary:            cloneRaw(evaluation.Wait.Summary),
+			InputSchema:        cloneRaw(evaluation.Wait.InputSchema),
+			AllowedResolutions: append([]string(nil), evaluation.Wait.AllowedResolutions...),
+			CreatedAt:          r.now(),
+			UpdatedAt:          r.now(),
+			ExpiresAt:          cloneTime(evaluation.Wait.ExpiresAt),
+		}
+		call.State = ToolCallStateWaiting
+		call.WaitID = wait.ID
+		run.WaitingRequests = append(run.WaitingRequests, wait)
+		run.State = RunStateWaiting
+		r.waitReferences[wait.ID] = waitReference{
+			ExecutorReference: evaluation.Wait.ExecutorReference,
+		}
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventWaitRequested,
+			wait.OperationID,
+			call.ID,
+			"",
+			wait.ID,
+			wait,
+		)
+
+	case ToolEvaluationDenied:
+		result := ToolExecutionResult{
+			HasResult: true,
+			Kind:      ToolResultKindError,
+			Text:      evaluation.Reason,
+			Error:     evaluation.Reason,
+		}
+		if evaluation.Result != nil {
+			result = *evaluation.Result
+		}
+
+		r.recordExecutionResultLocked(
+			sessionValue,
+			run,
+			call,
+			ToolAttemptID(""),
+			result,
+			&effects,
+		)
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+
+	case ToolEvaluationAllowed:
+		call.Authorization = cloneRaw(evaluation.Authorization)
+		call.State = ToolCallStatePending
+		r.touchRunLocked(sessionValue, run)
+
+		effects.work = append(effects.work, runtimeWork{
+			Kind:       workToolExecute,
+			SessionID:  sessionValue.ID,
+			RunID:      run.ID,
+			ToolCallID: call.ID,
+			Automatic:  work.Automatic,
+		})
+
+	default:
+		call.State = ToolCallStateFailed
+		call.LastFailure = "tool evaluator returned an unsupported decision"
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventToolCallFailed,
+			call.OriginOperationID,
+			call.ID,
+			"",
+			"",
+			map[string]string{
+				runtimeEventErrorKey: call.LastFailure,
+			},
+		)
+		advance = true
+	}
+
+	if advance {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
+
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventToolEvaluationStarted,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(evaluationCtx, effects)
+}
+
+func (r *Runtime) dispatchToolExecution(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	if r.deps.Tools == nil {
+		r.failToolWithoutResult(
+			ctx,
+			work,
+			"tool executor is not configured",
+		)
+		return
+	}
+
+	executionCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call := findToolCall(run, work.ToolCallID)
+	if call == nil ||
+		call.State != ToolCallStatePending ||
+		run.Controls.CancellationRequested ||
+		run.Controls.Paused ||
+		run.State.Terminal() ||
+		(work.Automatic &&
+			automationHoldApplies(
+				run.Controls.AutomaticTools,
+				call.OriginOperationID,
+			)) {
+		r.mu.Unlock()
+		return
+	}
+
+	if run.Limits.MaxToolAttempts > 0 &&
+		run.Usage.ToolAttempts >= run.Limits.MaxToolAttempts {
+		r.mu.Unlock()
+		r.failToolWithoutResult(
+			ctx,
+			work,
+			"run tool-attempt limit reached",
+		)
+		return
+	}
+
+	attempt := ToolAttempt{
+		ID:        ToolAttemptID(r.newID("tool-attempt")),
+		CallID:    call.ID,
+		State:     ToolAttemptStateRunning,
+		Automatic: work.Automatic,
+		StartedAt: r.now(),
+	}
+	call.Attempts = append(call.Attempts, attempt)
+	call.State = ToolCallStateRunning
+	removeRequestedCall(run, call.ID)
+	run.Usage.ToolAttempts++
+	r.cancels[toolExecutionCancelKey(run.ID, attempt.ID)] = cancel
+	r.touchRunLocked(sessionValue, run)
+
+	request := ToolExecutionRequest{
+		SessionID:      sessionValue.ID,
+		RunID:          run.ID,
+		ToolCall:       cloneJSON(*call),
+		Attempt:        cloneJSON(attempt),
+		SkillSessionID: run.SkillSession.ID,
+	}
+	request.Authorization = cloneRaw(call.Authorization)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolAttemptStarted,
+		call.OriginOperationID,
+		call.ID,
+		attempt.ID,
+		"",
+		attempt,
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventToolAttemptStarted,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(executionCtx, effects)
+
+	result, executionErr := r.deps.Tools.ExecuteTool(
+		executionCtx,
+		request,
+	)
+
+	r.mu.Lock()
+	sessionValue, run, err = r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call = findToolCall(run, work.ToolCallID)
+	if call == nil {
+		r.mu.Unlock()
+		return
+	}
+
+	attemptRecord := findToolAttempt(call, attempt.ID)
+	delete(r.cancels, toolExecutionCancelKey(run.ID, attempt.ID))
+	if attemptRecord == nil ||
+		attemptRecord.State != ToolAttemptStateRunning {
+		r.mu.Unlock()
+		return
+	}
+
+	effects = runtimeEffects{}
+	switch {
+	case executionErr != nil && !result.HasResult:
+		if run.Controls.CancellationRequested ||
+			errors.Is(executionErr, context.Canceled) ||
+			errors.Is(executionErr, context.DeadlineExceeded) {
+			attemptRecord.State = ToolAttemptStateUncertain
+			attemptRecord.Uncertain = true
+		} else {
+			attemptRecord.State = ToolAttemptStateFailed
+		}
+
+		attemptRecord.Error = executionErr.Error()
+		attemptRecord.FinishedAt = r.now()
+		call.State = ToolCallStateFailed
+		call.LastFailure = executionErr.Error()
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventToolCallFailed,
+			call.OriginOperationID,
+			call.ID,
+			attempt.ID,
+			"",
+			map[string]string{
+				runtimeEventErrorKey: executionErr.Error(),
+			},
+		)
+
+	default:
+		if executionErr != nil && result.Error == "" {
+			result.Error = executionErr.Error()
+		}
+
+		attemptRecord.State = ToolAttemptStateCompleted
+		attemptRecord.FinishedAt = r.now()
+
+		r.recordExecutionResultLocked(
+			sessionValue,
+			run,
+			call,
+			attempt.ID,
+			result,
+			&effects,
+		)
+	}
+
+	if run.Controls.CancellationRequested {
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeCancelled,
+				Code:    string(RunStateCancelled),
+				Message: "run cancellation was requested",
+			},
+			&effects,
+		)
+	} else {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
+
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventToolResultRecorded,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(executionCtx, effects)
+}
+
+func (r *Runtime) dispatchWaitResolution(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	if r.deps.Tools == nil {
+		return
+	}
+
+	r.mu.RLock()
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.RUnlock()
+		return
+	}
+
+	wait := findWaitingRequest(run, work.WaitID)
+	if wait == nil || wait.Status != WaitStatusResolving {
+		r.mu.RUnlock()
+		return
+	}
+
+	call := findToolCall(run, wait.ToolCallID)
+	reference, found := r.waitReferences[wait.ID]
+	if call == nil || !found {
+		r.mu.RUnlock()
+		r.markWaitInvalid(ctx, work)
+		return
+	}
+
+	request := ToolWaitResolutionRequest{
+		SessionID:         sessionValue.ID,
+		RunID:             run.ID,
+		Wait:              cloneJSON(*wait),
+		ToolCall:          cloneJSON(*call),
+		Resolution:        work.Resolution,
+		Input:             cloneRaw(work.Input),
+		ExecutorReference: reference.ExecutorReference,
+	}
+	r.mu.RUnlock()
+
+	resolution, resolutionErr := r.deps.Tools.ResolveToolWait(
+		ctx,
+		request,
+	)
+
+	r.mu.Lock()
+	sessionValue, run, err = r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	wait = findWaitingRequest(run, work.WaitID)
+	if wait == nil || wait.Status != WaitStatusResolving {
+		r.mu.Unlock()
+		return
+	}
+
+	call = findToolCall(run, wait.ToolCallID)
+	if call == nil {
+		wait.Status = WaitStatusInvalid
+		wait.Error = "waiting request no longer has an owning tool call"
+		wait.UpdatedAt = r.now()
+		delete(r.waitReferences, wait.ID)
+		r.touchRunLocked(sessionValue, run)
+
+		effects := runtimeEffects{}
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventWaitResolved,
+			wait.OperationID,
+			wait.ToolCallID,
+			"",
+			wait.ID,
+			wait,
+		)
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventWaitResolved,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
+		return
+	}
+
+	effects := runtimeEffects{}
+	if resolutionErr != nil {
+		wait.Status = WaitStatusPending
+		wait.Error = resolutionErr.Error()
+		wait.UpdatedAt = r.now()
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventWaitRequested,
+			wait.OperationID,
+			wait.ToolCallID,
+			"",
+			wait.ID,
+			wait,
+		)
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventWaitRequested,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
+		return
+	}
+
+	wait.Status = WaitStatusResolved
+	wait.Error = ""
+	wait.UpdatedAt = r.now()
+	delete(r.waitReferences, wait.ID)
+	call.WaitID = ""
+
+	switch resolution.Status {
+	case ToolWaitResolutionApproved:
+		call.Authorization = cloneRaw(resolution.Authorization)
+		call.State = ToolCallStatePending
+
+	case ToolWaitResolutionDenied:
+		result := ToolExecutionResult{
+			HasResult: true,
+			Kind:      ToolResultKindError,
+			Text:      "tool execution was denied",
+			Error:     "tool execution was denied",
+		}
+		if resolution.Result != nil {
+			result = *resolution.Result
+		}
+		r.recordExecutionResultLocked(
+			sessionValue,
+			run,
+			call,
+			"",
+			result,
+			&effects,
+		)
+
+	default:
+		call.State = ToolCallStateFailed
+		call.LastFailure = "wait resolver returned an unsupported resolution state"
+	}
+
+	r.touchRunLocked(sessionValue, run)
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventWaitResolved,
+		wait.OperationID,
+		call.ID,
+		"",
+		wait.ID,
+		wait,
+	)
+
+	r.advanceDriverLocked(
+		sessionValue,
+		run,
+		"",
+		DriverEvent{
+			Kind:        DriverEventToolWaitResolved,
+			OperationID: call.OriginOperationID,
+			ToolCallID:  call.ID,
+		},
+		&effects,
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventWaitResolved,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
+func (r *Runtime) markWaitInvalid(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	r.mu.Lock()
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	wait := findWaitingRequest(run, work.WaitID)
+	if wait == nil {
+		r.mu.Unlock()
+		return
+	}
+
+	wait.Status = WaitStatusInvalid
+	wait.Error = "wait cannot be resolved after recovery because executor state is unavailable"
+	wait.UpdatedAt = r.now()
+	r.touchRunLocked(sessionValue, run)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventWaitResolved,
+		wait.OperationID,
+		wait.ToolCallID,
+		"",
+		wait.ID,
+		wait,
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventWaitResolved,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
+func (r *Runtime) failToolWithoutResult(
+	ctx context.Context,
+	work runtimeWork,
+	message string,
+) {
+	r.mu.Lock()
+
+	sessionValue, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call := findToolCall(run, work.ToolCallID)
+	if call == nil {
+		r.mu.Unlock()
+		return
+	}
+
+	call.State = ToolCallStateFailed
+	call.LastFailure = message
+	r.touchRunLocked(sessionValue, run)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolCallFailed,
+		call.OriginOperationID,
+		call.ID,
+		"",
+		"",
+		map[string]string{
+			runtimeEventErrorKey: message,
+		},
+	)
+	r.advanceDriverLocked(
+		sessionValue,
+		run,
+		"",
+		DriverEvent{
+			Kind:        DriverEventToolSettled,
+			OperationID: call.OriginOperationID,
+			ToolCallID:  call.ID,
+		},
+		&effects,
+	)
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventToolCallFailed,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
+func (r *Runtime) recordExecutionResultLocked(
+	sessionValue *Session,
+	run *Run,
+	call *ToolCall,
+	attemptID ToolAttemptID,
+	result ToolExecutionResult,
+	effects *runtimeEffects,
+) {
+	if !result.HasResult {
+		call.State = ToolCallStateFailed
+		call.LastFailure = result.Error
+		if call.LastFailure == "" {
+			call.LastFailure = "tool execution ended without a usable result"
+		}
+		r.touchRunLocked(sessionValue, run)
+
+		r.recordRunEventLocked(
+			effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventToolCallFailed,
+			call.OriginOperationID,
+			call.ID,
+			attemptID,
+			"",
+			map[string]string{
+				runtimeEventErrorKey: call.LastFailure,
+			},
+		)
+		return
+	}
+
+	kind := result.Kind
+	if kind == "" {
+		if result.Error != "" {
+			kind = ToolResultKindError
+		} else {
+			kind = ToolResultKindSuccess
+		}
+	}
+
+	toolResult := ToolResult{
+		ID:             ToolResultID(r.newID("tool-result")),
+		AttemptID:      attemptID,
+		CallID:         call.ID,
+		ProviderCallID: call.ProviderCallID,
+		Name:           call.Name,
+		ChoiceID:       call.ChoiceID,
+		Type:           call.Type,
+		Kind:           kind,
+		Text:           result.Text,
+		Structured:     cloneRaw(result.Structured),
+		App:            cloneRaw(result.App),
+		Error:          result.Error,
+		CreatedAt:      r.now(),
+	}
+	selectToolResult(call, toolResult)
+	call.State = ToolCallStateResolved
+	call.LastFailure = ""
+	call.Authorization = nil
+	removeRequestedCall(run, call.ID)
+	r.touchRunLocked(sessionValue, run)
+
+	r.recordRunEventLocked(
+		effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolResultRecorded,
+		call.OriginOperationID,
+		call.ID,
+		attemptID,
+		"",
+		toolResult,
+	)
+}
+
+func (r *Runtime) dispatchSkillClose(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	if work.SkillID == "" {
+		return
+	}
+	r.closeSkillSession(
+		ctx,
+		work.SkillID,
+		work.SessionID,
+		work.RunID,
+	)
+}
+
+func (r *Runtime) closeSkillSession(
+	ctx context.Context,
+	skillID string,
+	sessionID SessionID,
+	runID RunID,
+) {
+	if r.deps.Skills == nil {
+		return
+	}
+
+	if err := r.deps.Skills.CloseSkillSession(
+		context.WithoutCancel(ctx),
+		skillID,
+	); err != nil {
+		r.reportDiagnostic(ctx, RuntimeDiagnostic{
+			SessionID: sessionID,
+			RunID:     runID,
+			Operation: "close skill session",
+			Message:   "skill session close failed",
+			Cause:     err.Error(),
+			At:        r.now(),
+		})
+	}
+}
+
+func findModelOperation(
+	run *Run,
+	id OperationID,
+) *ModelOperation {
+	for index := range run.ModelOperations {
+		if run.ModelOperations[index].ID == id {
+			return &run.ModelOperations[index]
+		}
+	}
+	return nil
+}
+
+func findToolAttempt(
+	call *ToolCall,
+	id ToolAttemptID,
+) *ToolAttempt {
+	for index := range call.Attempts {
+		if call.Attempts[index].ID == id {
+			return &call.Attempts[index]
+		}
+	}
+	return nil
+}
+
+func transcriptMessageIndex(
+	messages []TranscriptMessage,
+	id string,
+) int {
+	for index := range messages {
+		if messages[index].ID == id {
+			return index
+		}
+	}
+	return -1
+}
+
+func cloneOperationError(
+	value *OperationError,
+) *OperationError {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
+}
+
+func cloneTime(
+	value *time.Time,
+) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
+}
+
+func modelCancelKey(
+	runID RunID,
+	operationID OperationID,
+) string {
+	return "model:" + string(runID) + ":" + string(operationID)
+}
+
+func toolEvaluationCancelKey(
+	runID RunID,
+	callID ToolCallID,
+) string {
+	return "tool-evaluation:" + string(runID) + ":" + string(callID)
+}
+
+func toolExecutionCancelKey(
+	runID RunID,
+	attemptID ToolAttemptID,
+) string {
+	return "tool-execution:" + string(runID) + ":" + string(attemptID)
+}

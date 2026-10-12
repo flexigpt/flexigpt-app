@@ -6,7 +6,7 @@ import (
 	"path"
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
@@ -28,7 +28,7 @@ func NormalizeManagedSkillFiles(
 		if len(skillMD) == 0 {
 			return nil, nil, fmt.Errorf(
 				"%w: configured Skill document content is required",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return []managedpackageModel.ManagedPackageFile{{
@@ -51,7 +51,7 @@ func NormalizeManagedSkillFiles(
 		if documentIndex != -1 {
 			return nil, nil, fmt.Errorf(
 				"%w: managed Skill package has multiple configured Skill documents",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 			)
 		}
 		documentIndex = index
@@ -59,7 +59,7 @@ func NormalizeManagedSkillFiles(
 	if documentIndex == -1 {
 		return nil, nil, fmt.Errorf(
 			"%w: managed Skill package must contain a configured Skill document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -77,7 +77,7 @@ func NormalizeManagedSkillFiles(
 		!bytes.Equal(skillMD, packageSkillMD) {
 		return nil, nil, fmt.Errorf(
 			"%w: requested SKILL.md differs from package SKILL.md",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return normalized, packageSkillMD, nil
@@ -124,7 +124,7 @@ func ManagedSkillStorageFiles(
 			documentFound = true
 		}
 
-		locator := spec.Locator(path.Join(
+		locator := storeSpec.Locator(path.Join(
 			string(address.Name),
 			string(file.Locator),
 		))
@@ -140,7 +140,7 @@ func ManagedSkillStorageFiles(
 	if !documentFound {
 		return nil, fmt.Errorf(
 			"%w: logical managed Skill package must contain %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			documentFile,
 		)
 	}
@@ -156,7 +156,7 @@ func PackageDigest(
 		return "", err
 	}
 	type fileManifest struct {
-		Locator spec.Locator      `json:"locator"`
+		Locator storeSpec.Locator `json:"locator"`
 		Size    int64             `json:"size"`
 		Digest  cryptoutil.Digest `json:"digest"`
 	}
@@ -171,7 +171,7 @@ func PackageDigest(
 	raw, err := jsonutil.MarshalCanonicalObject(map[string]any{
 		"format": "skill-package-content/v1",
 		"files":  manifest,
-	}, spec.MaxDefinitionBytes)
+	}, storeSpec.MaxDefinitionBytes)
 	if err != nil {
 		return "", err
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -35,7 +35,7 @@ func (s Support) Validate() error {
 	if s.Documents.Default != s.ManagedPackage.Document {
 		return fmt.Errorf(
 			"%w: Agent managed package document differs from Agent document support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := s.PluginProfile.Validate(); err != nil {
@@ -44,19 +44,19 @@ func (s Support) Validate() error {
 	if s.PluginProfile.BuiltinRoot != s.BuiltinRoot {
 		return fmt.Errorf(
 			"%w: Agent Plugin profile built-in Root differs from Agent support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if s.PluginProfile.Source == nil {
 		return fmt.Errorf(
 			"%w: Agent Plugin profile requires a managed Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if len(s.ImportFormats) == 0 {
 		return fmt.Errorf(
 			"%w: Agent import format support is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -66,7 +66,7 @@ func (s Support) Validate() error {
 			strings.ToLower(extension) != extension {
 			return fmt.Errorf(
 				"%w: Agent import extension %q is invalid",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				extension,
 			)
 		}
@@ -75,7 +75,7 @@ func (s Support) Validate() error {
 		default:
 			return fmt.Errorf(
 				"%w: Agent import extension %q has unsupported format %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				extension,
 				format,
 			)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
@@ -12,7 +12,7 @@ import (
 
 func IsAgentDeclarationDocument(
 	documents support.Documents,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) bool {
 	return documents.Matches(locator)
 }
@@ -36,7 +36,7 @@ func ManagedAgentEntryPayload(
 	if document.Locator != nil {
 		return nil, definitionModel.Definition{}, fmt.Errorf(
 			"%w: managed Agent declaration cannot be a source-selected alias",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	raw, err := entry.CanonicalJSON()
@@ -48,11 +48,11 @@ func ManagedAgentEntryPayload(
 		return nil, definitionModel.Definition{}, err
 	}
 	if value.Kind != AgentArtifactKind ||
-		value.LogicalName != spec.LogicalName(document.Name) ||
+		value.LogicalName != storeSpec.LogicalName(document.Name) ||
 		value.LogicalVersion != "" {
 		return nil, definitionModel.Definition{}, fmt.Errorf(
 			"%w: managed Agent Definition identity is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return raw, value, nil

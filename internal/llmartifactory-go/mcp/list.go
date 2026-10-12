@@ -9,7 +9,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
@@ -59,7 +59,7 @@ func NewMCPListService(
 	if roots == nil || store == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP management dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &MCPListService{
@@ -78,7 +78,7 @@ type pageCursor struct {
 
 type pageKey struct {
 	rootID rootModel.RootID
-	name   spec.LogicalName
+	name   storeSpec.LogicalName
 	id     artifactModel.ArtifactID
 }
 
@@ -254,7 +254,7 @@ func afterCursor(value pageKey, cursor pageCursor) bool {
 	return lessPageKey(
 		pageKey{
 			rootID: rootModel.RootID(cursor.AfterRoot),
-			name:   spec.LogicalName(cursor.AfterName),
+			name:   storeSpec.LogicalName(cursor.AfterName),
 			id:     artifactModel.ArtifactID(cursor.AfterID),
 		},
 		value,
@@ -277,7 +277,7 @@ func decodeCursor(
 	if err != nil {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -285,7 +285,7 @@ func decodeCursor(
 	if err := json.Unmarshal(raw, &cursor); err != nil {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if cursor.Kind != kind ||
@@ -293,7 +293,7 @@ func decodeCursor(
 		cursor.PageSize > MaxPageSize {
 		return pageCursor{}, fmt.Errorf(
 			"%w: stale MCP management page token",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -307,13 +307,13 @@ func decodeCursor(
 		cursor.AfterID == "" {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := rootModel.RootID(cursor.AfterRoot).Validate(); err != nil {
 		return pageCursor{}, err
 	}
-	if err := spec.LogicalName(cursor.AfterName).Validate(); err != nil {
+	if err := storeSpec.LogicalName(cursor.AfterName).Validate(); err != nil {
 		return pageCursor{}, err
 	}
 	if err := artifactModel.ArtifactID(cursor.AfterID).Validate(); err != nil {

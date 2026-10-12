@@ -10,7 +10,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
@@ -32,9 +32,9 @@ type ListItem struct {
 	Ref      artifactModel.ArtifactRef `json:"ref"`
 	SourceID sourceModel.SourceID      `json:"sourceID"`
 
-	Name        spec.LogicalName `json:"name"`
-	DisplayName string           `json:"displayName"`
-	Description string           `json:"description,omitempty"`
+	Name        storeSpec.LogicalName `json:"name"`
+	DisplayName string                `json:"displayName"`
+	Description string                `json:"description,omitempty"`
 
 	State    artifactModel.State `json:"state"`
 	Enabled  bool                `json:"enabled"`
@@ -196,7 +196,7 @@ func (a *API) pluginDocuments(
 	if len(values) != len(keys) {
 		return nil, fmt.Errorf(
 			"%w: Plugin Definition batch is incomplete",
-			spec.ErrDefinitionNotFound,
+			storeSpec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -205,7 +205,7 @@ func (a *API) pluginDocuments(
 		if value.Digest != keys[index].Digest {
 			return nil, fmt.Errorf(
 				"%w: Plugin Definition batch returned another digest",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 		output[keys[index]] = value.Clone()
@@ -220,7 +220,7 @@ func (a *API) pluginProjectionFor(
 	if entry.Definition == nil {
 		return pluginProjection{}, fmt.Errorf(
 			"%w: Plugin Definition is unavailable",
-			spec.ErrDefinitionNotFound,
+			storeSpec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -232,7 +232,7 @@ func (a *API) pluginProjectionFor(
 		if cached.document.Name != string(entry.LogicalName) {
 			return pluginProjection{}, fmt.Errorf(
 				"%w: cached Plugin identity differs from catalog identity",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 		return cached, nil
@@ -240,7 +240,7 @@ func (a *API) pluginProjectionFor(
 	if loaded == nil {
 		return pluginProjection{}, fmt.Errorf(
 			"%w: Plugin listing requires an admitted Definition document",
-			spec.ErrDefinitionNotFound,
+			storeSpec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -255,7 +255,7 @@ func (a *API) pluginProjectionFor(
 			if document.Name != string(entry.LogicalName) {
 				return pluginProjection{}, fmt.Errorf(
 					"%w: Plugin Definition identity differs from catalog identity",
-					spec.ErrDigestMismatch,
+					storeSpec.ErrDigestMismatch,
 				)
 			}
 			projection := pluginProjection{
@@ -354,7 +354,7 @@ func (a *API) validateEditableProjection(
 		if member.Form != declaration.MemberNamed {
 			return fmt.Errorf(
 				"%w: editable Plugin has a non-named member",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 			)
 		}
 		if a.domain != nil &&
@@ -362,7 +362,7 @@ func (a *API) validateEditableProjection(
 				!a.domain.allowsMemberForm(member.Form)) {
 			return fmt.Errorf(
 				"%w: Plugin member is outside the domain policy",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 			)
 		}
 	}

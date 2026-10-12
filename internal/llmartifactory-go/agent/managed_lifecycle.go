@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 )
 
@@ -29,7 +29,7 @@ func (a *Service) DeleteManagedAgent(
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Agent Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -91,7 +91,7 @@ func (a *Service) purgeRemovedManagedAgentArtifacts(
 		if record.State != artifactModel.StateMissing {
 			return fmt.Errorf(
 				"%w: removed managed Agent package Artifact %q is not missing",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				record.ID,
 			)
 		}
@@ -104,7 +104,7 @@ func (a *Service) purgeRemovedManagedAgentArtifacts(
 	if !rootFound {
 		return fmt.Errorf(
 			"%w: removed managed Agent Artifact %q was not found",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			rootRef.ArtifactID,
 		)
 	}
@@ -148,25 +148,25 @@ func (a *Service) loadManagedAgent(
 		return editableManagedAgent{}, err
 	}
 	if expectedRevision != 0 && record.Revision != expectedRevision {
-		return editableManagedAgent{}, spec.ErrConflict
+		return editableManagedAgent{}, storeSpec.ErrConflict
 	}
 	if record.State != artifactModel.StateAvailable {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.LogicalVersion != "" {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent Artifact has an unexpected logical version",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: contained Agent declarations are not exportable managed Agents",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if err := a.requireMutable(ctx, record.RootID); err != nil {
@@ -184,13 +184,13 @@ func (a *Service) loadManagedAgent(
 	if !a.support.PluginProfile.Source.Matches(sourceValue) {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent is not backed by the managed Agent Source",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if requireCurrentSource && !sourceValue.Enabled {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent Source is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -203,7 +203,7 @@ func (a *Service) loadManagedAgent(
 	if address.Name != record.LogicalName {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent package name differs from Artifact identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -220,7 +220,7 @@ func (a *Service) loadManagedAgent(
 		if !inspection.IsCurrent() {
 			return editableManagedAgent{}, fmt.Errorf(
 				"%w: managed Agent Source requires refresh",
-				spec.ErrRefreshRequired,
+				storeSpec.ErrRefreshRequired,
 			)
 		}
 		generation = inspection.State.SourceGeneration
@@ -238,7 +238,7 @@ func (a *Service) loadManagedAgent(
 		document.Locator != nil {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent declaration is not a concrete matching Agent",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

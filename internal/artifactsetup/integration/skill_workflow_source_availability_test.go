@@ -8,7 +8,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
 )
@@ -128,7 +128,7 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		runtimeAdapter,
 		missing.Ref(),
 	)
-	if !errors.Is(err, spec.ErrReferenceUnresolved) {
+	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"runtime adapter resolution after Source disable error=%v, want ErrReferenceUnresolved",
 			err,

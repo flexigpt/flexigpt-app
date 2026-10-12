@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
@@ -140,7 +140,7 @@ func TestGeneratedCatalogRetainsGoAndSDKTools(t *testing.T) {
 					)
 				}
 
-				name := spec.LogicalName(document.Name)
+				name := storeSpec.LogicalName(document.Name)
 				if _, found := index[name]; !found {
 					t.Fatalf(
 						"generated Tool %q has no generated Plugin membership",

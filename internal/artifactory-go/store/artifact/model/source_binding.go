@@ -2,7 +2,7 @@ package model
 
 import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // SourceBinding is the immutable physical declaration origin for one
@@ -14,9 +14,9 @@ import (
 // This permits one physical declaration origin to later emit a different
 // kind while retaining the prior Artifact as incompatible for diagnostics.
 type SourceBinding struct {
-	SourceID           sourceModel.SourceID    `json:"sourceID"`
-	Locator            spec.Locator            `json:"locator"`
-	SubresourceLocator spec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	SourceID           sourceModel.SourceID         `json:"sourceID"`
+	Locator            storeSpec.Locator            `json:"locator"`
+	SubresourceLocator storeSpec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }
 
 func (b SourceBinding) Validate() error {

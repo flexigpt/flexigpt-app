@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // PublishSourceLifecycle is Source's injected aggregate publication port.
@@ -18,7 +18,7 @@ func (s *Service) PublishSourceLifecycle(
 ) error {
 	if s == nil || s.sources == nil || s.artifacts == nil ||
 		s.states == nil || s.synchronizer == nil || s.publisher == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 
 	if err := transition.Validate(); err != nil {
@@ -33,7 +33,7 @@ func (s *Service) PublishSourceLifecycle(
 		return err
 	}
 	if current.Revision != transition.ExpectedSourceRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	expectedRefreshRevision := uint64(0)
@@ -41,7 +41,7 @@ func (s *Service) PublishSourceLifecycle(
 	switch {
 	case err == nil:
 		expectedRefreshRevision = previous.Revision
-	case errors.Is(err, spec.ErrRefreshStateNotFound):
+	case errors.Is(err, storeSpec.ErrRefreshStateNotFound):
 	default:
 		return err
 	}

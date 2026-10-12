@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -44,7 +44,7 @@ func NewArtifactOverlayRepository(
 		dependencies.LocalState == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Artifact overlay dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -107,7 +107,7 @@ func (r *ArtifactOverlayRepository) PutProviderOverlay(
 		return err
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	if r.protection.IsProtectedRoot(record.RootID) {
@@ -132,7 +132,7 @@ func (r *ArtifactOverlayRepository) PutProviderOverlay(
 		if stored.Revision != value.Revision {
 			return fmt.Errorf(
 				"%w: protected Model Provider overlay revision changed unexpectedly",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 		return nil
@@ -144,10 +144,10 @@ func (r *ArtifactOverlayRepository) PutProviderOverlay(
 	}
 	if found {
 		if current.Revision != expectedOverlayRevision {
-			return spec.ErrConflict
+			return storeSpec.ErrConflict
 		}
 	} else if expectedOverlayRevision != 0 {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	raw, err := encodeMutableProviderOverlay(value)
@@ -173,7 +173,7 @@ func (r *ArtifactOverlayRepository) DeleteProviderOverlay(
 		return err
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	if r.protection.IsProtectedRoot(record.RootID) {
@@ -192,7 +192,7 @@ func (r *ArtifactOverlayRepository) DeleteProviderOverlay(
 	}
 	if !found ||
 		current.Revision != expectedOverlayRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	return r.removeMutableData(
@@ -252,7 +252,7 @@ func (r *ArtifactOverlayRepository) PutModelOverlay(
 		return err
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	if r.protection.IsProtectedRoot(record.RootID) {
@@ -277,7 +277,7 @@ func (r *ArtifactOverlayRepository) PutModelOverlay(
 		if stored.Revision != value.Revision {
 			return fmt.Errorf(
 				"%w: protected Model overlay revision changed unexpectedly",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 		return nil
@@ -289,10 +289,10 @@ func (r *ArtifactOverlayRepository) PutModelOverlay(
 	}
 	if found {
 		if current.Revision != expectedOverlayRevision {
-			return spec.ErrConflict
+			return storeSpec.ErrConflict
 		}
 	} else if expectedOverlayRevision != 0 {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	raw, err := encodeMutableModelOverlay(value)
@@ -318,7 +318,7 @@ func (r *ArtifactOverlayRepository) DeleteModelOverlay(
 		return err
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	if r.protection.IsProtectedRoot(record.RootID) {
@@ -337,7 +337,7 @@ func (r *ArtifactOverlayRepository) DeleteModelOverlay(
 	}
 	if !found ||
 		current.Revision != expectedOverlayRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	return r.removeMutableData(
@@ -365,7 +365,7 @@ func (r *ArtifactOverlayRepository) ReplaceProviderCredential(
 		request.Key.Slot != ProviderCredentialSlot {
 		return secretModel.Binding{}, fmt.Errorf(
 			"%w: unsupported Model Provider secret binding slot",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return r.secrets.ReplaceBinding(ctx, request)
@@ -379,7 +379,7 @@ func (r *ArtifactOverlayRepository) ClearProviderCredential(
 		request.Key.Slot != ProviderCredentialSlot {
 		return fmt.Errorf(
 			"%w: unsupported Model Provider secret binding slot",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return r.secrets.ClearBinding(ctx, request)
@@ -520,7 +520,7 @@ func encodeProtectedProviderOverlay(
 			DefaultModel:      cloneReference(value.DefaultModel),
 			AdapterParameters: cloneRaw(value.AdapterParameters),
 		},
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }
 
@@ -531,11 +531,11 @@ func decodeProtectedProviderOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ProviderOverlay{}, fmt.Errorf(
 			"%w: decode protected Model Provider overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -564,7 +564,7 @@ func encodeProtectedModelOverlay(
 			Capabilities:      cloneRaw(value.Capabilities),
 			AdapterParameters: cloneRaw(value.AdapterParameters),
 		},
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }
 
@@ -575,11 +575,11 @@ func decodeProtectedModelOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ModelOverlay{}, fmt.Errorf(
 			"%w: decode protected Model overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -613,11 +613,11 @@ func decodeMutableProviderOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		value,
 		&output,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ProviderOverlay{}, false, fmt.Errorf(
 			"%w: decode mutable Model Provider overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -635,7 +635,7 @@ func encodeMutableProviderOverlay(
 	}
 	return jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }
 
@@ -655,11 +655,11 @@ func decodeMutableModelOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		value,
 		&output,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ModelOverlay{}, false, fmt.Errorf(
 			"%w: decode mutable Model overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -677,7 +677,7 @@ func encodeMutableModelOverlay(
 	}
 	return jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }
 
@@ -690,7 +690,7 @@ func validateOverlayTransition(
 		next != expected+1 {
 		return fmt.Errorf(
 			"%w: invalid Model runtime overlay revision transition",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

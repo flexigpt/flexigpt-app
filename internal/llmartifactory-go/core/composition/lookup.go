@@ -9,7 +9,7 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -77,7 +77,7 @@ func (r *Resolver) resolveRelationship(
 				state,
 				rootID,
 				header.Type,
-				spec.LogicalName(header.Name),
+				storeSpec.LogicalName(header.Name),
 				expectedVersion,
 				relationshipFields.Scope,
 				from,
@@ -120,7 +120,7 @@ func (r *Resolver) resolveRelationship(
 	default:
 		return ResolvedRelationship{}, fmt.Errorf(
 			"%w: unsupported member form %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			form,
 		)
 	}
@@ -145,8 +145,8 @@ func (r *Resolver) resolveNamedMember(
 	state *resolutionState,
 	rootID rootModel.RootID,
 	declarationType declaration.Type,
-	name spec.LogicalName,
-	expectedVersion spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	expectedVersion storeSpec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifactModel.Artifact,
 	depth int,
@@ -218,8 +218,8 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	state *resolutionState,
 	rootID rootModel.RootID,
 	declarationType declaration.Type,
-	name spec.LogicalName,
-	expectedVersion spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	expectedVersion storeSpec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifactModel.Artifact,
 	depth int,
@@ -336,7 +336,7 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	default:
 		return nil, fmt.Errorf(
 			"%w: %s/%s resolves to %d terminal Artifacts in the composition Source",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			declarationType,
 			name,
 			len(terminals),
@@ -349,8 +349,8 @@ func (r *Resolver) resolveInRoot(
 	state *resolutionState,
 	rootID rootModel.RootID,
 	declarationType declaration.Type,
-	name spec.LogicalName,
-	expectedVersion spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	expectedVersion storeSpec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, bool, error) {
 	records, err := r.catalog.FindByIdentity(
@@ -415,7 +415,7 @@ func (r *Resolver) resolveInRoot(
 	default:
 		return nil, false, fmt.Errorf(
 			"%w: %s/%s resolves to %d terminal Artifacts in Root %q",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			declarationType,
 			name,
 			len(terminals),
@@ -428,7 +428,7 @@ func (r *Resolver) resolveDirectCapability(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	declarationType declaration.Type,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 	scope declaration.LookupScope,
 	from *artifactModel.Artifact,
 ) (*ResolvedEntry, error) {
@@ -458,7 +458,7 @@ func (r *Resolver) resolveDirectCapability(
 			target.ProviderIdentity != provider.ProviderIdentity() {
 			return nil, fmt.Errorf(
 				"%w: direct capability target identity is invalid",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return &ResolvedEntry{
@@ -471,7 +471,7 @@ func (r *Resolver) resolveDirectCapability(
 
 	return nil, fmt.Errorf(
 		"%w: %s/%s",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 		declarationType,
 		name,
 	)
@@ -483,19 +483,19 @@ func (r *Resolver) resolveLocatedMember(
 	rootID rootModel.RootID,
 	member declaration.Entry,
 	from *artifactModel.Artifact,
-	expectedVersion spec.LogicalVersion,
+	expectedVersion storeSpec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if from == nil {
 		return nil, fmt.Errorf(
 			"%w: located member requires a source-backed declaration origin",
-			spec.ErrLocatorUnresolved,
+			storeSpec.ErrLocatorUnresolved,
 		)
 	}
 	if r.locators == nil {
 		return nil, fmt.Errorf(
 			"%w: declaration locator requires a locator resolver",
-			spec.ErrLocatorUnresolved,
+			storeSpec.ErrLocatorUnresolved,
 		)
 	}
 
@@ -503,7 +503,7 @@ func (r *Resolver) resolveLocatedMember(
 	if header.Locator == nil {
 		return nil, fmt.Errorf(
 			"%w: located member has no locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -522,7 +522,7 @@ func (r *Resolver) resolveLocatedMember(
 			Entry:               member.Clone(),
 			Locator:             header.Locator.Clone(),
 			ExpectedType:        header.Type,
-			ExpectedLogicalName: spec.LogicalName(header.Name),
+			ExpectedLogicalName: storeSpec.LogicalName(header.Name),
 		},
 	)
 	if err != nil {
@@ -531,7 +531,7 @@ func (r *Resolver) resolveLocatedMember(
 	if ref.RootID != rootID {
 		return nil, fmt.Errorf(
 			"%w: located member resolver returned an Artifact from another Root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -556,7 +556,7 @@ func (r *Resolver) resolveContainedMember(
 	if from == nil {
 		return nil, fmt.Errorf(
 			"%w: contained declaration requires a source-backed parent",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -587,7 +587,7 @@ func (r *Resolver) resolveContainedMember(
 		ctx,
 		rootID,
 		artifactModel.ArtifactKind(header.Type),
-		spec.LogicalName(header.Name),
+		storeSpec.LogicalName(header.Name),
 		catalogModel.ListOptions{},
 	)
 	if err != nil {
@@ -617,7 +617,7 @@ func (r *Resolver) resolveContainedMember(
 	case 0:
 		return nil, fmt.Errorf(
 			"%w: contained declaration %s/%s has no matching source Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			header.Type,
 			header.Name,
 		)
@@ -633,7 +633,7 @@ func (r *Resolver) resolveContainedMember(
 	default:
 		return nil, fmt.Errorf(
 			"%w: contained declaration %s/%s has %d matching source Artifacts",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			header.Type,
 			header.Name,
 			len(matches),
@@ -644,8 +644,8 @@ func (r *Resolver) resolveContainedMember(
 func containedMemberSubresource(
 	parent artifactModel.Artifact,
 	fact coreinterpretation.Relationship,
-) (spec.SubresourceLocator, error) {
-	value := spec.SubresourceLocator(
+) (storeSpec.SubresourceLocator, error) {
+	value := storeSpec.SubresourceLocator(
 		strings.Join(fact.ContainedPath, "/"),
 	)
 	if parent.Binding.SubresourceLocator != "" {
@@ -659,7 +659,7 @@ func containedMemberSubresource(
 
 func memberTextLogicalVersion(
 	member declaration.Entry,
-) (spec.LogicalVersion, error) {
+) (storeSpec.LogicalVersion, error) {
 	if member.Header().Type != declaration.TypeText {
 		return "", nil
 	}
@@ -667,7 +667,7 @@ func memberTextLogicalVersion(
 	if err != nil {
 		return "", err
 	}
-	return spec.LogicalVersion(insert), nil
+	return storeSpec.LogicalVersion(insert), nil
 }
 
 func resolutionFailure(
@@ -683,37 +683,37 @@ func resolutionFailure(
 	switch {
 	case errors.Is(err, context.Canceled),
 		errors.Is(err, context.DeadlineExceeded),
-		errors.Is(err, spec.ErrClosed):
+		errors.Is(err, storeSpec.ErrClosed):
 		return "", ResolutionIssue{}, false
 
-	case errors.Is(err, spec.ErrDigestMismatch),
-		errors.Is(err, spec.ErrInvalid):
+	case errors.Is(err, storeSpec.ErrDigestMismatch),
+		errors.Is(err, storeSpec.ErrInvalid):
 		return ResolutionUnavailable, issue("artifact.reference-invalid"), true
 
-	case errors.Is(err, spec.ErrIdentityConflict):
+	case errors.Is(err, storeSpec.ErrIdentityConflict):
 		return ResolutionAmbiguous, issue("artifact.identity-conflict"), true
 
-	case errors.Is(err, spec.ErrLocatorLimitExceeded):
+	case errors.Is(err, storeSpec.ErrLocatorLimitExceeded):
 		return ResolutionUnavailable, issue("artifact.locator-limit-exceeded"), true
 
-	case errors.Is(err, spec.ErrLocatorUnresolved):
+	case errors.Is(err, storeSpec.ErrLocatorUnresolved):
 		return ResolutionUnavailable, issue("artifact.locator-unresolved"), true
 
-	case errors.Is(err, spec.ErrSourceUnavailable):
+	case errors.Is(err, storeSpec.ErrSourceUnavailable):
 		return ResolutionUnavailable, issue("artifact.source-unavailable"), true
 
-	case errors.Is(err, spec.ErrRefreshRequired):
+	case errors.Is(err, storeSpec.ErrRefreshRequired):
 		return ResolutionUnavailable, issue("artifact.refresh-required"), true
 
-	case errors.Is(err, spec.ErrUnsupported):
+	case errors.Is(err, storeSpec.ErrUnsupported):
 		return ResolutionUnavailable, issue("artifact.reference-unsupported"), true
 
-	case errors.Is(err, spec.ErrReferenceUnresolved),
-		errors.Is(err, spec.ErrArtifactNotFound),
-		errors.Is(err, spec.ErrRootNotFound),
-		errors.Is(err, spec.ErrDefinitionNotFound),
-		errors.Is(err, spec.ErrSourceNotFound),
-		errors.Is(err, spec.ErrNotFound):
+	case errors.Is(err, storeSpec.ErrReferenceUnresolved),
+		errors.Is(err, storeSpec.ErrArtifactNotFound),
+		errors.Is(err, storeSpec.ErrRootNotFound),
+		errors.Is(err, storeSpec.ErrDefinitionNotFound),
+		errors.Is(err, storeSpec.ErrSourceNotFound),
+		errors.Is(err, storeSpec.ErrNotFound):
 		return ResolutionUnavailable, issue("artifact.reference-unresolved"), true
 
 	default:

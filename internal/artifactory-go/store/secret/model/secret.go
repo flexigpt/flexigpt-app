@@ -10,7 +10,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -32,7 +32,7 @@ func (v Ref) Validate() error {
 	if !strings.HasPrefix(value, refPrefix) {
 		return fmt.Errorf(
 			"%w: secret reference has an unsupported format",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := uuidutil.ValidateUUIDv7(
@@ -59,10 +59,10 @@ func (v Ref) ID() (string, error) {
 type Slot string
 
 func (v Slot) Validate() error {
-	return spec.ValidateIdentifier(
+	return storeSpec.ValidateIdentifier(
 		"secret binding slot",
 		string(v),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	)
 }
 
@@ -109,7 +109,7 @@ func (b Binding) Validate() error {
 		if b.SHA256 != "" {
 			return fmt.Errorf(
 				"%w: cleared secret binding cannot retain SHA-256 metadata",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	} else {
@@ -124,19 +124,19 @@ func (b Binding) Validate() error {
 	if b.Revision == 0 {
 		return fmt.Errorf(
 			"%w: secret binding revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if b.CreatedAt.IsZero() || b.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: secret binding timestamps are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if b.ModifiedAt.Before(b.CreatedAt) {
 		return fmt.Errorf(
 			"%w: secret binding modified time precedes creation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -171,7 +171,7 @@ func (r ReplaceBindingRequest) Validate() error {
 	if r.ExpectedArtifactRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return ValidateValue(r.Value)
@@ -193,7 +193,7 @@ func (r ClearBindingRequest) Validate() error {
 	if r.ExpectedArtifactRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -216,7 +216,7 @@ func (s RecordState) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid secret record state %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			s,
 		)
 	}
@@ -237,10 +237,10 @@ func (r Record) Validate() error {
 	if err := r.Ref.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"secret value store name",
 		r.StoreName,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -253,13 +253,13 @@ func (r Record) Validate() error {
 	if r.CreatedAt.IsZero() || r.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: secret record timestamps are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.ModifiedAt.Before(r.CreatedAt) {
 		return fmt.Errorf(
 			"%w: secret record modified time precedes creation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -285,36 +285,36 @@ func (c Cleanup) Validate() error {
 	if err := c.Ref.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"secret cleanup store name",
 		c.StoreName,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
 	if c.Attempts < 0 {
 		return fmt.Errorf(
 			"%w: secret cleanup attempts cannot be negative",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"secret cleanup error",
 		c.LastError,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
 	if c.CreatedAt.IsZero() || c.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: secret cleanup timestamps are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if c.ModifiedAt.Before(c.CreatedAt) {
 		return fmt.Errorf(
 			"%w: secret cleanup modified time precedes creation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -326,20 +326,20 @@ func ValidateValue(value string) error {
 	if value == "" {
 		return fmt.Errorf(
 			"%w: secret value is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if len(value) > spec.MaxSecretBytes {
+	if len(value) > storeSpec.MaxSecretBytes {
 		return fmt.Errorf(
 			"%w: secret value exceeds %d bytes",
-			spec.ErrInvalid,
-			spec.MaxSecretBytes,
+			storeSpec.ErrInvalid,
+			storeSpec.MaxSecretBytes,
 		)
 	}
 	if !utf8.ValidString(value) {
 		return fmt.Errorf(
 			"%w: secret value must be valid UTF-8",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -355,13 +355,13 @@ func ValidateSHA256(value string) error {
 		strings.ToLower(value) != value {
 		return fmt.Errorf(
 			"%w: invalid secret SHA-256 metadata",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if _, err := hex.DecodeString(value); err != nil {
 		return fmt.Errorf(
 			"%w: invalid secret SHA-256 metadata",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

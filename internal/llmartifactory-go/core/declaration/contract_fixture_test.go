@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 
@@ -38,7 +38,7 @@ var contractFixtures embed.FS
 
 var fixturePackageLayout = support.PackageLayout{
 	Kind:           "fixture",
-	DefaultVersion: spec.LogicalVersion("unversioned"),
+	DefaultVersion: storeSpec.LogicalVersion("unversioned"),
 	FixedVersion:   true,
 	Document: support.Document{
 		Locator:   "fixture.yaml",
@@ -83,7 +83,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			}
 			raw, err := yamlutil.CanonicalObjectJSON(
 				rawYAML,
-				spec.MaxDefinitionBytes,
+				storeSpec.MaxDefinitionBytes,
 			)
 			if err != nil {
 				t.Fatalf("canonicalize YAML: %v", err)
@@ -116,7 +116,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			if err := jsonutil.ValidateJSONSchema(
 				compiled,
 				json.RawMessage(raw),
-				spec.MaxDefinitionBytes,
+				storeSpec.MaxDefinitionBytes,
 			); err != nil {
 				t.Fatalf("validate fixture JSON Schema: %v", err)
 			}
@@ -260,7 +260,7 @@ func declarationTestRegistry(t *testing.T) *coreinterpretation.Registry {
 func fixtureDocumentSupport() (support.Documents, error) {
 	value := support.Documents{
 		Default: fixturePackageLayout.Document,
-		Files: []spec.Locator{
+		Files: []storeSpec.Locator{
 			fixturePackageLayout.Document.Locator,
 		},
 	}

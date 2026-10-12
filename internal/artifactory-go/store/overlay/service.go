@@ -8,7 +8,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -41,7 +41,7 @@ func NewService(
 	cleanup cleanupDrainer,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
-		return nil, fmt.Errorf("%w: Overlay service dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Overlay service dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	protected, err := normalizeNamespaces("protected overlay", namespaces)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *Service) Put(ctx context.Context, request overlayModel.PutRequest) (ove
 		return overlayModel.Record{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return overlayModel.Record{}, spec.ErrConflict
+		return overlayModel.Record{}, storeSpec.ErrConflict
 	}
 	payload, err := overlayModel.CanonicalPayload(request.Payload)
 	if err != nil {
@@ -121,7 +121,7 @@ func (s *Service) Delete(
 		return err
 	}
 	if expectedArtifactRevision == 0 || expectedOverlayRevision == 0 {
-		return fmt.Errorf("%w: expected Artifact and overlay revisions are required", spec.ErrInvalid)
+		return fmt.Errorf("%w: expected Artifact and overlay revisions are required", storeSpec.ErrInvalid)
 	}
 	target, err := s.availableArtifact(ctx, ref)
 	if err != nil {
@@ -131,7 +131,7 @@ func (s *Service) Delete(
 		return err
 	}
 	if target.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	if err := s.repository.DeleteOverlay(
 		ctx,
@@ -184,7 +184,7 @@ func (s *Service) DeleteStoreOverlay(
 		return err
 	}
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected store overlay revision is required", spec.ErrInvalid)
+		return fmt.Errorf("%w: expected store overlay revision is required", storeSpec.ErrInvalid)
 	}
 	return s.repository.DeleteStoreOverlay(ctx, namespace, expectedRevision)
 }
@@ -200,7 +200,7 @@ func (s *Service) availableArtifact(
 	if value.State != artifactModel.StateAvailable {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			value.ID,
 		)
 	}
@@ -209,7 +209,7 @@ func (s *Service) availableArtifact(
 
 func (s *Service) requireProtected(rootID rootModel.RootID) error {
 	if s.policy == nil || !s.policy.IsProtectedRoot(rootID) {
-		return fmt.Errorf("%w: protected Artifact overlays are valid only in protected Roots", spec.ErrUnsupported)
+		return fmt.Errorf("%w: protected Artifact overlays are valid only in protected Roots", storeSpec.ErrUnsupported)
 	}
 	return nil
 }
@@ -219,7 +219,7 @@ func (s *Service) requireNamespace(value overlayModel.Namespace) error {
 		return err
 	}
 	if _, found := s.namespaces[value]; !found {
-		return fmt.Errorf("%w: protected overlay namespace %q is not registered", spec.ErrUnsupported, value)
+		return fmt.Errorf("%w: protected overlay namespace %q is not registered", storeSpec.ErrUnsupported, value)
 	}
 	return nil
 }
@@ -229,7 +229,7 @@ func (s *Service) requireStoreNamespace(value overlayModel.Namespace) error {
 		return err
 	}
 	if _, found := s.storeNamespaces[value]; !found {
-		return fmt.Errorf("%w: store overlay namespace %q is not registered", spec.ErrUnsupported, value)
+		return fmt.Errorf("%w: store overlay namespace %q is not registered", storeSpec.ErrUnsupported, value)
 	}
 	return nil
 }
@@ -247,7 +247,7 @@ func normalizeNamespaces(label string, values []overlayModel.Namespace) (map[ove
 			return nil, fmt.Errorf("%s namespace %d: %w", label, index, err)
 		}
 		if _, found := output[value]; found {
-			return nil, fmt.Errorf("%w: duplicate %s namespace %q", spec.ErrConflict, label, value)
+			return nil, fmt.Errorf("%w: duplicate %s namespace %q", storeSpec.ErrConflict, label, value)
 		}
 		output[value] = struct{}{}
 	}

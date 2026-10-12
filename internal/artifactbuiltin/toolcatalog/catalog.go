@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
 
@@ -21,7 +21,7 @@ var (
 	)
 
 	generatedPluginIndexOnce sync.Once
-	generatedPluginIndex     map[spec.LogicalName]spec.LogicalName
+	generatedPluginIndex     map[storeSpec.LogicalName]storeSpec.LogicalName
 	errGeneratedPluginIndex  error
 )
 
@@ -37,7 +37,7 @@ func generatedCatalogValue() (
 // avoids rediscovering membership by listing and decoding every Plugin at
 // runtime.
 func GeneratedToolPluginIndex() (
-	map[spec.LogicalName]spec.LogicalName,
+	map[storeSpec.LogicalName]storeSpec.LogicalName,
 	error,
 ) {
 	generatedPluginIndexOnce.Do(func() {
@@ -48,7 +48,7 @@ func GeneratedToolPluginIndex() (
 		}
 
 		plugins := make(
-			map[spec.Locator]spec.LogicalName,
+			map[storeSpec.Locator]storeSpec.LogicalName,
 		)
 		for _, packageValue := range set.Packages {
 			if packageValue.Address.Kind !=
@@ -59,7 +59,7 @@ func GeneratedToolPluginIndex() (
 		}
 
 		index := make(
-			map[spec.LogicalName]spec.LogicalName,
+			map[storeSpec.LogicalName]storeSpec.LogicalName,
 		)
 		for _, packageValue := range set.Packages {
 			if packageValue.Address.Kind != toolDomain.ToolPackageKind {

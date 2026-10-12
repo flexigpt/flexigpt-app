@@ -8,7 +8,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -36,7 +36,7 @@ func NewBindingService(
 	cleanup CleanupAPI,
 ) (*BindingService, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
-		return nil, fmt.Errorf("%w: secret binding dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: secret binding dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	if values != nil {
 		if err := value.ValidateValueStore(values); err != nil {
@@ -86,7 +86,7 @@ func (s *BindingService) ReplaceBinding(
 	if s.values == nil {
 		return secretModel.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	target, err := s.availableArtifact(ctx, request.Key.Artifact)
@@ -94,7 +94,7 @@ func (s *BindingService) ReplaceBinding(
 		return secretModel.Binding{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return secretModel.Binding{}, spec.ErrConflict
+		return secretModel.Binding{}, storeSpec.ErrConflict
 	}
 	now := clockutil.NowUTC(s.clock)
 	record := secretModel.Record{
@@ -145,7 +145,7 @@ func (s *BindingService) ClearBinding(ctx context.Context, request secretModel.C
 		return err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	if err := s.repository.ClearSecretBinding(ctx, request, clockutil.NowUTC(s.clock)); err != nil {
 		return err
@@ -165,7 +165,7 @@ func (s *BindingService) availableArtifact(
 	if v.State != artifactModel.StateAvailable {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			v.ID,
 		)
 	}

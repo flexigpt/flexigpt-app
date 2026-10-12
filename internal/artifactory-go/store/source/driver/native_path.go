@@ -4,7 +4,7 @@ import (
 	"context"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // LocalPathResolver is an optional trusted capability.
@@ -15,7 +15,7 @@ type LocalPathResolver interface {
 	ResolveLocalPath(
 		ctx context.Context,
 		value sourceModel.Source,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (string, error)
 }
 

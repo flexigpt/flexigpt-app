@@ -4,13 +4,13 @@ import (
 	"slices"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func AppendUniqueLocator(
-	values []spec.Locator,
-	value spec.Locator,
-) []spec.Locator {
+	values []storeSpec.Locator,
+	value storeSpec.Locator,
+) []storeSpec.Locator {
 	if slices.Contains(values, value) {
 		return values
 	}

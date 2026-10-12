@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -27,7 +27,7 @@ func (a *Service) ExportAgent(
 	if record.State != artifactModel.StateAvailable {
 		return AgentExportResult{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -42,7 +42,7 @@ func (a *Service) ExportAgent(
 
 	content, err := yamlutil.CanonicalObjectYAML(
 		definitionValue.Body,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return AgentExportResult{}, err

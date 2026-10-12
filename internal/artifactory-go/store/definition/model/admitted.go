@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ValidateAdmitted checks inexpensive structural guarantees of a Definition
@@ -15,8 +15,8 @@ func ValidateAdmitted(value Definition) error {
 		return err
 	}
 	body := bytes.TrimSpace(value.Body)
-	if len(body) < 2 || len(body) > spec.MaxDefinitionBodyBytes || body[0] != '{' || body[len(body)-1] != '}' {
-		return fmt.Errorf("%w: admitted Definition body must be a bounded JSON object", spec.ErrInvalid)
+	if len(body) < 2 || len(body) > storeSpec.MaxDefinitionBodyBytes || body[0] != '{' || body[len(body)-1] != '}' {
+		return fmt.Errorf("%w: admitted Definition body must be a bounded JSON object", storeSpec.ErrInvalid)
 	}
 	return nil
 }

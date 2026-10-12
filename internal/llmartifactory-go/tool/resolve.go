@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (a *Service) ResolveEnabledTool(
@@ -30,7 +30,7 @@ func (a *Service) ResolveEnabledTool(
 	if !output.Enabled() {
 		return ResolvedToolView{}, fmt.Errorf(
 			"%w: Tool %q or its Plugin is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			value.Artifact.LogicalName,
 		)
 	}

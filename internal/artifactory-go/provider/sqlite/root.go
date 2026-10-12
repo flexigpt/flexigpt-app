@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const rootColumns = `
@@ -50,7 +50,7 @@ func (s *Store) getRoot(
 	if errors.Is(err, sql.ErrNoRows) {
 		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q",
-			spec.ErrRootNotFound,
+			storeSpec.ErrRootNotFound,
 			id,
 		)
 	}
@@ -91,7 +91,7 @@ func (s *Store) updateRoot(
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid root update", spec.ErrInvalid)
+		return fmt.Errorf("%w: invalid root update", storeSpec.ErrInvalid)
 	}
 	result, err := s.db.ExecContext(
 		ctx,
@@ -121,7 +121,7 @@ func (s *Store) retireRoot(
 ) error {
 	if value.RetiredAt == nil ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid root retirement", spec.ErrInvalid)
+		return fmt.Errorf("%w: invalid root retirement", storeSpec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -193,7 +193,7 @@ func (s *Store) requireActiveRoot(
 		string(id),
 	).Scan(&marker)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("%w: root %q", spec.ErrRootNotFound, id)
+		return fmt.Errorf("%w: root %q", storeSpec.ErrRootNotFound, id)
 	}
 	return err
 }
@@ -213,7 +213,7 @@ func getActiveRootTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q",
-			spec.ErrRootNotFound,
+			storeSpec.ErrRootNotFound,
 			id,
 		)
 	}
@@ -241,7 +241,7 @@ func scanRoot(row scanner) (rootModel.Root, error) {
 	}
 	value := rootModel.Root{
 		ID:          rootModel.RootID(id),
-		StorageKey:  spec.StorageKey(storageKey),
+		StorageKey:  storeSpec.StorageKey(storageKey),
 		DisplayName: displayName,
 		Description: description,
 		Revision:    revision,
@@ -264,7 +264,7 @@ func requireOneChanged(
 		return err
 	}
 	if changed != 1 {
-		return fmt.Errorf("%w: %s", spec.ErrConflict, message)
+		return fmt.Errorf("%w: %s", storeSpec.ErrConflict, message)
 	}
 	return nil
 }

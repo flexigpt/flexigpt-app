@@ -6,7 +6,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -20,18 +20,18 @@ func validateCompiledSet(set installModel.CompiledPackageSet) error {
 	if err := validateGeneratedEnvelope(set); err != nil {
 		return err
 	}
-	if len(set.Packages) > spec.MaxDiscoveryCandidates {
-		return fmt.Errorf("%w: compiled package count exceeds its limit", spec.ErrInvalid)
+	if len(set.Packages) > storeSpec.MaxDiscoveryCandidates {
+		return fmt.Errorf("%w: compiled package count exceeds its limit", storeSpec.ErrInvalid)
 	}
 
-	scopes := make(map[spec.Locator]struct{}, len(set.Packages))
+	scopes := make(map[storeSpec.Locator]struct{}, len(set.Packages))
 	for packageIndex, value := range set.Packages {
 		scope, err := value.Address.Directory()
 		if err != nil {
 			return err
 		}
 		if _, duplicate := scopes[scope]; duplicate {
-			return fmt.Errorf("%w: repeated compiled package %q", spec.ErrIdentityConflict, scope)
+			return fmt.Errorf("%w: repeated compiled package %q", storeSpec.ErrIdentityConflict, scope)
 		}
 		scopes[scope] = struct{}{}
 		if err := value.EmbeddedRoot.ValidatePortable(false); err != nil {
@@ -42,13 +42,13 @@ func validateCompiledSet(set installModel.CompiledPackageSet) error {
 		}
 
 		files := make([]managedpackageModel.ManagedPackageFile, len(value.Files))
-		witnesses := make(map[spec.Locator]cryptoutil.Digest, len(value.Files))
+		witnesses := make(map[storeSpec.Locator]cryptoutil.Digest, len(value.Files))
 		for index, file := range value.Files {
 			if file.Size != int64(len(file.Content)) ||
 				file.Digest != cryptoutil.DigestBytes(file.Content) {
 				return fmt.Errorf(
 					"%w: compiled package %q file %q witness differs",
-					spec.ErrDigestMismatch,
+					storeSpec.ErrDigestMismatch,
 					scope,
 					file.Locator,
 				)
@@ -63,12 +63,12 @@ func validateCompiledSet(set installModel.CompiledPackageSet) error {
 			return fmt.Errorf("compiled packages[%d]: %w", packageIndex, err)
 		}
 
-		documents := make(map[spec.Locator]struct{}, len(value.Documents))
+		documents := make(map[storeSpec.Locator]struct{}, len(value.Documents))
 		for _, document := range value.Documents {
 			if _, duplicate := documents[document.Locator]; duplicate {
 				return fmt.Errorf(
 					"%w: compiled package repeats document %q",
-					spec.ErrIdentityConflict,
+					storeSpec.ErrIdentityConflict,
 					document.Locator,
 				)
 			}
@@ -77,17 +77,17 @@ func validateCompiledSet(set installModel.CompiledPackageSet) error {
 			if !found || digest != document.Digest {
 				return fmt.Errorf(
 					"%w: compiled document %q has no matching package file",
-					spec.ErrDigestMismatch,
+					storeSpec.ErrDigestMismatch,
 					document.Locator,
 				)
 			}
 			if len(document.Artifacts) == 0 ||
-				len(document.Artifacts) > spec.MaxDiscoveryCandidates {
-				return fmt.Errorf("%w: compiled document artifact count is invalid", spec.ErrInvalid)
+				len(document.Artifacts) > storeSpec.MaxDiscoveryCandidates {
+				return fmt.Errorf("%w: compiled document artifact count is invalid", storeSpec.ErrInvalid)
 			}
 
 			type origin struct {
-				subresource spec.SubresourceLocator
+				subresource storeSpec.SubresourceLocator
 				kind        string
 			}
 			seen := make(map[origin]struct{}, len(document.Artifacts))
@@ -108,7 +108,7 @@ func validateCompiledSet(set installModel.CompiledPackageSet) error {
 				if _, duplicate := seen[key]; duplicate {
 					return fmt.Errorf(
 						"%w: compiled document repeats typed origin",
-						spec.ErrIdentityConflict,
+						storeSpec.ErrIdentityConflict,
 					)
 				}
 				seen[key] = struct{}{}

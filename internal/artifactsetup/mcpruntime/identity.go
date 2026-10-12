@@ -8,7 +8,7 @@ import (
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -40,14 +40,14 @@ func ArtifactRefForServerID(
 	if !found {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: unsupported MCP runtime server ID",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: decode MCP runtime server ID: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -55,7 +55,7 @@ func ArtifactRefForServerID(
 	if !found {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: malformed MCP runtime server ID",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

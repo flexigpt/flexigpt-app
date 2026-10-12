@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -18,12 +18,12 @@ func (r *Resolver) resolveStructure(
 	if node == nil || node.Artifact == nil {
 		return fmt.Errorf(
 			"%w: source-backed declaration has no Artifact origin",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	rootID, found := node.RootID()
 	if !found {
-		return fmt.Errorf("%w: declaration has no Root scope", spec.ErrInvalid)
+		return fmt.Errorf("%w: declaration has no Root scope", storeSpec.ErrInvalid)
 	}
 	// "entry was reconstructed from an admitted Definition by
 	// resolveTerminalDeclaration. Composition must retain family semantic

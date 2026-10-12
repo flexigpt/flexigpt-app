@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -22,7 +22,7 @@ func Canonicalize(input Definition) (Definition, error) {
 
 	body, err := jsonutil.CanonicalizeObject(
 		output.Body,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Definition{}, fmt.Errorf("canonicalize definition body: %w", err)
@@ -41,8 +41,8 @@ func Canonicalize(input Definition) (Definition, error) {
 		Kind           artifactModel.ArtifactKind `json:"kind"`
 		SchemaID       schemaModel.SchemaID       `json:"schemaID"`
 		SchemaVersion  string                     `json:"schemaVersion"`
-		LogicalName    spec.LogicalName           `json:"logicalName"`
-		LogicalVersion spec.LogicalVersion        `json:"logicalVersion,omitempty"`
+		LogicalName    storeSpec.LogicalName      `json:"logicalName"`
+		LogicalVersion storeSpec.LogicalVersion   `json:"logicalVersion,omitempty"`
 		DisplayName    string                     `json:"displayName,omitempty"`
 		Description    string                     `json:"description,omitempty"`
 		Labels         map[string]string          `json:"labels,omitempty"`
@@ -68,7 +68,7 @@ func Canonicalize(input Definition) (Definition, error) {
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return Definition{}, fmt.Errorf(
 			"%w: supplied definition digest %q, calculated %q",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 			suppliedDigest,
 			calculated,
 		)
@@ -93,12 +93,12 @@ func canonicalPayloadDigest(
 			err,
 		)
 	}
-	if len(canonicalPayload) > spec.MaxDefinitionBytes {
+	if len(canonicalPayload) > storeSpec.MaxDefinitionBytes {
 		return "", fmt.Errorf(
 			"%w: canonical %s exceeds %d bytes",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			subject,
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		)
 	}
 	return cryptoutil.DigestBytes(canonicalPayload), nil

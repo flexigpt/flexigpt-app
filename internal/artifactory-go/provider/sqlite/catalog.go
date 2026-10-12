@@ -12,7 +12,7 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -202,7 +202,7 @@ func (s *Store) findArtifactCatalogByIdentity(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	kind artifactModel.ArtifactKind,
-	logicalName spec.LogicalName,
+	logicalName storeSpec.LogicalName,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
@@ -267,7 +267,7 @@ func (s *Store) getArtifactsByReferences(
 		if len(values) != end-start {
 			return nil, fmt.Errorf(
 				"%w: one or more requested Artifacts are unavailable",
-				spec.ErrArtifactNotFound,
+				storeSpec.ErrArtifactNotFound,
 			)
 		}
 		output = append(output, values...)
@@ -378,12 +378,12 @@ func scanArtifactCatalogEntry(
 		RootID: rootModel.RootID(rootID),
 		Binding: artifactModel.SourceBinding{
 			SourceID:           sourceModel.SourceID(sourceID),
-			Locator:            spec.Locator(locator),
-			SubresourceLocator: spec.SubresourceLocator(subresource),
+			Locator:            storeSpec.Locator(locator),
+			SubresourceLocator: storeSpec.SubresourceLocator(subresource),
 		},
 		Kind:           artifactModel.ArtifactKind(kind),
-		LogicalName:    spec.LogicalName(logicalName),
-		LogicalVersion: spec.LogicalVersion(logicalVersion),
+		LogicalName:    storeSpec.LogicalName(logicalName),
+		LogicalVersion: storeSpec.LogicalVersion(logicalVersion),
 		DisplayName:    displayName,
 		State:          artifactModel.State(state),
 		Enabled:        enabled != 0,
@@ -391,7 +391,7 @@ func scanArtifactCatalogEntry(
 		Source: catalogModel.SourceMetadata{
 			ID:         sourceModel.SourceID(sourceID),
 			Kind:       sourceModel.SourceKind(sourceKind),
-			StorageKey: spec.StorageKey(sourceStorageKey),
+			StorageKey: storeSpec.StorageKey(sourceStorageKey),
 			Enabled:    sourceEnabled != 0,
 		},
 	}

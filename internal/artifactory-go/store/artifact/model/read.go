@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
@@ -37,31 +37,35 @@ func (a Artifact) ValidateRead() error {
 	if err := diagnostic.Validate(a.Diagnostics); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText("Artifact display name", a.DisplayName, spec.MaxDisplayNameBytes); err != nil {
+	if err := storeSpec.ValidateRequiredText(
+		"Artifact display name",
+		a.DisplayName,
+		storeSpec.MaxDisplayNameBytes,
+	); err != nil {
 		return err
 	}
 	if err := validateReadData(a.Data); err != nil {
 		return err
 	}
 	if a.Revision == 0 {
-		return fmt.Errorf("%w: Artifact revision must be positive", spec.ErrInvalid)
+		return fmt.Errorf("%w: Artifact revision must be positive", storeSpec.ErrInvalid)
 	}
 	if a.CreatedAt.IsZero() || a.ModifiedAt.IsZero() {
-		return fmt.Errorf("%w: Artifact timestamps are required", spec.ErrInvalid)
+		return fmt.Errorf("%w: Artifact timestamps are required", storeSpec.ErrInvalid)
 	}
 	if a.ModifiedAt.Before(a.CreatedAt) {
-		return fmt.Errorf("%w: Artifact modified time precedes creation", spec.ErrInvalid)
+		return fmt.Errorf("%w: Artifact modified time precedes creation", storeSpec.ErrInvalid)
 	}
 	return nil
 }
 
 func validateReadData(raw json.RawMessage) error {
-	if len(raw) == 0 || len(raw) > spec.MaxLocalDataBytes {
-		return fmt.Errorf("%w: Artifact local data is empty or exceeds its size limit", spec.ErrInvalid)
+	if len(raw) == 0 || len(raw) > storeSpec.MaxLocalDataBytes {
+		return fmt.Errorf("%w: Artifact local data is empty or exceeds its size limit", storeSpec.ErrInvalid)
 	}
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) < 2 || trimmed[0] != '{' || trimmed[len(trimmed)-1] != '}' {
-		return fmt.Errorf("%w: Artifact local data must be a JSON object", spec.ErrInvalid)
+		return fmt.Errorf("%w: Artifact local data must be a JSON object", storeSpec.ErrInvalid)
 	}
 	return nil
 }

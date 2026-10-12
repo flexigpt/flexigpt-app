@@ -6,7 +6,7 @@ import (
 
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 )
@@ -51,13 +51,13 @@ func (a *Service) SetToolPluginEnabled(
 
 func (a *Service) pluginForTool(
 	ctx context.Context,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) (pluginAPI.PluginView, error) {
 	pluginName, found := a.builtin.PluginByTool[name]
 	if !found {
 		return pluginAPI.PluginView{}, fmt.Errorf(
 			"%w: Tool %q has no generated Tool Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			name,
 		)
 	}
@@ -88,13 +88,13 @@ func (a *Service) pluginForTool(
 	case 0:
 		return pluginAPI.PluginView{}, fmt.Errorf(
 			"%w: Tool %q has no Tool Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			name,
 		)
 	default:
 		return pluginAPI.PluginView{}, fmt.Errorf(
 			"%w: Tool %q belongs to %d Tool Plugins",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			name,
 			len(matches),
 		)

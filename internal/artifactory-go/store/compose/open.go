@@ -18,7 +18,7 @@ import (
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -249,7 +249,7 @@ func validateConfig(config Config) error {
 		config.ArtifactCleanupRepository == nil ||
 		config.InstallationRepository == nil ||
 		config.SchemaFactory == nil {
-		return fmt.Errorf("%w: Artifact Store composition dependencies are incomplete", spec.ErrInvalid)
+		return fmt.Errorf("%w: Artifact Store composition dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	return nil
 }

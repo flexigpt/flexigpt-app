@@ -1,7 +1,7 @@
 package textv1
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
@@ -12,7 +12,7 @@ func Interpretation() coreinterpretation.Registration {
 		SchemaKey:       TextSchemaKey,
 		LogicalVersion: func(
 			entry declaration.Entry,
-		) (spec.LogicalVersion, error) {
+		) (storeSpec.LogicalVersion, error) {
 			// Definition reconstruction has already crossed expected-key
 			// schema admission. Do not execute the Text schema again solely
 			// to recover the family-owned logical version.
@@ -20,7 +20,7 @@ func Interpretation() coreinterpretation.Registration {
 			if err != nil {
 				return "", err
 			}
-			return spec.LogicalVersion(document.Insert), nil
+			return storeSpec.LogicalVersion(document.Insert), nil
 		},
 		ValidateEntry: func(entry declaration.Entry) error {
 			_, err := DecodeTextEntry(entry)

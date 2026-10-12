@@ -7,7 +7,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type bindingReader interface {
@@ -33,7 +33,7 @@ func NewRuntimeResolver(
 	if bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP secret runtime dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := namespace.Validate(); err != nil {
@@ -63,7 +63,7 @@ func (r *RuntimeResolver) ResolveSecret(
 	if !found || !binding.Active() {
 		return "", fmt.Errorf(
 			"%w: %w: MCP secret is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			ErrNotFound,
 		)
 	}
@@ -82,7 +82,7 @@ func (r *RuntimeResolver) ResolveSecret(
 		*current.Ref != *binding.Ref {
 		return "", fmt.Errorf(
 			"%w: MCP secret changed during resolution",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return value, nil
@@ -104,7 +104,7 @@ func NewTrustedRuntimeStore(
 	if bindings == nil || resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP trusted secret runtime dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &TrustedRuntimeStore{
@@ -118,7 +118,7 @@ func (s *TrustedRuntimeStore) ResolveSecret(
 	logicalRef string,
 ) (string, error) {
 	if s == nil || s.resolver == nil {
-		return "", spec.ErrClosed
+		return "", storeSpec.ErrClosed
 	}
 	return s.resolver.ResolveSecret(ctx, logicalRef)
 }
@@ -129,7 +129,7 @@ func (s *TrustedRuntimeStore) SetMCPSecret(
 	value string,
 ) (hash string, nonEmpty bool, err error) {
 	if s == nil || s.bindings == nil {
-		return "", false, spec.ErrClosed
+		return "", false, storeSpec.ErrClosed
 	}
 	return s.bindings.SetMCPSecret(ctx, logicalRef, value)
 }
@@ -139,7 +139,7 @@ func (s *TrustedRuntimeStore) DeleteSecret(
 	logicalRef string,
 ) error {
 	if s == nil || s.bindings == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return s.bindings.DeleteSecret(ctx, logicalRef)
 }

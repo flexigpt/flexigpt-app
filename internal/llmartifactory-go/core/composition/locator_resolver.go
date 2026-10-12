@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -21,7 +21,7 @@ func NewProviderLocatorResolver(
 	runtime corelocator.Runtime,
 ) (*ProviderLocatorResolver, error) {
 	if runtime == nil {
-		return nil, fmt.Errorf("%w: locator catalog runtime is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: locator catalog runtime is nil", storeSpec.ErrInvalid)
 	}
 	output := &ProviderLocatorResolver{
 		resolvers: make(map[corelocator.FactoryKey]corelocator.Resolver),
@@ -35,14 +35,14 @@ func NewProviderLocatorResolver(
 			return nil, fmt.Errorf("bind locator resolver %q: %w", factory.LocatorKind(), err)
 		}
 		if bound == nil {
-			return nil, fmt.Errorf("%w: locator factory bound a nil resolver", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: locator factory bound a nil resolver", storeSpec.ErrInvalid)
 		}
 		for _, kind := range factory.ArtifactKinds() {
 			key := corelocator.FactoryKey{LocatorKind: factory.LocatorKind(), ArtifactKind: kind}
 			if _, duplicate := output.resolvers[key]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: duplicate locator resolver %q for %q",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					key.LocatorKind,
 					key.ArtifactKind,
 				)
@@ -86,7 +86,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if !found {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: no %q locator resolver is registered for %q",
-			spec.ErrLocatorUnresolved,
+			storeSpec.ErrLocatorUnresolved,
 			kind,
 			input.ExpectedKind,
 		)
@@ -101,7 +101,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if ref.RootID != request.RootID {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: locator resolver returned an Artifact from another Root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return ref, nil

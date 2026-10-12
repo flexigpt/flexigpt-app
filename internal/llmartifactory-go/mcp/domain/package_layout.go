@@ -2,14 +2,14 @@ package domain
 
 import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
 func ManagedPackageAddressForMCP(
 	layout support.PackageLayout,
-	name spec.LogicalName,
-	version spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	version storeSpec.LogicalVersion,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return layout.Address(name, version)
 }
@@ -17,20 +17,20 @@ func ManagedPackageAddressForMCP(
 func ManagedPackageLocatorForMCP(
 	layout support.PackageLayout,
 	address managedpackageModel.ManagedPackageAddress,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	return layout.Locator(address)
 }
 
 func ManagedPackageAddressFromMCPLocator(
 	layout support.PackageLayout,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return layout.AddressFromLocator(locator)
 }
 
 func ManagedPackageAddressFromMCPPolicyLocator(
 	layout support.PackageLayout,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (managedpackageModel.ManagedPackageAddress, error) {
 	return layout.AddressFromLocator(locator)
 }

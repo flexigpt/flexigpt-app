@@ -12,7 +12,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Requirement struct {
@@ -58,13 +58,13 @@ func New(
 	if sources == nil || refreshes == nil || planner == nil {
 		return nil, fmt.Errorf(
 			"%w: composition refresh dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if maxPasses <= 0 || maxPasses > spec.MaxDiscoveryDepth {
+	if maxPasses <= 0 || maxPasses > storeSpec.MaxDiscoveryDepth {
 		return nil, fmt.Errorf(
 			"%w: composition refresh pass limit is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -148,7 +148,7 @@ func (s *Service) Refresh(
 
 	return fmt.Errorf(
 		"%w: composition refresh closure exceeds %d passes",
-		spec.ErrLocatorLimitExceeded,
+		storeSpec.ErrLocatorLimitExceeded,
 		s.maxPasses,
 	)
 }
@@ -201,7 +201,7 @@ func mergeRequirements(
 ) sourceModel.DiscoveryRequirement {
 	current := sourceModel.DiscoverySpec{
 		ExplicitLocators: append(
-			[]spec.Locator(nil),
+			[]storeSpec.Locator(nil),
 			left.ExplicitLocators...,
 		),
 		DirectoryRoots: append([]sourceModel.DirectoryRoot(nil), left.DirectoryRoots...),
@@ -210,7 +210,7 @@ func mergeRequirements(
 	}
 	required := sourceModel.DiscoverySpec{
 		ExplicitLocators: append(
-			[]spec.Locator(nil),
+			[]storeSpec.Locator(nil),
 			right.ExplicitLocators...,
 		),
 		DirectoryRoots: append([]sourceModel.DirectoryRoot(nil), right.DirectoryRoots...),

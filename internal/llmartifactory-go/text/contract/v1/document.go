@@ -7,7 +7,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -118,8 +118,8 @@ func DefinitionForDocument(
 		Kind:           artifactModel.ArtifactKind(TextType),
 		SchemaID:       TextSchemaKey.SchemaID,
 		SchemaVersion:  TextSchemaKey.SchemaVersion,
-		LogicalName:    spec.LogicalName(document.Name),
-		LogicalVersion: spec.LogicalVersion(document.Insert),
+		LogicalName:    storeSpec.LogicalName(document.Name),
+		LogicalVersion: storeSpec.LogicalVersion(document.Insert),
 		DisplayName:    displayName,
 		Description:    document.Description,
 		Labels:         declaration.CloneStringMap(document.Labels),
@@ -174,18 +174,18 @@ func (v TextDocument) validateFields() error {
 	case v.Content != nil && v.Locator != nil:
 		return fmt.Errorf(
 			"%w: Text cannot contain both content and locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	case v.Content == nil && v.Locator == nil:
 		return fmt.Errorf(
 			"%w: Text requires content or locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	case v.Content != nil &&
 		(len(v.Include) != 0 || len(v.Exclude) != 0):
 		return fmt.Errorf(
 			"%w: inline Text cannot contain include or exclude patterns",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := declaration.ValidateOptionalContent(v.Content); err != nil {
@@ -194,8 +194,8 @@ func (v TextDocument) validateFields() error {
 	if err := declaration.ValidateOptionalMediaType(v.MediaType); err != nil {
 		return err
 	}
-	if err := spec.ValidatePathPatterns("Text include", v.Include); err != nil {
+	if err := storeSpec.ValidatePathPatterns("Text include", v.Include); err != nil {
 		return err
 	}
-	return spec.ValidatePathPatterns("Text exclude", v.Exclude)
+	return storeSpec.ValidatePathPatterns("Text exclude", v.Exclude)
 }

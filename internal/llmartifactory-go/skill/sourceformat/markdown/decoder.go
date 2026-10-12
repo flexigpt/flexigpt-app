@@ -7,7 +7,7 @@ import (
 
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
@@ -38,7 +38,7 @@ func NewDecoder(
 	if layout.Document != documents.Default {
 		return nil, fmt.Errorf(
 			"%w: Skill package layout document differs from Skill documents",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Decoder{
@@ -48,7 +48,7 @@ func NewDecoder(
 	}, nil
 }
 
-func (*Decoder) ID() spec.DecoderID {
+func (*Decoder) ID() storeSpec.DecoderID {
 	return skillSource.MarkdownDecoderID
 }
 
@@ -111,13 +111,13 @@ func (d *Decoder) Decode(
 
 func expectedSkillName(
 	layout support.PackageLayout,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) string {
 	skillDirectory := path.Dir(string(locator))
 	if skillDirectory == "." {
 		return ""
 	}
-	packageDirectory := spec.Locator(path.Dir(skillDirectory))
+	packageDirectory := storeSpec.Locator(path.Dir(skillDirectory))
 	if address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		packageDirectory,
 	); err == nil &&

@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"maps"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -36,7 +36,7 @@ func NewSigner(
 	if len(key) < cryptoutil.HMACSHA256KeyBytes {
 		return nil, fmt.Errorf(
 			"%w: prepared import signing key is too short",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Signer{
@@ -48,12 +48,12 @@ func (s *Signer) Seal(
 	value any,
 ) (Sealed, error) {
 	if s == nil || len(s.key) == 0 {
-		return Sealed{}, spec.ErrClosed
+		return Sealed{}, storeSpec.ErrClosed
 	}
 
 	payload, err := jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return Sealed{}, err
@@ -77,12 +77,12 @@ func (s *Signer) Open(
 	target any,
 ) (cryptoutil.Digest, error) {
 	if s == nil || len(s.key) == 0 {
-		return "", spec.ErrClosed
+		return "", storeSpec.ErrClosed
 	}
 	if target == nil {
 		return "", fmt.Errorf(
 			"%w: prepared import target is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := cryptoutil.ValidateDigest(expected); err != nil {
@@ -96,15 +96,15 @@ func (s *Signer) Open(
 	if !found || payloadEncoded == "" || signatureEncoded == "" {
 		return "", fmt.Errorf(
 			"%w: prepared import envelope is malformed",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if base64.RawURLEncoding.DecodedLen(
 		len(payloadEncoded),
-	) > spec.MaxDefinitionBytes {
+	) > storeSpec.MaxDefinitionBytes {
 		return "", fmt.Errorf(
 			"%w: prepared import payload exceeds maximum size",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if base64.RawURLEncoding.DecodedLen(
@@ -112,7 +112,7 @@ func (s *Signer) Open(
 	) != hmacSHA256SignatureBytes {
 		return "", fmt.Errorf(
 			"%w: prepared import signature has invalid size",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -120,7 +120,7 @@ func (s *Signer) Open(
 	if err != nil {
 		return "", fmt.Errorf(
 			"%w: decode prepared import payload: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -130,7 +130,7 @@ func (s *Signer) Open(
 	if err != nil {
 		return "", fmt.Errorf(
 			"%w: decode prepared import signature: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -146,7 +146,7 @@ func (s *Signer) Open(
 	if !valid {
 		return "", fmt.Errorf(
 			"%w: prepared import signature is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -154,14 +154,14 @@ func (s *Signer) Open(
 	if fingerprint != expected {
 		return "", fmt.Errorf(
 			"%w: prepared import fingerprint differs from envelope",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		payload,
 		target,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	); err != nil {
 		return "", err
 	}

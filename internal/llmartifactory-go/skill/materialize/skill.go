@@ -14,7 +14,7 @@ import (
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
@@ -38,14 +38,14 @@ type ResourceReader interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 		maximumBytes int64,
 	) (resourceModel.VerifiedEntry, error)
 
 	ResolveVerifiedLocalPath(
 		ctx context.Context,
 		resolved resourceModel.ResolvedArtifact,
-		localLocator spec.Locator,
+		localLocator storeSpec.Locator,
 	) (string, error)
 }
 
@@ -56,7 +56,7 @@ type ResolvedSkill struct {
 	ArtifactRevision uint64
 	DefinitionDigest cryptoutil.Digest
 	SourceID         sourceModel.SourceID
-	Locator          spec.Locator
+	Locator          storeSpec.Locator
 
 	Document        document.SkillDocument
 	RuntimeLocation string
@@ -74,7 +74,7 @@ func ResolveAll(
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill materializer ResourceReader is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := documents.Validate(); err != nil {
@@ -115,7 +115,7 @@ func Resolve(
 	if resources == nil {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill materializer ResourceReader is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := documents.Validate(); err != nil {
@@ -136,7 +136,7 @@ func resolve(
 		record.SourceContentDigest == nil {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -155,7 +155,7 @@ func resolve(
 		resolved.Definition.Digest != *record.ResolvedDefinition {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Artifact changed during resource resolution",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 
@@ -179,7 +179,7 @@ func resolve(
 		resolved.Artifact.RootID,
 		resolved.Artifact.Binding.SourceID,
 		documentLocator,
-		spec.MaxCandidateBytes,
+		storeSpec.MaxCandidateBytes,
 	)
 	if err != nil {
 		return ResolvedSkill{}, err
@@ -189,14 +189,14 @@ func resolve(
 			resolved.RefreshState.SourceGeneration {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Source changed during materialization",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 	if documentLocator == resolved.Artifact.Binding.Locator &&
 		sourceEntry.Digest != *resolved.Artifact.SourceContentDigest {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill declaration source changed during materialization",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 

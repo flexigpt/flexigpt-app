@@ -10,7 +10,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -34,7 +34,7 @@ func NewSynchronizer(
 	if timeClock == nil || ids == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact synchronizer dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Synchronizer{
@@ -53,7 +53,7 @@ func (s *Synchronizer) Synchronize(
 	rootID rootModel.RootID,
 	sourceValue sourceModel.Source,
 	observations []ingest.Observation,
-	seenLocators []spec.Locator,
+	seenLocators []storeSpec.Locator,
 	existing []artifactModel.Artifact,
 ) (Synchronization, error) {
 	if err := rootID.Validate(); err != nil {
@@ -65,7 +65,7 @@ func (s *Synchronizer) Synchronize(
 	if sourceValue.RootID != rootID {
 		return Synchronization{}, fmt.Errorf(
 			"%w: Source belongs to another Root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	discoverySpec := sourceValue.Discovery.Effective()
@@ -99,7 +99,7 @@ func (s *Synchronizer) Synchronize(
 			observation.Binding.SourceID != sourceValue.ID {
 			return Synchronization{}, fmt.Errorf(
 				"%w: Source observation belongs to another Root or Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -112,7 +112,7 @@ func (s *Synchronizer) Synchronize(
 			if _, duplicate := validByTypedBinding[key]; duplicate {
 				return Synchronization{}, fmt.Errorf(
 					"%w: duplicate valid typed Source observation",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 			validByTypedBinding[key] = observation.Clone()
@@ -125,7 +125,7 @@ func (s *Synchronizer) Synchronize(
 			if _, duplicate := invalidByBinding[observation.Binding]; duplicate {
 				return Synchronization{}, fmt.Errorf(
 					"%w: duplicate invalid Source observation",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 			invalidByBinding[observation.Binding] = observation.Clone()
@@ -143,7 +143,7 @@ func (s *Synchronizer) Synchronize(
 		})
 	}
 
-	seen := make(map[spec.Locator]struct{}, len(seenLocators))
+	seen := make(map[storeSpec.Locator]struct{}, len(seenLocators))
 	for _, locator := range seenLocators {
 		if err := locator.Validate(false); err != nil {
 			return Synchronization{}, err
@@ -173,13 +173,13 @@ func (s *Synchronizer) Synchronize(
 			current.Binding.SourceID != sourceValue.ID {
 			return Synchronization{}, fmt.Errorf(
 				"%w: existing Artifact belongs to another Root or Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seenIDs[current.ID]; duplicate {
 			return Synchronization{}, fmt.Errorf(
 				"%w: duplicate existing Artifact ID %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				current.ID,
 			)
 		}
@@ -192,7 +192,7 @@ func (s *Synchronizer) Synchronize(
 		if _, duplicate := existingByTypedBinding[key]; duplicate {
 			return Synchronization{}, fmt.Errorf(
 				"%w: duplicate source-origin Artifact",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		existingByTypedBinding[key] = current.Clone()
@@ -218,7 +218,7 @@ func (s *Synchronizer) Synchronize(
 		if current.Revision == ^uint64(0) {
 			return Synchronization{}, fmt.Errorf(
 				"%w: Artifact revision is exhausted",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -284,7 +284,7 @@ func (s *Synchronizer) Synchronize(
 			observation.SourceContentDigest == nil {
 			return Synchronization{}, fmt.Errorf(
 				"%w: valid Source observation is incomplete",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -298,7 +298,7 @@ func (s *Synchronizer) Synchronize(
 		if _, duplicate := seenIDs[id]; duplicate {
 			return Synchronization{}, fmt.Errorf(
 				"%w: Artifact ID provider reused %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				id,
 			)
 		}
@@ -348,7 +348,7 @@ func deriveCurrentArtifact(
 	validByTypedBinding map[typedBinding]ingest.Observation,
 	validByBinding map[artifactModel.SourceBinding][]ingest.Observation,
 	invalidByBinding map[artifactModel.SourceBinding]ingest.Observation,
-	seenLocators map[spec.Locator]struct{},
+	seenLocators map[storeSpec.Locator]struct{},
 	discoverySpec sourceModel.DiscoverySpec,
 ) (artifactModel.Artifact, bool, error) {
 	next := current.Clone()
@@ -362,7 +362,7 @@ func deriveCurrentArtifact(
 			observation.SourceContentDigest == nil {
 			return artifactModel.Artifact{}, false, fmt.Errorf(
 				"%w: valid Source observation is incomplete",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		resolved := observation.Definition.Digest
@@ -396,7 +396,7 @@ func deriveCurrentArtifact(
 			alternative.SourceContentDigest == nil {
 			return artifactModel.Artifact{}, false, fmt.Errorf(
 				"%w: incompatible Source observation is incomplete",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		resolved := alternative.Definition.Digest

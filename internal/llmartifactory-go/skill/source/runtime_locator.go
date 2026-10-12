@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
@@ -19,8 +19,8 @@ import (
 func SourceDocumentLocator(
 	documents support.Documents,
 	locator *declaration.Locator,
-	declarationLocator spec.Locator,
-) (spec.Locator, error) {
+	declarationLocator storeSpec.Locator,
+) (storeSpec.Locator, error) {
 	if err := documents.Validate(); err != nil {
 		return "", err
 	}
@@ -39,7 +39,7 @@ func SourceDocumentLocator(
 		return "", err
 	}
 	if !IsSkillDefinitionFile(documents, target) {
-		target = spec.Locator(path.Join(
+		target = storeSpec.Locator(path.Join(
 			string(target),
 			string(SkillDefinitionFileName(documents)),
 		))
@@ -54,20 +54,20 @@ func SourceDocumentLocator(
 // configured Skill document Artifact binding. Artifact Store verifies source
 // generation and source content evidence before exposing the local path.
 func RuntimePackageLocator(
-	locator spec.Locator,
-	subresource spec.SubresourceLocator,
-) (spec.Locator, error) {
+	locator storeSpec.Locator,
+	subresource storeSpec.SubresourceLocator,
+) (storeSpec.Locator, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return "", err
 	}
 	if subresource != "" {
 		return "", fmt.Errorf(
 			"%w: Skill bindings cannot target a subresource",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
-	directory := spec.Locator(path.Dir(string(locator)))
+	directory := storeSpec.Locator(path.Dir(string(locator)))
 	if directory == "." {
 		return directory, nil
 	}

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
@@ -67,7 +67,7 @@ func MergeServerData(
 	}
 	payload, err := jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func decodeServerDataPayload(
 ) (ServerData, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return ServerData{}, err
@@ -111,11 +111,11 @@ func decodeServerDataPayload(
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ServerData{}, fmt.Errorf(
 			"%w: decode MCP installation data: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -146,22 +146,22 @@ func (value ServerData) Validate() error {
 	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP installation schema %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			value.SchemaVersion,
 		)
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"selected MCP connection profile",
 		value.SelectedConnectionProfile,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if len(value.Inputs) > spec.MaxDefinitionDependencies ||
-		len(value.AdditionalPolicies) > spec.MaxDefinitionDependencies {
+	if len(value.Inputs) > storeSpec.MaxDefinitionDependencies ||
+		len(value.AdditionalPolicies) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: MCP installation data exceeds entry limits",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	seen := make(map[artifactModel.ArtifactRef]struct{})
@@ -169,21 +169,21 @@ func (value ServerData) Validate() error {
 		if !installationInputNamePattern.MatchString(name) {
 			return fmt.Errorf(
 				"%w: invalid MCP installation input name %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
 		if binding.Value != nil && binding.SecretRef != "" {
 			return fmt.Errorf(
 				"%w: MCP input %q has both value and secretRef",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
 		if binding.Value == nil && binding.SecretRef == "" {
 			return fmt.Errorf(
 				"%w: MCP input %q has no value or secretRef",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -200,7 +200,7 @@ func (value ServerData) Validate() error {
 		if _, duplicate := seen[ref]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate additional MCP Policy",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		seen[ref] = struct{}{}
@@ -254,7 +254,7 @@ func (value ServerData) ValidateFor(
 		if _, found := document.Configuration.ConnectionProfiles[value.SelectedConnectionProfile]; !found {
 			return fmt.Errorf(
 				"%w: selected MCP connection profile %q does not exist",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				value.SelectedConnectionProfile,
 			)
 		}
@@ -264,7 +264,7 @@ func (value ServerData) ValidateFor(
 		if !installationInputNamePattern.MatchString(name) {
 			return fmt.Errorf(
 				"%w: invalid MCP installation input name %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -273,7 +273,7 @@ func (value ServerData) ValidateFor(
 		if !declared {
 			return fmt.Errorf(
 				"%w: MCP installation input %q is not declared by the server",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -283,14 +283,14 @@ func (value ServerData) ValidateFor(
 			if binding.SecretRef != "" {
 				return fmt.Errorf(
 					"%w: MCP input %q must use a local value, not a secret reference",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
 			if binding.Value == nil {
 				return fmt.Errorf(
 					"%w: MCP input %q requires a local value",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
@@ -299,7 +299,7 @@ func (value ServerData) ValidateFor(
 			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
 				return fmt.Errorf(
 					"%w: MCP secret input %q requires exactly one secret reference",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
@@ -307,7 +307,7 @@ func (value ServerData) ValidateFor(
 			if !found {
 				return fmt.Errorf(
 					"%w: MCP secret input %q is not used by a permitted connection target",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
@@ -319,7 +319,7 @@ func (value ServerData) ValidateFor(
 			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
 				return fmt.Errorf(
 					"%w: MCP OAuth client input %q requires exactly one secret reference",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					name,
 				)
 			}
@@ -338,7 +338,7 @@ func (value ServerData) ValidateFor(
 		default:
 			return fmt.Errorf(
 				"%w: MCP input %q has unsupported kind %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				declaration.Kind,
 			)
@@ -353,13 +353,13 @@ func (value ServerData) ValidateFor(
 		if ref.RootID != server.RootID {
 			return fmt.Errorf(
 				"%w: additional MCP policy belongs to another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seen[ref]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate additional MCP policy Artifact",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		seen[ref] = struct{}{}
@@ -381,6 +381,6 @@ func stripRetiredRuntimeEnabled(
 	delete(fields, "runtimeEnabled")
 	return jsonutil.MarshalCanonicalObject(
 		fields,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }

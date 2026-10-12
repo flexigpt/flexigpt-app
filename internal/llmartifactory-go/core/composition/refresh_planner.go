@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	corerefresh "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -46,7 +46,7 @@ func (r LocatedMemberDiscoveryRequest) Validate() error {
 	if r.Member.Header().Locator == nil {
 		return fmt.Errorf(
 			"%w: located-member discovery requires a declaration locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -82,7 +82,7 @@ func NewReachableDiscoveryPlanner(
 	if resolveRoot == nil || requirements == nil {
 		return nil, fmt.Errorf(
 			"%w: composition refresh planner dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &ReachableDiscoveryPlanner{
@@ -106,14 +106,14 @@ func (p *ReachableDiscoveryPlanner) ReachableRequirements(
 	if entry == nil {
 		return nil, fmt.Errorf(
 			"%w: composition refresh root resolved to nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	rootID, found := entry.RootID()
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: composition refresh root has no Root identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -230,7 +230,7 @@ func (w *reachableDiscoveryWalker) appendRequirements(
 		if value.RootID != w.rootID {
 			return fmt.Errorf(
 				"%w: composition refresh requirement escaped its Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		copyValue := value

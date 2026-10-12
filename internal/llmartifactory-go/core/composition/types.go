@@ -9,7 +9,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
@@ -20,7 +20,7 @@ type LocatorRequest struct {
 	Entry               declaration.Entry
 	Locator             declaration.Locator
 	ExpectedType        declaration.Type
-	ExpectedLogicalName spec.LogicalName
+	ExpectedLogicalName storeSpec.LogicalName
 }
 
 // LocatorResolver resolves one supported external declaration locator kind.
@@ -58,16 +58,16 @@ func (l Limits) Normalized() Limits {
 
 func (l Limits) Validate() error {
 	value := l.Normalized()
-	if value.MaxDepth <= 0 || value.MaxDepth > spec.MaxDiscoveryDepth {
+	if value.MaxDepth <= 0 || value.MaxDepth > storeSpec.MaxDiscoveryDepth {
 		return fmt.Errorf(
 			"%w: Artifact composition depth limit is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if value.MaxNodes <= 0 || value.MaxNodes > spec.MaxDiscoveryEntries {
+	if value.MaxNodes <= 0 || value.MaxNodes > storeSpec.MaxDiscoveryEntries {
 		return fmt.Errorf(
 			"%w: Artifact composition node limit is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -116,19 +116,19 @@ func New(options ResolverOptions) (*Resolver, error) {
 	if options.Artifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact composition ArtifactReader is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if options.Catalog == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact composition ArtifactCatalogReader is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if options.Interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact composition interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := options.Scope.Validate(); err != nil {
@@ -152,22 +152,22 @@ func New(options ResolverOptions) (*Resolver, error) {
 		if provider == nil {
 			return nil, fmt.Errorf(
 				"%w: direct capability provider %d is nil",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 			)
 		}
 		identity := provider.ProviderIdentity()
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"direct capability provider identity",
 			identity,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seenProviders[identity]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate direct capability provider %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				identity,
 			)
 		}
@@ -185,7 +185,7 @@ func New(options ResolverOptions) (*Resolver, error) {
 		if projector == nil {
 			return nil, fmt.Errorf(
 				"%w: Artifact capability projector for %q is nil",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				declarationType,
 			)
 		}
@@ -243,7 +243,7 @@ func (r ResolvedRelationship) IsAvailable() bool {
 
 type ResolvedSelector struct {
 	Type    declaration.Type        `json:"-"`
-	Base    spec.Locator            `json:"-"`
+	Base    storeSpec.Locator       `json:"-"`
 	Matches []ResolvedSelectorMatch `json:"-"`
 }
 

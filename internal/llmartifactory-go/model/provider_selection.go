@@ -7,7 +7,7 @@ import (
 
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
@@ -17,14 +17,14 @@ import (
 func (a *Service) SelectDefaultProvider(
 	ctx context.Context,
 	preferred *artifactModel.ArtifactRef,
-	baseName spec.LogicalName,
+	baseName storeSpec.LogicalName,
 ) (*artifactModel.ArtifactRef, error) {
 	if preferred != nil {
 		record, err := a.artifacts.Get(ctx, *preferred)
 		if err != nil {
-			if !errors.Is(err, spec.ErrArtifactNotFound) &&
-				!errors.Is(err, spec.ErrRootNotFound) &&
-				!errors.Is(err, spec.ErrRetired) {
+			if !errors.Is(err, storeSpec.ErrArtifactNotFound) &&
+				!errors.Is(err, storeSpec.ErrRootNotFound) &&
+				!errors.Is(err, storeSpec.ErrRetired) {
 				return nil, err
 			}
 		} else if record.Kind == modelDomain.ModelProviderArtifactKind &&
@@ -92,7 +92,7 @@ func (a *Service) RequireSettableDefaultProvider(
 	if record.State != artifactModel.StateAvailable || !record.Enabled {
 		return fmt.Errorf(
 			"%w: Model Provider %q must be enabled before it can be selected as default",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.LogicalName,
 		)
 	}
@@ -107,7 +107,7 @@ func (a *Service) RequireSettableDefaultProvider(
 	if !found || !credential.Active() {
 		return fmt.Errorf(
 			"%w: Model Provider %q has no configured API key",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.LogicalName,
 		)
 	}

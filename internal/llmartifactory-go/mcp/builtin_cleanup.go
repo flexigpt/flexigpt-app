@@ -11,7 +11,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
@@ -44,7 +44,7 @@ func NewBuiltinPackageCleanup(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP built-in package cleanup requires an API",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &builtinPackageCleanup{api: api}, nil
@@ -60,11 +60,11 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 		sourceID != c.api.support.BuiltinPackageSource {
 		return nil, fmt.Errorf(
 			"%w: MCP cleanup does not target the built-in package Source",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 
-	directories := make(map[spec.Locator]struct{}, len(addresses))
+	directories := make(map[storeSpec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
 		if address.Kind != mcpDomain.MCPPluginPackageKind {
 			continue
@@ -97,7 +97,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 			continue
 		}
 
-		if _, found := directories[spec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
+		if _, found := directories[storeSpec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
 			continue
 		}
 		if !c.api.support.BuiltinPluginDocument.Matches(
@@ -120,8 +120,8 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 ) error {
 	for _, ref := range refs {
 		record, err := c.api.artifacts.Get(ctx, ref)
-		if errors.Is(err, spec.ErrArtifactNotFound) ||
-			errors.Is(err, spec.ErrRootNotFound) {
+		if errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+			errors.Is(err, storeSpec.ErrRootNotFound) {
 			// Protected topology reset may already have removed the Artifact
 			// and its local state in the same installation attempt.
 			continue

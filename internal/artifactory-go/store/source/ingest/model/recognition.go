@@ -5,7 +5,7 @@ import (
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -21,28 +21,28 @@ const (
 type Candidate struct {
 	SourceID            sourceModel.SourceID
 	SourceKind          sourceModel.SourceKind
-	Locator             spec.Locator
+	Locator             storeSpec.Locator
 	SourceContentDigest cryptoutil.Digest
 	Content             []byte
-	RequestedDecoderIDs []spec.DecoderID
+	RequestedDecoderIDs []storeSpec.DecoderID
 }
 
 func (c Candidate) RequestsDecoder(
-	id spec.DecoderID,
+	id storeSpec.DecoderID,
 ) bool {
 	return slices.Contains(c.RequestedDecoderIDs, id)
 }
 
 type SourceContent struct {
-	Locator spec.Locator
+	Locator storeSpec.Locator
 	Content []byte
 	Digest  cryptoutil.Digest
 }
 
 type Decoded struct {
-	SubresourceLocator spec.SubresourceLocator
+	SubresourceLocator storeSpec.SubresourceLocator
 
-	OriginLocator       spec.Locator
+	OriginLocator       storeSpec.Locator
 	OriginContentDigest *cryptoutil.Digest
 
 	Definition  definitionModel.Definition

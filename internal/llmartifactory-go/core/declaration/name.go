@@ -4,7 +4,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -13,9 +13,9 @@ import (
 // native format has no explicit portable declaration name.
 func DeriveLogicalName(
 	prefix string,
-	locator spec.Locator,
-) (spec.LogicalName, error) {
-	if err := spec.ValidatePortableName(
+	locator storeSpec.Locator,
+) (storeSpec.LogicalName, error) {
+	if err := storeSpec.ValidatePortableName(
 		"derived logical name prefix",
 		prefix,
 	); err != nil {
@@ -38,7 +38,7 @@ func DeriveLogicalName(
 		strings.Join(parts, "-"),
 		".-_",
 	)
-	if value := spec.LogicalName(candidate); value.Validate() == nil {
+	if value := storeSpec.LogicalName(candidate); value.Validate() == nil {
 		return value, nil
 	}
 
@@ -47,7 +47,7 @@ func DeriveLogicalName(
 		cryptoutil.DigestSHA256Prefix,
 	)
 	fallback := prefix + "-" + digest[:16]
-	value := spec.LogicalName(fallback)
+	value := storeSpec.LogicalName(fallback)
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
@@ -66,22 +66,22 @@ const nestedNameDigestLength = 16
 // If that value would exceed the portable name limit, the parent is shortened
 // and a digest suffix preserves deterministic uniqueness.
 func DeriveNestedLogicalName(
-	parent spec.LogicalName,
+	parent storeSpec.LogicalName,
 	relationship string,
-) (spec.LogicalName, error) {
+) (storeSpec.LogicalName, error) {
 	if err := parent.Validate(); err != nil {
 		return "", err
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"derived nested declaration relationship",
 		relationship,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return "", err
 	}
 
 	candidate := string(parent) + "-" + relationship
-	if value := spec.LogicalName(candidate); value.Validate() == nil {
+	if value := storeSpec.LogicalName(candidate); value.Validate() == nil {
 		return value, nil
 	}
 
@@ -92,13 +92,13 @@ func DeriveNestedLogicalName(
 		cryptoutil.DigestSHA256Prefix,
 	)
 	suffix := "-" + relationship + "-" + digest[:nestedNameDigestLength]
-	maximumParentBytes := spec.MaxLogicalNameBytes - len(suffix)
+	maximumParentBytes := storeSpec.MaxLogicalNameBytes - len(suffix)
 	shortenedParent := strings.TrimRight(
 		string(parent)[:maximumParentBytes],
 		".-_",
 	)
 
-	value := spec.LogicalName(shortenedParent + suffix)
+	value := storeSpec.LogicalName(shortenedParent + suffix)
 	if err := value.Validate(); err != nil {
 		return "", err
 	}

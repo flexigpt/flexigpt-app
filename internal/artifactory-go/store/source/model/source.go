@@ -6,7 +6,7 @@ import (
 	"time"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -25,19 +25,19 @@ func (v SourceID) Validate() error {
 }
 
 func (v SourceKind) Validate() error {
-	return spec.ValidateIdentifier("source kind", string(v), spec.MaxKindBytes)
+	return storeSpec.ValidateIdentifier("source kind", string(v), storeSpec.MaxKindBytes)
 }
 
 type Source struct {
-	ID             SourceID         `json:"id"`
-	RootID         rootModel.RootID `json:"rootID"`
-	RootStorageKey spec.StorageKey  `json:"rootStorageKey"`
-	StorageKey     spec.StorageKey  `json:"storageKey"`
-	Kind           SourceKind       `json:"kind"`
-	DisplayName    string           `json:"displayName"`
-	Enabled        bool             `json:"enabled"`
-	Config         json.RawMessage  `json:"-"`
-	Discovery      DiscoverySpec    `json:"discovery"`
+	ID             SourceID             `json:"id"`
+	RootID         rootModel.RootID     `json:"rootID"`
+	RootStorageKey storeSpec.StorageKey `json:"rootStorageKey"`
+	StorageKey     storeSpec.StorageKey `json:"storageKey"`
+	Kind           SourceKind           `json:"kind"`
+	DisplayName    string               `json:"displayName"`
+	Enabled        bool                 `json:"enabled"`
+	Config         json.RawMessage      `json:"-"`
+	Discovery      DiscoverySpec        `json:"discovery"`
 
 	Revision   uint64     `json:"revision"`
 	CreatedAt  time.Time  `json:"createdAt"`
@@ -59,9 +59,9 @@ func (s Source) Validate() error {
 	}
 	if _, err := jsonutil.CanonicalizeObject(
 		s.Config,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	); err != nil {
-		return fmt.Errorf("%w: source config: %w", spec.ErrInvalid, err)
+		return fmt.Errorf("%w: source config: %w", storeSpec.ErrInvalid, err)
 	}
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func EnsureSourceCurrent(
@@ -22,7 +22,7 @@ func EnsureSourceCurrent(
 		return nil
 	}
 	if err != nil &&
-		!errors.Is(err, spec.ErrRefreshStateNotFound) {
+		!errors.Is(err, storeSpec.ErrRefreshStateNotFound) {
 		return err
 	}
 
@@ -51,7 +51,7 @@ func EnsureAndRefreshSource(
 	if sources == nil || refreshes == nil {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -63,7 +63,7 @@ func EnsureAndRefreshSource(
 	if !draft.Enabled || draft.Discovery.Empty() {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle requires an enabled Source with discovery",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	draft.Discovery = draft.Discovery.Normalized()

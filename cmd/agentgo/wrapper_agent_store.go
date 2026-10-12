@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
@@ -111,7 +111,7 @@ func withAgentStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -134,7 +134,7 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 ) {
 	return withRecoveryResp(func() ([]agentAPI.AgentListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
-			return nil, spec.ErrClosed
+			return nil, storeSpec.ErrClosed
 		}
 		ctx := context.Background()
 		roots, err := w.roots.List(ctx)
@@ -174,7 +174,7 @@ func (w *AgentStoreWrapper) ListAgentPluginsForManagement() (
 ) {
 	return withRecoveryResp(func() ([]pluginAPI.ListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
-			return nil, spec.ErrClosed
+			return nil, storeSpec.ErrClosed
 		}
 		ctx := context.Background()
 		roots, err := w.roots.List(ctx)
@@ -264,7 +264,7 @@ func (w *AgentStoreWrapper) CreateAgentPlugin(
 		func(api *agentAPI.Service) (pluginAPI.PluginView, error) {
 			if request.RootID == "" {
 				if w.roots == nil {
-					return pluginAPI.PluginView{}, spec.ErrClosed
+					return pluginAPI.PluginView{}, storeSpec.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
@@ -421,7 +421,7 @@ func (w *AgentStoreWrapper) DeleteAgentPlugin(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return spec.ErrClosed
+			return storeSpec.ErrClosed
 		}
 		return w.api.DeleteAgentPlugin(
 			context.Background(),
@@ -437,7 +437,7 @@ func (w *AgentStoreWrapper) ListAgentImportDestinations() (
 ) {
 	return withRecoveryResp(func() ([]agentAPI.AgentImportDestination, error) {
 		if w == nil || w.api == nil || w.roots == nil {
-			return nil, spec.ErrClosed
+			return nil, storeSpec.ErrClosed
 		}
 
 		ctx := context.Background()
@@ -524,7 +524,7 @@ func (w *AgentStoreWrapper) DeleteManagedAgent(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return spec.ErrClosed
+			return storeSpec.ErrClosed
 		}
 		return w.api.DeleteManagedAgent(context.Background(), request)
 	})

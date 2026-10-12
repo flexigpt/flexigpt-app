@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 )
@@ -46,14 +46,14 @@ func (value ServerOverlay) Validate() error {
 	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP server overlay schema %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			value.SchemaVersion,
 		)
 	}
 	if value.Revision == 0 {
 		return fmt.Errorf(
 			"%w: MCP server overlay revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return value.ServerData.Validate()

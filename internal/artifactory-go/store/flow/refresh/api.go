@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // CompiledDocumentRegistrar accepts Ingest-owned evidence. Install translates
@@ -49,7 +49,7 @@ type ArtifactSynchronizer interface {
 		rootID rootModel.RootID,
 		sourceValue sourceModel.Source,
 		observations []ingest.Observation,
-		seenLocators []spec.Locator,
+		seenLocators []storeSpec.Locator,
 		existing []artifactModel.Artifact,
 	) (artifact.Synchronization, error)
 	DeriveLifecycleInvalidation(

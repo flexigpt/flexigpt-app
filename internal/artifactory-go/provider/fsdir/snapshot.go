@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type snapshot struct {
@@ -29,7 +29,7 @@ func (s *snapshot) Generation() string {
 
 func (s *snapshot) Stat(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.Entry, error) {
 	if err := s.ensureOpen(); err != nil {
 		return sourceModel.Entry{}, err
@@ -37,7 +37,7 @@ func (s *snapshot) Stat(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -49,7 +49,7 @@ func (s *snapshot) Stat(
 	if errors.Is(err, os.ErrNotExist) {
 		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -61,7 +61,7 @@ func (s *snapshot) Stat(
 
 func (s *snapshot) ReadDir(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) ([]sourceModel.Entry, error) {
 	if err := s.ensureOpen(); err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *snapshot) ReadDir(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source directory %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -124,14 +124,14 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 	values := make([]os.DirEntry, 0)
 	for {
 		batch, readErr := directory.ReadDir(directoryReadBatchSize)
-		if len(batch) > spec.MaxDiscoveryEntries-len(values) {
+		if len(batch) > storeSpec.MaxDiscoveryEntries-len(values) {
 			closeErr := directory.Close()
 			return nil, errors.Join(
 				fmt.Errorf(
 					"%w: source directory %q exceeds %d entries",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					location,
-					spec.MaxDiscoveryEntries,
+					storeSpec.MaxDiscoveryEntries,
 				),
 				closeErr,
 			)
@@ -153,7 +153,7 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 
 func (s *snapshot) Open(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(); err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (s *snapshot) Open(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return nil, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -173,7 +173,7 @@ func (s *snapshot) Open(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source file %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -188,7 +188,7 @@ func (s *snapshot) Open(
 		return nil, errors.Join(
 			fmt.Errorf(
 				"%w: source locator %q is not a regular file",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				locator,
 			),
 			file.Close(),
@@ -208,7 +208,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if current != s.generation {
 		return fmt.Errorf(
 			"%w: filesystem source changed during discovery",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return nil
@@ -221,19 +221,19 @@ func (s *snapshot) Close() error {
 
 func (s *snapshot) ensureOpen() error {
 	if s.closed.Load() {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return nil
 }
 
 func (s *snapshot) resolve(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
 
 func (s *snapshot) resolveDirectory(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
@@ -242,7 +242,7 @@ func (s *snapshot) resolveDirectory(
 // root using normal native filesystem path semantics.
 func resolveNativePath(
 	root string,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	rootInfo, err := os.Stat(root)
 	if err != nil {
@@ -251,14 +251,14 @@ func resolveNativePath(
 	if !rootInfo.IsDir() {
 		return "", fmt.Errorf(
 			"%w: filesystem source root is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	p, err := resolveWithinRoot(root, locator)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -268,7 +268,7 @@ func resolveNativePath(
 	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	} else if err != nil {
@@ -279,7 +279,7 @@ func resolveNativePath(
 
 func resolveWithinRoot(
 	root string,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	if err := locator.Validate(true); err != nil {
 		return "", err
@@ -298,7 +298,7 @@ func resolveWithinRoot(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: locator %q escapes source root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			locator,
 		)
 	}
@@ -307,7 +307,7 @@ func resolveWithinRoot(
 }
 
 func entryFromInfo(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	info os.FileInfo,
 ) sourceModel.Entry {
 	name := info.Name()
@@ -327,18 +327,18 @@ func entryFromInfo(
 }
 
 func joinLocator(
-	parent spec.Locator,
+	parent storeSpec.Locator,
 	name string,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	if name == "" || strings.ContainsAny(name, `/\:`) {
 		return "", fmt.Errorf(
 			"%w: invalid source entry name %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
 	if parent == "." {
-		return spec.Locator(name), nil
+		return storeSpec.Locator(name), nil
 	}
-	return spec.Locator(string(parent) + "/" + name), nil
+	return storeSpec.Locator(string(parent) + "/" + name), nil
 }

@@ -8,7 +8,7 @@ import (
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -112,7 +112,7 @@ func (s *Store) getDefinitions(
 		if !exists {
 			return nil, fmt.Errorf(
 				"%w: Definition %q in Root %q",
-				spec.ErrDefinitionNotFound,
+				storeSpec.ErrDefinitionNotFound,
 				key.Digest,
 				key.RootID,
 			)

@@ -8,7 +8,7 @@ import (
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type artifactReader interface {
@@ -35,7 +35,7 @@ func NewBindingService(
 	if artifacts == nil || bindings == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP secret binding dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := namespace.Validate(); err != nil {
@@ -134,7 +134,7 @@ func (s *BindingService) availableServer(
 	if record.State != artifactModel.StateAvailable {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: MCP Server Artifact is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return record, nil

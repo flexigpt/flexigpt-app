@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -18,7 +18,7 @@ var ErrGeneratedPackageSetNotLoaded = errors.New(
 
 // Generated payloads contain base64 file content and Definition metadata.
 // This is an installation-envelope limit, not declaration vocabulary.
-const maximumGeneratedPackageSetBytes = 2 * spec.MaxScanBytes
+const maximumGeneratedPackageSetBytes = 2 * storeSpec.MaxScanBytes
 
 // DecodeGeneratedPackageSet decodes trusted generated installation data.
 // It does not admit ordinary user-supplied declarations.
@@ -30,7 +30,7 @@ func DecodeGeneratedPackageSet(raw []byte) (installModel.CompiledPackageSet, err
 		int64(len(raw)) > maximumGeneratedPackageSetBytes {
 		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated package set is empty or exceeds its size limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	var value installModel.CompiledPackageSet
@@ -90,14 +90,14 @@ func validateGeneratedEnvelope(value installModel.CompiledPackageSet) error {
 	if value.Format != installModel.CompiledPackageSetFormat {
 		return fmt.Errorf(
 			"%w: generated package format %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			value.Format,
 		)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"generated package set name",
 		value.Name,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}

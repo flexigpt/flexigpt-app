@@ -3,7 +3,7 @@ package tool
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -28,7 +28,7 @@ func (s Support) Validate() error {
 	if s.Documents.Default != s.ToolPackage.Document {
 		return fmt.Errorf(
 			"%w: Tool package document differs from Tool document support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := s.PluginProfile.Validate(); err != nil {
@@ -37,7 +37,7 @@ func (s Support) Validate() error {
 	if s.PluginDocuments.Default != s.PluginProfile.Package.Document {
 		return fmt.Errorf(
 			"%w: Tool Plugin package document differs from Tool Plugin document support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

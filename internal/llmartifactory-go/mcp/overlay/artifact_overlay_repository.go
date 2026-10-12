@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 )
@@ -32,7 +32,7 @@ func NewArtifactOverlayRepository(
 		dependencies.LocalState == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Artifact overlay dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -96,11 +96,11 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: MCP server is not in a protected Root",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	payload, err := encodeProtectedServerOverlay(value)
@@ -125,7 +125,7 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 	if stored.Revision != value.Revision {
 		return fmt.Errorf(
 			"%w: MCP protected overlay revision changed unexpectedly",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return nil
@@ -144,11 +144,11 @@ func (r *ArtifactOverlayRepository) DeleteServerOverlay(
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: MCP server is not in a protected Root",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 
 	return r.protectedOverlay.Delete(
@@ -207,7 +207,7 @@ func encodeProtectedServerOverlay(
 		serverOverlayPayload{
 			ServerData: value.ServerData.Clone(),
 		},
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }
 
@@ -218,11 +218,11 @@ func decodeProtectedServerOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return ServerOverlay{}, fmt.Errorf(
 			"%w: decode protected MCP installation overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -247,7 +247,7 @@ func validateOverlayTransition(
 		next != expected+1 {
 		return fmt.Errorf(
 			"%w: invalid MCP installation overlay revision transition",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

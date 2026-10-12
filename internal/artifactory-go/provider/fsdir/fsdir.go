@@ -18,7 +18,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -61,18 +61,18 @@ func (a *Adapter) NormalizeConfig(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, storeSpec.MaxConfigBytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: filesystem source config: %w", spec.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: filesystem source config: %w", storeSpec.ErrInvalid, err)
 	}
 
 	var config Config
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&config,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	); err != nil {
-		return nil, fmt.Errorf("%w: decode filesystem source config: %w", spec.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: decode filesystem source config: %w", storeSpec.ErrInvalid, err)
 	}
 	root, err := normalizeFilesystemRoot(config.RootPath)
 	if err != nil {
@@ -115,12 +115,12 @@ func (a *Adapter) Open(
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	if a.traversalPolicy.excludesLocator(string(locator)) {
 		return "", fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -132,7 +132,7 @@ func (a *Adapter) ResolveLocalPath(
 }
 
 func decodeConfig(raw json.RawMessage) (Config, error) {
-	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, storeSpec.MaxConfigBytes)
 	if err != nil {
 		return Config{}, err
 	}
@@ -140,7 +140,7 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&config,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	); err != nil {
 		return Config{}, err
 	}
@@ -148,7 +148,7 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 		filepath.Clean(config.RootPath) != config.RootPath {
 		return Config{}, fmt.Errorf(
 			"%w: invalid normalized filesystem root",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := validateFilesystemRoot(config.RootPath); err != nil {
@@ -161,13 +161,13 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 	if strings.TrimSpace(raw) == "" {
 		return "", fmt.Errorf(
 			"%w: filesystem root path is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !filepath.IsAbs(raw) {
 		return "", fmt.Errorf(
 			"%w: filesystem root path must be absolute",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -179,7 +179,7 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf(
 			"%w: filesystem source root is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return root, nil
@@ -190,14 +190,14 @@ func validateFilesystemRoot(root string) error {
 	if err != nil {
 		return fmt.Errorf(
 			"%w: filesystem source root is unavailable: %w",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 			err,
 		)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: filesystem source root is no longer a directory",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 		)
 	}
 	return nil
@@ -226,28 +226,28 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		if location == root && !info.IsDir() {
 			return fmt.Errorf(
 				"%w: filesystem source root is no longer a directory",
-				spec.ErrSourceUnavailable,
+				storeSpec.ErrSourceUnavailable,
 			)
 		}
 
 		if location != root {
 			visited++
-			if visited > spec.DefaultMaxEntries {
+			if visited > storeSpec.DefaultMaxEntries {
 				return fmt.Errorf(
 					"%w: source exceeds %d entries",
-					spec.ErrInvalid,
-					spec.DefaultMaxEntries,
+					storeSpec.ErrInvalid,
+					storeSpec.DefaultMaxEntries,
 				)
 			}
 			relative, err := filepath.Rel(root, location)
 			if err != nil {
 				return err
 			}
-			if depth > spec.DefaultMaxDepth {
+			if depth > storeSpec.DefaultMaxDepth {
 				return fmt.Errorf(
 					"%w: source exceeds traversal depth %d",
-					spec.ErrInvalid,
-					spec.DefaultMaxDepth,
+					storeSpec.ErrInvalid,
+					storeSpec.DefaultMaxDepth,
 				)
 			}
 			if info.IsDir() &&
@@ -319,10 +319,10 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 			continue
 		}
 		if value.size < 0 ||
-			value.size > spec.MaxScanBytes-totalBytes {
+			value.size > storeSpec.MaxScanBytes-totalBytes {
 			return "", fmt.Errorf(
 				"%w: source exceeds byte limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -340,7 +340,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 			_ = file.Close()
 			return "", fmt.Errorf(
 				"%w: source entry %q changed during fingerprinting",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value.relative,
 			)
 		}
@@ -360,7 +360,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		if written != value.size {
 			return "", fmt.Errorf(
 				"%w: source entry %q changed during fingerprinting",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value.relative,
 			)
 		}

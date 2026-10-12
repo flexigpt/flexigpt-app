@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
@@ -30,8 +30,8 @@ const (
 // ArtifactNameReference is the Model-domain projection of a declaration
 // logical-name reference.
 type ArtifactNameReference struct {
-	Name  spec.LogicalName `json:"name"`
-	Scope LookupScope      `json:"scope,omitempty"`
+	Name  storeSpec.LogicalName `json:"name"`
+	Scope LookupScope           `json:"scope,omitempty"`
 }
 
 func (r ArtifactNameReference) Clone() ArtifactNameReference {
@@ -264,7 +264,7 @@ type CapabilitiesPatch struct {
 // Conversion to the source declaration contract remains internal.
 type ProviderDocument struct {
 	Type              DocumentType           `json:"type"`
-	Name              spec.LogicalName       `json:"name"`
+	Name              storeSpec.LogicalName  `json:"name"`
 	DisplayName       string                 `json:"displayName,omitempty"`
 	Description       string                 `json:"description,omitempty"`
 	Labels            map[string]string      `json:"labels,omitempty"`
@@ -281,7 +281,7 @@ type ProviderDocument struct {
 // Conversion to the source declaration contract remains internal.
 type ModelDocument struct {
 	Type              DocumentType          `json:"type"`
-	Name              spec.LogicalName      `json:"name"`
+	Name              storeSpec.LogicalName `json:"name"`
 	DisplayName       string                `json:"displayName,omitempty"`
 	Description       string                `json:"description,omitempty"`
 	Labels            map[string]string     `json:"labels,omitempty"`
@@ -319,7 +319,7 @@ func (v ProviderDocument) ToDeclaration() (
 ) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		v,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return modelproviderv1.ProviderDocument{}, err
@@ -356,7 +356,7 @@ func (v ModelDocument) Validate() error {
 func (v ModelDocument) ToDeclaration() (modelv1.ModelDocument, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		v,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return modelv1.ModelDocument{}, err

@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -34,9 +34,9 @@ const (
 type ProviderSetAPI struct {
 	inner *inference.ProviderSetAPI
 
-	models             inferencewrapperSpec.ModelRuntime
+	models             inferenceRuntimeSpec.ModelRuntime
 	toolsSvc           ToolSource
-	artifactSkills     inferencewrapperSpec.SkillSource
+	artifactSkills     inferenceRuntimeSpec.SkillSource
 	mcpInferenceBridge *MCPInferenceBridge
 	workspaceSource    WorkspaceSource
 
@@ -78,10 +78,10 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 // capability is wrapped here rather than forcing application composition to
 // construct an inference-owned bridge.
 func NewProviderSetAPI(
-	models inferencewrapperSpec.ModelRuntime,
+	models inferenceRuntimeSpec.ModelRuntime,
 	tools ToolSource,
-	artifactSkills inferencewrapperSpec.SkillSource,
-	mcpRuntime inferencewrapperSpec.MCPRuntime,
+	artifactSkills inferenceRuntimeSpec.SkillSource,
+	mcpRuntime inferenceRuntimeSpec.MCPRuntime,
 	workspaceSource WorkspaceSource,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
@@ -172,8 +172,8 @@ func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
 // AddProvider forwards to inference-go ProviderSetAPI.AddProvider.
 func (ps *ProviderSetAPI) AddProvider(
 	ctx context.Context,
-	req *inferencewrapperSpec.AddProviderRequest,
-) (*inferencewrapperSpec.AddProviderResponse, error) {
+	req *inferenceRuntimeSpec.AddProviderRequest,
+) (*inferenceRuntimeSpec.AddProviderResponse, error) {
 	if req == nil || req.Body == nil || req.Provider == "" || strings.TrimSpace(req.Body.Origin) == "" {
 		return nil, errors.New("invalid params")
 	}
@@ -189,14 +189,14 @@ func (ps *ProviderSetAPI) AddProvider(
 		return nil, err
 	}
 
-	return &inferencewrapperSpec.AddProviderResponse{}, nil
+	return &inferenceRuntimeSpec.AddProviderResponse{}, nil
 }
 
 // DeleteProvider forwards to inference-go ProviderSetAPI.DeleteProvider.
 func (ps *ProviderSetAPI) DeleteProvider(
 	ctx context.Context,
-	req *inferencewrapperSpec.DeleteProviderRequest,
-) (*inferencewrapperSpec.DeleteProviderResponse, error) {
+	req *inferenceRuntimeSpec.DeleteProviderRequest,
+) (*inferenceRuntimeSpec.DeleteProviderResponse, error) {
 	if req == nil || req.Provider == "" {
 		return nil, errors.New("got empty provider input")
 	}
@@ -204,29 +204,29 @@ func (ps *ProviderSetAPI) DeleteProvider(
 		return nil, err
 	}
 
-	return &inferencewrapperSpec.DeleteProviderResponse{}, nil
+	return &inferenceRuntimeSpec.DeleteProviderResponse{}, nil
 }
 
 // SetProviderAPIKey forwards to inference-go ProviderSetAPI.SetProviderAPIKey.
 func (ps *ProviderSetAPI) SetProviderAPIKey(
 	ctx context.Context,
-	req *inferencewrapperSpec.SetProviderAPIKeyRequest,
-) (*inferencewrapperSpec.SetProviderAPIKeyResponse, error) {
+	req *inferenceRuntimeSpec.SetProviderAPIKeyRequest,
+) (*inferenceRuntimeSpec.SetProviderAPIKeyResponse, error) {
 	if req == nil || req.Body == nil {
 		return nil, errors.New("got empty provider input")
 	}
 	if err := ps.inner.SetProviderAPIKey(ctx, req.Provider, req.Body.APIKey); err != nil {
 		return nil, err
 	}
-	return &inferencewrapperSpec.SetProviderAPIKeyResponse{}, nil
+	return &inferenceRuntimeSpec.SetProviderAPIKeyResponse{}, nil
 }
 
 // FetchCompletion builds a normalized inference-go FetchCompletionRequest from
 // app-level conversation types and calls inference-go's FetchCompletion.
 func (ps *ProviderSetAPI) FetchCompletion(
 	ctx context.Context,
-	req *inferencewrapperSpec.CompletionRequest,
-) (*inferencewrapperSpec.CompletionResponse, error) {
+	req *inferenceRuntimeSpec.CompletionRequest,
+) (*inferenceRuntimeSpec.CompletionResponse, error) {
 	if req == nil {
 		return nil, errors.New("got empty completion input")
 	}
@@ -283,8 +283,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		currentMessage.WorkspaceSelection,
 		currentMessage.EnabledSkillRefs,
 	); err != nil {
-		return &inferencewrapperSpec.CompletionResponse{
-			Body: &inferencewrapperSpec.CompletionResponseBody{
+		return &inferenceRuntimeSpec.CompletionResponse{
+			Body: &inferenceRuntimeSpec.CompletionResponseBody{
 				InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 					Error: &inferenceSpec.Error{
 						Code:    "workspace_selection_invalid",
@@ -314,8 +314,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			}
 		}
 		if workspaceErr != nil {
-			return &inferencewrapperSpec.CompletionResponse{
-				Body: &inferencewrapperSpec.CompletionResponseBody{
+			return &inferenceRuntimeSpec.CompletionResponse{
+				Body: &inferenceRuntimeSpec.CompletionResponseBody{
 					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 						Error: &inferenceSpec.Error{
 							Code:    "workspace_unavailable",
@@ -420,7 +420,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 		skills, skillErr := ps.artifactSkills.ResolveSkillSession(
 			ctx,
-			inferencewrapperSpec.SkillSessionRequest{
+			inferenceRuntimeSpec.SkillSessionRequest{
 				SessionID:        agentskillsRuntimeSpec.SessionID(skillSessionID),
 				Artifacts:        enabledSkillRefs,
 				IncludeRunScript: ps.skillsRunScriptEnabled,
@@ -434,7 +434,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				return nil, err
 			}
 			ps.logger.Warn("hydrate artifact skills failed; disabling skills for this turn", "err", skillErr)
-			skills = inferencewrapperSpec.SkillSession{}
+			skills = inferenceRuntimeSpec.SkillSession{}
 		}
 		availableSkillRefs := skills.AvailableArtifacts
 		activeSkillRefs := skills.ActiveArtifacts
@@ -537,14 +537,14 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if b == nil && err == nil {
 		b = &inferenceSpec.FetchCompletionResponse{
 			Error: &inferenceSpec.Error{
-				Code:    "empty_completion_response",
+				Code:    emptyCompletionResponseCode,
 				Message: "provider finished without a final response payload",
 			},
 		}
 	}
 	if b != nil && err == nil && b.Error == nil && len(b.Outputs) == 0 {
 		b.Error = &inferenceSpec.Error{
-			Code:    "empty_completion_response",
+			Code:    emptyCompletionResponseCode,
 			Message: "provider finished without final output",
 		}
 	}
@@ -560,7 +560,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		b.DebugDetails = mergeCompletionDebugDetails(b.DebugDetails, "mcp", mcpDebugDetails)
 	}
 
-	resp := &inferencewrapperSpec.CompletionResponse{Body: &inferencewrapperSpec.CompletionResponseBody{
+	resp := &inferenceRuntimeSpec.CompletionResponse{Body: &inferenceRuntimeSpec.CompletionResponseBody{
 		InferenceResponse:     b,
 		HydratedCurrentInputs: currentInputs,
 		MCPToolMappings:       mcpToolMappings,
@@ -574,9 +574,9 @@ func workspaceUnavailableCompletionResponse(
 	currentInputs []inferenceSpec.InputUnion,
 	workspaceUsage *conversationSpec.WorkspaceConversationUsage,
 	message string,
-) *inferencewrapperSpec.CompletionResponse {
-	return &inferencewrapperSpec.CompletionResponse{
-		Body: &inferencewrapperSpec.CompletionResponseBody{
+) *inferenceRuntimeSpec.CompletionResponse {
+	return &inferenceRuntimeSpec.CompletionResponse{
+		Body: &inferenceRuntimeSpec.CompletionResponseBody{
 			InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 				Error: &inferenceSpec.Error{
 					Code:    "workspace_unavailable",

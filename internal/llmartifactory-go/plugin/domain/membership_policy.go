@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -43,7 +43,7 @@ func (p MembershipPolicy) Validate() error {
 		if len(p.AllowedTypes) != 0 || len(p.AllowedForms) != 0 {
 			return fmt.Errorf(
 				"%w: legacy Plugin policy cannot declare constraints",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return nil
@@ -52,7 +52,7 @@ func (p MembershipPolicy) Validate() error {
 		if len(p.AllowedTypes) != 1 {
 			return fmt.Errorf(
 				"%w: single-type Plugin policy requires exactly one type",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -60,14 +60,14 @@ func (p MembershipPolicy) Validate() error {
 		if len(p.AllowedTypes) < 2 {
 			return fmt.Errorf(
 				"%w: mixed-type Plugin policy requires at least two types",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Plugin membership mode %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			p.Mode,
 		)
 	}
@@ -80,7 +80,7 @@ func (p MembershipPolicy) Validate() error {
 		if _, duplicate := seenTypes[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Plugin membership policy repeats type %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				value,
 			)
 		}
@@ -96,14 +96,14 @@ func (p MembershipPolicy) Validate() error {
 		default:
 			return fmt.Errorf(
 				"%w: Plugin membership policy has invalid member form %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				value,
 			)
 		}
 		if _, duplicate := seenForms[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Plugin membership policy repeats member form %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				value,
 			)
 		}
@@ -131,7 +131,7 @@ func (p MembershipPolicy) Allows(
 		if !found {
 			return fmt.Errorf(
 				"%w: Plugin membership form %q is not allowed",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				form,
 			)
 		}
@@ -147,7 +147,7 @@ func (p MembershipPolicy) Allows(
 	if !typeFound {
 		return fmt.Errorf(
 			"%w: Plugin membership type %q is not allowed",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			entry.Header().Type,
 		)
 	}
@@ -166,11 +166,11 @@ func FromMetadata(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		raw,
 		&value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return MembershipPolicy{}, fmt.Errorf(
 			"%w: decode Plugin membership policy: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -205,7 +205,7 @@ func PutMetadata(
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		policy,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err

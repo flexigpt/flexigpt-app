@@ -7,14 +7,14 @@ import (
 	"slices"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
 func NewDocument(
-	name spec.LogicalName,
-	version spec.LogicalVersion,
+	name storeSpec.LogicalName,
+	version storeSpec.LogicalVersion,
 	displayName string,
 	description string,
 	labels map[string]string,
@@ -64,7 +64,7 @@ func ServerDocumentFromDefinition(
 		input.SchemaVersion != mcpv1.MCPSchemaKey.SchemaVersion {
 		return ServerDocument{}, fmt.Errorf(
 			"%w: Definition is not an MCP Artifact",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -76,7 +76,7 @@ func ServerDocumentFromDefinition(
 		decl.Description != input.Description {
 		return ServerDocument{}, fmt.Errorf(
 			"%w: MCP Definition does not match declaration header",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -147,7 +147,7 @@ func declarationForDocument(
 	default:
 		return mcpv1.MCPDocument{}, fmt.Errorf(
 			"%w: unsupported MCP server transport %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			input.MCPServer.Type,
 		)
 	}
@@ -176,7 +176,7 @@ func coreFromDeclaration(
 	default:
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP declaration has no executable transport",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if err := validateCoreServer(output); err != nil {
@@ -200,7 +200,7 @@ func configurationFromDeclaration(
 }
 
 func PolicyReferenceSelector(
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) definitionModel.Selector {
 	return definitionModel.Selector{
 		Kind:        mcpDomain.MCPPolicyArtifactKind,
@@ -449,7 +449,7 @@ func jsonDefaultToString(value *json.RawMessage) (*string, error) {
 	if err := json.Unmarshal(*value, &output); err != nil {
 		return nil, fmt.Errorf(
 			"%w: MCP runtime supports string installation defaults only",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	return &output, nil

@@ -1,6 +1,6 @@
 package model
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+import storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 
 // ManagedPackagePublication atomically publishes one package at one semantic
 // address. ExpectedGeneration is optional for creation and required by callers
@@ -20,7 +20,7 @@ func NormalizeManagedPackagePublication(
 		return ManagedPackagePublication{}, err
 	}
 	if input.ExpectedGeneration != "" {
-		if err := spec.ValidateSourceGeneration(input.ExpectedGeneration); err != nil {
+		if err := storeSpec.ValidateSourceGeneration(input.ExpectedGeneration); err != nil {
 			return ManagedPackagePublication{}, err
 		}
 	}

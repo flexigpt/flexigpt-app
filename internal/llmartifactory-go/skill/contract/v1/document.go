@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -158,14 +158,14 @@ func (v SkillDocument) validateFields() error {
 	if v.Locator == nil {
 		return fmt.Errorf(
 			"%w: concrete Skill requires a Skill package locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if v.License != "" {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"Skill license",
 			v.License,
-			spec.MaxURIBytes,
+			storeSpec.MaxURIBytes,
 		); err != nil {
 			return err
 		}

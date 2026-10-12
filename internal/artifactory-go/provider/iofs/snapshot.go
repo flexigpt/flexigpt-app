@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type snapshot struct {
@@ -28,7 +28,7 @@ func (s *snapshot) Generation() string {
 
 func (s *snapshot) Stat(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.Entry, error) {
 	if err := s.ensureOpen(); err != nil {
 		return sourceModel.Entry{}, err
@@ -41,7 +41,7 @@ func (s *snapshot) Stat(
 	if errors.Is(err, fs.ErrNotExist) {
 		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: embedded locator %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -53,7 +53,7 @@ func (s *snapshot) Stat(
 
 func (s *snapshot) ReadDir(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) ([]sourceModel.Entry, error) {
 	if err := s.ensureOpen(); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (s *snapshot) ReadDir(
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: embedded directory %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			locator,
 		)
 	}
@@ -97,7 +97,7 @@ func (s *snapshot) ReadDir(
 
 func (s *snapshot) Open(
 	ctx context.Context,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(); err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (s *snapshot) Open(
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf(
 			"%w: embedded locator %q is not a regular file",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			locator,
 		)
 	}
@@ -138,7 +138,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if current != s.generation {
 		return fmt.Errorf(
 			"%w: embedded source changed during discovery",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	return nil
@@ -151,12 +151,12 @@ func (s *snapshot) Close() error {
 
 func (s *snapshot) ensureOpen() error {
 	if s.closed.Load() {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return nil
 }
 
-func fsName(locator spec.Locator) (string, error) {
+func fsName(locator storeSpec.Locator) (string, error) {
 	if err := locator.Validate(true); err != nil {
 		return "", err
 	}
@@ -167,24 +167,24 @@ func fsName(locator spec.Locator) (string, error) {
 }
 
 func joinLocator(
-	parent spec.Locator,
+	parent storeSpec.Locator,
 	name string,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	if name == "" || strings.Contains(name, "/") || !fs.ValidPath(name) {
 		return "", fmt.Errorf(
 			"%w: invalid embedded entry name %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
 	if parent == "." {
-		return spec.Locator(name), nil
+		return storeSpec.Locator(name), nil
 	}
-	return spec.Locator(path.Join(string(parent), name)), nil
+	return storeSpec.Locator(path.Join(string(parent), name)), nil
 }
 
 func entryFromInfo(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	info fs.FileInfo,
 ) sourceModel.Entry {
 	name := info.Name()

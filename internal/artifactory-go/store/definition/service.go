@@ -6,7 +6,7 @@ import (
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -18,7 +18,7 @@ type Service struct {
 
 func NewService(repository Repository) (*Service, error) {
 	if repository == nil {
-		return nil, fmt.Errorf("%w: Definition repository is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Definition repository is nil", storeSpec.ErrInvalid)
 	}
 	return &Service{repository: repository}, nil
 }
@@ -64,7 +64,7 @@ func (s *Service) GetDefinitions(
 	if len(values) != len(ownedKeys) {
 		return nil, fmt.Errorf(
 			"%w: definition repository returned %d values for %d keys",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			len(values),
 			len(ownedKeys),
 		)

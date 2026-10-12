@@ -14,7 +14,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
@@ -29,17 +29,17 @@ type AdapterDescriptor struct {
 }
 
 func (d AdapterDescriptor) Validate() error {
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"Model adapter ID",
 		d.ID,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	return spec.ValidateRequiredText(
+	return storeSpec.ValidateRequiredText(
 		"Model adapter version",
 		d.Version,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	)
 }
 
@@ -104,10 +104,10 @@ func (r ListModelsByProviderRequest) Validate() error {
 type ProviderListItem struct {
 	Ref artifactModel.ArtifactRef `json:"ref"`
 
-	Name        spec.LogicalName `json:"name"`
-	DisplayName string           `json:"displayName"`
-	Description string           `json:"description,omitempty"`
-	Adapter     string           `json:"adapter,omitempty"`
+	Name        storeSpec.LogicalName `json:"name"`
+	DisplayName string                `json:"displayName"`
+	Description string                `json:"description,omitempty"`
+	Adapter     string                `json:"adapter,omitempty"`
 
 	State    artifactModel.State `json:"state"`
 	Enabled  bool                `json:"enabled"`
@@ -118,7 +118,7 @@ type ProviderListItem struct {
 type ModelListItem struct {
 	Ref artifactModel.ArtifactRef `json:"ref"`
 
-	Name            spec.LogicalName                   `json:"name"`
+	Name            storeSpec.LogicalName              `json:"name"`
 	DisplayName     string                             `json:"displayName"`
 	Description     string                             `json:"description,omitempty"`
 	Provider        *modelDomain.ArtifactNameReference `json:"provider,omitempty"`
@@ -296,7 +296,7 @@ func validateExpectedArtifactRevision(value uint64) error {
 	if value == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

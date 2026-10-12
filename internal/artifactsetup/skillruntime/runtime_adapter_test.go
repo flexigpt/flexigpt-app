@@ -8,7 +8,7 @@ import (
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func testArtifactRef(id string) artifactModel.ArtifactRef {
@@ -26,7 +26,7 @@ func TestSelectionRootsRejectsEmptyAndDuplicateSelections(t *testing.T) {
 
 	ref := testArtifactRef("0192c4c0-0002-7000-8000-000000000001")
 	_, err = selectionRoots([]artifactModel.ArtifactRef{ref, ref})
-	if !errors.Is(err, spec.ErrInvalid) {
+	if !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("duplicate selection error=%v, want ErrInvalid", err)
 	}
 }
@@ -60,7 +60,7 @@ func TestSelectionRejectsDefinitionCollisions(t *testing.T) {
 			Definition: definition,
 		},
 	})
-	if !errors.Is(err, spec.ErrConflict) {
+	if !errors.Is(err, storeSpec.ErrConflict) {
 		t.Fatalf("collision error=%v, want ErrConflict", err)
 	}
 }

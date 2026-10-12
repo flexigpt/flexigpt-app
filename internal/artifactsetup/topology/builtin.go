@@ -11,7 +11,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -37,19 +37,19 @@ const (
 )
 
 type builtinRootWire struct {
-	ID          rootModel.RootID `json:"id"`
-	StorageKey  spec.StorageKey  `json:"storageKey"`
-	DisplayName string           `json:"displayName"`
-	Description string           `json:"description"`
-	Protected   bool             `json:"protected"`
-	Retained    bool             `json:"retained"`
+	ID          rootModel.RootID     `json:"id"`
+	StorageKey  storeSpec.StorageKey `json:"storageKey"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description"`
+	Protected   bool                 `json:"protected"`
+	Retained    bool                 `json:"retained"`
 }
 
 type builtinSourceWire struct {
 	Name        string                 `json:"name"`
 	Roles       []string               `json:"roles"`
 	ID          sourceModel.SourceID   `json:"id"`
-	StorageKey  spec.StorageKey        `json:"storageKey"`
+	StorageKey  storeSpec.StorageKey   `json:"storageKey"`
 	Kind        sourceModel.SourceKind `json:"kind"`
 	DisplayName string                 `json:"displayName"`
 	Enabled     bool                   `json:"enabled"`
@@ -64,9 +64,9 @@ type builtinTopologyWire struct {
 	} `json:"application"`
 
 	Builtin struct {
-		Root             builtinRootWire         `json:"root"`
-		Sources          []builtinSourceWire     `json:"sources"`
-		EmbeddedPackages map[string]spec.Locator `json:"embeddedPackages"`
+		Root             builtinRootWire              `json:"root"`
+		Sources          []builtinSourceWire          `json:"sources"`
+		EmbeddedPackages map[string]storeSpec.Locator `json:"embeddedPackages"`
 	} `json:"builtin"`
 }
 
@@ -74,7 +74,7 @@ type builtinTopologyConfig struct {
 	declaration          installModel.Declaration
 	sourcesByName        map[string]sourceModel.Draft
 	sourceNameByRole     map[string]string
-	embeddedPackageRoots map[string]spec.Locator
+	embeddedPackageRoots map[string]storeSpec.Locator
 	applicationStorage   map[ApplicationStorageKey]string
 
 	userRoot         rootModel.RootDraft
@@ -117,7 +117,7 @@ func BuiltinSource(
 	if !found {
 		return sourceModel.Draft{}, fmt.Errorf(
 			"%w: built-in topology has no source role %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			role,
 		)
 	}
@@ -125,7 +125,7 @@ func BuiltinSource(
 	if !found {
 		return sourceModel.Draft{}, fmt.Errorf(
 			"%w: built-in topology source role %q is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			role,
 		)
 	}
@@ -150,19 +150,19 @@ func IsBuiltinPackageSource(
 
 func BuiltinEmbeddedPackageRoot(
 	name string,
-) (spec.Locator, error) {
+) (storeSpec.Locator, error) {
 	value, found := configuredBuiltinTopology.embeddedPackageRoots[name]
 	if !found {
 		return "", fmt.Errorf(
 			"%w: built-in topology has no embedded package set %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			name,
 		)
 	}
 	return value, nil
 }
 
-func MustBuiltinEmbeddedPackageRoot(name string) spec.Locator {
+func MustBuiltinEmbeddedPackageRoot(name string) storeSpec.Locator {
 	value, err := BuiltinEmbeddedPackageRoot(name)
 	if err != nil {
 		panic(err)
@@ -176,14 +176,14 @@ func ApplicationStorageName(
 	if key == "" {
 		return "", fmt.Errorf(
 			"%w: application storage key is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	value, found := configuredBuiltinTopology.applicationStorage[key]
 	if !found {
 		return "", fmt.Errorf(
 			"%w: application topology has no storage entry %q",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			key,
 		)
 	}
@@ -278,7 +278,7 @@ func loadBuiltinTopology(
 ) (builtinTopologyConfig, error) {
 	canonical, err := yamlutil.CanonicalObjectJSON(
 		raw,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return builtinTopologyConfig{}, err
@@ -288,7 +288,7 @@ func loadBuiltinTopology(
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&wire,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	); err != nil {
 		return builtinTopologyConfig{}, err
 	}
@@ -308,13 +308,13 @@ func loadBuiltinTopology(
 	if wire.Application.UserRoot.Protected {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: application user Root cannot be protected",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !wire.Application.UserRoot.Retained {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: application user Root must be retained",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -327,7 +327,7 @@ func loadBuiltinTopology(
 	if len(wire.Builtin.Sources) == 0 {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in topology has no Sources",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -346,7 +346,7 @@ func loadBuiltinTopology(
 	if !wire.Builtin.Root.Protected {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in Root must be protected",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -358,10 +358,10 @@ func loadBuiltinTopology(
 	sourceNameByRole := make(map[string]string)
 
 	for index, value := range wire.Builtin.Sources {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"built-in source name",
 			value.Name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return builtinTopologyConfig{}, fmt.Errorf(
 				"builtin sources[%d]: %w",
@@ -372,7 +372,7 @@ func loadBuiltinTopology(
 		if _, duplicate := sourcesByName[value.Name]; duplicate {
 			return builtinTopologyConfig{}, fmt.Errorf(
 				"%w: built-in topology repeats source name %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				value.Name,
 			)
 		}
@@ -383,7 +383,7 @@ func loadBuiltinTopology(
 		}
 		config, err = jsonutil.CanonicalizeObject(
 			config,
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		)
 		if err != nil {
 			return builtinTopologyConfig{}, fmt.Errorf(
@@ -415,17 +415,17 @@ func loadBuiltinTopology(
 
 		seenRoles := make(map[string]struct{}, len(value.Roles))
 		for _, role := range value.Roles {
-			if err := spec.ValidateIdentifier(
+			if err := storeSpec.ValidateIdentifier(
 				"built-in source role",
 				role,
-				spec.MaxKindBytes,
+				storeSpec.MaxKindBytes,
 			); err != nil {
 				return builtinTopologyConfig{}, err
 			}
 			if _, duplicate := seenRoles[role]; duplicate {
 				return builtinTopologyConfig{}, fmt.Errorf(
 					"%w: source %q repeats role %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					value.Name,
 					role,
 				)
@@ -434,7 +434,7 @@ func loadBuiltinTopology(
 			if previous, duplicate := sourceNameByRole[role]; duplicate {
 				return builtinTopologyConfig{}, fmt.Errorf(
 					"%w: source role %q is declared by both %q and %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					role,
 					previous,
 					value.Name,
@@ -451,7 +451,7 @@ func loadBuiltinTopology(
 		userRoot.StorageKey == declaration.Root.StorageKey {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in and user Roots must have distinct identities and storage keys",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	for _, sourceValue := range declaration.Sources {
@@ -459,7 +459,7 @@ func loadBuiltinTopology(
 			userRoot.ID == rootModel.RootID(sourceValue.ID) {
 			return builtinTopologyConfig{}, fmt.Errorf(
 				"%w: application Root and Source IDs must differ",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 	}
@@ -467,38 +467,38 @@ func loadBuiltinTopology(
 	if !found {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in topology has no package Source role",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	packageSource := sourcesByName[packageSourceName]
 	if packageSource.Kind != managedfs.Kind {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in package Source must be managed",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !packageSource.Enabled {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in package Source must be enabled",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !packageSource.Discovery.Authoritative {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in package Source discovery must be authoritative",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	embeddedRoots := make(
-		map[string]spec.Locator,
+		map[string]storeSpec.Locator,
 		len(wire.Builtin.EmbeddedPackages),
 	)
 	for name, locator := range wire.Builtin.EmbeddedPackages {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"embedded package set name",
 			name,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return builtinTopologyConfig{}, err
 		}
@@ -516,7 +516,7 @@ func loadBuiltinTopology(
 		if _, found := embeddedRoots[required]; !found {
 			return builtinTopologyConfig{}, fmt.Errorf(
 				"%w: built-in topology has no embedded package set %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				required,
 			)
 		}
@@ -533,7 +533,7 @@ func loadBuiltinTopology(
 		}
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in topology declares unsupported embedded package set %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -561,17 +561,17 @@ func validateConfiguredRoot(
 	if err := value.StorageKey.Validate(); err != nil {
 		return fmt.Errorf("%s: %w", label, err)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		label+" display name",
 		value.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	return spec.ValidateOptionalText(
+	return storeSpec.ValidateOptionalText(
 		label+" description",
 		value.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	)
 }
 
@@ -581,7 +581,7 @@ func parseApplicationStorage(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: application storage declarations are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -589,31 +589,31 @@ func parseApplicationStorage(
 	output := make(map[ApplicationStorageKey]string, len(values))
 	for rawKey, name := range values {
 		key := ApplicationStorageKey(rawKey)
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"application storage key",
 			rawKey,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"application storage name",
 			name,
-			spec.MaxLogicalNameBytes,
+			storeSpec.MaxLogicalNameBytes,
 		); err != nil {
 			return nil, err
 		}
 		if strings.HasPrefix(name, ".") || strings.Contains(name, "/") {
 			return nil, fmt.Errorf(
 				"%w: application storage name %q is invalid",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 			)
 		}
 		if previous, duplicate := seenValues[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: application storage keys %q and %q both use %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				previous,
 				key,
 				name,
@@ -634,7 +634,7 @@ func parseApplicationStorage(
 		}
 		return nil, fmt.Errorf(
 			"%w: application storage declaration %q is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			key,
 		)
 	}

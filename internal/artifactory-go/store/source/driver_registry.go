@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -25,14 +25,14 @@ func NewRegistry(adapters ...driver.Driver) (*Registry, error) {
 
 	for _, adapter := range adapters {
 		if adapter == nil {
-			return nil, fmt.Errorf("%w: source adapter is nil", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: source adapter is nil", storeSpec.ErrInvalid)
 		}
 		kind := adapter.Kind()
 		if err := kind.Validate(); err != nil {
 			return nil, err
 		}
 		if _, exists := values[kind]; exists {
-			return nil, fmt.Errorf("%w: duplicate source adapter %q", spec.ErrConflict, kind)
+			return nil, fmt.Errorf("%w: duplicate source adapter %q", storeSpec.ErrConflict, kind)
 		}
 		values[kind] = adapter
 		kinds = append(kinds, kind)
@@ -54,15 +54,15 @@ func (r *Registry) NormalizeConfig(
 	}
 	adapter, exists := r.adapter(kind)
 	if !exists {
-		return nil, fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, kind)
+		return nil, fmt.Errorf("%w: source adapter %q", storeSpec.ErrSourceUnavailable, kind)
 	}
 	normalized, err := adapter.NormalizeConfig(ctx, append(json.RawMessage(nil), raw...))
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsonutil.CanonicalizeObject(normalized, spec.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(normalized, storeSpec.MaxConfigBytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: normalized Source config: %w", spec.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: normalized Source config: %w", storeSpec.ErrInvalid, err)
 	}
 	return json.RawMessage(canonical), nil
 }
@@ -73,7 +73,7 @@ func (r *Registry) Open(
 ) (driver.Snapshot, error) {
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
-		return nil, fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
+		return nil, fmt.Errorf("%w: source adapter %q", storeSpec.ErrSourceUnavailable, value.Kind)
 	}
 	snapshot, err := adapter.Open(ctx, value.Clone())
 	if err != nil {
@@ -107,15 +107,15 @@ func (r *Registry) SupportsManagedPackages(kind sourceModel.SourceKind) bool {
 func (r *Registry) ResolveLocalPath(
 	ctx context.Context,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
-		return "", fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
+		return "", fmt.Errorf("%w: source adapter %q", storeSpec.ErrSourceUnavailable, value.Kind)
 	}
 	resolver, supported := adapter.(driver.LocalPathResolver)
 	if !supported {
-		return "", fmt.Errorf("%w: source kind %q has no native filesystem path", spec.ErrUnsupported, value.Kind)
+		return "", fmt.Errorf("%w: source kind %q has no native filesystem path", storeSpec.ErrUnsupported, value.Kind)
 	}
 	return resolver.ResolveLocalPath(ctx, value.Clone(), locator)
 }
@@ -131,18 +131,18 @@ func (r *Registry) PublishPackage(
 	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
-		return "", fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
+		return "", fmt.Errorf("%w: source adapter %q", storeSpec.ErrSourceUnavailable, value.Kind)
 	}
 	writer, supported := adapter.(managedpackage.Writer)
 	if !supported {
-		return "", fmt.Errorf("%w: source kind %q is not writable", spec.ErrUnsupported, value.Kind)
+		return "", fmt.Errorf("%w: source kind %q is not writable", storeSpec.ErrUnsupported, value.Kind)
 	}
 	generation, err := writer.PublishPackage(ctx, value.Clone(), normalized)
 	if err != nil {
 		return "", err
 	}
-	if err := spec.ValidateSourceGeneration(generation); err != nil {
-		return "", fmt.Errorf("%w: managed Source writer returned an invalid generation: %w", spec.ErrInvalid, err)
+	if err := storeSpec.ValidateSourceGeneration(generation); err != nil {
+		return "", fmt.Errorf("%w: managed Source writer returned an invalid generation: %w", storeSpec.ErrInvalid, err)
 	}
 	return generation, nil
 }
@@ -155,11 +155,11 @@ func (r *Registry) RemovePackage(
 ) error {
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
-		return fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, value.Kind)
+		return fmt.Errorf("%w: source adapter %q", storeSpec.ErrSourceUnavailable, value.Kind)
 	}
 	writer, supported := adapter.(managedpackage.Writer)
 	if !supported {
-		return fmt.Errorf("%w: source kind %q is not writable", spec.ErrUnsupported, value.Kind)
+		return fmt.Errorf("%w: source kind %q is not writable", storeSpec.ErrUnsupported, value.Kind)
 	}
 	return writer.RemovePackage(ctx, value.Clone(), address, expectedGeneration)
 }
@@ -169,7 +169,7 @@ func (r *Registry) RemovePackage(
 // exposed by source.Service.
 func (r *Registry) RemoveManagedRoot(
 	ctx context.Context,
-	rootStorageKey spec.StorageKey,
+	rootStorageKey storeSpec.StorageKey,
 ) error {
 	if err := rootStorageKey.Validate(); err != nil {
 		return err

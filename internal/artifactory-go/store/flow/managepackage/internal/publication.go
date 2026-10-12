@@ -6,7 +6,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Service) publishPackage(
@@ -20,7 +20,7 @@ func (s *Service) publishPackage(
 		s.dependencies.Runtime == nil ||
 		s.dependencies.ContentMutation == nil ||
 		s.dependencies.Packages == nil {
-		return SourceState{}, spec.ErrClosed
+		return SourceState{}, storeSpec.ErrClosed
 	}
 
 	value, err := s.managedSource(

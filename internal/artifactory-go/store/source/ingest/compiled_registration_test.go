@@ -9,7 +9,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -36,8 +36,8 @@ func TestRegisterCompiledDocumentsReplacesPriorRegistrationEvidence(
 
 	first := compiledRegistrationTestDocument(
 		t,
-		spec.Locator("first.json"),
-		spec.LogicalName("first"),
+		storeSpec.Locator("first.json"),
+		storeSpec.LogicalName("first"),
 	)
 	if err := engine.RegisterCompiledDocuments(
 		t.Context(),
@@ -51,8 +51,8 @@ func TestRegisterCompiledDocumentsReplacesPriorRegistrationEvidence(
 
 	second := compiledRegistrationTestDocument(
 		t,
-		spec.Locator("second.json"),
-		spec.LogicalName("second"),
+		storeSpec.Locator("second.json"),
+		storeSpec.LogicalName("second"),
 	)
 	if err := engine.RegisterCompiledDocuments(
 		t.Context(),
@@ -95,7 +95,7 @@ func TestRegisterCompiledDocumentsReplacesPriorRegistrationEvidence(
 		compiledRegistrationTestSourceID,
 		[]CompiledDocument{second},
 	)
-	if !errors.Is(err, spec.ErrIdentityConflict) {
+	if !errors.Is(err, storeSpec.ErrIdentityConflict) {
 		t.Fatalf(
 			"duplicate locator from another registration error = %v, want identity conflict",
 			err,
@@ -105,8 +105,8 @@ func TestRegisterCompiledDocumentsReplacesPriorRegistrationEvidence(
 
 func compiledRegistrationTestDocument(
 	t *testing.T,
-	locator spec.Locator,
-	name spec.LogicalName,
+	locator storeSpec.Locator,
+	name storeSpec.LogicalName,
 ) CompiledDocument {
 	t.Helper()
 

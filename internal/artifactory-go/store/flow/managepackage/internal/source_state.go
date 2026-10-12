@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Service) sourceState(
@@ -35,7 +35,7 @@ func (s *Service) sourceState(
 	if !s.dependencies.Packages.SupportsManagedPackages(value.Kind) {
 		return SourceState{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -64,7 +64,7 @@ func (s *Service) managedSource(
 	if expectedSourceRevision == 0 {
 		return sourceModel.Source{}, fmt.Errorf(
 			"%w: expected Source revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -73,12 +73,12 @@ func (s *Service) managedSource(
 		return sourceModel.Source{}, err
 	}
 	if value.Revision != expectedSourceRevision {
-		return sourceModel.Source{}, spec.ErrConflict
+		return sourceModel.Source{}, storeSpec.ErrConflict
 	}
 	if !s.dependencies.Packages.SupportsManagedPackages(value.Kind) {
 		return sourceModel.Source{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -132,7 +132,7 @@ func managedPackageExists(
 		return false, errors.Join(statErr, confirmErr)
 	}
 
-	if errors.Is(statErr, spec.ErrNotFound) {
+	if errors.Is(statErr, storeSpec.ErrNotFound) {
 		return false, nil
 	}
 	if statErr != nil {
@@ -141,7 +141,7 @@ func managedPackageExists(
 	if !entry.IsDirectory {
 		return false, fmt.Errorf(
 			"%w: managed package %q is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			address,
 		)
 	}

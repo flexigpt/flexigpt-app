@@ -1,7 +1,7 @@
 package mcpv1
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
@@ -54,7 +54,7 @@ func mcpRelationships(
 		return nil, err
 	}
 	if value.Declared.Header().Name == "" {
-		return nil, spec.ErrInvalid
+		return nil, storeSpec.ErrInvalid
 	}
 	return []coreinterpretation.Relationship{value}, nil
 }

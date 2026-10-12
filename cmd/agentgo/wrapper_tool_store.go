@@ -16,7 +16,7 @@ import (
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -76,7 +76,7 @@ func withToolStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -211,12 +211,12 @@ func (w *ToolStoreWrapper) InvokeGoToolTarget(
 ) (*llmtoolsutil.InvokeResponse, error) {
 	return withRecoveryResp(func() (*llmtoolsutil.InvokeResponse, error) {
 		if w == nil || w.api == nil || w.runtime == nil {
-			return nil, spec.ErrClosed
+			return nil, storeSpec.ErrClosed
 		}
 		if timeoutMS < 0 {
 			return nil, fmt.Errorf(
 				"%w: Tool timeout cannot be negative",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -231,7 +231,7 @@ func (w *ToolStoreWrapper) InvokeGoToolTarget(
 			toolv1.ImplementationKindGo {
 			return nil, fmt.Errorf(
 				"%w: SDK Tool %q cannot be invoked by the local Go Tool runtime",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				resolved.Tool.Name,
 			)
 		}
@@ -242,7 +242,7 @@ func (w *ToolStoreWrapper) InvokeGoToolTarget(
 			if !json.Valid(raw) {
 				return nil, fmt.Errorf(
 					"%w: Tool arguments must be valid JSON",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 		}

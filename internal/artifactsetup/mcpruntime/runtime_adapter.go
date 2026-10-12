@@ -9,7 +9,7 @@ import (
 
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
 )
@@ -53,7 +53,7 @@ func NewRuntimeAdapter(
 		oauthTokens == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP runtime adapter dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -73,13 +73,13 @@ func (a *RuntimeAdapter) BindRuntime(
 	if runtime == nil {
 		return fmt.Errorf(
 			"%w: MCP runtime is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if a.runtime != nil {
 		return fmt.Errorf(
 			"%w: MCP runtime adapter is already bound",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	a.runtime = runtime
@@ -227,7 +227,7 @@ func (a *RuntimeAdapter) runtimeManager() (
 	error,
 ) {
 	if a.runtime == nil {
-		return nil, spec.ErrClosed
+		return nil, storeSpec.ErrClosed
 	}
 	return a.runtime, nil
 }

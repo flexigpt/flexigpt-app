@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -41,7 +41,7 @@ func ContentDigest(
 	if provider == nil {
 		return "", fmt.Errorf(
 			"%w: embedded content filesystem is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	value, err := fingerprint(ctx, provider)
@@ -59,17 +59,17 @@ func NewWithRegistrations(
 	immutable := make(map[string]immutableProvider)
 
 	for key, registration := range registrations {
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"embedded provider key",
 			key,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if registration.Filesystem == nil {
 			return nil, fmt.Errorf(
 				"%w: embedded provider %q is nil",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				key,
 			)
 		}
@@ -78,10 +78,10 @@ func NewWithRegistrations(
 		if registration.Immutable == nil {
 			continue
 		}
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"immutable embedded provider revision",
 			registration.Immutable.Revision,
-			spec.MaxVersionBytes,
+			storeSpec.MaxVersionBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func NewWithRegistrations(
 		if observed != registration.Immutable.ContentDigest {
 			return nil, fmt.Errorf(
 				"%w: immutable embedded provider %q content evidence differs",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 				key,
 			)
 		}
@@ -117,12 +117,12 @@ func NewWithRegistrations(
 
 func (p immutableProvider) generation(
 	providerKey string,
-	root spec.Locator,
+	root storeSpec.Locator,
 ) (string, error) {
 	value, err := cryptoutil.CanonicalDigest(struct {
 		Format        string            `json:"format"`
 		Provider      string            `json:"provider"`
-		Root          spec.Locator      `json:"root"`
+		Root          storeSpec.Locator `json:"root"`
 		Revision      string            `json:"revision"`
 		ContentDigest cryptoutil.Digest `json:"contentDigest"`
 	}{

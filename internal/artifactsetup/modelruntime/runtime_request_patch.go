@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"maps"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
@@ -18,7 +18,7 @@ const runtimeRequestPatchDigestDomain = "flexigpt.spec.runtime-request-patch/v1"
 // Only prepareRuntimeRequestPatch constructs non-empty values.
 type preparedRuntimeRequestPatch struct {
 	defaults map[string]any
-	clear    []inferencewrapperSpec.RuntimeDefaultField
+	clear    []inferenceRuntimeSpec.RuntimeDefaultField
 	digest   cryptoutil.Digest
 }
 
@@ -26,7 +26,7 @@ type preparedRuntimeRequestPatch struct {
 // It validates the typed defaults, converts them to the merge representation,
 // and computes their configuration digest.
 func prepareRuntimeRequestPatch(
-	patch *inferencewrapperSpec.RuntimeRequestPatch,
+	patch *inferenceRuntimeSpec.RuntimeRequestPatch,
 ) (preparedRuntimeRequestPatch, error) {
 	if patch == nil {
 		return preparedRuntimeRequestPatch{}, nil
@@ -44,7 +44,7 @@ func prepareRuntimeRequestPatch(
 	if patch.Defaults != nil {
 		canonical, err := jsonutil.MarshalCanonicalObject(
 			patch.Defaults,
-			spec.MaxDefinitionBodyBytes,
+			storeSpec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return preparedRuntimeRequestPatch{}, fmt.Errorf(
@@ -81,14 +81,14 @@ func prepareRuntimeRequestPatch(
 }
 
 func normalizeRuntimeDefaultFields(
-	fields []inferencewrapperSpec.RuntimeDefaultField,
-) ([]inferencewrapperSpec.RuntimeDefaultField, error) {
+	fields []inferenceRuntimeSpec.RuntimeDefaultField,
+) ([]inferenceRuntimeSpec.RuntimeDefaultField, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
 
-	output := make([]inferencewrapperSpec.RuntimeDefaultField, len(fields))
-	seen := make(map[inferencewrapperSpec.RuntimeDefaultField]struct{}, len(fields))
+	output := make([]inferenceRuntimeSpec.RuntimeDefaultField, len(fields))
+	seen := make(map[inferenceRuntimeSpec.RuntimeDefaultField]struct{}, len(fields))
 	for index, field := range fields {
 		if err := field.Validate(); err != nil {
 			return nil, err
@@ -96,7 +96,7 @@ func normalizeRuntimeDefaultFields(
 		if _, duplicate := seen[field]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Model runtime request clear field %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				field,
 			)
 		}
@@ -108,7 +108,7 @@ func normalizeRuntimeDefaultFields(
 
 func runtimeRequestPatchDigest(
 	canonicalDefaults []byte,
-	clearFields []inferencewrapperSpec.RuntimeDefaultField,
+	clearFields []inferenceRuntimeSpec.RuntimeDefaultField,
 ) cryptoutil.Digest {
 	input := make(
 		[]byte,
@@ -147,7 +147,7 @@ func applyRuntimeDefaults(
 	if defaults == nil {
 		return fmt.Errorf(
 			"%w: effective Model defaults are nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -158,7 +158,7 @@ func applyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model defaults field %q must be an object",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					key,
 				)
 			}
@@ -170,7 +170,7 @@ func applyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model stopSequences must be an array",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 				)
 			}
 			if len(values) != 0 {

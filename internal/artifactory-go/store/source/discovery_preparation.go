@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -96,7 +96,7 @@ func (s *Service) PrepareDiscovery(
 		return sourceModel.Summary{}, err
 	}
 	if current.Revision != preparation.ExpectedRevision {
-		return sourceModel.Summary{}, spec.ErrConflict
+		return sourceModel.Summary{}, storeSpec.ErrConflict
 	}
 
 	nextDiscovery, err := MergeDiscoveryRequirement(
@@ -112,7 +112,7 @@ func (s *Service) PrepareDiscovery(
 	if current.Revision == ^uint64(0) {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Source revision is exhausted",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

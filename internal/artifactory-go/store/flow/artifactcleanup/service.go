@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -36,7 +36,7 @@ func NewService(
 	cleanup cleanupDrainer,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
-		return nil, fmt.Errorf("%w: Artifact cleanup dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Artifact cleanup dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	return &Service{
 		repository: repository,
@@ -74,11 +74,11 @@ func (s *Service) CleanupArtifactLocalState(
 	if s.policy != nil && s.policy.IsProtectedRoot(value.RootID) && !root.IsInstallerPrivileged(ctx) {
 		return PurgeResult{}, fmt.Errorf(
 			"%w: protected Artifact local-state purge requires installer privilege",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 	if value.Revision != request.ExpectedArtifactRevision {
-		return PurgeResult{}, spec.ErrConflict
+		return PurgeResult{}, storeSpec.ErrConflict
 	}
 	updated, err := s.repository.CleanupArtifactLocalState(
 		ctx,
@@ -91,7 +91,7 @@ func (s *Service) CleanupArtifactLocalState(
 	if updated.Ref() != request.Artifact {
 		return PurgeResult{}, fmt.Errorf(
 			"%w: Artifact cleanup repository returned another Artifact",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if s.cleanup != nil {

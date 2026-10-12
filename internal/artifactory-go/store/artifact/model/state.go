@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -37,7 +37,7 @@ func (s State) Validate(
 			sourceContentDigest == nil {
 			return fmt.Errorf(
 				"%w: available Artifact requires Definition and source content digests",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -46,7 +46,7 @@ func (s State) Validate(
 			sourceContentDigest == nil {
 			return fmt.Errorf(
 				"%w: incompatible Artifact requires observed Definition and source content digests",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -55,7 +55,7 @@ func (s State) Validate(
 			sourceContentDigest != nil {
 			return fmt.Errorf(
 				"%w: missing Artifact cannot retain current source state",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -63,14 +63,14 @@ func (s State) Validate(
 		if resolvedDefinition != nil {
 			return fmt.Errorf(
 				"%w: invalid Artifact cannot retain a resolved Definition",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
 			"%w: invalid Artifact state %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			s,
 		)
 	}

@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
 
@@ -22,7 +22,7 @@ func (w *ModelStoreWrapper) ListProviders(
 	rootID rootModel.RootID,
 ) ([]modelAPI.ProviderListItem, error) {
 	if w == nil || w.api == nil {
-		return nil, spec.ErrClosed
+		return nil, storeSpec.ErrClosed
 	}
 
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func (w *ModelStoreWrapper) ListModels(
 	rootID rootModel.RootID,
 ) ([]modelAPI.ModelListItem, error) {
 	if w == nil || w.api == nil {
-		return nil, spec.ErrClosed
+		return nil, storeSpec.ErrClosed
 	}
 
 	ctx := context.Background()
@@ -74,7 +74,7 @@ func (w *ModelStoreWrapper) GetProvider(
 	ref artifactModel.ArtifactRef,
 ) (modelAPI.ProviderView, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ProviderView{}, spec.ErrClosed
+		return modelAPI.ProviderView{}, storeSpec.ErrClosed
 	}
 	return w.api.GetProvider(context.Background(), ref)
 }
@@ -83,7 +83,7 @@ func (w *ModelStoreWrapper) GetModel(
 	ref artifactModel.ArtifactRef,
 ) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, storeSpec.ErrClosed
 	}
 	return w.api.GetModel(context.Background(), ref)
 }
@@ -92,7 +92,7 @@ func (w *ModelStoreWrapper) SaveModelSettings(
 	request modelAPI.SaveModelSettingsRequest,
 ) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, storeSpec.ErrClosed
 	}
 	return w.api.SaveModelSettings(context.Background(), request)
 }
@@ -103,7 +103,7 @@ func (w *ModelStoreWrapper) ResetModelSettings(
 	expectedSettingsRevision uint64,
 ) (modelAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ModelView{}, spec.ErrClosed
+		return modelAPI.ModelView{}, storeSpec.ErrClosed
 	}
 	return w.api.ResetModelSettings(
 		context.Background(),
@@ -117,7 +117,7 @@ func (w *ModelStoreWrapper) GetProviderAPIKeyStatus(
 	ref artifactModel.ArtifactRef,
 ) (modelAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
+		return modelAPI.ProviderAPIKeyStatus{}, storeSpec.ErrClosed
 	}
 	return w.api.GetProviderAPIKeyStatus(context.Background(), ref)
 }
@@ -126,7 +126,7 @@ func (w *ModelStoreWrapper) CreateModel(
 	request modelAPI.ManagedModelCreateRequest,
 ) (modelAPI.ManagedModelCreateResult, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ManagedModelCreateResult{}, spec.ErrClosed
+		return modelAPI.ManagedModelCreateResult{}, storeSpec.ErrClosed
 	}
 
 	rootID, err := w.writableManagementRoot(
@@ -144,7 +144,7 @@ func (w *ModelStoreWrapper) UpdateModel(
 	request modelAPI.ManagedModelReplaceRequest,
 ) (modelAPI.ManagedModelReplaceResult, error) {
 	if w == nil || w.api == nil {
-		return modelAPI.ManagedModelReplaceResult{}, spec.ErrClosed
+		return modelAPI.ManagedModelReplaceResult{}, storeSpec.ErrClosed
 	}
 	return w.api.ReplaceModel(context.Background(), request)
 }
@@ -154,7 +154,7 @@ func (w *ModelStoreWrapper) DeleteModel(
 	expectedRevision uint64,
 ) error {
 	if w == nil || w.api == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return w.api.DeleteModel(
 		context.Background(),
@@ -169,7 +169,7 @@ func (w *ModelStoreWrapper) SetModelEnabled(
 	enabled bool,
 ) (artifactModel.Artifact, error) {
 	if w == nil || w.api == nil {
-		return artifactModel.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, storeSpec.ErrClosed
 	}
 	return w.api.SetModelEnabled(
 		context.Background(),
@@ -221,7 +221,7 @@ func (w *ModelStoreWrapper) writableManagementRoot(
 	}
 	return "", fmt.Errorf(
 		"%w: no writable Artifact Root is available for Model authoring",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 	)
 }
 

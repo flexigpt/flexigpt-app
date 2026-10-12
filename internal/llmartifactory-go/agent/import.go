@@ -15,7 +15,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -53,7 +53,7 @@ type preparedAgentImport struct {
 	ExpectedSourceGeneration string                    `json:"expectedSourceGeneration"`
 
 	Address      managedpackageModel.ManagedPackageAddress `json:"address"`
-	AgentLocator spec.Locator                              `json:"agentLocator"`
+	AgentLocator storeSpec.Locator                         `json:"agentLocator"`
 
 	RestoredMemberships       []AgentRestoredMembership `json:"restoredMemberships"`
 	MCPSetupDescriptors       []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors"`
@@ -63,8 +63,8 @@ type preparedAgentImport struct {
 type plannedImportIdentity struct {
 	OccurrencePath string
 	Type           declaration.Type
-	Name           spec.LogicalName
-	LogicalVersion spec.LogicalVersion
+	Name           storeSpec.LogicalName
+	LogicalVersion storeSpec.LogicalVersion
 	Digest         cryptoutil.Digest
 }
 
@@ -114,7 +114,7 @@ func (a *Service) PreviewAgentImport(
 	if request.ExpectedPluginRevision == 0 {
 		return AgentImportPreview{}, fmt.Errorf(
 			"%w: expected Agent Plugin revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	inputFormat, err := managedAgentImportFormatForPath(
@@ -148,7 +148,7 @@ func (a *Service) PreviewAgentImport(
 	sourceBytes, err := llmtoolsutil.ReadPortableTextFile(
 		ctx,
 		request.Path,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return preview, err
@@ -227,7 +227,7 @@ func (a *Service) PreviewAgentImport(
 
 	normalizedYAML, err := yamlutil.CanonicalObjectYAML(
 		canonical,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return previewValidationError(
@@ -449,7 +449,7 @@ func (a *Service) CommitAgentImport(
 	if request.Prepared == "" {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -465,13 +465,13 @@ func (a *Service) CommitAgentImport(
 	if !time.Now().UTC().Before(plan.ExpiresAt) {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import has expired",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	if plan.ProfileID != agentv1.ManagedAgentImportProfileID {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import profile is unsupported",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !sameCodes(
@@ -480,7 +480,7 @@ func (a *Service) CommitAgentImport(
 	) {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: accepted confirmation codes differ from preview",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -497,7 +497,7 @@ func (a *Service) CommitAgentImport(
 		destination.sourceGeneration != plan.ExpectedSourceGeneration {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import Source witness is stale",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -520,7 +520,7 @@ func (a *Service) CommitAgentImport(
 	if !bytes.Equal(canonical, normalizedCanonical) {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import is not normalized",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	canonical, err = a.managedAgentProfile.Validate(normalizedCanonical)
@@ -542,7 +542,7 @@ func (a *Service) CommitAgentImport(
 	if admission.HasErrors() {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import no longer satisfies managed admission",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -553,7 +553,7 @@ func (a *Service) CommitAgentImport(
 	if rootDefinition.Digest != plan.DefinitionDigest {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent Definition digest changed",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	address, err := a.support.ManagedPackage.Address(
@@ -566,7 +566,7 @@ func (a *Service) CommitAgentImport(
 	if address != plan.Address {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent package address changed",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	agentLocator, err := a.support.ManagedPackage.Locator(address)
@@ -576,7 +576,7 @@ func (a *Service) CommitAgentImport(
 	if agentLocator != plan.AgentLocator {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent package locator changed",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -595,7 +595,7 @@ func (a *Service) CommitAgentImport(
 	if len(conflicts) != 0 {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: prepared Agent import now conflicts with existing Artifacts",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 
@@ -611,7 +611,7 @@ func (a *Service) CommitAgentImport(
 	if packageConflict != nil {
 		return AgentImportCommitResult{}, fmt.Errorf(
 			"%w: %s",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			packageConflict.Message,
 		)
 	}
@@ -686,18 +686,18 @@ func (a *Service) agentImportDestination(
 	}
 	if expectedRevision != 0 &&
 		value.Artifact.Revision != expectedRevision {
-		return agentImportDestinationState{}, spec.ErrConflict
+		return agentImportDestinationState{}, storeSpec.ErrConflict
 	}
 	if !a.IsManagedAgentPlugin(value) {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected Plugin is not an editable managed Agent Plugin",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if a.protection.IsProtectedRoot(value.Artifact.RootID) {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: protected Plugins cannot receive managed Agent imports",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 	if err := a.requireMutable(ctx, value.Artifact.RootID); err != nil {
@@ -715,7 +715,7 @@ func (a *Service) agentImportDestination(
 	if !a.support.PluginProfile.Source.Matches(sourceValue) || !sourceValue.Enabled {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected Plugin does not use the enabled managed Agent Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -730,7 +730,7 @@ func (a *Service) agentImportDestination(
 	if !inspection.IsCurrent() {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected managed Agent Source requires refresh",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 
@@ -866,7 +866,7 @@ func (a *Service) managedAgentPackageConflict(
 		directory,
 	)
 	if err != nil {
-		if errors.Is(err, spec.ErrNotFound) {
+		if errors.Is(err, storeSpec.ErrNotFound) {
 			//nolint:nilnil // Explicit.
 			return nil, nil
 		}
@@ -878,7 +878,7 @@ func (a *Service) managedAgentPackageConflict(
 	if entry.Locator != directory {
 		return nil, fmt.Errorf(
 			"%w: managed package inspection returned %q for %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			entry.Locator,
 			directory,
 		)
@@ -894,8 +894,8 @@ func (a *Service) managedAgentPackageConflict(
 func (a *Service) analyzeAgentImportMembership(
 	ctx context.Context,
 	selected pluginAPI.PluginView,
-	name spec.LogicalName,
-	agentLocator spec.Locator,
+	name storeSpec.LogicalName,
+	agentLocator storeSpec.Locator,
 ) (
 	[]AgentRestoredMembership,
 	[]AgentImportConflict,
@@ -982,8 +982,8 @@ func (a *Service) analyzeAgentImportMembership(
 
 func memberTargetsAgentLocator(
 	member pluginAPI.MemberReference,
-	parentLocator spec.Locator,
-	targetLocator spec.Locator,
+	parentLocator storeSpec.Locator,
+	targetLocator storeSpec.Locator,
 ) bool {
 	if member.Locator == nil ||
 		member.Scope != "" ||
@@ -1102,7 +1102,7 @@ func (a *Service) preflightNamedManagedDependency(
 		return AgentImportRelationship{},
 			nil,
 			nil,
-			spec.ErrClosed
+			storeSpec.ErrClosed
 	}
 
 	header := member.Header()
@@ -1131,7 +1131,7 @@ func (a *Service) preflightNamedManagedDependency(
 	output := AgentImportRelationship{
 		Path:   memberPath,
 		Type:   header.Type,
-		Name:   spec.LogicalName(header.Name),
+		Name:   storeSpec.LogicalName(header.Name),
 		Scope:  relationshipFields.Scope,
 		Status: target.Status,
 	}
@@ -1231,7 +1231,7 @@ func (a *Service) validateManagedDependencyTarget(
 	if target.Target == nil {
 		return fmt.Errorf(
 			"%w: managed Agent dependency %q resolved without a capability target",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			memberPath,
 		)
 	}
@@ -1239,7 +1239,7 @@ func (a *Service) validateManagedDependencyTarget(
 	if scope != declaration.LookupScopeBuiltin {
 		return fmt.Errorf(
 			"%w: managed Agent dependency %q is not normalized to built-in scope",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			memberPath,
 		)
 	}
@@ -1272,7 +1272,7 @@ func (a *Service) validateManagedDependencyTarget(
 
 	return fmt.Errorf(
 		"%w: managed Agent dependency %q does not resolve to the required protected built-in Artifact or direct capability",
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 		memberPath,
 	)
 }
@@ -1330,7 +1330,7 @@ func (a *Service) publishPreparedManagedAgent(
 		*published.Artifact.ResolvedDefinition != expectedDefinition {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: published Agent does not match prepared Definition",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return published.Artifact.Clone(), nil

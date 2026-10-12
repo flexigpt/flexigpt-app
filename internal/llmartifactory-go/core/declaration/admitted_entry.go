@@ -3,7 +3,7 @@ package declaration
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // DecodeAdmittedEntryInto decodes one Entry whose containing Definition has
@@ -19,7 +19,7 @@ func DecodeAdmittedEntryInto(
 	if target == nil {
 		return fmt.Errorf(
 			"%w: admitted declaration decode target is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return entry.DecodeInto(target)

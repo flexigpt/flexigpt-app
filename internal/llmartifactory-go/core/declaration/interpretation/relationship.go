@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -63,7 +63,7 @@ func NewMemberRelationship(
 	if form == declaration.MemberSelector && !options.AllowSelector {
 		return Relationship{}, fmt.Errorf(
 			"%w: this declaration relationship does not permit selectors",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -123,7 +123,7 @@ func NewMemberRelationship(
 	default:
 		return Relationship{}, fmt.Errorf(
 			"%w: unsupported declaration member form %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			form,
 		)
 	}
@@ -155,7 +155,7 @@ func (r Relationship) Validate() error {
 	if len(r.Path) == 0 {
 		return fmt.Errorf(
 			"%w: declaration relationship path is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := declarationPath(r.Path); err != nil {
@@ -171,14 +171,14 @@ func (r Relationship) Validate() error {
 	if form != r.Form {
 		return fmt.Errorf(
 			"%w: declaration relationship form differs from declaration member",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.Form == declaration.MemberContained {
 		if len(r.ContainedPath) == 0 {
 			return fmt.Errorf(
 				"%w: contained declaration relationship has no subresource path",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return declarationPath(r.ContainedPath)
@@ -186,7 +186,7 @@ func (r Relationship) Validate() error {
 	if len(r.ContainedPath) != 0 {
 		return fmt.Errorf(
 			"%w: non-contained relationship has a subresource path",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -198,9 +198,9 @@ func declarationPath(
 	if len(values) == 0 {
 		return fmt.Errorf(
 			"%w: declaration relationship path is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	value := spec.SubresourceLocator(strings.Join(values, "/"))
+	value := storeSpec.SubresourceLocator(strings.Join(values, "/"))
 	return value.Validate()
 }

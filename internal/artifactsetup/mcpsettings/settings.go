@@ -11,7 +11,7 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 )
@@ -34,7 +34,7 @@ func New(
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP global settings overlay store is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Settings{overlays: overlays}, nil
@@ -58,11 +58,11 @@ func (s *Settings) Get(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&value,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	); err != nil {
 		return mcpAuth.MCPAuthSettings{}, 0, fmt.Errorf(
 			"%w: decode MCP global settings overlay: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -92,7 +92,7 @@ func (s *Settings) Put(
 		payload{
 			OAuthLoopbackListenAddr: settings.OAuthLoopbackListenAddr,
 		},
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return 0, err
@@ -129,13 +129,13 @@ func normalize(
 	if err != nil {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen address must be host:port",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !isLoopbackHost(host) {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen host must be loopback",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -143,7 +143,7 @@ func normalize(
 	if err != nil || number <= 0 || number > 65535 {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen port must be 1..65535",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return value, nil

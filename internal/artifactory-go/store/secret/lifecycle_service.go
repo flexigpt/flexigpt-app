@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -31,7 +31,7 @@ func NewLifecycleService(
 	values value.ValueStore,
 ) (*LifecycleService, error) {
 	if repository == nil || timeClock == nil {
-		return nil, fmt.Errorf("%w: secret lifecycle dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: secret lifecycle dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	if values != nil {
 		if err := value.ValidateValueStore(values); err != nil {
@@ -43,7 +43,7 @@ func NewLifecycleService(
 
 func (s *LifecycleService) DrainSecretGarbage(ctx context.Context) error {
 	if s.values == nil {
-		return fmt.Errorf("%w: Artifact Store secret value backend is not configured", spec.ErrUnsupported)
+		return fmt.Errorf("%w: Artifact Store secret value backend is not configured", storeSpec.ErrUnsupported)
 	}
 	values, err := s.repository.ListSecretCleanup(ctx, secretCleanupBatchSize)
 	if err != nil {
@@ -60,7 +60,11 @@ func (s *LifecycleService) DrainSecretGarbage(ctx context.Context) error {
 			)
 			output = errors.Join(
 				output,
-				fmt.Errorf("%w: cleanup record belongs to secret backend %q", spec.ErrUnsupported, record.StoreName),
+				fmt.Errorf(
+					"%w: cleanup record belongs to secret backend %q",
+					storeSpec.ErrUnsupported,
+					record.StoreName,
+				),
 			)
 			continue
 		}

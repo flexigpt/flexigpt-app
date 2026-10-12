@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func NormalizeCodecs(
@@ -17,7 +17,7 @@ func NormalizeCodecs(
 		if codec == nil {
 			return nil, fmt.Errorf(
 				"%w: schema codec %d is nil",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 			)
 		}
@@ -33,7 +33,7 @@ func NormalizeCodecs(
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate schema %q/%q/%q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,

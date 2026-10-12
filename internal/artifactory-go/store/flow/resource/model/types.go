@@ -9,7 +9,7 @@ import (
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -56,7 +56,7 @@ func (r ResolvedArtifact) Validate() error {
 		r.Artifact.SourceContentDigest == nil {
 		return fmt.Errorf(
 			"%w: Artifact has no current available source state",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	if r.Artifact.RootID != r.Source.RootID ||
@@ -65,13 +65,13 @@ func (r ResolvedArtifact) Validate() error {
 		r.Artifact.Binding.SourceID != r.RefreshState.SourceID {
 		return fmt.Errorf(
 			"%w: resolved Artifact Source does not match Artifact binding",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.Source.Revision != r.RefreshState.SourceRevision {
 		return fmt.Errorf(
 			"%w: resolved Source revision does not match refresh state",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 	if r.Definition.Kind != r.Artifact.Kind ||
@@ -80,7 +80,7 @@ func (r ResolvedArtifact) Validate() error {
 		r.Definition.LogicalVersion != r.Artifact.LogicalVersion {
 		return fmt.Errorf(
 			"%w: resolved Definition does not match Artifact state",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return nil
@@ -100,7 +100,7 @@ func (r ResolvedArtifact) Clone() ResolvedArtifact {
 type VerifiedEntry struct {
 	RootID           rootModel.RootID     `json:"-"`
 	SourceID         sourceModel.SourceID `json:"-"`
-	Locator          spec.Locator         `json:"-"`
+	Locator          storeSpec.Locator    `json:"-"`
 	SourceRevision   uint64               `json:"-"`
 	SourceGeneration string               `json:"-"`
 	Content          []byte               `json:"-"`
@@ -120,10 +120,10 @@ func (e VerifiedEntry) Validate() error {
 	if e.SourceRevision == 0 {
 		return fmt.Errorf(
 			"%w: verified entry Source revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateSourceGeneration(
+	if err := storeSpec.ValidateSourceGeneration(
 		e.SourceGeneration,
 	); err != nil {
 		return err
@@ -134,7 +134,7 @@ func (e VerifiedEntry) Validate() error {
 	if cryptoutil.DigestBytes(e.Content) != e.Digest {
 		return fmt.Errorf(
 			"%w: verified entry content does not match digest",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return nil

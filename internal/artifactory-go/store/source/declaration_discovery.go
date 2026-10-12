@@ -4,7 +4,7 @@ import (
 	"slices"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // AddDeclarationDiscovery adds one declaration origin and decoder hint to an
@@ -15,8 +15,8 @@ import (
 // publication. Existing unrestricted decoder selection stays unrestricted.
 func AddDeclarationDiscovery(
 	current sourceModel.DiscoverySpec,
-	locator spec.Locator,
-	decoder spec.DecoderID,
+	locator storeSpec.Locator,
+	decoder storeSpec.DecoderID,
 	authoritative bool,
 ) (sourceModel.DiscoverySpec, error) {
 	if err := current.Validate(); err != nil {
@@ -39,7 +39,7 @@ func AddDeclarationDiscovery(
 	}
 	next.DecoderHints = AppendDecoderHint(next.DecoderHints, sourceModel.DecoderHint{
 		Locator:    locator,
-		DecoderIDs: []spec.DecoderID{decoder},
+		DecoderIDs: []storeSpec.DecoderID{decoder},
 	})
 	if len(next.AllowedDecoderIDs) != 0 &&
 		!slices.Contains(next.AllowedDecoderIDs, decoder) {

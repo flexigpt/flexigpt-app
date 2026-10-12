@@ -9,7 +9,7 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
@@ -36,13 +36,13 @@ func initSkillRuntimeWrappers(
 	if aggregateWrapper == nil || runtimeWrapper == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill wrappers are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if runtimeWrapper.service != nil {
 		return nil, fmt.Errorf(
 			"%w: Skill runtime wrapper is already initialized",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	support, err := llmsupport.Skill()

@@ -11,7 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -19,8 +19,8 @@ import (
 const Kind sourceModel.SourceKind = "embedded-directory"
 
 type Config struct {
-	ProviderKey string       `json:"providerKey"`
-	Root        spec.Locator `json:"root"`
+	ProviderKey string            `json:"providerKey"`
+	Root        storeSpec.Locator `json:"root"`
 }
 
 type Adapter struct {
@@ -56,7 +56,7 @@ func (a *Adapter) NormalizeConfig(
 	if _, exists := a.providers[config.ProviderKey]; !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -79,7 +79,7 @@ func (a *Adapter) Open(
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -111,7 +111,7 @@ func (a *Adapter) Open(
 }
 
 func decodeConfig(raw json.RawMessage) (Config, error) {
-	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, storeSpec.MaxConfigBytes)
 	if err != nil {
 		return Config{}, err
 	}
@@ -120,18 +120,18 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&config,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	); err != nil {
 		return Config{}, fmt.Errorf(
 			"%w: decode embedded source config: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"embedded provider key",
 		config.ProviderKey,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return Config{}, err
 	}
@@ -171,18 +171,18 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return nil
 		}
 		entries++
-		if entries > spec.DefaultMaxEntries {
+		if entries > storeSpec.DefaultMaxEntries {
 			return fmt.Errorf(
 				"%w: embedded source exceeds %d entries",
-				spec.ErrInvalid,
-				spec.DefaultMaxEntries,
+				storeSpec.ErrInvalid,
+				storeSpec.DefaultMaxEntries,
 			)
 		}
-		if strings.Count(name, "/")+1 > spec.DefaultMaxDepth {
+		if strings.Count(name, "/")+1 > storeSpec.DefaultMaxDepth {
 			return fmt.Errorf(
 				"%w: embedded source exceeds depth %d",
-				spec.ErrInvalid,
-				spec.DefaultMaxDepth,
+				storeSpec.ErrInvalid,
+				storeSpec.DefaultMaxDepth,
 			)
 		}
 		info, err := fs.Stat(provider, name)
@@ -196,10 +196,10 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		if info.Size() < 0 || info.Size() > spec.MaxScanBytes-totalBytes {
+		if info.Size() < 0 || info.Size() > storeSpec.MaxScanBytes-totalBytes {
 			return fmt.Errorf(
 				"%w: embedded source exceeds byte limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		totalBytes += info.Size()
@@ -221,7 +221,7 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if written != info.Size() {
 			return fmt.Errorf(
 				"%w: embedded source entry %q changed during fingerprinting",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				name,
 			)
 		}

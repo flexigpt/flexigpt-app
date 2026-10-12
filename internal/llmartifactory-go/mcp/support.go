@@ -5,7 +5,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -41,13 +41,13 @@ func (s Support) Validate() error {
 	if s.PluginProfile.BuiltinRoot != s.BuiltinRoot {
 		return fmt.Errorf(
 			"%w: MCP Plugin profile built-in Root differs from MCP support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if s.PluginProfile.Source == nil {
 		return fmt.Errorf(
 			"%w: MCP Plugin profile requires a managed Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

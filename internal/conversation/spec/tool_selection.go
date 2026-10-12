@@ -1,7 +1,7 @@
 package spec
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 )
@@ -20,10 +20,10 @@ type ToolSelection struct {
 }
 
 func (s ToolSelection) Validate() error {
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Tool choice ID",
 		s.ChoiceID,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}

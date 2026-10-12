@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 )
 
@@ -22,10 +22,10 @@ import (
 func (a *Service) ListMCPServersReferencingPolicy(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	policyName spec.LogicalName,
+	policyName storeSpec.LogicalName,
 ) ([]artifactModel.ArtifactRef, error) {
 	if a.resources == nil {
-		return nil, spec.ErrClosed
+		return nil, storeSpec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (a *Service) ListMCPServersReferencingPolicy(
 func (a *Service) listMCPServersReferencingPolicy(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	policyName spec.LogicalName,
+	policyName storeSpec.LogicalName,
 ) ([]artifactModel.ArtifactRef, error) {
 	servers, err := a.ListServers(ctx, ListServersRequest{
 		RootID: rootID,
@@ -115,7 +115,7 @@ func (a *Service) additionalPoliciesReferenceName(
 	ctx context.Context,
 	refs []artifactModel.ArtifactRef,
 	rootID rootModel.RootID,
-	policyName spec.LogicalName,
+	policyName storeSpec.LogicalName,
 ) (bool, error) {
 	for _, ref := range refs {
 		terminal, err := a.resolveDeclarationArtifact(ctx, ref)

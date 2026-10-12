@@ -10,14 +10,14 @@ import (
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Installer supplies application-owned protected content. These contracts
 // describe installation roles, not a universal Store plugin registration.
 type Installer interface {
 	BuiltInName() string
-	BuiltInPackageScopes() []spec.Locator
+	BuiltInPackageScopes() []storeSpec.Locator
 	Ensure(ctx context.Context) error
 }
 
@@ -45,7 +45,7 @@ type CompiledPackageInstaller interface {
 
 type bootstrapInstaller struct {
 	name      string
-	scopes    []spec.Locator
+	scopes    []storeSpec.Locator
 	installer Installer
 }
 
@@ -82,7 +82,7 @@ func NewBootstrap(
 	installers ...Installer,
 ) (*Bootstrap, error) {
 	if coordinator == nil {
-		return nil, fmt.Errorf("%w: bootstrap installation coordinator is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: bootstrap installation coordinator is nil", storeSpec.ErrInvalid)
 	}
 	if err := declaration.Validate(); err != nil {
 		return nil, err
@@ -99,14 +99,14 @@ func NewBootstrap(
 	names := make(map[string]struct{}, len(installers))
 	for index, installer := range installers {
 		if installer == nil {
-			return nil, fmt.Errorf("%w: installer %d is nil", spec.ErrInvalid, index)
+			return nil, fmt.Errorf("%w: installer %d is nil", storeSpec.ErrInvalid, index)
 		}
 		name := installer.BuiltInName()
 		if err := installModel.ValidateHydrationInstallerName(name); err != nil {
 			return nil, err
 		}
 		if _, duplicate := names[name]; duplicate {
-			return nil, fmt.Errorf("%w: duplicate installer %q", spec.ErrConflict, name)
+			return nil, fmt.Errorf("%w: duplicate installer %q", storeSpec.ErrConflict, name)
 		}
 		names[name] = struct{}{}
 		scopes, err := normalizePackageScopes(installer.BuiltInPackageScopes())
@@ -197,7 +197,7 @@ func (b *Bootstrap) Ensure(ctx context.Context) error {
 		if !found {
 			return fmt.Errorf(
 				"%w: hydration coordinator omitted installer %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				plan.entry.name,
 			)
 		}
@@ -324,7 +324,7 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 			}
 			if desired.InstallerName != entry.name ||
 				desired.RootID != b.declaration.Root.ID {
-				return nil, fmt.Errorf("%w: installer %q hydration identity differs", spec.ErrInvalid, entry.name)
+				return nil, fmt.Errorf("%w: installer %q hydration identity differs", storeSpec.ErrInvalid, entry.name)
 			}
 			sourceFound := false
 			for _, source := range b.declaration.Sources {
@@ -334,7 +334,7 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 				}
 			}
 			if !sourceFound {
-				return nil, fmt.Errorf("%w: installer %q names an undeclared Source", spec.ErrInvalid, entry.name)
+				return nil, fmt.Errorf("%w: installer %q names an undeclared Source", storeSpec.ErrInvalid, entry.name)
 			}
 			plan.desired = desired
 		}
@@ -355,7 +355,7 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 					!ownsPackageScope(entry.scopes, value.Key.Scope) {
 					return nil, fmt.Errorf(
 						"%w: installer %q returned an unowned package hydration",
-						spec.ErrInvalid,
+						storeSpec.ErrInvalid,
 						entry.name,
 					)
 				}
@@ -376,11 +376,11 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 				len(registration.Set.Packages) != len(plan.packages) {
 				return nil, fmt.Errorf(
 					"%w: compiled installer %q has inconsistent hydration",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					entry.name,
 				)
 			}
-			byScope := make(map[spec.Locator]installModel.PackageHydration, len(plan.packages))
+			byScope := make(map[storeSpec.Locator]installModel.PackageHydration, len(plan.packages))
 			for _, value := range plan.packages {
 				byScope[value.Key.Scope] = value
 			}
@@ -391,7 +391,7 @@ func (b *Bootstrap) preparePlans(ctx context.Context) ([]bootstrapPlan, error) {
 				}
 				marker, found := byScope[scope]
 				if !found || marker.Fingerprint != value.Fingerprint {
-					return nil, fmt.Errorf("%w: compiled package hydration differs", spec.ErrInvalid)
+					return nil, fmt.Errorf("%w: compiled package hydration differs", storeSpec.ErrInvalid)
 				}
 			}
 			plan.registration = &registration
@@ -430,7 +430,7 @@ func validatePlannedPackageScopes(
 					}
 					return fmt.Errorf(
 						"%w: installer %q scope %q overlaps installer %q scope %q in Root %q Source %q",
-						spec.ErrConflict,
+						storeSpec.ErrConflict,
 						current.entry.name,
 						scope,
 						previous.entry.name,
@@ -457,7 +457,7 @@ func (p bootstrapPlan) needsPackageMutation() bool {
 	return false
 }
 
-func normalizePackageScopes(values []spec.Locator) ([]spec.Locator, error) {
+func normalizePackageScopes(values []storeSpec.Locator) ([]storeSpec.Locator, error) {
 	output := slices.Clone(values)
 	for _, value := range output {
 		if err := value.ValidatePortable(false); err != nil {
@@ -470,7 +470,7 @@ func normalizePackageScopes(values []spec.Locator) ([]spec.Locator, error) {
 			if packageScopesOverlap(previous, scope) {
 				return nil, fmt.Errorf(
 					"%w: overlapping package scopes %q and %q",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					previous,
 					scope,
 				)
@@ -480,13 +480,13 @@ func normalizePackageScopes(values []spec.Locator) ([]spec.Locator, error) {
 	return output, nil
 }
 
-func packageScopesOverlap(left, right spec.Locator) bool {
+func packageScopesOverlap(left, right storeSpec.Locator) bool {
 	return left == right ||
 		strings.HasPrefix(string(left), string(right)+"/") ||
 		strings.HasPrefix(string(right), string(left)+"/")
 }
 
-func ownsPackageScope(scopes []spec.Locator, requested spec.Locator) bool {
+func ownsPackageScope(scopes []storeSpec.Locator, requested storeSpec.Locator) bool {
 	for _, scope := range scopes {
 		if requested == scope || strings.HasPrefix(string(requested), string(scope)+"/") {
 			return true

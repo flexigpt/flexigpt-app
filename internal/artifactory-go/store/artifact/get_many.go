@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // GetMany loads complete Artifact entities in caller order. Catalog consumers
@@ -27,17 +27,17 @@ func (s *Service) GetMany(ctx context.Context, refs []artifactModel.ArtifactRef)
 	if len(values) != len(owned) {
 		return nil, fmt.Errorf(
 			"%w: artifact repository returned %d values for %d refs",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			len(values),
 			len(owned),
 		)
 	}
 	for index, value := range values {
 		if err := value.ValidateRead(); err != nil {
-			return nil, fmt.Errorf("%w: artifact repository returned invalid Artifact: %w", spec.ErrInvalid, err)
+			return nil, fmt.Errorf("%w: artifact repository returned invalid Artifact: %w", storeSpec.ErrInvalid, err)
 		}
 		if value.Ref() != owned[index] {
-			return nil, fmt.Errorf("%w: artifact repository did not preserve requested ordering", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: artifact repository did not preserve requested ordering", storeSpec.ErrInvalid)
 		}
 	}
 	// Repository values are contractually independently owned. Returning them

@@ -6,7 +6,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
@@ -32,7 +32,7 @@ func (r RefreshSourceResult) Validate() error {
 	if r.Candidates < 0 {
 		return fmt.Errorf(
 			"%w: Source refresh candidate count cannot be negative",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := diagnostic.Validate(r.Diagnostics); err != nil {
@@ -47,7 +47,7 @@ func (r RefreshSourceResult) Validate() error {
 		if _, duplicate := created[artifactID]; duplicate {
 			return fmt.Errorf(
 				"%w: Source refresh repeats created Artifact %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				artifactID,
 			)
 		}
@@ -62,14 +62,14 @@ func (r RefreshSourceResult) Validate() error {
 		if _, duplicate := updated[artifactID]; duplicate {
 			return fmt.Errorf(
 				"%w: Source refresh repeats updated Artifact %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				artifactID,
 			)
 		}
 		if _, createdNow := created[artifactID]; createdNow {
 			return fmt.Errorf(
 				"%w: Source refresh Artifact %q is both created and updated",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				artifactID,
 			)
 		}
@@ -89,14 +89,14 @@ func (r RefreshSourceResult) Validate() error {
 			if _, changed := updated[artifactID]; !changed {
 				return fmt.Errorf(
 					"%w: Source refresh state change %q is not an Artifact update",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					artifactID,
 				)
 			}
 			if _, duplicate := stateChanged[artifactID]; duplicate {
 				return fmt.Errorf(
 					"%w: Source refresh repeats Artifact state change %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					artifactID,
 				)
 			}
@@ -159,13 +159,13 @@ func (r RefreshRootResult) Validate() error {
 		if result.State.RootID != r.RootID {
 			return fmt.Errorf(
 				"%w: Source refresh belongs to another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seen[result.State.SourceID]; duplicate {
 			return fmt.Errorf(
 				"%w: Root refresh repeats Source %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				result.State.SourceID,
 			)
 		}

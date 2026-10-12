@@ -14,7 +14,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
@@ -62,7 +62,7 @@ func (r workspaceSourceRegistry) load(
 			if output.HasDirectory {
 				return workspaceSourceSet{}, fmt.Errorf(
 					"%w: Root %q has multiple Workspace directory Sources",
-					spec.ErrIdentityConflict,
+					storeSpec.ErrIdentityConflict,
 					rootID,
 				)
 			}
@@ -73,7 +73,7 @@ func (r workspaceSourceRegistry) load(
 			if output.HasPolicy {
 				return workspaceSourceSet{}, fmt.Errorf(
 					"%w: Root %q has multiple Workspace policy Sources",
-					spec.ErrIdentityConflict,
+					storeSpec.ErrIdentityConflict,
 					rootID,
 				)
 			}
@@ -86,7 +86,7 @@ func (r workspaceSourceRegistry) load(
 		!r.directory.Matches(output.Directory) {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace directory Source has kind %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			output.Directory.Kind,
 		)
 	}
@@ -94,7 +94,7 @@ func (r workspaceSourceRegistry) load(
 		!r.policy.Matches(output.Policy) {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace policy Source has kind %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			output.Policy.Kind,
 		)
 	}
@@ -112,7 +112,7 @@ func (r workspaceSourceRegistry) required(
 	if !values.HasDirectory || !values.HasPolicy {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace directory Root %q is missing a required Source",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			rootID,
 		)
 	}
@@ -157,7 +157,7 @@ func (a *Service) findWorkspaceRoot(
 	if count > 1 {
 		return rootModel.Root{}, false, fmt.Errorf(
 			"%w: multiple Roots use Workspace storage key %q",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			storageKey,
 		)
 	}
@@ -174,10 +174,10 @@ func (a *Service) ensureWorkspaceRoot(
 	}
 
 	displayName := filepath.Base(rootPath)
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Workspace Root display name",
 		displayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		displayName = "Workspace directory"
 	}
@@ -191,7 +191,7 @@ func (a *Service) ensureWorkspaceRoot(
 	if err == nil {
 		return created, true, nil
 	}
-	if !errors.Is(err, spec.ErrConflict) {
+	if !errors.Is(err, storeSpec.ErrConflict) {
 		return rootModel.Root{}, false, err
 	}
 
@@ -241,7 +241,7 @@ func (a *Service) defaultWorkspaceRecord(
 	default:
 		return artifactModel.Artifact{}, false, fmt.Errorf(
 			"%w: policy Source produced multiple default Workspace Artifacts",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 		)
 	}
 }
@@ -307,7 +307,7 @@ func (a *Service) requireEffectiveWorkspace(
 		!workspace.Artifact.Enabled {
 		return fmt.Errorf(
 			"%w: selected Workspace is disabled or unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -321,7 +321,7 @@ func (a *Service) requireEffectiveWorkspace(
 	if !values.Directory.Enabled || !values.Policy.Enabled {
 		return fmt.Errorf(
 			"%w: Workspace directory is disabled",
-			spec.ErrSourceUnavailable,
+			storeSpec.ErrSourceUnavailable,
 		)
 	}
 
@@ -338,7 +338,7 @@ func (a *Service) requireEffectiveWorkspace(
 		if !effective {
 			return fmt.Errorf(
 				"%w: Workspace is not an effective physical manifest Workspace",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 		return nil
@@ -351,14 +351,14 @@ func (a *Service) requireEffectiveWorkspace(
 		if !found || record.Ref() != workspace.Ref() {
 			return fmt.Errorf(
 				"%w: selected Workspace is not the Root-local default policy Workspace",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 		if string(workspace.Artifact.LogicalName) != a.policy.ID ||
 			cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
 			return fmt.Errorf(
 				"%w: selected default Workspace does not match the active policy",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 		intent, err := a.listManifestIntent(
@@ -380,7 +380,7 @@ func (a *Service) requireEffectiveWorkspace(
 		if len(intent) != 0 || len(physical) != 0 {
 			return fmt.Errorf(
 				"%w: default Workspace is inactive because a physical Workspace manifest is present",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 		return nil
@@ -388,7 +388,7 @@ func (a *Service) requireEffectiveWorkspace(
 	default:
 		return fmt.Errorf(
 			"%w: Workspace does not belong to this directory or policy Source",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 }
@@ -460,7 +460,7 @@ func normalizeWorkspaceDirectoryPath(raw string) (string, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
 		return "", fmt.Errorf(
 			"%w: Workspace directory path is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(raw)
@@ -475,7 +475,7 @@ func normalizeWorkspaceDirectoryPath(raw string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf(
 			"%w: Workspace path is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return absolute, nil

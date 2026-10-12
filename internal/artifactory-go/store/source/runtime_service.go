@@ -9,7 +9,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -22,7 +22,7 @@ type runtime struct {
 
 func NewRuntime(reader Reader, opener driver.Opener) (Runtime, error) {
 	if reader == nil || opener == nil {
-		return nil, fmt.Errorf("%w: source runtime dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: source runtime dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	value := &runtime{reader: reader, opener: opener}
 	if resolver, supported := opener.(driver.LocalPathResolver); supported {
@@ -43,26 +43,26 @@ func ReadSnapshotEntry(
 	maximumBytes int64,
 ) ([]byte, error) {
 	if snapshot == nil {
-		return nil, fmt.Errorf("%w: source snapshot is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: source snapshot is nil", storeSpec.ErrInvalid)
 	}
 	if err := entry.Validate(); err != nil {
 		return nil, err
 	}
 	if !entry.IsRegular {
-		return nil, fmt.Errorf("%w: source entry %q is not a regular file", spec.ErrInvalid, entry.Locator)
+		return nil, fmt.Errorf("%w: source entry %q is not a regular file", storeSpec.ErrInvalid, entry.Locator)
 	}
-	if maximumBytes <= 0 || maximumBytes > spec.MaxScanBytes {
-		return nil, fmt.Errorf("%w: source snapshot read limit is invalid", spec.ErrInvalid)
+	if maximumBytes <= 0 || maximumBytes > storeSpec.MaxScanBytes {
+		return nil, fmt.Errorf("%w: source snapshot read limit is invalid", storeSpec.ErrInvalid)
 	}
 	if entry.SizeBytes > maximumBytes {
-		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", spec.ErrInvalid, entry.Locator)
+		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", storeSpec.ErrInvalid, entry.Locator)
 	}
 	reader, err := snapshot.Open(ctx, entry.Locator)
 	if err != nil {
 		return nil, err
 	}
 	if reader == nil {
-		return nil, fmt.Errorf("%w: source snapshot returned a nil reader for %q", spec.ErrInvalid, entry.Locator)
+		return nil, fmt.Errorf("%w: source snapshot returned a nil reader for %q", storeSpec.ErrInvalid, entry.Locator)
 	}
 	content, readErr := io.ReadAll(io.LimitReader(reader, maximumBytes+1))
 	closeErr := reader.Close()
@@ -70,10 +70,14 @@ func ReadSnapshotEntry(
 		return nil, errors.Join(readErr, closeErr)
 	}
 	if int64(len(content)) > maximumBytes {
-		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", spec.ErrInvalid, entry.Locator)
+		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", storeSpec.ErrInvalid, entry.Locator)
 	}
 	if int64(len(content)) != entry.SizeBytes {
-		return nil, fmt.Errorf("%w: source entry %q changed size during snapshot read", spec.ErrConflict, entry.Locator)
+		return nil, fmt.Errorf(
+			"%w: source entry %q changed size during snapshot read",
+			storeSpec.ErrConflict,
+			entry.Locator,
+		)
 	}
 	return content, nil
 }
@@ -84,7 +88,7 @@ func ReadVerifiedSnapshotEntry(
 	ctx context.Context,
 	runtime Runtime,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	expectedGeneration string,
 	maximumBytes int64,
 ) (content []byte, digest cryptoutil.Digest, returnErr error) {
@@ -94,11 +98,11 @@ func ReadVerifiedSnapshotEntry(
 	if err := locator.Validate(false); err != nil {
 		return nil, "", err
 	}
-	if err := spec.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := storeSpec.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return nil, "", err
 	}
-	if maximumBytes <= 0 || maximumBytes > spec.MaxScanBytes {
-		return nil, "", fmt.Errorf("%w: verified source read limit is invalid", spec.ErrInvalid)
+	if maximumBytes <= 0 || maximumBytes > storeSpec.MaxScanBytes {
+		return nil, "", fmt.Errorf("%w: verified source read limit is invalid", storeSpec.ErrInvalid)
 	}
 	snapshot, err := runtime.Open(ctx, value)
 	if err != nil {
@@ -106,7 +110,7 @@ func ReadVerifiedSnapshotEntry(
 	}
 	defer func() { returnErr = errors.Join(returnErr, snapshot.Close()) }()
 	if snapshot.Generation() != expectedGeneration {
-		return nil, "", fmt.Errorf("%w: source generation changed since it was observed", spec.ErrConflict)
+		return nil, "", fmt.Errorf("%w: source generation changed since it was observed", storeSpec.ErrConflict)
 	}
 	content, err = readSnapshotLocator(ctx, snapshot, locator, maximumBytes)
 	if err != nil {
@@ -124,7 +128,7 @@ func VerifySnapshotContentDigest(
 	ctx context.Context,
 	runtime Runtime,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
@@ -132,15 +136,15 @@ func VerifySnapshotContentDigest(
 	if err := cryptoutil.ValidateDigest(expectedDigest); err != nil {
 		return err
 	}
-	if maximumBytes <= 0 || maximumBytes > spec.MaxCandidateBytes {
-		return fmt.Errorf("%w: source digest verification limit is invalid", spec.ErrInvalid)
+	if maximumBytes <= 0 || maximumBytes > storeSpec.MaxCandidateBytes {
+		return fmt.Errorf("%w: source digest verification limit is invalid", storeSpec.ErrInvalid)
 	}
 	_, actualDigest, err := ReadVerifiedSnapshotEntry(ctx, runtime, value, locator, expectedGeneration, maximumBytes)
 	if err != nil {
 		return err
 	}
 	if actualDigest != expectedDigest {
-		return fmt.Errorf("%w: Source content for %q changed since refresh", spec.ErrConflict, locator)
+		return fmt.Errorf("%w: Source content for %q changed since refresh", storeSpec.ErrConflict, locator)
 	}
 	return nil
 }
@@ -155,7 +159,10 @@ func (r *runtime) Get(
 		return sourceModel.Source{}, err
 	}
 	if value.ID != id || value.RootID != rootID {
-		return sourceModel.Source{}, fmt.Errorf("%w: source reader returned another Source identity", spec.ErrInvalid)
+		return sourceModel.Source{}, fmt.Errorf(
+			"%w: source reader returned another Source identity",
+			storeSpec.ErrInvalid,
+		)
 	}
 	if err := value.ValidateRead(); err != nil {
 		return sourceModel.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
@@ -171,7 +178,11 @@ func (r *runtime) List(ctx context.Context, rootID rootModel.RootID) ([]sourceMo
 	output := make([]sourceModel.Source, len(values))
 	for index, value := range values {
 		if value.RootID != rootID {
-			return nil, fmt.Errorf("%w: source reader returned Source %q for another Root", spec.ErrInvalid, value.ID)
+			return nil, fmt.Errorf(
+				"%w: source reader returned Source %q for another Root",
+				storeSpec.ErrInvalid,
+				value.ID,
+			)
 		}
 		if err := value.ValidateRead(); err != nil {
 			return nil, err
@@ -198,10 +209,10 @@ func (r *runtime) Open(ctx context.Context, value sourceModel.Source) (driver.Sn
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	if r.localPaths == nil || !r.SupportsLocalPath(value.Kind) {
-		return "", fmt.Errorf("%w: source runtime has no native path resolver", spec.ErrUnsupported)
+		return "", fmt.Errorf("%w: source runtime has no native path resolver", storeSpec.ErrUnsupported)
 	}
 	return r.localPaths.ResolveLocalPath(ctx, value.Clone(), locator)
 }
@@ -212,10 +223,10 @@ func (r *runtime) SupportsLocalPath(kind sourceModel.SourceKind) bool {
 
 func validateSnapshot(snapshot driver.Snapshot) error {
 	if snapshot == nil {
-		return fmt.Errorf("%w: source opener returned a nil snapshot", spec.ErrInvalid)
+		return fmt.Errorf("%w: source opener returned a nil snapshot", storeSpec.ErrInvalid)
 	}
-	if err := spec.ValidateSourceGeneration(snapshot.Generation()); err != nil {
-		return fmt.Errorf("%w: source snapshot returned an invalid generation: %w", spec.ErrInvalid, err)
+	if err := storeSpec.ValidateSourceGeneration(snapshot.Generation()); err != nil {
+		return fmt.Errorf("%w: source snapshot returned an invalid generation: %w", storeSpec.ErrInvalid, err)
 	}
 	return nil
 }

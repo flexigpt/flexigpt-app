@@ -6,7 +6,7 @@ import (
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (c *Service) PrepareTopologyPackageHydrations(
@@ -30,7 +30,7 @@ func (c *Service) PrepareTopologyPackageHydrations(
 		if _, duplicate := installers[installerName]; duplicate {
 			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: duplicate package hydration installer %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				installerName,
 			)
 		}
@@ -57,7 +57,7 @@ func (c *Service) PrepareTopologyPackageHydrations(
 		if _, found := installers[desiredValue.Key.InstallerName]; !found {
 			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: package hydration %q/%q has no participating installer",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				desiredValue.Key.InstallerName,
 				desiredValue.Key.Scope,
 			)
@@ -65,7 +65,7 @@ func (c *Service) PrepareTopologyPackageHydrations(
 		if !c.isProtectedRoot(desiredValue.RootID) {
 			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: package hydration root %q is not protected",
-				spec.ErrProtected,
+				storeSpec.ErrProtected,
 				desiredValue.RootID,
 			)
 		}
@@ -115,7 +115,7 @@ func (c *Service) CommitTopologyPackageHydration(
 	if !c.isProtectedRoot(value.RootID) {
 		return fmt.Errorf(
 			"%w: package hydration root %q is not protected",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			value.RootID,
 		)
 	}

@@ -6,7 +6,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 )
 
@@ -40,10 +40,10 @@ func (v WorkspaceView) Validate() error {
 	if err := v.Artifact.Validate(); err != nil {
 		return err
 	}
-	return spec.ValidateOptionalText(
+	return storeSpec.ValidateOptionalText(
 		"Workspace description",
 		v.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	)
 }
 

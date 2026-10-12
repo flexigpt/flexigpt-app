@@ -9,17 +9,17 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-const compiledDecoderID spec.DecoderID = "artifact.builtin-compiled"
+const compiledDecoderID storeSpec.DecoderID = "artifact.builtin-compiled"
 
 // CompiledArtifact is trusted already-admitted evidence for one source
 // subresource. It is owned by Ingest rather than an installation package plan.
 type CompiledArtifact struct {
-	Subresource spec.SubresourceLocator
+	Subresource storeSpec.SubresourceLocator
 	Definition  definitionModel.Definition
 	Diagnostics []diagnostic.Diagnostic
 }
@@ -35,7 +35,7 @@ func (a CompiledArtifact) Clone() CompiledArtifact {
 // Install is responsible for translating package-relative generated values to
 // this shape; Ingest owns its registration and scan-time use.
 type CompiledDocument struct {
-	Locator   spec.Locator
+	Locator   storeSpec.Locator
 	Digest    cryptoutil.Digest
 	Artifacts []CompiledArtifact
 }
@@ -47,11 +47,11 @@ func (d CompiledDocument) Validate() error {
 	if err := cryptoutil.ValidateDigest(d.Digest); err != nil {
 		return err
 	}
-	if len(d.Artifacts) == 0 || len(d.Artifacts) > spec.MaxDiscoveryCandidates {
-		return fmt.Errorf("%w: compiled document has an invalid artifact count", spec.ErrInvalid)
+	if len(d.Artifacts) == 0 || len(d.Artifacts) > storeSpec.MaxDiscoveryCandidates {
+		return fmt.Errorf("%w: compiled document has an invalid artifact count", storeSpec.ErrInvalid)
 	}
 	type typedSubresource struct {
-		subresource spec.SubresourceLocator
+		subresource storeSpec.SubresourceLocator
 		kind        string
 	}
 	seen := make(map[typedSubresource]struct{}, len(d.Artifacts))
@@ -63,7 +63,7 @@ func (d CompiledDocument) Validate() error {
 		if _, duplicate := seen[key]; duplicate {
 			return fmt.Errorf(
 				"%w: compiled document repeats typed subresource %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				artifact.Subresource,
 			)
 		}
@@ -113,7 +113,7 @@ func (d CompiledDocument) Clone() CompiledDocument {
 type compiledDocumentKey struct {
 	rootID   rootModel.RootID
 	sourceID sourceModel.SourceID
-	locator  spec.Locator
+	locator  storeSpec.Locator
 }
 
 type registeredCompiledDocument struct {
@@ -136,10 +136,10 @@ func (e *Engine) RegisterCompiledDocuments(
 	sourceID sourceModel.SourceID,
 	documents []CompiledDocument,
 ) error {
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"compiled document registration ID",
 		registrationID,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (e *Engine) RegisterCompiledDocuments(
 		if _, duplicate := pending[key]; duplicate {
 			return fmt.Errorf(
 				"%w: compiled built-in catalog repeats source locator %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				document.Locator,
 			)
 		}
@@ -187,7 +187,7 @@ func (e *Engine) RegisterCompiledDocuments(
 		}
 		return fmt.Errorf(
 			"%w: compiled source locator %q is registered by both %q and %q",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			key.locator,
 			current.registrationID,
 			registrationID,
@@ -215,7 +215,7 @@ func (e *Engine) RegisterCompiledDocuments(
 func (e *Engine) compiledDocument(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (CompiledDocument, bool) {
 	e.compiled.mu.RLock()
 	defer e.compiled.mu.RUnlock()

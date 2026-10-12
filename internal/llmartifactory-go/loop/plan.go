@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
@@ -18,7 +18,7 @@ type Service struct {
 
 type Plan struct {
 	Loop          artifactModel.ArtifactRef  `json:"loop"`
-	Name          spec.LogicalName           `json:"name"`
+	Name          storeSpec.LogicalName      `json:"name"`
 	Body          *Body                      `json:"body,omitempty"`
 	MaxIterations int                        `json:"maxIterations,omitempty"`
 	Until         *declaration.OutputMatch   `json:"until,omitempty"`
@@ -28,7 +28,7 @@ type Plan struct {
 
 type Body struct {
 	Type   declaration.Type              `json:"type"`
-	Name   spec.LogicalName              `json:"name"`
+	Name   storeSpec.LogicalName         `json:"name"`
 	Form   declaration.MemberForm        `json:"form"`
 	Status composition.ResolutionStatus  `json:"status"`
 	Target *composition.CapabilityTarget `json:"target,omitempty"`
@@ -41,7 +41,7 @@ func NewService(resolver *composition.Resolver) (*Service, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Loop plan resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{resolver: resolver}, nil
@@ -52,7 +52,7 @@ func (s *Service) ResolvePlan(
 	ref artifactModel.ArtifactRef,
 ) (Plan, error) {
 	if s.resolver == nil {
-		return Plan{}, spec.ErrClosed
+		return Plan{}, storeSpec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return Plan{}, err
@@ -66,14 +66,14 @@ func (s *Service) ResolvePlan(
 		resolved.Definition == nil {
 		return Plan{}, fmt.Errorf(
 			"%w: Artifact did not resolve as a Loop",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	loopRef, found := resolved.ArtifactRef()
 	if !found {
 		return Plan{}, fmt.Errorf(
 			"%w: Loop plan root has no Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -88,7 +88,7 @@ func (s *Service) ResolvePlan(
 
 	output := Plan{
 		Loop:          loopRef,
-		Name:          spec.LogicalName(document.Name),
+		Name:          storeSpec.LogicalName(document.Name),
 		MaxIterations: document.MaxIterations,
 		Capabilities:  capabilities,
 		Complete:      capabilities.Complete,
@@ -108,7 +108,7 @@ func (s *Service) ResolvePlan(
 	if !found {
 		return Plan{}, fmt.Errorf(
 			"%w: Loop body has no resolved relationship",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	form, err := document.Body.MemberForm()
@@ -118,7 +118,7 @@ func (s *Service) ResolvePlan(
 	header := document.Body.Header()
 	body := Body{
 		Type:   header.Type,
-		Name:   spec.LogicalName(header.Name),
+		Name:   storeSpec.LogicalName(header.Name),
 		Form:   form,
 		Status: relationship.Status,
 	}

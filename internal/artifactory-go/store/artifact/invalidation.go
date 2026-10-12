@@ -7,7 +7,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
@@ -32,10 +32,13 @@ func (s *Synchronizer) DeriveLifecycleInvalidation(
 			return nil, fmt.Errorf("existing Artifact %d: %w", index, err)
 		}
 		if current.RootID != transition.Source.RootID || current.Binding.SourceID != transition.Source.ID {
-			return nil, fmt.Errorf("%w: lifecycle invalidation Artifact belongs to another Source", spec.ErrInvalid)
+			return nil, fmt.Errorf(
+				"%w: lifecycle invalidation Artifact belongs to another Source",
+				storeSpec.ErrInvalid,
+			)
 		}
 		if _, duplicate := seen[current.ID]; duplicate {
-			return nil, fmt.Errorf("%w: lifecycle invalidation repeats Artifact %q", spec.ErrInvalid, current.ID)
+			return nil, fmt.Errorf("%w: lifecycle invalidation repeats Artifact %q", storeSpec.ErrInvalid, current.ID)
 		}
 		seen[current.ID] = struct{}{}
 		if current.State == artifactModel.StateMissing && current.ResolvedDefinition == nil &&
@@ -43,7 +46,7 @@ func (s *Synchronizer) DeriveLifecycleInvalidation(
 			continue
 		}
 		if current.Revision == ^uint64(0) {
-			return nil, fmt.Errorf("%w: Artifact revision is exhausted", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: Artifact revision is exhausted", storeSpec.ErrInvalid)
 		}
 		updates = append(updates, SourceStateUpdate{
 			ArtifactID:       current.ID,

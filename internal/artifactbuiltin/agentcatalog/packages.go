@@ -12,7 +12,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -25,11 +25,11 @@ import (
 )
 
 type PreparedPackage struct {
-	EmbeddedPackageRoot spec.Locator
+	EmbeddedPackageRoot storeSpec.Locator
 
 	PackageAddress managedpackageModel.ManagedPackageAddress
 
-	PluginDocumentFile spec.Locator
+	PluginDocumentFile storeSpec.Locator
 
 	PackageFiles []managedpackageModel.ManagedPackageFile
 
@@ -39,11 +39,11 @@ type PreparedPackage struct {
 // ArtifactExpectation is build-time package admission data. Runtime Agent
 // consumers do not own embedded package validation.
 type ArtifactExpectation struct {
-	Locator          spec.Locator
-	Subresource      spec.SubresourceLocator
+	Locator          storeSpec.Locator
+	Subresource      storeSpec.SubresourceLocator
 	Kind             artifactModel.ArtifactKind
-	LogicalName      spec.LogicalName
-	LogicalVersion   spec.LogicalVersion
+	LogicalName      storeSpec.LogicalName
+	LogicalVersion   storeSpec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
 }
 
@@ -57,7 +57,7 @@ func PreparePackages(
 	documents support.Documents,
 ) ([]PreparedPackage, error) {
 	if interpretations == nil {
-		return nil, fmt.Errorf("%w: Agent package interpretation registry is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Agent package interpretation registry is nil", storeSpec.ErrInvalid)
 	}
 	if err := documents.Validate(); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func PreparePackages(
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded Agent package filesystem is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -99,7 +99,7 @@ func PreparePackages(
 func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 	interpretations *coreinterpretation.Registry,
 	documents support.Documents,
 ) (PreparedPackage, error) {
@@ -122,7 +122,7 @@ func preparePackage(
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Agent package %q lacks a supported Plugin document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			packageRoot,
 		)
 	}
@@ -142,7 +142,7 @@ func preparePackage(
 		)
 	}
 
-	packageName := spec.LogicalName(path.Base(string(packageRoot)))
+	packageName := storeSpec.LogicalName(path.Base(string(packageRoot)))
 	if err := packageName.Validate(); err != nil {
 		return PreparedPackage{}, err
 	}
@@ -165,7 +165,7 @@ func preparePackage(
 }
 
 func canonicalPluginPackage(
-	documentFile spec.Locator,
+	documentFile storeSpec.Locator,
 	document []byte,
 	files []managedpackageModel.ManagedPackageFile,
 	interpretations *coreinterpretation.Registry,
@@ -177,7 +177,7 @@ func canonicalPluginPackage(
 ) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
@@ -190,7 +190,7 @@ func canonicalPluginPackage(
 	if r.Header().Type != declaration.TypePlugin {
 		return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 			"%w: built-in Agent package root must be a Plugin",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	plugin, err := pluginv1.DecodePluginEntry(r)
@@ -207,13 +207,13 @@ func canonicalPluginPackage(
 		return pluginv1.PluginDocument{}, nil, err
 	}
 
-	filesByLocator := make(map[spec.Locator][]byte, len(files))
+	filesByLocator := make(map[storeSpec.Locator][]byte, len(files))
 	for _, file := range files {
 		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
 	}
 
-	seenNames := make(map[spec.LogicalName]spec.Locator)
-	seenDocuments := make(map[spec.Locator]struct{})
+	seenNames := make(map[storeSpec.LogicalName]storeSpec.Locator)
+	seenDocuments := make(map[storeSpec.Locator]struct{})
 
 	for index, member := range plugin.Members {
 		form, err := member.MemberForm()
@@ -223,7 +223,7 @@ func canonicalPluginPackage(
 		if form != declaration.MemberNamed {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent Plugin member %d must be a named external Agent reference",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 			)
 		}
@@ -232,7 +232,7 @@ func canonicalPluginPackage(
 		if header.Type != declaration.TypeAgent {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent Plugin member %d has type %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 				header.Type,
 			)
@@ -240,7 +240,7 @@ func canonicalPluginPackage(
 		if header.Locator == nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent %q requires a local package locator",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -252,7 +252,7 @@ func canonicalPluginPackage(
 		if relationship.Scope != "" {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent %q cannot use lookup scope",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -276,17 +276,17 @@ func canonicalPluginPackage(
 		if header.Name != string(documentName) {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent member name %q does not match packaged document name %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 				documentName,
 			)
 		}
 
-		name := spec.LogicalName(header.Name)
+		name := storeSpec.LogicalName(header.Name)
 		if previous, duplicate := seenNames[name]; duplicate {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent Plugin references Agent %q at both %q and %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				name,
 				previous,
 				documentLocator,
@@ -297,7 +297,7 @@ func canonicalPluginPackage(
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent Plugin references document %q more than once",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				documentLocator,
 			)
 		}
@@ -306,7 +306,7 @@ func canonicalPluginPackage(
 		if !found {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent %q locator does not identify a configured packaged Agent document",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -322,14 +322,14 @@ func canonicalPluginPackage(
 		if agentDocument.Locator != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent %q cannot be a source-selected alias",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 			)
 		}
 		if agentDocument.Name != header.Name {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent document name differs from Plugin member %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -348,7 +348,7 @@ func canonicalPluginPackage(
 	}
 
 	for locator := range filesByLocator {
-		documentFile := spec.Locator(path.Base(string(locator)))
+		documentFile := storeSpec.Locator(path.Base(string(locator)))
 		if !agentDomain.IsAgentDeclarationDocument(
 			documents,
 			documentFile,
@@ -361,7 +361,7 @@ func canonicalPluginPackage(
 		if _, found := seenDocuments[locator]; !found {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Agent document %q is not referenced by Plugin %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				locator,
 				plugin.Name,
 			)
@@ -377,7 +377,7 @@ func canonicalAgentDocument(
 ) (declaration.Entry, agentv1.AgentDocument, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		content,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return declaration.Entry{}, agentv1.AgentDocument{}, err
@@ -389,7 +389,7 @@ func canonicalAgentDocument(
 	if r.Header().Type != declaration.TypeAgent {
 		return declaration.Entry{}, agentv1.AgentDocument{}, fmt.Errorf(
 			"%w: package Agent document must have type %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			declaration.TypeAgent,
 		)
 	}
@@ -401,7 +401,7 @@ func canonicalAgentDocument(
 }
 
 func expectationsForDocument(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	entry declaration.Entry,
 	interpretations *coreinterpretation.Registry,
 ) ([]ArtifactExpectation, error) {
@@ -434,8 +434,8 @@ func expectationsForDocument(
 
 func packageAgentDocumentName(
 	documents support.Documents,
-	locator spec.Locator,
-) (spec.LogicalName, error) {
+	locator storeSpec.Locator,
+) (storeSpec.LogicalName, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return "", err
 	}
@@ -444,16 +444,16 @@ func packageAgentDocumentName(
 	if len(segments) != 2 ||
 		!agentDomain.IsAgentDeclarationDocument(
 			documents,
-			spec.Locator(segments[1]),
+			storeSpec.Locator(segments[1]),
 		) {
 		return "", fmt.Errorf(
 			"%w: built-in Agent document %q must use <name>/<configured-agent-document>",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			locator,
 		)
 	}
 
-	name := spec.LogicalName(segments[0])
+	name := storeSpec.LogicalName(segments[0])
 	if err := name.Validate(); err != nil {
 		return "", err
 	}
@@ -462,14 +462,14 @@ func packageAgentDocumentName(
 
 type preparedArtifactIdentity struct {
 	kind    artifactModel.ArtifactKind
-	name    spec.LogicalName
-	version spec.LogicalVersion
+	name    storeSpec.LogicalName
+	version storeSpec.LogicalVersion
 }
 
 func validatePreparedPackageIdentities(
 	packages []PreparedPackage,
 ) error {
-	seen := make(map[preparedArtifactIdentity]spec.Locator)
+	seen := make(map[preparedArtifactIdentity]storeSpec.Locator)
 
 	for _, packageValue := range packages {
 		if err := packageValue.PackageAddress.Validate(); err != nil {
@@ -505,7 +505,7 @@ func validatePreparedPackageIdentities(
 			if previous, duplicate := seen[identity]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded Agent packages %q and %q both provide %q/%q/%q",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					previous,
 					packageValue.EmbeddedPackageRoot,
 					expected.Kind,
@@ -528,7 +528,7 @@ func PackageFingerprint(
 	if !topology.IsPluginDocumentFile(value.PluginDocumentFile) {
 		return "", fmt.Errorf(
 			"%w: built-in Agent Plugin document is not declared in topology",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

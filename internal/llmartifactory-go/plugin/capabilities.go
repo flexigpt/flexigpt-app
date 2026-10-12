@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -23,7 +23,7 @@ func (a *API) ResolveCapabilities(
 	if a == nil || a.resolver == nil {
 		return PluginCapabilityPlan{}, fmt.Errorf(
 			"%w: Plugin resolver is unavailable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	plan, err := a.resolver.ResolvePluginCapabilities(ctx, ref)
@@ -33,7 +33,7 @@ func (a *API) ResolveCapabilities(
 	if plan.RootType != declaration.TypePlugin || plan.RootArtifact == nil {
 		return PluginCapabilityPlan{}, fmt.Errorf(
 			"%w: Plugin did not resolve to a source-backed Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	view, err := a.Read(ctx, *plan.RootArtifact)

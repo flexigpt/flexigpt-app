@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
@@ -51,7 +51,7 @@ func New(
 		dependencies.Definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Store dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := dependencies.Support.Validate(); err != nil {
@@ -62,7 +62,7 @@ func New(
 	) {
 		return nil, fmt.Errorf(
 			"%w: Model Store built-in Root must be protected",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -317,7 +317,7 @@ func (a *Service) requireKind(
 	if record.Kind != kind {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q has kind %q, expected %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			record.ID,
 			record.Kind,
 			kind,

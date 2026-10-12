@@ -5,7 +5,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -40,9 +40,9 @@ type ListSkillsRequest struct {
 type SkillListItem struct {
 	Ref artifactModel.ArtifactRef `json:"ref"`
 
-	Name        spec.LogicalName `json:"name"`
-	DisplayName string           `json:"displayName"`
-	Description string           `json:"description,omitempty"`
+	Name        storeSpec.LogicalName `json:"name"`
+	DisplayName string                `json:"displayName"`
+	Description string                `json:"description,omitempty"`
 
 	State            artifactModel.State `json:"state"`
 	Enabled          bool                `json:"enabled"`

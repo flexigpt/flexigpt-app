@@ -6,7 +6,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Declaration is application-supplied protected topology metadata.
@@ -42,24 +42,24 @@ func (d Declaration) Validate() error {
 	if err := d.Root.StorageKey.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"protected Root display name",
 		d.Root.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"protected Root description",
 		d.Root.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
 	if len(d.Sources) == 0 {
 		return fmt.Errorf(
 			"%w: protected topology requires at least one Source declaration",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -74,10 +74,10 @@ func (d Declaration) Validate() error {
 		if err := draft.Kind.Validate(); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"protected Source display name",
 			draft.DisplayName,
-			spec.MaxDisplayNameBytes,
+			storeSpec.MaxDisplayNameBytes,
 		); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
@@ -91,7 +91,7 @@ func (d Declaration) Validate() error {
 		if _, duplicate := seen[draft.ID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate protected Source %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				draft.ID,
 			)
 		}

@@ -11,7 +11,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -27,7 +27,7 @@ func (c *Service) RegisterCompiledPackages(
 		if !c.isProtectedRoot(value.Set.Hydration.RootID) {
 			return fmt.Errorf(
 				"%w: compiled built-in registration targets an unprotected Root",
-				spec.ErrProtected,
+				storeSpec.ErrProtected,
 			)
 		}
 
@@ -63,7 +63,7 @@ func (c *Service) HydrateCompiledPackages(
 		c.Refresh == nil ||
 		c.Artifacts == nil ||
 		c.managedSources == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
@@ -114,7 +114,7 @@ func (c *Service) HydrateCompiledPackages(
 			batches[key] = batch
 		}
 
-		byScope := make(map[spec.Locator]installModel.CompiledPackage)
+		byScope := make(map[storeSpec.Locator]installModel.CompiledPackage)
 		for _, packageValue := range set.Packages {
 			scope, err := packageValue.Address.Directory()
 			if err != nil {
@@ -128,7 +128,7 @@ func (c *Service) HydrateCompiledPackages(
 			if !found {
 				return fmt.Errorf(
 					"%w: compiled hydration selected unknown package scope %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					scope,
 				)
 			}
@@ -191,7 +191,7 @@ func (c *Service) HydrateCompiledPackages(
 			!sourceValue.Enabled {
 			return fmt.Errorf(
 				"%w: compiled hydration requires an enabled managed Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 
@@ -287,7 +287,7 @@ func (c *Service) verifyCompiledPackage(
 				*record.SourceContentDigest != document.Digest {
 				return fmt.Errorf(
 					"%w: compiled package Artifact does not match generated catalog",
-					spec.ErrDigestMismatch,
+					storeSpec.ErrDigestMismatch,
 				)
 			}
 		}
@@ -299,10 +299,10 @@ func readCompiledPackageFiles(
 	ctx context.Context,
 	value installModel.CompiledPackage,
 ) ([]managedpackageModel.ManagedPackageFile, error) {
-	if len(value.Files) == 0 || len(value.Files) > spec.MaxDiscoveryEntries {
+	if len(value.Files) == 0 || len(value.Files) > storeSpec.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: compiled package has an invalid file count",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -316,17 +316,17 @@ func readCompiledPackageFiles(
 			return nil, err
 		}
 
-		if file.Size < 0 || file.Size > spec.MaxScanBytes-total {
+		if file.Size < 0 || file.Size > storeSpec.MaxScanBytes-total {
 			return nil, fmt.Errorf(
 				"%w: compiled package exceeds the byte limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		actual := cryptoutil.DigestBytes(file.Content)
 		if int64(len(file.Content)) != file.Size || actual != file.Digest {
 			return nil, fmt.Errorf(
 				"%w: compiled package %q file %q: size %d/%d, digest %q/%q",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 				value.Address,
 				file.Locator,
 				len(file.Content),

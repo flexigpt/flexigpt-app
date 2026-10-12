@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -18,7 +18,7 @@ type Service struct {
 
 type Plan struct {
 	Workflow     artifactModel.ArtifactRef  `json:"workflow"`
-	Name         spec.LogicalName           `json:"name"`
+	Name         storeSpec.LogicalName      `json:"name"`
 	Start        []string                   `json:"start,omitempty"`
 	Nodes        []Node                     `json:"nodes"`
 	Edges        []Edge                     `json:"edges"`
@@ -30,7 +30,7 @@ type Node struct {
 	ID     string                        `json:"id"`
 	Join   workflowv1.Join               `json:"join,omitempty"`
 	Type   declaration.Type              `json:"type"`
-	Name   spec.LogicalName              `json:"name"`
+	Name   storeSpec.LogicalName         `json:"name"`
 	Form   declaration.MemberForm        `json:"form"`
 	Status composition.ResolutionStatus  `json:"status"`
 	Target *composition.CapabilityTarget `json:"target,omitempty"`
@@ -49,7 +49,7 @@ func NewService(resolver *composition.Resolver) (*Service, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Workflow plan resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{resolver: resolver}, nil
@@ -71,7 +71,7 @@ func (s *Service) ResolvePlan(
 		resolved.Definition == nil {
 		return Plan{}, fmt.Errorf(
 			"%w: Artifact did not resolve as a Workflow",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -79,7 +79,7 @@ func (s *Service) ResolvePlan(
 	if !found {
 		return Plan{}, fmt.Errorf(
 			"%w: Workflow plan root has no Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	document, err := workflowv1.DecodeAdmittedWorkflowJSON(
@@ -100,7 +100,7 @@ func (s *Service) ResolvePlan(
 
 	output := Plan{
 		Workflow:     workflowRef,
-		Name:         spec.LogicalName(document.Name),
+		Name:         storeSpec.LogicalName(document.Name),
 		Start:        append([]string(nil), document.Start...),
 		Nodes:        make([]Node, 0, len(nodes)),
 		Edges:        make([]Edge, 0, len(document.Edges)),
@@ -118,7 +118,7 @@ func (s *Service) ResolvePlan(
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: Workflow node %q has no resolved relationship",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				value.ID,
 			)
 		}
@@ -132,7 +132,7 @@ func (s *Service) ResolvePlan(
 			ID:     value.ID,
 			Join:   value.Join,
 			Type:   header.Type,
-			Name:   spec.LogicalName(header.Name),
+			Name:   storeSpec.LogicalName(header.Name),
 			Form:   form,
 			Status: relationship.Status,
 		}

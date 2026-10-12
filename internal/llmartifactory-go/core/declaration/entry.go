@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -20,12 +20,12 @@ type Entry struct {
 func DecodeEntryJSON(raw []byte) (Entry, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Entry{}, fmt.Errorf(
 			"%w: canonicalize declaration entry: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -40,18 +40,18 @@ func DecodeCanonicalEntryJSON(
 	raw []byte,
 ) (Entry, error) {
 	if len(raw) == 0 ||
-		len(raw) > spec.MaxDefinitionBodyBytes ||
+		len(raw) > storeSpec.MaxDefinitionBodyBytes ||
 		raw[0] != '{' {
 		return Entry{}, fmt.Errorf(
 			"%w: canonical declaration entry must be a bounded JSON object",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	var header Header
 	if err := json.Unmarshal(raw, &header); err != nil {
 		return Entry{}, fmt.Errorf(
 			"%w: decode declaration entry header: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -68,7 +68,7 @@ func DecodeCanonicalEntryJSON(
 func NewEntry(value any) (Entry, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		value,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Entry{}, err
@@ -79,7 +79,7 @@ func NewEntry(value any) (Entry, error) {
 // NewSymbolicEntry constructs the portable exact symbolic-reference form.
 func NewSymbolicEntry(
 	declarationType Type,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) (Entry, error) {
 	return NewEntry(Header{
 		Type: declarationType,
@@ -95,14 +95,14 @@ func (e Entry) Validate() error {
 	if len(e.raw) == 0 {
 		return fmt.Errorf(
 			"%w: declaration entry is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := e.header.Type.Validate(); err != nil {
 		return err
 	}
 	if e.header.Name != "" {
-		if err := spec.ValidatePortableName(
+		if err := storeSpec.ValidatePortableName(
 			"artifact declaration name",
 			e.header.Name,
 		); err != nil {
@@ -112,7 +112,7 @@ func (e Entry) Validate() error {
 	if e.header.Name == "" && !e.hasField("base") {
 		return fmt.Errorf(
 			"%w: declaration entry requires name or selector base",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -144,7 +144,7 @@ func (e Entry) DecodeInto(target any) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
-	return jsonutil.DecodeCanonicalObjectBytesInto(e.raw, target, spec.MaxDefinitionBodyBytes)
+	return jsonutil.DecodeCanonicalObjectBytesInto(e.raw, target, storeSpec.MaxDefinitionBodyBytes)
 }
 
 // IsSymbolic reports the portable exact reference form:
@@ -175,7 +175,7 @@ func (e *Entry) UnmarshalJSON(raw []byte) error {
 	if e == nil {
 		return fmt.Errorf(
 			"%w: declaration entry target is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	value, err := DecodeEntryJSON(raw)
@@ -208,7 +208,7 @@ func ValidateEntryType(
 	if entry.Header().Type != expected {
 		return fmt.Errorf(
 			"%w: declaration entry type is %q, expected %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			entry.Header().Type,
 			expected,
 		)
@@ -232,7 +232,7 @@ func ValidateEntryTypes(
 		if _, supported := allowedTypes[value.Header().Type]; !supported {
 			return fmt.Errorf(
 				"%w: %s[%d] has incompatible type %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				index,
 				value.Header().Type,

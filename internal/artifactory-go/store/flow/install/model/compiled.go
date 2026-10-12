@@ -5,7 +5,7 @@ import (
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -48,7 +48,7 @@ func (s CompiledPackageSet) Clone() CompiledPackageSet {
 }
 
 type CompiledPackage struct {
-	EmbeddedRoot spec.Locator                              `json:"embeddedRoot"`
+	EmbeddedRoot storeSpec.Locator                         `json:"embeddedRoot"`
 	Address      managedpackageModel.ManagedPackageAddress `json:"address"`
 	Fingerprint  cryptoutil.Digest                         `json:"fingerprint"`
 
@@ -71,14 +71,14 @@ func (p CompiledPackage) Clone() CompiledPackage {
 }
 
 type CompiledFile struct {
-	Locator spec.Locator      `json:"locator"`
+	Locator storeSpec.Locator `json:"locator"`
 	Size    int64             `json:"size"`
 	Digest  cryptoutil.Digest `json:"digest"`
 	Content []byte            `json:"content"`
 }
 
 type CompiledDocument struct {
-	Locator   spec.Locator       `json:"locator"`
+	Locator   storeSpec.Locator  `json:"locator"`
 	Digest    cryptoutil.Digest  `json:"digest"`
 	Artifacts []CompiledArtifact `json:"artifacts"`
 }
@@ -93,9 +93,9 @@ func (d CompiledDocument) Clone() CompiledDocument {
 }
 
 type CompiledArtifact struct {
-	Subresource spec.SubresourceLocator    `json:"subresource,omitempty"`
-	Definition  definitionModel.Definition `json:"definition"`
-	Diagnostics []diagnostic.Diagnostic    `json:"diagnostics,omitempty"`
+	Subresource storeSpec.SubresourceLocator `json:"subresource,omitempty"`
+	Definition  definitionModel.Definition   `json:"definition"`
+	Diagnostics []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
 }
 
 func (a CompiledArtifact) Clone() CompiledArtifact {
@@ -145,7 +145,7 @@ type CompiledPackagePlan struct {
 	// marker changed or was removed. MCP uses this to discard overlays after a
 	// protected topology reset.
 	TopologyCurrent bool
-	Changed         []spec.Locator
+	Changed         []storeSpec.Locator
 	Stale           []PackageHydration
 }
 

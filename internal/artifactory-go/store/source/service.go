@@ -11,7 +11,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -37,7 +37,7 @@ func NewService(
 	lifecycle LifecyclePublisher,
 ) (*Service, error) {
 	if repository == nil || registry == nil || roots == nil || timeClock == nil || lifecycle == nil {
-		return nil, fmt.Errorf("%w: source service dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: source service dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	return &Service{
 		repository: repository,
@@ -78,10 +78,10 @@ func (s *Service) Ensure(
 	if err := draft.Kind.Validate(); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
@@ -102,18 +102,22 @@ func (s *Service) Ensure(
 	existing, err := s.repository.FindByStorageKey(ctx, rootID, draft.StorageKey)
 	if err == nil {
 		if existing.RetiredAt != nil {
-			return sourceModel.Summary{}, false, fmt.Errorf("%w: Source %q is retired", spec.ErrRetired, existing.ID)
+			return sourceModel.Summary{}, false, fmt.Errorf(
+				"%w: Source %q is retired",
+				storeSpec.ErrRetired,
+				existing.ID,
+			)
 		}
 		if !sameEnsuredSource(existing, rootID, rootValue.StorageKey, draft, normalizedConfig) {
 			return sourceModel.Summary{}, false, fmt.Errorf(
 				"%w: Source storage key %q identifies another physical Source",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				draft.StorageKey,
 			)
 		}
 		return existing.Summary(), false, nil
 	}
-	if !errors.Is(err, spec.ErrSourceNotFound) && !errors.Is(err, spec.ErrNotFound) {
+	if !errors.Is(err, storeSpec.ErrSourceNotFound) && !errors.Is(err, storeSpec.ErrNotFound) {
 		return sourceModel.Summary{}, false, err
 	}
 	return s.CreateWithStatus(ctx, rootID, draft)
@@ -145,10 +149,10 @@ func (s *Service) CreateWithStatus(
 	if err := draft.Kind.Validate(); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
@@ -187,17 +191,21 @@ func (s *Service) CreateWithStatus(
 		}
 		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			draft.ID,
 		)
-	case !errors.Is(lookupErr, spec.ErrSourceNotFound) && !errors.Is(lookupErr, spec.ErrNotFound):
+	case !errors.Is(lookupErr, storeSpec.ErrSourceNotFound) && !errors.Is(lookupErr, storeSpec.ErrNotFound):
 		return sourceModel.Summary{}, false, lookupErr
 	}
 
 	var bootstrapper driver.ManagedSourceBootstrapper
 	adapter, found := s.registry.adapter(draft.Kind)
 	if !found {
-		return sourceModel.Summary{}, false, fmt.Errorf("%w: source adapter %q", spec.ErrSourceUnavailable, draft.Kind)
+		return sourceModel.Summary{}, false, fmt.Errorf(
+			"%w: source adapter %q",
+			storeSpec.ErrSourceUnavailable,
+			draft.Kind,
+		)
 	}
 	if candidate, supported := adapter.(driver.ManagedSourceBootstrapper); supported {
 		bootstrapper = candidate
@@ -218,12 +226,12 @@ func (s *Service) CreateWithStatus(
 	if createErr == nil {
 		return value.Summary(), true, nil
 	}
-	if !errors.Is(createErr, spec.ErrConflict) {
+	if !errors.Is(createErr, storeSpec.ErrConflict) {
 		return sourceModel.Summary{}, false, createErr
 	}
 	existing, lookupErr = s.repository.Get(ctx, rootID, draft.ID)
 	if lookupErr != nil {
-		if errors.Is(lookupErr, spec.ErrSourceNotFound) || errors.Is(lookupErr, spec.ErrNotFound) {
+		if errors.Is(lookupErr, storeSpec.ErrSourceNotFound) || errors.Is(lookupErr, storeSpec.ErrNotFound) {
 			return sourceModel.Summary{}, false, cleanupBootstrap(createErr)
 		}
 		return sourceModel.Summary{}, false, createErr
@@ -231,7 +239,7 @@ func (s *Service) CreateWithStatus(
 	if !sourceCreationIntentMatches(existing, value) {
 		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			draft.ID,
 		)
 	}
@@ -252,7 +260,7 @@ func sourceCreationIntentMatches(existing, requested sourceModel.Source) bool {
 func sameEnsuredSource(
 	existing sourceModel.Source,
 	rootID rootModel.RootID,
-	rootStorageKey spec.StorageKey,
+	rootStorageKey storeSpec.StorageKey,
 	draft sourceModel.Draft,
 	normalizedConfig json.RawMessage,
 ) bool {
@@ -311,14 +319,14 @@ func (s *Service) Update(
 		return sourceModel.Summary{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source %q changed since it was read", spec.ErrConflict, id)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source %q changed since it was read", storeSpec.ErrConflict, id)
 	}
 	config := append(json.RawMessage(nil), current.Config...)
 	if update.Config != nil {
@@ -342,7 +350,7 @@ func (s *Service) Update(
 		return current.Summary(), nil
 	}
 	if current.Revision == ^uint64(0) {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", storeSpec.ErrInvalid)
 	}
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
@@ -398,17 +406,17 @@ func (s *Service) Retire(
 		return sourceModel.Summary{}, err
 	}
 	if expectedRevision == 0 {
-		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source %q changed since it was read", spec.ErrConflict, id)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source %q changed since it was read", storeSpec.ErrConflict, id)
 	}
 	if current.Revision == ^uint64(0) {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", storeSpec.ErrInvalid)
 	}
 	now := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current.Clone()
@@ -445,14 +453,14 @@ func (s *Service) Discard(
 		return err
 	}
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected Source revision is required", spec.ErrInvalid)
+		return fmt.Errorf("%w: expected Source revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	cleanupContext := context.WithoutCancel(ctx)
 	if err := s.repository.Discard(cleanupContext, rootID, id, expectedRevision); err != nil {
@@ -474,7 +482,7 @@ func (s *Service) Purge(
 		return err
 	}
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected source revision is required", spec.ErrInvalid)
+		return fmt.Errorf("%w: expected source revision is required", storeSpec.ErrInvalid)
 	}
 	if err := rootID.Validate(); err != nil {
 		return err
@@ -501,17 +509,17 @@ func (s *Service) MarkContentChanged(
 		return sourceModel.Summary{}, err
 	}
 	if expectedRevision == 0 {
-		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: expected source revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return sourceModel.Summary{}, spec.ErrConflict
+		return sourceModel.Summary{}, storeSpec.ErrConflict
 	}
 	if current.Revision == ^uint64(0) {
-		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", storeSpec.ErrInvalid)
 	}
 	next := current.Clone()
 	next.Revision++

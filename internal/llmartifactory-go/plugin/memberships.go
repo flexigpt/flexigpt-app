@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -15,7 +15,7 @@ import (
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
 	Plugin             artifactModel.ArtifactRef    `json:"plugin"`
-	PluginName         spec.LogicalName             `json:"pluginName"`
+	PluginName         storeSpec.LogicalName        `json:"pluginName"`
 	PluginRevision     uint64                       `json:"pluginRevision"`
 	MemberIndex        int                          `json:"memberIndex"`
 	Member             MemberReference              `json:"member"`
@@ -33,7 +33,7 @@ func (a *API) ListMembershipsForArtifact(
 	if a == nil || a.resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Plugin resolver is unavailable",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	target, err := a.artifacts.Get(ctx, ref)
@@ -47,7 +47,7 @@ func (a *API) ListMembershipsForArtifact(
 	if a.domain != nil && !a.domain.allows(targetType) {
 		return nil, fmt.Errorf(
 			"%w: Artifact type %q is not supported by the %s Plugin domain",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			targetType,
 			a.domain.Name,
 		)
@@ -87,7 +87,7 @@ func (a *API) ListMembershipsForArtifact(
 		if plugin == nil || plugin.Type != declaration.TypePlugin {
 			return nil, fmt.Errorf(
 				"%w: Plugin %q did not resolve as a Plugin",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				pluginValue.Ref.ArtifactID,
 			)
 		}

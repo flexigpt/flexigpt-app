@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -32,7 +32,7 @@ func ArtifactNameReferenceLookupRoots(
 		if builtinRoot == "" {
 			return nil, fmt.Errorf(
 				"%w: built-in lookup is unavailable",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 		if err := builtinRoot.Validate(); err != nil {
@@ -55,7 +55,7 @@ func ArtifactNameReferenceLookupRoots(
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported Model reference scope %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			reference.Scope,
 		)
 	}

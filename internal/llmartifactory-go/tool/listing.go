@@ -6,7 +6,7 @@ import (
 
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )
@@ -15,7 +15,7 @@ func (a *Service) listPluginTools(
 	ctx context.Context,
 	value pluginAPI.PluginView,
 ) ([]ToolListItem, error) {
-	allowed := make(map[spec.LogicalName]struct{}, len(value.Members))
+	allowed := make(map[storeSpec.LogicalName]struct{}, len(value.Members))
 	for _, member := range value.Members {
 		if member.Type == "tool" {
 			allowed[member.Name] = struct{}{}

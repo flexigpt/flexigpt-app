@@ -25,7 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -59,7 +59,7 @@ func New(
 	if strings.TrimSpace(base) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source base directory is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(base)
@@ -69,7 +69,7 @@ func New(
 	if strings.TrimSpace(stagingBase) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source staging directory is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	stagingAbsolute, err := filepath.Abs(stagingBase)
@@ -82,7 +82,7 @@ func New(
 	if managedDirectoriesOverlap(contentBase, stagingDirectory) {
 		return nil, fmt.Errorf(
 			"%w: managed Source content and staging directories must not overlap",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -135,7 +135,7 @@ func (*Adapter) Kind() sourceModel.SourceKind {
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value sourceModel.Source,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	root, err := a.sourceRootPath(value, false)
 	if err != nil {
@@ -166,7 +166,7 @@ func (a *Adapter) BootstrapManagedSource(
 // reaches the adapter.
 func (a *Adapter) RemoveManagedRoot(
 	ctx context.Context,
-	rootStorageKey spec.StorageKey,
+	rootStorageKey storeSpec.StorageKey,
 ) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -206,7 +206,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: bootstrapped managed Source path is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	empty, err := managedDirectoryEmpty(root)
@@ -216,7 +216,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !empty {
 		return fmt.Errorf(
 			"%w: refusing to discard a managed Source with published package content",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	if err := os.Remove(root); err != nil {
@@ -277,7 +277,7 @@ func (a *Adapter) PublishPackage(
 		return "", err
 	}
 	if publication.ExpectedGeneration != "" {
-		if err := spec.ValidateSourceGeneration(
+		if err := storeSpec.ValidateSourceGeneration(
 			publication.ExpectedGeneration,
 		); err != nil {
 			return "", err
@@ -289,7 +289,7 @@ func (a *Adapter) PublishPackage(
 		if current != publication.ExpectedGeneration {
 			return "", fmt.Errorf(
 				"%w: managed Source changed before package publication",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 	}
@@ -300,7 +300,7 @@ func (a *Adapter) PublishPackage(
 	if exists && publication.ExpectedGeneration == "" {
 		return "", fmt.Errorf(
 			"%w: replacing managed package %v requires an expected generation",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			publication.Address,
 		)
 	}
@@ -428,7 +428,7 @@ func (a *Adapter) RemovePackage(
 	if current != expectedGeneration {
 		return fmt.Errorf(
 			"%w: managed Source changed before package removal",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	root, err := a.sourceRootPath(value, false)
@@ -453,7 +453,7 @@ func (a *Adapter) RemovePackage(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: managed package is not a directory",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -496,12 +496,12 @@ func (*Adapter) NormalizeConfig(
 ) (json.RawMessage, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -509,11 +509,11 @@ func (*Adapter) NormalizeConfig(
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&value,
-		spec.MaxConfigBytes,
+		storeSpec.MaxConfigBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config must be an empty object: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -572,7 +572,7 @@ func (a *Adapter) sourceStagingPath(
 }
 
 func (a *Adapter) managedRootPath(
-	rootStorageKey spec.StorageKey,
+	rootStorageKey storeSpec.StorageKey,
 ) (string, error) {
 	if err := rootStorageKey.Validate(); err != nil {
 		return "", err
@@ -588,14 +588,14 @@ func (a *Adapter) managedRootPath(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: managed Root path escapes managed Source base",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return root, nil
 }
 
 func (a *Adapter) managedStagingRootPath(
-	rootStorageKey spec.StorageKey,
+	rootStorageKey storeSpec.StorageKey,
 ) (string, error) {
 	if err := rootStorageKey.Validate(); err != nil {
 		return "", err
@@ -611,7 +611,7 @@ func (a *Adapter) managedStagingRootPath(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: managed Source staging path escapes staging base",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return root, nil
@@ -652,7 +652,7 @@ func (a *Adapter) confirmedGeneration(
 
 func managedPackagePath(
 	root string,
-	directory spec.Locator,
+	directory storeSpec.Locator,
 	createParent bool,
 ) (string, error) {
 	parent := path.Dir(string(directory))
@@ -733,15 +733,15 @@ func equivalentPackage(
 		if entry == nil {
 			return fmt.Errorf(
 				"%w: managed package walk returned no entry for %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				location,
 			)
 		}
 		entries++
-		if entries > spec.MaxDiscoveryEntries {
+		if entries > storeSpec.MaxDiscoveryEntries {
 			return fmt.Errorf(
 				"%w: managed package exceeds entry limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		relative, err := filepath.Rel(root, location)
@@ -749,10 +749,10 @@ func equivalentPackage(
 			return err
 		}
 		if strings.Count(filepath.ToSlash(relative), "/")+1 >
-			spec.MaxDiscoveryDepth {
+			storeSpec.MaxDiscoveryDepth {
 			return fmt.Errorf(
 				"%w: managed package exceeds depth limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		info, err := entry.Info()
@@ -762,7 +762,7 @@ func equivalentPackage(
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf(
 				"%w: managed package contains a symbolic link",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if info.IsDir() {
@@ -771,18 +771,18 @@ func equivalentPackage(
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
 				"%w: managed package contains a non-regular file",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
-		if info.Size() < 0 || info.Size() > spec.MaxScanBytes-total {
+		if info.Size() < 0 || info.Size() > storeSpec.MaxScanBytes-total {
 			return fmt.Errorf(
 				"%w: managed package exceeds byte limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		total += info.Size()
 		relative = filepath.ToSlash(relative)
-		if err := spec.Locator(relative).ValidatePortable(false); err != nil {
+		if err := storeSpec.Locator(relative).ValidatePortable(false); err != nil {
 			return err
 		}
 		expectedContent, found := remaining[relative]
@@ -835,7 +835,7 @@ func readManagedPackageFile(
 }
 
 type packageFileKeyAttributes struct {
-	Locator spec.Locator
+	Locator storeSpec.Locator
 }
 
 type packagePartitionProvider struct{}
@@ -847,7 +847,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: invalid managed package MapStore key",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := attributes.Locator.ValidatePortable(false); err != nil {
@@ -856,7 +856,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if key.FileName != path.Base(string(attributes.Locator)) {
 		return "", fmt.Errorf(
 			"%w: managed package filename does not match its locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	parent := path.Dir(string(attributes.Locator))
@@ -872,7 +872,7 @@ func (*packagePartitionProvider) ListPartitions(
 	_ string,
 	_ int,
 ) (dirs []string, nextPageToken string, err error) {
-	return nil, "", spec.ErrUnsupported
+	return nil, "", storeSpec.ErrUnsupported
 }
 
 func writeManagedPackageFiles(
@@ -885,7 +885,7 @@ func writeManagedPackageFiles(
 		true,
 		&packagePartitionProvider{},
 		mapstoreio.RawEncoderDecoder{
-			MaximumBytes: spec.MaxScanBytes,
+			MaximumBytes: storeSpec.MaxScanBytes,
 		},
 	)
 	if err != nil {
@@ -924,7 +924,7 @@ func writeManagedPackageFiles(
 		}
 		content, err := mapstoreio.RawBytes(
 			stored,
-			spec.MaxScanBytes,
+			storeSpec.MaxScanBytes,
 		)
 		if err != nil {
 			return err
@@ -932,7 +932,7 @@ func writeManagedPackageFiles(
 		if !bytes.Equal(content, file.Content) {
 			return fmt.Errorf(
 				"%w: MapStore changed managed package file %q",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 				file.Locator,
 			)
 		}
@@ -945,7 +945,7 @@ func writeManagedPackageFiles(
 }
 
 func managedPackageFileKey(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (mapstore.FileKey, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return mapstore.FileKey{}, err

@@ -8,7 +8,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
@@ -40,7 +40,7 @@ func ParseSkillDocument(
 	if err := document.ValidateSkillDocument(doc); err != nil {
 		return document.SkillDocument{}, nil, fmt.Errorf(
 			"%w: invalid Agent Skill document: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -90,7 +90,7 @@ func DefinitionForSkillDeclaration(
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
-		LogicalName:   spec.LogicalName(doc.Name),
+		LogicalName:   storeSpec.LogicalName(doc.Name),
 		DisplayName:   displayName,
 		Description:   doc.Description,
 		Labels:        declaration.CloneStringMap(doc.Labels),
@@ -120,28 +120,28 @@ func ValidateDefinition(
 	if value.Kind != SkillArtifactKind {
 		return fmt.Errorf(
 			"%w: Skill Definition kind must be %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			SkillArtifactKind,
 		)
 	}
 	if value.SchemaID != SkillSchemaID {
 		return fmt.Errorf(
 			"%w: Skill Definition schema must be %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			SkillSchemaID,
 		)
 	}
 	if value.SchemaVersion != SkillSchemaVersion {
 		return fmt.Errorf(
 			"%w: Skill Definition schema version must be %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			SkillSchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
 		return fmt.Errorf(
 			"%w: Skill Definition dependencies belong to the resolver graph",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -152,13 +152,13 @@ func ValidateDefinition(
 	if doc.Name != string(value.LogicalName) {
 		return fmt.Errorf(
 			"%w: Skill Definition logical name does not match declaration name",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if doc.Description != value.Description {
 		return fmt.Errorf(
 			"%w: Skill Definition description does not match declaration description",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -191,7 +191,7 @@ func definitionForSkillDocument(
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
-		LogicalName:   spec.LogicalName(doc.Name),
+		LogicalName:   storeSpec.LogicalName(doc.Name),
 		DisplayName:   doc.DisplayName,
 		Description:   doc.Description,
 		Labels: map[string]string{

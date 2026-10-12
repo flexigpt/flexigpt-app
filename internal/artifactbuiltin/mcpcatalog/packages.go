@@ -15,7 +15,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
@@ -30,19 +30,19 @@ import (
 // Artifact IDs are intentionally absent. Artifact Store assigns them while
 // refreshing the managed built-in Source.
 type PreparedPackage struct {
-	EmbeddedPackageRoot spec.Locator
+	EmbeddedPackageRoot storeSpec.Locator
 	PackageAddress      managedpackageModel.ManagedPackageAddress
-	DocumentFile        spec.Locator
+	DocumentFile        storeSpec.Locator
 	PackageFiles        []managedpackageModel.ManagedPackageFile
 	Expectations        []ArtifactExpectation
 }
 
 type ArtifactExpectation struct {
-	Locator          spec.Locator
-	Subresource      spec.SubresourceLocator
+	Locator          storeSpec.Locator
+	Subresource      storeSpec.SubresourceLocator
 	Kind             artifactModel.ArtifactKind
-	LogicalName      spec.LogicalName
-	LogicalVersion   spec.LogicalVersion
+	LogicalName      storeSpec.LogicalName
+	LogicalVersion   storeSpec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
 }
 
@@ -59,13 +59,13 @@ func PreparePackages(
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP package interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded MCP package filesystem is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -92,7 +92,7 @@ func PreparePackages(
 func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 	registry *coreinterpretation.Registry,
 ) (PreparedPackage, error) {
 	files, err := managedpackage.ReadPackageFiles(
@@ -118,7 +118,7 @@ func preparePackage(
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded MCP package %q lacks a supported Plugin document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			packageRoot,
 		)
 	}
@@ -135,7 +135,7 @@ func preparePackage(
 		)
 	}
 
-	packageName := spec.LogicalName(
+	packageName := storeSpec.LogicalName(
 		path.Base(string(packageRoot)),
 	)
 	if err := packageName.Validate(); err != nil {
@@ -160,13 +160,13 @@ func preparePackage(
 }
 
 func canonicalPluginExpectations(
-	documentFile spec.Locator,
+	documentFile storeSpec.Locator,
 	document []byte,
 	registry *coreinterpretation.Registry,
 ) ([]ArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func canonicalPluginExpectations(
 	if root.Header().Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP package root must be a Plugin",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	plugin, err := pluginv1.DecodePluginEntry(root)
@@ -191,7 +191,7 @@ func canonicalPluginExpectations(
 		default:
 			return nil, fmt.Errorf(
 				"%w: built-in MCP Plugin member %d has incompatible type %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 				member.Header().Type,
 			)
@@ -249,13 +249,13 @@ func canonicalPluginExpectations(
 
 type preparedArtifactIdentity struct {
 	kind artifactModel.ArtifactKind
-	name spec.LogicalName
+	name storeSpec.LogicalName
 }
 
 func validatePreparedPackageIdentities(
 	packages []PreparedPackage,
 ) error {
-	seen := make(map[preparedArtifactIdentity]spec.Locator)
+	seen := make(map[preparedArtifactIdentity]storeSpec.Locator)
 	for _, packageValue := range packages {
 		for _, expected := range packageValue.Expectations {
 			if err := expected.Locator.ValidatePortable(false); err != nil {
@@ -283,7 +283,7 @@ func validatePreparedPackageIdentities(
 			if previous, duplicate := seen[identity]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded MCP packages %q and %q both provide %q/%q",
-					spec.ErrConflict,
+					storeSpec.ErrConflict,
 					previous,
 					packageValue.EmbeddedPackageRoot,
 					expected.Kind,
@@ -302,7 +302,7 @@ func PackageFingerprint(
 	if !topology.IsPluginDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
 			"%w: built-in MCP Plugin document is not declared in topology",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

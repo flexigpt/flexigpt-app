@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type (
@@ -18,7 +18,7 @@ type (
 )
 
 func (v SchemaID) Validate() error {
-	return spec.ValidateIdentifier("schema ID", string(v), spec.MaxSchemaIDBytes)
+	return storeSpec.ValidateIdentifier("schema ID", string(v), storeSpec.MaxSchemaIDBytes)
 }
 
 const (
@@ -42,7 +42,7 @@ func (k Key) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported schema entity %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			k.Entity,
 		)
 	}
@@ -50,10 +50,10 @@ func (k Key) Validate() error {
 	if err := k.SchemaID.Validate(); err != nil {
 		return err
 	}
-	return spec.ValidateRequiredText(
+	return storeSpec.ValidateRequiredText(
 		"schema version",
 		k.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	)
 }
 

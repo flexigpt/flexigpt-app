@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -19,14 +19,14 @@ func (v RootID) Validate() error {
 }
 
 type Root struct {
-	ID          RootID          `json:"id"`
-	StorageKey  spec.StorageKey `json:"storageKey"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description,omitempty"`
-	Revision    uint64          `json:"revision"`
-	CreatedAt   time.Time       `json:"createdAt"`
-	ModifiedAt  time.Time       `json:"modifiedAt"`
-	RetiredAt   *time.Time      `json:"retiredAt,omitempty"`
+	ID          RootID               `json:"id"`
+	StorageKey  storeSpec.StorageKey `json:"storageKey"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+	Revision    uint64               `json:"revision"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	ModifiedAt  time.Time            `json:"modifiedAt"`
+	RetiredAt   *time.Time           `json:"retiredAt,omitempty"`
 }
 
 func (r Root) Validate() error {
@@ -36,28 +36,28 @@ func (r Root) Validate() error {
 	if err := r.StorageKey.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"root display name",
 		r.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"root description",
 		r.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
 	if r.Revision == 0 {
-		return fmt.Errorf("%w: root revision must be positive", spec.ErrInvalid)
+		return fmt.Errorf("%w: root revision must be positive", storeSpec.ErrInvalid)
 	}
 	if r.CreatedAt.IsZero() || r.ModifiedAt.IsZero() {
-		return fmt.Errorf("%w: root timestamps are required", spec.ErrInvalid)
+		return fmt.Errorf("%w: root timestamps are required", storeSpec.ErrInvalid)
 	}
 	if r.ModifiedAt.Before(r.CreatedAt) {
-		return fmt.Errorf("%w: root modified time precedes creation", spec.ErrInvalid)
+		return fmt.Errorf("%w: root modified time precedes creation", storeSpec.ErrInvalid)
 	}
 	if r.RetiredAt != nil {
 		if r.RetiredAt.IsZero() ||
@@ -65,7 +65,7 @@ func (r Root) Validate() error {
 			r.RetiredAt.Before(r.ModifiedAt) {
 			return fmt.Errorf(
 				"%w: root retirement time is invalid",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 	}

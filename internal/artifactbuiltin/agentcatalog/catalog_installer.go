@@ -5,7 +5,7 @@ import (
 
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type InstallerDependencies struct {
@@ -18,7 +18,7 @@ func NewInstaller(
 	if dependencies.Hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: agent generated catalog installer dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

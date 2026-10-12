@@ -6,14 +6,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DecoderRegistry struct {
 	decoders    []Decoder
-	byID        map[spec.DecoderID]Decoder
+	byID        map[storeSpec.DecoderID]Decoder
 	fingerprint cryptoutil.Digest
 }
 
@@ -26,7 +26,7 @@ func NewDecoderRegistry(
 		return nil, err
 	}
 
-	byID := make(map[spec.DecoderID]Decoder, len(ordered))
+	byID := make(map[storeSpec.DecoderID]Decoder, len(ordered))
 	for _, decoder := range ordered {
 		byID[decoder.ID()] = decoder
 	}
@@ -50,7 +50,7 @@ func (r *DecoderRegistry) Fingerprint() (
 	if r == nil {
 		return "", fmt.Errorf(
 			"%w: decoder registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return r.fingerprint, nil
@@ -61,8 +61,8 @@ func registryFingerprint(
 	decoders []Decoder,
 ) (cryptoutil.Digest, error) {
 	type descriptor struct {
-		ID       spec.DecoderID `json:"id"`
-		Revision string         `json:"revision"`
+		ID       storeSpec.DecoderID `json:"id"`
+		Revision string              `json:"revision"`
 	}
 	values := make([]descriptor, 0, len(decoders))
 	for _, decoder := range decoders {
@@ -81,7 +81,7 @@ func registryFingerprint(
 		if codec == nil {
 			return "", fmt.Errorf(
 				"%w: nil schema codec",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		raw, err := jsonutil.Canonicalize(codec.JSONSchema())
@@ -113,7 +113,7 @@ func registryFingerprint(
 		"format":   "artifact-decoder-registry/v1",
 		"decoders": values,
 		"schemas":  schemas,
-	}, spec.MaxDefinitionBytes)
+	}, storeSpec.MaxDefinitionBytes)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +121,7 @@ func registryFingerprint(
 }
 
 func (r *DecoderRegistry) find(
-	id spec.DecoderID,
+	id storeSpec.DecoderID,
 ) (Decoder, bool) {
 	if r == nil {
 		return nil, false

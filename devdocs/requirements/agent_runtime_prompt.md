@@ -583,28 +583,7 @@ internal/agentruntime-go/
 
 However, this selective set is not sufficient for compilation unless all its transitive imports are also available. Prefer the complete folders listed above.
 
-## Required root and Wails build files
-
-Attach the actual repository files that define module and Wails composition:
-
-```text
-go.mod
-go.sum
-wails.json
-```
-
-Also attach the actual Go Wails entrypoint file that calls `wails.Run`.
-
-Its path is not present in the supplied files, so do not guess it. In many repositories it is `main.go`, but attach the real file from this repository.
-
-If present, also attach:
-
-```text
-go.work
-go.work.sum
-```
-
-## Required frontend folders
+### Required frontend folders
 
 For the complete chat migration, attach these folders:
 

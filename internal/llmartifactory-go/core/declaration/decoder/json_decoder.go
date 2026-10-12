@@ -8,14 +8,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 )
 
-const JSONDecoderID spec.DecoderID = "artifact-declaration-json"
+const JSONDecoderID storeSpec.DecoderID = "artifact-declaration-json"
 
 type JSONDecoder struct {
 	core       *canonicalDecoder
@@ -53,7 +53,7 @@ func NewJSONDecoderForSchemaKeys(
 	}, nil
 }
 
-func (*JSONDecoder) ID() spec.DecoderID {
+func (*JSONDecoder) ID() storeSpec.DecoderID {
 	return JSONDecoderID
 }
 
@@ -74,7 +74,7 @@ func (d *JSONDecoder) BindExpectedCanonicalizer(
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
 			"%w: canonical JSON declaration decoder is unavailable",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return d.core.BindExpectedCanonicalizer(catalog)

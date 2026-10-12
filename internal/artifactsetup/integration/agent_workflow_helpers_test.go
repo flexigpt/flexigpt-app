@@ -22,7 +22,7 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
@@ -46,7 +46,7 @@ type workflowHarness struct {
 
 	dependencyDirectory     string
 	dependencySourceCreated bool
-	dependencyFiles         map[workflowDependency]spec.Locator
+	dependencyFiles         map[workflowDependency]storeSpec.Locator
 	nextDependencyFile      int
 
 	agentBootstrap *installFlow.Bootstrap
@@ -55,7 +55,7 @@ type workflowHarness struct {
 
 type workflowDependency struct {
 	Type   declaration.Type
-	Name   spec.LogicalName
+	Name   storeSpec.LogicalName
 	Insert declaration.InsertTarget
 }
 
@@ -206,7 +206,7 @@ func newWorkflowHarness(
 		store:           store,
 		api:             api,
 		texts:           texts,
-		dependencyFiles: make(map[workflowDependency]spec.Locator),
+		dependencyFiles: make(map[workflowDependency]storeSpec.Locator),
 	}
 }
 
@@ -567,7 +567,7 @@ func workflowDependencyDiscovery(
 		)
 	}
 
-	decoderIDs := []spec.DecoderID{
+	decoderIDs := []storeSpec.DecoderID{
 		coredecoder.YAMLDecoderID,
 	}
 	if documents.Default.DecoderID != coredecoder.YAMLDecoderID {
@@ -593,9 +593,9 @@ func workflowDependencySourceFile(
 	dependency workflowDependency,
 	index int,
 	documents support.Documents,
-) (spec.Locator, []byte, error) {
+) (storeSpec.Locator, []byte, error) {
 	if dependency.Type == declaration.TypeSkill {
-		locator := spec.Locator(path.Join(
+		locator := storeSpec.Locator(path.Join(
 			string(dependency.Name),
 			string(documents.Default.Locator),
 		))
@@ -609,7 +609,7 @@ func workflowDependencySourceFile(
 		return locator, content, nil
 	}
 
-	locator := spec.Locator(fmt.Sprintf(
+	locator := storeSpec.Locator(fmt.Sprintf(
 		"dependency-%04d.yaml",
 		index,
 	))

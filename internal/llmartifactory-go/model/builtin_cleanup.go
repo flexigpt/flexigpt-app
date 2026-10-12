@@ -13,7 +13,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
@@ -57,7 +57,7 @@ func NewBuiltinPackageCleanup(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: Model built-in package cleanup requires a Model Store API",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &builtinPackageCleanup{api: api}, nil
@@ -73,7 +73,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 		sourceID != c.api.support.BuiltinPackageSource {
 		return nil, fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 
@@ -135,7 +135,7 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 		sourceID != c.api.support.BuiltinPackageSource {
 		return fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 
@@ -206,8 +206,8 @@ func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 ) error {
 	record, err := c.api.artifacts.Get(ctx, ref)
 	if err != nil {
-		if errors.Is(err, spec.ErrArtifactNotFound) ||
-			errors.Is(err, spec.ErrRootNotFound) {
+		if errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+			errors.Is(err, storeSpec.ErrRootNotFound) {
 			return nil
 		}
 		return err
@@ -235,7 +235,7 @@ func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 	default:
 		return fmt.Errorf(
 			"%w: built-in Model initial enabled label %q is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			raw,
 		)
 	}
@@ -257,8 +257,8 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 	value BuiltinArtifactSnapshot,
 ) error {
 	record, err := c.api.artifacts.Get(ctx, value.Ref)
-	if errors.Is(err, spec.ErrArtifactNotFound) ||
-		errors.Is(err, spec.ErrRootNotFound) {
+	if errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+		errors.Is(err, storeSpec.ErrRootNotFound) {
 		// A protected-root reset already removes family local state before
 		// deleting Artifact metadata. Cleanup must remain idempotent.
 		return nil
@@ -282,8 +282,8 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 
 func managedPackageScopes(
 	addresses []managedpackageModel.ManagedPackageAddress,
-) (map[spec.Locator]struct{}, error) {
-	output := make(map[spec.Locator]struct{}, len(addresses))
+) (map[storeSpec.Locator]struct{}, error) {
+	output := make(map[storeSpec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
 		if address.Kind != modelDomain.ModelProviderPackageKind &&
 			address.Kind != modelDomain.ModelPackageKind {
@@ -300,12 +300,12 @@ func managedPackageScopes(
 
 func entryBelongsToPackageScope(
 	entry catalogModel.Entry,
-	scopes map[spec.Locator]struct{},
+	scopes map[storeSpec.Locator]struct{},
 ) bool {
 	if len(scopes) == 0 {
 		return false
 	}
-	scope := spec.Locator(path.Dir(string(entry.Binding.Locator)))
+	scope := storeSpec.Locator(path.Dir(string(entry.Binding.Locator)))
 	_, found := scopes[scope]
 	return found
 }

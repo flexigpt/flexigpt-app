@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -17,8 +17,8 @@ type SourceStateUpdate struct {
 	RootID     rootModel.RootID         `json:"rootID"`
 
 	Binding        artifactModel.SourceBinding `json:"binding"`
-	LogicalName    spec.LogicalName            `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion         `json:"logicalVersion,omitempty"`
+	LogicalName    storeSpec.LogicalName       `json:"logicalName"`
+	LogicalVersion storeSpec.LogicalVersion    `json:"logicalVersion,omitempty"`
 
 	ResolvedDefinition  *cryptoutil.Digest      `json:"resolvedDefinition,omitempty"`
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
@@ -60,7 +60,7 @@ func (u SourceStateUpdate) Validate() error {
 		u.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: invalid source-derived Artifact update",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

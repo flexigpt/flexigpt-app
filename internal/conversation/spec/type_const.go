@@ -3,8 +3,8 @@ package spec
 import (
 	"time"
 
+	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/attachment"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -60,9 +60,9 @@ type ConversationMessage struct {
 
 	// Attachments that backed this turn's user input (files, URLs, etc).
 	// These are ref attachments; ContentBlock may or may not be hydrated.
-	Attachments      []attachment.Attachment     `json:"attachments,omitempty"`
-	EnabledSkillRefs []artifactModel.ArtifactRef `json:"enabledSkillRefs,omitempty"`
-	ActiveSkillRefs  []artifactModel.ArtifactRef `json:"activeSkillRefs,omitempty"`
+	Attachments      []attachmentRuntime.Attachment `json:"attachments,omitempty"`
+	EnabledSkillRefs []artifactModel.ArtifactRef    `json:"enabledSkillRefs,omitempty"`
+	ActiveSkillRefs  []artifactModel.ArtifactRef    `json:"activeSkillRefs,omitempty"`
 
 	// Usage / error info from the model/provider for this turn
 	// (usually attached to assistant turns).

@@ -6,14 +6,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ManagedPackageFile is one regular file relative to a managed package root.
 // Empty directories are deliberately not represented.
 type ManagedPackageFile struct {
-	Locator spec.Locator `json:"locator"`
-	Content []byte       `json:"content"`
+	Locator storeSpec.Locator `json:"locator"`
+	Content []byte            `json:"content"`
 }
 
 // NormalizeManagedPackageFiles validates and returns an independently owned,
@@ -26,20 +26,20 @@ func NormalizeManagedPackageFiles(
 	if len(input) == 0 {
 		return nil, fmt.Errorf(
 			"%w: managed package must contain at least one file",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if len(input) > spec.MaxDiscoveryEntries {
+	if len(input) > storeSpec.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: managed package exceeds the file count limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make([]ManagedPackageFile, len(input))
-	seen := make(map[spec.Locator]struct{}, len(input))
-	filesByIdentity := make(map[string]spec.Locator, len(input))
-	directoriesByIdentity := make(map[string]spec.Locator)
+	seen := make(map[storeSpec.Locator]struct{}, len(input))
+	filesByIdentity := make(map[string]storeSpec.Locator, len(input))
+	directoriesByIdentity := make(map[string]storeSpec.Locator)
 
 	var total int64
 	for index, file := range input {
@@ -53,7 +53,7 @@ func NormalizeManagedPackageFiles(
 		if _, duplicate := seen[file.Locator]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate managed package file %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				file.Locator,
 			)
 		}
@@ -63,7 +63,7 @@ func NormalizeManagedPackageFiles(
 		if previous, collision := filesByIdentity[identity]; collision {
 			return nil, fmt.Errorf(
 				"%w: managed package file %q collides with %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				file.Locator,
 				previous,
 			)
@@ -71,7 +71,7 @@ func NormalizeManagedPackageFiles(
 		if child, conflict := directoriesByIdentity[identity]; conflict {
 			return nil, fmt.Errorf(
 				"%w: managed package file %q conflicts with child path %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				file.Locator,
 				child,
 			)
@@ -79,12 +79,12 @@ func NormalizeManagedPackageFiles(
 
 		for parent := path.Dir(string(file.Locator)); parent != "."; parent = path.Dir(parent) {
 			parentIdentity := portableLocatorIdentity(
-				spec.Locator(parent),
+				storeSpec.Locator(parent),
 			)
 			if parentFile, conflict := filesByIdentity[parentIdentity]; conflict {
 				return nil, fmt.Errorf(
 					"%w: managed package path %q is below file %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					file.Locator,
 					parentFile,
 				)
@@ -93,10 +93,10 @@ func NormalizeManagedPackageFiles(
 		}
 		filesByIdentity[identity] = file.Locator
 
-		if int64(len(file.Content)) > spec.MaxScanBytes-total {
+		if int64(len(file.Content)) > storeSpec.MaxScanBytes-total {
 			return nil, fmt.Errorf(
 				"%w: managed package exceeds the byte limit",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		total += int64(len(file.Content))
@@ -118,16 +118,16 @@ func NormalizeManagedPackageFiles(
 // documents because that would make its declaration root ambiguous.
 func PackageFileContentOneOf(
 	files []ManagedPackageFile,
-	candidates []spec.Locator,
-) (documentFile spec.Locator, document []byte, found bool, err error) {
+	candidates []storeSpec.Locator,
+) (documentFile storeSpec.Locator, document []byte, found bool, err error) {
 	if len(candidates) == 0 {
 		return "", nil, false, fmt.Errorf(
 			"%w: package document candidates are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
-	seenCandidates := make(map[spec.Locator]struct{}, len(candidates))
+	seenCandidates := make(map[storeSpec.Locator]struct{}, len(candidates))
 	for _, candidate := range candidates {
 		if err := candidate.ValidatePortable(false); err != nil {
 			return "", nil, false, err
@@ -135,7 +135,7 @@ func PackageFileContentOneOf(
 		if _, duplicate := seenCandidates[candidate]; duplicate {
 			return "", nil, false, fmt.Errorf(
 				"%w: duplicate package document candidate %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				candidate,
 			)
 		}
@@ -143,7 +143,7 @@ func PackageFileContentOneOf(
 	}
 
 	var (
-		selected        spec.Locator
+		selected        storeSpec.Locator
 		selectedContent []byte
 	)
 	for _, candidate := range candidates {
@@ -154,7 +154,7 @@ func PackageFileContentOneOf(
 		if selected != "" {
 			return "", nil, false, fmt.Errorf(
 				"%w: package contains both %q and %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				selected,
 				candidate,
 			)
@@ -171,7 +171,7 @@ func PackageFileContentOneOf(
 // packageFileContent returns an owned copy of one package-relative file.
 func packageFileContent(
 	files []ManagedPackageFile,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) ([]byte, bool) {
 	for _, file := range files {
 		if file.Locator != locator {
@@ -183,7 +183,7 @@ func packageFileContent(
 }
 
 func portableLocatorIdentity(
-	value spec.Locator,
+	value storeSpec.Locator,
 ) string {
 	if value == "." {
 		return "."

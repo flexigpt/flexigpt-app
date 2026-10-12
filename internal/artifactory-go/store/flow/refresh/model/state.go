@@ -6,7 +6,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -34,10 +34,10 @@ func (s State) Validate() error {
 	if s.SourceRevision == 0 || s.Revision == 0 {
 		return fmt.Errorf(
 			"%w: source refresh revisions must be positive",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateSourceGeneration(s.SourceGeneration); err != nil {
+	if err := storeSpec.ValidateSourceGeneration(s.SourceGeneration); err != nil {
 		return err
 	}
 	if err := cryptoutil.ValidateDigest(s.DiscoveryFingerprint); err != nil {
@@ -55,7 +55,7 @@ func (s State) Validate() error {
 	if s.RefreshedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: Source refresh time is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return diagnostic.Validate(s.Diagnostics)

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 )
@@ -84,7 +84,7 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 			PreparedFingerprint: preview.PreparedFingerprint,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	committed, err := harness.api.CommitAgentImport(
 		t.Context(),

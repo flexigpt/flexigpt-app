@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -41,7 +41,7 @@ func buildToolChoices(
 		if _, duplicate := seen[selection.ChoiceID]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool choice %q is repeated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				selection.ChoiceID,
 			)
 		}
@@ -111,7 +111,7 @@ func hydrateInferenceToolChoice(
 	default:
 		return inferenceSpec.ToolChoice{}, fmt.Errorf(
 			"%w: Tool implementation %q is unsupported",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			document.Implementation.Kind,
 		)
 	}
@@ -131,7 +131,7 @@ func resolveToolTarget(
 	if target.Type != declaration.TypeTool {
 		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: capability target type is %q, expected tool",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			target.Type,
 		)
 	}
@@ -139,7 +139,7 @@ func resolveToolTarget(
 		target.Artifact == nil {
 		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: direct Tool capability targets require an application runtime adapter",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
@@ -151,7 +151,7 @@ func resolveToolTarget(
 		value.Tool.Name != target.Name {
 		return toolAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: Tool capability target no longer matches its Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return value, nil
@@ -200,7 +200,7 @@ func hydrateSDKToolChoice(
 	default:
 		return inferenceSpec.ToolChoice{}, fmt.Errorf(
 			"%w: SDK Tool type %q is unsupported",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			document.Implementation.SDKToolType,
 		)
 	}
@@ -213,7 +213,7 @@ func toolArguments(
 	if bytes.Equal(raw, []byte("false")) {
 		return nil, fmt.Errorf(
 			"%w: false Tool inputSchema cannot be advertised as inference arguments",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if len(raw) == 0 ||
@@ -225,7 +225,7 @@ func toolArguments(
 	if err := json.Unmarshal(raw, &output); err != nil {
 		return nil, fmt.Errorf(
 			"%w: Tool inputSchema must project to an object",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if output == nil {

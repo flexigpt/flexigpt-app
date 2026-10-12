@@ -14,7 +14,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -47,7 +47,7 @@ func schemaKeysForCompiledPackages(
 	if interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in compilation interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -73,7 +73,7 @@ func schemaKeysForCompiledPackages(
 	if len(kinds) == 0 {
 		return nil, fmt.Errorf(
 			"%w: built-in package set has no expected Artifact kinds",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return interpretations.SchemaKeysForArtifactKinds(kinds)
@@ -89,13 +89,13 @@ func CompileBuiltInPackageSet(
 	if temporaryDirectory == "" {
 		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in compilation directory is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if config.Interpretations == nil {
 		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in compilation interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

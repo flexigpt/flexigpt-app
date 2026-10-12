@@ -9,7 +9,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
@@ -31,7 +31,7 @@ type Profile struct {
 	// from Source, which is the mutable authoring Source profile.
 	ReadOnlySource *support.SourceProfile
 
-	BaselineName        spec.LogicalName
+	BaselineName        storeSpec.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
 	MembershipPolicy    pluginDomain.MembershipPolicy
@@ -70,10 +70,10 @@ func (p Profile) Clone() Profile {
 }
 
 func (p Profile) Validate() error {
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"Plugin family profile name",
 		p.Name,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (a *API) EnsureBaseline(
 	if a == nil || a.domain == nil {
 		return PluginView{}, fmt.Errorf(
 			"%w: Plugin baseline is not configured",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
@@ -206,8 +206,8 @@ func (a *API) EnsureBaseline(
 		}
 		return a.Read(ctx, record.Ref())
 
-	case errors.Is(err, spec.ErrArtifactNotFound),
-		errors.Is(err, spec.ErrNotFound):
+	case errors.Is(err, storeSpec.ErrArtifactNotFound),
+		errors.Is(err, storeSpec.ErrNotFound):
 	default:
 		return PluginView{}, err
 	}
@@ -231,7 +231,7 @@ func (a *API) domainManagedSource(
 	sourceID sourceModel.SourceID,
 ) (sourceModel.Summary, error) {
 	if a.domain == nil {
-		return sourceModel.Summary{}, spec.ErrClosed
+		return sourceModel.Summary{}, storeSpec.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return sourceModel.Summary{}, err
@@ -244,13 +244,13 @@ func (a *API) domainManagedSource(
 		if !a.domain.Source.Matches(value) {
 			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Plugin belongs to another managed domain Source",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 			)
 		}
 		if !value.Enabled {
 			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Plugin domain Source is disabled",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 		return value, nil
@@ -284,7 +284,7 @@ func (a *API) validateDomainMember(
 	if !a.domain.allows(member.Type) {
 		return fmt.Errorf(
 			"%w: %s Plugin cannot contain %q members",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			a.domain.Name,
 			member.Type,
 		)
@@ -292,7 +292,7 @@ func (a *API) validateDomainMember(
 	if !a.domain.allowsMemberForm(declaration.MemberNamed) {
 		return fmt.Errorf(
 			"%w: %s Plugin does not support named external members",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			a.domain.Name,
 		)
 	}
@@ -315,7 +315,7 @@ func (a *API) validateDomainEntry(
 	if !a.domain.allows(member.Header().Type) {
 		return fmt.Errorf(
 			"%w: %s Plugin cannot contain %q members",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			a.domain.Name,
 			member.Header().Type,
 		)
@@ -323,7 +323,7 @@ func (a *API) validateDomainEntry(
 	if !a.domain.allowsMemberForm(form) {
 		return fmt.Errorf(
 			"%w: %s Plugin cannot contain %q members",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			a.domain.Name,
 			form,
 		)
@@ -342,7 +342,7 @@ func (a *API) validateEditableDomainDocument(
 		if form != declaration.MemberNamed {
 			return fmt.Errorf(
 				"%w: editable Plugin cannot contain contained or selector members",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 			)
 		}
 		if err := a.validateDomainEntry(member); err != nil {
@@ -388,7 +388,7 @@ func (a *API) readPluginDocument(
 		record.State != artifactModel.StateAvailable {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Artifact %q is not an available Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -402,7 +402,7 @@ func (a *API) readPluginDocument(
 		*record.ResolvedDefinition != definitionValue.Digest {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin definition changed during read",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 	document, err := pluginv1.FromDefinition(definitionValue)
@@ -413,7 +413,7 @@ func (a *API) readPluginDocument(
 	if document.Name != string(record.LogicalName) {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return record, document, nil
@@ -471,7 +471,7 @@ func (a *API) Read(
 	if !visible {
 		return PluginView{}, fmt.Errorf(
 			"%w: Plugin is not visible in this domain",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	if a.domain != nil && a.domain.ValidateDocument != nil {
@@ -549,7 +549,7 @@ func readPluginViewOf(
 	}
 	view := PluginView{
 		Artifact:    record.Clone(),
-		Name:        spec.LogicalName(document.Name),
+		Name:        storeSpec.LogicalName(document.Name),
 		DisplayName: displayName,
 		Description: document.Description,
 		Editable:    editable,
@@ -571,7 +571,7 @@ func readPluginViewOf(
 		header := entry.Header()
 		member := PluginMemberView{
 			Type:      header.Type,
-			Name:      spec.LogicalName(header.Name),
+			Name:      storeSpec.LogicalName(header.Name),
 			Contained: form == declaration.MemberContained,
 			Selector:  form == declaration.MemberSelector,
 		}

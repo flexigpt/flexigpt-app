@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // StoreRecord is one non-secret Artifact Store-scoped overlay.
@@ -27,10 +27,10 @@ func (r StoreRecord) Validate() error {
 	if err := r.Namespace.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"store overlay schema version",
 		r.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
@@ -42,26 +42,26 @@ func (r StoreRecord) Validate() error {
 	if !bytes.Equal(canonical, r.Payload) {
 		return fmt.Errorf(
 			"%w: store overlay payload is not canonical",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	if r.Revision == 0 {
 		return fmt.Errorf(
 			"%w: store overlay revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.CreatedAt.IsZero() || r.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: store overlay timestamps are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.ModifiedAt.Before(r.CreatedAt) {
 		return fmt.Errorf(
 			"%w: store overlay modified time precedes creation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -88,10 +88,10 @@ func (r StorePutRequest) Validate() error {
 	if err := r.Namespace.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"store overlay schema version",
 		r.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}

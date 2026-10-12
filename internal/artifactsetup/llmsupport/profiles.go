@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -116,7 +116,7 @@ func managedSource(
 	displayName string,
 ) support.SourceProfile {
 	return support.SourceProfile{
-		StorageKey:  spec.StorageKey(storageKey),
+		StorageKey:  storeSpec.StorageKey(storageKey),
 		Kind:        managedfs.Kind,
 		DisplayName: displayName,
 		Config:      json.RawMessage(`{}`),
@@ -137,7 +137,7 @@ func profile(
 		BuiltinRoot:         topology.BuiltinRootID(),
 		Source:              &source,
 		Package:             packageLayout,
-		BaselineName:        spec.LogicalName(baselineName),
+		BaselineName:        storeSpec.LogicalName(baselineName),
 		BaselineDisplayName: baselineDisplayName,
 		BaselineDescription: baselineDescription,
 		MembershipPolicy:    policy,
@@ -464,16 +464,16 @@ func Workspace() (workspaceAPI.Support, error) {
 
 	value := workspaceAPI.Support{
 		DirectorySource: support.SourceProfile{
-			StorageKey:  spec.StorageKey("workspace-directory"),
+			StorageKey:  storeSpec.StorageKey("workspace-directory"),
 			Kind:        fsdir.Kind,
 			DisplayName: "Workspace directory source",
 		},
 		PolicySource: support.SourceProfile{
-			StorageKey:  spec.StorageKey("workspace-base-policy"),
+			StorageKey:  storeSpec.StorageKey("workspace-base-policy"),
 			Kind:        iofs.Kind,
 			DisplayName: "Workspace base policy source",
 		},
-		RootStorageKeyPrefix:    spec.StorageKey("workspace-directory-root-"),
+		RootStorageKeyPrefix:    storeSpec.StorageKey("workspace-directory-root-"),
 		DirectoryDiscovery:      discovery,
 		ManifestPatterns:        append([]string(nil), manifestPatterns...),
 		SelectorIncludePatterns: append([]string(nil), selectorPatterns...),
@@ -486,7 +486,7 @@ func Workspace() (workspaceAPI.Support, error) {
 }
 
 func Candidates(
-	decoderID spec.DecoderID,
+	decoderID storeSpec.DecoderID,
 ) (support.Candidates, error) {
 	patterns, err := topology.DocumentPatternsForDecoder(decoderID)
 	if err != nil {

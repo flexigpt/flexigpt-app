@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -26,7 +26,7 @@ func NewService(
 	if repository == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: root service dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -52,7 +52,7 @@ func (s *Service) EnsureSystem(ctx context.Context, draft rootModel.RootDraft) (
 	if s.policy == nil || !s.policy.IsProtectedRoot(draft.ID) {
 		return rootModel.Root{}, fmt.Errorf(
 			"%w: Root %q is not declared as protected application topology",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			draft.ID,
 		)
 	}
@@ -82,14 +82,14 @@ func (s *Service) Update(
 		return rootModel.Root{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return rootModel.Root{}, fmt.Errorf("%w: expected root revision is required", spec.ErrInvalid)
+		return rootModel.Root{}, fmt.Errorf("%w: expected root revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return rootModel.Root{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return rootModel.Root{}, fmt.Errorf("%w: root %q changed since it was read", spec.ErrConflict, id)
+		return rootModel.Root{}, fmt.Errorf("%w: root %q changed since it was read", storeSpec.ErrConflict, id)
 	}
 	next := current
 	next.DisplayName = update.DisplayName
@@ -116,14 +116,14 @@ func (s *Service) Retire(ctx context.Context, id rootModel.RootID, expectedRevis
 		return rootModel.Root{}, err
 	}
 	if expectedRevision == 0 {
-		return rootModel.Root{}, fmt.Errorf("%w: expected root revision is required", spec.ErrInvalid)
+		return rootModel.Root{}, fmt.Errorf("%w: expected root revision is required", storeSpec.ErrInvalid)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return rootModel.Root{}, err
 	}
 	if current.Revision != expectedRevision {
-		return rootModel.Root{}, fmt.Errorf("%w: root %q changed since it was read", spec.ErrConflict, id)
+		return rootModel.Root{}, fmt.Errorf("%w: root %q changed since it was read", storeSpec.ErrConflict, id)
 	}
 	modifiedAt := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
@@ -147,7 +147,7 @@ func (s *Service) Purge(ctx context.Context, id rootModel.RootID, expectedRevisi
 		return err
 	}
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected root revision is required", spec.ErrInvalid)
+		return fmt.Errorf("%w: expected root revision is required", storeSpec.ErrInvalid)
 	}
 	return s.repository.Purge(ctx, id, expectedRevision)
 }
@@ -168,7 +168,7 @@ func (s *Service) create(ctx context.Context, draft rootModel.RootDraft) (rootMo
 	if createErr == nil {
 		return value, nil
 	}
-	if !errors.Is(createErr, spec.ErrConflict) {
+	if !errors.Is(createErr, storeSpec.ErrConflict) {
 		return rootModel.Root{}, createErr
 	}
 	existing, err := s.repository.Get(ctx, draft.ID)
@@ -177,7 +177,7 @@ func (s *Service) create(ctx context.Context, draft rootModel.RootDraft) (rootMo
 	}
 	if existing.DisplayName != draft.DisplayName || existing.StorageKey != draft.StorageKey ||
 		existing.Description != draft.Description {
-		return rootModel.Root{}, fmt.Errorf("%w: root %q creation intent differs", spec.ErrConflict, draft.ID)
+		return rootModel.Root{}, fmt.Errorf("%w: root %q creation intent differs", storeSpec.ErrConflict, draft.ID)
 	}
 	return existing, nil
 }

@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -43,7 +43,7 @@ type Request struct {
 	Entry   *declaration.Entry
 
 	ExpectedKind        artifactModel.ArtifactKind
-	ExpectedLogicalName spec.LogicalName
+	ExpectedLogicalName storeSpec.LogicalName
 }
 
 func (r Request) Validate() error {
@@ -55,7 +55,7 @@ func (r Request) Validate() error {
 			return err
 		}
 		if r.From.RootID != r.RootID {
-			return fmt.Errorf("%w: locator origin belongs to another Root", spec.ErrInvalid)
+			return fmt.Errorf("%w: locator origin belongs to another Root", storeSpec.ErrInvalid)
 		}
 	}
 	if err := r.Locator.Validate(); err != nil {
@@ -75,10 +75,10 @@ func (r Request) Validate() error {
 		}
 		header := r.Entry.Header()
 		if artifactModel.ArtifactKind(header.Type) != r.ExpectedKind {
-			return fmt.Errorf("%w: locator entry type differs from expected kind", spec.ErrInvalid)
+			return fmt.Errorf("%w: locator entry type differs from expected kind", storeSpec.ErrInvalid)
 		}
 		if r.ExpectedLogicalName != "" && header.Name != string(r.ExpectedLogicalName) {
-			return fmt.Errorf("%w: locator entry name differs from expected identity", spec.ErrInvalid)
+			return fmt.Errorf("%w: locator entry name differs from expected identity", storeSpec.ErrInvalid)
 		}
 	}
 	return nil
@@ -104,7 +104,7 @@ type FactoryKey struct {
 }
 
 func (k FactoryKey) Validate() error {
-	if err := spec.ValidateIdentifier("locator resolver kind", k.LocatorKind, spec.MaxKindBytes); err != nil {
+	if err := storeSpec.ValidateIdentifier("locator resolver kind", k.LocatorKind, storeSpec.MaxKindBytes); err != nil {
 		return err
 	}
 	return k.ArtifactKind.Validate()
@@ -112,21 +112,25 @@ func (k FactoryKey) Validate() error {
 
 func ValidateFactory(value Factory) error {
 	if value == nil {
-		return fmt.Errorf("%w: declaration locator factory is nil", spec.ErrInvalid)
+		return fmt.Errorf("%w: declaration locator factory is nil", storeSpec.ErrInvalid)
 	}
-	if err := spec.ValidateIdentifier("locator resolver kind", value.LocatorKind(), spec.MaxKindBytes); err != nil {
+	if err := storeSpec.ValidateIdentifier(
+		"locator resolver kind",
+		value.LocatorKind(),
+		storeSpec.MaxKindBytes,
+	); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"locator resolver revision",
 		value.Revision(),
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
 	kinds := value.ArtifactKinds()
 	if len(kinds) == 0 {
-		return fmt.Errorf("%w: locator resolver has no Artifact kinds", spec.ErrInvalid)
+		return fmt.Errorf("%w: locator resolver has no Artifact kinds", storeSpec.ErrInvalid)
 	}
 	seen := make(map[artifactModel.ArtifactKind]struct{}, len(kinds))
 	for _, kind := range kinds {
@@ -134,7 +138,7 @@ func ValidateFactory(value Factory) error {
 			return err
 		}
 		if _, duplicate := seen[kind]; duplicate {
-			return fmt.Errorf("%w: locator resolver repeats Artifact kind %q", spec.ErrConflict, kind)
+			return fmt.Errorf("%w: locator resolver repeats Artifact kind %q", storeSpec.ErrConflict, kind)
 		}
 		seen[kind] = struct{}{}
 	}

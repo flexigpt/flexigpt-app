@@ -10,7 +10,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -33,7 +33,7 @@ func NewService(
 		timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact service dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -88,7 +88,7 @@ func (s *Service) GetDefinition(
 	if record.ResolvedDefinition == nil {
 		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: Artifact %q has no current Definition",
-			spec.ErrDefinitionNotFound,
+			storeSpec.ErrDefinitionNotFound,
 			record.ID,
 		)
 	}
@@ -105,7 +105,7 @@ func (s *Service) GetDefinition(
 			value.Kind != record.Kind) {
 		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: Artifact Definition does not match Artifact state",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return value, nil
@@ -138,10 +138,10 @@ func (s *Service) SetDisplayName(
 	expectedRevision uint64,
 	displayName string,
 ) (artifactModel.Artifact, error) {
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Artifact display name",
 		displayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return artifactModel.Artifact{}, err
 	}
@@ -164,7 +164,7 @@ func (s *Service) UpdateData(
 ) (artifactModel.Artifact, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		data,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return artifactModel.Artifact{}, err
@@ -198,7 +198,7 @@ func (s *Service) Purge(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -207,12 +207,12 @@ func (s *Service) Purge(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	if current.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: source-backed Artifact %q must be missing before purge",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			current.ID,
 		)
 	}
@@ -242,7 +242,7 @@ func (s *Service) updateLocal(
 	if expectedRevision == 0 {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -251,7 +251,7 @@ func (s *Service) updateLocal(
 		return artifactModel.Artifact{}, err
 	}
 	if current.Revision != expectedRevision {
-		return artifactModel.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, storeSpec.ErrConflict
 	}
 
 	next := current.Clone()
@@ -264,7 +264,7 @@ func (s *Service) updateLocal(
 	if current.Revision == ^uint64(0) {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact revision is exhausted",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	next.Revision++

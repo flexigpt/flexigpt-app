@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
@@ -99,8 +99,8 @@ type ConnectionProfile struct {
 }
 
 type PolicyReference struct {
-	Name     spec.LogicalName `json:"name"`
-	Required bool             `json:"required"`
+	Name     storeSpec.LogicalName `json:"name"`
+	Required bool                  `json:"required"`
 }
 
 // ServerConfiguration is the runtime projection of direct MCP declaration
@@ -122,11 +122,11 @@ type Include struct {
 // ServerDocument is the MCP consumer projection of one direct canonical mcpv1
 // declaration. It is not itself a portable document format.
 type ServerDocument struct {
-	LogicalName    spec.LogicalName    `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string              `json:"displayName,omitempty"`
-	Description    string              `json:"description,omitempty"`
-	Labels         map[string]string   `json:"labels,omitempty"`
+	LogicalName    storeSpec.LogicalName    `json:"logicalName"`
+	LogicalVersion storeSpec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DisplayName    string                   `json:"displayName,omitempty"`
+	Description    string                   `json:"description,omitempty"`
+	Labels         map[string]string        `json:"labels,omitempty"`
 
 	MCPServer     CoreServer          `json:"mcpServer"`
 	Include       *Include            `json:"include,omitempty"`
@@ -164,21 +164,21 @@ func (d ServerDocument) Validate() error {
 	if err := d.LogicalVersion.Validate(true); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP server display name",
 		d.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"MCP server description",
 		d.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateLabels(
+	if err := storeSpec.ValidateLabels(
 		"MCP server",
 		d.Labels,
 	); err != nil {
@@ -225,7 +225,7 @@ func (d ServerDocument) AcceptsSecretTarget(
 			declaration.Kind != InputOAuthClientCredentials {
 			return fmt.Errorf(
 				"%w: OAuth client credential target is not declared",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 			)
 		}
 		return nil
@@ -247,13 +247,13 @@ func (d ServerDocument) AcceptsSecretTarget(
 		}
 		return fmt.Errorf(
 			"%w: MCP secret target is not declared by the server",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret kind %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			kind,
 		)
 	}

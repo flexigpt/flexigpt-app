@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // BindSchemaCatalog validates decoder schema dependencies and supplies the
@@ -17,7 +17,7 @@ func BindSchemaCatalog(
 	if schemas == nil {
 		return fmt.Errorf(
 			"%w: schema catalog is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -47,7 +47,7 @@ func BindSchemaCatalog(
 			if _, duplicate := seen[key]; duplicate {
 				return fmt.Errorf(
 					"%w: decoder %q repeats required schema %q/%q/%q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					decoder.ID(),
 					key.Kind,
 					key.SchemaID,
@@ -59,7 +59,7 @@ func BindSchemaCatalog(
 			if _, found := available[key]; !found {
 				return fmt.Errorf(
 					"%w: decoder %q requires unregistered schema %q/%q/%q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					decoder.ID(),
 					key.Kind,
 					key.SchemaID,

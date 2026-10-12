@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -47,7 +47,7 @@ func NewService(
 		synchronizer == nil ||
 		publisher == nil ||
 		timeClock == nil {
-		return nil, fmt.Errorf("%w: Source refresh service dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Source refresh service dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	return &Service{
 		sources:      sources,
@@ -111,12 +111,16 @@ func (s *Service) RefreshSource(
 		return refreshModel.RefreshSourceResult{}, err
 	}
 	if !value.Enabled {
-		return refreshModel.RefreshSourceResult{}, fmt.Errorf("%w: Source %q is disabled", spec.ErrConflict, sourceID)
+		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
+			"%w: Source %q is disabled",
+			storeSpec.ErrConflict,
+			sourceID,
+		)
 	}
 	if value.Discovery.Empty() {
 		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source %q has no declaration discovery configuration",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 			sourceID,
 		)
 	}
@@ -125,7 +129,7 @@ func (s *Service) RefreshSource(
 	switch {
 	case stateErr == nil:
 		expectedRefreshRevision = previous.Revision
-	case errors.Is(stateErr, spec.ErrRefreshStateNotFound):
+	case errors.Is(stateErr, storeSpec.ErrRefreshStateNotFound):
 	default:
 		return refreshModel.RefreshSourceResult{}, stateErr
 	}
@@ -203,7 +207,7 @@ func (s *Service) RefreshSource(
 	if err := published.Validate(); err != nil {
 		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: refresh publisher returned invalid state: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -309,7 +313,7 @@ func definitionsFromObservations(observations []ingest.Observation) ([]definitio
 			continue
 		}
 		if observation.Definition == nil {
-			return nil, fmt.Errorf("%w: valid Source observation has no Definition", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: valid Source observation has no Definition", storeSpec.ErrInvalid)
 		}
 		if _, duplicate := seen[observation.Definition.Digest]; duplicate {
 			continue

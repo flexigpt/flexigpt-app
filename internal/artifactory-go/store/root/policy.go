@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // SetRootPolicy supports protected topology Roots and retained application
@@ -71,7 +71,7 @@ func RequireMutableRoot(
 	}
 	return fmt.Errorf(
 		"%w: root %q may only be mutated by a trusted protected-topology installer",
-		spec.ErrProtected,
+		storeSpec.ErrProtected,
 		rootID,
 	)
 }
@@ -85,7 +85,7 @@ func RequireRootDeletion(
 		deletionPolicy.IsRootDeletionProtected(rootID) {
 		return fmt.Errorf(
 			"%w: root %q is retained and cannot be retired or purged",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			rootID,
 		)
 	}

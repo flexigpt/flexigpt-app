@@ -12,7 +12,7 @@ import (
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -49,11 +49,11 @@ func New(
 		protection == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Store dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if resolver == nil {
-		return nil, fmt.Errorf("%w: Tool composition resolver is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Tool composition resolver is nil", storeSpec.ErrInvalid)
 	}
 	if err := builtin.Validate(); err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func New(
 	if !protection.IsProtectedRoot(builtin.RootID) {
 		return nil, fmt.Errorf(
 			"%w: Tool Store built-in Root must be protected",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -126,7 +126,7 @@ func (a *Service) SetToolEnabled(
 	if expectedRevision == 0 {
 		return ToolView{}, fmt.Errorf(
 			"%w: expected Tool revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -135,7 +135,7 @@ func (a *Service) SetToolEnabled(
 		return ToolView{}, err
 	}
 	if value.Artifact.Revision != expectedRevision {
-		return ToolView{}, spec.ErrConflict
+		return ToolView{}, storeSpec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -166,7 +166,7 @@ func (a *Service) MapToolTarget(
 		return composition.CapabilityTarget{}, err
 	}
 	if a == nil || a.resolver == nil {
-		return composition.CapabilityTarget{}, spec.ErrClosed
+		return composition.CapabilityTarget{}, storeSpec.ErrClosed
 	}
 
 	resolved, err := a.resolver.ResolveTool(ctx, ref)
@@ -177,7 +177,7 @@ func (a *Service) MapToolTarget(
 	if !found {
 		return composition.CapabilityTarget{}, fmt.Errorf(
 			"%w: Tool %q resolved without a capability target",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			value.Tool.Name,
 		)
 	}
@@ -188,7 +188,7 @@ func (a *Service) MapToolTarget(
 		target.Name != value.Tool.Name {
 		return composition.CapabilityTarget{}, fmt.Errorf(
 			"%w: Tool capability target identity differs from Tool Artifact",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	if target.Form != composition.TargetFormArtifact ||
@@ -196,7 +196,7 @@ func (a *Service) MapToolTarget(
 		*target.Artifact != value.Tool.Artifact.Ref() {
 		return composition.CapabilityTarget{}, fmt.Errorf(
 			"%w: Tool Store requires an Artifact-backed Tool target",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 	return target.Clone(), nil
@@ -219,7 +219,7 @@ func (a *Service) ResolveToolTarget(
 	if target.Type != declaration.TypeTool {
 		return ResolvedToolView{}, fmt.Errorf(
 			"%w: capability target type is %q, expected tool",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			target.Type,
 		)
 	}
@@ -227,7 +227,7 @@ func (a *Service) ResolveToolTarget(
 		target.Artifact == nil {
 		return ResolvedToolView{}, fmt.Errorf(
 			"%w: direct Tool capability targets require their owning runtime adapter",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
@@ -239,7 +239,7 @@ func (a *Service) ResolveToolTarget(
 		value.Tool.Name != target.Name {
 		return ResolvedToolView{}, fmt.Errorf(
 			"%w: Tool capability target no longer matches the Tool Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return value, nil
@@ -286,7 +286,7 @@ func (a *Service) getTool(
 	if actual != expected {
 		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: Tool package identity differs from its declaration",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return value, nil
@@ -300,7 +300,7 @@ func (a *Service) requireBuiltinRef(ref artifactModel.ArtifactRef) error {
 		!a.protection.IsProtectedRoot(ref.RootID) {
 		return fmt.Errorf(
 			"%w: Tool Artifact is not in the protected built-in Root",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return nil
@@ -314,7 +314,7 @@ func (a *Service) requireBuiltinArtifact(record artifactModel.Artifact) error {
 		record.Binding.SubresourceLocator != "" {
 		return fmt.Errorf(
 			"%w: Tool catalog Artifact has an unsupported origin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return nil

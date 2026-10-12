@@ -10,7 +10,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
@@ -39,7 +39,7 @@ func (a *Service) ResolveModel(
 	if !m.Artifact.Enabled {
 		return ResolvedModel{}, fmt.Errorf(
 			"%w: Model %q is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			m.Artifact.LogicalName,
 		)
 	}
@@ -95,7 +95,7 @@ func (a *Service) resolveProvider(
 	if !provider.Artifact.Enabled {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider %q is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			provider.Artifact.LogicalName,
 		)
 	}
@@ -110,7 +110,7 @@ func (a *Service) resolveProvider(
 	if !found {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider adapter %q is not installed",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			provider.Document.Adapter,
 		)
 	}
@@ -120,7 +120,7 @@ func (a *Service) resolveProvider(
 	if adapter.ID != provider.Document.Adapter {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model adapter registry returned %q for Provider adapter %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			adapter.ID,
 			provider.Document.Adapter,
 		)
@@ -189,7 +189,7 @@ func (a *Service) resolveProviderReference(
 		default:
 			return modelDomain.Provider{}, fmt.Errorf(
 				"%w: Model Provider %q resolves to %d Artifacts in Root %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				reference.Name,
 				len(candidates),
 				rootID,
@@ -199,7 +199,7 @@ func (a *Service) resolveProviderReference(
 
 	return modelDomain.Provider{}, fmt.Errorf(
 		"%w: Model Provider %q is unresolved",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 		reference.Name,
 	)
 }
@@ -208,7 +208,7 @@ func (a *Service) availableIdentityCandidates(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	kind artifactModel.ArtifactKind,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) ([]artifactModel.ArtifactRef, error) {
 	entries, err := a.cat.FindByIdentity(
 		ctx,
@@ -255,7 +255,7 @@ func (a *Service) ResolveProviderDefaultModel(
 	if !provider.Artifact.Enabled {
 		return DefaultModelResolution{}, fmt.Errorf(
 			"%w: Model Provider %q is disabled",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			provider.Artifact.LogicalName,
 		)
 	}
@@ -356,7 +356,7 @@ func (a *Service) resolveNamedModelForProvider(
 			if resolved.Provider.Artifact.Ref() != provider.Artifact.Ref() {
 				lastErr = fmt.Errorf(
 					"%w: Model %q resolves to another Provider",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 					reference.Name,
 				)
 				continue
@@ -365,7 +365,7 @@ func (a *Service) resolveNamedModelForProvider(
 		default:
 			return ResolvedModel{}, fmt.Errorf(
 				"%w: default Model %q resolves to %d Artifacts in Root %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				reference.Name,
 				len(candidates),
 				rootID,
@@ -378,7 +378,7 @@ func (a *Service) resolveNamedModelForProvider(
 	}
 	return ResolvedModel{}, fmt.Errorf(
 		"%w: default Model %q is unresolved",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 		reference.Name,
 	)
 }
@@ -413,17 +413,17 @@ func (a *Service) firstEnabledModelForProvider(
 
 	return ResolvedModel{}, fmt.Errorf(
 		"%w: Model Provider %q has no enabled resolved Models",
-		spec.ErrReferenceUnresolved,
+		storeSpec.ErrReferenceUnresolved,
 		provider.Artifact.LogicalName,
 	)
 }
 
 func bestEffortDefaultFailure(err error) bool {
-	return errors.Is(err, spec.ErrReferenceUnresolved) ||
-		errors.Is(err, spec.ErrArtifactNotFound) ||
-		errors.Is(err, spec.ErrDefinitionNotFound) ||
-		errors.Is(err, spec.ErrIdentityConflict) ||
-		errors.Is(err, spec.ErrUnsupported)
+	return errors.Is(err, storeSpec.ErrReferenceUnresolved) ||
+		errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+		errors.Is(err, storeSpec.ErrDefinitionNotFound) ||
+		errors.Is(err, storeSpec.ErrIdentityConflict) ||
+		errors.Is(err, storeSpec.ErrUnsupported)
 }
 
 type resolveModel struct {

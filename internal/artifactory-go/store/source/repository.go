@@ -5,7 +5,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ContentMutation is the trusted Source capability that acknowledges a
@@ -32,7 +32,7 @@ type Repository interface {
 	FindByStorageKey(
 		ctx context.Context,
 		rootID rootModel.RootID,
-		storageKey spec.StorageKey,
+		storageKey storeSpec.StorageKey,
 	) (sourceModel.Source, error)
 	Create(ctx context.Context, value sourceModel.Source) error
 	Update(ctx context.Context, value sourceModel.Source, expectedRevision uint64) error

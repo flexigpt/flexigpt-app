@@ -5,11 +5,11 @@ import (
 	"path"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Entry struct {
-	Locator    spec.Locator
+	Locator    storeSpec.Locator
 	Name       string
 	SizeBytes  int64
 	Mode       uint32
@@ -24,22 +24,22 @@ func (e Entry) Validate() error {
 		return err
 	}
 	if e.Name == "" {
-		return fmt.Errorf("%w: source entry name is empty", spec.ErrInvalid)
+		return fmt.Errorf("%w: source entry name is empty", storeSpec.ErrInvalid)
 	}
 	if e.Locator != "." &&
 		e.Name != path.Base(string(e.Locator)) {
 		return fmt.Errorf(
 			"%w: source entry name does not match locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if e.SizeBytes < 0 {
-		return fmt.Errorf("%w: source entry size is negative", spec.ErrInvalid)
+		return fmt.Errorf("%w: source entry size is negative", storeSpec.ErrInvalid)
 	}
 	if e.IsDirectory == e.IsRegular {
 		return fmt.Errorf(
 			"%w: source entry must identify exactly one entry type",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

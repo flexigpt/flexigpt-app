@@ -14,7 +14,7 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
@@ -68,7 +68,7 @@ func New(dependencies Dependencies) (*Service, error) {
 		dependencies.SecretCleaner == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP installation dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -104,7 +104,7 @@ func (s *Service) Resolve(
 	if resolved.Artifact.Kind != mcpDomain.MCPArtifactKind {
 		return Material{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Server",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -142,7 +142,7 @@ func (s *Service) Save(
 	if expectedRevision == 0 {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: expected MCP installation revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -214,7 +214,7 @@ func (s *Service) saveMutable(
 ) (artifactModel.Artifact, error) {
 	record := material.Resource.Artifact
 	if record.Revision != expectedRevision {
-		return artifactModel.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, storeSpec.ErrConflict
 	}
 
 	encoded, err := serverMCPDomain.MergeServerData(record.Data, data)
@@ -259,7 +259,7 @@ func (s *Service) saveProtected(
 	if !s.protection.IsProtectedRoot(record.RootID) || !material.BuiltIn {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: MCP Server is not in a protected Root",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 		)
 	}
 
@@ -271,10 +271,10 @@ func (s *Service) saveProtected(
 		return artifactModel.Artifact{}, err
 	}
 	if found && current.Revision != expectedRevision {
-		return artifactModel.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, storeSpec.ErrConflict
 	}
 	if !found && expectedRevision != 0 {
-		return artifactModel.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, storeSpec.ErrConflict
 	}
 
 	nextRevision := uint64(1)

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // PhysicalPackageState records the observed source-side publication state.
@@ -26,7 +26,7 @@ func (s PhysicalPackageState) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid physical package state %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			s,
 		)
 	}
@@ -49,14 +49,14 @@ func (o PublicationOutcome) Validate() error {
 		return err
 	}
 	if o.SourceGeneration != "" {
-		if err := spec.ValidateSourceGeneration(o.SourceGeneration); err != nil {
+		if err := storeSpec.ValidateSourceGeneration(o.SourceGeneration); err != nil {
 			return err
 		}
 	}
 	if o.ArtifactVerified && !o.SourceAcknowledged {
 		return fmt.Errorf(
 			"%w: verified package publication requires Source acknowledgment",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -79,7 +79,7 @@ func (o RemovalOutcome) Validate() error {
 		return err
 	}
 	if o.SourceGeneration != "" {
-		return spec.ValidateSourceGeneration(o.SourceGeneration)
+		return storeSpec.ValidateSourceGeneration(o.SourceGeneration)
 	}
 	return nil
 }

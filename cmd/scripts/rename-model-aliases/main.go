@@ -61,7 +61,7 @@ var targets = map[string]string{
 
 	internalPrefix + "artifactcontract/topology": "documentTopology",
 	internalPrefix + "conversation/spec":         "conversationSpec",
-	internalPrefix + "inferencewrapper/spec":     "inferencewrapperSpec",
+	internalPrefix + "inferencewrapper/spec":     "inferenceRuntimeSpec",
 	internalPrefix + "setting/spec":              "settingSpec",
 	internalPrefix + "workspace/store/domain":    "workspaceDomain",
 

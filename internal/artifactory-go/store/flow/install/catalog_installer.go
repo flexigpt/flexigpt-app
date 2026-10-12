@@ -6,7 +6,7 @@ import (
 
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // CatalogInstaller installs one application-supplied compiled package set.
@@ -14,7 +14,7 @@ import (
 type CatalogInstaller struct {
 	registration installModel.CompiledRegistration
 	hydrator     installModel.CompiledHydrationCoordinator
-	scopes       []spec.Locator
+	scopes       []storeSpec.Locator
 }
 
 func NewCatalogInstaller(
@@ -23,13 +23,13 @@ func NewCatalogInstaller(
 	lifecycle installModel.CompiledPackageLifecycle,
 ) (*CatalogInstaller, error) {
 	if hydrator == nil {
-		return nil, fmt.Errorf("%w: compiled hydration coordinator is nil", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: compiled hydration coordinator is nil", storeSpec.ErrInvalid)
 	}
 	owned := set.Clone()
 	if err := validateCompiledSet(owned); err != nil {
 		return nil, err
 	}
-	scopes := make([]spec.Locator, 0, len(owned.Packages))
+	scopes := make([]storeSpec.Locator, 0, len(owned.Packages))
 	for _, value := range owned.Packages {
 		scope, err := value.Address.Directory()
 		if err != nil {
@@ -55,8 +55,8 @@ func (i *CatalogInstaller) BuiltInName() string {
 	return i.registration.Set.Hydration.InstallerName
 }
 
-func (i *CatalogInstaller) BuiltInPackageScopes() []spec.Locator {
-	return append([]spec.Locator(nil), i.scopes...)
+func (i *CatalogInstaller) BuiltInPackageScopes() []storeSpec.Locator {
+	return append([]storeSpec.Locator(nil), i.scopes...)
 }
 
 func (i *CatalogInstaller) DesiredHydration(

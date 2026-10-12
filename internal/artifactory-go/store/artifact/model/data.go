@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -15,7 +15,7 @@ func DecodeDataObject(
 ) (map[string]json.RawMessage, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func DecodeDataObject(
 	if err := json.Unmarshal(canonical, &values); err != nil {
 		return nil, fmt.Errorf(
 			"%w: decode Artifact local data: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -46,7 +46,7 @@ func EncodeDataObject(
 		if err != nil {
 			return nil, fmt.Errorf(
 				"%w: Artifact local data field %q: %w",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				key,
 				err,
 			)
@@ -55,6 +55,6 @@ func EncodeDataObject(
 	}
 	return jsonutil.MarshalCanonicalObject(
 		output,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 }

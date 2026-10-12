@@ -9,7 +9,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // PrepareTopologyHydrations reconciles all installer desired states before
@@ -34,7 +34,7 @@ func (c *Service) PrepareTopologyHydrations(
 		if _, duplicate := seenInstallers[desired.InstallerName]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate topology hydration installer %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				desired.InstallerName,
 			)
 		}
@@ -42,7 +42,7 @@ func (c *Service) PrepareTopologyHydrations(
 		if !c.isProtectedRoot(desired.RootID) {
 			return nil, fmt.Errorf(
 				"%w: topology hydration root %q is not protected",
-				spec.ErrProtected,
+				storeSpec.ErrProtected,
 				desired.RootID,
 			)
 		}
@@ -128,7 +128,7 @@ func (c *Service) PutTopologyHydration(
 	if !c.isProtectedRoot(value.RootID) {
 		return fmt.Errorf(
 			"%w: topology hydration root %q is not currently protected",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			value.RootID,
 		)
 	}
@@ -188,7 +188,7 @@ func (c *Service) ResetTopologyHydration(
 	if !c.isProtectedRoot(rootID) && !ownedByStoredHydration {
 		return fmt.Errorf(
 			"%w: topology hydration installer %q does not own root %q",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			installerName,
 			rootID,
 		)
@@ -197,7 +197,7 @@ func (c *Service) ResetTopologyHydration(
 	// Remove source-side package data first. If this fails, metadata remains
 	// intact and the next startup can retry safely.
 	rootValue, err := c.Roots.Get(ctx, rootID)
-	if errors.Is(err, spec.ErrRootNotFound) {
+	if errors.Is(err, storeSpec.ErrRootNotFound) {
 		// Preparation runs before EnsureProtectedTopology. Therefore, a
 		// missing protected Root is the normal first-install state. It is
 		// also valid after a clean hydration reset completed and a process

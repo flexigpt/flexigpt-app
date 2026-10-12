@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -20,7 +20,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const AgentMarkdownDecoderID spec.DecoderID = "agent-markdown"
+const AgentMarkdownDecoderID storeSpec.DecoderID = "agent-markdown"
 
 const markdownMediaType = "text/markdown"
 
@@ -40,7 +40,7 @@ func NewAgentMarkdownDecoder(
 	if interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent Markdown interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := candidates.Validate(); err != nil {
@@ -52,7 +52,7 @@ func NewAgentMarkdownDecoder(
 	}, nil
 }
 
-func (d *AgentMarkdownDecoder) ID() spec.DecoderID {
+func (d *AgentMarkdownDecoder) ID() storeSpec.DecoderID {
 	return AgentMarkdownDecoderID
 }
 
@@ -84,7 +84,7 @@ func (d *AgentMarkdownDecoder) Decode(
 
 	if strings.TrimSpace(body) != "" {
 		instructionName, err := declaration.DeriveNestedLogicalName(
-			spec.LogicalName(document.Name),
+			storeSpec.LogicalName(document.Name),
 			"instructions",
 		)
 		if err != nil {
@@ -124,7 +124,7 @@ func (d *AgentMarkdownDecoder) Decode(
 	if d == nil || d.interpretations == nil {
 		return nil, agentMarkdownDiagnostics(
 			candidate.Locator,
-			fmt.Errorf("%w: Agent Markdown interpretation registry is unavailable", spec.ErrClosed),
+			fmt.Errorf("%w: Agent Markdown interpretation registry is unavailable", storeSpec.ErrClosed),
 		)
 	}
 	admitted, err := d.interpretations.DefinitionsForDocument(
@@ -147,7 +147,7 @@ func (d *AgentMarkdownDecoder) Decode(
 
 func decodeAgentMarkdown(
 	content []byte,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (agentv1.AgentDocument, string, error) {
 	markdown, err := normalizeMarkdownOptional(content)
 	if err != nil {
@@ -162,7 +162,7 @@ func decodeAgentMarkdown(
 	if strings.TrimSpace(frontmatter) != "" {
 		raw, err := yamlutil.CanonicalObjectJSON(
 			[]byte(frontmatter),
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		)
 		if err != nil {
 			return agentv1.AgentDocument{}, "", err
@@ -170,7 +170,7 @@ func decodeAgentMarkdown(
 		if err := jsonutil.DecodeCanonicalObjectBytesInto(
 			raw,
 			&fields,
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		); err != nil {
 			return agentv1.AgentDocument{}, "", err
 		}
@@ -193,7 +193,7 @@ func decodeAgentMarkdown(
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		fields,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return agentv1.AgentDocument{}, "", err
@@ -226,12 +226,12 @@ func splitAgentMarkdown(
 	}
 	return "", "", fmt.Errorf(
 		"%w: Agent Markdown front matter has no closing delimiter",
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 	)
 }
 
 func agentMarkdownDiagnostics(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	err error,
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
@@ -250,13 +250,13 @@ func normalizeMarkdownOptional(
 	if !utf8.Valid(content) {
 		return "", fmt.Errorf(
 			"%w: Markdown source must contain valid UTF-8",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if bytes.ContainsRune(content, 0) {
 		return "", fmt.Errorf(
 			"%w: Markdown source contains a NUL byte",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

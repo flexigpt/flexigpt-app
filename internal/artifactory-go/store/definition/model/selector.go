@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Selector struct {
 	Kind              artifactModel.ArtifactKind `json:"kind"`
-	LogicalName       spec.LogicalName           `json:"logicalName,omitempty"`
+	LogicalName       storeSpec.LogicalName      `json:"logicalName,omitempty"`
 	VersionConstraint string                     `json:"versionConstraint,omitempty"`
 	Labels            map[string]string          `json:"labels,omitempty"`
 }
@@ -23,14 +23,14 @@ func (s Selector) Validate() error {
 			return fmt.Errorf("selector: %w", err)
 		}
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"selector version constraint",
 		s.VersionConstraint,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateLabels("selector", s.Labels); err != nil {
+	if err := storeSpec.ValidateLabels("selector", s.Labels); err != nil {
 		return err
 	}
 	return nil

@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func NormalizeDecoders(
 	values []Decoder,
 ) ([]Decoder, error) {
 	output := append([]Decoder(nil), values...)
-	seen := make(map[spec.DecoderID]struct{}, len(output))
+	seen := make(map[storeSpec.DecoderID]struct{}, len(output))
 
 	for index, decoder := range output {
 		if decoder == nil {
 			return nil, fmt.Errorf(
 				"%w: decoder %d is nil",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				index,
 			)
 		}
@@ -26,17 +26,17 @@ func NormalizeDecoders(
 		if err := id.Validate(); err != nil {
 			return nil, err
 		}
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"decoder revision",
 			decoder.Revision(),
-			spec.MaxVersionBytes,
+			storeSpec.MaxVersionBytes,
 		); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seen[id]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate decoder %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				id,
 			)
 		}

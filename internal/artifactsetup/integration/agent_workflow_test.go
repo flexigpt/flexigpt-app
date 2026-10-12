@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -39,7 +39,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	known := requireNamedAgent(
 		t,
 		builtinAgents,
-		spec.LogicalName("local-dev-workspace"),
+		storeSpec.LogicalName("local-dev-workspace"),
 	)
 	if !known.BuiltIn {
 		t.Fatalf("bundled Agent BuiltIn = false")
@@ -97,7 +97,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	requireNamedAgent(
 		t,
 		userVisible,
-		spec.LogicalName("local-dev-workspace"),
+		storeSpec.LogicalName("local-dev-workspace"),
 	)
 
 	before := append([]agentAPI.AgentListItem(nil), builtinAgents...)
@@ -302,7 +302,7 @@ members:
 		t.Fatalf("managed Agent preview has no prepared envelope")
 	}
 	if preview.Agent == nil ||
-		preview.Agent.Name != spec.LogicalName("workflow-agent") {
+		preview.Agent.Name != storeSpec.LogicalName("workflow-agent") {
 		t.Fatalf("managed Agent preview has wrong projected Agent: %#v", preview.Agent)
 	}
 	if preview.NormalizedYAML == "" {
@@ -334,7 +334,7 @@ members:
 		committed.Agent.Ref,
 	)
 	requireNoError(t, err)
-	if current.Name != spec.LogicalName("workflow-agent") {
+	if current.Name != storeSpec.LogicalName("workflow-agent") {
 		t.Fatalf("read Agent name = %q", current.Name)
 	}
 
@@ -378,7 +378,7 @@ members:
 		t,
 		resolution.Capabilities,
 		declaration.TypeText,
-		spec.LogicalName("workflow-agent-instructions"),
+		storeSpec.LogicalName("workflow-agent-instructions"),
 	)
 	materialized, err := harness.texts.Materialize(t.Context(), textRef)
 	requireNoError(t, err)
@@ -430,7 +430,7 @@ members:
 		committed.Agent.Revision,
 		true,
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	enabledAgent, err := harness.api.SetAgentEnabled(
 		t.Context(),
@@ -504,12 +504,12 @@ members:
 		pluginRef,
 		currentPlugin.Artifact.Revision,
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	memberIndex := requireAgentPluginMemberIndex(
 		t,
 		currentPlugin.Members,
-		spec.LogicalName("workflow-agent"),
+		storeSpec.LogicalName("workflow-agent"),
 	)
 	detachedPlugin, err := harness.api.RemoveAgentPluginMember(
 		t.Context(),
@@ -569,7 +569,7 @@ members:
 func requireNamedAgent(
 	t *testing.T,
 	values []agentAPI.AgentListItem,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) agentAPI.AgentListItem {
 	t.Helper()
 
@@ -602,7 +602,7 @@ func requireAvailableCapability(
 	t *testing.T,
 	plan agentAPI.AgentCapabilityPlan,
 	declarationType declaration.Type,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) artifactModel.ArtifactRef {
 	t.Helper()
 
@@ -637,7 +637,7 @@ func requireAvailableCapability(
 func requireAgentPluginMemberIndex(
 	t *testing.T,
 	values []pluginAPI.MemberReference,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) int {
 	t.Helper()
 

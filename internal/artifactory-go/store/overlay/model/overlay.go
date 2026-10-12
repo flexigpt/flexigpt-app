@@ -7,7 +7,7 @@ import (
 	"time"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -19,10 +19,10 @@ import (
 type Namespace string
 
 func (v Namespace) Validate() error {
-	return spec.ValidateIdentifier(
+	return storeSpec.ValidateIdentifier(
 		"protected overlay namespace",
 		string(v),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	)
 }
 
@@ -47,10 +47,10 @@ func (r Record) Validate() error {
 	if err := r.Namespace.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"protected overlay schema version",
 		r.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
@@ -62,26 +62,26 @@ func (r Record) Validate() error {
 	if !bytes.Equal(canonical, r.Payload) {
 		return fmt.Errorf(
 			"%w: protected overlay payload is not canonical",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	if r.Revision == 0 {
 		return fmt.Errorf(
 			"%w: protected overlay revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.CreatedAt.IsZero() || r.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: protected overlay timestamps are required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.ModifiedAt.Before(r.CreatedAt) {
 		return fmt.Errorf(
 			"%w: protected overlay modified time precedes creation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -116,17 +116,17 @@ func (r PutRequest) Validate() error {
 	if err := r.Namespace.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"protected overlay schema version",
 		r.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
 	if r.ExpectedArtifactRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -139,12 +139,12 @@ func CanonicalPayload(
 ) (json.RawMessage, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxLocalDataBytes,
+		storeSpec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: protected overlay payload: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}

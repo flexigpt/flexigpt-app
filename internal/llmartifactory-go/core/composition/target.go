@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -36,7 +36,7 @@ const (
 type CapabilityTarget struct {
 	Form       TargetForm                 `json:"form"`
 	Type       declaration.Type           `json:"type"`
-	Name       spec.LogicalName           `json:"name"`
+	Name       storeSpec.LogicalName      `json:"name"`
 	Provenance TargetProvenance           `json:"provenance"`
 	Artifact   *artifactModel.ArtifactRef `json:"artifact,omitempty"`
 
@@ -58,7 +58,7 @@ func (t CapabilityTarget) Validate() error {
 		if t.Artifact == nil {
 			return fmt.Errorf(
 				"%w: Artifact capability target requires an Artifact reference",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if err := t.Artifact.Validate(); err != nil {
@@ -69,7 +69,7 @@ func (t CapabilityTarget) Validate() error {
 			t.Evidence != "" {
 			return fmt.Errorf(
 				"%w: Artifact capability target cannot contain direct-capability evidence",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		switch t.Provenance {
@@ -79,7 +79,7 @@ func (t CapabilityTarget) Validate() error {
 		default:
 			return fmt.Errorf(
 				"%w: Artifact capability target has invalid provenance %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				t.Provenance,
 			)
 		}
@@ -88,27 +88,27 @@ func (t CapabilityTarget) Validate() error {
 		if t.Artifact != nil {
 			return fmt.Errorf(
 				"%w: direct capability target cannot contain an Artifact reference",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if t.Provenance != TargetProvenanceDirectCapability {
 			return fmt.Errorf(
 				"%w: direct capability target has invalid provenance %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				t.Provenance,
 			)
 		}
-		if err := spec.ValidateIdentifier(
+		if err := storeSpec.ValidateIdentifier(
 			"direct capability provider identity",
 			t.ProviderIdentity,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"direct capability provider-local identifier",
 			t.ProviderLocalID,
-			spec.MaxURIBytes,
+			storeSpec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (t CapabilityTarget) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported capability target form %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			t.Form,
 		)
 	}
@@ -139,7 +139,7 @@ type DirectCapabilityRequest struct {
 	RootID rootModel.RootID
 
 	Type  declaration.Type
-	Name  spec.LogicalName
+	Name  storeSpec.LogicalName
 	Scope declaration.LookupScope
 }
 

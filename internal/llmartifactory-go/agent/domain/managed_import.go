@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -41,7 +41,7 @@ type ManagedMCPSetupInput struct {
 
 type ManagedMCPSetupDescriptor struct {
 	OccurrencePath string
-	Name           spec.LogicalName
+	Name           storeSpec.LogicalName
 	Transport      string
 	Command        string
 	URL            string
@@ -84,7 +84,7 @@ func NormalizeManagedAgentImport(
 	if fields == nil {
 		return declaration.Entry{}, fmt.Errorf(
 			"%w: managed Agent declaration must be an object",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -97,7 +97,7 @@ func NormalizeManagedAgentImport(
 	if err := json.Unmarshal(membersRaw, &members); err != nil {
 		return declaration.Entry{}, fmt.Errorf(
 			"%w: managed Agent members must be an array",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -139,7 +139,7 @@ func NormalizeManagedAgentImport(
 		if relationship.Scope != "" {
 			return declaration.Entry{}, fmt.Errorf(
 				"%w: managed Agent dependency %q has unsupported scope %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				member.Header().Name,
 				relationship.Scope,
 			)
@@ -153,7 +153,7 @@ func NormalizeManagedAgentImport(
 
 		normalizedMember, err := jsonutil.MarshalCanonicalObject(
 			memberFields,
-			spec.MaxDefinitionBodyBytes,
+			storeSpec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return declaration.Entry{}, err
@@ -174,7 +174,7 @@ func NormalizeManagedAgentImport(
 
 	normalized, err := jsonutil.MarshalCanonicalObject(
 		fields,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return declaration.Entry{}, err
@@ -214,7 +214,7 @@ func ManagedAgentMemberPath(
 	if len(digest) < managedAgentMemberPathDigestLength {
 		return "", fmt.Errorf(
 			"%w: managed Agent member identity digest is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -418,7 +418,7 @@ func validateManagedAgentMember(
 				output.MCPSetupDescriptors,
 				ManagedMCPSetupDescriptor{
 					OccurrencePath: memberPath,
-					Name:           spec.LogicalName(header.Name),
+					Name:           storeSpec.LogicalName(header.Name),
 				},
 			)
 
@@ -540,7 +540,7 @@ func MCPSetupDescriptorForDocument(
 ) ManagedMCPSetupDescriptor {
 	output := ManagedMCPSetupDescriptor{
 		OccurrencePath: occurrencePath,
-		Name:           spec.LogicalName(document.Name),
+		Name:           storeSpec.LogicalName(document.Name),
 		Transport:      string(document.Transport),
 		Command:        document.Command,
 		URL:            document.URL,
@@ -700,7 +700,7 @@ func placeholderReferences(
 
 		name := remaining[:end]
 		remaining = remaining[end+1:]
-		if spec.LogicalName(name).Validate() != nil {
+		if storeSpec.LogicalName(name).Validate() != nil {
 			continue
 		}
 		if _, duplicate := seen[name]; duplicate {

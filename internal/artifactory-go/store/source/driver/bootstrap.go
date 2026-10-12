@@ -4,7 +4,7 @@ import (
 	"context"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ManagedSourceBootstrapper is implemented by writable managed drivers that
@@ -26,6 +26,6 @@ type ManagedSourceBootstrapper interface {
 type ManagedRootRemover interface {
 	RemoveManagedRoot(
 		ctx context.Context,
-		rootStorageKey spec.StorageKey,
+		rootStorageKey storeSpec.StorageKey,
 	) error
 }

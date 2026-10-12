@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
@@ -19,14 +19,14 @@ const generatedCatalogName = "models"
 // PreparedPackage is one generated independent Model Provider or Model package
 // ready for generic Artifact Store built-in compilation.
 type PreparedPackage struct {
-	EmbeddedPackageRoot spec.Locator
+	EmbeddedPackageRoot storeSpec.Locator
 	Address             managedpackageModel.ManagedPackageAddress
-	DocumentFile        spec.Locator
+	DocumentFile        storeSpec.Locator
 	PackageFiles        []managedpackageModel.ManagedPackageFile
 
 	ExpectedKind           artifactModel.ArtifactKind
-	ExpectedLogicalName    spec.LogicalName
-	ExpectedLogicalVersion spec.LogicalVersion
+	ExpectedLogicalName    storeSpec.LogicalName
+	ExpectedLogicalVersion storeSpec.LogicalVersion
 	ExpectedDefinition     cryptoutil.Digest
 }
 
@@ -46,7 +46,7 @@ func PrepareProviderPackage(
 	}
 	raw := append([]byte(nil), definitionValue.Body...)
 
-	address, err := support.ProviderPackage.Address(spec.LogicalName(document.Name), "")
+	address, err := support.ProviderPackage.Address(storeSpec.LogicalName(document.Name), "")
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -84,7 +84,7 @@ func PrepareModelPackage(
 	}
 	raw := append([]byte(nil), definitionValue.Body...)
 
-	address, err := support.ModelPackage.Address(spec.LogicalName(document.Name), "")
+	address, err := support.ModelPackage.Address(storeSpec.LogicalName(document.Name), "")
 	if err != nil {
 		return PreparedPackage{}, err
 	}
@@ -114,7 +114,7 @@ func NormalizePreparedPackages(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: generated Model catalog has no packages",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -131,7 +131,7 @@ func NormalizePreparedPackages(
 		if _, duplicate := seen[value.Address]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate generated Model package %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value.Address,
 			)
 		}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -79,7 +79,7 @@ func TestWorkflow_AgentPluginMembershipRestoresAfterReimport(
 			Artifact:         first.Agent.Ref,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrIdentityConflict)
+	requireErrorIs(t, err, storeSpec.ErrIdentityConflict)
 
 	secondaryRef := secondaryWithMember.Artifact.Ref()
 	requirePluginContainsAgent(

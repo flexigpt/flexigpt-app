@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
 )
@@ -88,7 +88,7 @@ func TestSkillStoreWorkflowRuntimeAdapterHonorsBuiltinSkillEnablement(
 		runtimeAdapter,
 		disabled.Ref(),
 	)
-	if !errors.Is(err, spec.ErrReferenceUnresolved) {
+	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"runtime adapter resolution after built-in disable error=%v, want ErrReferenceUnresolved",
 			err,

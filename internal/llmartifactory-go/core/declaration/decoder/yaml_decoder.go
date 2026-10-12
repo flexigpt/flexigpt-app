@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const YAMLDecoderID spec.DecoderID = "artifact-declaration-yaml"
+const YAMLDecoderID storeSpec.DecoderID = "artifact-declaration-yaml"
 
 type YAMLDecoder struct {
 	core       *canonicalDecoder
@@ -54,7 +54,7 @@ func NewYAMLDecoderForSchemaKeys(
 	}, nil
 }
 
-func (*YAMLDecoder) ID() spec.DecoderID {
+func (*YAMLDecoder) ID() storeSpec.DecoderID {
 	return YAMLDecoderID
 }
 
@@ -75,7 +75,7 @@ func (d *YAMLDecoder) BindExpectedCanonicalizer(
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
 			"%w: canonical YAML declaration decoder is unavailable",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return d.core.BindExpectedCanonicalizer(catalog)
@@ -91,7 +91,7 @@ func (d *YAMLDecoder) Recognize(
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
 		candidate.Content,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		if requested {
@@ -131,7 +131,7 @@ func (d *YAMLDecoder) Decode(
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
 		candidate.Content,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, yamlDiagnostic(candidate.Locator, "", err)
@@ -140,8 +140,8 @@ func (d *YAMLDecoder) Decode(
 }
 
 func yamlDiagnostic(
-	locator spec.Locator,
-	subresource spec.SubresourceLocator,
+	locator storeSpec.Locator,
+	subresource storeSpec.SubresourceLocator,
 	err error,
 ) []diagnostic.Diagnostic {
 	location := &diagnostic.Location{

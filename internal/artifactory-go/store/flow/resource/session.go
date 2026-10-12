@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // WithVerificationSession runs fn under one explicit ordinary resource
@@ -22,7 +22,7 @@ func WithVerificationSession[T any](
 		return zero, err
 	}
 	if sessionCtx == nil || session == nil {
-		return zero, fmt.Errorf("%w: resource verification session is incomplete", spec.ErrInvalid)
+		return zero, fmt.Errorf("%w: resource verification session is incomplete", storeSpec.ErrInvalid)
 	}
 	defer func() {
 		returnErr = errors.Join(

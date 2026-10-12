@@ -11,7 +11,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type refreshInspector interface {
@@ -50,7 +50,7 @@ func (s *ordinaryService) ReadSourceEntry(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	maximumBytes int64,
 ) (resourceModel.VerifiedEntry, error) {
 	return s.service.ReadSourceEntry(ctx, rootID, sourceID, locator, maximumBytes)
@@ -60,7 +60,7 @@ func (s *ordinaryService) StatSourceEntry(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (sourceModel.Entry, error) {
 	return s.service.StatSourceEntry(ctx, rootID, sourceID, locator)
 }
@@ -69,7 +69,7 @@ func (s *ordinaryService) ReadSourceTree(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	base spec.Locator,
+	base storeSpec.Locator,
 	include, exclude []string,
 	maximumEntries int,
 	maximumBytes int64,
@@ -86,7 +86,7 @@ func (s *ordinaryService) BeginVerificationSession(
 func (s *nativePathService) ResolveVerifiedLocalPath(
 	ctx context.Context,
 	resolved resourceModel.ResolvedArtifact,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) (string, error) {
 	return s.service.ResolveVerifiedLocalPath(ctx, resolved, locator)
 }

@@ -1,27 +1,27 @@
-package inferencewrapper
+package inference
 
 import (
 	"context"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 func buildContentItemsFromAttachments(
 	ctx context.Context,
-	atts []attachment.Attachment,
+	atts []attachmentRuntime.Attachment,
 ) ([]inferenceSpec.InputOutputContentItemUnion, error) {
 	items := make([]inferenceSpec.InputOutputContentItemUnion, 0)
 	if len(atts) == 0 {
 		return items, nil
 	}
 
-	blocks, err := attachment.BuildContentBlocks(
+	blocks, err := attachmentRuntime.BuildContentBlocks(
 		ctx,
 		atts,
-		attachment.WithOverrideOriginalContentBlock(true),
-		attachment.WithOnlyTextKindContentBlock(false),
+		attachmentRuntime.WithOverrideOriginalContentBlock(true),
+		attachmentRuntime.WithOnlyTextKindContentBlock(false),
 	)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func buildContentItemsFromAttachments(
 
 	for _, b := range blocks {
 		switch b.Kind {
-		case attachment.ContentBlockText:
+		case attachmentRuntime.ContentBlockText:
 			if b.Text == nil {
 				continue
 			}
@@ -37,7 +37,7 @@ func buildContentItemsFromAttachments(
 			if txt == "" {
 				continue
 			}
-			formattedTxt, err := attachment.FormatTextBlockForLLM(b)
+			formattedTxt, err := attachmentRuntime.FormatTextBlockForLLM(b)
 			if err != nil {
 				return nil, err
 			}
@@ -51,7 +51,7 @@ func buildContentItemsFromAttachments(
 				},
 			})
 
-		case attachment.ContentBlockImage:
+		case attachmentRuntime.ContentBlockImage:
 			var data, urlStr string
 			if b.Base64Data != nil {
 				data = strings.TrimSpace(*b.Base64Data)
@@ -86,7 +86,7 @@ func buildContentItemsFromAttachments(
 				ImageItem: img,
 			})
 
-		case attachment.ContentBlockFile:
+		case attachmentRuntime.ContentBlockFile:
 			var data, urlStr string
 			if b.Base64Data != nil {
 				data = strings.TrimSpace(*b.Base64Data)

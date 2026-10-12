@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/flexigpt/llmtools-go/texttool"
 
-	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
@@ -30,9 +30,9 @@ func (a *App) ApplyUnifiedDiff(
 
 func (a *App) OpenURLAsAttachment(
 	rawURL string,
-) (att *attachment.Attachment, err error) {
-	return withRecoveryResp(func() (*attachment.Attachment, error) {
-		return attachment.BuildAttachmentForURL(rawURL)
+) (att *attachmentRuntime.Attachment, err error) {
+	return withRecoveryResp(func() (*attachmentRuntime.Attachment, error) {
+		return attachmentRuntime.BuildAttachmentForURL(rawURL)
 	})
 }
 
@@ -40,7 +40,7 @@ func (a *App) OpenURLAsAttachment(
 func (a *App) SaveFile(
 	defaultFilename string,
 	contentBase64 string,
-	additionalFilters []attachment.FileFilter,
+	additionalFilters []attachmentRuntime.FileFilter,
 ) error {
 	_, err := withRecoveryResp(func() (struct{}, error) {
 		return struct{}{}, a.saveFile(defaultFilename, contentBase64, additionalFilters)
@@ -52,9 +52,9 @@ func (a *App) SaveFile(
 // When allowMultiple is true, users can pick multiple files; otherwise at most one path is returned.
 func (a *App) OpenMultipleFilesAsAttachments(
 	allowMultiple bool,
-	additionalFilters []attachment.FileFilter,
-) (attachments []attachment.Attachment, err error) {
-	return withRecoveryResp(func() ([]attachment.Attachment, error) {
+	additionalFilters []attachmentRuntime.FileFilter,
+) (attachments []attachmentRuntime.Attachment, err error) {
+	return withRecoveryResp(func() ([]attachmentRuntime.Attachment, error) {
 		return a.openMultipleFilesAsAttachments(allowMultiple, additionalFilters)
 	})
 }
@@ -77,19 +77,25 @@ func (a *App) PickFiles(allowMultiple bool) (paths []string, err error) {
 
 // OpenDirectoryAsAttachments opens a single directory pick dialog and then does WalkDirectoryWithFiles for fetching max
 // no of files.
-func (a *App) OpenDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
-	return withRecoveryResp(func() (*attachment.DirectoryAttachmentsResult, error) {
+func (a *App) OpenDirectoryAsAttachments(maxFiles int) (*attachmentRuntime.DirectoryAttachmentsResult, error) {
+	return withRecoveryResp(func() (*attachmentRuntime.DirectoryAttachmentsResult, error) {
 		return a.openDirectoryAsAttachments(maxFiles)
 	})
 }
 
-func (a *App) GetPathsAsAttachments(paths []string, maxFilesPerDir int) (*attachment.PathAttachmentsResult, error) {
-	return withRecoveryResp(func() (*attachment.PathAttachmentsResult, error) {
+func (a *App) GetPathsAsAttachments(
+	paths []string,
+	maxFilesPerDir int,
+) (*attachmentRuntime.PathAttachmentsResult, error) {
+	return withRecoveryResp(func() (*attachmentRuntime.PathAttachmentsResult, error) {
 		return a.getPathsAsAttachments(paths, maxFilesPerDir)
 	})
 }
 
-func (a *App) getPathsAsAttachments(paths []string, inMaxFilesPerDir int) (*attachment.PathAttachmentsResult, error) {
+func (a *App) getPathsAsAttachments(
+	paths []string,
+	inMaxFilesPerDir int,
+) (*attachmentRuntime.PathAttachmentsResult, error) {
 	if len(paths) == 0 {
 		return nil, errors.New("empty paths received")
 	}
@@ -113,9 +119,9 @@ func (a *App) getPathsAsAttachments(paths []string, inMaxFilesPerDir int) (*atta
 		clean = append(clean, p)
 	}
 
-	out := attachment.PathAttachmentsResult{
-		FileAttachments: []attachment.Attachment{},
-		DirAttachments:  []attachment.DirectoryAttachmentsResult{},
+	out := attachmentRuntime.PathAttachmentsResult{
+		FileAttachments: []attachmentRuntime.Attachment{},
+		DirAttachments:  []attachmentRuntime.DirectoryAttachmentsResult{},
 		Errors:          []string{},
 	}
 
@@ -137,7 +143,7 @@ func (a *App) getPathsAsAttachments(paths []string, inMaxFilesPerDir int) (*atta
 			continue
 		}
 
-		att, aerr := attachment.BuildAttachmentForFile(context.Background(), &attachment.PathInfo{
+		att, aerr := attachmentRuntime.BuildAttachmentForFile(context.Background(), &attachmentRuntime.PathInfo{
 			Path:    info.Path,
 			Name:    info.Name,
 			Exists:  info.Exists,
@@ -154,15 +160,18 @@ func (a *App) getPathsAsAttachments(paths []string, inMaxFilesPerDir int) (*atta
 	return &out, nil
 }
 
-func (a *App) buildDirectoryAttachments(dirPath string, maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
-	walkRes, err := attachment.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
+func (a *App) buildDirectoryAttachments(
+	dirPath string,
+	maxFiles int,
+) (*attachmentRuntime.DirectoryAttachmentsResult, error) {
+	walkRes, err := attachmentRuntime.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	out := &attachment.DirectoryAttachmentsResult{
+	out := &attachmentRuntime.DirectoryAttachmentsResult{
 		DirPath:      walkRes.DirPath,
-		Attachments:  make([]attachment.Attachment, 0, len(walkRes.Files)),
+		Attachments:  make([]attachmentRuntime.Attachment, 0, len(walkRes.Files)),
 		OverflowDirs: walkRes.OverflowDirs,
 		MaxFiles:     walkRes.MaxFiles,
 		TotalSize:    walkRes.TotalSize,
@@ -170,7 +179,7 @@ func (a *App) buildDirectoryAttachments(dirPath string, maxFiles int) (*attachme
 	}
 
 	for _, pi := range walkRes.Files {
-		att, buildErr := attachment.BuildAttachmentForFile(context.Background(), &pi)
+		att, buildErr := attachmentRuntime.BuildAttachmentForFile(context.Background(), &pi)
 		if buildErr != nil || att == nil {
 			continue
 		}
@@ -183,7 +192,7 @@ func (a *App) buildDirectoryAttachments(dirPath string, maxFiles int) (*attachme
 func (a *App) saveFile(
 	defaultFilename string,
 	contentBase64 string,
-	additionalFilters []attachment.FileFilter,
+	additionalFilters []attachmentRuntime.FileFilter,
 ) error {
 	if a.ctx == nil {
 		return errors.New("context is not initialized")
@@ -214,8 +223,8 @@ func (a *App) saveFile(
 
 func (a *App) openMultipleFilesAsAttachments(
 	allowMultiple bool,
-	additionalFilters []attachment.FileFilter,
-) (attachments []attachment.Attachment, err error) {
+	additionalFilters []attachmentRuntime.FileFilter,
+) (attachments []attachmentRuntime.Attachment, err error) {
 	if a.ctx == nil {
 		return nil, errors.New("context is not initialized")
 	}
@@ -240,10 +249,10 @@ func (a *App) openMultipleFilesAsAttachments(
 		return nil, err
 	}
 	if len(paths) == 0 {
-		return []attachment.Attachment{}, nil
+		return []attachmentRuntime.Attachment{}, nil
 	}
 
-	attachments = make([]attachment.Attachment, 0, len(paths))
+	attachments = make([]attachmentRuntime.Attachment, 0, len(paths))
 	for _, p := range paths {
 		path := strings.TrimSpace(p)
 		if path == "" {
@@ -260,7 +269,7 @@ func (a *App) openMultipleFilesAsAttachments(
 			continue
 		}
 
-		att, attErr := attachment.BuildAttachmentForFile(context.Background(), &attachment.PathInfo{
+		att, attErr := attachmentRuntime.BuildAttachmentForFile(context.Background(), &attachmentRuntime.PathInfo{
 			Path:    pathInfo.Path,
 			Name:    pathInfo.Name,
 			Exists:  pathInfo.Exists,
@@ -330,7 +339,7 @@ func (a *App) pickFiles(allowMultiple bool) ([]string, error) {
 	return output, nil
 }
 
-func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
+func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachmentRuntime.DirectoryAttachmentsResult, error) {
 	if a.ctx == nil {
 		return nil, errors.New("context is not initialized")
 	}
@@ -344,20 +353,20 @@ func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAtt
 	if err != nil {
 		return nil, err
 	}
-	walkRes, err := attachment.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
+	walkRes, err := attachmentRuntime.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
 	if err != nil {
 		return nil, err
 	}
-	out := &attachment.DirectoryAttachmentsResult{
+	out := &attachmentRuntime.DirectoryAttachmentsResult{
 		DirPath:      walkRes.DirPath,
-		Attachments:  make([]attachment.Attachment, 0, len(walkRes.Files)),
+		Attachments:  make([]attachmentRuntime.Attachment, 0, len(walkRes.Files)),
 		OverflowDirs: walkRes.OverflowDirs,
 		MaxFiles:     walkRes.MaxFiles,
 		TotalSize:    walkRes.TotalSize,
 		HasMore:      walkRes.HasMore,
 	}
 	for _, pi := range walkRes.Files {
-		att, buildErr := attachment.BuildAttachmentForFile(context.Background(), &pi)
+		att, buildErr := attachmentRuntime.BuildAttachmentForFile(context.Background(), &pi)
 		if buildErr != nil || att == nil {
 			slog.Debug("failed to build attachment for directory file",
 				"path", pi.Path,
@@ -371,13 +380,13 @@ func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAtt
 }
 
 var defaultRuntimeFilters = func() []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(attachment.DefaultFileFilters))
-	for idx := range attachment.DefaultFileFilters {
+	runtimeFilters := make([]runtime.FileFilter, 0, len(attachmentRuntime.DefaultFileFilters))
+	for idx := range attachmentRuntime.DefaultFileFilters {
 		runtimeFilters = append(
 			runtimeFilters,
 			runtime.FileFilter{
-				DisplayName: attachment.DefaultFileFilters[idx].DisplayName,
-				Pattern:     attachment.DefaultFileFilters[idx].Pattern(),
+				DisplayName: attachmentRuntime.DefaultFileFilters[idx].DisplayName,
+				Pattern:     attachmentRuntime.DefaultFileFilters[idx].Pattern(),
 			},
 		)
 	}
@@ -388,7 +397,7 @@ var defaultRuntimeFilters = func() []runtime.FileFilter {
 // This is important for macOS: providing filters makes NSOpenPanel/NSSavePanel
 // restrict selectable/savable file types, which can hide/disable "unknown"
 // extensions (e.g. .bazel/.cmake) and dotfiles depending on type mapping.
-func dialogFilters(additionalFilters []attachment.FileFilter) []runtime.FileFilter {
+func dialogFilters(additionalFilters []attachmentRuntime.FileFilter) []runtime.FileFilter {
 	if len(additionalFilters) == 0 {
 		return nil
 	}
@@ -396,8 +405,8 @@ func dialogFilters(additionalFilters []attachment.FileFilter) []runtime.FileFilt
 	return getRuntimeFilters(additionalFilters, false)
 }
 
-func getRuntimeFilters(additionalFilters []attachment.FileFilter, includeDefault bool) []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(additionalFilters)+len(attachment.DefaultFileFilters))
+func getRuntimeFilters(additionalFilters []attachmentRuntime.FileFilter, includeDefault bool) []runtime.FileFilter {
+	runtimeFilters := make([]runtime.FileFilter, 0, len(additionalFilters)+len(attachmentRuntime.DefaultFileFilters))
 
 	for idx := range additionalFilters {
 		runtimeFilters = append(

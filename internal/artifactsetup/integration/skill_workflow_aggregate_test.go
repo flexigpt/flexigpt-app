@@ -9,10 +9,10 @@ import (
 
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
@@ -77,7 +77,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	}
 
 	sessionID := newWorkflowSkillSession(t, runtimeService)
-	request := inferencewrapperSpec.SkillSessionRequest{
+	request := inferenceRuntimeSpec.SkillSessionRequest{
 		SessionID: sessionID,
 		Artifacts: []artifactModel.ArtifactRef{created.Artifact.Ref()},
 	}
@@ -96,7 +96,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatalf("inactive session tools=%+v, want only skills-load", session.ToolChoices)
 	}
 
-	_, err = adapter.ResolveSkillSession(ctx, inferencewrapperSpec.SkillSessionRequest{
+	_, err = adapter.ResolveSkillSession(ctx, inferenceRuntimeSpec.SkillSessionRequest{
 		SessionID: sessionID,
 	})
 	if !errors.Is(err, skillruntime.ErrArtifactSkillSelectionRequired) {
@@ -115,7 +115,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	}
 
 	_, err = resolveWorkflowSkill(ctx, adapter, disabled.Ref())
-	if !errors.Is(err, spec.ErrReferenceUnresolved) {
+	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
 		t.Fatalf("resolution after disable error=%v, want ErrReferenceUnresolved", err)
 	}
 	if runtimeService.IsRegistered(skillRuntime.SkillRegistration{

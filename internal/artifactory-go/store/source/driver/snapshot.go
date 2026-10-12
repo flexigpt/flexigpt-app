@@ -5,7 +5,7 @@ import (
 	"io"
 
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Snapshot is one generation-stable source view.
@@ -17,17 +17,17 @@ type Snapshot interface {
 
 	Stat(
 		ctx context.Context,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (sourceModel.Entry, error)
 
 	ReadDir(
 		ctx context.Context,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) ([]sourceModel.Entry, error)
 
 	Open(
 		ctx context.Context,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (io.ReadCloser, error)
 
 	Confirm(ctx context.Context) error

@@ -5,7 +5,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // PurgeRequest describes one atomic Artifact-local cleanup operation.
@@ -30,13 +30,13 @@ func (r PurgeRequest) Validate() error {
 	if r.ExpectedArtifactRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if r.AllNamespaces && len(r.Namespaces) != 0 {
 		return fmt.Errorf(
 			"%w: all-namespaces cleanup cannot also select namespaces",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !r.AllNamespaces &&
@@ -44,7 +44,7 @@ func (r PurgeRequest) Validate() error {
 		len(r.DataNamespaces) == 0 {
 		return fmt.Errorf(
 			"%w: Artifact cleanup selects no local state",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -56,7 +56,7 @@ func (r PurgeRequest) Validate() error {
 		if _, duplicate := seenOverlay[namespace]; duplicate {
 			return fmt.Errorf(
 				"%w: Artifact cleanup repeats overlay namespace %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				namespace,
 			)
 		}
@@ -71,7 +71,7 @@ func (r PurgeRequest) Validate() error {
 		if _, duplicate := seenData[namespace]; duplicate {
 			return fmt.Errorf(
 				"%w: Artifact cleanup repeats data namespace %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				namespace,
 			)
 		}

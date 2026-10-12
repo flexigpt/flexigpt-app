@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -34,7 +34,7 @@ func NewRegistry(codecs ...schema.Codec) (*Registry, error) {
 
 	for index, codec := range codecs {
 		if codec == nil {
-			return nil, fmt.Errorf("%w: schema codec %d is nil", spec.ErrInvalid, index)
+			return nil, fmt.Errorf("%w: schema codec %d is nil", storeSpec.ErrInvalid, index)
 		}
 		key := codec.Key()
 		if err := key.Validate(); err != nil {
@@ -43,7 +43,7 @@ func NewRegistry(codecs ...schema.Codec) (*Registry, error) {
 		if _, exists := values[key]; exists {
 			return nil, fmt.Errorf(
 				"%w: duplicate schema %q/%q/%q/%q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				key.Entity,
 				key.Kind,
 				key.SchemaID,
@@ -55,7 +55,7 @@ func NewRegistry(codecs ...schema.Codec) (*Registry, error) {
 		if err != nil {
 			return nil, fmt.Errorf(
 				"%w: compile schema %q/%q/%q: %w",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
@@ -100,7 +100,7 @@ func (r *Registry) CanonicalizeExpected(
 	if !found {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: schema %q/%q/%q/%q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			expected.Entity,
 			expected.Kind,
 			expected.SchemaID,
@@ -108,18 +108,18 @@ func (r *Registry) CanonicalizeExpected(
 		)
 	}
 
-	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxDefinitionBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, storeSpec.MaxDefinitionBytes)
 	if err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
 	if err := jsonutil.ValidateJSONSchema(
 		registered.schema,
 		json.RawMessage(canonical),
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	); err != nil {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: document does not satisfy its expected JSON Schema: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -137,30 +137,30 @@ func (r *Registry) CanonicalizeExpected(
 	if value.Key != expected {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: schema codec returned another schema key",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := append([]byte(nil), value.Raw...)
 	if !bytes.Equal(output, canonical) {
-		normalized, err := jsonutil.CanonicalizeObject(output, spec.MaxDefinitionBytes)
+		normalized, err := jsonutil.CanonicalizeObject(output, storeSpec.MaxDefinitionBytes)
 		if err != nil {
 			return schemaModel.ParsedDocument{}, err
 		}
 		if !bytes.Equal(normalized, output) {
 			return schemaModel.ParsedDocument{}, fmt.Errorf(
 				"%w: schema codec returned non-canonical JSON",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if err := jsonutil.ValidateJSONSchema(
 			registered.schema,
 			json.RawMessage(output),
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		); err != nil {
 			return schemaModel.ParsedDocument{}, fmt.Errorf(
 				"%w: changed codec output does not satisfy its expected JSON Schema: %w",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				err,
 			)
 		}
@@ -169,7 +169,7 @@ func (r *Registry) CanonicalizeExpected(
 	if value.Digest != cryptoutil.DigestBytes(output) {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: schema codec output does not match its document digest",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 

@@ -10,7 +10,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/materialize"
@@ -21,11 +21,11 @@ type Materialization struct {
 	ArtifactRevision uint64                    `json:"artifactRevision"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 
-	Name      spec.LogicalName         `json:"name"`
+	Name      storeSpec.LogicalName    `json:"name"`
 	Insert    declaration.InsertTarget `json:"insert"`
 	MediaType string                   `json:"mediaType,omitempty"`
 	Content   string                   `json:"content"`
-	Locator   spec.Locator             `json:"locator"`
+	Locator   storeSpec.Locator        `json:"locator"`
 
 	BuiltIn bool `json:"builtIn"`
 }
@@ -42,7 +42,7 @@ func New(
 	if resources == nil || protection == nil {
 		return nil, fmt.Errorf(
 			"%w: Text service dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -68,7 +68,7 @@ func (s *Service) Materialize(
 		Artifact:         value.Artifact,
 		ArtifactRevision: value.ArtifactRevision,
 		DefinitionDigest: value.DefinitionDigest,
-		Name:             spec.LogicalName(value.Name),
+		Name:             storeSpec.LogicalName(value.Name),
 		Insert:           value.Insert,
 		MediaType:        value.MediaType,
 		Content:          value.Content,

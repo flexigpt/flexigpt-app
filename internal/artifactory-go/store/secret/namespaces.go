@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func namespaceSet(values []overlayModel.Namespace) (map[overlayModel.Namespace]struct{}, error) {
@@ -14,7 +14,7 @@ func namespaceSet(values []overlayModel.Namespace) (map[overlayModel.Namespace]s
 			return nil, fmt.Errorf("secret namespace %d: %w", index, err)
 		}
 		if _, duplicate := output[value]; duplicate {
-			return nil, fmt.Errorf("%w: duplicate secret namespace %q", spec.ErrConflict, value)
+			return nil, fmt.Errorf("%w: duplicate secret namespace %q", storeSpec.ErrConflict, value)
 		}
 		output[value] = struct{}{}
 	}
@@ -26,7 +26,7 @@ func requireNamespace(namespaces map[overlayModel.Namespace]struct{}, value over
 		return err
 	}
 	if _, found := namespaces[value]; !found {
-		return fmt.Errorf("%w: secret namespace %q is not registered", spec.ErrUnsupported, value)
+		return fmt.Errorf("%w: secret namespace %q is not registered", storeSpec.ErrUnsupported, value)
 	}
 	return nil
 }

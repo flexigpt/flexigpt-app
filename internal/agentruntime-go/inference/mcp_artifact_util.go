@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
@@ -27,11 +27,11 @@ var simpleMCPURITemplateVariableRE = regexp.MustCompile(
 )
 
 type MCPInferenceBridge struct {
-	runtime inferencewrapperSpec.MCPRuntime
+	runtime inferenceRuntimeSpec.MCPRuntime
 }
 
 func NewMCPInferenceBridge(
-	rt inferencewrapperSpec.MCPRuntime,
+	rt inferenceRuntimeSpec.MCPRuntime,
 ) *MCPInferenceBridge {
 	return &MCPInferenceBridge{runtime: rt}
 }

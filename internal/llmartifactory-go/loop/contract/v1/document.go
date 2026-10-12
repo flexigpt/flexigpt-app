@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -167,7 +167,7 @@ func (v LoopDocument) validateFields() error {
 		if form == declaration.MemberSelector {
 			return fmt.Errorf(
 				"%w: Loop body cannot be a member selector",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if err := declaration.ValidateNoRelationshipBehavior(
@@ -190,7 +190,7 @@ func (v LoopDocument) validateFields() error {
 		v.Name != "" {
 		return fmt.Errorf(
 			"%w: inline standalone Loop requires body",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

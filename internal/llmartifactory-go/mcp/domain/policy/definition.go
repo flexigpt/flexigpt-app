@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
@@ -20,7 +20,7 @@ func BodyFromDefinition(
 		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {
 		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -48,7 +48,7 @@ func BodyFromDocument(
 			ToolPolicies:  document.ToolPolicies,
 			AppsPolicy:    document.AppsPolicy,
 		},
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return mcppolicy.MCPPolicy{}, err
@@ -57,7 +57,7 @@ func BodyFromDocument(
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: decode MCP Policy body: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -79,7 +79,7 @@ func DefinitionForDocument(
 		Kind:          mcpDomain.MCPPolicyArtifactKind,
 		SchemaID:      mcppolicyv1.MCPPolicySchemaKey.SchemaID,
 		SchemaVersion: mcppolicyv1.MCPPolicySchemaKey.SchemaVersion,
-		LogicalName:   spec.LogicalName(input.Name),
+		LogicalName:   storeSpec.LogicalName(input.Name),
 		DisplayName:   input.Name,
 		Description:   input.Description,
 		Labels:        input.Labels,
@@ -90,13 +90,13 @@ func DefinitionForDocument(
 }
 
 func DocumentFromPolicy(
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 	description string,
 	body mcppolicy.MCPPolicy,
 ) (mcppolicyv1.MCPPolicyDocument, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		body,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return mcppolicyv1.MCPPolicyDocument{}, err

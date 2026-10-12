@@ -2,7 +2,7 @@ package spec
 
 import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -35,7 +35,7 @@ const (
 type WorkspaceConversationResourceSelectionRef struct {
 	Artifact         artifactModel.ArtifactRef `json:"artifact"`
 	Name             string                    `json:"name,omitempty"`
-	Locator          spec.Locator              `json:"locator,omitempty"`
+	Locator          storeSpec.Locator         `json:"locator,omitempty"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest,omitempty"`
 	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
 }
@@ -54,7 +54,7 @@ type WorkspaceConversationSelection struct {
 type WorkspaceConversationContextUsage struct {
 	Artifact                 artifactModel.ArtifactRef               `json:"artifact"`
 	Name                     string                                  `json:"name,omitempty"`
-	Locator                  spec.Locator                            `json:"locator,omitempty"`
+	Locator                  storeSpec.Locator                       `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest                       `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     cryptoutil.Digest                       `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                                  `json:"usedArtifactRevision,omitempty"`
@@ -70,7 +70,7 @@ type WorkspaceConversationSkillUsage struct {
 	Artifact                 artifactModel.ArtifactRef             `json:"artifact"`
 	Name                     string                                `json:"name,omitempty"`
 	DisplayName              string                                `json:"displayName,omitempty"`
-	Locator                  spec.Locator                          `json:"locator,omitempty"`
+	Locator                  storeSpec.Locator                     `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest                     `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     cryptoutil.Digest                     `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                                `json:"usedArtifactRevision,omitempty"`

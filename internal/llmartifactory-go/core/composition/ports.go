@@ -8,7 +8,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ArtifactReader is the entity read boundary used by declaration resolution.
@@ -41,7 +41,7 @@ type ArtifactCatalogReader interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		kind artifactModel.ArtifactKind,
-		logicalName spec.LogicalName,
+		logicalName storeSpec.LogicalName,
 		options catalogModel.ListOptions,
 	) ([]catalogModel.Entry, error)
 
@@ -62,6 +62,6 @@ type SourceEntryInspector interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		locator spec.Locator,
+		locator storeSpec.Locator,
 	) (sourceModel.Entry, error)
 }

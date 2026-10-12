@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -95,7 +95,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	session, err := runtimeAdapter.ResolveSkillSession(
 		ctx,
-		inferencewrapperSpec.SkillSessionRequest{
+		inferenceRuntimeSpec.SkillSessionRequest{
 			SessionID: sessionID,
 			Artifacts: []artifactModel.ArtifactRef{
 				first.Artifact.Ref(),
@@ -241,7 +241,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		runtimeAdapter,
 		firstBeforePurge.Ref(),
 	)
-	if !errors.Is(err, spec.ErrReferenceUnresolved) {
+	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"aggregate resolution after first Skill purge error=%v, want ErrReferenceUnresolved",
 			err,

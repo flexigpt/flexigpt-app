@@ -13,8 +13,8 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/setting"
@@ -29,7 +29,7 @@ func init() {
 }
 
 type CompletionWrapper struct {
-	providersetAPI *inferencewrapper.ProviderSetAPI
+	providersetAPI *inferenceRuntime.ProviderSetAPI
 
 	appContext          context.Context
 	completionCancelMux sync.Mutex
@@ -44,7 +44,7 @@ type CompletionRequestBody struct {
 	Current conversationSpec.ConversationMessage   `json:"current"`
 
 	// Applied after Provider/Model source and overlay defaults.
-	RequestPatch *inferencewrapperSpec.RuntimeRequestPatch `json:"requestPatch,omitempty"`
+	RequestPatch *inferenceRuntimeSpec.RuntimeRequestPatch `json:"requestPatch,omitempty"`
 
 	// These are current-call selections, not persisted historical ToolChoices.
 	ToolSelections []conversationSpec.ToolSelection `json:"toolSelections,omitempty"`
@@ -55,26 +55,26 @@ type CompletionRequestBody struct {
 
 func InitCompletionWrapper(
 	w *CompletionWrapper,
-	models inferencewrapperSpec.ModelRuntime,
+	models inferenceRuntimeSpec.ModelRuntime,
 	settings *setting.SettingStore,
-	tools inferencewrapper.ToolSource,
-	skills inferencewrapperSpec.SkillSource,
-	mcpRuntime inferencewrapperSpec.MCPRuntime,
-	workspaceSource inferencewrapper.WorkspaceSource,
+	tools inferenceRuntime.ToolSource,
+	skills inferenceRuntimeSpec.SkillSource,
+	mcpRuntime inferenceRuntimeSpec.MCPRuntime,
+	workspaceSource inferenceRuntime.WorkspaceSource,
 ) error {
 	if w == nil || settings == nil {
 		return errors.New("completion wrapper dependencies are incomplete")
 	}
 
-	debugConfig := inferencewrapper.DefaultDebugConfig()
-	providers, err := inferencewrapper.NewProviderSetAPI(
+	debugConfig := inferenceRuntime.DefaultDebugConfig()
+	providers, err := inferenceRuntime.NewProviderSetAPI(
 		models,
 		tools,
 		skills,
 		mcpRuntime,
 		workspaceSource,
-		inferencewrapper.WithLogger(slog.Default()),
-		inferencewrapper.WithDebugConfig(&debugConfig),
+		inferenceRuntime.WithLogger(slog.Default()),
+		inferenceRuntime.WithDebugConfig(&debugConfig),
 	)
 	if err != nil {
 		return fmt.Errorf("initialize completion inference: %w", err)
@@ -111,8 +111,8 @@ func (w *CompletionWrapper) FetchCompletion(
 	textCallbackID string,
 	thinkingCallbackID string,
 	requestID string,
-) (*inferencewrapperSpec.CompletionResponse, error) {
-	return withRecoveryResp(func() (*inferencewrapperSpec.CompletionResponse, error) {
+) (*inferenceRuntimeSpec.CompletionResponse, error) {
+	return withRecoveryResp(func() (*inferenceRuntimeSpec.CompletionResponse, error) {
 		if w == nil {
 			return nil, errors.New("completion wrapper is unavailable")
 		}
@@ -156,8 +156,8 @@ func (w *CompletionWrapper) FetchCompletion(
 			w.completionWG.Done()
 		}()
 
-		request := &inferencewrapperSpec.CompletionRequest{
-			Model: inferencewrapperSpec.RuntimeModelRequest{
+		request := &inferenceRuntimeSpec.CompletionRequest{
+			Model: inferenceRuntimeSpec.RuntimeModelRequest{
 				Model:        model,
 				RequestPatch: completionData.RequestPatch,
 			},
@@ -287,7 +287,7 @@ func (w *CompletionWrapper) close() {
 }
 
 func applyDebugSettings(
-	providerSet *inferencewrapper.ProviderSetAPI,
+	providerSet *inferenceRuntime.ProviderSetAPI,
 	config setting.DebugSettings,
 ) error {
 	appSlogLevelVar.Set(toSlogLevel(config.LogLevel))

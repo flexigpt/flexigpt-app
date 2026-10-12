@@ -6,7 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
@@ -27,14 +27,14 @@ func DecodeTool(
 	if record.Kind != ToolArtifactKind {
 		return Tool{}, fmt.Errorf(
 			"%w: Artifact %q is not a Tool",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if record.State != artifactModel.StateAvailable {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool Artifact %q is unavailable",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -43,7 +43,7 @@ func DecodeTool(
 		value.SchemaVersion != toolv1.ToolSchemaKey.SchemaVersion {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool Artifact %q has an unsupported schema",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			record.ID,
 		)
 	}
@@ -51,7 +51,7 @@ func DecodeTool(
 		*record.ResolvedDefinition != value.Digest {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool definition changed during read",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 
@@ -59,10 +59,10 @@ func DecodeTool(
 	if err != nil {
 		return Tool{}, err
 	}
-	if record.LogicalName != spec.LogicalName(document.Name) {
+	if record.LogicalName != storeSpec.LogicalName(document.Name) {
 		return Tool{}, fmt.Errorf(
 			"%w: tool identity differs from its declaration",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 
@@ -78,14 +78,14 @@ func DecodeTool(
 // the plugin package.
 func ValidateToolPluginDocument(
 	document pluginv1.PluginDocument,
-) ([]spec.LogicalName, error) {
+) ([]storeSpec.LogicalName, error) {
 	if err := document.Validate(); err != nil {
 		return nil, err
 	}
 	if document.Locator != nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Plugins cannot be located aliases",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
@@ -97,8 +97,8 @@ func ValidateToolPluginDocument(
 		return nil, err
 	}
 
-	seen := make(map[spec.LogicalName]struct{}, len(ordered))
-	names := make([]spec.LogicalName, 0, len(ordered))
+	seen := make(map[storeSpec.LogicalName]struct{}, len(ordered))
+	names := make([]storeSpec.LogicalName, 0, len(ordered))
 	for index, member := range ordered {
 		form, err := member.MemberForm()
 		if err != nil {
@@ -114,7 +114,7 @@ func ValidateToolPluginDocument(
 			header.Locator != nil {
 			return nil, fmt.Errorf(
 				"%w: Tool Plugins require named built-in Tool references",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 			)
 		}
 
@@ -127,19 +127,19 @@ func ValidateToolPluginDocument(
 			len(relationship.Use) != 0 {
 			return nil, fmt.Errorf(
 				"%w: Tool Plugin member %q has unsupported relationship behavior",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				header.Name,
 			)
 		}
 
-		name := spec.LogicalName(header.Name)
+		name := storeSpec.LogicalName(header.Name)
 		if err := name.Validate(); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seen[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool Plugin repeats Tool %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				name,
 			)
 		}

@@ -8,13 +8,13 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type PackageHydrationKey struct {
 	InstallerName string
-	Scope         spec.Locator
+	Scope         storeSpec.Locator
 }
 
 func (k PackageHydrationKey) Validate() error {
@@ -123,7 +123,7 @@ func NormalizePackageHydrations(
 		if _, duplicate := seen[value.Key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate package hydration %q/%q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value.Key.InstallerName,
 				value.Key.Scope,
 			)

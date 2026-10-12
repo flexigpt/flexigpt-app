@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
@@ -46,7 +46,7 @@ func (target SecretInputTarget) matches(
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret input target %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			target.Kind,
 		)
 	}
@@ -73,7 +73,7 @@ func secretInputTargets(
 		if strings.TrimSpace(slot) == "" {
 			return fmt.Errorf(
 				"%w: secret input %q has no materialization slot in %s",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 				field,
 			)
@@ -85,7 +85,7 @@ func secretInputTargets(
 				!strings.EqualFold(current.Slot, next.Slot) {
 				return fmt.Errorf(
 					"%w: secret input %q is used by multiple targets",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					inputName,
 				)
 			}
@@ -98,7 +98,7 @@ func secretInputTargets(
 			owner != inputName {
 			return fmt.Errorf(
 				"%w: secret inputs %q and %q use the same materialization target",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				owner,
 				inputName,
 			)
@@ -114,7 +114,7 @@ func secretInputTargets(
 			if declared && declaration.Kind == InputSecret {
 				return fmt.Errorf(
 					"%w: secret input %q cannot be substituted into %s",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					inputName,
 					field,
 				)
@@ -241,7 +241,7 @@ func secretInputTargets(
 		if _, found := targets[inputName]; !found {
 			return nil, fmt.Errorf(
 				"%w: secret input %q has no permitted environment or HTTP header target",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				inputName,
 			)
 		}

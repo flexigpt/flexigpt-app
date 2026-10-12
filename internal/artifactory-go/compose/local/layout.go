@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -51,7 +51,7 @@ func ensureStoreLayout(base string) error {
 	if manifest.Format != storeFormat || manifest.ContentLayout != storeContentLayout {
 		return fmt.Errorf(
 			"%w: unsupported Artifact Store layout %q/%q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			manifest.Format,
 			manifest.ContentLayout,
 		)
@@ -77,7 +77,7 @@ func removeStaleManifestTemporaryFiles(base string) error {
 		if entry.IsDir() {
 			return fmt.Errorf(
 				"%w: invalid Artifact Store manifest temporary directory %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				entry.Name(),
 			)
 		}
@@ -119,9 +119,9 @@ func writeNewStoreManifest(manifestPath string, raw []byte) error {
 }
 
 func decodeStoreManifest(raw []byte) (storeManifest, error) {
-	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](raw, spec.MaxConfigBytes)
+	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](raw, storeSpec.MaxConfigBytes)
 	if err != nil {
-		return storeManifest{}, fmt.Errorf("%w: decode artifact store layout manifest: %w", spec.ErrInvalid, err)
+		return storeManifest{}, fmt.Errorf("%w: decode artifact store layout manifest: %w", storeSpec.ErrInvalid, err)
 	}
 	return manifest, nil
 }

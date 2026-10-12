@@ -6,7 +6,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // EnsureManagedDeclarationDiscovery prepares the caller-owned managed
@@ -16,8 +16,8 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	locator spec.Locator,
-	requiredDecoder spec.DecoderID,
+	locator storeSpec.Locator,
+	requiredDecoder storeSpec.DecoderID,
 ) (sourceModel.Summary, error) {
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return sourceModel.Summary{}, err
@@ -50,10 +50,10 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 			ExpectedRevision: current.Revision,
 			Intent:           sourceModel.DiscoveryPreparationAdditive,
 			Requirement: sourceModel.DiscoveryRequirement{
-				ExplicitLocators: []spec.Locator{locator},
+				ExplicitLocators: []storeSpec.Locator{locator},
 				DecoderHints: []sourceModel.DecoderHint{{
 					Locator:    locator,
-					DecoderIDs: []spec.DecoderID{requiredDecoder},
+					DecoderIDs: []storeSpec.DecoderID{requiredDecoder},
 				}},
 				RequireAuthoritative: true,
 			},

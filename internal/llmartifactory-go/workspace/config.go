@@ -2,7 +2,7 @@ package workspace
 
 import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
@@ -12,17 +12,17 @@ import (
 
 type DefaultPolicySource struct {
 	ProviderKey string
-	Root        spec.Locator
-	Locator     spec.Locator
-	DecoderID   spec.DecoderID
+	Root        storeSpec.Locator
+	Locator     storeSpec.Locator
+	DecoderID   storeSpec.DecoderID
 	Policy      workspaceDomain.DefaultPolicy
 }
 
 func (s DefaultPolicySource) Validate() error {
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"Workspace default policy provider key",
 		s.ProviderKey,
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (s DefaultPolicySource) Validate() error {
 type Support struct {
 	DirectorySource         support.SourceProfile
 	PolicySource            support.SourceProfile
-	RootStorageKeyPrefix    spec.StorageKey
+	RootStorageKeyPrefix    storeSpec.StorageKey
 	DirectoryDiscovery      sourceModel.DiscoverySpec
 	ManifestPatterns        []string
 	SelectorIncludePatterns []string
@@ -58,13 +58,13 @@ func (s Support) Validate() error {
 	if err := s.DirectoryDiscovery.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidatePathPatterns(
+	if err := storeSpec.ValidatePathPatterns(
 		"Workspace manifest patterns",
 		s.ManifestPatterns,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidatePathPatterns(
+	if err := storeSpec.ValidatePathPatterns(
 		"Workspace selector patterns",
 		s.SelectorIncludePatterns,
 	); err != nil {

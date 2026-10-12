@@ -10,7 +10,7 @@ import (
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Dependencies struct {
@@ -72,7 +72,7 @@ func NewService(
 		dependencies.SecretLifecycle == nil {
 		return nil, fmt.Errorf(
 			"%w: installation flow dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

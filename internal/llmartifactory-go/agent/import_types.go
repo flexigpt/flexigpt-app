@@ -6,7 +6,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -35,11 +35,11 @@ type AgentImportDestination struct {
 	SourceID        sourceModel.SourceID      `json:"sourceID"`
 	Plugin          artifactModel.ArtifactRef `json:"plugin"`
 
-	PluginRevision    uint64           `json:"pluginRevision"`
-	PluginName        spec.LogicalName `json:"pluginName"`
-	PluginDisplayName string           `json:"pluginDisplayName"`
-	Baseline          bool             `json:"baseline"`
-	Enabled           bool             `json:"enabled"`
+	PluginRevision    uint64                `json:"pluginRevision"`
+	PluginName        storeSpec.LogicalName `json:"pluginName"`
+	PluginDisplayName string                `json:"pluginDisplayName"`
+	Baseline          bool                  `json:"baseline"`
+	Enabled           bool                  `json:"enabled"`
 }
 
 type AgentImportPreviewRequest struct {
@@ -54,17 +54,17 @@ type AgentImportPreviewRequest struct {
 }
 
 type AgentImportArtifactPreview struct {
-	OccurrencePath   string              `json:"occurrencePath"`
-	Type             declaration.Type    `json:"type"`
-	Name             spec.LogicalName    `json:"name"`
-	LogicalVersion   spec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DefinitionDigest cryptoutil.Digest   `json:"definitionDigest"`
+	OccurrencePath   string                   `json:"occurrencePath"`
+	Type             declaration.Type         `json:"type"`
+	Name             storeSpec.LogicalName    `json:"name"`
+	LogicalVersion   storeSpec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
 }
 
 type AgentImportRelationship struct {
 	Path   string                       `json:"path"`
 	Type   declaration.Type             `json:"type"`
-	Name   spec.LogicalName             `json:"name"`
+	Name   storeSpec.LogicalName        `json:"name"`
 	Scope  declaration.LookupScope      `json:"scope,omitempty"`
 	Status composition.ResolutionStatus `json:"status"`
 
@@ -96,8 +96,8 @@ type AgentMCPSetupInput struct {
 }
 
 type AgentMCPSetupDescriptor struct {
-	OccurrencePath string           `json:"occurrencePath"`
-	Name           spec.LogicalName `json:"name"`
+	OccurrencePath string                `json:"occurrencePath"`
+	Name           storeSpec.LogicalName `json:"name"`
 
 	Artifact *artifactModel.ArtifactRef `json:"artifact,omitempty"`
 
@@ -156,14 +156,14 @@ type AgentExportRequest struct {
 }
 
 type AgentExportResult struct {
-	Type              declaration.Type  `json:"type"`
-	Name              spec.LogicalName  `json:"name"`
-	MediaType         string            `json:"mediaType"`
-	SuggestedFileName string            `json:"suggestedFileName"`
-	Content           string            `json:"content"`
-	ContentDigest     cryptoutil.Digest `json:"contentDigest"`
-	DefinitionDigest  cryptoutil.Digest `json:"definitionDigest"`
-	ArtifactRevision  uint64            `json:"artifactRevision"`
-	BuiltIn           bool              `json:"builtIn"`
-	Managed           bool              `json:"managed"`
+	Type              declaration.Type      `json:"type"`
+	Name              storeSpec.LogicalName `json:"name"`
+	MediaType         string                `json:"mediaType"`
+	SuggestedFileName string                `json:"suggestedFileName"`
+	Content           string                `json:"content"`
+	ContentDigest     cryptoutil.Digest     `json:"contentDigest"`
+	DefinitionDigest  cryptoutil.Digest     `json:"definitionDigest"`
+	ArtifactRevision  uint64                `json:"artifactRevision"`
+	BuiltIn           bool                  `json:"builtIn"`
+	Managed           bool                  `json:"managed"`
 }

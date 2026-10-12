@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -46,7 +46,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(t *testing.T) {
 		t.Fatal("fresh topology hydration was unexpectedly current")
 	}
 
-	if _, err := store.Roots.Get(ctx, rootID); !errors.Is(err, spec.ErrRootNotFound) {
+	if _, err := store.Roots.Get(ctx, rootID); !errors.Is(err, storeSpec.ErrRootNotFound) {
 		t.Fatalf("fresh protected root read error=%v, want ErrRootNotFound", err)
 	}
 }

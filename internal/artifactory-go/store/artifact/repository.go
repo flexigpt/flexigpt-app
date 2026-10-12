@@ -7,7 +7,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -27,7 +27,7 @@ type Reader interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		kind artifactModel.ArtifactKind,
-		logicalName spec.LogicalName,
+		logicalName storeSpec.LogicalName,
 	) ([]artifactModel.Artifact, error)
 	FindByOrigin(
 		ctx context.Context,

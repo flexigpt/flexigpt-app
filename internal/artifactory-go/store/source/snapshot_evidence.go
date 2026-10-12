@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // readSnapshotLocator is Source-owned bounded snapshot evidence access. It is
@@ -14,7 +14,7 @@ import (
 func readSnapshotLocator(
 	ctx context.Context,
 	snapshot driver.Snapshot,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	maximumBytes int64,
 ) ([]byte, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -22,10 +22,15 @@ func readSnapshotLocator(
 		return nil, err
 	}
 	if err := entry.Validate(); err != nil {
-		return nil, fmt.Errorf("%w: source snapshot returned an invalid entry: %w", spec.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: source snapshot returned an invalid entry: %w", storeSpec.ErrInvalid, err)
 	}
 	if entry.Locator != locator {
-		return nil, fmt.Errorf("%w: source snapshot stat for %q returned %q", spec.ErrInvalid, locator, entry.Locator)
+		return nil, fmt.Errorf(
+			"%w: source snapshot stat for %q returned %q",
+			storeSpec.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
 	}
 	return ReadSnapshotEntry(ctx, snapshot, entry, maximumBytes)
 }

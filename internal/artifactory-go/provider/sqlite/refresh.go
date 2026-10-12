@@ -10,7 +10,7 @@ import (
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -40,7 +40,7 @@ func (s *Store) getRefreshState(
 	if errors.Is(err, sql.ErrNoRows) {
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
-			spec.ErrRefreshStateNotFound,
+			storeSpec.ErrRefreshStateNotFound,
 			sourceID,
 			rootID,
 		)
@@ -85,13 +85,13 @@ func (p *Publisher) Publish(
 		currentSource.Revision != publication.ExpectedSourceRevision {
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source changed or was disabled during refresh",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	if currentSource.Discovery.Empty() {
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source has no declaration discovery configuration",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 	var currentRefreshRevision uint64
@@ -111,13 +111,13 @@ func (p *Publisher) Publish(
 	if currentRefreshRevision != publication.ExpectedRefreshRevision {
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source refresh state changed during refresh",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	if currentRefreshRevision == ^uint64(0) {
 		return refreshModel.State{}, fmt.Errorf(
 			"%w: Source refresh revision is exhausted",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

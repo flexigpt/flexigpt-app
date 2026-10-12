@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -31,7 +31,7 @@ func newCanonicalDecoder(
 	if interpretations == nil {
 		output.selectionErr = fmt.Errorf(
 			"%w: canonical declaration interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 		return output
 	}
@@ -72,7 +72,7 @@ func (d *canonicalDecoder) BindExpectedCanonicalizer(catalog schema.Catalog) err
 	if d == nil || d.interpretations == nil || catalog == nil {
 		return fmt.Errorf(
 			"%w: canonical declaration schema catalog is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if d.selectionErr != nil {
@@ -98,7 +98,7 @@ func (d *canonicalDecoder) Decode(
 		return nil, decodeDiagnostic(
 			candidate,
 			"artifact.declaration-schema-unavailable",
-			fmt.Errorf("%w: canonical declaration decoder is not bound", spec.ErrClosed),
+			fmt.Errorf("%w: canonical declaration decoder is not bound", storeSpec.ErrClosed),
 		)
 	}
 
@@ -153,7 +153,7 @@ func decodeDiagnostic(
 
 func decodeDiagnosticAt(
 	candidate ingestModel.Candidate,
-	subresource spec.SubresourceLocator,
+	subresource storeSpec.SubresourceLocator,
 	code string,
 	err error,
 ) []diagnostic.Diagnostic {

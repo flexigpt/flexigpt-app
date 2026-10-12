@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // EnsureProtectedTopology creates or verifies a declared protected Root and
@@ -28,7 +28,7 @@ func (c *Service) EnsureProtectedTopology(
 		!c.rootMutationPolicy.IsProtectedRoot(declaration.Root.ID) {
 		return installModel.Installed{}, fmt.Errorf(
 			"%w: declared Root %q is not protected by application policy",
-			spec.ErrProtected,
+			storeSpec.ErrProtected,
 			declaration.Root.ID,
 		)
 	}

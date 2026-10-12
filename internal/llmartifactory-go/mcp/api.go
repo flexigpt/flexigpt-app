@@ -15,7 +15,7 @@ import (
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -67,7 +67,7 @@ func New(
 		secretCleaner == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Store dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := baselinePolicy.Validate(); err != nil {
@@ -85,7 +85,7 @@ func New(
 	if config.resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP composition resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	installations, err := installation.New(installation.Dependencies{
@@ -215,7 +215,7 @@ func (a *Service) GetMCPPolicy(
 	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
 		return PolicyView{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Policy",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	body, err := a.policyBodyForResolvedArtifact(
@@ -272,7 +272,7 @@ func (a *Service) listMCPPluginServers(
 	if p == nil || p.Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
 			"%w: MCP Plugin did not resolve as a Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -353,7 +353,7 @@ func (a *Service) serverReadFromMaterial(
 	if material.Resource.Artifact.SourceContentDigest == nil {
 		return ServerRead{}, fmt.Errorf(
 			"%w: MCP Server has no source content digest",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 
@@ -432,7 +432,7 @@ func (a *Service) resolveDeclarationArtifact(
 
 func resolvedMCPPolicyRelationship(
 	value *composition.ResolvedEntry,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) (*composition.ResolvedRelationship, bool) {
 	if value == nil {
 		return nil, false
@@ -472,7 +472,7 @@ func (a *Service) effectivePolicy(
 			if reference.Required {
 				return mcppolicy.Effective{}, fmt.Errorf(
 					"%w: required MCP Policy %q did not resolve",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 					reference.Name,
 				)
 			}
@@ -481,7 +481,7 @@ func (a *Service) effectivePolicy(
 				if reference.Required {
 					return mcppolicy.Effective{}, fmt.Errorf(
 						"%w: required MCP Policy %q is %s",
-						spec.ErrReferenceUnresolved,
+						storeSpec.ErrReferenceUnresolved,
 						reference.Name,
 						policyResult.Status,
 					)
@@ -494,7 +494,7 @@ func (a *Service) effectivePolicy(
 					policyResult.Resolved.Target.Artifact == nil {
 					return mcppolicy.Effective{}, fmt.Errorf(
 						"%w: MCP Policy %q did not resolve to a source-backed Artifact",
-						spec.ErrReferenceUnresolved,
+						storeSpec.ErrReferenceUnresolved,
 						reference.Name,
 					)
 				}
@@ -512,7 +512,7 @@ func (a *Service) effectivePolicy(
 		if ref.RootID != serverRef.RootID {
 			return mcppolicy.Effective{}, fmt.Errorf(
 				"%w: additional MCP Policy belongs to another Root",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		terminal, err := a.resolveDeclarationArtifact(ctx, ref)
@@ -548,7 +548,7 @@ func (a *Service) policyBodyForArtifact(
 	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
 		return mcppolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Artifact %q is not an MCP Policy",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}

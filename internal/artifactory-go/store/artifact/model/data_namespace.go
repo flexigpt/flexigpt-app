@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // DataNamespace identifies one independently owned Artifact.Data field. The
@@ -12,10 +12,10 @@ import (
 type DataNamespace string
 
 func (n DataNamespace) Validate() error {
-	return spec.ValidateRequiredText(
+	return storeSpec.ValidateRequiredText(
 		"Artifact local-data namespace",
 		string(n),
-		spec.MaxSchemaIDBytes,
+		storeSpec.MaxSchemaIDBytes,
 	)
 }
 

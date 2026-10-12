@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -20,14 +20,14 @@ func ValidateOptionalContent(
 	if !utf8.ValidString(*value) {
 		return fmt.Errorf(
 			"%w: inline content must be valid UTF-8",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	if len(*value) > spec.MaxDefinitionBodyBytes {
+	if len(*value) > storeSpec.MaxDefinitionBodyBytes {
 		return fmt.Errorf(
 			"%w: inline content exceeds %d bytes",
-			spec.ErrInvalid,
-			spec.MaxDefinitionBodyBytes,
+			storeSpec.ErrInvalid,
+			storeSpec.MaxDefinitionBodyBytes,
 		)
 	}
 	return nil
@@ -39,7 +39,7 @@ func ValidateOptionalMediaType(
 	if value == "" {
 		return nil
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"media type",
 		value,
 		256,
@@ -60,7 +60,7 @@ func ValidateDeclarationLocatorExclusivity(
 	if locator != nil && hasInlineBody {
 		return fmt.Errorf(
 			"%w: %s cannot combine a declaration locator with inline fields",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 		)
 	}
@@ -84,7 +84,7 @@ func canonicalJSONValue(
 	if len(value) == 0 {
 		return nil, fmt.Errorf(
 			"%w: %s is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 		)
 	}
@@ -95,7 +95,7 @@ func canonicalJSONValue(
 	if len(canonical) > maximum {
 		return nil, fmt.Errorf(
 			"%w: %s exceeds %d bytes",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 			maximum,
 		)
@@ -108,7 +108,7 @@ func ValidateJSONSchemaValue(
 	value json.RawMessage,
 ) error {
 	canonical, err := canonicalJSONValue(
-		label, value, spec.MaxDefinitionBodyBytes,
+		label, value, storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return err
@@ -120,14 +120,14 @@ func ValidateJSONSchemaValue(
 	if len(canonical) == 0 || canonical[0] != '{' {
 		return fmt.Errorf(
 			"%w: %s must be a JSON object or boolean",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 		)
 	}
 	if _, err := jsonutil.CompileJSONSchema(canonical); err != nil {
 		return fmt.Errorf(
 			"%w: %s is not a valid JSON Schema: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
 			err,
 		)
@@ -151,12 +151,12 @@ func ValidateJSONPointer(value string) error {
 	if value == "" {
 		return nil
 	}
-	if len(value) > spec.MaxURIBytes ||
+	if len(value) > storeSpec.MaxURIBytes ||
 		!utf8.ValidString(value) ||
 		!strings.HasPrefix(value, "/") {
 		return fmt.Errorf(
 			"%w: invalid RFC 6901 JSON Pointer",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	for index := 0; index < len(value); index++ {
@@ -168,7 +168,7 @@ func ValidateJSONPointer(value string) error {
 				value[index+1] != '1') {
 			return fmt.Errorf(
 				"%w: invalid RFC 6901 JSON Pointer escape",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		index++
@@ -181,16 +181,16 @@ func ValidateTextSlice(
 	values []string,
 	maximumBytes int,
 ) error {
-	if len(values) > spec.MaxDefinitionDependencies {
+	if len(values) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: %s exceed %d entries",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
-			spec.MaxDefinitionDependencies,
+			storeSpec.MaxDefinitionDependencies,
 		)
 	}
 	for index, value := range values {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			label,
 			value,
 			maximumBytes,
@@ -205,27 +205,27 @@ func ValidateStringMap(
 	label string,
 	values map[string]string,
 ) error {
-	if len(values) > spec.MaxDefinitionDependencies {
+	if len(values) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: %s exceed %d entries",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
-			spec.MaxDefinitionDependencies,
+			storeSpec.MaxDefinitionDependencies,
 		)
 	}
 	for key, value := range values {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			label+" key",
 			key,
-			spec.MaxURIBytes,
+			storeSpec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
-		if len(value) > spec.MaxURIBytes ||
+		if len(value) > storeSpec.MaxURIBytes ||
 			!utf8.ValidString(value) {
 			return fmt.Errorf(
 				"%w: %s value for %q is invalid",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				label,
 				key,
 			)
@@ -238,26 +238,26 @@ func ValidateRawMessageMap(
 	label string,
 	values map[string]json.RawMessage,
 ) error {
-	if len(values) > spec.MaxDefinitionDependencies {
+	if len(values) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: %s exceed %d entries",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			label,
-			spec.MaxDefinitionDependencies,
+			storeSpec.MaxDefinitionDependencies,
 		)
 	}
 	for key, value := range values {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			label+" key",
 			key,
-			spec.MaxKindBytes,
+			storeSpec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
 		if err := ValidateJSONValue(
 			label+" value",
 			value,
-			spec.MaxLocalDataBytes,
+			storeSpec.MaxLocalDataBytes,
 		); err != nil {
 			return err
 		}
@@ -269,10 +269,10 @@ func ValidateWorkflowID(
 	label string,
 	value string,
 ) error {
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		label,
 		value,
-		spec.MaxLogicalNameBytes,
+		storeSpec.MaxLogicalNameBytes,
 	); err != nil {
 		return err
 	}

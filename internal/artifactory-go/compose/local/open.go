@@ -20,7 +20,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Open opens the local Artifact Store deployment and returns the one generic
@@ -29,7 +29,7 @@ import (
 // failure, caller-supplied SecretValues remains caller-owned.
 func Open(ctx context.Context, config Config) (_ *compose.Store, returnErr error) {
 	if config.BaseDirectory == "" {
-		return nil, fmt.Errorf("%w: Artifact Store local base directory is empty", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Artifact Store local base directory is empty", storeSpec.ErrInvalid)
 	}
 
 	policy, err := localRootPolicy(config)

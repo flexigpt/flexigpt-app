@@ -12,7 +12,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -86,7 +86,7 @@ func putDefinitionTx(
 	if !equalDefinitions(existing, canonical) {
 		return fmt.Errorf(
 			"%w: Definition digest %q conflicts with existing immutable Definition",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 			canonical.Digest,
 		)
 	}
@@ -147,8 +147,8 @@ func scanDefinition(row scanner) (definitionModel.Definition, error) {
 	value.Kind = artifactModel.ArtifactKind(kind)
 	value.SchemaID = schemaModel.SchemaID(schemaID)
 	value.SchemaVersion = schemaVersion
-	value.LogicalName = spec.LogicalName(logicalName)
-	value.LogicalVersion = spec.LogicalVersion(logicalVersion)
+	value.LogicalName = storeSpec.LogicalName(logicalName)
+	value.LogicalVersion = storeSpec.LogicalVersion(logicalVersion)
 	value.DisplayName = displayName
 	value.Description = description
 	value.Body = append([]byte(nil), bodyRaw...)

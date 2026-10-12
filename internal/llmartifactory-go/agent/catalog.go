@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -30,7 +30,7 @@ func (a *Service) getAgentRecord(
 	if !agentDomain.IsAgentKind(value.Kind) {
 		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
-			spec.ErrNotFound,
+			storeSpec.ErrNotFound,
 			ref.ArtifactID,
 		)
 	}
@@ -73,7 +73,7 @@ func (a *Service) ResolveAgent(
 	if plan.RootArtifact == nil {
 		return AgentResolution{}, fmt.Errorf(
 			"%w: Agent resolution has no Artifact root",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	agent, err := a.GetAgent(ctx, *plan.RootArtifact)
@@ -166,7 +166,7 @@ func projectAgentCapabilityPlan(
 			default:
 				return AgentCapabilityPlan{}, fmt.Errorf(
 					"%w: Agent capability %q has unsupported Skill use mode %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					occurrence.Path,
 					mode,
 				)
@@ -186,7 +186,7 @@ func projectAgentBoolean(
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf(
 			"%w: Agent relationship field %q must be boolean",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			name,
 		)
 	}
@@ -251,7 +251,7 @@ func (a *Service) agentViewWithSourceCache(
 	if !agentDomain.IsAgentKind(record.Kind) {
 		return AgentView{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			record.ID,
 		)
 	}

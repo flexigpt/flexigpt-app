@@ -8,7 +8,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -37,8 +37,8 @@ type Definition struct {
 	Kind           artifactModel.ArtifactKind `json:"kind"`
 	SchemaID       schemaModel.SchemaID       `json:"schemaID"`
 	SchemaVersion  string                     `json:"schemaVersion"`
-	LogicalName    spec.LogicalName           `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion        `json:"logicalVersion,omitempty"`
+	LogicalName    storeSpec.LogicalName      `json:"logicalName"`
+	LogicalVersion storeSpec.LogicalVersion   `json:"logicalVersion,omitempty"`
 	DisplayName    string                     `json:"displayName,omitempty"`
 	Description    string                     `json:"description,omitempty"`
 	Labels         map[string]string          `json:"labels,omitempty"`
@@ -55,7 +55,7 @@ func (d Definition) Validate() error {
 		!bytes.Equal(canonical.Body, d.Body) {
 		return fmt.Errorf(
 			"%w: Definition digest or Body is not canonical",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	return nil
@@ -71,10 +71,10 @@ func validateDefinitionFields(d Definition) error {
 	if err := d.SchemaID.Validate(); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"definition schema version",
 		d.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
@@ -84,28 +84,28 @@ func validateDefinitionFields(d Definition) error {
 	if err := d.LogicalVersion.Validate(true); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"definition display name",
 		d.DisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"definition description",
 		d.Description,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if err := spec.ValidateLabels("definition", d.Labels); err != nil {
+	if err := storeSpec.ValidateLabels("definition", d.Labels); err != nil {
 		return err
 	}
-	if len(d.Dependencies) > spec.MaxDefinitionDependencies {
+	if len(d.Dependencies) > storeSpec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: definition dependencies exceed %d entries",
-			spec.ErrInvalid,
-			spec.MaxDefinitionDependencies,
+			storeSpec.ErrInvalid,
+			storeSpec.MaxDefinitionDependencies,
 		)
 	}
 	for index, selector := range d.Dependencies {

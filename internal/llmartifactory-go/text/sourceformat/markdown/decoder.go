@@ -5,7 +5,7 @@ import (
 	"path"
 
 	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
@@ -14,7 +14,7 @@ import (
 
 const markdownMediaType = "text/markdown"
 
-const TextMarkdownDecoderID spec.DecoderID = "text-markdown"
+const TextMarkdownDecoderID storeSpec.DecoderID = "text-markdown"
 
 type TextDecoder struct {
 	candidates   support.Candidates
@@ -31,7 +31,7 @@ func NewTextDecoder(
 	}
 }
 
-func (t *TextDecoder) ID() spec.DecoderID {
+func (t *TextDecoder) ID() storeSpec.DecoderID {
 	return TextMarkdownDecoderID
 }
 
@@ -89,7 +89,7 @@ func (t *TextDecoder) Decode(
 }
 
 func textDiagnostics(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 	err error,
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
@@ -104,7 +104,7 @@ func textDiagnostics(
 // containing a source-format declaration. It keeps source material out of
 // Definition.Body while preserving declaration-relative locator semantics.
 func sourceEntryDeclarationLocator(
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) *declaration.Locator {
 	value := declaration.ScalarLocator(
 		"./" + path.Base(string(locator)),

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -40,7 +40,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if form != declaration.MemberNamed {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship inspection requires a named member",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -48,7 +48,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if header.Locator != nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship inspection does not accept a locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -70,7 +70,7 @@ func (r *Resolver) InspectNamedRelationship(
 		&state,
 		request.RootID,
 		header.Type,
-		spec.LogicalName(header.Name),
+		storeSpec.LogicalName(header.Name),
 		expectedVersion,
 		relationship.Scope,
 		nil,
@@ -88,7 +88,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if value == nil || value.Target == nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship resolved without a target",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -116,7 +116,7 @@ func (r *Resolver) ResolveNamedRelationship(
 		}
 		return CapabilityTarget{}, fmt.Errorf(
 			"%w: %s",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			message,
 		)
 	}

@@ -4,7 +4,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 )
@@ -16,7 +16,7 @@ const (
 	ManagedSkillPackageKind       managedpackageModel.PackageKind = "skill"
 	BuiltinSkillPluginPackageKind managedpackageModel.PackageKind = "skill-plugin"
 	SkillSchemaID                 schemaModel.SchemaID            = skillv1.SkillSchemaID
-	MarkdownDecoderID             spec.DecoderID                  = "agent.skill-markdown"
+	MarkdownDecoderID             storeSpec.DecoderID             = "agent.skill-markdown"
 
 	SkillSchemaVersion     = skillv1.SkillSchemaVersion
 	InsertLabelKey         = "skill.insert"
@@ -26,19 +26,19 @@ const (
 
 func SkillDefinitionFileName(
 	documents support.Documents,
-) spec.Locator {
+) storeSpec.Locator {
 	return documents.Default.Locator
 }
 
 func SkillDefinitionFiles(
 	documents support.Documents,
-) []spec.Locator {
-	return append([]spec.Locator(nil), documents.Files...)
+) []storeSpec.Locator {
+	return append([]storeSpec.Locator(nil), documents.Files...)
 }
 
 func IsSkillDefinitionFile(
 	documents support.Documents,
-	locator spec.Locator,
+	locator storeSpec.Locator,
 ) bool {
 	return documents.Matches(locator)
 }

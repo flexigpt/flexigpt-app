@@ -1,4 +1,4 @@
-package inferencewrapper
+package inference
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -83,7 +83,7 @@ func (ps *ProviderSetAPI) removeRuntimeProvider(
 // concurrent requests cannot replace each other's credentials or settings.
 func (ps *ProviderSetAPI) registerRuntimeProvider(
 	ctx context.Context,
-	runtimeModel inferencewrapperSpec.RuntimeConfiguration,
+	runtimeModel inferenceRuntimeSpec.RuntimeConfiguration,
 	completionKey string,
 ) (inferenceSpec.ProviderName, func(), error) {
 	digest := strings.TrimPrefix(
@@ -121,7 +121,7 @@ func (ps *ProviderSetAPI) registerRuntimeProvider(
 func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	runtimeModel inferencewrapperSpec.RuntimeConfiguration,
+	runtimeModel inferenceRuntimeSpec.RuntimeConfiguration,
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
 	if len(runtimeModel.CapabilityOverrides) == 0 {

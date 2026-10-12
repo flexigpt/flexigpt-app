@@ -11,7 +11,7 @@ import (
 	"fmt"
 
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ValueStore persists actual secret values by opaque Artifact Store refs.
@@ -46,12 +46,12 @@ func ValidateValueStore(value ValueStore) error {
 	if value == nil {
 		return fmt.Errorf(
 			"%w: secret value store is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
-	return spec.ValidateIdentifier(
+	return storeSpec.ValidateIdentifier(
 		"secret value store name",
 		value.Name(),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	)
 }

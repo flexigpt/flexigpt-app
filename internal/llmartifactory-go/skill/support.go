@@ -5,7 +5,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -31,7 +31,7 @@ func (s Support) Validate() error {
 	if s.Documents.Default != s.Package.Document {
 		return fmt.Errorf(
 			"%w: Skill package document differs from Skill document support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := s.Discovery.Validate(); err != nil {
@@ -43,13 +43,13 @@ func (s Support) Validate() error {
 	if s.PluginProfile.BuiltinRoot != s.BuiltinRoot {
 		return fmt.Errorf(
 			"%w: Skill Plugin profile built-in Root differs from Skill support",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if s.PluginProfile.Source == nil {
 		return fmt.Errorf(
 			"%w: Skill Plugin profile requires a managed Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return nil

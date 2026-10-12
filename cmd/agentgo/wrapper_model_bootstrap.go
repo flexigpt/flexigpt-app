@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelcredentials"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
@@ -49,7 +49,7 @@ func initModelWrappers(
 	if storeWrapper == nil || aggregateWrapper == nil || roots == nil {
 		return nil, nil, fmt.Errorf(
 			"%w: Model wrapper dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -125,7 +125,7 @@ func initModelWrappers(
 	aggregateWrapper.runtime = runtimeAdapter
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
-	aggregateWrapper.fallbackProvider = spec.LogicalName(
+	aggregateWrapper.fallbackProvider = storeSpec.LogicalName(
 		modelruntime.ProviderNameOpenAIResponses,
 	)
 
@@ -142,7 +142,7 @@ func initModelProviderRuntime(
 ) error {
 	if store == nil || store.api == nil ||
 		runtimeAdapter == nil || publisher == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 
 	roots, err := store.managementRootIDs(ctx, "")

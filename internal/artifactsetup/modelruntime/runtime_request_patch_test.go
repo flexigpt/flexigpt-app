@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
@@ -14,13 +14,13 @@ func TestRuntimeRequestPatchPrepareAppliesTypedDefaultsAndClear(t *testing.T) {
 
 	stream := false
 	systemPrompt := "Use concise answers."
-	patch := inferencewrapperSpec.RuntimeRequestPatch{
+	patch := inferenceRuntimeSpec.RuntimeRequestPatch{
 		Defaults: &modelDomain.DefaultsPatch{
 			Stream:       &stream,
 			SystemPrompt: &systemPrompt,
 		},
-		Clear: []inferencewrapperSpec.RuntimeDefaultField{
-			inferencewrapperSpec.RuntimeDefaultFieldTemperature,
+		Clear: []inferenceRuntimeSpec.RuntimeDefaultField{
+			inferenceRuntimeSpec.RuntimeDefaultFieldTemperature,
 		},
 	}
 	prepared, err := prepareRuntimeRequestPatch(&patch)
@@ -59,7 +59,7 @@ func TestRuntimeRequestPatchPrepareAppliesTypedDefaultsAndClear(t *testing.T) {
 func TestNilRuntimeRequestPatchPrepareIsNoop(t *testing.T) {
 	t.Parallel()
 
-	var patch *inferencewrapperSpec.RuntimeRequestPatch
+	var patch *inferenceRuntimeSpec.RuntimeRequestPatch
 	prepared, err := prepareRuntimeRequestPatch(patch)
 	if err != nil {
 		t.Fatalf("prepare nil runtime request patch: %v", err)
@@ -80,14 +80,14 @@ func TestNilRuntimeRequestPatchPrepareIsNoop(t *testing.T) {
 func TestRuntimeRequestPatchPrepareRejectsDuplicateClear(t *testing.T) {
 	t.Parallel()
 
-	patch := inferencewrapperSpec.RuntimeRequestPatch{
-		Clear: []inferencewrapperSpec.RuntimeDefaultField{
-			inferencewrapperSpec.RuntimeDefaultFieldReasoning,
-			inferencewrapperSpec.RuntimeDefaultFieldReasoning,
+	patch := inferenceRuntimeSpec.RuntimeRequestPatch{
+		Clear: []inferenceRuntimeSpec.RuntimeDefaultField{
+			inferenceRuntimeSpec.RuntimeDefaultFieldReasoning,
+			inferenceRuntimeSpec.RuntimeDefaultFieldReasoning,
 		},
 	}
 	_, err := prepareRuntimeRequestPatch(&patch)
-	if !errors.Is(err, spec.ErrInvalid) {
+	if !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("prepare duplicate clear fields: got %v, want ErrInvalid", err)
 	}
 }
@@ -95,11 +95,11 @@ func TestRuntimeRequestPatchPrepareRejectsDuplicateClear(t *testing.T) {
 func TestRuntimeRequestPatchPrepareRejectsUnknownClear(t *testing.T) {
 	t.Parallel()
 
-	patch := inferencewrapperSpec.RuntimeRequestPatch{
-		Clear: []inferencewrapperSpec.RuntimeDefaultField{"unknown"},
+	patch := inferenceRuntimeSpec.RuntimeRequestPatch{
+		Clear: []inferenceRuntimeSpec.RuntimeDefaultField{"unknown"},
 	}
 	_, err := prepareRuntimeRequestPatch(&patch)
-	if !errors.Is(err, spec.ErrInvalid) {
+	if !errors.Is(err, storeSpec.ErrInvalid) {
 		t.Fatalf("prepare unknown clear field: got %v, want ErrInvalid", err)
 	}
 }
@@ -108,12 +108,12 @@ func TestRuntimeRequestPatchClearWinsOverDefaults(t *testing.T) {
 	t.Parallel()
 
 	temperature := 0.4
-	patch := inferencewrapperSpec.RuntimeRequestPatch{
+	patch := inferenceRuntimeSpec.RuntimeRequestPatch{
 		Defaults: &modelDomain.DefaultsPatch{
 			Temperature: &temperature,
 		},
-		Clear: []inferencewrapperSpec.RuntimeDefaultField{
-			inferencewrapperSpec.RuntimeDefaultFieldTemperature,
+		Clear: []inferenceRuntimeSpec.RuntimeDefaultField{
+			inferenceRuntimeSpec.RuntimeDefaultFieldTemperature,
 		},
 	}
 	prepared, err := prepareRuntimeRequestPatch(&patch)

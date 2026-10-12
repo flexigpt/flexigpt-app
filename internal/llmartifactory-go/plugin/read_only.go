@@ -5,18 +5,18 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (p Profile) validateAuthoringConfiguration() error {
 	if p.ReadOnly {
 		if p.Source != nil {
-			return fmt.Errorf("%w: read-only Plugin profile cannot define a managed Source", spec.ErrInvalid)
+			return fmt.Errorf("%w: read-only Plugin profile cannot define a managed Source", storeSpec.ErrInvalid)
 		}
 		if p.ReadOnlySource == nil {
 			return fmt.Errorf(
 				"%w: read-only Plugin profile requires a Source profile",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return p.ReadOnlySource.Validate()
@@ -24,11 +24,11 @@ func (p Profile) validateAuthoringConfiguration() error {
 	if p.ReadOnlySource != nil {
 		return fmt.Errorf(
 			"%w: writable Plugin profile cannot define a read-only Source",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if p.Source == nil {
-		return fmt.Errorf("%w: managed Plugin profile requires a Source profile", spec.ErrInvalid)
+		return fmt.Errorf("%w: managed Plugin profile requires a Source profile", storeSpec.ErrInvalid)
 	}
 	if err := p.Source.Validate(); err != nil {
 		return err
@@ -36,17 +36,17 @@ func (p Profile) validateAuthoringConfiguration() error {
 	if err := p.BaselineName.Validate(); err != nil {
 		return err
 	}
-	if err := spec.ValidateOptionalText(
+	if err := storeSpec.ValidateOptionalText(
 		"Plugin baseline display name",
 		p.BaselineDisplayName,
-		spec.MaxDisplayNameBytes,
+		storeSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	return spec.ValidateRequiredText(
+	return storeSpec.ValidateRequiredText(
 		"Plugin baseline description",
 		p.BaselineDescription,
-		spec.MaxDescriptionBytes,
+		storeSpec.MaxDescriptionBytes,
 	)
 }
 
@@ -54,7 +54,7 @@ func (a *API) requireDeclarationAuthoring() error {
 	if a.domain != nil && a.domain.ReadOnly {
 		return fmt.Errorf(
 			"%w: %s Plugin declarations are read-only",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			a.domain.Name,
 		)
 	}

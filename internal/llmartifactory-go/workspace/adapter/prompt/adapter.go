@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -25,7 +25,7 @@ type Contribution struct {
 	Name             string                     `json:"-"`
 	Insert           declaration.InsertTarget   `json:"-"`
 	MediaType        string                     `json:"-"`
-	Locator          spec.Locator               `json:"-"`
+	Locator          storeSpec.Locator          `json:"-"`
 	Content          string                     `json:"-"`
 	OriginalBytes    int                        `json:"-"`
 	IncludedBytes    int                        `json:"-"`
@@ -292,7 +292,7 @@ func (a *Adapter) resolveContribution(
 	default:
 		return Contribution{}, fmt.Errorf(
 			"%w: Artifact kind %q cannot contribute to Workspace prompt",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			record.Kind,
 		)
 	}

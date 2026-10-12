@@ -11,7 +11,7 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
@@ -169,11 +169,11 @@ func managedSkillFiles(
 ) []managedpackageModel.ManagedPackageFile {
 	return []managedpackageModel.ManagedPackageFile{
 		{
-			Locator: spec.Locator("SKILL.md"),
+			Locator: storeSpec.Locator("SKILL.md"),
 			Content: append([]byte(nil), document...),
 		},
 		{
-			Locator: spec.Locator("references/checklist.md"),
+			Locator: storeSpec.Locator("references/checklist.md"),
 			Content: []byte(checklist),
 		},
 	}
@@ -223,7 +223,7 @@ func findPluginByName(
 	return pluginAPI.ListItem{}, false
 }
 
-func skillBaselineName(t *testing.T) spec.LogicalName {
+func skillBaselineName(t *testing.T) storeSpec.LogicalName {
 	t.Helper()
 
 	support, err := llmsupport.Skill()

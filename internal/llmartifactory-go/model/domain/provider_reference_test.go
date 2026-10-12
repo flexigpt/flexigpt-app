@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
@@ -26,7 +26,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 		{
 			name: "unscoped searches current then builtin",
 			reference: declaration.ArtifactNameReference{
-				Name: spec.LogicalName("provider"),
+				Name: storeSpec.LogicalName("provider"),
 			},
 			current: userRoot,
 			builtin: builtinRoot,
@@ -35,7 +35,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 		{
 			name: "builtin scope searches only builtin",
 			reference: declaration.ArtifactNameReference{
-				Name:  spec.LogicalName("provider"),
+				Name:  storeSpec.LogicalName("provider"),
 				Scope: declaration.LookupScopeBuiltin,
 			},
 			current: userRoot,
@@ -45,7 +45,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 		{
 			name: "current builtin root is not repeated",
 			reference: declaration.ArtifactNameReference{
-				Name: spec.LogicalName("provider"),
+				Name: storeSpec.LogicalName("provider"),
 			},
 			current: builtinRoot,
 			builtin: builtinRoot,
@@ -54,7 +54,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 		{
 			name: "builtin scope requires configured builtin root",
 			reference: declaration.ArtifactNameReference{
-				Name:  spec.LogicalName("provider"),
+				Name:  storeSpec.LogicalName("provider"),
 				Scope: declaration.LookupScopeBuiltin,
 			},
 			current: userRoot,

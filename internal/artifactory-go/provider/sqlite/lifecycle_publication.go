@@ -10,7 +10,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // PublishLifecycle applies Refresh's already-decided lifecycle command. It
@@ -33,7 +33,7 @@ func (p *Publisher) PublishLifecycle(ctx context.Context, publication refreshFlo
 		return err
 	}
 	if current.Revision != publication.Transition.ExpectedSourceRevision {
-		return spec.ErrConflict
+		return storeSpec.ErrConflict
 	}
 	if err := validateLifecycleApplicability(current, publication.Transition); err != nil {
 		return err
@@ -48,7 +48,7 @@ func (p *Publisher) PublishLifecycle(ctx context.Context, publication refreshFlo
 		return err
 	}
 	if refreshRevision != publication.ExpectedRefreshRevision {
-		return fmt.Errorf("%w: Source refresh state changed during lifecycle publication", spec.ErrConflict)
+		return fmt.Errorf("%w: Source refresh state changed during lifecycle publication", storeSpec.ErrConflict)
 	}
 	if err := applyLifecycleSourceTransitionTx(ctx, tx, publication.Transition); err != nil {
 		return err
@@ -86,7 +86,7 @@ func (p *Publisher) PublishLifecycle(ctx context.Context, publication refreshFlo
 			return err
 		}
 		if exists != 0 {
-			return fmt.Errorf("%w: Source refresh state appeared during lifecycle publication", spec.ErrConflict)
+			return fmt.Errorf("%w: Source refresh state appeared during lifecycle publication", storeSpec.ErrConflict)
 		}
 	}
 	return tx.Commit()
@@ -112,12 +112,12 @@ func validateLifecycleApplicability(current sourceModel.Source, transition sourc
 		current.RootStorageKey != transition.Source.RootStorageKey ||
 		current.StorageKey != transition.Source.StorageKey ||
 		current.Kind != transition.Source.Kind {
-		return fmt.Errorf("%w: Source lifecycle transition changed Source identity", spec.ErrInvalid)
+		return fmt.Errorf("%w: Source lifecycle transition changed Source identity", storeSpec.ErrInvalid)
 	}
 	switch transition.Invalidation {
 	case source.LifecycleInvalidationDisabled:
 		if !current.Enabled || transition.Source.Enabled || transition.Source.RetiredAt != nil {
-			return fmt.Errorf("%w: Source disable lifecycle transition is no longer applicable", spec.ErrConflict)
+			return fmt.Errorf("%w: Source disable lifecycle transition is no longer applicable", storeSpec.ErrConflict)
 		}
 	case source.LifecycleInvalidationDiscoveryRemoved:
 		if !current.Enabled || current.Discovery.Empty() || !transition.Source.Enabled ||
@@ -125,15 +125,15 @@ func validateLifecycleApplicability(current sourceModel.Source, transition sourc
 			transition.Source.RetiredAt != nil {
 			return fmt.Errorf(
 				"%w: Source discovery-removal lifecycle transition is no longer applicable",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 			)
 		}
 	case source.LifecycleInvalidationRetired:
 		if transition.Source.Enabled || transition.Source.RetiredAt == nil {
-			return fmt.Errorf("%w: Source retirement lifecycle transition is invalid", spec.ErrInvalid)
+			return fmt.Errorf("%w: Source retirement lifecycle transition is invalid", storeSpec.ErrInvalid)
 		}
 	default:
-		return fmt.Errorf("%w: unsupported Source lifecycle transition", spec.ErrInvalid)
+		return fmt.Errorf("%w: unsupported Source lifecycle transition", storeSpec.ErrInvalid)
 	}
 	return nil
 }

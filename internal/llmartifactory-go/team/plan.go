@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	teamv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/team/contract/v1"
@@ -17,7 +17,7 @@ type Service struct {
 
 type Plan struct {
 	Team         artifactModel.ArtifactRef  `json:"team"`
-	Name         spec.LogicalName           `json:"name"`
+	Name         storeSpec.LogicalName      `json:"name"`
 	Members      []Member                   `json:"members"`
 	Program      *Program                   `json:"program,omitempty"`
 	Capabilities composition.CapabilityPlan `json:"capabilities"`
@@ -26,7 +26,7 @@ type Plan struct {
 
 type Member struct {
 	Type     declaration.Type             `json:"type"`
-	Name     spec.LogicalName             `json:"name,omitempty"`
+	Name     storeSpec.LogicalName        `json:"name,omitempty"`
 	Form     declaration.MemberForm       `json:"form"`
 	Required bool                         `json:"required"`
 	Status   composition.ResolutionStatus `json:"status"`
@@ -49,7 +49,7 @@ type SelectorMatch struct {
 
 type Program struct {
 	Type   declaration.Type              `json:"type"`
-	Name   spec.LogicalName              `json:"name"`
+	Name   storeSpec.LogicalName         `json:"name"`
 	Status composition.ResolutionStatus  `json:"status"`
 	Target *composition.CapabilityTarget `json:"target,omitempty"`
 
@@ -61,7 +61,7 @@ func NewService(resolver *composition.Resolver) (*Service, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Team plan resolver is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Service{resolver: resolver}, nil
@@ -83,7 +83,7 @@ func (s *Service) ResolvePlan(
 		resolved.Definition == nil {
 		return Plan{}, fmt.Errorf(
 			"%w: Artifact did not resolve as a Team",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -91,7 +91,7 @@ func (s *Service) ResolvePlan(
 	if !found {
 		return Plan{}, fmt.Errorf(
 			"%w: Team plan root has no Artifact",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	document, err := teamv1.DecodeAdmittedTeamJSON(resolved.Definition.Body)
@@ -114,7 +114,7 @@ func (s *Service) ResolvePlan(
 
 	output := Plan{
 		Team:         teamRef,
-		Name:         spec.LogicalName(document.Name),
+		Name:         storeSpec.LogicalName(document.Name),
 		Members:      make([]Member, 0, len(ordered)),
 		Capabilities: capabilities,
 		Complete:     capabilities.Complete,
@@ -124,7 +124,7 @@ func (s *Service) ResolvePlan(
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: Team member has no resolved relationship",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		member, err := projectMember(relationship)
@@ -145,7 +145,7 @@ func (s *Service) ResolvePlan(
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: Team program member has no resolved relationship",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		value, err := projectProgram(relationship)
@@ -166,7 +166,7 @@ func teamRelationshipsByIdentity(
 		if _, duplicate := output[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Team relationship identity is duplicated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 			)
 		}
 		output[key] = value
@@ -192,7 +192,7 @@ func projectMember(
 	header := relationship.Declared.Header()
 	output := Member{
 		Type:     header.Type,
-		Name:     spec.LogicalName(header.Name),
+		Name:     storeSpec.LogicalName(header.Name),
 		Form:     form,
 		Required: relationship.Required,
 		Status:   relationship.Status,
@@ -238,7 +238,7 @@ func projectProgram(
 	header := relationship.Declared.Header()
 	output := Program{
 		Type:   header.Type,
-		Name:   spec.LogicalName(header.Name),
+		Name:   storeSpec.LogicalName(header.Name),
 		Status: relationship.Status,
 	}
 	if relationship.Issue != nil {

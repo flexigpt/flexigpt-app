@@ -10,7 +10,7 @@ import (
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -23,13 +23,13 @@ import (
 )
 
 type PreparedPackage struct {
-	EmbeddedPackageRoot    spec.Locator
+	EmbeddedPackageRoot    storeSpec.Locator
 	Address                managedpackageModel.ManagedPackageAddress
-	DocumentFile           spec.Locator
+	DocumentFile           storeSpec.Locator
 	PackageFiles           []managedpackageModel.ManagedPackageFile
 	ExpectedKind           artifactModel.ArtifactKind
-	ExpectedLogicalName    spec.LogicalName
-	ExpectedLogicalVersion spec.LogicalVersion
+	ExpectedLogicalName    storeSpec.LogicalName
+	ExpectedLogicalVersion storeSpec.LogicalVersion
 	ExpectedDefinition     cryptoutil.Digest
 }
 
@@ -50,7 +50,7 @@ func PreparePackages(
 	if registry == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool package interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := s.Validate(); err != nil {
@@ -59,7 +59,7 @@ func PreparePackages(
 	if packages == nil || goTools == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool package preparation dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -68,7 +68,7 @@ func PreparePackages(
 		return nil, err
 	}
 
-	seenTools := map[spec.LogicalName]spec.Locator{}
+	seenTools := map[storeSpec.LogicalName]storeSpec.Locator{}
 	output := make([]PreparedPackage, 0)
 
 	for _, root := range roots {
@@ -93,9 +93,9 @@ func PreparePackages(
 func preparePluginDirectory(
 	ctx context.Context,
 	packages fs.FS,
-	pluginRoot spec.Locator,
+	pluginRoot storeSpec.Locator,
 	goTools toolDomain.GoToolLocator,
-	seenTools map[spec.LogicalName]spec.Locator,
+	seenTools map[storeSpec.LogicalName]storeSpec.Locator,
 	registry *coreinterpretation.Registry,
 	s toolAPI.Support,
 ) ([]PreparedPackage, error) {
@@ -110,7 +110,7 @@ func preparePluginDirectory(
 
 	pluginRaw, err := yamlutil.CanonicalObjectJSON(
 		pluginBytes,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func preparePluginDirectory(
 		if previous, duplicate := seenTools[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool %q belongs to both Plugin directories %q and %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				name,
 				previous,
 				pluginRoot,
@@ -201,32 +201,32 @@ func preparePluginDirectory(
 
 func readPluginDocument(
 	packages fs.FS,
-	pluginRoot spec.Locator,
+	pluginRoot storeSpec.Locator,
 	documents support.Documents,
-) (spec.Locator, []byte, error) {
+) (storeSpec.Locator, []byte, error) {
 	entries, err := fs.ReadDir(packages, string(pluginRoot))
 	if err != nil {
 		return "", nil, err
 	}
 
-	var documentFile spec.Locator
+	var documentFile storeSpec.Locator
 	for _, entry := range entries {
-		if entry.IsDir() || !documents.Matches(spec.Locator(entry.Name())) {
+		if entry.IsDir() || !documents.Matches(storeSpec.Locator(entry.Name())) {
 			continue
 		}
 		if documentFile != "" {
 			return "", nil, fmt.Errorf(
 				"%w: Tool Plugin directory %q contains multiple configured Plugin documents",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				pluginRoot,
 			)
 		}
-		documentFile = spec.Locator(entry.Name())
+		documentFile = storeSpec.Locator(entry.Name())
 	}
 	if documentFile == "" {
 		return "", nil, fmt.Errorf(
 			"%w: Tool Plugin directory %q lacks a configured Plugin document",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			pluginRoot,
 		)
 	}
@@ -250,12 +250,12 @@ func readPluginDocument(
 // GoToolLocator and are intentionally not read from static files.
 func readStaticSDKTools(
 	packages fs.FS,
-	pluginRoot spec.Locator,
-	declared []spec.LogicalName,
-	pluginDocumentFile spec.Locator,
+	pluginRoot storeSpec.Locator,
+	declared []storeSpec.LogicalName,
+	pluginDocumentFile storeSpec.Locator,
 	documents support.Documents,
-) (map[spec.LogicalName]toolv1.ToolDocument, error) {
-	allowed := make(map[spec.LogicalName]struct{}, len(declared))
+) (map[storeSpec.LogicalName]toolv1.ToolDocument, error) {
+	allowed := make(map[storeSpec.LogicalName]struct{}, len(declared))
 	for _, name := range declared {
 		allowed[name] = struct{}{}
 	}
@@ -265,7 +265,7 @@ func readStaticSDKTools(
 		return nil, err
 	}
 
-	output := make(map[spec.LogicalName]toolv1.ToolDocument)
+	output := make(map[storeSpec.LogicalName]toolv1.ToolDocument)
 	for _, entry := range entries {
 		if entry.Name() == string(pluginDocumentFile) {
 			continue
@@ -273,7 +273,7 @@ func readStaticSDKTools(
 		if !entry.IsDir() {
 			return nil, fmt.Errorf(
 				"%w: Tool Plugin directory %q contains unexpected file %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				pluginRoot,
 				entry.Name(),
 			)
@@ -286,10 +286,10 @@ func readStaticSDKTools(
 		}
 		if len(files) != 1 ||
 			files[0].IsDir() ||
-			!documents.Matches(spec.Locator(files[0].Name())) {
+			!documents.Matches(storeSpec.Locator(files[0].Name())) {
 			return nil, fmt.Errorf(
 				"%w: embedded SDK Tool directory %q must contain only one configured Tool document",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				directory,
 			)
 		}
@@ -306,7 +306,7 @@ func readStaticSDKTools(
 		}
 		raw, err := yamlutil.CanonicalObjectJSON(
 			rawDocument,
-			spec.MaxDefinitionBytes,
+			storeSpec.MaxDefinitionBytes,
 		)
 		if err != nil {
 			return nil, err
@@ -322,16 +322,16 @@ func readStaticSDKTools(
 		if document.Implementation.Kind != toolv1.ImplementationKindSDK {
 			return nil, fmt.Errorf(
 				"%w: embedded Tool %q must use sdk implementation",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				document.Name,
 			)
 		}
 
-		name := spec.LogicalName(document.Name)
+		name := storeSpec.LogicalName(document.Name)
 		if _, found := allowed[name]; !found {
 			return nil, fmt.Errorf(
 				"%w: embedded SDK Tool %q is not declared by Plugin %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				name,
 				pluginRoot,
 			)
@@ -339,7 +339,7 @@ func readStaticSDKTools(
 		if _, duplicate := output[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Plugin %q repeats embedded SDK Tool %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				pluginRoot,
 				name,
 			)
@@ -374,7 +374,7 @@ func toolDocumentFromGoDescriptor(
 }
 
 func preparePluginPackage(
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 	document pluginv1.PluginDocument,
 	registry *coreinterpretation.Registry,
 	layout support.PackageLayout,
@@ -392,7 +392,7 @@ func preparePluginPackage(
 		return PreparedPackage{}, err
 	}
 	address, err := layout.Address(
-		spec.LogicalName(document.Name),
+		storeSpec.LogicalName(document.Name),
 		"",
 	)
 	if err != nil {
@@ -410,14 +410,14 @@ func preparePluginPackage(
 		ExpectedKind: artifactModel.ArtifactKind(
 			pluginv1.PluginType,
 		),
-		ExpectedLogicalName:    spec.LogicalName(document.Name),
+		ExpectedLogicalName:    storeSpec.LogicalName(document.Name),
 		ExpectedLogicalVersion: definitionValue.LogicalVersion,
 		ExpectedDefinition:     definitionValue.Digest,
 	}, nil
 }
 
 func prepareToolPackage(
-	pluginRoot spec.Locator,
+	pluginRoot storeSpec.Locator,
 	document toolv1.ToolDocument,
 	registry *coreinterpretation.Registry,
 	layout support.PackageLayout,
@@ -438,7 +438,7 @@ func prepareToolPackage(
 		return PreparedPackage{}, err
 	}
 	address, err := layout.Address(
-		spec.LogicalName(document.Name),
+		storeSpec.LogicalName(document.Name),
 		document.Version,
 	)
 	if err != nil {
@@ -454,7 +454,7 @@ func prepareToolPackage(
 			Content: raw,
 		}},
 		ExpectedKind:           toolDomain.ToolArtifactKind,
-		ExpectedLogicalName:    spec.LogicalName(document.Name),
+		ExpectedLogicalName:    storeSpec.LogicalName(document.Name),
 		ExpectedLogicalVersion: definitionValue.LogicalVersion,
 		ExpectedDefinition:     definitionValue.Digest,
 	}, nil
@@ -473,7 +473,7 @@ func normalizePreparedPackages(
 		if _, duplicate := seen[value.Address]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Tool package %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				value.Address,
 			)
 		}
@@ -529,8 +529,8 @@ func (p PreparedPackage) Fingerprint() (
 		p.DocumentFile,
 		struct {
 			Kind       artifactModel.ArtifactKind `json:"kind"`
-			Name       spec.LogicalName           `json:"name"`
-			Version    spec.LogicalVersion        `json:"version"`
+			Name       storeSpec.LogicalName      `json:"name"`
+			Version    storeSpec.LogicalVersion   `json:"version"`
 			Definition cryptoutil.Digest          `json:"definition"`
 		}{
 			Kind:       p.ExpectedKind,

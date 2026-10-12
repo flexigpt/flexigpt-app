@@ -16,16 +16,16 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Expectation struct {
-	Locator          spec.Locator
-	Subresource      spec.SubresourceLocator
+	Locator          storeSpec.Locator
+	Subresource      storeSpec.SubresourceLocator
 	Kind             artifactModel.ArtifactKind
-	LogicalName      spec.LogicalName
-	LogicalVersion   spec.LogicalVersion
+	LogicalName      storeSpec.LogicalName
+	LogicalVersion   storeSpec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
 }
 
@@ -34,9 +34,9 @@ type Expectation struct {
 // All text normalization and declaration adaptation must already be complete.
 // Compilation never rewrites package content after expectations are fixed.
 type PackageInput struct {
-	EmbeddedRoot spec.Locator
+	EmbeddedRoot storeSpec.Locator
 	Address      managedpackageModel.ManagedPackageAddress
-	DocumentFile spec.Locator
+	DocumentFile storeSpec.Locator
 	Files        []managedpackageModel.ManagedPackageFile
 	Expectations []Expectation
 }
@@ -93,7 +93,7 @@ func CompilePackageSet(
 	if topology == nil || publisher == nil || catalog == nil || artifacts == nil {
 		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: package compilation dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -163,13 +163,13 @@ func prepareCompilation(
 	fail := func(err error) ([]PackageInput, cryptoutil.Digest, installModel.Hydration, error) {
 		return nil, "", installModel.Hydration{}, err
 	}
-	if err := spec.ValidateRequiredText("compiled set name", config.SetName, spec.MaxKindBytes); err != nil {
+	if err := storeSpec.ValidateRequiredText("compiled set name", config.SetName, storeSpec.MaxKindBytes); err != nil {
 		return fail(err)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"compiled set schema version",
 		config.SchemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return fail(err)
 	}
@@ -190,10 +190,10 @@ func prepareCompilation(
 		}
 	}
 	if !sourceFound {
-		return fail(fmt.Errorf("%w: compilation requires a declared enabled discovery Source", spec.ErrInvalid))
+		return fail(fmt.Errorf("%w: compilation requires a declared enabled discovery Source", storeSpec.ErrInvalid))
 	}
-	if len(config.Packages) == 0 || len(config.Packages) > spec.MaxDiscoveryCandidates {
-		return fail(fmt.Errorf("%w: compiled set package count is invalid", spec.ErrInvalid))
+	if len(config.Packages) == 0 || len(config.Packages) > storeSpec.MaxDiscoveryCandidates {
+		return fail(fmt.Errorf("%w: compiled set package count is invalid", storeSpec.ErrInvalid))
 	}
 
 	codecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
@@ -210,7 +210,7 @@ func prepareCompilation(
 	}
 
 	inputs := make([]PackageInput, len(config.Packages))
-	scopes := make(map[spec.Locator]struct{}, len(inputs))
+	scopes := make(map[storeSpec.Locator]struct{}, len(inputs))
 	for index, input := range config.Packages {
 		if err := input.EmbeddedRoot.ValidatePortable(false); err != nil {
 			return fail(err)
@@ -220,7 +220,7 @@ func prepareCompilation(
 			return fail(err)
 		}
 		if _, duplicate := scopes[scope]; duplicate {
-			return fail(fmt.Errorf("%w: duplicate compilation package %q", spec.ErrIdentityConflict, scope))
+			return fail(fmt.Errorf("%w: duplicate compilation package %q", storeSpec.ErrIdentityConflict, scope))
 		}
 		scopes[scope] = struct{}{}
 
@@ -229,12 +229,12 @@ func prepareCompilation(
 			return fail(err)
 		}
 		input.Expectations = append([]Expectation(nil), input.Expectations...)
-		files := make(map[spec.Locator]struct{}, len(input.Files))
+		files := make(map[storeSpec.Locator]struct{}, len(input.Files))
 		for _, file := range input.Files {
 			files[file.Locator] = struct{}{}
 		}
 		if _, found := files[input.DocumentFile]; !found {
-			return fail(fmt.Errorf("%w: package primary document is absent", spec.ErrInvalid))
+			return fail(fmt.Errorf("%w: package primary document is absent", storeSpec.ErrInvalid))
 		}
 		expected := make(map[compilationOrigin]struct{}, len(input.Expectations))
 		for _, value := range input.Expectations {
@@ -257,11 +257,11 @@ func prepareCompilation(
 				return fail(err)
 			}
 			if _, found := files[value.Locator]; !found {
-				return fail(fmt.Errorf("%w: expected declaration file is absent", spec.ErrInvalid))
+				return fail(fmt.Errorf("%w: expected declaration file is absent", storeSpec.ErrInvalid))
 			}
 			key := compilationOrigin{value.Locator, value.Subresource, value.Kind}
 			if _, duplicate := expected[key]; duplicate {
-				return fail(fmt.Errorf("%w: duplicate compilation expectation", spec.ErrIdentityConflict))
+				return fail(fmt.Errorf("%w: duplicate compilation expectation", storeSpec.ErrIdentityConflict))
 			}
 			expected[key] = struct{}{}
 		}
@@ -304,14 +304,14 @@ func (p PackageInput) rootExpectation() (Expectation, error) {
 	}
 	return Expectation{}, fmt.Errorf(
 		"%w: package %q has no primary Artifact expectation",
-		spec.ErrInvalid,
+		storeSpec.ErrInvalid,
 		p.EmbeddedRoot,
 	)
 }
 
 type compilationOrigin struct {
-	locator     spec.Locator
-	subresource spec.SubresourceLocator
+	locator     storeSpec.Locator
+	subresource storeSpec.SubresourceLocator
 	kind        artifactModel.ArtifactKind
 }
 
@@ -332,7 +332,7 @@ func compilePackage(
 		Files:        make([]installModel.CompiledFile, 0, len(input.Files)),
 		Documents:    make([]installModel.CompiledDocument, 0),
 	}
-	fileDigests := make(map[spec.Locator]cryptoutil.Digest, len(input.Files))
+	fileDigests := make(map[storeSpec.Locator]cryptoutil.Digest, len(input.Files))
 	for _, file := range input.Files {
 		digest := cryptoutil.DigestBytes(file.Content)
 		fileDigests[file.Locator] = digest
@@ -349,19 +349,19 @@ func compilePackage(
 		expected[compilationOrigin{value.Locator, value.Subresource, value.Kind}] = value
 	}
 
-	documents := make(map[spec.Locator]*installModel.CompiledDocument)
+	documents := make(map[storeSpec.Locator]*installModel.CompiledDocument)
 	for _, entry := range entries {
 		relative, inside := strings.CutPrefix(string(entry.Binding.Locator), string(scope)+"/")
 		if !inside || relative == "" {
 			continue
 		}
-		locator := spec.Locator(relative)
+		locator := storeSpec.Locator(relative)
 		key := compilationOrigin{locator, entry.Binding.SubresourceLocator, entry.Kind}
 		wanted, found := expected[key]
 		if !found {
 			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: package %q emitted an undeclared typed Artifact origin",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				scope,
 			)
 		}
@@ -372,7 +372,7 @@ func compilePackage(
 			entry.Definition.Digest != wanted.DefinitionDigest {
 			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: admitted Artifact differs from package expectation",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 
@@ -384,7 +384,7 @@ func compilePackage(
 			*record.SourceContentDigest != fileDigests[locator] {
 			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: Artifact source digest differs from package bytes",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 		definition, err := artifacts.GetDefinition(ctx, entry.Ref())
@@ -394,7 +394,7 @@ func compilePackage(
 		if definition.Digest != wanted.DefinitionDigest {
 			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: Artifact Definition changed during compilation",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 
@@ -416,7 +416,7 @@ func compilePackage(
 	if len(expected) != 0 {
 		return installModel.CompiledPackage{}, fmt.Errorf(
 			"%w: package %q has unfulfilled Artifact expectations",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			scope,
 		)
 	}
@@ -459,8 +459,8 @@ func compilationValidationFingerprint(
 		Digest   cryptoutil.Digest `json:"digest"`
 	}
 	type decoderValue struct {
-		ID       spec.DecoderID `json:"id"`
-		Revision string         `json:"revision"`
+		ID       storeSpec.DecoderID `json:"id"`
+		Revision string              `json:"revision"`
 	}
 	schemas := make([]schemaValue, 0, len(codecs))
 	for _, codec := range codecs {

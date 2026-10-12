@@ -11,7 +11,7 @@ import (
 
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
@@ -57,7 +57,7 @@ func InitSkillAggregateWrapper(
 	if wrapper == nil || resolver == nil || runtime == nil {
 		return fmt.Errorf(
 			"%w: Skill aggregate wrapper dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -66,7 +66,7 @@ func InitSkillAggregateWrapper(
 	if wrapper.resolver != nil || wrapper.runtime != nil {
 		return fmt.Errorf(
 			"%w: Skill aggregate wrapper is already initialized",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	wrapper.resolver = resolver
@@ -81,13 +81,13 @@ func withSkillAggregate[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 
 		w.mu.RLock()
 		defer w.mu.RUnlock()
 		if w.resolver == nil || w.runtime == nil {
-			return zero, spec.ErrClosed
+			return zero, storeSpec.ErrClosed
 		}
 		return fn(context.Background())
 	})
@@ -103,7 +103,7 @@ func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 	if len(values) != 1 {
 		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: expected one resolved Artifact Skill",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return values[0], nil
@@ -192,7 +192,7 @@ func (w *SkillAggregateWrapper) DescribeArtifactSkill(
 			if len(selected.Values) != 1 {
 				return ArtifactSkillSummary{}, fmt.Errorf(
 					"%w: expected one resolved Artifact Skill",
-					spec.ErrReferenceUnresolved,
+					storeSpec.ErrReferenceUnresolved,
 				)
 			}
 
@@ -219,7 +219,7 @@ func (w *SkillAggregateWrapper) DescribeArtifactSkill(
 			}
 			return ArtifactSkillSummary{}, fmt.Errorf(
 				"%w: runtime did not index Artifact Skill %q",
-				spec.ErrReferenceUnresolved,
+				storeSpec.ErrReferenceUnresolved,
 				ref.ArtifactID,
 			)
 		},

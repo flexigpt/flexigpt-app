@@ -3,7 +3,7 @@ package llmartifactory
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 )
@@ -17,13 +17,13 @@ func Open(config Config) (*Artifactory, error) {
 		config.Resources == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM Artifactory generic composition dependencies are incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if config.Interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM Artifactory declaration interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 

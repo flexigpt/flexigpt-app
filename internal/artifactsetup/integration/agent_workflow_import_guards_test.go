@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
@@ -44,7 +44,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrInvalid)
+	requireErrorIs(t, err, storeSpec.ErrInvalid)
 
 	_, err = harness.api.CommitAgentImport(
 		t.Context(),
@@ -56,7 +56,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	_, err = harness.api.SetAgentPluginEnabled(
 		t.Context(),
@@ -74,7 +74,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	agents, err := harness.api.ListAgents(
 		t.Context(),
@@ -211,7 +211,7 @@ func TestWorkflow_ManagedAgentImportRequiresDeclaredConfirmation(
 			PreparedFingerprint: preview.PreparedFingerprint,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrConflict)
+	requireErrorIs(t, err, storeSpec.ErrConflict)
 
 	committed, err := harness.api.CommitAgentImport(
 		t.Context(),
@@ -296,7 +296,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 			ExpectedRevision: enabled.Revision,
 		},
 	)
-	requireErrorIs(t, err, spec.ErrProtected)
+	requireErrorIs(t, err, storeSpec.ErrProtected)
 
 	_, err = harness.api.CreateAgentPlugin(
 		t.Context(),
@@ -306,7 +306,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 			DisplayName: "Protected Test Plugin",
 		},
 	)
-	requireErrorIs(t, err, spec.ErrProtected)
+	requireErrorIs(t, err, storeSpec.ErrProtected)
 }
 
 func newManagedImportFixture(
@@ -328,7 +328,7 @@ func newManagedImportFixture(
 		t.Context(),
 		pluginAPI.CreateRequest{
 			RootID:      topology.UserRootID(),
-			Name:        spec.LogicalName(pluginName),
+			Name:        storeSpec.LogicalName(pluginName),
 			DisplayName: "Managed Import Guard Plugin",
 		},
 	)

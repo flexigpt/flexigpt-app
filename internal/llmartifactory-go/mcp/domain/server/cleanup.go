@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 )
 
@@ -41,7 +41,7 @@ func CleanupUnboundServerSecrets(
 	if cleaner == nil {
 		return fmt.Errorf(
 			"%w: MCP secret cleaner is unavailable",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := data.ValidateFor(
@@ -75,7 +75,7 @@ func CleanupUnboundServerSecrets(
 		default:
 			return fmt.Errorf(
 				"%w: unsupported MCP secret target %q",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 				target.Kind,
 			)
 		}

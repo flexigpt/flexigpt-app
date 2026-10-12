@@ -9,7 +9,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -126,7 +126,7 @@ func DefinitionForDocument(
 		Kind:          artifactModel.ArtifactKind(ModelType),
 		SchemaID:      ModelSchemaKey.SchemaID,
 		SchemaVersion: ModelSchemaKey.SchemaVersion,
-		LogicalName:   spec.LogicalName(document.Name),
+		LogicalName:   storeSpec.LogicalName(document.Name),
 		DisplayName:   displayName,
 		Description:   document.Description,
 		Labels:        declaration.CloneStringMap(document.Labels),
@@ -186,16 +186,16 @@ func (v ModelDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: model declarations do not support locator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if err := v.Provider.Validate(); err != nil {
 		return fmt.Errorf("model provider reference: %w", err)
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Model providerModelID",
 		v.ProviderModelID,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func ValidateDefaultsPatch(raw json.RawMessage) error {
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("model defaults patch: %w", err)
@@ -263,7 +263,7 @@ func validatePatchObject(
 	}
 	_, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -286,7 +286,7 @@ func validateNoSecretObject(
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBodyBytes,
+		storeSpec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -309,7 +309,7 @@ func rejectSecretValues(
 			if modelSecretKey(key) && child != nil {
 				return fmt.Errorf(
 					"%w: %s contains forbidden credential field %q",
-					spec.ErrInvalid,
+					storeSpec.ErrInvalid,
 					label,
 					key,
 				)

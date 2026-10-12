@@ -7,7 +7,7 @@ import (
 
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
@@ -27,7 +27,7 @@ func NewPathFactory(
 	if interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator interpretation registry is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -47,7 +47,7 @@ func NewPathFactory(
 	if len(kinds) == 0 {
 		return nil, fmt.Errorf(
 			"%w: path locator has no supported Artifact kinds",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	slices.Sort(kinds)
@@ -79,7 +79,7 @@ func (p *PathFactory) Bind(
 	if runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator runtime is nil",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &pathResolver{
@@ -103,7 +103,7 @@ func (r *pathResolver) Resolve(
 	if request.From == nil {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator requires a source-backed declaration origin",
-			spec.ErrLocatorUnresolved,
+			storeSpec.ErrLocatorUnresolved,
 		)
 	}
 
@@ -164,7 +164,7 @@ func (r *pathResolver) Resolve(
 	case 0:
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator %q did not resolve %q",
-			spec.ErrLocatorUnresolved,
+			storeSpec.ErrLocatorUnresolved,
 			request.Locator,
 			request.ExpectedLogicalName,
 		)
@@ -175,7 +175,7 @@ func (r *pathResolver) Resolve(
 	default:
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator %q resolves to %d Artifacts",
-			spec.ErrIdentityConflict,
+			storeSpec.ErrIdentityConflict,
 			request.Locator,
 			len(matches),
 		)

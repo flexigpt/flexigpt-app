@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 )
 
@@ -66,7 +66,7 @@ func EmbeddedWorkspacePackages() (fs.FS, error) {
 	return embeddedSubtree(embeddedWorkspacesFS, "workspaces")
 }
 
-func embeddedSubtree(embedded fs.FS, root spec.Locator) (fs.FS, error) {
+func embeddedSubtree(embedded fs.FS, root storeSpec.Locator) (fs.FS, error) {
 	if embedded == nil || !fs.ValidPath(string(root)) {
 		return nil, fmt.Errorf("invalid embedded built-in root %q", root)
 	}

@@ -2,7 +2,7 @@ package model
 
 import (
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -12,10 +12,10 @@ func HydrationFingerprint(
 	schemaVersion string,
 	declaration Declaration,
 ) (cryptoutil.Digest, error) {
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"topology hydration schema version",
 		schemaVersion,
-		spec.MaxVersionBytes,
+		storeSpec.MaxVersionBytes,
 	); err != nil {
 		return "", err
 	}
@@ -36,9 +36,9 @@ func HydrationFingerprint(
 // Callers own validation and deterministic ordering of Expectations because
 // Artifact Store topology intentionally does not know domain expectation types.
 func PackageFingerprint(
-	packageRoot spec.Locator,
+	packageRoot storeSpec.Locator,
 	address managedpackageModel.ManagedPackageAddress,
-	documentFile spec.Locator,
+	documentFile storeSpec.Locator,
 	expectations any,
 	packageFiles []managedpackageModel.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
@@ -57,7 +57,7 @@ func PackageFingerprint(
 	}
 
 	type file struct {
-		Locator spec.Locator      `json:"locator"`
+		Locator storeSpec.Locator `json:"locator"`
 		Digest  cryptoutil.Digest `json:"digest"`
 		Size    int64             `json:"size"`
 	}
@@ -71,9 +71,9 @@ func PackageFingerprint(
 	}
 
 	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot  spec.Locator                              `json:"packageRoot"`
+		PackageRoot  storeSpec.Locator                         `json:"packageRoot"`
 		Address      managedpackageModel.ManagedPackageAddress `json:"address"`
-		DocumentFile spec.Locator                              `json:"documentFile"`
+		DocumentFile storeSpec.Locator                         `json:"documentFile"`
 		Expectations any                                       `json:"expectations"`
 		Files        []file                                    `json:"files"`
 	}{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
@@ -57,7 +57,7 @@ func (a *API) ResolveDirectMembers(
 	ref artifactModel.ArtifactRef,
 ) (DirectMembership, error) {
 	if a.resolver == nil || a.artifacts == nil {
-		return DirectMembership{}, spec.ErrClosed
+		return DirectMembership{}, storeSpec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return DirectMembership{}, err
@@ -70,7 +70,7 @@ func (a *API) ResolveDirectMembers(
 	if resolved == nil || resolved.Type != declaration.TypePlugin {
 		return DirectMembership{}, fmt.Errorf(
 			"%w: direct membership root is not a Plugin",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -78,7 +78,7 @@ func (a *API) ResolveDirectMembers(
 	if !found {
 		return DirectMembership{}, fmt.Errorf(
 			"%w: Plugin direct membership has no source-backed root",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -94,7 +94,7 @@ func (a *API) ResolveDirectMembers(
 		*view.Artifact.ResolvedDefinition != definitionValue.Digest {
 		return DirectMembership{}, fmt.Errorf(
 			"%w: Plugin Definition changed during direct membership resolution",
-			spec.ErrRefreshRequired,
+			storeSpec.ErrRefreshRequired,
 		)
 	}
 
@@ -112,7 +112,7 @@ func (a *API) ResolveDirectMembers(
 	if len(indexes) != len(view.Entries) {
 		return DirectMembership{}, fmt.Errorf(
 			"%w: Plugin view member ordering is incomplete",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -130,7 +130,7 @@ func (a *API) ResolveDirectMembers(
 		if _, duplicate := relationships[string(identity)]; duplicate {
 			return DirectMembership{}, fmt.Errorf(
 				"%w: Plugin direct membership repeats a normalized member",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 			)
 		}
 		relationships[string(identity)] = relationship
@@ -152,7 +152,7 @@ func (a *API) ResolveDirectMembers(
 		if !found {
 			return DirectMembership{}, fmt.Errorf(
 				"%w: Plugin direct membership has no relationship result",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 

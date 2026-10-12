@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -36,7 +36,7 @@ type Registration struct {
 
 	// LogicalVersion supplies family-specific Artifact identity qualification.
 	// Text uses its insertion target; most families return an empty version.
-	LogicalVersion func(declaration.Entry) (spec.LogicalVersion, error)
+	LogicalVersion func(declaration.Entry) (storeSpec.LogicalVersion, error)
 
 	// SelectorEligible identifies target families that can participate in
 	// generic selector expansion.
@@ -49,7 +49,7 @@ type Registration struct {
 	// LocatorCandidates permits a family to expand a source-relative locator
 	// into family-owned candidate declaration entries. Skill uses this for
 	// directory locators and SKILL.md.
-	LocatorCandidates func(spec.Locator) ([]spec.Locator, error)
+	LocatorCandidates func(storeSpec.Locator) ([]storeSpec.Locator, error)
 }
 
 func (r Registration) Validate() error {
@@ -63,21 +63,21 @@ func (r Registration) Validate() error {
 		r.SchemaKey.Kind != schemaModel.Kind(r.DeclarationType) {
 		return fmt.Errorf(
 			"%w: declaration interpretation schema key does not match %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			r.DeclarationType,
 		)
 	}
 	if r.ValidateEntry == nil {
 		return fmt.Errorf(
 			"%w: declaration interpretation %q has no semantic validator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			r.DeclarationType,
 		)
 	}
 	if r.ValidateAdmittedEntry == nil {
 		return fmt.Errorf(
 			"%w: declaration interpretation %q has no admitted semantic validator",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			r.DeclarationType,
 		)
 	}
@@ -96,7 +96,7 @@ func NewRegistry(
 	if len(registrations) == 0 {
 		return nil, fmt.Errorf(
 			"%w: declaration interpretation registry is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -116,7 +116,7 @@ func NewRegistry(
 		if _, duplicate := output.bySchema[registration.SchemaKey]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate declaration interpretation schema %q/%q/%q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				registration.SchemaKey.Kind,
 				registration.SchemaKey.SchemaID,
 				registration.SchemaKey.SchemaVersion,
@@ -159,7 +159,7 @@ func (r *Registry) RequireSchemaKeys(
 	if len(keys) == 0 {
 		return nil, fmt.Errorf(
 			"%w: declaration schema key selection is empty",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -176,7 +176,7 @@ func (r *Registry) RequireSchemaKeys(
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: declaration schema key %q/%q/%q is repeated",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
@@ -185,7 +185,7 @@ func (r *Registry) RequireSchemaKeys(
 		if _, found := r.bySchema[key]; !found {
 			return nil, fmt.Errorf(
 				"%w: declaration schema %q/%q/%q",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
@@ -230,13 +230,13 @@ func (r *Registry) SchemaKeysForArtifactKinds(
 		case 0:
 			return nil, fmt.Errorf(
 				"%w: declaration interpretation for Artifact kind %q",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				kind,
 			)
 		default:
 			return nil, fmt.Errorf(
 				"%w: Artifact kind %q has %d declaration schema versions",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				kind,
 				len(registrations),
 			)
@@ -281,26 +281,26 @@ func (r *Registry) DeclarationAliasEligible(
 
 func (r *Registry) LocatorCandidates(
 	kind artifactModel.ArtifactKind,
-	target spec.Locator,
-) ([]spec.Locator, error) {
+	target storeSpec.Locator,
+) ([]storeSpec.Locator, error) {
 	declarationType := declaration.Type(kind)
 	values := r.byType[declarationType]
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: no declaration interpretation for %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			kind,
 		)
 	}
 	if len(values) != 1 {
 		return nil, fmt.Errorf(
 			"%w: declaration type %q has multiple schema versions",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			declarationType,
 		)
 	}
 	if values[0].LocatorCandidates == nil {
-		return []spec.Locator{target}, nil
+		return []storeSpec.Locator{target}, nil
 	}
 	return values[0].LocatorCandidates(target)
 }
@@ -428,7 +428,7 @@ func (r *Registry) EntryFromDefinition(
 		entry.Header().Name != string(value.LogicalName) {
 		return declaration.Entry{}, fmt.Errorf(
 			"%w: Definition body identity differs from Definition metadata",
-			spec.ErrDigestMismatch,
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 	if err := registration.ValidateAdmittedEntry(entry); err != nil {
@@ -442,7 +442,7 @@ func (r *Registry) EntryFromDefinition(
 		if version != value.LogicalVersion {
 			return declaration.Entry{}, fmt.Errorf(
 				"%w: Definition logical version differs from family identity",
-				spec.ErrDigestMismatch,
+				storeSpec.ErrDigestMismatch,
 			)
 		}
 	}
@@ -457,11 +457,11 @@ func (r *Registry) definitionForValidatedSchema(
 	if entry.Header().Type != registration.DeclarationType {
 		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: declaration type differs from schema interpretation",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
-	version := spec.LogicalVersion("")
+	version := storeSpec.LogicalVersion("")
 	var err error
 	if registration.LogicalVersion != nil {
 		version, err = registration.LogicalVersion(entry)
@@ -487,7 +487,7 @@ func (r *Registry) definitionForValidatedSchema(
 		Kind:           artifactModel.ArtifactKind(registration.DeclarationType),
 		SchemaID:       key.SchemaID,
 		SchemaVersion:  key.SchemaVersion,
-		LogicalName:    spec.LogicalName(header.Name),
+		LogicalName:    storeSpec.LogicalName(header.Name),
 		LogicalVersion: version,
 		DisplayName:    displayName,
 		Description:    header.Description,
@@ -512,12 +512,12 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 	if root.Header().Name == "" {
 		return nil, fmt.Errorf(
 			"%w: declaration root requires a name",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	output := make([]NamedEntry, 0)
-	seen := make(map[spec.SubresourceLocator]struct{})
+	seen := make(map[storeSpec.SubresourceLocator]struct{})
 
 	var walk func(
 		declaration.Entry,
@@ -531,11 +531,11 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 		depth int,
 		schemaValidated bool,
 	) error {
-		if depth > spec.MaxDiscoveryDepth {
+		if depth > storeSpec.MaxDiscoveryDepth {
 			return fmt.Errorf(
 				"%w: declaration nesting exceeds depth %d",
-				spec.ErrInvalid,
-				spec.MaxDiscoveryDepth,
+				storeSpec.ErrInvalid,
+				storeSpec.MaxDiscoveryDepth,
 			)
 		}
 
@@ -553,14 +553,14 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 			}
 		}
 
-		subresource := spec.SubresourceLocator(strings.Join(path, "/"))
+		subresource := storeSpec.SubresourceLocator(strings.Join(path, "/"))
 		if err := subresource.Validate(); err != nil {
 			return err
 		}
 		if _, duplicate := seen[subresource]; duplicate {
 			return fmt.Errorf(
 				"%w: declaration emits duplicate subresource %q",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				subresource,
 			)
 		}
@@ -629,7 +629,7 @@ func (r *Registry) relationshipsForValidatedEntry(
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: declaration relationship path %q is repeated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				strings.Join(value.Path, "/"),
 			)
 		}
@@ -659,7 +659,7 @@ func (r *Registry) definitionsForDocument(
 	if root.Header().Type != registration.DeclarationType {
 		return nil, fmt.Errorf(
 			"%w: declaration header does not match expected schema",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -708,7 +708,7 @@ func (r *Registry) registrationForSchema(
 	if !found {
 		return Registration{}, fmt.Errorf(
 			"%w: declaration schema %q/%q/%q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			key.Kind,
 			key.SchemaID,
 			key.SchemaVersion,
@@ -725,14 +725,14 @@ func (r *Registry) registrationForEntry(
 	if len(values) == 0 {
 		return Registration{}, fmt.Errorf(
 			"%w: declaration type %q",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			header.Type,
 		)
 	}
 	if len(values) != 1 {
 		return Registration{}, fmt.Errorf(
 			"%w: declaration type %q requires an explicit schema key",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			header.Type,
 		)
 	}
@@ -740,7 +740,7 @@ func (r *Registry) registrationForEntry(
 }
 
 type NamedEntry struct {
-	SubresourceLocator spec.SubresourceLocator
+	SubresourceLocator storeSpec.SubresourceLocator
 	Entry              declaration.Entry
 }
 
@@ -752,7 +752,7 @@ func (e NamedEntry) Clone() NamedEntry {
 }
 
 type AdmittedEntry struct {
-	SubresourceLocator spec.SubresourceLocator
+	SubresourceLocator storeSpec.SubresourceLocator
 	Definition         definitionModel.Definition
 }
 
@@ -777,7 +777,7 @@ func shortIdentity(
 	if len(digest) < 16 {
 		return "", fmt.Errorf(
 			"%w: declaration member identity digest is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return digest[:16], nil

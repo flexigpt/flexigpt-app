@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
@@ -31,12 +31,12 @@ func NodeRelationshipSegment(
 	if len(digest) < workflowNodeIdentityDigestLength {
 		return "", fmt.Errorf(
 			"%w: Workflow node identity digest is invalid",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	segment := "node-" + digest[:workflowNodeIdentityDigestLength]
-	if err := spec.SubresourceLocator(segment).Validate(); err != nil {
+	if err := storeSpec.SubresourceLocator(segment).Validate(); err != nil {
 		return "", err
 	}
 	return segment, nil

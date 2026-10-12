@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/llmtools-go"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
@@ -38,7 +38,7 @@ var nonAutoGoFunctions = map[string]struct{}{
 type Adapter struct {
 	registry   *llmtools.Registry
 	byFunction map[string]toolDomain.GoToolDescriptor
-	byName     map[spec.LogicalName]toolDomain.GoToolDescriptor
+	byName     map[storeSpec.LogicalName]toolDomain.GoToolDescriptor
 }
 
 func NewAdapter() (*Adapter, error) {
@@ -55,7 +55,7 @@ func NewAdapter() (*Adapter, error) {
 		len(registry.Tools()),
 	)
 	byName := make(
-		map[spec.LogicalName]toolDomain.GoToolDescriptor,
+		map[storeSpec.LogicalName]toolDomain.GoToolDescriptor,
 		len(registry.Tools()),
 	)
 
@@ -67,14 +67,14 @@ func NewAdapter() (*Adapter, error) {
 		if _, duplicate := byFunction[descriptor.Function]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Go Tool function %q is repeated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				descriptor.Function,
 			)
 		}
 		if _, duplicate := byName[descriptor.Name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Go Tool name %q is repeated",
-				spec.ErrIdentityConflict,
+				storeSpec.ErrIdentityConflict,
 				descriptor.Name,
 			)
 		}
@@ -98,7 +98,7 @@ func (a *Adapter) LookupGoTool(
 	if function == "" {
 		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool function is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -106,7 +106,7 @@ func (a *Adapter) LookupGoTool(
 	if !found {
 		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool function %q is not registered",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			function,
 		)
 	}
@@ -115,7 +115,7 @@ func (a *Adapter) LookupGoTool(
 
 func (a *Adapter) LookupGoToolByName(
 	ctx context.Context,
-	name spec.LogicalName,
+	name storeSpec.LogicalName,
 ) (toolDomain.GoToolDescriptor, error) {
 	if err := name.Validate(); err != nil {
 		return toolDomain.GoToolDescriptor{}, err
@@ -125,7 +125,7 @@ func (a *Adapter) LookupGoToolByName(
 	if !found {
 		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool %q is not registered",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 			name,
 		)
 	}
@@ -167,8 +167,8 @@ func descriptorFor(
 
 	descriptor := toolDomain.GoToolDescriptor{
 		Function:    function,
-		Name:        spec.LogicalName(value.Slug),
-		Version:     spec.LogicalVersion(value.Version),
+		Name:        storeSpec.LogicalName(value.Slug),
+		Version:     storeSpec.LogicalVersion(value.Version),
 		DisplayName: value.DisplayName,
 		Description: value.Description,
 		Tags:        append([]string(nil), value.Tags...),

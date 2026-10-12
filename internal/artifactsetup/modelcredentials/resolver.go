@@ -6,7 +6,7 @@ import (
 
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 )
 
@@ -22,7 +22,7 @@ func New(
 	if secrets == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store Model credential runtime is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return &Resolver{secrets: secrets}, nil
@@ -38,7 +38,7 @@ func (r *Resolver) ResolveModelCredential(
 	if !binding.Active() {
 		return modelruntime.Credential{}, fmt.Errorf(
 			"%w: Model Provider credential binding is not configured",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -56,7 +56,7 @@ func (r *Resolver) ResolveModelCredential(
 		*current.Ref != *binding.Ref {
 		return modelruntime.Credential{}, fmt.Errorf(
 			"%w: Model Provider credential changed during resolution",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 

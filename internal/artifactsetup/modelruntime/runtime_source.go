@@ -7,9 +7,9 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inferencewrapper/spec"
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
@@ -22,16 +22,16 @@ func (a *RuntimeAdapter) BindModelStore(store *modelAPI.Service) error {
 	if store == nil {
 		return fmt.Errorf(
 			"%w: Model runtime store is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if a == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	if a.store != nil {
 		return fmt.Errorf(
 			"%w: Model runtime store is already bound",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 		)
 	}
 	a.store = store
@@ -44,18 +44,18 @@ func (a *RuntimeAdapter) ResolveRuntimeModel(
 ) (RuntimeConfiguration, error) {
 	return a.ResolveRuntimeConfiguration(
 		ctx,
-		inferencewrapperSpec.RuntimeModelRequest{Model: ref},
+		inferenceRuntimeSpec.RuntimeModelRequest{Model: ref},
 	)
 }
 
 func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-	requestPatch *inferencewrapperSpec.RuntimeRequestPatch,
+	requestPatch *inferenceRuntimeSpec.RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	return a.ResolveRuntimeConfiguration(
 		ctx,
-		inferencewrapperSpec.RuntimeModelRequest{
+		inferenceRuntimeSpec.RuntimeModelRequest{
 			Model:        ref,
 			RequestPatch: requestPatch,
 		},
@@ -66,7 +66,7 @@ func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 // Completion supplies the typed request and owns only execution/transport.
 func (a *RuntimeAdapter) ResolveRuntimeConfiguration(
 	ctx context.Context,
-	request inferencewrapperSpec.RuntimeModelRequest,
+	request inferenceRuntimeSpec.RuntimeModelRequest,
 ) (RuntimeConfiguration, error) {
 	prepared, err := prepareRuntimeRequestPatch(request.RequestPatch)
 	if err != nil {
@@ -95,14 +95,14 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 	if target.Type != declaration.TypeModel {
 		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: capability target type is %q, expected model",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			target.Type,
 		)
 	}
 	if target.Form != composition.TargetFormArtifact || target.Artifact == nil {
 		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: direct Model capability targets require an application runtime adapter",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 		)
 	}
 
@@ -118,7 +118,7 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 		resolved.Model.Artifact.LogicalName != target.Name {
 		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model capability target no longer matches current source-backed configuration",
-			spec.ErrReferenceUnresolved,
+			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 	return a.resolveRuntime(ctx, resolved, preparedRuntimeRequestPatch{})
@@ -143,7 +143,7 @@ func (a *RuntimeAdapter) ResolveProvider(
 
 func (a *RuntimeAdapter) modelStore() (*modelAPI.Service, error) {
 	if a == nil || a.store == nil {
-		return nil, spec.ErrClosed
+		return nil, storeSpec.ErrClosed
 	}
 	return a.store, nil
 }
@@ -162,13 +162,13 @@ func (a *RuntimeAdapter) InitializeProviderRuntime(
 	if publish == nil {
 		return fmt.Errorf(
 			"%w: Model Provider runtime publication capability is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
 	candidates := make([]modelAPI.ProviderListItem, 0, len(providers))
 	seen := make(map[artifactModel.ArtifactRef]struct{}, len(providers))
-	names := make(map[spec.LogicalName]int)
+	names := make(map[storeSpec.LogicalName]int)
 	for _, provider := range providers {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -194,7 +194,7 @@ func (a *RuntimeAdapter) InitializeProviderRuntime(
 				result,
 				fmt.Errorf(
 					"%w: runtime Provider %q (%s/%s) has a duplicate logical name",
-					spec.ErrIdentityConflict,
+					storeSpec.ErrIdentityConflict,
 					provider.Name,
 					provider.Ref.RootID,
 					provider.Ref.ArtifactID,

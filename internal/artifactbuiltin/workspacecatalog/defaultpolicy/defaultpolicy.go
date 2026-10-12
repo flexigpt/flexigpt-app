@@ -5,7 +5,7 @@ import (
 	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
@@ -31,7 +31,7 @@ func Load() (workspaceDomain.DefaultPolicy, error) {
 	if err != nil {
 		return workspaceDomain.DefaultPolicy{}, err
 	}
-	canonical, err := yamlutil.CanonicalObjectJSON(rawYAML, spec.MaxDefinitionBytes)
+	canonical, err := yamlutil.CanonicalObjectJSON(rawYAML, storeSpec.MaxDefinitionBytes)
 	if err != nil {
 		return workspaceDomain.DefaultPolicy{}, err
 	}
@@ -42,7 +42,7 @@ func Load() (workspaceDomain.DefaultPolicy, error) {
 	if document.Name != PolicyID {
 		return workspaceDomain.DefaultPolicy{}, fmt.Errorf(
 			"%w: base policy name is %q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			document.Name,
 		)
 	}
@@ -71,14 +71,14 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 		}
 		header := member.Header()
 		if header.Type == declaration.TypeWorkspace {
-			return fmt.Errorf("%w: members[%d] cannot contain workspace", spec.ErrInvalid, index)
+			return fmt.Errorf("%w: members[%d] cannot contain workspace", storeSpec.ErrInvalid, index)
 		}
 		if header.Type == declaration.TypeText {
 			if form != declaration.MemberContained {
-				return fmt.Errorf("%w: members[%d] text must be contained", spec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must be contained", storeSpec.ErrInvalid, index)
 			}
 			if header.Locator == nil {
-				return fmt.Errorf("%w: members[%d] text must be source-backed", spec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must be source-backed", storeSpec.ErrInvalid, index)
 			}
 			target, err := member.ContainedDeclaration()
 			if err != nil {
@@ -89,11 +89,11 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 				return fmt.Errorf("members[%d]: %w", index, err)
 			}
 			if text.Content != nil || text.Locator == nil {
-				return fmt.Errorf("%w: members[%d] text must use locator content", spec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must use locator content", storeSpec.ErrInvalid, index)
 			}
 			if _, err := declaration.ResolveSourceRelativePathLocator(
 				*text.Locator,
-				spec.Locator(PolicyLocator),
+				storeSpec.Locator(PolicyLocator),
 			); err != nil {
 				return fmt.Errorf(
 					"members[%d] text must use a local source-relative locator: %w",
@@ -112,10 +112,10 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 				return fmt.Errorf("members[%d]: %w", index, err)
 			}
 			if relationship.Scope != declaration.LookupScopeBuiltin {
-				return fmt.Errorf("%w: members[%d] named non-text must use scope builtin", spec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] named non-text must use scope builtin", storeSpec.ErrInvalid, index)
 			}
 		default:
-			return fmt.Errorf("%w: members[%d] contained non-text is not allowed", spec.ErrInvalid, index)
+			return fmt.Errorf("%w: members[%d] contained non-text is not allowed", storeSpec.ErrInvalid, index)
 		}
 	}
 	return nil

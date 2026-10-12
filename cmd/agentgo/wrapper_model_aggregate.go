@@ -11,7 +11,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
 
@@ -42,7 +42,7 @@ type ModelAggregateWrapper struct {
 	store            *modelAPI.Service
 	runtime          modelProviderRuntime
 	preferences      modelDefaultProviderPreferences
-	fallbackProvider spec.LogicalName
+	fallbackProvider storeSpec.LogicalName
 	providers        providerRuntimePublisher
 
 	writableRoot func(
@@ -298,7 +298,7 @@ func mutateModelProvider[T any](
 	defer w.mu.Unlock()
 
 	if w.providers == nil {
-		return zero, spec.ErrClosed
+		return zero, storeSpec.ErrClosed
 	}
 
 	ctx := context.Background()
@@ -380,7 +380,7 @@ func (w *ModelAggregateWrapper) setProviderRuntimePublisher(
 	if publisher == nil {
 		return fmt.Errorf(
 			"%w: Model Provider runtime publisher is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	w.providers = publisher
@@ -390,12 +390,12 @@ func (w *ModelAggregateWrapper) setProviderRuntimePublisher(
 // lock acquires the wrapper lifecycle lock on success.
 func (w *ModelAggregateWrapper) lock() error {
 	if w == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	w.mu.Lock()
 	if w.store == nil || w.runtime == nil || w.preferences == nil {
 		w.mu.Unlock()
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return nil
 }

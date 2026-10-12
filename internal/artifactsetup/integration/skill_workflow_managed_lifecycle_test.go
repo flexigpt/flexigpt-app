@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -27,7 +27,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		ctx,
 		pluginAPI.CreateRequest{
 			RootID:      topology.UserRootID(),
-			Name:        spec.LogicalName("release-workflow"),
+			Name:        storeSpec.LogicalName("release-workflow"),
 			DisplayName: "Release workflow",
 			Description: "Skills used to prepare release notes.",
 		},
@@ -248,14 +248,14 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		gotSkill.RootID,
 		gotSkill.Binding.SourceID,
 		gotSkill.Binding.Locator,
-		spec.MaxCandidateBytes,
+		storeSpec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(storedDocument.Content, initialDocument) {
 		t.Fatal("managed Skill source document differs from the created SKILL.md")
 	}
 
-	assetLocator := spec.Locator(path.Join(
+	assetLocator := storeSpec.Locator(path.Join(
 		path.Dir(string(gotSkill.Binding.Locator)),
 		"references/checklist.md",
 	))
@@ -264,7 +264,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		gotSkill.RootID,
 		gotSkill.Binding.SourceID,
 		assetLocator,
-		spec.MaxCandidateBytes,
+		storeSpec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(storedChecklist.Content, []byte(initialChecklist)) {
@@ -417,7 +417,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		updatedSkill.RootID,
 		updatedSkill.Binding.SourceID,
 		updatedSkill.Binding.Locator,
-		spec.MaxCandidateBytes,
+		storeSpec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(updatedSourceDocument.Content, replacementDocument) {
@@ -429,7 +429,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		updatedSkill.RootID,
 		updatedSkill.Binding.SourceID,
 		assetLocator,
-		spec.MaxCandidateBytes,
+		storeSpec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(updatedChecklist.Content, []byte(replacedChecklist)) {
@@ -481,7 +481,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 	requireNoError(t, err)
 
 	_, err = fixture.api.GetSkill(ctx, skillBeforePurge.Ref())
-	if !errors.Is(err, spec.ErrArtifactNotFound) {
+	if !errors.Is(err, storeSpec.ErrArtifactNotFound) {
 		t.Fatalf(
 			"GetSkill after purge error=%v, want ErrArtifactNotFound",
 			err,
@@ -518,7 +518,7 @@ func TestSkillStoreWorkflowManagedPluginAndSkillLifecycle(
 		ctx,
 		pluginBeforeDelete.Artifact.Ref(),
 	)
-	if !errors.Is(err, spec.ErrArtifactNotFound) {
+	if !errors.Is(err, storeSpec.ErrArtifactNotFound) {
 		t.Fatalf(
 			"GetSkillPlugin after delete error=%v, want ErrArtifactNotFound",
 			err,

@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // LifecyclePublication is Refresh's aggregate command for a Source lifecycle
@@ -34,11 +34,11 @@ func (p LifecyclePublication) Validate() error {
 			update.SourceContentDigest != nil {
 			return fmt.Errorf(
 				"%w: lifecycle Artifact update does not invalidate the transitioned Source",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seen[update.ArtifactID]; duplicate {
-			return fmt.Errorf("%w: lifecycle publication repeats Artifact %q", spec.ErrInvalid, update.ArtifactID)
+			return fmt.Errorf("%w: lifecycle publication repeats Artifact %q", storeSpec.ErrInvalid, update.ArtifactID)
 		}
 		seen[update.ArtifactID] = struct{}{}
 	}

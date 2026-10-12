@@ -10,7 +10,7 @@ import (
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -54,7 +54,7 @@ func (r *SourceRepository) Get(
 func (r *SourceRepository) FindByStorageKey(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	storageKey spec.StorageKey,
+	storageKey storeSpec.StorageKey,
 ) (sourceModel.Source, error) {
 	return r.store.findSourceByStorageKey(ctx, rootID, storageKey)
 }
@@ -143,7 +143,7 @@ func (r *ArtifactRepository) FindByIdentity(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	kind artifactModel.ArtifactKind,
-	logicalName spec.LogicalName,
+	logicalName storeSpec.LogicalName,
 ) ([]artifactModel.Artifact, error) {
 	return r.store.findArtifactsByIdentity(ctx, rootID, kind, logicalName)
 }
@@ -198,7 +198,7 @@ func (r *CatalogRepository) FindCatalogByIdentity(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	kind artifactModel.ArtifactKind,
-	logicalName spec.LogicalName,
+	logicalName storeSpec.LogicalName,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
 	return r.store.findArtifactCatalogByIdentity(ctx, rootID, kind, logicalName, options)

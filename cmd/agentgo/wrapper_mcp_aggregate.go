@@ -11,7 +11,7 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	serverMCPDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain/server"
@@ -643,7 +643,7 @@ func (w *MCPAggregateWrapper) invalidateServers(
 // under this lock and do not repeat dependency checks or acquire it again.
 func (w *MCPAggregateWrapper) lock() error {
 	if w == nil {
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	w.mu.Lock()
 	if w.store == nil ||
@@ -652,7 +652,7 @@ func (w *MCPAggregateWrapper) lock() error {
 		w.auth == nil ||
 		w.secrets == nil {
 		w.mu.Unlock()
-		return spec.ErrClosed
+		return storeSpec.ErrClosed
 	}
 	return nil
 }

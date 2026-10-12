@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -37,14 +37,14 @@ func NewDispatcher(keys []schemaModel.Key) (*Dispatcher, error) {
 		if key.Entity != schemaModel.EntityArtifact {
 			return nil, fmt.Errorf(
 				"%w: declaration dispatch requires Artifact schemas",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		slot := dispatchVersion{kind: key.Kind, version: key.SchemaVersion}
 		if previous, duplicate := output.byVersion[slot]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: schemas %q and %q both dispatch from type %q and apiVersion %q",
-				spec.ErrConflict,
+				storeSpec.ErrConflict,
 				previous.SchemaID,
 				key.SchemaID,
 				key.Kind,
@@ -75,7 +75,7 @@ func (d *Dispatcher) Resolve(raw []byte) (schemaModel.Key, error) {
 		if !found {
 			return schemaModel.Key{}, fmt.Errorf(
 				"%w: declaration type %q apiVersion %q",
-				spec.ErrUnsupported,
+				storeSpec.ErrUnsupported,
 				header.kind,
 				header.version,
 			)
@@ -87,7 +87,7 @@ func (d *Dispatcher) Resolve(raw []byte) (schemaModel.Key, error) {
 	if len(candidates) != 1 {
 		return schemaModel.Key{}, fmt.Errorf(
 			"%w: declaration type %q without apiVersion resolves to %d registered schemas",
-			spec.ErrUnsupported,
+			storeSpec.ErrUnsupported,
 			header.kind,
 			len(candidates),
 		)
@@ -110,7 +110,7 @@ func ValidateSchemaHeader(expected schemaModel.Key, raw []byte) error {
 			header.version != expected.SchemaVersion) {
 		return fmt.Errorf(
 			"%w: declaration header does not match expected schema %q/%q/%q",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			expected.Kind,
 			expected.SchemaID,
 			expected.SchemaVersion,
@@ -126,17 +126,17 @@ type dispatchHeader struct {
 }
 
 func readDispatchHeader(raw []byte) (dispatchHeader, error) {
-	if len(raw) == 0 || len(raw) > spec.MaxDefinitionBytes {
+	if len(raw) == 0 || len(raw) > storeSpec.MaxDefinitionBytes {
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: declaration document is empty or exceeds its size limit",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || trimmed[0] != '{' {
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: declaration document must be a JSON object",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -144,7 +144,7 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 	if err := json.Unmarshal(trimmed, &fields); err != nil {
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: decode declaration header: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
@@ -159,18 +159,18 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 		if hasType || hasVersion {
 			return dispatchHeader{}, fmt.Errorf(
 				"%w: declaration mixes type/apiVersion and kind/schemaID/schemaVersion headers",
-				spec.ErrInvalid,
+				storeSpec.ErrInvalid,
 			)
 		}
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: declarations require type and optional apiVersion",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	if !hasType {
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: declaration requires type",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -181,23 +181,23 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 	if err := json.Unmarshal(trimmed, &header); err != nil {
 		return dispatchHeader{}, fmt.Errorf(
 			"%w: decode type/apiVersion header: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
-	if err := spec.ValidateIdentifier(
+	if err := storeSpec.ValidateIdentifier(
 		"declaration type",
 		string(header.Type),
-		spec.MaxKindBytes,
+		storeSpec.MaxKindBytes,
 	); err != nil {
 		return dispatchHeader{}, err
 	}
 
 	if hasVersion {
-		if err := spec.ValidateRequiredText(
+		if err := storeSpec.ValidateRequiredText(
 			"declaration apiVersion",
 			header.APIVersion,
-			spec.MaxVersionBytes,
+			storeSpec.MaxVersionBytes,
 		); err != nil {
 			return dispatchHeader{}, err
 		}
@@ -220,7 +220,7 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 func CanonicalDocumentForSchema(raw []byte) ([]byte, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -238,13 +238,13 @@ func CanonicalDocumentForSchema(raw []byte) ([]byte, error) {
 	if err := json.Unmarshal(canonical, &fields); err != nil {
 		return nil, fmt.Errorf(
 			"%w: decode declaration for apiVersion normalization: %w",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			err,
 		)
 	}
 	delete(fields, "apiVersion")
 	return jsonutil.MarshalCanonicalObject(
 		fields,
-		spec.MaxDefinitionBytes,
+		storeSpec.MaxDefinitionBytes,
 	)
 }

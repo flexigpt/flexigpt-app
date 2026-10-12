@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/mapstore-go/keyringencdec"
 
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -57,7 +57,7 @@ func New(
 	if strings.TrimSpace(file) == "" {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store secret MapStore file is required",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 
@@ -67,17 +67,17 @@ func New(
 	if config.KeyringUser == "" {
 		config.KeyringUser = defaultKeyringUser
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Artifact Store secret keyring service",
 		config.KeyringService,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return nil, err
 	}
-	if err := spec.ValidateRequiredText(
+	if err := storeSpec.ValidateRequiredText(
 		"Artifact Store secret keyring user",
 		config.KeyringUser,
-		spec.MaxURIBytes,
+		storeSpec.MaxURIBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: initialize Artifact Store keyring encryption: %w",
-			spec.ErrSecretUnavailable,
+			storeSpec.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -112,7 +112,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: initialize Artifact Store secret MapStore: %w",
-			spec.ErrSecretUnavailable,
+			storeSpec.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -149,7 +149,7 @@ func (s *Store) Put(
 	if _, exists := values[id]; exists {
 		return fmt.Errorf(
 			"%w: Artifact Store secret ref %q already exists",
-			spec.ErrConflict,
+			storeSpec.ErrConflict,
 			ref,
 		)
 	}
@@ -160,7 +160,7 @@ func (s *Store) Put(
 	); err != nil {
 		return fmt.Errorf(
 			"%w: persist Artifact Store secret: %w",
-			spec.ErrSecretUnavailable,
+			storeSpec.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -184,7 +184,7 @@ func (s *Store) Get(
 	if !found {
 		return "", fmt.Errorf(
 			"%w: Artifact Store secret ref %q",
-			spec.ErrSecretNotFound,
+			storeSpec.ErrSecretNotFound,
 			ref,
 		)
 	}
@@ -193,7 +193,7 @@ func (s *Store) Get(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: Artifact Store secret ref %q is not a string",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 			ref,
 		)
 	}
@@ -228,7 +228,7 @@ func (s *Store) Delete(
 	); err != nil {
 		return fmt.Errorf(
 			"%w: delete Artifact Store secret: %w",
-			spec.ErrSecretUnavailable,
+			storeSpec.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -249,7 +249,7 @@ func (s *Store) values(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: read Artifact Store secret MapStore: %w",
-			spec.ErrSecretUnavailable,
+			storeSpec.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -258,7 +258,7 @@ func (s *Store) values(
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store secret MapStore has invalid value layout",
-			spec.ErrInvalid,
+			storeSpec.ErrInvalid,
 		)
 	}
 	return values, nil

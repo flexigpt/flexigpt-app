@@ -10,7 +10,7 @@ import (
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Service owns committed metadata-only catalog reads and optional immutable
@@ -22,7 +22,7 @@ type Service struct {
 
 func NewService(repository Repository, definitions definition.API) (*Service, error) {
 	if repository == nil || definitions == nil {
-		return nil, fmt.Errorf("%w: Artifact catalog dependencies are incomplete", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Artifact catalog dependencies are incomplete", storeSpec.ErrInvalid)
 	}
 	return &Service{repository: repository, definitions: definitions}, nil
 }
@@ -71,7 +71,7 @@ func (s *Service) FindByIdentity(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	kind artifactModel.ArtifactKind,
-	logicalName spec.LogicalName,
+	logicalName storeSpec.LogicalName,
 	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
 	if err := rootID.Validate(); err != nil {
@@ -126,7 +126,7 @@ func (s *Service) attachDocuments(
 		return nil, err
 	}
 	if len(documents) != len(keys) {
-		return nil, fmt.Errorf("%w: Definition attachment cardinality mismatch", spec.ErrInvalid)
+		return nil, fmt.Errorf("%w: Definition attachment cardinality mismatch", storeSpec.ErrInvalid)
 	}
 	byKey := make(map[definitionModel.Key]definitionModel.Definition, len(documents))
 	for index, value := range documents {
@@ -139,7 +139,7 @@ func (s *Service) attachDocuments(
 		key := definitionModel.Key{RootID: output[index].RootID, Digest: output[index].Definition.Digest}
 		value, found := byKey[key]
 		if !found {
-			return nil, fmt.Errorf("%w: listed Artifact Definition is unavailable", spec.ErrDefinitionNotFound)
+			return nil, fmt.Errorf("%w: listed Artifact Definition is unavailable", storeSpec.ErrDefinitionNotFound)
 		}
 		copyValue := value.Clone()
 		output[index].Document = &copyValue

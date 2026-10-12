@@ -5,7 +5,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
@@ -27,7 +27,7 @@ type BuiltinCatalog struct {
 	ToolPackage   support.PackageLayout
 	PluginProfile pluginAPI.Profile
 
-	PluginByTool map[spec.LogicalName]spec.LogicalName
+	PluginByTool map[storeSpec.LogicalName]storeSpec.LogicalName
 }
 
 func (c BuiltinCatalog) Validate() error {
@@ -44,7 +44,7 @@ func (c BuiltinCatalog) Validate() error {
 		return err
 	}
 	if c.PluginByTool == nil {
-		return spec.ErrInvalid
+		return storeSpec.ErrInvalid
 	}
 	for toolName, pluginName := range c.PluginByTool {
 		if err := toolName.Validate(); err != nil {

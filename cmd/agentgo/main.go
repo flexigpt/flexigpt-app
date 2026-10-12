@@ -115,6 +115,7 @@ func main() {
 			app.completionAPI,
 			app.agentStoreAPI,
 			app.textStoreAPI,
+			app.skillRuntimeAPI,
 		},
 
 		Windows: &windows.Options{

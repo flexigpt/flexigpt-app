@@ -5,7 +5,7 @@ import (
 
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // BatchWriter is the trusted physical package hydration capability used by
@@ -33,6 +33,6 @@ type Runtime interface {
 
 	RemoveManagedRoot(
 		ctx context.Context,
-		rootStorageKey spec.StorageKey,
+		rootStorageKey storeSpec.StorageKey,
 	) error
 }
