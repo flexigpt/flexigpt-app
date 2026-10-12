@@ -86,11 +86,11 @@ func (a *Adapter) EvaluateTool(
 			Wait: &sessionRuntime.ToolWaitSpec{
 				Kind:    sessionRuntime.WaitKindApproval,
 				Summary: summary,
-				AllowedResolutions: []string{
-					string(mcpServer.MCPApprovalResolutionAllowOnce),
-					string(mcpServer.MCPApprovalResolutionAllowAlways),
-					string(mcpServer.MCPApprovalResolutionDenyOnce),
-					string(mcpServer.MCPApprovalResolutionDenyAlways),
+				AllowedResolutions: []sessionRuntime.WaitResolution{
+					sessionRuntime.WaitResolutionApproveOnce,
+					sessionRuntime.WaitResolutionApproveAlways,
+					sessionRuntime.WaitResolutionDenyOnce,
+					sessionRuntime.WaitResolutionDenyAlways,
 				},
 				ExecutorReference: evaluation.ApprovalID,
 			},
@@ -183,9 +183,11 @@ func (a *Adapter) ResolveToolWait(
 		)
 	}
 
-	resolution := mcpServer.MCPApprovalResolution(
-		strings.TrimSpace(request.Resolution),
-	)
+	resolution, err := mcpApprovalResolution(request.Resolution)
+	if err != nil {
+		return sessionRuntime.ToolWaitResolution{}, err
+	}
+
 	result, err := a.bridge.ResolveApproval(
 		ctx,
 		request.ExecutorReference,
@@ -261,6 +263,26 @@ func decodeRequest(
 		Arguments:        arguments,
 		ToolUseID:        request.ToolCall.ProviderCallID,
 	}, nil
+}
+
+func mcpApprovalResolution(
+	resolution sessionRuntime.WaitResolution,
+) (mcpServer.MCPApprovalResolution, error) {
+	switch resolution {
+	case sessionRuntime.WaitResolutionApproveOnce:
+		return mcpServer.MCPApprovalResolutionAllowOnce, nil
+	case sessionRuntime.WaitResolutionApproveAlways:
+		return mcpServer.MCPApprovalResolutionAllowAlways, nil
+	case sessionRuntime.WaitResolutionDenyOnce:
+		return mcpServer.MCPApprovalResolutionDenyOnce, nil
+	case sessionRuntime.WaitResolutionDenyAlways:
+		return mcpServer.MCPApprovalResolutionDenyAlways, nil
+	default:
+		return "", fmt.Errorf(
+			"unsupported MCP approval wait resolution %q",
+			resolution,
+		)
+	}
 }
 
 func failureText(message string) string {

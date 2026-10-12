@@ -496,6 +496,14 @@ The task list must be concise, copy-pastable, and suitable for maintaining in a 
 Do not place prose after `## Next steps`.
 
 I have already done some amount of work. build on that.
+notes:
+
+- Note that mains integration is already done for this for wails binding generation.
+- uuidutil json util clock util already exists. anything shoudl be added there and removed from this custom implementations.
+- do not hand generate any rand number or uuid or whatever. proper packages to be used.
+- do not add locks etc unnecessarily. init path of store is only once. it should be lock free as no one else is initiating it other than app.
+- remove all unnecessary store closed, ctx nil ctx err validations from everywhere.
+- remove any double triple validations added that you as a agent are susceptible to do.
 
 Work as much as possible with available files. after that in next steps if your next items require some more files, ask for them too.
 complete the first and second step properly now.

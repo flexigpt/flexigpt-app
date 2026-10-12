@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 )
@@ -25,6 +24,9 @@ type ToolInvocationResult struct {
 	Meta    json.RawMessage `json:"meta,omitempty"`
 	IsError bool            `json:"isError"`
 	Error   string          `json:"error,omitempty"`
+
+	Active      []sessionRuntime.ArtifactReference `json:"active,omitempty"`
+	ActiveKnown bool                               `json:"activeKnown,omitempty"`
 }
 
 type ArtifactSessionService interface {
@@ -44,6 +46,11 @@ type ArtifactSessionService interface {
 		toolName string,
 		args json.RawMessage,
 	) (ToolInvocationResult, error)
+
+	ListActiveArtifactSkills(
+		ctx context.Context,
+		sessionID string,
+	) ([]sessionRuntime.ArtifactReference, error)
 }
 
 type Adapter struct {
@@ -93,12 +100,6 @@ func (a *Adapter) EvaluateTool(
 	_ context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolEvaluation, error) {
-	if request.ToolCall.Binding.Kind != sessionRuntime.ToolBindingKindSkill {
-		return sessionRuntime.ToolEvaluation{}, fmt.Errorf(
-			"skill adapter cannot evaluate binding kind %q",
-			request.ToolCall.Binding.Kind,
-		)
-	}
 	if request.SkillSessionID == "" {
 		return sessionRuntime.ToolEvaluation{
 			Decision: sessionRuntime.ToolEvaluationDenied,
@@ -156,6 +157,17 @@ func (a *Adapter) ExecuteTool(
 		}
 	}
 
+	if isSkillLifecycleTool(request.ToolCall.Name) {
+		active, activeErr := a.service.ListActiveArtifactSkills(
+			ctx,
+			request.SkillSessionID,
+		)
+		if activeErr == nil {
+			output.SkillSessionActive = active
+			output.SkillSessionActiveKnown = true
+		}
+	}
+
 	return output, nil
 }
 
@@ -166,4 +178,13 @@ func (a *Adapter) ResolveToolWait(
 	return sessionRuntime.ToolWaitResolution{}, errors.New(
 		"skill tool execution does not expose an approval wait",
 	)
+}
+
+func isSkillLifecycleTool(name string) bool {
+	switch name {
+	case "skills-load", "skills-unload":
+		return true
+	default:
+		return false
+	}
 }

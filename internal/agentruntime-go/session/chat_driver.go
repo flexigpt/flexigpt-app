@@ -131,7 +131,7 @@ func (d *SequentialChatDriver) Advance(
 		}, nil
 	}
 
-	if first := firstOutstanding(batch); first != nil {
+	if first := firstPending(batch); first != nil {
 		if first.Automatic &&
 			!automationHoldApplies(
 				view.Controls.AutomaticTools,
@@ -149,6 +149,14 @@ func (d *SequentialChatDriver) Advance(
 			}, nil
 		}
 
+		waiting := RunStateWaiting
+		return DriverTransition{
+			NextState:    encodeDriverState(d.Kind(), d.Version(), current),
+			SetLifecycle: &waiting,
+		}, nil
+	}
+
+	if hasUnresolved(batch) {
 		waiting := RunStateWaiting
 		return DriverTransition{
 			NextState:    encodeDriverState(d.Kind(), d.Version(), current),
@@ -242,10 +250,9 @@ func firstRequestedOutstanding(
 	return nil
 }
 
-func firstOutstanding(calls []DriverToolCallView) *DriverToolCallView {
+func firstPending(calls []DriverToolCallView) *DriverToolCallView {
 	for _, call := range calls {
-		if call.State == ToolCallStateResolved ||
-			call.State == ToolCallStateObserved {
+		if call.State != ToolCallStatePending {
 			continue
 		}
 		copyValue := call
@@ -253,6 +260,18 @@ func firstOutstanding(calls []DriverToolCallView) *DriverToolCallView {
 	}
 
 	return nil
+}
+
+func hasUnresolved(calls []DriverToolCallView) bool {
+	for _, call := range calls {
+		if call.State == ToolCallStateResolved ||
+			call.State == ToolCallStateObserved {
+			continue
+		}
+		return true
+	}
+
+	return false
 }
 
 func allAutomaticAndSuccessful(calls []DriverToolCallView) bool {

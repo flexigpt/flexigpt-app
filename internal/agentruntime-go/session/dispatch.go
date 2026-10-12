@@ -482,7 +482,7 @@ func (r *Runtime) finishModelExecution(
 		sessionValue.Transcript = append(
 			sessionValue.Transcript,
 			TranscriptMessage{
-				ID:              r.newID("message"),
+				ID:              r.newID(),
 				CreatedAt:       r.now(),
 				Role:            MessageRoleAssistant,
 				Status:          status,
@@ -643,7 +643,7 @@ func (r *Runtime) registerToolCallLocked(
 ) ToolCall {
 	callID := proposal.ID
 	if callID == "" {
-		callID = ToolCallID(r.newID("tool-call"))
+		callID = ToolCallID(r.newID())
 	}
 
 	call := ToolCall{
@@ -867,14 +867,14 @@ func (r *Runtime) dispatchToolEvaluation(
 		}
 
 		wait := WaitingRequest{
-			ID:                 WaitID(r.newID("wait")),
+			ID:                 WaitID(r.newID()),
 			Kind:               evaluation.Wait.Kind,
 			Status:             WaitStatusPending,
 			OperationID:        call.OriginOperationID,
 			ToolCallID:         call.ID,
 			Summary:            cloneRaw(evaluation.Wait.Summary),
 			InputSchema:        cloneRaw(evaluation.Wait.InputSchema),
-			AllowedResolutions: append([]string(nil), evaluation.Wait.AllowedResolutions...),
+			AllowedResolutions: append([]WaitResolution(nil), evaluation.Wait.AllowedResolutions...),
 			CreatedAt:          r.now(),
 			UpdatedAt:          r.now(),
 			ExpiresAt:          cloneTime(evaluation.Wait.ExpiresAt),
@@ -1049,7 +1049,7 @@ func (r *Runtime) dispatchToolExecution(
 	}
 
 	attempt := ToolAttempt{
-		ID:        ToolAttemptID(r.newID("tool-attempt")),
+		ID:        ToolAttemptID(r.newID()),
 		CallID:    call.ID,
 		State:     ToolAttemptStateRunning,
 		Automatic: work.Automatic,
@@ -1559,7 +1559,7 @@ func (r *Runtime) recordExecutionResultLocked(
 	}
 
 	toolResult := ToolResult{
-		ID:             ToolResultID(r.newID("tool-result")),
+		ID:             ToolResultID(r.newID()),
 		AttemptID:      attemptID,
 		CallID:         call.ID,
 		ProviderCallID: call.ProviderCallID,
@@ -1573,6 +1573,14 @@ func (r *Runtime) recordExecutionResultLocked(
 		Error:          result.Error,
 		CreatedAt:      r.now(),
 	}
+
+	if result.SkillSessionActiveKnown {
+		run.SkillSession.Active = filterReferences(
+			result.SkillSessionActive,
+			run.SkillSession.Enabled,
+		)
+	}
+
 	selectToolResult(call, toolResult)
 	call.State = ToolCallStateResolved
 	call.LastFailure = ""

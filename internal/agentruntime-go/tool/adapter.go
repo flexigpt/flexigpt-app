@@ -35,15 +35,8 @@ func NewAdapter(
 
 func (a *Adapter) EvaluateTool(
 	_ context.Context,
-	request sessionRuntime.ToolExecutionRequest,
+	_ sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolEvaluation, error) {
-	if request.ToolCall.Binding.Kind != sessionRuntime.ToolBindingKindGo {
-		return sessionRuntime.ToolEvaluation{}, fmt.Errorf(
-			"go-tool adapter cannot evaluate binding kind %q",
-			request.ToolCall.Binding.Kind,
-		)
-	}
-
 	return sessionRuntime.ToolEvaluation{
 		Decision: sessionRuntime.ToolEvaluationAllowed,
 	}, nil

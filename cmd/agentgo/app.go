@@ -27,6 +27,7 @@ type App struct {
 
 	settingStoreAPI       *SettingStoreWrapper
 	conversationStoreAPI  *ConversationCollectionWrapper
+	sessionStoreAPI       *SessionStoreWrapper
 	modelStoreAPI         *ModelStoreWrapper
 	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
@@ -55,6 +56,7 @@ type App struct {
 
 	settingsDirPath      string
 	conversationsDirPath string
+	sessionsDirPath      string
 	artifactStoreDirPath string
 
 	artifactInitializationError error
@@ -84,6 +86,10 @@ func newApp() *App {
 		app.dataBasePath,
 		storageName(topology.ApplicationStorageConversationsDirectory),
 	)
+	app.sessionsDirPath = filepath.Join(
+		app.dataBasePath,
+		"sessions",
+	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
@@ -91,12 +97,14 @@ func newApp() *App {
 		),
 	)
 
-	if app.settingsDirPath == "" || app.conversationsDirPath == "" || app.artifactStoreDirPath == "" {
+	if app.settingsDirPath == "" || app.conversationsDirPath == "" || app.sessionsDirPath == "" ||
+		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
+			"sessionsDirPath", app.sessionsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -113,6 +121,7 @@ func newApp() *App {
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
+	app.sessionStoreAPI = &SessionStoreWrapper{}
 	app.modelStoreAPI = &ModelStoreWrapper{}
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
@@ -162,6 +171,7 @@ func newApp() *App {
 		"app data", app.dataBasePath,
 		"settingsDirPath", app.settingsDirPath,
 		"conversationsDirPath", app.conversationsDirPath,
+		"sessionsDirPath", app.sessionsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
@@ -218,6 +228,20 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: conversation store initialization failed\n" + err.Error())
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
+
+	err = InitSessionStoreWrapper(
+		a.sessionStoreAPI,
+		a.sessionsDirPath,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize session store",
+			"directory", a.sessionsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: session store initialization failed\n" + err.Error())
+	}
+	slog.Info("session store initialized", "directory", a.sessionsDirPath)
 
 	artifactSetup, err := artifactsetup.OpenArtifactStore(
 		context.Background(),
@@ -627,6 +651,8 @@ func (a *App) initManagers() {
 	err = InitComposedSessionRuntime(
 		a.ctx,
 		a.sessionRuntimeAPI,
+		a.sessionStoreAPI.store,
+		a.sessionStoreAPI.store,
 		a.completionAPI,
 		a.toolStoreAPI,
 		a.mcpRuntimeAPI,
@@ -681,6 +707,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Stop background goroutines + flushes for stores that need it.
 	if a.sessionRuntimeAPI != nil {
 		a.sessionRuntimeAPI.close()
+	}
+	if a.sessionStoreAPI != nil {
+		a.sessionStoreAPI.close()
 	}
 	if a.completionAPI != nil {
 		a.completionAPI.close()

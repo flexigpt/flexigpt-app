@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"sync"
 
 	"github.com/flexigpt/agentskills-go/provider"
+	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
 	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
@@ -21,6 +24,8 @@ import (
 func InitComposedSessionRuntime(
 	ctx context.Context,
 	wrapper *SessionRuntimeWrapper,
+	checkpoints sessionRuntime.CheckpointSink,
+	recovery sessionRuntime.RecoverySource,
 	completion *CompletionWrapper,
 	tools *ToolStoreWrapper,
 	mcpWrapper *MCPRuntimeWrapper,
@@ -62,8 +67,9 @@ func InitComposedSessionRuntime(
 	}
 
 	skillBridge := &agentgoArtifactSkillSessionBridge{
-		aggregate: skillAggregate,
-		runtime:   skillRuntimeWrapper,
+		aggregate:   skillAggregate,
+		runtime:     skillRuntimeWrapper,
+		sessionRefs: make(map[string]map[string]sessionRuntime.ArtifactReference),
 	}
 	skillExecutor, err := skillRuntime.NewAdapter(skillBridge)
 	if err != nil {
@@ -82,9 +88,11 @@ func InitComposedSessionRuntime(
 	}
 
 	runtimeValue, err := sessionRuntime.NewRuntime(sessionRuntime.RuntimeDependencies{
-		Model:  modelExecutor,
-		Tools:  toolRouter,
-		Skills: skillExecutor,
+		Model:       modelExecutor,
+		Tools:       toolRouter,
+		Skills:      skillExecutor,
+		Checkpoints: checkpoints,
+		Recovery:    recovery,
 	})
 	if err != nil {
 		return err
@@ -101,6 +109,9 @@ func InitComposedSessionRuntime(
 type agentgoArtifactSkillSessionBridge struct {
 	aggregate *SkillAggregateWrapper
 	runtime   *SkillRuntimeWrapper
+
+	mu          sync.RWMutex
+	sessionRefs map[string]map[string]sessionRuntime.ArtifactReference
 }
 
 func (b *agentgoArtifactSkillSessionBridge) EnsureArtifactSkillSession(
@@ -183,6 +194,16 @@ func (b *agentgoArtifactSkillSessionBridge) EnsureArtifactSkillSession(
 		}
 	}
 
+	b.mu.Lock()
+	if request.PreviousSessionID != "" &&
+		request.PreviousSessionID != string(response.Body.SessionID) {
+		delete(b.sessionRefs, request.PreviousSessionID)
+	}
+	b.sessionRefs[string(response.Body.SessionID)] = cloneSessionDefinitionMap(
+		byDefinition,
+	)
+	b.mu.Unlock()
+
 	return skillRuntime.ArtifactSessionResult{
 		SessionID: string(response.Body.SessionID),
 		Active:    activeReferences,
@@ -197,10 +218,68 @@ func (b *agentgoArtifactSkillSessionBridge) CloseArtifactSkillSession(
 		return errors.New("artifact skill-session bridge is unavailable")
 	}
 
-	return b.runtime.service.CloseSession(
+	err := b.runtime.service.CloseSession(
 		ctx,
 		agentskillsRuntimeSpec.SessionID(sessionID),
 	)
+	if err != nil {
+		return err
+	}
+
+	b.mu.Lock()
+	delete(b.sessionRefs, sessionID)
+	b.mu.Unlock()
+
+	return nil
+}
+
+func (b *agentgoArtifactSkillSessionBridge) ListActiveArtifactSkills(
+	ctx context.Context,
+	sessionID string,
+) ([]sessionRuntime.ArtifactReference, error) {
+	if b == nil || b.runtime == nil || b.runtime.service == nil {
+		return nil, errors.New("artifact skill-session bridge is unavailable")
+	}
+
+	b.mu.RLock()
+	byDefinition := cloneSessionDefinitionMap(b.sessionRefs[sessionID])
+	b.mu.RUnlock()
+
+	if len(byDefinition) == 0 {
+		return []sessionRuntime.ArtifactReference{}, nil
+	}
+
+	records, err := b.runtime.service.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			SessionID: agentskillsRuntimeSpec.SessionID(sessionID),
+			Activity:  agentskillsRuntimeSpec.SkillActivity("active"),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]sessionRuntime.ArtifactReference, 0, len(records))
+	seen := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		key, keyErr := definitionKey(record.Def)
+		if keyErr != nil {
+			continue
+		}
+		reference, found := byDefinition[key]
+		if !found {
+			continue
+		}
+		referenceKey := reference.RootID + "\x00" + reference.ArtifactID
+		if _, duplicate := seen[referenceKey]; duplicate {
+			continue
+		}
+		seen[referenceKey] = struct{}{}
+		output = append(output, reference)
+	}
+
+	return output, nil
 }
 
 func (b *agentgoArtifactSkillSessionBridge) InvokeArtifactSkillTool(
@@ -272,6 +351,14 @@ func sessionArtifactRefsToArtifactRefs(
 	}
 
 	return output, nil
+}
+
+func cloneSessionDefinitionMap(
+	input map[string]sessionRuntime.ArtifactReference,
+) map[string]sessionRuntime.ArtifactReference {
+	output := make(map[string]sessionRuntime.ArtifactReference, len(input))
+	maps.Copy(output, input)
+	return output
 }
 
 func definitionKey(value any) (string, error) {

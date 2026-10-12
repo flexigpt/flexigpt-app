@@ -11,7 +11,7 @@ type Clock interface {
 }
 
 type IDGenerator interface {
-	NewID(kind string) string
+	NewID() string
 }
 
 type ModelStream struct {
@@ -57,11 +57,11 @@ const (
 )
 
 type ToolWaitSpec struct {
-	Kind               WaitKind        `json:"kind"`
-	Summary            json.RawMessage `json:"summary,omitempty"`
-	InputSchema        json.RawMessage `json:"inputSchema,omitempty"`
-	AllowedResolutions []string        `json:"allowedResolutions,omitempty"`
-	ExpiresAt          *time.Time      `json:"expiresAt,omitempty"`
+	Kind               WaitKind         `json:"kind"`
+	Summary            json.RawMessage  `json:"summary,omitempty"`
+	InputSchema        json.RawMessage  `json:"inputSchema,omitempty"`
+	AllowedResolutions []WaitResolution `json:"allowedResolutions,omitempty"`
+	ExpiresAt          *time.Time       `json:"expiresAt,omitempty"`
 
 	// ExecutorReference is intentionally runtime-private. The Session core
 	// stores it in memory only and does not include it in snapshots/checkpoints.
@@ -94,6 +94,9 @@ type ToolExecutionResult struct {
 	Structured json.RawMessage `json:"structured,omitempty"`
 	App        json.RawMessage `json:"app,omitempty"`
 	Error      string          `json:"error,omitempty"`
+
+	SkillSessionActive      []ArtifactReference `json:"skillSessionActive,omitempty"`
+	SkillSessionActiveKnown bool                `json:"skillSessionActiveKnown,omitempty"`
 }
 
 type ToolWaitResolutionStatus string
@@ -108,7 +111,7 @@ type ToolWaitResolutionRequest struct {
 	RunID      RunID           `json:"runID"`
 	Wait       WaitingRequest  `json:"wait"`
 	ToolCall   ToolCall        `json:"toolCall"`
-	Resolution string          `json:"resolution"`
+	Resolution WaitResolution  `json:"resolution"`
 	Input      json.RawMessage `json:"input,omitempty"`
 
 	// ExecutorReference is the in-memory reference captured while creating the
@@ -175,6 +178,7 @@ type RuntimeEventKind string
 
 const (
 	RuntimeEventSessionCreated              RuntimeEventKind = "sessionCreated"
+	RuntimeEventSessionRenamed              RuntimeEventKind = "sessionRenamed"
 	RuntimeEventSessionConfigurationChanged RuntimeEventKind = "sessionConfigurationChanged"
 	RuntimeEventRunAccepted                 RuntimeEventKind = "runAccepted"
 	RuntimeEventRunStateChanged             RuntimeEventKind = "runStateChanged"

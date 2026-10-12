@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -12,6 +13,8 @@ import (
 const sessionRuntimeEventName = "session-runtime:event"
 
 type SessionRuntimeWrapper struct {
+	mu sync.RWMutex
+
 	runtime          *sessionRuntime.Runtime
 	eventUnsubscribe func()
 	eventDone        chan struct{}
@@ -24,6 +27,9 @@ func InitSessionRuntimeWrapper(
 	if wrapper == nil || runtimeValue == nil {
 		return errors.New("session runtime wrapper dependencies are incomplete")
 	}
+
+	wrapper.mu.Lock()
+	defer wrapper.mu.Unlock()
 
 	if wrapper.runtime != nil {
 		return errors.New("session runtime wrapper is already initialized")
@@ -46,6 +52,14 @@ func (w *SessionRuntimeWrapper) UpdateSessionConfiguration(
 ) (*sessionRuntime.CommandReceipt, error) {
 	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
 		return runtimeValue.UpdateSessionConfiguration(context.Background(), command)
+	})
+}
+
+func (w *SessionRuntimeWrapper) RenameSession(
+	command sessionRuntime.RenameSessionCommand,
+) (*sessionRuntime.CommandReceipt, error) {
+	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
+		return runtimeValue.RenameSession(context.Background(), command)
 	})
 }
 
@@ -196,7 +210,13 @@ func withSessionRuntime[T any](
 			return zero, sessionRuntime.ErrRuntimeClosed
 		}
 
-		return callback(wrapper.runtime)
+		wrapper.mu.RLock()
+		runtimeValue := wrapper.runtime
+		wrapper.mu.RUnlock()
+		if runtimeValue == nil {
+			return zero, sessionRuntime.ErrRuntimeClosed
+		}
+		return callback(runtimeValue)
 	})
 }
 
@@ -208,11 +228,13 @@ func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
 		return
 	}
 
+	w.mu.Lock()
 	previousUnsubscribe := w.eventUnsubscribe
 	previousDone := w.eventDone
 	w.eventUnsubscribe = nil
 	w.eventDone = nil
 	runtimeValue := w.runtime
+	w.mu.Unlock()
 
 	if previousUnsubscribe != nil {
 		previousUnsubscribe()
@@ -227,12 +249,15 @@ func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
 	events, unsubscribe := runtimeValue.Subscribe(256)
 	done := make(chan struct{})
 
+	w.mu.Lock()
 	if w.runtime != runtimeValue {
+		w.mu.Unlock()
 		unsubscribe()
 		return
 	}
 	w.eventUnsubscribe = unsubscribe
 	w.eventDone = done
+	w.mu.Unlock()
 
 	go func() {
 		defer close(done)
@@ -247,12 +272,14 @@ func (w *SessionRuntimeWrapper) close() {
 		return
 	}
 
+	w.mu.Lock()
 	runtimeValue := w.runtime
 	unsubscribe := w.eventUnsubscribe
 	done := w.eventDone
 	w.runtime = nil
 	w.eventUnsubscribe = nil
 	w.eventDone = nil
+	w.mu.Unlock()
 
 	if unsubscribe != nil {
 		unsubscribe()

@@ -102,7 +102,8 @@ func (a *Adapter) ExecuteModel(
 	history, err := a.conversationMessages(
 		ctx,
 		request.History,
-		false,
+		true,
+		true,
 	)
 	if err != nil {
 		return sessionRuntime.ModelExecutionResult{}, err
@@ -112,6 +113,7 @@ func (a *Adapter) ExecuteModel(
 		ctx,
 		[]sessionRuntime.TranscriptMessage{request.Current},
 		true,
+		false,
 	)
 	if err != nil {
 		return sessionRuntime.ModelExecutionResult{}, err
@@ -272,6 +274,7 @@ func (a *Adapter) conversationMessages(
 	ctx context.Context,
 	messages []sessionRuntime.TranscriptMessage,
 	materializeAttachments bool,
+	embedAttachments bool,
 ) ([]conversationSpec.ConversationMessage, error) {
 	output := make([]conversationSpec.ConversationMessage, 0, len(messages))
 
@@ -280,6 +283,7 @@ func (a *Adapter) conversationMessages(
 			ctx,
 			message,
 			materializeAttachments,
+			embedAttachments,
 		)
 		if err != nil {
 			return nil, err
@@ -294,6 +298,7 @@ func (a *Adapter) conversationMessage(
 	ctx context.Context,
 	message sessionRuntime.TranscriptMessage,
 	materializeAttachments bool,
+	embedAttachments bool,
 ) (conversationSpec.ConversationMessage, error) {
 	inputs, err := decodeInputUnions(message.ProtocolInputs)
 	if err != nil {
@@ -337,10 +342,97 @@ func (a *Adapter) conversationMessage(
 				materializeErr,
 			)
 		}
-		value.Attachments = attachments
+
+		if embedAttachments && message.Role == sessionRuntime.MessageRoleUser {
+			value.Inputs, err = appendMaterializedAttachmentInputs(
+				ctx,
+				value.Inputs,
+				attachments,
+				message.ID,
+			)
+			if err != nil {
+				return conversationSpec.ConversationMessage{}, err
+			}
+		} else {
+			value.Attachments = attachments
+		}
 	}
 
 	return value, nil
+}
+
+func appendMaterializedAttachmentInputs(
+	ctx context.Context,
+	inputs []inferenceSpec.InputUnion,
+	attachments []attachmentRuntime.Attachment,
+	messageID string,
+) ([]inferenceSpec.InputUnion, error) {
+	if len(attachments) == 0 || hasMaterializedAttachmentInput(inputs) {
+		return inputs, nil
+	}
+
+	items, err := buildContentItemsFromAttachments(ctx, attachments)
+	if err != nil || len(items) == 0 {
+		return inputs, err
+	}
+
+	output := append([]inferenceSpec.InputUnion(nil), inputs...)
+	for index := len(output) - 1; index >= 0; index-- {
+		input := &output[index]
+		if input.Kind != inferenceSpec.InputKindInputMessage ||
+			input.InputMessage == nil ||
+			input.InputMessage.Role != inferenceSpec.RoleUser {
+			continue
+		}
+
+		input.InputMessage.Contents = append(
+			input.InputMessage.Contents,
+			items...,
+		)
+		return output, nil
+	}
+
+	output = append(output, inferenceSpec.InputUnion{
+		Kind: inferenceSpec.InputKindInputMessage,
+		InputMessage: &inferenceSpec.InputOutputContent{
+			ID:       messageID,
+			Role:     inferenceSpec.RoleUser,
+			Status:   inferenceSpec.StatusNone,
+			Contents: items,
+		},
+	})
+	return output, nil
+}
+
+func hasMaterializedAttachmentInput(
+	inputs []inferenceSpec.InputUnion,
+) bool {
+	for _, input := range inputs {
+		if input.Kind != inferenceSpec.InputKindInputMessage ||
+			input.InputMessage == nil {
+			continue
+		}
+
+		for _, content := range input.InputMessage.Contents {
+			switch content.Kind {
+			case inferenceSpec.ContentItemKindImage,
+				inferenceSpec.ContentItemKindFile:
+				return true
+
+			case inferenceSpec.ContentItemKindText:
+				if content.TextItem != nil &&
+					strings.HasPrefix(
+						strings.TrimSpace(content.TextItem.Text),
+						"<<<FILE",
+					) {
+					return true
+				}
+			default:
+			}
+		}
+	}
+
+	return false
 }
 
 func buildInputsFromTranscriptMessage(

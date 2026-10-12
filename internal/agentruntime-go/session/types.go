@@ -140,6 +140,22 @@ const (
 	WaitStatusInvalid   WaitStatus = "invalid"
 )
 
+// WaitResolution is a Session-owned, generic human-intervention decision.
+//
+// Concrete adapters translate these values to provider or policy-specific
+// decisions. The Session core never accepts external approval-token or
+// MCP-resolution strings directly.
+type WaitResolution string
+
+const (
+	WaitResolutionApproveOnce   WaitResolution = "approveOnce"
+	WaitResolutionApproveAlways WaitResolution = "approveAlways"
+	WaitResolutionDenyOnce      WaitResolution = "denyOnce"
+	WaitResolutionDenyAlways    WaitResolution = "denyAlways"
+	WaitResolutionContinue      WaitResolution = "continue"
+	WaitResolutionCancel        WaitResolution = "cancel"
+)
+
 type AutomationHoldScope string
 
 const (
@@ -365,18 +381,18 @@ type ToolCallProposal struct {
 }
 
 type WaitingRequest struct {
-	ID                 WaitID          `json:"id"`
-	Kind               WaitKind        `json:"kind"`
-	Status             WaitStatus      `json:"status"`
-	OperationID        OperationID     `json:"operationID,omitempty"`
-	ToolCallID         ToolCallID      `json:"toolCallID,omitempty"`
-	Summary            json.RawMessage `json:"summary,omitempty"`
-	InputSchema        json.RawMessage `json:"inputSchema,omitempty"`
-	AllowedResolutions []string        `json:"allowedResolutions,omitempty"`
-	CreatedAt          time.Time       `json:"createdAt"`
-	UpdatedAt          time.Time       `json:"updatedAt"`
-	ExpiresAt          *time.Time      `json:"expiresAt,omitempty"`
-	Error              string          `json:"error,omitempty"`
+	ID                 WaitID           `json:"id"`
+	Kind               WaitKind         `json:"kind"`
+	Status             WaitStatus       `json:"status"`
+	OperationID        OperationID      `json:"operationID,omitempty"`
+	ToolCallID         ToolCallID       `json:"toolCallID,omitempty"`
+	Summary            json.RawMessage  `json:"summary,omitempty"`
+	InputSchema        json.RawMessage  `json:"inputSchema,omitempty"`
+	AllowedResolutions []WaitResolution `json:"allowedResolutions,omitempty"`
+	CreatedAt          time.Time        `json:"createdAt"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
+	ExpiresAt          *time.Time       `json:"expiresAt,omitempty"`
+	Error              string           `json:"error,omitempty"`
 }
 
 type AutomationHold struct {
@@ -542,6 +558,12 @@ type UpdateSessionConfigurationCommand struct {
 	Configuration SessionConfiguration `json:"configuration"`
 }
 
+type RenameSessionCommand struct {
+	Meta      CommandMeta `json:"meta"`
+	SessionID SessionID   `json:"sessionID"`
+	Title     string      `json:"title"`
+}
+
 type AgentApplication struct {
 	Agent             AgentProvenance      `json:"agent"`
 	Configuration     SessionConfiguration `json:"configuration"`
@@ -613,7 +635,7 @@ type ResolveWaitCommand struct {
 	SessionID  SessionID       `json:"sessionID"`
 	RunID      RunID           `json:"runID"`
 	WaitID     WaitID          `json:"waitID"`
-	Resolution string          `json:"resolution"`
+	Resolution WaitResolution  `json:"resolution"`
 	Input      json.RawMessage `json:"input,omitempty"`
 }
 

@@ -2,14 +2,16 @@ package session
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 var (
@@ -18,27 +20,6 @@ var (
 	ErrRunNotFound       = errors.New("run not found")
 	ErrCommandIDConflict = errors.New("command ID was reused with a different payload")
 )
-
-type systemClock struct{}
-
-func (systemClock) Now() time.Time {
-	return time.Now().UTC()
-}
-
-type randomIDGenerator struct{}
-
-func (randomIDGenerator) NewID(kind string) string {
-	raw := make([]byte, 16)
-	if _, err := rand.Read(raw); err != nil {
-		return fmt.Sprintf(
-			"%s-%d",
-			kind,
-			time.Now().UTC().UnixNano(),
-		)
-	}
-
-	return kind + "-" + hex.EncodeToString(raw)
-}
 
 type commandRecord struct {
 	Fingerprint string
@@ -67,7 +48,7 @@ type runtimeWork struct {
 	ToolCallID  ToolCallID
 	WaitID      WaitID
 	Automatic   bool
-	Resolution  string
+	Resolution  WaitResolution
 	Input       json.RawMessage
 	SkillID     string
 }
@@ -115,6 +96,10 @@ type Runtime struct {
 	nextSubscriberID uint64
 
 	closed bool
+
+	effectMu      sync.Mutex
+	effectWG      sync.WaitGroup
+	effectClosing bool
 }
 
 func NewRuntime(
@@ -123,13 +108,6 @@ func NewRuntime(
 ) (*Runtime, error) {
 	if dependencies.Model == nil {
 		return nil, errors.New("session runtime requires a model executor")
-	}
-
-	if dependencies.Clock == nil {
-		dependencies.Clock = systemClock{}
-	}
-	if dependencies.IDs == nil {
-		dependencies.IDs = randomIDGenerator{}
 	}
 
 	runtime := &Runtime{
@@ -193,9 +171,15 @@ func (r *Runtime) Close() {
 	r.subscribers = make(map[uint64]chan RuntimeEvent)
 	r.mu.Unlock()
 
+	r.effectMu.Lock()
+	r.effectClosing = true
+	r.effectMu.Unlock()
+
 	for _, cancel := range cancels {
 		cancel()
 	}
+
+	r.effectWG.Wait()
 
 	for _, subscriber := range subscribers {
 		close(subscriber)
@@ -328,11 +312,19 @@ func (r *Runtime) ListSessions(
 }
 
 func (r *Runtime) now() time.Time {
-	return r.deps.Clock.Now().UTC()
+	if r.deps.Clock != nil {
+		return clockutil.NowUTC(r.deps.Clock)
+	}
+
+	return clockutil.System{}.Now()
 }
 
-func (r *Runtime) newID(kind string) string {
-	return r.deps.IDs.NewID(kind)
+func (r *Runtime) newID() string {
+	if r.deps.IDs != nil {
+		return r.deps.IDs.NewID()
+	}
+
+	return uuidutil.NewUUIDv7()
 }
 
 func (r *Runtime) sessionAndRunLocked(
@@ -437,6 +429,21 @@ func (r *Runtime) checkpointLocked(
 	effects.checkpoints = append(effects.checkpoints, view)
 }
 
+func (r *Runtime) launchEffect(fn func()) {
+	r.effectMu.Lock()
+	if r.effectClosing {
+		r.effectMu.Unlock()
+		return
+	}
+	r.effectWG.Add(1)
+	r.effectMu.Unlock()
+
+	go func() {
+		defer r.effectWG.Done()
+		fn()
+	}()
+}
+
 func (r *Runtime) flushEffects(
 	ctx context.Context,
 	effects runtimeEffects,
@@ -457,7 +464,9 @@ func (r *Runtime) flushEffects(
 
 	for _, work := range effects.work {
 		workCopy := work
-		go r.dispatchWork(effectCtx, workCopy)
+		r.launchEffect(func() {
+			r.dispatchWork(effectCtx, workCopy)
+		})
 	}
 }
 
@@ -484,11 +493,10 @@ func (r *Runtime) publishEvent(
 	r.mu.RUnlock()
 
 	if publisher != nil {
-		go func(
-			publishCtx context.Context,
-			eventPublisher EventPublisher,
-			runtimeEvent RuntimeEvent,
-		) {
+		f := func() {
+			publishCtx := context.WithoutCancel(ctx)
+			eventPublisher := publisher
+			runtimeEvent := event
 			if err := eventPublisher.PublishRuntimeEvent(publishCtx, runtimeEvent); err != nil {
 				r.reportDiagnostic(publishCtx, RuntimeDiagnostic{
 					SessionID: event.SessionID,
@@ -499,7 +507,8 @@ func (r *Runtime) publishEvent(
 					At:        r.now(),
 				})
 			}
-		}(context.WithoutCancel(ctx), publisher, event)
+		}
+		r.launchEffect(f)
 	}
 }
 
@@ -511,11 +520,10 @@ func (r *Runtime) handleCheckpoint(
 		return
 	}
 
-	go func(
-		checkpointCtx context.Context,
-		sink CheckpointSink,
-		checkpointView RuntimeCheckpointView,
-	) {
+	r.launchEffect(func() {
+		checkpointCtx := context.WithoutCancel(ctx)
+		sink := r.deps.Checkpoints
+		checkpointView := checkpoint
 		if err := sink.HandleCheckpoint(
 			checkpointCtx,
 			checkpoint,
@@ -528,7 +536,7 @@ func (r *Runtime) handleCheckpoint(
 				At:        r.now(),
 			})
 		}
-	}(context.WithoutCancel(ctx), r.deps.Checkpoints, checkpoint)
+	})
 }
 
 func (r *Runtime) reportDiagnostic(
@@ -539,10 +547,12 @@ func (r *Runtime) reportDiagnostic(
 	if sink == nil {
 		return
 	}
-	go sink.ReportRuntimeDiagnostic(
-		context.WithoutCancel(ctx),
-		diagnostic,
-	)
+	r.launchEffect(func() {
+		sink.ReportRuntimeDiagnostic(
+			context.WithoutCancel(ctx),
+			diagnostic,
+		)
+	})
 }
 
 func eventData(value any) json.RawMessage {
@@ -559,16 +569,7 @@ func eventData(value any) json.RawMessage {
 }
 
 func cloneJSON[T any](value T) T {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return value
-	}
-
-	var output T
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return value
-	}
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }
 
 type runtimeRestorer struct {
@@ -657,12 +658,15 @@ func normalizeRecoveredRun(
 		return
 	}
 
+	requiresRecoveryReview := false
+
 	for operationIndex := range run.ModelOperations {
 		operation := &run.ModelOperations[operationIndex]
 		switch operation.State {
 		case OperationStateQueued,
 			OperationStatePreparing,
 			OperationStateRunning:
+			requiresRecoveryReview = true
 			operation.State = OperationStateInterrupted
 			operation.FinishedAt = now
 			operation.Error = &OperationError{
@@ -679,6 +683,7 @@ func normalizeRecoveredRun(
 			attempt := &call.Attempts[attemptIndex]
 			if attempt.State == ToolAttemptStateQueued ||
 				attempt.State == ToolAttemptStateRunning {
+				requiresRecoveryReview = true
 				attempt.State = ToolAttemptStateUncertain
 				attempt.Uncertain = true
 				attempt.FinishedAt = now
@@ -692,28 +697,39 @@ func normalizeRecoveredRun(
 		case ToolCallStateEvaluating,
 			ToolCallStateWaiting,
 			ToolCallStateRunning:
+			requiresRecoveryReview = true
 			call.State = ToolCallStateFailed
 			call.LastFailure = "external tool outcome requires recovery decision"
 		default:
 		}
 	}
 
-	if run.State == RunStateQueued ||
-		run.State == RunStateRunning ||
-		run.State == RunStateCancelling {
+	for waitIndex := range run.WaitingRequests {
+		wait := &run.WaitingRequests[waitIndex]
+		if wait.Status != WaitStatusPending &&
+			wait.Status != WaitStatusResolving {
+			continue
+		}
+
+		if wait.Kind == WaitKindRecovery {
+			requiresRecoveryReview = true
+			continue
+		}
+
+		requiresRecoveryReview = true
+		wait.Status = WaitStatusInvalid
+		wait.Error = "wait executor state is unavailable after runtime recovery"
+		wait.UpdatedAt = now
+	}
+
+	if !run.State.Terminal() &&
+		(run.State == RunStateQueued ||
+			run.State == RunStateRunning ||
+			run.State == RunStateCancelling ||
+			requiresRecoveryReview) {
 		run.State = RunStateWaiting
 		run.Outcome = nil
-		run.WaitingRequests = append(run.WaitingRequests, WaitingRequest{
-			ID:        WaitID("recovery-" + string(run.ID)),
-			Kind:      WaitKindRecovery,
-			Status:    WaitStatusPending,
-			CreatedAt: now,
-			UpdatedAt: now,
-			Summary: eventData(map[string]string{
-				"message": "recovered work requires review before new external work is dispatched",
-			}),
-			AllowedResolutions: []string{"continue", "cancel"},
-		})
+		ensureRecoveryWait(run, now)
 	}
 
 	run.ActiveModelOperationID = ""
@@ -721,4 +737,36 @@ func normalizeRecoveredRun(
 	run.Controls.CancellationRequested = false
 	run.Revision++
 	run.UpdatedAt = now
+}
+
+func ensureRecoveryWait(
+	run *Run,
+	now time.Time,
+) {
+	for _, wait := range run.WaitingRequests {
+		if wait.Kind == WaitKindRecovery &&
+			(wait.Status == WaitStatusPending ||
+				wait.Status == WaitStatusResolving) {
+			return
+		}
+	}
+
+	run.WaitingRequests = append(run.WaitingRequests, WaitingRequest{
+		ID: WaitID(fmt.Sprintf(
+			"recovery-%s-%d",
+			run.ID,
+			now.UnixNano(),
+		)),
+		Kind:      WaitKindRecovery,
+		Status:    WaitStatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Summary: eventData(map[string]string{
+			"message": "recovered work requires review before new external work is dispatched",
+		}),
+		AllowedResolutions: []WaitResolution{
+			WaitResolutionContinue,
+			WaitResolutionCancel,
+		},
+	})
 }
