@@ -70,7 +70,7 @@
 - [ ] Tool calls: Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
 - [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 
-- Multi Model parallell comparison and evals
+- Multi Model parallel comparison and evals
   - [ ] send same prompt to multiple models
   - [ ] compare responses side-by-side
   - [ ] show token usage
