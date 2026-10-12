@@ -68,7 +68,6 @@ The core `session` package must remain free of:
 - `internal/conversation`.
 - `internal/artifactory-go`.
 - `internal/llmartifactory-go`.
-- `internal/attachment`.
 - Existing frontend DTOs.
 - Concrete MCP, skill, model, workspace, or tool implementations.
 
@@ -84,14 +83,14 @@ internal/
     session/
       ... core Session/Run domain, coordinator, ports, events, drivers
 
-    inferenceruntime/
-    attachmentruntime/
-    skillruntime/
-    mcpruntime/
-    ... adapters only
+    inference/
+    attachment/
+    skill/
+    mcp/
+
 
   sessionstore/
-    ... new optional file/MapStore/FTS-backed Session store implementation
+    ... new file/MapStore/FTS-backed Session store implementation. this is optional wrt session knowing about it.
 
 cmd/
   agentgo/
@@ -102,7 +101,7 @@ The final exact file names are yours to define, but the dependency direction is 
 
 ```text
 session core
-  <- domain specific runtime wrappers like skillruntime, mcp runtime, etc
+  <- domain specific runtimes like skill, mcp, etc
   <- app wrappers in cmd/agentgo composition
   <- Wails bindings
   <- frontend clients
@@ -112,21 +111,19 @@ session core
 
 ### Existing wrapper migration
 
-The current `internal/agentruntime-go/inferencewrapper` contains artifact-backed and conversation-backed inference preparation.
+The current `internal/agentruntime-go/inference` contains artifact-backed and conversation-backed inference preparation for current things.
 
-The new Session runtime must not import it directly.
+The new Sessions runtime must not import it directly.
 
 Create a Session-facing inference adapter under:
 
 ```text
-internal/agentruntime-go/inferenceruntime/
+internal/agentruntime-go/inference/adapter.go
 ```
 
 That adapter may initially reuse the current `inferencewrapper.ProviderSetAPI`, but it must translate between Session-owned domain types and current inference/artifact/conversation types.
 
 Do not put artifact, conversation, storage, or Wails conversion code inside `internal/agentruntime-go/session`.
-
-If moving `internal/agentruntime-go/inferencewrapper` itself is necessary, perform a deliberate package move with import updates. Do not duplicate its behavior into a second implementation.
 
 ## Optional store and recovery requirements
 
@@ -181,12 +178,7 @@ Create the new store outside the Session core:
 internal/sessionstore/
 ```
 
-Create the adapter from that store into the Session runtime under:
-
-```text
-internal/agentruntime-go/wrappers/sessionstore/
-```
-
+The store shoudl implmeent the runtime needed ports and then bootstrap shoudl init it nad inject to sessions as needed.
 The Session store must support the Session-oriented read model needed by chat:
 
 - Read Session.
@@ -222,6 +214,7 @@ Support durable references for at least:
 Use the existing attachment domain types as reference material. If the existing attachment type cannot faithfully represent a directory reference required by Session storage, define a Session-store attachment-reference type and provide adapters.
 
 Keep attachment materialization behind a Session port and wrapper.
+Again, Sessions doesnt really understand if attachments are done in single file or as refs or whatever, it takes its own input and works with it.
 
 ## Existing service integration
 
@@ -342,7 +335,6 @@ Do not stop after this design step. Continue into implementation as:
 - Implement the in-memory Session/Run coordinator.
 - Implement the sequential chat driver.
 - Implement optional checkpoint and recovery ports.
-- Implement the adapters under `internal/agentruntime-go/wrappers/`.
 - Wire model, tools, skills, MCP, workspace, Agent, and attachment capabilities.
 - Add Wails-facing Session runtime command/query APIs.
 - Initialize the runtime only after its model, tool, skill, MCP, workspace, Agent, and attachment dependencies are ready.
@@ -503,232 +495,12 @@ The task list must be concise, copy-pastable, and suitable for maintaining in a 
 
 Do not place prose after `## Next steps`.
 
+I have already done some amount of work. build on that.
+
 Work as much as possible with available files. after that in next steps if your next items require some more files, ask for them too.
+complete the first and second step properly now.
+the file layout i have definied myself a bit.
 
----
+now, for sessionstore we will not have anything inside runtime. it is a pluggable thing. we should define that sessionstore properly based on conversation store and have files in internal/sessionstore. any other corrections in current things must be rectified.
 
-## Docs required
-
-### Required proposal
-
-Attach the final proposal document:
-
-```text
-<the Go Agent Runtime Proposal markdown file>
-```
-
-### Required Go backend folders
-
-Attach these complete folders, not isolated files:
-
-```text
-internal/agentruntime-go/
-internal/conversation/
-cmd/agentgo/
-internal/attachment/
-internal/artifactsetup/
-internal/artifactory-go/
-internal/llmartifactory-go/
-internal/mcppolicy/
-internal/llmtoolsutil/
-internal/setting/
-internal/jsonutil/
-internal/cryptoutil/
-internal/uuidutil/
-```
-
-These are needed because the implementation must inspect actual interfaces for:
-
-- Inference execution and completion preparation.
-- Agent resolution.
-- Tool resolution and Go-tool invocation.
-- Skill runtime and skill-session handling.
-- MCP connection, approval, execution, and App metadata.
-- Workspace planning and materialization.
-- Attachment references and content materialization.
-- Artifact-backed capability references.
-- Existing conversation persistence and FTS implementation.
-- Current Wails app composition and shutdown order.
-
-For a selective backend attachment, the minimum files already identified as directly relevant are:
-
-```text
-cmd/agentgo/app.go
-cmd/agentgo/wrapper_completion.go
-cmd/agentgo/wrapper_conversation.go
-cmd/agentgo/wrapper_agent_store.go
-cmd/agentgo/wrapper_attachment.go
-cmd/agentgo/wrapper_model_aggregate.go
-cmd/agentgo/wrapper_model_bootstrap.go
-cmd/agentgo/wrapper_model_store.go
-cmd/agentgo/wrapper_mcp_aggregate.go
-cmd/agentgo/wrapper_mcp_bootstrap.go
-cmd/agentgo/wrapper_mcp_runtime.go
-cmd/agentgo/wrapper_mcp_store.go
-cmd/agentgo/wrapper_skill_aggregate.go
-cmd/agentgo/wrapper_skill_bootstrap.go
-cmd/agentgo/wrapper_skill_runtime.go
-cmd/agentgo/wrapper_skill_store.go
-cmd/agentgo/wrapper_tool_runtime.go
-cmd/agentgo/wrapper_tool_store.go
-cmd/agentgo/wrapper_workspace_runtime.go
-cmd/agentgo/wrapper_workspace_store.go
-
-internal/conversation/store.go
-internal/conversation/ftslistner.go
-internal/conversation/spec/
-
-internal/agentruntime-go/
-```
-
-However, this selective set is not sufficient for compilation unless all its transitive imports are also available. Prefer the complete folders listed above.
-
-### Required frontend folders
-
-For the complete chat migration, attach these folders:
-
-```text
-frontend/app/chats/
-frontend/app/apis/
-frontend/app/spec/
-frontend/app/hooks/
-frontend/app/components/
-frontend/app/lib/
-```
-
-The following support folders are also required because the chat implementation imports them directly:
-
-```text
-frontend/app/models/lib/
-frontend/app/tools/lib/
-frontend/app/skills/lib/
-frontend/app/mcpservers/lib/
-```
-
-Attach these directly imported workspace components:
-
-```text
-frontend/app/workspaces/workspace_directory_registration_modal.tsx
-frontend/app/workspaces/workspace_mcp_setup_modal.tsx
-```
-
-Attach frontend build and TypeScript configuration files:
-
-```text
-frontend/package.json
-frontend/tsconfig.json
-```
-
-Also attach the actual frontend build configuration file or files if present, for example the repository’s real Vite configuration file.
-
-Do not guess its filename. Attach the file that configures the `@/` alias and frontend build.
-
-## Required generated Wails frontend bindings
-
-The current frontend imports generated bindings through:
-
-```text
-@/apis/wailsjs/
-```
-
-Attach the complete generated binding tree at its real repository location.
-
-Based on the supplied imports, this is expected to be under:
-
-```text
-frontend/app/apis/wailsjs/
-```
-
-If the generated tree is actually elsewhere, attach the real path and the generation configuration instead.
-
-Also attach:
-
-```text
-frontend/app/apis/wailsapi/
-```
-
-This includes the existing completion transport and establishes the current Wails API conventions that the new Session runtime and Session store adapters must follow.
-
-## Frontend files specifically central to the migration
-
-These are included by `frontend/app/chats/`, but they are the files the executor will almost certainly need to modify or replace behavior around:
-
-```text
-frontend/app/chats/page.tsx
-
-frontend/app/chats/conversation/use_send_message.ts
-frontend/app/chats/conversation/use_streaming_runtime.ts
-frontend/app/chats/conversation/use_input_registry.ts
-frontend/app/chats/conversation/conversation_area.tsx
-frontend/app/chats/conversation/conversation_input_pane.tsx
-frontend/app/chats/conversation/completion_helper.ts
-frontend/app/chats/conversation/completion_finalizer.ts
-frontend/app/chats/conversation/conversation_persistence_mapper.ts
-frontend/app/chats/conversation/hydration_helper.ts
-
-frontend/app/chats/tabs/use_chats_controller.ts
-frontend/app/chats/tabs/tabs_model.ts
-frontend/app/chats/tabs/tabs_persistence.ts
-
-frontend/app/chats/composer/composer_box.tsx
-frontend/app/chats/composer/contextarea/use_context_state.ts
-
-frontend/app/chats/composer/editor/editor_area.tsx
-frontend/app/chats/composer/editor/editor_types.ts
-
-frontend/app/chats/composer/toolruntime/execute_tool_call.ts
-frontend/app/chats/composer/toolruntime/tool_runtime_utils.ts
-frontend/app/chats/composer/toolruntime/use_composer_tool_config.ts
-frontend/app/chats/composer/toolruntime/use_composer_tools.ts
-frontend/app/chats/composer/toolruntime/use_tool_auto_exec_drainer.ts
-frontend/app/chats/composer/toolruntime/use_tool_runtime.ts
-
-frontend/app/chats/composer/mcp/use_composer_mcp.ts
-frontend/app/chats/composer/mcp/use_mcp_approval.ts
-frontend/app/chats/composer/mcp/mcp_composer_types.ts
-frontend/app/chats/composer/mcp/mcp_approval_modal.tsx
-
-frontend/app/chats/composer/agents/use_agent_manager.ts
-
-frontend/app/chats/composer/skills/use_composer_skills.ts
-frontend/app/chats/composer/skills/use_agent_system_prompt.ts
-frontend/app/chats/composer/skills/prompt_utils.ts
-
-frontend/app/chats/composer/workspaces/use_composer_workspace.ts
-
-frontend/app/chats/mcpapps/mcp_app_events.ts
-frontend/app/chats/mcpapps/mcp_app_rpc_router.ts
-frontend/app/chats/mcpapps/mcp_app_view.tsx
-frontend/app/chats/mcpapps/mcp_app_types.ts
-
-frontend/app/chats/search/use_conversation_search.ts
-frontend/app/chats/search/conversation_search.tsx
-```
-
-## Files and folders that can be omitted
-
-The following can be omitted from a selective implementation attachment, provided the executor is not expected to run a complete frontend typecheck without repository access:
-
-- Management-page route implementations for Agents, Models, Tools, Skills, MCP servers, and Workspaces.
-- Frontend tests.
-- Backend tests.
-- Documentation.
-- Static assets.
-- Storybook or demo code.
-- Existing generated catalogs and built-in artifact content.
-
-Do **not** omit the supporting `lib` folders listed above, because chat composer code imports them directly.
-
-Do **not** omit the current `frontend/app/chats/` folder if the executor is expected to complete the frontend migration rather than only the backend implementation.
-
-## Additional information required if not available in the repository
-
-Provide these only if the executor does not have repository access:
-
-- The actual Wails application entrypoint that registers bound structs.
-- The actual Wails binding-generation command and configuration.
-- The real location of generated Wails TypeScript bindings.
-- The frontend alias/build configuration file.
-- Any application bootstrap file that constructs `cmd/agentgo.App`.
-- The current attachment domain package under `internal/attachment/`.
-- The current Agent preparation response types and APIs if they are not available through `internal/llmartifactory-go/agent/` and `frontend/app/apis/`.
+now give output properly.
