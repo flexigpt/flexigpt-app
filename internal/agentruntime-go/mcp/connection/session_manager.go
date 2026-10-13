@@ -253,7 +253,7 @@ func (m *MCPRuntimeManager) Disconnect(
 	if state == nil || state.client == nil {
 		return nil
 	}
-	return state.client.Close(ctx)
+	return closeMCPClient(ctx, state.client)
 }
 
 func (m *MCPRuntimeManager) InvalidateCatalog(
@@ -814,7 +814,7 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 		if state.client == nil {
 			continue
 		}
-		output = errors.Join(output, state.client.Close(ctx))
+		output = errors.Join(output, closeMCPClient(ctx, state.client))
 	}
 	return output
 }

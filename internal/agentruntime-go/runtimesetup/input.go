@@ -101,8 +101,12 @@ func (c *coordinator) messageInputs(
 		}, nil
 	}
 
-	if len(message.ProtocolInputs) != 0 &&
-		message.AttachmentsHydrated {
+	// A present protocol projection is already the provider-facing
+	// representation of this historical message. AttachmentsHydrated tells
+	// persistence/projection code whether attachment material was hydrated;
+	// it is not a validity gate for replaying prepared Workspace, MCP, App,
+	// or Tool-result inputs.
+	if len(message.ProtocolInputs) != 0 {
 		return decodeInputUnions(message.ProtocolInputs)
 	}
 

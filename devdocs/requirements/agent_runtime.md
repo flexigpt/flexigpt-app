@@ -1463,6 +1463,9 @@ Frontend migration remains separately tracked.
 - [x] Panicked Session model, Tool, and wait work has operation-specific settlement.
 - [x] Panicked external Tool attempts are recorded as uncertain without fabricated selected results.
 - [x] Stale Skill-session cleanup remains inside tracked Session dispatch work.
+- [x] Direct Session Skill-session cleanup and MCP disconnect/shutdown cleanup
+      also use the common panic boundary, including application shutdown paths
+      that are not themselves dispatched background work.
 - [x] Session snapshots expose a durable event watermark independent of Session revision.
 - [x] Focused launcher and Session panic-settlement tests delivered.
 - [x] Authoritative runtime setup, typed intent, immutable preparation, and thin inference complete.
@@ -1495,6 +1498,14 @@ Frontend migration remains separately tracked.
 - [x] Session Runtime remains the only execution coordinator after command acceptance.
 - [x] Session-scoped MCP App routing delivered.
 - [x] Explicit Session Tool, Skill, and MCP Artifact pins are checked against authoritative current Artifact state before use.
+- [x] A retained provider-input projection is replayed whenever it is present;
+      attachment-free Workspace, MCP, App-context, and Tool-result inputs are
+      not dropped from historical provider context.
+- [x] A pending recovery-review wait blocks both explicit and driver-initiated
+      continuation until the user resolves that recovery decision.
+- [x] Collection replacement overrides clear inherited state once and retain
+      every valid replacement member rather than silently dropping earlier
+      replacement entries.
 - [x] Prepared MCP resolution summaries preserve the effective source owner and backend-used Artifact provenance.
 - [x] Attachment admission keeps backend-derived supported modes authoritative.
 - [x] Direct chat completion and direct Tool, Skill, and MCP execution removed from Session orchestration.
@@ -1504,8 +1515,9 @@ Frontend migration remains separately tracked.
       identity and reject changed implementations at side-effect time.
 - [x] Run-owned active Skill state survives continuation preparation when the
       effective Skill allow-list is unchanged.
-- [x] Explicit MCP Tool, resource, template, and prompt omissions become
-      resolution diagnostics rather than silently disappearing.
+- [x] Explicit MCP Tool, resource, template, and prompt omissions, including
+      empty selected resource-template responses, become resolution diagnostics
+      rather than silently disappearing.
 - [x] Runtime event unsubscribe is race-safe, and wait expiry cancels an
       in-flight wait-resolution dispatch.
 

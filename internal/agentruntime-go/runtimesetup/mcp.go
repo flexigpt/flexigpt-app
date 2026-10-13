@@ -516,6 +516,13 @@ func (c *coordinator) prepareMCPResources(
 						text,
 					}, "\n\n"),
 				)
+			} else {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resourceTemplate:"+expected.URITemplate,
+					"mcp_context_omitted",
+					"selected MCP resource template returned no textual context",
+				))
 			}
 		}
 	}

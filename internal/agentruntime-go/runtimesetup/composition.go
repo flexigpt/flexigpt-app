@@ -983,6 +983,7 @@ func applyArtifactOverrideSelections(
 		[]sessionRuntime.ArtifactSelection(nil),
 		baseline...,
 	)
+	replacementStarted := false
 
 	for _, override := range overrides {
 		switch override.Mode {
@@ -998,7 +999,10 @@ func applyArtifactOverrideSelections(
 			)
 
 		case sessionRuntime.CollectionOverrideReplace:
-			output = output[:0]
+			if !replacementStarted {
+				output = output[:0]
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:
@@ -1028,6 +1032,7 @@ func applySkillOverrides(
 ) ([]skillContribution, error) {
 	byKey := make(map[string]skillContribution, len(baseline))
 	order := make([]string, 0, len(baseline))
+	replacementStarted := false
 
 	for _, value := range baseline {
 		if _, found := byKey[value.key]; !found {
@@ -1048,8 +1053,11 @@ func applySkillOverrides(
 			})
 
 		case sessionRuntime.CollectionOverrideReplace:
-			clear(byKey)
-			order = order[:0]
+			if !replacementStarted {
+				clear(byKey)
+				order = order[:0]
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:
@@ -1130,6 +1138,7 @@ func applyMCPOverrides(
 ) ([]sessionRuntime.MCPServerSelection, error) {
 	byKey := make(map[string]sessionRuntime.MCPServerSelection)
 	order := make([]string, 0)
+	replacementStarted := false
 
 	for _, value := range baseline {
 		key := value.CanonicalKey()
@@ -1151,8 +1160,11 @@ func applyMCPOverrides(
 			})
 
 		case sessionRuntime.CollectionOverrideReplace:
-			clear(byKey)
-			order = order[:0]
+			if !replacementStarted {
+				clear(byKey)
+				order = order[:0]
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:
@@ -1191,6 +1203,7 @@ func sessionMCPOverrideSelections(
 	overrides []sessionRuntime.MCPServerOverride,
 ) map[string]sessionRuntime.MCPServerSelection {
 	output := make(map[string]sessionRuntime.MCPServerSelection)
+	replacementStarted := false
 
 	for _, override := range overrides {
 		switch override.Mode {
@@ -1201,7 +1214,10 @@ func sessionMCPOverrideSelections(
 			delete(output, override.Key)
 
 		case sessionRuntime.CollectionOverrideReplace:
-			clear(output)
+			if !replacementStarted {
+				clear(output)
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:
@@ -1224,6 +1240,7 @@ func (c *coordinator) applyInstructionOverrides(
 		len(baseline),
 	)
 	order := make([]string, 0, len(baseline))
+	replacementStarted := false
 
 	for _, value := range baseline {
 		if _, found := byKey[value.key]; !found {
@@ -1244,8 +1261,11 @@ func (c *coordinator) applyInstructionOverrides(
 			})
 
 		case sessionRuntime.CollectionOverrideReplace:
-			clear(byKey)
-			order = order[:0]
+			if !replacementStarted {
+				clear(byKey)
+				order = order[:0]
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:
@@ -1327,6 +1347,7 @@ func (c *coordinator) applyToolOverrides(
 ) ([]toolContribution, error) {
 	byKey := make(map[string]toolContribution, len(baseline))
 	order := make([]string, 0, len(baseline))
+	replacementStarted := false
 
 	for _, value := range baseline {
 		if _, found := byKey[value.key]; !found {
@@ -1347,8 +1368,11 @@ func (c *coordinator) applyToolOverrides(
 			})
 
 		case sessionRuntime.CollectionOverrideReplace:
-			clear(byKey)
-			order = order[:0]
+			if !replacementStarted {
+				clear(byKey)
+				order = order[:0]
+				replacementStarted = true
+			}
 			fallthrough
 
 		case sessionRuntime.CollectionOverrideAdd:

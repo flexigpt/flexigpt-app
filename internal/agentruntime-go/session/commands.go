@@ -2878,6 +2878,11 @@ func (r *Runtime) beginContinuationModelLocked(
 	commandID CommandID,
 	effects *runtimeEffects,
 ) (runtimeWork, error) {
+	if hasPendingRecoveryReview(run) {
+		return runtimeWork{}, errors.New(
+			"recovery review must be resolved before continuation",
+		)
+	}
 	if run.ActiveModelOperationID != "" {
 		return runtimeWork{}, errors.New("a model operation is already active")
 	}
@@ -3377,6 +3382,10 @@ func (r *Runtime) advanceDriverLocked(
 	event DriverEvent,
 	effects *runtimeEffects,
 ) {
+	if hasPendingRecoveryReview(run) {
+		return
+	}
+
 	driver := r.drivers[run.Driver.Kind]
 	if driver == nil {
 		r.markRunTerminalLocked(

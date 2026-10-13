@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 )
 
 var errStaleDispatch = errors.New("runtime dispatch became stale")
@@ -2100,13 +2102,23 @@ func (r *Runtime) closeSkillSession(
 	)
 	defer cancel()
 
-	if err := r.deps.Skills.CloseSkillSession(closeCtx, skillID); err != nil {
+	var closeErr error
+	backgroundutil.RunSafely(
+		"Session Skill-session cleanup",
+		func() {
+			closeErr = r.deps.Skills.CloseSkillSession(closeCtx, skillID)
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			closeErr = failure
+		},
+	)
+	if closeErr != nil {
 		r.reportDiagnostic(ctx, RuntimeDiagnostic{
 			SessionID: sessionID,
 			RunID:     runID,
 			Operation: "close skill session",
 			Message:   "skill session close failed",
-			Cause:     err.Error(),
+			Cause:     closeErr.Error(),
 			At:        r.now(),
 		})
 	}
