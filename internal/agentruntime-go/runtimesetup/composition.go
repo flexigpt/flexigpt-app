@@ -117,6 +117,7 @@ func (c *coordinator) resolveAgent(
 				continue
 			}
 			plan.model = value
+			plan.modelOwner = sessionRuntime.ConfigurationOwnerAgent
 
 		case declaration.TypeText:
 			value, found := selectionFromTarget(occurrence.Target)
@@ -591,6 +592,7 @@ func (c *coordinator) applySessionOverrides(
 ) error {
 	if configuration.Model != nil {
 		plan.model = configuration.Model
+		plan.modelOwner = sessionRuntime.ConfigurationOwnerSession
 	}
 
 	instructions, err := c.applyInstructionOverrides(

@@ -1425,36 +1425,36 @@ Composer does not:
 The backend items in this inventory are now delivered as recorded below.
 Frontend migration remains separately tracked.
 
-| Area                             | Current state            | Target                          |
-| -------------------------------- | ------------------------ | ------------------------------- |
-| `ProviderSetAPI.FetchCompletion` | Owns domain hydration    | Thin provider execution only    |
-| Workspace hydration              | Inside inference path    | Runtime setup Workspace adapter |
-| MCP inference hydration          | Inside inference path    | Runtime setup MCP adapter       |
-| Tool choice hydration            | Inside inference path    | Runtime setup Tool adapter      |
-| Skill prompt and tool hydration  | Inside inference path    | Runtime setup Skill adapter     |
-| Session inference adapter        | Inside inference package | Runtime setup adapter           |
-| Frontend tool scheduler          | Frontend-owned           | Remove for Session chat         |
-| Frontend auto-exec drainer       | Frontend-owned           | Remove for Session chat         |
-| Frontend Skill session lifecycle | Frontend-owned           | Session-owned                   |
-| Frontend MCP approval lifecycle  | Frontend-owned           | Session wait-owned              |
-| Conversation persistence         | Frontend-owned old store | SessionStore projection         |
+| Area                             | Current state              | Target                  |
+| -------------------------------- | -------------------------- | ----------------------- |
+| `ProviderSetAPI.FetchCompletion` | Provider-only              | Delivered               |
+| Workspace hydration              | Runtime setup adapter      | Delivered               |
+| MCP inference hydration          | Runtime setup adapter      | Delivered               |
+| Tool choice hydration            | Runtime setup adapter      | Delivered               |
+| Skill prompt and tool hydration  | Runtime setup adapter      | Delivered               |
+| Session inference adapter        | Runtime setup coordinator  | Delivered               |
+| Frontend tool scheduler          | Frontend migration pending | Remove for Session chat |
+| Frontend auto-exec drainer       | Frontend migration pending | Remove for Session chat |
+| Frontend Skill session lifecycle | Frontend migration pending | Session-owned           |
+| Frontend MCP approval lifecycle  | Frontend migration pending | Session wait-owned      |
+| Conversation persistence         | SessionStore projection    | Delivered               |
 
-### Missing for target branch
+### Historical gap inventory and current status
 
-| Area                                      | Required target work |
-| ----------------------------------------- | -------------------- |
-| Typed Agent and Workspace intent          | New                  |
-| Typed owner and override model            | New                  |
-| Backend composition resolver              | New                  |
-| Thin inference request API                | New                  |
-| Runtime setup package                     | New                  |
-| Prepared model-operation pipeline         | New                  |
-| Durable resolution summary and provenance | New                  |
-| Frontend Session client                   | New                  |
-| Frontend owner and override presentation  | New                  |
-| Session-scoped MCP App routing            | New                  |
-| Breaking SessionStore schema              | New                  |
-| Removal of old frontend direct execution  | New                  |
+| Area                                      | Current status                                |
+| ----------------------------------------- | --------------------------------------------- |
+| Typed Agent and Workspace intent          | Delivered                                     |
+| Typed owner and override model            | Delivered                                     |
+| Backend composition resolver              | Delivered                                     |
+| Thin inference request API                | Delivered                                     |
+| Runtime setup package                     | Delivered                                     |
+| Prepared model-operation pipeline         | Delivered                                     |
+| Durable resolution summary and provenance | Delivered                                     |
+| Frontend Session client                   | Pending                                       |
+| Frontend owner and override presentation  | Pending                                       |
+| Session-scoped MCP App routing            | Delivered                                     |
+| Breaking SessionStore schema              | Delivered                                     |
+| Removal of old frontend direct execution  | Backend delivered; frontend migration pending |
 
 ### Backend background-execution delivery
 
@@ -1498,6 +1498,16 @@ Frontend migration remains separately tracked.
 - [x] Prepared MCP resolution summaries preserve the effective source owner and backend-used Artifact provenance.
 - [x] Attachment admission keeps backend-derived supported modes authoritative.
 - [x] Direct chat completion and direct Tool, Skill, and MCP execution removed from Session orchestration.
+- [x] Session creation and Session-configuration updates use the same
+      authoritative typed-intent preparation boundary as Run admission.
+- [x] Prepared Go Tool bindings retain the exact resolved Tool Artifact
+      identity and reject changed implementations at side-effect time.
+- [x] Run-owned active Skill state survives continuation preparation when the
+      effective Skill allow-list is unchanged.
+- [x] Explicit MCP Tool, resource, template, and prompt omissions become
+      resolution diagnostics rather than silently disappearing.
+- [x] Runtime event unsubscribe is race-safe, and wait expiry cancels an
+      in-flight wait-resolution dispatch.
 
 ## Definition of done
 

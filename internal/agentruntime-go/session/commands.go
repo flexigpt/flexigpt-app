@@ -73,6 +73,60 @@ func (r *Runtime) CreateSession(
 		return &receipt, nil
 	}
 
+	r.mu.Unlock()
+
+	preparedConfiguration, preparationErr := r.prepareConfiguration(
+		ctx,
+		sessionID,
+		command.Configuration,
+	)
+
+	r.mu.Lock()
+	if r.closed {
+		delete(r.commandReservations, command.Meta.ID)
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+	if _, retired := r.retiredSessionIDs[sessionID]; retired {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: sessionID,
+				Message:   "session ID was previously deleted and cannot be reused",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if _, exists := r.sessions[sessionID]; exists {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: sessionID,
+				Message:   "session already exists",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if preparationErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: sessionID,
+				Message:   preparationErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
 	now := r.now()
 	sessionValue := &Session{
 		ID:            sessionID,
@@ -80,7 +134,7 @@ func (r *Runtime) CreateSession(
 		Title:         strings.TrimSpace(command.Title),
 		CreatedAt:     now,
 		UpdatedAt:     now,
-		Configuration: cloneJSON(command.Configuration),
+		Configuration: cloneJSON(preparedConfiguration),
 	}
 	r.sessions[sessionID] = sessionValue
 
@@ -297,7 +351,68 @@ func (r *Runtime) UpdateSessionConfiguration(
 		return &receipt, nil
 	}
 
-	sessionValue.Configuration = cloneJSON(command.Configuration)
+	configuration := cloneJSON(command.Configuration)
+	sessionRevisionBeforePreparation := sessionValue.Revision
+	r.mu.Unlock()
+
+	preparedConfiguration, preparationErr := r.prepareConfiguration(
+		ctx,
+		command.SessionID,
+		configuration,
+	)
+
+	r.mu.Lock()
+	if r.closed {
+		delete(r.commandReservations, command.Meta.ID)
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+
+	sessionValue = r.sessions[command.SessionID]
+	if sessionValue == nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: command.SessionID,
+				Message:   ErrSessionNotFound.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return commandReceiptResult(receipt)
+	}
+	if sessionValue.Revision != sessionRevisionBeforePreparation {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message: "session changed while configuration was being prepared; " +
+					"retry update",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if preparationErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         preparationErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	sessionValue.Configuration = cloneJSON(preparedConfiguration)
 	r.touchSessionLocked(sessionValue)
 
 	receipt := CommandReceipt{

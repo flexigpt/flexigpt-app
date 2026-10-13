@@ -109,11 +109,12 @@ func (c *coordinator) prepareMCP(
 			)
 		}
 
-		serverChoices, serverBindings, err := c.prepareMCPTools(
+		serverChoices, serverBindings, toolDiagnostics, err := c.prepareMCPTools(
 			ctx,
 			serverID,
 			selection,
 		)
+		summary.Diagnostics = append(summary.Diagnostics, toolDiagnostics...)
 		if err != nil {
 			return nil, preparedBindings{}, nil, err
 		}
@@ -128,11 +129,12 @@ func (c *coordinator) prepareMCP(
 			return nil, preparedBindings{}, nil, err
 		}
 
-		resourceContexts, err := c.prepareMCPResources(
+		resourceContexts, resourceDiagnostics, err := c.prepareMCPResources(
 			ctx,
 			serverID,
 			selection,
 		)
+		summary.Diagnostics = append(summary.Diagnostics, resourceDiagnostics...)
 		if err != nil {
 			summary.Diagnostics = append(
 				summary.Diagnostics,
@@ -155,17 +157,20 @@ func (c *coordinator) prepareMCPTools(
 	ctx context.Context,
 	serverID mcpServer.ServerID,
 	selection sessionRuntime.MCPServerSelection,
-) ([]inferenceSpec.ToolChoice, preparedBindings, error) {
+) ([]inferenceSpec.ToolChoice, preparedBindings,
+	[]sessionRuntime.ResolutionDiagnostic, error,
+) {
+	diagnostics := make([]sessionRuntime.ResolutionDiagnostic, 0)
 	if selection.ToolExposure == sessionRuntime.MCPToolExposureNone {
 		return nil, preparedBindings{
 			byChoice: map[string]sessionRuntime.ToolCallProposal{},
 			byName:   map[string]sessionRuntime.ToolCallProposal{},
-		}, nil
+		}, diagnostics, nil
 	}
 
 	tools, err := c.mcpRuntime.runtime.ListTools(ctx, serverID)
 	if err != nil {
-		return nil, preparedBindings{}, err
+		return nil, preparedBindings{}, diagnostics, err
 	}
 
 	selected := make([]mcpServer.MCPToolCapability, 0, len(tools))
@@ -191,26 +196,46 @@ func (c *coordinator) prepareMCPTools(
 
 		for _, expected := range selection.SelectedTools {
 			tool, found := byName[expected.ToolName]
-			if !found ||
-				!tool.Enabled ||
+			if !found {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"tool:"+expected.ToolName,
+					"mcp_tool_unavailable",
+					"selected MCP Tool is no longer available",
+				))
+				continue
+			}
+			if !tool.Enabled ||
 				tool.TaskSupport == mcpServer.MCPTaskSupportRequired ||
 				!mcpApps.ToolVisibleToModel(tool.App) {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"tool:"+expected.ToolName,
+					"mcp_tool_unavailable",
+					"selected MCP Tool is unavailable under current server policy",
+				))
 				continue
 			}
 			if expected.ExpectedDigest != "" &&
 				expected.ExpectedDigest != tool.Digest {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"tool:"+expected.ToolName,
+					"mcp_tool_stale",
+					"selected MCP Tool changed since selection",
+				))
 				continue
 			}
 
 			constrained, err := constrainMCPTool(tool, expected)
 			if err != nil {
-				return nil, preparedBindings{}, err
+				return nil, preparedBindings{}, diagnostics, err
 			}
 			selected = append(selected, constrained)
 		}
 
 	default:
-		return nil, preparedBindings{}, errors.New(
+		return nil, preparedBindings{}, diagnostics, errors.New(
 			"unsupported MCP Tool exposure",
 		)
 	}
@@ -272,7 +297,7 @@ func (c *coordinator) prepareMCPTools(
 			},
 		)
 		if err != nil {
-			return nil, preparedBindings{}, err
+			return nil, preparedBindings{}, diagnostics, err
 		}
 
 		proposal := sessionRuntime.ToolCallProposal{
@@ -292,7 +317,7 @@ func (c *coordinator) prepareMCPTools(
 		bindings.byName[choice.Name] = proposal
 	}
 
-	return choices, bindings, nil
+	return choices, bindings, diagnostics, nil
 }
 
 func constrainMCPTool(
@@ -334,8 +359,9 @@ func (c *coordinator) prepareMCPResources(
 	ctx context.Context,
 	serverID mcpServer.ServerID,
 	selection sessionRuntime.MCPServerSelection,
-) ([]string, error) {
+) ([]string, []sessionRuntime.ResolutionDiagnostic, error) {
 	sections := make([]string, 0)
+	diagnostics := make([]sessionRuntime.ResolutionDiagnostic, 0)
 
 	if len(selection.Resources) != 0 {
 		available, err := c.mcpRuntime.runtime.ListResources(
@@ -343,7 +369,7 @@ func (c *coordinator) prepareMCPResources(
 			serverID,
 		)
 		if err != nil {
-			return nil, err
+			return nil, diagnostics, err
 		}
 
 		byURI := make(
@@ -357,10 +383,22 @@ func (c *coordinator) prepareMCPResources(
 		for _, expected := range selection.Resources {
 			resource, found := byURI[expected.URI]
 			if !found {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resource:"+expected.URI,
+					"mcp_resource_unavailable",
+					"selected MCP resource is no longer available",
+				))
 				continue
 			}
 			if expected.ExpectedDigest != "" &&
 				expected.ExpectedDigest != resource.Digest {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resource:"+expected.URI,
+					"mcp_resource_stale",
+					"selected MCP resource changed since selection",
+				))
 				continue
 			}
 
@@ -370,6 +408,12 @@ func (c *coordinator) prepareMCPResources(
 				expected.URI,
 			)
 			if err != nil || response == nil {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resource:"+expected.URI,
+					"mcp_resource_unavailable",
+					"selected MCP resource could not be read",
+				))
 				continue
 			}
 
@@ -383,6 +427,13 @@ func (c *coordinator) prepareMCPResources(
 						text,
 					}, "\n\n"),
 				)
+			} else {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resource:"+expected.URI,
+					"mcp_context_omitted",
+					"selected MCP resource returned no textual context",
+				))
 			}
 		}
 	}
@@ -393,7 +444,7 @@ func (c *coordinator) prepareMCPResources(
 			serverID,
 		)
 		if err != nil {
-			return nil, err
+			return nil, diagnostics, err
 		}
 
 		byTemplate := make(
@@ -407,10 +458,22 @@ func (c *coordinator) prepareMCPResources(
 		for _, expected := range selection.ResourceTemplates {
 			template, found := byTemplate[expected.URITemplate]
 			if !found {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resourceTemplate:"+expected.URITemplate,
+					"mcp_resource_template_unavailable",
+					"selected MCP resource template is no longer available",
+				))
 				continue
 			}
 			if expected.ExpectedDigest != "" &&
 				expected.ExpectedDigest != template.Digest {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resourceTemplate:"+expected.URITemplate,
+					"mcp_resource_template_stale",
+					"selected MCP resource template changed since selection",
+				))
 				continue
 			}
 
@@ -419,6 +482,12 @@ func (c *coordinator) prepareMCPResources(
 				expected.Arguments,
 			)
 			if err != nil {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resourceTemplate:"+expected.URITemplate,
+					"mcp_resource_template_invalid",
+					"selected MCP resource template arguments are invalid",
+				))
 				continue
 			}
 
@@ -428,6 +497,12 @@ func (c *coordinator) prepareMCPResources(
 				uri,
 			)
 			if err != nil || response == nil {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"resourceTemplate:"+expected.URITemplate,
+					"mcp_resource_template_unavailable",
+					"selected MCP resource template could not be read",
+				))
 				continue
 			}
 
@@ -451,7 +526,7 @@ func (c *coordinator) prepareMCPResources(
 			serverID,
 		)
 		if err != nil {
-			return nil, err
+			return nil, diagnostics, err
 		}
 
 		byName := make(
@@ -465,10 +540,22 @@ func (c *coordinator) prepareMCPResources(
 		for _, expected := range selection.Prompts {
 			prompt, found := byName[expected.PromptName]
 			if !found {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"prompt:"+expected.PromptName,
+					"mcp_prompt_unavailable",
+					"selected MCP prompt is no longer available",
+				))
 				continue
 			}
 			if expected.ExpectedDigest != "" &&
 				expected.ExpectedDigest != prompt.Digest {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"prompt:"+expected.PromptName,
+					"mcp_prompt_stale",
+					"selected MCP prompt changed since selection",
+				))
 				continue
 			}
 
@@ -479,6 +566,12 @@ func (c *coordinator) prepareMCPResources(
 				expected.Arguments,
 			)
 			if err != nil || response == nil {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"prompt:"+expected.PromptName,
+					"mcp_prompt_unavailable",
+					"selected MCP prompt could not be read",
+				))
 				continue
 			}
 
@@ -506,11 +599,36 @@ func (c *coordinator) prepareMCPResources(
 						strings.Join(parts, "\n\n"),
 					}, "\n\n"),
 				)
+			} else {
+				diagnostics = append(diagnostics, mcpSelectionDiagnostic(
+					selection,
+					"prompt:"+expected.PromptName,
+					"mcp_context_omitted",
+					"selected MCP prompt returned no textual context",
+				))
 			}
 		}
 	}
 
-	return sections, nil
+	return sections, diagnostics, nil
+}
+
+func mcpSelectionDiagnostic(
+	selection sessionRuntime.MCPServerSelection,
+	item string,
+	code string,
+	message string,
+) sessionRuntime.ResolutionDiagnostic {
+	key := selection.CanonicalKey()
+	if strings.TrimSpace(item) != "" {
+		key += ":" + item
+	}
+	return sessionRuntime.ResolutionDiagnostic{
+		Severity: sessionRuntime.DiagnosticSeverityWarning,
+		Code:     code,
+		Message:  message,
+		Key:      key,
+	}
 }
 
 func (c *coordinator) PrepareAppTool(

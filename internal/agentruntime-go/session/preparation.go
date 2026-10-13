@@ -202,13 +202,29 @@ func (r *Runtime) prepareModelOperationForDispatch(
 	}
 
 	operation.Preparation = prepared
+
+	effectiveSkills := uniqueArtifactReferences(
+		cloneJSON(prepared.EffectiveSkills),
+	)
+	activeSkills := filterReferences(
+		cloneJSON(prepared.ActiveSkills),
+		effectiveSkills,
+	)
+
+	// Skill load/unload tools mutate Run-owned active Skill state. When the
+	// effective allow-list is unchanged, a continuation must retain that
+	// runtime state rather than reset it to static configuration defaults.
+	if artifactReferencesEqual(run.SkillSession.Enabled, effectiveSkills) {
+		activeSkills = filterReferences(
+			cloneJSON(run.SkillSession.Active),
+			effectiveSkills,
+		)
+	}
+
 	run.SkillSession.Generation++
 	run.SkillSession.EstablishedGeneration = 0
-	run.SkillSession.Enabled = cloneJSON(prepared.EffectiveSkills)
-	run.SkillSession.Active = filterReferences(
-		prepared.ActiveSkills,
-		prepared.EffectiveSkills,
-	)
+	run.SkillSession.Enabled = cloneJSON(effectiveSkills)
+	run.SkillSession.Active = cloneJSON(activeSkills)
 	r.touchRunLocked(sessionValue, run)
 
 	effects := runtimeEffects{}

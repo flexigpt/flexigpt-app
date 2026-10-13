@@ -24,6 +24,12 @@ type goToolExecutor struct {
 	runtime *toolruntime.Adapter
 }
 
+type goToolBinding struct {
+	Target    composition.CapabilityTarget    `json:"target"`
+	Used      sessionRuntime.ResolvedArtifact `json:"used"`
+	TimeoutMS int                             `json:"timeoutMS,omitempty"`
+}
+
 func newGoToolExecutor(
 	tools *toolAPI.Service,
 	runtime *toolruntime.Adapter,
@@ -53,10 +59,7 @@ func (e *goToolExecutor) ExecuteTool(
 	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolExecutionResult, error) {
-	var binding struct {
-		Target    composition.CapabilityTarget `json:"target"`
-		TimeoutMS int                          `json:"timeoutMS,omitempty"`
-	}
+	var binding goToolBinding
 	if err := json.Unmarshal(request.ToolCall.Binding.Data, &binding); err != nil {
 		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
 			"decode Go Tool binding: %w",
@@ -73,6 +76,12 @@ func (e *goToolExecutor) ExecuteTool(
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
+	if binding.Used != *toolResolvedArtifact(resolved) {
+		return sessionRuntime.ToolExecutionResult{}, errors.New(
+			"prepared Go Tool binding is stale",
+		)
+	}
+
 	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
 		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
 			"tool %q is not a Go Tool",
@@ -276,10 +285,9 @@ func toolChoiceAndBinding(
 
 	switch resolved.Tool.Implementation.Kind {
 	case toolv1.ImplementationKindGo:
-		rawBinding, err := json.Marshal(struct {
-			Target composition.CapabilityTarget `json:"target"`
-		}{
+		rawBinding, err := json.Marshal(goToolBinding{
 			Target: target,
+			Used:   *toolResolvedArtifact(resolved),
 		})
 		if err != nil {
 			return inferenceSpec.ToolChoice{},

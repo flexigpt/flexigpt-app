@@ -149,6 +149,7 @@ type preparedSkills struct {
 type operationPlan struct {
 	summary      sessionRuntime.OperationResolutionSummary
 	model        *sessionRuntime.ArtifactSelection
+	modelOwner   sessionRuntime.ConfigurationOwner
 	instructions []instructionContribution
 	tools        []toolContribution
 	skills       []skillContribution
@@ -237,6 +238,11 @@ func (c *coordinator) PrepareModelOperation(
 		)
 	}
 
+	modelOwner := plan.modelOwner
+	if modelOwner == "" {
+		modelOwner = sessionRuntime.ConfigurationOwnerSession
+	}
+
 	modelRef, err := artifactRef(*plan.model)
 	if err != nil {
 		return sessionRuntime.OperationPreparation{}, operationPreparationError(
@@ -275,7 +281,7 @@ func (c *coordinator) PrepareModelOperation(
 		plan.summary.Model = &sessionRuntime.ResolutionItem{
 			Key:      plan.model.CanonicalKey(),
 			Kind:     "model",
-			Owner:    sessionRuntime.ConfigurationOwnerSession,
+			Owner:    modelOwner,
 			State:    sessionRuntime.ResolutionStateStale,
 			Selected: plan.model,
 			Used:     usedModelArtifact,
@@ -291,7 +297,7 @@ func (c *coordinator) PrepareModelOperation(
 	plan.summary.Model = &sessionRuntime.ResolutionItem{
 		Key:      plan.model.CanonicalKey(),
 		Kind:     "model",
-		Owner:    sessionRuntime.ConfigurationOwnerSession,
+		Owner:    modelOwner,
 		State:    sessionRuntime.ResolutionStateIncluded,
 		Selected: plan.model,
 		Used:     usedModelArtifact,

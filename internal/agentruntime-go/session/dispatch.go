@@ -296,10 +296,6 @@ func (r *Runtime) ensureSkillSessionForModel(
 	enabled := uniqueArtifactReferences(
 		cloneJSON(preparation.EffectiveSkills),
 	)
-	active := filterReferences(
-		cloneJSON(preparation.ActiveSkills),
-		enabled,
-	)
 
 	r.mu.Lock()
 	var sessionValue *Session
@@ -328,14 +324,23 @@ func (r *Runtime) ensureSkillSessionForModel(
 
 	if !artifactReferencesEqual(currentEnabled, enabled) {
 		run.SkillSession.Enabled = cloneJSON(enabled)
-		run.SkillSession.Active = cloneJSON(active)
+		run.SkillSession.Active = filterReferences(
+			cloneJSON(preparation.ActiveSkills),
+			enabled,
+		)
 		run.SkillSession.Generation++
 		run.SkillSession.EstablishedGeneration = 0
 		generation = run.SkillSession.Generation
 		changed = true
-	} else if !artifactReferencesEqual(run.SkillSession.Active, active) {
-		run.SkillSession.Active = cloneJSON(active)
-		changed = true
+	} else {
+		active := filterReferences(
+			cloneJSON(run.SkillSession.Active),
+			enabled,
+		)
+		if !artifactReferencesEqual(run.SkillSession.Active, active) {
+			run.SkillSession.Active = cloneJSON(active)
+			changed = true
+		}
 	}
 
 	if len(enabled) == 0 {
@@ -390,7 +395,7 @@ func (r *Runtime) ensureSkillSessionForModel(
 		return nil
 	}
 
-	active = cloneJSON(run.SkillSession.Active)
+	active := cloneJSON(run.SkillSession.Active)
 	if changed {
 		r.touchRunLocked(sessionValue, run)
 		r.recordRunEventLocked(
@@ -1716,9 +1721,15 @@ func (r *Runtime) dispatchWaitExpiry(
 	wait.Status = WaitStatusExpired
 	wait.Error = expiryMessage
 	wait.UpdatedAt = r.now()
-	r.clearWaitReferenceLocked(wait.ID)
 
 	effects := runtimeEffects{}
+	releaseDispatchCancel(
+		r.cancels,
+		waitResolutionCancelKey(run.ID, wait.ID),
+		&effects,
+	)
+	r.clearWaitReferenceLocked(wait.ID)
+
 	r.recordRunEventLocked(
 		&effects,
 		sessionValue,
