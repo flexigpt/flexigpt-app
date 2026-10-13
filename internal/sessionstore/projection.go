@@ -55,7 +55,6 @@ func projectSessionConfiguration(
 
 	output.RequestPatch = cloneRawJSON(value.RequestPatch)
 	output.MCPContext = cloneRawJSON(value.MCPContext)
-	output.WorkspaceSelection = cloneRawJSON(value.WorkspaceSelection)
 	output.Metadata = cloneRawJSON(value.Metadata)
 
 	output.ToolSelections = make(
@@ -77,12 +76,6 @@ func projectSessionConfiguration(
 	}
 
 	output.InstalledSkills = slices.Clone(value.InstalledSkills)
-	output.WorkspaceSkills = slices.Clone(value.WorkspaceSkills)
-
-	if value.Agent != nil {
-		agent := *value.Agent
-		output.Agent = &agent
-	}
 
 	return output
 }

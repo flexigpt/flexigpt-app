@@ -249,11 +249,6 @@ type HistorySelection struct {
 	IncludePreviousUserTurns int  `json:"includePreviousUserTurns,omitempty"`
 }
 
-type AgentProvenance struct {
-	Reference ArtifactReference `json:"reference"`
-	Revision  string            `json:"revision,omitempty"`
-}
-
 type ModelToolSelection struct {
 	ChoiceID           string           `json:"choiceID"`
 	Target             CapabilityTarget `json:"target"`
@@ -265,17 +260,21 @@ type ModelToolSelection struct {
 }
 
 type SessionConfiguration struct {
-	Model              ArtifactReference    `json:"model"`
-	RequestPatch       json.RawMessage      `json:"requestPatch,omitempty"`
-	SystemPrompt       *string              `json:"systemPrompt,omitempty"`
-	History            HistorySelection     `json:"history,omitzero"`
-	ToolSelections     []ModelToolSelection `json:"toolSelections,omitempty"`
-	MCPContext         json.RawMessage      `json:"mcpContext,omitempty"`
-	WorkspaceSelection json.RawMessage      `json:"workspaceSelection,omitempty"`
-	InstalledSkills    []ArtifactReference  `json:"installedSkills,omitempty"`
-	WorkspaceSkills    []ArtifactReference  `json:"workspaceSkills,omitempty"`
-	Agent              *AgentProvenance     `json:"agent,omitempty"`
-	Metadata           json.RawMessage      `json:"metadata,omitempty"`
+	Model          ArtifactReference    `json:"model"`
+	RequestPatch   json.RawMessage      `json:"requestPatch,omitempty"`
+	SystemPrompt   *string              `json:"systemPrompt,omitempty"`
+	History        HistorySelection     `json:"history,omitzero"`
+	ToolSelections []ModelToolSelection `json:"toolSelections,omitempty"`
+	MCPContext     json.RawMessage      `json:"mcpContext,omitempty"`
+
+	// InstalledSkills is the complete effective Skill allow-list for the Run.
+	// The frontend resolves Agent and Workspace state, then supplies the final
+	// references here. Session does not distinguish their origin.
+	InstalledSkills []ArtifactReference `json:"installedSkills,omitempty"`
+
+	// Metadata is frontend-owned opaque presentation/provenance data. Session
+	// persists it but never interprets Agent or Workspace data within it.
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 type UserInput struct {
@@ -580,20 +579,6 @@ type RenameSessionCommand struct {
 type DeleteSessionCommand struct {
 	Meta      CommandMeta `json:"meta"`
 	SessionID SessionID   `json:"sessionID"`
-}
-
-type AgentApplication struct {
-	Agent             AgentProvenance      `json:"agent"`
-	Configuration     SessionConfiguration `json:"configuration"`
-	StarterText       string               `json:"starterText,omitempty"`
-	PreserveWorkspace bool                 `json:"preserveWorkspace,omitempty"`
-}
-
-type ApplyAgentCommand struct {
-	Meta        CommandMeta       `json:"meta"`
-	SessionID   SessionID         `json:"sessionID"`
-	Agent       ArtifactReference `json:"agent,omitzero"`
-	Application *AgentApplication `json:"application,omitempty"`
 }
 
 type StartRunCommand struct {

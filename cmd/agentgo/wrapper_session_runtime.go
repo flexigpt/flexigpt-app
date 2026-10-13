@@ -71,14 +71,6 @@ func (w *SessionRuntimeWrapper) DeleteSession(
 	})
 }
 
-func (w *SessionRuntimeWrapper) ApplyAgent(
-	command sessionRuntime.ApplyAgentCommand,
-) (*sessionRuntime.CommandReceipt, error) {
-	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
-		return runtimeValue.ApplyAgent(context.Background(), command)
-	})
-}
-
 func (w *SessionRuntimeWrapper) StartRun(
 	command sessionRuntime.StartRunCommand,
 ) (*sessionRuntime.CommandReceipt, error) {

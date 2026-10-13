@@ -267,20 +267,12 @@ func (r *Runtime) ensureSkillSessionForModel(
 	generation := run.SkillSession.Generation
 	r.mu.RUnlock()
 
-	workspaceSkills, err := r.resolveWorkspaceSkillsForModel(
-		ctx,
-		sessionID,
-		runID,
-		configuration,
-	)
-	if err != nil {
-		return err
-	}
-
-	enabled := uniqueArtifactReferences(append(
+	// InstalledSkills is already the final frontend-resolved effective skill
+	// allow-list. Session does not resolve Workspace membership or fetch
+	// Workspace state.
+	enabled := uniqueArtifactReferences(
 		cloneJSON(configuration.InstalledSkills),
-		workspaceSkills...,
-	))
+	)
 
 	r.mu.Lock()
 	var sessionValue *Session
@@ -494,52 +486,6 @@ func (r *Runtime) ensureSkillSessionForModel(
 	r.flushEffects(ctx, effects)
 
 	return nil
-}
-
-func (r *Runtime) resolveWorkspaceSkillsForModel(
-	ctx context.Context,
-	sessionID SessionID,
-	runID RunID,
-	configuration SessionConfiguration,
-) ([]ArtifactReference, error) {
-	requested := uniqueArtifactReferences(
-		cloneJSON(configuration.WorkspaceSkills),
-	)
-	if len(requested) == 0 {
-		return nil, nil
-	}
-	if r.deps.Workspace == nil {
-		return nil, errors.New(
-			"run selects Workspace Skills but no Workspace skill resolver is configured",
-		)
-	}
-
-	resolution, err := r.deps.Workspace.ResolveWorkspaceSkills(
-		ctx,
-		WorkspaceSkillResolutionRequest{
-			SessionID:                sessionID,
-			RunID:                    runID,
-			Configuration:            cloneJSON(configuration),
-			RequestedWorkspaceSkills: cloneJSON(requested),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	resolved := uniqueArtifactReferences(
-		cloneJSON(resolution.EnabledWorkspaceSkills),
-	)
-	allowed := uniqueArtifactReferences(
-		filterReferences(resolved, requested),
-	)
-	if !artifactReferencesEqual(resolved, allowed) {
-		return nil, errors.New(
-			"workspace skill resolver returned an Artifact outside the Run Workspace allow-list",
-		)
-	}
-
-	return allowed, nil
 }
 
 func (r *Runtime) finishModelExecution(

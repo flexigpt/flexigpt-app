@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strings"
 	"sync"
 
 	"github.com/flexigpt/agentskills-go/provider"
@@ -20,8 +19,6 @@ import (
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/tool"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
 func InitComposedSessionRuntime(
@@ -34,7 +31,6 @@ func InitComposedSessionRuntime(
 	mcpWrapper *MCPRuntimeWrapper,
 	skillAggregate *SkillAggregateWrapper,
 	skillRuntimeWrapper *SkillRuntimeWrapper,
-	workspaceSource inferenceRuntime.WorkspaceSource,
 ) error {
 	if wrapper == nil ||
 		completion == nil ||
@@ -47,8 +43,7 @@ func InitComposedSessionRuntime(
 		skillAggregate == nil ||
 		skillAggregate.resolver == nil ||
 		skillRuntimeWrapper == nil ||
-		skillRuntimeWrapper.service == nil ||
-		workspaceSource == nil {
+		skillRuntimeWrapper.service == nil {
 		return errors.New("session runtime composition dependencies are incomplete")
 	}
 
@@ -98,10 +93,7 @@ func InitComposedSessionRuntime(
 		Skills:      skillExecutor,
 		Attachments: attachmentMaterializer,
 		Checkpoints: checkpoints,
-		Workspace: &agentgoWorkspaceSkillResolver{
-			source: workspaceSource,
-		},
-		Recovery: recovery,
+		Recovery:    recovery,
 	})
 	if err != nil {
 		return err
@@ -121,97 +113,6 @@ type agentgoArtifactSkillSessionBridge struct {
 
 	mu          sync.RWMutex
 	sessionRefs map[string]map[string]sessionRuntime.ArtifactReference
-}
-
-type agentgoWorkspaceSkillResolver struct {
-	source inferenceRuntime.WorkspaceSource
-}
-
-func (r *agentgoWorkspaceSkillResolver) ResolveWorkspaceSkills(
-	ctx context.Context,
-	request sessionRuntime.WorkspaceSkillResolutionRequest,
-) (sessionRuntime.WorkspaceSkillResolution, error) {
-	if r == nil || r.source == nil {
-		return sessionRuntime.WorkspaceSkillResolution{}, errors.New(
-			"workspace skill resolver is unavailable",
-		)
-	}
-	if len(request.RequestedWorkspaceSkills) == 0 {
-		return sessionRuntime.WorkspaceSkillResolution{}, nil
-	}
-
-	rawSelection := strings.TrimSpace(
-		string(request.Configuration.WorkspaceSelection),
-	)
-	if rawSelection == "" || rawSelection == "null" {
-		return sessionRuntime.WorkspaceSkillResolution{}, errors.New(
-			"workspace skills require a Workspace selection",
-		)
-	}
-
-	var selection conversationSpec.WorkspaceConversationSelection
-	if err := json.Unmarshal(
-		request.Configuration.WorkspaceSelection,
-		&selection,
-	); err != nil {
-		return sessionRuntime.WorkspaceSkillResolution{}, fmt.Errorf(
-			"decode Workspace selection for Skill session: %w",
-			err,
-		)
-	}
-
-	requested := make(
-		map[string]sessionRuntime.ArtifactReference,
-		len(request.RequestedWorkspaceSkills),
-	)
-	for _, ref := range request.RequestedWorkspaceSkills {
-		if ref.RootID == "" || ref.ArtifactID == "" {
-			return sessionRuntime.WorkspaceSkillResolution{}, errors.New(
-				"workspace skill artifact reference is incomplete",
-			)
-		}
-		requested[ref.RootID+"\x00"+ref.ArtifactID] = ref
-	}
-
-	artifactRefs, err := sessionArtifactRefsToArtifactRefs(
-		request.RequestedWorkspaceSkills,
-	)
-	if err != nil {
-		return sessionRuntime.WorkspaceSkillResolution{}, err
-	}
-
-	plan, err := r.source.LoadWorkspaceSkills(
-		ctx,
-		selection.Workspace,
-		artifactRefs,
-	)
-	if err != nil {
-		return sessionRuntime.WorkspaceSkillResolution{}, err
-	}
-
-	enabled := make([]sessionRuntime.ArtifactReference, 0, len(plan.Skills))
-	seen := make(map[string]struct{}, len(plan.Skills))
-	for _, skill := range plan.Skills {
-		if skill.Insert != declaration.InsertInstructions {
-			continue
-		}
-		key := string(skill.Artifact.RootID) +
-			"\x00" +
-			string(skill.Artifact.ArtifactID)
-		ref, found := requested[key]
-		if !found {
-			continue
-		}
-		if _, duplicate := seen[key]; duplicate {
-			continue
-		}
-		seen[key] = struct{}{}
-		enabled = append(enabled, ref)
-	}
-
-	return sessionRuntime.WorkspaceSkillResolution{
-		EnabledWorkspaceSkills: enabled,
-	}, nil
 }
 
 func (b *agentgoArtifactSkillSessionBridge) EnsureArtifactSkillSession(

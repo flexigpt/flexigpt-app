@@ -149,20 +149,8 @@ func (a *Adapter) ExecuteModel(
 		)
 	}
 
-	workspaceSelection, err := decodeOptional[conversationSpec.WorkspaceConversationSelection](
-		request.Configuration.WorkspaceSelection,
-	)
-	if err != nil {
-		return sessionRuntime.ModelExecutionResult{}, fmt.Errorf(
-			"decode session Workspace selection: %w",
-			err,
-		)
-	}
-	current.WorkspaceSelection = workspaceSelection
-
 	enabledSkills, err := artifactReferences(
 		request.Configuration.InstalledSkills,
-		request.Configuration.WorkspaceSkills,
 	)
 	if err != nil {
 		return sessionRuntime.ModelExecutionResult{}, err

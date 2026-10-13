@@ -416,168 +416,6 @@ func (r *Runtime) RenameSession(
 	return &receipt, nil
 }
 
-func (r *Runtime) ApplyAgent(
-	ctx context.Context,
-	command ApplyAgentCommand,
-) (*CommandReceipt, error) {
-	r.mu.Lock()
-	if r.closed {
-		r.mu.Unlock()
-		return nil, ErrRuntimeClosed
-	}
-
-	previous, duplicate, fingerprint, err := r.beginCommandLocked(
-		command.Meta,
-		command,
-	)
-	if err != nil {
-		r.mu.Unlock()
-		return nil, err
-	}
-	if duplicate {
-		r.mu.Unlock()
-		previous.Duplicate = true
-		return &previous, nil
-	}
-
-	sessionValue := r.sessions[command.SessionID]
-	if sessionValue == nil {
-		receipt := r.rejectReceiptLocked(
-			command.Meta,
-			fingerprint,
-			CommandReceipt{
-				CommandID: command.Meta.ID,
-				SessionID: command.SessionID,
-				Message:   ErrSessionNotFound.Error(),
-			},
-		)
-		r.mu.Unlock()
-		return &receipt, nil
-	}
-	if message := expectedSessionRevisionMessage(
-		sessionValue,
-		command.Meta.ExpectedSessionRevision,
-	); message != "" {
-		receipt := r.rejectReceiptLocked(
-			command.Meta,
-			fingerprint,
-			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				SessionRevision: sessionValue.Revision,
-				Message:         message,
-			},
-		)
-		r.mu.Unlock()
-		return &receipt, nil
-	}
-
-	var application AgentApplication
-	switch {
-	case command.Application != nil:
-		application = cloneJSON(*command.Application)
-
-	case r.deps.Agents != nil:
-		resolved, resolveErr := r.deps.Agents.ResolveAgent(
-			ctx,
-			AgentResolveRequest{
-				SessionID:            command.SessionID,
-				Agent:                command.Agent,
-				CurrentConfiguration: cloneJSON(sessionValue.Configuration),
-			},
-		)
-		if resolveErr != nil {
-			receipt := r.rejectReceiptLocked(
-				command.Meta,
-				fingerprint,
-				CommandReceipt{
-					CommandID:       command.Meta.ID,
-					SessionID:       command.SessionID,
-					SessionRevision: sessionValue.Revision,
-					Message:         resolveErr.Error(),
-				},
-			)
-			r.mu.Unlock()
-			//nolint:nilerr // Ok
-			return &receipt, nil
-		}
-		application = resolved
-
-	default:
-		receipt := r.rejectReceiptLocked(
-			command.Meta,
-			fingerprint,
-			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				SessionRevision: sessionValue.Revision,
-				Message:         "agent resolver is unavailable",
-			},
-		)
-		r.mu.Unlock()
-		return &receipt, nil
-	}
-
-	if command.Agent.RootID != "" || command.Agent.ArtifactID != "" {
-		if command.Agent.RootID == "" ||
-			command.Agent.ArtifactID == "" ||
-			application.Agent.Reference != command.Agent {
-			receipt := r.rejectReceiptLocked(
-				command.Meta,
-				fingerprint,
-				CommandReceipt{
-					CommandID:       command.Meta.ID,
-					SessionID:       command.SessionID,
-					SessionRevision: sessionValue.Revision,
-					Message:         "resolved agent does not match the requested agent reference",
-				},
-			)
-			r.mu.Unlock()
-			return &receipt, nil
-		}
-	}
-
-	nextConfiguration := cloneJSON(application.Configuration)
-	nextConfiguration.Agent = &application.Agent
-	if application.PreserveWorkspace &&
-		rawJSONIsAbsent(nextConfiguration.WorkspaceSelection) {
-		nextConfiguration.WorkspaceSelection = cloneRaw(
-			sessionValue.Configuration.WorkspaceSelection,
-		)
-	}
-
-	sessionValue.Configuration = nextConfiguration
-	r.touchSessionLocked(sessionValue)
-
-	receipt := CommandReceipt{
-		CommandID:       command.Meta.ID,
-		Accepted:        true,
-		SessionID:       command.SessionID,
-		SessionRevision: sessionValue.Revision,
-		StarterText:     application.StarterText,
-	}
-	r.finishCommandLocked(command.Meta, fingerprint, receipt)
-
-	effects := runtimeEffects{}
-	r.recordSessionEventLocked(
-		&effects,
-		sessionValue,
-		command.Meta.ID,
-		RuntimeEventSessionConfigurationChanged,
-		sessionValue.Configuration,
-	)
-	r.checkpointLocked(
-		&effects,
-		RuntimeEventSessionConfigurationChanged,
-		sessionValue,
-		nil,
-	)
-	r.mu.Unlock()
-	r.flushEffects(ctx, effects)
-
-	return &receipt, nil
-}
-
 func (r *Runtime) StartRun(
 	ctx context.Context,
 	command StartRunCommand,
@@ -2690,10 +2528,9 @@ func (r *Runtime) startRunLocked(
 	}
 
 	now := r.now()
-	enabledSkills := uniqueArtifactReferences(append(
+	enabledSkills := uniqueArtifactReferences(
 		cloneJSON(runConfiguration.InstalledSkills),
-		cloneJSON(runConfiguration.WorkspaceSkills)...,
-	))
+	)
 	run := &Run{
 		ID:            runID,
 		SessionID:     sessionValue.ID,
@@ -3341,16 +3178,12 @@ func (r *Runtime) applyRunConfigurationLocked(
 	run *Run,
 	configuration SessionConfiguration,
 ) {
-	previousSkills := append(
-		append([]ArtifactReference(nil), run.Configuration.InstalledSkills...),
-		run.Configuration.WorkspaceSkills...,
+	previousSkills := uniqueArtifactReferences(
+		cloneJSON(run.Configuration.InstalledSkills),
 	)
-	nextSkills := append(
-		append([]ArtifactReference(nil), configuration.InstalledSkills...),
-		configuration.WorkspaceSkills...,
+	nextSkills := uniqueArtifactReferences(
+		cloneJSON(configuration.InstalledSkills),
 	)
-	previousSkills = uniqueArtifactReferences(previousSkills)
-	nextSkills = uniqueArtifactReferences(nextSkills)
 
 	run.Configuration = cloneJSON(configuration)
 	sessionValue.Configuration = cloneJSON(configuration)
@@ -3894,11 +3727,6 @@ func appendUniqueToolCallIDs(
 
 func uniqueToolCallIDs(values []ToolCallID) []ToolCallID {
 	return appendUniqueToolCallIDs(nil, values)
-}
-
-func rawJSONIsAbsent(value json.RawMessage) bool {
-	normalized := strings.TrimSpace(string(value))
-	return normalized == "" || normalized == "null"
 }
 
 func artifactReferencesEqual(

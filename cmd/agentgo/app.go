@@ -661,7 +661,6 @@ func (a *App) initManagers() {
 		a.mcpRuntimeAPI,
 		a.skillAggregateAPI,
 		a.skillRuntimeAPI,
-		workspaceConversationSource,
 	)
 	if err != nil {
 		slog.Error(

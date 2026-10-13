@@ -169,34 +169,6 @@ type SkillSessionController interface {
 	CloseSkillSession(ctx context.Context, s string) error
 }
 
-type AgentResolveRequest struct {
-	SessionID            SessionID            `json:"sessionID"`
-	Agent                ArtifactReference    `json:"agent"`
-	CurrentConfiguration SessionConfiguration `json:"currentConfiguration"`
-}
-
-type AgentResolver interface {
-	ResolveAgent(ctx context.Context, req AgentResolveRequest) (AgentApplication, error)
-}
-
-type WorkspaceSkillResolutionRequest struct {
-	SessionID                SessionID            `json:"sessionID"`
-	RunID                    RunID                `json:"runID"`
-	Configuration            SessionConfiguration `json:"configuration"`
-	RequestedWorkspaceSkills []ArtifactReference  `json:"requestedWorkspaceSkills"`
-}
-
-type WorkspaceSkillResolution struct {
-	EnabledWorkspaceSkills []ArtifactReference `json:"enabledWorkspaceSkills,omitempty"`
-}
-
-type WorkspaceResolver interface {
-	ResolveWorkspaceSkills(
-		ctx context.Context,
-		req WorkspaceSkillResolutionRequest,
-	) (WorkspaceSkillResolution, error)
-}
-
 type AttachmentPreparer interface {
 	PrepareAttachments(
 		ctx context.Context,
@@ -396,8 +368,6 @@ type RuntimeDependencies struct {
 	Model       ModelExecutor
 	Tools       ToolExecutor
 	Skills      SkillSessionController
-	Agents      AgentResolver
-	Workspace   WorkspaceResolver
 	Attachments AttachmentPreparer
 	Events      EventPublisher
 	Checkpoints CheckpointSink
