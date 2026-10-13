@@ -1,25 +1,6 @@
 package spec
 
-import (
-	"encoding/json"
-
-	inferenceSpec "github.com/flexigpt/inference-go/spec"
-
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-)
-
-type PreparedToolBinding struct {
-	ChoiceID string `json:"choiceID"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-
-	BindingKind string          `json:"bindingKind"`
-	BindingData json.RawMessage `json:"bindingData,omitempty"`
-
-	Required        bool `json:"required"`
-	ProviderManaged bool `json:"providerManaged,omitempty"`
-	Automatic       bool `json:"automatic,omitempty"`
-}
+import inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 type AddProviderRequestBody struct {
 	SDKType                  inferenceSpec.ProviderSDKType `json:"sdkType"`
@@ -53,31 +34,21 @@ type SetProviderAPIKeyRequest struct {
 
 type SetProviderAPIKeyResponse struct{}
 
+// CompletionRequest is the provider-only execution contract.
+//
+// All source resolution, history selection, attachment materialization,
+// instruction composition, Tool binding preparation, Skill preparation, and
+// MCP preparation must finish before this value reaches inference.
 type CompletionRequest struct {
-	Model        RuntimeModelRequest `json:"-"`
-	SystemPrompt *string             `json:"-"`
-
-	History        []conversationSpec.ConversationMessage   `json:"-"`
-	Current        conversationSpec.ConversationMessage     `json:"-"`
-	ToolSelections []conversationSpec.ToolSelection         `json:"-"`
-	MCPContext     *conversationSpec.MCPConversationContext `json:"-"`
-	SkillSessionID string                                   `json:"-"`
-
-	OnStreamText     func(text string) error     `json:"-"`
-	OnStreamThinking func(thinking string) error `json:"-"`
+	Configuration    RuntimeConfiguration       `json:"-"`
+	Inputs           []inferenceSpec.InputUnion `json:"-"`
+	ToolChoices      []inferenceSpec.ToolChoice `json:"-"`
+	OnStreamText     func(string) error         `json:"-"`
+	OnStreamThinking func(string) error         `json:"-"`
 }
 
 type CompletionResponseBody struct {
-	InferenceResponse     *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
-	HydratedCurrentInputs []inferenceSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
-
-	// MCPToolMappings must be persisted on the corresponding conversation
-	// user turn before a later provider-tool call is routed through
-	// InvokeMappedMCPTool. Conversation storage preserves this metadata;
-	// mapping/context validation and authorization belong at runtime.
-	MCPToolMappings      []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
-	WorkspaceUsage       *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
-	PreparedToolBindings []PreparedToolBinding                        `json:"preparedToolBindings,omitempty"`
+	InferenceResponse *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
 }
 
 type CompletionResponse struct {

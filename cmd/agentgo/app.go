@@ -26,7 +26,6 @@ type App struct {
 	ctx context.Context
 
 	settingStoreAPI       *SettingStoreWrapper
-	conversationStoreAPI  *ConversationCollectionWrapper
 	sessionStoreAPI       *SessionStoreWrapper
 	modelStoreAPI         *ModelStoreWrapper
 	modelAggregateAPI     *ModelAggregateWrapper
@@ -55,7 +54,6 @@ type App struct {
 	dataBasePath string
 
 	settingsDirPath      string
-	conversationsDirPath string
 	sessionsDirPath      string
 	artifactStoreDirPath string
 
@@ -82,7 +80,6 @@ func newApp() *App {
 		app.dataBasePath,
 		storageName(topology.ApplicationStorageSettingsDirectory),
 	)
-	app.conversationsDirPath = filepath.Join(app.dataBasePath, "conversations_v2")
 	app.sessionsDirPath = filepath.Join(app.dataBasePath, "sessions_v1")
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
@@ -91,13 +88,12 @@ func newApp() *App {
 		),
 	)
 
-	if app.settingsDirPath == "" || app.conversationsDirPath == "" || app.sessionsDirPath == "" ||
+	if app.settingsDirPath == "" || app.sessionsDirPath == "" ||
 		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"settingsDirPath", app.settingsDirPath,
-			"conversationsDirPath", app.conversationsDirPath,
 			"sessionsDirPath", app.sessionsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
@@ -114,7 +110,6 @@ func newApp() *App {
 	// Wails needs some instance of a struct to create bindings from its methods.
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
 	app.settingStoreAPI = &SettingStoreWrapper{}
-	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.sessionStoreAPI = &SessionStoreWrapper{}
 	app.modelStoreAPI = &ModelStoreWrapper{}
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
@@ -141,15 +136,6 @@ func newApp() *App {
 		)
 		panic("failed to initialize app: could not create settings directory")
 	}
-	if err := ensureAppPrivateDirectory(app.conversationsDirPath); err != nil {
-		slog.Error(
-			"failed to create conversations directory",
-			"conversations path", app.conversationsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create conversations directory")
-	}
-
 	if err := ensureAppPrivateDirectory(app.sessionsDirPath); err != nil {
 		slog.Error(
 			"failed to create sessions directory",
@@ -173,7 +159,6 @@ func newApp() *App {
 		"flexiGPT paths initialized",
 		"app data", app.dataBasePath,
 		"settingsDirPath", app.settingsDirPath,
-		"conversationsDirPath", app.conversationsDirPath,
 		"sessionsDirPath", app.sessionsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
@@ -221,18 +206,7 @@ func ensureAppPrivateDirectory(location string) error {
 }
 
 func (a *App) initManagers() {
-	err := InitConversationCollectionWrapper(a.conversationStoreAPI, a.conversationsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize conversation store",
-			"directory", a.conversationsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: conversation store initialization failed\n" + err.Error())
-	}
-	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
-
-	err = InitSessionStoreWrapper(
+	err := InitSessionStoreWrapper(
 		a.sessionStoreAPI,
 		a.sessionsDirPath,
 	)
@@ -293,6 +267,18 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
 	}
 	slog.Info("settings store initialized", "directory", a.settingsDirPath)
+
+	err = InitCompletionWrapper(
+		a.completionAPI,
+		a.settingStoreAPI.store,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: provider runtime initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("provider runtime initialized")
 
 	err = InitToolRuntimeWrapper(a.toolRuntimeAPI)
 	if err != nil {
@@ -491,7 +477,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill aggregate and runtime initialized")
 
-	mcpInstaller, mcpRuntime, err := initMCPWrappers(
+	mcpInstaller, _, err := initMCPWrappers(
 		context.Background(),
 		a.mcpStoreAPI,
 		a.mcpRuntimeAPI,
@@ -605,25 +591,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("user Artifact baseline Plugins initialized")
 
-	workspaceConversationSource := a.workspaceStoreAPI.api
-
-	err = InitCompletionWrapper(
-		a.completionAPI,
-		modelRuntime,
-		a.settingStoreAPI.store,
-		a.toolStoreAPI.api,
-		skillInference,
-		mcpRuntime,
-		workspaceConversationSource,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize aggregate",
-			"error", err,
-		)
-		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
-	}
-
 	providerPublisher := a.completionAPI.providersetAPI
 	if err := a.modelAggregateAPI.setProviderRuntimePublisher(
 		providerPublisher,
@@ -652,15 +619,20 @@ func (a *App) initManagers() {
 	}
 
 	err = InitComposedSessionRuntime(
-		a.ctx,
+		context.Background(),
 		a.sessionRuntimeAPI,
 		a.sessionStoreAPI.store,
 		a.sessionStoreAPI.store,
 		a.completionAPI,
+		modelRuntime,
+		artifactComposition.Artifacts,
 		a.toolStoreAPI,
 		a.mcpRuntimeAPI,
-		a.skillAggregateAPI,
+		skillInference,
 		a.skillRuntimeAPI,
+		a.agentStoreAPI,
+		a.workspaceStoreAPI,
+		a.textStoreAPI,
 	)
 	if err != nil {
 		slog.Error(
@@ -683,7 +655,6 @@ func (a *App) initManagers() {
 func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
 
-	SetWrappedProviderAppContext(a.completionAPI, a.ctx)
 	if a.sessionRuntimeAPI != nil {
 		a.sessionRuntimeAPI.setAppContext(a.ctx)
 	}
@@ -776,9 +747,5 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 			)
 		}
 		a.artifactStoreSetup = nil
-	}
-
-	if a.conversationStoreAPI != nil {
-		a.conversationStoreAPI.close()
 	}
 }

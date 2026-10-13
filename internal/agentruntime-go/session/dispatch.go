@@ -104,6 +104,28 @@ func (r *Runtime) dispatchModel(
 	r.mu.Unlock()
 	r.flushEffects(operationCtx, effects)
 
+	prepared, preparationErr := r.prepareModelOperationForDispatch(
+		operationCtx,
+		work,
+	)
+	if preparationErr != nil {
+		if errors.Is(preparationErr, errStaleDispatch) {
+			return
+		}
+		r.finishModelExecution(
+			operationCtx,
+			work,
+			ModelExecutionResult{
+				Error: &OperationError{
+					Code:    "operation_preparation_failed",
+					Message: preparationErr.Error(),
+				},
+			},
+			preparationErr,
+		)
+		return
+	}
+
 	if err := r.ensureSkillSessionForModel(
 		operationCtx,
 		work.SessionID,
@@ -178,6 +200,7 @@ func (r *Runtime) dispatchModel(
 		History:        cloneJSON(operation.Request.History),
 		Current:        cloneJSON(operation.Request.Current),
 		SkillSessionID: run.SkillSession.ID,
+		Preparation:    cloneOperationPreparation(prepared),
 	}
 	r.touchRunLocked(sessionValue, run)
 
@@ -263,15 +286,19 @@ func (r *Runtime) ensureSkillSessionForModel(
 		return errStaleDispatch
 	}
 
-	configuration := cloneJSON(run.Configuration)
+	preparation := cloneOperationPreparation(operation.Preparation)
 	generation := run.SkillSession.Generation
 	r.mu.RUnlock()
 
-	// InstalledSkills is already the final frontend-resolved effective skill
-	// allow-list. Session does not resolve Workspace membership or fetch
-	// Workspace state.
+	if err := RequirePreparedOperation(preparation); err != nil {
+		return err
+	}
 	enabled := uniqueArtifactReferences(
-		cloneJSON(configuration.InstalledSkills),
+		cloneJSON(preparation.EffectiveSkills),
+	)
+	active := filterReferences(
+		cloneJSON(preparation.ActiveSkills),
+		enabled,
 	)
 
 	r.mu.Lock()
@@ -296,7 +323,6 @@ func (r *Runtime) ensureSkillSessionForModel(
 
 	effects := runtimeEffects{}
 	previousID := run.SkillSession.ID
-	active := filterReferences(run.SkillSession.Active, enabled)
 	currentEnabled := uniqueArtifactReferences(run.SkillSession.Enabled)
 	changed := false
 
@@ -357,14 +383,6 @@ func (r *Runtime) ensureSkillSessionForModel(
 		return nil
 	}
 
-	if r.deps.Skills == nil {
-		r.mu.Unlock()
-		r.flushEffects(ctx, effects)
-		return errors.New(
-			"run selects skills but no skill-session controller is configured",
-		)
-	}
-
 	if previousID != "" &&
 		run.SkillSession.EstablishedGeneration == generation {
 		r.mu.Unlock()
@@ -403,9 +421,10 @@ func (r *Runtime) ensureSkillSessionForModel(
 	result, ensureErr := r.deps.Skills.EnsureSkillSession(
 		ctx,
 		SkillSessionRequest{
-			SessionID: previousID,
-			Enabled:   cloneJSON(enabled),
-			Active:    active,
+			SessionID:   previousID,
+			Enabled:     cloneJSON(enabled),
+			Active:      active,
+			Preparation: cloneOperationPreparation(preparation),
 		},
 	)
 	if ensureErr != nil {
@@ -563,8 +582,10 @@ func (r *Runtime) finishModelExecution(
 	operation.ProtocolOutputs = cloneJSON(result.ProtocolOutputs)
 	operation.Metadata = cloneRaw(result.Metadata)
 	operation.RuntimeMetadata = cloneRaw(result.RuntimeMetadata)
+	operation.Preparation.Private = nil
 	operation.StreamedText = result.Text
 	operation.StreamedThinking = result.Thinking
+	operation.Preparation.Private = nil
 
 	currentIndex := transcriptMessageIndex(
 		sessionValue.Transcript,
@@ -773,6 +794,7 @@ func (r *Runtime) registerToolCallLocked(
 	call := ToolCall{
 		ID:                callID,
 		OriginOperationID: operation.ID,
+		Source:            ToolCallSourceModel,
 		ProviderCallID:    proposal.ProviderCallID,
 		Name:              proposal.Name,
 		ChoiceID:          proposal.ChoiceID,
@@ -817,15 +839,6 @@ func (r *Runtime) dispatchToolEvaluation(
 	ctx context.Context,
 	work runtimeWork,
 ) {
-	if r.deps.Tools == nil {
-		r.failToolWithoutResult(
-			ctx,
-			work,
-			"tool executor is not configured",
-		)
-		return
-	}
-
 	evaluationCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -968,17 +981,20 @@ func (r *Runtime) dispatchToolEvaluation(
 			"",
 			ToolCallFailedEventData{Error: evaluationErr.Error()},
 		)
-		r.advanceDriverLocked(
-			sessionValue,
-			run,
-			"",
-			DriverEvent{
-				Kind:        DriverEventToolSettled,
-				OperationID: call.OriginOperationID,
-				ToolCallID:  call.ID,
-			},
-			&effects,
-		)
+		if call.Required {
+			r.advanceDriverLocked(
+				sessionValue,
+				run,
+				"",
+				DriverEvent{
+					Kind:        DriverEventToolSettled,
+					OperationID: call.OriginOperationID,
+					ToolCallID:  call.ID,
+				},
+				&effects,
+			)
+		}
+
 		r.checkpointLocked(
 			&effects,
 			RuntimeEventToolCallFailed,
@@ -1093,7 +1109,16 @@ func (r *Runtime) dispatchToolEvaluation(
 		call.Authorization = cloneRaw(evaluation.Authorization)
 		call.State = ToolCallStateReady
 		r.touchRunLocked(sessionValue, run)
-		advance = true
+		if call.Required {
+			advance = true
+		} else {
+			r.queueAppToolExecutionLocked(
+				sessionValue,
+				run,
+				call,
+				&effects,
+			)
+		}
 
 	default:
 		call.State = ToolCallStateFailed
@@ -1115,7 +1140,7 @@ func (r *Runtime) dispatchToolEvaluation(
 		advance = true
 	}
 
-	if advance {
+	if advance && call.Required {
 		r.advanceDriverLocked(
 			sessionValue,
 			run,
@@ -1143,15 +1168,6 @@ func (r *Runtime) dispatchToolExecution(
 	ctx context.Context,
 	work runtimeWork,
 ) {
-	if r.deps.Tools == nil {
-		r.failToolWithoutResult(
-			ctx,
-			work,
-			"tool executor is not configured",
-		)
-		return
-	}
-
 	executionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -1362,7 +1378,7 @@ func (r *Runtime) dispatchToolExecution(
 			},
 			&effects,
 		)
-	} else {
+	} else if call.Required {
 		r.advanceDriverLocked(
 			sessionValue,
 			run,
@@ -1390,11 +1406,6 @@ func (r *Runtime) dispatchWaitResolution(
 	ctx context.Context,
 	work runtimeWork,
 ) {
-	if r.deps.Tools == nil {
-		r.markWaitInvalid(ctx, work)
-		return
-	}
-
 	resolutionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -1551,6 +1562,14 @@ func (r *Runtime) dispatchWaitResolution(
 	case ToolWaitResolutionApproved:
 		call.Authorization = cloneRaw(resolution.Authorization)
 		call.State = ToolCallStateReady
+		if !call.Required {
+			r.queueAppToolExecutionLocked(
+				sessionValue,
+				run,
+				call,
+				&effects,
+			)
+		}
 
 	case ToolWaitResolutionDenied:
 		result := ToolExecutionResult{
@@ -1590,17 +1609,19 @@ func (r *Runtime) dispatchWaitResolution(
 		wait,
 	)
 
-	r.advanceDriverLocked(
-		sessionValue,
-		run,
-		"",
-		DriverEvent{
-			Kind:        DriverEventToolWaitResolved,
-			OperationID: call.OriginOperationID,
-			ToolCallID:  call.ID,
-		},
-		&effects,
-	)
+	if call.Required {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolWaitResolved,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
 	r.checkpointLocked(
 		&effects,
 		RuntimeEventWaitResolved,
@@ -1754,17 +1775,19 @@ func (r *Runtime) dispatchWaitExpiry(
 			},
 			&effects,
 		)
-		r.advanceDriverLocked(
-			sessionValue,
-			run,
-			"",
-			DriverEvent{
-				Kind:        DriverEventToolSettled,
-				OperationID: call.OriginOperationID,
-				ToolCallID:  call.ID,
-			},
-			&effects,
-		)
+		if call.Required {
+			r.advanceDriverLocked(
+				sessionValue,
+				run,
+				"",
+				DriverEvent{
+					Kind:        DriverEventToolSettled,
+					OperationID: call.OriginOperationID,
+					ToolCallID:  call.ID,
+				},
+				&effects,
+			)
+		}
 	}
 
 	r.checkpointLocked(
@@ -1866,17 +1889,19 @@ func (r *Runtime) markWaitInvalid(
 			Error: call.LastFailure,
 		},
 	)
-	r.advanceDriverLocked(
-		sessionValue,
-		run,
-		"",
-		DriverEvent{
-			Kind:        DriverEventToolSettled,
-			OperationID: call.OriginOperationID,
-			ToolCallID:  call.ID,
-		},
-		&effects,
-	)
+	if call.Required {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
 	r.checkpointLocked(
 		&effects,
 		RuntimeEventToolCallFailed,
@@ -1926,17 +1951,19 @@ func (r *Runtime) failToolWithoutResult(
 		"",
 		ToolCallFailedEventData{Error: message},
 	)
-	r.advanceDriverLocked(
-		sessionValue,
-		run,
-		"",
-		DriverEvent{
-			Kind:        DriverEventToolSettled,
-			OperationID: call.OriginOperationID,
-			ToolCallID:  call.ID,
-		},
-		&effects,
-	)
+	if call.Required {
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
 	r.checkpointLocked(
 		&effects,
 		RuntimeEventToolCallFailed,
@@ -2003,6 +2030,10 @@ func (r *Runtime) recordExecutionResultLocked(
 		CreatedAt:      r.now(),
 	}
 
+	if result.AppRoute != nil {
+		r.recordAppInstanceLocked(sessionValue, run, call, &toolResult, result.AppRoute, effects)
+	}
+
 	if result.SkillSessionActiveKnown {
 		run.SkillSession.Active = filterReferences(
 			result.SkillSessionActive,
@@ -2052,10 +2083,6 @@ func (r *Runtime) closeSkillSession(
 	sessionID SessionID,
 	runID RunID,
 ) {
-	if r.deps.Skills == nil {
-		return
-	}
-
 	closeCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
 		skillSessionCloseTimeout,

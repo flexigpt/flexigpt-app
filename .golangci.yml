@@ -462,6 +462,8 @@ linters:
           alias: html2md
         - pkg: "github.com/flexigpt/inference-go/spec"
           alias: inferenceSpec
+        - pkg: "github.com/flexigpt/inference-go"
+          alias: inferenceGo
         - pkg: "github.com/flexigpt/llmtools-go/spec"
           alias: llmtoolsSpec
         - pkg: "github.com/flexigpt/agentskills-go/runtime"

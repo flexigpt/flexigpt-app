@@ -3,724 +3,249 @@ package inference
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"slices"
+	"maps"
 	"strings"
 
-	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
-
-	"github.com/flexigpt/inference-go"
+	inferenceGo "github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
-	// Backend batching is the only intentional stream throttle.
-	defaultFlushIntervalMillis = 32
-	defaultFlushChunkSize      = 256
+	defaultFlushIntervalMillis  = 32
+	defaultFlushChunkSize       = 256
+	emptyCompletionResponseCode = "empty_completion_response"
 )
 
-// ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
-// It owns:
-//   - provider lifecycle (add/delete/set API key),
-//   - attachment/tool hydration,
-//   - mapping Conversation+CurrentTurn -> inference-go FetchCompletionRequest.
+// ProviderSetAPI owns provider lifecycle, completion-scoped provider
+// registration, SDK capability resolution, provider execution, and transport
+// streaming. It has no domain-resolution dependencies.
 type ProviderSetAPI struct {
-	inner *inference.ProviderSetAPI
-
-	models             inferenceRuntimeSpec.ModelRuntime
-	toolsSvc           ToolSource
-	artifactSkills     inferenceRuntimeSpec.SkillSource
-	mcpInferenceBridge *MCPInferenceBridge
-	workspaceSource    WorkspaceSource
-
-	logger             *slog.Logger
-	debugger           *debugclient.HTTPCompletionDebugger
-	initialDebugConfig *debugclient.DebugConfig
-
-	skillsRunScriptEnabled bool
+	inner    *inferenceGo.ProviderSetAPI
+	logger   *slog.Logger
+	debugger *debugclient.HTTPCompletionDebugger
 }
 
-type ProviderSetOption func(*ProviderSetAPI)
+type providerSetOptions struct {
+	logger      *slog.Logger
+	debugConfig *debugclient.DebugConfig
+}
+
+type ProviderSetOption func(*providerSetOptions)
 
 func WithLogger(logger *slog.Logger) ProviderSetOption {
-	return func(ps *ProviderSetAPI) {
-		ps.logger = logger
+	return func(options *providerSetOptions) {
+		options.logger = logger
 	}
 }
 
-func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
-	return func(ps *ProviderSetAPI) {
-		if debugConfig == nil {
-			ps.initialDebugConfig = nil
+func WithDebugConfig(config *debugclient.DebugConfig) ProviderSetOption {
+	return func(options *providerSetOptions) {
+		if config == nil {
+			options.debugConfig = nil
 			return
 		}
-		cloned := *debugConfig
-		ps.initialDebugConfig = &cloned
+		value := *config
+		options.debugConfig = &value
 	}
 }
 
-// WithSkillsRunScriptEnabled narrows the Skill source's run-script policy
-// for advertised completion tools. The source must still reject advertising
-// script execution when runtime policy disables it.
-func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
-	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }
-}
-
-// NewProviderSetAPI validates required capabilities once during assembly.
-// MCP hydration is optional. When supplied, the narrow inference consumer
-// capability is wrapped here rather than forcing application composition to
-// construct an inference-owned bridge.
 func NewProviderSetAPI(
-	models inferenceRuntimeSpec.ModelRuntime,
-	tools ToolSource,
-	artifactSkills inferenceRuntimeSpec.SkillSource,
-	mcpRuntime inferenceRuntimeSpec.MCPRuntime,
-	workspaceSource WorkspaceSource,
-	opts ...ProviderSetOption,
+	options ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if models == nil ||
-		tools == nil ||
-		artifactSkills == nil ||
-		workspaceSource == nil {
-		return nil, errors.New("inferencewrapper: required capabilities are incomplete")
+	config := providerSetOptions{
+		logger: slog.Default(),
 	}
-
-	var mcpBridge *MCPInferenceBridge
-	if mcpRuntime != nil {
-		mcpBridge = NewMCPInferenceBridge(mcpRuntime)
-	}
-
-	ps := &ProviderSetAPI{
-		models:             models,
-		toolsSvc:           tools,
-		artifactSkills:     artifactSkills,
-		mcpInferenceBridge: mcpBridge,
-		workspaceSource:    workspaceSource,
-
-		skillsRunScriptEnabled: artifactSkills.RunScriptsEnabled(),
-	}
-
-	for _, opt := range opts {
-		if opt != nil {
-			opt(ps)
+	for _, option := range options {
+		if option != nil {
+			option(&config)
 		}
 	}
+	if config.logger == nil {
+		return nil, errors.New("inference requires a logger")
+	}
 
-	allOpts := make([]inference.ProviderSetOption, 0, 2)
-	if ps.logger == nil {
-		ps.logger = slog.Default()
+	debugConfig := disabledDebugConfig()
+	if config.debugConfig != nil {
+		debugConfig = *config.debugConfig
 	}
-	allOpts = append(allOpts, inference.WithLogger(ps.logger))
-	// Always install a debugger so runtime debug config changes work even if debugging starts out disabled.
-	// If no config was provided, we begin in a disabled state and can enable later via SetDebugConfig without
-	// rebuilding
-	// providers or HTTP clients.
-	debugCfg := disabledDebugConfig()
-	if ps.initialDebugConfig != nil {
-		debugCfg = *ps.initialDebugConfig
-	}
-	dbg := debugclient.NewHTTPCompletionDebugger(&debugCfg)
-	ps.debugger = dbg
-	allOpts = append(allOpts,
-		inference.WithDebugClientBuilder(func(p inferenceSpec.ProviderParam) inferenceSpec.CompletionDebugger {
-			return dbg
-		}),
+	debugger := debugclient.NewHTTPCompletionDebugger(&debugConfig)
+
+	inner, err := inferenceGo.NewProviderSetAPI(
+		inferenceGo.WithLogger(config.logger),
+		inferenceGo.WithDebugClientBuilder(
+			func(inferenceSpec.ProviderParam) inferenceSpec.CompletionDebugger {
+				return debugger
+			},
+		),
 	)
-
-	inner, err := inference.NewProviderSetAPI(allOpts...)
 	if err != nil {
 		return nil, err
 	}
-	ps.inner = inner
 
-	return ps, nil
+	return &ProviderSetAPI{
+		inner:    inner,
+		logger:   config.logger,
+		debugger: debugger,
+	}, nil
 }
 
-// SetDebugConfig updates the live debug client configuration used for future
-// completions. Passing nil disables debugging while keeping the transport
-// wrapper installed, so debugging can be enabled again later without
-// reinitializing providers.
-func (ps *ProviderSetAPI) SetDebugConfig(cfg *debugclient.DebugConfig) {
-	if ps == nil || ps.debugger == nil {
-		return
-	}
-
+func (ps *ProviderSetAPI) SetDebugConfig(config *debugclient.DebugConfig) {
 	next := disabledDebugConfig()
-	if cfg != nil {
-		next = *cfg
+	if config != nil {
+		next = *config
 	}
-
 	ps.debugger.SetConfig(next)
 }
 
-// GetDebugConfig returns a defensive copy of the live debug configuration.
 func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
-	if ps == nil || ps.debugger == nil {
-		return nil
-	}
-	cfg := ps.debugger.GetConfig()
-	return &cfg
+	config := ps.debugger.GetConfig()
+	return &config
 }
 
-// AddProvider forwards to inference-go ProviderSetAPI.AddProvider.
 func (ps *ProviderSetAPI) AddProvider(
 	ctx context.Context,
-	req *inferenceRuntimeSpec.AddProviderRequest,
+	request *inferenceRuntimeSpec.AddProviderRequest,
 ) (*inferenceRuntimeSpec.AddProviderResponse, error) {
-	if req == nil || req.Body == nil || req.Provider == "" || strings.TrimSpace(req.Body.Origin) == "" {
-		return nil, errors.New("invalid params")
+	if request == nil || request.Body == nil ||
+		request.Provider == "" ||
+		strings.TrimSpace(request.Body.Origin) == "" {
+		return nil, errors.New("invalid provider publication request")
 	}
 
-	cfg := &inference.AddProviderConfig{
-		SDKType:                  req.Body.SDKType,
-		Origin:                   req.Body.Origin,
-		ChatCompletionPathPrefix: req.Body.ChatCompletionPathPrefix,
-		APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
-		DefaultHeaders:           req.Body.DefaultHeaders,
-	}
-	if _, err := ps.inner.AddProvider(ctx, req.Provider, cfg); err != nil {
+	_, err := ps.inner.AddProvider(
+		ctx,
+		request.Provider,
+		&inferenceGo.AddProviderConfig{
+			SDKType:                  request.Body.SDKType,
+			Origin:                   request.Body.Origin,
+			ChatCompletionPathPrefix: request.Body.ChatCompletionPathPrefix,
+			APIKeyHeaderKey:          request.Body.APIKeyHeaderKey,
+			DefaultHeaders:           maps.Clone(request.Body.DefaultHeaders),
+		},
+	)
+	if err != nil {
 		return nil, err
 	}
-
 	return &inferenceRuntimeSpec.AddProviderResponse{}, nil
 }
 
-// DeleteProvider forwards to inference-go ProviderSetAPI.DeleteProvider.
 func (ps *ProviderSetAPI) DeleteProvider(
 	ctx context.Context,
-	req *inferenceRuntimeSpec.DeleteProviderRequest,
+	request *inferenceRuntimeSpec.DeleteProviderRequest,
 ) (*inferenceRuntimeSpec.DeleteProviderResponse, error) {
-	if req == nil || req.Provider == "" {
-		return nil, errors.New("got empty provider input")
+	if request == nil || request.Provider == "" {
+		return nil, errors.New("invalid provider removal request")
 	}
-	if err := ps.inner.DeleteProvider(ctx, req.Provider); err != nil {
+	if err := ps.inner.DeleteProvider(ctx, request.Provider); err != nil {
 		return nil, err
 	}
-
 	return &inferenceRuntimeSpec.DeleteProviderResponse{}, nil
 }
 
-// SetProviderAPIKey forwards to inference-go ProviderSetAPI.SetProviderAPIKey.
 func (ps *ProviderSetAPI) SetProviderAPIKey(
 	ctx context.Context,
-	req *inferenceRuntimeSpec.SetProviderAPIKeyRequest,
+	request *inferenceRuntimeSpec.SetProviderAPIKeyRequest,
 ) (*inferenceRuntimeSpec.SetProviderAPIKeyResponse, error) {
-	if req == nil || req.Body == nil {
-		return nil, errors.New("got empty provider input")
+	if request == nil || request.Body == nil || request.Provider == "" {
+		return nil, errors.New("invalid provider credential request")
 	}
-	if err := ps.inner.SetProviderAPIKey(ctx, req.Provider, req.Body.APIKey); err != nil {
+	if err := ps.inner.SetProviderAPIKey(
+		ctx,
+		request.Provider,
+		request.Body.APIKey,
+	); err != nil {
 		return nil, err
 	}
 	return &inferenceRuntimeSpec.SetProviderAPIKeyResponse{}, nil
 }
 
-// FetchCompletion builds a normalized inference-go FetchCompletionRequest from
-// app-level conversation types and calls inference-go's FetchCompletion.
 func (ps *ProviderSetAPI) FetchCompletion(
 	ctx context.Context,
-	req *inferenceRuntimeSpec.CompletionRequest,
+	request *inferenceRuntimeSpec.CompletionRequest,
 ) (*inferenceRuntimeSpec.CompletionResponse, error) {
-	if req == nil {
-		return nil, errors.New("got empty completion input")
+	if request == nil {
+		return nil, errors.New("prepared completion request is required")
 	}
-	if req.Current.Role != inferenceSpec.RoleUser {
-		return nil, errors.New("current turn must have role=user")
-	}
-	if len(req.Current.ToolChoices) > 0 {
-		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
-	}
-
-	runtimeModel, err := ps.models.ResolveRuntimeConfiguration(ctx, req.Model)
-	if err != nil {
+	if err := request.Configuration.Validate(); err != nil {
 		return nil, err
 	}
-	if err := runtimeModel.Validate(); err != nil {
-		return nil, err
-	}
-	modelParam := runtimeModel.ModelParam
-	if req.SystemPrompt != nil {
-		modelParam.SystemPrompt = *req.SystemPrompt
+	if len(request.Inputs) == 0 {
+		return nil, errors.New("prepared completion has no inputs")
 	}
 
-	ck := uuidutil.NewUUIDv7()
-	currentMessage := req.Current
-	runtimeProvider, release, err := ps.registerRuntimeProvider(
+	completionKey := uuidutil.NewUUIDv7()
+	provider, release, err := ps.registerRuntimeProvider(
 		ctx,
-		runtimeModel,
-		ck,
+		request.Configuration,
+		completionKey,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
 
-	capabilityResolver, err := ps.newRuntimeCapabilityResolver(
+	capabilities, err := ps.newRuntimeCapabilityResolver(
 		ctx,
-		runtimeProvider,
-		runtimeModel,
-		ck,
+		provider,
+		request.Configuration,
+		completionKey,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Flatten full conversation (history + current) into InputUnion list.
-	inputs, currentInputs, err := ps.buildInputs(ctx, req.History, currentMessage)
-	if err != nil {
-		return nil, err
+	options := &inferenceSpec.FetchCompletionOptions{
+		CompletionKey:      completionKey,
+		CapabilityResolver: capabilities,
 	}
-
-	inputs, currentInputs = stripGeneratedCurrentContextInputs(
-		inputs,
-		currentInputs,
-	)
-
-	if err := validateArtifactSkillRefsForSelection(
-		currentMessage.WorkspaceSelection,
-		currentMessage.EnabledSkillRefs,
-	); err != nil {
-		return &inferenceRuntimeSpec.CompletionResponse{
-			Body: &inferenceRuntimeSpec.CompletionResponseBody{
-				InferenceResponse: &inferenceSpec.FetchCompletionResponse{
-					Error: &inferenceSpec.Error{
-						Code:    "workspace_selection_invalid",
-						Message: err.Error(),
-					},
-				},
-				HydratedCurrentInputs: currentInputs,
-			},
-		}, nil
-	}
-
-	var workspaceUsage *conversationSpec.WorkspaceConversationUsage
-	if currentMessage.WorkspaceSelection != nil {
-		hydrated, workspaceErr := HydrateCompletion(
-			ctx,
-			ps.workspaceSource,
-			currentMessage.WorkspaceSelection,
+	if request.OnStreamText != nil || request.OnStreamThinking != nil {
+		options.StreamHandler = makeStreamHandler(
+			request.OnStreamText,
+			request.OnStreamThinking,
 		)
-		if hydrated != nil {
-			workspaceUsage = hydrated.Usage
-			if len(hydrated.CurrentInputs) > 0 {
-				inputs, currentInputs = prependCurrentInputs(
-					inputs,
-					currentInputs,
-					hydrated.CurrentInputs...,
-				)
-			}
-		}
-		if workspaceErr != nil {
-			return &inferenceRuntimeSpec.CompletionResponse{
-				Body: &inferenceRuntimeSpec.CompletionResponseBody{
-					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
-						Error: &inferenceSpec.Error{
-							Code:    "workspace_unavailable",
-							Message: workspaceErr.Error(),
-						},
-					},
-					HydratedCurrentInputs: currentInputs,
-					WorkspaceUsage:        workspaceUsage,
-				},
-			}, nil
-		}
-		if hydrated != nil && len(hydrated.SystemPromptParts) != 0 {
-			// Workspace insert=instructions content is intentionally routed
-			// through the system-prompt path. User-message Workspace content
-			// remains in hydrated.CurrentInputs and is never merged here.
-			modelParam.SystemPrompt = appendToSystemPrompt(
-				modelParam.SystemPrompt,
-				hydrated.SystemPromptParts...,
-			)
-		}
-	}
-
-	mcpContext := req.MCPContext
-	if mcpContext == nil {
-		mcpContext = currentMessage.MCPContext
-	}
-	if len(currentMessage.MCPAppContextUpdates) != 0 {
-		if mcpContext == nil {
-			return nil, errors.New(
-				"MCP App context updates require an MCP conversation context",
-			)
-		}
-		if err := mcpContext.ValidateAppContextUpdates(
-			currentMessage.MCPAppContextUpdates,
-		); err != nil {
-			return nil, err
-		}
-	}
-	if appCtxInput := buildMCPAppContextInput(currentMessage.MCPAppContextUpdates); appCtxInput != nil {
-		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
-	}
-	// Build tool choices for this call.
-	toolChoices, preparedToolBindings, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
-	if err != nil {
-		return nil, err
-	}
-
-	enabledSkillRefs := currentMessage.EnabledSkillRefs
-	if workspaceUsage != nil {
-		enabledSkillRefs = filterWorkspaceSkillRefsToResolvedSelection(
-			enabledSkillRefs,
-			workspaceUsage,
-		)
-	}
-	skillSessionID := strings.TrimSpace(req.SkillSessionID)
-
-	// A Workspace selection is authoritative for which Root-scoped Skills may
-	// participate in this turn. If no runtime allow-list reaches Skill Runtime,
-	// do not report selected Skills as silently available.
-	//
-	// This covers stale persisted conversations where Workspace selection
-	// survives but a selected Artifact can no longer composition. A usable Context
-	// may still make the turn partial rather than
-	// completely unavailable.
-	if workspaceUsage != nil &&
-		len(workspaceUsage.Skills) > 0 &&
-		len(enabledSkillRefs) == 0 {
-		markWorkspaceSkillSessionUsage(
-			workspaceUsage,
-			enabledSkillRefs,
-			nil,
-			nil,
-			false,
-		)
-		if workspaceUsage.Status == conversationSpec.WorkspaceConversationSelectionUnavailable {
-			return workspaceUnavailableCompletionResponse(
-				currentInputs,
-				workspaceUsage,
-				"selected Workspace Skills were not included in the Skill Runtime session allow-list",
-			), nil
-		}
-	}
-
-	if len(enabledSkillRefs) > 0 {
-		if skillSessionID == "" {
-			if workspaceUsage != nil && len(workspaceUsage.Skills) > 0 {
-				markWorkspaceSkillSessionUsage(
-					workspaceUsage,
-					enabledSkillRefs,
-					nil,
-					nil,
-					false,
-				)
-				return workspaceUnavailableCompletionResponse(
-					currentInputs,
-					workspaceUsage,
-					"selected Workspace Skills require a current Skill Runtime session",
-				), nil
-			}
-			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
-		}
-
-		skills, skillErr := ps.artifactSkills.ResolveSkillSession(
-			ctx,
-			inferenceRuntimeSpec.SkillSessionRequest{
-				SessionID:        agentskillsRuntimeSpec.SessionID(skillSessionID),
-				Artifacts:        enabledSkillRefs,
-				IncludeRunScript: ps.skillsRunScriptEnabled,
-			},
-		)
-		if skillErr != nil {
-			if errors.Is(skillErr, agentskillsRuntimeSpec.ErrSessionNotFound) {
-				return nil, fmt.Errorf("skill session %q not found: %w", skillSessionID, skillErr)
-			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			ps.logger.Warn("hydrate artifact skills failed; disabling skills for this turn", "err", skillErr)
-			skills = inferenceRuntimeSpec.SkillSession{}
-		}
-		availableSkillRefs := skills.AvailableArtifacts
-		activeSkillRefs := skills.ActiveArtifacts
-		skillsPrompt := strings.TrimSpace(skills.Prompt)
-
-		// Only expose skills tools if we also have the prompt.
-		if skillsPrompt != "" {
-			modelParam.SystemPrompt = appendToSystemPrompt(
-				modelParam.SystemPrompt,
-				skills.RulesPrompt,
-				skillsPrompt,
-			)
-			toolChoices = append(toolChoices, skills.ToolChoices...)
-		}
-
-		markWorkspaceSkillSessionUsage(
-			workspaceUsage,
-			enabledSkillRefs,
-			availableSkillRefs,
-			activeSkillRefs,
-			skillsPrompt != "",
-		)
-
-		if workspaceUsage != nil &&
-			workspaceUsage.Status == conversationSpec.WorkspaceConversationSelectionUnavailable {
-			return workspaceUnavailableCompletionResponse(
-				currentInputs,
-				workspaceUsage,
-				"selected Workspace Skills could not enter the active Skill Runtime session",
-			), nil
-		}
-	}
-
-	var mcpDebugDetails map[string]any
-	var mcpToolMappings []conversationSpec.MCPProviderToolMapping
-	if ps.mcpInferenceBridge != nil && mcpContext != nil {
-		hydrated, err := ps.mcpInferenceBridge.HydrateCompletion(ctx, MCPCompletionHydrationRequest{
-			Context:             mcpContext,
-			ExistingToolChoices: toolChoices,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to hydrate MCP context: %w", err)
-		}
-		if hydrated != nil {
-			if len(hydrated.SystemPromptParts) > 0 {
-				modelParam.SystemPrompt = appendToSystemPrompt(
-					modelParam.SystemPrompt,
-					hydrated.SystemPromptParts...,
-				)
-			}
-			if len(hydrated.CurrentInputs) > 0 {
-				inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, hydrated.CurrentInputs...)
-			}
-			if len(hydrated.ToolChoices) > 0 {
-				toolChoices = append(toolChoices, hydrated.ToolChoices...)
-			}
-			if len(hydrated.ToolMappings) > 0 {
-				mcpToolMappings = append(
-					mcpToolMappings,
-					hydrated.ToolMappings...,
-				)
-			}
-
-			mcpDebugDetails = hydrated.DebugDetails
-		}
-	}
-
-	infReq := &inferenceSpec.FetchCompletionRequest{
-		ModelParam:  modelParam,
-		Inputs:      inputs,
-		ToolChoices: toolChoices,
-	}
-
-	opts := &inferenceSpec.FetchCompletionOptions{
-		CompletionKey:      ck,
-		CapabilityResolver: capabilityResolver,
-	}
-
-	// Keep provider batching at the transport boundary. The frontend owns
-	// paint-aligned rendering and additionally coalesces visible updates to
-	// avoid UI work more often than its stream frame budget.
-	if req.OnStreamText != nil || req.OnStreamThinking != nil {
-		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
-		opts.StreamConfig = &inferenceSpec.StreamConfig{
+		options.StreamConfig = &inferenceSpec.StreamConfig{
 			FlushIntervalMillis: defaultFlushIntervalMillis,
 			FlushChunkSize:      defaultFlushChunkSize,
 		}
 	}
 
-	b, err := ps.inner.FetchCompletion(
+	response, executeErr := ps.inner.FetchCompletion(
 		ctx,
-		runtimeProvider,
-		infReq,
-		opts,
+		provider,
+		&inferenceSpec.FetchCompletionRequest{
+			ModelParam:  request.Configuration.ModelParam,
+			Inputs:      request.Inputs,
+			ToolChoices: request.ToolChoices,
+		},
+		options,
 	)
 
-	// A nil or empty successful final payload is not a usable completion.
-	// Streaming may already have delivered visible text, so the frontend will
-	// preserve it and append this error instead of replacing it with blank UI.
-	if b == nil && err == nil {
-		b = &inferenceSpec.FetchCompletionResponse{
+	if response == nil && executeErr == nil {
+		response = &inferenceSpec.FetchCompletionResponse{
 			Error: &inferenceSpec.Error{
 				Code:    emptyCompletionResponseCode,
 				Message: "provider finished without a final response payload",
 			},
 		}
 	}
-	if b != nil && err == nil && b.Error == nil && len(b.Outputs) == 0 {
-		b.Error = &inferenceSpec.Error{
+	if response != nil &&
+		executeErr == nil &&
+		response.Error == nil &&
+		len(response.Outputs) == 0 {
+		response.Error = &inferenceSpec.Error{
 			Code:    emptyCompletionResponseCode,
 			Message: "provider finished without final output",
 		}
 	}
 
-	if b != nil && workspaceUsage != nil {
-		b.DebugDetails = mergeCompletionDebugDetails(
-			b.DebugDetails,
-			"workspace",
-			workspaceUsage,
-		)
-	}
-	if b != nil && mcpDebugDetails != nil {
-		b.DebugDetails = mergeCompletionDebugDetails(b.DebugDetails, "mcp", mcpDebugDetails)
-	}
-
-	resp := &inferenceRuntimeSpec.CompletionResponse{Body: &inferenceRuntimeSpec.CompletionResponseBody{
-		InferenceResponse:     b,
-		HydratedCurrentInputs: currentInputs,
-		MCPToolMappings:       mcpToolMappings,
-		WorkspaceUsage:        workspaceUsage,
-		PreparedToolBindings:  preparedToolBindings,
-	}}
-
-	return resp, err
-}
-
-func workspaceUnavailableCompletionResponse(
-	currentInputs []inferenceSpec.InputUnion,
-	workspaceUsage *conversationSpec.WorkspaceConversationUsage,
-	message string,
-) *inferenceRuntimeSpec.CompletionResponse {
 	return &inferenceRuntimeSpec.CompletionResponse{
 		Body: &inferenceRuntimeSpec.CompletionResponseBody{
-			InferenceResponse: &inferenceSpec.FetchCompletionResponse{
-				Error: &inferenceSpec.Error{
-					Code:    "workspace_unavailable",
-					Message: message,
-				},
-			},
-			HydratedCurrentInputs: currentInputs,
-			WorkspaceUsage:        workspaceUsage,
+			InferenceResponse: response,
 		},
-	}
-}
-
-// buildInputs flattens History + Current into a single InputUnion slice.
-// Attachments are always built from top level param and added to the union.
-// If the caller hydrates it then there is a possibility of duplicates.
-func (ps *ProviderSetAPI) buildInputs(
-	ctx context.Context,
-	history []conversationSpec.ConversationMessage,
-	inCurrent conversationSpec.ConversationMessage,
-) (all, current []inferenceSpec.InputUnion, err error) {
-	out := make([]inferenceSpec.InputUnion, 0)
-
-	// 1) History: replay stored unions exactly as they were.
-	for _, turn := range history {
-		// Inputs first, then Outputs, preserving stored order.
-
-		out = append(out, cloneInputUnionsForLocalMutation(turn.Inputs)...)
-		for _, outEv := range turn.Outputs {
-			// Outputs are not directly part of InputUnion; but for replay
-			// we want them to be visible as prior context. We embed them
-			// as InputUnion using the matching InputKind* variants.
-			o := outputToInput(outEv)
-			if o != nil {
-				out = append(out, *o)
-			}
-		}
-	}
-
-	cur := inCurrent
-
-	// If the caller already provided normalized InputUnions, just reuse them.
-	currentOut := make([]inferenceSpec.InputUnion, 0)
-	if len(cur.Inputs) > 0 {
-		currentOut = append(currentOut, cloneInputUnionsForLocalMutation(cur.Inputs)...)
-	}
-
-	// Always process attachments into content items.
-	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(msgContentItems) > 0 {
-		// Try to merge into the last user InputMessage if present.
-		merged := false
-		for idx := range slices.Backward(currentOut) {
-			iu := &currentOut[idx]
-			if iu.Kind == inferenceSpec.InputKindInputMessage &&
-				iu.InputMessage != nil &&
-				iu.InputMessage.Role == inferenceSpec.RoleUser {
-				iu.InputMessage.Contents = append(iu.InputMessage.Contents, msgContentItems...)
-				merged = true
-				break
-			}
-		}
-
-		if !merged {
-			inputMsg := inferenceSpec.InputOutputContent{
-				ID:       "",
-				Role:     inferenceSpec.RoleUser,
-				Status:   inferenceSpec.StatusNone,
-				Contents: msgContentItems,
-			}
-			currentOut = append(currentOut, inferenceSpec.InputUnion{
-				Kind:         inferenceSpec.InputKindInputMessage,
-				InputMessage: &inputMsg,
-			})
-		}
-	}
-	if len(currentOut) > 0 {
-		out = append(out, currentOut...)
-	}
-
-	if len(out) == 0 {
-		return nil, nil, errors.New("no usable inputs to send to inference-go")
-	}
-
-	return out, currentOut, nil
-}
-
-func appendToSystemPrompt(base string, parts ...string) string {
-	base = strings.TrimSpace(base)
-	var out []string
-	if base != "" {
-		out = append(out, base)
-	}
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		out = append(out, p)
-	}
-	return strings.Join(out, "\n\n")
-}
-
-// makeStreamHandler adapts inference-go streaming into the legacy
-// text/thinking callback pair.
-func makeStreamHandler(
-	onText func(string) error,
-	onThinking func(string) error,
-) inferenceSpec.StreamHandler {
-	if onText == nil && onThinking == nil {
-		return nil
-	}
-	return func(ev inferenceSpec.StreamEvent) error {
-		switch ev.Kind {
-		case inferenceSpec.StreamContentKindText:
-			if onText == nil || ev.Text == nil {
-				return nil
-			}
-
-			// Text is a delta chunk. Empty chunks are valid no-ops and are not
-			// completion markers. Do not collapse repeated equal chunks here.
-			text := ev.Text.Text
-			if text == "" {
-				return nil
-			}
-			return onText(text)
-		case inferenceSpec.StreamContentKindThinking:
-			if onThinking == nil || ev.Thinking == nil {
-				return nil
-			}
-
-			thinking := ev.Thinking.Text
-			if thinking == "" {
-				return nil
-			}
-			return onThinking(thinking)
-		}
-		return nil
-	}
+	}, executeErr
 }

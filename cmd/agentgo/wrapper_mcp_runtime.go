@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -159,49 +158,6 @@ func (w *MCPRuntimeWrapper) CompleteMCPArgument(
 ) (*mcpServer.MCPCompletionResult, error) {
 	return withMCPRuntime(w, func() (*mcpServer.MCPCompletionResult, error) {
 		return w.runtime.Complete(context.Background(), server, request)
-	})
-}
-
-func (w *MCPRuntimeWrapper) CheckMCPToolCall(
-	server mcpServer.ServerID,
-	request *mcpServer.InvokeMCPToolRequestBody,
-) (*mcpServer.MCPApprovalEvaluation, error) {
-	return withMCPRuntime(w, func() (*mcpServer.MCPApprovalEvaluation, error) {
-		if request == nil {
-			return nil, fmt.Errorf(
-				"%w: MCP tool request is required",
-				mcpServer.ErrMCPInvalidRuntimeRequest,
-			)
-		}
-		return w.toolBridge.Evaluate(context.Background(), server, *request)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ResolveMCPToolApproval(
-	approvalID string,
-	resolution mcpServer.MCPApprovalResolution,
-) (mcpServer.MCPApprovalResolutionResult, error) {
-	return withMCPRuntime(w, func() (mcpServer.MCPApprovalResolutionResult, error) {
-		return w.toolBridge.ResolveApproval(
-			context.Background(),
-			approvalID,
-			resolution,
-		)
-	})
-}
-
-func (w *MCPRuntimeWrapper) InvokeMCPTool(
-	server mcpServer.ServerID,
-	request *mcpServer.InvokeMCPToolRequestBody,
-) (*mcpServer.InvokeMCPToolResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpServer.InvokeMCPToolResponseBody, error) {
-		if request == nil {
-			return nil, fmt.Errorf(
-				"%w: MCP tool request is required",
-				mcpServer.ErrMCPInvalidRuntimeRequest,
-			)
-		}
-		return w.toolBridge.Invoke(context.Background(), server, *request)
 	})
 }
 

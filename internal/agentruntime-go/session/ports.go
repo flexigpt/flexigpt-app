@@ -27,6 +27,7 @@ type ModelExecutionRequest struct {
 	History        []TranscriptMessage  `json:"history"`
 	Current        TranscriptMessage    `json:"current"`
 	SkillSessionID string               `json:"skillSessionID,omitempty"`
+	Preparation    OperationPreparation `json:"-"`
 }
 
 type ModelExecutionResult struct {
@@ -54,6 +55,7 @@ type SubmissionPreparationRequest struct {
 	SessionID            SessionID
 	Configuration        SessionConfiguration
 	Input                UserInput
+	OperationID          OperationID
 	PersistConfiguration bool
 }
 
@@ -117,6 +119,7 @@ type ToolExecutionResult struct {
 	App        json.RawMessage `json:"app,omitempty"`
 	Error      string          `json:"error,omitempty"`
 
+	AppRoute                *AppRoute           `json:"-"`
 	SkillSessionActive      []ArtifactReference `json:"skillSessionActive,omitempty"`
 	SkillSessionActiveKnown bool                `json:"skillSessionActiveKnown,omitempty"`
 }
@@ -154,9 +157,10 @@ type ToolExecutor interface {
 }
 
 type SkillSessionRequest struct {
-	SessionID string              `json:"sessionID,omitempty"`
-	Enabled   []ArtifactReference `json:"enabled,omitempty"`
-	Active    []ArtifactReference `json:"active,omitempty"`
+	SessionID   string               `json:"sessionID,omitempty"`
+	Enabled     []ArtifactReference  `json:"enabled,omitempty"`
+	Active      []ArtifactReference  `json:"active,omitempty"`
+	Preparation OperationPreparation `json:"-"`
 }
 
 type SkillSessionResult struct {
@@ -208,6 +212,10 @@ const (
 	RuntimeEventRunFailed                   RuntimeEventKind = "runFailed"
 	RuntimeEventRunCancelled                RuntimeEventKind = "runCancelled"
 	RuntimeEventRecoveryApplied             RuntimeEventKind = "recoveryApplied"
+	RuntimeEventModelOperationPrepared      RuntimeEventKind = "modelOperationPrepared"
+	RuntimeEventAppInstanceCreated          RuntimeEventKind = "appInstanceCreated"
+	RuntimeEventAppViewOpened               RuntimeEventKind = "appViewOpened"
+	RuntimeEventAppContextStaged            RuntimeEventKind = "appContextStaged"
 )
 
 type RuntimeEvent struct {
@@ -284,6 +292,26 @@ type SkillSessionChangedEventData struct {
 	ActiveSkills   []ArtifactReference `json:"activeSkills,omitempty"`
 }
 
+type ModelOperationPreparedEventData struct {
+	Fingerprint string                     `json:"fingerprint"`
+	Resolution  OperationResolutionSummary `json:"resolution"`
+}
+
+type AppInstanceEventData struct {
+	AppInstance AppInstance `json:"appInstance"`
+}
+
+type AppViewEventData struct {
+	AppInstanceID AppInstanceID `json:"appInstanceID"`
+	ViewID        AppViewID     `json:"viewID"`
+}
+
+type AppContextEventData struct {
+	AppInstanceID AppInstanceID `json:"appInstanceID"`
+	ViewID        AppViewID     `json:"viewID"`
+	Revision      Revision      `json:"revision"`
+}
+
 type RecoveryWaitSummary struct {
 	Message string `json:"message"`
 }
@@ -315,12 +343,16 @@ func (ContinuationRevisionEventData) runtimeEventData() {
 
 func (SkillSessionChangedEventData) runtimeEventData() {
 }
-func (ToolCall) runtimeEventData()           {}
-func (ToolAttempt) runtimeEventData()        {}
-func (ToolResult) runtimeEventData()         {}
-func (WaitingRequest) runtimeEventData()     {}
-func (AutomationControls) runtimeEventData() {}
-func (RunOutcome) runtimeEventData()         {}
+func (ModelOperationPreparedEventData) runtimeEventData() {}
+func (AppInstanceEventData) runtimeEventData()            {}
+func (AppViewEventData) runtimeEventData()                {}
+func (AppContextEventData) runtimeEventData()             {}
+func (ToolCall) runtimeEventData()                        {}
+func (ToolAttempt) runtimeEventData()                     {}
+func (ToolResult) runtimeEventData()                      {}
+func (WaitingRequest) runtimeEventData()                  {}
+func (AutomationControls) runtimeEventData()              {}
+func (RunOutcome) runtimeEventData()                      {}
 
 type EventPublisher interface {
 	PublishRuntimeEvent(ctx context.Context, e RuntimeEvent) error
@@ -365,9 +397,11 @@ type RecoverySource interface {
 
 type RuntimeDependencies struct {
 	Preparation SubmissionPreparer
+	Operations  ModelOperationPreparer
 	Model       ModelExecutor
 	Tools       ToolExecutor
 	Skills      SkillSessionController
+	Apps        AppExecutor
 	Attachments AttachmentPreparer
 	Events      EventPublisher
 	Checkpoints CheckpointSink

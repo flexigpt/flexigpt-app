@@ -7,31 +7,12 @@ import (
 	"time"
 
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const skillRuntimeCloseTimeout = 30 * time.Second
 
 type SkillRuntimeWrapper struct {
 	service *skillRuntime.Service
-}
-
-func withSkillRuntime[T any](
-	w *SkillRuntimeWrapper,
-	fn func(*skillRuntime.Service) (T, error),
-) (T, error) {
-	return withRecoveryResp(func() (T, error) {
-		var zero T
-		if w == nil {
-			return zero, storeSpec.ErrClosed
-		}
-
-		service := w.service
-		if service == nil {
-			return zero, storeSpec.ErrClosed
-		}
-		return fn(service)
-	})
 }
 
 func InitSkillRuntimeWrapper(
@@ -60,102 +41,6 @@ func InitSkillRuntimeWrapper(
 	}
 	wrapper.service = service
 	return nil
-}
-
-func (w *SkillRuntimeWrapper) CreateSkillSession(
-	request *skillRuntime.CreateSkillSessionRequest,
-) (*skillRuntime.CreateSkillSessionResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.CreateSkillSessionResponse,
-			error,
-		) {
-			return service.CreateSkillSession(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) CloseSkillSession(
-	request *skillRuntime.CloseSkillSessionRequest,
-) (*skillRuntime.CloseSkillSessionResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.CloseSkillSessionResponse,
-			error,
-		) {
-			return service.CloseSkillSession(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) GetSkillsPrompt(
-	request *skillRuntime.GetSkillsPromptRequest,
-) (*skillRuntime.GetSkillsPromptResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.GetSkillsPromptResponse,
-			error,
-		) {
-			return service.GetSkillsPrompt(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) ListSkills(
-	request *skillRuntime.ListSkillsRequest,
-) (*skillRuntime.ListSkillsResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.ListSkillsResponse,
-			error,
-		) {
-			return service.ListSkills(context.Background(), request)
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) RenderSkill(
-	request *skillRuntime.RenderSkillRequest,
-) (*skillRuntime.RenderSkillResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.RenderSkillResponse,
-			error,
-		) {
-			return service.RenderSkill(context.Background(), request)
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) InvokeSkillTool(
-	request *skillRuntime.InvokeSkillToolRequest,
-) (*skillRuntime.InvokeSkillToolResponse, error) {
-	return withSkillRuntime(
-		w,
-		func(service *skillRuntime.Service) (
-			*skillRuntime.InvokeSkillToolResponse,
-			error,
-		) {
-			return service.InvokeSkillTool(
-				context.Background(),
-				request,
-			)
-		},
-	)
 }
 
 func (w *SkillRuntimeWrapper) close() {

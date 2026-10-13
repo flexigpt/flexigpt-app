@@ -15,6 +15,7 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
 	"github.com/flexigpt/mapstore-go/ftsengine"
@@ -22,34 +23,30 @@ import (
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
 )
 
-const defaultSessionFilenameTitle = "Session"
-
-type storedSession struct {
-	SchemaVersion SchemaVersion          `json:"schemaVersion"`
-	Session       sessionRuntime.Session `json:"session"`
-	Runs          []sessionRuntime.Run   `json:"runs,omitempty"`
-}
-
 type Store struct {
-	checkpointMu      sync.Mutex
-	baseDir           string
-	enableFTS         bool
-	store             *mapstore.MapDirectoryStore
-	fts               *ftsengine.Engine
-	deletedSessionIDs map[sessionRuntime.SessionID]struct{}
-	pp                mapstore.PartitionProvider
+	mu     sync.Mutex
+	closed bool
 
-	ftsRebuildCtx    context.Context
-	ftsRebuildCancel context.CancelFunc
-	ftsRebuildWG     sync.WaitGroup
+	baseDir   string
+	enableFTS bool
+	pp        mapstore.PartitionProvider
+
+	documents *mapstore.MapDirectoryStore
+	index     *mapstore.MapDirectoryStore
+
+	ftsMu             sync.RWMutex
+	fts               *ftsengine.Engine
+	maintenanceCancel context.CancelFunc
+	maintenanceWG     sync.WaitGroup
 }
 
 type Option func(*Store) error
 
-func WithPartitionProvider(
-	provider mapstore.PartitionProvider,
-) Option {
+func WithPartitionProvider(provider mapstore.PartitionProvider) Option {
 	return func(store *Store) error {
+		if provider == nil {
+			return errors.New("SessionStore partition provider is required")
+		}
 		store.pp = provider
 		return nil
 	}
@@ -63,26 +60,33 @@ func WithFTS(enabled bool) Option {
 }
 
 func New(baseDir string, options ...Option) (*Store, error) {
-	defaultPartitionProvider := dirpartition.MonthPartitionProvider{
-		TimeFn: func(fileKey mapstore.FileKey) (time.Time, error) {
-			info, err := uuidv7filename.Parse(fileKey.FileName)
+	if strings.TrimSpace(baseDir) == "" {
+		return nil, errors.New("SessionStore directory is required")
+	}
+
+	partition := &dirpartition.MonthPartitionProvider{
+		TimeFn: func(key mapstore.FileKey) (time.Time, error) {
+			info, err := uuidv7filename.Parse(key.FileName)
 			if err != nil {
 				return time.Time{}, err
 			}
 			return info.Time, nil
 		},
 	}
-
 	value := &Store{
-		baseDir:           filepath.Clean(baseDir),
-		pp:                &defaultPartitionProvider,
-		deletedSessionIDs: make(map[sessionRuntime.SessionID]struct{}),
+		baseDir: filepath.Clean(baseDir),
+		pp:      partition,
+	}
+	for _, option := range options {
+		if option != nil {
+			if err := option(value); err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	for _, option := range options {
-		if err := option(value); err != nil {
-			return nil, err
-		}
+	fail := func(cause error) (*Store, error) {
+		return nil, errors.Join(cause, value.Close())
 	}
 
 	if value.enableFTS {
@@ -104,58 +108,73 @@ func New(baseDir string, options ...Option) (*Store, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		value.fts = engine
-		value.ftsRebuildCtx, value.ftsRebuildCancel = context.WithCancel(
-			context.Background(),
-		)
 	}
 
-	directoryOptions := []mapstore.DirOption{
+	documentOptions := []mapstore.DirOption{
 		mapstore.WithDirLogger(slog.Default()),
 	}
 	if value.fts != nil {
-		directoryOptions = append(
-			directoryOptions,
-			mapstore.WithDirFileListeners(newFTSListener(value.fts)),
+		documentOptions = append(
+			documentOptions,
+			mapstore.WithDirFileListeners(value.ftsListener()),
 		)
 	}
 
-	directoryStore, err := mapstore.NewMapDirectoryStore(
-		value.baseDir,
+	documents, err := mapstore.NewMapDirectoryStore(
+		filepath.Join(value.baseDir, documentDirectory),
 		true,
 		value.pp,
 		jsonencdec.JSONEncoderDecoder{},
-		directoryOptions...,
+		documentOptions...,
 	)
 	if err != nil {
-		return nil, errors.Join(err, value.Close())
+		return fail(err)
+	}
+	value.documents = documents
+
+	index, err := mapstore.NewMapDirectoryStore(
+		filepath.Join(value.baseDir, indexDirectory),
+		true,
+		value.pp,
+		jsonencdec.JSONEncoderDecoder{},
+		mapstore.WithDirLogger(slog.Default()),
+	)
+	if err != nil {
+		return fail(err)
+	}
+	value.index = index
+
+	// The index is derived. Reconcile it before publication so a crash between
+	// document publication and index publication cannot hide a durable Session.
+	if err := value.rebuildIndex(); err != nil {
+		return fail(err)
 	}
 
-	value.store = directoryStore
 	if value.fts != nil {
+		maintenanceContext, cancel := context.WithCancel(context.Background())
+		value.maintenanceCancel = cancel
 		backgroundutil.Launch(
-			&value.ftsRebuildWG,
-			"session store FTS rebuild",
+			&value.maintenanceWG,
+			"SessionStore FTS reconciliation",
 			func() {
-				stat, syncErr := ftsengine.SyncDirToFTS(
-					value.ftsRebuildCtx,
+				value.ftsMu.RLock()
+				defer value.ftsMu.RUnlock()
+
+				stat, err := ftsengine.SyncDirToFTS(
+					maintenanceContext,
 					value.fts,
-					value.baseDir,
+					filepath.Join(value.baseDir, documentDirectory),
 					string(sessionFTSModifiedColumn),
 					1000,
-					syncSessionDocumentToFTS,
+					value.syncDocumentToFTS,
 				)
-				if syncErr != nil {
-					slog.Error(
-						"session store FTS rebuild failed",
-						"error",
-						syncErr,
-					)
+				if err != nil {
+					slog.Error("sessionStore FTS reconciliation failed", "error", err)
 					return
 				}
 				if stat != nil {
-					slog.Info("session store FTS rebuild", "stat", stat)
+					slog.Info("sessionStore FTS reconciliation completed", "stat", stat)
 				}
 			},
 			nil,
@@ -164,129 +183,195 @@ func New(baseDir string, options ...Option) (*Store, error) {
 	return value, nil
 }
 
-func (s *Store) Close() (err error) {
-	if s.ftsRebuildCancel != nil {
-		s.ftsRebuildCancel()
-		s.ftsRebuildWG.Wait()
-		s.ftsRebuildCancel = nil
+func (s *Store) Close() error {
+	if s == nil {
+		return nil
 	}
 
-	if s.store != nil {
-		err = errors.Join(err, s.store.CloseAll())
-		s.store = nil
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	cancel := s.maintenanceCancel
+	s.maintenanceCancel = nil
+	s.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	s.maintenanceWG.Wait()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var result error
+	if s.documents != nil {
+		result = errors.Join(result, s.documents.CloseAll())
+		s.documents = nil
+	}
+	if s.index != nil {
+		result = errors.Join(result, s.index.CloseAll())
+		s.index = nil
 	}
 
+	s.ftsMu.Lock()
 	if s.fts != nil {
-		err = errors.Join(err, s.fts.Close())
+		result = errors.Join(result, s.fts.Close())
 		s.fts = nil
 	}
+	s.ftsMu.Unlock()
 
-	return err
+	return result
 }
 
 func (s *Store) HandleCheckpoint(
 	_ context.Context,
 	checkpoint sessionRuntime.RuntimeCheckpointView,
 ) error {
-	s.checkpointMu.Lock()
-	defer s.checkpointMu.Unlock()
-
-	document := storedSessionFromCheckpoint(checkpoint)
-
-	if _, deleted := s.deletedSessionIDs[document.Session.ID]; deleted {
-		return nil
+	if err := s.lock(); err != nil {
+		return err
 	}
+	defer s.mu.Unlock()
 
-	existing, filename, found, err := s.readStoredSession(
-		document.Session.ID,
-		false,
-	)
+	incoming, err := storedSessionFromCheckpoint(checkpoint)
 	if err != nil {
+		return PersistenceError{
+			SessionID: checkpoint.Session.ID,
+			Operation: "projection",
+			Cause:     err,
+		}
+	}
+	if err := validateSessionID(incoming.Session.ID); err != nil {
 		return err
 	}
 
-	var checkpointRun *sessionRuntime.Run
-	if checkpoint.Run != nil {
-		run := projectRun(*checkpoint.Run)
-		checkpointRun = &run
+	current, found, err := s.readDocument(incoming.Session.ID, false)
+	if err != nil {
+		return err
+	}
+	if found && current.Kind == documentKindDeleted {
+		// A committed deletion dominates every previously queued checkpoint.
+		return nil
 	}
 
 	if found {
-		if existing.Session.Revision > document.Session.Revision ||
-			(existing.Session.Revision == document.Session.Revision &&
-				existing.Session.UpdatedAt.After(document.Session.UpdatedAt)) {
-			document.Session = existing.Session
+		if current.Session.Revision > incoming.Session.Revision ||
+			(current.Session.Revision == incoming.Session.Revision &&
+				current.Session.UpdatedAt.After(incoming.Session.UpdatedAt)) {
+			incoming.Session = current.Session
 		}
-		document.Runs = slices.Clone(existing.Runs)
+
+		runs := slices.Clone(current.Runs)
+		for _, run := range incoming.Runs {
+			mergeRun(&runs, run)
+		}
+		incoming.Runs = runs
 	}
 
-	if checkpointRun != nil {
-		mergeRun(&document.Runs, *checkpointRun)
+	reconcileRunAssociations(incoming.Session, incoming.Runs)
+	if err := validateStoredSession(incoming); err != nil {
+		return PersistenceError{
+			SessionID: incoming.Session.ID,
+			Operation: "validation",
+			Cause:     err,
+		}
 	}
 
-	for _, run := range document.Runs {
-		appendRunID(&document.Session.RunIDs, run.ID)
+	if err := s.writeDocument(incoming); err != nil {
+		return PersistenceError{
+			SessionID: incoming.Session.ID,
+			Operation: "document publication",
+			Cause:     err,
+		}
 	}
-
-	return s.writeStoredSession(document, filename)
+	if err := s.writeIndex(incoming); err != nil {
+		return PersistenceError{
+			SessionID: incoming.Session.ID,
+			Operation: "index publication; semantic document was committed",
+			Cause:     err,
+		}
+	}
+	return nil
 }
 
 func (s *Store) HandleSessionDeleted(
 	_ context.Context,
-	sessionID sessionRuntime.SessionID,
+	id sessionRuntime.SessionID,
 ) error {
-	s.checkpointMu.Lock()
-	defer s.checkpointMu.Unlock()
-
-	if s.deletedSessionIDs == nil {
-		s.deletedSessionIDs = make(map[sessionRuntime.SessionID]struct{})
-	}
-	s.deletedSessionIDs[sessionID] = struct{}{}
-
-	_, filename, found, err := s.readStoredSession(sessionID, true)
-	if err != nil {
+	if err := s.lock(); err != nil {
 		return err
 	}
-	if !found || filename == "" {
-		return nil
+	defer s.mu.Unlock()
+
+	if err := validateSessionID(id); err != nil {
+		return err
 	}
 
-	return s.store.DeleteFile(
-		mapstore.FileKey{FileName: filename},
-	)
+	tombstone := storedSession{
+		SchemaVersion: SessionSchemaVersion,
+		Kind:          documentKindDeleted,
+		Deletion: &deletionRecord{
+			SessionID: id,
+			DeletedAt: time.Now().UTC(),
+		},
+	}
+	if err := s.writeDocument(tombstone); err != nil {
+		return PersistenceError{
+			SessionID: id,
+			Operation: "deletion barrier publication",
+			Cause:     err,
+		}
+	}
+
+	if err := s.deleteIndex(id); err != nil {
+		return PersistenceError{
+			SessionID: id,
+			Operation: "index deletion; durable deletion barrier was committed",
+			Cause:     err,
+		}
+	}
+	return nil
 }
 
 func (s *Store) Restore(
 	ctx context.Context,
 	restorer sessionRuntime.RuntimeRestorer,
 ) error {
-	documents, err := s.allStoredSessions()
+	if restorer == nil {
+		return errors.New("SessionStore runtime restorer is required")
+	}
+	if err := s.lock(); err != nil {
+		return err
+	}
+	documents, err := s.allDocuments()
+	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
 
-	var restoreErr error
-
+	// No persistence lock or I/O is held while the Session coordinator accepts
+	// restored semantic records.
 	for _, document := range documents {
-		restoreErr = errors.Join(
-			restoreErr,
-			restorer.RestoreSession(
-				ctx,
-				projectSession(document.Session),
-			),
-		)
-	}
-
-	for _, document := range documents {
-		for _, run := range orderedRuns(document) {
-			restoreErr = errors.Join(
-				restoreErr,
-				restorer.RestoreRun(ctx, projectRun(run)),
-			)
+		if document.Kind != documentKindSession {
+			continue
+		}
+		if err := restorer.RestoreSession(ctx, *document.Session); err != nil {
+			return fmt.Errorf("restore Session %q: %w", document.Session.ID, err)
 		}
 	}
-
-	return restoreErr
+	for _, document := range documents {
+		if document.Kind != documentKindSession {
+			continue
+		}
+		for _, run := range orderedRuns(document) {
+			if err := restorer.RestoreRun(ctx, run); err != nil {
+				return fmt.Errorf("restore Run %q: %w", run.ID, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Store) ReadSession(
@@ -294,15 +379,16 @@ func (s *Store) ReadSession(
 	id sessionRuntime.SessionID,
 	forceFetch bool,
 ) (sessionRuntime.Session, error) {
-	document, _, found, err := s.readStoredSession(id, forceFetch)
+	if err := s.lock(); err != nil {
+		return sessionRuntime.Session{}, err
+	}
+	defer s.mu.Unlock()
+
+	document, err := s.requireSession(id, forceFetch)
 	if err != nil {
 		return sessionRuntime.Session{}, err
 	}
-	if !found {
-		return sessionRuntime.Session{}, ErrSessionNotFound
-	}
-
-	return projectSession(document.Session), nil
+	return *document.Session, nil
 }
 
 func (s *Store) ReadConversation(
@@ -310,23 +396,25 @@ func (s *Store) ReadConversation(
 	id sessionRuntime.SessionID,
 	forceFetch bool,
 ) (ConversationProjection, error) {
-	document, _, found, err := s.readStoredSession(id, forceFetch)
+	if err := s.lock(); err != nil {
+		return ConversationProjection{}, err
+	}
+	defer s.mu.Unlock()
+
+	document, err := s.requireSession(id, forceFetch)
 	if err != nil {
 		return ConversationProjection{}, err
 	}
-	if !found {
-		return ConversationProjection{}, ErrSessionNotFound
-	}
-
+	value := document.Session
 	return ConversationProjection{
 		SchemaVersion:    SessionSchemaVersion,
-		SessionID:        document.Session.ID,
-		SessionRevision:  document.Session.Revision,
-		Title:            document.Session.Title,
-		CreatedAt:        document.Session.CreatedAt,
-		ModifiedAt:       document.Session.UpdatedAt,
-		Messages:         projectTranscript(document.Session.Transcript),
-		AssociatedRunIDs: slices.Clone(document.Session.RunIDs),
+		SessionID:        value.ID,
+		SessionRevision:  value.Revision,
+		Title:            value.Title,
+		CreatedAt:        value.CreatedAt,
+		ModifiedAt:       value.UpdatedAt,
+		Messages:         value.Transcript,
+		AssociatedRunIDs: slices.Clone(value.RunIDs),
 	}, nil
 }
 
@@ -336,29 +424,24 @@ func (s *Store) ReadRun(
 	runID sessionRuntime.RunID,
 	forceFetch bool,
 ) (sessionRuntime.RunSnapshot, error) {
-	document, _, found, err := s.readStoredSession(
-		sessionID,
-		forceFetch,
-	)
+	if err := s.lock(); err != nil {
+		return sessionRuntime.RunSnapshot{}, err
+	}
+	defer s.mu.Unlock()
+
+	document, err := s.requireSession(sessionID, forceFetch)
 	if err != nil {
 		return sessionRuntime.RunSnapshot{}, err
 	}
-	if !found {
-		return sessionRuntime.RunSnapshot{}, ErrSessionNotFound
-	}
-
 	for _, run := range document.Runs {
-		if run.ID != runID {
-			continue
+		if run.ID == runID {
+			return sessionRuntime.RunSnapshot{
+				SessionID:       sessionID,
+				SessionRevision: document.Session.Revision,
+				Run:             run,
+			}, nil
 		}
-
-		return sessionRuntime.RunSnapshot{
-			SessionID:       sessionID,
-			SessionRevision: document.Session.Revision,
-			Run:             projectRun(run),
-		}, nil
 	}
-
 	return sessionRuntime.RunSnapshot{}, ErrRunNotFound
 }
 
@@ -366,47 +449,47 @@ func (s *Store) ListSessionRuns(
 	_ context.Context,
 	request ListSessionRunsRequest,
 ) ([]RunListItem, error) {
-	document, _, found, err := s.readStoredSession(
-		request.SessionID,
-		false,
-	)
+	if err := s.lock(); err != nil {
+		return nil, err
+	}
+	defer s.mu.Unlock()
+
+	document, err := s.requireSession(request.SessionID, false)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
-		return nil, ErrSessionNotFound
-	}
 
-	runs := orderedRuns(document)
-	items := make([]RunListItem, 0, len(runs))
-
-	for _, run := range runs {
+	items := make([]RunListItem, 0, len(document.Runs))
+	for _, run := range orderedRuns(document) {
 		if request.ActiveOnly && run.State.Terminal() {
 			continue
 		}
-
+		count := 0
+		for _, wait := range run.WaitingRequests {
+			if wait.Status == sessionRuntime.WaitStatusPending ||
+				wait.Status == sessionRuntime.WaitStatusResolving {
+				count++
+			}
+		}
 		items = append(items, RunListItem{
 			ID:               run.ID,
 			Revision:         run.Revision,
 			State:            run.State,
 			CreatedAt:        run.CreatedAt,
 			UpdatedAt:        run.UpdatedAt,
-			PendingWaitCount: pendingWaitCount(run),
-			Outcome:          copyRunOutcome(run.Outcome),
+			PendingWaitCount: count,
+			Outcome:          run.Outcome,
 		})
 	}
-
 	sort.Slice(items, func(left, right int) bool {
 		if !items[left].UpdatedAt.Equal(items[right].UpdatedAt) {
 			return items[left].UpdatedAt.After(items[right].UpdatedAt)
 		}
 		return items[left].ID > items[right].ID
 	})
-
-	if request.Limit > 0 && len(items) > request.Limit {
-		items = items[:request.Limit]
+	if request.Limit > 0 {
+		items = items[:min(request.Limit, len(items))]
 	}
-
 	return items, nil
 }
 
@@ -414,7 +497,12 @@ func (s *Store) ListSessions(
 	_ context.Context,
 	request ListSessionsRequest,
 ) (SessionPage, error) {
-	entries, next, err := s.store.ListFiles(
+	if err := s.lock(); err != nil {
+		return SessionPage{}, err
+	}
+	defer s.mu.Unlock()
+
+	entries, next, err := s.index.ListFiles(
 		mapstore.ListingConfig{
 			SortOrder: mapstore.SortOrderDescending,
 			PageSize:  normalizedPageSize(request.PageSize),
@@ -428,26 +516,15 @@ func (s *Store) ListSessions(
 	items := make([]SessionListItem, 0, len(entries))
 	for _, entry := range entries {
 		filename := filepath.Base(entry.BaseRelativePath)
-		if _, err := uuidv7filename.Parse(filename); err != nil {
+		if !strings.HasSuffix(filename, "."+indexFileExtension) {
 			continue
 		}
-
-		document, err := s.readStoredSessionFile(filename, false)
+		record, err := s.readIndexFile(filename)
 		if err != nil {
-			continue
+			return SessionPage{}, err
 		}
-
-		items = append(items, SessionListItem{
-			ID:           document.Session.ID,
-			Revision:     document.Session.Revision,
-			Title:        document.Session.Title,
-			CreatedAt:    document.Session.CreatedAt,
-			ModifiedAt:   entry.FileInfo.ModTime().UTC(),
-			RunCount:     len(document.Runs),
-			ActiveRunIDs: activeRunIDs(document),
-		})
+		items = append(items, record.Item)
 	}
-
 	return SessionPage{
 		Items:         items,
 		NextPageToken: next,
@@ -458,10 +535,14 @@ func (s *Store) SearchSessions(
 	ctx context.Context,
 	request SearchSessionsRequest,
 ) (SessionPage, error) {
+	if err := s.lock(); err != nil {
+		return SessionPage{}, err
+	}
+	defer s.mu.Unlock()
+
 	if s.fts == nil {
 		return SessionPage{}, ErrFTSDisabled
 	}
-
 	hits, next, err := s.fts.Search(
 		ctx,
 		request.Query,
@@ -473,28 +554,26 @@ func (s *Store) SearchSessions(
 	}
 
 	items := make([]SessionListItem, 0, len(hits))
+	seen := make(map[sessionRuntime.SessionID]struct{}, len(hits))
 	for _, hit := range hits {
-		filename := filepath.Base(hit.ID)
-		if _, err := uuidv7filename.Parse(filename); err != nil {
-			continue
-		}
-
-		document, err := s.readStoredSessionFile(filename, false)
+		info, err := uuidv7filename.Parse(filepath.Base(hit.ID))
 		if err != nil {
+			return SessionPage{}, fmt.Errorf("%w: malformed FTS identity", ErrInvalidDocument)
+		}
+		id := sessionRuntime.SessionID(info.ID)
+		if _, duplicate := seen[id]; duplicate {
 			continue
 		}
+		seen[id] = struct{}{}
 
-		items = append(items, SessionListItem{
-			ID:           document.Session.ID,
-			Revision:     document.Session.Revision,
-			Title:        document.Session.Title,
-			CreatedAt:    document.Session.CreatedAt,
-			ModifiedAt:   document.Session.UpdatedAt,
-			RunCount:     len(document.Runs),
-			ActiveRunIDs: activeRunIDs(document),
-		})
+		record, found, err := s.readIndex(id)
+		if err != nil {
+			return SessionPage{}, err
+		}
+		if found {
+			items = append(items, record.Item)
+		}
 	}
-
 	return SessionPage{
 		Items:         items,
 		NextPageToken: next,
@@ -505,230 +584,359 @@ func (s *Store) ExportSession(
 	_ context.Context,
 	id sessionRuntime.SessionID,
 ) ([]byte, error) {
-	document, _, found, err := s.readStoredSession(id, true)
+	if err := s.lock(); err != nil {
+		return nil, err
+	}
+	defer s.mu.Unlock()
+
+	document, err := s.requireSession(id, true)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
-		return nil, ErrSessionNotFound
-	}
-
 	return json.MarshalIndent(document, "", "  ")
 }
 
-func (s *Store) allStoredSessions() ([]storedSession, error) {
-	documents := make([]storedSession, 0)
-	seenTokens := make([]string, 0)
-	pageToken := ""
+func (s *Store) requireSession(
+	id sessionRuntime.SessionID,
+	forceFetch bool,
+) (storedSession, error) {
+	document, found, err := s.readDocument(id, forceFetch)
+	if err != nil {
+		return storedSession{}, err
+	}
+	if !found || document.Kind == documentKindDeleted {
+		return storedSession{}, ErrSessionNotFound
+	}
+	return document, nil
+}
 
-	for {
-		entries, next, err := s.store.ListFiles(
-			mapstore.ListingConfig{
-				SortOrder: mapstore.SortOrderDescending,
-				PageSize:  MaxPageSize,
-			},
-			pageToken,
+func (s *Store) readDocument(
+	id sessionRuntime.SessionID,
+	forceFetch bool,
+) (storedSession, bool, error) {
+	if err := validateSessionID(id); err != nil {
+		return storedSession{}, false, err
+	}
+
+	filename, err := stableFilename(id, SessionFileExtension.String())
+	if err != nil {
+		return storedSession{}, false, err
+	}
+	found, err := hasExactFile(s.documents, filename, string(id))
+	if err != nil || !found {
+		return storedSession{}, false, err
+	}
+
+	data, err := s.documents.GetFileData(
+		mapstore.FileKey{FileName: filename},
+		forceFetch,
+	)
+	if err != nil {
+		return storedSession{}, false, err
+	}
+	document, err := decodeStoredSessionData(data)
+	if err != nil {
+		return storedSession{}, false, err
+	}
+
+	if documentID(document) != id {
+		return storedSession{}, false, fmt.Errorf(
+			"%w: document identity differs from filename",
+			ErrInvalidDocument,
 		)
+	}
+	return document, true, nil
+}
+
+func (s *Store) writeDocument(document storedSession) error {
+	id := documentID(document)
+	filename, err := stableFilename(id, SessionFileExtension.String())
+	if err != nil {
+		return err
+	}
+
+	raw, err := json.Marshal(document)
+	if err != nil {
+		return err
+	}
+	if len(raw) > maximumDocumentBytes {
+		return fmt.Errorf("%w: document size limit exceeded", ErrInvalidDocument)
+	}
+
+	data, err := jsonencdec.StructWithJSONTagsToMap(&document)
+	if err != nil {
+		return err
+	}
+	return s.documents.SetFileData(
+		mapstore.FileKey{FileName: filename},
+		data,
+	)
+}
+
+func (s *Store) writeIndex(document storedSession) error {
+	record := indexForDocument(document)
+	filename, err := stableFilename(record.Item.ID, indexFileExtension)
+	if err != nil {
+		return err
+	}
+	data, err := jsonencdec.StructWithJSONTagsToMap(&record)
+	if err != nil {
+		return err
+	}
+	return s.index.SetFileData(mapstore.FileKey{FileName: filename}, data)
+}
+
+func (s *Store) deleteIndex(id sessionRuntime.SessionID) error {
+	filename, err := stableFilename(id, indexFileExtension)
+	if err != nil {
+		return err
+	}
+	found, err := hasExactFile(s.index, filename, string(id))
+	if err != nil || !found {
+		return err
+	}
+	return s.index.DeleteFile(mapstore.FileKey{FileName: filename})
+}
+
+func (s *Store) readIndex(
+	id sessionRuntime.SessionID,
+) (sessionIndexRecord, bool, error) {
+	filename, err := stableFilename(id, indexFileExtension)
+	if err != nil {
+		return sessionIndexRecord{}, false, err
+	}
+	found, err := hasExactFile(s.index, filename, string(id))
+	if err != nil || !found {
+		return sessionIndexRecord{}, false, err
+	}
+	record, err := s.readIndexFile(filename)
+	return record, true, err
+}
+
+func (s *Store) readIndexFile(filename string) (sessionIndexRecord, error) {
+	data, err := s.index.GetFileData(mapstore.FileKey{FileName: filename}, false)
+	if err != nil {
+		return sessionIndexRecord{}, err
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return sessionIndexRecord{}, err
+	}
+	record, err := jsonutil.DecodeJSONRaw[sessionIndexRecord](raw)
+	if err != nil {
+		return sessionIndexRecord{}, err
+	}
+	if record.SchemaVersion != SessionSchemaVersion {
+		return sessionIndexRecord{}, ErrUnsupportedStore
+	}
+	if err := validateSessionID(record.Item.ID); err != nil {
+		return sessionIndexRecord{}, err
+	}
+	expected, err := stableFilename(record.Item.ID, indexFileExtension)
+	if err != nil || expected != filename {
+		return sessionIndexRecord{}, fmt.Errorf("%w: index identity mismatch", ErrInvalidDocument)
+	}
+	return record, nil
+}
+
+func (s *Store) allDocuments() ([]storedSession, error) {
+	filenames, err := listAllFilenames(s.documents, SessionFileExtension.String())
+	if err != nil {
+		return nil, err
+	}
+	output := make([]storedSession, 0, len(filenames))
+	for _, filename := range filenames {
+		data, err := s.documents.GetFileData(mapstore.FileKey{FileName: filename}, false)
 		if err != nil {
 			return nil, err
 		}
-
-		for _, entry := range entries {
-			filename := filepath.Base(entry.BaseRelativePath)
-			if _, err := uuidv7filename.Parse(filename); err != nil {
-				continue
-			}
-
-			document, err := s.readStoredSessionFile(filename, false)
-			if err != nil {
-				continue
-			}
-
-			documents = append(documents, cloneStoredSession(document))
+		document, err := decodeStoredSessionData(data)
+		if err != nil {
+			return nil, fmt.Errorf("read %q: %w", filename, err)
 		}
-
-		if next == "" {
-			break
+		expected, err := stableFilename(documentID(document), SessionFileExtension.String())
+		if err != nil || expected != filename {
+			return nil, fmt.Errorf("%w: document filename mismatch", ErrInvalidDocument)
 		}
-		if slices.Contains(seenTokens, next) {
-			return nil, fmt.Errorf(
-				"session store listing repeated page token %q",
-				next,
-			)
-		}
-
-		seenTokens = append(seenTokens, next)
-		pageToken = next
+		output = append(output, document)
 	}
-
-	return documents, nil
+	return output, nil
 }
 
-func (s *Store) readStoredSession(
-	id sessionRuntime.SessionID,
-	forceFetch bool,
-) (doc storedSession, fname string, found bool, err error) {
-	entries, _, err := s.store.ListFiles(
+func (s *Store) rebuildIndex() error {
+	documents, err := s.allDocuments()
+	if err != nil {
+		return err
+	}
+
+	live := make(map[sessionRuntime.SessionID]struct{}, len(documents))
+	for _, document := range documents {
+		if document.Kind == documentKindDeleted {
+			if err := s.deleteIndex(document.Deletion.SessionID); err != nil {
+				return err
+			}
+			continue
+		}
+		live[document.Session.ID] = struct{}{}
+		if err := s.writeIndex(document); err != nil {
+			return err
+		}
+	}
+
+	filenames, err := listAllFilenames(s.index, indexFileExtension)
+	if err != nil {
+		return err
+	}
+	for _, filename := range filenames {
+		record, err := s.readIndexFile(filename)
+		if err != nil {
+			return err
+		}
+		if _, found := live[record.Item.ID]; !found {
+			if err := s.index.DeleteFile(mapstore.FileKey{FileName: filename}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) lock() error {
+	if s == nil {
+		return ErrStoreClosed
+	}
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return ErrStoreClosed
+	}
+	return nil
+}
+
+func decodeStoredSessionData(data map[string]any) (storedSession, error) {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return storedSession{}, err
+	}
+	return decodeStoredSessionJSON(raw)
+}
+
+func decodeStoredSessionJSON(raw []byte) (storedSession, error) {
+	if len(raw) > maximumDocumentBytes {
+		return storedSession{}, fmt.Errorf("%w: document size limit exceeded", ErrInvalidDocument)
+	}
+	document, err := jsonutil.DecodeJSONRaw[storedSession](raw)
+	if err != nil {
+		return storedSession{}, fmt.Errorf("%w: %w", ErrInvalidDocument, err)
+	}
+	if err := validateStoredSession(document); err != nil {
+		return storedSession{}, err
+	}
+	return document, nil
+}
+
+func stableFilename(id sessionRuntime.SessionID, extension string) (string, error) {
+	info, err := uuidv7filename.Build(string(id), "Session", extension)
+	if err != nil {
+		return "", err
+	}
+	return info.FileName, nil
+}
+
+func documentID(document storedSession) sessionRuntime.SessionID {
+	if document.Kind == documentKindDeleted {
+		return document.Deletion.SessionID
+	}
+	return document.Session.ID
+}
+
+func hasExactFile(
+	store *mapstore.MapDirectoryStore,
+	filename string,
+	prefix string,
+) (bool, error) {
+	entries, _, err := store.ListFiles(
 		mapstore.ListingConfig{
-			FilenamePrefix: string(id),
+			FilenamePrefix: prefix,
 			PageSize:       MaxPageSize,
 		},
 		"",
 	)
 	if err != nil {
-		return storedSession{}, "", false, err
+		return false, err
 	}
-
-	var selected storedSession
-	selectedFilename := ""
-
 	for _, entry := range entries {
-		filename := filepath.Base(entry.BaseRelativePath)
-		info, err := uuidv7filename.Parse(filename)
-		if err != nil || info.ID != string(id) {
-			continue
+		if filepath.Base(entry.BaseRelativePath) == filename {
+			return true, nil
 		}
+	}
+	return false, nil
+}
 
-		document, err := s.readStoredSessionFile(filename, forceFetch)
+func listAllFilenames(
+	store *mapstore.MapDirectoryStore,
+	extension string,
+) ([]string, error) {
+	output := make([]string, 0)
+	token := ""
+	seen := make(map[string]struct{})
+
+	for {
+		entries, next, err := store.ListFiles(
+			mapstore.ListingConfig{
+				SortOrder: mapstore.SortOrderDescending,
+				PageSize:  MaxPageSize,
+			},
+			token,
+		)
 		if err != nil {
-			return storedSession{}, "", false, err
+			return nil, err
 		}
-		if document.Session.ID != id {
-			continue
+		for _, entry := range entries {
+			filename := filepath.Base(entry.BaseRelativePath)
+			if strings.HasSuffix(filename, "."+extension) {
+				output = append(output, filename)
+			}
 		}
-
-		if !found ||
-			document.Session.Revision > selected.Session.Revision ||
-			(document.Session.Revision == selected.Session.Revision &&
-				document.Session.UpdatedAt.After(selected.Session.UpdatedAt)) {
-			selected = document
-			selectedFilename = filename
-			found = true
+		if next == "" {
+			return output, nil
 		}
+		if _, duplicate := seen[next]; duplicate {
+			return nil, fmt.Errorf("%w: repeated listing cursor", ErrInvalidDocument)
+		}
+		seen[next] = struct{}{}
+		token = next
 	}
-
-	return selected, selectedFilename, found, nil
 }
 
-func (s *Store) readStoredSessionFile(
-	filename string,
-	forceFetch bool,
-) (storedSession, error) {
-	value, err := s.store.GetFileData(
-		mapstore.FileKey{FileName: filename},
-		forceFetch,
-	)
-	if err != nil {
-		return storedSession{}, err
-	}
-
-	return decodeStoredSessionData(value)
-}
-
-func (s *Store) writeStoredSession(
-	document storedSession,
-	previousFilename string,
-) error {
-	filename, err := sessionFilename(document.Session)
-	if err != nil {
-		return err
-	}
-
-	value, err := jsonencdec.StructWithJSONTagsToMap(&document)
-	if err != nil {
-		return err
-	}
-
-	if err := s.store.SetFileData(
-		mapstore.FileKey{FileName: filename},
-		value,
-	); err != nil {
-		return err
-	}
-
-	if previousFilename != "" && previousFilename != filename {
-		if err := s.store.DeleteFile(
-			mapstore.FileKey{FileName: previousFilename},
-		); err != nil {
-			slog.Warn(
-				"session store remove renamed session file",
-				"file",
-				previousFilename,
-				"error",
-				err,
-			)
+func indexForDocument(document storedSession) sessionIndexRecord {
+	sessionValue := document.Session
+	active := make([]sessionRuntime.RunID, 0)
+	for _, run := range orderedRuns(document) {
+		if !run.State.Terminal() {
+			active = append(active, run.ID)
 		}
 	}
-
-	return nil
+	return sessionIndexRecord{
+		SchemaVersion: SessionSchemaVersion,
+		Item: SessionListItem{
+			ID:           sessionValue.ID,
+			Revision:     sessionValue.Revision,
+			Title:        sessionValue.Title,
+			CreatedAt:    sessionValue.CreatedAt,
+			ModifiedAt:   sessionValue.UpdatedAt,
+			RunCount:     len(document.Runs),
+			ActiveRunIDs: active,
+		},
+	}
 }
 
-func decodeStoredSessionData(
-	value map[string]any,
-) (storedSession, error) {
-	var document storedSession
-	if err := jsonencdec.MapToStructWithJSONTags(value, &document); err != nil {
-		return storedSession{}, err
-	}
-	if document.SchemaVersion != SessionSchemaVersion {
-		return storedSession{}, fmt.Errorf(
-			"%w: %q",
-			ErrUnsupportedStore,
-			document.SchemaVersion,
-		)
-	}
-
-	return document, nil
-}
-
-func decodeStoredSessionJSON(
-	value []byte,
-) (storedSession, error) {
-	var document storedSession
-	if err := json.Unmarshal(value, &document); err != nil {
-		return storedSession{}, err
-	}
-	if document.SchemaVersion != SessionSchemaVersion {
-		return storedSession{}, fmt.Errorf(
-			"%w: %q",
-			ErrUnsupportedStore,
-			document.SchemaVersion,
-		)
-	}
-
-	return document, nil
-}
-
-func sessionFilename(
-	value sessionRuntime.Session,
-) (string, error) {
-	title := strings.TrimSpace(value.Title)
-	if title == "" {
-		title = defaultSessionFilenameTitle
-	}
-
-	info, err := uuidv7filename.Build(
-		string(value.ID),
-		title,
-		SessionFileExtension.String(),
-	)
-	if err != nil {
-		return "", err
-	}
-
-	return info.FileName, nil
-}
-
-func mergeRun(
-	runs *[]sessionRuntime.Run,
-	incoming sessionRuntime.Run,
-) {
+func mergeRun(runs *[]sessionRuntime.Run, incoming sessionRuntime.Run) {
 	for index := range *runs {
 		current := (*runs)[index]
 		if current.ID != incoming.ID {
 			continue
 		}
-
 		if incoming.Revision > current.Revision ||
 			(incoming.Revision == current.Revision &&
 				incoming.UpdatedAt.After(current.UpdatedAt)) {
@@ -736,105 +944,44 @@ func mergeRun(
 		}
 		return
 	}
-
 	*runs = append(*runs, incoming)
 }
 
-func appendRunID(
-	runIDs *[]sessionRuntime.RunID,
-	id sessionRuntime.RunID,
+func reconcileRunAssociations(
+	sessionValue *sessionRuntime.Session,
+	runs []sessionRuntime.Run,
 ) {
-	if id == "" || slices.Contains(*runIDs, id) {
-		return
+	available := make(map[sessionRuntime.RunID]struct{}, len(runs))
+	for _, run := range runs {
+		available[run.ID] = struct{}{}
 	}
-	*runIDs = append(*runIDs, id)
+
+	ids := make([]sessionRuntime.RunID, 0, len(runs))
+	for _, id := range sessionValue.RunIDs {
+		if _, found := available[id]; found {
+			ids = append(ids, id)
+			delete(available, id)
+		}
+	}
+	for _, run := range runs {
+		if _, found := available[run.ID]; found {
+			ids = append(ids, run.ID)
+			delete(available, run.ID)
+		}
+	}
+	sessionValue.RunIDs = ids
 }
 
-func orderedRuns(
-	document storedSession,
-) []sessionRuntime.Run {
-	output := make([]sessionRuntime.Run, 0, len(document.Runs))
-
-	for _, id := range document.Session.RunIDs {
-		run, found := findRun(document.Runs, id)
-		if !found {
-			continue
-		}
-		output = append(output, run)
-	}
-
+func orderedRuns(document storedSession) []sessionRuntime.Run {
+	byID := make(map[sessionRuntime.RunID]sessionRuntime.Run, len(document.Runs))
 	for _, run := range document.Runs {
-		if containsRun(output, run.ID) {
-			continue
-		}
-		output = append(output, run)
+		byID[run.ID] = run
 	}
-
+	output := make([]sessionRuntime.Run, 0, len(document.Runs))
+	for _, id := range document.Session.RunIDs {
+		if run, found := byID[id]; found {
+			output = append(output, run)
+		}
+	}
 	return output
-}
-
-func activeRunIDs(
-	document storedSession,
-) []sessionRuntime.RunID {
-	runs := orderedRuns(document)
-	output := make([]sessionRuntime.RunID, 0, len(runs))
-
-	for _, run := range runs {
-		if run.State.Terminal() {
-			continue
-		}
-		output = append(output, run.ID)
-	}
-
-	return output
-}
-
-func findRun(
-	runs []sessionRuntime.Run,
-	id sessionRuntime.RunID,
-) (sessionRuntime.Run, bool) {
-	for _, run := range runs {
-		if run.ID == id {
-			return run, true
-		}
-	}
-
-	return sessionRuntime.Run{}, false
-}
-
-func containsRun(
-	runs []sessionRuntime.Run,
-	id sessionRuntime.RunID,
-) bool {
-	for _, run := range runs {
-		if run.ID == id {
-			return true
-		}
-	}
-	return false
-}
-
-func pendingWaitCount(
-	run sessionRuntime.Run,
-) int {
-	count := 0
-	for _, wait := range run.WaitingRequests {
-		if wait.Status == sessionRuntime.WaitStatusPending ||
-			wait.Status == sessionRuntime.WaitStatusResolving {
-			count++
-		}
-	}
-
-	return count
-}
-
-func copyRunOutcome(
-	value *sessionRuntime.RunOutcome,
-) *sessionRuntime.RunOutcome {
-	if value == nil {
-		return nil
-	}
-
-	output := *value
-	return &output
 }

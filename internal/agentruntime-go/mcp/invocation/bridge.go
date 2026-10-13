@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 
@@ -124,7 +123,7 @@ func (b *ToolBridge) Evaluate(
 // discovered digest, and any conversation policy tightening.
 func (b *ToolBridge) EvaluateMapped(
 	ctx context.Context,
-	mapping conversationSpec.MCPProviderToolMapping,
+	mapping MappedToolBinding,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (*mcpServer.MCPApprovalEvaluation, error) {
 	config, tool, normalized, err := b.mappedDryRun(
@@ -176,7 +175,7 @@ func (b *ToolBridge) EvaluateMapped(
 // connected runtime snapshot and applying only policy-tightening constraints.
 func (b *ToolBridge) InvokeMapped(
 	ctx context.Context,
-	mapping conversationSpec.MCPProviderToolMapping,
+	mapping MappedToolBinding,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (*mcpServer.InvokeMCPToolResponseBody, error) {
 	config, tool, normalized, err := b.mappedDryRun(
@@ -341,7 +340,7 @@ func (b *ToolBridge) Invoke(
 
 func (b *ToolBridge) mappedDryRun(
 	ctx context.Context,
-	mapping conversationSpec.MCPProviderToolMapping,
+	mapping MappedToolBinding,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (
 	config mcpServer.RuntimeConfig,
@@ -412,7 +411,7 @@ func (b *ToolBridge) mappedDryRun(
 }
 
 func normalizeMappedToolRequest(
-	mapping conversationSpec.MCPProviderToolMapping,
+	mapping MappedToolBinding,
 	request mcpServer.InvokeMCPToolRequestBody,
 ) (mcpServer.InvokeMCPToolRequestBody, error) {
 	if err := mapping.Validate(); err != nil {
@@ -469,7 +468,7 @@ func normalizeMappedToolRequest(
 func applyMappedPolicyConstraints(
 	config mcpServer.RuntimeConfig,
 	tool mcpServer.MCPToolCapability,
-	mapping conversationSpec.MCPProviderToolMapping,
+	mapping MappedToolBinding,
 ) (mcpServer.RuntimeConfig, error) {
 	currentApproval, currentExecution := currentToolConstraints(config, tool)
 

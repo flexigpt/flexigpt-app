@@ -151,6 +151,10 @@ func withSessionStore[T any](
 	callback func(*sessionstore.Store) (T, error),
 ) (T, error) {
 	return withRecoveryResp(func() (T, error) {
+		if wrapper == nil || wrapper.store == nil {
+			var zero T
+			return zero, sessionstore.ErrStoreClosed
+		}
 		return callback(wrapper.store)
 	})
 }

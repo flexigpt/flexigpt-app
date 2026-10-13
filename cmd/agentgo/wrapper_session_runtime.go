@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -38,6 +39,41 @@ func InitSessionRuntimeWrapper(
 
 	wrapper.runtime = runtimeValue
 	return nil
+}
+
+func (w *SessionRuntimeWrapper) OpenAppView(
+	command sessionRuntime.OpenAppViewCommand,
+) (*sessionRuntime.CommandReceipt, error) {
+	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
+		return runtimeValue.OpenAppView(context.Background(), command)
+	})
+}
+
+func (w *SessionRuntimeWrapper) ExecuteAppTool(
+	command sessionRuntime.ExecuteAppToolCommand,
+) (*sessionRuntime.CommandReceipt, error) {
+	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
+		return runtimeValue.ExecuteAppTool(context.Background(), command)
+	})
+}
+
+func (w *SessionRuntimeWrapper) StageAppContext(
+	command sessionRuntime.StageAppContextCommand,
+) (*sessionRuntime.CommandReceipt, error) {
+	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
+		return runtimeValue.StageAppContext(context.Background(), command)
+	})
+}
+
+func (w *SessionRuntimeWrapper) ReadAppResource(
+	request sessionRuntime.ReadAppResourceRequest,
+) (sessionRuntime.AppResourceReadResult, error) {
+	return withSessionRuntime(
+		w,
+		func(runtimeValue *sessionRuntime.Runtime) (sessionRuntime.AppResourceReadResult, error) {
+			return runtimeValue.ReadAppResource(context.Background(), request)
+		},
+	)
 }
 
 func (w *SessionRuntimeWrapper) CreateSession(
@@ -279,7 +315,14 @@ func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
 				}
 			}
 		},
-		nil,
+		func(failure backgroundutil.PanicFailureError) {
+			slog.Error(
+				"session Wails event bridge panicked",
+				"operation", failure.Operation,
+				"error", failure.Error(),
+				"stack", string(failure.Stack),
+			)
+		},
 	)
 }
 

@@ -16,7 +16,59 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
+
+type RuntimeRequestPatch struct {
+	Defaults *modelDomain.DefaultsPatch `json:"defaults,omitempty"`
+	Clear    []RuntimeDefaultField      `json:"clear,omitempty"`
+}
+
+type RuntimeDefaultField string
+
+const (
+	RuntimeDefaultFieldAdapterParameters RuntimeDefaultField = "adapterParameters"
+	RuntimeDefaultFieldCacheControl      RuntimeDefaultField = "cacheControl"
+	RuntimeDefaultFieldMaxOutputTokens   RuntimeDefaultField = "maxOutputTokens"
+	RuntimeDefaultFieldMaxPromptTokens   RuntimeDefaultField = "maxPromptTokens"
+	RuntimeDefaultFieldOutput            RuntimeDefaultField = "output"
+	RuntimeDefaultFieldReasoning         RuntimeDefaultField = "reasoning"
+	RuntimeDefaultFieldStopSequences     RuntimeDefaultField = "stopSequences"
+	RuntimeDefaultFieldStream            RuntimeDefaultField = "stream"
+	RuntimeDefaultFieldSystemPrompt      RuntimeDefaultField = "systemPrompt"
+	RuntimeDefaultFieldTemperature       RuntimeDefaultField = "temperature"
+	RuntimeDefaultFieldTimeoutMS         RuntimeDefaultField = "timeoutMS"
+)
+
+func (field RuntimeDefaultField) Validate() error {
+	switch field {
+	case RuntimeDefaultFieldAdapterParameters,
+		RuntimeDefaultFieldCacheControl,
+		RuntimeDefaultFieldMaxOutputTokens,
+		RuntimeDefaultFieldMaxPromptTokens,
+		RuntimeDefaultFieldOutput,
+		RuntimeDefaultFieldReasoning,
+		RuntimeDefaultFieldStopSequences,
+		RuntimeDefaultFieldStream,
+		RuntimeDefaultFieldSystemPrompt,
+		RuntimeDefaultFieldTemperature,
+		RuntimeDefaultFieldTimeoutMS:
+		return nil
+	default:
+		return fmt.Errorf(
+			"%w unsupported Model runtime request clear field %q",
+			storeSpec.ErrInvalid,
+			field,
+		)
+	}
+}
+
+type RuntimeModelUse struct {
+	RootID     string
+	ArtifactID string
+	Revision   uint64
+	Digest     string
+}
 
 // Credential is one runtime-only credential value and version pair.
 //
@@ -225,7 +277,7 @@ func (a *RuntimeAdapter) Resolve(
 func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
-	requestPatch *inferenceRuntimeSpec.RuntimeRequestPatch,
+	requestPatch *RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
@@ -341,7 +393,7 @@ func (a *RuntimeAdapter) resolveRuntime(
 		ProviderParam:       providerRuntime.param,
 		ModelParam:          modelParam,
 		CapabilityOverrides: capabilityOverrides,
-		Fingerprint:         fingerprint,
+		Fingerprint:         string(fingerprint),
 	}, nil
 }
 

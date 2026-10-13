@@ -14,6 +14,8 @@ type (
 	ToolAttemptID string
 	ToolResultID  string
 	WaitID        string
+	AppInstanceID string
+	AppViewID     string
 	Revision      uint64
 )
 
@@ -249,38 +251,10 @@ type HistorySelection struct {
 	IncludePreviousUserTurns int  `json:"includePreviousUserTurns,omitempty"`
 }
 
-type ModelToolSelection struct {
-	ChoiceID           string           `json:"choiceID"`
-	Target             CapabilityTarget `json:"target"`
-	AutoExecute        bool             `json:"autoExecute,omitempty"`
-	UserArguments      json.RawMessage  `json:"userArguments,omitempty"`
-	ImplementationKind string           `json:"implementationKind,omitempty"`
-	ToolType           string           `json:"toolType,omitempty"`
-	ProviderManaged    bool             `json:"providerManaged,omitempty"`
-}
-
-type SessionConfiguration struct {
-	Model          ArtifactReference    `json:"model"`
-	RequestPatch   json.RawMessage      `json:"requestPatch,omitempty"`
-	SystemPrompt   *string              `json:"systemPrompt,omitempty"`
-	History        HistorySelection     `json:"history,omitzero"`
-	ToolSelections []ModelToolSelection `json:"toolSelections,omitempty"`
-	MCPContext     json.RawMessage      `json:"mcpContext,omitempty"`
-
-	// InstalledSkills is the complete effective Skill allow-list for the Run.
-	// The frontend resolves Agent and Workspace state, then supplies the final
-	// references here. Session does not distinguish their origin.
-	InstalledSkills []ArtifactReference `json:"installedSkills,omitempty"`
-
-	// Metadata is frontend-owned opaque presentation/provenance data. Session
-	// persists it but never interprets Agent or Workspace data within it.
-	Metadata json.RawMessage `json:"metadata,omitempty"`
-}
-
 type UserInput struct {
 	Text          string                `json:"text,omitempty"`
 	Attachments   []AttachmentReference `json:"attachments,omitempty"`
-	MCPAppContext json.RawMessage       `json:"mcpAppContext,omitempty"`
+	MCPAppContext []AppContextUpdate    `json:"mcpAppContext,omitempty"`
 	Metadata      json.RawMessage       `json:"metadata,omitempty"`
 }
 
@@ -289,7 +263,7 @@ type ContinuationInput struct {
 	ConsumedRevision Revision              `json:"consumedRevision,omitempty"`
 	Text             string                `json:"text,omitempty"`
 	Attachments      []AttachmentReference `json:"attachments,omitempty"`
-	MCPAppContext    json.RawMessage       `json:"mcpAppContext,omitempty"`
+	MCPAppContext    []AppContextUpdate    `json:"mcpAppContext,omitempty"`
 	Configuration    *SessionConfiguration `json:"configuration,omitempty"`
 	Metadata         json.RawMessage       `json:"metadata,omitempty"`
 	UpdatedAt        time.Time             `json:"updatedAt,omitzero"`
@@ -306,7 +280,7 @@ type TranscriptMessage struct {
 	ProtocolInputs      []json.RawMessage     `json:"protocolInputs,omitempty"`
 	ProtocolOutputs     []json.RawMessage     `json:"protocolOutputs,omitempty"`
 	ToolResults         []ToolResult          `json:"toolResults,omitempty"`
-	MCPAppContext       json.RawMessage       `json:"mcpAppContext,omitempty"`
+	MCPAppContext       []AppContextUpdate    `json:"mcpAppContext,omitempty"`
 	OperationID         OperationID           `json:"operationID,omitempty"`
 	Error               *OperationError       `json:"error,omitempty"`
 	Metadata            json.RawMessage       `json:"metadata,omitempty"`
@@ -336,6 +310,7 @@ type ToolResult struct {
 	Structured     json.RawMessage `json:"structured,omitempty"`
 	App            json.RawMessage `json:"app,omitempty"`
 	Error          string          `json:"error,omitempty"`
+	AppInstanceID  AppInstanceID   `json:"appInstanceID,omitempty"`
 	CreatedAt      time.Time       `json:"createdAt"`
 }
 
@@ -362,6 +337,8 @@ type ToolCall struct {
 	Required              bool            `json:"required"`
 	ProviderManaged       bool            `json:"providerManaged,omitempty"`
 	Automatic             bool            `json:"automatic,omitempty"`
+	Source                ToolCallSource  `json:"source,omitempty"`
+	AppInstanceID         AppInstanceID   `json:"appInstanceID,omitempty"`
 	State                 ToolCallState   `json:"state"`
 	Attempts              []ToolAttempt   `json:"attempts,omitempty"`
 	Results               []ToolResult    `json:"results,omitempty"`
@@ -386,6 +363,7 @@ type ToolCallProposal struct {
 	Required        bool            `json:"required"`
 	ProviderManaged bool            `json:"providerManaged,omitempty"`
 	Automatic       bool            `json:"automatic,omitempty"`
+	Source          ToolCallSource  `json:"source,omitempty"`
 	Error           string          `json:"error,omitempty"`
 }
 
@@ -464,19 +442,20 @@ type ModelOperationInput struct {
 }
 
 type ModelOperation struct {
-	ID               OperationID         `json:"id"`
-	State            OperationState      `json:"state"`
-	StartedAt        time.Time           `json:"startedAt,omitzero"`
-	FinishedAt       time.Time           `json:"finishedAt,omitzero"`
-	Request          ModelOperationInput `json:"request"`
-	StreamedText     string              `json:"streamedText,omitempty"`
-	StreamedThinking string              `json:"streamedThinking,omitempty"`
-	ProtocolOutputs  []json.RawMessage   `json:"protocolOutputs,omitempty"`
-	ToolCallIDs      []ToolCallID        `json:"toolCallIDs,omitempty"`
-	Error            *OperationError     `json:"error,omitempty"`
-	Usable           bool                `json:"usable"`
-	Metadata         json.RawMessage     `json:"metadata,omitempty"`
-	RuntimeMetadata  json.RawMessage     `json:"runtimeMetadata,omitempty"`
+	ID               OperationID          `json:"id"`
+	State            OperationState       `json:"state"`
+	StartedAt        time.Time            `json:"startedAt,omitzero"`
+	FinishedAt       time.Time            `json:"finishedAt,omitzero"`
+	Request          ModelOperationInput  `json:"request"`
+	StreamedText     string               `json:"streamedText,omitempty"`
+	StreamedThinking string               `json:"streamedThinking,omitempty"`
+	ProtocolOutputs  []json.RawMessage    `json:"protocolOutputs,omitempty"`
+	ToolCallIDs      []ToolCallID         `json:"toolCallIDs,omitempty"`
+	Error            *OperationError      `json:"error,omitempty"`
+	Preparation      OperationPreparation `json:"preparation"`
+	Usable           bool                 `json:"usable"`
+	Metadata         json.RawMessage      `json:"metadata,omitempty"`
+	RuntimeMetadata  json.RawMessage      `json:"runtimeMetadata,omitempty"`
 }
 
 type Run struct {
@@ -498,6 +477,7 @@ type Run struct {
 	ModelOperations        []ModelOperation     `json:"modelOperations,omitempty"`
 	ToolCalls              []ToolCall           `json:"toolCalls,omitempty"`
 	WaitingRequests        []WaitingRequest     `json:"waitingRequests,omitempty"`
+	Apps                   []AppInstance        `json:"apps,omitempty"`
 	RequestedCallIDs       []ToolCallID         `json:"requestedCallIDs,omitempty"`
 	ContinuationRequested  bool                 `json:"continuationRequested,omitempty"`
 	ActiveModelOperationID OperationID          `json:"activeModelOperationID,omitempty"`

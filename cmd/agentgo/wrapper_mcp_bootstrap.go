@@ -152,7 +152,7 @@ func initMCPWrappers(
 	adapter, err := mcpruntime.NewRuntimeAdapter(
 		storeAPI,
 		runtimeSecrets,
-		bindingSecrets,
+		trustedSecrets,
 		mcpsettings.EnvironmentResolver{},
 	)
 	if err != nil {

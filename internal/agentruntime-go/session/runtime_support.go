@@ -21,12 +21,9 @@ func (r *Runtime) prepareSubmission(
 	sessionID SessionID,
 	configuration SessionConfiguration,
 	input UserInput,
+	operationID OperationID,
 	persistConfiguration bool,
 ) (PreparedSubmission, error) {
-	if err := ctx.Err(); err != nil {
-		return PreparedSubmission{}, err
-	}
-
 	input = cloneJSON(input)
 	attachments, err := r.prepareAttachments(ctx, input.Attachments)
 	if err != nil {
@@ -34,22 +31,13 @@ func (r *Runtime) prepareSubmission(
 	}
 	input.Attachments = attachments
 
-	prepared := PreparedSubmission{
-		Configuration:        cloneJSON(configuration),
-		Input:                input,
-		PersistConfiguration: persistConfiguration,
-	}
-
-	if r.deps.Preparation == nil {
-		return prepared, nil
-	}
-
-	prepared, err = r.deps.Preparation.PrepareSubmission(
+	prepared, err := r.deps.Preparation.PrepareSubmission(
 		ctx,
 		SubmissionPreparationRequest{
 			SessionID:            sessionID,
 			Configuration:        cloneJSON(configuration),
 			Input:                cloneJSON(input),
+			OperationID:          operationID,
 			PersistConfiguration: persistConfiguration,
 		},
 	)
@@ -71,12 +59,6 @@ func (r *Runtime) prepareAttachments(
 	if len(references) == 0 {
 		return nil, nil
 	}
-	if r.deps.Attachments == nil {
-		return nil, errors.New(
-			"attachments were supplied but no attachment preparer is configured",
-		)
-	}
-
 	values, err := r.deps.Attachments.PrepareAttachments(
 		ctx,
 		cloneJSON(references),
@@ -226,7 +208,9 @@ func (r *Runtime) resumeRecoveredModelLocked(
 		sessionValue,
 		run,
 		commandID,
+		"",
 		latest.Request.Current.ID,
+		nil,
 		effects,
 	)
 	if err != nil {

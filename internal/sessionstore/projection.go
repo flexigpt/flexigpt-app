@@ -1,270 +1,630 @@
 package sessionstore
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"slices"
+	"strings"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// storedSessionFromCheckpoint is the store-owned projection boundary.
-//
-// The runtime checkpoint remains live runtime state. This conversion keeps the
-// durable Session transcript and execution record semantic while explicitly
-// omitting hydrated inference payloads, generated attachment content, provider
-// protocol input payloads, App render payloads, and debug metadata.
-//
-// Approved MCP App context remains durable user-approved input. It is not an
-// App render payload and must survive recovery before a pending Run resumes.
+const textStr = "text"
+
+// Projection is checked and deep-copying. It never returns its input on clone
+// failure, and never persists a live executor authorization or hydrated input.
 func storedSessionFromCheckpoint(
 	checkpoint sessionRuntime.RuntimeCheckpointView,
-) storedSession {
+) (storedSession, error) {
+	sessionValue, err := projectSession(checkpoint.Session)
+	if err != nil {
+		return storedSession{}, err
+	}
+
 	document := storedSession{
 		SchemaVersion: SessionSchemaVersion,
-		Session:       projectSession(checkpoint.Session),
+		Kind:          documentKindSession,
+		Session:       &sessionValue,
 	}
-
 	if checkpoint.Run != nil {
-		document.Runs = []sessionRuntime.Run{
-			projectRun(*checkpoint.Run),
+		run, err := projectRun(*checkpoint.Run)
+		if err != nil {
+			return storedSession{}, err
 		}
+		document.Runs = []sessionRuntime.Run{run}
 	}
-
-	return document
-}
-
-func cloneStoredSession(value storedSession) storedSession {
-	return jsonutil.CloneJSONInValue(value)
+	return document, nil
 }
 
 func projectSession(
-	value sessionRuntime.Session,
-) sessionRuntime.Session {
-	output := value
-	output.Configuration = projectSessionConfiguration(value.Configuration)
-	output.Transcript = projectTranscript(value.Transcript)
-	output.RunIDs = slices.Clone(value.RunIDs)
-	return output
-}
-
-func projectSessionConfiguration(
-	value sessionRuntime.SessionConfiguration,
-) sessionRuntime.SessionConfiguration {
-	output := value
-
-	output.RequestPatch = cloneRawJSON(value.RequestPatch)
-	output.MCPContext = cloneRawJSON(value.MCPContext)
-	output.Metadata = cloneRawJSON(value.Metadata)
-
-	output.ToolSelections = make(
-		[]sessionRuntime.ModelToolSelection,
-		len(value.ToolSelections),
-	)
-	for index := range value.ToolSelections {
-		selection := value.ToolSelections[index]
-		selection.UserArguments = cloneRawJSON(
-			value.ToolSelections[index].UserArguments,
-		)
-
-		if selection.Target.Artifact != nil {
-			artifact := *selection.Target.Artifact
-			selection.Target.Artifact = &artifact
-		}
-
-		output.ToolSelections[index] = selection
+	input sessionRuntime.Session,
+) (sessionRuntime.Session, error) {
+	output, err := jsonutil.CloneJSON(input)
+	if err != nil {
+		return sessionRuntime.Session{}, fmt.Errorf("clone semantic Session: %w", err)
 	}
 
-	output.InstalledSkills = slices.Clone(value.InstalledSkills)
-
-	return output
-}
-
-func projectTranscript(
-	values []sessionRuntime.TranscriptMessage,
-) []sessionRuntime.TranscriptMessage {
-	if len(values) == 0 {
-		return nil
+	output.Transcript, err = projectTranscript(output.Transcript)
+	if err != nil {
+		return sessionRuntime.Session{}, err
 	}
-
-	output := make([]sessionRuntime.TranscriptMessage, len(values))
-	for index := range values {
-		output[index] = projectTranscriptMessage(values[index])
+	if err := normalizeConfiguration(&output.Configuration); err != nil {
+		return sessionRuntime.Session{}, err
 	}
-
-	return output
-}
-
-func projectTranscriptMessage(
-	value sessionRuntime.TranscriptMessage,
-) sessionRuntime.TranscriptMessage {
-	output := value
-
-	output.Attachments = slices.Clone(value.Attachments)
-	// Protocol inputs are deliberately not durable because they may contain
-	// hydrated content. Clearing this flag forces safe re-materialization on
-	// recovery instead of trusting an omitted protocol payload.
-	output.AttachmentsHydrated = false
-	output.ProtocolInputs = nil
-	output.ProtocolOutputs = slices.Clone(value.ProtocolOutputs)
-	output.ToolResults = projectToolResults(value.ToolResults)
-	output.MCPAppContext = cloneRawJSON(value.MCPAppContext)
-	output.Metadata = nil
-	output.RuntimeMetadata = cloneRawJSON(value.RuntimeMetadata)
-
-	if value.Error != nil {
-		errorValue := *value.Error
-		output.Error = &errorValue
-	}
-
-	return output
-}
-
-func projectToolResults(
-	values []sessionRuntime.ToolResult,
-) []sessionRuntime.ToolResult {
-	if len(values) == 0 {
-		return nil
-	}
-
-	output := make([]sessionRuntime.ToolResult, len(values))
-	for index := range values {
-		result := values[index]
-		result.Structured = nil
-		result.App = nil
-		output[index] = result
-	}
-
-	return output
+	return output, nil
 }
 
 func projectRun(
-	value sessionRuntime.Run,
-) sessionRuntime.Run {
-	output := value
-
-	output.Driver.Data = cloneRawJSON(value.Driver.Data)
-	output.Configuration = projectSessionConfiguration(value.Configuration)
-	output.SkillSession.Enabled = slices.Clone(value.SkillSession.Enabled)
-	output.SkillSession.Active = slices.Clone(value.SkillSession.Active)
-	output.Continuation = projectContinuation(value.Continuation)
-	output.ModelOperations = projectModelOperations(value.ModelOperations)
-	output.ToolCalls = projectToolCalls(value.ToolCalls)
-	output.WaitingRequests = projectWaitingRequests(value.WaitingRequests)
-	output.RequestedCallIDs = slices.Clone(value.RequestedCallIDs)
-
-	if value.Outcome != nil {
-		outcome := *value.Outcome
-		output.Outcome = &outcome
+	input sessionRuntime.Run,
+) (sessionRuntime.Run, error) {
+	output, err := jsonutil.CloneJSON(input)
+	if err != nil {
+		return sessionRuntime.Run{}, fmt.Errorf("clone semantic Run: %w", err)
 	}
 
-	return output
-}
+	output.SkillSession.ID = ""
+	output.SkillSession.EstablishedGeneration = 0
+	output.Continuation.Metadata = nil
+	output.Apps = projectApps(output.Apps)
 
-func projectContinuation(
-	value sessionRuntime.ContinuationInput,
-) sessionRuntime.ContinuationInput {
-	output := value
-
-	output.Attachments = slices.Clone(value.Attachments)
-	output.MCPAppContext = cloneRawJSON(value.MCPAppContext)
-	output.Metadata = nil
-
-	if value.Configuration != nil {
-		configuration := projectSessionConfiguration(*value.Configuration)
-		output.Configuration = &configuration
+	if err := normalizeConfiguration(&output.Configuration); err != nil {
+		return sessionRuntime.Run{}, err
+	}
+	if output.Continuation.Configuration != nil {
+		if err := normalizeConfiguration(output.Continuation.Configuration); err != nil {
+			return sessionRuntime.Run{}, err
+		}
 	}
 
-	return output
-}
-
-func projectModelOperations(
-	values []sessionRuntime.ModelOperation,
-) []sessionRuntime.ModelOperation {
-	if len(values) == 0 {
-		return nil
-	}
-
-	output := make([]sessionRuntime.ModelOperation, len(values))
-	for index := range values {
-		operation := values[index]
-		operation.Request.Configuration = projectSessionConfiguration(
-			values[index].Request.Configuration,
-		)
-		operation.Request.History = projectTranscript(
-			values[index].Request.History,
-		)
-		operation.Request.Current = projectTranscriptMessage(
-			values[index].Request.Current,
-		)
-		operation.ProtocolOutputs = slices.Clone(values[index].ProtocolOutputs)
-		operation.ToolCallIDs = slices.Clone(values[index].ToolCallIDs)
+	for index := range output.ModelOperations {
+		operation := &output.ModelOperations[index]
 		operation.Metadata = nil
-		operation.RuntimeMetadata = cloneRawJSON(values[index].RuntimeMetadata)
+		operation.RuntimeMetadata = nil
+		operation.Preparation.Private = nil
 
-		if values[index].Error != nil {
-			errorValue := *values[index].Error
-			operation.Error = &errorValue
+		if err := normalizeConfiguration(&operation.Request.Configuration); err != nil {
+			return sessionRuntime.Run{}, err
 		}
-
-		output[index] = operation
+		operation.Request.History, err = projectTranscript(operation.Request.History)
+		if err != nil {
+			return sessionRuntime.Run{}, err
+		}
+		operation.Request.Current, err = projectTranscriptMessage(operation.Request.Current)
+		if err != nil {
+			return sessionRuntime.Run{}, err
+		}
+		operation.ProtocolOutputs, err = semanticProtocolOutputs(operation.ProtocolOutputs)
+		if err != nil {
+			return sessionRuntime.Run{}, err
+		}
 	}
 
-	return output
-}
-
-func projectToolCalls(
-	values []sessionRuntime.ToolCall,
-) []sessionRuntime.ToolCall {
-	if len(values) == 0 {
-		return nil
-	}
-
-	output := make([]sessionRuntime.ToolCall, len(values))
-	for index := range values {
-		call := values[index]
-		call.Arguments = cloneRawJSON(values[index].Arguments)
-		call.Binding.Data = cloneRawJSON(values[index].Binding.Data)
-		call.Attempts = slices.Clone(values[index].Attempts)
-		call.Results = projectToolResults(values[index].Results)
+	for index := range output.ToolCalls {
+		call := &output.ToolCalls[index]
 		call.Authorization = nil
-		output[index] = call
+
+		call.Arguments, err = canonicalJSONValue(call.Arguments)
+		if err != nil {
+			return sessionRuntime.Run{}, fmt.Errorf("tool arguments: %w", err)
+		}
+		call.Binding.Data, err = semanticBindingData(call.Binding)
+		if err != nil {
+			return sessionRuntime.Run{}, err
+		}
+		call.Results, err = projectToolResults(call.Results)
+		if err != nil {
+			return sessionRuntime.Run{}, err
+		}
 	}
 
-	return output
+	for index := range output.WaitingRequests {
+		wait := &output.WaitingRequests[index]
+		wait.Summary, err = canonicalJSONValue(wait.Summary)
+		if err != nil {
+			return sessionRuntime.Run{}, fmt.Errorf("wait summary: %w", err)
+		}
+		wait.InputSchema, err = canonicalJSONValue(wait.InputSchema)
+		if err != nil {
+			return sessionRuntime.Run{}, fmt.Errorf("wait input schema: %w", err)
+		}
+	}
+
+	return output, nil
 }
 
-func projectWaitingRequests(
-	values []sessionRuntime.WaitingRequest,
-) []sessionRuntime.WaitingRequest {
-	if len(values) == 0 {
-		return nil
+func projectTranscript(
+	input []sessionRuntime.TranscriptMessage,
+) ([]sessionRuntime.TranscriptMessage, error) {
+	output := make([]sessionRuntime.TranscriptMessage, len(input))
+	for index := range input {
+		message, err := projectTranscriptMessage(input[index])
+		if err != nil {
+			return nil, fmt.Errorf("transcript message %d: %w", index, err)
+		}
+		output[index] = message
+	}
+	return output, nil
+}
+
+func projectTranscriptMessage(
+	input sessionRuntime.TranscriptMessage,
+) (sessionRuntime.TranscriptMessage, error) {
+	output, err := jsonutil.CloneJSON(input)
+	if err != nil {
+		return sessionRuntime.TranscriptMessage{}, err
 	}
 
-	output := make([]sessionRuntime.WaitingRequest, len(values))
-	for index := range values {
-		wait := values[index]
-		wait.Summary = cloneRawJSON(values[index].Summary)
-		wait.InputSchema = cloneRawJSON(values[index].InputSchema)
-		wait.AllowedResolutions = slices.Clone(
-			values[index].AllowedResolutions,
-		)
+	output.ProtocolInputs = nil
+	output.AttachmentsHydrated = false
+	output.Metadata = nil
+	output.RuntimeMetadata = nil
 
-		if values[index].ExpiresAt != nil {
-			expiresAt := *values[index].ExpiresAt
-			wait.ExpiresAt = &expiresAt
+	output.ProtocolOutputs, err = semanticProtocolOutputs(output.ProtocolOutputs)
+	if err != nil {
+		return sessionRuntime.TranscriptMessage{}, err
+	}
+	output.ToolResults, err = projectToolResults(output.ToolResults)
+	if err != nil {
+		return sessionRuntime.TranscriptMessage{}, err
+	}
+	return output, nil
+}
+
+func projectToolResults(
+	input []sessionRuntime.ToolResult,
+) ([]sessionRuntime.ToolResult, error) {
+	output := make([]sessionRuntime.ToolResult, len(input))
+	for index := range input {
+		value := input[index]
+
+		// The existing executor contract may carry binary Tool outputs in
+		// Structured and duplicate them into Text. Project both together.
+		if len(value.Structured) != 0 {
+			text, err := semanticToolOutputText(value.Structured)
+			if err != nil {
+				return nil, fmt.Errorf("tool result %q: %w", value.ID, err)
+			}
+			value.Text = text
+		}
+		value.Structured = nil
+		value.App = nil
+		output[index] = value
+	}
+	return output, nil
+}
+
+func normalizeConfiguration(
+	configuration *sessionRuntime.SessionConfiguration,
+) error {
+	metadata, err := canonicalJSONValue(configuration.Metadata)
+	if err != nil {
+		return fmt.Errorf("session presentation metadata: %w", err)
+	}
+	configuration.Metadata = metadata
+
+	for index := range configuration.Tools {
+		override := &configuration.Tools[index]
+		if override.Value == nil {
+			continue
+		}
+		arguments, err := canonicalJSONValue(
+			override.Value.UserArguments,
+		)
+		if err != nil {
+			return fmt.Errorf("tool override arguments: %w", err)
+		}
+		override.Value.UserArguments = arguments
+
+	}
+	for key, raw := range configuration.ModelOverrides.AdapterParameters {
+		canonical, err := canonicalJSONValue(raw)
+		if err != nil {
+			return fmt.Errorf("model adapter parameter %q: %w", key, err)
+		}
+		configuration.ModelOverrides.AdapterParameters[key] = canonical
+	}
+	return nil
+}
+
+func canonicalJSONValue(input json.RawMessage) (json.RawMessage, error) {
+	if len(bytes.TrimSpace(input)) == 0 {
+		return nil, nil
+	}
+	if len(input) > maximumJSONValueBytes {
+		return nil, fmt.Errorf("%w: JSON value exceeds size limit", ErrInvalidDocument)
+	}
+	canonical, err := jsonutil.Canonicalize(input)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidDocument, err)
+	}
+	return json.RawMessage(canonical), nil
+}
+
+type semanticGoBinding struct {
+	Target    sessionRuntime.CapabilityTarget `json:"target"`
+	TimeoutMS int                             `json:"timeoutMS,omitempty"`
+}
+
+type semanticMCPBinding struct {
+	Server           string   `json:"server"`
+	ProviderToolName string   `json:"providerToolName"`
+	ChoiceID         string   `json:"choiceID"`
+	ToolName         string   `json:"toolName"`
+	ToolDigest       string   `json:"toolDigest"`
+	ApprovalRule     string   `json:"approvalRule"`
+	ExecutionMode    string   `json:"executionMode"`
+	AppResourceURI   string   `json:"appResourceUri,omitempty"`
+	Visibility       []string `json:"visibility,omitempty"`
+}
+
+func semanticBindingData(
+	binding sessionRuntime.ToolBinding,
+) (json.RawMessage, error) {
+	switch binding.Kind {
+	case sessionRuntime.ToolBindingKindGo:
+		value, err := jsonutil.DecodeJSONRaw[semanticGoBinding](binding.Data)
+		if err != nil {
+			return nil, fmt.Errorf("go tool binding: %w", err)
+		}
+		if value.TimeoutMS < 0 {
+			return nil, fmt.Errorf("%w: negative Tool timeout", ErrInvalidDocument)
+		}
+		if err := validateCapabilityTarget(value.Target); err != nil {
+			return nil, err
+		}
+		return json.Marshal(value)
+
+	case sessionRuntime.ToolBindingKindMCP:
+		value, err := jsonutil.DecodeJSONRaw[semanticMCPBinding](binding.Data)
+		if err != nil {
+			return nil, fmt.Errorf("MCP Tool binding: %w", err)
+		}
+		for _, identity := range []string{
+			value.Server,
+			value.ProviderToolName,
+			value.ChoiceID,
+			value.ToolName,
+			value.ToolDigest,
+		} {
+			if err := validateIdentity("MCP binding identity", identity); err != nil {
+				return nil, err
+			}
+		}
+		value.Visibility = slices.Clone(value.Visibility)
+		return json.Marshal(value)
+
+	case sessionRuntime.ToolBindingKindSkill,
+		sessionRuntime.ToolBindingKindProvider,
+		sessionRuntime.ToolBindingKindUnresolved:
+		return nil, nil
+
+	default:
+		return nil, fmt.Errorf(
+			"%w: unsupported Tool binding kind %q",
+			ErrInvalidDocument,
+			binding.Kind,
+		)
+	}
+}
+
+// The following types are a closed semantic projection of provider outputs.
+// Their marshaled values preserve replayable messages and Tool call identities;
+// arbitrary provider transport, debugging, binary, or private fields are not
+// copied into persistence.
+type semanticOutput struct {
+	Kind                string              `json:"kind"`
+	OutputMessage       *semanticMessage    `json:"outputMessage,omitempty"`
+	ReasoningMessage    *semanticReasoning  `json:"reasoningMessage,omitempty"`
+	FunctionToolCall    *semanticCall       `json:"functionToolCall,omitempty"`
+	CustomToolCall      *semanticCall       `json:"customToolCall,omitempty"`
+	WebSearchToolCall   *semanticCall       `json:"webSearchToolCall,omitempty"`
+	WebSearchToolOutput *semanticToolOutput `json:"webSearchToolOutput,omitempty"`
+}
+
+type semanticMessage struct {
+	ID       string            `json:"id,omitempty"`
+	Role     string            `json:"role"`
+	Status   string            `json:"status,omitempty"`
+	Contents []semanticContent `json:"contents"`
+}
+
+type semanticContent struct {
+	Kind      string                  `json:"kind"`
+	TextItem  *semanticText           `json:"textItem,omitempty"`
+	ImageItem *semanticImageReference `json:"imageItem,omitempty"`
+	FileItem  *semanticFileReference  `json:"fileItem,omitempty"`
+}
+
+type semanticText struct {
+	Text string `json:"text"`
+}
+
+type semanticImageReference struct {
+	ImageName string `json:"imageName,omitempty"`
+	ImageMIME string `json:"imageMIME,omitempty"`
+}
+
+type semanticFileReference struct {
+	FileName string `json:"fileName,omitempty"`
+	FileMIME string `json:"fileMIME,omitempty"`
+}
+
+type semanticReasoning struct {
+	ID       string   `json:"id,omitempty"`
+	Thinking []string `json:"thinking,omitempty"`
+}
+
+type semanticCall struct {
+	ID        string          `json:"id,omitempty"`
+	CallID    string          `json:"callID,omitempty"`
+	ChoiceID  string          `json:"choiceID,omitempty"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type,omitempty"`
+	Role      string          `json:"role,omitempty"`
+	Status    string          `json:"status,omitempty"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+}
+
+type semanticToolOutput struct {
+	ID       string            `json:"id,omitempty"`
+	CallID   string            `json:"callID,omitempty"`
+	ChoiceID string            `json:"choiceID,omitempty"`
+	Name     string            `json:"name,omitempty"`
+	Type     string            `json:"type,omitempty"`
+	Role     string            `json:"role,omitempty"`
+	Status   string            `json:"status,omitempty"`
+	IsError  bool              `json:"isError,omitempty"`
+	Contents []semanticContent `json:"contents,omitempty"`
+}
+
+func semanticProtocolOutputs(
+	input []json.RawMessage,
+) ([]json.RawMessage, error) {
+	output := make([]json.RawMessage, 0, len(input))
+	for index, raw := range input {
+		canonical, err := canonicalJSONValue(raw)
+		if err != nil {
+			return nil, fmt.Errorf("protocol output %d: %w", index, err)
 		}
 
-		output[index] = wait
-	}
+		var value semanticOutput
+		if err := json.Unmarshal(canonical, &value); err != nil {
+			return nil, fmt.Errorf("adapt protocol output %d: %w", index, err)
+		}
 
+		switch value.Kind {
+		case "outputMessage":
+			if value.OutputMessage == nil {
+				return nil, fmt.Errorf("%w: missing output message", ErrInvalidDocument)
+			}
+			value.OutputMessage.Contents = semanticContents(value.OutputMessage.Contents)
+
+		case "reasoningMessage":
+			if value.ReasoningMessage == nil {
+				return nil, fmt.Errorf("%w: missing reasoning message", ErrInvalidDocument)
+			}
+
+		case "functionToolCall":
+			if err := normalizeSemanticCall(value.FunctionToolCall); err != nil {
+				return nil, err
+			}
+
+		case "customToolCall":
+			if err := normalizeSemanticCall(value.CustomToolCall); err != nil {
+				return nil, err
+			}
+
+		case "webSearchToolCall":
+			if err := normalizeSemanticCall(value.WebSearchToolCall); err != nil {
+				return nil, err
+			}
+
+		case "webSearchToolOutput":
+			if value.WebSearchToolOutput == nil {
+				return nil, fmt.Errorf("%w: missing provider Tool output", ErrInvalidDocument)
+			}
+			value.WebSearchToolOutput.Contents = semanticContents(
+				value.WebSearchToolOutput.Contents,
+			)
+
+		default:
+			// Unknown provider output cannot be faithfully replayed. Its
+			// omission is explicit in durable visible history.
+			value = semanticOutput{
+				Kind: "outputMessage",
+				OutputMessage: &semanticMessage{
+					Role:   "assistant",
+					Status: "completed",
+					Contents: []semanticContent{{
+						Kind: textStr,
+						TextItem: &semanticText{
+							Text: fmt.Sprintf(
+								"[Provider output kind %q is not available in durable history.]",
+								value.Kind,
+							),
+						},
+					}},
+				},
+			}
+		}
+
+		projected, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, projected)
+	}
+	return output, nil
+}
+
+func normalizeSemanticCall(call *semanticCall) error {
+	if call == nil {
+		return fmt.Errorf("%w: missing provider Tool call", ErrInvalidDocument)
+	}
+	if err := validateIdentity("provider Tool name", call.Name); err != nil {
+		return err
+	}
+	arguments, err := canonicalJSONValue(call.Arguments)
+	if err != nil {
+		return err
+	}
+	call.Arguments = arguments
+	return nil
+}
+
+func semanticContents(input []semanticContent) []semanticContent {
+	output := make([]semanticContent, 0, len(input))
+	for _, value := range input {
+		switch value.Kind {
+		case textStr:
+			if value.TextItem != nil {
+				output = append(output, semanticContent{
+					Kind:     textStr,
+					TextItem: &semanticText{Text: value.TextItem.Text},
+				})
+			}
+		case "image":
+			name := ""
+			if value.ImageItem != nil {
+				name = value.ImageItem.ImageName
+			}
+			output = append(output, semanticContent{
+				Kind: textStr,
+				TextItem: &semanticText{
+					Text: fmt.Sprintf("[Image content omitted from durable history: %s]", name),
+				},
+			})
+		case "file":
+			name := ""
+			if value.FileItem != nil {
+				name = value.FileItem.FileName
+			}
+			output = append(output, semanticContent{
+				Kind: textStr,
+				TextItem: &semanticText{
+					Text: fmt.Sprintf("[File content omitted from durable history: %s]", name),
+				},
+			})
+		default:
+			output = append(output, semanticContent{
+				Kind: textStr,
+				TextItem: &semanticText{
+					Text: fmt.Sprintf("[Content kind %q omitted from durable history.]", value.Kind),
+				},
+			})
+		}
+	}
 	return output
 }
 
-func cloneRawJSON(value json.RawMessage) json.RawMessage {
-	if len(value) == 0 {
-		return nil
+func projectApps(
+	values []sessionRuntime.AppInstance,
+) []sessionRuntime.AppInstance {
+	output := make([]sessionRuntime.AppInstance, len(values))
+	for index := range values {
+		value := values[index]
+		value.Route = nil
+		value.Views = append([]sessionRuntime.AppViewID(nil), value.Views...)
+		if value.UnavailableReason == "" {
+			value.UnavailableReason = "App route is not durable"
+		}
+		output[index] = value
+	}
+	return output
+}
+
+type toolOutputWire struct {
+	Kind      string                  `json:"kind"`
+	TextItem  *semanticText           `json:"textItem,omitempty"`
+	ImageItem *semanticImageReference `json:"imageItem,omitempty"`
+	FileItem  *semanticFileReference  `json:"fileItem,omitempty"`
+}
+
+type mcpResultWire struct {
+	Content []mcpContentWire `json:"content,omitempty"`
+}
+
+type mcpContentWire struct {
+	Type     string           `json:"type"`
+	Text     string           `json:"text,omitempty"`
+	URI      string           `json:"uri,omitempty"`
+	Name     string           `json:"name,omitempty"`
+	MIMEType string           `json:"mimeType,omitempty"`
+	Resource *mcpResourceWire `json:"resource,omitempty"`
+}
+
+type mcpResourceWire struct {
+	URI      string `json:"uri"`
+	MIMEType string `json:"mimeType,omitempty"`
+	Text     string `json:"text,omitempty"`
+}
+
+func semanticToolOutputText(raw json.RawMessage) (string, error) {
+	canonical, err := canonicalJSONValue(raw)
+	if err != nil {
+		return "", err
+	}
+	if len(canonical) == 0 {
+		return "", nil
 	}
 
-	return append(json.RawMessage(nil), value...)
+	var parts []string
+	switch canonical[0] {
+	case '[':
+		var values []toolOutputWire
+		if err := json.Unmarshal(canonical, &values); err != nil {
+			return "", err
+		}
+		for _, value := range values {
+			switch value.Kind {
+			case textStr:
+				if value.TextItem != nil {
+					parts = append(parts, value.TextItem.Text)
+				}
+			case "image":
+				name := ""
+				if value.ImageItem != nil {
+					name = value.ImageItem.ImageName
+				}
+				parts = append(parts, "[Tool image omitted: "+name+"]")
+			case "file":
+				name := ""
+				if value.FileItem != nil {
+					name = value.FileItem.FileName
+				}
+				parts = append(parts, "[Tool file omitted: "+name+"]")
+			default:
+				parts = append(parts, "[Structured Tool output omitted from durable history.]")
+			}
+		}
+	case '{':
+		var value mcpResultWire
+		if err := json.Unmarshal(canonical, &value); err != nil {
+			return "", err
+		}
+		for _, content := range value.Content {
+			switch content.Type {
+			case textStr:
+				parts = append(parts, content.Text)
+			case "resource":
+				if content.Resource != nil {
+					parts = append(parts, content.Resource.Text)
+					if content.Resource.Text == "" {
+						parts = append(parts, "[MCP resource omitted: "+content.Resource.URI+"]")
+					}
+				}
+			case "resource_link":
+				parts = append(parts, strings.TrimSpace(content.Name+" "+content.URI))
+			default:
+				parts = append(parts, "[MCP binary content omitted from durable history.]")
+			}
+		}
+	}
+
+	if len(parts) == 0 {
+		return "[Structured Tool content is not available in durable history.]", nil
+	}
+	return strings.Join(parts, "\n\n"), nil
 }

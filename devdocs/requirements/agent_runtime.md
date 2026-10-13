@@ -57,8 +57,11 @@ The branch must not include:
 
 A new clean Session storage namespace or schema is acceptable and preferred.
 
-## Current state
+## Historical baseline
 
+The following inventory describes the pre-delivery ownership model and the
+work that motivated this proposal. The status sections near the end of this
+document are authoritative for the current backend implementation.
 The current codebase contains substantial pieces that should be reused, but their ownership must change.
 
 ### Existing Agent resolution surface
@@ -1367,43 +1370,60 @@ Composer does not:
 
 ## Status
 
-### Backend background-execution delivery
+### Backend Session-owned execution delivery
 
-- [x] Common neutral panic-safe background launcher delivered.
-- [x] Supplied Session, MCP, SessionStore-maintenance, and Wails-event launches use the common utility.
-- [x] Panicked Session model, Tool, and wait work has operation-specific settlement.
-- [x] Panicked external Tool attempts are recorded as uncertain without fabricated selected results.
-- [x] Stale Skill-session cleanup remains inside tracked Session dispatch work.
-- [x] Session snapshots expose a durable event watermark independent of Session revision.
-- [x] Focused launcher and Session panic-settlement tests delivered.
-- [ ] Repository formatting, linting, and tests verified.
-- [ ] Authoritative runtime setup, typed intent, immutable preparation, and thin inference complete.
-- [ ] Breaking SessionStore schema, Wails execution removal, and Session-scoped MCP App routing complete.
-- [ ] Frontend Session command/snapshot/event migration complete.
+- [x] Session configuration uses typed Agent, Workspace, Model, Tool, Skill,
+      MCP, instruction, model-default, and App-context intent.
+- [x] Session configuration uses canonical identity keys instead of list order,
+      display labels, or frontend object identity.
+- [x] Agent and Workspace are independently resolved in backend runtime setup.
+- [x] Backend operation preparation captures immutable source composition,
+      Tool bindings, Skill selections, MCP mappings, attachments, and provenance.
+- [x] Initial Runs prepare authoritative execution before acceptance.
+- [x] Continuation Runs prepare authoritative execution before provider calls.
+- [x] Inference receives only provider-ready configuration, inputs, and Tool
+      choices.
+- [x] Inference has no Session, Agent, Workspace, Tool, Skill, MCP, Artifact,
+      attachment, or conversation-composition imports.
+- [x] Session Runtime remains the only accepted-command execution coordinator.
+- [x] Skill session creation and Tool execution are Session-owned.
+- [x] MCP approval resolution and invocation are Session-owned.
+- [x] Session-scoped App instances carry Session, Run, operation, Tool-call,
+      server, and view identities.
+- [x] App Tool calls route through Session Tool-call records and normal MCP
+      policy and approval enforcement.
+- [x] App context updates stage continuation input through Session commands.
+- [x] Legacy direct Wails completion, Tool invocation, Skill runtime session,
+      and MCP Tool invocation ownership has been removed from chat execution.
+- [x] Legacy Conversation collection runtime has been removed from backend
+      startup and shutdown.
 
 ### Present now
 
-| Area                                     | Current status |
-| ---------------------------------------- | -------------- |
-| Session and Run core state model         | Present        |
-| Sequential chat driver                   | Present        |
-| Model operation records                  | Present        |
-| Tool call, attempt, and result model     | Present        |
-| Wait model                               | Present        |
-| Pause, cancel, and limits                | Present        |
-| Checkpoint and recovery framework        | Present        |
-| SessionStore foundation                  | Present        |
-| Wails Session Runtime wrapper            | Present        |
-| Attachment materializer                  | Present        |
-| MCP runtime and domain                   | Present        |
-| Skill runtime and domain                 | Present        |
-| Agent preview and preparation APIs       | Present        |
-| Workspace preview and planning APIs      | Present        |
-| Frontend Agent picker                    | Present        |
-| Frontend Workspace picker                | Present        |
-| Existing direct frontend completion path | Present        |
+| Area                                   | Current status                                     |
+| -------------------------------------- | -------------------------------------------------- |
+| Session and Run core state model       | Present                                            |
+| Sequential chat driver                 | Present                                            |
+| Model operation records                | Present                                            |
+| Tool call, attempt, and result model   | Present                                            |
+| Wait model                             | Present                                            |
+| Pause, cancel, and limits              | Present                                            |
+| Checkpoint and recovery framework      | Present                                            |
+| SessionStore foundation                | Present                                            |
+| Wails Session Runtime wrapper          | Present                                            |
+| Attachment materializer                | Present                                            |
+| MCP runtime and domain                 | Present                                            |
+| Skill runtime and domain               | Present                                            |
+| Agent preview and preparation APIs     | Present                                            |
+| Workspace preview and planning APIs    | Present                                            |
+| Frontend Agent picker                  | Present                                            |
+| Frontend Workspace picker              | Present                                            |
+| Legacy direct frontend completion path | Historical only; removed from backend chat surface |
 
-### Present but must move or refactor
+### Historical components that needed movement or refactoring
+
+The backend items in this inventory are now delivered as recorded below.
+Frontend migration remains separately tracked.
 
 | Area                             | Current state            | Target                          |
 | -------------------------------- | ------------------------ | ------------------------------- |
@@ -1435,6 +1455,49 @@ Composer does not:
 | Session-scoped MCP App routing            | New                  |
 | Breaking SessionStore schema              | New                  |
 | Removal of old frontend direct execution  | New                  |
+
+### Backend background-execution delivery
+
+- [x] Common neutral panic-safe background launcher delivered.
+- [x] Supplied Session, MCP, SessionStore-maintenance, and Wails-event launches use the common utility.
+- [x] Panicked Session model, Tool, and wait work has operation-specific settlement.
+- [x] Panicked external Tool attempts are recorded as uncertain without fabricated selected results.
+- [x] Stale Skill-session cleanup remains inside tracked Session dispatch work.
+- [x] Session snapshots expose a durable event watermark independent of Session revision.
+- [x] Focused launcher and Session panic-settlement tests delivered.
+- [x] Authoritative runtime setup, typed intent, immutable preparation, and thin inference complete.
+- [x] Breaking SessionStore schema, Wails execution removal, and Session-scoped MCP App routing complete.
+- [ ] Frontend Session command/snapshot/event migration complete.
+
+### Backend inference and persistence delivery
+
+- [x] Provider-only inference implementation delivered.
+- [x] Domain-aware inference hydration and Session adapter removed from inference.
+- [x] Model, Skill, and MCP preparation contracts relocated into runtimesetup.
+- [x] Breaking SessionStore envelope and sessions_v1 namespace delivered.
+- [x] Durable Session deletion barriers delivered.
+- [x] Checked semantic projections exclude private authorization, hydrated inputs, Skill handles, render payloads, and unfiltered runtime metadata.
+- [x] Session listing and search use derived index records.
+- [x] FTS maintenance uses the common panic-safe launcher and existing filesystem utilities.
+- [x] Domain-runtime implementation sources adapted to relocated contracts.
+- [x] Authoritative Agent/Workspace composition and typed override resolution complete.
+- [x] Immutable operation preparation and initial-admission integration complete.
+- [x] Application/Wails assembly and legacy execution removal complete.
+- [x] Session-scoped MCP App routing complete.
+- [ ] Frontend Session migration complete.
+
+### Backend runtime-setup delivery
+
+- [x] `internal/agentruntime-go/runtimesetup` is the only Session, inference, and domain composition root.
+- [x] Inference receives only provider-ready completion data.
+- [x] Domain-aware operation composition lives in runtime-setup adapters.
+- [x] Typed intent, overrides, canonical identities, provenance, diagnostics, and immutable prepared operations delivered.
+- [x] Session Runtime remains the only execution coordinator after command acceptance.
+- [x] Session-scoped MCP App routing delivered.
+- [x] Explicit Session Tool, Skill, and MCP Artifact pins are checked against authoritative current Artifact state before use.
+- [x] Prepared MCP resolution summaries preserve the effective source owner and backend-used Artifact provenance.
+- [x] Attachment admission keeps backend-derived supported modes authoritative.
+- [x] Direct chat completion and direct Tool, Skill, and MCP execution removed from Session orchestration.
 
 ## Definition of done
 

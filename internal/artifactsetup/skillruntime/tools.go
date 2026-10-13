@@ -56,16 +56,6 @@ func buildSkillToolChoices(
 	return output, nil
 }
 
-func skillsRulesPrompt(includeAll, includeRunScript bool) string {
-	if !includeAll {
-		return agentskillsRuntimeSpec.SkillsRulesPromptLoadOnly
-	}
-	if !includeRunScript {
-		return agentskillsRuntimeSpec.SkillsRulesPromptWithoutRunScript
-	}
-	return agentskillsRuntimeSpec.SkillsRulesPromptAll
-}
-
 func decodeToolArgSchema(
 	raw jsonutil.JSONRawString,
 ) (map[string]any, error) {

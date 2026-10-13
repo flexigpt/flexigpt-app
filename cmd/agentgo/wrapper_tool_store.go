@@ -2,11 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -21,9 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
-	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 type ToolStoreWrapper struct {
@@ -196,77 +190,6 @@ func (w *ToolStoreWrapper) ResolveToolTarget(
 			)
 		},
 	)
-}
-
-// InvokeGoToolTarget invokes only an enabled Go Tool selected by an
-// Artifact-backed capability target.
-//
-// SDK Tools intentionally fail here. They are provider-native inference
-// ToolChoices and must be invoked by inference, never by the local Go Tool
-// runtime.
-func (w *ToolStoreWrapper) InvokeGoToolTarget(
-	target composition.CapabilityTarget,
-	args string,
-	timeoutMS int,
-) (*llmtoolsutil.InvokeResponse, error) {
-	return withRecoveryResp(func() (*llmtoolsutil.InvokeResponse, error) {
-		if w == nil || w.api == nil || w.runtime == nil {
-			return nil, storeSpec.ErrClosed
-		}
-		if timeoutMS < 0 {
-			return nil, fmt.Errorf(
-				"%w: Tool timeout cannot be negative",
-				storeSpec.ErrInvalid,
-			)
-		}
-
-		resolved, err := w.api.ResolveToolTarget(
-			context.Background(),
-			target,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if resolved.Tool.Implementation.Kind !=
-			toolv1.ImplementationKindGo {
-			return nil, fmt.Errorf(
-				"%w: SDK Tool %q cannot be invoked by the local Go Tool runtime",
-				storeSpec.ErrUnsupported,
-				resolved.Tool.Name,
-			)
-		}
-
-		raw := json.RawMessage(`{}`)
-		if value := strings.TrimSpace(args); value != "" {
-			raw = json.RawMessage(value)
-			if !json.Valid(raw) {
-				return nil, fmt.Errorf(
-					"%w: Tool arguments must be valid JSON",
-					storeSpec.ErrInvalid,
-				)
-			}
-		}
-
-		var timeout time.Duration
-		if timeoutMS > 0 {
-			timeout = time.Duration(timeoutMS) * time.Millisecond
-		}
-
-		outputs, invokeErr := w.runtime.CallGoTool(
-			context.Background(),
-			resolved.Tool.Implementation.Function,
-			raw,
-			timeout,
-		)
-		response := &llmtoolsutil.InvokeResponse{
-			Outputs: outputs,
-			IsError: invokeErr != nil,
-		}
-		if invokeErr != nil {
-			response.ErrorMessage = invokeErr.Error()
-		}
-		return response, nil
-	})
 }
 
 func (w *ToolStoreWrapper) close() {

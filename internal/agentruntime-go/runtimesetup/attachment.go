@@ -1,4 +1,4 @@
-package attachment
+package runtimesetup
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
@@ -15,52 +16,45 @@ import (
 
 const defaultDirectoryAttachmentMaxFiles = 1024
 
-type Materializer interface {
-	Materialize(
-		ctx context.Context,
-		references []sessionRuntime.AttachmentReference,
-	) ([]Attachment, error)
+// referenceMaterializer is the Session-facing attachment adapter.
+//
+// Attachment owns file and URL interpretation. Session owns durable attachment
+// references. Runtime setup is the sole boundary that is allowed to join those
+// two domains.
+type referenceMaterializer struct{}
+
+func newReferenceMaterializer() *referenceMaterializer {
+	return &referenceMaterializer{}
 }
 
-// JSONReferenceMaterializer converts durable Session references into the
-// attachment domain. It deliberately does not place hydrated bytes in Session
-// state. The name is retained for compatibility with existing construction
-// sites; conversion is now typed rather than marshal/unmarshal based.
-type JSONReferenceMaterializer struct{}
-
-func NewJSONReferenceMaterializer() *JSONReferenceMaterializer {
-	return &JSONReferenceMaterializer{}
-}
-
-func (m *JSONReferenceMaterializer) Materialize(
+func (m *referenceMaterializer) Materialize(
 	ctx context.Context,
 	references []sessionRuntime.AttachmentReference,
-) ([]Attachment, error) {
+) ([]attachmentRuntime.Attachment, error) {
 	if len(references) == 0 {
 		return nil, nil
 	}
 
-	output := make([]Attachment, 0, len(references))
+	output := make([]attachmentRuntime.Attachment, 0, len(references))
 	for index := range references {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
 		values, err := m.materializeReference(references[index])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(
+				"materialize attachment %d: %w",
+				index,
+				err,
+			)
 		}
 		output = append(output, values...)
 	}
-
 	return output, nil
 }
 
-// PrepareAttachments is the admission-time normalization boundary. Local files
-// receive an immutable path/size/modtime snapshot here. Directories are walked
-// once and persist their flattened child references, so historical replay does
-// not silently gain or lose files after the message was accepted.
-func (m *JSONReferenceMaterializer) PrepareAttachments(
+// PrepareAttachments is the Session command-admission attachment boundary.
+//
+// It snapshots local files, expands directories exactly once, validates URLs,
+// and stores only durable references. It never stores hydrated file bytes.
+func (m *referenceMaterializer) PrepareAttachments(
 	ctx context.Context,
 	references []sessionRuntime.AttachmentReference,
 ) ([]sessionRuntime.AttachmentReference, error) {
@@ -68,96 +62,110 @@ func (m *JSONReferenceMaterializer) PrepareAttachments(
 		return nil, nil
 	}
 
-	output := make([]sessionRuntime.AttachmentReference, 0, len(references))
+	output := make(
+		[]sessionRuntime.AttachmentReference,
+		0,
+		len(references),
+	)
 	for index := range references {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
 		reference, err := m.prepareReference(ctx, references[index])
 		if err != nil {
-			return nil, fmt.Errorf("prepare attachment %d: %w", index, err)
+			return nil, fmt.Errorf(
+				"prepare attachment %d: %w",
+				index,
+				err,
+			)
 		}
 		output = append(output, reference)
 	}
 	return output, nil
 }
 
-func (m *JSONReferenceMaterializer) prepareReference(
+func (m *referenceMaterializer) prepareReference(
 	ctx context.Context,
 	reference sessionRuntime.AttachmentReference,
 ) (sessionRuntime.AttachmentReference, error) {
 	switch reference.Kind {
 	case sessionRuntime.AttachmentReferenceFile:
 		if reference.File == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("file attachment reference has no file reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"file attachment reference has no file reference",
+			)
 		}
 		return prepareLocalReference(ctx, reference, reference.File.Path)
 
 	case sessionRuntime.AttachmentReferenceImage:
 		if reference.Image == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("image attachment reference has no image reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"image attachment reference has no image reference",
+			)
 		}
 		return prepareLocalReference(ctx, reference, reference.Image.Path)
 
 	case sessionRuntime.AttachmentReferenceURL:
 		if reference.URL == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("URL attachment reference has no URL reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"URL attachment reference has no URL reference",
+			)
 		}
-		attachment, err := BuildAttachmentForURLWithContext(
+
+		attachment, err := attachmentRuntime.BuildAttachmentForURLWithContext(
 			ctx,
 			reference.URL.URL,
 		)
 		if err != nil {
 			return sessionRuntime.AttachmentReference{}, err
 		}
+
 		output, err := attachmentReferenceFromAttachment(attachment)
 		if err != nil {
 			return sessionRuntime.AttachmentReference{}, err
 		}
-		copyAttachmentReferencePresentation(&output, reference)
+		copyAttachmentPresentation(&output, reference)
 		return output, nil
 
 	case sessionRuntime.AttachmentReferenceGeneric:
 		if reference.Generic == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("generic attachment reference has no handle")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"generic attachment reference has no handle",
+			)
 		}
+
 		generic := *reference.Generic
 		generic.Handle = strings.TrimSpace(generic.Handle)
 		if generic.Handle == "" {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("generic attachment reference has an empty handle")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"generic attachment reference has an empty handle",
+			)
 		}
 		if strings.TrimSpace(generic.OriginalHandle) == "" {
 			generic.OriginalHandle = generic.Handle
 		}
+
 		reference.Generic = &generic
 		if strings.TrimSpace(reference.Mode) == "" {
-			reference.Mode = string(AttachmentContentBlockModeTextLink)
+			reference.Mode = string(
+				attachmentRuntime.AttachmentContentBlockModeTextLink,
+			)
 		}
 		return reference, nil
 
 	case sessionRuntime.AttachmentReferenceDirectory:
 		if reference.Directory == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("directory attachment reference has no directory reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"directory attachment reference has no directory reference",
+			)
 		}
 
 		directory := *reference.Directory
 		directoryPath := strings.TrimSpace(directory.Path)
 		if directoryPath == "" {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("directory attachment reference has an empty path")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"directory attachment reference has an empty path",
+			)
 		}
 
-		// Expanded is durable, server-owned admission output. Never trust an
-		// inbound Expanded list: otherwise a client can bypass walking limits,
-		// file snapshots, and file-kind normalization.
-		walk, err := WalkDirectoryWithFiles(
+		walk, err := attachmentRuntime.WalkDirectoryWithFiles(
 			ctx,
 			directoryPath,
 			defaultDirectoryAttachmentMaxFiles,
@@ -166,11 +174,10 @@ func (m *JSONReferenceMaterializer) prepareReference(
 			return sessionRuntime.AttachmentReference{}, err
 		}
 		if len(walk.Files) == 0 {
-			return sessionRuntime.AttachmentReference{},
-				fmt.Errorf(
-					"directory attachment %q contains no readable files",
-					walk.DirPath,
-				)
+			return sessionRuntime.AttachmentReference{}, fmt.Errorf(
+				"directory attachment %q contains no readable files",
+				walk.DirPath,
+			)
 		}
 
 		directory.Path = walk.DirPath
@@ -178,37 +185,43 @@ func (m *JSONReferenceMaterializer) prepareReference(
 		if strings.TrimSpace(directory.Name) == "" {
 			directory.Name = filepath.Base(walk.DirPath)
 		}
+
 		directory.Expanded = make(
 			[]sessionRuntime.AttachmentReference,
 			0,
 			len(walk.Files),
 		)
 		for index := range walk.Files {
-			attachment, err := BuildAttachmentForFile(ctx, &walk.Files[index])
+			attachment, err := attachmentRuntime.BuildAttachmentForFile(
+				ctx,
+				&walk.Files[index],
+			)
 			if err != nil {
-				return sessionRuntime.AttachmentReference{},
-					fmt.Errorf(
-						"build directory attachment %q: %w",
-						walk.Files[index].Path,
-						err,
-					)
+				return sessionRuntime.AttachmentReference{}, fmt.Errorf(
+					"build directory child %q: %w",
+					walk.Files[index].Path,
+					err,
+				)
 			}
-			ensureAttachmentSnapshot(attachment, walk.Files[index])
 
+			ensureAttachmentSnapshot(attachment, walk.Files[index])
 			child, err := attachmentReferenceFromAttachment(attachment)
 			if err != nil {
 				return sessionRuntime.AttachmentReference{}, err
 			}
 			directory.Expanded = append(directory.Expanded, child)
 		}
+
 		directory.ScannedFileCount = len(directory.Expanded)
 		directory.HasMore = walk.HasMore
 		reference.Directory = &directory
 		return reference, nil
 
 	default:
-		return sessionRuntime.AttachmentReference{},
-			fmt.Errorf("unsupported attachment reference kind %q", reference.Kind)
+		return sessionRuntime.AttachmentReference{}, fmt.Errorf(
+			"unsupported attachment reference kind %q",
+			reference.Kind,
+		)
 	}
 }
 
@@ -219,20 +232,29 @@ func prepareLocalReference(
 ) (sessionRuntime.AttachmentReference, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return sessionRuntime.AttachmentReference{},
-			errors.New("local attachment reference has an empty path")
+		return sessionRuntime.AttachmentReference{}, errors.New(
+			"local attachment reference has an empty path",
+		)
 	}
 
-	stat, err := llmtoolsutil.StatPath(ctx, fstool.StatPathArgs{Path: path})
+	stat, err := llmtoolsutil.StatPath(
+		ctx,
+		fstool.StatPathArgs{Path: path},
+	)
 	if err != nil {
 		return sessionRuntime.AttachmentReference{}, err
 	}
-	if stat == nil || !stat.Exists || stat.IsDir || stat.ModTime == nil {
-		return sessionRuntime.AttachmentReference{},
-			fmt.Errorf("local attachment %q is not a readable regular file", path)
+	if stat == nil ||
+		!stat.Exists ||
+		stat.IsDir ||
+		stat.ModTime == nil {
+		return sessionRuntime.AttachmentReference{}, fmt.Errorf(
+			"local attachment %q is not a readable regular file",
+			path,
+		)
 	}
 
-	pathInfo := PathInfo{
+	pathInfo := attachmentRuntime.PathInfo{
 		Path:    stat.Path,
 		Name:    stat.Name,
 		Exists:  stat.Exists,
@@ -240,51 +262,71 @@ func prepareLocalReference(
 		Size:    stat.SizeBytes,
 		ModTime: cloneAttachmentTime(stat.ModTime),
 	}
-	attachment, err := BuildAttachmentForFile(ctx, &pathInfo)
+	attachment, err := attachmentRuntime.BuildAttachmentForFile(
+		ctx,
+		&pathInfo,
+	)
 	if err != nil {
 		return sessionRuntime.AttachmentReference{}, err
 	}
-	ensureAttachmentSnapshot(attachment, pathInfo)
 
+	ensureAttachmentSnapshot(attachment, pathInfo)
 	output, err := attachmentReferenceFromAttachment(attachment)
 	if err != nil {
 		return sessionRuntime.AttachmentReference{}, err
 	}
-	copyAttachmentReferencePresentation(&output, reference)
+	copyAttachmentPresentation(&output, reference)
 	return output, nil
 }
 
-func copyAttachmentReferencePresentation(
+func copyAttachmentPresentation(
 	output *sessionRuntime.AttachmentReference,
 	input sessionRuntime.AttachmentReference,
 ) {
 	if output == nil {
 		return
 	}
+
 	if strings.TrimSpace(input.Label) != "" {
 		output.Label = input.Label
 	}
-	if strings.TrimSpace(input.Mode) != "" {
-		output.Mode = input.Mode
-	}
-	if len(input.AvailableModes) != 0 {
-		output.AvailableModes = append(
-			[]string(nil),
-			input.AvailableModes...,
-		)
+
+	requestedMode := strings.TrimSpace(input.Mode)
+	if attachmentReferenceAllowsMode(*output, requestedMode) {
+		output.Mode = requestedMode
 	}
 }
 
-func ensureAttachmentSnapshot(attachment *Attachment, info PathInfo) {
+// attachmentReferenceAllowsMode preserves a user mode choice only when it was
+// offered by canonical backend type detection. AvailableModes is always
+// backend-owned; callers cannot widen it through persisted presentation data.
+func attachmentReferenceAllowsMode(
+	reference sessionRuntime.AttachmentReference,
+	mode string,
+) bool {
+	for _, available := range reference.AvailableModes {
+		if mode != "" && mode == available {
+			return true
+		}
+	}
+	return false
+}
+
+func ensureAttachmentSnapshot(
+	attachment *attachmentRuntime.Attachment,
+	info attachmentRuntime.PathInfo,
+) {
 	if attachment == nil || info.ModTime == nil {
 		return
 	}
+
 	if attachment.FileRef != nil &&
 		strings.TrimSpace(attachment.FileRef.OrigPath) == "" {
 		attachment.FileRef.OrigPath = info.Path
 		attachment.FileRef.OrigSize = info.Size
 		attachment.FileRef.OrigModTime = *info.ModTime
 	}
+
 	if attachment.ImageRef != nil &&
 		strings.TrimSpace(attachment.ImageRef.OrigPath) == "" {
 		attachment.ImageRef.OrigPath = info.Path
@@ -293,15 +335,23 @@ func ensureAttachmentSnapshot(attachment *Attachment, info PathInfo) {
 	}
 }
 
-func (m *JSONReferenceMaterializer) materializeReference(
+func (m *referenceMaterializer) materializeReference(
 	reference sessionRuntime.AttachmentReference,
-) ([]Attachment, error) {
+) ([]attachmentRuntime.Attachment, error) {
 	switch reference.Kind {
 	case sessionRuntime.AttachmentReferenceDirectory:
-		if reference.Directory == nil || len(reference.Directory.Expanded) == 0 {
-			return nil, errors.New("directory attachment was not expanded at submission time")
+		if reference.Directory == nil ||
+			len(reference.Directory.Expanded) == 0 {
+			return nil, errors.New(
+				"directory attachment was not expanded at submission time",
+			)
 		}
-		output := make([]Attachment, 0, len(reference.Directory.Expanded))
+
+		output := make(
+			[]attachmentRuntime.Attachment,
+			0,
+			len(reference.Directory.Expanded),
+		)
 		for index := range reference.Directory.Expanded {
 			children, err := m.materializeReference(
 				reference.Directory.Expanded[index],
@@ -321,6 +371,7 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if reference.File == nil || reference.File.IsDirectory {
 			return nil, errors.New("invalid file attachment reference")
 		}
+
 		modifiedAt, err := parseReferenceTime(reference.File.ModifiedAt)
 		if err != nil {
 			return nil, err
@@ -329,16 +380,23 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if err != nil {
 			return nil, err
 		}
+
 		originalMod := time.Time{}
 		if originalModTime != nil {
 			originalMod = *originalModTime
 		}
-		return []Attachment{{
-			Kind:                       AttachmentFile,
-			Label:                      reference.Label,
-			Mode:                       referenceMode(reference.Mode, AttachmentContentBlockModeText),
-			AvailableContentBlockModes: referenceModes(reference.AvailableModes),
-			FileRef: &FileRef{
+
+		return []attachmentRuntime.Attachment{{
+			Kind:  attachmentRuntime.AttachmentFile,
+			Label: reference.Label,
+			Mode: referenceMode(
+				reference.Mode,
+				attachmentRuntime.AttachmentContentBlockModeText,
+			),
+			AvailableContentBlockModes: referenceModes(
+				reference.AvailableModes,
+			),
+			FileRef: &attachmentRuntime.FileRef{
 				Path:        reference.File.Path,
 				Name:        reference.File.Name,
 				Exists:      reference.File.Exists,
@@ -355,6 +413,7 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if reference.Image == nil || reference.Image.IsDirectory {
 			return nil, errors.New("invalid image attachment reference")
 		}
+
 		modifiedAt, err := parseReferenceTime(reference.Image.ModifiedAt)
 		if err != nil {
 			return nil, err
@@ -363,16 +422,23 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if err != nil {
 			return nil, err
 		}
+
 		originalMod := time.Time{}
 		if originalModTime != nil {
 			originalMod = *originalModTime
 		}
-		return []Attachment{{
-			Kind:                       AttachmentImage,
-			Label:                      reference.Label,
-			Mode:                       referenceMode(reference.Mode, AttachmentContentBlockModeImage),
-			AvailableContentBlockModes: referenceModes(reference.AvailableModes),
-			ImageRef: &ImageRef{
+
+		return []attachmentRuntime.Attachment{{
+			Kind:  attachmentRuntime.AttachmentImage,
+			Label: reference.Label,
+			Mode: referenceMode(
+				reference.Mode,
+				attachmentRuntime.AttachmentContentBlockModeImage,
+			),
+			AvailableContentBlockModes: referenceModes(
+				reference.AvailableModes,
+			),
+			ImageRef: &attachmentRuntime.ImageRef{
 				Path:        reference.Image.Path,
 				Name:        reference.Image.Name,
 				Exists:      reference.Image.Exists,
@@ -382,7 +448,7 @@ func (m *JSONReferenceMaterializer) materializeReference(
 				Width:       reference.Image.Width,
 				Height:      reference.Image.Height,
 				Format:      reference.Image.Format,
-				MIMEType:    MIMEType(reference.Image.MIMEType),
+				MIMEType:    attachmentRuntime.MIMEType(reference.Image.MIMEType),
 				OrigPath:    reference.Image.OriginalPath,
 				OrigSize:    reference.Image.OriginalSize,
 				OrigModTime: originalMod,
@@ -393,12 +459,18 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if reference.URL == nil {
 			return nil, errors.New("invalid URL attachment reference")
 		}
-		return []Attachment{{
-			Kind:                       AttachmentURL,
-			Label:                      reference.Label,
-			Mode:                       referenceMode(reference.Mode, AttachmentContentBlockModePageContent),
-			AvailableContentBlockModes: referenceModes(reference.AvailableModes),
-			URLRef: &URLRef{
+
+		return []attachmentRuntime.Attachment{{
+			Kind:  attachmentRuntime.AttachmentURL,
+			Label: reference.Label,
+			Mode: referenceMode(
+				reference.Mode,
+				attachmentRuntime.AttachmentContentBlockModePageContent,
+			),
+			AvailableContentBlockModes: referenceModes(
+				reference.AvailableModes,
+			),
+			URLRef: &attachmentRuntime.URLRef{
 				URL:            reference.URL.URL,
 				Normalized:     reference.URL.Normalized,
 				OrigNormalized: reference.URL.Original,
@@ -409,11 +481,12 @@ func (m *JSONReferenceMaterializer) materializeReference(
 		if reference.Generic == nil {
 			return nil, errors.New("invalid generic attachment reference")
 		}
-		return []Attachment{{
-			Kind:  AttachmentDocIndex,
+
+		return []attachmentRuntime.Attachment{{
+			Kind:  attachmentRuntime.AttachmentDocIndex,
 			Label: reference.Label,
-			Mode:  AttachmentContentBlockModeTextLink,
-			GenericRef: &GenericRef{
+			Mode:  attachmentRuntime.AttachmentContentBlockModeTextLink,
+			GenericRef: &attachmentRuntime.GenericRef{
 				Handle:     reference.Generic.Handle,
 				OrigHandle: reference.Generic.OriginalHandle,
 			},
@@ -428,25 +501,30 @@ func (m *JSONReferenceMaterializer) materializeReference(
 }
 
 func attachmentReferenceFromAttachment(
-	attachment *Attachment,
+	attachment *attachmentRuntime.Attachment,
 ) (sessionRuntime.AttachmentReference, error) {
 	if attachment == nil {
-		return sessionRuntime.AttachmentReference{},
-			errors.New("cannot persist a nil attachment")
+		return sessionRuntime.AttachmentReference{}, errors.New(
+			"cannot persist a nil attachment",
+		)
 	}
 
 	output := sessionRuntime.AttachmentReference{
-		Label:          attachment.Label,
-		Mode:           string(attachment.Mode),
-		AvailableModes: attachmentModeStrings(attachment.AvailableContentBlockModes),
+		Label: attachment.Label,
+		Mode:  string(attachment.Mode),
+		AvailableModes: attachmentModeStrings(
+			attachment.AvailableContentBlockModes,
+		),
 	}
 
 	switch attachment.Kind {
-	case AttachmentFile:
+	case attachmentRuntime.AttachmentFile:
 		if attachment.FileRef == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("file attachment has no file reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"file attachment has no file reference",
+			)
 		}
+
 		ref := attachment.FileRef
 		output.Kind = sessionRuntime.AttachmentReferenceFile
 		output.File = &sessionRuntime.LocalAttachmentReference{
@@ -462,11 +540,13 @@ func attachmentReferenceFromAttachment(
 		}
 		return output, nil
 
-	case AttachmentImage:
+	case attachmentRuntime.AttachmentImage:
 		if attachment.ImageRef == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("image attachment has no image reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"image attachment has no image reference",
+			)
 		}
+
 		ref := attachment.ImageRef
 		output.Kind = sessionRuntime.AttachmentReferenceImage
 		output.Image = &sessionRuntime.LocalAttachmentReference{
@@ -486,11 +566,13 @@ func attachmentReferenceFromAttachment(
 		}
 		return output, nil
 
-	case AttachmentURL:
+	case attachmentRuntime.AttachmentURL:
 		if attachment.URLRef == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("URL attachment has no URL reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"URL attachment has no URL reference",
+			)
 		}
+
 		ref := attachment.URLRef
 		output.Kind = sessionRuntime.AttachmentReferenceURL
 		output.URL = &sessionRuntime.URLAttachmentReference{
@@ -500,11 +582,15 @@ func attachmentReferenceFromAttachment(
 		}
 		return output, nil
 
-	case AttachmentDocIndex, AttachmentPR, AttachmentCommit:
+	case attachmentRuntime.AttachmentDocIndex,
+		attachmentRuntime.AttachmentPR,
+		attachmentRuntime.AttachmentCommit:
 		if attachment.GenericRef == nil {
-			return sessionRuntime.AttachmentReference{},
-				errors.New("generic attachment has no generic reference")
+			return sessionRuntime.AttachmentReference{}, errors.New(
+				"generic attachment has no generic reference",
+			)
 		}
+
 		ref := attachment.GenericRef
 		output.Kind = sessionRuntime.AttachmentReferenceGeneric
 		output.Generic = &sessionRuntime.GenericAttachmentReference{
@@ -514,22 +600,27 @@ func attachmentReferenceFromAttachment(
 		return output, nil
 
 	default:
-		return sessionRuntime.AttachmentReference{},
-			fmt.Errorf("attachment kind %q cannot be persisted as a local reference",
-				attachment.Kind,
-			)
+		return sessionRuntime.AttachmentReference{}, fmt.Errorf(
+			"attachment kind %q cannot be persisted",
+			attachment.Kind,
+		)
 	}
 }
 
 func parseReferenceTime(value string) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		//nolint:nilnil // Ok.
+		//nolint:nilnil // Empty persisted timestamps represent omitted optional metadata.
 		return nil, nil
 	}
+
 	parsed, err := time.Parse(time.RFC3339Nano, value)
 	if err != nil {
-		return nil, fmt.Errorf("invalid attachment timestamp %q: %w", value, err)
+		return nil, fmt.Errorf(
+			"invalid attachment timestamp %q: %w",
+			value,
+			err,
+		)
 	}
 	parsed = parsed.UTC()
 	return &parsed, nil
@@ -559,35 +650,46 @@ func formatReferenceTimeValue(value time.Time) string {
 
 func referenceMode(
 	value string,
-	fallback AttachmentContentBlockMode,
-) AttachmentContentBlockMode {
+	fallback attachmentRuntime.AttachmentContentBlockMode,
+) attachmentRuntime.AttachmentContentBlockMode {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback
 	}
-	return AttachmentContentBlockMode(value)
+	return attachmentRuntime.AttachmentContentBlockMode(value)
 }
 
-func referenceModes(values []string) []AttachmentContentBlockMode {
+func referenceModes(
+	values []string,
+) []attachmentRuntime.AttachmentContentBlockMode {
 	if len(values) == 0 {
 		return nil
 	}
-	output := make([]AttachmentContentBlockMode, 0, len(values))
+
+	output := make(
+		[]attachmentRuntime.AttachmentContentBlockMode,
+		0,
+		len(values),
+	)
 	for _, value := range values {
 		value = strings.TrimSpace(value)
 		if value != "" {
-			output = append(output, AttachmentContentBlockMode(value))
+			output = append(
+				output,
+				attachmentRuntime.AttachmentContentBlockMode(value),
+			)
 		}
 	}
 	return output
 }
 
 func attachmentModeStrings(
-	values []AttachmentContentBlockMode,
+	values []attachmentRuntime.AttachmentContentBlockMode,
 ) []string {
 	if len(values) == 0 {
 		return nil
 	}
+
 	output := make([]string, 0, len(values))
 	for _, value := range values {
 		if value != "" {

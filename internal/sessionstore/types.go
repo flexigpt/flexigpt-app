@@ -2,25 +2,37 @@ package sessionstore
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 )
 
-type SchemaVersion string
+type (
+	SchemaVersion string
+	FileExtension string
+)
 
-type FileExtension string
-
-func (e FileExtension) String() string {
-	return string(e)
+func (extension FileExtension) String() string {
+	return string(extension)
 }
 
 const (
-	SessionSchemaVersion SchemaVersion = "v1"
-	SessionFileExtension FileExtension = "json"
+	SessionSchemaVersion SchemaVersion = "session-runtime/v2"
+	SessionFileExtension FileExtension = "session"
 
 	DefaultPageSize = 12
 	MaxPageSize     = 256
+
+	maximumDocumentBytes      = 32 << 20
+	maximumJSONValueBytes     = 2 << 20
+	maximumTranscriptMessages = 100_000
+	maximumAssociatedRuns     = 10_000
+	maximumAttachmentDepth    = 8
+
+	indexFileExtension = "sessionindex"
+	documentDirectory  = "documents"
+	indexDirectory     = "index"
 )
 
 var (
@@ -28,7 +40,29 @@ var (
 	ErrRunNotFound      = errors.New("session store run not found")
 	ErrFTSDisabled      = errors.New("session store full-text search is disabled")
 	ErrUnsupportedStore = errors.New("unsupported session store document")
+	ErrInvalidDocument  = errors.New("invalid session store document")
+	ErrStoreClosed      = errors.New("session store is closed")
+	ErrSessionRetired   = errors.New("session ID was durably deleted")
 )
+
+type PersistenceError struct {
+	SessionID sessionRuntime.SessionID
+	Operation string
+	Cause     error
+}
+
+func (failure PersistenceError) Error() string {
+	return fmt.Sprintf(
+		"session persistence %s failed for %q: %v",
+		failure.Operation,
+		failure.SessionID,
+		failure.Cause,
+	)
+}
+
+func (failure PersistenceError) Unwrap() error {
+	return failure.Cause
+}
 
 type ListSessionsRequest struct {
 	PageToken string `json:"pageToken,omitempty"`
@@ -83,12 +117,36 @@ type RunListItem struct {
 	Outcome          *sessionRuntime.RunOutcome `json:"outcome,omitempty"`
 }
 
+type documentKind string
+
+const (
+	documentKindSession documentKind = "session"
+	documentKindDeleted documentKind = "deleted"
+)
+
+type deletionRecord struct {
+	SessionID sessionRuntime.SessionID `json:"sessionID"`
+	DeletedAt time.Time                `json:"deletedAt"`
+}
+
+// storedSession is a new persistence envelope. A deletion record is a durable
+// write barrier, not an executable Session or an additional runtime state root.
+type storedSession struct {
+	SchemaVersion SchemaVersion           `json:"schemaVersion"`
+	Kind          documentKind            `json:"kind"`
+	Session       *sessionRuntime.Session `json:"session,omitempty"`
+	Runs          []sessionRuntime.Run    `json:"runs,omitempty"`
+	Deletion      *deletionRecord         `json:"deletion,omitempty"`
+}
+
+type sessionIndexRecord struct {
+	SchemaVersion SchemaVersion   `json:"schemaVersion"`
+	Item          SessionListItem `json:"item"`
+}
+
 func normalizedPageSize(value int) int {
 	if value <= 0 {
 		return DefaultPageSize
 	}
-	if value > MaxPageSize {
-		return MaxPageSize
-	}
-	return value
+	return min(value, MaxPageSize)
 }

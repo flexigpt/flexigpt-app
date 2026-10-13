@@ -7,7 +7,6 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -42,45 +41,37 @@ func (a *RuntimeAdapter) ResolveRuntimeModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (RuntimeConfiguration, error) {
-	return a.ResolveRuntimeConfiguration(
-		ctx,
-		inferenceRuntimeSpec.RuntimeModelRequest{Model: ref},
-	)
+	value, _, err := a.ResolveRuntimeModelWithRequestPatch(ctx, ref, nil)
+	return value, err
 }
 
 func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-	requestPatch *inferenceRuntimeSpec.RuntimeRequestPatch,
-) (RuntimeConfiguration, error) {
-	return a.ResolveRuntimeConfiguration(
-		ctx,
-		inferenceRuntimeSpec.RuntimeModelRequest{
-			Model:        ref,
-			RequestPatch: requestPatch,
-		},
-	)
-}
-
-// ResolveRuntimeConfiguration implements the inference consumer capability.
-// Completion supplies the typed request and owns only execution/transport.
-func (a *RuntimeAdapter) ResolveRuntimeConfiguration(
-	ctx context.Context,
-	request inferenceRuntimeSpec.RuntimeModelRequest,
-) (RuntimeConfiguration, error) {
-	prepared, err := prepareRuntimeRequestPatch(request.RequestPatch)
+	requestPatch *RuntimeRequestPatch,
+) (RuntimeConfiguration, *RuntimeModelUse, error) {
+	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, nil, err
 	}
 	store, err := a.modelStore()
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, nil, err
 	}
-	resolved, err := store.ResolveModel(ctx, request.Model)
+	resolved, err := store.ResolveModel(ctx, ref)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, nil, err
 	}
-	return a.resolveRuntime(ctx, resolved, prepared)
+	value, err := a.resolveRuntime(ctx, resolved, prepared)
+	if err != nil {
+		return RuntimeConfiguration{}, nil, err
+	}
+	return value, &RuntimeModelUse{
+		RootID:     string(resolved.Model.Artifact.RootID),
+		ArtifactID: string(resolved.Model.Artifact.ID),
+		Revision:   resolved.Model.Artifact.Revision,
+		Digest:     string(resolved.Model.Definition.Digest),
+	}, nil
 }
 
 // ResolveRuntimeModelTarget handles source-backed Model capability targets.

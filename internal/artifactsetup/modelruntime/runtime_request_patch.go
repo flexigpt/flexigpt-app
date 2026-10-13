@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -18,7 +17,7 @@ const runtimeRequestPatchDigestDomain = "flexigpt.spec.runtime-request-patch/v1"
 // Only prepareRuntimeRequestPatch constructs non-empty values.
 type preparedRuntimeRequestPatch struct {
 	defaults map[string]any
-	clear    []inferenceRuntimeSpec.RuntimeDefaultField
+	clear    []RuntimeDefaultField
 	digest   cryptoutil.Digest
 }
 
@@ -26,7 +25,7 @@ type preparedRuntimeRequestPatch struct {
 // It validates the typed defaults, converts them to the merge representation,
 // and computes their configuration digest.
 func prepareRuntimeRequestPatch(
-	patch *inferenceRuntimeSpec.RuntimeRequestPatch,
+	patch *RuntimeRequestPatch,
 ) (preparedRuntimeRequestPatch, error) {
 	if patch == nil {
 		return preparedRuntimeRequestPatch{}, nil
@@ -81,14 +80,14 @@ func prepareRuntimeRequestPatch(
 }
 
 func normalizeRuntimeDefaultFields(
-	fields []inferenceRuntimeSpec.RuntimeDefaultField,
-) ([]inferenceRuntimeSpec.RuntimeDefaultField, error) {
+	fields []RuntimeDefaultField,
+) ([]RuntimeDefaultField, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
 
-	output := make([]inferenceRuntimeSpec.RuntimeDefaultField, len(fields))
-	seen := make(map[inferenceRuntimeSpec.RuntimeDefaultField]struct{}, len(fields))
+	output := make([]RuntimeDefaultField, len(fields))
+	seen := make(map[RuntimeDefaultField]struct{}, len(fields))
 	for index, field := range fields {
 		if err := field.Validate(); err != nil {
 			return nil, err
@@ -108,7 +107,7 @@ func normalizeRuntimeDefaultFields(
 
 func runtimeRequestPatchDigest(
 	canonicalDefaults []byte,
-	clearFields []inferenceRuntimeSpec.RuntimeDefaultField,
+	clearFields []RuntimeDefaultField,
 ) cryptoutil.Digest {
 	input := make(
 		[]byte,

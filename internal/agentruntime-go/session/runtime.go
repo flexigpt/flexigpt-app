@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -124,8 +123,23 @@ func NewRuntime(
 	dependencies RuntimeDependencies,
 	options ...RuntimeOption,
 ) (*Runtime, error) {
-	if dependencies.Model == nil {
+	switch {
+	case dependencies.Preparation == nil:
+		return nil, errors.New("session runtime requires a submission preparer")
+	case dependencies.Operations == nil:
+		return nil, errors.New("session runtime requires an operation preparer")
+	case dependencies.Model == nil:
 		return nil, errors.New("session runtime requires a model executor")
+	case dependencies.Tools == nil:
+		return nil, errors.New("session runtime requires a Tool executor")
+	case dependencies.Skills == nil:
+		return nil, errors.New("session runtime requires a Skill session controller")
+	case dependencies.Apps == nil:
+		return nil, errors.New("session runtime requires an App executor")
+	case dependencies.Diagnostics == nil:
+		return nil, errors.New("session runtime requires a diagnostic sink")
+	case dependencies.Attachments == nil:
+		return nil, errors.New("session runtime requires an attachment preparer")
 	}
 
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
@@ -491,10 +505,6 @@ func (r *Runtime) checkpointLocked(
 	sessionValue *Session,
 	run *Run,
 ) {
-	if r.deps.Checkpoints == nil {
-		return
-	}
-
 	view := RuntimeCheckpointView{
 		Reason:    reason,
 		Session:   cloneJSON(*sessionValue),
@@ -592,8 +602,13 @@ func (r *Runtime) publishEvent(
 ) {
 	r.mu.RLock()
 	publisher := r.deps.Events
-
+	subscribers := make([]chan RuntimeEvent, 0, len(r.subscribers))
 	for _, subscriber := range r.subscribers {
+		subscribers = append(subscribers, subscriber)
+	}
+	r.mu.RUnlock()
+
+	for _, subscriber := range subscribers {
 		select {
 		case subscriber <- event:
 		default:
@@ -606,7 +621,6 @@ func (r *Runtime) publishEvent(
 			})
 		}
 	}
-	r.mu.RUnlock()
 
 	if publisher != nil {
 		f := func() {
@@ -632,10 +646,6 @@ func (r *Runtime) handleCheckpoint(
 	ctx context.Context,
 	checkpoint RuntimeCheckpointView,
 ) {
-	if r.deps.Checkpoints == nil {
-		return
-	}
-
 	r.launchEffect(func() {
 		checkpointCtx := context.WithoutCancel(ctx)
 		sink := r.deps.Checkpoints
@@ -660,7 +670,7 @@ func (r *Runtime) handleSessionDeletion(
 	sessionID SessionID,
 ) {
 	deletionSink, ok := r.deps.Checkpoints.(SessionDeletionSink)
-	if !ok || deletionSink == nil {
+	if !ok {
 		return
 	}
 
@@ -685,17 +695,6 @@ func (r *Runtime) reportDiagnostic(
 	diagnostic RuntimeDiagnostic,
 ) {
 	sink := r.deps.Diagnostics
-	if sink == nil {
-		slog.Warn(
-			"session runtime diagnostic",
-			"sessionID", diagnostic.SessionID,
-			"runID", diagnostic.RunID,
-			"operation", diagnostic.Operation,
-			"message", diagnostic.Message,
-			"cause", diagnostic.Cause,
-		)
-		return
-	}
 	// A panicking diagnostic sink must not create an infinite sequence of
 	// diagnostic-dispatch panics. The common boundary still logs its stack.
 	r.launchEffectWithFailure(
@@ -796,6 +795,10 @@ func (r runtimeRestorer) RestoreRun(
 
 	copyValue := cloneJSON(runValue)
 	normalizeRecoveredRun(&copyValue, r.runtime.now())
+	for index := range copyValue.Apps {
+		copyValue.Apps[index].Route = nil
+		copyValue.Apps[index].UnavailableReason = "App runtime route is unavailable after recovery"
+	}
 
 	if _, found := r.runtime.runs[copyValue.ID]; found {
 		return fmt.Errorf("recovery run %q is duplicated", copyValue.ID)

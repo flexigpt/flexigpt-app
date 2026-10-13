@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -67,8 +67,16 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	adapter, runtimeService := newSkillRuntimeAdapter(t, fixture)
 	requireNoError(t, adapter.SyncRootCatalog(ctx, topology.UserRootID()))
 
-	initial, err := resolveWorkflowSkill(ctx, adapter, created.Artifact.Ref())
+	requestedArtifacts := []artifactModel.ArtifactRef{
+		created.Artifact.Ref(),
+	}
+	selected, err := adapter.ResolveSkills(ctx, requestedArtifacts)
 	requireNoError(t, err)
+	if len(selected.Values) != 1 {
+		t.Fatalf("resolved Skills=%d, want 1", len(selected.Values))
+	}
+
+	initial := selected.Values[0]
 	if !initial.Enabled || initial.Artifact != created.Artifact.Ref() {
 		t.Fatalf("unexpected initial resolution: %+v", initial)
 	}
@@ -76,29 +84,25 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatalf("Skill name=%q, want %q", initial.Definition.Name, skillName)
 	}
 
-	sessionID := newWorkflowSkillSession(t, runtimeService)
-	request := inferenceRuntimeSpec.SkillSessionRequest{
-		SessionID: sessionID,
-		Artifacts: []artifactModel.ArtifactRef{created.Artifact.Ref()},
-	}
-	session, err := adapter.ResolveSkillSession(ctx, request)
+	sessionID := newWorkflowSkillSession(
+		t,
+		runtimeService,
+		agentskillsRuntime.WithSessionAllowedSkills(selected.Definitions),
+	)
+	prompt, err := runtimeService.SkillsPrompt(
+		ctx,
+		&agentskillsRuntime.SkillFilter{
+			AllowSkills: selected.Definitions,
+			SessionID:   sessionID,
+			Activity:    agentskillsRuntimeSpec.SkillActivityAny,
+		},
+	)
 	requireNoError(t, err)
-	if !artifactRefSetEquals(session.AvailableArtifacts, request.Artifacts) {
-		t.Fatalf("available refs=%+v, want %+v", session.AvailableArtifacts, request.Artifacts)
-	}
-	if !strings.Contains(session.Prompt, skillName) {
-		t.Fatalf("prompt does not mention Skill %q: %q", skillName, session.Prompt)
-	}
-	if session.RulesPrompt == "" {
-		t.Fatal("Skill rules prompt is empty")
-	}
-	if len(session.ToolChoices) != 1 || session.ToolChoices[0].Name != "skills-load" {
-		t.Fatalf("inactive session tools=%+v, want only skills-load", session.ToolChoices)
+	if !strings.Contains(prompt, skillName) {
+		t.Fatalf("prompt does not mention Skill %q: %q", skillName, prompt)
 	}
 
-	_, err = adapter.ResolveSkillSession(ctx, inferenceRuntimeSpec.SkillSessionRequest{
-		SessionID: sessionID,
-	})
+	_, err = adapter.ResolveSkills(ctx, nil)
 	if !errors.Is(err, skillruntime.ErrArtifactSkillSelectionRequired) {
 		t.Fatalf("empty selection error=%v, want selection required", err)
 	}
@@ -197,12 +201,23 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatal("replacement revision was not registered")
 	}
 
-	session, err = adapter.ResolveSkillSession(ctx, request)
+	selected, err = adapter.ResolveSkills(ctx, requestedArtifacts)
 	requireNoError(t, err)
-	if !artifactRefSetEquals(session.AvailableArtifacts, request.Artifacts) {
-		t.Fatalf("refs after replacement=%+v, want %+v", session.AvailableArtifacts, request.Artifacts)
+	if len(selected.Values) != 1 ||
+		selected.Values[0].Artifact != created.Artifact.Ref() {
+		t.Fatalf("unexpected replacement resolution: %+v", selected.Values)
 	}
-	if !strings.Contains(session.Prompt, skillName) {
+
+	prompt, err = runtimeService.SkillsPrompt(
+		ctx,
+		&agentskillsRuntime.SkillFilter{
+			AllowSkills: selected.Definitions,
+			SessionID:   sessionID,
+			Activity:    agentskillsRuntimeSpec.SkillActivityAny,
+		},
+	)
+	requireNoError(t, err)
+	if !strings.Contains(prompt, skillName) {
 		t.Fatalf("replacement prompt does not mention Skill %q", skillName)
 	}
 }
@@ -242,10 +257,14 @@ func newSkillRuntimeAdapter(
 func newWorkflowSkillSession(
 	t *testing.T,
 	runtimeService *skillRuntime.Service,
+	options ...agentskillsRuntime.SessionOption,
 ) agentskillsRuntimeSpec.SessionID {
 	t.Helper()
 
-	sessionID, _, err := runtimeService.NewSession(t.Context())
+	sessionID, _, err := runtimeService.NewSession(
+		t.Context(),
+		options...,
+	)
 	requireNoError(t, err)
 	t.Cleanup(func() {
 		if err := runtimeService.CloseSession(

@@ -509,6 +509,14 @@ func (r *Runtime) StartRun(
 	if command.Configuration != nil {
 		effectiveConfiguration = cloneJSON(*command.Configuration)
 	}
+
+	plannedRunID := command.RunID
+	if plannedRunID == "" {
+		plannedRunID = RunID(r.newID())
+	}
+	plannedOperationID := OperationID(r.newID())
+	plannedMessageID := r.newID()
+	transcriptBeforePreparation := cloneJSON(sessionValue.Transcript)
 	sessionRevisionBeforePreparation := sessionValue.Revision
 
 	r.mu.Unlock()
@@ -517,8 +525,22 @@ func (r *Runtime) StartRun(
 		command.SessionID,
 		effectiveConfiguration,
 		command.Input,
+		plannedOperationID,
 		persistConfiguration,
 	)
+	var initial initialModelOperation
+	if preparationErr == nil {
+		initial, preparationErr = r.prepareInitialModelOperation(
+			ctx,
+			command.SessionID,
+			plannedRunID,
+			plannedOperationID,
+			plannedMessageID,
+			prepared.Configuration,
+			transcriptBeforePreparation,
+			prepared.Input,
+		)
+	}
 	r.mu.Lock()
 
 	if r.closed {
@@ -597,7 +619,7 @@ func (r *Runtime) StartRun(
 	receipt, startErr := r.startRunLocked(
 		sessionValue,
 		command.Meta.ID,
-		command.RunID,
+		initial,
 		prepared.Input,
 		runConfiguration,
 		command.Limits,
@@ -744,6 +766,7 @@ func (r *Runtime) UpdateContinuationInput(
 			MCPAppContext: command.Input.MCPAppContext,
 			Metadata:      command.Input.Metadata,
 		},
+		"",
 		false,
 	)
 	r.mu.Lock()
@@ -811,7 +834,7 @@ func (r *Runtime) UpdateContinuationInput(
 	input := cloneJSON(command.Input)
 	input.Text = prepared.Input.Text
 	input.Attachments = prepared.Input.Attachments
-	input.MCPAppContext = cloneRaw(prepared.Input.MCPAppContext)
+	input.MCPAppContext = prepared.Input.MCPAppContext
 	input.Metadata = cloneRaw(prepared.Input.Metadata)
 	if command.Input.Configuration != nil {
 		input.Configuration = &prepared.Configuration
@@ -2102,6 +2125,10 @@ func (r *Runtime) EditAndResend(
 		revision    Revision
 		config      SessionConfiguration
 		persistConf bool
+		transcript  []TranscriptMessage
+		runID       RunID
+		operationID OperationID
+		messageID   string
 	}
 
 	// Do not hold the coordinator lock while attachment/model/tool/MCP
@@ -2135,6 +2162,13 @@ func (r *Runtime) EditAndResend(
 			snapshot.ready = true
 			snapshot.revision = sessionValue.Revision
 			snapshot.config = cloneJSON(sessionValue.Configuration)
+			snapshot.transcript = cloneJSON(sessionValue.Transcript[:index])
+			snapshot.runID = command.RunID
+			if snapshot.runID == "" {
+				snapshot.runID = RunID(r.newID())
+			}
+			snapshot.operationID = OperationID(r.newID())
+			snapshot.messageID = r.newID()
 			snapshot.persistConf = command.Configuration != nil
 			if command.Configuration != nil {
 				snapshot.config = cloneJSON(*command.Configuration)
@@ -2146,6 +2180,7 @@ func (r *Runtime) EditAndResend(
 	var (
 		prepared       PreparedSubmission
 		preparationErr error
+		initial        initialModelOperation
 	)
 	if snapshot.ready {
 		prepared, preparationErr = r.prepareSubmission(
@@ -2153,8 +2188,21 @@ func (r *Runtime) EditAndResend(
 			command.SessionID,
 			snapshot.config,
 			command.Input,
+			snapshot.operationID,
 			snapshot.persistConf,
 		)
+		if preparationErr == nil {
+			initial, preparationErr = r.prepareInitialModelOperation(
+				ctx,
+				command.SessionID,
+				snapshot.runID,
+				snapshot.operationID,
+				snapshot.messageID,
+				prepared.Configuration,
+				snapshot.transcript,
+				prepared.Input,
+			)
+		}
 	}
 
 	r.mu.Lock()
@@ -2332,7 +2380,7 @@ func (r *Runtime) EditAndResend(
 	receipt, startErr := r.startRunLocked(
 		sessionValue,
 		command.Meta.ID,
-		command.RunID,
+		initial,
 		prepared.Input,
 		runConfiguration,
 		command.Limits,
@@ -2491,7 +2539,7 @@ func expectedRevisionsMessage(
 func (r *Runtime) startRunLocked(
 	sessionValue *Session,
 	commandID CommandID,
-	requestedRunID RunID,
+	initial initialModelOperation,
 	input UserInput,
 	configuration *SessionConfiguration,
 	limits *RunLimits,
@@ -2507,10 +2555,7 @@ func (r *Runtime) startRunLocked(
 		return CommandReceipt{}, err
 	}
 
-	runID := requestedRunID
-	if runID == "" {
-		runID = RunID(r.newID())
-	}
+	runID := initial.RunID
 	if _, exists := r.runs[runID]; exists {
 		return CommandReceipt{}, fmt.Errorf("run %q already exists", runID)
 	}
@@ -2530,9 +2575,6 @@ func (r *Runtime) startRunLocked(
 	}
 
 	now := r.now()
-	enabledSkills := uniqueArtifactReferences(
-		cloneJSON(runConfiguration.InstalledSkills),
-	)
 	run := &Run{
 		ID:            runID,
 		SessionID:     sessionValue.ID,
@@ -2544,22 +2586,13 @@ func (r *Runtime) startRunLocked(
 		Configuration: runConfiguration,
 		SkillSession: SkillSessionState{
 			Generation: 1,
-			Enabled:    enabledSkills,
-			Active:     nil,
+			Enabled:    cloneJSON(initial.Prepared.EffectiveSkills),
+			Active:     cloneJSON(initial.Prepared.ActiveSkills),
 		},
 		Limits: normalizedLimits,
 	}
 
-	inputMessage := TranscriptMessage{
-		ID:            r.newID(),
-		CreatedAt:     now,
-		Role:          MessageRoleUser,
-		Status:        "accepted",
-		Text:          input.Text,
-		Attachments:   cloneJSON(input.Attachments),
-		MCPAppContext: cloneRaw(input.MCPAppContext),
-		Metadata:      cloneRaw(input.Metadata),
-	}
+	inputMessage := initial.Current
 
 	sessionValue.Transcript = append(sessionValue.Transcript, inputMessage)
 	sessionValue.RunIDs = append(sessionValue.RunIDs, runID)
@@ -2596,7 +2629,9 @@ func (r *Runtime) startRunLocked(
 		sessionValue,
 		run,
 		commandID,
+		initial.OperationID,
 		inputMessage.ID,
+		&initial.Prepared,
 		effects,
 	)
 	if err != nil {
@@ -2630,7 +2665,9 @@ func (r *Runtime) startModelOperationLocked(
 	sessionValue *Session,
 	run *Run,
 	commandID CommandID,
+	requestedOperationID OperationID,
 	currentMessageID string,
+	prepared *OperationPreparation,
 	effects *runtimeEffects,
 ) (runtimeWork, error) {
 	if run.Limits.MaxModelOperations > 0 &&
@@ -2654,7 +2691,10 @@ func (r *Runtime) startModelOperationLocked(
 		currentMessageID,
 		run.Configuration.History,
 	)
-	operationID := OperationID(r.newID())
+	operationID := requestedOperationID
+	if operationID == "" {
+		operationID = OperationID(r.newID())
+	}
 	operation := ModelOperation{
 		ID:    operationID,
 		State: OperationStateQueued,
@@ -2664,6 +2704,12 @@ func (r *Runtime) startModelOperationLocked(
 			Current:              cloneJSON(current),
 			ContinuationRevision: run.Continuation.ConsumedRevision,
 		},
+		Preparation: OperationPreparation{
+			State: PreparationStatePending,
+		},
+	}
+	if prepared != nil {
+		operation.Preparation = cloneOperationPreparation(*prepared)
 	}
 
 	run.ModelOperations = append(run.ModelOperations, operation)
@@ -2684,6 +2730,24 @@ func (r *Runtime) startModelOperationLocked(
 		"",
 		nil,
 	)
+
+	if operation.Preparation.State == PreparationStatePrepared {
+		r.recordRunEventLocked(
+			effects,
+			sessionValue,
+			run,
+			commandID,
+			RuntimeEventModelOperationPrepared,
+			operationID,
+			"",
+			"",
+			"",
+			ModelOperationPreparedEventData{
+				Fingerprint: operation.Preparation.Fingerprint,
+				Resolution:  cloneJSON(operation.Preparation.Resolution),
+			},
+		)
+	}
 
 	return runtimeWork{
 		Kind:        workModel,
@@ -2750,7 +2814,7 @@ func (r *Runtime) beginContinuationModelLocked(
 		Text:          staged.Text,
 		Attachments:   cloneJSON(staged.Attachments),
 		ToolResults:   cloneJSON(results),
-		MCPAppContext: cloneRaw(staged.MCPAppContext),
+		MCPAppContext: staged.MCPAppContext,
 		Metadata:      cloneRaw(staged.Metadata),
 	}
 	sessionValue.Transcript = append(sessionValue.Transcript, inputMessage)
@@ -2764,7 +2828,9 @@ func (r *Runtime) beginContinuationModelLocked(
 		sessionValue,
 		run,
 		commandID,
+		"",
 		inputMessage.ID,
+		nil,
 		effects,
 	)
 	if err != nil {
@@ -3180,26 +3246,12 @@ func (r *Runtime) applyRunConfigurationLocked(
 	run *Run,
 	configuration SessionConfiguration,
 ) {
-	previousSkills := uniqueArtifactReferences(
-		cloneJSON(run.Configuration.InstalledSkills),
-	)
-	nextSkills := uniqueArtifactReferences(
-		cloneJSON(configuration.InstalledSkills),
-	)
-
 	run.Configuration = cloneJSON(configuration)
 	sessionValue.Configuration = cloneJSON(configuration)
-	if artifactReferencesEqual(previousSkills, nextSkills) {
-		return
-	}
-
 	run.SkillSession.Generation++
 	run.SkillSession.EstablishedGeneration = 0
-	run.SkillSession.Enabled = cloneJSON(nextSkills)
-	run.SkillSession.Active = filterReferences(
-		run.SkillSession.Active,
-		run.SkillSession.Enabled,
-	)
+	run.SkillSession.Enabled = nil
+	run.SkillSession.Active = nil
 	r.touchRunLocked(sessionValue, run)
 }
 

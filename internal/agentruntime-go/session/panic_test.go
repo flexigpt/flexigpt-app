@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -76,6 +77,118 @@ func (e panicTestToolExecutor) ResolveToolWait(
 	return ToolWaitResolution{
 		Status: ToolWaitResolutionApproved,
 	}, nil
+}
+
+// panicTestSubmissionPreparer preserves the accepted command intent without
+// introducing domain/runtime-setup behavior into Session-core panic tests.
+type panicTestSubmissionPreparer struct{}
+
+func (panicTestSubmissionPreparer) PrepareSubmission(
+	_ context.Context,
+	request SubmissionPreparationRequest,
+) (PreparedSubmission, error) {
+	return PreparedSubmission{
+		Configuration:        request.Configuration,
+		Input:                request.Input,
+		PersistConfiguration: request.PersistConfiguration,
+	}, nil
+}
+
+type panicTestPreparedOperation struct{}
+
+// panicTestOperationPreparer creates the minimum valid immutable preparation
+// required by Session before dispatching model work. The test Model executor
+// remains the component under test.
+type panicTestOperationPreparer struct{}
+
+func (panicTestOperationPreparer) PrepareModelOperation(
+	_ context.Context,
+	_ ModelOperationPreparationRequest,
+) (OperationPreparation, error) {
+	return OperationPreparation{
+		State:       PreparationStatePrepared,
+		Fingerprint: "panic-test-prepared-operation",
+		Private:     panicTestPreparedOperation{},
+	}, nil
+}
+
+type panicTestSkillController struct{}
+
+func (panicTestSkillController) EnsureSkillSession(
+	_ context.Context,
+	request SkillSessionRequest,
+) (SkillSessionResult, error) {
+	sessionID := request.SessionID
+	if sessionID == "" {
+		sessionID = "panic-test-skill-session"
+	}
+
+	return SkillSessionResult{
+		SessionID: sessionID,
+		Active:    request.Active,
+	}, nil
+}
+
+func (panicTestSkillController) CloseSkillSession(
+	_ context.Context,
+	_ string,
+) error {
+	return nil
+}
+
+type panicTestAppExecutor struct{}
+
+func (panicTestAppExecutor) PrepareAppTool(
+	_ context.Context,
+	_ AppToolPreparationRequest,
+) (AppToolPreparation, error) {
+	return AppToolPreparation{}, errors.New(
+		"panic test does not support app tool execution",
+	)
+}
+
+func (panicTestAppExecutor) ReadAppResource(
+	_ context.Context,
+	_ AppResourceReadRequest,
+) (AppResourceReadResult, error) {
+	return AppResourceReadResult{}, errors.New(
+		"panic test does not support app resource reads",
+	)
+}
+
+func (panicTestAppExecutor) ValidateAppContext(
+	_ context.Context,
+	_ AppContextStagingRequest,
+) (AppContextUpdate, error) {
+	return AppContextUpdate{}, errors.New(
+		"panic test does not support app context staging",
+	)
+}
+
+type panicTestAttachmentPreparer struct{}
+
+func (panicTestAttachmentPreparer) PrepareAttachments(
+	_ context.Context,
+	references []AttachmentReference,
+) ([]AttachmentReference, error) {
+	return references, nil
+}
+
+type panicTestCheckpointSink struct{}
+
+func (panicTestCheckpointSink) HandleCheckpoint(
+	_ context.Context,
+	_ RuntimeCheckpointView,
+) error {
+	return nil
+}
+
+type panicTestDiagnosticSink struct{}
+
+func (panicTestDiagnosticSink) ReportRuntimeDiagnostic(
+	_ context.Context,
+	_ RuntimeDiagnostic,
+) {
 }
 
 func TestModelPanicSettlesRunAndPreservesStream(t *testing.T) {
@@ -283,14 +396,29 @@ func newPanicTestRuntime(
 ) (*Runtime, <-chan RuntimeEvent, SessionID) {
 	t.Helper()
 
+	// The model-panic test has no Tool calls, but Runtime construction still
+	// requires a concrete executor.
+	if tools == nil {
+		tools = panicTestToolExecutor{}
+	}
+
 	runtimeValue, err := NewRuntime(RuntimeDependencies{
-		Model: model,
-		Tools: tools,
+		Preparation: panicTestSubmissionPreparer{},
+		Operations:  panicTestOperationPreparer{},
+		Model:       model,
+		Tools:       tools,
+		Skills:      panicTestSkillController{},
+		Apps:        panicTestAppExecutor{},
+		Attachments: panicTestAttachmentPreparer{},
+		Checkpoints: panicTestCheckpointSink{},
+		Diagnostics: panicTestDiagnosticSink{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(runtimeValue.Close)
+	t.Cleanup(func() {
+		runtimeValue.Close()
+	})
 
 	events, unsubscribe := runtimeValue.Subscribe(128)
 	t.Cleanup(unsubscribe)

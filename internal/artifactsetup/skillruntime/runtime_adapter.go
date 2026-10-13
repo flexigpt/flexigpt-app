@@ -10,10 +10,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/agentskills-go/provider/fs"
-	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
-
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -33,16 +30,13 @@ var ErrArtifactSkillSelectionRequired = errors.New(
 	"artifact skill selection is required",
 )
 
-var (
-	_ skillRuntime.CatalogSource       = (*RuntimeAdapter)(nil)
-	_ inferenceRuntimeSpec.SkillSource = (*RuntimeAdapter)(nil)
-)
-
 type ResolvedArtifactSkill struct {
-	Artifact   artifactModel.ArtifactRef
-	Definition provider.SkillDef
-	Version    string
-	Enabled    bool
+	Artifact         artifactModel.ArtifactRef
+	Definition       provider.SkillDef
+	Version          string
+	Revision         uint64
+	DefinitionDigest string
+	Enabled          bool
 }
 
 // ResolvedSkills is a request-owned, verified selection. Values preserve the
@@ -274,72 +268,6 @@ func (a *RuntimeAdapter) SyncRootCatalog(
 	return a.syncRoot(ctx, rootID)
 }
 
-// ResolveSkillSession prepares all completion Skill data from one verified
-// selection. Errors return no partially advertised Skill capability.
-func (a *RuntimeAdapter) ResolveSkillSession(
-	ctx context.Context,
-	request inferenceRuntimeSpec.SkillSessionRequest,
-) (inferenceRuntimeSpec.SkillSession, error) {
-	if strings.TrimSpace(string(request.SessionID)) == "" {
-		return inferenceRuntimeSpec.SkillSession{}, fmt.Errorf(
-			"%w: Skill session ID is required",
-			skillRuntime.ErrInvalidRequest,
-		)
-	}
-
-	selected, err := a.ResolveSkills(ctx, request.Artifacts)
-	if err != nil {
-		return inferenceRuntimeSpec.SkillSession{}, err
-	}
-
-	filter := agentskillsRuntime.SkillListFilter{
-		AllowSkills: selected.Definitions,
-		SessionID:   request.SessionID,
-		Activity:    agentskillsRuntimeSpec.SkillActivityAny,
-	}
-	available, err := a.runtime.ListAgentSkills(ctx, &filter)
-	if err != nil {
-		return inferenceRuntimeSpec.SkillSession{}, err
-	}
-
-	filter.Activity = agentskillsRuntimeSpec.SkillActivityActive
-	active, err := a.runtime.ListAgentSkills(ctx, &filter)
-	if err != nil {
-		return inferenceRuntimeSpec.SkillSession{}, err
-	}
-
-	activity := agentskillsRuntimeSpec.SkillActivityInactive
-	if len(active) != 0 {
-		activity = agentskillsRuntimeSpec.SkillActivityAny
-	}
-	prompt, err := a.runtime.SkillsPrompt(ctx, &agentskillsRuntime.SkillFilter{
-		AllowSkills: selected.Definitions,
-		SessionID:   request.SessionID,
-		Activity:    activity,
-	})
-	if err != nil {
-		return inferenceRuntimeSpec.SkillSession{}, err
-	}
-
-	output := inferenceRuntimeSpec.SkillSession{
-		AvailableArtifacts: selected.ArtifactRefs(available),
-		ActiveArtifacts:    selected.ArtifactRefs(active),
-		Prompt:             strings.TrimSpace(prompt),
-	}
-	if output.Prompt == "" {
-		return output, nil
-	}
-
-	includeAll := len(active) != 0
-	includeRunScript := request.IncludeRunScript && a.RunScriptsEnabled()
-	output.RulesPrompt = skillsRulesPrompt(includeAll, includeRunScript)
-	output.ToolChoices, err = buildSkillToolChoices(includeAll, includeRunScript)
-	if err != nil {
-		return inferenceRuntimeSpec.SkillSession{}, err
-	}
-	return output, nil
-}
-
 // syncRoot coalesces overlapping observations, but does not cache successful
 // observations across requests. Runtime still owns reconciliation generations.
 func (a *RuntimeAdapter) syncRoot(
@@ -469,6 +397,10 @@ func (a *RuntimeAdapter) materializeRecords(
 				storeSpec.ErrInvalid,
 			)
 		}
+		definitionDigest := ""
+		if record.ResolvedDefinition != nil {
+			definitionDigest = string(*record.ResolvedDefinition)
+		}
 
 		output = append(output, ResolvedArtifactSkill{
 			Artifact: record.Ref(),
@@ -477,8 +409,10 @@ func (a *RuntimeAdapter) materializeRecords(
 				Name:     material.Document.Name,
 				Location: material.RuntimeLocation,
 			},
-			Version: "artifact-skill:" + string(material.VersionDigest),
-			Enabled: true,
+			Version:          "artifact-skill:" + string(material.VersionDigest),
+			Revision:         record.Revision,
+			DefinitionDigest: definitionDigest,
+			Enabled:          true,
 		})
 	}
 	return output, nil

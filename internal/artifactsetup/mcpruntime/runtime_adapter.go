@@ -18,12 +18,7 @@ import (
 // OAuth tokens. Installation-secret plaintext is supplied separately through
 // serverMCPDomain.SecretResolver.
 type OAuthTokenStore interface {
-	SetMCPSecret(
-		ctx context.Context,
-		ref string,
-		value string,
-	) (hash string, nonEmpty bool, err error)
-
+	SetMCPSecret(ctx context.Context, ref, value string) (hash string, nonEmpty bool, err error)
 	DeleteSecret(ctx context.Context, ref string) error
 }
 

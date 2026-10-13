@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
@@ -90,21 +89,20 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("Plugin capability plan does not contain second Skill")
 	}
 
-	runtimeAdapter, runtimeService := newSkillRuntimeAdapter(t, fixture)
-	sessionID := newWorkflowSkillSession(t, runtimeService)
-
-	session, err := runtimeAdapter.ResolveSkillSession(
+	runtimeAdapter, _ := newSkillRuntimeAdapter(t, fixture)
+	selected, err := runtimeAdapter.ResolveSkills(
 		ctx,
-		inferenceRuntimeSpec.SkillSessionRequest{
-			SessionID: sessionID,
-			Artifacts: []artifactModel.ArtifactRef{
-				first.Artifact.Ref(),
-				second.Artifact.Ref(),
-			},
+		[]artifactModel.ArtifactRef{
+			first.Artifact.Ref(),
+			second.Artifact.Ref(),
 		},
 	)
-	refs := session.AvailableArtifacts
 	requireNoError(t, err)
+
+	refs := make([]artifactModel.ArtifactRef, 0, len(selected.Values))
+	for _, value := range selected.Values {
+		refs = append(refs, value.Artifact)
+	}
 	if !artifactRefSetEquals(
 		refs,
 		[]artifactModel.ArtifactRef{

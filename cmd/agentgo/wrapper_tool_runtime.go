@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 type ToolRuntimeWrapper struct {
@@ -26,21 +24,6 @@ func InitToolRuntimeWrapper(
 
 	wrapper.adapter = adapter
 	return nil
-}
-
-// InvokeTool is the low-level local Go Tool runtime endpoint.
-//
-// It deliberately accepts only a Go function identity. SDK Tools are not
-// local executables: normal inference flows hydrate them.
-func (w *ToolRuntimeWrapper) InvokeTool(
-	req *llmtoolsutil.InvokeRequest,
-) (*llmtoolsutil.InvokeResponse, error) {
-	return withRecoveryResp(func() (*llmtoolsutil.InvokeResponse, error) {
-		if req == nil {
-			return nil, errors.New("invalid arguments: nil request received")
-		}
-		return llmtoolsutil.Invoke(context.Background(), w.adapter, *req)
-	})
 }
 
 func (w *ToolRuntimeWrapper) close() {
