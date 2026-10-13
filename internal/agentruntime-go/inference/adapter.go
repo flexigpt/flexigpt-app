@@ -344,7 +344,7 @@ func (a *Adapter) conversationMessage(
 		// Durable Session projections deliberately clear ProtocolInputs and
 		// AttachmentsHydrated, so restored history goes through the safe
 		// snapshot-aware materialization path below.
-		if !(message.AttachmentsHydrated && len(value.Inputs) != 0) {
+		if !message.AttachmentsHydrated || len(value.Inputs) == 0 {
 			attachments, materializeErr := a.attachments.Materialize(
 				ctx,
 				message.Attachments,
@@ -825,9 +825,7 @@ func decodeOutputs(
 		mappingByName[mapping.ProviderToolName] = mapping
 	}
 
-	preparedByChoice, preparedByName := preparedToolBindingMaps(
-		preparedBindings,
-	)
+	preparedByChoice, preparedByName := preparedToolBindingMaps(preparedBindings)
 	var textBuilder strings.Builder
 	var thinkingBuilder strings.Builder
 	calls = make([]sessionRuntime.ToolCallProposal, 0)
@@ -1000,8 +998,8 @@ func buildToolCallProposal(
 func preparedToolBindingMaps(
 	values []inferenceRuntimeSpec.PreparedToolBinding,
 ) (
-	map[string]inferenceRuntimeSpec.PreparedToolBinding,
-	map[string]inferenceRuntimeSpec.PreparedToolBinding,
+	preparedByChoicemap map[string]inferenceRuntimeSpec.PreparedToolBinding,
+	preparedByName map[string]inferenceRuntimeSpec.PreparedToolBinding,
 ) {
 	byChoice := make(
 		map[string]inferenceRuntimeSpec.PreparedToolBinding,

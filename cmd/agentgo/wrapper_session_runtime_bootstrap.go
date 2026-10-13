@@ -145,7 +145,7 @@ func (r *agentgoWorkspaceSkillResolver) ResolveWorkspaceSkills(
 	)
 	if rawSelection == "" || rawSelection == "null" {
 		return sessionRuntime.WorkspaceSkillResolution{}, errors.New(
-			"Workspace Skills require a Workspace selection",
+			"workspace skills require a Workspace selection",
 		)
 	}
 
@@ -167,7 +167,7 @@ func (r *agentgoWorkspaceSkillResolver) ResolveWorkspaceSkills(
 	for _, ref := range request.RequestedWorkspaceSkills {
 		if ref.RootID == "" || ref.ArtifactID == "" {
 			return sessionRuntime.WorkspaceSkillResolution{}, errors.New(
-				"Workspace Skill Artifact reference is incomplete",
+				"workspace skill artifact reference is incomplete",
 			)
 		}
 		requested[ref.RootID+"\x00"+ref.ArtifactID] = ref

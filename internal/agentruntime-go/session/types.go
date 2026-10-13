@@ -420,11 +420,11 @@ type AutomationControls struct {
 }
 
 type SkillSessionState struct {
-	ID                  string              `json:"id,omitempty"`
-	Generation          Revision            `json:"generation"`
-	EstablishedGeneration Revision           `json:"establishedGeneration,omitempty"`
-	Enabled             []ArtifactReference `json:"enabled,omitempty"`
-	Active              []ArtifactReference `json:"active,omitempty"`
+	ID                    string              `json:"id,omitempty"`
+	Generation            Revision            `json:"generation"`
+	EstablishedGeneration Revision            `json:"establishedGeneration,omitempty"`
+	Enabled               []ArtifactReference `json:"enabled,omitempty"`
+	Active                []ArtifactReference `json:"active,omitempty"`
 }
 
 type RunLimits struct {

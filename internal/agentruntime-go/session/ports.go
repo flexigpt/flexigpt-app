@@ -180,10 +180,10 @@ type AgentResolver interface {
 }
 
 type WorkspaceSkillResolutionRequest struct {
-	SessionID               SessionID            `json:"sessionID"`
-	RunID                   RunID                `json:"runID"`
-	Configuration           SessionConfiguration `json:"configuration"`
-	RequestedWorkspaceSkills []ArtifactReference `json:"requestedWorkspaceSkills"`
+	SessionID                SessionID            `json:"sessionID"`
+	RunID                    RunID                `json:"runID"`
+	Configuration            SessionConfiguration `json:"configuration"`
+	RequestedWorkspaceSkills []ArtifactReference  `json:"requestedWorkspaceSkills"`
 }
 
 type WorkspaceSkillResolution struct {

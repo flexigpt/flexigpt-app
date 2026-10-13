@@ -9,6 +9,8 @@ import (
 
 var errStaleDispatch = errors.New("runtime dispatch became stale")
 
+const waitOwnerMissingStr = "wait_owner_missing"
+
 func (r *Runtime) dispatchWork(
 	ctx context.Context,
 	work runtimeWork,
@@ -1547,7 +1549,7 @@ func (r *Runtime) dispatchWaitResolution(
 			"",
 			RunOutcome{
 				Kind:    RunOutcomeFailed,
-				Code:    "wait_owner_missing",
+				Code:    waitOwnerMissingStr,
 				Message: "waiting request no longer has an owning tool call",
 			},
 			&effects,
@@ -1785,7 +1787,7 @@ func (r *Runtime) dispatchWaitExpiry(
 			"",
 			RunOutcome{
 				Kind:    RunOutcomeFailed,
-				Code:    "wait_owner_missing",
+				Code:    waitOwnerMissingStr,
 				Message: "waiting request expired without an owning tool call",
 			},
 			&effects,
@@ -1881,7 +1883,7 @@ func (r *Runtime) markWaitInvalid(
 			"",
 			RunOutcome{
 				Kind:    RunOutcomeFailed,
-				Code:    "wait_owner_missing",
+				Code:    waitOwnerMissingStr,
 				Message: "wait executor state was lost and the owning tool call no longer exists",
 			},
 			&effects,
