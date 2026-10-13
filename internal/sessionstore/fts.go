@@ -5,11 +5,11 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"runtime/debug"
 	"strings"
 	"time"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/ftsengine"
 )
@@ -53,67 +53,61 @@ func newFTSListener(
 	engine *ftsengine.Engine,
 ) mapstore.FileListener {
 	return func(event mapstore.FileEvent) {
-		defer func() {
-			if recovered := recover(); recovered != nil {
-				slog.Error(
-					"session store FTS listener panic",
-					"op",
-					event.Op,
-					"file",
-					event.File,
-					"recover",
-					recovered,
-					"stack",
-					string(debug.Stack()),
-				)
-			}
-		}()
+		backgroundutil.RunSafely(
+			"session store FTS listener",
+			func() {
+				handleFTSEvent(engine, event)
+			},
+			nil,
+		)
+	}
+}
 
-		if !isSessionDocumentFile(event.File) {
+func handleFTSEvent(engine *ftsengine.Engine, event mapstore.FileEvent) {
+	if !isSessionDocumentFile(event.File) {
+		return
+	}
+
+	switch event.Op {
+	case mapstore.OpSetFile, mapstore.OpResetFile:
+		document, err := decodeStoredSessionData(event.Data)
+		if err != nil {
 			return
 		}
 
-		switch event.Op {
-		case mapstore.OpSetFile, mapstore.OpResetFile:
-			document, err := decodeStoredSessionData(event.Data)
-			if err != nil {
-				return
-			}
-
-			values := sessionFTSValuesForDocument(
+		values := sessionFTSValuesForDocument(
+			event.File,
+			document,
+		)
+		if err := engine.Upsert(
+			context.Background(),
+			event.File,
+			values.Map(),
+		); err != nil {
+			slog.Error(
+				"session store FTS upsert failed",
+				"file",
 				event.File,
-				document,
+				"error",
+				err,
 			)
-			if err := engine.Upsert(
-				context.Background(),
-				event.File,
-				values.Map(),
-			); err != nil {
-				slog.Error(
-					"session store FTS upsert failed",
-					"file",
-					event.File,
-					"error",
-					err,
-				)
-			}
-
-		case mapstore.OpDeleteFile:
-			if err := engine.Delete(
-				context.Background(),
-				event.File,
-			); err != nil {
-				slog.Error(
-					"session store FTS delete failed",
-					"file",
-					event.File,
-					"error",
-					err,
-				)
-			}
-
-		case mapstore.OpSetKey, mapstore.OpDeleteKey:
 		}
+
+	case mapstore.OpDeleteFile:
+		if err := engine.Delete(
+			context.Background(),
+			event.File,
+		); err != nil {
+			slog.Error(
+				"session store FTS delete failed",
+				"file",
+				event.File,
+				"error",
+				err,
+			)
+		}
+
+	case mapstore.OpSetKey, mapstore.OpDeleteKey:
 	}
 }
 

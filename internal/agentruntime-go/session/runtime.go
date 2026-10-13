@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -317,8 +318,9 @@ func (r *Runtime) GetSessionSnapshot(
 	}
 
 	snapshot := SessionSnapshot{
-		Session: cloneJSON(*sessionValue),
-		Runs:    make([]Run, 0, len(sessionValue.RunIDs)),
+		Session:  cloneJSON(*sessionValue),
+		Sequence: r.sessionSequences[id],
+		Runs:     make([]Run, 0, len(sessionValue.RunIDs)),
 	}
 	for _, runID := range sessionValue.RunIDs {
 		run := r.runs[runID]
@@ -441,6 +443,7 @@ func (r *Runtime) recordSessionEventLocked(
 	data runtimeEventData,
 ) {
 	r.sessionSequences[sessionValue.ID]++
+	sessionValue.EventSequence = r.sessionSequences[sessionValue.ID]
 	effects.events = append(effects.events, RuntimeEvent{
 		SessionID: sessionValue.ID,
 		Sequence:  r.sessionSequences[sessionValue.ID],
@@ -465,6 +468,7 @@ func (r *Runtime) recordRunEventLocked(
 ) {
 	run.EventSequence++
 	r.sessionSequences[sessionValue.ID]++
+	sessionValue.EventSequence = r.sessionSequences[sessionValue.ID]
 	effects.events = append(effects.events, RuntimeEvent{
 		SessionID:     sessionValue.ID,
 		RunID:         run.ID,
@@ -522,18 +526,37 @@ func (r *Runtime) shouldCheckpointStreamLocked(
 }
 
 func (r *Runtime) launchEffect(fn func()) {
+	r.launchEffectWithFailure(
+		"session runtime effect",
+		func(failure backgroundutil.PanicFailureError) {
+			r.reportDiagnostic(r.lifecycleCtx, RuntimeDiagnostic{
+				Operation: failure.Operation,
+				Message:   "background effect panicked",
+				Cause:     failure.Error(),
+				At:        time.Now().UTC(),
+			})
+		},
+		fn,
+	)
+}
+
+func (r *Runtime) launchEffectWithFailure(
+	operation string,
+	onPanic func(backgroundutil.PanicFailureError),
+	fn func(),
+) {
 	r.effectMu.Lock()
 	if r.effectClosing {
 		r.effectMu.Unlock()
 		return
 	}
-	r.effectWG.Add(1)
+	backgroundutil.Launch(
+		&r.effectWG,
+		operation,
+		fn,
+		onPanic,
+	)
 	r.effectMu.Unlock()
-
-	go func() {
-		defer r.effectWG.Done()
-		fn()
-	}()
 }
 
 func (r *Runtime) flushEffects(
@@ -559,10 +582,7 @@ func (r *Runtime) flushEffects(
 	}
 
 	for _, work := range effects.work {
-		workCopy := work
-		r.launchEffect(func() {
-			r.dispatchWork(effectCtx, workCopy)
-		})
+		r.launchWork(effectCtx, work)
 	}
 }
 
@@ -676,12 +696,18 @@ func (r *Runtime) reportDiagnostic(
 		)
 		return
 	}
-	r.launchEffect(func() {
-		sink.ReportRuntimeDiagnostic(
-			context.WithoutCancel(ctx),
-			diagnostic,
-		)
-	})
+	// A panicking diagnostic sink must not create an infinite sequence of
+	// diagnostic-dispatch panics. The common boundary still logs its stack.
+	r.launchEffectWithFailure(
+		"session diagnostic sink",
+		nil,
+		func() {
+			sink.ReportRuntimeDiagnostic(
+				context.WithoutCancel(ctx),
+				diagnostic,
+			)
+		},
+	)
 }
 
 func eventData(value runtimeEventData) json.RawMessage {
@@ -735,7 +761,7 @@ func (r runtimeRestorer) RestoreSession(
 		return fmt.Errorf("recovery session %q is duplicated", copyValue.ID)
 	}
 	r.runtime.sessions[copyValue.ID] = &copyValue
-	r.runtime.sessionSequences[copyValue.ID] = uint64(copyValue.Revision)
+	r.runtime.sessionSequences[copyValue.ID] = copyValue.EventSequence
 
 	return nil
 }

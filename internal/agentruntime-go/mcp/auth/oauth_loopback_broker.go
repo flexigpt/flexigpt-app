@@ -15,6 +15,7 @@ import (
 	"time"
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 )
 
 const (
@@ -129,21 +130,20 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	go func() {
-		if err := b.server.Serve(ln); err != nil && err != http.ErrServerClosed {
-			b.mu.Lock()
-			b.serveErr = err
-			for _, pending := range b.pendingByServer {
-				b.completeLocked(
-					pending,
-					nil,
-					fmt.Errorf("%w: OAuth loopback listener stopped", ErrMCPAuthRequired),
-				)
+	backgroundutil.Launch(
+		nil,
+		"MCP OAuth loopback listener",
+		func() {
+			if err := b.server.Serve(ln); err != nil && err != http.ErrServerClosed {
+				b.recordServeFailure(err)
+				logger.Warn("mcp oauth loopback server stopped unexpectedly", "err", err)
 			}
-			b.mu.Unlock()
-			logger.Warn("mcp oauth loopback server stopped unexpectedly", "err", err)
-		}
-	}()
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			b.recordServeFailure(failure)
+			_ = ln.Close()
+		},
+	)
 
 	return b, nil
 }
@@ -433,6 +433,23 @@ func (b *OAuthLoopbackBroker) validCallbackHost(host string) bool {
 	// the exact same callback port. This keeps the CSRF/state protection intact
 	// and avoids accepting non-loopback hosts.
 	return sameOAuthLoopbackEndpoint(host, b.redirectHost)
+}
+
+func (b *OAuthLoopbackBroker) recordServeFailure(err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.serveErr = err
+	for _, pending := range b.pendingByServer {
+		b.completeLocked(
+			pending,
+			nil,
+			fmt.Errorf(
+				"%w: OAuth loopback listener stopped",
+				ErrMCPAuthRequired,
+			),
+		)
+	}
 }
 
 func sameOAuthLoopbackEndpoint(callbackHost, redirectHost string) bool {

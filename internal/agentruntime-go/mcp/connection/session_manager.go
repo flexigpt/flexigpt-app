@@ -15,6 +15,7 @@ import (
 	"time"
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
@@ -210,19 +211,26 @@ func (m *MCPRuntimeManager) StartConnect(
 		return nil, err
 	}
 
-	go func() {
-		defer m.finishConnectionAttempt(ref, generation)
+	backgroundutil.Launch(
+		nil,
+		"MCP connection",
+		func() {
+			defer m.finishConnectionAttempt(ref, generation)
 
-		if _, connectErr := m.connect(
-			attemptContext,
-			ref,
-			generation,
-			previous,
-			timer,
-		); connectErr != nil && !errors.Is(connectErr, context.Canceled) {
-			slog.Debug("background MCP connection finished with an error", "server", ref, "error", connectErr)
-		}
-	}()
+			if _, connectErr := m.connect(
+				attemptContext,
+				ref,
+				generation,
+				previous,
+				timer,
+			); connectErr != nil && !errors.Is(connectErr, context.Canceled) {
+				slog.Debug("background MCP connection finished with an error", "server", ref, "error", connectErr)
+			}
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			m.setErrorIfCurrent(ref, generation, failure)
+		},
+	)
 
 	return m.Status(ctx, ref)
 }
@@ -1012,8 +1020,16 @@ func (m *MCPRuntimeManager) connect(
 		return nil, err
 	}
 
+	clientOwned := true
+	defer func() {
+		if clientOwned {
+			_ = closeMCPClient(ctx, client)
+		}
+	}()
+
 	snapshot, err := client.Discover(connectCtx, config)
 	if err != nil {
+		clientOwned = false
 		closeErr := closeMCPClient(ctx, client)
 		err = redactRuntimeError(
 			errors.Join(err, closeErr),
@@ -1037,6 +1053,7 @@ func (m *MCPRuntimeManager) connect(
 		snapshot,
 		now,
 	) {
+		clientOwned = false
 		_ = closeMCPClient(ctx, client)
 		return nil, fmt.Errorf(
 			"%w: MCP connection was superseded",
@@ -1044,6 +1061,7 @@ func (m *MCPRuntimeManager) connect(
 		)
 	}
 
+	clientOwned = false
 	m.authorizer.ConnectionSucceeded(
 		context.WithoutCancel(ctx),
 		config,
@@ -1145,7 +1163,12 @@ func (m *MCPRuntimeManager) beginConnection(
 	ref mcpServer.ServerID,
 ) (context.Context, uint64, *sessionState, *time.Timer, error) {
 	attemptContext, cancelAttempt := context.WithCancel(parent)
-	stopLifecycle := context.AfterFunc(m.lifecycleContext, cancelAttempt)
+	stopLifecycle := backgroundutil.AfterContext(
+		m.lifecycleContext,
+		"MCP connection lifecycle cancellation",
+		cancelAttempt,
+		nil,
+	)
 	cancelConnection := func() {
 		stopLifecycle()
 		cancelAttempt()
@@ -1410,7 +1433,7 @@ func withMCPRefreshTimeout(
 	return context.WithTimeout(ctx, defaultMCPRefreshTimeout)
 }
 
-func closeMCPClient(ctx context.Context, client ClientSession) error {
+func closeMCPClient(ctx context.Context, client ClientSession) (err error) {
 	if client == nil {
 		return nil
 	}
@@ -1419,11 +1442,20 @@ func closeMCPClient(ctx context.Context, client ClientSession) error {
 		5*time.Second,
 	)
 	defer cancel()
-	return client.Close(closeCtx)
+	backgroundutil.RunSafely(
+		"MCP client cleanup",
+		func() {
+			err = client.Close(closeCtx)
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			err = failure
+		},
+	)
+	return err
 }
 
 func (m *MCPRuntimeManager) scheduleRefresh(
-	ctx context.Context,
+	_ context.Context,
 	ref mcpServer.ServerID,
 ) {
 	m.mu.Lock()
@@ -1437,22 +1469,31 @@ func (m *MCPRuntimeManager) scheduleRefresh(
 		return
 	}
 
+	generation := m.generations[ref]
 	var timer *time.Timer
-	timer = time.AfterFunc(NotificationRefreshDebounce, func() {
-		refreshCtx, cancel := context.WithTimeout(
-			context.WithoutCancel(ctx),
-			time.Minute,
-		)
-		defer cancel()
+	timer = backgroundutil.AfterFunc(
+		NotificationRefreshDebounce,
+		"MCP discovery refresh",
+		//nolint:contextcheck // Separate context used.
+		func() {
+			refreshCtx, cancel := context.WithTimeout(
+				m.lifecycleContext,
+				time.Minute,
+			)
+			defer cancel()
 
-		m.mu.Lock()
-		if m.timers[ref] == timer {
-			delete(m.timers, ref)
-		}
-		m.mu.Unlock()
+			m.mu.Lock()
+			if m.timers[ref] == timer {
+				delete(m.timers, ref)
+			}
+			m.mu.Unlock()
 
-		_, _ = m.Refresh(refreshCtx, ref)
-	})
+			_, _ = m.Refresh(refreshCtx, ref)
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			m.setErrorIfCurrent(ref, generation, failure)
+		},
+	)
 	m.timers[ref] = timer
 }
 

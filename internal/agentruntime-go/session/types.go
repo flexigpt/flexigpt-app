@@ -514,11 +514,13 @@ type Session struct {
 	Configuration SessionConfiguration `json:"configuration"`
 	Transcript    []TranscriptMessage  `json:"transcript,omitempty"`
 	RunIDs        []RunID              `json:"runIDs,omitempty"`
+	EventSequence uint64               `json:"eventSequence"`
 }
 
 type SessionSnapshot struct {
-	Session Session `json:"session"`
-	Runs    []Run   `json:"runs"`
+	Session  Session `json:"session"`
+	Runs     []Run   `json:"runs"`
+	Sequence uint64  `json:"sequence"`
 }
 
 type RunSnapshot struct {

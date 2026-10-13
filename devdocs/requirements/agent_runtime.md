@@ -1367,6 +1367,20 @@ Composer does not:
 
 ## Status
 
+### Backend background-execution delivery
+
+- [x] Common neutral panic-safe background launcher delivered.
+- [x] Supplied Session, MCP, SessionStore-maintenance, and Wails-event launches use the common utility.
+- [x] Panicked Session model, Tool, and wait work has operation-specific settlement.
+- [x] Panicked external Tool attempts are recorded as uncertain without fabricated selected results.
+- [x] Stale Skill-session cleanup remains inside tracked Session dispatch work.
+- [x] Session snapshots expose a durable event watermark independent of Session revision.
+- [x] Focused launcher and Session panic-settlement tests delivered.
+- [ ] Repository formatting, linting, and tests verified.
+- [ ] Authoritative runtime setup, typed intent, immutable preparation, and thin inference complete.
+- [ ] Breaking SessionStore schema, Wails execution removal, and Session-scoped MCP App routing complete.
+- [ ] Frontend Session command/snapshot/event migration complete.
+
 ### Present now
 
 | Area                                     | Current status |

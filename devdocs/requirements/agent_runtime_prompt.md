@@ -76,6 +76,7 @@ During implementation:
 - Do not introduce repeated normal-path nil checks, repeated validation, or context polling prohibited by the proposal.
 - Do not use unchecked type assertions on public, persistence, provider, MCP, or external-domain adaptation paths.
 - Keep unrelated refactoring to a minimum, except where required to satisfy the target dependency graph.
+- Do NOT go into circles about symlink behaviour, root exec and any fs ops in general. Liek todays runtime of attachments etc, anything that runs thorugh mapstore or llmtools is already symling and fs and cross paltform sfe. you have to defer all these tasks to these 2 entities only. given that most of them are already implemented in some way or other in either workspace or agent or attachment use that properly rather than you doing things.
 
 ## Required verification before completion
 

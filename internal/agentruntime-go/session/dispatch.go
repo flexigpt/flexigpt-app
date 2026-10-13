@@ -425,7 +425,7 @@ func (r *Runtime) ensureSkillSessionForModel(
 	if err != nil {
 		r.mu.Unlock()
 		if result.SessionID != previousID {
-			go r.closeSkillSession(
+			r.closeSkillSession(
 				context.WithoutCancel(ctx),
 				result.SessionID,
 				sessionID,
@@ -442,7 +442,7 @@ func (r *Runtime) ensureSkillSessionForModel(
 		run.Controls.CancellationRequested {
 		r.mu.Unlock()
 		if result.SessionID != previousID {
-			go r.closeSkillSession(
+			r.closeSkillSession(
 				context.WithoutCancel(ctx),
 				result.SessionID,
 				sessionID,

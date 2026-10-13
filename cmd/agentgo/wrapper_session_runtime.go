@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 )
 
 const sessionRuntimeEventName = "session-runtime:event"
@@ -259,12 +260,27 @@ func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
 	w.eventDone = done
 	w.mu.Unlock()
 
-	go func() {
-		defer close(done)
-		for event := range events {
-			runtime.EventsEmit(ctx, sessionRuntimeEventName, event)
-		}
-	}()
+	backgroundutil.Launch(
+		nil,
+		"Wails Session event forwarding",
+		func() {
+			defer close(done)
+			defer unsubscribe()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case event, open := <-events:
+					if !open {
+						return
+					}
+					runtime.EventsEmit(ctx, sessionRuntimeEventName, event)
+				}
+			}
+		},
+		nil,
+	)
 }
 
 func (w *SessionRuntimeWrapper) close() {

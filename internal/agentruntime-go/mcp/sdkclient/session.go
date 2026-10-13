@@ -14,6 +14,7 @@ import (
 
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -33,9 +34,16 @@ func (s *Session) Close(ctx context.Context) error {
 	}
 
 	done := make(chan error, 1)
-	go func() {
-		done <- s.session.Close()
-	}()
+	backgroundutil.Launch(
+		nil,
+		"MCP SDK session close",
+		func() {
+			done <- s.session.Close()
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			done <- failure
+		},
+	)
 
 	select {
 	case err := <-done:
@@ -98,27 +106,52 @@ func (s *Session) Discover(
 	)
 
 	if caps == nil || caps.Tools != nil {
-		wait.Go(func() {
-			tools, toolsErr = s.listAllTools(ctx, config)
-		})
+		backgroundutil.Launch(
+			&wait,
+			"MCP tools discovery",
+			func() {
+				tools, toolsErr = s.listAllTools(ctx, config)
+			},
+			func(failure backgroundutil.PanicFailureError) {
+				toolsErr = failure
+			},
+		)
 	}
 
 	if caps == nil || caps.Resources != nil {
-		wait.Add(2)
-		go func() {
-			defer wait.Done()
-			resources, resourcesErr = s.listAllResources(ctx)
-		}()
-		go func() {
-			defer wait.Done()
-			resourceTemplates, resourceTemplatesErr = s.listAllResourceTemplates(ctx)
-		}()
+		backgroundutil.Launch(
+			&wait,
+			"MCP resources discovery",
+			func() {
+				resources, resourcesErr = s.listAllResources(ctx)
+			},
+			func(failure backgroundutil.PanicFailureError) {
+				resourcesErr = failure
+			},
+		)
+		backgroundutil.Launch(
+			&wait,
+			"MCP resource templates discovery",
+			func() {
+				resourceTemplates, resourceTemplatesErr = s.listAllResourceTemplates(ctx)
+			},
+			func(failure backgroundutil.PanicFailureError) {
+				resourceTemplatesErr = failure
+			},
+		)
 	}
 
 	if caps == nil || caps.Prompts != nil {
-		wait.Go(func() {
-			prompts, promptsErr = s.listAllPrompts(ctx)
-		})
+		backgroundutil.Launch(
+			&wait,
+			"MCP prompts discovery",
+			func() {
+				prompts, promptsErr = s.listAllPrompts(ctx)
+			},
+			func(failure backgroundutil.PanicFailureError) {
+				promptsErr = failure
+			},
+		)
 	}
 
 	wait.Wait()

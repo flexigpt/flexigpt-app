@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 )
 
 const (
@@ -3225,7 +3227,19 @@ func (r *Runtime) advanceDriverLocked(
 	}
 
 	event.View = buildDriverView(run)
-	transition, err := driver.Advance(run.Driver, event)
+	var (
+		transition DriverTransition
+		err        error
+	)
+	backgroundutil.RunSafely(
+		"session driver transition",
+		func() {
+			transition, err = driver.Advance(run.Driver, event)
+		},
+		func(failure backgroundutil.PanicFailureError) {
+			err = failure
+		},
+	)
 	if err != nil {
 		r.markRunTerminalLocked(
 			sessionValue,

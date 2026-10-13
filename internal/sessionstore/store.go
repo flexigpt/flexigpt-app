@@ -14,6 +14,7 @@ import (
 	"time"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
 	"github.com/flexigpt/mapstore-go/ftsengine"
@@ -108,27 +109,6 @@ func New(baseDir string, options ...Option) (*Store, error) {
 		value.ftsRebuildCtx, value.ftsRebuildCancel = context.WithCancel(
 			context.Background(),
 		)
-		value.ftsRebuildWG.Go(func() {
-			stat, syncErr := ftsengine.SyncDirToFTS(
-				value.ftsRebuildCtx,
-				value.fts,
-				value.baseDir,
-				string(sessionFTSModifiedColumn),
-				1000,
-				syncSessionDocumentToFTS,
-			)
-			if syncErr != nil {
-				slog.Error(
-					"session store FTS rebuild failed",
-					"error",
-					syncErr,
-				)
-				return
-			}
-			if stat != nil {
-				slog.Info("session store FTS rebuild", "stat", stat)
-			}
-		})
 	}
 
 	directoryOptions := []mapstore.DirOption{
@@ -149,10 +129,38 @@ func New(baseDir string, options ...Option) (*Store, error) {
 		directoryOptions...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, value.Close())
 	}
 
 	value.store = directoryStore
+	if value.fts != nil {
+		backgroundutil.Launch(
+			&value.ftsRebuildWG,
+			"session store FTS rebuild",
+			func() {
+				stat, syncErr := ftsengine.SyncDirToFTS(
+					value.ftsRebuildCtx,
+					value.fts,
+					value.baseDir,
+					string(sessionFTSModifiedColumn),
+					1000,
+					syncSessionDocumentToFTS,
+				)
+				if syncErr != nil {
+					slog.Error(
+						"session store FTS rebuild failed",
+						"error",
+						syncErr,
+					)
+					return
+				}
+				if stat != nil {
+					slog.Info("session store FTS rebuild", "stat", stat)
+				}
+			},
+			nil,
+		)
+	}
 	return value, nil
 }
 
