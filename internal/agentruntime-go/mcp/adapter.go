@@ -302,7 +302,10 @@ func decodeRequest(
 		ChoiceID:         mapping.ChoiceID,
 		ToolDigest:       mapping.ToolDigest,
 		Arguments:        arguments,
-		ToolUseID:        request.ToolCall.ProviderCallID,
+		ToolUseID: firstNonBlank(
+			request.ToolCall.ProviderCallID,
+			string(request.ToolCall.ID),
+		),
 	}, nil
 }
 

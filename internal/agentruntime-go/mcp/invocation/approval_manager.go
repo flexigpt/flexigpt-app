@@ -59,6 +59,10 @@ func NewApprovalManager(ttl time.Duration) *ApprovalManager {
 }
 
 func (m *ApprovalManager) ExpiresAt(approvalID string) (time.Time, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.purgeExpiredLocked(time.Now().UTC())
+
 	pending, found := m.pending[approvalID]
 	if !found {
 		return time.Time{}, fmt.Errorf(
@@ -192,10 +196,6 @@ func (m *ApprovalManager) Resolve(
 func (m *ApprovalManager) LookupDecision(
 	summary mcpServer.MCPApprovalSummary,
 ) (mcpServer.MCPApprovalResolution, bool) {
-	if m == nil {
-		return "", false
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -212,10 +212,6 @@ func (m *ApprovalManager) LookupDecision(
 func (m *ApprovalManager) ClearServer(
 	server mcpServer.ServerID,
 ) {
-	if m == nil {
-		return
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -232,10 +228,6 @@ func (m *ApprovalManager) ClearServer(
 }
 
 func (m *ApprovalManager) Clear() {
-	if m == nil {
-		return
-	}
-
 	m.mu.Lock()
 	m.pending = make(map[string]*pendingApproval)
 	m.decisions = make(map[string]rememberedApprovalDecision)

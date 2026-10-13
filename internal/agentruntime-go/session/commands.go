@@ -13,9 +13,7 @@ import (
 )
 
 const (
-	runtimeEventStateKey = "state"
-	runtimeEventErrorKey = "error"
-	toolCallNotFound     = "tool call was not found"
+	toolCallNotFound = "tool call was not found"
 )
 
 func (r *Runtime) CreateSession(
@@ -45,6 +43,19 @@ func (r *Runtime) CreateSession(
 	sessionID := command.SessionID
 	if sessionID == "" {
 		sessionID = SessionID(r.newID())
+	}
+	if _, retired := r.retiredSessionIDs[sessionID]; retired {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: sessionID,
+				Message:   "session ID was previously deleted and cannot be reused",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
 	}
 	if _, exists := r.sessions[sessionID]; exists {
 		receipt := r.rejectReceiptLocked(
@@ -93,6 +104,137 @@ func (r *Runtime) CreateSession(
 		sessionValue,
 		nil,
 	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+
+	return &receipt, nil
+}
+
+func (r *Runtime) DeleteSession(
+	ctx context.Context,
+	command DeleteSessionCommand,
+) (*CommandReceipt, error) {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+
+	previous, duplicate, fingerprint, err := r.beginCommandLocked(
+		command.Meta,
+		command,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return nil, err
+	}
+	if duplicate {
+		r.mu.Unlock()
+		previous.Duplicate = true
+		return &previous, nil
+	}
+
+	sessionValue := r.sessions[command.SessionID]
+	if sessionValue == nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: command.SessionID,
+				Message:   ErrSessionNotFound.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if message := expectedSessionRevisionMessage(
+		sessionValue,
+		command.Meta.ExpectedSessionRevision,
+	); message != "" {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         message,
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if active := r.activeRunLocked(sessionValue); active != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           active.ID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     active.Revision,
+				Message:         "an active run must be cancelled or completed before deleting its session",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	effects := runtimeEffects{}
+	r.recordSessionEventLocked(
+		&effects,
+		sessionValue,
+		command.Meta.ID,
+		RuntimeEventSessionDeleted,
+		nil,
+	)
+
+	for _, runID := range sessionValue.RunIDs {
+		run := r.runs[runID]
+		if run == nil {
+			continue
+		}
+
+		r.cancelOutstandingWaitsLocked(run, "session was deleted")
+		if skillID := run.SkillSession.ID; skillID != "" {
+			run.SkillSession.ID = ""
+			effects.work = append(effects.work, runtimeWork{
+				Kind:      workCloseSkill,
+				SessionID: sessionValue.ID,
+				RunID:     run.ID,
+				SkillID:   skillID,
+			})
+		}
+
+		for key, cancel := range r.cancels {
+			if strings.HasPrefix(key, "model:"+string(run.ID)+":") ||
+				strings.HasPrefix(key, "tool-evaluation:"+string(run.ID)+":") ||
+				strings.HasPrefix(key, "tool-execution:"+string(run.ID)+":") {
+				effects.cancels = append(effects.cancels, cancel)
+				delete(r.cancels, key)
+			}
+		}
+
+		delete(r.runs, run.ID)
+		delete(r.runToSession, run.ID)
+	}
+
+	delete(r.sessions, sessionValue.ID)
+	if r.retiredSessionIDs == nil {
+		r.retiredSessionIDs = make(map[SessionID]struct{})
+	}
+	r.retiredSessionIDs[sessionValue.ID] = struct{}{}
+	effects.deletedSessions = append(effects.deletedSessions, sessionValue.ID)
+
+	receipt := CommandReceipt{
+		CommandID:       command.Meta.ID,
+		Accepted:        true,
+		SessionID:       sessionValue.ID,
+		SessionRevision: sessionValue.Revision,
+	}
+	r.finishCommandLocked(command.Meta, fingerprint, receipt)
 	r.mu.Unlock()
 	r.flushEffects(ctx, effects)
 
@@ -253,7 +395,7 @@ func (r *Runtime) RenameSession(
 			sessionValue,
 			command.Meta.ID,
 			RuntimeEventSessionRenamed,
-			map[string]string{"title": title},
+			SessionRenamedEventData{Title: title},
 		)
 		r.checkpointLocked(
 			&effects,
@@ -400,7 +542,7 @@ func (r *Runtime) ApplyAgent(
 	nextConfiguration := cloneJSON(application.Configuration)
 	nextConfiguration.Agent = &application.Agent
 	if application.PreserveWorkspace &&
-		len(nextConfiguration.WorkspaceSelection) == 0 {
+		rawJSONIsAbsent(nextConfiguration.WorkspaceSelection) {
 		nextConfiguration.WorkspaceSelection = cloneRaw(
 			sessionValue.Configuration.WorkspaceSelection,
 		)
@@ -424,9 +566,7 @@ func (r *Runtime) ApplyAgent(
 		sessionValue,
 		command.Meta.ID,
 		RuntimeEventSessionConfigurationChanged,
-		map[string]any{
-			"agent": application.Agent,
-		},
+		sessionValue.Configuration,
 	)
 	r.checkpointLocked(
 		&effects,
@@ -866,7 +1006,7 @@ func (r *Runtime) UpdateContinuationInput(
 		"",
 		"",
 		"",
-		map[string]Revision{"revision": input.Revision},
+		ContinuationRevisionEventData{Revision: input.Revision},
 	)
 	r.checkpointLocked(
 		&effects,
@@ -1239,14 +1379,14 @@ func (r *Runtime) ExecuteCalls(
 		sessionValue,
 		run,
 		command.Meta.ID,
-		RuntimeEventRunStateChanged,
+		RuntimeEventToolCallsExecutionRequested,
 		"",
 		"",
 		"",
 		"",
-		map[string]any{
-			"executeCalls": callIDs,
-			"continue":     command.Continue,
+		ToolCallsExecutionRequestedEventData{
+			CallIDs:  append([]ToolCallID(nil), callIDs...),
+			Continue: command.Continue,
 		},
 	)
 	r.advanceDriverLocked(
@@ -1391,6 +1531,22 @@ func (r *Runtime) RetryCall(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+	if message := toolMutationMessage(run, call); message != "" {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         message,
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
 	if call.State != ToolCallStateFailed &&
 		call.State != ToolCallStateResolved {
 		receipt := r.rejectReceiptLocked(
@@ -1445,12 +1601,12 @@ func (r *Runtime) RetryCall(
 		sessionValue,
 		run,
 		command.Meta.ID,
-		RuntimeEventRunStateChanged,
+		RuntimeEventToolCallRetried,
 		"",
 		call.ID,
 		"",
 		"",
-		map[string]string{"action": "retry"},
+		nil,
 	)
 	r.advanceDriverLocked(
 		sessionValue,
@@ -1578,6 +1734,22 @@ func (r *Runtime) ResolveWait(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+	if run.State.Terminal() || run.Controls.CancellationRequested {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         "terminal or cancelling runs cannot resolve waiting requests",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
 
 	wait := findWaitingRequest(run, command.WaitID)
 	if wait == nil || wait.Status != WaitStatusPending {
@@ -1617,7 +1789,7 @@ func (r *Runtime) ResolveWait(
 		wait.Status = WaitStatusResolved
 		wait.Error = ""
 		wait.UpdatedAt = r.now()
-		delete(r.waitReferences, wait.ID)
+		r.clearWaitReferenceLocked(wait.ID)
 
 		effects := runtimeEffects{}
 		r.recordRunEventLocked(
@@ -1646,22 +1818,43 @@ func (r *Runtime) ResolveWait(
 				&effects,
 			)
 		} else {
-			run.State = RunStateWaiting
-			r.touchRunLocked(sessionValue, run)
-			r.recordRunEventLocked(
-				&effects,
+			work, resumed, resumeErr := r.resumeRecoveredModelLocked(
 				sessionValue,
 				run,
 				command.Meta.ID,
-				RuntimeEventRunStateChanged,
-				"",
-				"",
-				"",
-				"",
-				map[string]string{
-					runtimeEventStateKey: string(RunStateWaiting),
-				},
+				&effects,
 			)
+			//nolint:gocritic // No switch.
+			if resumeErr != nil {
+				r.markRunTerminalLocked(
+					sessionValue,
+					run,
+					command.Meta.ID,
+					RunOutcome{
+						Kind:    RunOutcomeFailed,
+						Code:    "recovery_resume_failed",
+						Message: resumeErr.Error(),
+					},
+					&effects,
+				)
+			} else if resumed {
+				effects.work = append(effects.work, work)
+			} else {
+				run.State = RunStateWaiting
+				r.touchRunLocked(sessionValue, run)
+				r.recordRunEventLocked(
+					&effects,
+					sessionValue,
+					run,
+					command.Meta.ID,
+					RuntimeEventRunStateChanged,
+					"",
+					"",
+					"",
+					"",
+					RunStateChangedEventData{State: RunStateWaiting},
+				)
+			}
 		}
 
 		receipt := CommandReceipt{
@@ -1695,12 +1888,14 @@ func (r *Runtime) ResolveWait(
 		sessionValue,
 		run,
 		command.Meta.ID,
-		RuntimeEventWaitResolved,
+		RuntimeEventWaitResolutionRequested,
 		wait.OperationID,
 		wait.ToolCallID,
 		"",
 		wait.ID,
-		map[string]string{"resolution": string(command.Resolution)},
+		WaitResolutionRequestedEventData{
+			Resolution: command.Resolution,
+		},
 	)
 	effects.work = append(effects.work, runtimeWork{
 		Kind:       workResolveWait,
@@ -2037,9 +2232,7 @@ func (r *Runtime) CancelRun(
 			"",
 			"",
 			"",
-			map[string]string{
-				runtimeEventStateKey: string(RunStateCancelling),
-			},
+			RunStateChangedEventData{State: RunStateCancelling},
 		)
 	}
 
@@ -2357,6 +2550,16 @@ func (r *Runtime) beginCommandLocked(
 		return cloneJSON(previous.Receipt), true, fingerprint, nil
 	}
 
+	if r.commandReservations == nil {
+		r.commandReservations = make(map[CommandID]string)
+	}
+	if reservedFingerprint, found := r.commandReservations[meta.ID]; found {
+		if reservedFingerprint != fingerprint {
+			return CommandReceipt{}, false, "", ErrCommandIDConflict
+		}
+		return CommandReceipt{}, false, fingerprint, ErrCommandInProgress
+	}
+	r.commandReservations[meta.ID] = fingerprint
 	return CommandReceipt{}, false, fingerprint, nil
 }
 
@@ -2365,6 +2568,7 @@ func (r *Runtime) finishCommandLocked(
 	fingerprint string,
 	receipt CommandReceipt,
 ) {
+	delete(r.commandReservations, meta.ID)
 	r.commandRecords[meta.ID] = commandRecord{
 		Fingerprint: fingerprint,
 		Receipt:     cloneJSON(receipt),
@@ -2538,9 +2742,7 @@ func (r *Runtime) startRunLocked(
 		"",
 		"",
 		"",
-		map[string]string{
-			runtimeEventStateKey: string(RunStateQueued),
-		},
+		RunStateChangedEventData{State: RunStateQueued},
 	)
 	r.recordRunEventLocked(
 		effects,
@@ -2552,9 +2754,7 @@ func (r *Runtime) startRunLocked(
 		"",
 		"",
 		"",
-		map[string]string{
-			runtimeEventStateKey: string(RunStateRunning),
-		},
+		RunStateChangedEventData{State: RunStateRunning},
 	)
 
 	work, err := r.startModelOperationLocked(
@@ -2759,8 +2959,8 @@ func (r *Runtime) beginContinuationModelLocked(
 		"",
 		"",
 		"",
-		map[string]Revision{
-			"revision": run.Continuation.ConsumedRevision,
+		ContinuationRevisionEventData{
+			Revision: run.Continuation.ConsumedRevision,
 		},
 	)
 
@@ -2897,6 +3097,22 @@ func (r *Runtime) completeCallWithResult(
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     run.Revision,
 				Message:         "provider-managed tool calls do not accept local results",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if message := toolMutationMessage(run, call); message != "" {
+		receipt := r.rejectReceiptLocked(
+			meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       meta.ID,
+				SessionID:       sessionID,
+				RunID:           runID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         message,
 			},
 		)
 		r.mu.Unlock()
@@ -3081,9 +3297,7 @@ func (r *Runtime) setPause(
 		"",
 		"",
 		"",
-		map[string]bool{
-			"paused": paused,
-		},
+		RunStateChangedEventData{State: run.State},
 	)
 	if !paused {
 		active := findModelOperation(run, run.ActiveModelOperationID)
@@ -3143,6 +3357,7 @@ func (r *Runtime) applyRunConfigurationLocked(
 	nextSkills = uniqueArtifactReferences(nextSkills)
 
 	run.Configuration = cloneJSON(configuration)
+	sessionValue.Configuration = cloneJSON(configuration)
 	if artifactReferencesEqual(previousSkills, nextSkills) {
 		return
 	}
@@ -3223,9 +3438,7 @@ func (r *Runtime) advanceDriverLocked(
 			event.ToolCallID,
 			"",
 			"",
-			map[string]string{
-				runtimeEventStateKey: string(run.State),
-			},
+			RunStateChangedEventData{State: run.State},
 		)
 	}
 
@@ -3324,6 +3537,10 @@ func (r *Runtime) markRunTerminalLocked(
 		return
 	}
 
+	r.cancelOutstandingWaitsLocked(
+		run,
+		firstNonEmpty(outcome.Message, "run reached a terminal state"),
+	)
 	run.Outcome = &outcome
 	switch outcome.Kind {
 	case RunOutcomeCancelled:
@@ -3679,6 +3896,11 @@ func appendUniqueToolCallIDs(
 
 func uniqueToolCallIDs(values []ToolCallID) []ToolCallID {
 	return appendUniqueToolCallIDs(nil, values)
+}
+
+func rawJSONIsAbsent(value json.RawMessage) bool {
+	normalized := strings.TrimSpace(string(value))
+	return normalized == "" || normalized == "null"
 }
 
 func artifactReferencesEqual(

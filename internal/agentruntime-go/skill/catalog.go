@@ -144,7 +144,17 @@ func (s *Service) Close(ctx context.Context) error {
 	defer s.catalogMu.Unlock()
 
 	s.catalogs = map[CatalogID]catalogView{}
-	err := s.reconcileCatalogsLocked(ctx)
+	if s.agentRuntime == nil {
+		s.generation = nil
+		return nil
+	}
+
+	present, err := s.applyDesiredLocked(
+		ctx,
+		s.registered,
+		catalogView{},
+	)
+	s.registered = present
 	s.generation = nil
 	return err
 }

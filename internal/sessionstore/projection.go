@@ -13,7 +13,10 @@ import (
 // The runtime checkpoint remains live runtime state. This conversion keeps the
 // durable Session transcript and execution record semantic while explicitly
 // omitting hydrated inference payloads, generated attachment content, provider
-// protocol output payloads, App render payloads, and debug metadata.
+// protocol input payloads, App render payloads, and debug metadata.
+//
+// Approved MCP App context remains durable user-approved input. It is not an
+// App render payload and must survive recovery before a pending Run resumes.
 func storedSessionFromCheckpoint(
 	checkpoint sessionRuntime.RuntimeCheckpointView,
 ) storedSession {
@@ -108,7 +111,7 @@ func projectTranscriptMessage(
 	output.ProtocolInputs = nil
 	output.ProtocolOutputs = slices.Clone(value.ProtocolOutputs)
 	output.ToolResults = projectToolResults(value.ToolResults)
-	output.MCPAppContext = nil
+	output.MCPAppContext = cloneRawJSON(value.MCPAppContext)
 	output.Metadata = nil
 
 	if value.Error != nil {
@@ -166,7 +169,7 @@ func projectContinuation(
 	output := value
 
 	output.Attachments = slices.Clone(value.Attachments)
-	output.MCPAppContext = nil
+	output.MCPAppContext = cloneRawJSON(value.MCPAppContext)
 	output.Metadata = nil
 
 	if value.Configuration != nil {

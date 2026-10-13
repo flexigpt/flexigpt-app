@@ -736,6 +736,11 @@ func marshalOutputUnions(
 	return output
 }
 
+type completionMetadata struct {
+	MCPToolMappings []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
+	WorkspaceUsage  *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
+}
+
 func marshalMetadata(
 	mappings []conversationSpec.MCPProviderToolMapping,
 	workspaceUsage *conversationSpec.WorkspaceConversationUsage,
@@ -744,9 +749,9 @@ func marshalMetadata(
 		return nil
 	}
 
-	raw, err := json.Marshal(map[string]any{
-		"mcpToolMappings": mappings,
-		"workspaceUsage":  workspaceUsage,
+	raw, err := json.Marshal(completionMetadata{
+		MCPToolMappings: mappings,
+		WorkspaceUsage:  workspaceUsage,
 	})
 	if err != nil {
 		return nil

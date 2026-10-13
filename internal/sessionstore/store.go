@@ -30,12 +30,13 @@ type storedSession struct {
 }
 
 type Store struct {
-	checkpointMu sync.Mutex
-	baseDir      string
-	enableFTS    bool
-	store        *mapstore.MapDirectoryStore
-	fts          *ftsengine.Engine
-	pp           mapstore.PartitionProvider
+	checkpointMu      sync.Mutex
+	baseDir           string
+	enableFTS         bool
+	store             *mapstore.MapDirectoryStore
+	fts               *ftsengine.Engine
+	deletedSessionIDs map[sessionRuntime.SessionID]struct{}
+	pp                mapstore.PartitionProvider
 
 	ftsRebuildCtx    context.Context
 	ftsRebuildCancel context.CancelFunc
@@ -72,8 +73,9 @@ func New(baseDir string, options ...Option) (*Store, error) {
 	}
 
 	value := &Store{
-		baseDir: filepath.Clean(baseDir),
-		pp:      &defaultPartitionProvider,
+		baseDir:           filepath.Clean(baseDir),
+		pp:                &defaultPartitionProvider,
+		deletedSessionIDs: make(map[sessionRuntime.SessionID]struct{}),
 	}
 
 	for _, option := range options {
@@ -183,6 +185,10 @@ func (s *Store) HandleCheckpoint(
 
 	document := storedSessionFromCheckpoint(checkpoint)
 
+	if _, deleted := s.deletedSessionIDs[document.Session.ID]; deleted {
+		return nil
+	}
+
 	existing, filename, found, err := s.readStoredSession(
 		document.Session.ID,
 		false,
@@ -215,6 +221,31 @@ func (s *Store) HandleCheckpoint(
 	}
 
 	return s.writeStoredSession(document, filename)
+}
+
+func (s *Store) HandleSessionDeleted(
+	_ context.Context,
+	sessionID sessionRuntime.SessionID,
+) error {
+	s.checkpointMu.Lock()
+	defer s.checkpointMu.Unlock()
+
+	if s.deletedSessionIDs == nil {
+		s.deletedSessionIDs = make(map[sessionRuntime.SessionID]struct{})
+	}
+	s.deletedSessionIDs[sessionID] = struct{}{}
+
+	_, filename, found, err := s.readStoredSession(sessionID, true)
+	if err != nil {
+		return err
+	}
+	if !found || filename == "" {
+		return nil
+	}
+
+	return s.store.DeleteFile(
+		mapstore.FileKey{FileName: filename},
+	)
 }
 
 func (s *Store) Restore(

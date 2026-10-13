@@ -109,7 +109,7 @@ func (b *ToolBridge) Evaluate(
 			return nil, err
 		}
 		evaluation.ApprovalID = approvalID
-		if expiresAt, err := b.approvals.ExpiresAt(approvalID); err != nil {
+		if expiresAt, err := b.approvals.ExpiresAt(approvalID); err == nil {
 			evaluation.ExpiresAt = expiresAt.Format(time.RFC3339Nano)
 		}
 	}
@@ -166,7 +166,7 @@ func (b *ToolBridge) EvaluateMapped(
 		return nil, err
 	}
 	evaluation.ApprovalID = approvalID
-	if expiresAt, err := b.approvals.ExpiresAt(approvalID); err != nil {
+	if expiresAt, err := b.approvals.ExpiresAt(approvalID); err == nil {
 		evaluation.ExpiresAt = expiresAt.Format(time.RFC3339Nano)
 	}
 	return &evaluation, nil

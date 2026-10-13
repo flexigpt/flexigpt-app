@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -162,10 +163,15 @@ func (f *Factory) Connect(
 
 		//nolint:gosec,noctx // User-configured MCP stdio command is intentional.
 		cmd := exec.Command(cfg.Stdio.Command, cfg.Stdio.Args...)
-		cmd.Env = envMapToList(mergeStringMaps(
-			cfg.Stdio.Env,
-			resolved.Env,
-		))
+		cmd.Env = envMapToList(
+			mergeStringMaps(
+				mergeStringMaps(
+					inheritedEnvironmentMap(),
+					cfg.Stdio.Env,
+				),
+				resolved.Env,
+			),
+		)
 
 		redactor := mcpAuth.NewSecretRedactor(mcpConnection.PreparedConnection{
 			SensitiveValues: append(
@@ -250,6 +256,20 @@ func mergeStringMaps(
 		output = map[string]string{}
 	}
 	maps.Copy(output, overlay)
+	return output
+}
+
+func inheritedEnvironmentMap() map[string]string {
+	output := make(map[string]string)
+
+	for _, entry := range os.Environ() {
+		key, value, found := strings.Cut(entry, "=")
+		if !found || key == "" {
+			continue
+		}
+		output[key] = value
+	}
+
 	return output
 }
 

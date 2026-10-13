@@ -63,6 +63,14 @@ func (w *SessionRuntimeWrapper) RenameSession(
 	})
 }
 
+func (w *SessionRuntimeWrapper) DeleteSession(
+	command sessionRuntime.DeleteSessionCommand,
+) (*sessionRuntime.CommandReceipt, error) {
+	return withSessionRuntime(w, func(runtimeValue *sessionRuntime.Runtime) (*sessionRuntime.CommandReceipt, error) {
+		return runtimeValue.DeleteSession(context.Background(), command)
+	})
+}
+
 func (w *SessionRuntimeWrapper) ApplyAgent(
 	command sessionRuntime.ApplyAgentCommand,
 ) (*sessionRuntime.CommandReceipt, error) {

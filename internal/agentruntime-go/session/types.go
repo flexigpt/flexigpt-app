@@ -575,6 +575,11 @@ type RenameSessionCommand struct {
 	Title     string      `json:"title"`
 }
 
+type DeleteSessionCommand struct {
+	Meta      CommandMeta `json:"meta"`
+	SessionID SessionID   `json:"sessionID"`
+}
+
 type AgentApplication struct {
 	Agent             AgentProvenance      `json:"agent"`
 	Configuration     SessionConfiguration `json:"configuration"`

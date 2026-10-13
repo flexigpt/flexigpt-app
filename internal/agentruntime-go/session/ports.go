@@ -35,6 +35,7 @@ type ModelExecutionResult struct {
 	Thinking              string             `json:"thinking,omitempty"`
 	ProtocolOutputs       []json.RawMessage  `json:"protocolOutputs,omitempty"`
 	HydratedCurrentInputs []json.RawMessage  `json:"hydratedCurrentInputs,omitempty"`
+	AttachmentsHydrated   bool               `json:"attachmentsHydrated,omitempty"`
 	ToolCalls             []ToolCallProposal `json:"toolCalls,omitempty"`
 	Error                 *OperationError    `json:"error,omitempty"`
 	Metadata              json.RawMessage    `json:"metadata,omitempty"`
@@ -199,6 +200,7 @@ type RuntimeEventKind string
 const (
 	RuntimeEventSessionCreated              RuntimeEventKind = "sessionCreated"
 	RuntimeEventSessionRenamed              RuntimeEventKind = "sessionRenamed"
+	RuntimeEventSessionDeleted              RuntimeEventKind = "sessionDeleted"
 	RuntimeEventSessionConfigurationChanged RuntimeEventKind = "sessionConfigurationChanged"
 	RuntimeEventRunAccepted                 RuntimeEventKind = "runAccepted"
 	RuntimeEventRunStateChanged             RuntimeEventKind = "runStateChanged"
@@ -208,14 +210,19 @@ const (
 	RuntimeEventModelOperationFinished      RuntimeEventKind = "modelOperationFinished"
 	RuntimeEventToolCallProposed            RuntimeEventKind = "toolCallProposed"
 	RuntimeEventToolEvaluationStarted       RuntimeEventKind = "toolEvaluationStarted"
+	RuntimeEventToolCallsExecutionRequested RuntimeEventKind = "toolCallsExecutionRequested"
+	RuntimeEventToolCallRetried             RuntimeEventKind = "toolCallRetried"
 	RuntimeEventToolAttemptStarted          RuntimeEventKind = "toolAttemptStarted"
 	RuntimeEventToolResultRecorded          RuntimeEventKind = "toolResultRecorded"
 	RuntimeEventToolCallFailed              RuntimeEventKind = "toolCallFailed"
 	RuntimeEventWaitRequested               RuntimeEventKind = "waitRequested"
+	RuntimeEventWaitResolutionRequested     RuntimeEventKind = "waitResolutionRequested"
 	RuntimeEventWaitResolved                RuntimeEventKind = "waitResolved"
+	RuntimeEventWaitExpired                 RuntimeEventKind = "waitExpired"
 	RuntimeEventContinuationUpdated         RuntimeEventKind = "continuationUpdated"
 	RuntimeEventContinuationConsumed        RuntimeEventKind = "continuationConsumed"
 	RuntimeEventAutomationChanged           RuntimeEventKind = "automationChanged"
+	RuntimeEventSkillSessionChanged         RuntimeEventKind = "skillSessionChanged"
 	RuntimeEventRunCompleted                RuntimeEventKind = "runCompleted"
 	RuntimeEventRunFailed                   RuntimeEventKind = "runFailed"
 	RuntimeEventRunCancelled                RuntimeEventKind = "runCancelled"
@@ -236,6 +243,103 @@ type RuntimeEvent struct {
 	Data          json.RawMessage  `json:"data,omitempty"`
 }
 
+// runtimeEventData is intentionally closed to this package.
+//
+// Runtime events are transport notifications, and Data remains raw JSON at
+// that final transport boundary. Inside Session, however, every event payload
+// must be a declared domain type. This prevents map-shaped or arbitrary event
+// payloads from becoming an accidental Session protocol.
+type runtimeEventData interface {
+	runtimeEventData()
+}
+
+type SessionRenamedEventData struct {
+	Title string `json:"title"`
+}
+
+type RunStateChangedEventData struct {
+	State RunState `json:"state"`
+}
+
+type ToolCallsExecutionRequestedEventData struct {
+	CallIDs  []ToolCallID `json:"callIDs"`
+	Continue bool         `json:"continue"`
+}
+
+type WaitResolutionRequestedEventData struct {
+	Resolution WaitResolution `json:"resolution"`
+}
+
+type ModelOperationStateEventData struct {
+	State OperationState `json:"state"`
+}
+
+type ModelOutputAppendedEventData struct {
+	Thinking bool   `json:"thinking"`
+	Text     string `json:"text"`
+}
+
+type ModelOperationFinishedEventData struct {
+	State  OperationState  `json:"state"`
+	Usable bool            `json:"usable"`
+	Error  *OperationError `json:"error,omitempty"`
+}
+
+type ToolEvaluationStartedEventData struct {
+	Automatic bool `json:"automatic"`
+}
+
+type ToolCallFailedEventData struct {
+	Error string `json:"error"`
+}
+
+type ContinuationRevisionEventData struct {
+	Revision Revision `json:"revision"`
+}
+
+type SkillSessionChangedEventData struct {
+	SkillSessionID string              `json:"skillSessionID"`
+	ActiveSkills   []ArtifactReference `json:"activeSkills,omitempty"`
+}
+
+type RecoveryWaitSummary struct {
+	Message string `json:"message"`
+}
+
+func (Session) runtimeEventData()                  {}
+func (SessionConfiguration) runtimeEventData()     {}
+func (SessionRenamedEventData) runtimeEventData()  {}
+func (RunStateChangedEventData) runtimeEventData() {}
+func (ToolCallsExecutionRequestedEventData) runtimeEventData() {
+}
+
+func (WaitResolutionRequestedEventData) runtimeEventData() {
+}
+
+func (ModelOperationStateEventData) runtimeEventData() {
+}
+
+func (ModelOutputAppendedEventData) runtimeEventData() {
+}
+
+func (ModelOperationFinishedEventData) runtimeEventData() {
+}
+
+func (ToolEvaluationStartedEventData) runtimeEventData() {
+}
+func (ToolCallFailedEventData) runtimeEventData() {}
+func (ContinuationRevisionEventData) runtimeEventData() {
+}
+
+func (SkillSessionChangedEventData) runtimeEventData() {
+}
+func (ToolCall) runtimeEventData()           {}
+func (ToolAttempt) runtimeEventData()        {}
+func (ToolResult) runtimeEventData()         {}
+func (WaitingRequest) runtimeEventData()     {}
+func (AutomationControls) runtimeEventData() {}
+func (RunOutcome) runtimeEventData()         {}
+
 type EventPublisher interface {
 	PublishRuntimeEvent(ctx context.Context, e RuntimeEvent) error
 }
@@ -249,6 +353,10 @@ type RuntimeCheckpointView struct {
 
 type CheckpointSink interface {
 	HandleCheckpoint(ctx context.Context, v RuntimeCheckpointView) error
+}
+
+type SessionDeletionSink interface {
+	HandleSessionDeleted(ctx context.Context, sessionID SessionID) error
 }
 
 type RuntimeDiagnostic struct {

@@ -43,23 +43,25 @@ const (
 )
 
 type runtimeWork struct {
-	Kind        workKind
-	SessionID   SessionID
-	RunID       RunID
-	OperationID OperationID
-	ToolCallID  ToolCallID
-	WaitID      WaitID
-	Automatic   bool
-	Resolution  WaitResolution
-	Input       json.RawMessage
-	SkillID     string
+	Kind                 workKind
+	SessionID            SessionID
+	RunID                RunID
+	OperationID          OperationID
+	ToolCallID           ToolCallID
+	WaitID               WaitID
+	Automatic            bool
+	Resolution           WaitResolution
+	Input                json.RawMessage
+	WaitExpiryGeneration uint64
+	SkillID              string
 }
 
 type runtimeEffects struct {
-	events      []RuntimeEvent
-	checkpoints []RuntimeCheckpointView
-	work        []runtimeWork
-	cancels     []context.CancelFunc
+	events          []RuntimeEvent
+	checkpoints     []RuntimeCheckpointView
+	work            []runtimeWork
+	cancels         []context.CancelFunc
+	deletedSessions []SessionID
 }
 
 type RuntimeOption func(*Runtime) error
@@ -83,18 +85,21 @@ type Runtime struct {
 
 	deps RuntimeDependencies
 
-	sessions     map[SessionID]*Session
-	runs         map[RunID]*Run
-	runToSession map[RunID]SessionID
+	sessions          map[SessionID]*Session
+	runs              map[RunID]*Run
+	runToSession      map[RunID]SessionID
+	retiredSessionIDs map[SessionID]struct{}
 
 	drivers map[string]ExecutionDriver
 
-	commandRecords      map[CommandID]commandRecord
-	commandReservations map[CommandID]string
-	sessionSequences    map[SessionID]uint64
-	waitReferences      map[WaitID]waitReference
-	waitExpirers        map[WaitID]context.CancelFunc
-	cancels             map[string]context.CancelFunc
+	commandRecords        map[CommandID]commandRecord
+	commandReservations   map[CommandID]string
+	sessionSequences      map[SessionID]uint64
+	waitReferences        map[WaitID]waitReference
+	waitExpirers          map[WaitID]context.CancelFunc
+	waitExpiryGenerations map[WaitID]uint64
+	waitExpirySequence    uint64
+	cancels               map[string]context.CancelFunc
 
 	subscribers      map[uint64]chan RuntimeEvent
 	nextSubscriberID uint64
@@ -120,20 +125,22 @@ func NewRuntime(
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
 
 	runtime := &Runtime{
-		deps:                dependencies,
-		sessions:            make(map[SessionID]*Session),
-		runs:                make(map[RunID]*Run),
-		runToSession:        make(map[RunID]SessionID),
-		drivers:             make(map[string]ExecutionDriver),
-		commandRecords:      make(map[CommandID]commandRecord),
-		commandReservations: make(map[CommandID]string),
-		sessionSequences:    make(map[SessionID]uint64),
-		waitReferences:      make(map[WaitID]waitReference),
-		waitExpirers:        make(map[WaitID]context.CancelFunc),
-		cancels:             make(map[string]context.CancelFunc),
-		subscribers:         make(map[uint64]chan RuntimeEvent),
-		lifecycleCtx:        lifecycleCtx,
-		lifecycleCancel:     lifecycleCancel,
+		deps:                  dependencies,
+		sessions:              make(map[SessionID]*Session),
+		runs:                  make(map[RunID]*Run),
+		runToSession:          make(map[RunID]SessionID),
+		retiredSessionIDs:     make(map[SessionID]struct{}),
+		drivers:               make(map[string]ExecutionDriver),
+		commandRecords:        make(map[CommandID]commandRecord),
+		commandReservations:   make(map[CommandID]string),
+		sessionSequences:      make(map[SessionID]uint64),
+		waitReferences:        make(map[WaitID]waitReference),
+		waitExpirers:          make(map[WaitID]context.CancelFunc),
+		waitExpiryGenerations: make(map[WaitID]uint64),
+		cancels:               make(map[string]context.CancelFunc),
+		subscribers:           make(map[uint64]chan RuntimeEvent),
+		lifecycleCtx:          lifecycleCtx,
+		lifecycleCancel:       lifecycleCancel,
 	}
 
 	runtime.drivers[SequentialChatDriverKind] = NewSequentialChatDriver()
@@ -186,6 +193,7 @@ func (r *Runtime) Close() {
 	}
 	clear(r.waitExpirers)
 	clear(r.waitReferences)
+	clear(r.waitExpiryGenerations)
 
 	skillClosures := make([]runtimeWork, 0)
 	for _, run := range r.runs {
@@ -423,7 +431,7 @@ func (r *Runtime) recordSessionEventLocked(
 	sessionValue *Session,
 	commandID CommandID,
 	kind RuntimeEventKind,
-	data any,
+	data runtimeEventData,
 ) {
 	r.sessionSequences[sessionValue.ID]++
 	effects.events = append(effects.events, RuntimeEvent{
@@ -446,7 +454,7 @@ func (r *Runtime) recordRunEventLocked(
 	toolCallID ToolCallID,
 	toolAttemptID ToolAttemptID,
 	waitID WaitID,
-	data any,
+	data runtimeEventData,
 ) {
 	run.EventSequence++
 	effects.events = append(effects.events, RuntimeEvent{
@@ -517,6 +525,10 @@ func (r *Runtime) flushEffects(
 
 	for _, checkpoint := range effects.checkpoints {
 		r.handleCheckpoint(effectCtx, checkpoint)
+	}
+
+	for _, sessionID := range effects.deletedSessions {
+		r.handleSessionDeletion(effectCtx, sessionID)
 	}
 
 	for _, work := range effects.work {
@@ -596,6 +608,31 @@ func (r *Runtime) handleCheckpoint(
 	})
 }
 
+func (r *Runtime) handleSessionDeletion(
+	ctx context.Context,
+	sessionID SessionID,
+) {
+	deletionSink, ok := r.deps.Checkpoints.(SessionDeletionSink)
+	if !ok || deletionSink == nil {
+		return
+	}
+
+	r.launchEffect(func() {
+		if err := deletionSink.HandleSessionDeleted(
+			context.WithoutCancel(ctx),
+			sessionID,
+		); err != nil {
+			r.reportDiagnostic(ctx, RuntimeDiagnostic{
+				SessionID: sessionID,
+				Operation: "delete session checkpoint",
+				Message:   "session deletion sink failed; live runtime state remains deleted",
+				Cause:     err.Error(),
+				At:        r.now(),
+			})
+		}
+	})
+}
+
 func (r *Runtime) reportDiagnostic(
 	ctx context.Context,
 	diagnostic RuntimeDiagnostic,
@@ -612,7 +649,7 @@ func (r *Runtime) reportDiagnostic(
 	})
 }
 
-func eventData(value any) json.RawMessage {
+func eventData(value runtimeEventData) json.RawMessage {
 	if value == nil {
 		return nil
 	}
@@ -829,22 +866,24 @@ func ensureRecoveryWait(
 		}
 	}
 
+	summary, _ := json.Marshal(RecoveryWaitSummary{
+		Message: "recovered work requires review before new external work is dispatched",
+	})
+
 	run.WaitingRequests = append(run.WaitingRequests, WaitingRequest{
 		ID: WaitID(fmt.Sprintf(
 			"recovery-%s-%d",
 			run.ID,
 			now.UnixNano(),
 		)),
-		Kind:      WaitKindRecovery,
-		Status:    WaitStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-		Summary: eventData(map[string]string{
-			"message": "recovered work requires review before new external work is dispatched",
-		}),
+		Kind:    WaitKindRecovery,
+		Status:  WaitStatusPending,
+		Summary: summary,
 		AllowedResolutions: []WaitResolution{
 			WaitResolutionContinue,
 			WaitResolutionCancel,
 		},
+		CreatedAt: now,
+		UpdatedAt: now,
 	})
 }

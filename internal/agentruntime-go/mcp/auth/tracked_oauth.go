@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -397,11 +398,26 @@ func redactSensitive(in string, sensitiveValues []string) string {
 	if in == "" || len(sensitiveValues) == 0 {
 		return in
 	}
-	out := in
+
+	seen := make(map[string]struct{}, len(sensitiveValues))
+	values := make([]string, 0, len(sensitiveValues))
 	for _, v := range sensitiveValues {
 		if v == "" || strings.TrimSpace(v) == "" {
 			continue
 		}
+		if _, found := seen[v]; found {
+			continue
+		}
+		seen[v] = struct{}{}
+		values = append(values, v)
+	}
+
+	sort.Slice(values, func(left, right int) bool {
+		return len(values[left]) > len(values[right])
+	})
+
+	out := in
+	for _, v := range values {
 		out = strings.ReplaceAll(out, v, "[REDACTED]")
 	}
 	return out

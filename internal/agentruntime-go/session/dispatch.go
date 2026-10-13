@@ -26,6 +26,9 @@ func (r *Runtime) dispatchWork(
 	case workResolveWait:
 		r.dispatchWaitResolution(ctx, work)
 
+	case workExpireWait:
+		r.dispatchWaitExpiry(ctx, work)
+
 	case workCloseSkill:
 		r.dispatchSkillClose(ctx, work)
 
@@ -88,9 +91,7 @@ func (r *Runtime) dispatchModel(
 		"",
 		"",
 		"",
-		map[string]string{
-			runtimeEventStateKey: string(OperationStatePreparing),
-		},
+		ModelOperationStateEventData{State: OperationStatePreparing},
 	)
 	r.checkpointLocked(
 		&effects,
@@ -189,9 +190,7 @@ func (r *Runtime) dispatchModel(
 		"",
 		"",
 		"",
-		map[string]string{
-			runtimeEventStateKey: string(OperationStateRunning),
-		},
+		ModelOperationStateEventData{State: OperationStateRunning},
 	)
 	r.checkpointLocked(
 		&effects,
@@ -386,9 +385,9 @@ func (r *Runtime) ensureSkillSessionForModel(
 		"",
 		"",
 		"",
-		map[string]any{
-			"skillSessionID": result.SessionID,
-			"activeSkills":   result.Active,
+		SkillSessionChangedEventData{
+			SkillSessionID: result.SessionID,
+			ActiveSkills:   cloneJSON(result.Active),
 		},
 	)
 	r.checkpointLocked(
@@ -430,19 +429,26 @@ func (r *Runtime) finishModelExecution(
 	operation.FinishedAt = r.now()
 	run.ActiveModelOperationID = ""
 
-	if result.Text == "" {
-		result.Text = operation.StreamedText
-	}
-	if result.Thinking == "" {
-		result.Thinking = operation.StreamedThinking
-	}
-
 	if executeErr != nil && result.Error == nil {
 		result.Error = &OperationError{
 			Code:    "model_execution_failed",
 			Message: executeErr.Error(),
 		}
 	}
+
+	preferStreamedOutput := result.Error != nil ||
+		run.Controls.CancellationRequested ||
+		errors.Is(executeErr, context.Canceled)
+	result.Text = canonicalModelOutput(
+		result.Text,
+		operation.StreamedText,
+		preferStreamedOutput,
+	)
+	result.Thinking = canonicalModelOutput(
+		result.Thinking,
+		operation.StreamedThinking,
+		preferStreamedOutput,
+	)
 
 	//nolint:gocritic // Not suitable for switch.
 	if run.Controls.CancellationRequested ||
@@ -481,6 +487,9 @@ func (r *Runtime) finishModelExecution(
 			sessionValue.Transcript[currentIndex].ProtocolInputs = cloneJSON(
 				result.HydratedCurrentInputs,
 			)
+			sessionValue.Transcript[currentIndex].AttachmentsHydrated =
+				sessionValue.Transcript[currentIndex].AttachmentsHydrated ||
+					result.AttachmentsHydrated
 		}
 		if len(result.Metadata) != 0 {
 			sessionValue.Transcript[currentIndex].Metadata = cloneRaw(
@@ -540,10 +549,10 @@ func (r *Runtime) finishModelExecution(
 		"",
 		"",
 		"",
-		map[string]any{
-			runtimeEventStateKey: operation.State,
-			"usable":             result.Usable,
-			runtimeEventErrorKey: result.Error,
+		ModelOperationFinishedEventData{
+			State:  operation.State,
+			Usable: result.Usable,
+			Error:  cloneOperationError(result.Error),
 		},
 	)
 
@@ -638,9 +647,9 @@ func (r *Runtime) appendModelStream(
 		"",
 		"",
 		"",
-		map[string]any{
-			"thinking": thinking,
-			"text":     value,
+		ModelOutputAppendedEventData{
+			Thinking: thinking,
+			Text:     value,
 		},
 	)
 	r.checkpointLocked(
@@ -743,14 +752,43 @@ func (r *Runtime) dispatchToolEvaluation(
 	if call == nil ||
 		call.State != ToolCallStateEvaluationQueued ||
 		run.Controls.CancellationRequested ||
-		run.Controls.Paused ||
-		run.State.Terminal() ||
+		run.State.Terminal() {
+		r.mu.Unlock()
+		return
+	}
+
+	if run.Controls.Paused ||
+		hasPendingRecoveryReview(run) ||
 		(work.Automatic &&
 			automationHoldApplies(
 				run.Controls.AutomaticTools,
 				call.OriginOperationID,
 			)) {
+		changed := r.releaseQueuedToolWorkLocked(
+			sessionValue,
+			run,
+			call,
+		)
+		effects := runtimeEffects{}
+		if changed {
+			if !run.Controls.Paused && !hasPendingRecoveryReview(run) {
+				r.advanceDriverLocked(
+					sessionValue,
+					run,
+					"",
+					DriverEvent{Kind: DriverEventControlsChanged},
+					&effects,
+				)
+			}
+			r.checkpointLocked(
+				&effects,
+				RuntimeEventRunStateChanged,
+				sessionValue,
+				run,
+			)
+		}
 		r.mu.Unlock()
+		r.flushEffects(evaluationCtx, effects)
 		return
 	}
 
@@ -777,9 +815,7 @@ func (r *Runtime) dispatchToolEvaluation(
 		call.ID,
 		"",
 		"",
-		map[string]bool{
-			"automatic": work.Automatic,
-		},
+		ToolEvaluationStartedEventData{Automatic: work.Automatic},
 	)
 	r.checkpointLocked(
 		&effects,
@@ -834,9 +870,7 @@ func (r *Runtime) dispatchToolEvaluation(
 			call.ID,
 			"",
 			"",
-			map[string]string{
-				runtimeEventErrorKey: evaluationErr.Error(),
-			},
+			ToolCallFailedEventData{Error: evaluationErr.Error()},
 		)
 		r.advanceDriverLocked(
 			sessionValue,
@@ -878,9 +912,7 @@ func (r *Runtime) dispatchToolEvaluation(
 				call.ID,
 				"",
 				"",
-				map[string]string{
-					runtimeEventErrorKey: call.LastFailure,
-				},
+				ToolCallFailedEventData{Error: call.LastFailure},
 			)
 			advance = true
 			break
@@ -918,6 +950,13 @@ func (r *Runtime) dispatchToolEvaluation(
 			call.ID,
 			"",
 			wait.ID,
+			wait,
+		)
+
+		r.scheduleWaitExpiryLocked(
+			&effects,
+			sessionValue.ID,
+			run.ID,
 			wait,
 		)
 
@@ -973,9 +1012,7 @@ func (r *Runtime) dispatchToolEvaluation(
 			call.ID,
 			"",
 			"",
-			map[string]string{
-				runtimeEventErrorKey: call.LastFailure,
-			},
+			ToolCallFailedEventData{Error: call.LastFailure},
 		)
 		advance = true
 	}
@@ -1057,14 +1094,16 @@ func (r *Runtime) dispatchToolExecution(
 			call,
 		)
 		effects := runtimeEffects{}
-		if changed && !run.Controls.Paused {
-			r.advanceDriverLocked(
-				sessionValue,
-				run,
-				"",
-				DriverEvent{Kind: DriverEventControlsChanged},
-				&effects,
-			)
+		if changed {
+			if !run.Controls.Paused && !hasPendingRecoveryReview(run) {
+				r.advanceDriverLocked(
+					sessionValue,
+					run,
+					"",
+					DriverEvent{Kind: DriverEventControlsChanged},
+					&effects,
+				)
+			}
 			r.checkpointLocked(
 				&effects,
 				RuntimeEventRunStateChanged,
@@ -1192,9 +1231,7 @@ func (r *Runtime) dispatchToolExecution(
 			call.ID,
 			attempt.ID,
 			"",
-			map[string]string{
-				runtimeEventErrorKey: executionErr.Error(),
-			},
+			ToolCallFailedEventData{Error: executionErr.Error()},
 		)
 
 	default:
@@ -1320,7 +1357,7 @@ func (r *Runtime) dispatchWaitResolution(
 		wait.Status = WaitStatusInvalid
 		wait.Error = "waiting request no longer has an owning tool call"
 		wait.UpdatedAt = r.now()
-		delete(r.waitReferences, wait.ID)
+		r.clearWaitReferenceLocked(wait.ID)
 		r.touchRunLocked(sessionValue, run)
 
 		effects := runtimeEffects{}
@@ -1380,7 +1417,7 @@ func (r *Runtime) dispatchWaitResolution(
 	wait.Status = WaitStatusResolved
 	wait.Error = ""
 	wait.UpdatedAt = r.now()
-	delete(r.waitReferences, wait.ID)
+	r.clearWaitReferenceLocked(wait.ID)
 	call.WaitID = ""
 
 	switch resolution.Status {
@@ -1447,6 +1484,172 @@ func (r *Runtime) dispatchWaitResolution(
 	r.flushEffects(ctx, effects)
 }
 
+func (r *Runtime) dispatchWaitExpiry(
+	ctx context.Context,
+	work runtimeWork,
+) {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	_, run, err := r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	wait := findWaitingRequest(run, work.WaitID)
+	if wait == nil ||
+		(wait.Status != WaitStatusPending &&
+			wait.Status != WaitStatusResolving) ||
+		wait.ExpiresAt == nil ||
+		r.waitExpiryGenerations[wait.ID] != work.WaitExpiryGeneration {
+		r.mu.Unlock()
+		return
+	}
+
+	if r.waitExpirers == nil {
+		r.waitExpirers = make(map[WaitID]context.CancelFunc)
+	}
+	if _, found := r.waitExpirers[wait.ID]; found {
+		r.mu.Unlock()
+		return
+	}
+
+	expiryCtx, cancel := context.WithCancel(r.lifecycleCtx)
+	r.waitExpirers[wait.ID] = cancel
+	deadline := wait.ExpiresAt.UTC()
+	r.mu.Unlock()
+
+	delay := deadline.Sub(r.now())
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-expiryCtx.Done():
+			return
+		case <-timer.C:
+		}
+	}
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
+	var sessionValue *Session
+	sessionValue, run, err = r.sessionAndRunLocked(
+		work.SessionID,
+		work.RunID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+
+	wait = findWaitingRequest(run, work.WaitID)
+	if wait == nil ||
+		(wait.Status != WaitStatusPending &&
+			wait.Status != WaitStatusResolving) ||
+		wait.ExpiresAt == nil ||
+		r.waitExpiryGenerations[wait.ID] != work.WaitExpiryGeneration {
+		r.mu.Unlock()
+		return
+	}
+
+	expiryMessage := "waiting request expired before a resolution was received"
+	wait.Status = WaitStatusExpired
+	wait.Error = expiryMessage
+	wait.UpdatedAt = r.now()
+	r.clearWaitReferenceLocked(wait.ID)
+
+	effects := runtimeEffects{}
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventWaitExpired,
+		wait.OperationID,
+		wait.ToolCallID,
+		"",
+		wait.ID,
+		wait,
+	)
+
+	call := findToolCall(run, wait.ToolCallID)
+	switch {
+	case wait.Kind == WaitKindRecovery:
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeFailed,
+				Code:    "recovery_wait_expired",
+				Message: expiryMessage,
+			},
+			&effects,
+		)
+
+	case call == nil:
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeFailed,
+				Code:    "wait_owner_missing",
+				Message: "waiting request expired without an owning tool call",
+			},
+			&effects,
+		)
+
+	default:
+		call.WaitID = ""
+		r.recordExecutionResultLocked(
+			sessionValue,
+			run,
+			call,
+			"",
+			ToolExecutionResult{
+				HasResult: true,
+				Kind:      ToolResultKindError,
+				Text:      expiryMessage,
+				Error:     expiryMessage,
+			},
+			&effects,
+		)
+		r.advanceDriverLocked(
+			sessionValue,
+			run,
+			"",
+			DriverEvent{
+				Kind:        DriverEventToolSettled,
+				OperationID: call.OriginOperationID,
+				ToolCallID:  call.ID,
+			},
+			&effects,
+		)
+	}
+
+	r.checkpointLocked(
+		&effects,
+		RuntimeEventWaitExpired,
+		sessionValue,
+		run,
+	)
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+}
+
 func (r *Runtime) markWaitInvalid(
 	ctx context.Context,
 	work runtimeWork,
@@ -1471,6 +1674,7 @@ func (r *Runtime) markWaitInvalid(
 	wait.Status = WaitStatusInvalid
 	wait.Error = "wait cannot be resolved after recovery because executor state is unavailable"
 	wait.UpdatedAt = r.now()
+	r.clearWaitReferenceLocked(wait.ID)
 	r.touchRunLocked(sessionValue, run)
 
 	effects := runtimeEffects{}
@@ -1533,9 +1737,7 @@ func (r *Runtime) failToolWithoutResult(
 		call.ID,
 		"",
 		"",
-		map[string]string{
-			runtimeEventErrorKey: message,
-		},
+		ToolCallFailedEventData{Error: message},
 	)
 	r.advanceDriverLocked(
 		sessionValue,
@@ -1584,9 +1786,7 @@ func (r *Runtime) recordExecutionResultLocked(
 			call.ID,
 			attemptID,
 			"",
-			map[string]string{
-				runtimeEventErrorKey: call.LastFailure,
-			},
+			ToolCallFailedEventData{Error: call.LastFailure},
 		)
 		return
 	}
@@ -1669,10 +1869,13 @@ func (r *Runtime) closeSkillSession(
 		return
 	}
 
-	if err := r.deps.Skills.CloseSkillSession(
+	closeCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
-		skillID,
-	); err != nil {
+		skillSessionCloseTimeout,
+	)
+	defer cancel()
+
+	if err := r.deps.Skills.CloseSkillSession(closeCtx, skillID); err != nil {
 		r.reportDiagnostic(ctx, RuntimeDiagnostic{
 			SessionID: sessionID,
 			RunID:     runID,
@@ -1738,6 +1941,29 @@ func cloneTime(
 	}
 	copyValue := *value
 	return &copyValue
+}
+
+func canonicalModelOutput(
+	finalValue string,
+	streamedValue string,
+	preferStreamed bool,
+) string {
+	if streamedValue == "" {
+		return finalValue
+	}
+	if finalValue == "" {
+		return streamedValue
+	}
+	if strings.HasPrefix(finalValue, streamedValue) {
+		return finalValue
+	}
+	if strings.HasPrefix(streamedValue, finalValue) {
+		return streamedValue
+	}
+	if preferStreamed {
+		return streamedValue
+	}
+	return finalValue
 }
 
 func modelCancelKey(

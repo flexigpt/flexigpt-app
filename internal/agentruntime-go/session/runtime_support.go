@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -12,6 +13,7 @@ const (
 	defaultRunMaxToolAttempts    = 64
 	maxRunMaxModelOperations     = 256
 	maxRunMaxToolAttempts        = 512
+	skillSessionCloseTimeout     = 5 * time.Second
 )
 
 func (r *Runtime) prepareSubmission(
@@ -191,11 +193,105 @@ func toolMutationMessage(run *Run, call *ToolCall) string {
 	}
 }
 
+func (r *Runtime) resumeRecoveredModelLocked(
+	sessionValue *Session,
+	run *Run,
+	commandID CommandID,
+	effects *runtimeEffects,
+) (runtimeWork, bool, error) {
+	if run == nil || sessionValue == nil {
+		return runtimeWork{}, false, errors.New("recovered run is unavailable")
+	}
+	if run.ActiveModelOperationID != "" {
+		return runtimeWork{}, false, errors.New("a model operation is already active")
+	}
+	if !allRequiredCallsResolved(run) {
+		return runtimeWork{}, false, nil
+	}
+	if len(run.ModelOperations) == 0 {
+		return runtimeWork{}, false, nil
+	}
+
+	latest := run.ModelOperations[len(run.ModelOperations)-1]
+	if latest.State != OperationStateInterrupted {
+		return runtimeWork{}, false, nil
+	}
+	if strings.TrimSpace(latest.Request.Current.ID) == "" {
+		return runtimeWork{}, false, errors.New(
+			"recovered interrupted model operation has no current message",
+		)
+	}
+
+	work, err := r.startModelOperationLocked(
+		sessionValue,
+		run,
+		commandID,
+		latest.Request.Current.ID,
+		effects,
+	)
+	if err != nil {
+		return runtimeWork{}, false, err
+	}
+
+	return work, true, nil
+}
+
+func (r *Runtime) cancelOutstandingWaitsLocked(
+	run *Run,
+	reason string,
+) {
+	if run == nil {
+		return
+	}
+
+	for index := range run.WaitingRequests {
+		wait := &run.WaitingRequests[index]
+		if wait.Status != WaitStatusPending &&
+			wait.Status != WaitStatusResolving {
+			continue
+		}
+
+		wait.Status = WaitStatusCancelled
+		wait.Error = reason
+		wait.UpdatedAt = r.now()
+		r.clearWaitReferenceLocked(wait.ID)
+	}
+}
+
 func (r *Runtime) cancelWaitExpiryLocked(waitID WaitID) {
 	if cancel, found := r.waitExpirers[waitID]; found {
 		delete(r.waitExpirers, waitID)
 		cancel()
 	}
+	delete(r.waitExpiryGenerations, waitID)
+}
+
+func (r *Runtime) scheduleWaitExpiryLocked(
+	effects *runtimeEffects,
+	sessionID SessionID,
+	runID RunID,
+	wait WaitingRequest,
+) {
+	if effects == nil ||
+		wait.ID == "" ||
+		wait.ExpiresAt == nil ||
+		wait.Status != WaitStatusPending {
+		return
+	}
+	if r.waitExpiryGenerations == nil {
+		r.waitExpiryGenerations = make(map[WaitID]uint64)
+	}
+
+	r.cancelWaitExpiryLocked(wait.ID)
+	r.waitExpirySequence++
+	r.waitExpiryGenerations[wait.ID] = r.waitExpirySequence
+	effects.work = append(effects.work, runtimeWork{
+		Kind:                 workExpireWait,
+		SessionID:            sessionID,
+		RunID:                runID,
+		WaitID:               wait.ID,
+		WaitExpiryGeneration: r.waitExpirySequence,
+	})
 }
 
 func (r *Runtime) clearWaitReferenceLocked(waitID WaitID) {
