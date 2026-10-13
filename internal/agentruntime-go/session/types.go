@@ -76,15 +76,18 @@ func (s OperationState) Terminal() bool {
 type ToolCallState string
 
 const (
-	ToolCallStateProposed   ToolCallState = "proposed"
-	ToolCallStatePending    ToolCallState = "pending"
-	ToolCallStateEvaluating ToolCallState = "evaluating"
-	ToolCallStateWaiting    ToolCallState = "waiting"
-	ToolCallStateRunning    ToolCallState = "running"
-	ToolCallStateResolved   ToolCallState = "resolved"
-	ToolCallStateFailed     ToolCallState = "failed"
-	ToolCallStateCancelled  ToolCallState = "cancelled"
-	ToolCallStateObserved   ToolCallState = "observed"
+	ToolCallStateProposed         ToolCallState = "proposed"
+	ToolCallStatePending          ToolCallState = "pending"
+	ToolCallStateEvaluationQueued ToolCallState = "evaluationQueued"
+	ToolCallStateEvaluating       ToolCallState = "evaluating"
+	ToolCallStateReady            ToolCallState = "ready"
+	ToolCallStateExecutionQueued  ToolCallState = "executionQueued"
+	ToolCallStateWaiting          ToolCallState = "waiting"
+	ToolCallStateRunning          ToolCallState = "running"
+	ToolCallStateResolved         ToolCallState = "resolved"
+	ToolCallStateFailed           ToolCallState = "failed"
+	ToolCallStateCancelled        ToolCallState = "cancelled"
+	ToolCallStateObserved         ToolCallState = "observed"
 )
 
 type ToolAttemptState string
@@ -222,6 +225,11 @@ type DirectoryAttachmentReference struct {
 	Name             string `json:"name,omitempty"`
 	ScannedFileCount int    `json:"scannedFileCount,omitempty"`
 	HasMore          bool   `json:"hasMore,omitempty"`
+
+	// Expanded is populated exactly once during submission preparation.
+	// Historical replay uses these immutable child references rather than
+	// walking the current directory contents again.
+	Expanded []AttachmentReference `json:"expanded,omitempty"`
 }
 
 type AttachmentReference struct {
@@ -259,7 +267,7 @@ type ModelToolSelection struct {
 type SessionConfiguration struct {
 	Model              ArtifactReference    `json:"model"`
 	RequestPatch       json.RawMessage      `json:"requestPatch,omitempty"`
-	SystemPrompt       string               `json:"systemPrompt,omitempty"`
+	SystemPrompt       *string              `json:"systemPrompt,omitempty"`
 	History            HistorySelection     `json:"history,omitzero"`
 	ToolSelections     []ModelToolSelection `json:"toolSelections,omitempty"`
 	MCPContext         json.RawMessage      `json:"mcpContext,omitempty"`
@@ -289,19 +297,21 @@ type ContinuationInput struct {
 }
 
 type TranscriptMessage struct {
-	ID              string                `json:"id"`
-	CreatedAt       time.Time             `json:"createdAt"`
-	Role            MessageRole           `json:"role"`
-	Status          string                `json:"status,omitempty"`
-	Text            string                `json:"text,omitempty"`
-	Attachments     []AttachmentReference `json:"attachments,omitempty"`
-	ProtocolInputs  []json.RawMessage     `json:"protocolInputs,omitempty"`
-	ProtocolOutputs []json.RawMessage     `json:"protocolOutputs,omitempty"`
-	ToolResults     []ToolResult          `json:"toolResults,omitempty"`
-	MCPAppContext   json.RawMessage       `json:"mcpAppContext,omitempty"`
-	OperationID     OperationID           `json:"operationID,omitempty"`
-	Error           *OperationError       `json:"error,omitempty"`
-	Metadata        json.RawMessage       `json:"metadata,omitempty"`
+	ID                  string                `json:"id"`
+	CreatedAt           time.Time             `json:"createdAt"`
+	Role                MessageRole           `json:"role"`
+	Status              string                `json:"status,omitempty"`
+	Text                string                `json:"text,omitempty"`
+	Attachments         []AttachmentReference `json:"attachments,omitempty"`
+	AttachmentsHydrated bool                  `json:"attachmentsHydrated,omitempty"`
+	ProtocolInputs      []json.RawMessage     `json:"protocolInputs,omitempty"`
+	ProtocolOutputs     []json.RawMessage     `json:"protocolOutputs,omitempty"`
+	ToolResults         []ToolResult          `json:"toolResults,omitempty"`
+	MCPAppContext       json.RawMessage       `json:"mcpAppContext,omitempty"`
+	OperationID         OperationID           `json:"operationID,omitempty"`
+	Error               *OperationError       `json:"error,omitempty"`
+	Metadata            json.RawMessage       `json:"metadata,omitempty"`
+	RuntimeMetadata     json.RawMessage       `json:"runtimeMetadata,omitempty"`
 }
 
 type OperationError struct {
@@ -531,18 +541,19 @@ type CommandMeta struct {
 }
 
 type CommandReceipt struct {
-	CommandID       CommandID     `json:"commandID"`
-	Accepted        bool          `json:"accepted"`
-	Duplicate       bool          `json:"duplicate,omitempty"`
-	SessionID       SessionID     `json:"sessionID,omitempty"`
-	RunID           RunID         `json:"runID,omitempty"`
-	SessionRevision Revision      `json:"sessionRevision,omitempty"`
-	RunRevision     Revision      `json:"runRevision,omitempty"`
-	OperationIDs    []OperationID `json:"operationIDs,omitempty"`
-	ToolCallIDs     []ToolCallID  `json:"toolCallIDs,omitempty"`
-	WaitIDs         []WaitID      `json:"waitIDs,omitempty"`
-	StarterText     string        `json:"starterText,omitempty"`
-	Message         string        `json:"message,omitempty"`
+	CommandID                CommandID     `json:"commandID"`
+	Accepted                 bool          `json:"accepted"`
+	Duplicate                bool          `json:"duplicate,omitempty"`
+	SessionID                SessionID     `json:"sessionID,omitempty"`
+	RunID                    RunID         `json:"runID,omitempty"`
+	SessionRevision          Revision      `json:"sessionRevision,omitempty"`
+	RunRevision              Revision      `json:"runRevision,omitempty"`
+	OperationIDs             []OperationID `json:"operationIDs,omitempty"`
+	ToolCallIDs              []ToolCallID  `json:"toolCallIDs,omitempty"`
+	WaitIDs                  []WaitID      `json:"waitIDs,omitempty"`
+	AlreadyActiveToolCallIDs []ToolCallID  `json:"alreadyActiveToolCallIDs,omitempty"`
+	StarterText              string        `json:"starterText,omitempty"`
+	Message                  string        `json:"message,omitempty"`
 }
 
 type CreateSessionCommand struct {
@@ -572,9 +583,10 @@ type AgentApplication struct {
 }
 
 type ApplyAgentCommand struct {
-	Meta        CommandMeta      `json:"meta"`
-	SessionID   SessionID        `json:"sessionID"`
-	Application AgentApplication `json:"application"`
+	Meta        CommandMeta       `json:"meta"`
+	SessionID   SessionID         `json:"sessionID"`
+	Agent       ArtifactReference `json:"agent,omitzero"`
+	Application *AgentApplication `json:"application,omitempty"`
 }
 
 type StartRunCommand struct {

@@ -93,6 +93,14 @@ func (d *SequentialChatDriver) Advance(
 		}, nil
 	}
 
+	// The sequential driver never overlaps a new model operation with tools
+	// from an earlier batch.
+	if view.ActiveModelOperationID != "" {
+		return DriverTransition{
+			NextState: encodeDriverState(d.Kind(), d.Version(), current),
+		}, nil
+	}
+
 	batch := localBatchCalls(view.ToolCalls, current.BatchOperationID)
 	if len(batch) == 0 {
 		if event.Kind == DriverEventModelFinished ||
@@ -215,8 +223,9 @@ func localBatchCalls(
 func hasInFlight(calls []DriverToolCallView) bool {
 	for _, call := range calls {
 		switch call.State {
-		case ToolCallStateEvaluating,
-			ToolCallStateWaiting,
+		case ToolCallStateEvaluationQueued,
+			ToolCallStateExecutionQueued,
+			ToolCallStateEvaluating,
 			ToolCallStateRunning:
 			return true
 		default:
@@ -241,7 +250,7 @@ func firstRequestedOutstanding(
 			continue
 		}
 		if call.State == ToolCallStatePending ||
-			call.State == ToolCallStateFailed {
+			call.State == ToolCallStateReady {
 			copyValue := call
 			return &copyValue
 		}
@@ -252,7 +261,8 @@ func firstRequestedOutstanding(
 
 func firstPending(calls []DriverToolCallView) *DriverToolCallView {
 	for _, call := range calls {
-		if call.State != ToolCallStatePending {
+		if call.State != ToolCallStatePending &&
+			call.State != ToolCallStateReady {
 			continue
 		}
 		copyValue := call

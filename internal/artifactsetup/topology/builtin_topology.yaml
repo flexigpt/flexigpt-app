@@ -2,7 +2,6 @@ application:
   storage:
     dataDirectory: "flexigpt"
     settingsDirectory: "settings_v2"
-    conversationsDirectory: "conversations_v2"
     artifactStoreDirectory: "artifacts_v2"
 
   userRoot:

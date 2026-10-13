@@ -2,6 +2,7 @@ package sdkclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -293,11 +294,22 @@ func (f *Factory) log() *slog.Logger {
 }
 
 func newStreamableHTTPClient(headers map[string]string) *http.Client {
-	if len(headers) == 0 {
-		return &http.Client{}
-	}
 	return &http.Client{
 		Transport: &headerRoundTripper{base: http.DefaultTransport, headers: maps.Clone(headers)},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("too many MCP HTTP redirects")
+			}
+			if len(via) == 0 {
+				return nil
+			}
+			origin := via[0].URL
+			if !strings.EqualFold(req.URL.Scheme, origin.Scheme) ||
+				!strings.EqualFold(req.URL.Host, origin.Host) {
+				return errors.New("cross-origin MCP HTTP redirects are not allowed")
+			}
+			return nil
+		},
 	}
 }
 

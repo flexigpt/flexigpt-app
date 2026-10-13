@@ -1,10 +1,25 @@
 package spec
 
 import (
+	"encoding/json"
+
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 )
+
+type PreparedToolBinding struct {
+	ChoiceID string `json:"choiceID"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+
+	BindingKind string          `json:"bindingKind"`
+	BindingData json.RawMessage `json:"bindingData,omitempty"`
+
+	Required        bool `json:"required"`
+	ProviderManaged bool `json:"providerManaged,omitempty"`
+	Automatic       bool `json:"automatic,omitempty"`
+}
 
 type AddProviderRequestBody struct {
 	SDKType                  inferenceSpec.ProviderSDKType `json:"sdkType"`
@@ -39,7 +54,8 @@ type SetProviderAPIKeyRequest struct {
 type SetProviderAPIKeyResponse struct{}
 
 type CompletionRequest struct {
-	Model RuntimeModelRequest `json:"-"`
+	Model        RuntimeModelRequest `json:"-"`
+	SystemPrompt *string             `json:"-"`
 
 	History        []conversationSpec.ConversationMessage   `json:"-"`
 	Current        conversationSpec.ConversationMessage     `json:"-"`
@@ -59,8 +75,9 @@ type CompletionResponseBody struct {
 	// user turn before a later provider-tool call is routed through
 	// InvokeMappedMCPTool. Conversation storage preserves this metadata;
 	// mapping/context validation and authorization belong at runtime.
-	MCPToolMappings []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
-	WorkspaceUsage  *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
+	MCPToolMappings      []conversationSpec.MCPProviderToolMapping    `json:"mcpToolMappings,omitempty"`
+	WorkspaceUsage       *conversationSpec.WorkspaceConversationUsage `json:"workspaceUsage,omitempty"`
+	PreparedToolBindings []PreparedToolBinding                        `json:"preparedToolBindings,omitempty"`
 }
 
 type CompletionResponse struct {

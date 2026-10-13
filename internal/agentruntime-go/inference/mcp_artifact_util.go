@@ -160,20 +160,18 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 			if _, duplicate := choiceSeen["id:"+choice.ID]; duplicate {
-				warnings = append(warnings, fmt.Sprintf(
-					"MCP tool %q was skipped because choice ID %q is duplicated",
+				return nil, fmt.Errorf(
+					"MCP tool %q has duplicated choice ID %q",
 					tool.ToolName,
 					choice.ID,
-				))
-				continue
+				)
 			}
 			if _, duplicate := choiceSeen["name:"+choice.Name]; duplicate {
-				warnings = append(warnings, fmt.Sprintf(
-					"MCP tool %q was skipped because provider name %q is duplicated",
+				return nil, fmt.Errorf(
+					"MCP tool %q has duplicated provider name %q",
 					tool.ToolName,
 					choice.Name,
-				))
-				continue
+				)
 			}
 
 			mapping := conversationSpec.MCPProviderToolMapping{
@@ -341,12 +339,11 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			current.Arguments,
 			selection.ArgumentValues,
 		); len(missing) != 0 {
-			warnings = append(warnings, fmt.Sprintf(
-				"MCP resource template %q was skipped because required arguments are missing: %s",
+			return nil, fmt.Errorf(
+				"MCP resource template %q requires arguments: %s",
 				selection.URITemplate,
 				strings.Join(missing, ", "),
-			))
-			continue
+			)
 		}
 
 		uri, err := resolveMCPResourceTemplateURI(
@@ -444,12 +441,11 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			current.Arguments,
 			selection.ArgumentValues,
 		); len(missing) != 0 {
-			warnings = append(warnings, fmt.Sprintf(
-				"MCP prompt %q was skipped because required arguments are missing: %s",
+			return nil, fmt.Errorf(
+				"MCP prompt %q requires arguments: %s",
 				selection.PromptName,
 				strings.Join(missing, ", "),
-			))
-			continue
+			)
 		}
 
 		text, err := b.getPromptAsText(

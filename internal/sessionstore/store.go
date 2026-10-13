@@ -30,11 +30,12 @@ type storedSession struct {
 }
 
 type Store struct {
-	baseDir   string
-	enableFTS bool
-	store     *mapstore.MapDirectoryStore
-	fts       *ftsengine.Engine
-	pp        mapstore.PartitionProvider
+	checkpointMu sync.Mutex
+	baseDir      string
+	enableFTS    bool
+	store        *mapstore.MapDirectoryStore
+	fts          *ftsengine.Engine
+	pp           mapstore.PartitionProvider
 
 	ftsRebuildCtx    context.Context
 	ftsRebuildCancel context.CancelFunc
@@ -177,6 +178,9 @@ func (s *Store) HandleCheckpoint(
 	_ context.Context,
 	checkpoint sessionRuntime.RuntimeCheckpointView,
 ) error {
+	s.checkpointMu.Lock()
+	defer s.checkpointMu.Unlock()
+
 	document := storedSessionFromCheckpoint(checkpoint)
 
 	existing, filename, found, err := s.readStoredSession(
@@ -187,10 +191,6 @@ func (s *Store) HandleCheckpoint(
 		return err
 	}
 
-	if found && existing.Session.Revision > document.Session.Revision {
-		return nil
-	}
-
 	var checkpointRun *sessionRuntime.Run
 	if checkpoint.Run != nil {
 		run := projectRun(*checkpoint.Run)
@@ -198,6 +198,11 @@ func (s *Store) HandleCheckpoint(
 	}
 
 	if found {
+		if existing.Session.Revision > document.Session.Revision ||
+			(existing.Session.Revision == document.Session.Revision &&
+				existing.Session.UpdatedAt.After(document.Session.UpdatedAt)) {
+			document.Session = existing.Session
+		}
 		document.Runs = slices.Clone(existing.Runs)
 	}
 

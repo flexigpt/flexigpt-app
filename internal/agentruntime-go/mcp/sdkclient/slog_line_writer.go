@@ -1,6 +1,7 @@
 package sdkclient
 
 import (
+	"bytes"
 	"log/slog"
 	"strings"
 	"sync"
@@ -8,14 +9,17 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 )
 
+const maxSlogLineBytes = 64 << 10
+
 type slogLineWriter struct {
 	logger   *slog.Logger
 	serverID string
 	message  string
 	redactor *mcpAuth.SecretRedactor
 
-	mu  sync.Mutex
-	buf []byte
+	mu         sync.Mutex
+	buf        []byte
+	discarding bool
 }
 
 func newSlogLineWriter(
@@ -46,32 +50,57 @@ func (w *slogLineWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.buf = append(w.buf, p...)
-
-	for {
-		i := -1
-		for idx, b := range w.buf {
-			if b == '\n' {
-				i = idx
-				break
+	written := len(p)
+	for len(p) != 0 {
+		if w.discarding {
+			index := bytes.IndexByte(p, '\n')
+			if index < 0 {
+				return written, nil
 			}
-		}
-		if i < 0 {
-			break
-		}
-
-		line := string(w.buf[:i])
-		line = strings.TrimRight(line, "\r")
-		w.buf = w.buf[i+1:]
-
-		if strings.TrimSpace(line) == "" {
+			p = p[index+1:]
+			w.discarding = false
 			continue
 		}
-		if w.redactor != nil {
-			line = w.redactor.Redact(line)
+
+		index := bytes.IndexByte(p, '\n')
+		if index < 0 {
+			if len(w.buf)+len(p) > maxSlogLineBytes {
+				w.buf = nil
+				w.discarding = true
+				w.logger.Warn(
+					w.message,
+					"serverID", w.serverID,
+					"line", "[line omitted: exceeds log safety limit]",
+				)
+				return written, nil
+			}
+			w.buf = append(w.buf, p...)
+			return written, nil
 		}
-		w.logger.Info(w.message, "serverID", w.serverID, "line", line)
+
+		if len(w.buf)+index > maxSlogLineBytes {
+			w.buf = nil
+			w.logger.Warn(
+				w.message,
+				"serverID", w.serverID,
+				"line", "[line omitted: exceeds log safety limit]",
+			)
+			p = p[index+1:]
+			continue
+		}
+
+		w.buf = append(w.buf, p[:index]...)
+		line := strings.TrimRight(string(w.buf), "\r")
+		w.buf = nil
+		p = p[index+1:]
+
+		if strings.TrimSpace(line) != "" {
+			if w.redactor != nil {
+				line = w.redactor.Redact(line)
+			}
+			w.logger.Info(w.message, "serverID", w.serverID, "line", line)
+		}
 	}
 
-	return len(p), nil
+	return written, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -108,6 +109,9 @@ func (b *ToolBridge) Evaluate(
 			return nil, err
 		}
 		evaluation.ApprovalID = approvalID
+		if expiresAt, err := b.approvals.ExpiresAt(approvalID); err != nil {
+			evaluation.ExpiresAt = expiresAt.Format(time.RFC3339Nano)
+		}
 	}
 
 	return &evaluation, nil
@@ -162,6 +166,9 @@ func (b *ToolBridge) EvaluateMapped(
 		return nil, err
 	}
 	evaluation.ApprovalID = approvalID
+	if expiresAt, err := b.approvals.ExpiresAt(approvalID); err != nil {
+		evaluation.ExpiresAt = expiresAt.Format(time.RFC3339Nano)
+	}
 	return &evaluation, nil
 }
 
@@ -241,6 +248,8 @@ func (b *ToolBridge) InvokeMapped(
 		)
 	}
 
+	normalized.ExpectedGeneration = config.InvocationGeneration
+	normalized.ExpectedSnapshotDigest = config.InvocationSnapshotDigest
 	return b.runtime.CallTool(ctx, mapping.Server, normalized)
 }
 
@@ -325,6 +334,8 @@ func (b *ToolBridge) Invoke(
 		)
 	}
 
+	request.ExpectedGeneration = config.InvocationGeneration
+	request.ExpectedSnapshotDigest = config.InvocationSnapshotDigest
 	return b.runtime.CallTool(ctx, serverRef, request)
 }
 

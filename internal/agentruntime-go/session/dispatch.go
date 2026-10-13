@@ -136,6 +136,25 @@ func (r *Runtime) dispatchModel(
 	}
 
 	operation = findModelOperation(run, work.OperationID)
+	if operation != nil &&
+		operation.State == OperationStatePreparing &&
+		run.Controls.Paused &&
+		!run.Controls.CancellationRequested &&
+		!run.State.Terminal() {
+		operation.State = OperationStateQueued
+		delete(r.cancels, modelCancelKey(run.ID, operation.ID))
+		r.touchRunLocked(sessionValue, run)
+		effects = runtimeEffects{}
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventRunStateChanged,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(operationCtx, effects)
+		return
+	}
 	if operation == nil ||
 		operation.State != OperationStatePreparing ||
 		run.Controls.Paused ||
@@ -642,7 +661,7 @@ func (r *Runtime) registerToolCallLocked(
 	effects *runtimeEffects,
 ) ToolCall {
 	callID := proposal.ID
-	if callID == "" {
+	if callID == "" || findToolCall(run, callID) != nil {
 		callID = ToolCallID(r.newID())
 	}
 
@@ -722,7 +741,7 @@ func (r *Runtime) dispatchToolEvaluation(
 
 	call := findToolCall(run, work.ToolCallID)
 	if call == nil ||
-		call.State != ToolCallStatePending ||
+		call.State != ToolCallStateEvaluationQueued ||
 		run.Controls.CancellationRequested ||
 		run.Controls.Paused ||
 		run.State.Terminal() ||
@@ -802,6 +821,7 @@ func (r *Runtime) dispatchToolEvaluation(
 	if evaluationErr != nil {
 		call.State = ToolCallStateFailed
 		call.LastFailure = evaluationErr.Error()
+		removeRequestedCall(run, call.ID)
 		r.touchRunLocked(sessionValue, run)
 
 		r.recordRunEventLocked(
@@ -934,16 +954,9 @@ func (r *Runtime) dispatchToolEvaluation(
 
 	case ToolEvaluationAllowed:
 		call.Authorization = cloneRaw(evaluation.Authorization)
-		call.State = ToolCallStatePending
+		call.State = ToolCallStateReady
 		r.touchRunLocked(sessionValue, run)
-
-		effects.work = append(effects.work, runtimeWork{
-			Kind:       workToolExecute,
-			SessionID:  sessionValue.ID,
-			RunID:      run.ID,
-			ToolCallID: call.ID,
-			Automatic:  work.Automatic,
-		})
+		advance = true
 
 	default:
 		call.State = ToolCallStateFailed
@@ -1023,17 +1036,44 @@ func (r *Runtime) dispatchToolExecution(
 	}
 
 	call := findToolCall(run, work.ToolCallID)
-	if call == nil ||
-		call.State != ToolCallStatePending ||
-		run.Controls.CancellationRequested ||
-		run.Controls.Paused ||
-		run.State.Terminal() ||
+	if call == nil || call.State != ToolCallStateExecutionQueued {
+		r.mu.Unlock()
+		return
+	}
+	if run.Controls.CancellationRequested || run.State.Terminal() {
+		r.mu.Unlock()
+		return
+	}
+	if run.Controls.Paused ||
+		hasPendingRecoveryReview(run) ||
 		(work.Automatic &&
 			automationHoldApplies(
 				run.Controls.AutomaticTools,
 				call.OriginOperationID,
 			)) {
+		changed := r.releaseQueuedToolWorkLocked(
+			sessionValue,
+			run,
+			call,
+		)
+		effects := runtimeEffects{}
+		if changed && !run.Controls.Paused {
+			r.advanceDriverLocked(
+				sessionValue,
+				run,
+				"",
+				DriverEvent{Kind: DriverEventControlsChanged},
+				&effects,
+			)
+			r.checkpointLocked(
+				&effects,
+				RuntimeEventRunStateChanged,
+				sessionValue,
+				run,
+			)
+		}
 		r.mu.Unlock()
+		r.flushEffects(executionCtx, effects)
 		return
 	}
 
@@ -1138,6 +1178,8 @@ func (r *Runtime) dispatchToolExecution(
 		attemptRecord.FinishedAt = r.now()
 		call.State = ToolCallStateFailed
 		call.LastFailure = executionErr.Error()
+		call.Authorization = nil
+		removeRequestedCall(run, call.ID)
 		r.touchRunLocked(sessionValue, run)
 
 		r.recordRunEventLocked(
@@ -1344,7 +1386,7 @@ func (r *Runtime) dispatchWaitResolution(
 	switch resolution.Status {
 	case ToolWaitResolutionApproved:
 		call.Authorization = cloneRaw(resolution.Authorization)
-		call.State = ToolCallStatePending
+		call.State = ToolCallStateReady
 
 	case ToolWaitResolutionDenied:
 		result := ToolExecutionResult{

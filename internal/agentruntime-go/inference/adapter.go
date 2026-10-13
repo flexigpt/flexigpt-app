@@ -181,6 +181,7 @@ func (a *Adapter) ExecuteModel(
 	}
 
 	completionRequest := &inferenceRuntimeSpec.CompletionRequest{
+		SystemPrompt: request.Configuration.SystemPrompt,
 		Model: inferenceRuntimeSpec.RuntimeModelRequest{
 			Model:        modelRef,
 			RequestPatch: requestPatch,
@@ -371,7 +372,7 @@ func appendMaterializedAttachmentInputs(
 		return inputs, nil
 	}
 
-	items, err := buildContentItemsFromAttachments(ctx, attachments)
+	items, err := buildContentItemsFromAttachments(ctx, attachments, true)
 	if err != nil || len(items) == 0 {
 		return inputs, err
 	}
@@ -478,11 +479,14 @@ func buildInputsFromTranscriptMessage(
 			wireTypeField:     result.Type,
 			wireChoiceIDField: result.ChoiceID,
 			wireIDField:       string(result.ID),
-			wireCallIDField:   string(result.CallID),
-			wireRoleField:     wireToolRole,
-			wireStatusField:   wireCompletedStatus,
-			wireNameField:     result.Name,
-			wireIsErrorField:  result.Kind != sessionRuntime.ToolResultKindSuccess,
+			wireCallIDField: firstNonEmpty(
+				result.ProviderCallID,
+				string(result.CallID),
+			),
+			wireRoleField:    wireToolRole,
+			wireStatusField:  wireCompletedStatus,
+			wireNameField:    result.Name,
+			wireIsErrorField: result.Kind != sessionRuntime.ToolResultKindSuccess,
 			wireContentsField: []map[string]any{
 				{
 					wireKindField: wireTextKind,

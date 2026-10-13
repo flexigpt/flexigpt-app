@@ -106,7 +106,7 @@ func projectTranscriptMessage(
 
 	output.Attachments = slices.Clone(value.Attachments)
 	output.ProtocolInputs = nil
-	output.ProtocolOutputs = nil
+	output.ProtocolOutputs = slices.Clone(value.ProtocolOutputs)
 	output.ToolResults = projectToolResults(value.ToolResults)
 	output.MCPAppContext = nil
 	output.Metadata = nil
@@ -196,7 +196,7 @@ func projectModelOperations(
 		operation.Request.Current = projectTranscriptMessage(
 			values[index].Request.Current,
 		)
-		operation.ProtocolOutputs = nil
+		operation.ProtocolOutputs = slices.Clone(values[index].ProtocolOutputs)
 		operation.ToolCallIDs = slices.Clone(values[index].ToolCallIDs)
 		operation.Metadata = nil
 

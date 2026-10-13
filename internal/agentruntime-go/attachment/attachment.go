@@ -67,6 +67,10 @@ func WithForceFetchContentBlock(forceFetch bool) ContentBlockOption {
 // It does NOT attach the content block to the attachment.
 func (att *Attachment) BuildContentBlock(ctx context.Context, opts ...ContentBlockOption,
 ) (*ContentBlock, error) {
+	if att == nil {
+		return nil, errors.New("attachment is nil")
+	}
+
 	buildContentOptions := getBuildContentBlockOptions(opts...)
 
 	// Ensure refs are populated; caller may have done this earlier,
@@ -106,6 +110,11 @@ func (att *Attachment) BuildContentBlock(ctx context.Context, opts ...ContentBlo
 				return nil, err
 			}
 			return att.GetTextBlockWithDisplayNameOnly("(binary file; not readable in this chat)")
+		}
+		if buildContentOptions.OnlyIfTextKind &&
+			cb != nil &&
+			cb.Kind != ContentBlockText {
+			return nil, ErrNonTextContentBlock
 		}
 		return cb, nil
 

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"sort"
 	"strings"
 
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
@@ -26,6 +27,9 @@ func NewSecretRedactor(resolved mcpConnection.PreparedConnection) *SecretRedacto
 		values = append(values, v)
 	}
 
+	sort.Slice(values, func(i, j int) bool {
+		return len(values[i]) > len(values[j])
+	})
 	return &SecretRedactor{values: values}
 }
 

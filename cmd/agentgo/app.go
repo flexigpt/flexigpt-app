@@ -82,14 +82,8 @@ func newApp() *App {
 		app.dataBasePath,
 		storageName(topology.ApplicationStorageSettingsDirectory),
 	)
-	app.conversationsDirPath = filepath.Join(
-		app.dataBasePath,
-		storageName(topology.ApplicationStorageConversationsDirectory),
-	)
-	app.sessionsDirPath = filepath.Join(
-		app.dataBasePath,
-		"sessions",
-	)
+	app.conversationsDirPath = filepath.Join(app.dataBasePath, "conversations_v2")
+	app.sessionsDirPath = filepath.Join(app.dataBasePath, "sessions_v1")
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(

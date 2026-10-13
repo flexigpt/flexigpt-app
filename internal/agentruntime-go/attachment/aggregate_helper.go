@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -276,29 +275,58 @@ func BuildContentBlocks(ctx context.Context, atts []Attachment, opts ...ContentB
 	blocks := make([]ContentBlock, 0, len(atts))
 	buildContentOptions := getBuildContentBlockOptions(opts...)
 	for i := range atts {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		att := &atts[i]
 		b, err := att.BuildContentBlock(ctx, opts...)
 		if err != nil {
 			switch {
 			case errors.Is(err, ErrExistingContentBlock):
-				// If content block already existed we should just reattach it.
 				b = att.ContentBlock
-				slog.Warn("got existing att", "a", att)
+				if b == nil {
+					return nil, fmt.Errorf(
+						"attachment %d reported an existing content block but has none",
+						i,
+					)
+				}
 
 			case errors.Is(err, ErrAttachmentModifiedSinceSnapshot) && !buildContentOptions.OverrideOriginal:
 				displayBlock, err := att.GetTextBlockWithDisplayNameOnly(
 					"attachment modified since this message was sent",
 				)
 				if err != nil {
-					continue
+					return nil, fmt.Errorf(
+						"build modified attachment %d display block: %w",
+						i,
+						err,
+					)
 				}
 				b = displayBlock
-			default:
-				slog.Warn("failed to build content block for attachment", "err", err, "attachment", att)
-				// Skip this content block. It is ok if the build block skipped this because OnlyIfTextKind was set or
-				// any other error.
+
+			case errors.Is(err, ErrNonTextContentBlock) &&
+				buildContentOptions.OnlyIfTextKind:
 				continue
+
+			default:
+				return nil, fmt.Errorf(
+					"build attachment %d content block: %w",
+					i,
+					err,
+				)
 			}
+		}
+
+		if b == nil {
+			return nil, fmt.Errorf(
+				"attachment %d produced no content block",
+				i,
+			)
+		}
+		if buildContentOptions.OnlyIfTextKind &&
+			b.Kind != ContentBlockText {
+			continue
 		}
 
 		blocks = append(blocks, *b)

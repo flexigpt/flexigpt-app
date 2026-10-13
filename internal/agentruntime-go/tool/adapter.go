@@ -11,7 +11,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
-type GoTargetInvoker interface {
+type ContextGoTargetInvoker interface {
+	InvokeGoToolTarget(
+		ctx context.Context,
+		target composition.CapabilityTarget,
+		args string,
+		timeoutMS int,
+	) (*llmtoolsutil.InvokeResponse, error)
+}
+
+// LegacyGoTargetInvoker keeps existing ToolStore wrappers source-compatible
+// while newer wrappers receive the Run cancellation context.
+type LegacyGoTargetInvoker interface {
 	InvokeGoToolTarget(
 		target composition.CapabilityTarget,
 		args string,
@@ -20,14 +31,21 @@ type GoTargetInvoker interface {
 }
 
 type Adapter struct {
-	invoker GoTargetInvoker
+	invoker any
 }
 
 func NewAdapter(
-	invoker GoTargetInvoker,
+	invoker any,
 ) (*Adapter, error) {
 	if invoker == nil {
 		return nil, errors.New("session go-tool adapter requires a target invoker")
+	}
+	if _, ok := invoker.(ContextGoTargetInvoker); !ok {
+		if _, legacy := invoker.(LegacyGoTargetInvoker); !legacy {
+			return nil, errors.New(
+				"session go-tool adapter target invoker has an unsupported signature",
+			)
+		}
 	}
 
 	return &Adapter{invoker: invoker}, nil
@@ -43,9 +61,9 @@ func (a *Adapter) EvaluateTool(
 }
 
 func (a *Adapter) ExecuteTool(
-	_ context.Context,
+	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
-) (sessionRuntime.ToolExecutionResult, error) {
+) (res sessionRuntime.ToolExecutionResult, err error) {
 	var binding struct {
 		Target    composition.CapabilityTarget `json:"target"`
 		TimeoutMS int                          `json:"timeoutMS,omitempty"`
@@ -57,11 +75,26 @@ func (a *Adapter) ExecuteTool(
 		)
 	}
 
-	response, err := a.invoker.InvokeGoToolTarget(
-		binding.Target,
-		string(request.ToolCall.Arguments),
-		binding.TimeoutMS,
-	)
+	var response *llmtoolsutil.InvokeResponse
+	switch invoker := a.invoker.(type) {
+	case ContextGoTargetInvoker:
+		response, err = invoker.InvokeGoToolTarget(
+			ctx,
+			binding.Target,
+			string(request.ToolCall.Arguments),
+			binding.TimeoutMS,
+		)
+	case LegacyGoTargetInvoker:
+		response, err = invoker.InvokeGoToolTarget(
+			binding.Target,
+			string(request.ToolCall.Arguments),
+			binding.TimeoutMS,
+		)
+	default:
+		return sessionRuntime.ToolExecutionResult{}, errors.New(
+			"go-tool target invoker is unavailable",
+		)
+	}
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
 	}

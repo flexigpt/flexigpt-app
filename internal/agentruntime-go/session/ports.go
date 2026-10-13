@@ -48,6 +48,26 @@ type ModelExecutor interface {
 	) (ModelExecutionResult, error)
 }
 
+type SubmissionPreparationRequest struct {
+	SessionID            SessionID
+	Configuration        SessionConfiguration
+	Input                UserInput
+	PersistConfiguration bool
+}
+
+type PreparedSubmission struct {
+	Configuration        SessionConfiguration
+	Input                UserInput
+	PersistConfiguration bool
+}
+
+type SubmissionPreparer interface {
+	PrepareSubmission(
+		ctx context.Context,
+		request SubmissionPreparationRequest,
+	) (PreparedSubmission, error)
+}
+
 type ToolEvaluationDecision string
 
 const (
@@ -167,11 +187,11 @@ type WorkspaceResolver interface {
 	ValidateWorkspace(ctx context.Context, req WorkspaceResolutionRequest) error
 }
 
-type AttachmentMaterializer interface {
-	MaterializeAttachments(
+type AttachmentPreparer interface {
+	PrepareAttachments(
 		ctx context.Context,
 		refs []AttachmentReference,
-	) error
+	) ([]AttachmentReference, error)
 }
 
 type RuntimeEventKind string
@@ -254,12 +274,13 @@ type RecoverySource interface {
 }
 
 type RuntimeDependencies struct {
+	Preparation SubmissionPreparer
 	Model       ModelExecutor
 	Tools       ToolExecutor
 	Skills      SkillSessionController
 	Agents      AgentResolver
 	Workspace   WorkspaceResolver
-	Attachments AttachmentMaterializer
+	Attachments AttachmentPreparer
 	Events      EventPublisher
 	Checkpoints CheckpointSink
 	Diagnostics DiagnosticSink

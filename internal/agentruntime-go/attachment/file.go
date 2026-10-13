@@ -183,8 +183,17 @@ func (ref *FileRef) BuildContentBlock(
 			// Could not detect mime or non pdf text attachment sent, render as unreadable file.
 			return nil, ErrUnreadableFile
 		}
-		// Text mode mimes and pdf with text extraction is supported.
-		return ref.getTextBlock(ctx, mimeType)
+		// Text mode mimes and PDF text extraction are supported. PDF fallback
+		// can produce a binary file block, which must not bypass text-only
+		// callers.
+		block, err := ref.getTextBlock(ctx, mimeType)
+		if err != nil {
+			return nil, err
+		}
+		if onlyIfTextKind && block != nil && block.Kind != ContentBlockText {
+			return nil, ErrNonTextContentBlock
+		}
+		return block, nil
 
 	case AttachmentContentBlockModeNotReadable,
 		AttachmentContentBlockModePageContent,

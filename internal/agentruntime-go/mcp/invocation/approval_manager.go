@@ -58,6 +58,17 @@ func NewApprovalManager(ttl time.Duration) *ApprovalManager {
 	}
 }
 
+func (m *ApprovalManager) ExpiresAt(approvalID string) (time.Time, error) {
+	pending, found := m.pending[approvalID]
+	if !found {
+		return time.Time{}, fmt.Errorf(
+			"%w: approval was not found",
+			mcpServer.ErrMCPInvalidRuntimeRequest,
+		)
+	}
+	return pending.ExpiresAt, nil
+}
+
 func (m *ApprovalManager) Create(
 	ctx context.Context,
 	summary mcpServer.MCPApprovalSummary,

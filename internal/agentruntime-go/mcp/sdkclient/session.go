@@ -209,7 +209,10 @@ func (s *Session) CallTool(
 		return nil, err
 	}
 	if res == nil {
-		res = &mcpSDK.CallToolResult{}
+		return nil, fmt.Errorf(
+			"%w: tools/call returned nil response",
+			mcpServer.ErrMCPRuntimeNotReady,
+		)
 	}
 
 	return &mcpServer.InvokeMCPToolResponseBody{

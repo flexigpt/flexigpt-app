@@ -11,6 +11,7 @@ import (
 func buildContentItemsFromAttachments(
 	ctx context.Context,
 	atts []attachmentRuntime.Attachment,
+	overrideOriginal bool,
 ) ([]inferenceSpec.InputOutputContentItemUnion, error) {
 	items := make([]inferenceSpec.InputOutputContentItemUnion, 0)
 	if len(atts) == 0 {
@@ -20,7 +21,7 @@ func buildContentItemsFromAttachments(
 	blocks, err := attachmentRuntime.BuildContentBlocks(
 		ctx,
 		atts,
-		attachmentRuntime.WithOverrideOriginalContentBlock(true),
+		attachmentRuntime.WithOverrideOriginalContentBlock(overrideOriginal),
 		attachmentRuntime.WithOnlyTextKindContentBlock(false),
 	)
 	if err != nil {

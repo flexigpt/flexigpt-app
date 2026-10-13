@@ -32,7 +32,6 @@ type ApplicationStorageKey string
 const (
 	ApplicationStorageDataDirectory          ApplicationStorageKey = "dataDirectory"
 	ApplicationStorageSettingsDirectory      ApplicationStorageKey = "settingsDirectory"
-	ApplicationStorageConversationsDirectory ApplicationStorageKey = "conversationsDirectory"
 	ApplicationStorageArtifactStoreDirectory ApplicationStorageKey = "artifactStoreDirectory"
 )
 
@@ -626,7 +625,6 @@ func parseApplicationStorage(
 	for _, key := range []ApplicationStorageKey{
 		ApplicationStorageDataDirectory,
 		ApplicationStorageSettingsDirectory,
-		ApplicationStorageConversationsDirectory,
 		ApplicationStorageArtifactStoreDirectory,
 	} {
 		if _, found := output[key]; found {

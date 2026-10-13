@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
@@ -31,6 +32,16 @@ func (a *Adapter) EvaluateTool(
 	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolEvaluation, error) {
+	if len(request.Authorization) != 0 {
+		// Invocation performs exact-scope revalidation and token consumption.
+		return sessionRuntime.ToolEvaluation{
+			Decision: sessionRuntime.ToolEvaluationAllowed,
+			Authorization: append(
+				json.RawMessage(nil),
+				request.Authorization...,
+			),
+		}, nil
+	}
 	mapping, invokeRequest, err := decodeRequest(request)
 	if err != nil {
 		return sessionRuntime.ToolEvaluation{}, err
@@ -80,6 +91,22 @@ func (a *Adapter) EvaluateTool(
 			return sessionRuntime.ToolEvaluation{}, marshalErr
 		}
 
+		var expiresAt *time.Time
+		if strings.TrimSpace(evaluation.ExpiresAt) != "" {
+			value, parseErr := time.Parse(
+				time.RFC3339Nano,
+				evaluation.ExpiresAt,
+			)
+			if parseErr != nil {
+				return sessionRuntime.ToolEvaluation{}, fmt.Errorf(
+					"decode MCP approval expiration: %w",
+					parseErr,
+				)
+			}
+			value = value.UTC()
+			expiresAt = &value
+		}
+
 		return sessionRuntime.ToolEvaluation{
 			Decision: sessionRuntime.ToolEvaluationWait,
 			Reason:   evaluation.Reason,
@@ -92,6 +119,7 @@ func (a *Adapter) EvaluateTool(
 					sessionRuntime.WaitResolutionDenyOnce,
 					sessionRuntime.WaitResolutionDenyAlways,
 				},
+				ExpiresAt:         expiresAt,
 				ExecutorReference: evaluation.ApprovalID,
 			},
 		}, nil
@@ -194,6 +222,19 @@ func (a *Adapter) ResolveToolWait(
 		resolution,
 	)
 	if err != nil {
+		if errors.Is(err, mcpServer.ErrMCPInvalidRuntimeRequest) ||
+			errors.Is(err, mcpServer.ErrMCPApprovalNeeded) {
+			message := "MCP approval expired or is no longer valid"
+			return sessionRuntime.ToolWaitResolution{
+				Status: sessionRuntime.ToolWaitResolutionDenied,
+				Result: &sessionRuntime.ToolExecutionResult{
+					HasResult: true,
+					Kind:      sessionRuntime.ToolResultKindError,
+					Text:      failureText(message),
+					Error:     message,
+				},
+			}, nil
+		}
 		return sessionRuntime.ToolWaitResolution{}, err
 	}
 

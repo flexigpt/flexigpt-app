@@ -19,6 +19,7 @@ var (
 	ErrSessionNotFound   = errors.New("session not found")
 	ErrRunNotFound       = errors.New("run not found")
 	ErrCommandIDConflict = errors.New("command ID was reused with a different payload")
+	ErrCommandInProgress = errors.New("command ID is already being processed")
 )
 
 type commandRecord struct {
@@ -37,6 +38,7 @@ const (
 	workToolEvaluate workKind = "toolEvaluate"
 	workToolExecute  workKind = "toolExecute"
 	workResolveWait  workKind = "resolveWait"
+	workExpireWait   workKind = "expireWait"
 	workCloseSkill   workKind = "closeSkill"
 )
 
@@ -87,13 +89,18 @@ type Runtime struct {
 
 	drivers map[string]ExecutionDriver
 
-	commandRecords   map[CommandID]commandRecord
-	sessionSequences map[SessionID]uint64
-	waitReferences   map[WaitID]waitReference
-	cancels          map[string]context.CancelFunc
+	commandRecords      map[CommandID]commandRecord
+	commandReservations map[CommandID]string
+	sessionSequences    map[SessionID]uint64
+	waitReferences      map[WaitID]waitReference
+	waitExpirers        map[WaitID]context.CancelFunc
+	cancels             map[string]context.CancelFunc
 
 	subscribers      map[uint64]chan RuntimeEvent
 	nextSubscriberID uint64
+
+	lifecycleCtx    context.Context
+	lifecycleCancel context.CancelFunc
 
 	closed bool
 
@@ -110,17 +117,23 @@ func NewRuntime(
 		return nil, errors.New("session runtime requires a model executor")
 	}
 
+	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+
 	runtime := &Runtime{
-		deps:             dependencies,
-		sessions:         make(map[SessionID]*Session),
-		runs:             make(map[RunID]*Run),
-		runToSession:     make(map[RunID]SessionID),
-		drivers:          make(map[string]ExecutionDriver),
-		commandRecords:   make(map[CommandID]commandRecord),
-		sessionSequences: make(map[SessionID]uint64),
-		waitReferences:   make(map[WaitID]waitReference),
-		cancels:          make(map[string]context.CancelFunc),
-		subscribers:      make(map[uint64]chan RuntimeEvent),
+		deps:                dependencies,
+		sessions:            make(map[SessionID]*Session),
+		runs:                make(map[RunID]*Run),
+		runToSession:        make(map[RunID]SessionID),
+		drivers:             make(map[string]ExecutionDriver),
+		commandRecords:      make(map[CommandID]commandRecord),
+		commandReservations: make(map[CommandID]string),
+		sessionSequences:    make(map[SessionID]uint64),
+		waitReferences:      make(map[WaitID]waitReference),
+		waitExpirers:        make(map[WaitID]context.CancelFunc),
+		cancels:             make(map[string]context.CancelFunc),
+		subscribers:         make(map[uint64]chan RuntimeEvent),
+		lifecycleCtx:        lifecycleCtx,
+		lifecycleCancel:     lifecycleCancel,
 	}
 
 	runtime.drivers[SequentialChatDriverKind] = NewSequentialChatDriver()
@@ -167,6 +180,30 @@ func (r *Runtime) Close() {
 	}
 	clear(r.cancels)
 
+	waitCancels := make([]context.CancelFunc, 0, len(r.waitExpirers))
+	for _, cancel := range r.waitExpirers {
+		waitCancels = append(waitCancels, cancel)
+	}
+	clear(r.waitExpirers)
+	clear(r.waitReferences)
+
+	skillClosures := make([]runtimeWork, 0)
+	for _, run := range r.runs {
+		if run == nil || run.SkillSession.ID == "" {
+			continue
+		}
+		skillClosures = append(skillClosures, runtimeWork{
+			Kind:      workCloseSkill,
+			SessionID: run.SessionID,
+			RunID:     run.ID,
+			SkillID:   run.SkillSession.ID,
+		})
+		run.SkillSession.ID = ""
+	}
+
+	lifecycleCancel := r.lifecycleCancel
+	r.lifecycleCancel = nil
+
 	subscribers := r.subscribers
 	r.subscribers = make(map[uint64]chan RuntimeEvent)
 	r.mu.Unlock()
@@ -175,11 +212,31 @@ func (r *Runtime) Close() {
 	r.effectClosing = true
 	r.effectMu.Unlock()
 
+	if lifecycleCancel != nil {
+		lifecycleCancel()
+	}
 	for _, cancel := range cancels {
+		cancel()
+	}
+	for _, cancel := range waitCancels {
 		cancel()
 	}
 
 	r.effectWG.Wait()
+
+	for _, closeWork := range skillClosures {
+		closeCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		r.closeSkillSession(
+			closeCtx,
+			closeWork.SkillID,
+			closeWork.SessionID,
+			closeWork.RunID,
+		)
+		cancel()
+	}
 
 	for _, subscriber := range subscribers {
 		close(subscriber)
@@ -602,7 +659,11 @@ func (r runtimeRestorer) RestoreSession(
 	if copyValue.UpdatedAt.IsZero() {
 		copyValue.UpdatedAt = copyValue.CreatedAt
 	}
+	if _, found := r.runtime.sessions[copyValue.ID]; found {
+		return fmt.Errorf("recovery session %q is duplicated", copyValue.ID)
+	}
 	r.runtime.sessions[copyValue.ID] = &copyValue
+	r.runtime.sessionSequences[copyValue.ID] = uint64(copyValue.Revision)
 
 	return nil
 }
@@ -638,6 +699,19 @@ func (r runtimeRestorer) RestoreRun(
 	copyValue := cloneJSON(runValue)
 	normalizeRecoveredRun(&copyValue, r.runtime.now())
 
+	if _, found := r.runtime.runs[copyValue.ID]; found {
+		return fmt.Errorf("recovery run %q is duplicated", copyValue.ID)
+	}
+	if active := r.runtime.activeRunLocked(sessionValue); active != nil &&
+		!copyValue.State.Terminal() {
+		return fmt.Errorf(
+			"recovery run %q conflicts with active run %q in session %q",
+			copyValue.ID,
+			active.ID,
+			copyValue.SessionID,
+		)
+	}
+
 	r.runtime.runs[copyValue.ID] = &copyValue
 	r.runtime.runToSession[copyValue.ID] = copyValue.SessionID
 
@@ -657,6 +731,8 @@ func normalizeRecoveredRun(
 	if run == nil {
 		return
 	}
+	run.SkillSession.ID = ""
+	run.SkillSession.Generation++
 
 	requiresRecoveryReview := false
 
@@ -694,7 +770,9 @@ func normalizeRecoveredRun(
 		}
 
 		switch call.State {
-		case ToolCallStateEvaluating,
+		case ToolCallStateEvaluationQueued,
+			ToolCallStateEvaluating,
+			ToolCallStateExecutionQueued,
 			ToolCallStateWaiting,
 			ToolCallStateRunning:
 			requiresRecoveryReview = true

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -98,6 +99,11 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 	ln, err := lc.Listen(ctx, "tcp", listenAddr)
 	if err != nil {
 		return nil, fmt.Errorf("start OAuth loopback listener: %w", err)
+	}
+	tcpAddress, ok := ln.Addr().(*net.TCPAddr)
+	if !ok || tcpAddress.IP == nil || !tcpAddress.IP.IsLoopback() {
+		_ = ln.Close()
+		return nil, errors.New("OAuth callback listener must bind a loopback address")
 	}
 
 	b := &OAuthLoopbackBroker{
@@ -219,6 +225,13 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	}
 
 	b.mu.Lock()
+	if b.closed || b.serveErr != nil {
+		b.mu.Unlock()
+		return nil, fmt.Errorf(
+			"%w: OAuth loopback listener is unavailable",
+			ErrMCPAuthRequired,
+		)
+	}
 	b.purgeExpiredLocked(now)
 
 	key := oauthPendingKey{Server: p.Server}
@@ -328,6 +341,10 @@ func (b *OAuthLoopbackBroker) Close() error {
 }
 
 func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -511,6 +528,17 @@ func authorizationState(rawURL string) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return "", fmt.Errorf("%w: invalid OAuth authorization URL", ErrMCPAuthRequired)
+	}
+	if !u.IsAbs() ||
+		u.Hostname() == "" ||
+		u.User != nil ||
+		u.Fragment != "" ||
+		(!strings.EqualFold(u.Scheme, "http") &&
+			!strings.EqualFold(u.Scheme, "https")) {
+		return "", fmt.Errorf(
+			"%w: invalid OAuth authorization URL",
+			ErrMCPAuthRequired,
+		)
 	}
 
 	state := u.Query().Get("state")

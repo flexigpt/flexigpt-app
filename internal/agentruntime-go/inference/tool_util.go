@@ -16,6 +16,8 @@ import (
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 )
 
 type ToolSource interface {
@@ -29,39 +31,58 @@ func buildToolChoices(
 	ctx context.Context,
 	toolsSvc ToolSource,
 	selections []conversationSpec.ToolSelection,
-) ([]inferenceSpec.ToolChoice, error) {
+) (
+	tc []inferenceSpec.ToolChoice,
+	tb []inferenceRuntimeSpec.PreparedToolBinding,
+	err error,
+) {
 	if len(selections) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	output := make([]inferenceSpec.ToolChoice, 0, len(selections))
-	seen := make(map[string]struct{}, len(selections))
+	bindings := make(
+		[]inferenceRuntimeSpec.PreparedToolBinding,
+		0,
+		len(selections),
+	)
+	seenIDs := make(map[string]struct{}, len(selections))
+	seenNames := make(map[string]struct{}, len(selections))
 
 	for index, selection := range selections {
-		if _, duplicate := seen[selection.ChoiceID]; duplicate {
-			return nil, fmt.Errorf(
+		if _, duplicate := seenIDs[selection.ChoiceID]; duplicate {
+			return nil, nil, fmt.Errorf(
 				"%w: Tool choice %q is repeated",
 				storeSpec.ErrIdentityConflict,
 				selection.ChoiceID,
 			)
 		}
-		seen[selection.ChoiceID] = struct{}{}
+		seenIDs[selection.ChoiceID] = struct{}{}
 
-		choice, err := hydrateInferenceToolChoice(
+		choice, binding, err := hydrateInferenceToolChoice(
 			ctx,
 			toolsSvc,
 			selection,
 		)
 		if err != nil {
-			return nil, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"hydrate Tool choice %d: %w",
 				index,
 				err,
 			)
 		}
+		if _, duplicate := seenNames[choice.Name]; duplicate {
+			return nil, nil, fmt.Errorf(
+				"%w: Tool provider name %q is repeated",
+				storeSpec.ErrIdentityConflict,
+				choice.Name,
+			)
+		}
+		seenNames[choice.Name] = struct{}{}
 		output = append(output, choice)
+		bindings = append(bindings, binding)
 	}
-	return output, nil
+	return output, bindings, nil
 }
 
 // hydrateInferenceToolChoice converts either supported source-backed Tool
@@ -72,20 +93,30 @@ func hydrateInferenceToolChoice(
 	ctx context.Context,
 	toolsSvc ToolSource,
 	selection conversationSpec.ToolSelection,
-) (inferenceSpec.ToolChoice, error) {
+) (
+	inferenceSpec.ToolChoice,
+	inferenceRuntimeSpec.PreparedToolBinding,
+	error,
+) {
 	if err := selection.Validate(); err != nil {
-		return inferenceSpec.ToolChoice{}, err
+		return inferenceSpec.ToolChoice{},
+			inferenceRuntimeSpec.PreparedToolBinding{},
+			err
 	}
 
 	resolved, err := resolveToolTarget(ctx, toolsSvc, selection.Target)
 	if err != nil {
-		return inferenceSpec.ToolChoice{}, err
+		return inferenceSpec.ToolChoice{},
+			inferenceRuntimeSpec.PreparedToolBinding{},
+			err
 	}
 
 	document := resolved.Tool
 	arguments, err := toolArguments(document.InputSchema)
 	if err != nil {
-		return inferenceSpec.ToolChoice{}, err
+		return inferenceSpec.ToolChoice{},
+			inferenceRuntimeSpec.PreparedToolBinding{},
+			err
 	}
 
 	choice := inferenceSpec.ToolChoice{
@@ -98,22 +129,53 @@ func hydrateInferenceToolChoice(
 	case toolv1.ImplementationKindGo:
 		choice.Type = inferenceSpec.ToolType("function")
 		choice.Arguments = arguments
-		return choice, nil
+		rawBinding, err := json.Marshal(map[string]any{
+			"target": selection.Target,
+		})
+		if err != nil {
+			return inferenceSpec.ToolChoice{},
+				inferenceRuntimeSpec.PreparedToolBinding{},
+				err
+		}
+		return choice, inferenceRuntimeSpec.PreparedToolBinding{
+			ChoiceID:    choice.ID,
+			Name:        choice.Name,
+			Type:        string(choice.Type),
+			BindingKind: "go",
+			BindingData: rawBinding,
+			Required:    true,
+			Automatic:   selection.AutoExecute,
+		}, nil
 
 	case toolv1.ImplementationKindSDK:
-		return hydrateSDKToolChoice(
+		choice, err = hydrateSDKToolChoice(
 			choice,
 			document,
 			arguments,
 			selection.UserArgSchemaInstance,
 		)
+		if err != nil {
+			return inferenceSpec.ToolChoice{},
+				inferenceRuntimeSpec.PreparedToolBinding{},
+				err
+		}
+		return choice, inferenceRuntimeSpec.PreparedToolBinding{
+			ChoiceID:        choice.ID,
+			Name:            choice.Name,
+			Type:            string(choice.Type),
+			BindingKind:     "provider",
+			Required:        false,
+			ProviderManaged: true,
+		}, nil
 
 	default:
-		return inferenceSpec.ToolChoice{}, fmt.Errorf(
-			"%w: Tool implementation %q is unsupported",
-			storeSpec.ErrUnsupported,
-			document.Implementation.Kind,
-		)
+		return inferenceSpec.ToolChoice{},
+			inferenceRuntimeSpec.PreparedToolBinding{},
+			fmt.Errorf(
+				"%w: Tool implementation %q is unsupported",
+				storeSpec.ErrUnsupported,
+				document.Implementation.Kind,
+			)
 	}
 }
 

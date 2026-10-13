@@ -277,6 +277,7 @@ type MCPApprovalEvaluation struct {
 	Decision   MCPApprovalDecision `json:"decision"`
 	Reason     string              `json:"reason,omitempty"`
 	ApprovalID string              `json:"approvalID,omitempty"`
+	ExpiresAt  string              `json:"expiresAt,omitempty"`
 	Summary    *MCPApprovalSummary `json:"summary,omitempty"`
 }
 

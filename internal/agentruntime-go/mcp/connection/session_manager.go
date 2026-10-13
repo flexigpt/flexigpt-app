@@ -619,7 +619,10 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 		}
 	}
 
-	return cloneRuntimeConfig(state.config), cloneTool(tool), nil
+	config := cloneRuntimeConfig(state.config)
+	config.InvocationGeneration = state.generation
+	config.InvocationSnapshotDigest = state.snapshot.Digest
+	return config, cloneTool(tool), nil
 }
 
 func (m *MCPRuntimeManager) CallTool(
@@ -634,6 +637,20 @@ func (m *MCPRuntimeManager) CallTool(
 	state, err := m.readySession(ref)
 	if err != nil {
 		return nil, err
+	}
+	if request.ExpectedGeneration != 0 &&
+		request.ExpectedGeneration != state.generation {
+		return nil, fmt.Errorf(
+			"%w: MCP runtime generation changed after authorization",
+			ErrMCPStaleReference,
+		)
+	}
+	if request.ExpectedSnapshotDigest != "" &&
+		request.ExpectedSnapshotDigest != state.snapshot.Digest {
+		return nil, fmt.Errorf(
+			"%w: MCP discovery snapshot changed after authorization",
+			ErrMCPStaleReference,
+		)
 	}
 	tool, err := toolByName(state.snapshot, request.ToolName)
 	if err != nil {
@@ -1596,7 +1613,9 @@ func mergeSensitiveValues(groups ...[]string) []string {
 		}
 	}
 
-	sort.Strings(values)
+	sort.Slice(values, func(left, right int) bool {
+		return len(values[left]) > len(values[right])
+	})
 	return values
 }
 
@@ -1753,7 +1772,7 @@ func cloneSnapshot(
 
 	output.Resources = append([]MCPResourceRef(nil), input.Resources...)
 	for index := range output.Resources {
-		output.Resources[index].Annotations = maps.Clone(
+		output.Resources[index].Annotations = cloneAnyMap(
 			input.Resources[index].Annotations,
 		)
 	}
@@ -1766,7 +1785,7 @@ func cloneSnapshot(
 		output.ResourceTemplates[index].Arguments = maps.Clone(
 			input.ResourceTemplates[index].Arguments,
 		)
-		output.ResourceTemplates[index].Annotations = maps.Clone(
+		output.ResourceTemplates[index].Annotations = cloneAnyMap(
 			input.ResourceTemplates[index].Annotations,
 		)
 	}
@@ -1782,10 +1801,16 @@ func cloneSnapshot(
 
 func cloneTool(input MCPToolCapability) MCPToolCapability {
 	output := input
-	output.InputSchema = maps.Clone(input.InputSchema)
-	output.OutputSchema = maps.Clone(input.OutputSchema)
+	output.InputSchema = cloneAnyMap(input.InputSchema)
+	output.OutputSchema = cloneAnyMap(input.OutputSchema)
 	if input.Annotations != nil {
 		value := *input.Annotations
+		value.DestructiveHint = cloneBoolPointer(
+			input.Annotations.DestructiveHint,
+		)
+		value.OpenWorldHint = cloneBoolPointer(
+			input.Annotations.OpenWorldHint,
+		)
 		output.Annotations = &value
 	}
 	if input.App != nil {
@@ -1813,7 +1838,30 @@ func cloneCapabilities(
 		return nil
 	}
 	output := *input
-	output.Experimental = maps.Clone(input.Experimental)
-	output.Extensions = maps.Clone(input.Extensions)
+	output.Experimental = cloneAnyMap(input.Experimental)
+	output.Extensions = cloneAnyMap(input.Extensions)
 	return &output
+}
+
+func cloneBoolPointer(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
+}
+
+func cloneAnyMap(input map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return maps.Clone(input)
+	}
+	var output map[string]any
+	if err := json.Unmarshal(raw, &output); err != nil {
+		return maps.Clone(input)
+	}
+	return output
 }

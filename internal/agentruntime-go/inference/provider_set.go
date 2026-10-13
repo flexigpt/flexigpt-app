@@ -245,6 +245,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, err
 	}
 	modelParam := runtimeModel.ModelParam
+	if req.SystemPrompt != nil {
+		modelParam.SystemPrompt = *req.SystemPrompt
+	}
 
 	ck := uuidutil.NewUUIDv7()
 	currentMessage := req.Current
@@ -358,7 +361,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
-	toolChoices, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
+	toolChoices, _, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +627,7 @@ func (ps *ProviderSetAPI) buildInputs(
 	}
 
 	// Always process attachments into content items.
-	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments)
+	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments, true)
 	if err != nil {
 		return nil, nil, err
 	}

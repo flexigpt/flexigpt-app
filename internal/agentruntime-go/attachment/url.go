@@ -44,8 +44,11 @@ func (ref *URLRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 	if err != nil {
 		return fmt.Errorf("invalid url %q: %w", raw, err)
 	}
-	if !parsed.IsAbs() {
+	if !parsed.IsAbs() || parsed.Hostname() == "" || parsed.Opaque != "" {
 		return fmt.Errorf("url %q must be absolute", raw)
+	}
+	if parsed.User != nil {
+		return errors.New("attachment URLs must not contain credentials")
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("unsupported url scheme %q; only http and https are allowed", parsed.Scheme)

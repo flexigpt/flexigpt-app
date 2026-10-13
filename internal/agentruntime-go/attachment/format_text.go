@@ -1,6 +1,7 @@
 package attachment
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -29,18 +30,15 @@ func FormatTextBlockForLLM(b ContentBlock) (string, error) {
 	sb.WriteString("<<<FILE")
 	switch {
 	case filePath != "":
-		sb.WriteString(` path="`)
-		sb.WriteString(filePath) // no escaping
-		sb.WriteString(`"`)
+		sb.WriteString(` path=`)
+		sb.WriteString(strconv.Quote(filePath))
 	case fileName != "":
-		sb.WriteString(` name="`)
-		sb.WriteString(fileName) // no escaping
-		sb.WriteString(`"`)
+		sb.WriteString(` name=`)
+		sb.WriteString(strconv.Quote(fileName))
 	}
 	if blockURL != "" {
-		sb.WriteString(` url="`)
-		sb.WriteString(blockURL) // no escaping
-		sb.WriteString(`"`)
+		sb.WriteString(` url=`)
+		sb.WriteString(strconv.Quote(blockURL))
 	}
 	sb.WriteString(">>>\n")
 

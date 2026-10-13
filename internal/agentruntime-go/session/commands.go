@@ -1,3 +1,4 @@
+//nolint:nilerr // Ok.
 package session
 
 import (
@@ -14,6 +15,7 @@ import (
 const (
 	runtimeEventStateKey = "state"
 	runtimeEventErrorKey = "error"
+	toolCallNotFound     = "tool call was not found"
 )
 
 func (r *Runtime) CreateSession(
@@ -330,9 +332,74 @@ func (r *Runtime) ApplyAgent(
 		return &receipt, nil
 	}
 
-	nextConfiguration := cloneJSON(command.Application.Configuration)
-	nextConfiguration.Agent = &command.Application.Agent
-	if command.Application.PreserveWorkspace &&
+	var application AgentApplication
+	switch {
+	case command.Application != nil:
+		application = cloneJSON(*command.Application)
+
+	case r.deps.Agents != nil:
+		resolved, resolveErr := r.deps.Agents.ResolveAgent(
+			ctx,
+			AgentResolveRequest{
+				SessionID:            command.SessionID,
+				Agent:                command.Agent,
+				CurrentConfiguration: cloneJSON(sessionValue.Configuration),
+			},
+		)
+		if resolveErr != nil {
+			receipt := r.rejectReceiptLocked(
+				command.Meta,
+				fingerprint,
+				CommandReceipt{
+					CommandID:       command.Meta.ID,
+					SessionID:       command.SessionID,
+					SessionRevision: sessionValue.Revision,
+					Message:         resolveErr.Error(),
+				},
+			)
+			r.mu.Unlock()
+			//nolint:nilerr // Ok
+			return &receipt, nil
+		}
+		application = resolved
+
+	default:
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         "agent resolver is unavailable",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	if command.Agent.RootID != "" || command.Agent.ArtifactID != "" {
+		if command.Agent.RootID == "" ||
+			command.Agent.ArtifactID == "" ||
+			application.Agent.Reference != command.Agent {
+			receipt := r.rejectReceiptLocked(
+				command.Meta,
+				fingerprint,
+				CommandReceipt{
+					CommandID:       command.Meta.ID,
+					SessionID:       command.SessionID,
+					SessionRevision: sessionValue.Revision,
+					Message:         "resolved agent does not match the requested agent reference",
+				},
+			)
+			r.mu.Unlock()
+			return &receipt, nil
+		}
+	}
+
+	nextConfiguration := cloneJSON(application.Configuration)
+	nextConfiguration.Agent = &application.Agent
+	if application.PreserveWorkspace &&
 		len(nextConfiguration.WorkspaceSelection) == 0 {
 		nextConfiguration.WorkspaceSelection = cloneRaw(
 			sessionValue.Configuration.WorkspaceSelection,
@@ -347,7 +414,7 @@ func (r *Runtime) ApplyAgent(
 		Accepted:        true,
 		SessionID:       command.SessionID,
 		SessionRevision: sessionValue.Revision,
-		StarterText:     command.Application.StarterText,
+		StarterText:     application.StarterText,
 	}
 	r.finishCommandLocked(command.Meta, fingerprint, receipt)
 
@@ -358,7 +425,7 @@ func (r *Runtime) ApplyAgent(
 		command.Meta.ID,
 		RuntimeEventSessionConfigurationChanged,
 		map[string]any{
-			"agent": command.Application.Agent,
+			"agent": application.Agent,
 		},
 	)
 	r.checkpointLocked(
@@ -428,7 +495,6 @@ func (r *Runtime) StartRun(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
-
 	if active := r.activeRunLocked(sessionValue); active != nil {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
@@ -445,14 +511,117 @@ func (r *Runtime) StartRun(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+	if !hasUserInput(command.Input) {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         "run input must contain text, attachments, or MCP App context",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	effectiveConfiguration := cloneJSON(sessionValue.Configuration)
+	persistConfiguration := command.Configuration != nil
+	if command.Configuration != nil {
+		effectiveConfiguration = cloneJSON(*command.Configuration)
+	}
+	sessionRevisionBeforePreparation := sessionValue.Revision
+
+	r.mu.Unlock()
+	prepared, preparationErr := r.prepareSubmission(
+		ctx,
+		command.SessionID,
+		effectiveConfiguration,
+		command.Input,
+		persistConfiguration,
+	)
+	r.mu.Lock()
+
+	if r.closed {
+		delete(r.commandReservations, command.Meta.ID)
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+
+	sessionValue = r.sessions[command.SessionID]
+	if sessionValue == nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: command.SessionID,
+				Message:   ErrSessionNotFound.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if sessionValue.Revision != sessionRevisionBeforePreparation {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         "session changed while submission was being prepared; retry submission",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if active := r.activeRunLocked(sessionValue); active != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           active.ID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     active.Revision,
+				Message:         "an active run already owns this session",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if preparationErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         preparationErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+		//nolint:nilerr // Ok
+		return &receipt, nil
+	}
+
+	var runConfiguration *SessionConfiguration
+	if prepared.PersistConfiguration {
+		value := cloneJSON(prepared.Configuration)
+		runConfiguration = &value
+	}
 
 	effects := runtimeEffects{}
 	receipt, startErr := r.startRunLocked(
 		sessionValue,
 		command.Meta.ID,
 		command.RunID,
-		command.Input,
-		command.Configuration,
+		prepared.Input,
+		runConfiguration,
 		command.Limits,
 		&effects,
 	)
@@ -578,9 +747,101 @@ func (r *Runtime) UpdateContinuationInput(
 		return &receipt, nil
 	}
 
+	effectiveConfiguration := cloneJSON(run.Configuration)
+	if command.Input.Configuration != nil {
+		effectiveConfiguration = cloneJSON(*command.Input.Configuration)
+	}
+	sessionRevisionBeforePreparation := sessionValue.Revision
+	runRevisionBeforePreparation := run.Revision
+	continuationRevisionBeforePreparation := run.Continuation.Revision
+
+	r.mu.Unlock()
+	prepared, preparationErr := r.prepareSubmission(
+		ctx,
+		command.SessionID,
+		effectiveConfiguration,
+		UserInput{
+			Text:          command.Input.Text,
+			Attachments:   command.Input.Attachments,
+			MCPAppContext: command.Input.MCPAppContext,
+			Metadata:      command.Input.Metadata,
+		},
+		false,
+	)
+	r.mu.Lock()
+
+	if r.closed {
+		delete(r.commandReservations, command.Meta.ID)
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+
+	sessionValue, run, lookupErr = r.sessionAndRunLocked(
+		command.SessionID,
+		command.RunID,
+	)
+	if lookupErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID: command.Meta.ID,
+				SessionID: command.SessionID,
+				RunID:     command.RunID,
+				Message:   lookupErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return commandReceiptResult(receipt)
+	}
+	if sessionValue.Revision != sessionRevisionBeforePreparation ||
+		run.Revision != runRevisionBeforePreparation ||
+		run.Continuation.Revision != continuationRevisionBeforePreparation {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         "run changed while continuation input was being prepared; retry update",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if preparationErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         preparationErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+
+		return &receipt, nil
+	}
+
 	input := cloneJSON(command.Input)
+	input.Text = prepared.Input.Text
+	input.Attachments = prepared.Input.Attachments
+	input.MCPAppContext = cloneRaw(prepared.Input.MCPAppContext)
+	input.Metadata = cloneRaw(prepared.Input.Metadata)
+	if command.Input.Configuration != nil {
+		input.Configuration = &prepared.Configuration
+	}
 	input.Revision = run.Continuation.Revision + 1
+	input.ConsumedRevision = run.Continuation.ConsumedRevision
 	input.UpdatedAt = r.now()
+
 	run.Continuation = input
 	r.touchRunLocked(sessionValue, run)
 
@@ -742,9 +1003,6 @@ func (r *Runtime) ContinueRun(
 		return &receipt, nil
 	}
 
-	run.ContinuationRequested = true
-	r.touchRunLocked(sessionValue, run)
-
 	effects := runtimeEffects{}
 	work, continuationErr := r.beginContinuationModelLocked(
 		sessionValue,
@@ -850,7 +1108,11 @@ func (r *Runtime) ExecuteCalls(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
-	if run.Controls.Paused || run.Controls.CancellationRequested || run.State.Terminal() {
+	if run.Controls.Paused ||
+		run.Controls.CancellationRequested ||
+		run.State.Terminal() ||
+		run.ActiveModelOperationID != "" ||
+		hasPendingRecoveryReview(run) {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,
@@ -924,9 +1186,7 @@ func (r *Runtime) ExecuteCalls(
 			r.mu.Unlock()
 			return &receipt, nil
 		}
-		if call.State == ToolCallStateRunning ||
-			call.State == ToolCallStateEvaluating ||
-			call.State == ToolCallStateWaiting {
+		if message := toolMutationMessage(run, call); message != "" {
 			receipt := r.rejectReceiptLocked(
 				command.Meta,
 				fingerprint,
@@ -936,7 +1196,27 @@ func (r *Runtime) ExecuteCalls(
 					RunID:           command.RunID,
 					SessionRevision: sessionValue.Revision,
 					RunRevision:     run.Revision,
-					Message:         fmt.Sprintf("tool call %q is already active", callID),
+					Message:         message,
+				},
+			)
+			r.mu.Unlock()
+			return &receipt, nil
+		}
+		if call.State != ToolCallStatePending &&
+			call.State != ToolCallStateReady {
+			receipt := r.rejectReceiptLocked(
+				command.Meta,
+				fingerprint,
+				CommandReceipt{
+					CommandID:       command.Meta.ID,
+					SessionID:       command.SessionID,
+					RunID:           command.RunID,
+					SessionRevision: sessionValue.Revision,
+					RunRevision:     run.Revision,
+					Message: fmt.Sprintf(
+						"tool call %q is not runnable; retry it before execution",
+						callID,
+					),
 				},
 			)
 			r.mu.Unlock()
@@ -1071,7 +1351,7 @@ func (r *Runtime) RetryCall(
 				RunID:           command.RunID,
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     run.Revision,
-				Message:         "tool call was not found",
+				Message:         toolCallNotFound,
 			},
 		)
 		r.mu.Unlock()
@@ -1111,9 +1391,47 @@ func (r *Runtime) RetryCall(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+	if call.State != ToolCallStateFailed &&
+		call.State != ToolCallStateResolved {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         "tool call is not in a retryable state",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if call.State == ToolCallStateResolved {
+		result := selectedToolResult(*call)
+		if result == nil || result.Kind == ToolResultKindSuccess {
+			receipt := r.rejectReceiptLocked(
+				command.Meta,
+				fingerprint,
+				CommandReceipt{
+					CommandID:       command.Meta.ID,
+					SessionID:       command.SessionID,
+					RunID:           command.RunID,
+					SessionRevision: sessionValue.Revision,
+					RunRevision:     run.Revision,
+					Message:         "successful tool results cannot be retried",
+				},
+			)
+			r.mu.Unlock()
+			return &receipt, nil
+		}
+	}
 
 	call.SelectedResultID = ""
 	call.LastFailure = ""
+	call.Authorization = nil
+	call.WaitID = ""
 	call.State = ToolCallStatePending
 	run.RequestedCallIDs = appendUniqueToolCallIDs(
 		run.RequestedCallIDs,
@@ -1513,6 +1831,9 @@ func (r *Runtime) SetAutomationHold(
 	}
 
 	target := latestBatchOperationID(run)
+	if run.ActiveModelOperationID != "" {
+		target = run.ActiveModelOperationID
+	}
 	hold := AutomationHold{
 		Enabled:           command.Enabled,
 		Scope:             scope,
@@ -1677,25 +1998,31 @@ func (r *Runtime) CancelRun(
 
 	run.Controls.CancellationRequested = true
 	run.State = RunStateCancelling
+	r.cancelUndispatchedLocked(run)
 	r.touchRunLocked(sessionValue, run)
 
 	effects := runtimeEffects{}
 	for key, cancel := range r.cancels {
-		if strings.Contains(key, string(run.ID)) {
+		if strings.HasPrefix(key, "model:"+string(run.ID)+":") ||
+			strings.HasPrefix(key, "tool-evaluation:"+string(run.ID)+":") ||
+			strings.HasPrefix(key, "tool-execution:"+string(run.ID)+":") {
 			effects.cancels = append(effects.cancels, cancel)
 			delete(r.cancels, key)
 		}
 	}
 
-	if run.ActiveModelOperationID == "" && !hasInFlightToolCalls(run) {
+	if !hasActiveExternalWork(run) {
 		r.markRunTerminalLocked(
 			sessionValue,
 			run,
 			command.Meta.ID,
 			RunOutcome{
-				Kind:    RunOutcomeCancelled,
-				Code:    string(RunStateCancelled),
-				Message: strings.TrimSpace(command.Reason),
+				Kind: RunOutcomeCancelled,
+				Code: string(RunStateCancelled),
+				Message: firstNonEmpty(
+					strings.TrimSpace(command.Reason),
+					"run cancellation was requested",
+				),
 			},
 			&effects,
 		)
@@ -1741,6 +2068,66 @@ func (r *Runtime) EditAndResend(
 	ctx context.Context,
 	command EditAndResendCommand,
 ) (*CommandReceipt, error) {
+	type preparationSnapshot struct {
+		ready       bool
+		revision    Revision
+		config      SessionConfiguration
+		persistConf bool
+	}
+
+	// Do not hold the coordinator lock while attachment/model/tool/MCP
+	// preparation runs. Preparation is potentially slow and may perform I/O.
+	snapshot := preparationSnapshot{}
+
+	r.mu.RLock()
+	if r.closed {
+		r.mu.RUnlock()
+		return nil, ErrRuntimeClosed
+	}
+
+	sessionValue := r.sessions[command.SessionID]
+	if sessionValue != nil &&
+		hasUserInput(command.Input) &&
+		expectedSessionRevisionMessage(
+			sessionValue,
+			command.Meta.ExpectedSessionRevision,
+		) == "" &&
+		r.activeRunLocked(sessionValue) == nil {
+		index := -1
+		for i, message := range sessionValue.Transcript {
+			if message.ID == command.ReplaceMessageID {
+				index = i
+				break
+			}
+		}
+
+		if index >= 0 &&
+			sessionValue.Transcript[index].Role == MessageRoleUser {
+			snapshot.ready = true
+			snapshot.revision = sessionValue.Revision
+			snapshot.config = cloneJSON(sessionValue.Configuration)
+			snapshot.persistConf = command.Configuration != nil
+			if command.Configuration != nil {
+				snapshot.config = cloneJSON(*command.Configuration)
+			}
+		}
+	}
+	r.mu.RUnlock()
+
+	var (
+		prepared       PreparedSubmission
+		preparationErr error
+	)
+	if snapshot.ready {
+		prepared, preparationErr = r.prepareSubmission(
+			ctx,
+			command.SessionID,
+			snapshot.config,
+			command.Input,
+			snapshot.persistConf,
+		)
+	}
+
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -1761,7 +2148,7 @@ func (r *Runtime) EditAndResend(
 		return &previous, nil
 	}
 
-	sessionValue := r.sessions[command.SessionID]
+	sessionValue = r.sessions[command.SessionID]
 	if sessionValue == nil {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
@@ -1775,6 +2162,7 @@ func (r *Runtime) EditAndResend(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+
 	if message := expectedSessionRevisionMessage(
 		sessionValue,
 		command.Meta.ExpectedSessionRevision,
@@ -1792,6 +2180,7 @@ func (r *Runtime) EditAndResend(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+
 	if active := r.activeRunLocked(sessionValue); active != nil {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
@@ -1803,6 +2192,21 @@ func (r *Runtime) EditAndResend(
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     active.Revision,
 				Message:         "editing requires an explicit cancellation or a safe terminal boundary",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	if !hasUserInput(command.Input) {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         "run input must contain text, attachments, or MCP App context",
 			},
 		)
 		r.mu.Unlock()
@@ -1845,6 +2249,50 @@ func (r *Runtime) EditAndResend(
 		return &receipt, nil
 	}
 
+	// We only accept preparation against the exact Session version that was
+	// inspected before releasing the lock. Otherwise an intervening mutation
+	// could make us replace a different visible suffix/configuration.
+	if !snapshot.ready || sessionValue.Revision != snapshot.revision {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         "session changed while edit-and-resend input was being prepared; retry the edit",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	if preparationErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         preparationErr.Error(),
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+
+	var runConfiguration *SessionConfiguration
+	if prepared.PersistConfiguration {
+		value := cloneJSON(prepared.Configuration)
+		runConfiguration = &value
+	}
+
+	// "startRunLocked" has its own rollback for Run construction. This outer
+	// snapshot restores the visible Session suffix if accepting replacement
+	// work fails after the transcript was truncated.
+	previousSession := cloneJSON(*sessionValue)
+
 	sessionValue.Transcript = append(
 		[]TranscriptMessage(nil),
 		sessionValue.Transcript[:index]...,
@@ -1856,12 +2304,14 @@ func (r *Runtime) EditAndResend(
 		sessionValue,
 		command.Meta.ID,
 		command.RunID,
-		command.Input,
-		command.Configuration,
+		prepared.Input,
+		runConfiguration,
 		command.Limits,
 		&effects,
 	)
 	if startErr != nil {
+		*sessionValue = previousSession
+
 		rejected := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,
@@ -1896,7 +2346,10 @@ func (r *Runtime) beginCommandLocked(
 		return CommandReceipt{}, false, "", errors.New("command ID is required")
 	}
 
-	fingerprint = commandFingerprint(payload)
+	fingerprint, err = commandFingerprint(payload)
+	if err != nil {
+		return CommandReceipt{}, false, "", err
+	}
 	if previous, found := r.commandRecords[meta.ID]; found {
 		if previous.Fingerprint != fingerprint {
 			return CommandReceipt{}, false, "", ErrCommandIDConflict
@@ -1940,13 +2393,16 @@ func commandReceiptResult(
 	return &receipt, nil
 }
 
-func commandFingerprint(value any) string {
+func commandFingerprint(value any) (string, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("encode command payload: %w", err)
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	// Include the command type so different command kinds cannot share an ID
+	// merely because their JSON object shapes happen to be identical.
+	typed := append(fmt.Appendf(nil, "%T\x00", value), raw...)
+	sum := sha256.Sum256(typed)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func expectedSessionRevisionMessage(
@@ -2006,6 +2462,10 @@ func (r *Runtime) startRunLocked(
 			"run input must contain text, attachments, tool results, or MCP App context",
 		)
 	}
+	normalizedLimits, err := normalizeRunLimits(limits)
+	if err != nil {
+		return CommandReceipt{}, err
+	}
 
 	runID := requestedRunID
 	if runID == "" {
@@ -2014,6 +2474,9 @@ func (r *Runtime) startRunLocked(
 	if _, exists := r.runs[runID]; exists {
 		return CommandReceipt{}, fmt.Errorf("run %q already exists", runID)
 	}
+
+	previousSession := cloneJSON(*sessionValue)
+	previousEffects := *effects
 
 	runConfiguration := cloneJSON(sessionValue.Configuration)
 	if configuration != nil {
@@ -2027,6 +2490,10 @@ func (r *Runtime) startRunLocked(
 	}
 
 	now := r.now()
+	enabledSkills := uniqueArtifactReferences(append(
+		cloneJSON(runConfiguration.InstalledSkills),
+		cloneJSON(runConfiguration.WorkspaceSkills)...,
+	))
 	run := &Run{
 		ID:            runID,
 		SessionID:     sessionValue.ID,
@@ -2038,12 +2505,10 @@ func (r *Runtime) startRunLocked(
 		Configuration: runConfiguration,
 		SkillSession: SkillSessionState{
 			Generation: 1,
-			Enabled:    cloneJSON(runConfiguration.InstalledSkills),
+			Enabled:    enabledSkills,
 			Active:     nil,
 		},
-	}
-	if limits != nil {
-		run.Limits = cloneJSON(*limits)
+		Limits: normalizedLimits,
 	}
 
 	inputMessage := TranscriptMessage{
@@ -2100,10 +2565,10 @@ func (r *Runtime) startRunLocked(
 		effects,
 	)
 	if err != nil {
+		*sessionValue = previousSession
+		*effects = previousEffects
 		delete(r.runs, runID)
 		delete(r.runToSession, runID)
-		sessionValue.RunIDs = sessionValue.RunIDs[:len(sessionValue.RunIDs)-1]
-		sessionValue.Transcript = sessionValue.Transcript[:len(sessionValue.Transcript)-1]
 		return CommandReceipt{}, err
 	}
 
@@ -2205,19 +2670,22 @@ func (r *Runtime) beginContinuationModelLocked(
 	if !allRequiredCallsResolved(run) {
 		return runtimeWork{}, errors.New("required tool calls remain unresolved")
 	}
+	if run.Limits.MaxModelOperations > 0 &&
+		run.Usage.ModelOperations >= run.Limits.MaxModelOperations {
+		return runtimeWork{}, errors.New("run model operation limit reached")
+	}
 
-	if run.Continuation.Configuration != nil {
-		r.applyRunConfigurationLocked(
-			sessionValue,
-			run,
-			*run.Continuation.Configuration,
-		)
+	staged := ContinuationInput{}
+	hasNewRevision := run.Continuation.Revision >
+		run.Continuation.ConsumedRevision
+	if hasNewRevision {
+		staged = cloneJSON(run.Continuation)
 	}
 
 	results := collectUnconsumedToolResults(run)
-	hasInput := strings.TrimSpace(run.Continuation.Text) != "" ||
-		len(run.Continuation.Attachments) != 0 ||
-		len(run.Continuation.MCPAppContext) != 0 ||
+	hasInput := strings.TrimSpace(staged.Text) != "" ||
+		len(staged.Attachments) != 0 ||
+		len(staged.MCPAppContext) != 0 ||
 		len(results) != 0
 
 	if !hasInput {
@@ -2226,20 +2694,35 @@ func (r *Runtime) beginContinuationModelLocked(
 		)
 	}
 
+	// Keep rollback local. Rejected continuation must not change live state.
+	previousSession := cloneJSON(*sessionValue)
+	previousRun := cloneJSON(*run)
+	previousEffects := *effects
+
+	if staged.Configuration != nil {
+		r.applyRunConfigurationLocked(
+			sessionValue,
+			run,
+			*staged.Configuration,
+		)
+	}
+
 	inputMessage := TranscriptMessage{
 		ID:            r.newID(),
 		CreatedAt:     r.now(),
 		Role:          MessageRoleUser,
 		Status:        "continuation",
-		Text:          run.Continuation.Text,
-		Attachments:   cloneJSON(run.Continuation.Attachments),
+		Text:          staged.Text,
+		Attachments:   cloneJSON(staged.Attachments),
 		ToolResults:   cloneJSON(results),
-		MCPAppContext: cloneRaw(run.Continuation.MCPAppContext),
-		Metadata:      cloneRaw(run.Continuation.Metadata),
+		MCPAppContext: cloneRaw(staged.MCPAppContext),
+		Metadata:      cloneRaw(staged.Metadata),
 	}
 	sessionValue.Transcript = append(sessionValue.Transcript, inputMessage)
 
-	run.Continuation.ConsumedRevision = run.Continuation.Revision
+	if hasNewRevision {
+		run.Continuation.ConsumedRevision = staged.Revision
+	}
 	run.ContinuationRequested = false
 
 	work, err := r.startModelOperationLocked(
@@ -2250,7 +2733,9 @@ func (r *Runtime) beginContinuationModelLocked(
 		effects,
 	)
 	if err != nil {
-		sessionValue.Transcript = sessionValue.Transcript[:len(sessionValue.Transcript)-1]
+		*sessionValue = previousSession
+		*run = previousRun
+		*effects = previousEffects
 		return runtimeWork{}, err
 	}
 
@@ -2262,6 +2747,7 @@ func (r *Runtime) beginContinuationModelLocked(
 		}
 		call.ConsumedByOperationID = work.OperationID
 	}
+	r.touchRunLocked(sessionValue, run)
 
 	r.recordRunEventLocked(
 		effects,
@@ -2376,7 +2862,7 @@ func (r *Runtime) completeCallWithResult(
 				RunID:           runID,
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     run.Revision,
-				Message:         "tool call was not found",
+				Message:         toolCallNotFound,
 			},
 		)
 		r.mu.Unlock()
@@ -2600,15 +3086,23 @@ func (r *Runtime) setPause(
 		},
 	)
 	if !paused {
-		r.advanceDriverLocked(
-			sessionValue,
-			run,
-			meta.ID,
-			DriverEvent{
-				Kind: DriverEventResumed,
-			},
-			&effects,
-		)
+		active := findModelOperation(run, run.ActiveModelOperationID)
+		if active != nil && active.State == OperationStateQueued {
+			effects.work = append(effects.work, runtimeWork{
+				Kind:        workModel,
+				SessionID:   sessionID,
+				RunID:       runID,
+				OperationID: active.ID,
+			})
+		} else {
+			r.advanceDriverLocked(
+				sessionValue,
+				run,
+				meta.ID,
+				DriverEvent{Kind: DriverEventResumed},
+				&effects,
+			)
+		}
 	}
 
 	receipt := CommandReceipt{
@@ -2645,6 +3139,8 @@ func (r *Runtime) applyRunConfigurationLocked(
 		append([]ArtifactReference(nil), configuration.InstalledSkills...),
 		configuration.WorkspaceSkills...,
 	)
+	previousSkills = uniqueArtifactReferences(previousSkills)
+	nextSkills = uniqueArtifactReferences(nextSkills)
 
 	run.Configuration = cloneJSON(configuration)
 	if artifactReferencesEqual(previousSkills, nextSkills) {
@@ -2759,8 +3255,23 @@ func (r *Runtime) advanceDriverLocked(
 			effects.work = append(effects.work, work)
 
 		case OperationIntentExecuteTool:
+			call := findToolCall(run, intent.ToolCallID)
+			if call == nil {
+				continue
+			}
+			kind := workToolEvaluate
+			switch call.State {
+			case ToolCallStatePending:
+				call.State = ToolCallStateEvaluationQueued
+			case ToolCallStateReady:
+				call.State = ToolCallStateExecutionQueued
+				kind = workToolExecute
+			default:
+				continue
+			}
+			r.touchRunLocked(sessionValue, run)
 			effects.work = append(effects.work, runtimeWork{
-				Kind:       workToolEvaluate,
+				Kind:       kind,
 				SessionID:  sessionValue.ID,
 				RunID:      run.ID,
 				ToolCallID: intent.ToolCallID,
@@ -2946,9 +3457,11 @@ func selectHistory(
 		return cloneJSON(beforeCurrent)
 	}
 
-	targetPureUsers := selection.IncludePreviousUserTurns + 1
+	previousTurns := max(selection.IncludePreviousUserTurns, 0)
+	targetPureUsers := previousTurns + 1
 	pureUsers := 0
-	start := currentIndex
+	// If fewer than the requested number exist, retain all available history.
+	start := 0
 
 	for index := currentIndex; index >= 0; index-- {
 		message := messages[index]
@@ -2991,7 +3504,9 @@ func hasUserInput(input UserInput) bool {
 func hasInFlightToolCalls(run *Run) bool {
 	for _, call := range run.ToolCalls {
 		switch call.State {
-		case ToolCallStateEvaluating,
+		case ToolCallStateEvaluationQueued,
+			ToolCallStateEvaluating,
+			ToolCallStateExecutionQueued,
 			ToolCallStateWaiting,
 			ToolCallStateRunning:
 			return true
@@ -3025,7 +3540,8 @@ func unresolvedCallsForLatestOperation(run *Run) []ToolCallID {
 			!call.Required ||
 			call.ProviderManaged ||
 			call.State == ToolCallStateResolved ||
-			call.State == ToolCallStateObserved {
+			call.State == ToolCallStateObserved ||
+			call.State == ToolCallStateCancelled {
 			continue
 		}
 		output = append(output, call.ID)
@@ -3169,6 +3685,8 @@ func artifactReferencesEqual(
 	left []ArtifactReference,
 	right []ArtifactReference,
 ) bool {
+	left = uniqueArtifactReferences(left)
+	right = uniqueArtifactReferences(right)
 	if len(left) != len(right) {
 		return false
 	}
@@ -3178,12 +3696,13 @@ func artifactReferencesEqual(
 		leftKeys[reference.RootID+"\x00"+reference.ArtifactID] = struct{}{}
 	}
 	for _, reference := range right {
-		if _, found := leftKeys[reference.RootID+"\x00"+reference.ArtifactID]; !found {
+		key := reference.RootID + "\x00" + reference.ArtifactID
+		if _, found := leftKeys[key]; !found {
 			return false
 		}
+		delete(leftKeys, key)
 	}
-
-	return true
+	return len(leftKeys) == 0
 }
 
 func filterReferences(

@@ -153,6 +153,9 @@ type MCPInclude struct {
 }
 
 type RuntimeConfig struct {
+	InvocationGeneration     uint64 `json:"-"`
+	InvocationSnapshotDigest string `json:"-"`
+
 	Server  ServerID
 	Catalog CatalogID
 
