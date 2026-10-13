@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,8 @@ var (
 	ErrCommandIDConflict = errors.New("command ID was reused with a different payload")
 	ErrCommandInProgress = errors.New("command ID is already being processed")
 )
+
+const streamCheckpointMinInterval = time.Second
 
 type commandRecord struct {
 	Fingerprint string
@@ -100,6 +104,7 @@ type Runtime struct {
 	waitExpiryGenerations map[WaitID]uint64
 	waitExpirySequence    uint64
 	cancels               map[string]context.CancelFunc
+	streamCheckpointAt    map[OperationID]time.Time
 
 	subscribers      map[uint64]chan RuntimeEvent
 	nextSubscriberID uint64
@@ -138,6 +143,7 @@ func NewRuntime(
 		waitExpirers:          make(map[WaitID]context.CancelFunc),
 		waitExpiryGenerations: make(map[WaitID]uint64),
 		cancels:               make(map[string]context.CancelFunc),
+		streamCheckpointAt:    make(map[OperationID]time.Time),
 		subscribers:           make(map[uint64]chan RuntimeEvent),
 		lifecycleCtx:          lifecycleCtx,
 		lifecycleCancel:       lifecycleCancel,
@@ -194,6 +200,7 @@ func (r *Runtime) Close() {
 	clear(r.waitExpirers)
 	clear(r.waitReferences)
 	clear(r.waitExpiryGenerations)
+	clear(r.streamCheckpointAt)
 
 	skillClosures := make([]runtimeWork, 0)
 	for _, run := range r.runs {
@@ -457,10 +464,12 @@ func (r *Runtime) recordRunEventLocked(
 	data runtimeEventData,
 ) {
 	run.EventSequence++
+	r.sessionSequences[sessionValue.ID]++
 	effects.events = append(effects.events, RuntimeEvent{
 		SessionID:     sessionValue.ID,
 		RunID:         run.ID,
-		Sequence:      run.EventSequence,
+		Sequence:      r.sessionSequences[sessionValue.ID],
+		RunSequence:   run.EventSequence,
 		CommandID:     commandID,
 		OperationID:   operationID,
 		ToolCallID:    toolCallID,
@@ -492,6 +501,24 @@ func (r *Runtime) checkpointLocked(
 		view.Run = &cloned
 	}
 	effects.checkpoints = append(effects.checkpoints, view)
+}
+
+func (r *Runtime) shouldCheckpointStreamLocked(
+	operationID OperationID,
+) bool {
+	if r.deps.Checkpoints == nil || operationID == "" {
+		return false
+	}
+
+	now := r.now()
+	last := r.streamCheckpointAt[operationID]
+	if !last.IsZero() &&
+		now.Sub(last) < streamCheckpointMinInterval {
+		return false
+	}
+
+	r.streamCheckpointAt[operationID] = now
+	return true
 }
 
 func (r *Runtime) launchEffect(fn func()) {
@@ -639,6 +666,14 @@ func (r *Runtime) reportDiagnostic(
 ) {
 	sink := r.deps.Diagnostics
 	if sink == nil {
+		slog.Warn(
+			"session runtime diagnostic",
+			"sessionID", diagnostic.SessionID,
+			"runID", diagnostic.RunID,
+			"operation", diagnostic.Operation,
+			"message", diagnostic.Message,
+			"cause", diagnostic.Cause,
+		)
 		return
 	}
 	r.launchEffect(func() {
@@ -769,6 +804,7 @@ func normalizeRecoveredRun(
 		return
 	}
 	run.SkillSession.ID = ""
+	run.SkillSession.EstablishedGeneration = 0
 	run.SkillSession.Generation++
 
 	requiresRecoveryReview := false
@@ -886,4 +922,15 @@ func ensureRecoveryWait(
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
+}
+
+func isRunDispatchCancelKey(
+	key string,
+	runID RunID,
+) bool {
+	run := string(runID) + ":"
+	return strings.HasPrefix(key, "model:"+run) ||
+		strings.HasPrefix(key, "tool-evaluation:"+run) ||
+		strings.HasPrefix(key, "tool-execution:"+run) ||
+		strings.HasPrefix(key, "wait-resolution:"+run)
 }

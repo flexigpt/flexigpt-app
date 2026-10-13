@@ -209,9 +209,7 @@ func (r *Runtime) DeleteSession(
 		}
 
 		for key, cancel := range r.cancels {
-			if strings.HasPrefix(key, "model:"+string(run.ID)+":") ||
-				strings.HasPrefix(key, "tool-evaluation:"+string(run.ID)+":") ||
-				strings.HasPrefix(key, "tool-execution:"+string(run.ID)+":") {
+			if isRunDispatchCancelKey(key, run.ID) {
 				effects.cancels = append(effects.cancels, cancel)
 				delete(r.cancels, key)
 			}
@@ -2198,9 +2196,7 @@ func (r *Runtime) CancelRun(
 
 	effects := runtimeEffects{}
 	for key, cancel := range r.cancels {
-		if strings.HasPrefix(key, "model:"+string(run.ID)+":") ||
-			strings.HasPrefix(key, "tool-evaluation:"+string(run.ID)+":") ||
-			strings.HasPrefix(key, "tool-execution:"+string(run.ID)+":") {
+		if isRunDispatchCancelKey(key, run.ID) {
 			effects.cancels = append(effects.cancels, cancel)
 			delete(r.cancels, key)
 		}
@@ -3363,6 +3359,7 @@ func (r *Runtime) applyRunConfigurationLocked(
 	}
 
 	run.SkillSession.Generation++
+	run.SkillSession.EstablishedGeneration = 0
 	run.SkillSession.Enabled = cloneJSON(nextSkills)
 	run.SkillSession.Active = filterReferences(
 		run.SkillSession.Active,
@@ -3554,6 +3551,7 @@ func (r *Runtime) markRunTerminalLocked(
 	run.Controls.CancellationRequested = outcome.Kind == RunOutcomeCancelled
 	skillID := run.SkillSession.ID
 	run.SkillSession.ID = ""
+	run.SkillSession.EstablishedGeneration = 0
 	r.touchRunLocked(sessionValue, run)
 
 	eventKind := RuntimeEventRunCompleted

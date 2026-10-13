@@ -361,7 +361,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
-	toolChoices, _, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
+	toolChoices, preparedToolBindings, err := buildToolChoices(ctx, ps.toolsSvc, req.ToolSelections)
 	if err != nil {
 		return nil, err
 	}
@@ -568,6 +568,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		HydratedCurrentInputs: currentInputs,
 		MCPToolMappings:       mcpToolMappings,
 		WorkspaceUsage:        workspaceUsage,
+		PreparedToolBindings:  preparedToolBindings,
 	}}
 
 	return resp, err
@@ -627,7 +628,7 @@ func (ps *ProviderSetAPI) buildInputs(
 	}
 
 	// Always process attachments into content items.
-	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments, true)
+	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments, false)
 	if err != nil {
 		return nil, nil, err
 	}

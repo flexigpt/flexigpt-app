@@ -39,6 +39,7 @@ type ModelExecutionResult struct {
 	ToolCalls             []ToolCallProposal `json:"toolCalls,omitempty"`
 	Error                 *OperationError    `json:"error,omitempty"`
 	Metadata              json.RawMessage    `json:"metadata,omitempty"`
+	RuntimeMetadata       json.RawMessage    `json:"runtimeMetadata,omitempty"`
 }
 
 type ModelExecutor interface {
@@ -178,14 +179,22 @@ type AgentResolver interface {
 	ResolveAgent(ctx context.Context, req AgentResolveRequest) (AgentApplication, error)
 }
 
-type WorkspaceResolutionRequest struct {
-	SessionID     SessionID            `json:"sessionID"`
-	RunID         RunID                `json:"runID"`
-	Configuration SessionConfiguration `json:"configuration"`
+type WorkspaceSkillResolutionRequest struct {
+	SessionID               SessionID            `json:"sessionID"`
+	RunID                   RunID                `json:"runID"`
+	Configuration           SessionConfiguration `json:"configuration"`
+	RequestedWorkspaceSkills []ArtifactReference `json:"requestedWorkspaceSkills"`
+}
+
+type WorkspaceSkillResolution struct {
+	EnabledWorkspaceSkills []ArtifactReference `json:"enabledWorkspaceSkills,omitempty"`
 }
 
 type WorkspaceResolver interface {
-	ValidateWorkspace(ctx context.Context, req WorkspaceResolutionRequest) error
+	ResolveWorkspaceSkills(
+		ctx context.Context,
+		req WorkspaceSkillResolutionRequest,
+	) (WorkspaceSkillResolution, error)
 }
 
 type AttachmentPreparer interface {
@@ -233,6 +242,7 @@ type RuntimeEvent struct {
 	SessionID     SessionID        `json:"sessionID"`
 	RunID         RunID            `json:"runID,omitempty"`
 	Sequence      uint64           `json:"sequence"`
+	RunSequence   uint64           `json:"runSequence,omitempty"`
 	CommandID     CommandID        `json:"commandID,omitempty"`
 	OperationID   OperationID      `json:"operationID,omitempty"`
 	ToolCallID    ToolCallID       `json:"toolCallID,omitempty"`

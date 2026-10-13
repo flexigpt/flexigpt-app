@@ -245,7 +245,7 @@ func (r *Runtime) ensureSkillSessionForModel(
 	operationID OperationID,
 ) error {
 	r.mu.RLock()
-	sessionValue, run, err := r.sessionAndRunLocked(
+	_, run, err := r.sessionAndRunLocked(
 		sessionID,
 		runID,
 	)
@@ -261,68 +261,156 @@ func (r *Runtime) ensureSkillSessionForModel(
 		return errStaleDispatch
 	}
 
-	enabled := cloneJSON(run.SkillSession.Enabled)
-	active := cloneJSON(run.SkillSession.Active)
-	previousID := run.SkillSession.ID
+	configuration := cloneJSON(run.Configuration)
 	generation := run.SkillSession.Generation
-	_ = sessionValue
 	r.mu.RUnlock()
 
+	workspaceSkills, err := r.resolveWorkspaceSkillsForModel(
+		ctx,
+		sessionID,
+		runID,
+		configuration,
+	)
+	if err != nil {
+		return err
+	}
+
+	enabled := uniqueArtifactReferences(append(
+		cloneJSON(configuration.InstalledSkills),
+		workspaceSkills...,
+	))
+
+	r.mu.Lock()
+	var sessionValue *Session
+	sessionValue, run, err = r.sessionAndRunLocked(
+		sessionID,
+		runID,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return err
+	}
+
+	operation = findModelOperation(run, operationID)
+	if operation == nil ||
+		operation.State != OperationStatePreparing ||
+		run.SkillSession.Generation != generation ||
+		run.Controls.CancellationRequested {
+		r.mu.Unlock()
+		return errStaleDispatch
+	}
+
+	effects := runtimeEffects{}
+	previousID := run.SkillSession.ID
+	active := filterReferences(run.SkillSession.Active, enabled)
+	currentEnabled := uniqueArtifactReferences(run.SkillSession.Enabled)
+	changed := false
+
+	if !artifactReferencesEqual(currentEnabled, enabled) {
+		run.SkillSession.Enabled = cloneJSON(enabled)
+		run.SkillSession.Active = cloneJSON(active)
+		run.SkillSession.Generation++
+		run.SkillSession.EstablishedGeneration = 0
+		generation = run.SkillSession.Generation
+		changed = true
+	} else if !artifactReferencesEqual(run.SkillSession.Active, active) {
+		run.SkillSession.Active = cloneJSON(active)
+		changed = true
+	}
+
 	if len(enabled) == 0 {
-		if previousID == "" {
-			return nil
+		if run.SkillSession.ID != "" ||
+			run.SkillSession.EstablishedGeneration != 0 {
+			run.SkillSession.ID = ""
+			run.SkillSession.EstablishedGeneration = 0
+			changed = true
 		}
 
-		r.mu.Lock()
-		sessionValue, run, err := r.sessionAndRunLocked(
-			sessionID,
-			runID,
-		)
-		if err != nil {
-			r.mu.Unlock()
-			return err
-		}
-		if run.SkillSession.Generation != generation {
-			r.mu.Unlock()
-			return errStaleDispatch
-		}
-
-		run.SkillSession.ID = ""
-		r.touchRunLocked(sessionValue, run)
-
-		effects := runtimeEffects{
-			work: []runtimeWork{
-				{
-					Kind:      workCloseSkill,
-					SessionID: sessionID,
-					RunID:     runID,
-					SkillID:   previousID,
+		if changed {
+			r.touchRunLocked(sessionValue, run)
+			r.recordRunEventLocked(
+				&effects,
+				sessionValue,
+				run,
+				"",
+				RuntimeEventSkillSessionChanged,
+				operationID,
+				"",
+				"",
+				"",
+				SkillSessionChangedEventData{
+					SkillSessionID: "",
+					ActiveSkills:   nil,
 				},
-			},
+			)
+			r.checkpointLocked(
+				&effects,
+				RuntimeEventSkillSessionChanged,
+				sessionValue,
+				run,
+			)
 		}
-		r.checkpointLocked(
-			&effects,
-			RuntimeEventRunStateChanged,
-			sessionValue,
-			run,
-		)
+		if previousID != "" {
+			effects.work = append(effects.work, runtimeWork{
+				Kind:      workCloseSkill,
+				SessionID: sessionID,
+				RunID:     runID,
+				SkillID:   previousID,
+			})
+		}
 		r.mu.Unlock()
 		r.flushEffects(ctx, effects)
-
 		return nil
 	}
 
 	if r.deps.Skills == nil {
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
 		return errors.New(
 			"run selects skills but no skill-session controller is configured",
 		)
 	}
 
+	if previousID != "" &&
+		run.SkillSession.EstablishedGeneration == generation {
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
+		return nil
+	}
+
+	active = cloneJSON(run.SkillSession.Active)
+	if changed {
+		r.touchRunLocked(sessionValue, run)
+		r.recordRunEventLocked(
+			&effects,
+			sessionValue,
+			run,
+			"",
+			RuntimeEventSkillSessionChanged,
+			operationID,
+			"",
+			"",
+			"",
+			SkillSessionChangedEventData{
+				SkillSessionID: previousID,
+				ActiveSkills:   cloneJSON(active),
+			},
+		)
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventSkillSessionChanged,
+			sessionValue,
+			run,
+		)
+	}
+	r.mu.Unlock()
+	r.flushEffects(ctx, effects)
+
 	result, ensureErr := r.deps.Skills.EnsureSkillSession(
 		ctx,
 		SkillSessionRequest{
 			SessionID: previousID,
-			Enabled:   enabled,
+			Enabled:   cloneJSON(enabled),
 			Active:    active,
 		},
 	)
@@ -371,28 +459,32 @@ func (r *Runtime) ensureSkillSessionForModel(
 	}
 
 	run.SkillSession.ID = result.SessionID
-	run.SkillSession.Active = cloneJSON(result.Active)
+	run.SkillSession.Active = filterReferences(
+		result.Active,
+		run.SkillSession.Enabled,
+	)
+	run.SkillSession.EstablishedGeneration = generation
 	r.touchRunLocked(sessionValue, run)
 
-	effects := runtimeEffects{}
+	effects = runtimeEffects{}
 	r.recordRunEventLocked(
 		&effects,
 		sessionValue,
 		run,
 		"",
-		RuntimeEventRunStateChanged,
+		RuntimeEventSkillSessionChanged,
 		operationID,
 		"",
 		"",
 		"",
 		SkillSessionChangedEventData{
 			SkillSessionID: result.SessionID,
-			ActiveSkills:   cloneJSON(result.Active),
+			ActiveSkills:   cloneJSON(run.SkillSession.Active),
 		},
 	)
 	r.checkpointLocked(
 		&effects,
-		RuntimeEventRunStateChanged,
+		RuntimeEventSkillSessionChanged,
 		sessionValue,
 		run,
 	)
@@ -400,6 +492,52 @@ func (r *Runtime) ensureSkillSessionForModel(
 	r.flushEffects(ctx, effects)
 
 	return nil
+}
+
+func (r *Runtime) resolveWorkspaceSkillsForModel(
+	ctx context.Context,
+	sessionID SessionID,
+	runID RunID,
+	configuration SessionConfiguration,
+) ([]ArtifactReference, error) {
+	requested := uniqueArtifactReferences(
+		cloneJSON(configuration.WorkspaceSkills),
+	)
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	if r.deps.Workspace == nil {
+		return nil, errors.New(
+			"run selects Workspace Skills but no Workspace skill resolver is configured",
+		)
+	}
+
+	resolution, err := r.deps.Workspace.ResolveWorkspaceSkills(
+		ctx,
+		WorkspaceSkillResolutionRequest{
+			SessionID:                sessionID,
+			RunID:                    runID,
+			Configuration:            cloneJSON(configuration),
+			RequestedWorkspaceSkills: cloneJSON(requested),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	resolved := uniqueArtifactReferences(
+		cloneJSON(resolution.EnabledWorkspaceSkills),
+	)
+	allowed := uniqueArtifactReferences(
+		filterReferences(resolved, requested),
+	)
+	if !artifactReferencesEqual(resolved, allowed) {
+		return nil, errors.New(
+			"workspace skill resolver returned an Artifact outside the Run Workspace allow-list",
+		)
+	}
+
+	return allowed, nil
 }
 
 func (r *Runtime) finishModelExecution(
@@ -425,6 +563,7 @@ func (r *Runtime) finishModelExecution(
 		return
 	}
 
+	delete(r.streamCheckpointAt, operation.ID)
 	delete(r.cancels, modelCancelKey(run.ID, operation.ID))
 	operation.FinishedAt = r.now()
 	run.ActiveModelOperationID = ""
@@ -475,6 +614,7 @@ func (r *Runtime) finishModelExecution(
 	operation.Usable = result.Usable
 	operation.ProtocolOutputs = cloneJSON(result.ProtocolOutputs)
 	operation.Metadata = cloneRaw(result.Metadata)
+	operation.RuntimeMetadata = cloneRaw(result.RuntimeMetadata)
 	operation.StreamedText = result.Text
 	operation.StreamedThinking = result.Thinking
 
@@ -490,6 +630,11 @@ func (r *Runtime) finishModelExecution(
 			sessionValue.Transcript[currentIndex].AttachmentsHydrated =
 				sessionValue.Transcript[currentIndex].AttachmentsHydrated ||
 					result.AttachmentsHydrated
+		}
+		if len(result.RuntimeMetadata) != 0 {
+			sessionValue.Transcript[currentIndex].RuntimeMetadata = cloneRaw(
+				result.RuntimeMetadata,
+			)
 		}
 		if len(result.Metadata) != 0 {
 			sessionValue.Transcript[currentIndex].Metadata = cloneRaw(
@@ -519,6 +664,7 @@ func (r *Runtime) finishModelExecution(
 				OperationID:     operation.ID,
 				Error:           cloneOperationError(result.Error),
 				Metadata:        cloneRaw(result.Metadata),
+				RuntimeMetadata: cloneRaw(result.RuntimeMetadata),
 			},
 		)
 	}
@@ -652,12 +798,14 @@ func (r *Runtime) appendModelStream(
 			Text:     value,
 		},
 	)
-	r.checkpointLocked(
-		&effects,
-		RuntimeEventModelOutputAppended,
-		sessionValue,
-		run,
-	)
+	if r.shouldCheckpointStreamLocked(operationID) {
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventModelOutputAppended,
+			sessionValue,
+			run,
+		)
+	}
 	r.mu.Unlock()
 	r.flushEffects(ctx, effects)
 }
@@ -934,7 +1082,9 @@ func (r *Runtime) dispatchToolEvaluation(
 		call.State = ToolCallStateWaiting
 		call.WaitID = wait.ID
 		run.WaitingRequests = append(run.WaitingRequests, wait)
-		run.State = RunStateWaiting
+		if !run.Controls.Paused {
+			run.State = RunStateWaiting
+		}
 		r.waitReferences[wait.ID] = waitReference{
 			ExecutorReference: evaluation.Wait.ExecutorReference,
 		}
@@ -1293,30 +1443,43 @@ func (r *Runtime) dispatchWaitResolution(
 	work runtimeWork,
 ) {
 	if r.deps.Tools == nil {
+		r.markWaitInvalid(ctx, work)
 		return
 	}
 
-	r.mu.RLock()
+	resolutionCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+
 	sessionValue, run, err := r.sessionAndRunLocked(
 		work.SessionID,
 		work.RunID,
 	)
 	if err != nil {
-		r.mu.RUnlock()
+		r.mu.Unlock()
 		return
 	}
 
 	wait := findWaitingRequest(run, work.WaitID)
 	if wait == nil || wait.Status != WaitStatusResolving {
-		r.mu.RUnlock()
+		r.mu.Unlock()
 		return
 	}
 
 	call := findToolCall(run, wait.ToolCallID)
 	reference, found := r.waitReferences[wait.ID]
 	if call == nil || !found {
-		r.mu.RUnlock()
+		r.mu.Unlock()
 		r.markWaitInvalid(ctx, work)
+		return
+	}
+	if run.Controls.CancellationRequested || run.State.Terminal() {
+		r.mu.Unlock()
 		return
 	}
 
@@ -1329,14 +1492,19 @@ func (r *Runtime) dispatchWaitResolution(
 		Input:             cloneRaw(work.Input),
 		ExecutorReference: reference.ExecutorReference,
 	}
-	r.mu.RUnlock()
+	r.cancels[waitResolutionCancelKey(run.ID, wait.ID)] = cancel
+	r.mu.Unlock()
 
 	resolution, resolutionErr := r.deps.Tools.ResolveToolWait(
-		ctx,
+		resolutionCtx,
 		request,
 	)
 
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
 	sessionValue, run, err = r.sessionAndRunLocked(
 		work.SessionID,
 		work.RunID,
@@ -1346,6 +1514,7 @@ func (r *Runtime) dispatchWaitResolution(
 		return
 	}
 
+	delete(r.cancels, waitResolutionCancelKey(run.ID, work.WaitID))
 	wait = findWaitingRequest(run, work.WaitID)
 	if wait == nil || wait.Status != WaitStatusResolving {
 		r.mu.Unlock()
@@ -1358,7 +1527,6 @@ func (r *Runtime) dispatchWaitResolution(
 		wait.Error = "waiting request no longer has an owning tool call"
 		wait.UpdatedAt = r.now()
 		r.clearWaitReferenceLocked(wait.ID)
-		r.touchRunLocked(sessionValue, run)
 
 		effects := runtimeEffects{}
 		r.recordRunEventLocked(
@@ -1373,14 +1541,25 @@ func (r *Runtime) dispatchWaitResolution(
 			wait.ID,
 			wait,
 		)
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeFailed,
+				Code:    "wait_owner_missing",
+				Message: "waiting request no longer has an owning tool call",
+			},
+			&effects,
+		)
 		r.checkpointLocked(
 			&effects,
-			RuntimeEventWaitResolved,
+			RuntimeEventRunFailed,
 			sessionValue,
 			run,
 		)
 		r.mu.Unlock()
-		r.flushEffects(ctx, effects)
+		r.flushEffects(resolutionCtx, effects)
 		return
 	}
 
@@ -1410,7 +1589,7 @@ func (r *Runtime) dispatchWaitResolution(
 			run,
 		)
 		r.mu.Unlock()
-		r.flushEffects(ctx, effects)
+		r.flushEffects(resolutionCtx, effects)
 		return
 	}
 
@@ -1481,7 +1660,7 @@ func (r *Runtime) dispatchWaitResolution(
 		run,
 	)
 	r.mu.Unlock()
-	r.flushEffects(ctx, effects)
+	r.flushEffects(resolutionCtx, effects)
 }
 
 func (r *Runtime) dispatchWaitExpiry(
@@ -1655,6 +1834,10 @@ func (r *Runtime) markWaitInvalid(
 	work runtimeWork,
 ) {
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
 
 	sessionValue, run, err := r.sessionAndRunLocked(
 		work.SessionID,
@@ -1675,7 +1858,6 @@ func (r *Runtime) markWaitInvalid(
 	wait.Error = "wait cannot be resolved after recovery because executor state is unavailable"
 	wait.UpdatedAt = r.now()
 	r.clearWaitReferenceLocked(wait.ID)
-	r.touchRunLocked(sessionValue, run)
 
 	effects := runtimeEffects{}
 	r.recordRunEventLocked(
@@ -1690,9 +1872,66 @@ func (r *Runtime) markWaitInvalid(
 		wait.ID,
 		wait,
 	)
+
+	call := findToolCall(run, wait.ToolCallID)
+	if call == nil {
+		r.markRunTerminalLocked(
+			sessionValue,
+			run,
+			"",
+			RunOutcome{
+				Kind:    RunOutcomeFailed,
+				Code:    "wait_owner_missing",
+				Message: "wait executor state was lost and the owning tool call no longer exists",
+			},
+			&effects,
+		)
+		r.checkpointLocked(
+			&effects,
+			RuntimeEventRunFailed,
+			sessionValue,
+			run,
+		)
+		r.mu.Unlock()
+		r.flushEffects(ctx, effects)
+		return
+	}
+
+	call.WaitID = ""
+	call.Authorization = nil
+	call.State = ToolCallStateFailed
+	call.LastFailure = "wait cannot be resolved because executor state is unavailable"
+	removeRequestedCall(run, call.ID)
+	r.touchRunLocked(sessionValue, run)
+
+	r.recordRunEventLocked(
+		&effects,
+		sessionValue,
+		run,
+		"",
+		RuntimeEventToolCallFailed,
+		call.OriginOperationID,
+		call.ID,
+		"",
+		wait.ID,
+		ToolCallFailedEventData{
+			Error: call.LastFailure,
+		},
+	)
+	r.advanceDriverLocked(
+		sessionValue,
+		run,
+		"",
+		DriverEvent{
+			Kind:        DriverEventToolSettled,
+			OperationID: call.OriginOperationID,
+			ToolCallID:  call.ID,
+		},
+		&effects,
+	)
 	r.checkpointLocked(
 		&effects,
-		RuntimeEventWaitResolved,
+		RuntimeEventToolCallFailed,
 		sessionValue,
 		run,
 	)
@@ -1985,4 +2224,11 @@ func toolExecutionCancelKey(
 	attemptID ToolAttemptID,
 ) string {
 	return "tool-execution:" + string(runID) + ":" + string(attemptID)
+}
+
+func waitResolutionCancelKey(
+	runID RunID,
+	waitID WaitID,
+) string {
+	return "wait-resolution:" + string(runID) + ":" + string(waitID)
 }

@@ -115,8 +115,6 @@ func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (
 
 			fileEntries = append(fileEntries, e)
 		}
-		// Process files first.
-		filesAddedHere := 0
 
 		for i, e := range fileEntries {
 			if len(files) >= maxFiles {
@@ -164,7 +162,6 @@ func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (
 
 			files = append(files, pInfo)
 			totalSize += pInfo.Size
-			filesAddedHere++
 
 			if len(files) >= maxFiles {
 				// We just consumed the last allowed slot from this directory.

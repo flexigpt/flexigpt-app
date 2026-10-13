@@ -214,10 +214,13 @@ func (a *Adapter) ExecuteModel(
 		result.HydratedCurrentInputs = marshalInputUnions(
 			body.HydratedCurrentInputs,
 		)
-		result.Metadata = marshalMetadata(
+		result.RuntimeMetadata = marshalMetadata(
 			body.MCPToolMappings,
 			body.WorkspaceUsage,
 		)
+		result.AttachmentsHydrated =
+			len(request.Current.Attachments) != 0 &&
+				len(body.HydratedCurrentInputs) != 0
 
 		if body.InferenceResponse != nil {
 			inferenceResponse := body.InferenceResponse
@@ -232,6 +235,7 @@ func (a *Adapter) ExecuteModel(
 				result.ProtocolOutputs,
 				request.Configuration.ToolSelections,
 				body.MCPToolMappings,
+				body.PreparedToolBindings,
 			)
 			result.Text = text
 			result.Thinking = thinking
@@ -333,29 +337,38 @@ func (a *Adapter) conversationMessage(
 	}
 
 	if materializeAttachments && len(message.Attachments) != 0 {
-		attachments, materializeErr := a.attachments.Materialize(
-			ctx,
-			message.Attachments,
-		)
-		if materializeErr != nil {
-			return conversationSpec.ConversationMessage{}, fmt.Errorf(
-				"materialize session attachments: %w",
-				materializeErr,
-			)
-		}
-
-		if embedAttachments && message.Role == sessionRuntime.MessageRoleUser {
-			value.Inputs, err = appendMaterializedAttachmentInputs(
+		// Live messages that already retain hydrated protocol inputs must not
+		// stat/read/fetch the attachment again. This matters for recovery and
+		// prevents attachment duplication during a restarted model operation.
+		//
+		// Durable Session projections deliberately clear ProtocolInputs and
+		// AttachmentsHydrated, so restored history goes through the safe
+		// snapshot-aware materialization path below.
+		if !(message.AttachmentsHydrated && len(value.Inputs) != 0) {
+			attachments, materializeErr := a.attachments.Materialize(
 				ctx,
-				value.Inputs,
-				attachments,
-				message.ID,
+				message.Attachments,
 			)
-			if err != nil {
-				return conversationSpec.ConversationMessage{}, err
+			if materializeErr != nil {
+				return conversationSpec.ConversationMessage{}, fmt.Errorf(
+					"materialize session attachments: %w",
+					materializeErr,
+				)
 			}
-		} else {
-			value.Attachments = attachments
+
+			if embedAttachments && message.Role == sessionRuntime.MessageRoleUser {
+				value.Inputs, err = appendMaterializedAttachmentInputs(
+					ctx,
+					value.Inputs,
+					attachments,
+					message.ID,
+				)
+				if err != nil {
+					return conversationSpec.ConversationMessage{}, err
+				}
+			} else {
+				value.Attachments = attachments
+			}
 		}
 	}
 
@@ -368,7 +381,7 @@ func appendMaterializedAttachmentInputs(
 	attachments []attachmentRuntime.Attachment,
 	messageID string,
 ) ([]inferenceSpec.InputUnion, error) {
-	if len(attachments) == 0 || hasMaterializedAttachmentInput(inputs) {
+	if len(attachments) == 0 {
 		return inputs, nil
 	}
 
@@ -403,37 +416,6 @@ func appendMaterializedAttachmentInputs(
 		},
 	})
 	return output, nil
-}
-
-func hasMaterializedAttachmentInput(
-	inputs []inferenceSpec.InputUnion,
-) bool {
-	for _, input := range inputs {
-		if input.Kind != inferenceSpec.InputKindInputMessage ||
-			input.InputMessage == nil {
-			continue
-		}
-
-		for _, content := range input.InputMessage.Contents {
-			switch content.Kind {
-			case inferenceSpec.ContentItemKindImage,
-				inferenceSpec.ContentItemKindFile:
-				return true
-
-			case inferenceSpec.ContentItemKindText:
-				if content.TextItem != nil &&
-					strings.HasPrefix(
-						strings.TrimSpace(content.TextItem.Text),
-						"<<<FILE",
-					) {
-					return true
-				}
-			default:
-			}
-		}
-	}
-
-	return false
 }
 
 func buildInputsFromTranscriptMessage(
@@ -823,6 +805,7 @@ func decodeOutputs(
 	outputs []json.RawMessage,
 	selections []sessionRuntime.ModelToolSelection,
 	mappings []conversationSpec.MCPProviderToolMapping,
+	preparedBindings []inferenceRuntimeSpec.PreparedToolBinding,
 ) (
 	text string,
 	thinking string,
@@ -842,6 +825,9 @@ func decodeOutputs(
 		mappingByName[mapping.ProviderToolName] = mapping
 	}
 
+	preparedByChoice, preparedByName := preparedToolBindingMaps(
+		preparedBindings,
+	)
 	var textBuilder strings.Builder
 	var thinkingBuilder strings.Builder
 	calls = make([]sessionRuntime.ToolCallProposal, 0)
@@ -882,6 +868,8 @@ func decodeOutputs(
 			selectionByName,
 			mappingByChoice,
 			mappingByName,
+			preparedByChoice,
+			preparedByName,
 		))
 	}
 
@@ -894,6 +882,8 @@ func buildToolCallProposal(
 	selectionByName map[string]sessionRuntime.ModelToolSelection,
 	mappingByChoice map[string]conversationSpec.MCPProviderToolMapping,
 	mappingByName map[string]conversationSpec.MCPProviderToolMapping,
+	preparedByChoice map[string]inferenceRuntimeSpec.PreparedToolBinding,
+	preparedByName map[string]inferenceRuntimeSpec.PreparedToolBinding,
 ) sessionRuntime.ToolCallProposal {
 	arguments := normalizedArguments(call.Arguments)
 	proposal := sessionRuntime.ToolCallProposal{
@@ -931,6 +921,46 @@ func buildToolCallProposal(
 		return proposal
 	}
 
+	prepared, found := preparedByChoice[call.ChoiceID]
+	if !found {
+		prepared, found = preparedByName[call.Name]
+	}
+	if found {
+		bindingKind := sessionRuntime.ToolBindingKind(
+			strings.TrimSpace(prepared.BindingKind),
+		)
+		switch bindingKind {
+		case sessionRuntime.ToolBindingKindGo,
+			sessionRuntime.ToolBindingKindMCP,
+			sessionRuntime.ToolBindingKindSkill,
+			sessionRuntime.ToolBindingKindProvider:
+			proposal.Binding = sessionRuntime.ToolBinding{
+				Kind: bindingKind,
+				Data: append(
+					json.RawMessage(nil),
+					prepared.BindingData...,
+				),
+			}
+			proposal.Required = prepared.Required
+			proposal.ProviderManaged = prepared.ProviderManaged
+			proposal.Automatic = prepared.Automatic
+			if proposal.Type == "" {
+				proposal.Type = prepared.Type
+			}
+			return proposal
+
+		default:
+			proposal.Binding = sessionRuntime.ToolBinding{
+				Kind: sessionRuntime.ToolBindingKindUnresolved,
+			}
+			proposal.Error = fmt.Sprintf(
+				"resolved tool binding %q is unsupported",
+				prepared.BindingKind,
+			)
+			return proposal
+		}
+	}
+
 	selection, found := selectionByChoice[call.ChoiceID]
 	if !found {
 		selection, found = selectionByName[call.Name]
@@ -965,6 +995,33 @@ func buildToolCallProposal(
 
 	proposal.Error = "the tool call cannot be matched to the originating model operation bindings"
 	return proposal
+}
+
+func preparedToolBindingMaps(
+	values []inferenceRuntimeSpec.PreparedToolBinding,
+) (
+	map[string]inferenceRuntimeSpec.PreparedToolBinding,
+	map[string]inferenceRuntimeSpec.PreparedToolBinding,
+) {
+	byChoice := make(
+		map[string]inferenceRuntimeSpec.PreparedToolBinding,
+		len(values),
+	)
+	byName := make(
+		map[string]inferenceRuntimeSpec.PreparedToolBinding,
+		len(values),
+	)
+
+	for _, value := range values {
+		if strings.TrimSpace(value.ChoiceID) != "" {
+			byChoice[value.ChoiceID] = value
+		}
+		if strings.TrimSpace(value.Name) != "" {
+			byName[value.Name] = value
+		}
+	}
+
+	return byChoice, byName
 }
 
 func normalizedArguments(

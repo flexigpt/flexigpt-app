@@ -76,6 +76,17 @@ func (att *Attachment) BuildContentBlock(ctx context.Context, opts ...ContentBlo
 	// Ensure refs are populated; caller may have done this earlier,
 	// but calling again on a populated ref is cheap to do in actual read data path.
 	if err := att.PopulateRef(ctx, buildContentOptions.OverrideOriginal); err != nil {
+		// A previously admitted local attachment may later be deleted, moved,
+		// or become unreadable. It must not make historical replay fail and it
+		// must never be silently replaced with current unrelated content.
+		//
+		// BuildContentBlocks turns this sentinel into a safe display-only text
+		// block for the model.
+		if !buildContentOptions.OverrideOriginal &&
+			ctx.Err() == nil &&
+			att.hasOriginalSnapshot() {
+			return nil, errors.Join(ErrAttachmentModifiedSinceSnapshot, err)
+		}
 		return nil, err
 	}
 
@@ -331,6 +342,25 @@ func (att *Attachment) isModifiedSinceSnapshot() bool {
 		return false
 	}
 	return false
+}
+
+func (att *Attachment) hasOriginalSnapshot() bool {
+	if att == nil {
+		return false
+	}
+
+	switch att.Kind {
+	case AttachmentFile:
+		return att.FileRef != nil &&
+			strings.TrimSpace(att.FileRef.OrigPath) != ""
+
+	case AttachmentImage:
+		return att.ImageRef != nil &&
+			strings.TrimSpace(att.ImageRef.OrigPath) != ""
+
+	default:
+		return false
+	}
 }
 
 func getBuildContentBlockOptions(opts ...ContentBlockOption) *buildContentBlockOptions {

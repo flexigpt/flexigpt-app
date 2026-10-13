@@ -150,6 +150,15 @@ func newApp() *App {
 		panic("failed to initialize app: could not create conversations directory")
 	}
 
+	if err := ensureAppPrivateDirectory(app.sessionsDirPath); err != nil {
+		slog.Error(
+			"failed to create sessions directory",
+			"sessions path", app.sessionsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create sessions directory")
+	}
+
 	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
 
 		slog.Error(
@@ -652,6 +661,7 @@ func (a *App) initManagers() {
 		a.mcpRuntimeAPI,
 		a.skillAggregateAPI,
 		a.skillRuntimeAPI,
+		workspaceConversationSource,
 	)
 	if err != nil {
 		slog.Error(

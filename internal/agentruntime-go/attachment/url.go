@@ -50,9 +50,12 @@ func (ref *URLRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 	if parsed.User != nil {
 		return errors.New("attachment URLs must not contain credentials")
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
 		return fmt.Errorf("unsupported url scheme %q; only http and https are allowed", parsed.Scheme)
 	}
+	parsed.Scheme = scheme
 
 	nURL := parsed.String()
 	ref.URL = raw

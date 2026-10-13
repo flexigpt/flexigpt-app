@@ -108,11 +108,16 @@ func projectTranscriptMessage(
 	output := value
 
 	output.Attachments = slices.Clone(value.Attachments)
+	// Protocol inputs are deliberately not durable because they may contain
+	// hydrated content. Clearing this flag forces safe re-materialization on
+	// recovery instead of trusting an omitted protocol payload.
+	output.AttachmentsHydrated = false
 	output.ProtocolInputs = nil
 	output.ProtocolOutputs = slices.Clone(value.ProtocolOutputs)
 	output.ToolResults = projectToolResults(value.ToolResults)
 	output.MCPAppContext = cloneRawJSON(value.MCPAppContext)
 	output.Metadata = nil
+	output.RuntimeMetadata = cloneRawJSON(value.RuntimeMetadata)
 
 	if value.Error != nil {
 		errorValue := *value.Error
@@ -202,6 +207,7 @@ func projectModelOperations(
 		operation.ProtocolOutputs = slices.Clone(values[index].ProtocolOutputs)
 		operation.ToolCallIDs = slices.Clone(values[index].ToolCallIDs)
 		operation.Metadata = nil
+		operation.RuntimeMetadata = cloneRawJSON(values[index].RuntimeMetadata)
 
 		if values[index].Error != nil {
 			errorValue := *values[index].Error

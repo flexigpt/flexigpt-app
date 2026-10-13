@@ -37,7 +37,7 @@ func BuildAttachmentForFile(ctx context.Context, pathInfo *PathInfo) (*Attachmen
 		return nil, errors.Join(ErrUnreadableFile, err)
 	}
 
-	baseMIMEType := toolOut.BaseMIMEType
+	baseMIMEType := normalizeMIMEType(toolOut.BaseMIMEType)
 	extMode := toolOut.Mode
 	baseName := filepath.Base(pathInfo.Path)
 
