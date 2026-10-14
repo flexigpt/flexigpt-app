@@ -1,4 +1,5 @@
 import type { MCPProviderToolMapping, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
+import type { SessionAppRenderTarget } from '@/spec/session';
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
@@ -549,6 +550,13 @@ export interface UIToolOutput {
 	 * Optional MCP Apps render info for tool calls that produced a UI resource.
 	 */
 	mcpApp?: MCPToolAppRenderInfo;
+
+	/**
+	 * Session-scoped route for an MCP App created by this Tool result.
+	 * Unlike mcpApp metadata, this identifies the authoritative Session Runtime
+	 * command boundary for resource reads, app tools, and staged context.
+	 */
+	sessionApp?: SessionAppRenderTarget;
 
 	/** Short human-readable label used in chips. */
 	summary: string;

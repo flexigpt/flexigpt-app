@@ -4,7 +4,7 @@ import { FiX } from 'react-icons/fi';
 interface ModalHeaderProps {
 	title: ReactNode;
 	description?: ReactNode;
-	onClose: () => void;
+	onClose?: () => void;
 	closeDisabled?: boolean;
 }
 

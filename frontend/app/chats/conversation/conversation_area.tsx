@@ -15,10 +15,14 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
+import type { SessionWaitingRequest, SessionWaitResolution } from '@/spec/session';
 import { RoleEnum } from '@/spec/inference';
+import { SessionWaitStatus } from '@/spec/session';
 import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+
+import { sessionManagementAPI } from '@/apis/baseapi';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
@@ -33,6 +37,12 @@ import { useSendMessage } from '@/chats/conversation/use_send_message';
 import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
 import { MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, MCP_APP_UI_MESSAGE_EVENT } from '@/chats/mcpapps/mcp_app_events';
 import { ChatMessage } from '@/chats/messages/message';
+import {
+	requireAcceptedSessionCommand,
+	selectedSessionRun,
+	sessionCommandMeta,
+} from '@/chats/session/session_commands';
+import { SessionWaitModal } from '@/chats/session/session_wait_modal';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
 const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
@@ -610,15 +620,7 @@ interface ConversationAreaProps {
 }
 
 function ConversationAreaInner(
-	{
-		tabs,
-		selectedTabId,
-		mountedInputTabIds,
-		shortcutConfig,
-		initialScrollTopByTab,
-		updateTab,
-		saveUpdatedConversation,
-	}: ConversationAreaProps,
+	{ tabs, selectedTabId, mountedInputTabIds, shortcutConfig, initialScrollTopByTab, updateTab }: ConversationAreaProps,
 	ref: Ref<ConversationAreaHandle>
 ) {
 	const tabsRef = useRef(tabs);
@@ -629,6 +631,9 @@ function ConversationAreaInner(
 	const activeTabIsBusy = activeTab?.isBusy ?? false;
 	const activeTabIsHydrating = (activeTab?.isHydrating ?? false) || !(activeTab?.isLoaded ?? true);
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
+	const activeRun = activeTab?.sessionSnapshot
+		? selectedSessionRun(activeTab.sessionSnapshot, activeTab.activeRunID)
+		: undefined;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
 
@@ -645,18 +650,11 @@ function ConversationAreaInner(
 	const {
 		tabExists,
 		getAbortRef,
-		getStreamBuffer,
-		clearStreamBuffer,
 		clearStreamForTab,
-		getFullStreamTextForTab,
-		getFullStreamThinkingForTab,
 		getVisibleStreamTextForTab,
 		getVisibleStreamThinkingForTab,
 		getStreamVersionSnapshot,
 		subscribeToStream,
-		notifyStreamNow,
-		notifyStreamSoon,
-		requestIdByTabRef,
 		disposeStreamRuntime,
 	} = useStreamingRuntime({
 		tabs,
@@ -683,7 +681,6 @@ function ConversationAreaInner(
 		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
-		loadAssistantTurnForTab,
 	} = useInputRegistry({ tabExists });
 
 	useAttachmentsDropTarget({
@@ -764,22 +761,107 @@ function ConversationAreaInner(
 
 	const { sendMessageForTab, beginEditMessageForTab, cancelEditingForTab } = useSendMessage({
 		tabsRef,
-		selectedTabIdRef,
 		updateTab,
-		saveUpdatedConversation,
 		scrollTabToBottomSoon,
 		tabExists,
-		getAbortRef,
-		requestIdByTabRef,
-		clearStreamBuffer,
-		notifyStreamNow,
-		notifyStreamSoon,
-		getStreamBuffer,
-		getFullStreamTextForTab,
-		getFullStreamThinkingForTab,
-		inputRefs,
-		loadAssistantTurnForTab,
 	});
+
+	const runCommand = useCallback(
+		async (
+			action: (sessionID: string, sessionRevision: number, runID: string, runRevision: number) => Promise<void>
+		) => {
+			const snapshot = activeTab?.sessionSnapshot;
+			const run = snapshot ? selectedSessionRun(snapshot, activeTab.activeRunID) : undefined;
+
+			if (!snapshot || !run || !activeTab?.sessionID) {
+				throw new Error('The active Run snapshot is unavailable.');
+			}
+
+			await action(activeTab.sessionID, snapshot.session.revision, run.id, run.revision);
+		},
+		[activeTab]
+	);
+
+	const executeSessionToolCall = useCallback(
+		(callId: string) =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.executeCalls({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						callIDs: [callId],
+						continue: true,
+					}),
+					'Execute Tool call'
+				);
+			}),
+		[runCommand]
+	);
+
+	const retrySessionToolCall = useCallback(
+		(callId: string) =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.retryCall({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						callID: callId,
+					}),
+					'Retry Tool call'
+				);
+			}),
+		[runCommand]
+	);
+
+	const skipSessionToolCall = useCallback(
+		(callId: string) =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.skipCall({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						callID: callId,
+					}),
+					'Skip Tool call'
+				);
+			}),
+		[runCommand]
+	);
+
+	const cancelActiveRun = useCallback(
+		() =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.cancelRun({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+					}),
+					'Cancel Run'
+				);
+			}),
+		[runCommand]
+	);
+
+	const resolveWait = useCallback(
+		(wait: SessionWaitingRequest, resolution: SessionWaitResolution) =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.resolveWait({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						waitID: wait.id,
+						resolution,
+					}),
+					'Resolve Run wait'
+				);
+			}),
+		[runCommand]
+	);
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
@@ -883,6 +965,15 @@ function ConversationAreaInner(
 						tabId={activeTabId}
 						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
+						onRunToolCall={call => {
+							void executeSessionToolCall(call.id).catch(console.error);
+						}}
+						onRetryToolCall={call => {
+							void retrySessionToolCall(call.id).catch(console.error);
+						}}
+						onSkipToolCall={call => {
+							void skipSessionToolCall(call.id).catch(console.error);
+						}}
 						streamSource={activeStreamSource}
 					/>
 				);
@@ -897,10 +988,29 @@ function ConversationAreaInner(
 					tabId={activeTabId}
 					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
+					onRunToolCall={call => {
+						void executeSessionToolCall(call.id).catch(console.error);
+					}}
+					onRetryToolCall={call => {
+						void retrySessionToolCall(call.id).catch(console.error);
+					}}
+					onSkipToolCall={call => {
+						void skipSessionToolCall(call.id).catch(console.error);
+					}}
 				/>
 			);
 		},
-		[activeEditingMessageId, activeTabId, activeTabIsBusy, beginEditMessageForTab, messageCount, activeStreamSource]
+		[
+			activeEditingMessageId,
+			activeTabId,
+			activeTabIsBusy,
+			beginEditMessageForTab,
+			messageCount,
+			activeStreamSource,
+			executeSessionToolCall,
+			retrySessionToolCall,
+			skipSessionToolCall,
+		]
 	);
 
 	const mountedInputTabs = useMemo(
@@ -1039,10 +1149,23 @@ function ConversationAreaInner(
 							shortcutConfig={shortcutConfig}
 							sendMessage={sendMessageForTab}
 							cancelEditing={cancelEditingForTab}
+							cancelRun={() => cancelActiveRun()}
 						/>
 					))}
 				</div>
 			</div>
+
+			<SessionWaitModal
+				wait={activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending)}
+				isResolving={false}
+				onResolve={resolution => {
+					const wait = activeRun?.waitingRequests?.find(candidate => candidate.status === SessionWaitStatus.Pending);
+					if (!wait) {
+						return Promise.resolve();
+					}
+					return resolveWait(wait, resolution);
+				}}
+			/>
 		</>
 	);
 }

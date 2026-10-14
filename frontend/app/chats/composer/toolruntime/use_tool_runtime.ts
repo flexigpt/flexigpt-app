@@ -2,15 +2,12 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { SkillRef } from '@/spec/skill';
 import { UIToolCallStatus } from '@/spec/inference';
 import { ToolImplType, ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import { executeComposerToolCall } from '@/chats/composer/toolruntime/execute_tool_call';
 import { getPendingRunnableToolCalls } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -60,14 +57,6 @@ function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
 		toolSelection: toolCall.toolSelection,
 		mcpToolSelection: toolCall.mcpToolSelection,
 	};
-}
-
-interface UseComposerToolRuntimeArgs {
-	ensureSkillSession: () => Promise<string | null>;
-	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
-	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
-	getCurrentSkillSessionID: () => string | null;
-	requestMCPApproval?: RequestMCPApproval;
 }
 
 type Action =
@@ -157,13 +146,7 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 	}
 }
 
-export function useComposerToolRuntime({
-	ensureSkillSession,
-	listActiveSkillRefs,
-	setActiveSkillRefsFromSession,
-	getCurrentSkillSessionID,
-	requestMCPApproval,
-}: UseComposerToolRuntimeArgs): {
+export function useComposerToolRuntime(): {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
 	setToolOutputs: Dispatch<SetStateAction<UIToolOutput[]>>;
@@ -220,34 +203,12 @@ export function useComposerToolRuntime({
 		return attemptKey;
 	}, []);
 
-	const isCurrentToolCallAttempt = useCallback((toolCallId: string, attemptKey: string) => {
-		return toolCallAttemptKeyByIdRef.current.get(toolCallId) === attemptKey;
-	}, []);
-
 	const clearToolCallAttempt = useCallback((toolCallId: string, attemptKey?: string) => {
 		const currentAttemptKey = toolCallAttemptKeyByIdRef.current.get(toolCallId);
 		if (attemptKey === undefined || currentAttemptKey === attemptKey) {
 			toolCallAttemptKeyByIdRef.current.delete(toolCallId);
 		}
 	}, []);
-
-	const refreshActiveSkillRefs = useCallback(
-		async (sid: string) => {
-			try {
-				const nextActive = await listActiveSkillRefs(sid);
-				if (!isMountedRef.current) {
-					return;
-				}
-				if (getCurrentSkillSessionID() !== sid) {
-					return;
-				}
-				setActiveSkillRefsFromSession(nextActive);
-			} catch {
-				// ignore
-			}
-		},
-		[getCurrentSkillSessionID, listActiveSkillRefs, setActiveSkillRefsFromSession]
-	);
 
 	const setToolOutputs = useCallback<Dispatch<SetStateAction<UIToolOutput[]>>>(
 		update => {
@@ -288,58 +249,15 @@ export function useComposerToolRuntime({
 			const attemptKey = beginToolCallAttempt(id);
 			dispatchRuntime({ type: 'mark-running', callId: id });
 
-			try {
-				const result = await executeComposerToolCall({
-					toolCall,
-					ensureSkillSession,
-					getCurrentSkillSessionID,
-					requestMCPApproval,
-				});
-
-				if (!isCurrentToolCallAttempt(id, attemptKey)) {
-					return null;
-				}
-
-				clearToolCallAttempt(id, attemptKey);
-
-				if (!result.ok) {
-					dispatchRuntime({ type: 'mark-failed', callId: id, errorMessage: result.errorMessage });
-					return null;
-				}
-
-				dispatchRuntime({ type: 'succeed', callId: id, output: result.output });
-
-				if (result.refreshActiveSkillRefsForSessionID) {
-					void refreshActiveSkillRefs(result.refreshActiveSkillRefsForSessionID);
-				}
-
-				return result.output;
-			} catch (err) {
-				if (!isCurrentToolCallAttempt(id, attemptKey)) {
-					return null;
-				}
-
-				clearToolCallAttempt(id, attemptKey);
-
-				dispatchRuntime({
-					type: 'mark-failed',
-					callId: id,
-					errorMessage: (err as Error)?.message || 'Tool invocation failed.',
-				});
-
-				return null;
-			}
+			clearToolCallAttempt(id, attemptKey);
+			dispatchRuntime({
+				type: 'mark-failed',
+				callId: id,
+				errorMessage: 'Tool execution is Session-owned. Use the Run tool controls to execute this call.',
+			});
+			return null;
 		},
-		[
-			beginToolCallAttempt,
-			clearToolCallAttempt,
-			ensureSkillSession,
-			getCurrentSkillSessionID,
-			dispatchRuntime,
-			isCurrentToolCallAttempt,
-			refreshActiveSkillRefs,
-			requestMCPApproval,
-		]
+		[beginToolCallAttempt, clearToolCallAttempt, dispatchRuntime]
 	);
 
 	const runAllPendingToolCalls = useCallback(async (): Promise<UIToolOutput[]> => {

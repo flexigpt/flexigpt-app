@@ -2,29 +2,21 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
-import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AutoExecState } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
 import type { ComposerToolRuntimeState } from '@/chats/composer/toolruntime/use_tool_runtime';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
-import { useToolAutoExecDrainer } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
 import { useComposerToolRuntime } from '@/chats/composer/toolruntime/use_tool_runtime';
 
 interface UseComposerToolsArgs {
 	isBusy: boolean;
 	isSubmitting: boolean;
-	ensureSkillSession: () => Promise<string | null>;
-	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
-	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
-	getCurrentSkillSessionID: () => string | null;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	externalExecutionBlocked?: boolean;
-	requestMCPApproval?: RequestMCPApproval;
 }
 
 interface UseComposerToolsResult {
@@ -56,21 +48,10 @@ interface UseComposerToolsResult {
 export function useComposerTools({
 	isBusy,
 	isSubmitting,
-	ensureSkillSession,
-	listActiveSkillRefs,
-	setActiveSkillRefsFromSession,
-	getCurrentSkillSessionID,
 	getAttachedToolEntries,
 	externalExecutionBlocked = false,
-	requestMCPApproval,
 }: UseComposerToolsArgs): UseComposerToolsResult {
-	const runtime = useComposerToolRuntime({
-		ensureSkillSession,
-		listActiveSkillRefs,
-		setActiveSkillRefsFromSession,
-		getCurrentSkillSessionID,
-		requestMCPApproval,
-	});
+	const runtime = useComposerToolRuntime();
 
 	const config = useComposerToolConfig({
 		getAttachedToolEntries,
@@ -83,18 +64,10 @@ export function useComposerTools({
 	const removeToolOutput = runtime.removeToolOutput;
 	const retryErroredOutput = runtime.retryErroredOutput;
 	const clearToolRuntime = runtime.clearToolRuntime;
-	const getToolRuntimeSnapshot = runtime.getToolRuntimeSnapshot;
 	const recomputeAttachedToolArgsBlocked = config.recomputeAttachedToolArgsBlocked;
 	const clearAttachedToolValidation = config.clearAttachedToolValidation;
 
-	const getToolCallsSnapshot = useCallback(() => getToolRuntimeSnapshot().toolCalls, [getToolRuntimeSnapshot]);
-
-	const { state: autoExecState } = useToolAutoExecDrainer({
-		toolCalls: runtime.toolCalls,
-		isBlocked: autoExecBlocked,
-		getToolCallsSnapshot,
-		runToolCall,
-	});
+	const autoExecState = { phase: autoExecBlocked ? ('blocked' as const) : ('idle' as const), runningCallId: null };
 
 	const handleRunSingleToolCall = useCallback(
 		async (id: string) => {

@@ -9,11 +9,8 @@ import type { UIModelOption } from '@/spec/model';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { SkillSessionSyncMode } from '@/spec/skill';
-import { ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
-
-import type { PreparedAgentStarter } from '@/apis/agent_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
@@ -70,11 +67,12 @@ interface ComposerBoxProps {
 	shortcutConfig: ShortcutConfig;
 	editingMessageId: string | null;
 	onCancelEditing: () => void;
+	onCancelRun?: () => Promise<void>;
 }
 
 export const ComposerBox = memo(
 	forwardRef<ComposerBoxHandle, ComposerBoxProps>(function ComposerBox(
-		{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
+		{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing, onCancelRun },
 		ref
 	) {
 		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
@@ -85,39 +83,7 @@ export const ComposerBox = memo(
 			modelOptionsLoaded: composerContext.modelOptionsLoaded,
 		});
 
-		const applyAgentRuntime = useCallback((recipe: PreparedAgentStarter) => {
-			const editor = editorAreaRef.current;
-			if (!editor) {
-				return;
-			}
-
-			// An Agent is a complete starter recipe. Apply empty selections too,
-			// otherwise switching to an Agent with fewer capabilities leaves
-			// Tools, active Skills, or MCP state from the previous Agent.
-			const choices = recipe.toolSelections.map(selection => selection.choice);
-			editor.setConversationToolsFromChoices(
-				choices.filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch)
-			);
-			editor.setWebSearchFromChoices(choices.filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch));
-			editor.setToolSelectionIssues([]);
-
-			editor.setInstalledSkillStateFromAgent(recipe.enabledSkillRefs, recipe.activeSkillRefs);
-
-			if (recipe.mcpContext) {
-				editor.setMCPContextFromMessage(recipe.mcpContext);
-			} else {
-				editor.clearMCPContext();
-			}
-
-			// Agent request templates are starter text, not an overwrite of user
-			// input or a workflow draft.
-			if (recipe.startingText.trim()) {
-				editor.setDraftTextIfEmpty(recipe.startingText);
-			}
-		}, []);
-
-		const agent = useAgentManager(composerContext, { applyAgentRuntime }, systemPrompt);
-
+		const agent = useAgentManager(composerContext);
 		const resetComposerState = useCallback(() => {
 			setAbortConfirmationRequested(false);
 			agent.clearAgentTracking();
@@ -150,9 +116,23 @@ export const ComposerBox = memo(
 					return Promise.resolve();
 				}
 
-				return onSend(payload, composerContext.chatOptions);
+				return onSend(
+					{
+						...payload,
+						agentRef: agent.selectedAgent?.ref,
+						modelSelectionSource:
+							agent.selectedAgent && composerContext.modelSelectionSource === 'agent' ? 'agent' : 'session',
+					},
+					composerContext.chatOptions
+				);
 			},
-			[composerContext.chatOptions, composerContext.hasRunnableModel, onSend]
+			[
+				agent.selectedAgent,
+				composerContext.chatOptions,
+				composerContext.hasRunnableModel,
+				composerContext.modelSelectionSource,
+				onSend,
+			]
 		);
 
 		useImperativeHandle(
@@ -234,6 +214,10 @@ export const ComposerBox = memo(
 					}}
 					onConfirm={() => {
 						setAbortConfirmationRequested(false);
+						if (onCancelRun) {
+							void onCancelRun().catch(console.error);
+							return;
+						}
 						abortRef.current?.abort();
 					}}
 					title="Abort generation?"

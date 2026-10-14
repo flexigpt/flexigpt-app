@@ -729,6 +729,21 @@ export interface SessionAppInstance {
 	unavailableReason?: string;
 }
 
+/**
+ * Runtime-only identity required to route an MCP App through its originating
+ * Session and Run. It is intentionally attached only to UI projections and is
+ * never persisted as provider or MCP binding data.
+ */
+export interface SessionAppRenderTarget {
+	sessionID: SessionID;
+	runID: RunID;
+	appInstanceID: AppInstanceID;
+	serverID: string;
+	resourceURI?: string;
+	sessionRevision: SessionRevision;
+	runRevision: SessionRevision;
+}
+
 export interface SessionRun {
 	id: RunID;
 	sessionID: SessionID;

@@ -5,14 +5,13 @@ import { useStoreState } from '@ariakit/react';
 import { useTabStore } from '@ariakit/react/tab';
 
 import type { Conversation, ConversationSearchItem } from '@/spec/conversation';
-import { RoleEnum } from '@/spec/inference';
+import { SessionSnapshotObservationKind } from '@/spec/session';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { defaultShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
 import { omitManyKeys } from '@/lib/obj_utils';
-import { generateTitle } from '@/lib/title_utils';
 
-import { conversationStoreAPI } from '@/apis/baseapi';
+import { sessionManagementAPI } from '@/apis/baseapi';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
@@ -20,10 +19,11 @@ import type { ConversationSearchHandle } from '@/chats/search/conversation_searc
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import type { InitialChatsModel } from '@/chats/tabs/tabs_persistence';
 import {
-	hydrateConversationAsync,
-	toStoreConversationAsync,
-} from '@/chats/conversation/conversation_persistence_mapper';
-import { initConversation } from '@/chats/conversation/hydration_helper';
+	requireAcceptedSessionCommand,
+	selectedSessionRun,
+	sessionCommandMeta,
+} from '@/chats/session/session_commands';
+import { projectSessionSnapshotToConversation, sessionRunIsActive } from '@/chats/session/session_projection';
 import {
 	createEmptyTab,
 	isScratchTab,
@@ -56,15 +56,6 @@ function scheduleIdleWork(work: () => void, timeout = 1500): () => void {
 	return () => {
 		window.clearTimeout(timer);
 	};
-}
-
-async function yieldBeforeBackgroundWork(): Promise<void> {
-	if (typeof window === 'undefined' || typeof document === 'undefined' || document.visibilityState === 'hidden') {
-		return;
-	}
-	await new Promise<void>(resolve => {
-		window.setTimeout(resolve, 0);
-	});
 }
 
 async function yieldUntilAfterNextPaint(): Promise<void> {
@@ -221,7 +212,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	// tab.isPersisted is UI state and must not decide whether the next write
 	// can use PutMessagesToConversation. In particular, a failed initial
 	// PutConversation must not be followed by a message-only update.
-	const acknowledgedConversationTitleByIDRef = useRef(new Map<string, string>());
+	const sessionObserverByTabRef = useRef(new Map<string, () => void>());
 	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
 	const tabLoadVersionRef = useRef(new Map<string, number>());
 
@@ -249,30 +240,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		},
 		[conversationAreaRef]
 	);
-
-	const enqueueSaveForTab = useCallback((tabId: string, operation: () => Promise<void>) => {
-		const previous = saveQueueByTabRef.current.get(tabId) ?? Promise.resolve();
-
-		const next = previous
-			.catch(() => {
-				// ignore previous error so next save still runs
-			})
-			.then(async () => {
-				await yieldBeforeBackgroundWork();
-				await operation();
-			})
-			.catch((error: unknown) => {
-				console.error('Failed to persist conversation state:', error);
-			});
-
-		saveQueueByTabRef.current.set(tabId, next);
-
-		void next.finally(() => {
-			if (saveQueueByTabRef.current.get(tabId) === next) {
-				saveQueueByTabRef.current.delete(tabId);
-			}
-		});
-	}, []);
 
 	const commitTabs = useCallback((nextTabs: ChatTabState[]) => {
 		tabsRef.current = nextTabs;
@@ -344,120 +311,120 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		[normalizeAndCommitTabs]
 	);
 
-	const ensureTabLoaded = useCallback(
-		(tabId: string): Promise<void> => {
-			const existing = hydratePromiseByTabRef.current.get(tabId);
-			if (existing) {
-				return existing;
+	const applySessionSnapshot = useCallback(
+		(tabId: string, snapshot: ChatTabState['sessionSnapshot']) => {
+			if (!snapshot) {
+				return;
 			}
 
-			const tab = tabsRef.current.find(current => current.tabId === tabId);
-			if (!tab || tab.isLoaded || tab.isHydrating || !tab.isPersisted || !tab.conversation.id) {
-				return Promise.resolve();
-			}
+			const activeRun = selectedSessionRun(snapshot);
 
-			const loadVersion = beginTabLoad(tabId);
-			updateTab(tabId, prev =>
-				prev.isLoaded || prev.isHydrating || !prev.isPersisted || !prev.conversation.id
-					? prev
-					: {
-							...prev,
-							isBusy: false,
-							isHydrating: true,
-							editingMessageId: null,
-						}
-			);
-
-			const promise = (async () => {
-				try {
-					const stored = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
-					if (!isTabLoadCurrent(tabId, loadVersion)) {
-						return;
-					}
-
-					if (!stored) {
-						updateTab(tabId, prev => ({
-							...prev,
-							isLoaded: true,
-							isBusy: false,
-							isHydrating: false,
-							isPersisted: false,
-							manualTitleLocked: false,
-							editingMessageId: null,
-							conversation: initConversation(),
-						}));
-						return;
-					}
-
-					const hydrated = await hydrateConversationAsync(
-						stored,
-						() =>
-							isTabLoadCurrent(tabId, loadVersion) &&
-							tabsRef.current.some(
-								current => current.tabId === tabId && current.conversation.id === tab.conversation.id
-							)
-					);
-					if (!hydrated || !isTabLoadCurrent(tabId, loadVersion)) {
-						return;
-					}
-
-					acknowledgedConversationTitleByIDRef.current.set(hydrated.id, hydrated.title);
-					conversationAreaRef.current?.clearStreamForTab(tabId);
-
-					updateTab(tabId, prev => ({
-						...prev,
-						isLoaded: true,
-						isBusy: false,
-						isHydrating: true,
-						editingMessageId: null,
-						isPersisted: true,
-						conversation: hydrated,
-					}));
-
-					await yieldUntilAfterNextPaint();
-					if (!isTabLoadCurrent(tabId, loadVersion)) {
-						return;
-					}
-
-					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
-
-					updateTab(tabId, prev => ({
-						...prev,
-						isLoaded: true,
-						isBusy: false,
-						isHydrating: false,
-						editingMessageId: null,
-					}));
-				} catch (error) {
-					if (!isTabLoadCurrent(tabId, loadVersion)) {
-						return;
-					}
-
-					console.error(error);
-					updateTab(tabId, prev => ({
-						...prev,
-						isLoaded: true,
-						isBusy: false,
-						isHydrating: false,
-						isPersisted: false,
-						manualTitleLocked: false,
-						editingMessageId: null,
-						conversation: initConversation(),
-					}));
+			updateTab(tabId, previous => {
+				if (previous.sessionID !== snapshot.session.id) {
+					return previous;
 				}
-			})();
 
-			hydratePromiseByTabRef.current.set(tabId, promise);
-			void promise.finally(() => {
-				if (hydratePromiseByTabRef.current.get(tabId) === promise) {
-					hydratePromiseByTabRef.current.delete(tabId);
+				return {
+					...previous,
+					sessionSnapshot: snapshot,
+					activeRunID: activeRun?.id,
+					conversation: projectSessionSnapshotToConversation(snapshot, activeRun?.id),
+					isLoaded: true,
+					isHydrating: false,
+					isPersisted: true,
+					isBusy: sessionRunIsActive(activeRun),
+					runtimeError: undefined,
+				};
+			});
+		},
+		[updateTab]
+	);
+
+	const ensureSessionObserver = useCallback(
+		(tabId: string, sessionID: string) => {
+			if (sessionObserverByTabRef.current.has(tabId)) {
+				return;
+			}
+
+			const unsubscribe = sessionManagementAPI.observeSession(sessionID, observation => {
+				if (observation.kind === SessionSnapshotObservationKind.Snapshot && observation.snapshot) {
+					applySessionSnapshot(tabId, observation.snapshot);
+				} else if (observation.kind === SessionSnapshotObservationKind.Error) {
+					updateTab(tabId, tab => ({
+						...tab,
+						runtimeError:
+							observation.error instanceof Error ? observation.error.message : 'Session snapshot refresh failed.',
+					}));
 				}
 			});
 
-			return promise;
+			sessionObserverByTabRef.current.set(tabId, unsubscribe);
 		},
-		[beginTabLoad, conversationAreaRef, isTabLoadCurrent, updateTab]
+		[applySessionSnapshot, updateTab]
 	);
+
+	const ensureTabLoaded = useCallback(
+		(tabId: string): Promise<void> => {
+			const tab = tabsRef.current.find(current => current.tabId === tabId);
+			if (!tab?.sessionID) {
+				return Promise.resolve();
+			}
+
+			ensureSessionObserver(tabId, tab.sessionID);
+			updateTab(tabId, previous => ({
+				...previous,
+				isHydrating: true,
+			}));
+
+			return sessionManagementAPI
+				.getSessionSnapshot(tab.sessionID)
+				.then(snapshot => {
+					applySessionSnapshot(tabId, snapshot);
+					conversationAreaRef.current?.syncComposerFromConversation(
+						tabId,
+						projectSessionSnapshotToConversation(snapshot, selectedSessionRun(snapshot)?.id)
+					);
+				})
+				.catch((error: unknown) => {
+					updateTab(tabId, previous => ({
+						...previous,
+						isHydrating: false,
+						runtimeError: error instanceof Error ? error.message : 'Failed to load Session snapshot.',
+					}));
+				});
+		},
+		[applySessionSnapshot, conversationAreaRef, ensureSessionObserver, updateTab]
+	);
+
+	useEffect(() => {
+		const wanted = new Set(tabs.filter(tab => Boolean(tab.sessionID)).map(tab => `${tab.tabId}:${tab.sessionID}`));
+
+		for (const tab of tabs) {
+			if (tab.sessionID) {
+				ensureSessionObserver(tab.tabId, tab.sessionID);
+			}
+		}
+
+		for (const [tabId, unsubscribe] of sessionObserverByTabRef.current.entries()) {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+			if (tab?.sessionID && wanted.has(`${tabId}:${tab.sessionID}`)) {
+				continue;
+			}
+			unsubscribe();
+			sessionObserverByTabRef.current.delete(tabId);
+		}
+	}, [ensureSessionObserver, tabs]);
+
+	useEffect(() => {
+		return () => {
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			for (const unsubscribe of sessionObserverByTabRef.current.values()) {
+				unsubscribe();
+			}
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			sessionObserverByTabRef.current.clear();
+		};
+	}, []);
 
 	useEffect(() => {
 		const active = tabs.find(tab => tab.tabId === selectedTabId);
@@ -492,16 +459,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		touchTab(selectedTabId);
 	}, [selectedTabId, touchTab]);
 
-	const [searchRefreshKey, setSearchRefreshKey] = useState(0);
-	const bumpSearchKey = useCallback(async () => {
-		await new Promise<void>(resolve => {
-			setTimeout(() => {
-				resolve();
-			}, 50);
-		});
-		setSearchRefreshKey(key => key + 1);
-	}, []);
-
 	const persistNow = useCallback(() => {
 		const tabsSnapshot = tabsRef.current.slice(0, MAX_TABS);
 
@@ -517,13 +474,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		}
 
 		writePersistedChatsPageState({
-			v: 1,
+			v: 2,
 			selectedTabId: selectedTabIdRef.current,
 			tabs: tabsSnapshot.map(tab => ({
 				tabId: tab.tabId,
-				conversationId: tab.conversation.id,
+				sessionID: tab.sessionID,
 				title: tab.conversation.title,
-				isPersisted: tab.isPersisted,
 				manualTitleLocked: tab.manualTitleLocked,
 			})),
 			scrollTopByTab: scrollObj,
@@ -592,84 +548,16 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const saveUpdatedConversation = useCallback(
 		(tabId: string, updatedConv: Conversation, titleWasExternallyChanged = false) => {
-			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) {
-				return;
-			}
-
-			let newTitle = updatedConv.title;
-
-			const allowAutoTitle = !titleWasExternallyChanged && !tab.manualTitleLocked;
-			if (allowAutoTitle && updatedConv.messages.length <= 4) {
-				const userMessages = updatedConv.messages.filter(message => message.role === RoleEnum.User);
-
-				if (userMessages.length === 1) {
-					newTitle = generateTitle(userMessages[0].uiContent).title;
-				} else if (userMessages.length === 2) {
-					const c1 = generateTitle(userMessages[0].uiContent);
-					const c2 = generateTitle(userMessages[1].uiContent);
-					newTitle = c2.score > c1.score ? c2.title : c1.title;
-				}
-
-				newTitle = sanitizeConversationTitle(newTitle);
-			}
-
-			const titleChangedByFunction = newTitle !== updatedConv.title;
-			const conversationToSave = titleChangedByFunction
-				? {
-						...updatedConv,
-						title: newTitle,
-					}
-				: updatedConv;
-
 			updateTab(tabId, current => ({
 				...current,
-				conversation: conversationToSave,
+				conversation: updatedConv,
 				isLoaded: true,
-				isPersisted: current.isPersisted || acknowledgedConversationTitleByIDRef.current.has(conversationToSave.id),
+				isPersisted: Boolean(current.sessionID),
 				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,
 				isHydrating: false,
 			}));
-
-			enqueueSaveForTab(tabId, async () => {
-				const storeConversation = await toStoreConversationAsync(conversationToSave);
-
-				// Decide at execution time, after prior queued writes have
-				// completed. This is essential when an initial PutConversation
-				// failed: there is no file to update yet.
-				const acknowledgedTitle = acknowledgedConversationTitleByIDRef.current.get(storeConversation.id);
-				const needsFullSave = acknowledgedTitle !== storeConversation.title;
-
-				if (needsFullSave) {
-					await conversationStoreAPI.putConversation(storeConversation);
-
-					// Only a successful full write proves that a corresponding
-					// conversation file exists.
-					acknowledgedConversationTitleByIDRef.current.set(storeConversation.id, storeConversation.title);
-
-					updateTab(tabId, current => {
-						if (current.conversation.id !== storeConversation.id || current.isPersisted) {
-							return current;
-						}
-						return {
-							...current,
-							isPersisted: true,
-						};
-					});
-
-					await bumpSearchKey();
-					persistNowRef.current();
-					return;
-				}
-
-				await conversationStoreAPI.putMessagesToConversation(
-					storeConversation.id,
-					storeConversation.title,
-					storeConversation.messages
-				);
-			});
 		},
-		[bumpSearchKey, enqueueSaveForTab, updateTab]
+		[updateTab]
 	);
 
 	const getOrCreateScratchTabForStarter = useCallback((): string => {
@@ -797,28 +685,28 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		cycleTabBy(-1);
 	}, [cycleTabBy]);
 
-	const renameTabTitle = useCallback(
-		(tabId: string, newTitle: string) => {
-			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) {
-				return;
-			}
+	const renameTabTitle = useCallback((tabId: string, newTitle: string) => {
+		const tab = tabsRef.current.find(t => t.tabId === tabId);
+		if (!tab || !tab.sessionID || !tab.sessionSnapshot) {
+			return;
+		}
 
-			const sanitized = sanitizeConversationTitle(newTitle.trim());
-			if (!sanitized || sanitized === tab.conversation.title) {
-				return;
-			}
+		const sanitized = sanitizeConversationTitle(newTitle.trim());
+		if (!sanitized || sanitized === tab.conversation.title) {
+			return;
+		}
 
-			const updatedConv: Conversation = {
-				...tab.conversation,
+		void sessionManagementAPI
+			.renameSession({
+				meta: sessionCommandMeta(tab.sessionSnapshot.session.revision),
+				sessionID: tab.sessionID,
 				title: sanitized,
-				modifiedAt: new Date().toISOString(),
-			};
-
-			saveUpdatedConversation(tabId, updatedConv, true);
-		},
-		[saveUpdatedConversation]
-	);
+			})
+			.then(receipt => {
+				requireAcceptedSessionCommand(receipt, 'Rename Session');
+			})
+			.catch(console.error);
+	}, []);
 
 	const loadConversationIntoTab = useCallback(
 		async (tabId: string, item: ConversationSearchItem) => {
@@ -831,38 +719,24 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}));
 
 			try {
-				const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
+				const selectedChat = await sessionManagementAPI.getSessionSnapshot(item.id);
 				if (!isTabLoadCurrent(tabId, loadVersion)) {
 					return;
 				}
 
-				if (!selectedChat) {
-					updateTab(tabId, tab => ({
-						...tab,
-						isLoaded: true,
-						isHydrating: false,
-						isBusy: false,
-						editingMessageId: null,
-					}));
-					return;
-				}
-
-				const hydrated = await hydrateConversationAsync(selectedChat, () => isTabLoadCurrent(tabId, loadVersion));
-				if (!hydrated || !isTabLoadCurrent(tabId, loadVersion)) {
-					return;
-				}
-
-				acknowledgedConversationTitleByIDRef.current.set(hydrated.id, hydrated.title);
-				conversationAreaRef.current?.clearStreamForTab(tabId);
+				const hydrated = projectSessionSnapshotToConversation(selectedChat, selectedSessionRun(selectedChat)?.id);
 				conversationAreaRef.current?.resetScrollToTop(tabId);
 
 				updateTab(tabId, tab => ({
 					...tab,
+					sessionID: selectedChat.session.id,
+					sessionSnapshot: selectedChat,
+					activeRunID: selectedSessionRun(selectedChat)?.id,
 					conversation: hydrated,
 					isPersisted: true,
 					manualTitleLocked: false,
 					editingMessageId: null,
-					isBusy: false,
+					isBusy: sessionRunIsActive(selectedSessionRun(selectedChat)),
 					isLoaded: true,
 					isHydrating: true,
 				}));
@@ -983,8 +857,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			return JSON.stringify(null, null, 2);
 		}
 
-		const selectedChat = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
-		return JSON.stringify(selectedChat ?? null, null, 2);
+		if (!tab.sessionID) {
+			return JSON.stringify(null, null, 2);
+		}
+		return sessionManagementAPI.exportSession(tab.sessionID);
 	}, []);
 
 	const tabBarItems = useMemo(
@@ -1016,7 +892,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		getConversationForExport,
 		tabBarItems,
 		openConversationIds,
-		searchRefreshKey,
 		maxTabs: MAX_TABS,
 		preloadWorkflowStarter,
 	};

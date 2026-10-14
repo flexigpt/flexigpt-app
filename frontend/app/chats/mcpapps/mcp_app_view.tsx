@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPAppsPolicy, MCPContent } from '@/spec/mcp';
+import type { MCPContent } from '@/spec/mcp';
 import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp';
+import { SessionRunObservationKind, SessionToolCallSource, SessionToolResultKind } from '@/spec/session';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
+import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
+import { backendAPI, sessionManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -15,23 +16,17 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import type { MCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
-import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { buildMCPAppAllowAttribute, buildMCPAppCSP, getMCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
-import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import { dispatchMCPAppModelContextUpdate, dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import { dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
 import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
+import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
+import { decodeSessionOpaqueJSON } from '@/chats/session/session_projection';
 
 const APP_MIME = MCP_APP_HTML_MIME_TYPE;
 const NORMALIZED_APP_MIME = APP_MIME.toLowerCase().replaceAll(/\s/g, '');
-const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
-	enabled: false,
-	allowAppInitiatedToolCalls: false,
-	requireApprovalForOpenLink: true,
-	requireApprovalForContextUpdates: true,
-};
 
 const DEFAULT_APP_HEIGHT = 480;
 const MIN_APP_HEIGHT = 160;
@@ -273,16 +268,18 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const [pendingURL, setPendingURL] = useState<string | null>(null);
 	const [pendingUIMessage, setPendingUIMessage] = useState<MCPAppUIMessage | null>(null);
 	const [pendingContextUpdate, setPendingContextUpdate] = useState<MCPAppModelContextUpdatePayload | null>(null);
-	const [serverArtifact, setServerArtifact] = useState<ArtifactRef | null>(null);
 	const [blockedLink, setBlockedLink] = useState<BlockedExternalLink | null>(null);
 	const [initializedBridgeVersion, setInitializedBridgeVersion] = useState(0);
-	const [appsPolicy, setAppsPolicy] = useState<MCPAppsPolicy | null>(null);
-	const [policyError, setPolicyError] = useState<string | null>(null);
 	const [appRequestedHeight, setAppRequestedHeight] = useState<number | null>(null);
+	const [sessionError, setSessionError] = useState<string | null>(null);
+	const [viewID] = useState(() => `mcp-app-view-${getUUIDv7()}`);
+	const revisionsRef = useRef({
+		sessionRevision: instance.session.sessionRevision,
+		runRevision: instance.session.runRevision,
+	});
 
 	const approvalResolverRef = useRef<((ok: boolean) => void) | null>(null);
 	const mountedRef = useRef(true);
-	const mcpApproval = useMCPApproval();
 
 	const bridgeRef = useRef<MCPAppPostMessageBridge | null>(null);
 	const bridgeVersionRef = useRef(0);
@@ -300,82 +297,66 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		value: MCPAppViewProps['toolResult'];
 	} | null>(null);
 
-	const server = instance.server;
-	const appsEnabled = appsPolicy?.enabled === true;
-	const effectiveAppsPolicy = appsPolicy ?? UNKNOWN_APP_POLICY;
-	const serverLabel = serverArtifact ? `${serverArtifact.rootID}/${serverArtifact.artifactID}` : server;
+	const serverLabel = instance.server;
 	const frameHeight = appRequestedHeight ?? clampAppHeight(height);
 
 	useEffect(() => {
-		if (!appsEnabled) {
-			return;
-		}
-
 		let cancelled = false;
 
-		void mcpManagementAPI
-			.readMCPResource(server, instance.resourceUri)
-			.then(resp => {
+		void (async () => {
+			try {
+				const opened = requireAcceptedSessionCommand(
+					await sessionManagementAPI.openAppView({
+						meta: sessionCommandMeta(revisionsRef.current.sessionRevision, revisionsRef.current.runRevision),
+						sessionID: instance.session.sessionID,
+						runID: instance.session.runID,
+						appInstanceID: instance.session.appInstanceID,
+						viewID,
+					}),
+					'Open MCP App view'
+				);
+
+				revisionsRef.current = {
+					sessionRevision: opened.sessionRevision ?? revisionsRef.current.sessionRevision,
+					runRevision: opened.runRevision ?? revisionsRef.current.runRevision,
+				};
+
+				const raw = await sessionManagementAPI.readAppResource({
+					sessionID: instance.session.sessionID,
+					runID: instance.session.runID,
+					appInstanceID: instance.session.appInstanceID,
+					viewID,
+					resourceURI: instance.resourceUri,
+				});
+
 				if (cancelled) {
 					return;
 				}
-				const extracted = extractAppHTML(resp?.contents);
+				const response = decodeSessionOpaqueJSON<{ contents?: MCPContent[] }>(raw.content);
+				const extracted = extractAppHTML(response?.contents);
 				if (!extracted) {
 					setLoadError('UI resource did not return MCP App HTML.');
 					return;
 				}
 				setLoadedResource(extracted);
-			})
-			.catch((err: unknown) => {
+			} catch (error) {
 				if (cancelled) {
 					return;
 				}
-				setLoadError(err instanceof Error ? err.message : 'Failed to load MCP App.');
-			});
+				setSessionError(error instanceof Error ? error.message : 'Failed to open the Session-scoped MCP App.');
+			}
+		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [appsEnabled, instance.resourceUri, server]);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		void mcpManagementAPI
-			.findComposerServerByRuntimeID(server)
-			.then(view => {
-				if (cancelled) {
-					return;
-				}
-
-				if (!view) {
-					setPolicyError('MCP server is not available in the composer catalog.');
-					return;
-				}
-
-				setServerArtifact(view.ref);
-				const nextPolicy = view.policy?.body.appsPolicy;
-				if (!nextPolicy) {
-					setPolicyError('The server did not return an MCP Apps policy.');
-					return;
-				}
-				if (!nextPolicy.enabled) {
-					setPolicyError('MCP Apps is currently disabled for this server.');
-					return;
-				}
-				setAppsPolicy(nextPolicy);
-			})
-			.catch((err: unknown) => {
-				if (cancelled) {
-					return;
-				}
-				setPolicyError(err instanceof Error ? err.message : 'Could not verify MCP Apps policy.');
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [server]);
+	}, [
+		instance.resourceUri,
+		instance.session.appInstanceID,
+		instance.session.runID,
+		instance.session.sessionID,
+		viewID,
+	]);
 
 	useEffect(() => {
 		return () => {
@@ -385,38 +366,24 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		};
 	}, []);
 
-	const requestOpenLinkApproval = useCallback(
-		async (url: string) => {
-			if (!mountedRef.current) {
-				return false;
-			}
+	const requestOpenLinkApproval = useCallback(async (url: string) => {
+		if (!mountedRef.current) {
+			return false;
+		}
 
-			if (approvalResolverRef.current) {
-				return false;
-			}
-			const safeURL = normalizeSafeExternalURL(url);
-			if (!safeURL) {
-				setBlockedLink({ url, reason: 'unsafe' });
-				return false;
-			}
-			if (!effectiveAppsPolicy.requireApprovalForOpenLink) {
-				try {
-					backendAPI.openURL(safeURL);
-					return true;
-				} catch {
-					if (mountedRef.current) {
-						setBlockedLink({ url: safeURL, reason: 'open-failed' });
-					}
-					return false;
-				}
-			}
-			return await new Promise<boolean>(resolve => {
-				approvalResolverRef.current = resolve;
-				setPendingURL(safeURL);
-			});
-		},
-		[effectiveAppsPolicy.requireApprovalForOpenLink]
-	);
+		if (approvalResolverRef.current) {
+			return false;
+		}
+		const safeURL = normalizeSafeExternalURL(url);
+		if (!safeURL) {
+			setBlockedLink({ url, reason: 'unsafe' });
+			return false;
+		}
+		return await new Promise<boolean>(resolve => {
+			approvalResolverRef.current = resolve;
+			setPendingURL(safeURL);
+		});
+	}, []);
 
 	const applySizeChanged = useCallback((params: unknown) => {
 		if (!params || typeof params !== 'object') {
@@ -442,10 +409,67 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			// oxlint-disable-next-line react/refs
 			new MCPAppRPCRouter({
 				instance: routerInstance,
-				allowAppInitiatedToolCalls: effectiveAppsPolicy.enabled && effectiveAppsPolicy.allowAppInitiatedToolCalls,
 				isActive: () => mountedRef.current,
+				executeAppTool: async (toolName, args) => {
+					const receipt = requireAcceptedSessionCommand(
+						await sessionManagementAPI.executeAppTool({
+							meta: sessionCommandMeta(revisionsRef.current.sessionRevision, revisionsRef.current.runRevision),
+							sessionID: instance.session.sessionID,
+							runID: instance.session.runID,
+							appInstanceID: instance.session.appInstanceID,
+							viewID,
+							toolName,
+							arguments: args,
+						}),
+						'Execute MCP App Tool'
+					);
+					revisionsRef.current = {
+						sessionRevision: receipt.sessionRevision ?? revisionsRef.current.sessionRevision,
+						runRevision: receipt.runRevision ?? revisionsRef.current.runRevision,
+					};
+				},
+				readAppResource: async resourceURI => {
+					const response = await sessionManagementAPI.readAppResource({
+						sessionID: instance.session.sessionID,
+						runID: instance.session.runID,
+						appInstanceID: instance.session.appInstanceID,
+						viewID,
+						resourceURI,
+					});
+					return decodeSessionOpaqueJSON(response.content);
+				},
+				stageModelContext: async update => {
+					const receipt = requireAcceptedSessionCommand(
+						await sessionManagementAPI.stageAppContext({
+							meta: sessionCommandMeta(revisionsRef.current.sessionRevision, revisionsRef.current.runRevision),
+							sessionID: instance.session.sessionID,
+							runID: instance.session.runID,
+							appInstanceID: instance.session.appInstanceID,
+							viewID,
+							update: {
+								appInstanceID: instance.session.appInstanceID,
+								viewID,
+								serverID: instance.session.serverID,
+								resourceURI: instance.session.resourceURI,
+								content: update.content?.map(content => ({
+									type: content.type,
+									text: content.text ?? content.resource?.text,
+									uri: content.uri ?? content.resource?.uri,
+									name: content.name,
+									description: content.description,
+									mimeType: content.mimeType ?? content.resource?.mimeType,
+								})),
+								structuredContent: update.structuredContent,
+							},
+						}),
+						'Stage MCP App context'
+					);
+					revisionsRef.current = {
+						sessionRevision: receipt.sessionRevision ?? revisionsRef.current.sessionRevision,
+						runRevision: receipt.runRevision ?? revisionsRef.current.runRevision,
+					};
+				},
 				requestOpenLinkApproval,
-				requestMCPApproval: mcpApproval.requestMCPApproval,
 				requestUIMessageApproval: async message => {
 					if (!mountedRef.current || approvalResolverRef.current) {
 						return false;
@@ -458,12 +482,9 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				onUIMessage: message => {
 					dispatchMCPAppUIMessage(routerInstance, message);
 				},
-				requestModelContextUpdateApproval: async update => {
+				requestModelContextUpdateApproval: async () => {
 					if (!mountedRef.current) {
 						return false;
-					}
-					if (!effectiveAppsPolicy.requireApprovalForContextUpdates) {
-						return true;
 					}
 					if (approvalResolverRef.current) {
 						return false;
@@ -471,20 +492,18 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 
 					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
-						setPendingContextUpdate(update);
 					});
-				},
-				onModelContextUpdate: update => {
-					dispatchMCPAppModelContextUpdate(routerInstance, update);
 				},
 			}),
 		[
-			effectiveAppsPolicy.allowAppInitiatedToolCalls,
-			effectiveAppsPolicy.enabled,
-			effectiveAppsPolicy.requireApprovalForContextUpdates,
-			mcpApproval.requestMCPApproval,
+			instance.session.appInstanceID,
+			instance.session.resourceURI,
+			instance.session.runID,
+			instance.session.serverID,
+			instance.session.sessionID,
 			requestOpenLinkApproval,
 			routerInstance,
+			viewID,
 		]
 	);
 
@@ -537,7 +556,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 							result: buildMCPAppHostContext({
 								width: iframe.clientWidth,
 								height: iframe.clientHeight,
-								allowToolCalls: effectiveAppsPolicy.enabled && effectiveAppsPolicy.allowAppInitiatedToolCalls,
+								allowToolCalls: true,
 							}),
 						};
 					}
@@ -558,12 +577,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			});
 			bridgeRef.current = bridge;
 		},
-		[
-			applySizeChanged,
-			effectiveAppsPolicy.allowAppInitiatedToolCalls,
-			effectiveAppsPolicy.enabled,
-			instance.resourceUri,
-		]
+		[applySizeChanged, instance.resourceUri]
 	);
 
 	useEffect(() => {
@@ -640,6 +654,47 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	}, [instance.resourceUri]);
 
 	useEffect(() => {
+		const sentResultIDs = new Set<string>();
+
+		return sessionManagementAPI.observeRun(instance.session.sessionID, instance.session.runID, observation => {
+			if (observation.kind !== SessionRunObservationKind.Snapshot || !observation.snapshot) {
+				return;
+			}
+
+			revisionsRef.current = {
+				sessionRevision: observation.snapshot.sessionRevision,
+				runRevision: observation.snapshot.run.revision,
+			};
+
+			const bridge = bridgeRef.current;
+			if (!bridge) {
+				return;
+			}
+
+			for (const call of observation.snapshot.run.toolCalls ?? []) {
+				if (call.source !== SessionToolCallSource.App || call.appInstanceID !== instance.session.appInstanceID) {
+					continue;
+				}
+
+				for (const result of call.results ?? []) {
+					if (sentResultIDs.has(result.id)) {
+						continue;
+					}
+					sentResultIDs.add(result.id);
+
+					bridge.sendNotification('ui/notifications/tool-result', {
+						toolName: result.name,
+						toolUseID: result.providerCallID || result.callID,
+						content: [{ type: 'text', text: result.text || result.error || '' }],
+						structuredContent: decodeSessionOpaqueJSON(result.structured),
+						isError: result.kind !== SessionToolResultKind.Success,
+					});
+				}
+			}
+		});
+	}, [instance.session.appInstanceID, instance.session.runID, instance.session.sessionID]);
+
+	useEffect(() => {
 		mountedRef.current = true;
 		return () => {
 			mountedRef.current = false;
@@ -648,20 +703,12 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		};
 	}, []);
 
-	if (!appsPolicy && !policyError) {
-		return (
-			<output className="text-base-content/60 text-xs" aria-live="polite">
-				Verifying MCP App policy…
-			</output>
-		);
-	}
-
-	if (policyError) {
+	if (sessionError) {
 		return (
 			<div className="alert alert-warning rounded-2xl text-sm" role="alert">
 				<div className="flex items-center gap-2">
 					<FiAlertTriangle size={14} aria-hidden="true" />
-					<span>MCP App is unavailable: {policyError}</span>
+					<span>MCP App is unavailable: {sessionError}</span>
 				</div>
 			</div>
 		);
@@ -690,12 +737,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			<div className="border-base-content/10 bg-base-200 rounded-2xl border p-2">
 				<div className="mb-2 flex items-center justify-between gap-2 text-xs">
 					<span className="truncate font-semibold">{instance.displayName ?? instance.toolName}</span>
-					<span
-						className="text-base-content/60 truncate"
-						title={serverArtifact ? `${serverArtifact.rootID}/${serverArtifact.artifactID}` : server}
-					>
-						{serverLabel}
-					</span>
+					<span className="text-base-content/60 truncate">{serverLabel}</span>
 				</div>
 				<MCPAppSandbox
 					html={loadedResource.html}
@@ -790,14 +832,6 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 							: `Could not open:\n${truncateForDisplay(blockedLink.url)}`
 						: ''
 				}
-			/>
-			<MCPApprovalModal
-				approvalRequest={mcpApproval.approvalRequest}
-				isResolving={mcpApproval.isResolving}
-				error={mcpApproval.approvalError}
-				onResolve={r => {
-					return mcpApproval.resolveMCPApproval(r);
-				}}
 			/>
 		</>
 	);

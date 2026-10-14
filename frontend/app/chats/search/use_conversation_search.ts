@@ -4,7 +4,7 @@ import type { ConversationSearchItem } from '@/spec/conversation';
 
 import { cleanSearchQuery } from '@/lib/title_utils';
 
-import { conversationStoreAPI } from '@/apis/baseapi';
+import { sessionManagementAPI } from '@/apis/baseapi';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 import {
@@ -14,6 +14,7 @@ import {
 	sortConversationSearchResults,
 	uniqBy,
 } from '@/chats/search/conversation_search_utils';
+import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
 
 interface SearchState {
 	query: string;
@@ -36,6 +37,20 @@ const searchCache = new Map<string, SearchCacheEntry>();
 interface UseConversationSearchArgs {
 	onSelectConversation: (item: ConversationSearchItem) => Promise<void>;
 	refreshKey: number;
+}
+
+function toSearchItem(value: {
+	id: string;
+	title?: string;
+	createdAt?: string;
+	modifiedAt?: string;
+	updatedAt?: string;
+}): ConversationSearchItem {
+	return {
+		id: value.id,
+		title: value.title || 'Conversation',
+		modifiedAt: value.modifiedAt ?? value.updatedAt ?? value.createdAt,
+	};
 }
 
 export function useConversationSearch({ onSelectConversation, refreshKey }: UseConversationSearchArgs) {
@@ -71,7 +86,12 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				setSearchState(prev => ({ ...prev, loading: true, error: undefined }));
 			}
 
-			const { conversations, nextToken } = await conversationStoreAPI.listConversations(token, 20);
+			const page = await sessionManagementAPI.listSessions({
+				pageToken: token,
+				pageSize: 20,
+			});
+			const conversations = page.items.map(toSearchItem);
+			const nextToken = page.nextPageToken;
 			const trimmedNext = nextToken?.trim() || '';
 			const nextRecentConversations = append
 				? mergeUniqBy(recentConversationsRef.current, conversations, conversation => conversation.id)
@@ -163,7 +183,15 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 			}
 
 			try {
-				const res = await conversationStoreAPI.searchConversations(query, token, 20);
+				const page = await sessionManagementAPI.searchSessions({
+					query,
+					pageToken: token,
+					pageSize: 20,
+				});
+				const res = {
+					conversations: page.items.map(toSearchItem),
+					nextToken: page.nextPageToken,
+				};
 				if (requestSeq !== searchRequestSeqRef.current) {
 					return;
 				}
@@ -347,7 +375,14 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		setDeleteLoading(true);
 
 		try {
-			await conversationStoreAPI.deleteConversation(deleteTarget.id, deleteTarget.title);
+			const snapshot = await sessionManagementAPI.getSessionSnapshot(deleteTarget.id);
+			requireAcceptedSessionCommand(
+				await sessionManagementAPI.deleteSession({
+					meta: sessionCommandMeta(snapshot.session.revision),
+					sessionID: deleteTarget.id,
+				}),
+				'Delete Session'
+			);
 
 			const nextRecentConversations = recentConversationsRef.current.filter(
 				conversation => conversation.id !== deleteTarget.id

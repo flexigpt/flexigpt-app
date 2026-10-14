@@ -1,16 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent, SubmitEventHandler } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import {
-	FiAlertTriangle,
-	FiEdit2,
-	FiFastForward,
-	FiPlay,
-	FiSend,
-	FiSquare,
-	FiTool,
-	FiX,
-	FiZapOff,
-} from 'react-icons/fi';
+import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiSquare, FiTool, FiX } from 'react-icons/fi';
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
@@ -27,9 +17,8 @@ import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
 import { UIToolCallStatus } from '@/spec/inference';
-import { MCPExecutionMode } from '@/spec/mcp';
 import { SkillSessionSyncMode } from '@/spec/skill';
-import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
+import { ToolImplType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
@@ -52,9 +41,7 @@ import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_u
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
-import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
-import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { buildEditorValueFromPlainText, insertPlainTextAsSingleBlock } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getAttachedTools,
@@ -65,11 +52,6 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
-import {
-	createAutoSubmitTracker,
-	getToolAutoSubmitKey,
-	isAutoSubmitEligibleToolCall,
-} from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
@@ -128,18 +110,6 @@ interface EditorAreaProps {
 	systemPrompt: AgentSystemPromptController;
 }
 
-function isAutoExecutableToolChoice(choice: ToolStoreChoice): boolean {
-	return (
-		choice.autoExecute &&
-		choice.implementationKind === ToolImplType.Go &&
-		(choice.toolType === ToolStoreChoiceType.Function || choice.toolType === ToolStoreChoiceType.Custom)
-	);
-}
-
-function countAutoExecutableToolChoices(choices: ToolStoreChoice[]): number {
-	return choices.filter(c => isAutoExecutableToolChoice(c)).length;
-}
-
 function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolSelection[] {
 	const out: MCPToolSelection[] = [];
 
@@ -153,10 +123,6 @@ function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolS
 	}
 
 	return out;
-}
-
-function countAutoExecutableMCPTools(context?: MCPConversationContext): number {
-	return getMCPContextToolSelections(context).filter(tool => tool.executionMode === MCPExecutionMode.Auto).length;
 }
 
 function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MCPToolSelection): MCPToolSelection {
@@ -282,12 +248,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	},
 	ref
 ) {
-	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
 	const lastSubmittedMCPContextRef = useRef<MCPConversationContext | undefined>(undefined);
-	const mcpApproval = useMCPApproval();
-	const resetAutoSubmitTracker = useCallback(() => {
-		autoSubmitTrackerRef.current = createAutoSubmitTracker();
-	}, []);
 
 	const {
 		editor,
@@ -389,16 +350,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		installedActiveSkillRefs,
 		setEnabledSkillRefs,
 		setActiveSkillRefs,
-		setActiveSkillRefsFromSession,
 		enableAllSkills,
 		disableAllSkills,
 		refreshSkills,
 		applyInstalledSkillSelectionState,
 		applySkillSelectionState,
 		applyWorkspaceSkillSelectionState,
-		ensureSkillSession,
-		listActiveSkillRefs,
-		getCurrentSkillSessionID,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
 		getCurrentInstalledEnabledSkillRefs,
@@ -413,30 +370,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const workspaceSelectionPending = workspace.selectionLoading;
 	const workspaceExecutionBlocked = workspaceSelectionPending || workspace.blockingError !== null;
 	const workspaceControlsLocked = isInputLocked || isSubmitting || fastForwardPending || workspaceSelectionPending;
-
-	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
-	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
-	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
-
-	const autoExecStopRequestedRef = useRef(false);
-	const autoExecBlockedByUserRef = useRef(false);
-
-	const clearAutoExecStopState = useCallback(() => {
-		autoExecStopRequestedRef.current = false;
-		autoExecBlockedByUserRef.current = false;
-		setAutoExecStopRequested(false);
-		setAutoExecBlockedByUser(false);
-		setAutoExecStopVisible(false);
-	}, []);
-
-	const requestBlockNextAutoExec = useCallback(() => {
-		autoExecStopRequestedRef.current = true;
-		autoExecBlockedByUserRef.current = true;
-		setAutoExecStopRequested(true);
-		setAutoExecBlockedByUser(true);
-		setAutoExecStopVisible(true);
-		resetAutoSubmitTracker();
-	}, [resetAutoSubmitTracker]);
 
 	const {
 		toolCalls,
@@ -459,17 +392,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		loadToolCalls,
 		clearComposerToolsState,
 		getToolRuntimeSnapshot,
-		autoExecState,
 	} = useComposerTools({
 		isBusy: isGenerating,
 		isSubmitting,
-		ensureSkillSession,
-		listActiveSkillRefs,
-		setActiveSkillRefsFromSession,
-		getCurrentSkillSessionID,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
-		externalExecutionBlocked: fastForwardPending || autoExecBlockedByUser || workspaceExecutionBlocked,
-		requestMCPApproval: mcpApproval.requestMCPApproval,
+		externalExecutionBlocked: fastForwardPending || workspaceExecutionBlocked,
 	});
 
 	const webSearchConfiguration = getWebSearchConfiguration(
@@ -1019,19 +946,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setFastForwardPending(false);
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
-		resetAutoSubmitTracker();
-		clearAutoExecStopState();
 		clearAttachments();
 		clearComposerToolsState();
 		setMCPAppContextUpdates([]);
-	}, [
-		clearAttachments,
-		clearAutoExecStopState,
-		clearComposerToolsState,
-		closeAllMenus,
-		resetAutoSubmitTracker,
-		setSubmitting,
-	]);
+	}, [clearAttachments, clearComposerToolsState, closeAllMenus, setSubmitting]);
 
 	const startFastForwardRun = useCallback(
 		(pendingRunnableToolCallIDs: string[]) => {
@@ -1075,10 +993,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (isInputLocked) {
 				return;
 			}
-
-			// If conversation sync queued enabled/active skill refs via timeout,
-			// flush them now so this submit uses the latest skill selection.
-			let effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
 
 			// Pure send path: if we're *not* running tools, bail out when we
 			//    don't already have something to send.
@@ -1125,37 +1039,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			let didSend = false;
 			let submittedToolChoices: ToolStoreChoice[] | null = null;
-			let shouldShowAutoExecStopAfterSend = false;
 
 			try {
-				let effectiveSkillSessionID = getCurrentSkillSessionID();
-				if (!effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
-					try {
-						effectiveSkillSessionID = await ensureSkillSession();
-					} catch (err) {
-						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
-						return;
-					}
-				}
-
-				// A selection update may invalidate an in-flight session creation.
-				// Re-read the refs after awaiting and never send lifecycle selections
-				// without the corresponding authoritative runtime session.
-				effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
-				let activeForMessage = getCurrentActiveSkillRefs();
-				if (!effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
-					setSubmitError(
-						'Selected skills are still being synchronized. Wait briefly and send again so the skill session can be created.'
-					);
-					return;
-				}
-
 				// Build final message content after tools have run.
 				// Always read from the live tool runtime snapshot here. Auto-execute
 				// can complete and trigger submit before React re-renders the latest
 				// toolOutputs / hasPendingToolCalls values into this component.
 				const runtimeAfterRun = getToolRuntimeSnapshot();
-				const resolvedSystemPrompt = systemPrompt.resolvedSystemPrompt.trim() || undefined;
 
 				const textToSend = editor.api.string([]);
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
@@ -1197,18 +1087,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					return;
 				}
 
-				// Snapshot active skills right before send (authoritative persistence).
-				if (effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
-					try {
-						activeForMessage = await listActiveSkillRefs(effectiveSkillSessionID);
-						if (getCurrentSkillSessionID() === effectiveSkillSessionID) {
-							setActiveSkillRefs(activeForMessage);
-						}
-					} catch {
-						// keep last-known
-					}
-				}
-
 				// 5) Tool choices (editor-attached + conversation-level).
 				const attachedTools = getAttachedTools(editor);
 				const explicitChoices = attachedTools.map(c => uiToolChoiceToToolStoreChoice(c));
@@ -1224,12 +1102,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					setSubmitError((err as Error)?.message || 'Fill required MCP arguments before sending.');
 					return;
 				}
-				shouldShowAutoExecStopAfterSend =
-					countAutoExecutableToolChoices(finalToolChoices) + countAutoExecutableMCPTools(preparedMCPContext) >= 1;
 
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
-					resolvedSystemPrompt,
+					sessionInstructionText: systemPrompt.sessionInstructionText.trim() || undefined,
+					includeModelDefault: systemPrompt.includeModelDefault,
 					attachedTools,
 					attachments,
 					toolOutputs: finalToolOutputs,
@@ -1239,12 +1116,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
 					enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
 					activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
-					skillSessionID: effectiveSkillSessionID ?? undefined,
 					workspaceSelection: workspace.getSelectionSnapshot(),
+					workspacePlan: workspace.plan,
 				};
 
 				lastSubmittedMCPContextRef.current = preparedMCPContext;
-				await onSubmit(payload);
+				try {
+					await onSubmit(payload);
+				} catch (error: unknown) {
+					setSubmitError(error instanceof Error ? error.message : 'The Session Runtime rejected this submission.');
+					return;
+				}
 				setSubmitError(null);
 				submittedToolChoices = finalToolChoices;
 
@@ -1255,13 +1137,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				// Only clear the editor if we actually sent something.
 				if (didSend) {
 					resetEditor();
-					if (shouldShowAutoExecStopAfterSend) {
-						autoExecStopRequestedRef.current = false;
-						autoExecBlockedByUserRef.current = false;
-						setAutoExecStopRequested(false);
-						setAutoExecBlockedByUser(false);
-						setAutoExecStopVisible(true);
-					}
 
 					// If we were editing, the old snapshot is no longer relevant.
 					clearPreEditSnapshot();
@@ -1275,32 +1150,27 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 		},
 		[
+			systemPrompt,
 			attachments,
 			clearPreEditSnapshot,
 			closeAllMenus,
 			conversationToolsState,
 			editor,
-			ensureSkillSession,
-			getCurrentActiveSkillRefs,
-			getCurrentEnabledSkillRefs,
+
 			getCurrentInstalledActiveSkillRefs,
 			getCurrentInstalledEnabledSkillRefs,
-			getCurrentSkillSessionID,
 			getToolRuntimeSnapshot,
 			hasBlockingMCPArgs,
 			hasBlockingToolArgs,
 			isInputLocked,
 			isSendButtonEnabled,
-			listActiveSkillRefs,
 			mcp,
 			mcpAppContextUpdates,
 			onSubmit,
 			resetEditor,
-			setActiveSkillRefs,
 			setConversationToolsState,
 			setSubmitting,
 			startFastForwardRun,
-			systemPrompt.resolvedSystemPrompt,
 			toolCalls,
 			webSearchTemplates,
 			workspace,
@@ -1381,84 +1251,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isInputLocked,
 		toolCalls,
 		toolOutputs.length,
-	]);
-
-	useEffect(() => {
-		const tracker = autoSubmitTrackerRef.current;
-
-		if (toolCalls.length > 0) {
-			for (const toolCall of toolCalls) {
-				tracker.observedCallKeys.add(getToolAutoSubmitKey(toolCall));
-				if (!isAutoSubmitEligibleToolCall(toolCall)) {
-					tracker.allObservedCallsAreAutoExecute = false;
-				}
-			}
-			return;
-		}
-
-		if (autoExecState.phase !== 'idle') {
-			return;
-		}
-		if (tracker.observedCallKeys.size === 0) {
-			return;
-		}
-		if (!tracker.allObservedCallsAreAutoExecute) {
-			return;
-		}
-		if (autoExecBlockedByUser) {
-			return;
-		}
-		if (isGenerating || isInputLocked || isSubmittingRef.current) {
-			return;
-		}
-
-		if (hasBlockingToolArgs) {
-			return;
-		}
-
-		const runtime = getToolRuntimeSnapshot();
-
-		if (runtime.toolCalls.length === 0 && runtime.toolOutputs.length === 0) {
-			resetAutoSubmitTracker();
-			return;
-		}
-
-		if (runtime.toolCalls.length > 0) {
-			return;
-		}
-
-		const observedCallKeys = [...tracker.observedCallKeys].toSorted();
-		const batchSignature = observedCallKeys.join('::');
-		if (!batchSignature) {
-			return;
-		}
-		if (tracker.attemptedBatchSignature === batchSignature) {
-			return;
-		}
-
-		const outputByCallKey = new Map(runtime.toolOutputs.map(output => [getToolAutoSubmitKey(output), output] as const));
-
-		const allObservedCallsProducedSuccessfulOutputs = observedCallKeys.every(callKey => {
-			const output = outputByCallKey.get(callKey);
-			return output && !output.isError;
-		});
-
-		if (!allObservedCallsProducedSuccessfulOutputs) {
-			return;
-		}
-
-		tracker.attemptedBatchSignature = batchSignature;
-		void doSubmit({ runPendingTools: false });
-	}, [
-		autoExecBlockedByUser,
-		autoExecState.phase,
-		doSubmit,
-		getToolRuntimeSnapshot,
-		hasBlockingToolArgs,
-		isGenerating,
-		isInputLocked,
-		resetAutoSubmitTracker,
-		toolCalls,
 	]);
 
 	const loadExternalMessage = useCallback(
@@ -1545,13 +1337,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		(text: string) => {
 			closeAllMenus();
 			setSubmitError(null);
-			resetAutoSubmitTracker();
 			replaceEditorDocument(buildEditorValueFromPlainText(text), 'end');
 			window.requestAnimationFrame(() => {
 				focusEditorAtEnd();
 			});
 		},
-		[closeAllMenus, focusEditorAtEnd, replaceEditorDocument, resetAutoSubmitTracker]
+		[closeAllMenus, focusEditorAtEnd, replaceEditorDocument]
 	);
 
 	const setDraftTextIfEmpty = useCallback(
@@ -1616,49 +1407,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleLoadToolCalls = useCallback(
 		(toolCallsToLoad: UIToolCall[]) => {
-			resetAutoSubmitTracker();
-			const enrichedToolCalls = enrichMCPToolCallsFromContext(
-				toolCallsToLoad,
-				lastSubmittedMCPContextRef.current ?? mcp.mcpContext
+			loadToolCalls(
+				enrichMCPToolCallsFromContext(toolCallsToLoad, lastSubmittedMCPContextRef.current ?? mcp.mcpContext)
 			);
-			const autoEligibleCount = enrichedToolCalls.filter(t => isAutoSubmitEligibleToolCall(t)).length;
-			const shouldSuppressAutoExec = autoExecStopRequestedRef.current || autoExecBlockedByUserRef.current;
-
-			const preparedToolCalls = shouldSuppressAutoExec
-				? enrichedToolCalls.map(toolCall =>
-						isAutoSubmitEligibleToolCall(toolCall) ? { ...toolCall, suppressAutoExecute: true } : toolCall
-					)
-				: enrichedToolCalls;
-
-			const tracker = autoSubmitTrackerRef.current;
-			for (const toolCall of preparedToolCalls) {
-				tracker.observedCallKeys.add(getToolAutoSubmitKey(toolCall));
-				if (!isAutoSubmitEligibleToolCall(toolCall)) {
-					tracker.allObservedCallsAreAutoExecute = false;
-				}
-			}
-
-			if (shouldSuppressAutoExec || autoEligibleCount === 0) {
-				autoExecStopRequestedRef.current = false;
-				autoExecBlockedByUserRef.current = false;
-				setAutoExecStopRequested(false);
-				setAutoExecBlockedByUser(false);
-				setAutoExecStopVisible(false);
-			}
-
-			loadToolCalls(preparedToolCalls);
 		},
-		[loadToolCalls, mcp.mcpContext, resetAutoSubmitTracker]
+		[loadToolCalls, mcp.mcpContext]
 	);
 
-	const finishAssistantTurn = useCallback(
-		(payload: AssistantTurnFinishedPayload) => {
-			if (payload.loadedRunnableToolCallCount === 0) {
-				clearAutoExecStopState();
-			}
-		},
-		[clearAutoExecStopState]
-	);
+	const finishAssistantTurn = useCallback((_payload: AssistantTurnFinishedPayload) => undefined, []);
 
 	useImperativeHandle(
 		ref,
@@ -1819,12 +1575,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!workspaceExecutionBlocked &&
 		!hasBlockingToolArgs;
 
-	const activeAutoExecBatchCount = useMemo(
-		() => toolCalls.filter(toolCall => isAutoSubmitEligibleToolCall(toolCall)).length,
-		[toolCalls]
-	);
-
-	const showAutoExecStopButton = autoExecStopVisible || activeAutoExecBatchCount >= 2;
 	const erroredToolOutputsReadyToSubmit =
 		toolOutputs.some(output => output.isError && !output.isSkipped) &&
 		!hasPendingToolCalls &&
@@ -1953,28 +1703,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex shrink-0 flex-col items-end justify-end gap-2 p-1">
-							{showAutoExecStopButton ? (
-								<HoverTip
-									content={
-										autoExecStopRequested
-											? 'Auto-exec stop armed for the next tool-call batch'
-											: 'Stop auto-exec for the next tool-call batch'
-									}
-									placement="left"
-								>
-									<button
-										type="button"
-										className={`btn btn-circle btn-sm shrink-0 ${
-											autoExecStopRequested || autoExecBlockedByUser ? 'btn-warning' : 'btn-neutral'
-										}`}
-										onClick={requestBlockNextAutoExec}
-										aria-label="Stop auto-exec for next tool calls"
-										aria-pressed={autoExecStopRequested || autoExecBlockedByUser}
-									>
-										<FiZapOff size={18} />
-									</button>
-								</HoverTip>
-							) : null}
 							{isGenerating ? (
 								<HoverTip
 									content={stopResponseShortcut ? `Stop response (${stopResponseShortcut})` : 'Stop response'}
@@ -2129,15 +1857,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				state={toolDetailsState}
 				onClose={() => {
 					setToolDetailsState(null);
-				}}
-			/>
-
-			<MCPApprovalModal
-				approvalRequest={mcpApproval.approvalRequest}
-				isResolving={mcpApproval.isResolving}
-				error={mcpApproval.approvalError}
-				onResolve={r => {
-					return mcpApproval.resolveMCPApproval(r);
 				}}
 			/>
 

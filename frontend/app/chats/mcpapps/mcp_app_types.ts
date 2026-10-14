@@ -1,5 +1,6 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
+import type { MCPToolSelection } from '@/spec/mcp';
+import type { SessionAppRenderTarget } from '@/spec/session';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
@@ -7,7 +8,8 @@ import type { MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
  */
 export interface MCPAppInstance {
 	instanceID: string;
-	server: MCPRuntimeServerID;
+	session: SessionAppRenderTarget;
+	server: string;
 	resourceUri: string;
 	mimeType?: string;
 	toolName: string;
@@ -102,14 +104,17 @@ export function isJSONRPCNotification(value: unknown): value is JSONRPCNotificat
 export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInstance | undefined {
 	const app = output.mcpApp;
 	const sel: MCPToolSelection | undefined = output.mcpToolSelection;
-	if (!app?.resourceUri || !sel?.server) {
+	const session = output.sessionApp;
+
+	if (!app?.resourceUri || !sel?.server || !session) {
 		return undefined;
 	}
 
 	const resourceUri = app.resourceUri;
-	const instanceID = `mcpapp-${sel.server}-${output.callID || output.id}`;
+
 	return {
-		instanceID,
+		instanceID: session.appInstanceID,
+		session,
 		server: sel.server,
 		resourceUri,
 		mimeType: app.mimeType,

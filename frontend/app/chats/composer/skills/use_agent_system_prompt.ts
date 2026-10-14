@@ -25,6 +25,7 @@ export interface AgentSystemPromptController {
 	includeModelDefault: boolean;
 	selectedInstructionSourceKeys: string[];
 	resolvedSystemPrompt: string;
+	sessionInstructionText: string;
 
 	setIncludeModelDefault(next: boolean): void;
 	toggleInstructionSource(identityKey: string): void;
@@ -126,6 +127,17 @@ export function useAgentSystemPrompt(args: {
 		[includeModelDefault, modelDefaultPrompt, selectedInstructionSourceKeys, sourceByKey]
 	);
 
+	const sessionInstructionText = useMemo(
+		() =>
+			buildEffectiveSystemPrompt({
+				modelDefaultPrompt: '',
+				includeModelDefault: false,
+				selectedInstructionSourceKeys,
+				instructionSourcesByKey: sourceByKey,
+			}),
+		[selectedInstructionSourceKeys, sourceByKey]
+	);
+
 	const setSelectedKeys = useCallback((next: string[]) => {
 		const deduped = dedupeStringArray(next);
 		selectedKeysRef.current = deduped;
@@ -217,6 +229,7 @@ export function useAgentSystemPrompt(args: {
 		includeModelDefault,
 		selectedInstructionSourceKeys,
 		resolvedSystemPrompt,
+		sessionInstructionText,
 		setIncludeModelDefault,
 		toggleInstructionSource,
 		upsertAndSelectInstructionSource,

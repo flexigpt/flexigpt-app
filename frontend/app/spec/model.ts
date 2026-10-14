@@ -11,6 +11,7 @@ import type {
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
+import type { SessionModelDefaultField } from '@/spec/session';
 
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID = '__conversation__';
@@ -381,7 +382,7 @@ export interface ManagedModelResult {
 
 export interface ModelRequestPatch {
 	defaults?: ModelDefaults;
-	clear?: ModelRequestClearField[];
+	clear?: SessionModelDefaultField[];
 }
 
 export interface UIModelOption extends ModelParam {

@@ -3,24 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
+import { CapabilityResolutionStatus } from '@/spec/artifact';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import type { AgentCatalogOption, AgentPreparedInstructionSource, PreparedAgentStarter } from '@/apis/agent_management';
+import type { AgentCatalogOption } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
-
-import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
-import { modelRefEqual } from '@/models/lib/document';
 
 interface AgentComposerContext {
 	selectedModel: UIModelOption;
 	allOptions: UIModelOption[];
 	modelOptionsLoaded: boolean;
 	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
-}
-
-interface AgentRuntimeApplier {
-	applyAgentRuntime(recipe: PreparedAgentStarter): void;
+	setModelSelectionSource: (source: 'session' | 'agent') => void;
 }
 
 type PendingDefaultAction = 'ensure' | 'reset' | 'track';
@@ -41,7 +36,7 @@ export interface AgentManagerState {
 
 	selectedAgentKey: string | null;
 	selectedAgent: AgentCatalogOption | null;
-	preparedStarter: PreparedAgentStarter | null;
+	preparedStarter: null;
 	isTrackingOnly: boolean;
 
 	refreshAgents(): Promise<void>;
@@ -57,25 +52,7 @@ function agentKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
 }
 
-function agentInstructionSourceKey(agent: ArtifactRef, source: AgentPreparedInstructionSource): string {
-	return `agent:${agentKey(agent)}:${source.kind}:${agentKey(source.artifact)}`;
-}
-
-function getRecipeError(recipe: PreparedAgentStarter): string | undefined {
-	const blocking = recipe.issues.filter(issue => issue.severity === 'error');
-
-	if (blocking.length === 0) {
-		return undefined;
-	}
-
-	return blocking.map(issue => `${issue.path ? `${issue.path}: ` : ''}${issue.message}`).join('\n');
-}
-
-export function useAgentManager(
-	context: AgentComposerContext,
-	runtimeCompiler: AgentRuntimeApplier,
-	systemPrompt: AgentSystemPromptController
-): AgentManagerState {
+export function useAgentManager(context: AgentComposerContext): AgentManagerState {
 	const [agentOptions, setAgentOptions] = useState<AgentCatalogOption[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -83,7 +60,6 @@ export function useAgentManager(
 	const [isApplying, setIsApplying] = useState(false);
 	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
-	const [preparedStarter, setPreparedStarter] = useState<PreparedAgentStarter | null>(null);
 
 	const selectedAgentKeyRef = useRef<string | null>(null);
 	const isApplyingRef = useRef(false);
@@ -92,17 +68,13 @@ export function useAgentManager(
 	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
 	const initialDefaultRequestRef = useRef(false);
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
-	const appliedInstructionSourceKeysRef = useRef<Set<string>>(new Set());
 
-	const setTrackedAgent = useCallback(
-		(aKey: string | null, starter: PreparedAgentStarter | null, trackingOnly = false) => {
-			selectedAgentKeyRef.current = aKey;
-			setSelectedAgentKey(aKey);
-			setPreparedStarter(starter);
-			setIsTrackingOnly(trackingOnly);
-		},
-		[]
-	);
+	const setTrackedAgent = useCallback((aKey: string | null, trackingOnly = false) => {
+		selectedAgentKeyRef.current = aKey;
+		setSelectedAgentKey(aKey);
+
+		setIsTrackingOnly(trackingOnly);
+	}, []);
 
 	const cancelActiveAgentRequest = useCallback(() => {
 		applyRequestSeqRef.current += 1;
@@ -192,121 +164,26 @@ export function useAgentManager(
 				return false;
 			}
 
-			const requestSeq = applyRequestSeqRef.current + 1;
-			applyRequestSeqRef.current = requestSeq;
-			pendingDefaultActionRef.current = null;
-			setActionError(null);
-			isApplyingRef.current = true;
-			setIsApplying(true);
-
 			try {
-				const recipe = await agentManagementAPI.prepareAgentStarter(agentRef);
-				if (applyRequestSeqRef.current !== requestSeq) {
-					return false;
-				}
-
-				const recipeError = getRecipeError(recipe);
-
-				if (recipeError) {
-					setActionError(recipeError);
-					return false;
-				}
-
-				let nextModel = context.selectedModel;
-
-				if (recipe.modelRef) {
-					const resolvedModel = context.allOptions.find(o => modelRefEqual(o.model, recipe.modelRef));
-
-					if (!resolvedModel) {
-						setActionError(
-							`Agent model "${recipe.modelRef.rootID}/${recipe.modelRef.artifactID}" is not currently selectable in Composer.`
-						);
-						return false;
-					}
-
-					nextModel = resolvedModel;
-				}
-
-				for (const tool of recipe.toolSelections) {
-					if (tool.requiredSDKType && tool.requiredSDKType !== (nextModel.providerSDKType as string)) {
-						setActionError(
-							`Tool "${tool.choice.displayName || tool.choice.target.name}" requires provider SDK "${tool.requiredSDKType}", but the Agent Model uses "${nextModel.providerSDKType}".`
-						);
-						return false;
-					}
-				}
-
-				context.handleSetSelectedModel({
-					...nextModel,
-				});
-
-				if (recipe.includeModelSystemPrompt !== undefined) {
-					systemPrompt.setIncludeModelDefault(recipe.includeModelSystemPrompt);
-				}
-
-				const instructionSources: AgentPreparedInstructionSource[] =
-					recipe.instructionSources.length > 0
-						? recipe.instructionSources
-						: recipe.instructionText.trim()
-							? [
-									{
-										kind: 'text',
-										artifact: option.ref,
-										displayName: `${option.displayName} instructions`,
-										text: recipe.instructionText,
-									},
-								]
-							: [];
-
-				const visibleInstructionSources = instructionSources.filter(source => source.text.trim());
-				const nextInstructionSourceKeys = new Set(
-					visibleInstructionSources.map(source => agentInstructionSourceKey(option.ref, source))
+				const resolution = await agentManagementAPI.resolveAgent(agentRef);
+				const unavailableRequired = resolution.capabilities.occurrences.find(
+					occurrence => occurrence.required && occurrence.status !== CapabilityResolutionStatus.Available
 				);
 
-				for (const previousKey of appliedInstructionSourceKeysRef.current) {
-					if (nextInstructionSourceKeys.has(previousKey)) {
-						continue;
-					}
-					systemPrompt.removeInstructionSource(previousKey);
-				}
-
-				for (const source of visibleInstructionSources) {
-					const identityKey = agentInstructionSourceKey(option.ref, source);
-
-					systemPrompt.upsertAndSelectInstructionSource({
-						identityKey,
-						sourceKind: 'agent',
-						pluginID: agentKey(option.ref),
-						pluginDisplayName: option.displayName,
-						pluginSlug: option.agent.name,
-						displayName: source.displayName,
-						sourceSlug: source.artifact.artifactID,
-						text: source.text,
-						sourceTags: source.sourceTags,
-						isBuiltIn: option.agent.builtIn,
-						skillRef: source.kind === 'skill' ? source.artifact : undefined,
-					});
-				}
-
-				appliedInstructionSourceKeysRef.current = nextInstructionSourceKeys;
-				runtimeCompiler.applyAgentRuntime(recipe);
-				setTrackedAgent(option.key, recipe);
-				return true;
-			} catch (prepareError) {
-				if (applyRequestSeqRef.current !== requestSeq) {
+				if (unavailableRequired) {
+					setActionError(unavailableRequired.message || 'A required Agent capability is unavailable.');
 					return false;
 				}
 
-				setActionError(getErrorMessage(prepareError, 'Failed to prepare the Agent starter recipe.'));
+				context.setModelSelectionSource('agent');
+				setTrackedAgent(option.key);
+				return true;
+			} catch (e: unknown) {
+				setActionError(getErrorMessage(e, 'Failed to validate the Agent selection.'));
 				return false;
-			} finally {
-				if (applyRequestSeqRef.current === requestSeq) {
-					isApplyingRef.current = false;
-					setIsApplying(false);
-				}
 			}
 		},
-		[agentOptions, context, runtimeCompiler, setTrackedAgent, systemPrompt]
+		[agentOptions, context, setTrackedAgent]
 	);
 
 	const applyDefaultAgent = useCallback(
@@ -371,7 +248,7 @@ export function useAgentManager(
 
 		pendingDefaultActionRef.current = null;
 		setActionError(null);
-		setTrackedAgent(defaultAgent.key, null, true);
+		setTrackedAgent(defaultAgent.key, true);
 		return true;
 	}, [cancelActiveAgentRequest, defaultAgent, hasTrackedAgent, loading, setTrackedAgent]);
 
@@ -379,11 +256,10 @@ export function useAgentManager(
 		cancelActiveAgentRequest();
 		pendingDefaultActionRef.current = null;
 		autoEnsureCatalogKeyRef.current = null;
-		setTrackedAgent(null, null);
+		context.setModelSelectionSource('session');
+		setTrackedAgent(null);
 		setActionError(null);
-		// Retain applied Composer state and instruction-source keys. The next
-		// Agent application can remove only Agent-owned stale sources.
-	}, [cancelActiveAgentRequest, setTrackedAgent]);
+	}, [cancelActiveAgentRequest, context, setTrackedAgent]);
 
 	const catalogIdentity = useMemo(
 		() => agentOptions.map(option => `${option.key}:${option.isSelectable ? '1' : '0'}`).join('|'),
@@ -470,7 +346,7 @@ export function useAgentManager(
 
 		selectedAgentKey: selectedAgent?.key ?? null,
 		selectedAgent,
-		preparedStarter: selectedAgent ? preparedStarter : null,
+		preparedStarter: null,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		refreshAgents,
 		selectAgent,

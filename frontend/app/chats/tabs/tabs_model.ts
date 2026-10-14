@@ -1,4 +1,5 @@
 import type { Conversation } from '@/spec/conversation';
+import type { RunID, SessionID, SessionSnapshot } from '@/spec/session';
 
 import { ensureMakeID } from '@/lib/uuid_utils';
 
@@ -9,6 +10,11 @@ export const MAX_TABS = 16;
 export interface ChatTabState {
 	tabId: string;
 	conversation: Conversation;
+
+	sessionID?: SessionID;
+	activeRunID?: RunID;
+	sessionSnapshot?: SessionSnapshot;
+	runtimeError?: string;
 
 	isLoaded: boolean;
 	isBusy: boolean;
@@ -34,7 +40,7 @@ export const sanitizeConversationTitle = (raw: string): string =>
 		.slice(0, 64);
 
 export function isScratchTab(tab: ChatTabState): boolean {
-	return !tab.isPersisted && tab.conversation.messages.length === 0;
+	return !tab.sessionID && !tab.isPersisted && tab.conversation.messages.length === 0;
 }
 
 export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {

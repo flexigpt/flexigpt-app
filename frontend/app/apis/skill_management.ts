@@ -3,6 +3,7 @@ import type {
 	ArtifactRef,
 	ArtifactRootID,
 	ArtifactSourceID,
+	ArtifactState,
 	CapabilityPlan,
 	StoreArtifact,
 	StoreArtifactSourceSummary,
@@ -28,6 +29,7 @@ import type {
 	ManagedSkillReplaceResult,
 	ResolvedArtifactSkill,
 	SkillDirectoryRegistration,
+	SkillInsert,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
@@ -37,6 +39,20 @@ import type { ResolvedToolView } from '@/spec/tool';
 
 import type { ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
+
+export interface ComposerSkillCatalogItem {
+	ref: ArtifactRef;
+	name: string;
+	displayName: string;
+	description?: string;
+	state: ArtifactState;
+	enabled: boolean;
+	builtIn: boolean;
+	managed: boolean;
+	insert: SkillInsert;
+	hasArguments: boolean;
+	hasResources: boolean;
+}
 
 export interface SkillManagementPageData {
 	plugins: PluginListItem[];
@@ -68,6 +84,52 @@ export class SkillManagementAPI {
 			plugins,
 			skills,
 		};
+	}
+
+	/**
+	 * Composer catalog projection. This is a management/read façade only:
+	 * it resolves Artifact-backed Skill metadata for selection UI and does not
+	 * create a Skill Runtime session or invoke a Skill tool.
+	 */
+	async listComposerSkillCatalog(): Promise<ComposerSkillCatalogItem[]> {
+		const skills = await this.store.listSkillsForManagement();
+		const summaries = await Promise.all(
+			skills.map(async skill => {
+				try {
+					const summary = await this.aggregate.describeArtifactSkill(skill.ref);
+
+					return {
+						ref: skill.ref,
+						name: skill.name,
+						displayName: skill.displayName || skill.name,
+						description: skill.description,
+						state: skill.state,
+						enabled: skill.enabled,
+						builtIn: skill.builtIn,
+						managed: skill.managed,
+						insert: summary.Insert,
+						hasArguments: summary.HasArguments,
+						hasResources: summary.HasResources,
+					} satisfies ComposerSkillCatalogItem;
+				} catch {
+					return {
+						ref: skill.ref,
+						name: skill.name,
+						displayName: skill.displayName || skill.name,
+						description: skill.description,
+						state: skill.state,
+						enabled: skill.enabled,
+						builtIn: skill.builtIn,
+						managed: skill.managed,
+						insert: 'instructions' as SkillInsert,
+						hasArguments: false,
+						hasResources: false,
+					} satisfies ComposerSkillCatalogItem;
+				}
+			})
+		);
+
+		return summaries.toSorted((left, right) => left.displayName.localeCompare(right.displayName));
 	}
 
 	getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string> {

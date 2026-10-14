@@ -1,16 +1,5 @@
-import type {
-	InvokeMCPToolRequestBody,
-	InvokeMCPToolResponseBody,
-	MCPApprovalResolutionResult,
-	MCPContent,
-} from '@/spec/mcp';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp';
-
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-import { mcpManagementAPI } from '@/apis/baseapi';
-
-import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
 import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import type { JSONRPCRequest, JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 import {
@@ -23,61 +12,15 @@ function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSO
 	return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
-function toolErrorResult(message: string): {
-	content: MCPContent[];
-	isError: true;
-} {
-	return {
-		content: [
-			{
-				type: MCPContentType.Text,
-				text: message,
-			},
-		],
-		isError: true,
-	};
-}
-
-function stringifyRawArguments(params: Record<string, unknown>): string | undefined {
-	try {
-		return JSON.stringify(params);
-	} catch {
-		return undefined;
-	}
-}
-
-function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
-	content: MCPContent[];
-	structuredContent?: Record<string, unknown>;
-	isError?: boolean;
-} {
-	const result: {
-		content: MCPContent[];
-		structuredContent?: Record<string, unknown>;
-		isError?: boolean;
-	} = {
-		content: Array.isArray(resp?.content) ? resp.content : [],
-	};
-
-	if (isJSONObject(resp?.structuredContent)) {
-		result.structuredContent = resp.structuredContent;
-	}
-
-	if (typeof resp?.isError === 'boolean') {
-		result.isError = resp.isError;
-	}
-
-	return result;
-}
-
 export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
-	allowAppInitiatedToolCalls: boolean;
 	/** Returns false after the owning App view has been torn down. */
 	isActive?: () => boolean;
+	executeAppTool: (toolName: string, args?: Record<string, unknown>) => Promise<void>;
+	readAppResource: (uri: string) => Promise<unknown>;
+	stageModelContext: (update: MCPAppModelContextUpdatePayload) => Promise<void>;
 	/** Returns true if the user approves opening this URL. */
 	requestOpenLinkApproval: (url: string) => Promise<boolean>;
-	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolutionResult>;
 	requestUIMessageApproval?: (message: MCPAppUIMessage) => Promise<boolean>;
 	onUIMessage?: (message: MCPAppUIMessage) => void;
 	requestModelContextUpdateApproval?: (update: MCPAppModelContextUpdatePayload) => Promise<boolean>;
@@ -167,78 +110,20 @@ export class MCPAppRPCRouter {
 		if (!name) {
 			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'tools/call requires a name');
 		}
-		let args: Record<string, unknown> | undefined;
-		if (params.arguments !== undefined) {
-			if (!isJSONObject(params.arguments)) {
+		try {
+			const args =
+				params.arguments === undefined ? undefined : isJSONObject(params.arguments) ? params.arguments : null;
+			if (args === null) {
 				return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'tools/call arguments must be an object');
 			}
-			args = params.arguments;
-		}
-		if (!this.deps.allowAppInitiatedToolCalls) {
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'App-initiated tool calls are disabled');
-		}
-
-		const { server, instanceID } = this.deps.instance;
-		const callReq: InvokeMCPToolRequestBody = {
-			source: MCPInvocationSource.App,
-			toolName: name,
-			providerToolName: name,
-			arguments: args,
-			appInstanceID: instanceID,
-		};
-
-		// The opaque Runtime server ID identifies the app's connected server.
-		// The backend remains the final authority for policy enforcement.
-		const evaluation = await mcpManagementAPI.checkMCPToolCall(server, callReq);
-		if (!evaluation) {
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
-		}
-		if (!this.isActive()) {
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
-		}
-		if (evaluation.decision === MCPApprovalDecision.Denied) {
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Denied by policy');
-		}
-		if (evaluation.decision === MCPApprovalDecision.ApprovalRequired) {
-			if (!evaluation.approvalID || !evaluation.summary || !this.deps.requestMCPApproval) {
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
-			}
-
-			let approval: MCPApprovalResolutionResult;
-			try {
-				approval = await this.deps.requestMCPApproval({
-					approvalID: evaluation.approvalID,
-					summary: evaluation.summary,
-					reason: evaluation.reason,
-				});
-			} catch {
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Tool approval was closed');
-			}
-
-			if (approval.decision !== MCPApprovalDecision.Allowed) {
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
-			}
-
-			if (approval.resolution === MCPApprovalResolution.AllowOnce && !approval.token) {
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Allow-once approval returned no token');
-			}
-
-			callReq.approvalID = approval.approvalID;
-			if (approval.token) {
-				callReq.approvalToken = approval.token;
-			}
-		}
-
-		if (!this.isActive()) {
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
-		}
-
-		try {
-			const resp = await mcpManagementAPI.invokeMCPTool(server, callReq);
-			return { jsonrpc: '2.0', id: req.id, result: normalizeToolCallResultForApp(resp) };
+			await this.deps.executeAppTool(name, args);
+			return { jsonrpc: '2.0', id: req.id, result: { accepted: true } };
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Tool invocation failed';
-			return { jsonrpc: '2.0', id: req.id, result: toolErrorResult(message) };
+			return errorResp(
+				req.id,
+				JSONRPC_ERR_BLOCKED_BY_POLICY,
+				err instanceof Error ? err.message : 'Tool execution could not be accepted.'
+			);
 		}
 	}
 
@@ -250,9 +135,8 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'resources/read requires uri');
 		}
 
-		const { server } = this.deps.instance;
 		try {
-			const resp = await mcpManagementAPI.readMCPResource(server, uri);
+			const resp = await this.deps.readAppResource(uri);
 			return { jsonrpc: '2.0', id: req.id, result: resp };
 		} catch (err) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Read failed');
@@ -322,11 +206,9 @@ export class MCPAppRPCRouter {
 			}
 			structuredContent = params.structuredContent;
 		}
-		const rawArguments = stringifyRawArguments(params);
 		const update: MCPAppModelContextUpdatePayload = {
 			content,
 			...(structuredContent !== undefined ? { structuredContent } : {}),
-			...(rawArguments === undefined ? {} : { rawArguments }),
 		};
 
 		if (!content && structuredContent === undefined) {
@@ -348,7 +230,7 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
 		}
 
-		this.deps.onModelContextUpdate?.(update);
+		await this.deps.stageModelContext(update);
 		return { jsonrpc: '2.0', id: req.id, result: {} };
 	}
 

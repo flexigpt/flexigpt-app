@@ -1,10 +1,4 @@
-import type { ArtifactRef } from '@/spec/artifact';
-import type { ConversationMessage } from '@/spec/conversation';
 import type {
-	CompletionResponseBody,
-	InferenceError,
-	InferenceUsage,
-	ModelParam,
 	OutputUnion,
 	ReasoningContent,
 	ToolCall,
@@ -15,16 +9,12 @@ import type {
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
-import type { ModelRequestPatch } from '@/spec/model';
-import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
-import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
+import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
+import { CitationKind, ContentItemKind, OutputKind, UIToolCallStatus } from '@/spec/inference';
 import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
-import { getUUIDv7 } from '@/lib/uuid_utils';
-
-import { completionAPI } from '@/apis/baseapi';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
@@ -34,140 +24,6 @@ import {
 	formatToolOutputSummary,
 	mapToolOutputItemsToToolOutputs,
 } from '@/tools/lib/tool_output_utils';
-
-export async function HandleCompletion(
-	model: ArtifactRef,
-	requestPatch: ModelRequestPatch | undefined,
-	modelParams: ModelParam,
-	currentUserMsg: ConversationMessage,
-	history: ConversationMessage[],
-	toolSelections: ToolSelection[] | undefined,
-	mcpContext: MCPConversationContext | undefined,
-	assistantPlaceholder: ConversationMessage,
-	skillSessionID?: string,
-	requestId?: string,
-	signal?: AbortSignal,
-	onStreamTextData?: (textData: string) => void,
-	onStreamThinkingData?: (thinkingData: string) => void
-): Promise<{
-	responseMessage: ConversationMessage | undefined;
-	rawResponse?: CompletionResponseBody;
-}> {
-	const choiceMap = new Map<string, ToolStoreChoice>(
-		(currentUserMsg.uiToolChoices ?? []).map(choice => [choice.choiceID, choice])
-	);
-
-	const resp = await completionAPI.fetchCompletion(
-		model,
-		requestPatch,
-		currentUserMsg,
-		history,
-		toolSelections,
-		mcpContext,
-		skillSessionID,
-		requestId,
-		signal,
-		onStreamTextData,
-		onStreamThinkingData
-	);
-
-	if (!resp) {
-		return { responseMessage: undefined, rawResponse: undefined };
-	}
-
-	const inf = resp.inferenceResponse;
-	const hasModelError = !!inf?.error;
-	const hasOutputs = !!inf?.outputs && inf.outputs.length > 0;
-
-	if (!hasModelError || hasOutputs) {
-		const assistantMsg = buildAssistantMessageFromResponse(
-			assistantPlaceholder.id,
-			modelParams,
-			resp,
-			choiceMap,
-			mcpContext
-		);
-		return { responseMessage: assistantMsg, rawResponse: resp };
-	}
-
-	// Error with no outputs at all -> fall back to existing "error stub".
-	return getErrorStub(modelParams, assistantPlaceholder, resp, undefined);
-}
-
-function getErrorStub(
-	modelParams: ModelParam,
-	assistantPlaceholder: ConversationMessage,
-	rawResponse: CompletionResponseBody | undefined,
-	errorObj: any
-) {
-	let error: InferenceError;
-	if (rawResponse?.inferenceResponse && rawResponse.inferenceResponse.error) {
-		error = rawResponse.inferenceResponse.error;
-	} else {
-		let msg: string;
-		try {
-			msg = JSON.stringify(errorObj, null, 2);
-		} catch {
-			msg = String(errorObj);
-		}
-		error = {
-			code: 'unknown',
-			message: msg,
-		} as InferenceError;
-	}
-
-	const errMsg = typeof error?.message === 'string' ? error.message.trim() : '';
-	const outText = errMsg ? `> Error: ${errMsg}` : '> Error: Got error in API processing.';
-	const outputs: OutputUnion[] = [
-		{
-			kind: OutputKind.OutputMessage,
-			outputMessage: {
-				id: assistantPlaceholder.id || getUUIDv7(),
-				role: RoleEnum.Assistant,
-				status: Status.Failed,
-				contents: [
-					{
-						kind: ContentItemKind.Text,
-						textItem: {
-							text: outText,
-						},
-					},
-				],
-			},
-		},
-	];
-
-	// Prefer backend debugDetails if present
-	let detailsMarkdown = '';
-	let debugDetails: any;
-	if (rawResponse?.inferenceResponse) {
-		detailsMarkdown =
-			getDebugDetailsMarkdown(rawResponse.inferenceResponse.debugDetails, rawResponse.inferenceResponse.error) ?? '';
-		debugDetails = rawResponse.inferenceResponse.debugDetails;
-	}
-
-	if (errorObj !== undefined && errorObj !== null) {
-		const errorBlock = buildJSONOrTextCodeBlock(errorObj) ?? undefined;
-		if (errorBlock) {
-			detailsMarkdown = detailsMarkdown
-				? `${detailsMarkdown}\n\n### Error\n\n${errorBlock}`
-				: `### Error\n\n${errorBlock}`;
-		}
-	}
-
-	const errorMessage: ConversationMessage = {
-		...assistantPlaceholder,
-		modelParam: modelParams,
-		status: Status.Failed,
-		error,
-		uiContent: outText,
-		outputs,
-		debugDetails,
-		uiDebugDetails: detailsMarkdown,
-	};
-
-	return { responseMessage: errorMessage, rawResponse };
-}
 
 export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string | undefined {
 	const parts: string[] = [];
@@ -419,53 +275,6 @@ function findMCPToolSelectionForToolLike(
 	}
 
 	return undefined;
-}
-
-function buildAssistantMessageFromResponse(
-	baseId: string,
-	modelParams: ModelParam,
-	resp: CompletionResponseBody,
-	choiceMap: Map<string, ToolStoreChoice>,
-	mcpContext?: MCPConversationContext
-): ConversationMessage | undefined {
-	const now = new Date().toISOString();
-	const id = baseId || getUUIDv7();
-
-	if (!resp.inferenceResponse) {
-		return undefined;
-	}
-
-	const inf = resp.inferenceResponse;
-	const outputs = inf.outputs ?? [];
-	const usage: InferenceUsage | undefined = inf.usage;
-	const error = inf.error;
-
-	const { uiContent, uiReasoningContents, uiToolCalls, uiToolOutputs, uiCitations } = deriveUIFieldsFromOutputUnion(
-		outputs,
-		choiceMap,
-		buildMCPToolSelectionMap(mcpContext, inf.debugDetails, resp.mcpToolMappings)
-	);
-	const debugDetails = inf.debugDetails;
-	const s = error ? Status.Failed : Status.Completed;
-	const msg: ConversationMessage = {
-		id,
-		createdAt: now,
-		role: RoleEnum.Assistant,
-		status: s,
-		modelParam: modelParams,
-		outputs,
-		usage,
-		error,
-		debugDetails,
-		mcpToolMappings: resp.mcpToolMappings,
-		uiContent,
-		uiReasoningContents,
-		uiToolCalls,
-		uiToolOutputs,
-		uiCitations,
-	};
-	// console.log('assistant from message out', JSON.stringify(msg, null, 2));
-	return msg;
 }
 
 export function deriveUIFieldsFromOutputUnion(

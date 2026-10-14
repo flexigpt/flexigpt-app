@@ -102,8 +102,8 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 		const isDefault = option.key === manager.defaultAgentKey;
 		const disabled = manager.loading || manager.isApplying || !option.isSelectable;
 		const statusTip = manager.isTrackingOnly
-			? 'This Agent is tracked for restored conversation context. Reapply it to apply its starter recipe.'
-			: 'This Agent starter recipe was applied. Composer controls remain user-editable.';
+			? 'This Agent is tracked from restored Session state.'
+			: 'The Session Runtime will resolve this Agent authoritatively when the next Run starts.';
 		const resetTip = isDefault
 			? 'The default Agent is already active.'
 			: resetTargetsBase
@@ -263,9 +263,8 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 				>
 					<div className="mb-2 flex items-start justify-between gap-2 px-1">
 						<div className="text-xs opacity-70">
-							Agents apply a starter Model, Tools, session Skills, MCP selection, system instruction Skills, and, when
-							supplied, an Agent request template. Request templates should only prefill an empty Composer draft. After
-							application, the Composer remains user-editable.
+							Agent selection is persisted as Session intent. The backend re-resolves the Agent, Model, Tools, Skills,
+							MCP capabilities, and instructions when it prepares the next immutable Run operation.
 						</div>
 
 						<HoverTip

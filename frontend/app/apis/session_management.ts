@@ -19,6 +19,7 @@ import type {
 	SessionAppResourceReadResult,
 	SessionCommandReceipt,
 	SessionID,
+	SessionRunObservation,
 	SessionRunObserver,
 	SessionRunSnapshot,
 	SessionRuntimeEvent,
@@ -137,16 +138,17 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 					const run = observation.snapshot.runs.find(candidate => candidate.id === runID);
 
 					if (!run) {
-						listener({
+						const unavailable: SessionRunObservation = {
 							kind: SessionRunObservationKind.Unavailable,
 							sessionID,
 							runID,
 							event: observation.event,
-						});
+						};
+						listener(unavailable);
 						return;
 					}
 
-					listener({
+					const snapshot: SessionRunObservation = {
 						kind: SessionRunObservationKind.Snapshot,
 						event: observation.event,
 						snapshot: {
@@ -154,28 +156,31 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 							sessionRevision: observation.snapshot.session.revision,
 							run,
 						},
-					});
+					};
+					listener(snapshot);
 					return;
 				}
 
 				case SessionSnapshotObservationKind.Deleted: {
-					listener({
+					const deleted: SessionRunObservation = {
 						kind: SessionRunObservationKind.Deleted,
 						sessionID,
 						runID,
 						event: observation.event,
-					});
+					};
+					listener(deleted);
 					return;
 				}
 
 				case SessionSnapshotObservationKind.Error: {
-					listener({
+					const failure: SessionRunObservation = {
 						kind: SessionRunObservationKind.Error,
 						sessionID,
 						runID,
 						event: observation.event,
 						error: observation.error,
-					});
+					};
+					listener(failure);
 				}
 			}
 		});

@@ -151,6 +151,8 @@ function buildChatOptions(
 	return base;
 }
 
+export type ComposerModelSelectionSource = 'session' | 'agent';
+
 export interface ComposerContextController {
 	chatOptions: UIModelOption;
 
@@ -161,12 +163,14 @@ export interface ComposerContextController {
 	modelCatalogUnavailableReason: ModelCatalogUnavailableReason | null;
 	modelCatalogError: string | null;
 
+	modelSelectionSource: ComposerModelSelectionSource;
 	isHybridReasoningEnabled: boolean;
 	includePreviousMessages: IncludePreviousMessages;
 
 	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
 	handleSetIsHybridReasoningEnabled: (enabled?: boolean) => void;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
+	setModelSelectionSource: (source: ComposerModelSelectionSource) => void;
 
 	setTemperature(temp?: number): void;
 	setReasoningLevel(level?: ReasoningLevel): void;
@@ -193,6 +197,7 @@ export function useComposerContextState(): ComposerContextController {
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIModelOption.includePreviousMessages
 	);
+	const [modelSelectionSource, setModelSelectionSource] = useState<ComposerModelSelectionSource>('session');
 
 	const selectedModelRef = useRef(selectedModel);
 	const allOptionsRef = useRef(allOptions);
@@ -299,6 +304,7 @@ export function useComposerContextState(): ComposerContextController {
 
 	const handleSetSelectedModel = useCallback(
 		(update: SetStateAction<UIModelOption>) => {
+			setModelSelectionSource('session');
 			applySelectedModel(update, {
 				syncHybridReasoning: true,
 			});
@@ -370,6 +376,7 @@ export function useComposerContextState(): ComposerContextController {
 
 	const applyAdvancedModel = useCallback(
 		(updated: UIModelOption) => {
+			setModelSelectionSource('session');
 			applySelectedModel(updated);
 		},
 		[applySelectedModel]
@@ -394,6 +401,7 @@ export function useComposerContextState(): ComposerContextController {
 		pendingRestoreRef.current = null;
 
 		const next = defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption;
+		setModelSelectionSource('session');
 
 		selectedModelRef.current = next;
 		hybridReasoningRef.current = isHybridReasoningModel(next);
@@ -418,11 +426,13 @@ export function useComposerContextState(): ComposerContextController {
 		hasRunnableModel,
 		modelCatalogUnavailableReason,
 		modelCatalogError,
+		modelSelectionSource,
 		isHybridReasoningEnabled,
 		includePreviousMessages,
 		handleSetSelectedModel,
 		handleSetIsHybridReasoningEnabled,
 		setIncludePreviousMessages,
+		setModelSelectionSource,
 		setTemperature,
 		setReasoningLevel,
 		setHybridTokens,

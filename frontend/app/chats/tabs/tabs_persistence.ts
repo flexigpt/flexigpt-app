@@ -9,13 +9,12 @@ function canUseStorage(): boolean {
 }
 
 interface PersistedChatsPageStateV1 {
-	v: 1;
+	v: 2;
 	selectedTabId: string;
 	tabs: Array<{
 		tabId: string;
-		conversationId: string;
+		sessionID?: string;
 		title: string;
-		isPersisted: boolean;
 		manualTitleLocked: boolean;
 	}>;
 	scrollTopByTab?: Record<string, number>;
@@ -42,7 +41,7 @@ function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
 		}
 
 		const parsed = JSON.parse(raw) as PersistedChatsPageStateV1;
-		if (!parsed || parsed.v !== 1) {
+		if (!parsed || parsed.v !== 2) {
 			return null;
 		}
 		if (!Array.isArray(parsed.tabs)) {
@@ -97,8 +96,8 @@ export function buildInitialChatsModel(): InitialChatsModel {
 
 	const tabs: ChatTabState[] = sanitizedTabs.map(tab => {
 		const conversation = initConversation();
-		if (tab.isPersisted && tab.conversationId) {
-			conversation.id = tab.conversationId;
+		if (tab.sessionID) {
+			conversation.id = tab.sessionID;
 		}
 		conversation.title = tab.title || conversation.title;
 		conversation.messages = [];
@@ -106,10 +105,11 @@ export function buildInitialChatsModel(): InitialChatsModel {
 		return {
 			tabId: tab.tabId,
 			conversation,
-			isLoaded: !tab.isPersisted,
+			sessionID: tab.sessionID,
+			isLoaded: !tab.sessionID,
 			isBusy: false,
 			isHydrating: false,
-			isPersisted: tab.isPersisted,
+			isPersisted: Boolean(tab.sessionID),
 			manualTitleLocked: tab.manualTitleLocked,
 			editingMessageId: null,
 		};

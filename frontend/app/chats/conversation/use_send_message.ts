@@ -1,103 +1,30 @@
 import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
-import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import type { InferenceError, ModelParam, UIToolCall } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
-import type { ToolSelection } from '@/spec/tool';
-import { RoleEnum, Status } from '@/spec/inference';
+import { RoleEnum } from '@/spec/inference';
+import { SessionRunState } from '@/spec/session';
 
-import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
+import { generateTitle } from '@/lib/title_utils';
 
-import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
-import type {
-	AssistantTurnFinishedPayload,
-	EditorExternalMessage,
-	EditorSubmitPayload,
-} from '@/chats/composer/editor/editor_types';
-import type { StreamBuffer } from '@/chats/conversation/use_streaming_runtime';
+import { sessionManagementAPI } from '@/apis/baseapi';
+
+import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
-import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
-import {
-	applyCompletionMetadata,
-	buildTerminalAssistantMessage,
-	getFailureTerminalLine,
-	getInferenceFailureMessage,
-	hasNonTextAssistantOutcome,
-	reconcileAssistantTextWithStream,
-	streamHasData,
-} from '@/chats/conversation/completion_finalizer';
-import { HandleCompletion } from '@/chats/conversation/completion_helper';
-import {
-	applyAssistantPersistenceContext,
-	buildUserConversationMessageFromEditor,
-	dedupeAttachmentsByRef,
-	initConversationMessage,
-	shouldPersistAssistantModelParam,
-} from '@/chats/conversation/hydration_helper';
-import { buildRequestPatch } from '@/models/lib/model_defaults';
-import { requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
+import { buildUserConversationMessageFromEditor, initConversationMessage } from '@/chats/conversation/hydration_helper';
+import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
+import { buildSessionSubmissionIntent } from '@/chats/session/session_intent';
 
 interface UseSendMessageArgs {
 	tabsRef: RefObject<ChatTabState[]>;
-	selectedTabIdRef: RefObject<string>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
-	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
 	scrollTabToBottomSoon: (tabId: string) => void;
-
 	tabExists: (tabId: string) => boolean;
-	getAbortRef: (tabId: string) => { current: AbortController | null };
-	requestIdByTabRef: RefObject<Map<string, string | null>>;
-	clearStreamBuffer: (tabId: string) => void;
-	notifyStreamNow: (tabId: string) => void;
-	notifyStreamSoon: (tabId: string) => void;
-	getStreamBuffer: (tabId: string) => StreamBuffer;
-	getFullStreamTextForTab: (tabId: string) => string;
-	getFullStreamThinkingForTab: (tabId: string) => string;
-
-	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
-	loadAssistantTurnForTab: (
-		tabId: string,
-		toolCalls: UIToolCall[],
-		finishPayload: AssistantTurnFinishedPayload
-	) => boolean;
 }
 
-function findLatestUserMessage(messages: ConversationMessage[]): ConversationMessage | undefined {
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message.role === RoleEnum.User) {
-			return message;
-		}
-	}
-	return undefined;
-}
-
-export function useSendMessage({
-	tabsRef,
-	selectedTabIdRef,
-	updateTab,
-	saveUpdatedConversation,
-	scrollTabToBottomSoon,
-	tabExists,
-	getAbortRef,
-	requestIdByTabRef,
-	clearStreamBuffer,
-	notifyStreamNow,
-	notifyStreamSoon,
-	getStreamBuffer,
-	getFullStreamTextForTab,
-	getFullStreamThinkingForTab,
-	inputRefs,
-	loadAssistantTurnForTab,
-}: UseSendMessageArgs) {
+export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabExists }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
-		async (
-			tabId: string,
-			updatedChatWithUserMessage: Conversation,
-			options: UIModelOption,
-			skillSessionID?: string
-		) => {
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
 			if (!tabExists(tabId)) {
 				return;
 			}
@@ -106,396 +33,102 @@ export function useSendMessage({
 				throw new Error('Select an available Artifact-backed model before sending.');
 			}
 
-			const abortRef = getAbortRef(tabId);
-			let queuedRunnableToolCalls: UIToolCall[] = [];
-
-			abortRef.current?.abort();
-			const allMessages = sliceMessagesForSend(updatedChatWithUserMessage.messages, options.includePreviousMessages);
-			if (allMessages.length === 0) {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+			if (!tab) {
 				return;
 			}
 
-			let reqId: string;
 			try {
-				reqId = getUUIDv7();
-			} catch {
-				reqId = ensureMakeID();
-			}
+				const submission = await buildSessionSubmissionIntent(payload, options);
+				const optimisticUser = buildUserConversationMessageFromEditor(payload, undefined, options.model);
+				const optimisticAssistant = initConversationMessage(RoleEnum.Assistant);
 
-			requestIdByTabRef.current.set(tabId, reqId);
-
-			const controller = new AbortController();
-			abortRef.current = controller;
-
-			const currentUserMsg = allMessages.at(-1);
-			const history = allMessages.slice(0, allMessages.length - 1);
-			const effectiveCurrentUserMsg = {
-				...currentUserMsg,
-				attachments: dedupeAttachmentsByRef(currentUserMsg?.attachments),
-			} as ConversationMessage;
-
-			clearStreamBuffer(tabId);
-			notifyStreamNow(tabId);
-			const streamBuffer = getStreamBuffer(tabId);
-
-			const assistantPlaceholder = initConversationMessage(RoleEnum.Assistant);
-			const chatWithPlaceholder: Conversation = {
-				...updatedChatWithUserMessage,
-				messages: [...updatedChatWithUserMessage.messages, assistantPlaceholder],
-				modifiedAt: new Date().toISOString(),
-			};
-
-			updateTab(tabId, tab => ({
-				...tab,
-				isBusy: true,
-				conversation: chatWithPlaceholder,
-			}));
-
-			if (selectedTabIdRef.current === tabId) {
+				updateTab(tabId, current => ({
+					...current,
+					isBusy: true,
+					runtimeError: undefined,
+					conversation: {
+						...current.conversation,
+						messages: [...current.conversation.messages, optimisticUser, optimisticAssistant],
+						modifiedAt: new Date().toISOString(),
+					},
+				}));
 				scrollTabToBottomSoon(tabId);
-			}
 
-			const onStreamTextData = (textData: string) => {
-				// Empty chunks are valid no-ops, never an end-of-stream signal.
-				if (typeof textData !== 'string' || textData.length === 0) {
+				if (!tab.sessionID) {
+					const title = tab.manualTitleLocked
+						? tab.conversation.title
+						: generateTitle(payload.text || tab.conversation.title).title;
+					const created = requireAcceptedSessionCommand(
+						await sessionManagementAPI.createSession({
+							meta: sessionCommandMeta(),
+							title,
+							configuration: submission.configuration,
+						}),
+						'Create Session'
+					);
+
+					if (!created.sessionID || created.sessionRevision === undefined) {
+						throw new Error('Session Runtime accepted creation without returning a Session identity.');
+					}
+
+					updateTab(tabId, current => ({
+						...current,
+						sessionID: created.sessionID,
+						isPersisted: true,
+					}));
+
+					requireAcceptedSessionCommand(
+						await sessionManagementAPI.startRun({
+							meta: sessionCommandMeta(created.sessionRevision),
+							sessionID: created.sessionID,
+							input: submission.input,
+						}),
+						'Start Run'
+					);
 					return;
 				}
-				if (requestIdByTabRef.current.get(tabId) !== reqId) {
-					return;
+
+				const snapshot = tab.sessionSnapshot ?? (await sessionManagementAPI.getSessionSnapshot(tab.sessionID));
+
+				if (
+					snapshot.runs.some(
+						run =>
+							run.state !== SessionRunState.Completed &&
+							run.state !== SessionRunState.Failed &&
+							run.state !== SessionRunState.Cancelled
+					)
+				) {
+					throw new Error('This Session already has an active Run.');
 				}
 
-				streamBuffer.text.chunks.push(textData);
-				notifyStreamSoon(tabId);
-			};
-
-			const onStreamThinkingData = (thinkingData: string) => {
-				if (typeof thinkingData !== 'string' || thinkingData.length === 0) {
-					return;
-				}
-				if (requestIdByTabRef.current.get(tabId) !== reqId) {
-					return;
-				}
-
-				streamBuffer.thinking.chunks.push(thinkingData);
-				notifyStreamSoon(tabId);
-			};
-
-			const inputParams: ModelParam = {
-				name: options.name,
-				temperature: options.temperature,
-				stream: options.stream,
-				maxPromptLength: options.maxPromptLength,
-				cacheControl: options.cacheControl,
-				maxOutputLength: options.maxOutputLength,
-				reasoning: options.reasoning,
-				systemPrompt: options.systemPrompt,
-				timeout: options.timeout,
-				outputParam: options.outputParam,
-				stopSequences: options.stopSequences,
-				additionalParametersRawJSON: options.additionalParametersRawJSON,
-			};
-
-			const effectiveModelRef = options.model;
-
-			const persistedAssistantModelParam = shouldPersistAssistantModelParam(
-				updatedChatWithUserMessage.messages,
-				inputParams
-			)
-				? inputParams
-				: undefined;
-
-			try {
-				let toolSelections: ToolSelection[] | undefined;
-
-				const latestUser = findLatestUserMessage(updatedChatWithUserMessage.messages);
-
-				if (latestUser?.toolSelections && latestUser.toolSelections.length > 0) {
-					toolSelections = latestUser.toolSelections;
-				}
-
-				const { responseMessage, rawResponse } = await HandleCompletion(
-					effectiveModelRef,
-					buildRequestPatch(options),
-					inputParams,
-					effectiveCurrentUserMsg,
-					history,
-					toolSelections,
-					effectiveCurrentUserMsg.mcpContext,
-					assistantPlaceholder,
-					skillSessionID,
-					reqId,
-					controller.signal,
-					onStreamTextData,
-					onStreamThinkingData
+				const updatedConfiguration = requireAcceptedSessionCommand(
+					await sessionManagementAPI.updateSessionConfiguration({
+						meta: sessionCommandMeta(snapshot.session.revision),
+						sessionID: tab.sessionID,
+						configuration: submission.configuration,
+					}),
+					'Update Session configuration'
 				);
 
-				// Yield only to already-queued bridge microtasks. This does not add
-				// a timer or frame delay during normal streaming.
-				await Promise.resolve();
-
-				if (!tabExists(tabId)) {
-					return;
-				}
-				if (requestIdByTabRef.current.get(tabId) !== reqId) {
-					return;
-				}
-
-				const partialText = getFullStreamTextForTab(tabId);
-				const partialThinking = getFullStreamThinkingForTab(tabId);
-				const hasPartialText = streamHasData(partialText);
-				const hasPartialStream = hasPartialText || streamHasData(partialThinking);
-
-				if (responseMessage) {
-					const responseError = responseMessage.error ?? rawResponse?.inferenceResponse?.error;
-					const responseFailed = responseMessage.status === Status.Failed || !!responseError;
-					let finalResponseMessage: ConversationMessage;
-
-					if (responseFailed) {
-						const rawOutputs = rawResponse?.inferenceResponse?.outputs ?? [];
-						const baseText = rawOutputs.length > 0 ? (responseMessage.uiContent ?? '') : '';
-						const failureError =
-							responseError ??
-							({
-								code: 'unknown',
-								message: 'The API returned an incomplete response.',
-							} as InferenceError);
-						const hasContentBeforeFailure = hasPartialStream || streamHasData(baseText);
-
-						finalResponseMessage = buildTerminalAssistantMessage({
-							baseMessage: responseMessage,
-							status: Status.Failed,
-							partialText,
-							partialThinking,
-							baseText,
-							error: failureError,
-							terminalLine: getFailureTerminalLine(
-								getInferenceFailureMessage(failureError, 'The API returned an incomplete response.'),
-								hasContentBeforeFailure
-							),
-							preferStreamedText: hasPartialText,
-							includeStreamedThinking: true,
-						});
-					} else {
-						// Inspect the backend's final payload before reconciling it
-						// with streamed text. Otherwise an empty final payload would
-						// incorrectly look successful merely because streaming had
-						// already produced visible content.
-						const finalPayloadHasOutcome =
-							/\S/.test(responseMessage.uiContent ?? '') || hasNonTextAssistantOutcome(responseMessage);
-
-						if (!finalPayloadHasOutcome) {
-							const noResponseError = {
-								code: 'empty_completion_response',
-								message: 'The backend ended without a usable final response.',
-							} as InferenceError;
-
-							finalResponseMessage = buildTerminalAssistantMessage({
-								baseMessage: responseMessage,
-								status: Status.Failed,
-								partialText,
-								partialThinking,
-								error: noResponseError,
-								terminalLine: getFailureTerminalLine(noResponseError.message, hasPartialStream),
-								preferStreamedText: true,
-								includeStreamedThinking: true,
-							});
-						} else {
-							finalResponseMessage = reconcileAssistantTextWithStream(responseMessage, partialText);
-						}
-					}
-
-					const persistedAssistantMessage = applyAssistantPersistenceContext(
-						finalResponseMessage,
-						effectiveModelRef,
-						persistedAssistantModelParam
-					);
-
-					let finalChat: Conversation = {
-						...chatWithPlaceholder,
-						messages: [...chatWithPlaceholder.messages.slice(0, -1), persistedAssistantMessage],
-						modifiedAt: new Date().toISOString(),
-					};
-
-					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
-
-					saveUpdatedConversation(tabId, finalChat);
-
-					if (persistedAssistantMessage.uiToolCalls && persistedAssistantMessage.uiToolCalls.length > 0) {
-						queuedRunnableToolCalls = persistedAssistantMessage.uiToolCalls.filter(call =>
-							requiresComposerToolResponse(call)
-						);
-					}
-				} else {
-					const fallbackError = {
-						code: 'unknown',
-						message: 'No response was returned by the backend.',
-					} as InferenceError;
-					const fallbackMsg = applyAssistantPersistenceContext(
-						buildTerminalAssistantMessage({
-							baseMessage: assistantPlaceholder,
-							status: Status.Failed,
-							partialText,
-							partialThinking,
-							error: fallbackError,
-							terminalLine: getFailureTerminalLine(fallbackError.message, hasPartialStream),
-							preferStreamedText: true,
-							includeStreamedThinking: true,
-						}),
-						effectiveModelRef,
-						persistedAssistantModelParam
-					);
-
-					let finalChat: Conversation = {
-						...chatWithPlaceholder,
-						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
-						modifiedAt: new Date().toISOString(),
-					};
-					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
-
-					saveUpdatedConversation(tabId, finalChat);
-				}
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.startRun({
+						meta: sessionCommandMeta(updatedConfiguration.sessionRevision),
+						sessionID: tab.sessionID,
+						input: submission.input,
+					}),
+					'Start Run'
+				);
 			} catch (error) {
-				if (!tabExists(tabId)) {
-					return;
-				}
-				if (requestIdByTabRef.current.get(tabId) !== reqId) {
-					return;
-				}
-
-				if ((error as DOMException).name === 'AbortError') {
-					const partialText = getFullStreamTextForTab(tabId);
-					const partialThinking = getFullStreamThinkingForTab(tabId);
-					const hasPartialStream = streamHasData(partialText) || streamHasData(partialThinking);
-
-					if (!hasPartialStream) {
-						updateTab(tabId, tab => {
-							const idx = tab.conversation.messages.findIndex(message => message.id === assistantPlaceholder.id);
-							if (idx === -1) {
-								return tab;
-							}
-
-							const messages = tab.conversation.messages.filter((_, i) => i !== idx);
-							return {
-								...tab,
-								conversation: { ...tab.conversation, messages, modifiedAt: new Date().toISOString() },
-							};
-						});
-					} else {
-						const partialMsg = applyAssistantPersistenceContext(
-							buildTerminalAssistantMessage({
-								baseMessage: assistantPlaceholder,
-								status: Status.Completed,
-								partialText,
-								partialThinking,
-								terminalLine: '> Generation stopped before the API returned a final response.',
-								includeStreamedThinking: true,
-							}),
-							effectiveModelRef,
-							persistedAssistantModelParam
-						);
-
-						const finalChat: Conversation = {
-							...chatWithPlaceholder,
-							messages: [...chatWithPlaceholder.messages.slice(0, -1), partialMsg],
-							modifiedAt: new Date().toISOString(),
-						};
-
-						saveUpdatedConversation(tabId, finalChat);
-					}
-				} else {
-					console.error(error);
-
-					const errorMessage =
-						error instanceof Error && error.message.trim().length > 0
-							? error.message
-							: 'Unexpected error while processing this request.';
-
-					const partialText = getFullStreamTextForTab(tabId);
-					const partialThinking = getFullStreamThinkingForTab(tabId);
-					const fallbackError = {
-						code: 'unknown',
-						message: errorMessage,
-					} as InferenceError;
-					const hasPartialStream = streamHasData(partialText) || streamHasData(partialThinking);
-
-					const fallbackMsg = applyAssistantPersistenceContext(
-						buildTerminalAssistantMessage({
-							baseMessage: assistantPlaceholder,
-							status: Status.Failed,
-							partialText,
-							partialThinking,
-							terminalLine: getFailureTerminalLine(errorMessage, hasPartialStream),
-							error: fallbackError,
-							preferStreamedText: true,
-							includeStreamedThinking: true,
-						}),
-						effectiveModelRef,
-						persistedAssistantModelParam
-					);
-
-					const finalChat: Conversation = {
-						...chatWithPlaceholder,
-						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
-						modifiedAt: new Date().toISOString(),
-					};
-
-					saveUpdatedConversation(tabId, finalChat);
-				}
-			} finally {
-				if (abortRef.current === controller) {
-					abortRef.current = null;
-				}
-
-				if (tabExists(tabId) && requestIdByTabRef.current.get(tabId) === reqId) {
-					updateTab(tabId, tab => (tab.isBusy ? { ...tab, isBusy: false } : tab));
-
-					const finishPayload: AssistantTurnFinishedPayload = {
-						loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
-					};
-
-					// Keep the last stream snapshot until the next request or
-					// explicit tab cleanup. Clearing it before React commits the
-					// final message can make the live card briefly render empty.
-					// The next request clears this buffer before installing its
-					// placeholder, so stale text cannot enter another turn.
-
-					const deliverAssistantTurn = () => {
-						if (!tabExists(tabId)) {
-							return;
-						}
-						if (requestIdByTabRef.current.get(tabId) !== reqId) {
-							return;
-						}
-						loadAssistantTurnForTab(tabId, queuedRunnableToolCalls, finishPayload);
-					};
-
-					// The runtime itself remains blocked by the tab's busy prop until
-					// React commits the completion transition. No animation frame is
-					// needed, and background windows must not pause this delivery.
-					deliverAssistantTurn();
-
-					if (requestIdByTabRef.current.get(tabId) === reqId) {
-						requestIdByTabRef.current.set(tabId, null);
-					}
-				}
+				updateTab(tabId, current => ({
+					...current,
+					isBusy: false,
+					runtimeError: error instanceof Error ? error.message : 'Session submission failed.',
+				}));
+				throw error;
 			}
 		},
-		[
-			clearStreamBuffer,
-			getAbortRef,
-			getFullStreamTextForTab,
-			getFullStreamThinkingForTab,
-			getStreamBuffer,
-			loadAssistantTurnForTab,
-			notifyStreamNow,
-			notifyStreamSoon,
-			requestIdByTabRef,
-			saveUpdatedConversation,
-			scrollTabToBottomSoon,
-			selectedTabIdRef,
-			tabExists,
-			updateTab,
-		]
+		[scrollTabToBottomSoon, tabExists, tabsRef, updateTab]
 	);
 
 	const sendMessageForTab = useCallback(
@@ -508,62 +141,28 @@ export function useSendMessage({
 				return;
 			}
 
-			const trimmed = payload.text.trim();
-			const hasNonEmptyText = trimmed.length > 0;
-			const hasToolOutputs = payload.toolOutputs.length > 0;
-			const hasAttachments = payload.attachments.length > 0;
-			const hasMCPContext = (payload.mcpContext?.servers?.length ?? 0) > 0;
-			const hasMCPAppContext = (payload.mcpAppContextUpdates?.length ?? 0) > 0;
-
-			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments && !hasMCPContext && !hasMCPAppContext) {
+			if (tab.editingMessageId) {
+				if (!tab.sessionID || !tab.sessionSnapshot) {
+					throw new Error('Edit-and-resend requires an existing Session snapshot.');
+				}
+				const submission = await buildSessionSubmissionIntent(payload, options);
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.editAndResend({
+						meta: sessionCommandMeta(tab.sessionSnapshot.session.revision),
+						sessionID: tab.sessionID,
+						replaceMessageID: tab.editingMessageId,
+						input: submission.input,
+						configuration: submission.configuration,
+					}),
+					'Edit and resend'
+				);
+				updateTab(tabId, current => ({ ...current, editingMessageId: null, isBusy: true }));
 				return;
 			}
 
-			const sendOptions: UIModelOption = {
-				...options,
-				systemPrompt: payload.resolvedSystemPrompt?.trim() || '',
-			};
-			const editingId = tab.editingMessageId ?? undefined;
-			const modelRef = sendOptions.model;
-
-			const userMsg = buildUserConversationMessageFromEditor(payload, editingId, modelRef);
-
-			if (tab.editingMessageId) {
-				const idx = tab.conversation.messages.findIndex(message => message.id === tab.editingMessageId);
-				if (idx !== -1) {
-					const oldMessages = tab.conversation.messages.slice(0, idx);
-					const messages = [...oldMessages, userMsg];
-
-					const updatedChat: Conversation = {
-						...tab.conversation,
-						messages,
-						modifiedAt: new Date().toISOString(),
-					};
-
-					updateTab(tabId, current => ({ ...current, editingMessageId: null }));
-					saveUpdatedConversation(tabId, updatedChat);
-					void updateStreamingMessage(tabId, updatedChat, sendOptions, payload.skillSessionID).catch(console.error);
-					return;
-				}
-
-				updateTab(tabId, current => ({ ...current, editingMessageId: null }));
-			}
-
-			const updatedChat: Conversation = {
-				...tab.conversation,
-				messages: [...tab.conversation.messages, userMsg],
-				modifiedAt: new Date().toISOString(),
-			};
-
-			saveUpdatedConversation(tabId, updatedChat);
-
-			if (selectedTabIdRef.current === tabId) {
-				scrollTabToBottomSoon(tabId);
-			}
-
-			void updateStreamingMessage(tabId, updatedChat, sendOptions, payload.skillSessionID).catch(console.error);
+			await updateStreamingMessage(tabId, payload, options);
 		},
-		[selectedTabIdRef, saveUpdatedConversation, scrollTabToBottomSoon, tabsRef, updateStreamingMessage, updateTab]
+		[tabsRef, updateStreamingMessage, updateTab]
 	);
 
 	const beginEditMessageForTab = useCallback(
@@ -584,23 +183,9 @@ export function useSendMessage({
 				return;
 			}
 
-			const external: EditorExternalMessage = {
-				text: message.uiContent ?? '',
-				attachments: message.attachments,
-				toolChoices: message.uiToolChoices,
-				toolSelectionIssues: message.uiToolSelectionIssues,
-				mcpContext: message.mcpContext,
-				mcpAppContextUpdates: message.mcpAppContextUpdates,
-				toolOutputs: message.uiToolOutputs,
-				enabledSkillRefs: message.enabledSkillRefs,
-				activeSkillRefs: message.activeSkillRefs,
-				workspaceSelection: message.workspaceSelection,
-			};
-
-			inputRefs.current.get(tabId)?.loadExternalMessage(external);
 			updateTab(tabId, current => ({ ...current, editingMessageId: id }));
 		},
-		[inputRefs, tabsRef, updateTab]
+		[tabsRef, updateTab]
 	);
 
 	const cancelEditingForTab = useCallback(

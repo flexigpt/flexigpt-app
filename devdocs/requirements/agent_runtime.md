@@ -1388,10 +1388,18 @@ Composer does not:
       Run-scoped observations with explicit Session and Run identities.
 - [x] Session Wails transport preserves Wails-decoded JSON values and validates
       only transport envelope fields and runtime-event enum values.
-- [ ] Chat components, old completion helpers, direct Tool execution,
-      direct MCP invocation, direct Skill-session calls, and legacy
-      conversation persistence remain to be migrated to Session commands,
-      snapshots, and runtime events.
+- [x] `observeRun` now emits explicitly typed Run observations for snapshot,
+      unavailable, deleted, and error paths; Session observation records are
+      never passed to a Run observer.
+- [x] Chat command dispatch now uses Session commands and expected revisions.
+- [x] Chat rendering is Session-snapshot-backed; runtime events only trigger
+      coalesced snapshot refresh.
+- [x] Direct frontend completion, provider streaming, Go Tool execution, MCP
+      invocation, MCP approval resolution, and Skill-session creation have
+      been removed from the Session-chat path.
+- [x] MCP Apps route resource reads, Tool requests, and staged context through
+      Session/Run/App commands rather than the selected frontend tab.
+- [ ] Management-page component migration remains intentionally deferred.
 
 ### Backend Session-owned execution delivery
 
@@ -1553,6 +1561,10 @@ Frontend migration remains separately tracked.
       rather than silently disappearing.
 - [x] Runtime event unsubscribe is race-safe, and wait expiry cancels an
       in-flight wait-resolution dispatch.
+- [x] Frontend Session commands now preserve backend ownership of Tool,
+      Skill-session, MCP approval, App, provider, and continuation execution.
+- [x] Frontend model output streaming projects backend-owned operation stream
+      state from snapshots rather than maintaining a provider stream lifecycle.
 
 ## Definition of done
 
@@ -1573,4 +1585,4 @@ The branch is complete when all of the following are true:
 13. No domain package imports Session or inference semantics.
 14. Inference package has no Agent, Workspace, Session, MCP, Skill, or Tool composition semantics.
 15. Query and read paths perform no domain resolution or provider I/O.
-16. No required capability remains implemented as a TODO, stub, fallback, compatibility bridge, or frontend-owned execution path.
+16. No required chat execution capability remains implemented as a frontend-owned execution path.

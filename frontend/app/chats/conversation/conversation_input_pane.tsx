@@ -19,6 +19,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	shortcutConfig: ShortcutConfig;
 	sendMessage: (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
 	cancelEditing: (tabId: string) => void;
+	cancelRun: (tabId: string) => Promise<void>;
 }) {
 	const {
 		tabId,
@@ -31,6 +32,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		shortcutConfig,
 		sendMessage,
 		cancelEditing,
+		cancelRun,
 	} = props;
 
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
@@ -54,6 +56,9 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				shortcutConfig={shortcutConfig}
 				editingMessageId={editingMessageId}
 				onCancelEditing={onCancelEditing}
+				onCancelRun={() => {
+					return cancelRun(tabId);
+				}}
 			/>
 		</div>
 	);
