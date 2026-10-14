@@ -6,20 +6,27 @@ import type {
 	ManagedMCPPolicyUpsertResult,
 	ManagedMCPReplaceRequest,
 	ManagedMCPReplaceResult,
+	MCPAuthHealth,
+	MCPAuthStatus,
+	MCPOAuthAuthorization,
 	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerInstallationDataView,
 	MCPServerInstallationView,
 	MCPServerRuntimeDetails,
+	MCPServerRuntimeSnapshot,
 } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPAuthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
 import { pluginResultFromWails } from '@/apis/wailsapi/list_item_projection';
 import {
+	enumFromWails,
 	optionalWailsString,
 	requiredObject,
 	requireWailsBoolean,
+	wailsArrayOrEmpty,
 	wailsObjectArrayOrEmpty,
 	wailsRecordOrEmpty,
 } from '@/apis/wailsapi/transport';
@@ -50,10 +57,10 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPServerRuntimeDetails[]> {
-		return wailsObjectArrayOrEmpty<MCPServerRuntimeDetails>(
+		return wailsObjectArrayOrEmpty(
 			await GetMCPServersForRuntimeServers(servers as Parameters<typeof GetMCPServersForRuntimeServers>[0]),
 			'GetMCPServersForRuntimeServers'
-		);
+		).map((value, index) => mcpServerRuntimeDetailsFromWails(value, `GetMCPServersForRuntimeServers[${index}]`));
 	}
 
 	async createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
@@ -115,11 +122,66 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 }
 
+function mcpServerRuntimeSnapshotFromWails(value: unknown, operation: string): MCPServerRuntimeSnapshot {
+	const snapshot = requiredObject<MCPServerRuntimeSnapshot>(value, operation);
+
+	return {
+		...snapshot,
+		status: enumFromWails(snapshot.status, MCPServerStatus, `${operation}.status`),
+	};
+}
+
+function mcpAuthStatusFromWails(value: unknown, operation: string): MCPAuthStatus {
+	const status = requiredObject<MCPAuthStatus>(value, operation);
+
+	return {
+		...status,
+		authMode: enumFromWails(status.authMode, MCPHTTPAuthMode, `${operation}.authMode`),
+		state: enumFromWails(status.state, MCPAuthState, `${operation}.state`),
+		scopes: wailsArrayOrEmpty<string>(status.scopes, `${operation}.scopes`),
+	};
+}
+
+function mcpOAuthAuthorizationFromWails(value: unknown, operation: string): MCPOAuthAuthorization {
+	return requiredObject<MCPOAuthAuthorization>(value, operation);
+}
+
+function mcpAuthHealthFromWails(value: unknown, operation: string): MCPAuthHealth {
+	const health = requiredObject<MCPAuthHealth>(value, operation);
+
+	return {
+		...health,
+		authMode: enumFromWails(health.authMode, MCPHTTPAuthMode, `${operation}.authMode`),
+		state: enumFromWails(health.state, MCPAuthHealthState, `${operation}.state`),
+		scopes: wailsArrayOrEmpty<string>(health.scopes, `${operation}.scopes`),
+	};
+}
+
+function mcpServerRuntimeDetailsFromWails(value: unknown, operation: string): MCPServerRuntimeDetails {
+	const details = requiredObject<MCPServerRuntimeDetails>(value, operation);
+
+	return {
+		...details,
+		connection: mcpServerRuntimeSnapshotFromWails(details.connection, `${operation}.connection`),
+		authorization:
+			details.authorization === undefined
+				? undefined
+				: mcpAuthStatusFromWails(details.authorization, `${operation}.authorization`),
+		pendingAuthorization:
+			details.pendingAuthorization === undefined
+				? undefined
+				: mcpOAuthAuthorizationFromWails(details.pendingAuthorization, `${operation}.pendingAuthorization`),
+	};
+}
+
 function serverDetailsFromWails(value: unknown, operation: string): MCPServerDetails {
 	const details = requiredObject<MCPServerDetails>(value, operation);
+
 	return {
 		...details,
 		settings: installationViewFromWails(details.settings, `${operation}.settings`),
+		authorization: mcpAuthHealthFromWails(details.authorization, `${operation}.authorization`),
+		connection: mcpServerRuntimeSnapshotFromWails(details.connection, `${operation}.connection`),
 	};
 }
 

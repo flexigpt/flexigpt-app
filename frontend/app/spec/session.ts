@@ -1,4 +1,5 @@
 import type { ArtifactRef } from '@/spec/artifact';
+import type { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
 
 export type SessionID = string;
 export type RunID = string;
@@ -278,8 +279,8 @@ export interface SessionActiveSkillOverride {
 export interface SessionMCPToolSelection {
 	toolName: string;
 	expectedDigest?: string;
-	approvalRule?: string;
-	executionMode?: string;
+	approvalRule?: MCPApprovalRule;
+	executionMode?: MCPExecutionMode;
 }
 
 export interface SessionMCPResourceSelection {

@@ -106,7 +106,7 @@ export enum MCPToolRisk {
 	OpenWorld = 'openWorld',
 }
 
-enum MCPTaskSupport {
+export enum MCPTaskSupport {
 	Forbidden = 'forbidden',
 	Optional = 'optional',
 	Required = 'required',
@@ -155,7 +155,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-interface MCPServerPolicy {
+export interface MCPServerPolicy {
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
 	requireApprovalForUnknownRisk: boolean;
@@ -163,7 +163,7 @@ interface MCPServerPolicy {
 	requireApprovalForDestructive: boolean;
 }
 
-interface MCPToolPolicyOverride {
+export interface MCPToolPolicyOverride {
 	toolName: string;
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
@@ -220,7 +220,7 @@ interface MCPServerCapabilitiesSummary {
 	extensions?: Record<string, any>;
 }
 
-interface MCPToolAnnotations {
+export interface MCPToolAnnotations {
 	destructiveHint?: boolean;
 	idempotentHint: boolean;
 	openWorldHint?: boolean;
@@ -228,7 +228,7 @@ interface MCPToolAnnotations {
 	title?: string;
 }
 
-interface MCPToolAppInfo {
+export interface MCPToolAppInfo {
 	resourceUri?: string;
 	visibility?: MCPAppVisibility[];
 }
@@ -497,7 +497,7 @@ export enum MCPAuthState {
 	Error = 'error',
 }
 
-interface MCPAuthStatus {
+export interface MCPAuthStatus {
 	server: MCPRuntimeServerID;
 	authMode: MCPHTTPAuthMode;
 	state: MCPAuthState;
@@ -508,7 +508,7 @@ interface MCPAuthStatus {
 	resource?: string;
 }
 
-interface MCPOAuthAuthorization {
+export interface MCPOAuthAuthorization {
 	server: MCPRuntimeServerID;
 	authorizationURL: string;
 	expiresAt?: MCPTimestamp;

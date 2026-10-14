@@ -11,7 +11,14 @@ import type {
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
 } from '@/spec/mcp';
-import { MCPServerStatus } from '@/spec/mcp';
+import {
+	MCPApprovalRule,
+	MCPAppVisibility,
+	MCPExecutionMode,
+	MCPServerStatus,
+	MCPTaskSupport,
+	MCPToolRisk,
+} from '@/spec/mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
 import {
@@ -19,6 +26,7 @@ import {
 	optionalWailsString,
 	requiredObject,
 	requireWailsBoolean,
+	wailsArrayOrEmpty,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 import {
@@ -41,6 +49,27 @@ function runtimeSnapshotFromWails(value: unknown, operation: string): MCPServerR
 	return {
 		...snapshot,
 		status: enumFromWails(snapshot.status, MCPServerStatus, `${operation}.status`),
+	};
+}
+
+function mcpToolCapabilityFromWails(value: unknown, operation: string): MCPToolCapability {
+	const tool = requiredObject<MCPToolCapability>(value, operation);
+
+	return {
+		...tool,
+		inferredRisk: enumFromWails(tool.inferredRisk, MCPToolRisk, `${operation}.inferredRisk`),
+		approvalRule: enumFromWails(tool.approvalRule, MCPApprovalRule, `${operation}.approvalRule`),
+		executionMode: enumFromWails(tool.executionMode, MCPExecutionMode, `${operation}.executionMode`),
+		taskSupport: enumFromWails(tool.taskSupport, MCPTaskSupport, `${operation}.taskSupport`),
+		app:
+			tool.app === undefined
+				? undefined
+				: {
+						...tool.app,
+						visibility: wailsArrayOrEmpty(tool.app.visibility, `${operation}.app.visibility`).map((item, index) =>
+							enumFromWails(item, MCPAppVisibility, `${operation}.app.visibility[${index}]`)
+						),
+					},
 	};
 }
 
@@ -139,10 +168,15 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		pageSize: number,
 		pageToken = ''
 	): Promise<MCPDiscoveryPage<MCPToolCapability>> {
-		return discoveryPageFromWails<MCPToolCapability>(
+		const page = discoveryPageFromWails<MCPToolCapability>(
 			await ListMCPServerTools(server as Parameters<typeof ListMCPServerTools>[0], pageSize, pageToken),
 			'ListMCPServerTools'
 		);
+
+		return {
+			...page,
+			items: page.items.map((tool, index) => mcpToolCapabilityFromWails(tool, `ListMCPServerTools.items[${index}]`)),
+		};
 	}
 
 	async readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {

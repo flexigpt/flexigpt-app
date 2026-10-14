@@ -1599,6 +1599,14 @@ Frontend migration remains separately tracked.
 - [x] Session template Wails transport adapts the generated request shape at
       the transport boundary without modifying generated bindings.
 - [x] Composer cancellation is scoped to the tab that owns the Run.
+- [x] Wails MCP aggregate and runtime projections normalize exported MCP
+      runtime, authorization, policy, risk, task-support, execution, and
+      approval enum values at the frontend transport boundary.
+- [x] Frontend Session MCP Tool selections carry typed MCP approval and
+      execution enums rather than unbounded string values.
+- [x] Session runtime setup accepts typed direct Tool capability selections and
+      validates that active Skill intent remains a subset of effective enabled
+      Skills before operation preparation.
 
 ## Definition of done
 

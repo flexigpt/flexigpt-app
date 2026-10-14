@@ -11,6 +11,7 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -745,6 +746,14 @@ func (c *coordinator) applySessionOverrides(
 			err,
 		)
 	}
+	if err := validateActiveSkills(plan.skills, active); err != nil {
+		return operationPreparationError(
+			"active_skill_override_invalid",
+			err.Error(),
+			plan.summary,
+			err,
+		)
+	}
 	plan.activeSkills = active
 
 	mcp, err := applyMCPOverrides(
@@ -1226,6 +1235,30 @@ func applyActiveSkillOverrides(
 	return output, nil
 }
 
+// validateActiveSkills keeps the Session invariant explicit: an active Skill
+// must also belong to the effective enabled Skill collection. Without this
+// check an activate override for a removed or never-enabled Skill would be
+// silently ignored later by Skill-session preparation.
+func validateActiveSkills(
+	skills []skillContribution,
+	active map[string]struct{},
+) error {
+	enabled := make(map[string]struct{}, len(skills))
+	for _, skill := range skills {
+		enabled[skill.key] = struct{}{}
+	}
+
+	for key := range active {
+		if _, found := enabled[key]; !found {
+			return fmt.Errorf(
+				"active Skill %q is not part of the effective enabled Skills",
+				key,
+			)
+		}
+	}
+	return nil
+}
+
 func applyMCPOverrides(
 	baseline []sessionRuntime.MCPServerSelection,
 	overrides []sessionRuntime.MCPServerOverride,
@@ -1529,17 +1562,28 @@ func (c *coordinator) toolTargetFromIntent(
 	ctx context.Context,
 	intent sessionRuntime.ToolSelectionIntent,
 ) (composition.CapabilityTarget, error) {
-	if intent.Capability.Artifact == nil {
-		return composition.CapabilityTarget{}, errors.New(
-			"direct Tool capabilities are not available in this runtime",
-		)
+	if intent.Capability.Artifact != nil {
+		ref, err := artifactRef(*intent.Capability.Artifact)
+		if err != nil {
+			return composition.CapabilityTarget{}, err
+		}
+		return c.tools.MapToolTarget(ctx, ref)
 	}
 
-	ref, err := artifactRef(*intent.Capability.Artifact)
-	if err != nil {
-		return composition.CapabilityTarget{}, err
+	if intent.Capability.Direct != nil {
+		direct := intent.Capability.Direct
+		return composition.CapabilityTarget{
+			Form:             "direct",
+			Type:             declaration.Type(direct.Type),
+			Name:             spec.LogicalName(direct.Name),
+			ProviderIdentity: direct.ProviderIdentity,
+			ProviderLocalID:  direct.ProviderLocalID,
+		}, nil
 	}
-	return c.tools.MapToolTarget(ctx, ref)
+
+	return composition.CapabilityTarget{}, errors.New(
+		"tool capability selection is required",
+	)
 }
 
 func agentOccurrenceDiagnostic(

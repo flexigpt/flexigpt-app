@@ -24,7 +24,7 @@ export enum ArtifactState {
 	Incompatible = 'incompatible',
 }
 
-enum ArtifactDiagnosticSeverity {
+export enum ArtifactDiagnosticSeverity {
 	Error = 'error',
 	Warning = 'warning',
 	Info = 'info',
