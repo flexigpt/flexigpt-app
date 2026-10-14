@@ -171,9 +171,10 @@ func (c *coordinator) resolveAgent(
 
 			key := value.CanonicalKey()
 			plan.skills = append(plan.skills, skillContribution{
-				key:       key,
-				owner:     sessionRuntime.ConfigurationOwnerAgent,
-				selection: *value,
+				key:         key,
+				owner:       sessionRuntime.ConfigurationOwnerAgent,
+				selection:   *value,
+				instruction: occurrence.SkillUseMode == agentAPI.AgentSkillUseModeInstructions,
 				item: sessionRuntime.ResolutionItem{
 					Key:      key,
 					Kind:     resolutionItemKindSkill,
@@ -432,6 +433,7 @@ func (c *coordinator) resolveWorkspace(
 		contextByRef[value.CanonicalKey()] = value
 	}
 
+	includedWorkspaceContexts := make(map[string]struct{}, len(runtimePlan.Prompt.Contributions))
 	for _, contribution := range runtimePlan.Prompt.Contributions {
 		key := artifactKey(contribution.Artifact)
 		selected, found := contextByRef[key]
@@ -464,6 +466,36 @@ func (c *coordinator) resolveWorkspace(
 				Used:     used,
 			},
 		)
+		includedWorkspaceContexts[key] = struct{}{}
+	}
+
+	for _, selected := range contextSelections {
+		key := selected.CanonicalKey()
+		if _, included := includedWorkspaceContexts[key]; included {
+			continue
+		}
+
+		selectedCopy := selected
+		plan.summary.Instructions = append(
+			plan.summary.Instructions,
+			sessionRuntime.ResolutionItem{
+				Key:      key,
+				Kind:     "workspaceContext",
+				Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+				State:    sessionRuntime.ResolutionStateExcluded,
+				Selected: &selectedCopy,
+				Reason:   "Workspace Context was not included in the resolved runtime plan",
+			},
+		)
+		plan.summary.Diagnostics = append(
+			plan.summary.Diagnostics,
+			sessionRuntime.ResolutionDiagnostic{
+				Severity: sessionRuntime.DiagnosticSeverityWarning,
+				Code:     "workspace_context_excluded",
+				Message:  "Selected Workspace Context was not included in the resolved runtime plan",
+				Key:      key,
+			},
+		)
 	}
 
 	skillByRef := make(
@@ -474,6 +506,7 @@ func (c *coordinator) resolveWorkspace(
 		skillByRef[value.CanonicalKey()] = value
 	}
 
+	includedWorkspaceSkills := make(map[string]struct{}, len(runtimePlan.Skills.Skills))
 	for _, skill := range runtimePlan.Skills.Skills {
 		key := artifactKey(skill.Artifact)
 		selected, found := skillByRef[key]
@@ -508,6 +541,36 @@ func (c *coordinator) resolveWorkspace(
 				Used:     used,
 			},
 		})
+		includedWorkspaceSkills[selected.CanonicalKey()] = struct{}{}
+	}
+
+	for _, selected := range skillSelections {
+		key := selected.CanonicalKey()
+		if _, included := includedWorkspaceSkills[key]; included {
+			continue
+		}
+
+		selectedCopy := selected
+		plan.summary.Skills = append(
+			plan.summary.Skills,
+			sessionRuntime.ResolutionItem{
+				Key:      key,
+				Kind:     resolutionItemKindSkill,
+				Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+				State:    sessionRuntime.ResolutionStateExcluded,
+				Selected: &selectedCopy,
+				Reason:   "Workspace Skill was not included in the resolved runtime plan",
+			},
+		)
+		plan.summary.Diagnostics = append(
+			plan.summary.Diagnostics,
+			sessionRuntime.ResolutionDiagnostic{
+				Severity: sessionRuntime.DiagnosticSeverityWarning,
+				Code:     "workspace_skill_excluded",
+				Message:  "Selected Workspace Skill was not included in the resolved runtime plan",
+				Key:      key,
+			},
+		)
 	}
 
 	for _, target := range artifactTargetsForCapabilities(
@@ -536,6 +599,7 @@ func (c *coordinator) resolveWorkspace(
 		mcpByRef[value.Server.CanonicalKey()] = cloneMCPSelection(value)
 	}
 
+	includedWorkspaceMCP := make(map[string]struct{}, len(runtimePlan.MCPServers.Servers))
 	for _, server := range runtimePlan.MCPServers.Servers {
 		key := artifactKey(server.Artifact)
 		selected, found := mcpByRef[key]
@@ -560,6 +624,36 @@ func (c *coordinator) resolveWorkspace(
 		plan.mcp = append(plan.mcp, selected)
 		plan.mcpUses[selected.CanonicalKey()] = used
 		plan.mcpOwners[selected.CanonicalKey()] = sessionRuntime.ConfigurationOwnerWorkspace
+		includedWorkspaceMCP[selected.CanonicalKey()] = struct{}{}
+	}
+
+	for _, selected := range mcpSelections {
+		key := selected.CanonicalKey()
+		if _, included := includedWorkspaceMCP[key]; included {
+			continue
+		}
+
+		selectedServer := selected.Server
+		plan.summary.MCP = append(
+			plan.summary.MCP,
+			sessionRuntime.ResolutionItem{
+				Key:      key,
+				Kind:     resolutionItemKindMCP,
+				Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+				State:    sessionRuntime.ResolutionStateExcluded,
+				Selected: &selectedServer,
+				Reason:   "Workspace MCP server was not included in the resolved runtime plan",
+			},
+		)
+		plan.summary.Diagnostics = append(
+			plan.summary.Diagnostics,
+			sessionRuntime.ResolutionDiagnostic{
+				Severity: sessionRuntime.DiagnosticSeverityWarning,
+				Code:     "workspace_mcp_excluded",
+				Message:  "Selected Workspace MCP server was not included in the resolved runtime plan",
+				Key:      key,
+			},
+		)
 	}
 
 	for _, decision := range runtimePlan.Prompt.Decisions {

@@ -104,30 +104,31 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
 	const [workspaceSkillRefKeys, setWorkspaceSkillRefKeys] = useState<ReadonlySet<string>>(() => new Set());
 
-	// Keep the historical allSkills surface instruction-only for callers that
-	// manage sessions. Templates are exposed separately and never enter the
-	// Skills dropdown or the session-selection path.
-	const allSkills = useMemo(
-		() =>
-			composerSkills.filter(s => {
-				return isInstructionSkill(s);
-			}),
-		[composerSkills]
-	);
-	const templateSkills = useMemo(
-		() => composerSkills.filter(skill => skill.insert === SkillInsert.UserMessage),
-		[composerSkills]
-	);
-
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
 	const activeSkillRefsRef = useRef<SkillRef[]>([]);
 	const workspaceRefRef = useRef<WorkspaceRef | undefined>(undefined);
 	const workspaceSkillRefKeysRef = useRef<Set<string>>(new Set());
 	const catalogByRefKeyRef = useRef(new Map<string, ComposerSkillCatalogItem>());
 
+	const runtimeResolvedSkills = useMemo(() => composerSkills.filter(skill => skill.runtimeResolved), [composerSkills]);
+
+	const allSkills = useMemo(
+		() =>
+			runtimeResolvedSkills.filter(s => {
+				return isInstructionSkill(s);
+			}),
+		[runtimeResolvedSkills]
+	);
+	const templateSkills = useMemo(
+		() => runtimeResolvedSkills.filter(skill => skill.insert === SkillInsert.UserMessage),
+		[runtimeResolvedSkills]
+	);
+
 	useEffect(() => {
-		catalogByRefKeyRef.current = new Map(composerSkills.map(skill => [skillRefKey(catalogItemRef(skill)), skill]));
-	}, [composerSkills]);
+		catalogByRefKeyRef.current = new Map(
+			runtimeResolvedSkills.map(skill => [skillRefKey(catalogItemRef(skill)), skill])
+		);
+	}, [runtimeResolvedSkills]);
 
 	const updateEnabledSkillRefsState = useCallback((next: SkillRef[]) => {
 		enabledSkillRefsRef.current = next;

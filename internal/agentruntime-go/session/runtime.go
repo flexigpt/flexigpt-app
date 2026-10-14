@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -412,6 +413,14 @@ func (r *Runtime) ListSessions(
 
 		output = append(output, item)
 	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if !output[left].UpdatedAt.Equal(output[right].UpdatedAt) {
+			return output[left].UpdatedAt.After(output[right].UpdatedAt)
+		}
+
+		return output[left].ID < output[right].ID
+	})
 
 	return output, nil
 }

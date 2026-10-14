@@ -1,106 +1,142 @@
-import type { Skill, SkillPlugin } from '@/spec/skill';
+import { useEffect, useState } from 'react';
 
+import type { PluginListItem, PluginView } from '@/spec/plugin';
+import type { StoreSkillListItem } from '@/spec/skill';
+
+import { skillManagementAPI } from '@/apis/baseapi';
+
+import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { getSkillInsertCounts, getSkillInsertDescription, skillHasResources } from '@/skills/lib/skill_artifact_utils';
-
 interface SkillPluginDetailsModalProps {
 	isOpen: boolean;
+	plugin: PluginListItem | null;
+	skills: StoreSkillListItem[];
 	onClose: () => void;
-	plugin: SkillPlugin | null;
-	skills: Skill[];
 }
 
-export function SkillPluginDetailsModal({ isOpen, onClose, plugin, skills }: SkillPluginDetailsModalProps) {
-	const skillCounts = getSkillInsertCounts(skills);
+export function SkillPluginDetailsModal({ isOpen, plugin, skills, onClose }: SkillPluginDetailsModalProps) {
+	const [view, setView] = useState<PluginView | null>(null);
+	const [error, setError] = useState('');
 
-	const totalSkills = skills.length;
-	const resourceSkillCount = skills.filter(s => {
-		return skillHasResources(s);
-	}).length;
+	useEffect(() => {
+		if (!isOpen || !plugin) {
+			return;
+		}
+
+		let cancelled = false;
+
+		void skillManagementAPI
+			.getSkillPlugin(plugin.ref)
+			.then(next => {
+				if (!cancelled) {
+					// oxlint-disable-next-line promise/no-callback-in-promise
+					setView(next);
+				}
+			})
+			.catch((cause: unknown) => {
+				if (!cancelled) {
+					setError(cause instanceof Error ? cause.message : 'Skill Plugin details could not be loaded.');
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [isOpen, plugin]);
+
 	if (!isOpen || !plugin) {
 		return null;
 	}
 
 	return (
 		<ManagementDetailsModal
-			isOpen={isOpen}
+			isOpen
 			onClose={onClose}
 			title="Skill Plugin Details"
-			modalKey={`skill-plugin:${plugin.id}:${plugin.modifiedAt}`}
+			modalKey={`skill-plugin:${plugin.ref.rootID}:${plugin.ref.artifactID}:${plugin.revision}`}
 		>
-			<ModalSection title="Plugin details">
+			{!view && !error ? <Loader text="Loading Skill Plugin details..." /> : null}
+			{error ? <div className="alert alert-warning rounded-2xl text-sm">{error}</div> : null}
+
+			<ModalSection title="Plugin">
 				<ManagementInfoGrid>
-					<ManagementInfoRow label="Display Name">{plugin.displayName || '—'}</ManagementInfoRow>
-					<ManagementInfoRow label="Name" mono>
-						{plugin.slug}
+					<ManagementInfoRow label="Display name">{plugin.displayName || plugin.name}</ManagementInfoRow>
+					<ManagementInfoRow label="Logical name" mono>
+						{plugin.name}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Built-in">{plugin.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Enabled">{plugin.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Description">
-						<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
+					<ManagementInfoRow label="Root" mono>
+						{plugin.ref.rootID}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Created">{plugin.createdAt}</ManagementInfoRow>
-					<ManagementInfoRow label="Modified">{plugin.modifiedAt}</ManagementInfoRow>
+					<ManagementInfoRow label="Source" mono>
+						{plugin.sourceID}
+					</ManagementInfoRow>
+					<ManagementInfoRow label="State">{plugin.state}</ManagementInfoRow>
+					<ManagementInfoRow label="Enabled">{plugin.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Built-in">{plugin.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Revision">{plugin.revision}</ManagementInfoRow>
+					<ManagementInfoRow label="Description">{plugin.description || '—'}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
 
-			<ModalSection title="Sources">
-				{plugin.attachments.length > 0 ? (
-					<div className="space-y-2">
-						{plugin.attachments.map(attachment => (
-							<div key={attachment.sourceID} className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
-								<div className="flex flex-wrap gap-2">
-									<MetadataPill label="Role">{attachment.role}</MetadataPill>
-									<MetadataPill label="State">{attachment.enabled ? 'Enabled' : 'Disabled'}</MetadataPill>
-									{attachment.sourceKind ? <MetadataPill label="Kind">{attachment.sourceKind}</MetadataPill> : null}
-								</div>
-								<div className="mt-2 text-sm">{attachment.sourceDisplayName || 'Attached Source'}</div>
+			<ModalSection title="Resolved Skills">
+				<div className="mb-3 text-sm">
+					{skills.length} Skill Artifact{skills.length === 1 ? '' : 's'} currently resolve through this Plugin.
+				</div>
+
+				<div className="space-y-2">
+					{skills.map(skill => (
+						<div
+							key={`${skill.ref.rootID}:${skill.ref.artifactID}`}
+							className="border-base-content/10 rounded-2xl border p-3"
+						>
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="font-medium">{skill.displayName || skill.name}</span>
+								<MetadataPill label="State">{skill.state}</MetadataPill>
+								<MetadataPill label="Revision">{skill.revision}</MetadataPill>
+								{skill.managed ? <MetadataPill>Managed</MetadataPill> : null}
+								{skill.builtIn ? <MetadataPill>Built-in</MetadataPill> : null}
+							</div>
+							<div className="text-base-content/60 mt-1 font-mono text-xs">
+								{skill.ref.rootID}/{skill.ref.artifactID}
+							</div>
+						</div>
+					))}
+
+					{skills.length === 0 ? (
+						<div className="text-base-content/60 rounded-2xl border border-dashed p-3 text-sm">
+							No Skill Artifact currently resolves through this Plugin.
+						</div>
+					) : null}
+				</div>
+			</ModalSection>
+
+			{view ? (
+				<ModalSection title="Declared membership">
+					<div className="text-base-content/70 mb-2 text-sm">
+						{view.members.length} declared member{view.members.length === 1 ? '' : 's'}.
+					</div>
+
+					<div className="space-y-1">
+						{view.members.map((member, index) => (
+							<div key={`${member.type}:${member.name}:${index}`} className="bg-base-100 rounded-xl px-3 py-2 text-xs">
+								<span className="font-mono">{member.type}</span>
+								{member.name ? ` / ${member.name}` : ''}
+								{member.scope ? ` / scope: ${member.scope}` : ''}
 							</div>
 						))}
-					</div>
-				) : (
-					<div className="text-base-content/70 text-sm">No Sources attached.</div>
-				)}
-			</ModalSection>
 
-			<ModalSection title="Skill summary">
-				<ManagementInfoGrid>
-					<ManagementInfoRow label="Total skills">{totalSkills}</ManagementInfoRow>
-					<ManagementInfoRow label="Instruction skills">
-						<div className="flex flex-wrap items-center gap-2">
-							<MetadataPill label="Count">{skillCounts.instructions}</MetadataPill>
-							<span className="text-base-content/70 text-xs">{getSkillInsertDescription('instructions')}</span>
-						</div>
-					</ManagementInfoRow>
-					<ManagementInfoRow label="User-message skills">
-						<div className="flex flex-wrap items-center gap-2">
-							<MetadataPill label="Count">{skillCounts['user-message']}</MetadataPill>
-							<span className="text-base-content/70 text-xs">{getSkillInsertDescription('user-message')}</span>
-						</div>
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Skills with resources">
-						<div className="flex flex-wrap items-center gap-2">
-							<MetadataPill label="Count">{resourceSkillCount}</MetadataPill>
-							<span className="text-base-content/70 text-xs">
-								Resources are regular files under each skill directory.
-							</span>
-						</div>
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Usage note">
-						Instruction skills affect session state. User-message skills render into the composer or user message body
-						and are not active session skills.
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Resource note">
-						Managed creation writes only SKILL.md. Add extra resources to the skill folder, then re-enable the skill or
-						refresh the owning Skill Plugin.
-					</ManagementInfoRow>
-				</ManagementInfoGrid>
-			</ModalSection>
+						{view.members.length === 0 ? (
+							<div className="text-base-content/60 px-1 text-sm">No declared members.</div>
+						) : null}
+					</div>
+				</ModalSection>
+			) : null}
 		</ManagementDetailsModal>
 	);
 }

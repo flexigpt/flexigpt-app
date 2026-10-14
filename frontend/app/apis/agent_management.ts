@@ -70,9 +70,7 @@ export interface AgentStarterPreview {
 	canApply: boolean;
 	modelRef?: ArtifactRef;
 	includeModelSystemPrompt?: boolean;
-	mcpContext?: {
-		servers: [];
-	};
+	mcpCandidates: ArtifactRef[];
 	toolSelections: Array<{
 		choice: {
 			toolType: ToolStoreChoiceType;
@@ -391,6 +389,7 @@ export class AgentManagementAPI {
 		const instructionSkillRefs: ArtifactRef[] = [];
 		const textArtifacts: ArtifactRef[] = [];
 		const instructionTextParts: string[] = [];
+		const mcpCandidates: ArtifactRef[] = [];
 		let modelRef: ArtifactRef | undefined;
 		let includeModelSystemPrompt: boolean | undefined;
 
@@ -500,6 +499,9 @@ export class AgentManagementAPI {
 					break;
 
 				case 'mcp':
+					if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
+						mcpCandidates.push(target.artifact);
+					}
 					addIssue(
 						occurrence,
 						'information',
@@ -518,13 +520,14 @@ export class AgentManagementAPI {
 			canApply: !issues.some(issue => issue.severity === 'error'),
 			modelRef,
 			includeModelSystemPrompt,
-			toolSelections,
+			mcpCandidates: uniqueRefs(mcpCandidates),
 			enabledSkillRefs: uniqueRefs(enabledSkillRefs),
 			activeSkillRefs: uniqueRefs(activeSkillRefs),
 			instructionSkillRefs: uniqueRefs(instructionSkillRefs),
 			instructionText: instructionTextParts.join('\n\n') || undefined,
 			textArtifacts: uniqueRefs(textArtifacts),
 			issues,
+			toolSelections,
 		};
 	}
 

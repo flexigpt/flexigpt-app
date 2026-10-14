@@ -88,15 +88,15 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 				/>
 
 				<ManagementItemCard
-					title="MCP"
+					title="MCP candidates"
 					subtitle={
-						recipe.mcpContext?.servers.length
-							? `${recipe.mcpContext.servers.length} MCP server${recipe.mcpContext.servers.length === 1 ? '' : 's'}`
-							: 'No MCP servers'
+						recipe.mcpCandidates.length > 0
+							? `${recipe.mcpCandidates.length} MCP server${recipe.mcpCandidates.length === 1 ? '' : 's'}`
+							: 'No MCP candidates'
 					}
 					metadata={
-						recipe.mcpContext?.servers.length ? (
-							<MetadataPill label="Exposure">All enabled model-visible tools</MetadataPill>
+						recipe.mcpCandidates.length > 0 ? (
+							<MetadataPill label="Execution">Explicit Session selection required</MetadataPill>
 						) : null
 					}
 				/>

@@ -2,9 +2,9 @@ import type { SubmitEventHandler } from 'react';
 import { useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { SkillPlugin } from '@/spec/skill';
+import type { PluginListItem } from '@/spec/plugin';
 
-import { useModalDialogController } from '@/hooks/use_dialog_controller';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -14,95 +14,87 @@ import { ModalSection } from '@/components/modal/modal_section';
 
 interface SkillPluginEditModalProps {
 	isOpen: boolean;
+	plugin: PluginListItem | null;
 	onClose: () => void;
-	plugin: SkillPlugin;
-	onSubmit: (pluginID: string, displayName: string, description?: string) => Promise<void>;
+	onSaved: () => Promise<void> | void;
 }
 
-function SkillPluginEditModalContent({ plugin, onSubmit }: Omit<SkillPluginEditModalProps, 'isOpen' | 'onClose'>) {
-	const { requestClose, unmountingRef } = useModalDialogController();
-	const [displayName, setDisplayName] = useState(plugin.displayName || plugin.slug);
-	const [description, setDescription] = useState(plugin.description || '');
-	const [submitError, setSubmitError] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
+function SkillPluginEditModalContent({
+	plugin,
+	onClose,
+	onSaved,
+}: Omit<SkillPluginEditModalProps, 'isOpen' | 'plugin'> & { plugin: PluginListItem }) {
+	const [displayName, setDisplayName] = useState(plugin.displayName);
+	const [description, setDescription] = useState(plugin.description ?? '');
+	const [error, setError] = useState('');
+	const [saving, setSaving] = useState(false);
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
+	const submit: SubmitEventHandler<HTMLFormElement> = event => {
 		event.preventDefault();
-		event.stopPropagation();
 
-		const normalizedName = displayName.trim();
-		if (!normalizedName) {
-			setSubmitError('Display name is required.');
+		if (!displayName.trim()) {
+			setError('Display name is required.');
 			return;
 		}
 
-		setSubmitError('');
-		setIsSubmitting(true);
-		void onSubmit(plugin.id, normalizedName, description.trim() || undefined)
-			.then(() => {
-				if (!unmountingRef.current) {
-					requestClose(true);
-				}
+		setSaving(true);
+		setError('');
+
+		void skillManagementAPI
+			.updateSkillPlugin({
+				plugin: plugin.ref,
+				expectedRevision: plugin.revision,
+				displayName: displayName.trim(),
+				description: description.trim() || undefined,
 			})
-			.catch((error: unknown) => {
-				if (!unmountingRef.current) {
-					setSubmitError(error instanceof Error ? error.message : 'Skill Plugin could not be updated.');
-				}
+			.then(async () => {
+				await onSaved();
+				onClose();
+			})
+			.catch((cause: unknown) => {
+				setError(cause instanceof Error ? cause.message : 'Skill Plugin could not be updated.');
 			})
 			.finally(() => {
-				if (!unmountingRef.current) {
-					setIsSubmitting(false);
-				}
+				setSaving(false);
 			});
 	};
 
 	return (
-		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl flex-col overflow-hidden rounded-2xl p-0">
-			<ModalHeader
-				title="Edit Skill Plugin"
-				description="Update the Plugin display name and description. Its stable name remains unchanged."
-				onClose={requestClose}
-				closeDisabled={isSubmitting}
-			/>
+		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+			<ModalHeader title="Edit Skill Plugin" onClose={onClose} closeDisabled={saving} />
 
-			<form
-				noValidate
-				onSubmit={handleSubmit}
-				className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6"
-			>
-				{submitError ? (
+			<form className="space-y-4 p-4 sm:p-6" onSubmit={submit}>
+				{error ? (
 					<div className="alert alert-error rounded-2xl text-sm">
 						<FiAlertCircle size={14} />
-						<span>{submitError}</span>
+						<span>{error}</span>
 					</div>
 				) : null}
 
 				<ModalSection title="Plugin details">
-					<ModalField label="Name">
-						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.slug}</div>
+					<ModalField label="Logical name">
+						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.name}</div>
 					</ModalField>
 
 					<ModalField label="Display name" htmlFor="skill-plugin-display-name" required>
 						<input
 							id="skill-plugin-display-name"
-							type="text"
 							className="input w-full rounded-xl"
 							value={displayName}
-							disabled={isSubmitting}
+							disabled={saving}
 							onChange={event => {
 								setDisplayName(event.currentTarget.value);
-								setSubmitError('');
+								setError('');
 							}}
-							maxLength={256}
 						/>
 					</ModalField>
 
-					<ModalField label="Description" htmlFor="skill-plugin-description" align="start">
+					<ModalField label="Description" htmlFor="skill-plugin-description">
 						<textarea
 							id="skill-plugin-description"
-							className="textarea min-h-28 w-full rounded-xl"
+							className="textarea min-h-24 w-full rounded-xl"
 							value={description}
-							disabled={isSubmitting}
+							disabled={saving}
 							onChange={event => {
 								setDescription(event.currentTarget.value);
 							}}
@@ -110,19 +102,12 @@ function SkillPluginEditModalContent({ plugin, onSubmit }: Omit<SkillPluginEditM
 					</ModalField>
 				</ModalSection>
 
-				<ModalActions className="-mx-4 -mb-4 sm:-mx-6 sm:-mb-6">
-					<button
-						type="button"
-						className="btn bg-base-300 rounded-xl"
-						disabled={isSubmitting}
-						onClick={() => {
-							requestClose();
-						}}
-					>
+				<ModalActions>
+					<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
 						Cancel
 					</button>
-					<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
-						{isSubmitting ? 'Saving...' : 'Save Changes'}
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={saving}>
+						{saving ? 'Saving...' : 'Save Plugin'}
 					</button>
 				</ModalActions>
 			</form>
@@ -131,16 +116,17 @@ function SkillPluginEditModalContent({ plugin, onSubmit }: Omit<SkillPluginEditM
 }
 
 export function SkillPluginEditModal(props: SkillPluginEditModalProps) {
-	if (!props.isOpen) {
+	if (!props.isOpen || !props.plugin) {
 		return null;
 	}
 
 	return (
 		<ModalDialog isOpen onClose={props.onClose} blockCancel>
 			<SkillPluginEditModalContent
-				key={`${props.plugin.id}:${props.plugin.revision}`}
+				key={`${props.plugin.ref.rootID}:${props.plugin.ref.artifactID}:${props.plugin.revision}`}
 				plugin={props.plugin}
-				onSubmit={props.onSubmit}
+				onClose={props.onClose}
+				onSaved={props.onSaved}
 			/>
 		</ModalDialog>
 	);

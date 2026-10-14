@@ -1,14 +1,26 @@
-import { useMemo, useState } from 'react';
-import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import type { SubmitEventHandler } from 'react';
+import { useState } from 'react';
+import {
+	FiChevronDown,
+	FiChevronUp,
+	FiEdit2,
+	FiEye,
+	FiFolder,
+	FiGitBranch,
+	FiLink,
+	FiPlus,
+	FiRefreshCw,
+	FiTrash2,
+	FiX,
+} from 'react-icons/fi';
 
-import type { Skill, SkillPlugin } from '@/spec/skill';
-import { SkillInsert, SkillPresenceStatus } from '@/spec/skill';
+import type { PluginListItem } from '@/spec/plugin';
+import type { StoreSkillListItem } from '@/spec/skill';
+import { ArtifactState } from '@/spec/artifact';
+import { SkillInsert } from '@/spec/skill';
 
-import { getErrorMessage } from '@/lib/error_utils';
+import { backendAPI } from '@/apis/baseapi';
 
-import { usePendingActions } from '@/hooks/use_pending_actions';
-
-import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
@@ -17,276 +29,341 @@ import { ManagementItemCard } from '@/components/managementui/management_item_ca
 import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
+import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalDialog } from '@/components/modal/modal_dialog';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
-import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
-import {
-	getSkillArgumentCountLabel,
-	getSkillArgumentTooltip,
-	getSkillInsertDescription,
-	getSkillInsertLabel,
-	getSkillInsertShortLabel,
-	getSkillInstructionPromptEligibilityReason,
-	getSkillResourceCountLabel,
-	getSkillResourceTooltip,
-	normalizeSkillInsert,
-	skillHasResources,
-	skillMatchesInsertFilter,
-	skillMatchesSearch,
-	skillMatchesTags,
-} from '@/skills/lib/skill_artifact_utils';
-import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
+import type { ManagedSkillEditorMode, ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
+import { ManagedSkillEditorModal, SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
 import { SkillPluginDetailsModal } from '@/skills/skill_plugin_details_modal';
 import { SkillPluginEditModal } from '@/skills/skill_plugin_edit_modal';
 
-type SkillModalMode = 'add' | 'edit' | 'view' | 'fork';
-
 interface SkillPluginCardProps {
-	plugin: SkillPlugin;
-	skills: Skill[];
-	skillLoadError?: string;
-	runtimeMetadataLoaded: boolean;
-	prefillSkills: SkillItem[];
-	onRefreshSkills: () => Promise<void>;
-	insertFilter: SkillInsertFilter;
-	searchQuery: string;
-	tagFilters: string[];
-	onTogglePluginEnable: (pluginID: string, nextEnabled: boolean) => Promise<void>;
-	onToggleSkillEnable: (pluginID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
-	onDeleteSkill: (pluginID: string, skillID: string, skillSlug: string) => Promise<void>;
-	onSubmitSkill: (pluginID: string, partial: SkillUpsertInput, existingSkillID?: string) => Promise<void>;
-	onRequestPluginDelete: (plugin: SkillPlugin) => void;
-	onEditPlugin: (pluginID: string, displayName: string, description?: string) => Promise<void>;
+	plugin: PluginListItem;
+	skills: StoreSkillListItem[];
+	allSkills: StoreSkillListItem[];
+	skillsLoaded: boolean;
+	skillsLoading: boolean;
+	skillsError?: string;
+	onLoadSkills: (plugin: PluginListItem) => Promise<void>;
+	onRefresh: () => Promise<void>;
+	onTogglePlugin: (plugin: PluginListItem, enabled: boolean) => Promise<void>;
+	onToggleSkill: (skill: StoreSkillListItem, enabled: boolean) => Promise<void>;
+	onAttachExisting: (plugin: PluginListItem, skill: StoreSkillListItem) => Promise<void>;
+	onAttachPath: (plugin: PluginListItem, path: string) => Promise<void>;
+	onDetachSkill: (plugin: PluginListItem, skill: StoreSkillListItem) => Promise<void>;
+	onPurgeSkill: (skill: StoreSkillListItem) => Promise<void>;
+	onDeletePlugin: (plugin: PluginListItem) => Promise<void>;
+	onError: (message: string) => void;
 }
 
-function PresenceStatusBadge({ skill }: { skill: Skill }) {
-	const p = skill.presence;
-	const status = p?.status ?? SkillPresenceStatus.Unknown;
+interface EditorState {
+	mode: ManagedSkillEditorMode;
+	skill?: StoreSkillListItem;
+	seed?: ManagedSkillEditorSeed;
+}
 
-	const { label, tone } = (() => {
-		switch (status) {
-			case SkillPresenceStatus.Present:
-				return { label: 'Present', tone: 'success' as const };
-			case SkillPresenceStatus.Missing:
-				return { label: 'Missing', tone: 'warning' as const };
-			case SkillPresenceStatus.Error:
-				return { label: 'Error', tone: 'error' as const };
-			default:
-				return { label: 'Unknown', tone: 'neutral' as const };
+function refKey(value: { ref: { rootID: string; artifactID: string } }): string {
+	return `${value.ref.rootID}:${value.ref.artifactID}`;
+}
+
+function buildForkSeed(skill: StoreSkillListItem): ManagedSkillEditorSeed {
+	const baseName = skill.name
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9-]+/g, '-')
+		.replaceAll(/-+/g, '-')
+		.replaceAll(/^-|-$/g, '')
+		.slice(0, 58);
+
+	return {
+		document: {
+			name: baseName ? `${baseName}-copy` : 'skill-copy',
+			displayName: `${skill.displayName || skill.name} Copy`,
+			description: skill.description || `Forked from ${skill.displayName || skill.name}.`,
+			insert: SkillInsert.Instructions,
+			arguments: [],
+			tags: ['forked'],
+			markdownBody: `# ${skill.displayName || skill.name} Copy
+
+Replace this placeholder with the managed Skill content you want to retain.
+
+The original Skill Artifact remains unchanged.`,
+		},
+		enabled: true,
+	};
+}
+
+function SkillPathAttachModal({
+	isOpen,
+	onClose,
+	onSubmit,
+}: {
+	isOpen: boolean;
+	onClose: () => void;
+	onSubmit: (path: string) => Promise<void>;
+}) {
+	const [path, setPath] = useState('');
+	const [error, setError] = useState('');
+	const [submitting, setSubmitting] = useState(false);
+
+	if (!isOpen) {
+		return null;
+	}
+
+	const submit: SubmitEventHandler<HTMLFormElement> = event => {
+		event.preventDefault();
+
+		if (!path.trim()) {
+			setError('Choose an existing Skill directory.');
+			return;
 		}
-	})();
 
-	const tooltip = [
-		`Status: ${status}`,
-		p?.lastCheckedAt ? `Last checked: ${p.lastCheckedAt}` : null,
-		p?.lastSeenAt ? `Last seen: ${p.lastSeenAt}` : null,
-		p?.missingSince ? `Missing since: ${p.missingSince}` : null,
-		p?.lastCheckError ? `Error: ${p.lastCheckError}` : null,
-	]
-		.filter(Boolean)
-		.join('\n');
+		setSubmitting(true);
+		setError('');
+
+		void onSubmit(path.trim())
+			.then(onClose)
+			.catch((cause: unknown) => {
+				setError(cause instanceof Error ? cause.message : 'Skill path could not be attached.');
+			})
+			.finally(() => {
+				setSubmitting(false);
+			});
+	};
 
 	return (
-		<StatusBadge tone={tone} title={tooltip}>
-			{label}
-		</StatusBadge>
+		<ModalDialog isOpen onClose={onClose} blockCancel={submitting}>
+			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+				<ModalHeader title="Attach Existing Skill Path" onClose={onClose} closeDisabled={submitting} />
+				<form className="space-y-4 p-4 sm:p-6" onSubmit={submit}>
+					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
+
+					<ModalField label="Skill directory" htmlFor="skill-path" required>
+						<div className="flex gap-2">
+							<input
+								id="skill-path"
+								className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
+								value={path}
+								onChange={event => {
+									setPath(event.currentTarget.value);
+								}}
+								placeholder="/path/to/skill"
+								disabled={submitting}
+							/>
+							<button
+								type="button"
+								className="btn btn-ghost rounded-xl"
+								disabled={submitting}
+								onClick={() => {
+									void backendAPI.pickDirectoryPath().then(selected => {
+										if (selected) {
+											setPath(selected);
+										}
+									});
+								}}
+							>
+								<FiFolder size={15} />
+								Choose
+							</button>
+						</div>
+					</ModalField>
+
+					<ModalActions>
+						<button type="button" className="btn bg-base-300 rounded-xl" disabled={submitting} onClick={onClose}>
+							Cancel
+						</button>
+						<button type="submit" className="btn btn-primary rounded-xl" disabled={submitting}>
+							{submitting ? 'Attaching...' : 'Attach Skill'}
+						</button>
+					</ModalActions>
+				</form>
+			</div>
+		</ModalDialog>
+	);
+}
+
+function ExistingSkillAttachModal({
+	isOpen,
+	candidates,
+	onClose,
+	onAttach,
+}: {
+	isOpen: boolean;
+	candidates: StoreSkillListItem[];
+	onClose: () => void;
+	onAttach: (skill: StoreSkillListItem) => Promise<void>;
+}) {
+	const [selectedKey, setSelectedKey] = useState('');
+	const [error, setError] = useState('');
+	const [submitting, setSubmitting] = useState(false);
+
+	if (!isOpen) {
+		return null;
+	}
+
+	const selected = candidates.find(candidate => refKey(candidate) === selectedKey);
+
+	return (
+		<ModalDialog isOpen onClose={onClose} blockCancel={submitting}>
+			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+				<ModalHeader title="Attach Existing Skill Artifact" onClose={onClose} closeDisabled={submitting} />
+				<div className="space-y-4 p-4 sm:p-6">
+					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
+
+					<ModalField label="Skill Artifact" htmlFor="existing-skill-artifact" required>
+						<select
+							id="existing-skill-artifact"
+							className="select w-full rounded-xl"
+							value={selectedKey}
+							disabled={submitting}
+							onChange={event => {
+								setSelectedKey(event.currentTarget.value);
+							}}
+						>
+							<option value="">Select a Skill Artifact</option>
+							{candidates.map(skill => (
+								<option key={refKey(skill)} value={refKey(skill)}>
+									{skill.displayName || skill.name} · {skill.ref.rootID}
+								</option>
+							))}
+						</select>
+					</ModalField>
+
+					<ModalActions>
+						<button type="button" className="btn bg-base-300 rounded-xl" disabled={submitting} onClick={onClose}>
+							Cancel
+						</button>
+						<button
+							type="button"
+							className="btn btn-primary rounded-xl"
+							disabled={!selected || submitting}
+							onClick={() => {
+								if (!selected) {
+									return;
+								}
+
+								setSubmitting(true);
+								setError('');
+
+								void onAttach(selected)
+									.then(onClose)
+									.catch((cause: unknown) => {
+										setError(cause instanceof Error ? cause.message : 'Skill Artifact could not be attached.');
+									})
+									.finally(() => {
+										setSubmitting(false);
+									});
+							}}
+						>
+							<FiLink size={14} />
+							<span>{submitting ? 'Attaching...' : 'Attach'}</span>
+						</button>
+					</ModalActions>
+				</div>
+			</div>
+		</ModalDialog>
 	);
 }
 
 export function SkillPluginCard({
 	plugin,
 	skills,
-	skillLoadError,
-	runtimeMetadataLoaded,
-	prefillSkills,
-	onRefreshSkills,
-	insertFilter,
-	searchQuery,
-	tagFilters,
-	onTogglePluginEnable,
-	onToggleSkillEnable,
-	onDeleteSkill,
-	onSubmitSkill,
-	onRequestPluginDelete,
-	onEditPlugin,
+	allSkills,
+	skillsLoaded,
+	skillsLoading,
+	skillsError,
+	onLoadSkills,
+	onRefresh,
+	onTogglePlugin,
+	onToggleSkill,
+	onAttachExisting,
+	onAttachPath,
+	onDetachSkill,
+	onPurgeSkill,
+	onDeletePlugin,
+	onError,
 }: SkillPluginCardProps) {
-	const [isExpanded, setIsExpanded] = useState(false);
+	const [expanded, setExpanded] = useState(false);
+	const [editorState, setEditorState] = useState<EditorState | null>(null);
+	const [skillToView, setSkillToView] = useState<StoreSkillListItem | null>(null);
+	const [skillToPurge, setSkillToPurge] = useState<StoreSkillListItem | null>(null);
+	const [isPathOpen, setIsPathOpen] = useState(false);
+	const [isAttachExistingOpen, setIsAttachExistingOpen] = useState(false);
+	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+	const [isEditPluginOpen, setIsEditPluginOpen] = useState(false);
+	const [isDeletePluginOpen, setIsDeletePluginOpen] = useState(false);
 
-	const [isDeleteSkillModalOpen, setIsDeleteSkillModalOpen] = useState(false);
-	const [skillToDelete, setSkillToDelete] = useState<Skill | null>(null);
-
-	const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-	const [skillModalMode, setSkillModalMode] = useState<SkillModalMode>('add');
-	const [skillToEdit, setSkillToEdit] = useState<Skill | undefined>(undefined);
-
-	const [isPluginDetailsOpen, setIsPluginDetailsOpen] = useState(false);
-	const [isPluginEditOpen, setIsPluginEditOpen] = useState(false);
-
-	const [showAlert, setShowAlert] = useState(false);
-	const [alertMsg, setAlertMsg] = useState('');
-
-	const { isPending, runAction } = usePendingActions();
-
-	const existingSkillItems = useMemo(
-		() =>
-			skills.map(skill => ({
-				skill,
-				pluginID: plugin.id,
-				skillSlug: skill.slug,
-			})),
-		[skills, plugin.id]
+	const attachedKeys = new Set(
+		skills.map(r => {
+			return refKey(r);
+		})
 	);
+	const attachCandidates = allSkills.filter(skill => !attachedKeys.has(refKey(skill)));
 
-	const visibleSkills = useMemo(
-		() =>
-			skills.filter(
-				skill =>
-					skillMatchesInsertFilter(skill.insert, insertFilter) &&
-					skillMatchesSearch(skill, searchQuery) &&
-					skillMatchesTags(skill, tagFilters)
-			),
-		[insertFilter, searchQuery, skills, tagFilters]
-	);
-
-	const hasActiveFilters = insertFilter !== 'all' || searchQuery.trim().length > 0 || tagFilters.length > 0;
-
-	const runActionWithAlert = async (key: string, action: () => Promise<void>, fallback: string) => {
-		try {
-			await runAction(key, action);
-		} catch (err) {
-			setAlertMsg(getErrorMessage(err, fallback));
-			setShowAlert(true);
-			throw err;
-		}
+	const refreshPluginSkills = async () => {
+		await onRefresh();
+		await onLoadSkills(plugin);
 	};
 
-	const togglePluginEnable = (nextEnabled: boolean) => {
-		void runActionWithAlert(
-			'plugin:toggle',
-			() => onTogglePluginEnable(plugin.id, nextEnabled),
-			'Failed to toggle plugin enable state.'
-		).catch(() => undefined);
+	const load = () => {
+		void onLoadSkills(plugin).catch((cause: unknown) => {
+			onError(cause instanceof Error ? cause.message : 'Skills could not be loaded for this Plugin.');
+		});
 	};
 
-	const patchSkillEnable = (skill: Skill, nextEnabled: boolean) => {
-		void runActionWithAlert(
-			`${skill.id}:toggle`,
-			() => onToggleSkillEnable(plugin.id, skill.id, skill.slug, nextEnabled),
-			'Failed to toggle skill.'
-		).catch(() => undefined);
-	};
-
-	const requestDeleteSkill = (skill: Skill) => {
-		if (!plugin.isEditable) {
-			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
-			setShowAlert(true);
-			return;
-		}
-
-		setSkillToDelete(skill);
-		setIsDeleteSkillModalOpen(true);
-	};
-
-	const confirmDeleteSkill = async () => {
-		if (!skillToDelete) {
-			return;
-		}
-
-		try {
-			await runActionWithAlert(
-				`${skillToDelete.id}:delete`,
-				() => onDeleteSkill(plugin.id, skillToDelete.id, skillToDelete.slug),
-				'Failed to delete skill.'
-			);
-			setIsDeleteSkillModalOpen(false);
-			setSkillToDelete(null);
-		} catch {
-			// ok.
-		}
-	};
-
-	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
-		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !plugin.isEnabled) {
-			setAlertMsg('Enable the Plugin before creating, editing, or forking a skill.');
-			setShowAlert(true);
-			return;
-		}
-
-		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !plugin.isEditable) {
-			setAlertMsg('This Skill Plugin only supports enable and disable actions.');
-			setShowAlert(true);
-			return;
-		}
-
-		if (mode === 'edit' && (!skill?.isManaged || skillHasResources(skill))) {
-			setAlertMsg('Fork this Skill to edit it. Managed Skills with package resources cannot be replaced safely.');
-			setShowAlert(true);
-			return;
-		}
-
-		setSkillModalMode(mode);
-		setSkillToEdit(skill);
-		setIsSkillModalOpen(true);
-	};
-
-	const refreshSkills = async () => {
-		try {
-			await runAction('plugin:refresh', onRefreshSkills);
-		} catch (error) {
-			setAlertMsg(getErrorMessage(error, 'Failed to reload Plugin skills.'));
-			setShowAlert(true);
-		}
-	};
-
-	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
-		const existingSkillID = skillModalMode === 'edit' ? skillToEdit?.id : undefined;
-		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(plugin.id, partial, existingSkillID));
-	};
+	const pluginAvailable = plugin.state === ArtifactState.Available;
+	const canWrite = pluginAvailable && plugin.enabled && plugin.editable;
 
 	return (
 		<>
 			<ManagementPluginCard
-				title={plugin.displayName || plugin.slug}
-				identity={
-					plugin.displayName && plugin.displayName !== plugin.slug ? (
-						<span className="font-mono">{plugin.slug}</span>
-					) : null
-				}
+				title={plugin.displayName || plugin.name}
+				identity={plugin.displayName !== plugin.name ? <span className="font-mono">{plugin.name}</span> : null}
 				description={plugin.description}
 				status={
 					<>
-						<StatusBadge tone={plugin.isEnabled ? 'success' : 'neutral'}>
-							{plugin.isEnabled ? 'Enabled' : 'Disabled'}
+						<StatusBadge tone={plugin.enabled ? 'success' : 'neutral'}>
+							{plugin.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
-						<StatusBadge>{plugin.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
-						{!runtimeMetadataLoaded && !skillLoadError ? (
-							<StatusBadge tone="neutral">Loading details</StatusBadge>
-						) : null}
+						{plugin.state !== ArtifactState.Available ? <StatusBadge tone="warning">{plugin.state}</StatusBadge> : null}
+						{plugin.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+						{plugin.baseline ? <StatusBadge>Baseline</StatusBadge> : null}
 					</>
 				}
 				disclosure={
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
-						aria-expanded={isExpanded}
+						aria-expanded={expanded}
 						onClick={() => {
-							setIsExpanded(previous => !previous);
+							setExpanded(value => !value);
+							if (!skillsLoaded && !skillsLoading) {
+								load();
+							}
 						}}
 					>
-						<span className="whitespace-nowrap">
-							Skills: {visibleSkills.length}
-							{hasActiveFilters ? ` / ${skills.length}` : ''}
+						<span>
+							{skillsLoading
+								? 'Loading...'
+								: skillsLoaded
+									? `Skills: ${skills.length}`
+									: `Members: ${plugin.memberCount}`}
 						</span>
-						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+						{expanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
 				}
 				actionLeading={
 					<EnabledControl
-						id={`skill-plugin-${plugin.id}`}
-						checked={plugin.isEnabled}
-						onChange={togglePluginEnable}
-						busy={isPending('plugin:toggle')}
-						compact={false}
+						id={`skill-plugin-${plugin.ref.rootID}-${plugin.ref.artifactID}`}
+						checked={plugin.enabled}
+						disabled={!pluginAvailable}
+						title={!pluginAvailable ? 'This Skill Plugin Artifact is unavailable.' : undefined}
+						onChange={enabled => {
+							void onTogglePlugin(plugin, enabled).catch((cause: unknown) => {
+								onError(cause instanceof Error ? cause.message : 'Plugin enablement could not be changed.');
+							});
+						}}
 					/>
 				}
 				actions={
@@ -295,297 +372,344 @@ export function SkillPluginCard({
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
 							onClick={() => {
-								setIsPluginDetailsOpen(true);
+								setIsDetailsOpen(true);
 							}}
 						>
-							<FiEye size={16} />
-							<span>Details</span>
+							<FiEye size={15} />
+							Details
 						</button>
-						{plugin.isEditable ? (
+
+						{plugin.editable && !plugin.baseline ? (
+							<button
+								type="button"
+								className="btn btn-sm btn-ghost rounded-xl"
+								onClick={() => {
+									setIsEditPluginOpen(true);
+								}}
+							>
+								<FiEdit2 size={15} />
+								Edit Plugin
+							</button>
+						) : null}
+
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={skillsLoading}
+							onClick={() => {
+								void refreshPluginSkills().catch((cause: unknown) => {
+									onError(cause instanceof Error ? cause.message : 'Skill Plugin could not be refreshed.');
+								});
+							}}
+						>
+							<FiRefreshCw size={15} />
+							Refresh
+						</button>
+
+						{plugin.editable ? (
 							<>
-								{!plugin.isBaseline ? (
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											setIsPluginEditOpen(true);
-										}}
-									>
-										<FiEdit2 size={16} />
-										<span>Edit Plugin</span>
-									</button>
-								) : null}
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={isPending('plugin:refresh') || !plugin.isEnabled}
-									onClick={() => void refreshSkills()}
-								>
-									<FiRefreshCw size={16} />
-									<span>{isPending('plugin:refresh') ? 'Refreshing...' : 'Refresh'}</span>
-								</button>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!plugin.isEnabled || Boolean(skillLoadError)}
+									disabled={!canWrite}
 									onClick={() => {
-										openSkillModal('add');
+										setEditorState({ mode: 'create' });
 									}}
 								>
-									<FiPlus size={16} />
-									<span>Add Skill</span>
+									<FiPlus size={15} />
+									Create Skill
+								</button>
+
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={!canWrite}
+									onClick={() => {
+										setIsPathOpen(true);
+									}}
+								>
+									<FiFolder size={15} />
+									Attach Path
+								</button>
+
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={!canWrite || attachCandidates.length === 0}
+									onClick={() => {
+										setIsAttachExistingOpen(true);
+									}}
+								>
+									<FiLink size={15} />
+									Attach Existing
 								</button>
 							</>
 						) : null}
 
-						{plugin.isDeletable ? (
+						{plugin.deletable ? (
 							<button
 								type="button"
 								className="btn btn-sm btn-ghost rounded-xl"
-								disabled={skills.length > 0 || Boolean(skillLoadError)}
+								disabled={!skillsLoaded || skills.length > 0 || Boolean(skillsError)}
+								title={
+									!skillsLoaded
+										? 'Load Plugin Skills before deletion.'
+										: skillsError
+											? 'Reload Plugin Skills before deletion.'
+											: skills.length > 0
+												? 'Detach or delete all Skill Artifacts before deleting this Plugin.'
+												: undefined
+								}
 								onClick={() => {
-									onRequestPluginDelete(plugin);
+									setIsDeletePluginOpen(true);
 								}}
 							>
-								<FiTrash2 size={16} />
-								<span>Delete Plugin</span>
+								<FiTrash2 size={15} />
+								Delete Plugin
 							</button>
 						) : null}
 					</>
 				}
 			>
-				{skillLoadError ? (
+				{skillsError ? (
 					<div className="alert alert-warning mt-3 rounded-2xl text-sm">
-						<div className="grow">
-							<div className="font-semibold">Skills could not be loaded for this Plugin</div>
-							<div>{skillLoadError}</div>
-						</div>
-						<button
-							type="button"
-							className="btn btn-sm rounded-xl"
-							onClick={() => void refreshSkills()}
-							disabled={isPending('plugin:refresh')}
-						>
-							{isPending('plugin:refresh') ? 'Reloading…' : 'Retry'}
+						<div className="grow">{skillsError}</div>
+						<button type="button" className="btn btn-xs rounded-lg" onClick={load}>
+							Retry
 						</button>
 					</div>
 				) : null}
 
-				{isExpanded && (
-					<div className="mt-6 space-y-4">
-						{insertFilter !== 'all' && (
-							<div className="alert alert-info rounded-2xl py-3 text-sm">
-								<div>
-									Showing only <span className="font-semibold">{getSkillInsertShortLabel(insertFilter)}</span> skills.{' '}
-									{getSkillInsertDescription(insertFilter)}
-								</div>
-							</div>
-						)}
-						{(searchQuery.trim() || tagFilters.length > 0) && (
-							<div className="text-base-content/70 rounded-2xl px-1 text-xs">
-								Additional filters active: {searchQuery.trim() ? `search "${searchQuery.trim()}"` : ''}
-								{searchQuery.trim() && tagFilters.length > 0 ? ' · ' : ''}
-								{tagFilters.length > 0 ? `tags ${tagFilters.join(', ')}` : ''}
-							</div>
-						)}
+				{expanded ? (
+					<div className="mt-5 space-y-3">
+						{!skillsLoaded ? (
+							<ManagementEmptyState>
+								{skillsLoading ? 'Loading Skills...' : 'Skill contents have not been loaded.'}
+							</ManagementEmptyState>
+						) : null}
 
-						<div className="space-y-3">
-							{visibleSkills.map(skill => {
-								const title = skill.displayName || skill.name || skill.slug;
-								const insert = normalizeSkillInsert(skill.insert).value;
-								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
-
-								const usage =
-									insert === SkillInsert.UserMessage
-										? 'Composer template'
-										: instructionUseReason
-											? 'Session only'
-											: 'System prompt eligible';
-
-								return (
-									<ManagementItemCard
-										key={skill.id}
-										title={title}
-										subtitle={
-											[skill.name, skill.slug]
-												.filter((value, index, values) => value && value !== title && values.indexOf(value) === index)
-												.join(' · ') || undefined
-										}
-										description={skill.description}
-										status={
-											<>
-												<PresenceStatusBadge skill={skill} />
-												<StatusBadge tone={skill.isEnabled ? 'success' : 'neutral'}>
-													{skill.isEnabled ? 'Enabled' : 'Disabled'}
-												</StatusBadge>
-											</>
-										}
-										metadata={
-											<>
-												<MetadataPill label="Insert" title={getSkillInsertDescription(insert)}>
-													{getSkillInsertLabel(skill.insert)}
-												</MetadataPill>
-												<MetadataPill label="Arguments" title={getSkillArgumentTooltip(skill.arguments)}>
-													{getSkillArgumentCountLabel(skill.arguments)}
-												</MetadataPill>
-												<MetadataPill label="Resources" title={getSkillResourceTooltip(skill.resources)}>
-													{getSkillResourceCountLabel(skill.resources)}
-												</MetadataPill>
-												<MetadataPill label="Usage" title={instructionUseReason}>
-													{usage}
-												</MetadataPill>
-												{(skill.tags ?? []).map(tag => (
-													<MetadataPill key={tag} label="Tag">
-														{tag}
-													</MetadataPill>
-												))}
-												{skill.isBuiltIn ? <MetadataPill>Built-in</MetadataPill> : null}
-											</>
-										}
-									>
-										{skill.runtimeWarnings?.length ? (
-											<div className="text-warning mt-3 text-xs">
-												{skill.runtimeWarnings.length} runtime warning
-												{skill.runtimeWarnings.length === 1 ? '' : 's'}
-											</div>
+						{skills.map(skill => (
+							<ManagementItemCard
+								key={refKey(skill)}
+								title={skill.displayName || skill.name}
+								subtitle={skill.displayName !== skill.name ? skill.name : undefined}
+								description={skill.description}
+								status={
+									<>
+										<StatusBadge tone={skill.enabled ? 'success' : 'neutral'}>
+											{skill.enabled ? 'Enabled' : 'Disabled'}
+										</StatusBadge>
+										{skill.state !== ArtifactState.Available ? (
+											<StatusBadge tone="warning">{skill.state}</StatusBadge>
 										) : null}
+										{skill.managed ? <StatusBadge>Managed</StatusBadge> : null}
+										{skill.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+									</>
+								}
+								metadata={
+									<>
+										<MetadataPill label="Revision">{skill.revision}</MetadataPill>
+										{skill.definitionDigest ? <MetadataPill label="Definition">Pinned</MetadataPill> : null}
+									</>
+								}
+							>
+								<ActionRow
+									leading={
+										<EnabledControl
+											id={`skill-${skill.ref.rootID}-${skill.ref.artifactID}`}
+											checked={skill.enabled}
+											disabled={!plugin.enabled || skill.state !== ArtifactState.Available}
+											title={!plugin.enabled ? 'Enable the Skill Plugin first.' : undefined}
+											onChange={enabled => {
+												void onToggleSkill(skill, enabled).catch((cause: unknown) => {
+													onError(cause instanceof Error ? cause.message : 'Skill enablement could not be changed.');
+												});
+											}}
+										/>
+									}
+								>
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										onClick={() => {
+											setSkillToView(skill);
+										}}
+									>
+										<FiEye size={15} />
+										View
+									</button>
 
-										<ActionRow
-											leading={
-												<EnabledControl
-													id={`skill-${plugin.id}-${skill.id}`}
-													checked={skill.isEnabled}
-													onChange={enabled => {
-														patchSkillEnable(skill, enabled);
-													}}
-													disabled={!plugin.isEnabled}
-													busy={isPending(`${skill.id}:toggle`)}
-													title={!plugin.isEnabled ? 'Enable the Plugin first.' : undefined}
-												/>
-											}
+									{plugin.editable && skill.managed && !skill.builtIn ? (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											disabled={!canWrite}
+											onClick={() => {
+												setEditorState({ mode: 'edit', skill });
+											}}
 										>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													openSkillModal('view', skill);
-												}}
-												title="View skill"
-											>
-												<FiEye size={15} />
-												<span>View</span>
-											</button>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													openSkillModal('edit', skill);
-												}}
-												disabled={!plugin.isEditable || !skill.isManaged || skillHasResources(skill)}
-												title={
-													!plugin.isEditable
-														? 'This Skill Plugin only supports enable and disable actions.'
-														: !skill.isManaged
-															? 'Only managed Skills can be edited. Fork this Skill to create a managed copy.'
-															: skillHasResources(skill)
-																? 'Fork this Skill to preserve package resources.'
-																: 'Edit Skill'
-												}
-											>
-												<FiEdit2 size={15} />
-												<span>Edit</span>
-											</button>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													openSkillModal('fork', skill);
-												}}
-												disabled={!plugin.isEditable || !plugin.isEnabled}
-												title={!plugin.isEnabled ? 'Enable the plugin before forking.' : 'Fork skill'}
-											>
-												<FiGitBranch size={15} />
-												<span>Fork</span>
-											</button>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													requestDeleteSkill(skill);
-												}}
-												disabled={!plugin.isEditable || isPending(`${skill.id}:delete`)}
-												title={!plugin.isEditable ? 'This Skill Plugin is read-only' : 'Delete'}
-											>
-												<FiTrash2 size={15} />
-												<span>Delete</span>
-											</button>
-										</ActionRow>
-									</ManagementItemCard>
-								);
-							})}
+											<FiEdit2 size={15} />
+											Edit
+										</button>
+									) : null}
 
-							{skills.length === 0 ? <ManagementEmptyState>No skills in this Plugin.</ManagementEmptyState> : null}
+									{plugin.editable ? (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											disabled={!canWrite}
+											onClick={() => {
+												setEditorState({ mode: 'fork', seed: buildForkSeed(skill) });
+											}}
+										>
+											<FiGitBranch size={15} />
+											Fork
+										</button>
+									) : null}
 
-							{skills.length > 0 && visibleSkills.length === 0 ? (
-								<ManagementEmptyState>No skills match the current filters.</ManagementEmptyState>
-							) : null}
-						</div>
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										onClick={() => {
+											void onDetachSkill(plugin, skill).catch((cause: unknown) => {
+												onError(
+													cause instanceof Error ? cause.message : 'Skill could not be detached from this Plugin.'
+												);
+											});
+										}}
+									>
+										<FiX size={15} />
+										Detach
+									</button>
+
+									{skill.managed && !skill.builtIn ? (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												setSkillToPurge(skill);
+											}}
+										>
+											<FiTrash2 size={15} />
+											Delete Artifact
+										</button>
+									) : null}
+								</ActionRow>
+							</ManagementItemCard>
+						))}
+
+						{skillsLoaded && skills.length === 0 ? (
+							<ManagementEmptyState>No Skill Artifact currently resolves through this Plugin.</ManagementEmptyState>
+						) : null}
 					</div>
-				)}
+				) : null}
 			</ManagementPluginCard>
 
-			<DeleteConfirmationModal
-				isOpen={isDeleteSkillModalOpen}
+			<ManagedSkillEditorModal
+				isOpen={editorState !== null}
+				plugin={plugin}
+				skill={editorState?.skill}
+				mode={editorState?.mode}
+				seed={editorState?.seed}
 				onClose={() => {
-					if (!skillToDelete || !isPending(`${skillToDelete.id}:delete`)) {
-						setIsDeleteSkillModalOpen(false);
-						setSkillToDelete(null);
-					}
+					setEditorState(null);
 				}}
-				onConfirm={confirmDeleteSkill}
-				title="Delete Skill"
-				message={`Delete skill "${skillToDelete?.displayName || skillToDelete?.name || ''}"? This cannot be undone.`}
-				confirmButtonText="Delete"
+				onSaved={async () => {
+					setEditorState(null);
+					await refreshPluginSkills();
+				}}
 			/>
 
-			<AddEditSkillModal
-				isOpen={isSkillModalOpen}
+			<SkillPathAttachModal
+				isOpen={isPathOpen}
 				onClose={() => {
-					setIsSkillModalOpen(false);
-					setSkillToEdit(undefined);
+					setIsPathOpen(false);
 				}}
-				onSubmit={handleSubmitSkill}
-				mode={skillModalMode}
-				initialData={skillToEdit ? { skill: skillToEdit, pluginID: plugin.id, skillSlug: skillToEdit.slug } : undefined}
-				existingSkills={existingSkillItems}
-				prefillSkills={prefillSkills}
+				onSubmit={async path => {
+					await onAttachPath(plugin, path);
+					await refreshPluginSkills();
+				}}
+			/>
+
+			<ExistingSkillAttachModal
+				isOpen={isAttachExistingOpen}
+				candidates={attachCandidates}
+				onClose={() => {
+					setIsAttachExistingOpen(false);
+				}}
+				onAttach={async skill => {
+					await onAttachExisting(plugin, skill);
+					await refreshPluginSkills();
+				}}
+			/>
+
+			<SkillArtifactDetailsModal
+				isOpen={skillToView !== null}
+				skill={skillToView}
+				onClose={() => {
+					setSkillToView(null);
+				}}
 			/>
 
 			<SkillPluginDetailsModal
-				isOpen={isPluginDetailsOpen}
-				onClose={() => {
-					setIsPluginDetailsOpen(false);
-				}}
+				isOpen={isDetailsOpen}
 				plugin={plugin}
 				skills={skills}
+				onClose={() => {
+					setIsDetailsOpen(false);
+				}}
 			/>
 
 			<SkillPluginEditModal
-				isOpen={isPluginEditOpen}
-				onClose={() => {
-					setIsPluginEditOpen(false);
-				}}
+				isOpen={isEditPluginOpen}
 				plugin={plugin}
-				onSubmit={onEditPlugin}
+				onClose={() => {
+					setIsEditPluginOpen(false);
+				}}
+				onSaved={onRefresh}
 			/>
 
-			<ActionDeniedAlertModal
-				isOpen={showAlert}
+			<DeleteConfirmationModal
+				isOpen={skillToPurge !== null}
 				onClose={() => {
-					setShowAlert(false);
-					setAlertMsg('');
+					setSkillToPurge(null);
 				}}
-				message={alertMsg}
+				onConfirm={() => {
+					if (!skillToPurge) {
+						return Promise.resolve();
+					}
+
+					return onPurgeSkill(skillToPurge)
+						.then(async () => {
+							setSkillToPurge(null);
+							await refreshPluginSkills();
+						})
+						.catch((cause: unknown) => {
+							onError(cause instanceof Error ? cause.message : 'Managed Skill Artifact could not be deleted.');
+						});
+				}}
+				title="Delete Managed Skill Artifact"
+				message={`Delete "${skillToPurge?.displayName || skillToPurge?.name || ''}" permanently?`}
+				confirmButtonText="Delete"
+			/>
+
+			<DeleteConfirmationModal
+				isOpen={isDeletePluginOpen}
+				onClose={() => {
+					setIsDeletePluginOpen(false);
+				}}
+				onConfirm={() => {
+					return onDeletePlugin(plugin)
+						.then(() => {
+							setIsDeletePluginOpen(false);
+						})
+						.catch((cause: unknown) => {
+							onError(cause instanceof Error ? cause.message : 'Skill Plugin could not be deleted.');
+						});
+				}}
+				title="Delete Skill Plugin"
+				message={`Delete empty Skill Plugin "${plugin.displayName || plugin.name}"?`}
+				confirmButtonText="Delete"
 			/>
 		</>
 	);

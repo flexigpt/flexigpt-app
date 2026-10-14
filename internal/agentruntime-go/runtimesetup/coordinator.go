@@ -180,10 +180,11 @@ type toolContribution struct {
 }
 
 type skillContribution struct {
-	key       string
-	owner     sessionRuntime.ConfigurationOwner
-	selection sessionRuntime.ArtifactSelection
-	item      sessionRuntime.ResolutionItem
+	key         string
+	owner       sessionRuntime.ConfigurationOwner
+	selection   sessionRuntime.ArtifactSelection
+	item        sessionRuntime.ResolutionItem
+	instruction bool
 }
 
 func (c *coordinator) PrepareSubmission(
@@ -304,6 +305,17 @@ func (c *coordinator) PrepareModelOperation(
 		Selected: plan.model,
 		Used:     usedModelArtifact,
 	}
+	skills, effectiveSkills, activeSkills, skillInstructions, err := c.prepareSkills(
+		ctx,
+		plan.skills,
+		plan.activeSkills,
+		&plan.summary,
+	)
+	if err != nil {
+		return sessionRuntime.OperationPreparation{}, err
+	}
+
+	plan.instructions = append(plan.instructions, skillInstructions...)
 
 	systemParts := make([]string, 0, len(plan.instructions)+1)
 	if strings.TrimSpace(modelConfig.ModelParam.SystemPrompt) != "" {
@@ -341,16 +353,6 @@ func (c *coordinator) PrepareModelOperation(
 		bindings,
 		mcpChoices,
 		mcpBindings,
-	)
-	if err != nil {
-		return sessionRuntime.OperationPreparation{}, err
-	}
-
-	skills, effectiveSkills, activeSkills, err := c.prepareSkills(
-		ctx,
-		plan.skills,
-		plan.activeSkills,
-		&plan.summary,
 	)
 	if err != nil {
 		return sessionRuntime.OperationPreparation{}, err
@@ -648,43 +650,11 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 func cloneConfiguration(
 	value sessionRuntime.SessionConfiguration,
 ) sessionRuntime.SessionConfiguration {
-	output := value
-	output.Metadata = append(json.RawMessage(nil), value.Metadata...)
-	output.Instructions = append(
-		[]sessionRuntime.InstructionOverride(nil),
-		value.Instructions...,
-	)
-	output.Tools = append(
-		[]sessionRuntime.ToolOverride(nil),
-		value.Tools...,
-	)
-	output.Skills = append(
-		[]sessionRuntime.ArtifactOverride(nil),
-		value.Skills...,
-	)
-	output.ActiveSkills = append(
-		[]sessionRuntime.ActiveSkillOverride(nil),
-		value.ActiveSkills...,
-	)
-	output.MCP = append(
-		[]sessionRuntime.MCPServerOverride(nil),
-		value.MCP...,
-	)
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }
 
 func cloneUserInput(value sessionRuntime.UserInput) sessionRuntime.UserInput {
-	output := value
-	output.Attachments = append(
-		[]sessionRuntime.AttachmentReference(nil),
-		value.Attachments...,
-	)
-	output.MCPAppContext = append(
-		[]sessionRuntime.AppContextUpdate(nil),
-		value.MCPAppContext...,
-	)
-	output.Metadata = append(json.RawMessage(nil), value.Metadata...)
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }
 
 func normalizeConfigurationIntent(

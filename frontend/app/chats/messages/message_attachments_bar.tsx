@@ -377,7 +377,8 @@ function MessageToolCallChip({ call, fullWidth = false, onClick, onRun, onRetry,
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs text-error rounded-lg"
-							onClick={() => {
+							onClick={event => {
+								event.stopPropagation();
 								onSkip(call);
 							}}
 						>

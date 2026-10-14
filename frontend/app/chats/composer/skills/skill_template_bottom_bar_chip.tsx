@@ -1,5 +1,5 @@
 import type { RefObject, SubmitEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiFile, FiFilePlus } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -47,7 +47,7 @@ interface SkillTemplateRenderModalProps {
 	isOpen: boolean;
 	item: ComposerSkillCatalogItem | null;
 	onClose: () => void;
-	onInsert: (arguments: Record<string, string>) => Promise<void>;
+	onInsert: (args: Record<string, string>) => Promise<void>;
 }
 
 export interface SkillTemplateBottomBarChipProps {
@@ -85,7 +85,7 @@ function compareSkillTemplateListItems(a: ComposerSkillCatalogItem, b: ComposerS
 }
 
 function templateIsSelectable(item: ComposerSkillCatalogItem): boolean {
-	return item.enabled && item.state === ArtifactState.Available;
+	return item.runtimeResolved && item.enabled && item.state === ArtifactState.Available;
 }
 
 function parseTemplateArguments(raw: string): Record<string, string> {
@@ -325,14 +325,12 @@ function SkillTemplateRenderModalContent({
 		return null;
 	}
 
-	const resourceCount = item.skillDefinition.resources?.totalCount ?? 0;
-
 	return (
 		<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
 			<div className="max-h-[80vh] overflow-y-auto p-6">
 				<ModalHeader
 					title="Use Template"
-						description={`${getSkillTemplateLabel(item)} is rendered by the Session Runtime before insertion.`}
+					description={`${getSkillTemplateLabel(item)} is rendered by the Session Runtime before insertion.`}
 					onClose={() => {
 						requestClose();
 					}}
@@ -347,26 +345,26 @@ function SkillTemplateRenderModalContent({
 						</div>
 					) : null}
 
-						{item.hasArguments ? (
-							<div>
-								<label htmlFor="user-message-skill-arguments" className="label py-1">
-									<span className="text-sm">Arguments JSON</span>
-								</label>
-								<textarea
-									id="user-message-skill-arguments"
-									className="textarea w-full rounded-xl font-mono text-xs"
-									rows={8}
-									value={argumentsJSON}
-									onChange={event => {
-										setArgumentsJSON(event.currentTarget.value);
-									}}
-									placeholder={'{\n  "argument": "value"\n}'}
-									spellCheck="false"
-								/>
-							</div>
-						) : (
-							<div className="text-base-content/70 text-sm">This template has no declared arguments.</div>
-						)}
+					{item.hasArguments ? (
+						<div>
+							<label htmlFor="user-message-skill-arguments" className="label py-1">
+								<span className="text-sm">Arguments JSON</span>
+							</label>
+							<textarea
+								id="user-message-skill-arguments"
+								className="textarea w-full rounded-xl font-mono text-xs"
+								rows={8}
+								value={argumentsJSON}
+								onChange={event => {
+									setArgumentsJSON(event.currentTarget.value);
+								}}
+								placeholder={'{\n  "argument": "value"\n}'}
+								spellCheck="false"
+							/>
+						</div>
+					) : (
+						<div className="text-base-content/70 text-sm">This template has no declared arguments.</div>
+					)}
 
 					<ModalActions className="-mx-6 mt-6 -mb-6">
 						<button
@@ -438,14 +436,11 @@ function SkillTemplateBottomBarChipInner({
 		/>
 	);
 	const templates = useMemo(
-		() =>
-			items
-				.filter(item => item.insert === SkillInsert.UserMessage)
-				.toSorted(compareSkillTemplateListItems),
+		() => items.filter(item => item.insert === SkillInsert.UserMessage).toSorted(compareSkillTemplateListItems),
 		[items]
 	);
 	const templateCatalogRefreshAttemptedRef = useRef(false);
-	const [modalItem, setModalItem] = useState<SkillListItem | null>(null);
+	const [modalItem, setModalItem] = useState<ComposerSkillCatalogItem | null>(null);
 	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -474,7 +469,7 @@ function SkillTemplateBottomBarChipInner({
 	}, [isInputLocked, store]);
 
 	const handleInsertRendered = useCallback(
-		async (item: ComposerSkillCatalogItem, arguments: Record<string, string>) => {
+		async (item: ComposerSkillCatalogItem, args: Record<string, string>) => {
 			const rendered = await sessionManagementAPI.prepareUserMessageSkillTemplate({
 				skill: {
 					rootID: item.ref.rootID,
@@ -482,7 +477,7 @@ function SkillTemplateBottomBarChipInner({
 					expectedRevision: item.revision,
 					...(item.definitionDigest ? { expectedDigest: item.definitionDigest } : {}),
 				},
-				arguments,
+				arguments: args,
 			});
 			await onInsertTemplateText(rendered.text);
 			store.hide();
@@ -500,10 +495,8 @@ function SkillTemplateBottomBarChipInner({
 				return;
 			}
 
-			let inserted = false;
 			try {
 				await handleInsertRendered(item, {});
-				inserted = true;
 			} catch (error) {
 				setTemplateActionError(error instanceof Error ? error.message : 'Template rendering was rejected.');
 			}
@@ -562,8 +555,11 @@ function SkillTemplateBottomBarChipInner({
 				onClose={() => {
 					setModalItem(null);
 				}}
-				onInsert={arguments => {
-					return handleInsertRendered(modalItem, arguments);
+				onInsert={args => {
+					if (modalItem) {
+						return handleInsertRendered(modalItem, args);
+					}
+					return Promise.resolve();
 				}}
 			/>
 		</div>

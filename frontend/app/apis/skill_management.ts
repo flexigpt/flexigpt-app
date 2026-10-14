@@ -37,6 +37,7 @@ import type {
 } from '@/spec/skill';
 import type { ResolvedToolView } from '@/spec/tool';
 
+import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
@@ -56,6 +57,8 @@ export interface ComposerSkillCatalogItem {
 	insert: SkillInsert;
 	hasArguments: boolean;
 	hasResources: boolean;
+	runtimeResolved: boolean;
+	runtimeError?: string;
 }
 
 export interface SkillManagementPageData {
@@ -67,45 +70,47 @@ export class SkillManagementAPI {
 	private readonly composerSkillCatalog = createSharedAsyncCatalog<ComposerSkillCatalogItem[]>(async () => {
 		const skills = await this.store.listSkillsForManagement();
 
-		const values = await Promise.all(
-			skills.map(async skill => {
-				try {
-					const summary = await this.aggregate.describeArtifactSkill(skill.ref);
+		const values = await mapWithConcurrency(skills, 8, async skill => {
+			try {
+				const summary = await this.aggregate.describeArtifactSkill(skill.ref);
 
-					return {
-						ref: skill.ref,
-						name: skill.name,
-						displayName: skill.displayName || skill.name,
-						description: skill.description,
-						state: skill.state,
-						enabled: skill.enabled,
-						builtIn: skill.builtIn,
-						managed: skill.managed,
-						revision: skill.revision,
-						definitionDigest: skill.definitionDigest,
-						insert: summary.Insert,
-						hasArguments: summary.HasArguments,
-						hasResources: summary.HasResources,
-					} satisfies ComposerSkillCatalogItem;
-				} catch {
-					return {
-						ref: skill.ref,
-						name: skill.name,
-						displayName: skill.displayName || skill.name,
-						description: skill.description,
-						state: skill.state,
-						enabled: skill.enabled,
-						builtIn: skill.builtIn,
-						managed: skill.managed,
-						revision: skill.revision,
-						definitionDigest: skill.definitionDigest,
-						insert: 'instructions' as SkillInsert,
-						hasArguments: false,
-						hasResources: false,
-					} satisfies ComposerSkillCatalogItem;
-				}
-			})
-		);
+				return {
+					ref: skill.ref,
+					name: skill.name,
+					displayName: skill.displayName || skill.name,
+					description: skill.description,
+					state: skill.state,
+					enabled: skill.enabled && summary.IsEnabled,
+					builtIn: skill.builtIn,
+					managed: skill.managed,
+					revision: skill.revision,
+					definitionDigest: skill.definitionDigest,
+					insert: summary.Insert,
+					hasArguments: summary.HasArguments,
+					hasResources: summary.HasResources,
+					runtimeResolved: true,
+				} satisfies ComposerSkillCatalogItem;
+			} catch (error) {
+				return {
+					ref: skill.ref,
+					name: skill.name,
+					displayName: skill.displayName || skill.name,
+					description: skill.description,
+					state: skill.state,
+					enabled: false,
+					builtIn: skill.builtIn,
+					managed: skill.managed,
+					revision: skill.revision,
+					definitionDigest: skill.definitionDigest,
+					insert: 'instructions' as SkillInsert,
+					hasArguments: false,
+					hasResources: false,
+					runtimeResolved: false,
+					runtimeError:
+						error instanceof Error && error.message.trim() ? error.message : 'Skill Runtime metadata is unavailable.',
+				} satisfies ComposerSkillCatalogItem;
+			}
+		});
 
 		return values.toSorted((left, right) => {
 			const display = left.displayName.localeCompare(right.displayName, undefined, {

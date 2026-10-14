@@ -1,15 +1,17 @@
-import type { Dispatch, SetStateAction, SubmitEventHandler, SyntheticEvent } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX } from 'react-icons/fi';
+// oxlint-disable unicorn/no-immediate-mutation
+import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX, FiZap } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
-import type { SkillListItem, SkillPlugin, SkillRef } from '@/spec/skill';
+import type { PluginListItem } from '@/spec/plugin';
+import type { SkillDocumentInput, SkillRef } from '@/spec/skill';
+import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
-import { useModalDialogController } from '@/hooks/use_dialog_controller';
-
+import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
 
 import {
@@ -19,10 +21,10 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { Dropdown } from '@/components/dropdown';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
+import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -33,399 +35,191 @@ import {
 } from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
-import {
-	getSkillInstructionPromptEligibilityReason,
-	isInstructionInsertSkill,
-	skillCanBePreloadedAsActive,
-	skillCanBeRenderedAsInstructionPrompt,
-} from '@/skills/lib/skill_artifact_utils';
-import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
+import type { ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
+import { skillRefKey } from '@/skills/lib/skill_identity_utils';
+import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
 
-const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const skillRowActionButtonClasses = 'btn btn-ghost btn-xs rounded-lg';
-const skillRowRemoveActionButtonClasses = `${skillRowActionButtonClasses} text-error`;
-
-interface InstructionSkillDraft {
-	pluginID?: string;
-	displayName: string;
-	name: string;
-	body: string;
-	description?: string;
+interface SkillsBottomBarChipProps {
+	store: MenuStore;
+	shortcut: string;
+	allSkills: ComposerSkillCatalogItem[];
+	loading: boolean;
+	loadError?: string | null;
+	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
+	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	onEnableAll: () => void;
+	onDisableAll: () => void;
+	onRefreshSkills: () => Promise<void>;
+	systemPrompt: AgentSystemPromptController;
+	isInputLocked?: boolean;
 }
 
-const DEFAULT_INSTRUCTION_SKILL_DRAFT: InstructionSkillDraft = {
-	displayName: 'Instruction Skill',
-	name: 'instruction-skill',
-	body: '',
-};
-
-const skillDropdownCollator = new Intl.Collator(undefined, {
-	numeric: true,
-	sensitivity: 'base',
-});
-
-function stop(e: SyntheticEvent) {
-	e.preventDefault();
-	e.stopPropagation();
+interface PendingManagedSkillAction {
+	mode: 'create' | 'fork';
+	seed?: ManagedSkillEditorSeed;
 }
 
-function skillListItemKey(item: SkillListItem): string {
-	return skillRefKey(skillRefFromListItem(item));
+function skillRef(item: ComposerSkillCatalogItem): SkillRef {
+	return {
+		rootID: item.ref.rootID,
+		artifactID: item.ref.artifactID,
+	};
 }
 
-function getSkillDisplayLabel(item: SkillListItem): string {
-	return item.skillDefinition.displayName?.trim() || item.skillDefinition.name?.trim() || item.skillSlug;
+function skillKey(item: ComposerSkillCatalogItem): string {
+	return skillRefKey(skillRef(item));
 }
 
-function getInstructionSourceIdentityKey(item: SkillListItem): string {
-	return `skill-instructions:${skillRefKey(skillRefFromListItem(item))}`;
+function skillLabel(item: ComposerSkillCatalogItem): string {
+	return item.displayName || item.name;
 }
 
-function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
-	const pluginSlugCompare = skillDropdownCollator.compare(a.pluginSlug, b.pluginSlug);
-	if (pluginSlugCompare !== 0) {
-		return pluginSlugCompare;
+function compareSkills(left: ComposerSkillCatalogItem, right: ComposerSkillCatalogItem): number {
+	return (
+		skillLabel(left).localeCompare(skillLabel(right), undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		}) || skillKey(left).localeCompare(skillKey(right))
+	);
+}
+
+function canActivate(item: ComposerSkillCatalogItem): boolean {
+	return !item.hasArguments;
+}
+
+function uniqueForkName(seed: string, items: ComposerSkillCatalogItem[]): string {
+	const base =
+		seed
+			.trim()
+			.toLowerCase()
+			.replaceAll(/[^a-z0-9-]+/g, '-')
+			.replaceAll(/-+/g, '-')
+			.replaceAll(/^-|-$/g, '')
+			.slice(0, 58) || 'skill';
+
+	const existing = new Set(items.map(item => item.name));
+	let candidate = `${base}-copy`;
+	let index = 2;
+
+	while (existing.has(candidate)) {
+		const suffix = `-copy-${index}`;
+		candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+		index += 1;
 	}
 
-	const pluginIDCompare = skillDropdownCollator.compare(a.pluginID, b.pluginID);
-	if (pluginIDCompare !== 0) {
-		return pluginIDCompare;
-	}
-
-	const skillSlugCompare = skillDropdownCollator.compare(a.skillSlug, b.skillSlug);
-	if (skillSlugCompare !== 0) {
-		return skillSlugCompare;
-	}
-
-	const skillNameCompare = skillDropdownCollator.compare(a.skillDefinition.name, b.skillDefinition.name);
-	if (skillNameCompare !== 0) {
-		return skillNameCompare;
-	}
-
-	return skillDropdownCollator.compare(skillListItemKey(a), skillListItemKey(b));
+	return candidate;
 }
 
-function getSkillSearchFields(item: SkillListItem) {
-	return [
-		{ value: getSkillDisplayLabel(item), weight: 6 },
-		{ value: item.skillSlug, weight: 5 },
-		{ value: item.skillDefinition.name, weight: 4 },
-		{ value: item.pluginSlug, weight: 3 },
-		{ value: item.pluginID, weight: 2 },
-		{ value: item.skillDefinition.description, weight: 2 },
-		{ value: item.skillDefinition.type, weight: 1 },
-		{ value: item.skillDefinition.location, weight: 1 },
-		{ value: item.skillDefinition.insert, weight: 2 },
-		...(item.skillDefinition.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
-		...(item.skillDefinition.arguments ?? []).map(arg => ({ value: arg.name, weight: 1 })),
-	];
+function fallbackForkSeed(
+	item: ComposerSkillCatalogItem,
+	allSkills: ComposerSkillCatalogItem[]
+): ManagedSkillEditorSeed {
+	const name = uniqueForkName(item.name, allSkills);
+
+	return {
+		document: {
+			name,
+			displayName: `${skillLabel(item)} Copy`,
+			description: item.description || `Forked from ${skillLabel(item)}.`,
+			insert: SkillInsert.Instructions,
+			arguments: [],
+			tags: ['composer', 'forked'],
+			markdownBody: `# ${skillLabel(item)} Copy
+
+Replace this placeholder with the managed instruction Skill content you want to retain.
+
+The original Skill Artifact remains unchanged.`,
+		},
+		enabled: true,
+	};
 }
 
-function isInstructionSkill(item: SkillListItem): boolean {
-	return isInstructionInsertSkill(item.skillDefinition);
-}
-
-function compareSkillRows(a: SkillListItem, b: SkillListItem): number {
-	const ai = isInstructionSkill(a);
-	const bi = isInstructionSkill(b);
-	if (ai !== bi) {
-		return ai ? -1 : 1;
-	}
-	return compareSkillListItems(a, b);
-}
-
-function resourceCount(item: SkillListItem): number {
-	const resources = item.skillDefinition.resources;
-	return resources?.hasResources ? resources.totalCount : 0;
-}
-
-function getDefaultCustomPlugin(plugins: SkillPlugin[]): string {
-	return plugins.find(plugin => !plugin.isBuiltIn && plugin.isEnabled)?.id ?? '';
-}
-
-function makeUniqueSimpleSkillName(seed: string, allSkills: SkillListItem[]): string {
-	const base = slugifySkillName(seed) || 'instruction-skill';
-	const existing = new Set(allSkills.map(item => item.skillDefinition.name).filter(Boolean));
-
-	if (!existing.has(base)) {
-		return base;
-	}
-
-	for (let i = 2; i < 1000; i += 1) {
-		const suffix = `-${i}`;
-		const candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
-		if (!existing.has(candidate)) {
-			return candidate;
-		}
-	}
-
-	return `${base.slice(0, 54)}-${Date.now().toString(36)}`;
-}
-
-function slugifySkillName(value: string): string {
-	return value
-		.trim()
-		.toLowerCase()
-		.replaceAll(/[^a-z0-9-]+/g, '-')
-		.replaceAll(/-+/g, '-')
-		.replaceAll(/^-|-$/g, '')
-		.slice(0, 64);
-}
-
-interface AddInstructionSkillModalProps {
+function ComposerSkillDestinationModal({
+	isOpen,
+	plugins,
+	action,
+	onClose,
+	onChoose,
+}: {
 	isOpen: boolean;
-	allSkills: SkillListItem[];
-	mode: 'add' | 'fork';
-	initialDraft: InstructionSkillDraft | null;
+	plugins: PluginListItem[];
+	action: PendingManagedSkillAction | null;
 	onClose: () => void;
-	onCreated: (item: SkillListItem) => Promise<void> | void;
-}
+	onChoose: (plugin: PluginListItem, action: PendingManagedSkillAction) => void;
+}) {
+	const [selectedKey, setSelectedKey] = useState('');
 
-function AddInstructionSkillModal(props: AddInstructionSkillModalProps) {
-	if (!props.isOpen) {
+	if (!isOpen || !action) {
 		return null;
 	}
 
+	const writablePlugins = plugins.filter(
+		plugin => plugin.editable && plugin.enabled && plugin.state === ArtifactState.Available
+	);
+	const selected = writablePlugins.find(plugin => `${plugin.ref.rootID}:${plugin.ref.artifactID}` === selectedKey);
+
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
-			<AddInstructionSkillModalContent {...props} />
+		<ModalDialog isOpen onClose={onClose}>
+			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+				<ModalHeader
+					title={action.mode === 'fork' ? 'Choose Fork Destination' : 'Choose Skill Destination'}
+					onClose={onClose}
+				/>
+
+				<div className="space-y-4 p-4 sm:p-6">
+					<div className="text-base-content/70 text-sm">
+						Managed Skills are created inside an editable, enabled Skill Plugin.
+					</div>
+
+					<ModalField label="Skill Plugin" htmlFor="composer-skill-plugin" required>
+						<select
+							id="composer-skill-plugin"
+							className="select w-full rounded-xl"
+							value={selectedKey}
+							onChange={event => {
+								setSelectedKey(event.currentTarget.value);
+							}}
+						>
+							<option value="">Select a Skill Plugin</option>
+							{writablePlugins.map(plugin => (
+								<option
+									key={`${plugin.ref.rootID}:${plugin.ref.artifactID}`}
+									value={`${plugin.ref.rootID}:${plugin.ref.artifactID}`}
+								>
+									{plugin.displayName || plugin.name} · {plugin.ref.rootID}
+								</option>
+							))}
+						</select>
+					</ModalField>
+
+					{writablePlugins.length === 0 ? (
+						<div className="alert alert-warning rounded-2xl text-sm">
+							Create or enable an editable Skill Plugin in Skill management before creating a managed Skill.
+						</div>
+					) : null}
+
+					<ModalActions>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
+							Cancel
+						</button>
+						<button
+							type="button"
+							className="btn btn-primary rounded-xl"
+							disabled={!selected}
+							onClick={() => {
+								if (selected) {
+									onChoose(selected, action);
+								}
+							}}
+						>
+							Continue
+						</button>
+					</ModalActions>
+				</div>
+			</div>
 		</ModalDialog>
-	);
-}
-
-function AddInstructionSkillModalContent({
-	allSkills,
-	mode,
-	initialDraft,
-	onCreated,
-}: Omit<AddInstructionSkillModalProps, 'isOpen' | 'onClose'>) {
-	const initial = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
-	const [plugins, setPlugins] = useState<SkillPlugin[]>([]);
-	const [pluginID, setPluginID] = useState(initial.pluginID ?? '');
-	const [displayName, setDisplayName] = useState(initial.displayName);
-	const [name, setName] = useState(initial.name);
-	const [body, setBody] = useState(initial.body);
-	const [submitError, setSubmitError] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const { requestClose, unmountingRef } = useModalDialogController();
-
-	useEffect(() => {
-		let cancelled = false;
-		void skillManagementAPI
-			.listSkillPlugins(undefined, true)
-			.then(nextPlugins => {
-				if (cancelled) {
-					return;
-				}
-				const custom = nextPlugins.filter(plugin => !plugin.isBuiltIn);
-				setPlugins(custom);
-				const preferredPluginID =
-					initialDraft?.pluginID && custom.some(plugin => plugin.id === initialDraft.pluginID && plugin.isEnabled)
-						? initialDraft.pluginID
-						: getDefaultCustomPlugin(custom);
-				setPluginID(preferredPluginID);
-			})
-			.catch((error: unknown) => {
-				console.error('Failed to load skill plugins:', error);
-				if (!cancelled) {
-					setPlugins([]);
-				}
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [initialDraft]);
-
-	const existingSlugsForPlugin = useMemo(
-		() => new Set(allSkills.filter(item => item.pluginID === pluginID).map(item => item.skillSlug)),
-		[allSkills, pluginID]
-	);
-	const normalizedName = slugifySkillName(name);
-	const nameError = !normalizedName
-		? 'Name is required.'
-		: !SIMPLE_SKILL_NAME_RE.test(normalizedName)
-			? 'Use lowercase letters, numbers, and hyphens. Maximum 64 characters.'
-			: existingSlugsForPlugin.has(normalizedName)
-				? 'A skill with this slug already exists in the selected plugin.'
-				: '';
-	const bodyError = body.trim() ? '' : 'Instruction body is required.';
-	const selectedPlugin = plugins.find(plugin => plugin.id === pluginID);
-	const pluginError = !pluginID
-		? 'Select a custom enabled skill plugin.'
-		: selectedPlugin?.isEnabled
-			? ''
-			: 'The selected custom skill plugin is disabled.';
-	const canSubmit = !nameError && !bodyError && !pluginError && !isSubmitting;
-
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
-		event.preventDefault();
-		event.stopPropagation();
-
-		if (!canSubmit) {
-			return;
-		}
-
-		setIsSubmitting(true);
-		setSubmitError('');
-
-		void skillManagementAPI
-			.putSkillArtifact(pluginID, normalizedName, {
-				name: normalizedName,
-				displayName: displayName.trim() || normalizedName,
-				description:
-					initialDraft?.description ||
-					`Instruction skill created from the composer. Use when these instructions should guide the agent.`,
-				insert: SkillInsert.Instructions,
-				arguments: [],
-				tags: ['composer'],
-				markdownBody: body.trim(),
-				isEnabled: true,
-			})
-			.then(async createdSkill => {
-				const plugin = plugins.find(item => item.id === pluginID);
-				await onCreated({
-					pluginID,
-					pluginSlug: plugin?.slug ?? pluginID,
-					skillSlug: normalizedName,
-					skillDefinition: createdSkill,
-				});
-				if (!unmountingRef.current) {
-					requestClose(true);
-				}
-			})
-			.catch((error: unknown) => {
-				if (!unmountingRef.current) {
-					setSubmitError(error instanceof Error ? error.message : 'Failed to create instruction skill.');
-				}
-			})
-			.finally(() => {
-				if (!unmountingRef.current) {
-					setIsSubmitting(false);
-				}
-			});
-	};
-
-	const pluginDropdownItems = Object.fromEntries(
-		plugins.map(plugin => [plugin.id, { isEnabled: plugin.isEnabled }] as const)
-	);
-
-	return (
-		<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl p-0">
-			<ModalHeader
-				title={mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}
-				onClose={() => {
-					requestClose();
-				}}
-				closeDisabled={isSubmitting}
-			/>
-
-			<form className="space-y-4 p-6" onSubmit={handleSubmit} aria-busy={isSubmitting}>
-				{submitError ? (
-					<div className="alert alert-error rounded-2xl text-sm">
-						<FiAlertCircle size={14} />
-						<span>{submitError}</span>
-					</div>
-				) : null}
-
-				<div className="alert alert-info rounded-2xl text-sm">
-					{mode === 'fork' ? (
-						<span>This creates a new managed filesystem instruction skill from the rendered source skill text.</span>
-					) : (
-						<span>
-							This creates a managed filesystem skill with <span className="font-mono">insert: instructions</span>. For
-							arguments, scripts, resources, or user-message templates, use the Skill Plugins page.
-						</span>
-					)}
-				</div>
-
-				<div>
-					<div className="label py-1">
-						<span className="text-sm">Plugin</span>
-					</div>
-					<Dropdown<string>
-						dropdownItems={pluginDropdownItems}
-						orderedKeys={plugins.map(plugin => plugin.id)}
-						selectedKey={pluginID}
-						onChange={setPluginID}
-						filterDisabled={true}
-						title="Select skill plugin"
-						getDisplayName={key => {
-							const plugin = plugins.find(item => item.id === key);
-							return plugin ? `${plugin.displayName || plugin.slug} (${plugin.slug})` : key;
-						}}
-					/>
-					{pluginError ? <div className="text-error mt-1 text-xs">{pluginError}</div> : null}
-				</div>
-
-				<div>
-					<label htmlFor="instruction-skill-display-name" className="label py-1">
-						<span className="text-sm">Display name</span>
-					</label>
-					<input
-						id="instruction-skill-display-name"
-						className="input w-full rounded-xl"
-						value={displayName}
-						onChange={event => {
-							setDisplayName(event.target.value);
-						}}
-						spellCheck="false"
-					/>
-				</div>
-
-				<div>
-					<label htmlFor="instruction-skill-name" className="label py-1">
-						<span className="text-sm">Skill name and slug</span>
-					</label>
-					<input
-						id="instruction-skill-name"
-						className={`input w-full rounded-xl ${nameError ? 'input-error' : ''}`}
-						value={name}
-						onChange={event => {
-							const next = event.target.value;
-							setName(next);
-							if (displayName === 'Instruction Skill') {
-								setDisplayName(next.replaceAll('-', ' ').replaceAll(/\b\w/g, c => c.toUpperCase()));
-							}
-						}}
-						spellCheck="false"
-					/>
-					<div className="text-base-content/70 mt-1 text-xs">Saved as: {normalizedName || '-'}</div>
-					{nameError ? <div className="text-error mt-1 text-xs">{nameError}</div> : null}
-				</div>
-
-				<div>
-					<label htmlFor="instruction-skill-body" className="label py-1">
-						<span className="text-sm">Instructions</span>
-					</label>
-					<textarea
-						id="instruction-skill-body"
-						className={`textarea h-36 w-full rounded-xl ${bodyError ? 'textarea-error' : ''}`}
-						value={body}
-						onChange={event => {
-							setBody(event.target.value);
-						}}
-						placeholder="Write standing agent instructions here..."
-						spellCheck="false"
-					/>
-					{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
-				</div>
-
-				<ModalActions className="-mx-6 mt-6 -mb-6">
-					<button
-						type="button"
-						className="btn bg-base-300 rounded-xl"
-						onClick={() => {
-							requestClose();
-						}}
-					>
-						Cancel
-					</button>
-					<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
-						{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and add to instructions' : 'Create and add'}
-					</button>
-				</ModalActions>
-			</form>
-		</div>
 	);
 }
 
@@ -444,696 +238,367 @@ export function SkillsBottomBarChip({
 	onRefreshSkills,
 	systemPrompt,
 	isInputLocked = false,
-}: {
-	store: MenuStore;
-	shortcut: string;
-	allSkills: SkillListItem[];
-	loading: boolean;
-	loadError?: string | null;
-	enabledSkillRefs: SkillRef[];
-	activeSkillRefs: SkillRef[];
-	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
-	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
-	onEnableAll: () => void;
-	onDisableAll: () => void;
-	onRefreshSkills: () => Promise<void>;
-	systemPrompt: AgentSystemPromptController;
-	isInputLocked?: boolean;
-}) {
-	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const menu = store ?? internalMenu;
-	const open = useStoreState(menu, 'open');
-	const menuContentElement = useStoreState(menu, 'contentElement');
+}: SkillsBottomBarChipProps) {
+	const open = useStoreState(store, 'open');
+	const menuContentElement = useStoreState(store, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
-	const [isAddInstructionOpen, setIsAddInstructionOpen] = useState(false);
-	const [instructionModalMode, setInstructionModalMode] = useState<'add' | 'fork'>('add');
-	const [instructionDraft, setInstructionDraft] = useState<InstructionSkillDraft | null>(null);
-	const [skillActionError, setSkillActionError] = useState<string | null>(null);
+	const [actionError, setActionError] = useState('');
+	const [plugins, setPlugins] = useState<PluginListItem[]>([]);
+	const [pluginsLoading, setPluginsLoading] = useState(false);
+	const [pendingAction, setPendingAction] = useState<PendingManagedSkillAction | null>(null);
+	const [editorAction, setEditorAction] = useState<{
+		plugin: PluginListItem;
+		action: PendingManagedSkillAction;
+	} | null>(null);
 
 	useEffect(() => {
 		if (isInputLocked) {
-			menu.hide();
+			store.hide();
 		}
-	}, [isInputLocked, menu]);
+	}, [isInputLocked, store]);
 
-	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(k => skillRefKey(k))), [enabledSkillRefs]);
-	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(k => skillRefKey(k))), [activeSkillRefs]);
+	const instructionSkills = useMemo(
+		() =>
+			allSkills
+				.filter(
+					skill =>
+						skill.runtimeResolved &&
+						skill.insert === SkillInsert.Instructions &&
+						skill.enabled &&
+						skill.state === ArtifactState.Available
+				)
+				.toSorted(compareSkills),
+		[allSkills]
+	);
 
-	const availableSkillKeySet = useMemo(
+	const visibleSkills = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return instructionSkills;
+		}
+
+		return rankSearchableItems(instructionSkills, {
+			query: searchQuery,
+			getKey: skillKey,
+			getFields: skill => [
+				{ value: skillLabel(skill), weight: 7 },
+				{ value: skill.name, weight: 6 },
+				{ value: skill.description, weight: 3 },
+				{ value: skill.ref.rootID, weight: 2 },
+				{ value: skill.ref.artifactID, weight: 2 },
+				{ value: skill.runtimeError, weight: 1 },
+			],
+			fallbackCompare: compareSkills,
+		});
+	}, [instructionSkills, searchQuery]);
+
+	const enabledKeys = useMemo(
 		() =>
 			new Set(
-				(allSkills ?? [])
-					.filter(s => {
-						return isInstructionSkill(s);
-					})
-					.map(item => skillRefKey(skillRefFromListItem(item)))
+				enabledSkillRefs.map(r => {
+					return skillRefKey(r);
+				})
 			),
-		[allSkills]
+		[enabledSkillRefs]
+	);
+	const activeKeys = useMemo(
+		() =>
+			new Set(
+				activeSkillRefs.map(r => {
+					return skillRefKey(r);
+				})
+			),
+		[activeSkillRefs]
 	);
 
-	const availableEnabledKeySet = useMemo(
-		() => new Set([...enabledKeySet].filter(key => availableSkillKeySet.has(key))),
-		[availableSkillKeySet, enabledKeySet]
-	);
-	const availableActiveKeySet = useMemo(
-		() => new Set([...activeKeySet].filter(key => availableSkillKeySet.has(key) && availableEnabledKeySet.has(key))),
-		[activeKeySet, availableEnabledKeySet, availableSkillKeySet]
-	);
+	const enabledCount = enabledKeys.size;
+	const activeCount = activeKeys.size;
+	const selectedSystemSourceCount =
+		(systemPrompt.includeModelDefault ? 1 : 0) + systemPrompt.selectedInstructionSourceKeys.length;
+	const configuredCount = enabledCount + activeCount + selectedSystemSourceCount;
+	const firstVisibleSkill = visibleSkills[0] ?? null;
 
-	// Persisted refs are not presentation state until the current catalog can resolve them.
-	const enabledCount = availableEnabledKeySet.size;
-	const activeCount = availableActiveKeySet.size;
+	const updateEnabled = (item: ComposerSkillCatalogItem, enabled: boolean) => {
+		const ref = skillRef(item);
+		const key = skillRefKey(ref);
 
-	const instructionCount = allSkills.filter(s => {
-		return isInstructionSkill(s);
-	}).length;
-	const totalCount = instructionCount;
+		setEnabledSkillRefs(previous => {
+			const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
 
-	const sortedSkills = useMemo(
-		() => [...(allSkills ?? [])].filter(item => isInstructionSkill(item)).toSorted(compareSkillRows),
-		[allSkills]
-	);
+			if (enabled) {
+				next.set(key, ref);
+			} else {
+				next.delete(key);
+			}
 
-	const displayedGroups = useMemo(() => {
-		if (!isSearchQueryActive(searchQuery)) {
-			return [{ pluginID: 'flat', pluginSlug: 'skills', skills: sortedSkills }];
+			return [...next.values()];
+		});
+
+		if (!enabled) {
+			setActiveSkillRefs(previous => previous.filter(value => skillRefKey(value) !== key));
+		}
+	};
+
+	const updateActive = (item: ComposerSkillCatalogItem, active: boolean) => {
+		const ref = skillRef(item);
+		const key = skillRefKey(ref);
+
+		if (active) {
+			setEnabledSkillRefs(previous => {
+				const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
+				next.set(key, ref);
+				return [...next.values()];
+			});
+			setActiveSkillRefs(previous => {
+				const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
+				next.set(key, ref);
+				return [...next.values()];
+			});
+			return;
 		}
 
-		const ranked = rankSearchableItems(sortedSkills, {
-			query: searchQuery,
-			getKey: skillListItemKey,
-			getFields: getSkillSearchFields,
-			fallbackCompare: compareSkillRows,
-		});
-		return [{ pluginID: 'flat', pluginSlug: 'skills', skills: ranked }];
-	}, [searchQuery, sortedSkills]);
-
-	const displayedSkillCount = displayedGroups.reduce((sum, group) => sum + group.skills.length, 0);
-	const firstVisibleSkill = displayedGroups[0]?.skills[0] ?? null;
-
-	const setSkillEnabled = useCallback(
-		(ref: SkillRef, enabled: boolean) => {
-			const k = skillRefKey(ref);
-
-			setEnabledSkillRefs(prev => {
-				const byKey = new Map<string, SkillRef>();
-
-				for (const r of prev ?? []) {
-					byKey.set(skillRefKey(r), r);
-				}
-
-				if (enabled) {
-					byKey.set(k, ref);
-				} else {
-					byKey.delete(k);
-					setActiveSkillRefs(prevActive => prevActive.filter(activeRef => skillRefKey(activeRef) !== k));
-				}
-
-				return [...byKey.values()];
-			});
-		},
-		[setActiveSkillRefs, setEnabledSkillRefs]
-	);
-
-	const toggleSkillItem = useCallback(
-		(item: SkillListItem) => {
-			const ref = skillRefFromListItem(item);
-			const k = skillRefKey(ref);
-			setSkillEnabled(ref, !enabledKeySet.has(k));
-		},
-		[enabledKeySet, setSkillEnabled]
-	);
-
-	const enableAndActivateSkill = useCallback(
-		(item: SkillListItem) => {
-			const ref = skillRefFromListItem(item);
-			setEnabledSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
-			setActiveSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
-		},
-		[setActiveSkillRefs, setEnabledSkillRefs]
-	);
-
-	const addSkillAsSystemInstructions = useCallback(
-		async (item: SkillListItem, values: Record<string, string>) => {
-			const rendered = await skillManagementAPI.renderSkill(skillRefFromListItem(item), values);
-
-			if (rendered.insert !== SkillInsert.Instructions) {
-				throw new Error(`Expected instruction skill, but renderer returned insert=${rendered.insert}.`);
-			}
-
-			systemPrompt.addAndSelectInstructionSkillSource({
-				identityKey: getInstructionSourceIdentityKey(item),
-				displayName: getSkillDisplayLabel(item),
-				prompt: rendered.text,
-				skillRef: item.skillDefinition.ref,
-				sourceTags: rendered.sourceTags,
-			});
-		},
-		[systemPrompt]
-	);
-
-	const instructionSourceByKey = useMemo(
-		() => new Map(systemPrompt.instructionSources.map(source => [source.identityKey, source] as const)),
-		[systemPrompt.instructionSources]
-	);
-
-	const selectedInstructionSourceKeySet = useMemo(
-		() => new Set(systemPrompt.selectedInstructionSourceKeys),
-		[systemPrompt.selectedInstructionSourceKeys]
-	);
-	const appliedFlattenedInstructionSourceCount = useMemo(
-		() =>
-			systemPrompt.selectedInstructionSourceKeys.reduce((count, key) => {
-				const source = instructionSourceByKey.get(key);
-				return source?.text.trim() ? count + 1 : count;
-			}, 0),
-		[instructionSourceByKey, systemPrompt.selectedInstructionSourceKeys]
-	);
-	const hasAppliedModelDefault = systemPrompt.includeModelDefault && Boolean(systemPrompt.modelDefaultPrompt.trim());
-	const appliedSystemInstructionCount = appliedFlattenedInstructionSourceCount + (hasAppliedModelDefault ? 1 : 0);
-	const configuredCount = enabledCount + appliedSystemInstructionCount;
-	const hasConfiguredSkillState = configuredCount > 0 || activeCount > 0;
-	const hasSelectedSystemInstructionState =
-		systemPrompt.includeModelDefault || systemPrompt.selectedInstructionSourceKeys.length > 0;
-
-	const hoverTipContent = useMemo(
-		() => (
-			<HoverTipContent
-				title={shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills'}
-				description="Enable skills for this conversation, activate eligible instructions now, and select flattened system-instruction sources. User-message templates are managed in Templates."
-				sections={[
-					{
-						id: 'current-state',
-						title: 'Current state',
-						items: [
-							`Configured entries: ${configuredCount}`,
-							`Session-enabled skills: ${enabledCount}`,
-							`Active session instructions: ${activeCount}`,
-							`Applied system instruction sources: ${appliedSystemInstructionCount}`,
-							`Available instruction skills: ${totalCount}`,
-							loading
-								? 'Skill catalog: loading'
-								: loadError
-									? 'Skill catalog: needs refresh'
-									: 'Skill catalog: available',
-						],
-					},
-					...(loadError
-						? [
-								{
-									id: 'catalog-attention',
-									title: <span className="text-warning">Catalog needs attention</span>,
-									items: ['Refresh the skill catalog. Only skills currently listed in the menu are counted.'],
-								},
-							]
-						: []),
-					...(hasSelectedSystemInstructionState
-						? [
-								{
-									id: 'clear-action',
-									title: 'Clear action',
-									items: [
-										'Clear disables skills, turns off the model default, and removes flattened instruction sources.',
-									],
-								},
-							]
-						: []),
-				]}
-			/>
-		),
-		[
-			appliedSystemInstructionCount,
-			activeCount,
-			configuredCount,
-			enabledCount,
-			hasSelectedSystemInstructionState,
-			loadError,
-			loading,
-			shortcut,
-			totalCount,
-		]
-	);
-
-	const chipToneClasses = hasConfiguredSkillState
-		? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-		: open
-			? 'border-base-300 bg-base-300/60'
-			: 'border-transparent';
-
-	const clearConfiguredSkillState = () => {
-		onDisableAll();
-		systemPrompt.clearAllSystemPromptState();
-		menu.hide();
+		setActiveSkillRefs(previous => previous.filter(value => skillRefKey(value) !== key));
 	};
 
-	const openAddInstructionModal = useCallback(() => {
-		setInstructionModalMode('add');
-		setInstructionDraft(null);
-		setIsAddInstructionOpen(true);
-		menu.hide();
-	}, [menu]);
+	const loadWritablePlugins = async () => {
+		if (pluginsLoading) {
+			return;
+		}
 
-	const openForkInstructionModal = useCallback(
-		async (item: SkillListItem) => {
-			setSkillActionError(null);
+		setPluginsLoading(true);
+		setActionError('');
+
+		try {
+			setPlugins(await skillManagementAPI.listSkillPluginsForManagement());
+		} catch (cause) {
+			setActionError(cause instanceof Error ? cause.message : 'Skill Plugins could not be loaded.');
+		} finally {
+			setPluginsLoading(false);
+		}
+	};
+
+	const openManagedAction = async (action: PendingManagedSkillAction) => {
+		await loadWritablePlugins();
+		setPendingAction(action);
+		store.hide();
+	};
+
+	const openFork = async (item: ComposerSkillCatalogItem) => {
+		setActionError('');
+
+		let seed = fallbackForkSeed(item, allSkills);
+
+		if (item.managed) {
 			try {
-				const rendered = await skillManagementAPI.renderSkill(skillRefFromListItem(item), {});
-				const sourceLabel = getSkillDisplayLabel(item);
-				const nextName = makeUniqueSimpleSkillName(`${item.skillDefinition.name || item.skillSlug}-fork`, allSkills);
-
-				setInstructionModalMode('fork');
-				setInstructionDraft({
-					pluginID: item.skillDefinition.isBuiltIn ? undefined : item.pluginID,
-					displayName: `${sourceLabel} Copy`,
-					name: nextName,
-					body: rendered.text || `Forked from "${sourceLabel}". Replace this placeholder with instructions.`,
-					description:
-						item.skillDefinition.description ||
-						`Forked from ${sourceLabel}. Use when these instructions should guide the agent.`,
-				});
-				setIsAddInstructionOpen(true);
-				menu.hide();
-			} catch (error) {
-				console.error('Failed to render skill for fork:', error);
-				setSkillActionError(
-					error instanceof Error && error.message.trim()
-						? error.message
-						: 'Failed to render the instruction skill for fork.'
+				const document = await skillManagementAPI.getManagedSkillDocument(item.ref);
+				const sourceDocument: SkillDocumentInput = document.document;
+				seed = {
+					document: {
+						...sourceDocument,
+						name: uniqueForkName(sourceDocument.name, allSkills),
+						displayName: `${sourceDocument.displayName || sourceDocument.name} Copy`,
+					},
+					enabled: true,
+				};
+			} catch (cause) {
+				setActionError(
+					cause instanceof Error
+						? `${cause.message} A blank managed fork draft was prepared instead.`
+						: 'The source document could not be loaded. A blank managed fork draft was prepared instead.'
 				);
 			}
-		},
-		[allSkills, menu]
-	);
+		}
 
-	const renderSkillItem = (item: SkillListItem) => {
-		const ref = skillRefFromListItem(item);
-		const k = skillRefKey(ref);
-		const checked = availableEnabledKeySet.has(k);
-		const isActive = availableActiveKeySet.has(k);
-		const isInstruction = isInstructionSkill(item);
-		const label = getSkillDisplayLabel(item);
-		const args = item.skillDefinition.arguments ?? [];
-		const resources = resourceCount(item);
-		const canUseAsSystemPrompt = isInstruction && skillCanBeRenderedAsInstructionPrompt(item.skillDefinition);
-		const instructionPromptReason = getSkillInstructionPromptEligibilityReason(item.skillDefinition);
-		const canPreloadActive = isInstruction && skillCanBePreloadedAsActive(item.skillDefinition);
-		const instructionSourceKey = getInstructionSourceIdentityKey(item);
-		const instructionSourceKnown = systemPrompt.instructionSources.some(
-			source => source.identityKey === instructionSourceKey
-		);
-		const instructionSourceSelected = selectedInstructionSourceKeySet.has(instructionSourceKey);
-		const hasVisibleSelection = checked || isActive || instructionSourceSelected;
-
-		return (
-			<MenuItem
-				key={k}
-				data-searchable-menu-item="true"
-				hideOnClick={false}
-				className={`data-active-item:bg-base-200 flex w-full flex-col items-start gap-2 rounded-xl border p-2 transition-colors outline-none ${
-					hasVisibleSelection
-						? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-						: 'border-base-300 hover:bg-base-200'
-				} ${!isInstruction ? 'opacity-75' : ''}`}
-				title={
-					isInstruction
-						? `${item.pluginSlug}/${item.skillSlug}\nEnable makes it available. Enable + active loads its instructions now.`
-						: `${item.pluginSlug}/${item.skillSlug}\nThis is a user-message template. Use the Templates menu.`
-				}
-				onClick={() => {
-					if (isInputLocked || !isInstruction) {
-						return;
-					}
-					toggleSkillItem(item);
-				}}
-			>
-				<div className="flex w-full flex-col space-y-1">
-					<div className="flex min-w-0 items-center gap-2">
-						<div className="min-w-0 truncate text-xs font-medium">{label}</div>
-						<span className={`badge badge-xs shrink-0 ${isInstruction ? 'badge-info' : 'badge-secondary'}`}>
-							{isInstruction ? 'instructions' : 'template'}
-						</span>
-						{checked ? (
-							<span className="text-secondary ml-auto shrink-0" title="Enabled for this conversation">
-								<FiCheck size={14} />
-							</span>
-						) : null}
-					</div>
-					<div className="text-base-content/60 truncate text-xs">
-						{item.pluginSlug}/{item.skillSlug} • {item.skillDefinition.name}
-					</div>
-
-					<div className="mt-1 flex flex-wrap items-center justify-end gap-1">
-						{checked ? <span className="badge badge-success badge-xs">Enabled</span> : null}
-						{isInstruction && isActive ? <span className="badge badge-info badge-xs">Active</span> : null}
-						{resources > 0 ? (
-							<span className="badge badge-ghost badge-xs">
-								{resources} resource{resources === 1 ? '' : 's'}
-							</span>
-						) : null}
-						{instructionSourceSelected ? (
-							<span className="badge badge-secondary badge-xs">System instructions</span>
-						) : null}
-						{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
-					</div>
-				</div>
-
-				{/* Child buttons need to stop propagation so the enclosing menu item does not toggle. */}
-				{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
-				<div className="ml-2 flex w-full items-center justify-end gap-1" onClick={stop} onPointerDown={stop}>
-					{isInstruction ? (
-						checked ? (
-							<>
-								{isActive ? (
-									<button
-										type="button"
-										className={skillRowRemoveActionButtonClasses}
-										disabled={isInputLocked}
-										title="Remove this skill's active session instructions. It remains enabled."
-										onClick={() => {
-											setActiveSkillRefs(prev => prev.filter(activeRef => skillRefKey(activeRef) !== k));
-										}}
-									>
-										Deactivate
-									</button>
-								) : (
-									<button
-										type="button"
-										className={skillRowActionButtonClasses}
-										disabled={isInputLocked || !canPreloadActive}
-										title={
-											!canPreloadActive
-												? 'This skill cannot be preloaded as active because it has arguments.'
-												: 'Load this skill’s instructions into the active session.'
-										}
-										onClick={() => {
-											enableAndActivateSkill(item);
-										}}
-									>
-										Activate
-									</button>
-								)}
-								<button
-									type="button"
-									className={skillRowRemoveActionButtonClasses}
-									disabled={isInputLocked}
-									title="Disable this skill and remove its active session instructions."
-
-									onClick={() => {
-										setSkillEnabled(ref, false);
-									}}
-								>
-									Disable
-								</button>
-							</>
-						) : (
-							<>
-								<button
-									type="button"
-									className={skillRowActionButtonClasses}
-									disabled={isInputLocked}
-									title="Enable this skill for this conversation."
-									onClick={() => {
-										setSkillEnabled(ref, true);
-									}}
-								>
-									Enable
-								</button>
-								<button
-									type="button"
-									className={skillRowActionButtonClasses}
-
-									disabled={isInputLocked || !canPreloadActive}
-									title={
-										!canPreloadActive
-											? 'This skill cannot be preloaded as active because it has arguments.'
-											: 'Enable this skill and load its instructions into the active session.'
-									}
-									onClick={() => {
-										enableAndActivateSkill(item);
-									}}
-								>
-									Enable + activate
-								</button>
-							</>
-						)
-					) : (
-						<span className="text-base-content/60 text-xs">Use Templates</span>
-					)}
-
-					{isInstruction ? (
-						<button
-							type="button"
-							className={instructionSourceSelected ? skillRowRemoveActionButtonClasses : skillRowActionButtonClasses}
-							disabled={isInputLocked || !canUseAsSystemPrompt}
-							title={
-								canUseAsSystemPrompt
-									? instructionSourceSelected
-										? 'Remove this skill from the flattened system instructions.'
-										: 'Select this simple skill as a flattened system instruction source. This does not enable or activate the skill session.'
-									: instructionPromptReason
-							}
-							onClick={() => {
-								if (!canUseAsSystemPrompt) {
-									return;
-								}
-								setSkillActionError(null);
-								if (instructionSourceKnown) {
-									systemPrompt.toggleInstructionSource(instructionSourceKey);
-									return;
-								}
-								void addSkillAsSystemInstructions(item, {}).catch((error: unknown) => {
-									console.error('Failed to add skill as system instructions:', error);
-									setSkillActionError(
-										error instanceof Error && error.message.trim()
-											? error.message
-											: 'Failed to add this skill as system instructions.'
-									);
-								});
-							}}
-						>
-							{instructionSourceSelected
-								? 'Remove from instructions'
-								: instructionSourceKnown
-									? 'Select as instructions'
-									: 'Add as instructions'}
-						</button>
-					) : null}
-
-					{isInstruction && args.length === 0 && resources === 0 ? (
-						<button
-							type="button"
-							className={skillRowActionButtonClasses}
-							disabled={isInputLocked}
-							title="Create a new managed instruction skill from this rendered skill text."
-							onClick={() => {
-								void openForkInstructionModal(item);
-							}}
-						>
-							<FiGitBranch size={12} />
-							<span className="ml-1">Fork</span>
-						</button>
-					) : null}
-				</div>
-			</MenuItem>
-		);
+		await openManagedAction({
+			mode: 'fork',
+			seed,
+		});
 	};
 
-	return (
-		<div className="relative shrink-0" data-bottom-bar-skills>
-			<HoverTip
-				content={hoverTipContent}
-				placement="top"
-				wrapperElement="div"
-				wrapperClassName="inline-flex max-w-full"
-				tooltipClassName="max-w-sm"
-			>
-				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
-				>
-					<MenuButton
-						store={menu}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label={shortcut ? `Manage instruction skills (${shortcut})` : 'Manage instruction skills'}
-						disabled={isInputLocked}
-					>
-						<ActionTriggerChipContent
-							icon={<FiFilePlus size={14} />}
-							label="Skills"
-							count={
-								enabledCount > 0 ? (
-									<span className="badge badge-success badge-xs bg-success/30">Session {enabledCount}</span>
-								) : undefined
-							}
-							suffix={
-								activeCount > 0 || appliedSystemInstructionCount > 0 ? (
-									<span className="flex shrink-0 items-center gap-1">
-										{activeCount > 0 ? (
-											<span className="badge badge-info badge-xs bg-info/30">Active {activeCount}</span>
-										) : null}
-										{appliedSystemInstructionCount > 0 ? (
-											<span className="badge badge-secondary badge-xs bg-secondary/30">
-												System {appliedSystemInstructionCount}
-											</span>
-										) : null}
-									</span>
-								) : hasConfiguredSkillState ? (
-									<FiCheck size={14} className="shrink-0" />
-								) : undefined
-							}
-							open={open}
-						/>
-					</MenuButton>
+	const chipTone =
+		configuredCount > 0
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: open
+				? 'border-base-300 bg-base-300/60'
+				: 'border-transparent';
 
-					{hasSelectedSystemInstructionState ? (
-						<button
-							type="button"
-							className={actionTriggerChipClearButtonClasses}
-							onClick={event => {
-								stop(event);
-								clearConfiguredSkillState();
-							}}
-							aria-label="Clear all skills and system instructions"
-							title="Clear all skills and system instructions"
+	const hoverTip = (
+		<HoverTipContent
+			title={shortcut ? `Instruction Skills (${shortcut})` : 'Instruction Skills'}
+			description="Session Runtime owns effective Skill resolution, Skill sessions, lifecycle tools, and active Skill state."
+			sections={[
+				{
+					id: 'current-state',
+					title: 'Current state',
+					items: [
+						`Enabled Skills: ${enabledCount}`,
+						`Active Skills: ${activeCount}`,
+						`System instruction sources: ${selectedSystemSourceCount}`,
+						`Available instruction Skills: ${instructionSkills.length}`,
+					],
+				},
+				{
+					id: 'template-behavior',
+					title: 'Template behavior',
+					items: [
+						'User-message Skills are rendered through the Templates menu and are not active Skill-session state.',
+					],
+				},
+			]}
+		/>
+	);
+
+	return (
+		<>
+			<div className="relative shrink-0" data-bottom-bar-skills>
+				<HoverTip content={hoverTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+					<div className={`${actionTriggerChipSurfaceClasses} border ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}>
+						<MenuButton
+							store={store}
+							className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+							aria-label={shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills'}
 							disabled={isInputLocked}
 						>
-							<FiX size={12} />
-						</button>
-					) : null}
-				</div>
-			</HoverTip>
+							<ActionTriggerChipContent
+								icon={<FiFilePlus size={14} />}
+								label="Skills"
+								count={
+									enabledCount > 0 ? (
+										<span className="badge badge-success badge-xs">Enabled {enabledCount}</span>
+									) : undefined
+								}
+								suffix={
+									activeCount > 0 || selectedSystemSourceCount > 0 ? (
+										<span className="flex shrink-0 items-center gap-1">
+											{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
+											{selectedSystemSourceCount > 0 ? (
+												<span className="badge badge-secondary badge-xs">System {selectedSystemSourceCount}</span>
+											) : null}
+										</span>
+									) : undefined
+								}
+								open={open}
+							/>
+						</MenuButton>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className={actionTriggerMenuWideClasses}
-				autoFocusOnShow={false}
-				portal
-			>
-				<div className="mb-2 flex items-center justify-between gap-2 px-1">
-					<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
-					<div className="text-base-content/60 flex flex-wrap items-center justify-end gap-1 text-xs">
 						{configuredCount > 0 ? (
-							<span className="badge badge-success badge-xs">Configured {configuredCount}</span>
-						) : null}
-						{enabledCount > 0 ? <span className="badge badge-ghost badge-xs">Enabled {enabledCount}</span> : null}
-						{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
-						{appliedSystemInstructionCount > 0 ? (
-							<span className="badge badge-secondary badge-xs">System {appliedSystemInstructionCount}</span>
-						) : null}
-						<span className="badge badge-ghost badge-xs">Available {totalCount}</span>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg px-1"
-							title="Refresh instruction skills"
-							aria-label="Refresh instruction skills"
-							disabled={isInputLocked || loading}
-							onClick={event => {
-								stop(event);
-								void onRefreshSkills();
-							}}
-						>
-							<FiRefreshCw size={12} />
-						</button>
-					</div>
-				</div>
-
-				{loadError ? (
-					<div className="alert alert-warning mb-2 rounded-xl text-xs">
-						<FiAlertCircle size={14} className="shrink-0" />
-						<div className="grow">
-							<div className="font-semibold">Skills could not be refreshed</div>
-							<div>{loadError}</div>
-						</div>
-						<button
-							type="button"
-							className="btn btn-xs rounded-lg"
-							disabled={isInputLocked || loading}
-							onClick={event => {
-								stop(event);
-								void onRefreshSkills();
-							}}
-						>
-							Retry
-						</button>
-					</div>
-				) : null}
-				{skillActionError ? (
-					<div className="alert alert-error mb-2 rounded-xl text-xs">
-						<FiAlertCircle size={14} className="shrink-0" />
-						<div className="grow">{skillActionError}</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							onClick={() => {
-								setSkillActionError(null);
-							}}
-						>
-							Dismiss
-						</button>
-					</div>
-				) : null}
-				<SearchableMenuInput
-					open={open}
-					query={searchQuery}
-					onQueryChange={setSearchQuery}
-					placeholder="Search skills…"
-					resultCount={displayedSkillCount}
-					totalCount={totalCount}
-					disabled={loading || totalCount === 0}
-					onFocusFirstItem={() => {
-						focusFirstSearchableMenuItem(menuContentElement);
-					}}
-					onEnterFirstResult={() => {
-						if (firstVisibleSkill && !isInputLocked) {
-							toggleSkillItem(firstVisibleSkill);
-						}
-					}}
-					onEscape={() => {
-						menu.hide();
-					}}
-				/>
-
-				<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<div className="flex min-w-0 items-center gap-1">
-							<div className="truncate text-xs font-semibold">System instruction sources</div>
-							<span className="badge badge-secondary badge-xs">{appliedSystemInstructionCount} applied</span>
-						</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							title="Clear selected model-default and flattened system instruction sources"
-
-							aria-label="Clear selected system instruction sources"
-							disabled={isInputLocked || !hasSelectedSystemInstructionState}
-
-							onClick={event => {
-								stop(event);
-								systemPrompt.clearInstructionSources();
-							}}
-						>
-							Clear selected
-						</button>
-					</div>
-
-					<div className="max-h-40 space-y-1 overflow-y-auto">
-						{systemPrompt.modelDefaultPrompt.trim() ? (
-							<label
-								className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
-									systemPrompt.includeModelDefault
-										? 'bg-secondary/10 hover:bg-secondary/15 focus-within:bg-secondary/15'
-										: 'hover:bg-base-200 focus-within:bg-base-200'
-								}`}
+							<button
+								type="button"
+								className={actionTriggerChipClearButtonClasses}
+								onClick={event => {
+									event.preventDefault();
+									event.stopPropagation();
+									onDisableAll();
+									systemPrompt.clearAllSystemPromptState();
+									store.hide();
+								}}
+								disabled={isInputLocked}
+								aria-label="Clear Skills and system instruction sources"
+								title="Clear Skills and system instruction sources"
 							>
-								<span className="truncate text-xs">Model default instructions</span>
+								<FiX size={12} />
+							</button>
+						) : null}
+					</div>
+				</HoverTip>
+
+				<Menu
+					store={store}
+					gutter={8}
+					overflowPadding={8}
+					className={actionTriggerMenuWideClasses}
+					autoFocusOnShow={false}
+					portal
+				>
+					<div className="mb-2 flex items-center justify-between gap-2 px-1">
+						<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
+						<div className="flex items-center gap-1">
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || pluginsLoading}
+								onClick={() => {
+									void openManagedAction({ mode: 'create' });
+								}}
+								title="Create managed instruction Skill"
+							>
+								<FiPlus size={12} />
+								Create
+							</button>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || loading}
+								onClick={() => {
+									void onRefreshSkills();
+								}}
+								title="Refresh Skill catalog"
+							>
+								<FiRefreshCw size={12} />
+								Refresh
+							</button>
+						</div>
+					</div>
+
+					{loadError ? (
+						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} />
+							<span>{loadError}</span>
+						</div>
+					) : null}
+
+					{actionError ? (
+						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} />
+							<span>{actionError}</span>
+						</div>
+					) : null}
+
+					<SearchableMenuInput
+						open={open}
+						query={searchQuery}
+						onQueryChange={setSearchQuery}
+						placeholder="Search instruction Skills…"
+						resultCount={visibleSkills.length}
+						totalCount={instructionSkills.length}
+						disabled={loading || instructionSkills.length === 0}
+						onFocusFirstItem={() => {
+							focusFirstSearchableMenuItem(menuContentElement);
+						}}
+						onEnterFirstResult={() => {
+							if (firstVisibleSkill && !isInputLocked) {
+								updateEnabled(firstVisibleSkill, !enabledKeys.has(skillKey(firstVisibleSkill)));
+							}
+						}}
+						onEscape={() => {
+							store.hide();
+						}}
+					/>
+
+					<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
+						<div className="mb-2 flex items-center justify-between gap-2">
+							<div className="text-xs font-semibold">System instruction sources</div>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || selectedSystemSourceCount === 0}
+								onClick={() => {
+									systemPrompt.clearInstructionSources();
+								}}
+							>
+								Clear selected
+							</button>
+						</div>
+
+						{systemPrompt.modelDefaultPrompt.trim() ? (
+							<label className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1">
+								<span className="text-xs">Model default instructions</span>
 								<input
 									type="checkbox"
 									className="checkbox checkbox-xs"
 									checked={systemPrompt.includeModelDefault}
 									disabled={isInputLocked}
 									onChange={event => {
-										systemPrompt.setIncludeModelDefault(event.target.checked);
+										systemPrompt.setIncludeModelDefault(event.currentTarget.checked);
 									}}
 								/>
 							</label>
@@ -1142,33 +607,13 @@ export function SkillsBottomBarChip({
 						{systemPrompt.instructionSources.map(source => (
 							<label
 								key={source.identityKey}
-								className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
-									selectedInstructionSourceKeySet.has(source.identityKey)
-										? 'bg-secondary/10 hover:bg-secondary/15 focus-within:bg-secondary/15'
-										: 'hover:bg-base-200 focus-within:bg-base-200'
-								}`}
-								title={
-									source.sourceTags?.length
-										? `${source.text}\n\nSource tags: ${source.sourceTags.join(', ')}`
-										: source.text
-								}
+								className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
 							>
-								<span className="min-w-0">
-									<span className="block truncate text-xs">{source.displayName}</span>
-									{source.sourceTags?.length ? (
-										<span className="mt-1 flex flex-wrap gap-1">
-											{source.sourceTags.map(tag => (
-												<span key={`${source.identityKey}:${tag}`} className="badge badge-outline badge-xs">
-													{tag}
-												</span>
-											))}
-										</span>
-									) : null}
-								</span>
+								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
 								<input
 									type="checkbox"
 									className="checkbox checkbox-xs"
-									checked={selectedInstructionSourceKeySet.has(source.identityKey)}
+									checked={systemPrompt.selectedInstructionSourceKeys.includes(source.identityKey)}
 									disabled={isInputLocked}
 									onChange={() => {
 										systemPrompt.toggleInstructionSource(source.identityKey);
@@ -1179,103 +624,197 @@ export function SkillsBottomBarChip({
 
 						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
 							<div className="text-base-content/60 px-2 py-1 text-xs">
-								No system instruction sources are available in this conversation.
+								No flattened Session instruction source is selected.
 							</div>
 						) : null}
 					</div>
-					{Boolean(systemPrompt.modelDefaultPrompt.trim()) || systemPrompt.instructionSources.length > 0 ? (
-						<div className="text-base-content/60 mt-2 px-1 text-[10px]">
-							Checked sources are applied to this conversations system prompt. The top-level Skills clear control also
-							turns off the model default and removes all rendered sources.
+
+					<div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+						<div className="text-base-content/60 text-xs">
+							{instructionSkills.length} available · {enabledCount} enabled · {activeCount} active
 						</div>
-					) : null}
-				</div>
-
-				{!loading ? (
-					<div className="border-base-300 mb-2 flex flex-wrap items-center justify-between gap-2 border-b px-1 pb-2">
-						<button
-							type="button"
-							className="btn btn-xs rounded-lg"
-							disabled={isInputLocked}
-							onClick={openAddInstructionModal}
-							title="Create a simple managed instruction skill and select it as flattened system instructions."
-						>
-							<FiPlus size={12} />
-							<span className="ml-1">Add new instruction skill</span>
-						</button>
-
-						{totalCount > 0 ? (
-							<div className="flex gap-2">
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
-									onClick={e => {
-										stop(e);
-										onEnableAll();
-									}}
-									title="Enable all instruction skills"
-								>
-									Enable all
-								</button>
-
-								<button
-									type="button"
-									className={skillRowRemoveActionButtonClasses}
-									disabled={isInputLocked || (enabledSkillRefs.length === 0 && activeSkillRefs.length === 0)}
-									onClick={e => {
-										stop(e);
-										onDisableAll();
-									}}
-									title="Disable all instruction skills and remove active session instructions. System instruction sources remain selected."
-								>
-									<FiX size={12} />
-									<span className="ml-1">Disable all</span>
-								</button>
-							</div>
-						) : null}
+						<div className="flex gap-1">
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || instructionSkills.length === 0}
+								onClick={onEnableAll}
+							>
+								Enable all
+							</button>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs text-error rounded-lg"
+								disabled={isInputLocked || enabledCount === 0}
+								onClick={onDisableAll}
+							>
+								Disable all
+							</button>
+						</div>
 					</div>
-				) : null}
 
-				{loading ? (
-					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading skills…</div>
-				) : totalCount === 0 ? (
-					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						No skills available
-					</div>
-				) : displayedSkillCount === 0 ? (
-					<div className={searchableMenuEmptyStateClasses}>No skills match your search.</div>
-				) : (
-					<div className="space-y-1">
-						{displayedGroups[0]?.skills.map(item => (
-							<div className="w-full" key={skillListItemKey(item)}>
-								{renderSkillItem(item)}
-							</div>
-						))}
-					</div>
-				)}
-			</Menu>
+					{loading ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading Skills…</div>
+					) : instructionSkills.length === 0 ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+							No runtime-resolved instruction Skills are available.
+						</div>
+					) : visibleSkills.length === 0 ? (
+						<div className={searchableMenuEmptyStateClasses}>No Skills match your search.</div>
+					) : (
+						<div className="space-y-1">
+							{visibleSkills.map(skill => {
+								const key = skillKey(skill);
+								const enabled = enabledKeys.has(key);
+								const active = activeKeys.has(key);
+								const activationAllowed = canActivate(skill);
 
-			{isAddInstructionOpen ? (
-				<AddInstructionSkillModal
-					key={`${instructionModalMode}:${instructionDraft?.name ?? 'new'}`}
-					isOpen={true}
-					allSkills={allSkills}
-					mode={instructionModalMode}
-					initialDraft={instructionDraft}
-					onClose={() => {
-						setIsAddInstructionOpen(false);
-						setInstructionDraft(null);
-					}}
-					onCreated={async item => {
-						await addSkillAsSystemInstructions(item, {});
-						await onRefreshSkills();
-						setIsAddInstructionOpen(false);
-						setInstructionDraft(null);
-						menu.hide();
-					}}
-				/>
-			) : null}
-		</div>
+								return (
+									<MenuItem
+										key={key}
+										store={store}
+										hideOnClick={false}
+										disabled={isInputLocked}
+										data-searchable-menu-item="true"
+										className={`data-active-item:bg-base-200 flex flex-col items-start rounded-xl border p-2 ${
+											enabled ? 'border-secondary/50 bg-secondary/10' : 'border-base-300'
+										}`}
+										onClick={() => {
+											updateEnabled(skill, !enabled);
+										}}
+									>
+										<div className="flex w-full items-start gap-2">
+											<FiZap size={14} className="mt-0.5 shrink-0" />
+											<div className="min-w-0 flex-1">
+												<div className="truncate text-xs font-medium">{skillLabel(skill)}</div>
+												<div className="text-base-content/60 truncate text-[10px]">
+													{skill.name} · {skill.ref.rootID}
+												</div>
+												{skill.description ? (
+													<div className="text-base-content/70 mt-1 line-clamp-2 text-xs">{skill.description}</div>
+												) : null}
+											</div>
+											{enabled ? <FiCheck size={14} className="text-secondary shrink-0" /> : null}
+										</div>
+
+										<div className="mt-2 ml-6 flex flex-wrap items-center gap-1">
+											{skill.hasArguments ? <span className="badge badge-warning badge-xs">Arguments</span> : null}
+											{skill.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
+											{skill.builtIn ? <span className="badge badge-ghost badge-xs">Built-in</span> : null}
+											{active ? <span className="badge badge-success badge-xs">Active</span> : null}
+										</div>
+
+										<div className="mt-2 ml-6 flex w-[calc(100%-1.5rem)] justify-end gap-1">
+											{enabled ? (
+												<>
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs rounded-lg"
+														disabled={isInputLocked || !activationAllowed}
+														title={
+															activationAllowed
+																? active
+																	? 'Deactivate this Skill for the next Run.'
+																	: 'Activate this Skill for the next Run.'
+																: 'Argument-backed Skills can be enabled but cannot be preloaded as active.'
+														}
+														onClick={() => {
+															updateActive(skill, !active);
+														}}
+													>
+														{active ? 'Deactivate' : 'Activate'}
+													</button>
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs text-error rounded-lg"
+														disabled={isInputLocked}
+														onClick={() => {
+															updateEnabled(skill, false);
+														}}
+													>
+														Disable
+													</button>
+												</>
+											) : (
+												<>
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs rounded-lg"
+														disabled={isInputLocked}
+														onClick={() => {
+															updateEnabled(skill, true);
+														}}
+													>
+														Enable
+													</button>
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs rounded-lg"
+														disabled={isInputLocked}
+														onClick={() => {
+															void openFork(skill);
+														}}
+													>
+														<FiGitBranch size={12} />
+														Fork
+													</button>
+												</>
+											)}
+										</div>
+									</MenuItem>
+								);
+							})}
+						</div>
+					)}
+				</Menu>
+			</div>
+
+			<ComposerSkillDestinationModal
+				isOpen={pendingAction !== null}
+				plugins={plugins}
+				action={pendingAction}
+				onClose={() => {
+					setPendingAction(null);
+				}}
+				onChoose={(plugin, action) => {
+					setPendingAction(null);
+					setEditorAction({ plugin, action });
+				}}
+			/>
+
+			<ManagedSkillEditorModal
+				isOpen={editorAction !== null}
+				plugin={
+					editorAction?.plugin ?? {
+						ref: { rootID: '', artifactID: '' },
+						sourceID: '',
+						name: '',
+						displayName: '',
+						state: ArtifactState.Available,
+						enabled: false,
+						revision: 0,
+						memberCount: 0,
+						builtIn: false,
+						editable: false,
+						deletable: false,
+						baseline: false,
+					}
+				}
+				mode={editorAction?.action.mode}
+				seed={editorAction?.action.seed}
+				onClose={() => {
+					setEditorAction(null);
+				}}
+				onSaved={async artifact => {
+					setEditorAction(null);
+					await onRefreshSkills();
+					setEnabledSkillRefs(previous => {
+						const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
+						next.set(skillRefKey(artifact), artifact);
+						return [...next.values()];
+					});
+				}}
+			/>
+		</>
 	);
 }

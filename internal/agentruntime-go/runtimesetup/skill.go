@@ -7,6 +7,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
@@ -29,10 +30,11 @@ func (c *coordinator) prepareSkills(
 	preparedOutput preparedSkills,
 	effectiveOutput []sessionRuntime.ArtifactReference,
 	activeOutput []sessionRuntime.ArtifactReference,
+	instructionOutput []instructionContribution,
 	err error,
 ) {
 	if len(contributions) == 0 {
-		return preparedSkills{}, nil, nil, nil
+		return preparedSkills{}, nil, nil, nil, nil
 	}
 
 	refs := make([]artifactModel.ArtifactRef, 0, len(contributions))
@@ -46,14 +48,14 @@ func (c *coordinator) prepareSkills(
 
 		ref, err := artifactRef(contribution.selection)
 		if err != nil {
-			return preparedSkills{}, nil, nil, err
+			return preparedSkills{}, nil, nil, nil, err
 		}
 		refs = append(refs, ref)
 	}
 
 	resolved, err := c.skillResolver.ResolveSkills(ctx, refs)
 	if err != nil {
-		return preparedSkills{}, nil, nil, operationPreparationError(
+		return preparedSkills{}, nil, nil, nil, operationPreparationError(
 			"skill_unavailable",
 			err.Error(),
 			*summary,
@@ -80,26 +82,33 @@ func (c *coordinator) prepareSkills(
 		0,
 		len(resolved.Values),
 	)
+	usedByDefinition := make(
+		map[provider.SkillDef]*sessionRuntime.ResolvedArtifact,
+		len(resolved.Values),
+	)
+	instructionByDefinition := make(
+		map[provider.SkillDef]skillContribution,
+		len(resolved.Values),
+	)
 
 	for _, value := range resolved.Values {
 		reference := sessionArtifactReference(value.Artifact)
-		key := artifactKey(value.Artifact)
-
-		output.definitions = append(
-			output.definitions,
-			value.Definition,
-		)
-		output.byArtifact[key] = value.Definition
-		output.byDefinition[value.Definition] = reference
-		effective = append(effective, reference)
-
-		contribution := byKey[referenceKey(reference)]
+		contribution, found := byKey[referenceKey(reference)]
+		if !found {
+			return preparedSkills{}, nil, nil, nil, operationPreparationError(
+				"skill_resolution_invalid",
+				"skill resolver returned an Artifact that was not requested",
+				*summary,
+				nil,
+			)
+		}
 		used := resolvedArtifact(
 			value.Artifact,
 			value.Revision,
 			cryptoutil.Digest(value.DefinitionDigest),
 		)
 		item := contribution.item
+
 		if contribution.owner == sessionRuntime.ConfigurationOwnerSession {
 			if err := requireSelectionPin(contribution.selection, used); err != nil {
 				item.State = sessionRuntime.ResolutionStateStale
@@ -107,7 +116,7 @@ func (c *coordinator) prepareSkills(
 				item.Reason = err.Error()
 				summary.Skills = append(summary.Skills, item)
 
-				return preparedSkills{}, nil, nil, operationPreparationError(
+				return preparedSkills{}, nil, nil, nil, operationPreparationError(
 					"skill_selection_stale",
 					err.Error(),
 					*summary,
@@ -116,6 +125,39 @@ func (c *coordinator) prepareSkills(
 			}
 		}
 
+		if !value.Enabled {
+			item.State = sessionRuntime.ResolutionStateUnavailable
+			item.Used = used
+			item.Reason = "Skill is disabled"
+			summary.Skills = append(summary.Skills, item)
+			summary.Diagnostics = append(
+				summary.Diagnostics,
+				sessionRuntime.ResolutionDiagnostic{
+					Severity: sessionRuntime.DiagnosticSeverityWarning,
+					Code:     "skill_disabled",
+					Message:  "Selected Skill is disabled",
+					Key:      contribution.key,
+				},
+			)
+
+			if contribution.owner == sessionRuntime.ConfigurationOwnerSession {
+				return preparedSkills{}, nil, nil, nil, operationPreparationError(
+					"skill_selection_unavailable",
+					"selected Skill is disabled",
+					*summary,
+					nil,
+				)
+			}
+			continue
+		}
+
+		key := artifactKey(value.Artifact)
+		output.definitions = append(output.definitions, value.Definition)
+		output.byArtifact[key] = value.Definition
+		output.byDefinition[value.Definition] = reference
+		usedByDefinition[value.Definition] = used
+		effective = append(effective, reference)
+
 		item.State = sessionRuntime.ResolutionStateIncluded
 		item.Used = used
 		summary.Skills = append(summary.Skills, item)
@@ -123,9 +165,126 @@ func (c *coordinator) prepareSkills(
 		if _, enabled := active[key]; enabled {
 			activeRefs = append(activeRefs, reference)
 		}
+		if contribution.instruction {
+			instructionByDefinition[value.Definition] = contribution
+		}
 	}
 
-	return output, effective, activeRefs, nil
+	if len(instructionByDefinition) == 0 {
+		return output, effective, activeRefs, nil, nil
+	}
+
+	records, err := c.skillRuntime.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			AllowSkills: output.definitions,
+		},
+	)
+	if err != nil {
+		return preparedSkills{}, nil, nil, nil, operationPreparationError(
+			"instruction_skill_unavailable",
+			err.Error(),
+			*summary,
+			err,
+		)
+	}
+
+	recordByDefinition := make(
+		map[provider.SkillDef]agentskillsRuntimeSpec.SkillRecord,
+		len(records),
+	)
+	for _, record := range records {
+		recordByDefinition[record.Def] = record
+	}
+
+	for _, definition := range output.definitions {
+		contribution, needed := instructionByDefinition[definition]
+		if !needed {
+			continue
+		}
+
+		record, found := recordByDefinition[definition]
+		if !found {
+			return preparedSkills{}, nil, nil, nil, operationPreparationError(
+				"instruction_skill_unavailable",
+				"Skill Runtime did not index an Agent instruction Skill",
+				*summary,
+				nil,
+			)
+		}
+
+		insert, supported := document.NormalizeSkillInsert(record.Insert)
+		if !supported || string(insert) != "instructions" {
+			return preparedSkills{}, nil, nil, nil, operationPreparationError(
+				"instruction_skill_invalid",
+				"Agent instruction Skill is not an instructions Skill",
+				*summary,
+				nil,
+			)
+		}
+
+		rendered, renderErr := c.skillRuntime.RenderSkill(
+			ctx,
+			&skillRuntime.RenderSkillRequest{
+				Body: &skillRuntime.RenderSkillRequestBody{
+					Definition: definition,
+					Arguments:  map[string]string{},
+				},
+			},
+		)
+		if renderErr != nil {
+			return preparedSkills{}, nil, nil, nil, operationPreparationError(
+				"instruction_skill_unavailable",
+				renderErr.Error(),
+				*summary,
+				renderErr,
+			)
+		}
+		if rendered == nil || rendered.Body == nil {
+			return preparedSkills{}, nil, nil, nil, operationPreparationError(
+				"instruction_skill_unavailable",
+				"Skill Runtime returned no rendered Agent instruction Skill",
+				*summary,
+				nil,
+			)
+		}
+
+		text := strings.TrimSpace(rendered.Body.Text)
+		if text == "" {
+			summary.Diagnostics = append(
+				summary.Diagnostics,
+				sessionRuntime.ResolutionDiagnostic{
+					Severity: sessionRuntime.DiagnosticSeverityWarning,
+					Code:     "instruction_skill_empty",
+					Message:  "Agent instruction Skill rendered no instruction text",
+					Key:      contribution.key,
+				},
+			)
+			continue
+		}
+
+		selected := contribution.selection
+		instructionKey := "skill:" + contribution.key + ":instructions"
+		instructionOutput = append(
+			instructionOutput,
+			instructionContribution{
+				key:   instructionKey,
+				owner: contribution.owner,
+				label: selected.ArtifactID,
+				text:  text,
+				item: sessionRuntime.ResolutionItem{
+					Key:      instructionKey,
+					Kind:     resolutionItemKindInstruction,
+					Owner:    contribution.owner,
+					State:    sessionRuntime.ResolutionStateIncluded,
+					Selected: &selected,
+					Used:     usedByDefinition[definition],
+				},
+			},
+		)
+	}
+
+	return output, effective, activeRefs, instructionOutput, nil
 }
 
 func (c *coordinator) ensureSkillSession(

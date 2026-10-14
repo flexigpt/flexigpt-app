@@ -1412,6 +1412,15 @@ Composer does not:
 - [x] Skill management and Composer Skill controls now use current Skill
       management and Session template APIs rather than retired direct runtime
       APIs.
+- [x] Skill Plugin management retains managed Skill create, edit, fork,
+      enable, detach, purge, external-path attachment, existing Artifact
+      attachment, and directory-source registration flows.
+- [x] Composer instruction Skill controls retain enabled and active Skill
+      selection, Skill creation, managed fork creation, catalog refresh,
+      model-default prompt selection, and Session-owned template separation.
+- [x] User-message template preview uses the Session Runtime template command;
+      instruction Skill execution remains Run-owned and is not reintroduced
+      as a frontend Skill Runtime call.
 
 ### Backend Session-owned execution delivery
 
@@ -1540,7 +1549,10 @@ Frontend migration remains separately tracked.
 - [x] Application/Wails assembly and legacy execution removal complete.
 - [x] Session-scoped MCP App routing complete.
 - [x] Frontend chat migration complete.
-- [ ] Management UI migration remains deferred.
+- [x] Attached Agent and Skill management pages use typed management facades
+      and current Artifact-backed contracts.
+- [ ] Model, MCP, and Workspace management page components remain outside the
+      supplied incremental UI set.
 
 ### Backend runtime-setup delivery
 

@@ -124,8 +124,6 @@ if (IS_WAILS_PLATFORM) {
 		toolManagementAPI,
 		modelManagementAPI
 	);
-
-	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillAggregateAPI, toolManagementAPI, modelManagementAPI);
 } else {
 	throw new Error('Unsupported platform');
 }

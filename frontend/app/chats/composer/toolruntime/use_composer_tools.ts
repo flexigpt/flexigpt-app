@@ -1,22 +1,31 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ToolStoreChoice } from '@/spec/tool';
 
+import { resolveStateUpdate } from '@/lib/hook_utils';
+
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import type { AutoExecState } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
-import type { ComposerToolRuntimeState } from '@/chats/composer/toolruntime/use_tool_runtime';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
-import { useComposerToolRuntime } from '@/chats/composer/toolruntime/use_tool_runtime';
 
 interface UseComposerToolsArgs {
 	isBusy: boolean;
 	isSubmitting: boolean;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	externalExecutionBlocked?: boolean;
+}
+
+export interface ComposerToolRuntimeState {
+	toolCalls: UIToolCall[];
+	toolOutputs: UIToolOutput[];
+}
+
+export interface AutoExecState {
+	phase: 'idle' | 'blocked';
+	runningCallId: null;
 }
 
 interface UseComposerToolsResult {
@@ -45,90 +54,72 @@ interface UseComposerToolsResult {
 	autoExecState: AutoExecState;
 }
 
-export function useComposerTools({
-	isBusy,
-	isSubmitting,
-	getAttachedToolEntries,
-	externalExecutionBlocked = false,
-}: UseComposerToolsArgs): UseComposerToolsResult {
-	const runtime = useComposerToolRuntime();
+const EMPTY_TOOL_CALLS: UIToolCall[] = [];
 
+export function useComposerTools({ getAttachedToolEntries }: UseComposerToolsArgs): UseComposerToolsResult {
 	const config = useComposerToolConfig({
 		getAttachedToolEntries,
 	});
+	const [toolOutputsState, setToolOutputsState] = useState<UIToolOutput[]>([]);
+	const toolOutputsRef = useRef<UIToolOutput[]>([]);
 
-	const autoExecBlocked = isBusy || isSubmitting || externalExecutionBlocked;
+	const setToolOutputs = useCallback<Dispatch<SetStateAction<UIToolOutput[]>>>(update => {
+		const next = resolveStateUpdate(update, toolOutputsRef.current);
+		toolOutputsRef.current = next;
+		setToolOutputsState(next);
+	}, []);
 
-	const runToolCall = runtime.runToolCall;
-	const discardToolCall = runtime.discardToolCall;
-	const removeToolOutput = runtime.removeToolOutput;
-	const retryErroredOutput = runtime.retryErroredOutput;
-	const clearToolRuntime = runtime.clearToolRuntime;
-	const recomputeAttachedToolArgsBlocked = config.recomputeAttachedToolArgsBlocked;
-	const clearAttachedToolValidation = config.clearAttachedToolValidation;
-
-	const autoExecState = { phase: autoExecBlocked ? ('blocked' as const) : ('idle' as const), runningCallId: null };
-
-	const handleRunSingleToolCall = useCallback(
-		async (id: string) => {
-			await runToolCall(id);
-		},
-		[runToolCall]
-	);
-
-	const handleDiscardToolCall = useCallback(
-		(id: string) => {
-			discardToolCall(id);
-		},
-		[discardToolCall]
-	);
-
-	const handleRemoveToolOutput = useCallback(
-		(id: string) => {
-			removeToolOutput(id);
-		},
-		[removeToolOutput]
-	);
-
-	const handleRetryErroredOutput = useCallback(
-		(output: UIToolOutput) => {
-			retryErroredOutput(output);
-		},
-		[retryErroredOutput]
-	);
-
-	const handleAttachedToolsChanged = useCallback(() => {
-		recomputeAttachedToolArgsBlocked();
-	}, [recomputeAttachedToolArgsBlocked]);
+	/*
+	 * Session Runtime owns accepted Tool calls, execution, retries, skips,
+	 * approvals, and automatic continuation. Composer retains only historical
+	 * draft output display state while editing a message. It intentionally
+	 * never receives a runnable local Tool-call queue.
+	 */
+	const noLocalToolExecution = useCallback(async (_id: string) => {
+		return undefined;
+	}, []);
 
 	const clearComposerToolsState = useCallback(() => {
-		clearToolRuntime();
-		clearAttachedToolValidation();
-	}, [clearAttachedToolValidation, clearToolRuntime]);
+		toolOutputsRef.current = [];
+		setToolOutputsState([]);
+		config.clearAttachedToolValidation();
+	}, [config]);
+
+	const handleAttachedToolsChanged = useCallback(() => {
+		config.recomputeAttachedToolArgsBlocked();
+	}, [config]);
 
 	return {
-		toolCalls: runtime.toolCalls,
-		toolOutputs: runtime.toolOutputs,
-		setToolOutputs: runtime.setToolOutputs,
+		toolCalls: EMPTY_TOOL_CALLS,
+		toolOutputs: toolOutputsState,
+		setToolOutputs,
 		conversationToolsState: config.conversationToolsState,
 		setConversationToolsState: config.setConversationToolsState,
 		webSearchTemplates: config.webSearchTemplates,
 		setWebSearchTemplates: config.setWebSearchTemplates,
 		toolArgsBlocked: config.toolArgsBlocked,
-		hasPendingToolCalls: runtime.hasPendingToolCalls,
-		hasRunningToolCalls: runtime.hasRunningToolCalls,
+		hasPendingToolCalls: false,
+		hasRunningToolCalls: false,
 		recomputeAttachedToolArgsBlocked: config.recomputeAttachedToolArgsBlocked,
-		runAllPendingToolCalls: runtime.runAllPendingToolCalls,
-		handleRunSingleToolCall,
-		handleDiscardToolCall,
-		handleRemoveToolOutput,
-		handleRetryErroredOutput,
+		runAllPendingToolCalls: async () => [],
+		handleRunSingleToolCall: noLocalToolExecution,
+		handleDiscardToolCall: () => undefined,
+		handleRemoveToolOutput: id => {
+			setToolOutputs(previous => previous.filter(output => output.id !== id));
+		},
+		handleRetryErroredOutput: () => undefined,
 		handleAttachedToolsChanged,
 		applyConversationToolsFromChoices: config.applyConversationToolsFromChoices,
 		applyWebSearchFromChoices: config.applyWebSearchFromChoices,
-		loadToolCalls: runtime.loadToolCalls,
+		loadToolCalls: () => undefined,
 		clearComposerToolsState,
-		getToolRuntimeSnapshot: runtime.getToolRuntimeSnapshot,
-		autoExecState,
+		getToolRuntimeSnapshot: () => ({
+			toolCalls: EMPTY_TOOL_CALLS,
+			toolOutputs: toolOutputsRef.current,
+		}),
+		autoExecState: {
+			phase: 'idle',
+			runningCallId: null,
+		},
 	};
 }

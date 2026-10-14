@@ -620,6 +620,12 @@ interface ConversationAreaProps {
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
 }
 
+interface WaitResolutionState {
+	waitID: string;
+	isResolving: boolean;
+	error?: string;
+}
+
 function ConversationAreaInner(
 	{ tabs, selectedTabId, mountedInputTabIds, shortcutConfig, initialScrollTopByTab, updateTab }: ConversationAreaProps,
 	ref: Ref<ConversationAreaHandle>
@@ -635,6 +641,7 @@ function ConversationAreaInner(
 	const activeRun = activeTab?.sessionSnapshot
 		? selectedSessionRun(activeTab.sessionSnapshot, activeTab.activeRunID)
 		: undefined;
+	const [waitResolutionState, setWaitResolutionState] = useState<WaitResolutionState | null>(null);
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
 
@@ -873,19 +880,37 @@ function ConversationAreaInner(
 	}, []);
 
 	const resolveWait = useCallback(
-		(wait: SessionWaitingRequest, resolution: SessionWaitResolution) =>
-			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
-				requireAcceptedSessionCommand(
-					await sessionManagementAPI.resolveWait({
-						meta: sessionCommandMeta(sessionRevision, runRevision),
-						sessionID,
-						runID,
-						waitID: wait.id,
-						resolution,
-					}),
-					'Resolve Run wait'
-				);
-			}),
+		async (wait: SessionWaitingRequest, resolution: SessionWaitResolution) => {
+			setWaitResolutionState({
+				waitID: wait.id,
+				isResolving: true,
+			});
+
+			try {
+				await runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+					requireAcceptedSessionCommand(
+						await sessionManagementAPI.resolveWait({
+							meta: sessionCommandMeta(sessionRevision, runRevision),
+							sessionID,
+							runID,
+							waitID: wait.id,
+							resolution,
+						}),
+						'Resolve Run wait'
+					);
+				});
+				setWaitResolutionState({
+					waitID: wait.id,
+					isResolving: false,
+				});
+			} catch (error) {
+				setWaitResolutionState({
+					waitID: wait.id,
+					isResolving: false,
+					error: error instanceof Error ? error.message : 'The wait could not be resolved.',
+				});
+			}
+		},
 		[runCommand]
 	);
 
@@ -1198,17 +1223,26 @@ function ConversationAreaInner(
 				</div>
 			</div>
 
-			<SessionWaitModal
-				wait={activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending)}
-				isResolving={false}
-				onResolve={resolution => {
-					const wait = activeRun?.waitingRequests?.find(candidate => candidate.status === SessionWaitStatus.Pending);
-					if (!wait) {
-						return Promise.resolve();
-					}
-					return resolveWait(wait, resolution);
-				}}
-			/>
+			{(() => {
+				const pendingWait = activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending);
+				const currentWaitState =
+					pendingWait && waitResolutionState?.waitID === pendingWait.id ? waitResolutionState : undefined;
+
+				return (
+					<SessionWaitModal
+						wait={pendingWait}
+						isResolving={currentWaitState?.isResolving ?? false}
+						error={currentWaitState?.error}
+						onResolve={resolution => {
+							const wait = pendingWait;
+							if (!wait) {
+								return Promise.resolve();
+							}
+							return resolveWait(wait, resolution);
+						}}
+					/>
+				);
+			})()}
 		</>
 	);
 }

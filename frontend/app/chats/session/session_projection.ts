@@ -208,7 +208,9 @@ function toolCallStatus(state: SessionToolCallState): UIToolCallStatus {
 	switch (state) {
 		case SessionToolCallState.Running:
 		case SessionToolCallState.Evaluating:
+		case SessionToolCallState.EvaluationQueued:
 		case SessionToolCallState.ExecutionQueued:
+		case SessionToolCallState.Waiting:
 			return UIToolCallStatus.Running;
 
 		case SessionToolCallState.Resolved:
