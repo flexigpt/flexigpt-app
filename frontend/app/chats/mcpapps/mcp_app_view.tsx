@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import type { MCPContent } from '@/spec/mcp';
-import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp';
-import { SessionRunObservationKind, SessionToolCallSource, SessionToolResultKind } from '@/spec/session';
+import type { MCPContent } from '@/spec/session_mcp';
+import { MCP_APP_HTML_MIME_TYPE } from '@/spec/mcp';
+import { SessionRunObservationKind } from '@/spec/session';
+import { SessionToolCallSource, SessionToolResultKind } from '@/spec/session_base';
+import { MCPContentType } from '@/spec/session_mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';

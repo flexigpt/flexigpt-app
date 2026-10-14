@@ -26,7 +26,6 @@ import type {
 	FileFilter,
 	PathAttachmentsResult,
 } from '@/spec/attachment';
-import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type {
 	ManagedMCPCreateRequest,
 	ManagedMCPCreateResult,
@@ -35,27 +34,15 @@ import type {
 	ManagedMCPReplaceRequest,
 	ManagedMCPReplaceResult,
 	MCPAuthSettings,
-	MCPCompleteArgumentRequestBody,
-	MCPCompletionResult,
-	MCPDiscoveryPage,
-	MCPGetPromptResponseBody,
 	MCPPluginPage,
 	MCPPolicyListItem,
 	MCPPolicyView,
-	MCPPromptRef,
-	MCPReadResourceResponseBody,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
-	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerListItem,
 	MCPServerPage,
-	MCPServerRuntimeDetails,
-	MCPServerRuntimeSnapshot,
 	MCPServerSecretsView,
 	MCPSettings,
-	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
 	ManagedModelCreateRequest,
@@ -93,23 +80,15 @@ import type {
 	CreateSessionCommand,
 	DeleteSessionCommand,
 	EditAndResendCommand,
-	ExecuteAppToolCommand,
 	ExecuteCallsCommand,
-	OpenAppViewCommand,
 	PauseRunCommand,
-	ReadAppResourceRequest,
 	RenameSessionCommand,
 	ResolveWaitCommand,
 	ResumeRunCommand,
 	RetryCallCommand,
-	RunID,
 	Session,
-	SessionAppResourceReadResult,
-	SessionCommandReceipt,
-	SessionID,
 	SessionRunObserver,
 	SessionRunSnapshot,
-	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
 	SessionSnapshotObserver,
@@ -117,11 +96,30 @@ import type {
 	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
-	StageAppContextCommand,
 	StartRunCommand,
 	UpdateContinuationInputCommand,
 	UpdateSessionConfigurationCommand,
 } from '@/spec/session';
+import type { RunID, SessionCommandReceipt, SessionID, SessionRuntimeEvent } from '@/spec/session_base';
+import type {
+	MCPAppExecuteToolCommand,
+	MCPAppOpenViewCommand,
+	MCPAppReadResourceRequest,
+	MCPAppResourceReadResult,
+	MCPAppStageContextCommand,
+	MCPCompleteArgumentRequestBody,
+	MCPCompletionResult,
+	MCPDiscoveryPage,
+	MCPGetPromptResponseBody,
+	MCPPromptRef,
+	MCPReadResourceResponseBody,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
+	MCPServerRuntimeDetails,
+	MCPServerRuntimeSnapshot,
+	MCPToolCapability,
+} from '@/spec/session_mcp';
 import type {
 	SessionStoreConversationProjection,
 	SessionStoreListSessionRunsRequest,
@@ -205,10 +203,10 @@ export interface ISessionRuntimeAPI {
 		command: SessionUserMessageSkillTemplateCommand
 	): Promise<SessionUserMessageSkillTemplateResult>;
 
-	openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt>;
-	executeAppTool(command: ExecuteAppToolCommand): Promise<SessionCommandReceipt>;
-	stageAppContext(command: StageAppContextCommand): Promise<SessionCommandReceipt>;
-	readAppResource(request: ReadAppResourceRequest): Promise<SessionAppResourceReadResult>;
+	openAppView(command: MCPAppOpenViewCommand): Promise<SessionCommandReceipt>;
+	executeAppTool(command: MCPAppExecuteToolCommand): Promise<SessionCommandReceipt>;
+	stageAppContext(command: MCPAppStageContextCommand): Promise<SessionCommandReceipt>;
+	readAppResource(request: MCPAppReadResourceRequest): Promise<MCPAppResourceReadResult>;
 
 	createSession(command: CreateSessionCommand): Promise<SessionCommandReceipt>;
 	updateSessionConfiguration(command: UpdateSessionConfigurationCommand): Promise<SessionCommandReceipt>;
@@ -527,22 +525,6 @@ export interface IWorkspaceManagementAPI {
 		workspace: ArtifactRef,
 		selection: WorkspaceRuntimeSelection
 	): Promise<WorkspaceRuntimePlan>;
-}
-
-export interface IConversationStoreAPI {
-	putConversation: (conversation: StoreConversation) => Promise<void>;
-	putMessagesToConversation(id: string, title: string, messages: StoreConversationMessage[]): Promise<void>;
-	deleteConversation: (id: string, title: string) => Promise<void>;
-	getConversation: (id: string, title: string, forceFetch?: boolean) => Promise<StoreConversation | null>;
-	listConversations: (
-		token?: string,
-		pageSize?: number
-	) => Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }>;
-	searchConversations: (
-		query: string,
-		token?: string,
-		pageSize?: number
-	) => Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }>;
 }
 
 export interface IAttachmentsDropAPI {

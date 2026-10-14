@@ -6,23 +6,15 @@ import type {
 	CreateSessionCommand,
 	DeleteSessionCommand,
 	EditAndResendCommand,
-	ExecuteAppToolCommand,
 	ExecuteCallsCommand,
-	OpenAppViewCommand,
 	PauseRunCommand,
-	ReadAppResourceRequest,
 	RenameSessionCommand,
 	ResolveWaitCommand,
 	ResumeRunCommand,
 	RetryCallCommand,
-	RunID,
-	SessionAppResourceReadResult,
-	SessionCommandReceipt,
-	SessionID,
 	SessionRunObservation,
 	SessionRunObserver,
 	SessionRunSnapshot,
-	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
 	SessionSnapshotObservation,
@@ -31,11 +23,18 @@ import type {
 	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
-	StageAppContextCommand,
 	StartRunCommand,
 	UpdateContinuationInputCommand,
 	UpdateSessionConfigurationCommand,
 } from '@/spec/session';
+import type { RunID, SessionCommandReceipt, SessionID, SessionRuntimeEvent } from '@/spec/session_base';
+import type {
+	MCPAppExecuteToolCommand,
+	MCPAppOpenViewCommand,
+	MCPAppReadResourceRequest,
+	MCPAppResourceReadResult,
+	MCPAppStageContextCommand,
+} from '@/spec/session_mcp';
 import type {
 	SessionStoreConversationProjection,
 	SessionStoreListSessionRunsRequest,
@@ -44,7 +43,8 @@ import type {
 	SessionStoreSearchSessionsRequest,
 	SessionStoreSessionPage,
 } from '@/spec/sessionstore';
-import { SessionRunObservationKind, SessionRuntimeEventKind, SessionSnapshotObservationKind } from '@/spec/session';
+import { SessionRunObservationKind, SessionSnapshotObservationKind } from '@/spec/session';
+import { SessionRuntimeEventKind } from '@/spec/session_base';
 
 import type { ISessionManagementAPI, ISessionRuntimeAPI, ISessionStoreAPI } from '@/apis/interface';
 
@@ -202,19 +202,19 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 		return this.runtime.prepareUserMessageSkillTemplate(command);
 	}
 
-	openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt> {
+	openAppView(command: MCPAppOpenViewCommand): Promise<SessionCommandReceipt> {
 		return this.runtime.openAppView(command);
 	}
 
-	executeAppTool(command: ExecuteAppToolCommand): Promise<SessionCommandReceipt> {
+	executeAppTool(command: MCPAppExecuteToolCommand): Promise<SessionCommandReceipt> {
 		return this.runtime.executeAppTool(command);
 	}
 
-	stageAppContext(command: StageAppContextCommand): Promise<SessionCommandReceipt> {
+	stageAppContext(command: MCPAppStageContextCommand): Promise<SessionCommandReceipt> {
 		return this.runtime.stageAppContext(command);
 	}
 
-	readAppResource(request: ReadAppResourceRequest): Promise<SessionAppResourceReadResult> {
+	readAppResource(request: MCPAppReadResourceRequest): Promise<MCPAppResourceReadResult> {
 		return this.runtime.readAppResource(request);
 	}
 

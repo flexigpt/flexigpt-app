@@ -14,15 +14,9 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import type {
-	MCPAuthHealth,
-	MCPPluginView,
-	MCPServerDraft,
-	MCPServerRuntimeSnapshot,
-	MCPServerView,
-	MCPSetupSubmissionValue,
-} from '@/spec/mcp';
-import { MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
+import type { MCPPluginView, MCPServerDraft, MCPServerView, MCPSetupSubmissionValue } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/session_mcp';
+import { MCPAuthHealthState, MCPServerStatus } from '@/spec/session_mcp';
 
 import { getErrorMessage } from '@/lib/error_utils';
 

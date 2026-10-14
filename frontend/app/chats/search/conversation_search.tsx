@@ -4,7 +4,7 @@ import { FiSearch } from 'react-icons/fi';
 
 import { Popover, usePopoverStore, useStoreState } from '@ariakit/react';
 
-import type { ConversationSearchItem } from '@/spec/conversation';
+import type { SessionSearchItem } from '@/spec/sessionstore';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
@@ -16,14 +16,14 @@ export interface ConversationSearchHandle {
 }
 
 interface ConversationSearchProps {
-	onSelectConversation: (item: ConversationSearchItem) => Promise<void>;
+	onSelectSession: (item: SessionSearchItem) => Promise<void>;
 	refreshKey: number;
-	openConversationIds: string[];
+	openSessionIds: string[];
 	compact: boolean;
 }
 
 export const ConversationSearch = forwardRef<ConversationSearchHandle, ConversationSearchProps>(
-	function ConversationSearch({ onSelectConversation, refreshKey, openConversationIds, compact }, ref) {
+	function ConversationSearch({ onSelectSession, refreshKey, openSessionIds, compact }, ref) {
 		const inputRef = useRef<HTMLInputElement>(null);
 		const [focusedIndex, setFocusedIndex] = useState(-1);
 
@@ -32,7 +32,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 		});
 
 		const isOpen = useStoreState(popover, 'open');
-		const openConversationIdSet = useMemo(() => new Set(openConversationIds.filter(Boolean)), [openConversationIds]);
+		const openSessionIdSet = useMemo(() => new Set(openSessionIds.filter(Boolean)), [openSessionIds]);
 
 		const {
 			query,
@@ -46,14 +46,14 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 			searchNow,
 			loadMore,
 			retryCurrentMode,
-			pickConversation,
+			pickSession,
 			deleteTarget,
 			deleteLoading,
-			askDeleteConversation,
+			askDeleteSession,
 			cancelDeleteConversation,
 			confirmDeleteConversation,
 		} = useConversationSearch({
-			onSelectConversation,
+			onSelectSession,
 			refreshKey,
 		});
 
@@ -84,13 +84,13 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 		);
 
 		const handlePick = useCallback(
-			(conversation: ConversationSearchItem) => {
+			(session: SessionSearchItem) => {
 				popover.setOpen(false);
 				setFocusedIndex(-1);
 				inputRef.current?.blur();
-				void pickConversation(conversation);
+				void pickSession(session);
 			},
-			[pickConversation, popover]
+			[pickSession, popover]
 		);
 
 		const handleKeyDown = useCallback(
@@ -117,7 +117,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 					case 'Enter':
 						event.preventDefault();
 						if (focusedIndex >= 0 && focusedIndex < results.length) {
-							handlePick(results[focusedIndex].searchConversation);
+							handlePick(results[focusedIndex].searchSession);
 						} else if (!loading && query.trim()) {
 							searchNow();
 						}
@@ -184,10 +184,10 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 						onRetry={retryCurrentMode}
 						focusedIndex={focusedIndex}
 						onPick={handlePick}
-						onAskDelete={askDeleteConversation}
+						onAskDelete={askDeleteSession}
 						query={query}
 						showSearchAllHintShortQuery={showSearchAllHintShortQuery}
-						openConversationIdSet={openConversationIdSet}
+						openSessionIdSet={openSessionIdSet}
 					/>
 				</Popover>
 

@@ -24,14 +24,9 @@ import type {
 	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
 	MCPToolCapability,
-} from '@/spec/mcp';
-import {
-	MCPAuthHealthState,
-	MCPCompletionRefType,
-	MCPHTTPAuthMode,
-	MCPServerStatus,
-	MCPToolExposure,
-} from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPHTTPAuthMode } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPCompletionRefType, MCPServerStatus, MCPToolExposure } from '@/spec/session_mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
 import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/apis/mcp_management';

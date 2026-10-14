@@ -1,11 +1,11 @@
-import type { ConversationSearchItem } from '@/spec/conversation';
+import type { SessionSearchItem } from '@/spec/sessionstore';
 
 import { extractTimeFromUUIDv7Str } from '@/lib/uuid_utils';
 
 export const CACHE_EXPIRY_TIME = 60_000;
 
 export interface SearchResult {
-	searchConversation: ConversationSearchItem;
+	searchSession: SessionSearchItem;
 	matchType: 'title' | 'message';
 	snippet?: string;
 }
@@ -16,10 +16,10 @@ export interface SearchResult {
  * retain the old UUIDv7 timestamp fallback without putting Date objects back
  * into the application conversation contract.
  */
-export function conversationSearchDate(conversation: ConversationSearchItem): Date {
-	const modifiedAt = conversation.modifiedAt ? new Date(conversation.modifiedAt) : undefined;
+export function sessionSearchDate(session: SessionSearchItem): Date {
+	const modifiedAt = session.modifiedAt ? new Date(session.modifiedAt) : undefined;
 
-	return modifiedAt && !Number.isNaN(modifiedAt.getTime()) ? modifiedAt : extractTimeFromUUIDv7Str(conversation.id);
+	return modifiedAt && !Number.isNaN(modifiedAt.getTime()) ? modifiedAt : extractTimeFromUUIDv7Str(session.id);
 }
 
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
@@ -66,8 +66,8 @@ export const mergeUniqBy = <T, K>(a: T[], b: T[], getKey: (item: T) => K): T[] =
 };
 
 export function sortConversationSearchResults(a: SearchResult, b: SearchResult): number {
-	const tA = conversationSearchDate(a.searchConversation).getTime();
-	const tB = conversationSearchDate(b.searchConversation).getTime();
+	const tA = sessionSearchDate(a.searchSession).getTime();
+	const tB = sessionSearchDate(b.searchSession).getTime();
 
 	if (tA !== tB) {
 		return tB - tA;
@@ -78,9 +78,9 @@ export function sortConversationSearchResults(a: SearchResult, b: SearchResult):
 	return a.matchType === 'title' ? -1 : 1;
 }
 
-export function conversationsToSearchResults(conversations: ConversationSearchItem[]): SearchResult[] {
-	return conversations.map(conversation => ({
-		searchConversation: conversation,
+export function sessionsToSearchResults(sessions: SessionSearchItem[]): SearchResult[] {
+	return sessions.map(session => ({
+		searchSession: session,
 		matchType: 'title',
 	}));
 }

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { Conversation } from '@/spec/conversation';
-import type { SessionConfiguration } from '@/spec/session';
+import type { Conversation, SessionConfiguration } from '@/spec/session';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';

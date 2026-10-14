@@ -1,6 +1,5 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
-import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/conversation';
 import type {
 	InputOutputContent,
 	InputOutputContentItemUnion,
@@ -11,11 +10,11 @@ import type {
 	UIToolCall,
 	UIToolOutput,
 } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/session';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
-import { CONVERSATION_SCHEMA_VERSION } from '@/spec/conversation';
 import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
@@ -32,7 +31,7 @@ import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
 	return {
-		schemaVersion: CONVERSATION_SCHEMA_VERSION,
+		schemaVersion: 'v1',
 		id: getUUIDv7(),
 		title: generateTitle(title).title,
 		createdAt: new Date().toISOString(),

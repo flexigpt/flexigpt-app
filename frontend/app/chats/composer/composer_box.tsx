@@ -2,11 +2,10 @@ import type { RefObject } from 'react';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
-import type { MCPAppModelContextUpdate } from '@/spec/mcp';
 import type { UIModelOption } from '@/spec/model';
-import type { SessionConfiguration } from '@/spec/session';
+import type { RestorableConversationContext, SessionConfiguration } from '@/spec/session';
+import type { MCPAppModelContextUpdate } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { SkillSessionSyncMode } from '@/spec/skill';

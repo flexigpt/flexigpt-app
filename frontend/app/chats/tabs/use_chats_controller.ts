@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStoreState } from '@ariakit/react';
 import { useTabStore } from '@ariakit/react/tab';
 
-import type { Conversation, ConversationSearchItem } from '@/spec/conversation';
+import type { Conversation } from '@/spec/session';
+import type { SessionSearchItem } from '@/spec/sessionstore';
 import { SessionSnapshotObservationKind } from '@/spec/session';
+import { SessionRuntimeEventKind } from '@/spec/session_base';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { defaultShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
@@ -38,6 +40,17 @@ interface UseChatsControllerArgs {
 	conversationAreaRef: RefObject<ConversationAreaHandle | null>;
 	searchRef: RefObject<ConversationSearchHandle | null>;
 }
+
+const SEARCH_REFRESH_EVENTS = new Set([
+	SessionRuntimeEventKind.SessionCreated,
+	SessionRuntimeEventKind.SessionRenamed,
+	SessionRuntimeEventKind.SessionDeleted,
+	SessionRuntimeEventKind.RunAccepted,
+	SessionRuntimeEventKind.ModelOperationFinished,
+	SessionRuntimeEventKind.RunCompleted,
+	SessionRuntimeEventKind.RunFailed,
+	SessionRuntimeEventKind.RunCancelled,
+]);
 
 function scheduleIdleWork(work: () => void, timeout = 1500): () => void {
 	if (typeof window.requestIdleCallback === 'function') {
@@ -147,6 +160,35 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const [tabs, setTabs] = useState<ChatTabState[]>(() => initialModel.tabs);
 	const tabsRef = useRef(initialModel.tabs);
+	const [searchRefreshKey, setSearchRefreshKey] = useState(0);
+	const searchRefreshTimerRef = useRef<number | null>(null);
+
+	const scheduleSearchRefresh = useCallback(() => {
+		if (searchRefreshTimerRef.current !== null) {
+			window.clearTimeout(searchRefreshTimerRef.current);
+		}
+
+		searchRefreshTimerRef.current = window.setTimeout(() => {
+			searchRefreshTimerRef.current = null;
+			setSearchRefreshKey(current => current + 1);
+		}, 250);
+	}, []);
+
+	useEffect(() => {
+		const unsubscribe = sessionManagementAPI.subscribeRuntimeEvents(event => {
+			if (SEARCH_REFRESH_EVENTS.has(event.kind)) {
+				scheduleSearchRefresh();
+			}
+		});
+
+		return () => {
+			unsubscribe();
+			if (searchRefreshTimerRef.current !== null) {
+				window.clearTimeout(searchRefreshTimerRef.current);
+				searchRefreshTimerRef.current = null;
+			}
+		};
+	}, [scheduleSearchRefresh]);
 
 	const [mountedInputTabIds, setMountedInputTabIds] = useState<Set<string>>(
 		() => new Set(initialSelectedTabId ? [initialSelectedTabId] : [])
@@ -394,6 +436,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const loadVersion = beginTabLoad(tabId);
 			const load = (async () => {
 				try {
+					if (!tab.sessionID) {
+						return;
+					}
 					const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
@@ -739,7 +784,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	}, []);
 
 	const loadConversationIntoTab = useCallback(
-		async (tabId: string, item: ConversationSearchItem) => {
+		async (tabId: string, item: SessionSearchItem) => {
 			const loadVersion = beginTabLoad(tabId);
 			updateTab(tabId, tab => ({
 				...tab,
@@ -807,8 +852,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		[beginTabLoad, conversationAreaRef, isTabLoadCurrent, updateTab]
 	);
 
-	const handleSelectConversation = useCallback(
-		async (item: ConversationSearchItem) => {
+	const handleSelectSession = useCallback(
+		async (item: SessionSearchItem) => {
 			const alreadyOpen = tabsRef.current.find(tab => tab.conversation.id === item.id);
 			if (alreadyOpen) {
 				selectTab(alreadyOpen.tabId);
@@ -921,10 +966,11 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		openNewTab,
 		closeTab,
 		renameTabTitle,
-		handleSelectConversation,
+		handleSelectSession,
 		getConversationForExport,
 		tabBarItems,
 		openConversationIds,
+		searchRefreshKey,
 		maxTabs: MAX_TABS,
 		preloadWorkflowStarter,
 	};

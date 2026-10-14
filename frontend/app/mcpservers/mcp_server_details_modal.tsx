@@ -2,17 +2,17 @@ import type { ReactNode } from 'react';
 import { useCallback } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
+import type { MCPPluginView, MCPServerView } from '@/spec/mcp';
 import type {
 	MCPAuthHealth,
-	MCPPluginView,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPServerRuntimeSnapshot,
-	MCPServerView,
 	MCPToolCapability,
-} from '@/spec/mcp';
-import { MCPServerType, MCPToolRisk } from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPServerType } from '@/spec/mcp';
+import { MCPToolRisk } from '@/spec/session_mcp';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 

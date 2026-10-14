@@ -1,23 +1,22 @@
 import type {
-	MCPAuthHealth,
 	MCPHTTPAuthMode,
-	MCPServerStatus,
 	MCPServerView,
-	MCPToolCapability,
-	MCPToolRisk,
 	MCPTransportType,
 } from '@/spec/mcp';
 import {
 	MCPApprovalRule,
-	MCPAppVisibility,
-	MCPAuthHealthState as MCPAuthHealthStateEnum,
 	MCPExecutionMode,
 	MCPHTTPAuthMode as MCPHTTPAuthModeEnum,
-	MCPServerStatus as MCPServerStatusEnum,
-	MCPToolRisk as MCPToolRiskEnum,
 	MCPTransportType as MCPTransportTypeEnum,
 	MCPTrustLevel,
 } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPServerStatus, MCPToolCapability, MCPToolRisk } from '@/spec/session_mcp';
+import {
+	MCPAppVisibility,
+	MCPAuthHealthState as MCPAuthHealthStateEnum,
+	MCPServerStatus as MCPServerStatusEnum,
+	MCPToolRisk as MCPToolRiskEnum,
+} from '@/spec/session_mcp';
 
 import { getAuthMode, getMCPServerSetupStatus, getServerAuthHealthState } from '@/apis/mcp_management';
 

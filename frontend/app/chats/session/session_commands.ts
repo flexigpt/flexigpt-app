@@ -1,12 +1,6 @@
-import type {
-	SessionCommandMeta,
-	SessionCommandReceipt,
-	SessionRevision,
-	SessionRun,
-	SessionRunSnapshot,
-	SessionSnapshot,
-} from '@/spec/session';
-import { SessionRunState } from '@/spec/session';
+import type { SessionRun, SessionRunSnapshot, SessionSnapshot } from '@/spec/session';
+import type { SessionCommandMeta, SessionCommandReceipt, SessionRevision } from '@/spec/session_base';
+import { SessionRunState } from '@/spec/session_base';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 

@@ -1,6 +1,5 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp';
-import type { SessionAppRenderTarget } from '@/spec/session';
+import type { MCPAppRenderTarget, MCPToolSelection } from '@/spec/session_mcp';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
@@ -8,7 +7,7 @@ import type { SessionAppRenderTarget } from '@/spec/session';
  */
 export interface MCPAppInstance {
 	instanceID: string;
-	session: SessionAppRenderTarget;
+	session: MCPAppRenderTarget;
 	server: string;
 	resourceUri: string;
 	mimeType?: string;

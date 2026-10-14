@@ -4,7 +4,8 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
 import type { SessionConfiguration } from '@/spec/session';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
-import { SessionCollectionOverrideMode, SessionModelDefaultField } from '@/spec/session';
+import { SessionModelDefaultField } from '@/spec/session';
+import { SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 

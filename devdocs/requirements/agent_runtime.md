@@ -1372,6 +1372,17 @@ Composer does not:
 
 ### Frontend transport and management-facade delivery
 
+- [x] The obsolete standalone `spec/conversation.ts` contract has been
+      removed. Chat rendering projections now live with Session types and
+      SessionStore owns search-row metadata.
+- [x] MCP runtime, discovery, authorization, provider-tool mapping, MCP App,
+      and Session MCP-selection contracts are centralized in
+      `spec/session_mcp.ts`. The former `SessionMCP*` frontend names were
+      removed in favor of MCP-prefixed contracts.
+- [x] Session-backed chat search now receives a coalesced refresh key for
+      Session creation, rename, deletion, admission, model completion, and
+      terminal Run events. An active full-text query is rerun rather than
+      silently falling back to recents after a Session mutation.
 - [x] Wails transport contracts now match the actual exported Go wrapper
       methods rather than stale direct-completion, Tool-runtime, Skill-runtime,
       or MCP-invocation assumptions.
@@ -1556,6 +1567,9 @@ Frontend migration remains separately tracked.
 
 ### Backend runtime-setup delivery
 
+- [x] Existing Go Session MCP intent records already use MCP-prefixed domain
+      types; frontend Session MCP contracts now mirror that boundary instead
+      of maintaining parallel `SessionMCP*` projections.
 - [x] `internal/agentruntime-go/runtimesetup` is the only Session, inference, and domain composition root.
 - [x] Inference receives only provider-ready completion data.
 - [x] Domain-aware operation composition lives in runtime-setup adapters.

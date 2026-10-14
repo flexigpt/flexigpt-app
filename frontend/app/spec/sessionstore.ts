@@ -1,11 +1,5 @@
-import type {
-	RunID,
-	Session,
-	SessionID,
-	SessionRunOutcome,
-	SessionRunSnapshot,
-	SessionTranscriptMessage,
-} from '@/spec/session';
+import type { SessionRunOutcome, SessionTranscriptMessage } from '@/spec/session';
+import type { RunID, SessionID } from '@/spec/session_base';
 
 export interface SessionStoreConversationProjection {
 	schemaVersion: string;
@@ -39,6 +33,16 @@ export interface SessionStoreSessionListItem {
 	activeRunIDs?: RunID[];
 }
 
+/**
+ * Search rows are SessionStore-owned metadata projections. They intentionally
+ * do not expose a separate Conversation domain identity.
+ */
+export interface SessionSearchItem {
+	id: SessionID;
+	title: string;
+	modifiedAt?: string;
+}
+
 export interface SessionStoreSessionPage {
 	items: SessionStoreSessionListItem[];
 	nextPageToken?: string;
@@ -58,14 +62,4 @@ export interface SessionStoreRunListItem {
 	updatedAt: string;
 	pendingWaitCount: number;
 	outcome?: SessionRunOutcome;
-}
-
-export interface SessionStoreAPIShape {
-	readSession(sessionID: SessionID, forceFetch?: boolean): Promise<Session>;
-	readConversation(sessionID: SessionID, forceFetch?: boolean): Promise<SessionStoreConversationProjection>;
-	readRun(sessionID: SessionID, runID: RunID, forceFetch?: boolean): Promise<SessionRunSnapshot>;
-	listSessions(request?: SessionStoreListSessionsRequest): Promise<SessionStoreSessionPage>;
-	searchSessions(request: SessionStoreSearchSessionsRequest): Promise<SessionStoreSessionPage>;
-	listSessionRuns(request: SessionStoreListSessionRunsRequest): Promise<SessionStoreRunListItem[]>;
-	exportSession(sessionID: SessionID): Promise<string>;
 }

@@ -21,7 +21,7 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';

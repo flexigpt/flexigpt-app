@@ -1,4 +1,5 @@
-import type { Session, SessionID, SessionRunSnapshot } from '@/spec/session';
+import type { Session, SessionRunSnapshot } from '@/spec/session';
+import type { SessionID } from '@/spec/session_base';
 import type {
 	SessionStoreConversationProjection,
 	SessionStoreListSessionRunsRequest,

@@ -1,8 +1,8 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FiUser, FiZap } from 'react-icons/fi';
 
-import type { ConversationMessage } from '@/spec/conversation';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { ConversationMessage } from '@/spec/session';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { RoleEnum, Status } from '@/spec/inference';
 

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { FiAlertCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 
-import type { MCPAuthHealth, MCPServerView } from '@/spec/mcp';
-import { MCPAuthHealthState } from '@/spec/mcp';
+import type { MCPServerView } from '@/spec/mcp';
+import type { MCPAuthHealth } from '@/spec/session_mcp';
+import { MCPAuthHealthState } from '@/spec/session_mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 

@@ -1,19 +1,9 @@
 import type { ArtifactRef, ArtifactState, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
 import type { PluginListItem, PluginView } from '@/spec/plugin';
-
-import type { JSONRawString } from '@/lib/jsonschema_utils';
+import type { MCPAuthHealth, MCPRuntimeServerID, MCPServerRuntimeSnapshot } from '@/spec/session_mcp';
 
 export const MCP_SCHEMA_VERSION = 'v1';
 export const MCP_APP_HTML_MIME_TYPE = 'text/html;profile=mcp-app';
-
-type MCPTimestamp = string;
-
-/**
- * Runtime-owned opaque MCP identities. Frontend code may carry these values
- * between Runtime calls but must not construct or parse them.
- */
-export type MCPRuntimeServerID = string;
-type MCPRuntimeCatalogID = string;
 
 export interface MCPPluginPage {
 	items: PluginListItem[];
@@ -79,82 +69,6 @@ export enum MCPExecutionMode {
 	Auto = 'auto',
 }
 
-export enum MCPServerStatus {
-	Disabled = 'disabled',
-	Disconnected = 'disconnected',
-	Connecting = 'connecting',
-	Ready = 'ready',
-	Error = 'error',
-}
-
-export enum MCPAuthHealthState {
-	NotRequired = 'notRequired',
-	NotConfigured = 'notConfigured',
-	AuthorizationNeeded = 'authorizationNeeded',
-	AuthorizationPending = 'authorizationPending',
-	Authorized = 'authorized',
-	Expired = 'expired',
-	InsufficientScope = 'insufficientScope',
-	Error = 'error',
-}
-
-export enum MCPToolRisk {
-	Unknown = 'unknown',
-	Read = 'read',
-	Write = 'write',
-	Destructive = 'destructive',
-	OpenWorld = 'openWorld',
-}
-
-export enum MCPTaskSupport {
-	Forbidden = 'forbidden',
-	Optional = 'optional',
-	Required = 'required',
-}
-
-export enum MCPInvocationSource {
-	Model = 'model',
-	User = 'user',
-	App = 'app',
-}
-
-export enum MCPApprovalDecision {
-	Allowed = 'allowed',
-	Denied = 'denied',
-	ApprovalRequired = 'approvalRequired',
-}
-
-export enum MCPApprovalResolution {
-	AllowOnce = 'allowOnce',
-	AllowAlways = 'allowAlways',
-	DenyOnce = 'denyOnce',
-	DenyAlways = 'denyAlways',
-}
-
-export enum MCPContentType {
-	Text = 'text',
-	Image = 'image',
-	Audio = 'audio',
-	ResourceLink = 'resource_link',
-	Resource = 'resource',
-}
-
-export enum MCPAppVisibility {
-	Model = 'model',
-	App = 'app',
-}
-
-export enum MCPToolExposure {
-	None = 'none',
-	All = 'all',
-	Selected = 'selected',
-}
-
-export enum MCPCompletionRefType {
-	Resource = 'resource',
-	Prompt = 'prompt',
-}
-
 export interface MCPServerPolicy {
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
@@ -205,349 +119,6 @@ export interface MCPServerInstallationDataView {
 	selectedConnectionProfile?: string;
 	inputs?: Record<string, MCPInstallationInputView>;
 	additionalPolicies?: ArtifactRef[];
-}
-
-interface MCPServerCapabilitiesSummary {
-	tools?: boolean;
-	toolsListChanged?: boolean;
-	resources?: boolean;
-	resourcesSubscribe?: boolean;
-	resourcesListChanged?: boolean;
-	prompts?: boolean;
-	promptsListChanged?: boolean;
-	completions?: boolean;
-	experimental?: Record<string, any>;
-	extensions?: Record<string, any>;
-}
-
-export interface MCPToolAnnotations {
-	destructiveHint?: boolean;
-	idempotentHint: boolean;
-	openWorldHint?: boolean;
-	readOnlyHint: boolean;
-	title?: string;
-}
-
-export interface MCPToolAppInfo {
-	resourceUri?: string;
-	visibility?: MCPAppVisibility[];
-}
-
-export interface MCPToolCapability {
-	server: MCPRuntimeServerID;
-	toolName: string;
-	providerToolName: string;
-	choiceID: string;
-
-	title?: string;
-	displayName: string;
-	description?: string;
-
-	inputSchema?: Record<string, any>;
-	outputSchema?: Record<string, any>;
-
-	annotations?: MCPToolAnnotations;
-	inferredRisk: MCPToolRisk;
-	approvalRule: MCPApprovalRule;
-	executionMode: MCPExecutionMode;
-	taskSupport: MCPTaskSupport;
-	app?: MCPToolAppInfo;
-
-	digest: string;
-	enabled: boolean;
-	stale?: boolean;
-}
-
-export interface MCPArgumentDefinition {
-	name: string;
-	title?: string;
-	description?: string;
-	required?: boolean;
-}
-
-export interface MCPResourceRef {
-	server: MCPRuntimeServerID;
-	uri: string;
-	name?: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	mimeType?: string;
-	size?: number;
-	annotations?: Record<string, any>;
-	digest?: string;
-}
-
-export interface MCPResourceTemplateRef {
-	server: MCPRuntimeServerID;
-	uriTemplate: string;
-	name?: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	mimeType?: string;
-	arguments?: Record<string, MCPArgumentDefinition>;
-	annotations?: Record<string, any>;
-	digest?: string;
-}
-
-export interface MCPPromptRef {
-	server: MCPRuntimeServerID;
-	promptName: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	arguments?: Record<string, MCPArgumentDefinition>;
-	digest?: string;
-}
-
-export interface MCPResourceTemplateSelection extends MCPResourceTemplateRef {
-	argumentValues?: Record<string, string>;
-}
-
-export interface MCPPromptSelection extends MCPPromptRef {
-	argumentValues?: Record<string, string>;
-}
-
-export interface MCPToolSelection {
-	server: MCPRuntimeServerID;
-	toolName: string;
-	providerToolName?: string;
-	choiceID?: string;
-	digest?: string;
-	approvalRule?: MCPApprovalRule;
-	executionMode?: MCPExecutionMode;
-	appResourceUri?: string;
-	visibility?: MCPAppVisibility[];
-}
-
-export interface MCPProviderToolMapping {
-	server: MCPRuntimeServerID;
-	providerToolName: string;
-	choiceID: string;
-	toolName: string;
-	toolDigest: string;
-	approvalRule?: MCPApprovalRule;
-	executionMode?: MCPExecutionMode;
-	appResourceUri?: string;
-	visibility?: MCPAppVisibility[];
-}
-
-export interface MCPServerSelection {
-	server: MCPRuntimeServerID;
-	snapshotDigest?: string;
-	toolExposure: MCPToolExposure;
-	selectedTools?: MCPToolSelection[];
-	includeServerInstructions?: boolean;
-}
-
-export interface MCPConversationContext {
-	servers: MCPServerSelection[];
-	resources?: MCPResourceRef[];
-	resourceTemplates?: MCPResourceTemplateSelection[];
-	prompts?: MCPPromptSelection[];
-}
-
-interface MCPIcon {
-	src: string;
-	mimeType?: string;
-	sizes?: string[];
-	theme?: string;
-}
-
-interface MCPResourceContents {
-	uri: string;
-	mimeType?: string;
-	text?: string;
-	blob?: number[];
-	_meta?: Record<string, any>;
-}
-
-export interface MCPContent {
-	type: MCPContentType;
-	text?: string;
-	data?: number[];
-	mimeType?: string;
-	uri?: string;
-	name?: string;
-	title?: string;
-	description?: string;
-	size?: number;
-	resource?: MCPResourceContents;
-	annotations?: Record<string, any>;
-	_meta?: Record<string, any>;
-	icons?: MCPIcon[];
-}
-
-interface MCPPromptMessage {
-	role: string;
-	content: MCPContent;
-}
-
-interface MCPToolCallProvenance {
-	server: MCPRuntimeServerID;
-	catalog: MCPRuntimeCatalogID;
-	serverDisplayName?: string;
-	toolName: string;
-	providerToolName: string;
-	toolDigest?: string;
-	choiceID?: string;
-	toolUseID?: string;
-	approvalID?: string;
-	appResourceUri?: string;
-	appInstanceID?: string;
-}
-
-export interface InvokeMCPToolRequestBody {
-	source: MCPInvocationSource;
-	toolName: string;
-	providerToolName?: string;
-	choiceID?: string;
-	toolDigest?: string;
-	arguments?: Record<string, any>;
-	approvalID?: string;
-	approvalToken?: string;
-	conversationID?: string;
-	messageID?: string;
-	toolUseID?: string;
-	appInstanceID?: string;
-}
-
-export interface MCPToolAppRenderInfo {
-	resourceUri?: string;
-	mimeType?: string;
-	content?: MCPContent[];
-	structuredContent?: any;
-	isError?: boolean;
-}
-
-export interface InvokeMCPToolResponseBody {
-	server: MCPRuntimeServerID;
-	toolName: string;
-	providerToolName?: string;
-	content?: MCPContent[];
-	structuredContent?: any;
-	isError?: boolean;
-	provenance: MCPToolCallProvenance;
-	app?: MCPToolAppRenderInfo;
-}
-
-export interface MCPReadResourceResponseBody {
-	server: MCPRuntimeServerID;
-	uri: string;
-	contents?: MCPContent[];
-}
-
-export interface MCPGetPromptResponseBody {
-	server: MCPRuntimeServerID;
-	promptName: string;
-	description?: string;
-	messages?: MCPPromptMessage[];
-}
-
-export interface MCPCompletionResult {
-	values?: string[];
-	total?: number;
-	hasMore?: boolean;
-}
-
-export interface MCPApprovalSummary {
-	server: MCPRuntimeServerID;
-	serverDisplayName?: string;
-	source: MCPInvocationSource;
-	appInstanceID?: string;
-	toolName: string;
-	toolDigest?: string;
-	risk: MCPToolRisk;
-	arguments?: JSONRawString;
-}
-
-export interface MCPApprovalEvaluation {
-	decision: MCPApprovalDecision;
-	reason?: string;
-	approvalID?: string;
-	expiresAt?: MCPTimestamp;
-	summary?: MCPApprovalSummary;
-}
-
-export interface MCPApprovalResolutionResult {
-	approvalID: string;
-	resolution: MCPApprovalResolution;
-	decision: MCPApprovalDecision;
-	rememberedForSession?: boolean;
-	token?: string;
-	expiresAt?: string;
-}
-export interface MCPAppModelContextUpdate {
-	instanceID?: string;
-	server: MCPRuntimeServerID;
-	resourceUri?: string;
-	content?: MCPContent[];
-	structuredContent?: any;
-	updatedAt?: MCPTimestamp;
-	rawArguments?: JSONRawString;
-}
-
-export enum MCPAuthState {
-	NotRequired = 'notRequired',
-	Required = 'required',
-	Authorized = 'authorized',
-	Expired = 'expired',
-	InsufficientScope = 'insufficientScope',
-	Error = 'error',
-}
-
-export interface MCPAuthStatus {
-	server: MCPRuntimeServerID;
-	authMode: MCPHTTPAuthMode;
-	state: MCPAuthState;
-	scopes?: string[];
-	expiresAt?: MCPTimestamp;
-	lastError?: string;
-	authorizationServer?: string;
-	resource?: string;
-}
-
-export interface MCPOAuthAuthorization {
-	server: MCPRuntimeServerID;
-	authorizationURL: string;
-	expiresAt?: MCPTimestamp;
-}
-
-export interface MCPAuthHealth {
-	server: MCPRuntimeServerID;
-	authMode: MCPHTTPAuthMode;
-	state: MCPAuthHealthState;
-	configured: boolean;
-	resource?: string;
-	scopes?: string[];
-	expiresAt?: MCPTimestamp;
-	authorizationPending?: boolean;
-	authorizationURL?: string;
-	authorizationExpiresAt?: MCPTimestamp;
-	oauthRedirectURL?: string;
-	oauthLoopbackListenAddr?: string;
-	oauthLoopbackReady?: boolean;
-	oauthLoopbackError?: string;
-	lastError?: string;
-}
-
-export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
-	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
-}
-
-export function isMCPExecutionMode(value: unknown): value is MCPExecutionMode {
-	return typeof value === 'string' && Object.values(MCPExecutionMode).includes(value as MCPExecutionMode);
-}
-
-export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
-	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
-}
-
-enum MCPPlatform {
-	Linux = 'linux',
-	Darwin = 'darwin',
-	Windows = 'windows',
 }
 
 interface MCPServerCore {
@@ -602,7 +173,7 @@ interface MCPHTTPProfile {
 }
 
 interface MCPConnectionProfile {
-	platforms?: MCPPlatform[];
+	platforms?: Array<'linux' | 'darwin' | 'windows'>;
 	stdio?: MCPStdioProfile;
 	http?: MCPHTTPProfile;
 }
@@ -620,10 +191,12 @@ interface MCPServerConfiguration {
 	policy?: MCPServerPolicyReference;
 }
 
-// Exact frontend projection of Go server.ServerDocument.
-//
-// It is used for mutable user Servers and protected built-in Servers alike.
-// It is not a portable declaration and does not contain raw secret values.
+/**
+ * Exact frontend projection of Go server.ServerDocument.
+ *
+ * It is used for mutable user Servers and protected built-in Servers alike.
+ * It is not a portable declaration and does not contain raw secret values.
+ */
 export interface MCPServerDocument {
 	logicalName: string;
 	logicalVersion?: string;
@@ -665,6 +238,21 @@ export interface ManagedMCPPolicyUpsertResult {
 	membershipCreated: boolean;
 }
 
+export interface ManagedMCPReplaceRequest {
+	plugin: ArtifactRef;
+	expectedPluginRevision: number;
+	artifact: ArtifactRef;
+	expectedArtifactRevision: number;
+	document: MCPServerDocument;
+	enabled: boolean;
+}
+
+export interface ManagedMCPReplaceResult {
+	artifact: StoreArtifact;
+	address: StoreArtifactAddress;
+	plugin: PluginView;
+}
+
 export interface MCPServerInstallationView {
 	artifact: StoreArtifact;
 	document: MCPServerDocument;
@@ -686,38 +274,14 @@ interface MCPEffectivePolicy {
 }
 
 /**
- * Bridge-facing aggregate response. Components should use MCPServerView or
- * MCPRuntimeServerView, both created by MCPManagementAPI.
+ * Management aggregate result. Runtime observations are typed in
+ * session_mcp.ts because they are process-local Session/MCP runtime state.
  */
 export interface MCPServerDetails {
 	settings: MCPServerInstallationView;
 	policy: MCPEffectivePolicy;
 	authorization: MCPAuthHealth;
 	connection: MCPServerRuntimeSnapshot;
-}
-
-export interface MCPServerRuntimeDetails {
-	ref: ArtifactRef;
-	connection: MCPServerRuntimeSnapshot;
-	authorization?: MCPAuthStatus;
-	pendingAuthorization?: MCPOAuthAuthorization;
-}
-
-export interface MCPRuntimeServerView {
-	ref: ArtifactRef;
-	runtimeServerID: MCPRuntimeServerID;
-	authorization?: MCPAuthStatus;
-	pendingAuthorization?: MCPOAuthAuthorization;
-	runtime: MCPServerRuntimeSnapshot;
-}
-
-export interface MCPServerSetupView {
-	server: ArtifactRef;
-	displayName: string;
-	builtIn: boolean;
-	settingsRevision: number;
-	note?: string;
-	inputs: MCPSetupInputView[];
 }
 
 interface MCPServerSecretInput {
@@ -731,6 +295,10 @@ interface MCPServerSecretInput {
 
 export interface MCPServerSecretsView {
 	inputs: MCPServerSecretInput[];
+}
+
+export interface MCPAuthSettings {
+	oauthLoopbackListenAddr?: string;
 }
 
 export interface MCPSettings {
@@ -762,58 +330,12 @@ export interface MCPPolicyListItem {
 	builtIn: boolean;
 }
 
-interface MCPRuntimeImplementationInfo {
-	name?: string;
-	version?: string;
-}
-
-export interface MCPServerRuntimeSnapshot {
-	server: MCPRuntimeServerID;
-	catalog: MCPRuntimeCatalogID;
-	status: MCPServerStatus;
-	generation: number;
-	negotiatedProtocolVersion?: string;
-	serverInfo?: MCPRuntimeImplementationInfo;
-	serverCapabilities?: MCPServerCapabilitiesSummary;
-	instructions?: string;
-	lastError?: string;
-	lastConnectedAt?: string;
-	lastSyncedAt?: string;
-	toolCount: number;
-	resourceCount: number;
-	resourceTemplateCount: number;
-	promptCount: number;
-	snapshotDigest?: string;
-}
-
-export interface MCPCompleteArgumentRequestBody {
-	refType: MCPCompletionRefType;
-	name: string;
-	argumentName: string;
-	argumentValue?: string;
-	context?: Record<string, string>;
-}
-
-export type MCPRuntimeInvokeToolResponse = InvokeMCPToolResponseBody;
-
-export interface MCPAuthSettings {
-	oauthLoopbackListenAddr?: string;
-}
-
-export interface ManagedMCPReplaceRequest {
-	plugin: ArtifactRef;
-	expectedPluginRevision: number;
-	artifact: ArtifactRef;
-	expectedArtifactRevision: number;
-	document: MCPServerDocument;
-	enabled: boolean;
-}
-
-export interface ManagedMCPReplaceResult {
-	artifact: StoreArtifact;
-	address: StoreArtifactAddress;
-	plugin: PluginView;
-}
+/**
+ * UI-facing management projection over one Plugin-backed MCP Server.
+ *
+ * Durable Server settings remain in this module. Process-local runtime fields
+ * are imported from session_mcp.ts.
+ */
 
 /**
  * UI-facing projection over a Plugin-backed MCP grouping.
@@ -867,6 +389,15 @@ export interface MCPSetupSubmissionValue {
 	value?: string;
 	clientID?: string;
 	clientSecret?: string;
+}
+
+export interface MCPServerSetupView {
+	server: ArtifactRef;
+	displayName: string;
+	builtIn: boolean;
+	settingsRevision: number;
+	note?: string;
+	inputs: MCPSetupInputView[];
 }
 
 export interface MCPStdioSecretDraft {

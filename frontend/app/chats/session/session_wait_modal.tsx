@@ -1,5 +1,5 @@
-import type { SessionWaitingRequest, SessionWaitResolution } from '@/spec/session';
-import { SessionWaitResolution as SessionWaitResolutionValue, SessionWaitStatus } from '@/spec/session';
+import type { SessionWaitingRequest } from '@/spec/session_base';
+import { SessionWaitResolution, SessionWaitStatus } from '@/spec/session_base';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
@@ -36,17 +36,17 @@ function formatSummary(value: unknown): string {
 
 function labelForResolution(value: SessionWaitResolution): string {
 	switch (value) {
-		case SessionWaitResolutionValue.ApproveOnce:
+		case SessionWaitResolution.ApproveOnce:
 			return 'Approve once';
-		case SessionWaitResolutionValue.ApproveAlways:
+		case SessionWaitResolution.ApproveAlways:
 			return 'Approve for this session';
-		case SessionWaitResolutionValue.DenyOnce:
+		case SessionWaitResolution.DenyOnce:
 			return 'Deny once';
-		case SessionWaitResolutionValue.DenyAlways:
+		case SessionWaitResolution.DenyAlways:
 			return 'Deny for this session';
-		case SessionWaitResolutionValue.Continue:
+		case SessionWaitResolution.Continue:
 			return 'Continue';
-		case SessionWaitResolutionValue.Cancel:
+		case SessionWaitResolution.Cancel:
 			return 'Cancel run';
 		default:
 			return value;
@@ -82,9 +82,9 @@ export function SessionWaitModal({ wait, isResolving, error, onResolve }: Sessio
 								key={resolution}
 								type="button"
 								className={`btn rounded-xl ${
-									resolution.includes('deny') || resolution === SessionWaitResolutionValue.Cancel
+									resolution.includes('deny') || resolution === SessionWaitResolution.Cancel
 										? 'btn-error'
-										: resolution.includes('approve') || resolution === SessionWaitResolutionValue.Continue
+										: resolution.includes('approve') || resolution === SessionWaitResolution.Continue
 											? 'btn-primary'
 											: 'bg-base-300'
 								}`}

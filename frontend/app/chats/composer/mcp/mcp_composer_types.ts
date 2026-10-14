@@ -1,8 +1,8 @@
+import type { MCPPluginView, MCPServerView, MCPTransportType } from '@/spec/mcp';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
 	MCPConversationContext,
-	MCPPluginView,
 	MCPPromptRef,
 	MCPPromptSelection,
 	MCPResourceRef,
@@ -10,13 +10,10 @@ import type {
 	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
-	MCPServerSelection,
-	MCPServerView,
 	MCPToolCapability,
 	MCPToolSelection,
-	MCPTransportType,
-} from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPToolExposure } from '@/spec/session_mcp';
 
 export interface MCPComposerServerOption {
 	plugin: MCPPluginView;
@@ -166,7 +163,7 @@ export function mcpSelectionToContext(
 		return undefined;
 	}
 
-	const servers: MCPServerSelection[] = selections.map(selection => ({
+	const servers = selections.map(selection => ({
 		server: selection.server,
 		snapshotDigest: selection.snapshotDigest,
 		toolExposure: selection.toolExposure,

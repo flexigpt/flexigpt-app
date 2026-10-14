@@ -1,11 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef, CapabilityOccurrence } from '@/spec/artifact';
-import type {
-	SessionArtifactOverride,
-	SessionMCPServerOverride,
-	SessionWorkspaceSelectionIntent,
-} from '@/spec/session';
+import type { SessionArtifactOverride, SessionWorkspaceSelectionIntent } from '@/spec/session';
+import type { MCPServerOverride } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type {
 	WorkspaceConversationResourceSelectionRef,
@@ -18,7 +15,7 @@ import type {
 	WorkspaceSkill,
 } from '@/spec/workspace';
 import { ArtifactState } from '@/spec/artifact';
-import { SessionCollectionOverrideMode } from '@/spec/session';
+import { SessionCollectionOverrideMode } from '@/spec/session_base';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
@@ -219,7 +216,7 @@ function applyArtifactOverrides(
 
 function applyMCPOverrides(
 	baseline: WorkspaceConversationResourceSelectionRef[],
-	overrides: SessionMCPServerOverride[] | undefined
+	overrides: MCPServerOverride[] | undefined
 ): WorkspaceConversationResourceSelectionRef[] {
 	const byKey = new Map(baseline.map(value => [refKey(value.artifact), value] as const));
 	const order = baseline.map(value => refKey(value.artifact));

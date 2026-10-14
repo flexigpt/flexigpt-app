@@ -2,31 +2,16 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type {
 	MCPAuthenticationDeclaration,
-	MCPAuthHealth,
-	MCPAuthHealthState,
 	MCPAuthSettings,
-	MCPCompleteArgumentRequestBody,
-	MCPCompletionResult,
-	MCPDiscoveryPage,
-	MCPGetPromptResponseBody,
-	MCPHTTPAuthMode,
 	MCPHTTPSecretDraft,
 	MCPPluginView,
 	MCPPolicy,
-	MCPPromptRef,
-	MCPReadResourceResponseBody,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
-	MCPRuntimeServerID,
-	MCPRuntimeServerView,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerDocument,
 	MCPServerDraft,
 	MCPServerInstallationDataView,
 	MCPServerListItem,
-	MCPServerRuntimeDetails,
-	MCPServerRuntimeSnapshot,
 	MCPServerSetupView,
 	MCPServerView,
 	MCPSettings,
@@ -34,7 +19,6 @@ import type {
 	MCPSetupSecretTarget,
 	MCPSetupSubmissionValue,
 	MCPStdioSecretDraft,
-	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
 	AddPluginArtifactMemberRequest,
@@ -45,22 +29,37 @@ import type {
 	RemovePluginMemberRequest,
 	UpdatePluginRequest,
 } from '@/spec/plugin';
+import type {
+	MCPAuthHealth,
+	MCPCompleteArgumentRequestBody,
+	MCPCompletionResult,
+	MCPDiscoveryPage,
+	MCPGetPromptResponseBody,
+	MCPPromptRef,
+	MCPReadResourceResponseBody,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
+	MCPRuntimeServerView,
+	MCPServerRuntimeDetails,
+	MCPServerRuntimeSnapshot,
+	MCPToolCapability,
+} from '@/spec/session_mcp';
 import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import {
 	MCP_SCHEMA_VERSION,
 	MCPApprovalRule,
-	MCPAuthHealthState as MCPAuthHealthStateValue,
-	MCPAuthState,
 	MCPExecutionMode,
-	MCPHTTPAuthMode as MCPHTTPAuthModeValue,
-	MCPInputKind as MCPInputKindValue,
+	MCPHTTPAuthMode,
+	MCPInputKind,
 	MCPSecretKind,
-	MCPServerType as MCPServerTypeValue,
-	MCPTransportType as MCPTransportTypeValue,
-	MCPTrustLevel as MCPTrustLevelValue,
+	MCPServerType,
+	MCPTransportType,
+	MCPTrustLevel,
 } from '@/spec/mcp';
 import { pluginListItemFromPluginView } from '@/spec/plugin';
+import { MCPAuthHealthState, MCPAuthState } from '@/spec/session_mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -158,7 +157,7 @@ function secretTargetChanged(left: MCPSecretTarget | undefined, right: MCPSecret
 
 function defaultPolicy(): MCPPolicy {
 	return {
-		trustLevel: MCPTrustLevelValue.Untrusted,
+		trustLevel: MCPTrustLevel.Untrusted,
 		defaultPolicy: {
 			defaultApprovalRule: MCPApprovalRule.Ask,
 			defaultExecutionMode: MCPExecutionMode.Manual,
@@ -202,7 +201,7 @@ function findSecretTargets(document: MCPServerDocument): Map<string, MCPSecretTa
 	const register = (inputName: string, kind: MCPSecretKind, slot: string) => {
 		const declaration = declarations[inputName];
 
-		if (!declaration || declaration.kind !== MCPInputKindValue.Secret) {
+		if (!declaration || declaration.kind !== MCPInputKind.Secret) {
 			return;
 		}
 
@@ -277,20 +276,20 @@ function buildServerDocument(
 	const headers = cloneJSON(draft.httpHeaders);
 
 	const mcpServer: MCPServerDocument['mcpServer'] =
-		draft.transport === MCPTransportTypeValue.Stdio
+		draft.transport === MCPTransportType.Stdio
 			? {
-					type: MCPServerTypeValue.Stdio,
+					type: MCPServerType.Stdio,
 					command: draft.stdioCommand.trim(),
 					args: draft.stdioArgs.filter(Boolean),
 					env,
 				}
 			: {
-					type: MCPServerTypeValue.HTTP,
+					type: MCPServerType.HTTP,
 					url: draft.httpURL.trim(),
 					headers,
 				};
 
-	if (draft.transport === MCPTransportTypeValue.Stdio) {
+	if (draft.transport === MCPTransportType.Stdio) {
 		for (const row of draft.stdioSecrets) {
 			const envName = row.envName.trim();
 			if (!envName) {
@@ -308,7 +307,7 @@ function buildServerDocument(
 			}
 
 			nextInputs[inputName] = {
-				kind: MCPInputKindValue.Secret,
+				kind: MCPInputKind.Secret,
 				label: envName,
 				required: true,
 			};
@@ -338,7 +337,7 @@ function buildServerDocument(
 		}
 	}
 
-	if (draft.transport === MCPTransportTypeValue.StreamableHTTP && draft.httpAuthMode === MCPHTTPAuthModeValue.APIKey) {
+	if (draft.transport === MCPTransportType.StreamableHTTP && draft.httpAuthMode === MCPHTTPAuthMode.APIKey) {
 		const apiKey = draft.httpAPIKey;
 
 		if (apiKey) {
@@ -354,7 +353,7 @@ function buildServerDocument(
 			}
 
 			nextInputs[inputName] = {
-				kind: MCPInputKindValue.Secret,
+				kind: MCPInputKind.Secret,
 				label: headerName,
 				required: true,
 			};
@@ -385,13 +384,13 @@ function buildServerDocument(
 	}
 
 	const useOAuthCredentials =
-		draft.httpAuthMode === MCPHTTPAuthModeValue.ClientCredentials ||
-		(draft.httpAuthMode === MCPHTTPAuthModeValue.OAuth && draft.httpOAuthClientCredentials.useClientCredentials);
+		draft.httpAuthMode === MCPHTTPAuthMode.ClientCredentials ||
+		(draft.httpAuthMode === MCPHTTPAuthMode.OAuth && draft.httpOAuthClientCredentials.useClientCredentials);
 
 	const auth: MCPAuthenticationDeclaration = {
-		mode: draft.transport === MCPTransportTypeValue.Stdio ? MCPHTTPAuthModeValue.None : draft.httpAuthMode,
+		mode: draft.transport === MCPTransportType.Stdio ? MCPHTTPAuthMode.None : draft.httpAuthMode,
 		clientIDMetadataDocumentURL:
-			draft.httpAuthMode === MCPHTTPAuthModeValue.OAuth
+			draft.httpAuthMode === MCPHTTPAuthMode.OAuth
 				? draft.httpClientIDMetadataDocumentURL.trim() || undefined
 				: undefined,
 	};
@@ -409,10 +408,10 @@ function buildServerDocument(
 		}
 
 		nextInputs[inputName] = {
-			kind: MCPInputKindValue.OAuthClientCredentials,
+			kind: MCPInputKind.OAuthClientCredentials,
 			label: 'OAuth client credentials',
-			required: draft.httpAuthMode === MCPHTTPAuthModeValue.ClientCredentials,
-			clientSecretRequired: draft.httpAuthMode === MCPHTTPAuthModeValue.ClientCredentials,
+			required: draft.httpAuthMode === MCPHTTPAuthMode.ClientCredentials,
+			clientSecretRequired: draft.httpAuthMode === MCPHTTPAuthMode.ClientCredentials,
 		};
 		auth.clientCredentialsInput = inputName;
 
@@ -446,7 +445,7 @@ function buildServerDocument(
 			mcpServer,
 			include: previous?.include ? cloneJSON(previous.include) : undefined,
 			configuration: {
-				timeoutMS: draft.transport === MCPTransportTypeValue.Stdio ? draft.stdioStartupTimeoutMS : draft.httpTimeoutMS,
+				timeoutMS: draft.transport === MCPTransportType.Stdio ? draft.stdioStartupTimeoutMS : draft.httpTimeoutMS,
 				auth,
 				install: {
 					note: previous?.configuration.install.note,
@@ -470,18 +469,18 @@ export function serverDisplayName(server: MCPServerView): string {
 }
 
 export function getAuthMode(server: MCPServerView): MCPHTTPAuthMode {
-	if (server.document?.mcpServer.type === MCPServerTypeValue.Stdio) {
-		return MCPHTTPAuthModeValue.None;
+	if (server.document?.mcpServer.type === MCPServerType.Stdio) {
+		return MCPHTTPAuthMode.None;
 	}
-	return server.document?.configuration.auth.mode ?? MCPHTTPAuthModeValue.None;
+	return server.document?.configuration.auth.mode ?? MCPHTTPAuthMode.None;
 }
 
 export function getServerAuthHealthState(
 	server: MCPServerView,
 	health?: MCPAuthHealth
 ): MCPAuthHealthState | undefined {
-	if (getAuthMode(server) === MCPHTTPAuthModeValue.None) {
-		return MCPAuthHealthStateValue.NotRequired;
+	if (getAuthMode(server) === MCPHTTPAuthMode.None) {
+		return MCPAuthHealthState.NotRequired;
 	}
 	return health?.state;
 }
@@ -504,7 +503,7 @@ function setupInputsFor(document: MCPServerDocument, installation: MCPServerInst
 	return Object.entries(inputs)
 		.map(([name, declaration]) => {
 			const target: MCPSetupSecretTarget | undefined =
-				declaration.kind === MCPInputKindValue.OAuthClientCredentials
+				declaration.kind === MCPInputKind.OAuthClientCredentials
 					? {
 							kind: MCPSecretKind.OAuthClientCredentials,
 							slot: 'clientCredentials',
@@ -540,7 +539,7 @@ export function getMCPServerSetupStatus(server: MCPServerView): {
 	const inputs = serverSetupInputs(server);
 	const required = inputs.filter(input => input.declaration.required);
 	const configured = required.filter(input => {
-		if (input.declaration.kind === MCPInputKindValue.Text || input.declaration.kind === MCPInputKindValue.Path) {
+		if (input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path) {
 			return Boolean(input.boundValue?.trim() || input.declaration.default?.trim());
 		}
 		return input.secretConfigured;
@@ -602,9 +601,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 		displayName: document?.displayName ?? '',
 		enabled: server?.enabled ?? true,
 		transport:
-			document?.mcpServer.type === MCPServerTypeValue.Stdio
-				? MCPTransportTypeValue.Stdio
-				: MCPTransportTypeValue.StreamableHTTP,
+			document?.mcpServer.type === MCPServerType.Stdio ? MCPTransportType.Stdio : MCPTransportType.StreamableHTTP,
 		trustLevel: policy.trustLevel,
 
 		stdioCommand: document?.mcpServer.command ?? '',
@@ -616,7 +613,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 		httpURL: document?.mcpServer.url ?? '',
 		httpHeaders,
 		httpTimeoutMS: document?.configuration.timeoutMS,
-		httpAuthMode: document?.configuration.auth.mode ?? MCPHTTPAuthModeValue.None,
+		httpAuthMode: document?.configuration.auth.mode ?? MCPHTTPAuthMode.None,
 		httpAPIKey,
 		httpOAuthClientCredentials: {
 			inputName: oauthInputName,
@@ -1073,7 +1070,7 @@ export class MCPManagementAPI {
 		let settingsChanged = false;
 
 		for (const [inputName, declaration] of Object.entries(declarations)) {
-			if (declaration.kind !== MCPInputKindValue.Text && declaration.kind !== MCPInputKindValue.Path) {
+			if (declaration.kind !== MCPInputKind.Text && declaration.kind !== MCPInputKind.Path) {
 				continue;
 			}
 
@@ -1101,7 +1098,7 @@ export class MCPManagementAPI {
 		for (const [inputName, declaration] of Object.entries(declarations)) {
 			const submitted = values[inputName];
 
-			if (declaration.kind === MCPInputKindValue.OAuthClientCredentials) {
+			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
 				const hasClientID = Boolean(submitted?.clientID?.trim());
 				const hasClientSecret = Boolean(submitted?.clientSecret);
 				const hasCredentials = hasClientID || hasClientSecret;
@@ -1131,7 +1128,7 @@ export class MCPManagementAPI {
 				continue;
 			}
 
-			if (declaration.kind !== MCPInputKindValue.Secret) {
+			if (declaration.kind !== MCPInputKind.Secret) {
 				continue;
 			}
 
@@ -1334,21 +1331,21 @@ export function getMCPRuntimeAuthHealth(
 	}
 	const status = view.authorization;
 	const states: Record<MCPAuthState, MCPAuthHealthState> = {
-		[MCPAuthState.NotRequired]: MCPAuthHealthStateValue.NotRequired,
-		[MCPAuthState.Required]: MCPAuthHealthStateValue.AuthorizationNeeded,
-		[MCPAuthState.Authorized]: MCPAuthHealthStateValue.Authorized,
-		[MCPAuthState.Expired]: MCPAuthHealthStateValue.Expired,
-		[MCPAuthState.InsufficientScope]: MCPAuthHealthStateValue.InsufficientScope,
-		[MCPAuthState.Error]: MCPAuthHealthStateValue.Error,
+		[MCPAuthState.NotRequired]: MCPAuthHealthState.NotRequired,
+		[MCPAuthState.Required]: MCPAuthHealthState.AuthorizationNeeded,
+		[MCPAuthState.Authorized]: MCPAuthHealthState.Authorized,
+		[MCPAuthState.Expired]: MCPAuthHealthState.Expired,
+		[MCPAuthState.InsufficientScope]: MCPAuthHealthState.InsufficientScope,
+		[MCPAuthState.Error]: MCPAuthHealthState.Error,
 	};
 	let state = status
 		? states[status.state]
-		: base.state === MCPAuthHealthStateValue.AuthorizationPending
-			? MCPAuthHealthStateValue.AuthorizationNeeded
+		: base.state === MCPAuthHealthState.AuthorizationPending
+			? MCPAuthHealthState.AuthorizationNeeded
 			: base.state;
 	const expiresAt = status ? status.expiresAt : base.expiresAt;
-	if (state === MCPAuthHealthStateValue.Authorized && expiresAt && Date.parse(expiresAt) <= Date.now()) {
-		state = MCPAuthHealthStateValue.Expired;
+	if (state === MCPAuthHealthState.Authorized && expiresAt && Date.parse(expiresAt) <= Date.now()) {
+		state = MCPAuthHealthState.Expired;
 	}
 	const pending = view.pendingAuthorization;
 	return {
@@ -1362,7 +1359,7 @@ export function getMCPRuntimeAuthHealth(
 				}
 			: {}),
 		expiresAt,
-		state: pending ? MCPAuthHealthStateValue.AuthorizationPending : state,
+		state: pending ? MCPAuthHealthState.AuthorizationPending : state,
 		authorizationPending: Boolean(pending),
 		authorizationURL: pending?.authorizationURL,
 		authorizationExpiresAt: pending?.expiresAt,

@@ -1,11 +1,6 @@
-import type {
-	Conversation,
-	ConversationMessage,
-	StoreConversation,
-	StoreConversationMessage,
-} from '@/spec/conversation';
 import type { InputUnion, ToolCall, ToolOutput, UIToolOutput } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp';
+import type { Conversation, ConversationMessage } from '@/spec/session';
+import type { MCPToolSelection } from '@/spec/session_mcp';
 import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
 
@@ -19,7 +14,23 @@ import { collectToolCallsFromInputs, collectToolCallsFromOutputs } from '@/tools
 import { toolSelectionFromChoice } from '@/tools/lib/tool_choice_utils';
 import { hydrateToolSelectionsForUI } from '@/tools/lib/tool_selection_hydration';
 
-function toStoreConversationMessage(message: ConversationMessage): StoreConversationMessage {
+type SessionStoreConversationMessage = Omit<
+	ConversationMessage,
+	| 'uiContent'
+	| 'uiDebugDetails'
+	| 'uiReasoningContents'
+	| 'uiToolCalls'
+	| 'uiToolOutputs'
+	| 'uiToolChoices'
+	| 'uiToolSelectionIssues'
+	| 'uiCitations'
+>;
+
+type SessionStoreConversation = Omit<Conversation, 'messages'> & {
+	messages: SessionStoreConversationMessage[];
+};
+
+function toStoreConversationMessage(message: ConversationMessage): SessionStoreConversationMessage {
 	const {
 		uiContent: _uiContent,
 		uiDebugDetails: _uiDebugDetails,
@@ -38,8 +49,8 @@ function toStoreConversationMessage(message: ConversationMessage): StoreConversa
 	};
 }
 
-export async function toStoreConversationAsync(conversation: Conversation): Promise<StoreConversation> {
-	const messages: StoreConversationMessage[] = [];
+export async function toStoreConversationAsync(conversation: Conversation): Promise<SessionStoreConversation> {
+	const messages: SessionStoreConversationMessage[] = [];
 	let sliceStartedAt = getHydrationClock();
 
 	for (let index = 0; index < conversation.messages.length; index += 1) {
@@ -67,7 +78,7 @@ interface ConversationHydrationContext {
 	mcpToolSelectionMap: Map<string, MCPToolSelection>;
 }
 
-function installMCPMappings(context: ConversationHydrationContext, message: StoreConversationMessage): void {
+function installMCPMappings(context: ConversationHydrationContext, message: SessionStoreConversationMessage): void {
 	for (const [key, selection] of buildMCPToolSelectionMap(
 		message.mcpContext,
 		message.debugDetails,
@@ -79,7 +90,7 @@ function installMCPMappings(context: ConversationHydrationContext, message: Stor
 
 function installToolSelections(
 	context: ConversationHydrationContext,
-	message: StoreConversationMessage,
+	message: SessionStoreConversationMessage,
 	hydratedBySelection: WeakMap<ToolSelection, ToolSelectionHydration>
 ): {
 	choices: ToolStoreChoice[];
@@ -114,7 +125,7 @@ function installToolSelections(
 }
 
 function hydrateConversationMessage(
-	message: StoreConversationMessage,
+	message: SessionStoreConversationMessage,
 	context: ConversationHydrationContext,
 	hydratedBySelection: WeakMap<ToolSelection, ToolSelectionHydration>
 ): ConversationMessage {
@@ -211,7 +222,7 @@ async function yieldHydrationToMainThread(): Promise<void> {
 }
 
 export async function hydrateConversationAsync(
-	store: StoreConversation,
+	store: Conversation,
 	shouldContinue: () => boolean = () => true
 ): Promise<Conversation | undefined> {
 	if (!shouldContinue()) {

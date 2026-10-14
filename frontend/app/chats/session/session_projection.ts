@@ -1,11 +1,9 @@
 import type { Attachment } from '@/spec/attachment';
-import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InputUnion, OutputUnion, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPApprovalRule, MCPAppVisibility, MCPContent, MCPContentType, MCPExecutionMode } from '@/spec/mcp';
+import type { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
 import type {
-	SessionAppContextUpdate,
-	SessionAppInstance,
-	SessionAppRenderTarget,
+	Conversation,
+	ConversationMessage,
 	SessionAttachmentReference,
 	SessionRun,
 	SessionSnapshot,
@@ -13,9 +11,16 @@ import type {
 	SessionToolResult,
 	SessionTranscriptMessage,
 } from '@/spec/session';
+import type {
+	MCPAppContextUpdate,
+	MCPAppInstance,
+	MCPAppRenderTarget,
+	MCPAppVisibility,
+	MCPContent,
+	MCPContentType,
+} from '@/spec/session_mcp';
 import { AttachmentKind } from '@/spec/attachment';
 import { RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import {
 	SessionAttachmentReferenceKind,
 	SessionMessageRole,
@@ -23,7 +28,8 @@ import {
 	SessionToolBindingKind,
 	SessionToolCallState,
 	SessionToolResultKind,
-} from '@/spec/session';
+} from '@/spec/session_base';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/session_mcp';
 import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 
 import { deriveUIFieldsFromOutputUnion } from '@/chats/conversation/completion_helper';
@@ -38,7 +44,7 @@ interface SessionRunIndex {
 	runsByOperationID: Map<string, SessionRun>;
 	callsByOperationID: Map<string, SessionToolCall[]>;
 	callsByID: Map<string, IndexedToolCall>;
-	appsByRunID: Map<string, Map<string, SessionAppInstance>>;
+	appsByRunID: Map<string, Map<string, MCPAppInstance>>;
 }
 
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
@@ -75,7 +81,7 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 	const runsByOperationID = new Map<string, SessionRun>();
 	const callsByOperationID = new Map<string, SessionToolCall[]>();
 	const callsByID = new Map<string, IndexedToolCall>();
-	const appsByRunID = new Map<string, Map<string, SessionAppInstance>>();
+	const appsByRunID = new Map<string, Map<string, MCPAppInstance>>();
 
 	for (const run of snapshot.runs) {
 		appsByRunID.set(run.id, new Map((run.apps ?? []).map(app => [app.id, app] as const)));
@@ -274,10 +280,10 @@ function mcpSelectionFromBinding(call: SessionToolCall): UIToolCall['mcpToolSele
 }
 
 function appRenderTarget(
-	app: SessionAppInstance | undefined,
+	app: MCPAppInstance | undefined,
 	sessionSnapshot: SessionSnapshot,
 	run: SessionRun | undefined
-): SessionAppRenderTarget | undefined {
+): MCPAppRenderTarget | undefined {
 	if (!app || !run) {
 		return undefined;
 	}
@@ -298,7 +304,7 @@ function toolOutputFromResult(
 	call: SessionToolCall | undefined,
 	run: SessionRun | undefined,
 	sessionSnapshot: SessionSnapshot,
-	appsByID: Map<string, SessionAppInstance> | undefined
+	appsByID: Map<string, MCPAppInstance> | undefined
 ): UIToolOutput {
 	const app = result.appInstanceID ? appsByID?.get(result.appInstanceID) : undefined;
 	const structured = decodeSessionOpaqueJSON(result.structured);
@@ -374,7 +380,7 @@ function protocolOutputs(message: SessionTranscriptMessage): OutputUnion[] {
 	return output;
 }
 
-function appContextUpdatesFromSession(values: SessionAppContextUpdate[] | undefined) {
+function appContextUpdatesFromSession(values: MCPAppContextUpdate[] | undefined) {
 	return values?.map(update => ({
 		instanceID: update.appInstanceID,
 		server: update.serverID,

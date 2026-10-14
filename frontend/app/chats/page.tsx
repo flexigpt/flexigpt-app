@@ -52,7 +52,7 @@ export default function ChatsPage() {
 		openNewTab,
 		closeTab,
 		renameTabTitle,
-		handleSelectConversation,
+		handleSelectSession,
 		getConversationForExport,
 		tabBarItems,
 		openConversationIds,
@@ -110,14 +110,14 @@ export default function ChatsPage() {
 					<ConversationSearch
 						ref={searchRef}
 						compact={true}
-						onSelectConversation={handleSelectConversation}
+						onSelectSession={handleSelectSession}
 						refreshKey={searchRefreshKey}
-						openConversationIds={openConversationIds}
+						openSessionIds={openConversationIds}
 					/>
 				</div>
 			),
 		}),
-		[handleSelectConversation, openConversationIds, searchRefreshKey]
+		[handleSelectSession, openConversationIds, searchRefreshKey]
 	);
 
 	useTitleBarContent(titleBarSlots);

@@ -1,5 +1,5 @@
-import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, InferenceError, OutputUnion, ReasoningContent, Status } from '@/spec/inference';
+import type { Conversation, ConversationMessage } from '@/spec/session';
 import { ContentItemKind, OutputKind, RoleEnum } from '@/spec/inference';
 
 export function streamHasData(value: string): boolean {

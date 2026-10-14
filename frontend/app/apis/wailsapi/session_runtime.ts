@@ -5,36 +5,35 @@ import type {
 	CreateSessionCommand,
 	DeleteSessionCommand,
 	EditAndResendCommand,
-	ExecuteAppToolCommand,
 	ExecuteCallsCommand,
-	OpenAppViewCommand,
 	PauseRunCommand,
-	ReadAppResourceRequest,
 	RenameSessionCommand,
 	ResolveWaitCommand,
 	ResumeRunCommand,
 	RetryCallCommand,
-	RunID,
-	SessionAppResourceReadResult,
-	SessionCommandReceipt,
-	SessionID,
 	SessionRunSnapshot,
-	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
 	SessionUserMessageSkillTemplateCommand,
 	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
-	StageAppContextCommand,
 	StartRunCommand,
 	UpdateContinuationInputCommand,
 	UpdateSessionConfigurationCommand,
 } from '@/spec/session';
+import type { RunID, SessionCommandReceipt, SessionID, SessionRuntimeEvent } from '@/spec/session_base';
+import type {
+	MCPAppExecuteToolCommand,
+	MCPAppOpenViewCommand,
+	MCPAppReadResourceRequest,
+	MCPAppResourceReadResult,
+	MCPAppStageContextCommand,
+} from '@/spec/session_mcp';
 
 import type { ISessionRuntimeAPI } from '@/apis/interface';
 import {
-	sessionAppResourceReadResultFromWails,
+	mcpAppResourceReadResultFromWails,
 	sessionCommandReceiptFromWails,
 	sessionRunSnapshotFromWails,
 	sessionRuntimeEventFromWails,
@@ -251,29 +250,29 @@ export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
 		);
 	}
 
-	async openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt> {
+	async openAppView(command: MCPAppOpenViewCommand): Promise<SessionCommandReceipt> {
 		return sessionCommandReceiptFromWails(
 			await OpenAppView(command as Parameters<typeof OpenAppView>[0]),
 			'OpenAppView'
 		);
 	}
 
-	async executeAppTool(command: ExecuteAppToolCommand): Promise<SessionCommandReceipt> {
+	async executeAppTool(command: MCPAppExecuteToolCommand): Promise<SessionCommandReceipt> {
 		return sessionCommandReceiptFromWails(
 			await ExecuteAppTool(command as Parameters<typeof ExecuteAppTool>[0]),
 			'ExecuteAppTool'
 		);
 	}
 
-	async stageAppContext(command: StageAppContextCommand): Promise<SessionCommandReceipt> {
+	async stageAppContext(command: MCPAppStageContextCommand): Promise<SessionCommandReceipt> {
 		return sessionCommandReceiptFromWails(
 			await StageAppContext(command as Parameters<typeof StageAppContext>[0]),
 			'StageAppContext'
 		);
 	}
 
-	async readAppResource(request: ReadAppResourceRequest): Promise<SessionAppResourceReadResult> {
-		return sessionAppResourceReadResultFromWails(
+	async readAppResource(request: MCPAppReadResourceRequest): Promise<MCPAppResourceReadResult> {
+		return mcpAppResourceReadResultFromWails(
 			await ReadAppResource(request as Parameters<typeof ReadAppResource>[0]),
 			'ReadAppResource'
 		);

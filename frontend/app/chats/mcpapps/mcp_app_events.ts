@@ -1,4 +1,4 @@
-import type { MCPAppModelContextUpdate } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate } from '@/spec/session_mcp';
 
 import type { MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 

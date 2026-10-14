@@ -1,22 +1,20 @@
 import type {
 	Session,
-	SessionAppResourceReadResult,
-	SessionCommandReceipt,
-	SessionOpaqueJSON,
 	SessionRun,
 	SessionRunSnapshot,
-	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
 	SessionUserMessageSkillTemplateResult,
 } from '@/spec/session';
+import type { SessionCommandReceipt, SessionOpaqueJSON, SessionRuntimeEvent } from '@/spec/session_base';
+import type { MCPAppResourceReadResult } from '@/spec/session_mcp';
 import type {
 	SessionStoreConversationProjection,
 	SessionStoreRunListItem,
 	SessionStoreSessionListItem,
 	SessionStoreSessionPage,
 } from '@/spec/sessionstore';
-import { SessionRuntimeEventKind } from '@/spec/session';
+import { SessionRuntimeEventKind } from '@/spec/session_base';
 
 import {
 	enumFromWails,
@@ -145,8 +143,8 @@ export function sessionRuntimeEventFromWails(value: unknown, operation: string):
 	};
 }
 
-export function sessionAppResourceReadResultFromWails(value: unknown, operation: string): SessionAppResourceReadResult {
-	return requiredObject<SessionAppResourceReadResult>(value, operation);
+export function mcpAppResourceReadResultFromWails(value: unknown, operation: string): MCPAppResourceReadResult {
+	return requiredObject<MCPAppResourceReadResult>(value, operation);
 }
 
 export function sessionStoreSessionListItemFromWails(value: unknown, operation: string): SessionStoreSessionListItem {

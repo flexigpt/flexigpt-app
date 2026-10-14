@@ -8,10 +8,15 @@ import type {
 	URLCitation,
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
-import type { MCPConversationContext, MCPProviderToolMapping, MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
+import type {
+	MCPConversationContext,
+	MCPProviderToolMapping,
+	MCPRuntimeServerID,
+	MCPToolSelection,
+} from '@/spec/session_mcp';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { CitationKind, ContentItemKind, OutputKind, UIToolCallStatus } from '@/spec/inference';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/session_mcp';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';

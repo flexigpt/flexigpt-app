@@ -11,8 +11,9 @@ import type {
 	MCPRuntimeServerView,
 	MCPToolCapability,
 	MCPToolSelection,
-} from '@/spec/mcp';
-import { MCPServerStatus, MCPServerType, MCPToolExposure, MCPTransportType } from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPServerType, MCPTransportType } from '@/spec/mcp';
+import { MCPServerStatus, MCPToolExposure } from '@/spec/session_mcp';
 
 import { getErrorMessage } from '@/lib/error_utils';
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';

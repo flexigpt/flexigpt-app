@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { SessionArtifactSelection } from '@/spec/session';
+import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
 import { SkillInsert, SkillSessionSyncMode } from '@/spec/skill';

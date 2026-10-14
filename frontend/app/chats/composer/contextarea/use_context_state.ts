@@ -2,10 +2,9 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
 import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
-import type { SessionConfiguration, SessionModelDefaultsOverride } from '@/spec/session';
+import type { RestorableConversationContext, SessionConfiguration, SessionModelDefaultsOverride } from '@/spec/session';
 import { ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
 import { SessionModelDefaultField } from '@/spec/session';

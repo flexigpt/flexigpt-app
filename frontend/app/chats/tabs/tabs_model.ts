@@ -1,5 +1,5 @@
-import type { Conversation } from '@/spec/conversation';
-import type { RunID, SessionID, SessionSnapshot } from '@/spec/session';
+import type { Conversation, SessionSnapshot } from '@/spec/session';
+import type { RunID, SessionID } from '@/spec/session_base';
 
 import { ensureMakeID } from '@/lib/uuid_utils';
 

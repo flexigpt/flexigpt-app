@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { ConversationSearchItem } from '@/spec/conversation';
+import type { SessionSearchItem } from '@/spec/sessionstore';
 
 import { GroupedDropdown } from '@/components/date_grouped_dropdown';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 import { ConversationSearchFlatRow, ConversationSearchRowMeta } from '@/chats/search/conversation_search_row';
-import { conversationSearchDate } from '@/chats/search/conversation_search_utils';
+import { sessionSearchDate } from '@/chats/search/conversation_search_utils';
 
 interface ConversationSearchDropdownProps {
 	results: SearchResult[];
@@ -16,11 +16,11 @@ interface ConversationSearchDropdownProps {
 	onLoadMore: () => void;
 	onRetry: () => void;
 	focusedIndex: number;
-	onPick: (item: ConversationSearchItem) => void;
-	onAskDelete: (item: ConversationSearchItem) => void;
+	onPick: (item: SessionSearchItem) => void;
+	onAskDelete: (item: SessionSearchItem) => void;
 	query: string;
 	showSearchAllHintShortQuery: boolean;
-	openConversationIdSet: Set<string>;
+	openSessionIdSet: Set<string>;
 }
 
 export function ConversationSearchDropdown({
@@ -35,7 +35,7 @@ export function ConversationSearchDropdown({
 	onAskDelete,
 	query,
 	showSearchAllHintShortQuery,
-	openConversationIdSet,
+	openSessionIdSet,
 }: ConversationSearchDropdownProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const shouldGroup = query.length === 0 || showSearchAllHintShortQuery;
@@ -130,17 +130,19 @@ export function ConversationSearchDropdown({
 						<GroupedDropdown<SearchResult>
 							items={results}
 							focused={focusedIndex}
-							getDate={result => conversationSearchDate(result.searchConversation)}
-							getKey={result => result.searchConversation.id}
+							getDate={result => {
+								return sessionSearchDate(result.searchSession);
+							}}
+							getKey={result => result.searchSession.id}
 							// oxlint-disable-next-line react/no-unstable-nested-components
-							getLabel={result => <span className="truncate">{result.searchConversation.title}</span>}
+							getLabel={result => <span className="truncate">{result.searchSession.title}</span>}
 							onPick={result => {
-								onPick(result.searchConversation);
+								onPick(result.searchSession);
 							}}
 							renderItemExtra={result => (
 								<ConversationSearchRowMeta
 									result={result}
-									openConversationIdSet={openConversationIdSet}
+									openSessionIdSet={openSessionIdSet}
 									onAskDelete={onAskDelete}
 								/>
 							)}
@@ -149,12 +151,12 @@ export function ConversationSearchDropdown({
 						<ul className="w-full text-sm">
 							{results.map((result, index) => (
 								<ConversationSearchFlatRow
-									key={result.searchConversation.id}
+									key={result.searchSession.id}
 									result={result}
 									index={index}
 									isFocused={index === focusedIndex}
 									onPick={onPick}
-									openConversationIdSet={openConversationIdSet}
+									openSessionIdSet={openSessionIdSet}
 									onAskDelete={onAskDelete}
 								/>
 							))}

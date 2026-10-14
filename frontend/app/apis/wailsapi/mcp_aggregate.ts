@@ -6,18 +6,21 @@ import type {
 	ManagedMCPPolicyUpsertResult,
 	ManagedMCPReplaceRequest,
 	ManagedMCPReplaceResult,
-	MCPAuthHealth,
-	MCPAuthStatus,
-	MCPOAuthAuthorization,
-	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerInstallationDataView,
 	MCPServerInstallationView,
+} from '@/spec/mcp';
+import type {
+	MCPAuthHealth,
+	MCPAuthStatus,
+	MCPOAuthAuthorization,
+	MCPRuntimeServerID,
 	MCPServerRuntimeDetails,
 	MCPServerRuntimeSnapshot,
-} from '@/spec/mcp';
-import { MCPAuthHealthState, MCPAuthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPHTTPAuthMode } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPAuthState, MCPServerStatus } from '@/spec/session_mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
 import { pluginResultFromWails } from '@/apis/wailsapi/list_item_projection';

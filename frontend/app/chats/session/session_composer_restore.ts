@@ -1,4 +1,6 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
+import type { SessionActiveSkillOverride, SessionArtifactOverride, SessionToolOverride } from '@/spec/session';
+import type { SessionArtifactSelection } from '@/spec/session_base';
 import type {
 	MCPConversationContext,
 	MCPPromptRef,
@@ -6,19 +8,13 @@ import type {
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
+	MCPServerOverride,
+	MCPServerSelection,
 	MCPToolSelection,
-} from '@/spec/mcp';
-import type {
-	SessionActiveSkillOverride,
-	SessionArtifactOverride,
-	SessionArtifactSelection,
-	SessionMCPServerOverride,
-	SessionMCPServerSelection,
-	SessionToolOverride,
-} from '@/spec/session';
+} from '@/spec/session_mcp';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { CapabilityTargetForm, CapabilityTargetProvenance } from '@/spec/artifact';
-import { SessionActivityOverrideMode, SessionCollectionOverrideMode } from '@/spec/session';
+import { SessionActivityOverrideMode, SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -255,8 +251,8 @@ export async function hydrateSessionToolOverrides(
 	return { choices, issues };
 }
 
-function effectiveMCPSelections(overrides: SessionMCPServerOverride[] | undefined): SessionMCPServerSelection[] {
-	const byKey = new Map<string, SessionMCPServerSelection>();
+function effectiveMCPSelections(overrides: MCPServerOverride[] | undefined): MCPServerSelection[] {
+	const byKey = new Map<string, MCPServerSelection>();
 	const order: string[] = [];
 	let replacementStarted = false;
 
@@ -297,14 +293,16 @@ function effectiveMCPSelections(overrides: SessionMCPServerOverride[] | undefine
 }
 
 export async function hydrateSessionMCPOverrides(
-	overrides: SessionMCPServerOverride[] | undefined
+	overrides: MCPServerOverride[] | undefined
 ): Promise<MCPConversationContext | undefined> {
 	const selections = effectiveMCPSelections(overrides);
 	if (selections.length === 0) {
 		return undefined;
 	}
 
-	const serverIDs = await mcpManagementAPI.resolveMCPRuntimeServerIDs(selections.map(selection => artifactRef(selection.server)));
+	const serverIDs = await mcpManagementAPI.resolveMCPRuntimeServerIDs(
+		selections.map(selection => artifactRef(selection.server))
+	);
 	const servers = [];
 	const resources: MCPResourceRef[] = [];
 	const resourceTemplates: MCPResourceTemplateSelection[] = [];
@@ -325,7 +323,7 @@ export async function hydrateSessionMCPOverrides(
 		}));
 
 		servers.push({
-			server: runtimeServerID,
+			server: selection.server.artifactID,
 			toolExposure: selection.toolExposure,
 			selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
 			includeServerInstructions: selection.includeServerInstructions,

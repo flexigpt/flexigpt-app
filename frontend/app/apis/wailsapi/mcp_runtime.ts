@@ -10,15 +10,9 @@ import type {
 	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
-} from '@/spec/mcp';
-import {
-	MCPApprovalRule,
-	MCPAppVisibility,
-	MCPExecutionMode,
-	MCPServerStatus,
-	MCPTaskSupport,
-	MCPToolRisk,
-} from '@/spec/mcp';
+} from '@/spec/session_mcp';
+import { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
+import { MCPAppVisibility, MCPServerStatus, MCPTaskSupport, MCPToolRisk } from '@/spec/session_mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
 import {

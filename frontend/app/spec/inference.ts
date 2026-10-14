@@ -1,5 +1,9 @@
-import type { MCPProviderToolMapping, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
-import type { SessionAppRenderTarget } from '@/spec/session';
+import type {
+	MCPAppRenderTarget,
+	MCPProviderToolMapping,
+	MCPToolAppRenderInfo,
+	MCPToolSelection,
+} from '@/spec/session_mcp';
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
@@ -556,7 +560,7 @@ export interface UIToolOutput {
 	 * Unlike mcpApp metadata, this identifies the authoritative Session Runtime
 	 * command boundary for resource reads, app tools, and staged context.
 	 */
-	sessionApp?: SessionAppRenderTarget;
+	sessionApp?: MCPAppRenderTarget;
 
 	/** Short human-readable label used in chips. */
 	summary: string;

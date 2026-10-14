@@ -3,28 +3,24 @@ import type { Attachment } from '@/spec/attachment';
 import type { UIModelOption } from '@/spec/model';
 import type {
 	SessionArtifactOverride,
-	SessionArtifactSelection,
 	SessionConfiguration,
 	SessionInstructionOverride,
-	SessionMCPServerOverride,
-	SessionMCPServerSelection,
 	SessionModelDefaultsOverride,
 	SessionToolOverride,
 	SessionUserInput,
 } from '@/spec/session';
+import type { SessionArtifactSelection } from '@/spec/session_base';
+import type { MCPServerOverride, MCPServerSelection } from '@/spec/session_mcp';
 import type { WorkspaceRuntimePlan } from '@/spec/workspace';
 import { CapabilityTargetForm } from '@/spec/artifact';
 import { AttachmentKind } from '@/spec/attachment';
-import { MCPToolExposure } from '@/spec/mcp';
+import { emptySessionConfiguration, SessionModelDefaultField } from '@/spec/session';
 import {
-	emptySessionConfiguration,
-	SessionActivityOverrideMode as SessionActivityOverrideModeValue,
+	SessionActivityOverrideMode,
 	SessionAttachmentReferenceKind,
-	SessionCollectionOverrideMode as SessionCollectionOverrideModeValue,
-	SessionMCPToolExposure,
-	SessionMCPToolExposure as SessionMCPToolExposureValue,
-	SessionModelDefaultField,
-} from '@/spec/session';
+	SessionCollectionOverrideMode,
+} from '@/spec/session_base';
+import { MCPToolExposure } from '@/spec/session_mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
 
@@ -93,19 +89,6 @@ function parseOptionalJSON(raw: string | undefined, field: string): unknown {
 		return JSON.parse(raw);
 	} catch {
 		throw new Error(`${field} must contain valid JSON.`);
-	}
-}
-
-function sessionMCPToolExposure(value: MCPToolExposure): SessionMCPToolExposure {
-	switch (value) {
-		case MCPToolExposure.None:
-			return SessionMCPToolExposureValue.None;
-		case MCPToolExposure.All:
-			return SessionMCPToolExposureValue.All;
-		case MCPToolExposure.Selected:
-			return SessionMCPToolExposureValue.Selected;
-		default:
-			throw new Error(`Unsupported MCP Tool exposure "${String(value)}".`);
 	}
 }
 
@@ -233,7 +216,7 @@ function toolOverridesFromChoices(payload: EditorSubmitPayload): SessionToolOver
 
 		overrides.push({
 			key: sessionCapabilityKey(choice.target),
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: {
 				key,
 				capability:
@@ -263,7 +246,7 @@ function artifactOverridesForWorkspace(
 		if (!selectedByKey.has(key)) {
 			output.push({
 				key,
-				mode: SessionCollectionOverrideModeValue.Remove,
+				mode: SessionCollectionOverrideMode.Remove,
 			});
 		}
 	}
@@ -275,7 +258,7 @@ function artifactOverridesForWorkspace(
 
 		output.push({
 			key,
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: artifactSelection(ref),
 		});
 	}
@@ -301,10 +284,10 @@ function workspaceSelectionFromPayload(payload: EditorSubmitPayload): SessionCon
 		skills: artifactOverridesForWorkspace(baselineSkills, selection.skillRefs),
 		mcp: selectedMCPRefs.map(value => ({
 			key: artifactKey(value.artifact),
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: {
 				server: artifactSelection(value.artifact, value.artifactRevision, value.definitionDigest),
-				toolExposure: SessionMCPToolExposure.None,
+				toolExposure: MCPToolExposure.None,
 			},
 		})),
 	};
@@ -320,7 +303,7 @@ function instructionOverridesFromPayload(payload: EditorSubmitPayload): SessionI
 	return [
 		{
 			key: 'inline:composer-system-instructions',
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: {
 				key: 'inline:composer-system-instructions',
 				label: 'Composer system instructions',
@@ -349,7 +332,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 
 		skills.push({
 			key,
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: ref,
 		});
 	}
@@ -371,7 +354,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 
 		active.push({
 			key,
-			mode: SessionActivityOverrideModeValue.Activate,
+			mode: SessionActivityOverrideMode.Activate,
 			value: ref,
 		});
 	}
@@ -382,7 +365,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	};
 }
 
-async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<SessionMCPServerOverride[]> {
+async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<MCPServerOverride[]> {
 	const context = payload.mcpContext;
 
 	if (!context?.servers.length) {
@@ -407,7 +390,7 @@ async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<Se
 		promptsByServer.set(prompt.server, [...values, prompt]);
 	}
 
-	const overrides: SessionMCPServerOverride[] = [];
+	const overrides: MCPServerOverride[] = [];
 
 	for (const serverSelection of context.servers) {
 		const server = await mcpManagementAPI.findComposerServerByRuntimeID(serverSelection.server);
@@ -417,10 +400,10 @@ async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<Se
 		}
 
 		const ref: ArtifactRef = server.ref;
-		const selection: SessionMCPServerSelection = {
+		const selection: MCPServerSelection = {
 			server: artifactSelection(ref, server.artifact.revision, server.artifact.resolvedDefinition),
 			includeServerInstructions: serverSelection.includeServerInstructions,
-			toolExposure: sessionMCPToolExposure(serverSelection.toolExposure),
+			toolExposure: serverSelection.toolExposure,
 			selectedTools: (serverSelection.selectedTools ?? []).map(tool => ({
 				toolName: tool.toolName,
 				expectedDigest: tool.digest,
@@ -445,7 +428,7 @@ async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<Se
 
 		overrides.push({
 			key: artifactKey(ref),
-			mode: SessionCollectionOverrideModeValue.Add,
+			mode: SessionCollectionOverrideMode.Add,
 			value: selection,
 		});
 	}

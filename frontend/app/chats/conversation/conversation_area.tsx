@@ -14,10 +14,10 @@ import {
 import { FiChevronDown, FiChevronUp, FiPlay } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
-import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import type { SessionConfiguration, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session';
+import type { Conversation, ConversationMessage, SessionConfiguration } from '@/spec/session';
+import type { SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
 import { RoleEnum } from '@/spec/inference';
-import { SessionRunState, SessionWaitStatus } from '@/spec/session';
+import { SessionRunState, SessionWaitStatus } from '@/spec/session_base';
 import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';

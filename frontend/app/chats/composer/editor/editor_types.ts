@@ -1,8 +1,8 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
-import type { SessionArtifactSelection } from '@/spec/session';
+import type { SessionArtifactSelection } from '@/spec/session_base';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceRuntimePlan } from '@/spec/workspace';

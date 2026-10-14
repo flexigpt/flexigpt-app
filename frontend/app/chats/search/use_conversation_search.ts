@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ConversationSearchItem } from '@/spec/conversation';
+import type { SessionSearchItem, SessionStoreSessionListItem } from '@/spec/sessionstore';
 
 import { cleanSearchQuery } from '@/lib/title_utils';
 
@@ -9,8 +9,8 @@ import { sessionManagementAPI } from '@/apis/baseapi';
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 import {
 	CACHE_EXPIRY_TIME,
-	conversationsToSearchResults,
 	mergeUniqBy,
+	sessionsToSearchResults,
 	sortConversationSearchResults,
 	uniqBy,
 } from '@/chats/search/conversation_search_utils';
@@ -35,25 +35,19 @@ interface SearchCacheEntry {
 const searchCache = new Map<string, SearchCacheEntry>();
 
 interface UseConversationSearchArgs {
-	onSelectConversation: (item: ConversationSearchItem) => Promise<void>;
+	onSelectSession: (item: SessionSearchItem) => Promise<void>;
 	refreshKey: number;
 }
 
-function toSearchItem(value: {
-	id: string;
-	title?: string;
-	createdAt?: string;
-	modifiedAt?: string;
-	updatedAt?: string;
-}): ConversationSearchItem {
+function toSearchItem(value: SessionStoreSessionListItem): SessionSearchItem {
 	return {
 		id: value.id,
 		title: value.title || 'Conversation',
-		modifiedAt: value.modifiedAt ?? value.updatedAt ?? value.createdAt,
+		modifiedAt: value.modifiedAt ?? value.createdAt,
 	};
 }
 
-export function useConversationSearch({ onSelectConversation, refreshKey }: UseConversationSearchArgs) {
+export function useConversationSearch({ onSelectSession, refreshKey }: UseConversationSearchArgs) {
 	const [searchState, setSearchState] = useState<SearchState>({
 		query: '',
 		results: [],
@@ -62,23 +56,28 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		searchedMessages: false,
 	});
 
-	const [recentConversations, setRecentConversations] = useState<ConversationSearchItem[]>([]);
-	const [deleteTarget, setDeleteTarget] = useState<ConversationSearchItem | null>(null);
+	const [recentSessions, setRecentSessions] = useState<SessionSearchItem[]>([]);
+	const [deleteTarget, setDeleteTarget] = useState<SessionSearchItem | null>(null);
 	const [deleteLoading, setDeleteLoading] = useState(false);
 
 	const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const recentsNextTokenRef = useRef<string | undefined>(undefined);
 	const recentsHasMoreRef = useRef(false);
-	const recentConversationsRef = useRef<ConversationSearchItem[]>([]);
+	const recentSessionsRef = useRef<SessionSearchItem[]>([]);
 	const searchRequestSeqRef = useRef(0);
+	const searchStateRef = useRef(searchState);
 
 	const invalidatePendingSearches = useCallback(() => {
 		searchRequestSeqRef.current += 1;
 	}, []);
 
 	useEffect(() => {
-		recentConversationsRef.current = recentConversations;
-	}, [recentConversations]);
+		recentSessionsRef.current = recentSessions;
+	}, [recentSessions]);
+
+	useEffect(() => {
+		searchStateRef.current = searchState;
+	}, [searchState]);
 
 	const loadRecentConversations = useCallback(async (token?: string, append = false) => {
 		try {
@@ -90,30 +89,30 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				pageToken: token,
 				pageSize: 20,
 			});
-			const conversations = page.items.map(toSearchItem);
+			const sessions = page.items.map(toSearchItem);
 			const nextToken = page.nextPageToken;
 			const trimmedNext = nextToken?.trim() || '';
-			const nextRecentConversations = append
-				? mergeUniqBy(recentConversationsRef.current, conversations, conversation => conversation.id)
-				: [...conversations];
+			const nextRecentSessions = append
+				? mergeUniqBy(recentSessionsRef.current, sessions, session => session.id)
+				: [...sessions];
 
 			recentsNextTokenRef.current = trimmedNext || undefined;
 			recentsHasMoreRef.current = !!trimmedNext;
 
-			recentConversationsRef.current = nextRecentConversations;
-			setRecentConversations(nextRecentConversations);
+			recentSessionsRef.current = nextRecentSessions;
+			setRecentSessions(nextRecentSessions);
 
 			setSearchState(prev => {
 				const activeQuery = prev.query;
 
 				if (activeQuery.length > 0 && activeQuery.length < 3) {
-					const filtered = nextRecentConversations.filter(conversation =>
-						conversation.title.toLowerCase().includes(activeQuery.toLowerCase())
+					const filtered = nextRecentSessions.filter(session =>
+						session.title.toLowerCase().includes(activeQuery.toLowerCase())
 					);
 
 					return {
 						...prev,
-						results: conversationsToSearchResults(filtered),
+						results: sessionsToSearchResults(filtered),
 						loading: false,
 						nextToken: trimmedNext,
 						hasMore: !!trimmedNext,
@@ -131,14 +130,14 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 					};
 				}
 
-				const previousConversations = append ? prev.results.map(result => result.searchConversation) : [];
-				const mergedConversations = append
-					? mergeUniqBy(previousConversations, conversations, conversation => conversation.id)
-					: nextRecentConversations;
+				const previousSessions = append ? prev.results.map(result => result.searchSession) : [];
+				const mergedSessions = append
+					? mergeUniqBy(previousSessions, sessions, session => session.id)
+					: nextRecentSessions;
 
 				return {
 					...prev,
-					results: conversationsToSearchResults(mergedConversations),
+					results: sessionsToSearchResults(mergedSessions),
 					loading: false,
 					nextToken: trimmedNext,
 					hasMore: !!trimmedNext,
@@ -189,7 +188,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 					pageSize: 20,
 				});
 				const res = {
-					conversations: page.items.map(toSearchItem),
+					sessions: page.items.map(toSearchItem),
 					nextToken: page.nextPageToken,
 				};
 				if (requestSeq !== searchRequestSeqRef.current) {
@@ -197,17 +196,17 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				}
 
 				const nextToken = res.nextToken?.trim() || '';
-				const pageResults: SearchResult[] = res.conversations.map(searchConversation => ({
-					searchConversation,
-					matchType: searchConversation.title.toLowerCase().includes(rawQuery.toLowerCase()) ? 'title' : 'message',
+				const pageResults: SearchResult[] = res.sessions.map(searchSession => ({
+					searchSession,
+					matchType: searchSession.title.toLowerCase().includes(rawQuery.toLowerCase()) ? 'title' : 'message',
 					snippet: '',
 				}));
 
-				const uniquePage = uniqBy(pageResults, result => result.searchConversation.id);
+				const uniquePage = uniqBy(pageResults, result => result.searchSession.id);
 
 				setSearchState(prev => {
 					const results = append
-						? mergeUniqBy(prev.results, uniquePage, result => result.searchConversation.id)
+						? mergeUniqBy(prev.results, uniquePage, result => result.searchSession.id)
 						: uniquePage;
 
 					return {
@@ -251,13 +250,11 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 
 	const filterLocalResults = useCallback(
 		(query: string) => {
-			const filtered = recentConversations.filter(conversation =>
-				conversation.title.toLowerCase().includes(query.toLowerCase())
-			);
+			const filtered = recentSessions.filter(session => session.title.toLowerCase().includes(query.toLowerCase()));
 
 			setSearchState(prev => ({
 				...prev,
-				results: conversationsToSearchResults(filtered),
+				results: sessionsToSearchResults(filtered),
 				loading: false,
 				hasMore: recentsHasMoreRef.current,
 				nextToken: recentsNextTokenRef.current,
@@ -265,7 +262,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				searchedMessages: false,
 			}));
 		},
-		[recentConversations]
+		[recentSessions]
 	);
 
 	const setQuery = useCallback(
@@ -281,7 +278,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				invalidatePendingSearches();
 				setSearchState(prev => ({
 					...prev,
-					results: conversationsToSearchResults(recentConversationsRef.current),
+					results: sessionsToSearchResults(recentSessionsRef.current),
 					loading: false,
 					hasMore: recentsHasMoreRef.current,
 					nextToken: recentsNextTokenRef.current,
@@ -322,7 +319,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	);
 
 	const openSearch = useCallback(async () => {
-		if (recentConversations.length === 0) {
+		if (recentSessions.length === 0) {
 			await loadRecentConversations();
 			return;
 		}
@@ -330,10 +327,10 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		if (!searchState.query) {
 			setSearchState(prev => ({
 				...prev,
-				results: conversationsToSearchResults(recentConversations),
+				results: sessionsToSearchResults(recentSessions),
 			}));
 		}
-	}, [loadRecentConversations, recentConversations, searchState.query]);
+	}, [loadRecentConversations, recentSessions, searchState.query]);
 
 	const searchNow = useCallback(() => {
 		if (debounceTimeoutRef.current) {
@@ -349,16 +346,16 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		void performSearch(searchState.query);
 	}, [performSearch, searchState.query]);
 
-	const pickConversation = useCallback(
-		async (conversation: ConversationSearchItem) => {
-			await onSelectConversation(conversation);
+	const pickSession = useCallback(
+		async (session: SessionSearchItem) => {
+			await onSelectSession(session);
 			setSearchState(prev => ({ ...prev, query: '', searchedMessages: false }));
 		},
-		[onSelectConversation]
+		[onSelectSession]
 	);
 
-	const askDeleteConversation = useCallback((conversation: ConversationSearchItem) => {
-		setDeleteTarget(conversation);
+	const askDeleteSession = useCallback((session: SessionSearchItem) => {
+		setDeleteTarget(session);
 	}, []);
 
 	const cancelDeleteConversation = useCallback(() => {
@@ -384,20 +381,18 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 				'Delete Session'
 			);
 
-			const nextRecentConversations = recentConversationsRef.current.filter(
-				conversation => conversation.id !== deleteTarget.id
-			);
+			const nextRecentSessions = recentSessionsRef.current.filter(session => session.id !== deleteTarget.id);
 
-			recentConversationsRef.current = nextRecentConversations;
-			setRecentConversations(nextRecentConversations);
+			recentSessionsRef.current = nextRecentSessions;
+			setRecentSessions(nextRecentSessions);
 
 			setSearchState(prev => ({
 				...prev,
-				results: prev.results.filter(result => result.searchConversation.id !== deleteTarget.id),
+				results: prev.results.filter(result => result.searchSession.id !== deleteTarget.id),
 			}));
 
 			searchCache.forEach((entry, key) => {
-				const filtered = entry.results.filter(result => result.searchConversation.id !== deleteTarget.id);
+				const filtered = entry.results.filter(result => result.searchSession.id !== deleteTarget.id);
 
 				if (filtered.length === 0) {
 					searchCache.delete(key);
@@ -450,9 +445,17 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		invalidatePendingSearches();
 		searchCache.clear();
 
-		// oxlint-disable-next-line react/set-state-in-effect
+		const current = searchStateRef.current;
+		const hasActiveFullTextSearch =
+			current.query.trim().length > 0 && (current.query.length >= 3 || current.searchedMessages);
+
+		if (hasActiveFullTextSearch) {
+			void performSearch(current.query);
+			return;
+		}
+
 		void loadRecentConversations();
-	}, [invalidatePendingSearches, loadRecentConversations, refreshKey]);
+	}, [invalidatePendingSearches, loadRecentConversations, performSearch, refreshKey]);
 
 	useEffect(() => {
 		return () => {
@@ -480,10 +483,10 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		searchNow,
 		loadMore,
 		retryCurrentMode,
-		pickConversation,
+		pickSession,
 		deleteTarget,
 		deleteLoading,
-		askDeleteConversation,
+		askDeleteSession,
 		cancelDeleteConversation,
 		confirmDeleteConversation,
 	};

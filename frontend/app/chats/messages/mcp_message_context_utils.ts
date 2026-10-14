@@ -1,10 +1,10 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPContent, MCPServerSelection } from '@/spec/mcp';
-import { MCPContentType, MCPToolExposure } from '@/spec/mcp';
+import type { MCPContent, MCPRuntimeServerSelection } from '@/spec/session_mcp';
+import { MCPContentType, MCPToolExposure } from '@/spec/session_mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-export function toolExposureLabel(server: MCPServerSelection): string {
+export function toolExposureLabel(server: Pick<MCPRuntimeServerSelection, 'toolExposure' | 'selectedTools'>): string {
 	if (server.toolExposure === MCPToolExposure.All) {
 		const count = server.selectedTools?.length ?? 0;
 		return count > 0 ? `All tools (${count})` : 'All tools';

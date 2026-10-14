@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 
 import type { UIModelOption } from '@/spec/model';
 import { RoleEnum } from '@/spec/inference';
-import { SessionRunState } from '@/spec/session';
+import { SessionRunState } from '@/spec/session_base';
 
 import { generateTitle } from '@/lib/title_utils';
 

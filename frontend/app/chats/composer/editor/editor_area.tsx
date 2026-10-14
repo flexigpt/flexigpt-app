@@ -7,13 +7,13 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { SessionConfiguration } from '@/spec/session';
 import type {
 	MCPAppModelContextUpdate,
 	MCPConversationContext,
 	MCPRuntimeServerID,
 	MCPToolSelection,
-} from '@/spec/mcp';
-import type { SessionConfiguration } from '@/spec/session';
+} from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
@@ -59,16 +59,16 @@ import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
 import { buildWebSearchChoicesForSubmit, getWebSearchConfiguration } from '@/chats/composer/tools/websearch_utils';
 import { useComposerWorkspace } from '@/chats/composer/workspaces/use_composer_workspace';
-import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
-import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
-import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 import {
 	effectiveActiveSkillSelections,
 	effectiveArtifactSelections,
 	hydrateSessionMCPOverrides,
 	hydrateSessionToolOverrides,
 } from '@/chats/session/session_composer_restore';
+import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
+import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
+import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 interface SkillStateApplyOptions {
 	syncSession?: SkillSessionSyncMode;
@@ -311,7 +311,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachFiles: handleAttachFiles,
 		attachDirectory: handleAttachDirectory,
 		attachURL: handleAttachURL,
-		attachPathsAsAttachments,
 		changeAttachmentMode: handleChangeAttachmentContentBlockMode,
 		removeAttachment: handleRemoveAttachment,
 		removeDirectoryGroup: handleRemoveDirectoryGroup,
@@ -1168,7 +1167,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			closeAllMenus,
 			conversationToolsState,
 			editor,
-
 			getCurrentInstalledActiveSkillRefs,
 			getCurrentInstalledEnabledSkillRefs,
 			getToolRuntimeSnapshot,
@@ -1187,6 +1185,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			webSearchTemplates,
 			workspace,
 			workspaceExecutionBlocked,
+			getCurrentInstalledEnabledSkillSelections,
+			getCurrentInstalledActiveSkillSelections,
 		]
 	);
 
