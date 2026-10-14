@@ -15,11 +15,6 @@ export interface MCPServerPage {
 	nextPageToken?: string;
 }
 
-export interface MCPDiscoveryPage<T> {
-	items: T[];
-	nextPageToken?: string;
-}
-
 export enum MCPServerType {
 	Stdio = 'stdio',
 	HTTP = 'http',
@@ -69,7 +64,7 @@ export enum MCPExecutionMode {
 	Auto = 'auto',
 }
 
-export interface MCPServerPolicy {
+interface MCPServerPolicy {
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
 	requireApprovalForUnknownRisk: boolean;
@@ -77,7 +72,7 @@ export interface MCPServerPolicy {
 	requireApprovalForDestructive: boolean;
 }
 
-export interface MCPToolPolicyOverride {
+interface MCPToolPolicyOverride {
 	toolName: string;
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
@@ -85,7 +80,7 @@ export interface MCPToolPolicyOverride {
 	expectedDigest?: string;
 }
 
-export interface MCPAppsPolicy {
+interface MCPAppsPolicy {
 	enabled: boolean;
 	allowAppInitiatedToolCalls: boolean;
 	requireApprovalForOpenLink: boolean;

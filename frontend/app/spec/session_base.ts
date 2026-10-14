@@ -87,7 +87,7 @@ export enum SessionToolCallSource {
 	App = 'app',
 }
 
-export enum SessionWaitKind {
+enum SessionWaitKind {
 	Approval = 'approval',
 	ManualToolExecution = 'manualToolExecution',
 	UserInput = 'userInput',
@@ -139,12 +139,6 @@ export enum SessionActivityOverrideMode {
 	Inherit = 'inherit',
 	Activate = 'activate',
 	Deactivate = 'deactivate',
-}
-
-export enum MCPToolExposure {
-	None = 'none',
-	All = 'all',
-	Selected = 'selected',
 }
 
 export enum SessionConfigurationOwner {

@@ -60,14 +60,14 @@ import type {
 import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
-export interface SessionDirectCapabilitySelection {
+interface SessionDirectCapabilitySelection {
 	providerIdentity: string;
 	providerLocalID: string;
 	name: string;
 	type: string;
 }
 
-export interface SessionCapabilitySelection {
+interface SessionCapabilitySelection {
 	artifact?: SessionArtifactSelection;
 	direct?: SessionDirectCapabilitySelection;
 }
@@ -78,7 +78,7 @@ export interface SessionArtifactOverride {
 	value?: SessionArtifactSelection;
 }
 
-export interface SessionInstructionSelection {
+interface SessionInstructionSelection {
 	key?: string;
 	artifact?: SessionArtifactSelection;
 	text?: string;
@@ -91,7 +91,7 @@ export interface SessionInstructionOverride {
 	value?: SessionInstructionSelection;
 }
 
-export interface SessionToolSelectionIntent {
+interface SessionToolSelectionIntent {
 	key?: string;
 	capability: SessionCapabilitySelection;
 	autoExecute?: boolean;
@@ -110,24 +110,7 @@ export interface SessionActiveSkillOverride {
 	value?: SessionArtifactSelection;
 }
 
-export interface SessionMCPResourceSelection {
-	uri: string;
-	expectedDigest?: string;
-}
-
-export interface SessionMCPResourceTemplateSelection {
-	uriTemplate: string;
-	expectedDigest?: string;
-	arguments?: Record<string, string>;
-}
-
-export interface SessionMCPPromptSelection {
-	promptName: string;
-	expectedDigest?: string;
-	arguments?: Record<string, string>;
-}
-
-export interface SessionModelReasoningOverride {
+interface SessionModelReasoningOverride {
 	type?: string;
 	level?: string;
 	tokens?: number;
@@ -136,25 +119,25 @@ export interface SessionModelReasoningOverride {
 	mode?: string;
 }
 
-export interface SessionModelCacheControlOverride {
+interface SessionModelCacheControlOverride {
 	kind?: string;
 	ttl?: string;
 	key?: string;
 }
 
-export interface SessionModelOutputJSONSchemaOverride {
+interface SessionModelOutputJSONSchemaOverride {
 	name?: string;
 	description?: string;
 	schema?: SessionOpaqueJSON;
 	strict?: boolean;
 }
 
-export interface SessionModelOutputFormatOverride {
+interface SessionModelOutputFormatOverride {
 	kind?: string;
 	jsonSchema?: SessionModelOutputJSONSchemaOverride;
 }
 
-export interface SessionModelOutputOverride {
+interface SessionModelOutputOverride {
 	verbosity?: string;
 	format?: SessionModelOutputFormatOverride;
 }
@@ -188,7 +171,7 @@ export interface SessionModelDefaultsOverride {
 	clear?: SessionModelDefaultField[];
 }
 
-export interface SessionHistorySelection {
+interface SessionHistorySelection {
 	all?: boolean;
 	includePreviousUserTurns?: number;
 }
@@ -214,7 +197,7 @@ export interface SessionConfiguration {
 	metadata?: SessionOpaqueJSON;
 }
 
-export interface SessionLocalAttachmentReference {
+interface SessionLocalAttachmentReference {
 	path?: string;
 	originalPath?: string;
 	name?: string;
@@ -230,18 +213,18 @@ export interface SessionLocalAttachmentReference {
 	format?: string;
 }
 
-export interface SessionURLAttachmentReference {
+interface SessionURLAttachmentReference {
 	url: string;
 	normalized?: string;
 	original?: string;
 }
 
-export interface SessionGenericAttachmentReference {
+interface SessionGenericAttachmentReference {
 	handle: string;
 	originalHandle?: string;
 }
 
-export interface SessionDirectoryAttachmentReference {
+interface SessionDirectoryAttachmentReference {
 	path: string;
 	originalPath?: string;
 	name?: string;
@@ -269,7 +252,7 @@ export interface SessionUserInput {
 	metadata?: SessionOpaqueJSON;
 }
 
-export interface SessionContinuationInput {
+interface SessionContinuationInput {
 	revision: SessionRevision;
 	consumedRevision?: SessionRevision;
 	text?: string;
@@ -291,12 +274,12 @@ export interface SessionUserMessageSkillTemplateResult {
 	text: string;
 }
 
-export interface SessionRunLimits {
+interface SessionRunLimits {
 	maxModelOperations?: number;
 	maxToolAttempts?: number;
 }
 
-export interface SessionToolBinding {
+interface SessionToolBinding {
 	kind: SessionToolBindingKind;
 	data?: SessionOpaqueJSON;
 }
@@ -318,7 +301,7 @@ export interface SessionToolResult {
 	createdAt: string;
 }
 
-export interface SessionToolAttempt {
+interface SessionToolAttempt {
 	id: ToolAttemptID;
 	callID: ToolCallID;
 	state: SessionToolAttemptState;
@@ -352,21 +335,21 @@ export interface SessionToolCall {
 	consumedByOperationID?: OperationID;
 }
 
-export interface SessionAutomationHold {
+interface SessionAutomationHold {
 	enabled: boolean;
 	scope?: SessionAutomationHoldScope;
 	targetOperationID?: OperationID;
 	setByCommandID?: CommandID;
 }
 
-export interface SessionAutomationControls {
+interface SessionAutomationControls {
 	automaticTools: SessionAutomationHold;
 	automaticContinuation: SessionAutomationHold;
 	paused: boolean;
 	cancellationRequested: boolean;
 }
 
-export interface SessionSkillSessionState {
+interface SessionSkillSessionState {
 	id?: string;
 	generation: SessionRevision;
 	establishedGeneration?: SessionRevision;
@@ -374,12 +357,12 @@ export interface SessionSkillSessionState {
 	active?: ArtifactRef[];
 }
 
-export interface SessionResolvedArtifact extends ArtifactRef {
+interface SessionResolvedArtifact extends ArtifactRef {
 	revision?: SessionRevision;
 	digest?: string;
 }
 
-export interface SessionResolutionItem {
+interface SessionResolutionItem {
 	key: string;
 	kind: string;
 	owner: SessionConfigurationOwner;
@@ -389,14 +372,14 @@ export interface SessionResolutionItem {
 	reason?: string;
 }
 
-export interface SessionResolutionDiagnostic {
+interface SessionResolutionDiagnostic {
 	severity: SessionDiagnosticSeverity;
 	code: string;
 	message: string;
 	key?: string;
 }
 
-export interface SessionOperationResolutionSummary {
+interface SessionOperationResolutionSummary {
 	version: number;
 	agent?: SessionResolutionItem;
 	workspace?: SessionResolutionItem;
@@ -409,7 +392,7 @@ export interface SessionOperationResolutionSummary {
 	diagnostics?: SessionResolutionDiagnostic[];
 }
 
-export interface SessionOperationPreparation {
+interface SessionOperationPreparation {
 	state: SessionPreparationState;
 	fingerprint?: string;
 	preparedAt?: string;
@@ -418,7 +401,7 @@ export interface SessionOperationPreparation {
 	activeSkills?: ArtifactRef[];
 }
 
-export interface SessionOperationError {
+interface SessionOperationError {
 	code: string;
 	message: string;
 }
@@ -441,14 +424,14 @@ export interface SessionTranscriptMessage {
 	runtimeMetadata?: SessionOpaqueJSON;
 }
 
-export interface SessionModelOperationInput {
+interface SessionModelOperationInput {
 	configuration: SessionConfiguration;
 	history: SessionTranscriptMessage[];
 	current: SessionTranscriptMessage;
 	continuationRevision?: SessionRevision;
 }
 
-export interface SessionModelOperation {
+interface SessionModelOperation {
 	id: OperationID;
 	state: SessionOperationState;
 	startedAt?: string;
@@ -465,13 +448,13 @@ export interface SessionModelOperation {
 	runtimeMetadata?: SessionOpaqueJSON;
 }
 
-export interface SessionDriverState {
+interface SessionDriverState {
 	kind: string;
 	version: number;
 	data?: SessionOpaqueJSON;
 }
 
-export interface SessionRunUsage {
+interface SessionRunUsage {
 	modelOperations: number;
 	toolAttempts: number;
 }

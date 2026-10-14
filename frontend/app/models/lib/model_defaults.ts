@@ -1,5 +1,5 @@
 import type { CacheControl, ModelParam, OutputParam, ReasoningParam } from '@/spec/inference';
-import type { ModelDefaults, ModelOutputDefaults, ModelRequestPatch, UIModelOption } from '@/spec/model';
+import type { ModelDefaults, ModelOutputDefaults } from '@/spec/model';
 import { DefaultModelParams } from '@/spec/inference';
 
 function mergeDefaults(
@@ -106,13 +106,4 @@ export function buildModelParamFromDefaults(
 				? JSON.stringify(defaults.adapterParameters)
 				: undefined,
 	};
-}
-
-export function buildRequestPatch(option: UIModelOption): ModelRequestPatch | undefined {
-	const patch = option.requestPatch;
-	if (!patch || (!patch.defaults && (!patch.clear || patch.clear.length === 0))) {
-		return undefined;
-	}
-
-	return structuredClone(patch);
 }

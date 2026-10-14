@@ -1,33 +1,17 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { Attachment } from '@/spec/attachment';
-import type {
-	InputOutputContent,
-	InputOutputContentItemUnion,
-	InputUnion,
-	ModelParam,
-	ToolOutput,
-	ToolOutputItemUnion,
-	UIToolCall,
-	UIToolOutput,
-} from '@/spec/inference';
+import type { ModelParam } from '@/spec/inference';
 import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/session';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
-import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
+import { RoleEnum } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
-import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
-import { requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
-import { toolSelectionFromChoice } from '@/tools/lib/tool_choice_utils';
-import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
 	return {
@@ -37,17 +21,6 @@ export function initConversation(title = 'New Conversation'): Conversation {
 		createdAt: new Date().toISOString(),
 		modifiedAt: new Date().toISOString(),
 		messages: [],
-	};
-}
-
-export function initConversationMessage(role: RoleEnum): ConversationMessage {
-	const now = new Date().toISOString();
-	return {
-		id: getUUIDv7(),
-		createdAt: now,
-		role,
-		status: Status.None,
-		uiContent: '',
 	};
 }
 
@@ -165,44 +138,6 @@ function findLastModelParam(messages: ConversationMessage[]): ModelParam | undef
 	return undefined;
 }
 
-function modelParamsEqual(a?: ModelParam, b?: ModelParam): boolean {
-	return JSON.stringify(stripUndefinedDeep(a)) === JSON.stringify(stripUndefinedDeep(b));
-}
-
-function findLastPersistedModelParam(messages: ConversationMessage[]): ModelParam | undefined {
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const modelParam = messages[i].modelParam;
-		if (modelParam) {
-			return modelParam;
-		}
-	}
-	return undefined;
-}
-
-export function shouldPersistAssistantModelParam(messages: ConversationMessage[], nextModelParam: ModelParam): boolean {
-	const previous = findLastPersistedModelParam(messages);
-	return !previous || !modelParamsEqual(previous, nextModelParam);
-}
-
-export function applyAssistantPersistenceContext(
-	message: ConversationMessage,
-	modelRef: ArtifactRef,
-	modelParam?: ModelParam
-): ConversationMessage {
-	const next = {
-		...message,
-		modelRef,
-	} as ConversationMessage & { modelParam?: ModelParam };
-
-	if (modelParam) {
-		next.modelParam = modelParam;
-	} else {
-		delete next.modelParam;
-	}
-
-	return next;
-}
-
 export function deriveRestorableConversationContextFromMessages(
 	messages: ConversationMessage[]
 ): RestorableConversationContext {
@@ -220,200 +155,4 @@ export function deriveRestorableConversationContextFromMessages(
 		activeSkillRefs,
 		workspaceSelection: deriveWorkspaceSelectionFromMessages(messages),
 	};
-}
-
-export function buildUserConversationMessageFromEditor(
-	payload: EditorSubmitPayload,
-	existingId?: string,
-	modelRef?: ArtifactRef
-): ConversationMessage {
-	const now = new Date().toISOString();
-	const id = existingId ?? getUUIDv7();
-
-	const text = payload.text.trim();
-	const hasText = text.length > 0;
-
-	const contents: InputOutputContentItemUnion[] = [];
-	if (hasText) {
-		contents.push({
-			kind: ContentItemKind.Text,
-			textItem: { text },
-		});
-	}
-
-	const inputMessage: InputOutputContent = {
-		id,
-		role: RoleEnum.User,
-		status: Status.None,
-		contents,
-	};
-
-	const inputs: InputUnion[] = [
-		{
-			kind: InputKind.InputMessage,
-			inputMessage,
-		},
-	];
-
-	for (const uiToolOutput of payload.toolOutputs) {
-		const inferenceToolOutput = buildToolOutputFromEditor(uiToolOutput);
-		if (!inferenceToolOutput) {
-			continue;
-		}
-
-		if (inferenceToolOutput.type === ToolType.Function) {
-			inputs.push({
-				kind: InputKind.FunctionToolOutput,
-				functionToolOutput: inferenceToolOutput,
-			});
-		} else if (inferenceToolOutput.type === ToolType.Custom) {
-			inputs.push({
-				kind: InputKind.CustomToolOutput,
-				customToolOutput: inferenceToolOutput,
-			});
-		} else if (inferenceToolOutput.type === ToolType.WebSearch) {
-			inputs.push({
-				kind: InputKind.WebSearchToolOutput,
-				webSearchToolOutput: inferenceToolOutput,
-			});
-		}
-	}
-
-	const attachments =
-		payload.attachments.length > 0
-			? dedupeAttachmentsByRef(payload.attachments.map(uiAttachmentToConversation))
-			: undefined;
-
-	const toolSelections = payload.finalToolChoices.map(choice => toolSelectionFromChoice(choice));
-	const uiToolChoices = payload.finalToolChoices.map(choice => ({ ...choice }));
-
-	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
-	const mcpContext = payload.mcpContext;
-	const mcpAppContextUpdates =
-		payload.mcpAppContextUpdates && payload.mcpAppContextUpdates.length > 0 ? payload.mcpAppContextUpdates : undefined;
-
-	const enabledSkillRefs = normalizeSkillRefs(payload.enabledSkillRefs);
-	const activeSkillRefs = clampActiveSkillRefsToEnabled(enabledSkillRefs, payload.activeSkillRefs);
-
-	return {
-		id,
-		createdAt: now,
-		role: RoleEnum.User,
-		status: Status.None,
-		modelRef,
-		inputs,
-		attachments,
-		toolSelections,
-		uiToolChoices,
-		uiToolSelectionIssues: [],
-		mcpContext,
-		mcpAppContextUpdates,
-		enabledSkillRefs: enabledSkillRefs.length > 0 ? enabledSkillRefs : undefined,
-		activeSkillRefs: activeSkillRefs.length > 0 ? activeSkillRefs : undefined,
-		workspaceSelection: payload.workspaceSelection,
-		uiContent: text,
-		uiToolOutputs: toolOutputs,
-	};
-}
-
-export function deriveHydratedLastAssistantToolCalls(conversation: Conversation): UIToolCall[] {
-	const lastMessage = conversation.messages.at(-1);
-	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) {
-		return [];
-	}
-
-	return (lastMessage.uiToolCalls ?? [])
-		.filter(call => requiresComposerToolResponse(call))
-		.map(call => Object.assign({}, call, { suppressAutoExecute: true }));
-}
-
-function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
-	if (
-		ui.type !== ToolStoreChoiceType.Function &&
-		ui.type !== ToolStoreChoiceType.Custom &&
-		ui.type !== ToolStoreChoiceType.WebSearch
-	) {
-		return undefined;
-	}
-
-	let contents = mapToolOutputsToToolOutputItems(ui.toolOutputs);
-	const hasContents = (contents?.length ?? 0) > 0;
-	const hasWebSearchToolOutputItems = (ui.webSearchToolOutputItems?.length ?? 0) > 0;
-
-	// Preserve tool errors as real tool output payloads.
-	// Without this, an errored output that only has `errorMessage` becomes
-	// an empty tool-output union on the wire.
-	if (ui.isError && !hasContents && !hasWebSearchToolOutputItems) {
-		const message = ui.errorMessage?.trim() || 'The tool call returned an error.';
-		contents = [
-			{
-				kind: ContentItemKind.Text,
-				textItem: {
-					text: [
-						`Tool error: ${message}`,
-						'This output completes the requested tool call.',
-						'The model may correct the request or retry the tool.',
-					].join('\n\n'),
-				},
-			},
-		] as ToolOutputItemUnion[];
-	}
-
-	return {
-		type: ui.type as unknown as ToolType,
-		choiceID: ui.choiceID,
-		id: ui.id,
-		callID: ui.callID,
-		role: RoleEnum.Tool,
-		status: Status.Completed,
-		cacheControl: undefined,
-		name: ui.name,
-		isError: !!ui.isError,
-		signature: undefined,
-		contents,
-		webSearchToolOutputItems: ui.webSearchToolOutputItems,
-	};
-}
-
-function attachmentRefKey(attachment: Attachment): string {
-	const kind = attachment.kind ?? '';
-
-	if (attachment.fileRef) {
-		const path = attachment.fileRef.origPath || attachment.fileRef.path || attachment.fileRef.name || '';
-		return `${kind}|file|${path}`;
-	}
-	if (attachment.imageRef) {
-		const path = attachment.imageRef.origPath || attachment.imageRef.path || attachment.imageRef.name || '';
-		return `${kind}|image|${path}`;
-	}
-	if (attachment.urlRef) {
-		const url = attachment.urlRef.origNormalized || attachment.urlRef.normalized || attachment.urlRef.url || '';
-		return `${kind}|url|${url}`;
-	}
-	if (attachment.genericRef) {
-		const handle = attachment.genericRef.origHandle || attachment.genericRef.handle || '';
-		return `${kind}|handle|${handle}`;
-	}
-
-	return `${kind}|label|${attachment.label ?? ''}`;
-}
-
-export function dedupeAttachmentsByRef<T extends Attachment>(attachments?: T[]): T[] | undefined {
-	if (!attachments || attachments.length === 0) {
-		return undefined;
-	}
-
-	const seen = new Set<string>();
-	const out: T[] = [];
-
-	for (const attachment of attachments) {
-		const key = attachmentRefKey(attachment);
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		out.push(attachment);
-	}
-
-	return out.length > 0 ? out : undefined;
 }

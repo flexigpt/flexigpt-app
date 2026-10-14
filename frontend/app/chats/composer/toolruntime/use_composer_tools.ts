@@ -18,12 +18,12 @@ interface UseComposerToolsArgs {
 	externalExecutionBlocked?: boolean;
 }
 
-export interface ComposerToolRuntimeState {
+interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
 }
 
-export interface AutoExecState {
+interface AutoExecState {
 	phase: 'idle' | 'blocked';
 	runningCallId: null;
 }

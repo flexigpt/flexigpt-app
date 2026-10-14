@@ -81,20 +81,6 @@ function getSafeAvailableModes(att: Partial<Attachment>): AttachmentContentBlock
 		: [att.mode ?? AttachmentContentBlockMode.notReadable];
 }
 
-// Convert editor attachment to API attachment payload.
-export function uiAttachmentToConversation(att: UIAttachment): Attachment {
-	return {
-		kind: att.kind,
-		label: getAttachmentDisplayLabel(att),
-		mode: att.mode ?? AttachmentContentBlockMode.notReadable,
-		availableContentBlockModes: getSafeAvailableModes(att),
-		fileRef: att.fileRef,
-		imageRef: att.imageRef,
-		urlRef: att.urlRef,
-		genericRef: att.genericRef,
-	};
-}
-
 // Identity key used for de-duplication in the composer.
 export function uiAttachmentKey(att: UIAttachment): string {
 	let label = getAttachmentDisplayLabel(att);

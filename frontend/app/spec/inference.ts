@@ -1,11 +1,5 @@
-import type {
-	MCPAppRenderTarget,
-	MCPProviderToolMapping,
-	MCPToolAppRenderInfo,
-	MCPToolSelection,
-} from '@/spec/session_mcp';
+import type { MCPAppRenderTarget, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/session_mcp';
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
-import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
 export enum ProviderSDKType {
 	ProviderSDKTypeAnthropic = 'providerSDKTypeAnthropicMessages',
@@ -276,7 +270,7 @@ interface ContentItemText {
 	citations?: Citation[];
 }
 
-export interface InputOutputContentItemUnion {
+interface InputOutputContentItemUnion {
 	kind: ContentItemKind;
 	textItem?: ContentItemText;
 	refusalItem?: ContentItemRefusal;
@@ -284,7 +278,7 @@ export interface InputOutputContentItemUnion {
 	fileItem?: ContentItemFile;
 }
 
-export interface InputOutputContent {
+interface InputOutputContent {
 	id: string;
 	role: RoleEnum;
 	status?: Status;
@@ -378,7 +372,7 @@ export interface WebSearchToolOutputItemUnion {
 	errorItem?: WebSearchToolOutputError;
 }
 
-export enum ToolType {
+enum ToolType {
 	Function = 'function',
 	Custom = 'custom',
 	WebSearch = 'webSearch',
@@ -421,7 +415,7 @@ export interface ToolChoice {
 	webSearchArguments?: WebSearchToolChoiceItem;
 }
 
-export enum InputKind {
+enum InputKind {
 	InputMessage = 'inputMessage',
 	OutputMessage = 'outputMessage',
 	ReasoningMessage = 'reasoningMessage',
@@ -462,25 +456,6 @@ export interface OutputUnion {
 	customToolCall?: ToolCall;
 	webSearchToolCall?: ToolCall;
 	webSearchToolOutput?: ToolOutput;
-}
-
-interface Warning {
-	code: string;
-	message: string;
-}
-interface FetchCompletionResponse {
-	outputs?: OutputUnion[];
-	usage?: InferenceUsage;
-	error?: InferenceError;
-	warnings?: Warning[];
-	debugDetails?: any;
-}
-
-export interface CompletionResponseBody {
-	inferenceResponse?: FetchCompletionResponse;
-	hydratedCurrentInputs?: InputUnion[];
-	mcpToolMappings?: MCPProviderToolMapping[];
-	workspaceUsage?: WorkspaceConversationUsage;
 }
 
 export enum UIToolCallStatus {

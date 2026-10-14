@@ -8,15 +8,9 @@ import type {
 	URLCitation,
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
-import type {
-	MCPConversationContext,
-	MCPProviderToolMapping,
-	MCPRuntimeServerID,
-	MCPToolSelection,
-} from '@/spec/session_mcp';
+import type { MCPToolSelection } from '@/spec/session_mcp';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { CitationKind, ContentItemKind, OutputKind, UIToolCallStatus } from '@/spec/inference';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/session_mcp';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
@@ -110,151 +104,6 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 	}
 
 	return parts.join('\n\n');
-}
-
-export function buildMCPToolSelectionMap(
-	mcpContext?: MCPConversationContext,
-	debugDetails?: any,
-	responseMappings?: MCPProviderToolMapping[]
-): Map<string, MCPToolSelection> | undefined {
-	const map = new Map<string, MCPToolSelection>();
-
-	for (const server of mcpContext?.servers ?? []) {
-		for (const tool of server.selectedTools ?? []) {
-			const normalized: MCPToolSelection = {
-				...tool,
-				server: tool.server ?? server.server,
-			};
-
-			addMCPToolSelectionToMap(map, normalized);
-		}
-	}
-	for (const mapping of [...(responseMappings ?? []), ...extractMCPToolMappings(debugDetails)]) {
-		const selection = mappingToMCPToolSelection(mapping);
-		if (selection) {
-			addMCPToolSelectionToMap(map, selection);
-		}
-	}
-
-	return map.size > 0 ? map : undefined;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) {
-		return undefined;
-	}
-	return value as Record<string, unknown>;
-}
-
-function mcpSelectionKeys(selection: MCPToolSelection): string[] {
-	const keys: string[] = [];
-
-	if (selection.choiceID) {
-		keys.push(`choice:${selection.choiceID}`);
-	}
-	if (selection.providerToolName) {
-		keys.push(`name:${selection.providerToolName}`);
-	}
-	if (selection.toolName) {
-		keys.push(`name:${selection.toolName}`);
-	}
-
-	return keys;
-}
-
-function mergeMCPToolSelections(existing: MCPToolSelection, incoming: MCPToolSelection): MCPToolSelection {
-	return {
-		...existing,
-		...incoming,
-		server: incoming.server ?? existing.server,
-		toolName: incoming.toolName || existing.toolName,
-		providerToolName: incoming.providerToolName || existing.providerToolName,
-		choiceID: incoming.choiceID || existing.choiceID,
-		digest: incoming.digest || existing.digest,
-		approvalRule: incoming.approvalRule ?? existing.approvalRule,
-		executionMode: incoming.executionMode ?? existing.executionMode,
-		appResourceUri: incoming.appResourceUri || existing.appResourceUri,
-		visibility: incoming.visibility?.length ? incoming.visibility : existing.visibility,
-	};
-}
-
-function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection: MCPToolSelection) {
-	const keys = mcpSelectionKeys(selection);
-	let merged = selection;
-
-	for (const key of keys) {
-		const existing = map.get(key);
-		if (existing) {
-			merged = mergeMCPToolSelections(existing, merged);
-		}
-	}
-
-	for (const key of keys) {
-		map.set(key, merged);
-	}
-}
-
-function asMCPRuntimeServerID(value: unknown): MCPRuntimeServerID | undefined {
-	if (typeof value !== 'string' || !value.trim()) {
-		return undefined;
-	}
-
-	return value;
-}
-
-function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
-	const obj = asRecord(mapping);
-	if (!obj) {
-		return undefined;
-	}
-	const server = asMCPRuntimeServerID(obj.server);
-	const toolName = obj.toolName;
-	const providerToolName = obj.providerToolName;
-	const choiceID = obj.choiceID;
-	const toolDigest = obj.toolDigest;
-	const approvalRule = obj.approvalRule;
-	const executionMode = obj.executionMode;
-	const appResourceUri = obj.appResourceUri;
-	const visibility = obj.visibility;
-
-	if (!server) {
-		return undefined;
-	}
-	if (typeof toolName !== 'string' || !toolName) {
-		return undefined;
-	}
-	return {
-		server,
-		toolName,
-		providerToolName: typeof providerToolName === 'string' ? providerToolName : undefined,
-		choiceID: typeof choiceID === 'string' ? choiceID : undefined,
-		digest: typeof toolDigest === 'string' ? toolDigest : undefined,
-		approvalRule: isMCPApprovalRule(approvalRule) ? approvalRule : undefined,
-		executionMode: isMCPExecutionMode(executionMode) ? executionMode : undefined,
-		appResourceUri: typeof appResourceUri === 'string' ? appResourceUri : undefined,
-		visibility: Array.isArray(visibility)
-			? visibility.some(v => {
-					return isMCPAppVisibility(v);
-				})
-				? visibility.filter(v => {
-						return isMCPAppVisibility(v);
-					})
-				: undefined
-			: undefined,
-	};
-}
-
-function extractMCPToolMappings(debugDetails?: any): MCPProviderToolMapping[] {
-	const root = asRecord(debugDetails);
-	if (!root) {
-		return [];
-	}
-	const mcpDebug = asRecord(root.mcp) ?? root;
-	const rawMappings = mcpDebug.toolMappings;
-	if (!Array.isArray(rawMappings)) {
-		return [];
-	}
-	return rawMappings.filter(mapping => mappingToMCPToolSelection(mapping)) as MCPProviderToolMapping[];
 }
 
 function findMCPToolSelectionForToolLike(
@@ -463,7 +312,7 @@ function deriveUIToolCallFromToolCall(
 	};
 }
 
-export function buildUIToolOutputFromToolOutput(
+function buildUIToolOutputFromToolOutput(
 	out: ToolOutput,
 	choiceMap: Map<string, ToolStoreChoice>,
 	toolCallMap?: Map<string, ToolCall>,

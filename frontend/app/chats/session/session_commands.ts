@@ -1,10 +1,10 @@
-import type { SessionRun, SessionRunSnapshot, SessionSnapshot } from '@/spec/session';
+import type { SessionRun, SessionSnapshot } from '@/spec/session';
 import type { SessionCommandMeta, SessionCommandReceipt, SessionRevision } from '@/spec/session_base';
 import { SessionRunState } from '@/spec/session_base';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
-export function newSessionCommandID(): string {
+function newSessionCommandID(): string {
 	try {
 		return getUUIDv7();
 	} catch {
@@ -34,7 +34,7 @@ export function requireAcceptedSessionCommand(
 	throw new Error(receipt.message?.trim() || `${operation} was rejected by the Session Runtime.`);
 }
 
-export function isTerminalSessionRun(run: SessionRun | undefined): boolean {
+function isTerminalSessionRun(run: SessionRun | undefined): boolean {
 	if (!run) {
 		return true;
 	}
@@ -58,21 +58,4 @@ export function selectedSessionRun(snapshot: SessionSnapshot, preferredRunID?: s
 		snapshot.runs.find(run => !isTerminalSessionRun(run)) ??
 		[...snapshot.runs].toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]
 	);
-}
-
-export function selectedRunSnapshot(
-	snapshot: SessionSnapshot,
-	preferredRunID?: string
-): SessionRunSnapshot | undefined {
-	const run = selectedSessionRun(snapshot, preferredRunID);
-
-	if (!run) {
-		return undefined;
-	}
-
-	return {
-		sessionID: snapshot.session.id,
-		sessionRevision: snapshot.session.revision,
-		run,
-	};
 }

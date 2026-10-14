@@ -144,12 +144,6 @@ export function optionalWailsBody<T>(body: T | null | undefined, operation = 'Wa
 	return body;
 }
 
-export function optionalWailsResponseBody<T extends object>(response: unknown, operation: string): T | undefined {
-	const envelope = requiredObject<{ Body?: unknown }>(response, `${operation} response`);
-
-	return optionalWailsBody<T>(envelope.Body as T | null | undefined, operation);
-}
-
 export function wailsObjectArrayOrEmpty<T extends object = Record<string, unknown>>(
 	value: unknown,
 	field: string
@@ -168,29 +162,13 @@ export function wailsRecordOrEmpty<T = unknown>(value: unknown, field: string): 
 	return requireWailsBody(value as Record<string, T> | null | undefined, field);
 }
 
-export function createAbortError(): Error {
-	if (typeof DOMException !== 'undefined') {
-		return new DOMException('Aborted', 'AbortError');
-	}
-
-	const error = new Error('Aborted');
-	error.name = 'AbortError';
-	return error;
-}
-
-export function throwIfAborted(signal?: AbortSignal): void {
-	if (signal?.aborted) {
-		throw createAbortError();
-	}
-}
-
 /**
  * Supports both Wails representations seen for `json.RawMessage`:
  *
  * - Raw JSON object
  * - Generated `number[]` byte representation
  */
-export function rawJSONFromWails(value: unknown, field: string): JSONRawString {
+function rawJSONFromWails(value: unknown, field: string): JSONRawString {
 	if (Array.isArray(value) && value.every(item => typeof item === 'number')) {
 		if (
 			!value.every(b => {
@@ -219,23 +197,6 @@ export function rawJSONFromWails(value: unknown, field: string): JSONRawString {
 	}
 
 	return serialized;
-}
-
-// Wails transports this source as a string. The Go jsonutil package unwraps
-// that outer string before passing it to a typed tool argument decoder.
-// Do not JSON.stringify this value again.
-export function rawJSONToWails(value: JSONRawString, field: string): string {
-	if (typeof value !== 'string') {
-		throw new TypeError(`${field} must be valid JSON.`);
-	}
-
-	try {
-		JSON.parse(value);
-	} catch {
-		throw new Error(`${field} must be valid JSON.`);
-	}
-
-	return value;
 }
 
 export function jsonSchemaFromWails(value: unknown, field: string): JSONObject | boolean {

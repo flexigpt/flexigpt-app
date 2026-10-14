@@ -22,8 +22,8 @@ import { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
  * resolution and is never constructed from an ArtifactRef in the frontend.
  */
 export type MCPRuntimeServerID = string;
-export type MCPRuntimeCatalogID = string;
-export type MCPTimestamp = string;
+type MCPRuntimeCatalogID = string;
+type MCPTimestamp = string;
 
 export interface MCPDiscoveryPage<T> {
 	items: T[];
@@ -63,25 +63,6 @@ export enum MCPTaskSupport {
 	Required = 'required',
 }
 
-export enum MCPInvocationSource {
-	Model = 'model',
-	User = 'user',
-	App = 'app',
-}
-
-export enum MCPApprovalDecision {
-	Allowed = 'allowed',
-	Denied = 'denied',
-	ApprovalRequired = 'approvalRequired',
-}
-
-export enum MCPApprovalResolution {
-	AllowOnce = 'allowOnce',
-	AllowAlways = 'allowAlways',
-	DenyOnce = 'denyOnce',
-	DenyAlways = 'denyAlways',
-}
-
 export enum MCPContentType {
 	Text = 'text',
 	Image = 'image',
@@ -100,7 +81,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-export interface MCPServerCapabilitiesSummary {
+interface MCPServerCapabilitiesSummary {
 	tools?: boolean;
 	toolsListChanged?: boolean;
 	resources?: boolean;
@@ -113,7 +94,7 @@ export interface MCPServerCapabilitiesSummary {
 	extensions?: Record<string, unknown>;
 }
 
-export interface MCPToolAnnotations {
+interface MCPToolAnnotations {
 	destructiveHint?: boolean;
 	idempotentHint: boolean;
 	openWorldHint?: boolean;
@@ -121,7 +102,7 @@ export interface MCPToolAnnotations {
 	title?: string;
 }
 
-export interface MCPToolAppInfo {
+interface MCPToolAppInfo {
 	resourceUri?: string;
 	visibility?: MCPAppVisibility[];
 }
@@ -230,14 +211,14 @@ export interface MCPProviderToolMapping {
 	visibility?: MCPAppVisibility[];
 }
 
-export interface MCPIcon {
+interface MCPIcon {
 	src: string;
 	mimeType?: string;
 	sizes?: string[];
 	theme?: string;
 }
 
-export interface MCPResourceContents {
+interface MCPResourceContents {
 	uri: string;
 	mimeType?: string;
 	text?: string;
@@ -261,38 +242,9 @@ export interface MCPContent {
 	icons?: MCPIcon[];
 }
 
-export interface MCPPromptMessage {
+interface MCPPromptMessage {
 	role: string;
 	content: MCPContent;
-}
-
-export interface InvokeMCPToolRequestBody {
-	source: MCPInvocationSource;
-	toolName: string;
-	providerToolName?: string;
-	choiceID?: string;
-	toolDigest?: string;
-	arguments?: Record<string, unknown>;
-	approvalID?: string;
-	approvalToken?: string;
-	conversationID?: string;
-	messageID?: string;
-	toolUseID?: string;
-	appInstanceID?: string;
-}
-
-export interface MCPToolCallProvenance {
-	server: MCPRuntimeServerID;
-	catalog: MCPRuntimeCatalogID;
-	serverDisplayName?: string;
-	toolName: string;
-	providerToolName: string;
-	toolDigest?: string;
-	choiceID?: string;
-	toolUseID?: string;
-	approvalID?: string;
-	appResourceUri?: string;
-	appInstanceID?: string;
 }
 
 export interface MCPToolAppRenderInfo {
@@ -301,17 +253,6 @@ export interface MCPToolAppRenderInfo {
 	content?: MCPContent[];
 	structuredContent?: SessionOpaqueJSON;
 	isError?: boolean;
-}
-
-export interface InvokeMCPToolResponseBody {
-	server: MCPRuntimeServerID;
-	toolName: string;
-	providerToolName?: string;
-	content?: MCPContent[];
-	structuredContent?: SessionOpaqueJSON;
-	isError?: boolean;
-	provenance: MCPToolCallProvenance;
-	app?: MCPToolAppRenderInfo;
 }
 
 export interface MCPReadResourceResponseBody {
@@ -331,34 +272,6 @@ export interface MCPCompletionResult {
 	values?: string[];
 	total?: number;
 	hasMore?: boolean;
-}
-
-export interface MCPApprovalSummary {
-	server: MCPRuntimeServerID;
-	serverDisplayName?: string;
-	source: MCPInvocationSource;
-	appInstanceID?: string;
-	toolName: string;
-	toolDigest?: string;
-	risk: MCPToolRisk;
-	arguments?: SessionOpaqueJSON;
-}
-
-export interface MCPApprovalEvaluation {
-	decision: MCPApprovalDecision;
-	reason?: string;
-	approvalID?: string;
-	expiresAt?: MCPTimestamp;
-	summary?: MCPApprovalSummary;
-}
-
-export interface MCPApprovalResolutionResult {
-	approvalID: string;
-	resolution: MCPApprovalResolution;
-	decision: MCPApprovalDecision;
-	rememberedForSession?: boolean;
-	token?: string;
-	expiresAt?: string;
 }
 
 export enum MCPAuthState {
@@ -462,25 +375,25 @@ export enum MCPToolExposure {
 	Selected = 'selected',
 }
 
-export interface MCPServerToolSelection {
+interface MCPServerToolSelection {
 	toolName: string;
 	expectedDigest?: string;
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
 }
 
-export interface MCPServerResourceSelection {
+interface MCPServerResourceSelection {
 	uri: string;
 	expectedDigest?: string;
 }
 
-export interface MCPServerResourceTemplateSelection {
+interface MCPServerResourceTemplateSelection {
 	uriTemplate: string;
 	expectedDigest?: string;
 	arguments?: Record<string, string>;
 }
 
-export interface MCPServerPromptSelection {
+interface MCPServerPromptSelection {
 	promptName: string;
 	expectedDigest?: string;
 	arguments?: Record<string, string>;
@@ -523,7 +436,7 @@ export interface MCPConversationContext {
 	prompts?: MCPPromptSelection[];
 }
 
-export interface MCPAppContextContent {
+interface MCPAppContextContent {
 	type: string;
 	text?: string;
 	uri?: string;

@@ -1,25 +1,20 @@
 import type {
-	ArtifactAddress,
 	ArtifactAdoptionMode,
 	ArtifactDiagnostic,
 	ArtifactDigest,
-	ArtifactKind,
 	ArtifactRef,
 	ArtifactRootID,
-	ArtifactSourceBinding,
-	ArtifactSourceID,
 	ArtifactState,
-	CapabilityPlan,
 	StoreArtifact,
 	StoreArtifactAddress,
 	StoreArtifactSourceSummary,
 	StoreManagedPackageFile,
 } from '@/spec/artifact';
-import type { ArtifactPluginMembershipView, PluginCapabilityPlan, PluginView } from '@/spec/plugin';
-import type { ToolOutputUnion } from '@/spec/tool';
+import type { PluginView } from '@/spec/plugin';
 
 export type SkillRef = ArtifactRef;
 
+/** @public */
 export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-load',
 	'builtin.skills-unload',
@@ -37,43 +32,10 @@ export enum SkillInsert {
 	UserMessage = 'user-message',
 }
 
-export enum SkillPluginAttachmentRole {
-	Managed = 'managed',
-	BuiltIn = 'builtin',
-	External = 'external',
-	Imported = 'imported',
-	Library = 'library',
-}
-
 export interface SkillArgument {
 	name: string;
 	description?: string;
 	default?: string;
-}
-
-interface SkillPluginAttachmentView {
-	sourceID: ArtifactSourceID;
-	revision: number;
-	role: SkillPluginAttachmentRole;
-	enabled: boolean;
-	sourceDisplayName?: string;
-	sourceKind?: string;
-}
-
-export interface SkillArtifactView {
-	artifact: ArtifactRef;
-	address: ArtifactAddress;
-	revision: number;
-	name: string;
-	kind: ArtifactKind;
-	enabled: boolean;
-	adoption: ArtifactAdoptionMode;
-	state: ArtifactState;
-	binding: ArtifactSourceBinding;
-	definitionDigest?: ArtifactDigest;
-	diagnostics?: ArtifactDiagnostic[];
-	createdAt: string;
-	modifiedAt: string;
 }
 
 /**
@@ -106,16 +68,7 @@ export interface SkillDocumentInput {
 	rawFrontmatter?: Record<string, unknown>;
 }
 
-/**
- * Editable managed Skill source projected from its canonical definition.
- * This deliberately exposes no source configuration or filesystem path.
- */
-export interface ManagedSkillDocumentView {
-	artifact: SkillArtifactView;
-	document: SkillDocumentInput;
-}
-
-export enum RuntimeSkillActivity {
+enum RuntimeSkillActivity {
 	Any = 'any',
 	Active = 'active',
 	Inactive = 'inactive',
@@ -128,98 +81,14 @@ export interface SkillResourceInfo {
 	moreLocations: boolean;
 }
 
-interface RuntimeSkillListItem {
-	skillRef: ArtifactRef;
-	name?: string;
-	displayName?: string;
-	type?: string;
-	description?: string;
-	digest?: ArtifactDigest;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	sourceTags?: string[];
-	resources: SkillResourceInfo;
-	rawFrontmatter?: Record<string, unknown>;
-	warnings?: string[];
-	isActive?: boolean;
-	errorMessage?: string;
-}
-
 /**
  * Runtime-native skill identity. Provider type remains a string because
  * Agent Skills providers are registry-extensible.
  */
-export interface RuntimeSkillDefinition {
+interface RuntimeSkillDefinition {
 	type: string;
 	name: string;
 	location: string;
-}
-
-export interface RuntimeSkillSessionOptions {
-	closeSessionID?: string;
-	maxActivePerSession?: number;
-
-	/**
-	 * Undefined preserves the native unrestricted Agent Skills session path.
-	 * An explicit empty array creates a deny-all allowed-skills session.
-	 */
-	allowedSkills?: RuntimeSkillDefinition[];
-	activeSkills?: RuntimeSkillDefinition[];
-}
-
-export interface RuntimeSkillSession {
-	sessionID: string;
-	activeSkills: RuntimeSkillDefinition[];
-}
-
-export interface RuntimeSkillRecord {
-	def: RuntimeSkillDefinition;
-	name: string;
-	description: string;
-	displayName?: string;
-	insert: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	resources: SkillResourceInfo;
-	rawFrontmatter?: Record<string, unknown>;
-	warnings?: string[];
-	digest?: ArtifactDigest;
-}
-
-export interface RuntimeSkillRenderResult {
-	text: string;
-	insert: SkillInsert;
-	name: string;
-	description?: string;
-	displayName?: string;
-	tags?: string[];
-	resources: SkillResourceInfo;
-	arguments?: SkillArgument[];
-	appliedArguments?: Record<string, string>;
-	rawFrontmatter?: Record<string, unknown>;
-	warnings?: string[];
-}
-
-export interface RenderSkillResponse {
-	text: string;
-	insert: SkillInsert;
-	name: string;
-	description?: string;
-	displayName?: string;
-	sourceTags?: string[];
-	resources: SkillResourceInfo;
-	arguments?: SkillArgument[];
-	appliedArguments?: Record<string, string>;
-	rawFrontmatter?: Record<string, unknown>;
-	warnings?: string[];
-}
-
-export interface InvokeSkillToolResponse {
-	outputs?: ToolOutputUnion[];
-	meta?: Record<string, unknown>;
-	isBuiltIn: boolean;
-	isError?: boolean;
-	errorMessage?: string;
 }
 
 /**
@@ -229,12 +98,12 @@ export interface InvokeSkillToolResponse {
  * exist so management components do not need to duplicate joins between
  * Plugin, Artifact, and runtime metadata.
  */
-export enum SkillType {
+enum SkillType {
 	FS = 'fs',
 	EmbeddedFS = 'embeddedfs',
 }
 
-export enum SkillPresenceStatus {
+enum SkillPresenceStatus {
 	Present = 'present',
 	Missing = 'missing',
 	Error = 'error',
@@ -247,17 +116,6 @@ interface SkillPresence {
 	lastSeenAt?: string;
 	missingSince?: string;
 	lastCheckError?: string;
-}
-
-export interface SkillArtifactCreateInput {
-	name: string;
-	displayName?: string;
-	description: string;
-	insert: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	markdownBody: string;
-	isEnabled: boolean;
 }
 
 export interface Skill {
@@ -296,36 +154,6 @@ export interface Skill {
  * The retained "Plugin" wording is UI-only. Durable backend identity is an
  * ArtifactRef for a Plugin, never an ArtifactPluginRef.
  */
-export interface SkillPlugin {
-	schemaVersion: string;
-	id: string;
-	rootID: string;
-	ref: ArtifactRef;
-	revision: number;
-	slug: string;
-	logicalVersion?: string;
-	labels?: Record<string, string>;
-	managedSourceID?: ArtifactSourceID;
-	displayName?: string;
-	description?: string;
-	isEnabled: boolean;
-	isBuiltIn: boolean;
-	isEditable: boolean;
-	isDeletable: boolean;
-	isBaseline: boolean;
-	sourceID: ArtifactSourceID;
-
-	attachments: SkillPluginAttachmentView[];
-	createdAt?: string;
-	modifiedAt?: string;
-}
-
-export interface SkillListItem {
-	pluginID: string;
-	pluginSlug: string;
-	skillSlug: string;
-	skillDefinition: Skill;
-}
 
 export interface ManagedSkillCreateRequest {
 	plugin: ArtifactRef;
@@ -424,69 +252,4 @@ export interface ArtifactSkillSummary {
 	Insert: SkillInsert;
 	HasArguments: boolean;
 	HasResources: boolean;
-}
-
-/**
- * Runtime-native prompt filter. It intentionally accepts Skill definitions,
- * never ArtifactRefs.
- */
-export interface RuntimeSkillPromptFilter {
-	types?: string[];
-	namePrefix?: string;
-	locationPrefix?: string;
-	allowSkills?: RuntimeSkillDefinition[];
-	sessionID?: string;
-	activity?: RuntimeSkillActivity;
-}
-
-/**
- * Runtime-native list filter. It intentionally accepts Skill definitions,
- * never ArtifactRefs.
- */
-export interface RuntimeSkillListFilter {
-	types?: string[];
-	inserts?: SkillInsert[];
-	namePrefix?: string;
-	locationPrefix?: string;
-	allowSkills?: RuntimeSkillDefinition[];
-	sessionID?: string;
-	activity?: RuntimeSkillActivity;
-}
-
-/**
- * Artifact-oriented session request exposed by Skill management.
- */
-export interface ArtifactSkillSessionOptions {
-	closeSessionID?: string;
-	maxActivePerSession?: number;
-	allowArtifacts?: ArtifactRef[];
-	activeArtifacts?: ArtifactRef[];
-}
-
-/**
- * Artifact-oriented session result exposed by Skill management.
- */
-export interface ArtifactSkillSession {
-	sessionID: string;
-	activeArtifacts: ArtifactRef[];
-}
-
-/**
- * Runtime record joined with its durable ArtifactRef by Skill management.
- */
-export interface ArtifactRuntimeSkillListItem extends RuntimeSkillListItem {
-	skillRef: ArtifactRef;
-}
-
-export interface SkillPluginManagementView {
-	plugin: PluginView;
-	capabilities: PluginCapabilityPlan;
-}
-
-export interface SkillManagementView {
-	artifact: StoreArtifact;
-	memberships: ArtifactPluginMembershipView[];
-	capabilities: CapabilityPlan;
-	runtimeSummary?: ArtifactSkillSummary;
-	runtimeError?: string;
 }

@@ -253,7 +253,9 @@ function WorkspaceDirectorySelectionModalContent({
 										/>
 										<div className="min-w-0 flex-1">
 											<div className="truncate text-sm font-medium">{server.displayName || server.name}</div>
-											<div className="text-base-content/60 truncate font-mono text-xs">{server.artifact.artifactID}</div>
+											<div className="text-base-content/60 truncate font-mono text-xs">
+												{server.artifact.artifactID}
+											</div>
 										</div>
 										<span className="badge badge-secondary badge-xs">{selected ? 'Selected' : 'Available'}</span>
 									</label>

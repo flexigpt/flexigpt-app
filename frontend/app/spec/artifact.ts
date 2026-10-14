@@ -24,7 +24,7 @@ export enum ArtifactState {
 	Incompatible = 'incompatible',
 }
 
-export enum ArtifactDiagnosticSeverity {
+enum ArtifactDiagnosticSeverity {
 	Error = 'error',
 	Warning = 'warning',
 	Info = 'info',
@@ -33,11 +33,6 @@ export enum ArtifactDiagnosticSeverity {
 export interface ArtifactRef {
 	rootID: ArtifactRootID;
 	artifactID: ArtifactID;
-}
-
-export interface ArtifactAddress extends ArtifactRef {
-	kind: ArtifactKind;
-	logicalName: string;
 }
 
 interface ArtifactDiagnosticLocation {
@@ -54,7 +49,7 @@ export interface ArtifactDiagnostic {
 	location?: ArtifactDiagnosticLocation;
 }
 
-export interface ArtifactSourceBinding {
+interface ArtifactSourceBinding {
 	sourceID: ArtifactSourceID;
 	locator: ArtifactLocator;
 	subresourceLocator?: ArtifactLocator;

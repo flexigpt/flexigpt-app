@@ -370,6 +370,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		loading,
 		resetToDefaultAgent,
 		trackDefaultAgentWithoutApplying,
+		restoreSelectedAgent,
 	]);
 
 	useEffect(() => {

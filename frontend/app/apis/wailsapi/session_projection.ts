@@ -27,20 +27,6 @@ import {
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 
-/**
- * Wails already JSON-decodes normal Go structs, `json.RawMessage`, and
- * `time.Time` transport values. Session opaque JSON must therefore remain the
- * value supplied by Wails rather than being reparsed as a byte array or a
- * second JSON document.
- *
- * The field argument remains for compatibility with call sites that attach a
- * transport-path label to errors; no wire conversion is performed here.
- */
-// oxlint-disable-next-line typescript/no-redundant-type-constituents
-export function sessionOpaqueJSONFromWails(value: unknown, _field: string): SessionOpaqueJSON | undefined {
-	return value === undefined ? undefined : (value as SessionOpaqueJSON);
-}
-
 function stringArrayFromWails(value: unknown, field: string): string[] {
 	return wailsArrayOrEmpty(value, field).map((item, index) => requireWailsString(item, `${field}[${index}]`));
 }
@@ -91,7 +77,7 @@ export function sessionFromWails(value: unknown, operation: string): Session {
 	return requiredObject<Session>(value, operation);
 }
 
-export function sessionRunFromWails(value: unknown, operation: string): SessionRun {
+function sessionRunFromWails(value: unknown, operation: string): SessionRun {
 	return requiredObject<SessionRun>(value, operation);
 }
 
@@ -139,7 +125,7 @@ export function sessionRuntimeEventFromWails(value: unknown, operation: string):
 		waitID: optionalWailsString(event.waitID, `${operation}.waitID`),
 		kind: enumFromWails(event.kind, SessionRuntimeEventKind, `${operation}.kind`),
 		at: requireWailsString(event.at, `${operation}.at`),
-		data: sessionOpaqueJSONFromWails(event.data, `${operation}.data`),
+		data: event.data === undefined ? undefined : (event.data as SessionOpaqueJSON),
 	};
 }
 
@@ -147,7 +133,7 @@ export function mcpAppResourceReadResultFromWails(value: unknown, operation: str
 	return requiredObject<MCPAppResourceReadResult>(value, operation);
 }
 
-export function sessionStoreSessionListItemFromWails(value: unknown, operation: string): SessionStoreSessionListItem {
+function sessionStoreSessionListItemFromWails(value: unknown, operation: string): SessionStoreSessionListItem {
 	return requiredObject<SessionStoreSessionListItem>(value, operation);
 }
 

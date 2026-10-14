@@ -190,7 +190,7 @@ function includePreviousMessagesFromSession(configuration: SessionConfiguration)
 	return Math.max(0, configuration.history.includePreviousUserTurns ?? 0);
 }
 
-export type ComposerModelSelectionSource = 'session' | 'agent';
+type ComposerModelSelectionSource = 'session' | 'agent';
 
 export interface ComposerContextController {
 	chatOptions: UIModelOption;

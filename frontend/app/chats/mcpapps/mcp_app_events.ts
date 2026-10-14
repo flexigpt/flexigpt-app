@@ -35,20 +35,3 @@ export function dispatchMCPAppUIMessage(instance: MCPAppInstance, message: MCPAp
 		})
 	);
 }
-
-export function dispatchMCPAppModelContextUpdate(instance: MCPAppInstance, update: MCPAppModelContextUpdatePayload) {
-	window.dispatchEvent(
-		new CustomEvent<MCPAppModelContextUpdateEventDetail>(MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, {
-			detail: {
-				instance,
-				update: {
-					...update,
-					instanceID: instance.instanceID,
-					server: instance.server,
-					resourceUri: instance.resourceUri,
-					updatedAt: new Date().toISOString(),
-				},
-			},
-		})
-	);
-}

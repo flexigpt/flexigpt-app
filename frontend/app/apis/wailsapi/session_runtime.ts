@@ -71,7 +71,7 @@ import {
 } from '@/apis/wailsjs/go/main/SessionRuntimeWrapper';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
-export const SESSION_RUNTIME_EVENT_NAME = 'session-runtime:event';
+const SESSION_RUNTIME_EVENT_NAME = 'session-runtime:event';
 
 type RuntimeEventListener = (event: SessionRuntimeEvent) => void;
 

@@ -1,5 +1,5 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillRef } from '@/spec/skill';
 
 function isSkillArtifactRef(ref: unknown): ref is ArtifactRef {
 	if (ref === null || typeof ref !== 'object') {
@@ -22,11 +22,7 @@ export function formatSkillRef(ref: SkillRef): string {
 	return `${ref.rootID}/${ref.artifactID}`;
 }
 
-export function skillRefFromListItem(item: SkillListItem): SkillRef {
-	return item.skillDefinition.ref;
-}
-
-export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[] {
+function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[] {
 	const seen = new Set<string>();
 	const out: SkillRef[] = [];
 	for (const r of refs ?? []) {
@@ -44,13 +40,6 @@ export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[]
 
 export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRef[] => {
 	return dedupeSkillRefs(refs ?? []);
-};
-
-export const buildSkillRefsFingerprint = (refs: SkillRef[] | null | undefined): string => {
-	const keys = normalizeSkillRefs(refs)
-		.map(r => skillRefKey(r))
-		.toSorted();
-	return keys.join('|');
 };
 
 export const clampActiveSkillRefsToEnabled = (

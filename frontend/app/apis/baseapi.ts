@@ -75,8 +75,10 @@ let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 export let workspaceManagementAPI: WorkspaceManagementAPI;
 
 let agentStoreAPI: IAgentStoreAPI;
-export let textStoreAPI: ITextStoreAPI;
 export let agentManagementAPI: AgentManagementAPI;
+
+/** @public */
+export let textStoreAPI: ITextStoreAPI;
 
 if (IS_WAILS_PLATFORM) {
 	log = new wailsImpl.WailsLogger();

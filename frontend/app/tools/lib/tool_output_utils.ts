@@ -5,22 +5,6 @@ import { ToolOutputKind } from '@/spec/tool';
 
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
-function mapImageDetail(detail?: string): ImageDetail | undefined {
-	if (!detail) {
-		return undefined;
-	}
-	switch (detail.toLowerCase()) {
-		case 'high':
-			return ImageDetail.High;
-		case 'low':
-			return ImageDetail.Low;
-		case 'auto':
-			return ImageDetail.Auto;
-		default:
-			return undefined;
-	}
-}
-
 /**
  * Map inference ToolOutput.contents -> ToolOutputUnion[]
  */
@@ -83,69 +67,6 @@ export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]
 	}
 
 	return outputs.length > 0 ? outputs : undefined;
-}
-
-/**
- * Map ToolOutputUnion[] -> inference ToolOutputItemUnion[]
- */
-export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): ToolOutputItemUnion[] | undefined {
-	if (!outputs?.length) {
-		return undefined;
-	}
-
-	const contents: ToolOutputItemUnion[] = [];
-
-	for (const out of outputs) {
-		switch (out.kind) {
-			case ToolOutputKind.Text: {
-				const text = out.textItem?.text;
-				if (text !== null) {
-					contents.push({
-						kind: ContentItemKind.Text,
-						textItem: { text: text ?? '' },
-					});
-				}
-				break;
-			}
-
-			case ToolOutputKind.Image: {
-				const img = out.imageItem;
-				if (img) {
-					contents.push({
-						kind: ContentItemKind.Image,
-						imageItem: {
-							detail: mapImageDetail(img.detail),
-							imageName: img.imageName,
-							imageMIME: img.imageMIME,
-							imageData: img.imageData,
-						},
-					});
-				}
-				break;
-			}
-
-			case ToolOutputKind.File: {
-				const file = out.fileItem;
-				if (file) {
-					contents.push({
-						kind: ContentItemKind.File,
-						fileItem: {
-							fileName: file.fileName,
-							fileMIME: file.fileMIME,
-							fileData: file.fileData,
-						},
-					});
-				}
-				break;
-			}
-
-			default:
-				// ignore
-				break;
-		}
-	}
-
-	return contents.length > 0 ? contents : undefined;
 }
 
 export function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): string | undefined {

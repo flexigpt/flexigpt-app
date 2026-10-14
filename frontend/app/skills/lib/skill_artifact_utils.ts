@@ -1,14 +1,14 @@
 import type { Skill, SkillArgument, SkillResourceInfo } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
-export type SkillInsertFilter = 'all' | SkillInsert;
+type SkillInsertFilter = 'all' | SkillInsert;
 
-export interface NormalizedSkillInsert {
+interface NormalizedSkillInsert {
 	value: SkillInsert;
 	isDefaulted: boolean;
 }
 
-export interface SkillMarkdownScaffoldInput {
+interface SkillMarkdownScaffoldInput {
 	name: string;
 	description?: string;
 	displayName?: string;

@@ -1,8 +1,5 @@
-import type {
-	MCPHTTPAuthMode,
-	MCPServerView,
-	MCPTransportType,
-} from '@/spec/mcp';
+import type { MCPHTTPAuthMode, MCPServerView, MCPTransportType } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPServerStatus, MCPToolCapability, MCPToolRisk } from '@/spec/session_mcp';
 import {
 	MCPApprovalRule,
 	MCPExecutionMode,
@@ -10,7 +7,6 @@ import {
 	MCPTransportType as MCPTransportTypeEnum,
 	MCPTrustLevel,
 } from '@/spec/mcp';
-import type { MCPAuthHealth, MCPServerStatus, MCPToolCapability, MCPToolRisk } from '@/spec/session_mcp';
 import {
 	MCPAppVisibility,
 	MCPAuthHealthState as MCPAuthHealthStateEnum,
