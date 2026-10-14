@@ -33,7 +33,7 @@ import {
 	isBuiltInAgentPlugin,
 	pluginDisplayName,
 } from '@/apis/agent_management';
-import { agentManagementAPI, agentStoreAPI, backendAPI } from '@/apis/baseapi';
+import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -591,6 +591,8 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 		? `agent-plugin:${state.view.artifact.rootID}:${state.view.artifact.id}:${state.view.artifact.revision}`
 		: `agent-plugin:${state.plugin.ref.rootID}:${state.plugin.ref.artifactID}:${state.plugin.revision}`;
 
+	const isBuiltIn = 'builtIn' in plugin ? plugin.builtIn : !plugin.deletable && !plugin.editable;
+
 	return (
 		<ManagementDetailsModal isOpen={true} onClose={onClose} title="Agent Plugin Details" modalKey={modalKey}>
 			{state.loading ? <Loader text="Loading Agent Plugin details..." /> : null}
@@ -609,7 +611,7 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 				<ManagementInfoRow label="Name" mono>
 					{plugin.name}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Built-in">{isBuiltInAgentPlugin(plugin) ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Built-in">{isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">
 					{'artifact' in plugin ? (plugin.artifact.enabled ? 'Yes' : 'No') : plugin.enabled ? 'Yes' : 'No'}
@@ -842,7 +844,7 @@ export default function AgentsPage() {
 			loading: true,
 		});
 
-		void agentStoreAPI
+		void agentManagementAPI
 			.getAgentPlugin(plugin.ref)
 			.then(view => {
 				if (!mountedRef.current || pluginDetailsRequestIDRef.current !== requestID) {
@@ -870,7 +872,7 @@ export default function AgentsPage() {
 
 	const togglePluginEnabled = useCallback(
 		async (plugin: PluginListItem, enabled: boolean) => {
-			const updated = await agentStoreAPI.setAgentPluginEnabled(plugin.ref, plugin.revision, enabled);
+			const updated = await agentManagementAPI.setAgentPluginEnabled(plugin.ref, plugin.revision, enabled);
 
 			updatePluginSummary(updated);
 			agentManagementAPI.invalidateAgentCatalog();
@@ -880,7 +882,7 @@ export default function AgentsPage() {
 
 	const toggleAgentEnabled = useCallback(
 		async (agent: AgentView, enabled: boolean) => {
-			const updated = await agentStoreAPI.setAgentEnabled(agentArtifactRef(agent), agent.revision, enabled);
+			const updated = await agentManagementAPI.setAgentEnabled(agentArtifactRef(agent), agent.revision, enabled);
 			const key = agentRefKey(updated);
 
 			setPageData(previous => ({
@@ -899,7 +901,7 @@ export default function AgentsPage() {
 
 	const createPlugin = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
-			await agentStoreAPI.createAgentPlugin({
+			await agentManagementAPI.createAgentPlugin({
 				rootID: effectivePluginCreationRootID,
 				name: slug,
 				displayName,
@@ -913,7 +915,7 @@ export default function AgentsPage() {
 
 	const updatePlugin = useCallback(
 		async (plugin: PluginListItem, displayName: string, description?: string) => {
-			const updated = await agentStoreAPI.updateAgentPlugin({
+			const updated = await agentManagementAPI.updateAgentPlugin({
 				plugin: plugin.ref,
 				expectedRevision: plugin.revision,
 				displayName,
@@ -934,7 +936,7 @@ export default function AgentsPage() {
 		setIsDeletingAgent(true);
 
 		try {
-			await agentStoreAPI.deleteManagedAgent(agentArtifactRef(agentToDelete), agentToDelete.revision);
+			await agentManagementAPI.deleteManagedAgent(agentArtifactRef(agentToDelete), agentToDelete.revision);
 			setAgentToDelete(null);
 			await refreshPage();
 		} catch (error) {
@@ -968,7 +970,7 @@ export default function AgentsPage() {
 		setIsDeletingPlugin(true);
 
 		try {
-			await agentStoreAPI.deleteAgentPlugin(pluginToDelete.ref, pluginToDelete.revision);
+			await agentManagementAPI.deleteAgentPlugin(pluginToDelete.ref, pluginToDelete.revision);
 			setPluginToDelete(null);
 			await refreshPage();
 		} catch (error) {
@@ -986,7 +988,7 @@ export default function AgentsPage() {
 	}, [pluginToDelete, isDeletingPlugin, pageData.plugins, refreshPage, showAlert]);
 
 	const exportAgent = useCallback(async (agent: AgentView) => {
-		const exported = await agentStoreAPI.exportAgent(agentArtifactRef(agent));
+		const exported = await agentManagementAPI.exportAgent(agentArtifactRef(agent));
 
 		await backendAPI.saveFile(exported.suggestedFileName, textToBase64(exported.content), [
 			{

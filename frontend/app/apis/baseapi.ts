@@ -114,7 +114,7 @@ if (IS_WAILS_PLATFORM) {
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
 	textStoreAPI = new wailsImpl.WailsTextStoreAPI();
-	agentManagementAPI = new AgentManagementAPI(agentStoreAPI);
+	agentManagementAPI = new AgentManagementAPI(agentStoreAPI, toolManagementAPI, textStoreAPI);
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();
 	workspaceRuntimeAPI = new WailsWorkspaceRuntimeAPI();
@@ -124,6 +124,8 @@ if (IS_WAILS_PLATFORM) {
 		toolManagementAPI,
 		modelManagementAPI
 	);
+
+	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillAggregateAPI, toolManagementAPI, modelManagementAPI);
 } else {
 	throw new Error('Unsupported platform');
 }

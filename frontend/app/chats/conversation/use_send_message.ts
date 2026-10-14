@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
 import type { UIModelOption } from '@/spec/model';
+import { RoleEnum } from '@/spec/inference';
 import { SessionRunState } from '@/spec/session';
 
 import { generateTitle } from '@/lib/title_utils';

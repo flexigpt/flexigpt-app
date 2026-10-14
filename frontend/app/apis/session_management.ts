@@ -421,6 +421,7 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 						continue;
 					}
 
+					state.lastEventSequence = Math.max(state.lastEventSequence, snapshot.sequence);
 					state.lastSnapshotSequence = snapshot.sequence;
 					this.emitSessionObservation(state, {
 						kind: SessionSnapshotObservationKind.Snapshot,

@@ -77,9 +77,9 @@ type SubmissionPreparer interface {
 // SessionID is optional so a draft in a new, not-yet-persisted tab can use the
 // same authoritative runtime path.
 type UserMessageSkillTemplatePreparationRequest struct {
-	SessionID SessionID
-	Skill     ArtifactSelection
-	Arguments map[string]string
+	SessionID SessionID         `json:"sessionID"`
+	Skill     ArtifactSelection `json:"skill"`
+	Arguments map[string]string `json:"arguments"`
 }
 
 type UserMessageSkillTemplateResult struct {

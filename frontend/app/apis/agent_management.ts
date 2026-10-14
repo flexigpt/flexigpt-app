@@ -1,5 +1,6 @@
 // oxlint-disable typescript/parameter-properties
 import type {
+	AgentCapabilityOccurrence,
 	AgentCapabilityPlan,
 	AgentExportResult,
 	AgentImportCommitRequest,
@@ -23,13 +24,16 @@ import type {
 	RemovePluginMemberRequest,
 	UpdatePluginRequest,
 } from '@/spec/plugin';
-import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
+import type { ToolStoreChoiceType } from '@/spec/tool';
+import { AgentSkillUseMode } from '@/spec/agent';
+import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
+import { ToolImplType, ToolStoreChoiceType as ToolStoreChoiceTypeValue } from '@/spec/tool';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type { IAgentStoreAPI } from '@/apis/interface';
+import type { IAgentStoreAPI, ITextStoreAPI, IToolTargetResolver } from '@/apis/interface';
 
 export interface AgentPluginData {
 	plugin: PluginListItem;
@@ -59,6 +63,32 @@ export interface AgentCatalogOption {
 	label: string;
 	isSelectable: boolean;
 	availabilityReason?: string;
+}
+
+export interface AgentStarterPreview {
+	resolution: AgentResolution;
+	canApply: boolean;
+	modelRef?: ArtifactRef;
+	includeModelSystemPrompt?: boolean;
+	mcpContext?: {
+		servers: [];
+	};
+	toolSelections: Array<{
+		choice: {
+			toolType: ToolStoreChoiceType;
+		};
+	}>;
+	enabledSkillRefs: ArtifactRef[];
+	activeSkillRefs: ArtifactRef[];
+	instructionSkillRefs: ArtifactRef[];
+	instructionText?: string;
+	textArtifacts: ArtifactRef[];
+	issues: Array<{
+		severity: 'error' | 'warning' | 'information';
+		code: string;
+		path?: string;
+		message: string;
+	}>;
 }
 
 function artifactRefKey(ref: ArtifactRef): string {
@@ -127,6 +157,18 @@ export function canDeleteAgentPlugin(plugin: PluginListItem): boolean {
 	return plugin.deletable && !plugin.baseline;
 }
 
+const uniqueRefs = (refs: ArtifactRef[]): ArtifactRef[] => {
+	const seen = new Set<string>();
+	return refs.filter(ref => {
+		const key = artifactRefKey(ref);
+		if (seen.has(key)) {
+			return false;
+		}
+		seen.add(key);
+		return true;
+	});
+};
+
 /**
  * Frontend management façade for Agent artifacts and Agent Plugins.
  *
@@ -141,7 +183,11 @@ export class AgentManagementAPI {
 		return (await this.agents.listAgentsForManagement()) ?? [];
 	});
 
-	constructor(private readonly agents: IAgentStoreAPI) {}
+	constructor(
+		private readonly agents: IAgentStoreAPI,
+		private readonly tools?: IToolTargetResolver,
+		private readonly texts?: ITextStoreAPI
+	) {}
 
 	private async mutate<T>(operation: () => Promise<T>): Promise<T> {
 		const result = await operation();
@@ -330,6 +376,156 @@ export class AgentManagementAPI {
 
 	resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan> {
 		return this.agents.resolveAgentCapabilities(agent);
+	}
+
+	/**
+	 * Frontend-only preview. It never becomes Session execution authority.
+	 * Session Runtime resolves the selected Agent again while preparing the
+	 * immutable Run operation.
+	 */
+	async prepareAgentStarterFromResolution(resolution: AgentResolution): Promise<AgentStarterPreview> {
+		const issues: AgentStarterPreview['issues'] = [];
+		const toolSelections: AgentStarterPreview['toolSelections'] = [];
+		const enabledSkillRefs: ArtifactRef[] = [];
+		const activeSkillRefs: ArtifactRef[] = [];
+		const instructionSkillRefs: ArtifactRef[] = [];
+		const textArtifacts: ArtifactRef[] = [];
+		const instructionTextParts: string[] = [];
+		let modelRef: ArtifactRef | undefined;
+		let includeModelSystemPrompt: boolean | undefined;
+
+		const addIssue = (
+			occurrence: AgentCapabilityOccurrence,
+			severity: AgentStarterPreview['issues'][number]['severity'],
+			code: string,
+			message: string
+		) => {
+			issues.push({
+				severity,
+				code,
+				path: occurrence.path,
+				message,
+			});
+		};
+
+		for (const occurrence of resolution.capabilities.occurrences) {
+			if (occurrence.status !== CapabilityResolutionStatus.Available || !occurrence.target) {
+				if (occurrence.required) {
+					addIssue(
+						occurrence,
+						'error',
+						occurrence.code || 'agent_capability_unavailable',
+						occurrence.message || 'A required Agent capability is unavailable.'
+					);
+				} else if (occurrence.message) {
+					addIssue(occurrence, 'warning', occurrence.code || 'agent_capability_unavailable', occurrence.message);
+				}
+				continue;
+			}
+
+			const target = occurrence.target;
+
+			switch (occurrence.type) {
+				case 'model':
+					if (target.form === CapabilityTargetForm.Artifact && target.artifact && !modelRef) {
+						modelRef = target.artifact;
+						includeModelSystemPrompt = occurrence.includeSystemPrompt;
+					}
+					break;
+
+				case 'tool':
+					if (!this.tools) {
+						addIssue(
+							occurrence,
+							'warning',
+							'agent_tool_preview_unavailable',
+							'Tool preview is unavailable in this frontend host.'
+						);
+						break;
+					}
+					try {
+						const resolved = await this.tools.resolveToolTarget(target);
+						toolSelections.push({
+							choice: {
+								toolType:
+									resolved.tool.implementation.kind === ToolImplType.Go
+										? ToolStoreChoiceTypeValue.Function
+										: (resolved.tool.implementation.sdkToolType ?? ToolStoreChoiceTypeValue.Function),
+							},
+						});
+					} catch (error) {
+						addIssue(
+							occurrence,
+							occurrence.required ? 'error' : 'warning',
+							'agent_tool_preview_unavailable',
+							getErrorMessage(error, 'Agent Tool preview could not be resolved.')
+						);
+					}
+					break;
+
+				case 'skill':
+					if (target.form !== CapabilityTargetForm.Artifact || !target.artifact) {
+						break;
+					}
+					enabledSkillRefs.push(target.artifact);
+					if (occurrence.skillUseMode === AgentSkillUseMode.Active) {
+						activeSkillRefs.push(target.artifact);
+					}
+					if (occurrence.skillUseMode === AgentSkillUseMode.Instructions) {
+						instructionSkillRefs.push(target.artifact);
+					}
+					break;
+
+				case 'text':
+					if (target.form !== CapabilityTargetForm.Artifact || !target.artifact) {
+						break;
+					}
+					textArtifacts.push(target.artifact);
+					if (!this.texts) {
+						break;
+					}
+					try {
+						const materialized = await this.texts.materializeText(target.artifact);
+						if (materialized.content.trim()) {
+							instructionTextParts.push(materialized.content);
+						}
+					} catch (error) {
+						addIssue(
+							occurrence,
+							occurrence.required ? 'error' : 'warning',
+							'agent_instruction_preview_unavailable',
+							getErrorMessage(error, 'Agent instruction preview could not be materialized.')
+						);
+					}
+					break;
+
+				case 'mcp':
+					addIssue(
+						occurrence,
+						'information',
+						'agent_mcp_requires_session_selection',
+						'Agent MCP declarations are candidates. They require an explicit Session MCP selection before execution.'
+					);
+					break;
+
+				default:
+					break;
+			}
+		}
+
+		return {
+			resolution,
+			canApply: !issues.some(issue => issue.severity === 'error'),
+			modelRef,
+			includeModelSystemPrompt,
+			toolSelections,
+			enabledSkillRefs: uniqueRefs(enabledSkillRefs),
+			activeSkillRefs: uniqueRefs(activeSkillRefs),
+			instructionSkillRefs: uniqueRefs(instructionSkillRefs),
+			instructionText: instructionTextParts.join('\n\n') || undefined,
+			textArtifacts: uniqueRefs(textArtifacts),
+			issues,
+		};
 	}
 
 	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView> {

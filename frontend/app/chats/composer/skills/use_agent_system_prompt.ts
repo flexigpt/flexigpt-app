@@ -2,8 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
-import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
 import type { SessionConfiguration } from '@/spec/session';
+import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
 import { SessionCollectionOverrideMode, SessionModelDefaultField } from '@/spec/session';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
@@ -270,14 +270,13 @@ export function useAgentSystemPrompt(args: {
 
 	const restoreSessionConfiguration = useCallback(
 		(configuration: SessionConfiguration) => {
-			const clearModelDefault = configuration.modelOverrides.clear?.includes(
-				SessionModelDefaultField.SystemPrompt
-			);
+			const clearModelDefault = configuration.modelOverrides.clear?.includes(SessionModelDefaultField.SystemPrompt);
+			const s = sessionInstructionSources(configuration);
 
 			setRestoredPrompt(null);
 			setIncludePreference(clearModelDefault ? false : 'auto');
-			setDynamicSources(sessionInstructionSources(configuration));
-			setSelectedKeys(sessionInstructionSources(configuration).map(source => source.identityKey));
+			setDynamicSources(s);
+			setSelectedKeys(s.map(source => source.identityKey));
 		},
 		[setSelectedKeys]
 	);

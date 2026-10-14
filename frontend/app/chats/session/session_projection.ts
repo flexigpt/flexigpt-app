@@ -1,12 +1,12 @@
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InputUnion, OutputUnion, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPApprovalRule, MCPAppVisibility, MCPContent, MCPExecutionMode } from '@/spec/mcp';
+import type { MCPApprovalRule, MCPAppVisibility, MCPContent, MCPContentType, MCPExecutionMode } from '@/spec/mcp';
 import type {
+	SessionAppContextUpdate,
 	SessionAppInstance,
 	SessionAppRenderTarget,
 	SessionAttachmentReference,
-	SessionAppContextUpdate,
 	SessionRun,
 	SessionSnapshot,
 	SessionToolCall,
@@ -15,6 +15,7 @@ import type {
 } from '@/spec/session';
 import { AttachmentKind } from '@/spec/attachment';
 import { RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import {
 	SessionAttachmentReferenceKind,
 	SessionMessageRole,
@@ -24,10 +25,21 @@ import {
 	SessionToolResultKind,
 } from '@/spec/session';
 import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
-import { MCPContentType } from '@/spec/mcp';
 
 import { deriveUIFieldsFromOutputUnion } from '@/chats/conversation/completion_helper';
 import { selectedSessionRun } from '@/chats/session/session_commands';
+
+interface IndexedToolCall {
+	call: SessionToolCall;
+	run: SessionRun;
+}
+
+interface SessionRunIndex {
+	runsByOperationID: Map<string, SessionRun>;
+	callsByOperationID: Map<string, SessionToolCall[]>;
+	callsByID: Map<string, IndexedToolCall>;
+	appsByRunID: Map<string, Map<string, SessionAppInstance>>;
+}
 
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function decodeSessionOpaqueJSON<T>(value: unknown): T | undefined {
@@ -57,6 +69,35 @@ export function decodeSessionOpaqueJSON<T>(value: unknown): T | undefined {
 	}
 
 	return undefined;
+}
+
+function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
+	const runsByOperationID = new Map<string, SessionRun>();
+	const callsByOperationID = new Map<string, SessionToolCall[]>();
+	const callsByID = new Map<string, IndexedToolCall>();
+	const appsByRunID = new Map<string, Map<string, SessionAppInstance>>();
+
+	for (const run of snapshot.runs) {
+		appsByRunID.set(run.id, new Map((run.apps ?? []).map(app => [app.id, app] as const)));
+
+		for (const operation of run.modelOperations ?? []) {
+			runsByOperationID.set(operation.id, run);
+		}
+
+		for (const call of run.toolCalls ?? []) {
+			const calls = callsByOperationID.get(call.originOperationID) ?? [];
+			calls.push(call);
+			callsByOperationID.set(call.originOperationID, calls);
+			callsByID.set(call.id, { call, run });
+		}
+	}
+
+	return {
+		runsByOperationID,
+		callsByOperationID,
+		callsByID,
+		appsByRunID,
+	};
 }
 
 function messageRole(role: SessionMessageRole): RoleEnum {
@@ -205,15 +246,17 @@ function mcpSelectionFromBinding(call: SessionToolCall): UIToolCall['mcpToolSele
 		choiceID?: string;
 		toolName?: string;
 		toolDigest?: string;
-		approvalRule?: string;
-		executionMode?: string;
+		approvalRule?: unknown;
+		executionMode?: unknown;
 		appResourceUri?: string;
-		visibility?: string[];
+		visibility?: unknown;
 	}>(call.binding.data);
 
 	if (!binding?.server || !binding.toolName) {
 		return undefined;
 	}
+
+	const visibility = Array.isArray(binding.visibility) ? binding.visibility.filter(isMCPAppVisibility) : undefined;
 
 	return {
 		server: binding.server,
@@ -221,19 +264,19 @@ function mcpSelectionFromBinding(call: SessionToolCall): UIToolCall['mcpToolSele
 		providerToolName: binding.providerToolName,
 		choiceID: binding.choiceID,
 		digest: binding.toolDigest,
-		approvalRule: binding.approvalRule as MCPApprovalRule,
-		executionMode: binding.executionMode as MCPExecutionMode,
+		approvalRule: isMCPApprovalRule(binding.approvalRule) ? (binding.approvalRule as MCPApprovalRule) : undefined,
+		executionMode: isMCPExecutionMode(binding.executionMode) ? (binding.executionMode as MCPExecutionMode) : undefined,
 		appResourceUri: binding.appResourceUri,
-		visibility: binding.visibility as MCPAppVisibility[],
+		visibility: visibility as MCPAppVisibility[] | undefined,
 	};
 }
 
 function appRenderTarget(
 	app: SessionAppInstance | undefined,
 	sessionSnapshot: SessionSnapshot,
-	run: SessionRun
+	run: SessionRun | undefined
 ): SessionAppRenderTarget | undefined {
-	if (!app) {
+	if (!app || !run) {
 		return undefined;
 	}
 
@@ -250,11 +293,12 @@ function appRenderTarget(
 
 function toolOutputFromResult(
 	result: SessionToolResult,
+	call: SessionToolCall | undefined,
+	run: SessionRun | undefined,
 	sessionSnapshot: SessionSnapshot,
-	run: SessionRun,
-	appsByID: Map<string, SessionAppInstance>
+	appsByID: Map<string, SessionAppInstance> | undefined
 ): UIToolOutput {
-	const app = result.appInstanceID ? appsByID.get(result.appInstanceID) : undefined;
+	const app = result.appInstanceID ? appsByID?.get(result.appInstanceID) : undefined;
 	const structured = decodeSessionOpaqueJSON(result.structured);
 	const appPayload = decodeSessionOpaqueJSON<{
 		resourceUri?: string;
@@ -265,17 +309,15 @@ function toolOutputFromResult(
 		isError?: boolean;
 	}>(result.app);
 
-	const text =
-		result.text ||
-		result.error ||
-		(structured === undefined ? 'Tool completed without textual output.' : JSON.stringify(structured, null, 2));
+	const structuredText = structured === undefined ? '' : JSON.stringify(structured, null, 2) || '';
+	const text = result.text || result.error || structuredText || 'Tool completed without textual output.';
 
 	return {
 		id: result.id,
 		callID: result.callID,
 		name: result.name,
-		choiceID: result.choiceID ?? '',
-		type: toolChoiceType(result.type),
+		choiceID: result.choiceID ?? call?.choiceID ?? '',
+		type: toolChoiceType(result.type || call?.type),
 		summary: result.kind === SessionToolResultKind.Success ? `Result: ${result.name}` : `Tool error: ${result.name}`,
 		toolOutputs: [
 			{
@@ -288,6 +330,7 @@ function toolOutputFromResult(
 		isError: result.kind !== SessionToolResultKind.Success,
 		isSkipped: result.kind === SessionToolResultKind.Skipped,
 		errorMessage: result.error,
+		mcpToolSelection: call ? mcpSelectionFromBinding(call) : undefined,
 		mcpApp:
 			app || appPayload?.resourceUri || appPayload?.resourceURI
 				? {
@@ -317,7 +360,7 @@ function uiToolCallFromSession(call: SessionToolCall): UIToolCall {
 }
 
 function protocolOutputs(message: SessionTranscriptMessage): OutputUnion[] {
-	const output = [];
+	const output: OutputUnion[] = [];
 
 	for (const raw of message.protocolOutputs ?? []) {
 		const value = decodeSessionOpaqueJSON<OutputUnion>(raw);
@@ -350,25 +393,24 @@ function appContextUpdatesFromSession(values: SessionAppContextUpdate[] | undefi
 function projectTranscriptMessage(
 	message: SessionTranscriptMessage,
 	sessionSnapshot: SessionSnapshot,
-	run: SessionRun | undefined,
-	appsByID: Map<string, SessionAppInstance>
+	index: SessionRunIndex
 ): ConversationMessage {
 	const outputs = protocolOutputs(message);
 	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
-	const toolCalls =
-		run && message.operationID
-			? run.toolCalls
-				? run.toolCalls
-						.filter(call => call.originOperationID === message.operationID)
-						.map(t => {
-							return uiToolCallFromSession(t);
-						})
-				: undefined
-			: undefined;
-	const toolOutputs =
-		run && message.toolResults
-			? message.toolResults.map(result => toolOutputFromResult(result, sessionSnapshot, run, appsByID))
-			: undefined;
+	const operationRun = message.operationID ? index.runsByOperationID.get(message.operationID) : undefined;
+	const operationCalls = message.operationID ? (index.callsByOperationID.get(message.operationID) ?? []) : [];
+	const appsByID = operationRun ? index.appsByRunID.get(operationRun.id) : undefined;
+
+	const toolResults =
+		message.toolResults
+			?.map(result => {
+				const indexed = index.callsByID.get(result.callID);
+				const resultRun = indexed?.run ?? operationRun;
+				const resultApps = resultRun ? index.appsByRunID.get(resultRun.id) : appsByID;
+
+				return toolOutputFromResult(result, indexed?.call, resultRun, sessionSnapshot, resultApps);
+			})
+			.filter(Boolean) ?? [];
 
 	return {
 		id: message.id,
@@ -384,38 +426,32 @@ function projectTranscriptMessage(
 		error: message.error,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
-		uiToolCalls: toolCalls?.length ? toolCalls : derived.uiToolCalls,
-		uiToolOutputs: toolOutputs?.length ? toolOutputs : derived.uiToolOutputs,
+		uiToolCalls:
+			operationCalls.length > 0
+				? operationCalls.map(t => {
+						return uiToolCallFromSession(t);
+					})
+				: derived.uiToolCalls,
+		uiToolOutputs: toolResults.length > 0 ? toolResults : derived.uiToolOutputs,
 		uiCitations: derived.uiCitations,
 	};
 }
 
-function projectActiveOperation(
-	_sessionSnapshot: SessionSnapshot,
-	run: SessionRun,
-	_appsByID: Map<string, SessionAppInstance>
-): ConversationMessage | undefined {
+function projectActiveOperation(run: SessionRun): ConversationMessage | undefined {
 	const operation = run.modelOperations?.find(candidate => candidate.id === run.activeModelOperationID);
 
-	if (!operation) {
+	if (!operation || (!operation.streamedText && !operation.streamedThinking)) {
 		return undefined;
 	}
 
-	if (!operation.streamedText && !operation.streamedThinking) {
-		return undefined;
-	}
-
-	const resultID = `session-stream:${run.id}:${operation.id}`;
 	const toolCalls = run.toolCalls
-		? run.toolCalls
-				.filter(call => call.originOperationID === operation.id)
-				.map(t => {
-					return uiToolCallFromSession(t);
-				})
-		: undefined;
+		?.filter(call => call.originOperationID === operation.id)
+		.map(t => {
+			return uiToolCallFromSession(t);
+		});
 
 	return {
-		id: resultID,
+		id: `session-stream:${run.id}:${operation.id}`,
 		createdAt: operation.startedAt || operation.request.current.createdAt,
 		role: RoleEnum.Assistant,
 		status: Status.InProgress,
@@ -429,29 +465,27 @@ function projectActiveOperation(
 					},
 				]
 			: undefined,
-		uiToolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+		uiToolCalls: toolCalls?.length ? toolCalls : undefined,
 	};
 }
 
 export function projectSessionSnapshotToConversation(snapshot: SessionSnapshot, preferredRunID?: string): Conversation {
-	const run = selectedSessionRun(snapshot, preferredRunID);
-	const appsByID = new Map((run?.apps ?? []).map(app => [app.id, app] as const));
-	const messages = snapshot.session.transcript
-		? snapshot.session.transcript.map(message => projectTranscriptMessage(message, snapshot, run, appsByID))
-		: [];
+	const selectedRun = selectedSessionRun(snapshot, preferredRunID);
+	const index = indexRuns(snapshot);
+	const messages =
+		snapshot.session.transcript?.map(message => projectTranscriptMessage(message, snapshot, index)) ?? [];
 
-	if (run && run.activeModelOperationID) {
+	if (selectedRun?.activeModelOperationID) {
 		const hasPersistedAssistantForActiveOperation = snapshot.session.transcript?.some(
 			message =>
-				message.role === SessionMessageRole.Assistant &&
-				message.operationID === run.activeModelOperationID
+				message.role === SessionMessageRole.Assistant && message.operationID === selectedRun.activeModelOperationID
 		);
-		const transient = hasPersistedAssistantForActiveOperation
-			? undefined
-			: projectActiveOperation(snapshot, run, appsByID);
 
-		if (transient) {
-			messages.push(transient);
+		if (!hasPersistedAssistantForActiveOperation) {
+			const transient = projectActiveOperation(selectedRun);
+			if (transient) {
+				messages.push(transient);
+			}
 		}
 	}
 

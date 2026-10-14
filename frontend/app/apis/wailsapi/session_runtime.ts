@@ -144,7 +144,7 @@ export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
 		command: SessionUserMessageSkillTemplateCommand
 	): Promise<SessionUserMessageSkillTemplateResult> {
 		return sessionUserMessageSkillTemplateResultFromWails(
-			await PrepareUserMessageSkillTemplate(command),
+			await PrepareUserMessageSkillTemplate(command as Parameters<typeof PrepareUserMessageSkillTemplate>[0]),
 			'PrepareUserMessageSkillTemplate'
 		);
 	}

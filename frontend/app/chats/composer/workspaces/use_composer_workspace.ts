@@ -1,20 +1,25 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef, CapabilityOccurrence } from '@/spec/artifact';
+import type {
+	SessionArtifactOverride,
+	SessionMCPServerOverride,
+	SessionWorkspaceSelectionIntent,
+} from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
-import type { SessionArtifactOverride, SessionMCPServerOverride, SessionWorkspaceSelectionIntent } from '@/spec/session';
 import type {
 	WorkspaceConversationResourceSelectionRef,
 	WorkspaceConversationSelection,
 	WorkspaceDirectoryView,
+	WorkspaceMCPServer,
 	WorkspacePromptContribution,
 	WorkspaceRef,
 	WorkspaceRuntimePlan,
 	WorkspaceSkill,
 } from '@/spec/workspace';
 import { ArtifactState } from '@/spec/artifact';
-import { SkillSessionSyncMode } from '@/spec/skill';
 import { SessionCollectionOverrideMode } from '@/spec/session';
+import { SkillSessionSyncMode } from '@/spec/skill';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -524,20 +529,11 @@ export function useComposerWorkspace({
 				setWorkspace(undefined);
 				setPlan(undefined);
 				setSelectionError('The Session-selected Workspace is no longer effective in its directory.');
-				await syncWorkspaceSkills(
-					undefined,
-					undefined,
-					syncSkills ? SkillSessionSyncMode.None : SkillSessionSyncMode.None
-				);
+				await syncWorkspaceSkills(undefined, undefined, SkillSessionSyncMode.None);
 				return;
 			}
 
-			await resolveCandidate(
-				candidate,
-				undefined,
-				syncSkills ? SkillSessionSyncMode.None : SkillSessionSyncMode.None,
-				intent
-			);
+			await resolveCandidate(candidate, undefined, SkillSessionSyncMode.None, intent);
 		},
 		[detachWorkspace, directories, replaceSelection, resolveCandidate, setDirectories, syncWorkspaceSkills]
 	);

@@ -7,7 +7,7 @@ import { AgentImportIssueSeverity } from '@/spec/agent';
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { agentArtifactRefKey } from '@/apis/agent_management';
-import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
+import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -161,7 +161,7 @@ function AgentImportModalContent({
 		setAcceptedConfirmationCodes(new Set());
 
 		try {
-			const value = await agentStoreAPI.previewAgentImport({
+			const value = await agentManagementAPI.previewAgentImport({
 				path: path.trim(),
 				plugin: selectedDestination.plugin,
 				expectedPluginRevision: selectedDestination.pluginRevision,
@@ -189,7 +189,7 @@ function AgentImportModalContent({
 		setError('');
 
 		try {
-			const result = await agentStoreAPI.commitAgentImport({
+			const result = await agentManagementAPI.commitAgentImport({
 				prepared: preview.prepared,
 				preparedFingerprint: preview.preparedFingerprint,
 				acceptedConfirmationCodes: requiredConfirmationCodes,

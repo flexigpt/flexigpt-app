@@ -36,6 +36,20 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
 	const flushPendingSessionConfigurationsRef = useRef<() => void>(() => {});
 
+	const schedulePendingInputFlush = useCallback(() => {
+		if (pendingInputFlushTimerRef.current !== null) {
+			return;
+		}
+
+		pendingInputFlushTimerRef.current = window.setTimeout(() => {
+			pendingInputFlushTimerRef.current = null;
+			flushPendingDropsRef.current();
+			flushPendingConversationContextsRef.current();
+			flushPendingWorkflowStartersRef.current();
+			flushPendingSessionConfigurationsRef.current();
+		}, 0);
+	}, []);
+
 	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
 		const input = inputRefs.current.get(tabId);
 		if (!input) {
@@ -114,7 +128,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 						pendingSessionConfigurationsRef.current.delete(tabId);
 					}
 				})
-				.catch(error => {
+				.catch((error: unknown) => {
 					console.error('Failed to restore Session Composer configuration:', error);
 				});
 		}
@@ -217,20 +231,6 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	useLayoutEffect(() => {
 		flushPendingSessionConfigurationsRef.current = flushPendingSessionConfigurations;
 	}, [flushPendingSessionConfigurations]);
-
-	const schedulePendingInputFlush = useCallback(() => {
-		if (pendingInputFlushTimerRef.current !== null) {
-			return;
-		}
-
-		pendingInputFlushTimerRef.current = window.setTimeout(() => {
-			pendingInputFlushTimerRef.current = null;
-			flushPendingDropsRef.current();
-			flushPendingConversationContextsRef.current();
-			flushPendingWorkflowStartersRef.current();
-			flushPendingSessionConfigurationsRef.current();
-		}, 0);
-	}, []);
 
 	useEffect(() => {
 		return () => {

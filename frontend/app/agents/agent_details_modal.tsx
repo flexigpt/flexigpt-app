@@ -6,7 +6,7 @@ import type { AgentExportResult, AgentMCPSetupDescriptor, AgentResolution, Agent
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { agentArtifactRef, agentDisplayName } from '@/apis/agent_management';
-import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
+import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
@@ -51,7 +51,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 				return;
 			}
 			try {
-				const value = await agentStoreAPI.resolveAgent(agentRef);
+				const value = await agentManagementAPI.resolveAgent(agentRef);
 				if (!cancelled) {
 					setResolution(value);
 					setResolutionError('');
@@ -65,7 +65,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 
 		void (async () => {
 			try {
-				const value = await agentStoreAPI.exportAgent(agentRef);
+				const value = await agentManagementAPI.exportAgent(agentRef);
 				if (!cancelled) {
 					setExportResult(value);
 				}

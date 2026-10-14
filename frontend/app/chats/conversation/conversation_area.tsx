@@ -853,20 +853,24 @@ function ConversationAreaInner(
 		[runCommand]
 	);
 
-	const cancelActiveRun = useCallback(
-		() =>
-			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
-				requireAcceptedSessionCommand(
-					await sessionManagementAPI.cancelRun({
-						meta: sessionCommandMeta(sessionRevision, runRevision),
-						sessionID,
-						runID,
-					}),
-					'Cancel Run'
-				);
+	const cancelRunForTab = useCallback(async (tabId: string) => {
+		const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+		const snapshot = tab?.sessionSnapshot;
+		const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
+
+		if (!tab?.sessionID || !snapshot || !run) {
+			throw new Error('The selected Run snapshot is unavailable.');
+		}
+
+		requireAcceptedSessionCommand(
+			await sessionManagementAPI.cancelRun({
+				meta: sessionCommandMeta(snapshot.session.revision, run.revision),
+				sessionID: tab.sessionID,
+				runID: run.id,
 			}),
-		[runCommand]
-	);
+			'Cancel Run'
+		);
+	}, []);
 
 	const resolveWait = useCallback(
 		(wait: SessionWaitingRequest, resolution: SessionWaitResolution) =>
@@ -1188,7 +1192,7 @@ function ConversationAreaInner(
 							shortcutConfig={shortcutConfig}
 							sendMessage={sendMessageForTab}
 							cancelEditing={cancelEditingForTab}
-							cancelRun={() => cancelActiveRun()}
+							cancelRun={cancelRunForTab}
 						/>
 					))}
 				</div>

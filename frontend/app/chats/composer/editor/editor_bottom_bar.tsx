@@ -4,15 +4,13 @@ import { memo, useMemo } from 'react';
 import type { MenuStore } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import type { SkillRef } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
-
-import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
@@ -70,9 +68,9 @@ interface EditorBottomBarProps {
 	toolCatalog: ToolCatalogState;
 
 	// Skills state comes from EditorArea (conversation-level)
-	allSkills: ComposerSkillCatalogItem[];
+	allSkills: SkillListItem[];
 	skillsLoading?: boolean;
-	templateSkills: ComposerSkillCatalogItem[];
+	templateSkills: SkillListItem[];
 	skillsLoadError?: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];

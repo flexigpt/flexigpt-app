@@ -327,7 +327,10 @@ func constrainMCPTool(
 	output := tool
 
 	if selection.ApprovalRule != nil {
-		value := mcppolicy.MCPApprovalRule(*selection.ApprovalRule)
+		value, err := selectedMCPApprovalRule(*selection.ApprovalRule)
+		if err != nil {
+			return mcpServer.MCPToolCapability{}, err
+		}
 		if mcppolicy.ApprovalRuleRank(value) <
 			mcppolicy.ApprovalRuleRank(
 				mcppolicy.NormalizedApprovalRule(tool.ApprovalRule),
@@ -340,7 +343,10 @@ func constrainMCPTool(
 	}
 
 	if selection.ExecutionMode != nil {
-		value := mcppolicy.MCPExecutionMode(*selection.ExecutionMode)
+		value, err := selectedMCPExecutionMode(*selection.ExecutionMode)
+		if err != nil {
+			return mcpServer.MCPToolCapability{}, err
+		}
 		if mcppolicy.ExecutionModeRank(value) <
 			mcppolicy.ExecutionModeRank(
 				mcppolicy.NormalizedExecutionMode(tool.ExecutionMode),
@@ -353,6 +359,41 @@ func constrainMCPTool(
 	}
 
 	return output, nil
+}
+
+func selectedMCPApprovalRule(
+	value string,
+) (mcppolicy.MCPApprovalRule, error) {
+	if strings.TrimSpace(value) != value {
+		return "", errors.New("MCP approval override is not normalized")
+	}
+
+	rule := mcppolicy.MCPApprovalRule(value)
+	switch rule {
+	case mcppolicy.MCPApprovalRuleAllow,
+		mcppolicy.MCPApprovalRuleAsk,
+		mcppolicy.MCPApprovalRuleDeny:
+		return rule, nil
+	default:
+		return "", errors.New("unsupported MCP approval override")
+	}
+}
+
+func selectedMCPExecutionMode(
+	value string,
+) (mcppolicy.MCPExecutionMode, error) {
+	if strings.TrimSpace(value) != value {
+		return "", errors.New("MCP execution override is not normalized")
+	}
+
+	mode := mcppolicy.MCPExecutionMode(value)
+	switch mode {
+	case mcppolicy.MCPExecutionModeAuto,
+		mcppolicy.MCPExecutionModeManual:
+		return mode, nil
+	default:
+		return "", errors.New("unsupported MCP execution override")
+	}
 }
 
 func (c *coordinator) prepareMCPResources(

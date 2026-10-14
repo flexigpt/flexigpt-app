@@ -8,7 +8,6 @@ import type {
 	SessionInstructionOverride,
 	SessionMCPServerOverride,
 	SessionMCPServerSelection,
-	SessionMCPToolExposure,
 	SessionModelDefaultsOverride,
 	SessionToolOverride,
 	SessionUserInput,
@@ -16,11 +15,14 @@ import type {
 import type { WorkspaceRuntimePlan } from '@/spec/workspace';
 import { CapabilityTargetForm } from '@/spec/artifact';
 import { AttachmentKind } from '@/spec/attachment';
+import { MCPToolExposure } from '@/spec/mcp';
 import {
 	emptySessionConfiguration,
 	SessionActivityOverrideMode as SessionActivityOverrideModeValue,
 	SessionAttachmentReferenceKind,
 	SessionCollectionOverrideMode as SessionCollectionOverrideModeValue,
+	SessionMCPToolExposure,
+	SessionMCPToolExposure as SessionMCPToolExposureValue,
 	SessionModelDefaultField,
 } from '@/spec/session';
 
@@ -91,6 +93,19 @@ function parseOptionalJSON(raw: string | undefined, field: string): unknown {
 		return JSON.parse(raw);
 	} catch {
 		throw new Error(`${field} must contain valid JSON.`);
+	}
+}
+
+function sessionMCPToolExposure(value: MCPToolExposure): SessionMCPToolExposure {
+	switch (value) {
+		case MCPToolExposure.None:
+			return SessionMCPToolExposureValue.None;
+		case MCPToolExposure.All:
+			return SessionMCPToolExposureValue.All;
+		case MCPToolExposure.Selected:
+			return SessionMCPToolExposureValue.Selected;
+		default:
+			throw new Error(`Unsupported MCP Tool exposure "${String(value)}".`);
 	}
 }
 
@@ -224,11 +239,7 @@ function toolOverridesFromChoices(payload: EditorSubmitPayload): SessionToolOver
 				capability:
 					choice.target.form === CapabilityTargetForm.Artifact && choice.target.artifact
 						? {
-								artifact: artifactSelection(
-									choice.target.artifact,
-									choice.artifactRevision,
-									choice.definitionDigest
-								),
+								artifact: artifactSelection(choice.target.artifact, choice.artifactRevision, choice.definitionDigest),
 							}
 						: sessionCapabilitySelection(choice.target),
 				autoExecute: choice.autoExecute,
@@ -326,8 +337,8 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	for (const selection of payload.enabledSkillSelections ?? payload.enabledSkillRefs ?? []) {
 		const ref = artifactSelection(
 			selection,
-			'expectedRevision' in selection ? selection.expectedRevision : undefined,
-			'expectedDigest' in selection ? selection.expectedDigest : undefined
+			'expectedRevision' in selection ? (selection.expectedRevision as number | undefined) : undefined,
+			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
 
@@ -349,8 +360,8 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	for (const selection of payload.activeSkillSelections ?? payload.activeSkillRefs ?? []) {
 		const ref = artifactSelection(
 			selection,
-			'expectedRevision' in selection ? selection.expectedRevision : undefined,
-			'expectedDigest' in selection ? selection.expectedDigest : undefined
+			'expectedRevision' in selection ? (selection.expectedRevision as number | undefined) : undefined,
+			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
 
@@ -409,7 +420,7 @@ async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<Se
 		const selection: SessionMCPServerSelection = {
 			server: artifactSelection(ref, server.artifact.revision, server.artifact.resolvedDefinition),
 			includeServerInstructions: serverSelection.includeServerInstructions,
-			toolExposure: serverSelection.toolExposure as string as SessionMCPToolExposure,
+			toolExposure: sessionMCPToolExposure(serverSelection.toolExposure),
 			selectedTools: (serverSelection.selectedTools ?? []).map(tool => ({
 				toolName: tool.toolName,
 				expectedDigest: tool.digest,

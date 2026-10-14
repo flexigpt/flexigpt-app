@@ -1544,5 +1544,15 @@ func cloneMCPSelection(
 		[]sessionRuntime.MCPPromptSelection(nil),
 		value.Prompts...,
 	)
+	for index := range output.ResourceTemplates {
+		output.ResourceTemplates[index].Arguments = maps.Clone(
+			value.ResourceTemplates[index].Arguments,
+		)
+	}
+	for index := range output.Prompts {
+		output.Prompts[index].Arguments = maps.Clone(
+			value.Prompts[index].Arguments,
+		)
+	}
 	return output
 }

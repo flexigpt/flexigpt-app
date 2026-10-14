@@ -1407,7 +1407,11 @@ Composer does not:
       Skill, MCP, Workspace, and inline instruction controls.
 - [x] MCP App context confirmation stages context directly into the owning
       Run continuation and exposes a Session-owned continuation action.
-- [ ] Management-page component migration remains intentionally deferred.
+- [x] Agent management components now use the Agent management façade rather
+      than importing the raw Agent Store transport.
+- [x] Skill management and Composer Skill controls now use current Skill
+      management and Session template APIs rather than retired direct runtime
+      APIs.
 
 ### Backend Session-owned execution delivery
 
@@ -1577,6 +1581,12 @@ Frontend migration remains separately tracked.
       insertion into a Composer draft.
 - [x] Persisted Session configuration intent restores Composer controls when
       a Session tab is reopened.
+- [x] Snapshot projection resolves historical Tool calls, Tool results, and
+      MCP App routes against their owning Run rather than only the selected
+      Run.
+- [x] Session template Wails transport adapts the generated request shape at
+      the transport boundary without modifying generated bindings.
+- [x] Composer cancellation is scoped to the tab that owns the Run.
 
 ## Definition of done
 
