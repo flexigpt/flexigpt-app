@@ -1,26 +1,15 @@
-import type { MCPHTTPAuthMode, MCPServerView, MCPTransportType } from '@/spec/mcp';
-import type { MCPAuthHealth, MCPServerStatus, MCPToolCapability, MCPToolRisk } from '@/spec/session_mcp';
-import {
-	MCPApprovalRule,
-	MCPExecutionMode,
-	MCPHTTPAuthMode as MCPHTTPAuthModeEnum,
-	MCPTransportType as MCPTransportTypeEnum,
-	MCPTrustLevel,
-} from '@/spec/mcp';
-import {
-	MCPAppVisibility,
-	MCPAuthHealthState as MCPAuthHealthStateEnum,
-	MCPServerStatus as MCPServerStatusEnum,
-	MCPToolRisk as MCPToolRiskEnum,
-} from '@/spec/session_mcp';
+import type { MCPServerView } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPToolCapability } from '@/spec/session_mcp';
+import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
+import { MCPAppVisibility, MCPAuthHealthState, MCPServerStatus, MCPToolRisk } from '@/spec/session_mcp';
 
 import { getAuthMode, getMCPServerSetupStatus, getServerAuthHealthState } from '@/apis/mcp_management';
 
 export function getMCPTransportLabel(value: MCPTransportType): string {
 	switch (value) {
-		case MCPTransportTypeEnum.Stdio:
+		case MCPTransportType.Stdio:
 			return 'Stdio';
-		case MCPTransportTypeEnum.StreamableHTTP:
+		case MCPTransportType.StreamableHTTP:
 			return 'Streamable HTTP';
 		default:
 			return String(value);
@@ -33,13 +22,13 @@ export function getMCPTrustLevelLabel(value: MCPTrustLevel): string {
 
 export function getMCPHTTPAuthModeLabel(value: MCPHTTPAuthMode): string {
 	switch (value) {
-		case MCPHTTPAuthModeEnum.None:
+		case MCPHTTPAuthMode.None:
 			return 'None';
-		case MCPHTTPAuthModeEnum.APIKey:
+		case MCPHTTPAuthMode.APIKey:
 			return 'API Key';
-		case MCPHTTPAuthModeEnum.OAuth:
+		case MCPHTTPAuthMode.OAuth:
 			return 'OAuth';
-		case MCPHTTPAuthModeEnum.ClientCredentials:
+		case MCPHTTPAuthMode.ClientCredentials:
 			return 'Client Credentials';
 		default:
 			return String(value);
@@ -63,13 +52,13 @@ export function getMCPExecutionModeLabel(value: MCPExecutionMode): string {
 
 export function getMCPToolRiskLabel(value: MCPToolRisk): string {
 	switch (value) {
-		case MCPToolRiskEnum.Read:
+		case MCPToolRisk.Read:
 			return 'Read';
-		case MCPToolRiskEnum.Write:
+		case MCPToolRisk.Write:
 			return 'Write';
-		case MCPToolRiskEnum.Destructive:
+		case MCPToolRisk.Destructive:
 			return 'Destructive';
-		case MCPToolRiskEnum.OpenWorld:
+		case MCPToolRisk.OpenWorld:
 			return 'Open World';
 		default:
 			return 'Unknown';
@@ -78,10 +67,10 @@ export function getMCPToolRiskLabel(value: MCPToolRisk): string {
 
 export function getEffectiveMCPServerStatus(server: MCPServerView, runtimeStatus?: MCPServerStatus): MCPServerStatus {
 	if (!server.enabled) {
-		return MCPServerStatusEnum.Disabled;
+		return MCPServerStatus.Disabled;
 	}
 
-	return runtimeStatus ?? MCPServerStatusEnum.Disconnected;
+	return runtimeStatus ?? MCPServerStatus.Disconnected;
 }
 
 export function isMCPServerConfiguredForUse(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
@@ -93,15 +82,15 @@ export function isMCPServerConfiguredForUse(server: MCPServerView, authHealth?: 
 
 	const authMode = getAuthMode(server);
 
-	if (authMode === MCPHTTPAuthModeEnum.None) {
+	if (authMode === MCPHTTPAuthMode.None) {
 		return true;
 	}
 
-	if (authMode === MCPHTTPAuthModeEnum.APIKey || authMode === MCPHTTPAuthModeEnum.ClientCredentials) {
+	if (authMode === MCPHTTPAuthMode.APIKey || authMode === MCPHTTPAuthMode.ClientCredentials) {
 		return authHealth?.configured === true;
 	}
 
-	return getServerAuthHealthState(server, authHealth) !== MCPAuthHealthStateEnum.NotConfigured;
+	return getServerAuthHealthState(server, authHealth) !== MCPAuthHealthState.NotConfigured;
 }
 
 export function isMCPServerConnectionPending(
@@ -110,23 +99,23 @@ export function isMCPServerConnectionPending(
 	authHealth?: MCPAuthHealth
 ): boolean {
 	return (
-		runtimeStatus === MCPServerStatusEnum.Connecting ||
+		runtimeStatus === MCPServerStatus.Connecting ||
 		authHealth?.authorizationPending === true ||
-		getServerAuthHealthState(server, authHealth) === MCPAuthHealthStateEnum.AuthorizationPending
+		getServerAuthHealthState(server, authHealth) === MCPAuthHealthState.AuthorizationPending
 	);
 }
 
 export function getMCPStatusLabel(value: MCPServerStatus): string {
 	switch (value) {
-		case MCPServerStatusEnum.Disabled:
+		case MCPServerStatus.Disabled:
 			return 'Disabled';
-		case MCPServerStatusEnum.Disconnected:
+		case MCPServerStatus.Disconnected:
 			return 'Disconnected';
-		case MCPServerStatusEnum.Connecting:
+		case MCPServerStatus.Connecting:
 			return 'Connecting';
-		case MCPServerStatusEnum.Ready:
+		case MCPServerStatus.Ready:
 			return 'Ready';
-		case MCPServerStatusEnum.Error:
+		case MCPServerStatus.Error:
 			return 'Error';
 		default:
 			return 'Unknown';
@@ -137,13 +126,13 @@ const STATUS_BADGE_LAYOUT = 'h-auto max-w-full whitespace-normal break-words px-
 
 export function getMCPStatusBadgeClass(value: MCPServerStatus): string {
 	switch (value) {
-		case MCPServerStatusEnum.Ready:
+		case MCPServerStatus.Ready:
 			return `${STATUS_BADGE_LAYOUT} badge-success`;
-		case MCPServerStatusEnum.Connecting:
+		case MCPServerStatus.Connecting:
 			return `${STATUS_BADGE_LAYOUT} badge-info`;
-		case MCPServerStatusEnum.Error:
+		case MCPServerStatus.Error:
 			return `${STATUS_BADGE_LAYOUT} badge-error`;
-		case MCPServerStatusEnum.Disabled:
+		case MCPServerStatus.Disabled:
 			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 		default:
 			return `${STATUS_BADGE_LAYOUT} badge-warning`;
@@ -154,31 +143,31 @@ export function getMCPServerAuthHealthLabel(server: MCPServerView, authHealth?: 
 	const authMode = getAuthMode(server);
 	const state = getServerAuthHealthState(server, authHealth);
 
-	if (authMode === MCPHTTPAuthModeEnum.None) {
+	if (authMode === MCPHTTPAuthMode.None) {
 		return 'Auth: not required';
 	}
 
 	if (
-		(authMode === MCPHTTPAuthModeEnum.APIKey || authMode === MCPHTTPAuthModeEnum.ClientCredentials) &&
+		(authMode === MCPHTTPAuthMode.APIKey || authMode === MCPHTTPAuthMode.ClientCredentials) &&
 		authHealth?.configured
 	) {
-		return state === MCPAuthHealthStateEnum.Error ? 'Auth: error' : 'Auth: configured';
+		return state === MCPAuthHealthState.Error ? 'Auth: error' : 'Auth: configured';
 	}
 
 	switch (state) {
-		case MCPAuthHealthStateEnum.NotConfigured:
+		case MCPAuthHealthState.NotConfigured:
 			return 'Auth: config needed';
-		case MCPAuthHealthStateEnum.AuthorizationNeeded:
+		case MCPAuthHealthState.AuthorizationNeeded:
 			return 'OAuth: required';
-		case MCPAuthHealthStateEnum.AuthorizationPending:
+		case MCPAuthHealthState.AuthorizationPending:
 			return 'OAuth: pending';
-		case MCPAuthHealthStateEnum.Authorized:
+		case MCPAuthHealthState.Authorized:
 			return 'OAuth: authorized';
-		case MCPAuthHealthStateEnum.Expired:
+		case MCPAuthHealthState.Expired:
 			return 'OAuth: expired';
-		case MCPAuthHealthStateEnum.InsufficientScope:
+		case MCPAuthHealthState.InsufficientScope:
 			return 'Auth: insufficient scope';
-		case MCPAuthHealthStateEnum.Error:
+		case MCPAuthHealthState.Error:
 			return 'Auth: error';
 		default:
 			return 'Auth: unknown';
@@ -189,18 +178,18 @@ export function getMCPServerAuthHealthBadgeClass(server: MCPServerView, authHeal
 	const state = getServerAuthHealthState(server, authHealth);
 
 	switch (state) {
-		case MCPAuthHealthStateEnum.NotRequired:
+		case MCPAuthHealthState.NotRequired:
 			return `${STATUS_BADGE_LAYOUT} badge-ghost`;
-		case MCPAuthHealthStateEnum.Authorized:
+		case MCPAuthHealthState.Authorized:
 			return `${STATUS_BADGE_LAYOUT} badge-success`;
-		case MCPAuthHealthStateEnum.AuthorizationPending:
+		case MCPAuthHealthState.AuthorizationPending:
 			return `${STATUS_BADGE_LAYOUT} badge-info`;
-		case MCPAuthHealthStateEnum.AuthorizationNeeded:
-		case MCPAuthHealthStateEnum.NotConfigured:
-		case MCPAuthHealthStateEnum.Expired:
+		case MCPAuthHealthState.AuthorizationNeeded:
+		case MCPAuthHealthState.NotConfigured:
+		case MCPAuthHealthState.Expired:
 			return `${STATUS_BADGE_LAYOUT} badge-warning`;
-		case MCPAuthHealthStateEnum.Error:
-		case MCPAuthHealthStateEnum.InsufficientScope:
+		case MCPAuthHealthState.Error:
+		case MCPAuthHealthState.InsufficientScope:
 			return `${STATUS_BADGE_LAYOUT} badge-error`;
 		default:
 			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
@@ -208,7 +197,7 @@ export function getMCPServerAuthHealthBadgeClass(server: MCPServerView, authHeal
 }
 
 export function isMCPAuthActionable(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
-	if (getAuthMode(server) !== MCPHTTPAuthModeEnum.OAuth) {
+	if (getAuthMode(server) !== MCPHTTPAuthMode.OAuth) {
 		return false;
 	}
 
@@ -216,9 +205,7 @@ export function isMCPAuthActionable(server: MCPServerView, authHealth?: MCPAuthH
 		return false;
 	}
 
-	return (
-		authHealth.state !== MCPAuthHealthStateEnum.Authorized && authHealth.state !== MCPAuthHealthStateEnum.NotRequired
-	);
+	return authHealth.state !== MCPAuthHealthState.Authorized && authHealth.state !== MCPAuthHealthState.NotRequired;
 }
 
 export function isMCPToolVisibleToModel(tool: Pick<MCPToolCapability, 'app'>): boolean {

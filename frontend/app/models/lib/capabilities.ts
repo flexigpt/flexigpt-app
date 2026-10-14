@@ -1,12 +1,11 @@
-import type { OutputFormatKind, OutputVerbosity, ReasoningLevel, ReasoningSummaryStyle } from '@/spec/inference';
 import type { ModelCacheCapabilities, ModelCacheControlCapabilities, ModelCapabilities } from '@/spec/model';
 import {
-	CacheControlKind as CacheControlKindValue,
-	CacheControlTTL as CacheControlTTLValue,
-	OutputFormatKind as OutputFormatKindValue,
-	OutputVerbosity as OutputVerbosityValue,
-	ReasoningLevel as ReasoningLevelValue,
-	ReasoningSummaryStyle as ReasoningSummaryStyleValue,
+	CacheControlKind,
+	CacheControlTTL,
+	OutputFormatKind,
+	OutputVerbosity,
+	ReasoningLevel,
+	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
 
@@ -171,17 +170,17 @@ export function mergeModelCapabilities(
 }
 
 const orderedReasoningLevels: ReasoningLevel[] = [
-	ReasoningLevelValue.None,
-	ReasoningLevelValue.Minimal,
-	ReasoningLevelValue.Low,
-	ReasoningLevelValue.Medium,
-	ReasoningLevelValue.High,
-	ReasoningLevelValue.XHigh,
-	ReasoningLevelValue.Max,
+	ReasoningLevel.None,
+	ReasoningLevel.Minimal,
+	ReasoningLevel.Low,
+	ReasoningLevel.Medium,
+	ReasoningLevel.High,
+	ReasoningLevel.XHigh,
+	ReasoningLevel.Max,
 ];
 
 export function isReasoningLevel(value: unknown): value is ReasoningLevel {
-	return typeof value === 'string' && (Object.values(ReasoningLevelValue) as string[]).includes(value);
+	return typeof value === 'string' && (Object.values(ReasoningLevel) as string[]).includes(value);
 }
 
 export function isReasoningType(value: unknown): value is ReasoningType {
@@ -189,15 +188,15 @@ export function isReasoningType(value: unknown): value is ReasoningType {
 }
 
 export function isOutputFormatKind(value: unknown): value is OutputFormatKind {
-	return typeof value === 'string' && (Object.values(OutputFormatKindValue) as string[]).includes(value);
+	return typeof value === 'string' && (Object.values(OutputFormatKind) as string[]).includes(value);
 }
 
 export function isOutputVerbosity(value: unknown): value is OutputVerbosity {
-	return typeof value === 'string' && (Object.values(OutputVerbosityValue) as string[]).includes(value);
+	return typeof value === 'string' && (Object.values(OutputVerbosity) as string[]).includes(value);
 }
 
 export function isReasoningSummaryStyle(value: unknown): value is ReasoningSummaryStyle {
-	return typeof value === 'string' && (Object.values(ReasoningSummaryStyleValue) as string[]).includes(value);
+	return typeof value === 'string' && (Object.values(ReasoningSummaryStyle) as string[]).includes(value);
 }
 
 export function getSupportedReasoningLevels(capabilities: ModelCapabilities | undefined): ReasoningLevel[] {
@@ -214,9 +213,7 @@ export function getSupportedReasoningLevels(capabilities: ModelCapabilities | un
 	);
 	const supported = orderedReasoningLevels.filter(level => enabled.has(level));
 
-	return supported.length > 0
-		? supported
-		: [ReasoningLevelValue.Low, ReasoningLevelValue.Medium, ReasoningLevelValue.High];
+	return supported.length > 0 ? supported : [ReasoningLevel.Low, ReasoningLevel.Medium, ReasoningLevel.High];
 }
 
 export function supportsReasoningSummaryStyle(capabilities: ModelCapabilities | undefined): boolean {
@@ -258,8 +255,8 @@ function sdkBaseCacheCapabilities(sdkType: string): ModelCacheCapabilities | und
 			return {
 				supportsAutomaticCaching: false,
 				topLevel: {
-					supportedKinds: [CacheControlKindValue.Ephemeral],
-					supportedTTLs: [CacheControlTTLValue.TTL5m, CacheControlTTLValue.TTL1h],
+					supportedKinds: [CacheControlKind.Ephemeral],
+					supportedTTLs: [CacheControlTTL.TTL5m, CacheControlTTL.TTL1h],
 					supportsKey: false,
 				},
 			};
@@ -267,8 +264,8 @@ function sdkBaseCacheCapabilities(sdkType: string): ModelCacheCapabilities | und
 			return {
 				supportsAutomaticCaching: true,
 				topLevel: {
-					supportedKinds: [CacheControlKindValue.Ephemeral],
-					supportedTTLs: [CacheControlTTLValue.TTLInMemory, CacheControlTTLValue.TTL24h],
+					supportedKinds: [CacheControlKind.Ephemeral],
+					supportedTTLs: [CacheControlTTL.TTLInMemory, CacheControlTTL.TTL24h],
 					supportsKey: true,
 				},
 			};

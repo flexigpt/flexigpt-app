@@ -1,20 +1,6 @@
-import type {
-	CacheControlKind,
-	JSONSchemaParam,
-	OutputFormatKind,
-	OutputVerbosity,
-	ProviderSDKType,
-	ReasoningLevel,
-	ReasoningSummaryStyle,
-	ReasoningType,
-} from '@/spec/inference';
+import type { CacheControlKind, JSONSchemaParam, OutputVerbosity, ProviderSDKType } from '@/spec/inference';
 import type { ModelCapabilities, ModelDefaults } from '@/spec/model';
-import {
-	OutputFormatKind as OutputFormatKindValue,
-	ReasoningLevel as ReasoningLevelValue,
-	ReasoningSummaryStyle as ReasoningSummaryStyleValue,
-	ReasoningType as ReasoningTypeValue,
-} from '@/spec/inference';
+import { OutputFormatKind, ReasoningLevel, ReasoningSummaryStyle, ReasoningType } from '@/spec/inference';
 
 import { formatJSON, MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
 
@@ -165,10 +151,10 @@ export function createModelRuntimeDefaultsForm(
 	const schema = defaults?.output?.format?.jsonSchema;
 	const reasoningType = isReasoningType(defaults?.reasoning?.type)
 		? defaults.reasoning.type
-		: ReasoningTypeValue.SingleWithLevels;
+		: ReasoningType.SingleWithLevels;
 	const reasoningLevel = isReasoningLevel(defaults?.reasoning?.level)
 		? defaults.reasoning.level
-		: ReasoningLevelValue.Medium;
+		: ReasoningLevel.Medium;
 
 	return {
 		stream: defaults?.stream ?? true,
@@ -183,7 +169,7 @@ export function createModelRuntimeDefaultsForm(
 		reasoningTokens: String(defaults?.reasoning?.tokens ?? DEFAULT_REASONING_TOKENS),
 		reasoningSummaryStyle: isReasoningSummaryStyle(defaults?.reasoning?.summaryStyle)
 			? defaults.reasoning.summaryStyle
-			: ReasoningSummaryStyleValue.Auto,
+			: ReasoningSummaryStyle.Auto,
 		systemPrompt: defaults?.systemPrompt ?? '',
 		timeoutSeconds:
 			defaults?.timeoutMS !== undefined ? String(Math.ceil(defaults.timeoutMS / 1000)) : isNewModel ? '300' : '',
@@ -210,10 +196,10 @@ export function createFallbackModelRuntimeDefaultsForm(): ModelRuntimeDefaultsFo
 		maxOutputTokens: '1024',
 		temperature: '',
 		reasoningEnabled: false,
-		reasoningType: ReasoningTypeValue.SingleWithLevels,
-		reasoningLevel: ReasoningLevelValue.Medium,
+		reasoningType: ReasoningType.SingleWithLevels,
+		reasoningLevel: ReasoningLevel.Medium,
 		reasoningTokens: String(DEFAULT_REASONING_TOKENS),
-		reasoningSummaryStyle: ReasoningSummaryStyleValue.Auto,
+		reasoningSummaryStyle: ReasoningSummaryStyle.Auto,
 		systemPrompt: '',
 		timeoutSeconds: '300',
 		cacheControlEnabled: false,
@@ -269,7 +255,7 @@ export function validateModelRuntimeDefaultsForm(
 		errors.temperature = 'Temperature is not supported while reasoning is enabled for this model.';
 	}
 
-	if (form.reasoningEnabled && form.reasoningType === ReasoningTypeValue.HybridWithTokens) {
+	if (form.reasoningEnabled && form.reasoningType === ReasoningType.HybridWithTokens) {
 		const reasoningTokens = parseOptionalPositiveInteger(form.reasoningTokens);
 		if (Number.isNaN(reasoningTokens) || reasoningTokens === undefined || reasoningTokens < DEFAULT_REASONING_TOKENS) {
 			errors.reasoningTokens = `Reasoning tokens must be a whole number of at least ${DEFAULT_REASONING_TOKENS}.`;
@@ -284,7 +270,7 @@ export function validateModelRuntimeDefaultsForm(
 		errors.outputFormatKind = 'This output format is not supported by the selected model/provider.';
 	}
 
-	if (form.outputFormatKind === OutputFormatKindValue.JSONSchema) {
+	if (form.outputFormatKind === OutputFormatKind.JSONSchema) {
 		if (!form.outputJSONSchemaName.trim()) {
 			errors.outputJSONSchemaName = 'JSON Schema output requires a schema name.';
 		}
@@ -359,9 +345,7 @@ export function buildModelDefaultsFromRuntimeForm(
 			type: form.reasoningType,
 			level: form.reasoningLevel,
 			tokens:
-				form.reasoningType === ReasoningTypeValue.HybridWithTokens
-					? Number(form.reasoningTokens)
-					: DEFAULT_REASONING_TOKENS,
+				form.reasoningType === ReasoningType.HybridWithTokens ? Number(form.reasoningTokens) : DEFAULT_REASONING_TOKENS,
 			summaryStyle: form.reasoningSummaryStyle,
 		};
 	}
@@ -383,12 +367,12 @@ export function buildModelDefaultsFromRuntimeForm(
 	if (form.outputVerbosity !== OUTPUT_VERBOSITY_NONE) {
 		output.verbosity = form.outputVerbosity;
 	}
-	if (form.outputFormatKind === OutputFormatKindValue.Text) {
+	if (form.outputFormatKind === OutputFormatKind.Text) {
 		output.format = {
-			kind: OutputFormatKindValue.Text,
+			kind: OutputFormatKind.Text,
 		};
 	}
-	if (form.outputFormatKind === OutputFormatKindValue.JSONSchema) {
+	if (form.outputFormatKind === OutputFormatKind.JSONSchema) {
 		const parsedSchema = tryParseJSONObject(form.outputJSONSchemaRaw, 'JSON schema body', MAX_JSON_SCHEMA_INPUT_CHARS);
 		const jsonSchema: JSONSchemaParam = {
 			name: form.outputJSONSchemaName.trim(),
@@ -406,7 +390,7 @@ export function buildModelDefaultsFromRuntimeForm(
 		};
 
 		output.format = {
-			kind: OutputFormatKindValue.JSONSchema,
+			kind: OutputFormatKind.JSONSchema,
 			jsonSchema,
 		};
 	}

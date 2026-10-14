@@ -1,5 +1,4 @@
-import type { ProviderSDKType } from '@/spec/inference';
-import { ProviderSDKType as ProviderSDKTypeValue, SDK_DEFAULTS, SDK_DISPLAY_NAME } from '@/spec/inference';
+import { ProviderSDKType, SDK_DEFAULTS, SDK_DISPLAY_NAME } from '@/spec/inference';
 
 export interface ProviderSDKOption {
 	adapter: string;
@@ -13,35 +12,35 @@ export interface ProviderSDKOption {
 const PROVIDER_SDK_OPTIONS: ProviderSDKOption[] = [
 	{
 		adapter: 'anthropic.messages',
-		sdkType: ProviderSDKTypeValue.ProviderSDKTypeAnthropic,
-		displayName: SDK_DISPLAY_NAME[ProviderSDKTypeValue.ProviderSDKTypeAnthropic],
-		defaultPath: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeAnthropic].chatPath,
-		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeAnthropic].apiKeyHeaderKey,
-		defaultHeaders: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeAnthropic].defaultHeaders,
+		sdkType: ProviderSDKType.ProviderSDKTypeAnthropic,
+		displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeAnthropic],
+		defaultPath: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeAnthropic].chatPath,
+		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeAnthropic].apiKeyHeaderKey,
+		defaultHeaders: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeAnthropic].defaultHeaders,
 	},
 	{
 		adapter: 'openai.chatCompletions',
-		sdkType: ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions,
-		displayName: SDK_DISPLAY_NAME[ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions],
-		defaultPath: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions].chatPath,
-		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions].apiKeyHeaderKey,
-		defaultHeaders: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions].defaultHeaders,
+		sdkType: ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions,
+		displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions],
+		defaultPath: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions].chatPath,
+		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions].apiKeyHeaderKey,
+		defaultHeaders: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions].defaultHeaders,
 	},
 	{
 		adapter: 'openai.responses',
-		sdkType: ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses,
-		displayName: SDK_DISPLAY_NAME[ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses],
-		defaultPath: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses].chatPath,
-		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses].apiKeyHeaderKey,
-		defaultHeaders: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses].defaultHeaders,
+		sdkType: ProviderSDKType.ProviderSDKTypeOpenAIResponses,
+		displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeOpenAIResponses],
+		defaultPath: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIResponses].chatPath,
+		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIResponses].apiKeyHeaderKey,
+		defaultHeaders: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeOpenAIResponses].defaultHeaders,
 	},
 	{
 		adapter: 'google.generateContent',
-		sdkType: ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent,
-		displayName: SDK_DISPLAY_NAME[ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent],
-		defaultPath: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent].chatPath,
-		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent].apiKeyHeaderKey,
-		defaultHeaders: SDK_DEFAULTS[ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent].defaultHeaders,
+		sdkType: ProviderSDKType.ProviderSDKTypeGoogleGenerateContent,
+		displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent],
+		defaultPath: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent].chatPath,
+		defaultAPIKeyHeader: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent].apiKeyHeaderKey,
+		defaultHeaders: SDK_DEFAULTS[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent].defaultHeaders,
 	},
 ];
 
@@ -54,5 +53,5 @@ export function getProviderSDKOption(adapter: string): ProviderSDKOption | undef
 }
 
 export function getProviderSDKType(adapter: string): ProviderSDKType {
-	return getProviderSDKOption(adapter)?.sdkType ?? ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses;
+	return getProviderSDKOption(adapter)?.sdkType ?? ProviderSDKType.ProviderSDKTypeOpenAIResponses;
 }

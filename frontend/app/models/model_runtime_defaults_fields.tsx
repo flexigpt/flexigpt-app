@@ -1,20 +1,14 @@
 import { useMemo } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type {
-	CacheControlKind,
-	ProviderSDKType,
+import type { CacheControlKind, ProviderSDKType } from '@/spec/inference';
+import type { ModelCapabilities } from '@/spec/model';
+import {
+	OutputFormatKind,
+	OutputVerbosity,
 	ReasoningLevel,
 	ReasoningSummaryStyle,
 	ReasoningType,
-} from '@/spec/inference';
-import type { ModelCapabilities } from '@/spec/model';
-import {
-	OutputFormatKind as OutputFormatKindValue,
-	OutputVerbosity as OutputVerbosityValue,
-	ReasoningLevel as ReasoningLevelValue,
-	ReasoningSummaryStyle as ReasoningSummaryStyleValue,
-	ReasoningType as ReasoningTypeValue,
 } from '@/spec/inference';
 
 import { Dropdown } from '@/components/dropdown';
@@ -116,82 +110,82 @@ export function ModelRuntimeDefaultsFields({
 	const outputFormatItems = useMemo<Record<OutputFormatSelection, { isEnabled: boolean; displayName: string }>>(
 		() => ({
 			[OUTPUT_FORMAT_NONE]: { isEnabled: true, displayName: 'Default' },
-			[OutputFormatKindValue.Text]: {
-				isEnabled: !supportedFormats || supportedFormats.includes(OutputFormatKindValue.Text),
-				displayName: getOutputFormatDisplayName(OutputFormatKindValue.Text),
+			[OutputFormatKind.Text]: {
+				isEnabled: !supportedFormats || supportedFormats.includes(OutputFormatKind.Text),
+				displayName: getOutputFormatDisplayName(OutputFormatKind.Text),
 			},
-			[OutputFormatKindValue.JSONSchema]: {
-				isEnabled: !supportedFormats || supportedFormats.includes(OutputFormatKindValue.JSONSchema),
-				displayName: getOutputFormatDisplayName(OutputFormatKindValue.JSONSchema),
+			[OutputFormatKind.JSONSchema]: {
+				isEnabled: !supportedFormats || supportedFormats.includes(OutputFormatKind.JSONSchema),
+				displayName: getOutputFormatDisplayName(OutputFormatKind.JSONSchema),
 			},
 		}),
 		[supportedFormats]
 	);
 	const outputVerbosityItems: Record<OutputVerbositySelection, { isEnabled: boolean; displayName: string }> = {
 		[OUTPUT_VERBOSITY_NONE]: { isEnabled: true, displayName: 'Default' },
-		[OutputVerbosityValue.Low]: {
+		[OutputVerbosity.Low]: {
 			isEnabled: true,
-			displayName: getOutputVerbosityDisplayName(OutputVerbosityValue.Low),
+			displayName: getOutputVerbosityDisplayName(OutputVerbosity.Low),
 		},
-		[OutputVerbosityValue.Medium]: {
+		[OutputVerbosity.Medium]: {
 			isEnabled: true,
-			displayName: getOutputVerbosityDisplayName(OutputVerbosityValue.Medium),
+			displayName: getOutputVerbosityDisplayName(OutputVerbosity.Medium),
 		},
-		[OutputVerbosityValue.High]: {
+		[OutputVerbosity.High]: {
 			isEnabled: true,
-			displayName: getOutputVerbosityDisplayName(OutputVerbosityValue.High),
+			displayName: getOutputVerbosityDisplayName(OutputVerbosity.High),
 		},
-		[OutputVerbosityValue.XHigh]: {
+		[OutputVerbosity.XHigh]: {
 			isEnabled: true,
-			displayName: getOutputVerbosityDisplayName(OutputVerbosityValue.XHigh),
+			displayName: getOutputVerbosityDisplayName(OutputVerbosity.XHigh),
 		},
-		[OutputVerbosityValue.Max]: {
+		[OutputVerbosity.Max]: {
 			isEnabled: true,
-			displayName: getOutputVerbosityDisplayName(OutputVerbosityValue.Max),
+			displayName: getOutputVerbosityDisplayName(OutputVerbosity.Max),
 		},
 	};
 	const reasoningTypeItems: Record<ReasoningType, { isEnabled: boolean; displayName: string }> = {
-		[ReasoningTypeValue.SingleWithLevels]: { isEnabled: true, displayName: 'Reasoning with levels' },
-		[ReasoningTypeValue.HybridWithTokens]: { isEnabled: true, displayName: 'Hybrid with tokens' },
+		[ReasoningType.SingleWithLevels]: { isEnabled: true, displayName: 'Reasoning with levels' },
+		[ReasoningType.HybridWithTokens]: { isEnabled: true, displayName: 'Hybrid with tokens' },
 	};
 	const reasoningLevelItems: Record<ReasoningLevel, { isEnabled: boolean; displayName: string }> = {
-		[ReasoningLevelValue.None]: {
+		[ReasoningLevel.None]: {
 			isEnabled: true,
-			displayName: getReasoningLevelDisplayName(ReasoningLevelValue.None),
+			displayName: getReasoningLevelDisplayName(ReasoningLevel.None),
 		},
-		[ReasoningLevelValue.Minimal]: {
+		[ReasoningLevel.Minimal]: {
 			isEnabled: true,
-			displayName: getReasoningLevelDisplayName(ReasoningLevelValue.Minimal),
+			displayName: getReasoningLevelDisplayName(ReasoningLevel.Minimal),
 		},
-		[ReasoningLevelValue.Low]: { isEnabled: true, displayName: getReasoningLevelDisplayName(ReasoningLevelValue.Low) },
-		[ReasoningLevelValue.Medium]: {
+		[ReasoningLevel.Low]: { isEnabled: true, displayName: getReasoningLevelDisplayName(ReasoningLevel.Low) },
+		[ReasoningLevel.Medium]: {
 			isEnabled: true,
-			displayName: getReasoningLevelDisplayName(ReasoningLevelValue.Medium),
+			displayName: getReasoningLevelDisplayName(ReasoningLevel.Medium),
 		},
-		[ReasoningLevelValue.High]: {
+		[ReasoningLevel.High]: {
 			isEnabled: true,
-			displayName: getReasoningLevelDisplayName(ReasoningLevelValue.High),
+			displayName: getReasoningLevelDisplayName(ReasoningLevel.High),
 		},
-		[ReasoningLevelValue.XHigh]: {
+		[ReasoningLevel.XHigh]: {
 			isEnabled: true,
-			displayName: getReasoningLevelDisplayName(ReasoningLevelValue.XHigh),
+			displayName: getReasoningLevelDisplayName(ReasoningLevel.XHigh),
 		},
-		[ReasoningLevelValue.Max]: { isEnabled: true, displayName: getReasoningLevelDisplayName(ReasoningLevelValue.Max) },
+		[ReasoningLevel.Max]: { isEnabled: true, displayName: getReasoningLevelDisplayName(ReasoningLevel.Max) },
 	};
 	const reasoningSummaryItems: Record<ReasoningSummaryStyle, { isEnabled: boolean; displayName: string }> = {
-		[ReasoningSummaryStyleValue.Auto]: {
+		[ReasoningSummaryStyle.Auto]: {
 			isEnabled: supportsReasoningSummaryStyle(capabilities),
 			displayName: 'Auto',
 		},
-		[ReasoningSummaryStyleValue.Concise]: {
+		[ReasoningSummaryStyle.Concise]: {
 			isEnabled: supportsReasoningSummaryStyle(capabilities),
 			displayName: 'Concise',
 		},
-		[ReasoningSummaryStyleValue.Detailed]: {
+		[ReasoningSummaryStyle.Detailed]: {
 			isEnabled: supportsReasoningSummaryStyle(capabilities),
 			displayName: 'Detailed',
 		},
-		[ReasoningSummaryStyleValue.Omitted]: {
+		[ReasoningSummaryStyle.Omitted]: {
 			isEnabled: supportsReasoningSummaryStyle(capabilities),
 			displayName: 'Concise (legacy default)',
 		},
@@ -280,7 +274,7 @@ export function ModelRuntimeDefaultsFields({
 							)}
 						</ModalField>
 
-						{value.reasoningType === ReasoningTypeValue.SingleWithLevels ? (
+						{value.reasoningType === ReasoningType.SingleWithLevels ? (
 							<ModalField label="Reasoning Level">
 								{readOnly ? (
 									<ReadOnlyValue value={getReasoningLevelDisplayName(value.reasoningLevel)} />
@@ -586,7 +580,7 @@ export function ModelRuntimeDefaultsFields({
 					)}
 				</ModalField>
 
-				{value.outputFormatKind === OutputFormatKindValue.JSONSchema ? (
+				{value.outputFormatKind === OutputFormatKind.JSONSchema ? (
 					<>
 						<ModalField label="JSON Schema Name" required error={errors.outputJSONSchemaName}>
 							{readOnly ? (
