@@ -85,6 +85,7 @@ function WorkspaceDirectorySelectionModalContent({
 		state.workspace?.workspace.workspace.artifact.displayName ??
 		state.selection?.displayName ??
 		'Unavailable Workspace';
+	const selectedMCPIDs = state.selectedMCPIDs;
 	const mcpTargets = useMemo(() => mcpSetupTargets(state.plan), [state.plan]);
 
 	return (
@@ -231,6 +232,34 @@ function WorkspaceDirectorySelectionModalContent({
 						description="MCP declarations are resolved by the Workspace. Setup values and secrets remain in MCP management storage and are never persisted in Workspace selection data."
 					>
 						<div className="space-y-2">
+							{(state.plan?.mcpServers.servers ?? []).map(server => {
+								const selected = selectedMCPIDs.has(artifactRefKey(server.artifact));
+
+								return (
+									<label
+										key={`select:${artifactRefKey(server.artifact)}`}
+										className={`border-base-content/10 bg-base-100 flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ${
+											selected ? 'border-secondary/50 bg-secondary/10' : ''
+										}`}
+									>
+										<input
+											type="checkbox"
+											className="checkbox checkbox-sm"
+											checked={selected}
+											disabled={isInputLocked}
+											onChange={event => {
+												state.toggleMCP(server, event.currentTarget.checked);
+											}}
+										/>
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-sm font-medium">{server.displayName || server.name}</div>
+											<div className="text-base-content/60 truncate font-mono text-xs">{server.artifact.artifactID}</div>
+										</div>
+										<span className="badge badge-secondary badge-xs">{selected ? 'Selected' : 'Available'}</span>
+									</label>
+								);
+							})}
+
 							{mcpTargets.map(target => (
 								<div
 									key={artifactRefKey(target.artifact)}
@@ -271,7 +300,7 @@ function WorkspaceDirectorySelectionModalContent({
 								</div>
 							))}
 
-							{mcpTargets.length === 0 ? (
+							{mcpTargets.length === 0 && (state.plan?.mcpServers.servers.length ?? 0) === 0 ? (
 								<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
 									No MCP declarations are reachable from this Workspace.
 								</div>

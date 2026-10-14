@@ -81,6 +81,8 @@ export function toolStoreChoiceFromSelection(selection: ToolSelection, resolved:
 		displayName: toolDisplayName(tool),
 		description: tool.description,
 		toolVersion: tool.version,
+		artifactRevision: tool.artifact.revision,
+		definitionDigest: tool.definitionDigest,
 		pluginRef: toolPluginRef(resolved.plugin),
 		pluginName: resolved.plugin.name,
 	};
@@ -102,6 +104,8 @@ export function toolChoiceFromListItem(
 		displayName: toolDisplayName(tool),
 		description: tool.description,
 		toolVersion: tool.version,
+		artifactRevision: tool.artifact.revision,
+		definitionDigest: tool.definitionDigest,
 		pluginRef: item.pluginRef,
 		pluginName: item.pluginName,
 	};

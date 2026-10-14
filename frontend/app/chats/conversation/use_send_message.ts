@@ -2,7 +2,6 @@ import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
 import type { UIModelOption } from '@/spec/model';
-import { RoleEnum } from '@/spec/inference';
 import { SessionRunState } from '@/spec/session';
 
 import { generateTitle } from '@/lib/title_utils';
@@ -11,7 +10,6 @@ import { sessionManagementAPI } from '@/apis/baseapi';
 
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
-import { buildUserConversationMessageFromEditor, initConversationMessage } from '@/chats/conversation/hydration_helper';
 import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
 import { buildSessionSubmissionIntent } from '@/chats/session/session_intent';
 
@@ -40,20 +38,6 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 
 			try {
 				const submission = await buildSessionSubmissionIntent(payload, options);
-				const optimisticUser = buildUserConversationMessageFromEditor(payload, undefined, options.model);
-				const optimisticAssistant = initConversationMessage(RoleEnum.Assistant);
-
-				updateTab(tabId, current => ({
-					...current,
-					isBusy: true,
-					runtimeError: undefined,
-					conversation: {
-						...current.conversation,
-						messages: [...current.conversation.messages, optimisticUser, optimisticAssistant],
-						modifiedAt: new Date().toISOString(),
-					},
-				}));
-				scrollTabToBottomSoon(tabId);
 
 				if (!tab.sessionID) {
 					const title = tab.manualTitleLocked
@@ -78,7 +62,7 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 						isPersisted: true,
 					}));
 
-					requireAcceptedSessionCommand(
+					const started = requireAcceptedSessionCommand(
 						await sessionManagementAPI.startRun({
 							meta: sessionCommandMeta(created.sessionRevision),
 							sessionID: created.sessionID,
@@ -86,10 +70,17 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 						}),
 						'Start Run'
 					);
+					updateTab(tabId, current => ({
+						...current,
+						activeRunID: started.runID,
+						isBusy: true,
+						runtimeError: undefined,
+					}));
+					scrollTabToBottomSoon(tabId);
 					return;
 				}
 
-				const snapshot = tab.sessionSnapshot ?? (await sessionManagementAPI.getSessionSnapshot(tab.sessionID));
+				const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
 
 				if (
 					snapshot.runs.some(
@@ -102,23 +93,22 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 					throw new Error('This Session already has an active Run.');
 				}
 
-				const updatedConfiguration = requireAcceptedSessionCommand(
-					await sessionManagementAPI.updateSessionConfiguration({
+				const started = requireAcceptedSessionCommand(
+					await sessionManagementAPI.startRun({
 						meta: sessionCommandMeta(snapshot.session.revision),
 						sessionID: tab.sessionID,
-						configuration: submission.configuration,
-					}),
-					'Update Session configuration'
-				);
-
-				requireAcceptedSessionCommand(
-					await sessionManagementAPI.startRun({
-						meta: sessionCommandMeta(updatedConfiguration.sessionRevision),
-						sessionID: tab.sessionID,
 						input: submission.input,
+						configuration: submission.configuration,
 					}),
 					'Start Run'
 				);
+				updateTab(tabId, current => ({
+					...current,
+					activeRunID: started.runID,
+					isBusy: true,
+					runtimeError: undefined,
+				}));
+				scrollTabToBottomSoon(tabId);
 			} catch (error) {
 				updateTab(tabId, current => ({
 					...current,

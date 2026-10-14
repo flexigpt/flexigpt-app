@@ -1,21 +1,20 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SessionArtifactSelection } from '@/spec/session';
+import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
-import { RuntimeSkillActivity, SkillInsert, SkillSessionSyncMode } from '@/spec/skill';
+import { SkillInsert, SkillSessionSyncMode } from '@/spec/skill';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
+import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
 
-import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 import {
 	areSkillRefListsEqual,
-	buildSkillRefsFingerprint,
 	clampActiveSkillRefsToEnabled,
 	normalizeSkillRefs,
-	skillRefFromListItem,
 	skillRefKey,
 } from '@/skills/lib/skill_identity_utils';
 
@@ -27,18 +26,16 @@ interface ApplySkillSelectionStateOptions {
 }
 
 interface UseComposerSkillsResult {
-	allSkills: SkillListItem[];
-	templateSkills: SkillListItem[];
+	allSkills: ComposerSkillCatalogItem[];
+	templateSkills: ComposerSkillCatalogItem[];
 	skillsLoading: boolean;
 	skillsLoadError: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	installedEnabledSkillRefs: SkillRef[];
 	installedActiveSkillRefs: SkillRef[];
-	skillSessionID: string | null;
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
-	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
 	enableAllSkills: () => void;
 	disableAllSkills: () => void;
 	refreshSkills: () => Promise<void>;
@@ -58,21 +55,28 @@ interface UseComposerSkillsResult {
 		nextActiveInput: SkillRef[] | null | undefined,
 		options?: ApplySkillSelectionStateOptions
 	) => Promise<void>;
-	ensureSkillSession: () => Promise<string | null>;
-	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
 	getCurrentEnabledSkillRefs: () => SkillRef[];
 	getCurrentActiveSkillRefs: () => SkillRef[];
 	getCurrentInstalledEnabledSkillRefs: () => SkillRef[];
 	getCurrentInstalledActiveSkillRefs: () => SkillRef[];
-	getCurrentSkillSessionID: () => string | null;
+	getCurrentInstalledEnabledSkillSelections: () => SessionArtifactSelection[];
+	getCurrentInstalledActiveSkillSelections: () => SessionArtifactSelection[];
 }
 
-function workspaceRefKey(workspace?: WorkspaceRef): string {
-	return workspace ? `${workspace.rootID}:${workspace.artifactID}` : '';
+function catalogItemRef(item: ComposerSkillCatalogItem): SkillRef {
+	return {
+		rootID: item.ref.rootID,
+		artifactID: item.ref.artifactID,
+	};
 }
 
-function workspaceRefsEqual(left?: WorkspaceRef, right?: WorkspaceRef): boolean {
-	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
+function catalogItemSelection(item: ComposerSkillCatalogItem): SessionArtifactSelection {
+	return {
+		rootID: item.ref.rootID,
+		artifactID: item.ref.artifactID,
+		expectedRevision: item.revision,
+		...(item.definitionDigest ? { expectedDigest: item.definitionDigest } : {}),
+	};
 }
 
 function stringSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
@@ -88,23 +92,14 @@ function stringSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>):
 	return true;
 }
 
-function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[], workspace?: WorkspaceRef): string {
-	return [workspaceRefKey(workspace), buildSkillRefsFingerprint(enabled), buildSkillRefsFingerprint(active)].join('::');
-}
-
-function isInstructionSkillListItem(item: SkillListItem): boolean {
-	return isInstructionInsertSkill(item.skillDefinition);
-}
-
-function isUserMessageSkillListItem(item: SkillListItem): boolean {
-	return item.skillDefinition.insert === SkillInsert.UserMessage;
+function isInstructionSkill(item: ComposerSkillCatalogItem): boolean {
+	return item.insert === SkillInsert.Instructions;
 }
 
 export function useComposerSkills(): UseComposerSkillsResult {
-	const [composerSkills, setComposerSkills] = useState<SkillListItem[]>([]);
+	const [composerSkills, setComposerSkills] = useState<ComposerSkillCatalogItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [activeSkillRefs, setActiveSkillRefsRaw] = useState<SkillRef[]>([]);
-	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(true);
 	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
 	const [workspaceSkillRefKeys, setWorkspaceSkillRefKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -115,38 +110,24 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const allSkills = useMemo(
 		() =>
 			composerSkills.filter(s => {
-				return isInstructionSkillListItem(s);
+				return isInstructionSkill(s);
 			}),
 		[composerSkills]
 	);
 	const templateSkills = useMemo(
-		() =>
-			composerSkills.filter(s => {
-				return isUserMessageSkillListItem(s);
-			}),
+		() => composerSkills.filter(skill => skill.insert === SkillInsert.UserMessage),
 		[composerSkills]
 	);
 
-	const sessionStateKeyRef = useRef('');
-	const skillSessionSyncVersionRef = useRef(0);
-
-	const skillSessionIDRef = useRef<string | null>(null);
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
 	const activeSkillRefsRef = useRef<SkillRef[]>([]);
 	const workspaceRefRef = useRef<WorkspaceRef | undefined>(undefined);
 	const workspaceSkillRefKeysRef = useRef<Set<string>>(new Set());
-	const skillsCatalogLoadPromiseRef = useRef<Promise<SkillListItem[]> | null>(null);
-	const enableAllSkillsRequestVersionRef = useRef(0);
+	const catalogByRefKeyRef = useRef(new Map<string, ComposerSkillCatalogItem>());
 
-	const cancelPendingEnableAllSkills = useCallback(() => {
-		enableAllSkillsRequestVersionRef.current += 1;
-	}, []);
-
-	const advanceSkillSessionSyncVersion = useCallback(() => {
-		const next = skillSessionSyncVersionRef.current + 1;
-		skillSessionSyncVersionRef.current = next;
-		return next;
-	}, []);
+	useEffect(() => {
+		catalogByRefKeyRef.current = new Map(composerSkills.map(skill => [skillRefKey(catalogItemRef(skill)), skill]));
+	}, [composerSkills]);
 
 	const updateEnabledSkillRefsState = useCallback((next: SkillRef[]) => {
 		enabledSkillRefsRef.current = next;
@@ -159,21 +140,12 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		setActiveSkillRefsRaw(prev => (areSkillRefListsEqual(prev, clampedNext) ? prev : clampedNext));
 	}, []);
 
-	const updateSkillSessionIDState = useCallback((next: string | null) => {
-		skillSessionIDRef.current = next;
-		setSkillSessionID(prev => (prev === next ? prev : next));
-	}, []);
-
 	const updateWorkspaceSkillRefKeysState = useCallback((next: ReadonlySet<string>) => {
 		const copied = new Set(next);
 		workspaceSkillRefKeysRef.current = copied;
 		setWorkspaceSkillRefKeys(previous => {
 			return stringSetsEqual(previous, copied) ? previous : copied;
 		});
-	}, []);
-
-	const getCurrentSkillSessionID = useCallback(() => {
-		return skillSessionIDRef.current;
 	}, []);
 
 	const getCurrentEnabledSkillRefs = useCallback(() => {
@@ -204,34 +176,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		[activeSkillRefs, workspaceSkillRefKeys]
 	);
 
-	const filterSkillRefsToLoadedCatalog = useCallback((refs: SkillRef[] | null | undefined): SkillRef[] => {
-		// A missing catalog item is diagnostic state, not permission to silently
-		// delete a requested ref. The runtime remains authoritative at session
-		// creation and prompt-render time.
-		return normalizeSkillRefs(refs);
-	}, []);
-
-	const closeSkillSessionBestEffort = useCallback((sid: string | null | undefined) => {
-		if (!sid) {
-			return;
-		}
-		void skillManagementAPI.closeSkillSession(sid).catch(() => {});
-	}, []);
-
 	const applySkillSelectionState = useCallback(
 		async (
 			nextEnabledInput: SkillRef[] | null | undefined,
 			nextActiveInput: SkillRef[] | null | undefined,
 			options?: ApplySkillSelectionStateOptions
 		) => {
-			const syncSession = options?.syncSession ?? SkillSessionSyncMode.IfSessionExists;
-			const forceResetSession = options?.forceResetSession ?? false;
 			const replacesWorkspace = options?.workspace !== undefined;
 			const replacesWorkspaceSkillRefs = options?.workspaceSkillRefs !== undefined;
-
-			const previousWorkspace = workspaceRefRef.current;
-			const nextWorkspace = replacesWorkspace ? (options?.workspace ?? undefined) : previousWorkspace;
-
 			const previousWorkspaceSkillRefKeys = workspaceSkillRefKeysRef.current;
 			const nextWorkspaceSkillRefs = replacesWorkspaceSkillRefs
 				? normalizeSkillRefs(options?.workspaceSkillRefs)
@@ -244,129 +196,15 @@ export function useComposerSkills(): UseComposerSkillsResult {
 					)
 				: previousWorkspaceSkillRefKeys;
 
-			const nextEnabled = filterSkillRefsToLoadedCatalog(nextEnabledInput);
-			const nextActive = clampActiveSkillRefsToEnabled(nextEnabled, filterSkillRefsToLoadedCatalog(nextActiveInput));
-			const prevEnabled = enabledSkillRefsRef.current;
-			const prevActive = activeSkillRefsRef.current;
-			const prevSelectionStateKey = buildSkillSessionStateKey(prevEnabled, prevActive, previousWorkspace);
-
-			const prevSessionID = skillSessionIDRef.current;
-			const prevSessionStateKey = sessionStateKeyRef.current;
-			const nextSessionStateKey = buildSkillSessionStateKey(nextEnabled, nextActive, nextWorkspace);
-			const hadSession = Boolean(prevSessionID);
-			const workspaceChanged = !workspaceRefsEqual(previousWorkspace, nextWorkspace);
-			const workspaceSkillIdentityChanged =
-				replacesWorkspaceSkillRefs &&
-				(previousWorkspaceSkillRefKeys.size !== nextWorkspaceSkillRefKeys.size ||
-					[...previousWorkspaceSkillRefKeys].some(key => !nextWorkspaceSkillRefKeys.has(key)));
-			const selectionChanged =
-				prevSelectionStateKey !== nextSessionStateKey || workspaceChanged || workspaceSkillIdentityChanged;
-
-			const stateChanged = hadSession ? prevSessionStateKey !== nextSessionStateKey || !prevSessionStateKey : false;
-			let syncVersion = skillSessionSyncVersionRef.current;
-
-			workspaceRefRef.current = nextWorkspace;
+			workspaceRefRef.current = replacesWorkspace ? (options?.workspace ?? undefined) : workspaceRefRef.current;
 			if (replacesWorkspaceSkillRefs) {
 				updateWorkspaceSkillRefKeysState(nextWorkspaceSkillRefKeys);
 			}
+			const nextEnabled = normalizeSkillRefs(nextEnabledInput);
 			updateEnabledSkillRefsState(nextEnabled);
-			updateActiveSkillRefsState(nextActive);
-			if (selectionChanged || forceResetSession) {
-				syncVersion = advanceSkillSessionSyncVersion();
-			}
-
-			if (syncSession === SkillSessionSyncMode.None) {
-				const invalidateExistingSession = selectionChanged || forceResetSession;
-
-				if (invalidateExistingSession) {
-					updateSkillSessionIDState(null);
-					sessionStateKeyRef.current = '';
-					if (prevSessionID) {
-						closeSkillSessionBestEffort(prevSessionID);
-					}
-				} else if (!prevSessionID) {
-					sessionStateKeyRef.current = '';
-				}
-				return;
-			}
-
-			const shouldEnsureSession =
-				nextEnabled.length > 0 &&
-				((syncSession === SkillSessionSyncMode.IfSessionExists && hadSession && (stateChanged || forceResetSession)) ||
-					(syncSession === SkillSessionSyncMode.EnsureIfEnabled && (!hadSession || stateChanged || forceResetSession)));
-
-			const shouldCloseExistingSession =
-				hadSession && (nextEnabled.length === 0 || forceResetSession || (stateChanged && !shouldEnsureSession));
-
-			const shouldKeepExistingSession = hadSession && nextEnabled.length > 0 && !forceResetSession && !stateChanged;
-
-			if (shouldKeepExistingSession) {
-				sessionStateKeyRef.current = nextSessionStateKey;
-				return;
-			}
-
-			if (!hadSession && !shouldEnsureSession) {
-				sessionStateKeyRef.current = '';
-				return;
-			}
-
-			if (!(selectionChanged || forceResetSession)) {
-				syncVersion = advanceSkillSessionSyncVersion();
-			}
-			updateSkillSessionIDState(null);
-			sessionStateKeyRef.current = '';
-
-			if (!shouldEnsureSession) {
-				if (prevSessionID && shouldCloseExistingSession) {
-					closeSkillSessionBestEffort(prevSessionID);
-				}
-				return;
-			}
-
-			try {
-				const sess = await skillManagementAPI.createArtifactSkillSession({
-					closeSessionID: prevSessionID ?? undefined,
-					allowArtifacts: nextEnabled,
-					activeArtifacts: nextActive,
-				});
-
-				if (skillSessionSyncVersionRef.current !== syncVersion) {
-					closeSkillSessionBestEffort(sess.sessionID);
-					return;
-				}
-
-				const latestEnabled = enabledSkillRefsRef.current;
-				const latestActive = activeSkillRefsRef.current;
-				const latestWorkspace = workspaceRefRef.current;
-				const latestSelectionStateKey = buildSkillSessionStateKey(latestEnabled, latestActive, latestWorkspace);
-
-				if (latestSelectionStateKey !== nextSessionStateKey) {
-					closeSkillSessionBestEffort(sess.sessionID);
-					return;
-				}
-
-				const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeArtifacts ?? latestActive);
-				updateSkillSessionIDState(sess.sessionID);
-				updateActiveSkillRefsState(resolvedActive);
-				sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, nextWorkspace);
-			} catch {
-				if (skillSessionSyncVersionRef.current !== syncVersion) {
-					return;
-				}
-				if (prevSessionID) {
-					closeSkillSessionBestEffort(prevSessionID);
-				}
-			}
+			updateActiveSkillRefsState(clampActiveSkillRefsToEnabled(nextEnabled, nextActiveInput));
 		},
-		[
-			advanceSkillSessionSyncVersion,
-			closeSkillSessionBestEffort,
-			filterSkillRefsToLoadedCatalog,
-			updateActiveSkillRefsState,
-			updateEnabledSkillRefsState,
-			updateSkillSessionIDState,
-			updateWorkspaceSkillRefKeysState,
-		]
+		[updateActiveSkillRefsState, updateEnabledSkillRefsState, updateWorkspaceSkillRefKeysState]
 	);
 
 	const applyWorkspaceSkillSelectionState = useCallback(
@@ -433,14 +271,13 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const setEnabledSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
 		update => {
-			cancelPendingEnableAllSkills();
 			const prevEnabled = enabledSkillRefsRef.current;
 			const nextEnabled = resolveStateUpdate(update, prevEnabled);
 			void applySkillSelectionState(nextEnabled, activeSkillRefsRef.current, {
-				syncSession: SkillSessionSyncMode.IfSessionExists,
+				syncSession: SkillSessionSyncMode.None,
 			});
 		},
-		[applySkillSelectionState, cancelPendingEnableAllSkills]
+		[applySkillSelectionState]
 	);
 
 	const setActiveSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
@@ -448,74 +285,18 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			const prevActive = activeSkillRefsRef.current;
 			const nextActive = resolveStateUpdate(update, prevActive);
 			void applySkillSelectionState(enabledSkillRefsRef.current, nextActive, {
-				syncSession: SkillSessionSyncMode.IfSessionExists,
+				syncSession: SkillSessionSyncMode.None,
 			});
 		},
 		[applySkillSelectionState]
 	);
-
-	const setActiveSkillRefsFromSession = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
-		update => {
-			const prevActive = activeSkillRefsRef.current;
-			const nextActive = resolveStateUpdate(update, prevActive);
-
-			// A skills lifecycle tool has already changed the active set in the
-			// current runtime session. Routing this through
-			// applySkillSelectionState(..., None) treats the change as a local
-			// selection replacement, clears the session ID, and closes the very
-			// session that reported the new active set.
-			updateActiveSkillRefsState(nextActive);
-
-			if (skillSessionIDRef.current) {
-				sessionStateKeyRef.current = buildSkillSessionStateKey(
-					enabledSkillRefsRef.current,
-					activeSkillRefsRef.current,
-					workspaceRefRef.current
-				);
-			} else {
-				sessionStateKeyRef.current = '';
-			}
-		},
-		[updateActiveSkillRefsState]
-	);
-
-	useEffect(() => {
-		if (skillsLoading) {
-			return;
-		}
-
-		const nextEnabled = filterSkillRefsToLoadedCatalog(enabledSkillRefsRef.current);
-		const nextActive = clampActiveSkillRefsToEnabled(
-			nextEnabled,
-			filterSkillRefsToLoadedCatalog(activeSkillRefsRef.current)
-		);
-
-		if (
-			areSkillRefListsEqual(enabledSkillRefsRef.current, nextEnabled) &&
-			areSkillRefListsEqual(activeSkillRefsRef.current, nextActive)
-		) {
-			return;
-		}
-
-		void applySkillSelectionState(nextEnabled, nextActive, { syncSession: SkillSessionSyncMode.IfSessionExists });
-	}, [allSkills, applySkillSelectionState, filterSkillRefsToLoadedCatalog, skillsLoading]);
-
-	useEffect(() => {
-		return () => {
-			const sid = skillSessionIDRef.current;
-			if (!sid) {
-				return;
-			}
-			void skillManagementAPI.closeSkillSession(sid).catch(() => {});
-		};
-	}, []);
 
 	const refreshSkills = useCallback(async () => {
 		setSkillsLoading(true);
 		setSkillsLoadError(null);
 
 		try {
-			setComposerSkills(await skillManagementAPI.listComposerSkills(true));
+			setComposerSkills(await skillManagementAPI.listComposerSkillCatalog(true));
 		} catch (error) {
 			console.error('Failed to refresh skills catalog:', error);
 			setSkillsLoadError(
@@ -525,84 +306,27 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			);
 		} finally {
 			setSkillsLoading(false);
-			if (skillsCatalogLoadPromiseRef.current) {
-				skillsCatalogLoadPromiseRef.current = null;
-			}
 		}
 	}, []);
 
-	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
 	useEffect(() => {
-		let cancelled = false;
-		const loadPromise = skillManagementAPI.listComposerSkills();
-		skillsCatalogLoadPromiseRef.current = loadPromise;
-
-		loadPromise
-			.then(out => {
-				if (cancelled) {
-					return;
-				}
-				setComposerSkills(out);
-				setSkillsLoadError(null);
-			})
-			.catch((error: unknown) => {
-				if (!cancelled) {
-					setSkillsLoadError(
-						error instanceof Error && error.message.trim()
-							? error.message
-							: 'Failed to load the skills catalog. Existing skill selections were kept.'
-					);
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setSkillsLoading(false);
-				}
-				if (skillsCatalogLoadPromiseRef.current === loadPromise) {
-					skillsCatalogLoadPromiseRef.current = null;
-				}
-			});
-
-		return () => {
-			cancelled = true;
-			if (skillsCatalogLoadPromiseRef.current === loadPromise) {
-				skillsCatalogLoadPromiseRef.current = null;
-			}
-		};
-	}, []);
+		// oxlint-disable-next-line react/set-state-in-effect
+		void refreshSkills();
+	}, [refreshSkills]);
 
 	const enableAllSkills = useCallback(() => {
-		const requestVersion = enableAllSkillsRequestVersionRef.current + 1;
-		enableAllSkillsRequestVersionRef.current = requestVersion;
+		const workspaceKeys = workspaceSkillRefKeysRef.current;
+		const selectable = allSkills
+			.filter(skill => skill.enabled)
+			.map(s => {
+				return catalogItemRef(s);
+			});
 
-		void (async () => {
-			const pendingLoad = skillsCatalogLoadPromiseRef.current;
-			const loadedSkills =
-				allSkills.length > 0 ? allSkills : pendingLoad ? await pendingLoad.catch(() => []) : ([] as SkillListItem[]);
-
-			if (enableAllSkillsRequestVersionRef.current !== requestVersion) {
-				return;
-			}
-			if (loadedSkills.length === 0) {
-				return;
-			}
-
-			const workspaceKeys = workspaceSkillRefKeysRef.current;
-			void applySkillSelectionState(
-				[
-					...enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref))),
-					...loadedSkills
-						.filter(s => {
-							return isInstructionSkillListItem(s);
-						})
-						.map(i => skillRefFromListItem(i)),
-				],
-				activeSkillRefsRef.current,
-				{
-					syncSession: SkillSessionSyncMode.IfSessionExists,
-				}
-			);
-		})();
+		void applySkillSelectionState(
+			[...enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref))), ...selectable],
+			activeSkillRefsRef.current,
+			{ syncSession: SkillSessionSyncMode.None }
+		);
 	}, [allSkills, applySkillSelectionState]);
 
 	const disableAllSkills = useCallback(() => {
@@ -610,97 +334,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		const nextEnabled = enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref)));
 		const nextActive = activeSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref)));
 		void applySkillSelectionState(nextEnabled, nextActive, {
-			syncSession: SkillSessionSyncMode.IfSessionExists,
+			syncSession: SkillSessionSyncMode.None,
 		});
 	}, [applySkillSelectionState]);
 
-	const listActiveSkillRefs = useCallback(async (sid: string): Promise<SkillRef[]> => {
-		const allowSkillRefs = enabledSkillRefsRef.current;
-		if (!sid || allowSkillRefs.length === 0) {
-			return [];
-		}
-
-		const items = await skillManagementAPI.listArtifactRuntimeSkills({
-			sessionID: sid,
-			activity: RuntimeSkillActivity.Active,
-			allowArtifacts: allowSkillRefs,
-		});
-
-		return clampActiveSkillRefsToEnabled(
-			allowSkillRefs,
-			(items ?? []).map(it => it.skillRef)
-		);
+	const selectionForRef = useCallback((ref: SkillRef): SessionArtifactSelection => {
+		const item = catalogByRefKeyRef.current.get(skillRefKey(ref));
+		return item ? catalogItemSelection(item) : { rootID: ref.rootID, artifactID: ref.artifactID };
 	}, []);
-
-	const ensureSkillSession = useCallback(async (): Promise<string | null> => {
-		const currentEnabled = enabledSkillRefsRef.current;
-		if (currentEnabled.length === 0) {
-			return null;
-		}
-
-		const currentActive = activeSkillRefsRef.current;
-		const currentStateKey = buildSkillSessionStateKey(currentEnabled, currentActive, workspaceRefRef.current);
-		const existing = skillSessionIDRef.current;
-
-		if (existing && sessionStateKeyRef.current === currentStateKey) {
-			return existing;
-		}
-		const syncVersion = advanceSkillSessionSyncVersion();
-
-		// `createSkillSession(closeSessionID, ...)` is a replacement operation.
-		// Do not retain a local ID that the backend may have already closed if
-		// creating its replacement fails.
-		updateSkillSessionIDState(null);
-		sessionStateKeyRef.current = '';
-
-		try {
-			const sess = await skillManagementAPI.createArtifactSkillSession({
-				closeSessionID: existing ?? undefined,
-				allowArtifacts: currentEnabled,
-				activeArtifacts: currentActive,
-			});
-
-			if (!sess.sessionID) {
-				throw new Error('Skill runtime did not return a session ID.');
-			}
-
-			if (skillSessionSyncVersionRef.current !== syncVersion) {
-				closeSkillSessionBestEffort(sess.sessionID);
-				return null;
-			}
-
-			const latestEnabled = enabledSkillRefsRef.current;
-			const latestActive = activeSkillRefsRef.current;
-			const latestWorkspace = workspaceRefRef.current;
-			const latestStateKey = buildSkillSessionStateKey(latestEnabled, latestActive, latestWorkspace);
-
-			if (latestStateKey !== currentStateKey) {
-				closeSkillSessionBestEffort(sess.sessionID);
-				return null;
-			}
-
-			const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeArtifacts ?? latestActive);
-			updateSkillSessionIDState(sess.sessionID);
-			updateActiveSkillRefsState(resolvedActive);
-			sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, workspaceRefRef.current);
-
-			return sess.sessionID;
-		} catch (error) {
-			if (skillSessionSyncVersionRef.current === syncVersion) {
-				updateSkillSessionIDState(null);
-				sessionStateKeyRef.current = '';
-				if (existing) {
-					closeSkillSessionBestEffort(existing);
-				}
-			}
-			throw error;
-		}
-	}, [
-		advanceSkillSessionSyncVersion,
-		closeSkillSessionBestEffort,
-		updateActiveSkillRefsState,
-		updateSkillSessionIDState,
-	]);
 
 	return {
 		allSkills,
@@ -711,22 +352,25 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		activeSkillRefs,
 		installedEnabledSkillRefs,
 		installedActiveSkillRefs,
-		skillSessionID,
 		setEnabledSkillRefs,
 		setActiveSkillRefs,
-		setActiveSkillRefsFromSession,
 		enableAllSkills,
 		disableAllSkills,
 		refreshSkills,
 		applySkillSelectionState,
 		applyWorkspaceSkillSelectionState,
 		applyInstalledSkillSelectionState,
-		ensureSkillSession,
-		listActiveSkillRefs,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
 		getCurrentInstalledEnabledSkillRefs,
 		getCurrentInstalledActiveSkillRefs,
-		getCurrentSkillSessionID,
+		getCurrentInstalledEnabledSkillSelections: () =>
+			getCurrentInstalledEnabledSkillRefs().map(r => {
+				return selectionForRef(r);
+			}),
+		getCurrentInstalledActiveSkillSelections: () =>
+			getCurrentInstalledActiveSkillRefs().map(r => {
+				return selectionForRef(r);
+			}),
 	};
 }

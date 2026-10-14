@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation } from '@/spec/conversation';
+import type { SessionConfiguration } from '@/spec/session';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
@@ -12,6 +13,11 @@ interface PendingDrop {
 	payload: AttachmentsDroppedPayload;
 }
 
+interface PendingSessionConfiguration {
+	tabId: string;
+	configuration: SessionConfiguration;
+}
+
 interface UseInputRegistryArgs {
 	tabExists: (tabId: string) => boolean;
 }
@@ -20,6 +26,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	const pendingDropsRef = useRef<PendingDrop[]>([]);
 	const pendingConversationContextsRef = useRef(new Map<string, Conversation>());
+	const pendingSessionConfigurationsRef = useRef(new Map<string, PendingSessionConfiguration>());
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const workflowStarterLoadsRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
@@ -27,6 +34,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const flushPendingDropsRef = useRef<() => void>(() => {});
 	const flushPendingConversationContextsRef = useRef<() => void>(() => {});
 	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
+	const flushPendingSessionConfigurationsRef = useRef<() => void>(() => {});
 
 	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
 		const input = inputRefs.current.get(tabId);
@@ -78,6 +86,51 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 			return true;
 		},
 		[applyConversationContextToInput]
+	);
+
+	const tryApplySessionConfigurationToTab = useCallback(
+		async (tabId: string, configuration: SessionConfiguration): Promise<boolean> => {
+			const input = inputRefs.current.get(tabId);
+			if (!input) {
+				return false;
+			}
+
+			await input.restoreSessionConfiguration(configuration);
+			return true;
+		},
+		[]
+	);
+
+	const flushPendingSessionConfigurations = useCallback(() => {
+		for (const [tabId, pending] of pendingSessionConfigurationsRef.current.entries()) {
+			if (!tabExists(tabId)) {
+				pendingSessionConfigurationsRef.current.delete(tabId);
+				continue;
+			}
+
+			void tryApplySessionConfigurationToTab(tabId, pending.configuration)
+				.then(applied => {
+					if (applied && pendingSessionConfigurationsRef.current.get(tabId) === pending) {
+						pendingSessionConfigurationsRef.current.delete(tabId);
+					}
+				})
+				.catch(error => {
+					console.error('Failed to restore Session Composer configuration:', error);
+				});
+		}
+	}, [tabExists, tryApplySessionConfigurationToTab]);
+
+	const restoreSessionConfiguration = useCallback(
+		async (tabId: string, configuration: SessionConfiguration) => {
+			if (await tryApplySessionConfigurationToTab(tabId, configuration)) {
+				pendingSessionConfigurationsRef.current.delete(tabId);
+				return;
+			}
+
+			pendingSessionConfigurationsRef.current.set(tabId, { tabId, configuration });
+			schedulePendingInputFlush();
+		},
+		[schedulePendingInputFlush, tryApplySessionConfigurationToTab]
 	);
 
 	const flushPendingConversationContexts = useCallback(() => {
@@ -161,6 +214,10 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		flushPendingWorkflowStartersRef.current = flushPendingWorkflowStarters;
 	}, [flushPendingWorkflowStarters]);
 
+	useLayoutEffect(() => {
+		flushPendingSessionConfigurationsRef.current = flushPendingSessionConfigurations;
+	}, [flushPendingSessionConfigurations]);
+
 	const schedulePendingInputFlush = useCallback(() => {
 		if (pendingInputFlushTimerRef.current !== null) {
 			return;
@@ -171,6 +228,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 			flushPendingDropsRef.current();
 			flushPendingConversationContextsRef.current();
 			flushPendingWorkflowStartersRef.current();
+			flushPendingSessionConfigurationsRef.current();
 		}, 0);
 	}, []);
 
@@ -262,6 +320,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		pendingWorkflowStartersRef.current.delete(tabId);
 		workflowStarterLoadsRef.current.delete(tabId);
 		pendingConversationContextsRef.current.delete(tabId);
+		pendingSessionConfigurationsRef.current.delete(tabId);
 		inputRefCallbacksRef.current.delete(tabId);
 	}, []);
 
@@ -273,6 +332,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		flushPendingDrops,
 		syncComposerFromConversation,
 		resetComposerForNewConversation,
+		restoreSessionConfiguration,
 		focusInput,
 		openTemplateMenu,
 		openToolMenu,

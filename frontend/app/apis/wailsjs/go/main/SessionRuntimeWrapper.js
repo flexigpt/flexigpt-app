@@ -54,6 +54,10 @@ export function PauseRun(arg1) {
   return window['go']['main']['SessionRuntimeWrapper']['PauseRun'](arg1);
 }
 
+export function PrepareUserMessageSkillTemplate(arg1) {
+  return window['go']['main']['SessionRuntimeWrapper']['PrepareUserMessageSkillTemplate'](arg1);
+}
+
 export function ReadAppResource(arg1) {
   return window['go']['main']['SessionRuntimeWrapper']['ReadAppResource'](arg1);
 }

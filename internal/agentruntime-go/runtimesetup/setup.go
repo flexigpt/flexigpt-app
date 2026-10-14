@@ -117,6 +117,7 @@ func New(
 		sessionRuntime.RuntimeDependencies{
 			Preparation: coordinator,
 			Operations:  coordinator,
+			Templates:   coordinator,
 			Model:       coordinator,
 			Tools:       router,
 			Skills:      skillExecutor,

@@ -2,6 +2,7 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import type { SessionArtifactSelection } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceRuntimePlan } from '@/spec/workspace';
@@ -25,6 +26,7 @@ export interface EditorSubmitPayload {
 	sessionInstructionText?: string;
 	includeModelDefault?: boolean;
 	agentRef?: ArtifactRef;
+	agentSelection?: SessionArtifactSelection;
 	modelSelectionSource?: 'session' | 'agent';
 	attachedTools: UIToolStoreChoice[];
 	attachments: UIAttachment[];
@@ -33,7 +35,9 @@ export interface EditorSubmitPayload {
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	enabledSkillRefs?: SkillRef[];
+	enabledSkillSelections?: SessionArtifactSelection[];
 	activeSkillRefs?: SkillRef[];
+	activeSkillSelections?: SessionArtifactSelection[];
 	skillSessionID?: string;
 	workspaceSelection?: WorkspaceConversationSelection;
 	workspacePlan?: WorkspaceRuntimePlan;

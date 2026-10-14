@@ -77,15 +77,6 @@ export enum ModelToolChoiceParameterStyle {
 	RequiredNamed = 'requiredNamed',
 }
 
-export enum ModelRequestClearField {
-	AdapterParameters = 'adapterParameters',
-	CacheControl = 'cacheControl',
-	Output = 'output',
-	Reasoning = 'reasoning',
-	StopSequences = 'stopSequences',
-	Temperature = 'temperature',
-}
-
 export type ModelReasoningLevel = ReasoningLevel | '';
 
 export type ModelJSONSchema = Record<string, unknown> | boolean;
@@ -389,6 +380,8 @@ export interface UIModelOption extends ModelParam {
 	model?: ArtifactRef;
 	provider?: ArtifactRef;
 
+	modelArtifactRevision?: number;
+	modelDefinitionDigest?: ArtifactDigest;
 	logicalName: string;
 	providerName: string;
 	providerAdapter: string;

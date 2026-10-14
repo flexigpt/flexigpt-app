@@ -5,8 +5,10 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
 import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
+import type { SessionConfiguration, SessionModelDefaultsOverride } from '@/spec/session';
 import { ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
+import { SessionModelDefaultField } from '@/spec/session';
 
 import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
@@ -151,6 +153,44 @@ function buildChatOptions(
 	return base;
 }
 
+function requestPatchFromSessionOverrides(overrides: SessionModelDefaultsOverride) {
+	const defaults = {
+		...(overrides.stream === undefined ? {} : { stream: overrides.stream }),
+		...(overrides.maxPromptTokens === undefined ? {} : { maxPromptTokens: overrides.maxPromptTokens }),
+		...(overrides.maxOutputTokens === undefined ? {} : { maxOutputTokens: overrides.maxOutputTokens }),
+		...(overrides.temperature === undefined ? {} : { temperature: overrides.temperature }),
+		...(overrides.systemPrompt === undefined ? {} : { systemPrompt: overrides.systemPrompt }),
+		...(overrides.timeoutMS === undefined ? {} : { timeoutMS: overrides.timeoutMS }),
+		...(overrides.reasoning ? { reasoning: structuredClone(overrides.reasoning) } : {}),
+		...(overrides.cacheControl ? { cacheControl: structuredClone(overrides.cacheControl) } : {}),
+		...(overrides.output ? { output: structuredClone(overrides.output) } : {}),
+		...(overrides.stopSequences ? { stopSequences: [...overrides.stopSequences] } : {}),
+		...(overrides.adapterParameters ? { adapterParameters: structuredClone(overrides.adapterParameters) } : {}),
+	};
+
+	const knownClearFields = new Set(Object.values(SessionModelDefaultField));
+	const clear = (overrides.clear ?? []).filter(field =>
+		knownClearFields.has(field as string as SessionModelDefaultField)
+	);
+
+	if (Object.keys(defaults).length === 0 && clear.length === 0) {
+		return undefined;
+	}
+
+	return {
+		...(Object.keys(defaults).length > 0 ? { defaults } : {}),
+		...(clear.length > 0 ? { clear } : {}),
+	};
+}
+
+function includePreviousMessagesFromSession(configuration: SessionConfiguration): IncludePreviousMessages {
+	if (configuration.history.all) {
+		return 'all';
+	}
+
+	return Math.max(0, configuration.history.includePreviousUserTurns ?? 0);
+}
+
 export type ComposerModelSelectionSource = 'session' | 'agent';
 
 export interface ComposerContextController {
@@ -179,6 +219,7 @@ export interface ComposerContextController {
 
 	applyAdvancedModel(updatedModel: UIModelOption): void;
 	restoreConversationContext(context: RestorableConversationContext): UIModelOption | null;
+	restoreSessionConfiguration(configuration: SessionConfiguration): UIModelOption | null;
 	resetForNewConversation(): UIModelOption;
 
 	verbosityEnabled: boolean;
@@ -397,6 +438,35 @@ export function useComposerContextState(): ComposerContextController {
 		[applyRestoredContext, modelOptionsLoaded]
 	);
 
+	const restoreSessionConfiguration = useCallback(
+		(configuration: SessionConfiguration) => {
+			pendingRestoreRef.current = null;
+
+			if (!modelOptionsLoaded) {
+				return null;
+			}
+
+			const fallback = defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption;
+			const resolved = configuration.model
+				? findRestorableModelOption(allOptionsRef.current, configuration.model)
+				: undefined;
+			const restored = {
+				...(resolved ?? fallback),
+				...(requestPatchFromSessionOverrides(configuration.modelOverrides)
+					? {
+							requestPatch: requestPatchFromSessionOverrides(configuration.modelOverrides),
+						}
+					: {}),
+			} as UIModelOption;
+
+			applySelectedModel(restored, { syncHybridReasoning: true });
+			setIncludePreviousMessages(includePreviousMessagesFromSession(configuration));
+			setModelSelectionSource(configuration.agent ? 'agent' : 'session');
+			return restored;
+		},
+		[applySelectedModel, modelOptionsLoaded]
+	);
+
 	const resetForNewConversation = useCallback(() => {
 		pendingRestoreRef.current = null;
 
@@ -439,6 +509,7 @@ export function useComposerContextState(): ComposerContextController {
 		setOutputVerbosity,
 		applyAdvancedModel,
 		restoreConversationContext,
+		restoreSessionConfiguration,
 		resetForNewConversation,
 		verbosityEnabled: supportsOutputVerbosity(selectedModel.capabilities),
 		reasoningLevelOptions: getSupportedReasoningLevels(selectedModel.capabilities),

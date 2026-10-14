@@ -6,6 +6,7 @@ import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
 import type { MCPAppModelContextUpdate } from '@/spec/mcp';
 import type { UIModelOption } from '@/spec/model';
+import type { SessionConfiguration } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { SkillSessionSyncMode } from '@/spec/skill';
@@ -57,6 +58,7 @@ export interface ComposerBoxHandle {
 		}
 	): void;
 	restoreConversationContext(context: RestorableConversationContext): void;
+	restoreSessionConfiguration(configuration: SessionConfiguration): Promise<void>;
 }
 
 interface ComposerBoxProps {
@@ -120,6 +122,16 @@ export const ComposerBox = memo(
 					{
 						...payload,
 						agentRef: agent.selectedAgent?.ref,
+						agentSelection: agent.selectedAgent
+							? {
+									rootID: agent.selectedAgent.ref.rootID,
+									artifactID: agent.selectedAgent.ref.artifactID,
+									expectedRevision: agent.selectedAgent.agent.revision,
+									...(agent.selectedAgent.agent.definitionDigest
+										? { expectedDigest: agent.selectedAgent.agent.definitionDigest }
+										: {}),
+								}
+							: undefined,
 						modelSelectionSource:
 							agent.selectedAgent && composerContext.modelSelectionSource === 'agent' ? 'agent' : 'session',
 					},
@@ -196,6 +208,16 @@ export const ComposerBox = memo(
 					// Preserve restored conversation state while retaining the
 					// Base/default Agent as the visible tracked selection.
 					void agent.trackDefaultAgentWithoutApplying();
+				},
+				restoreSessionConfiguration: async configuration => {
+					setAbortConfirmationRequested(false);
+					editorAreaRef.current?.resetEditor();
+
+					composerContext.restoreSessionConfiguration(configuration);
+					systemPrompt.restoreSessionConfiguration(configuration);
+
+					await agent.restoreSelectedAgent(configuration.agent);
+					await editorAreaRef.current?.restoreSessionConfiguration(configuration);
 				},
 			}),
 			[agent, composerContext, resetForNewConversation, resetComposerState, systemPrompt]

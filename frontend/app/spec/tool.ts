@@ -123,6 +123,8 @@ export interface ToolStoreChoice extends ToolSelection {
 	description?: string;
 	toolVersion?: string;
 
+	artifactRevision?: number;
+	definitionDigest?: string;
 	pluginRef?: ArtifactRef;
 	pluginName?: string;
 }

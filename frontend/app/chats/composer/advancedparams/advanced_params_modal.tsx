@@ -5,7 +5,7 @@ import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 import type { CacheControlKind } from '@/spec/inference';
 import type { ModelOutputFormat, UIModelOption } from '@/spec/model';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
-import { ModelRequestClearField } from '@/spec/model';
+import { SessionModelDefaultField } from '@/spec/session';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
@@ -175,7 +175,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 
 	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilities);
 	const reasoningEnabled =
-		!requestClear.includes(ModelRequestClearField.Reasoning) &&
+		!requestClear.includes(SessionModelDefaultField.Reasoning) &&
 		(effectiveReasoningEnabled ?? Boolean(currentModel.reasoning));
 
 	const stopPolicy = useMemo(() => getStopSequencesPolicy(currentModel.capabilities), [currentModel.capabilities]);
@@ -242,7 +242,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 	);
 
 	const [cacheControlMode, setCacheControlMode] = useState<CacheControlMode>(() => {
-		if (requestClear.includes(ModelRequestClearField.CacheControl)) {
+		if (requestClear.includes(SessionModelDefaultField.CacheControl)) {
 			return 'disabled';
 		}
 		return requestDefaults?.cacheControl ? 'enabled' : 'default';
@@ -527,20 +527,20 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		});
 
 		if (reasoningSummaryStyle) {
-			requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.Reasoning);
+			requestPatch = removeRequestClear(requestPatch, SessionModelDefaultField.Reasoning);
 		}
 
 		if (outputFormatChoice !== 'default') {
-			requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.Output);
+			requestPatch = removeRequestClear(requestPatch, SessionModelDefaultField.Output);
 		}
 
 		switch (cacheControlMode) {
 			case 'default':
-				requestPatch = inheritRequestDefault(requestPatch, ModelRequestClearField.CacheControl);
+				requestPatch = inheritRequestDefault(requestPatch, SessionModelDefaultField.CacheControl);
 				break;
 
 			case 'disabled':
-				requestPatch = clearRequestDefault(requestPatch, ModelRequestClearField.CacheControl);
+				requestPatch = clearRequestDefault(requestPatch, SessionModelDefaultField.CacheControl);
 				break;
 
 			case 'enabled':
@@ -548,7 +548,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 					requestPatch = editRequestDefaults(requestPatch, defaults => {
 						defaults.cacheControl = nextCacheControl;
 					});
-					requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.CacheControl);
+					requestPatch = removeRequestClear(requestPatch, SessionModelDefaultField.CacheControl);
 				}
 				break;
 		}

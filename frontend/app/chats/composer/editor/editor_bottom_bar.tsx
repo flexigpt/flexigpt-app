@@ -4,13 +4,15 @@ import { memo, useMemo } from 'react';
 import type { MenuStore } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
+
+import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
@@ -33,7 +35,6 @@ interface EditorBottomBarProps {
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
 	onInsertTemplateText: (text: string) => Promise<void> | void;
-	onAttachTemplateResourcePaths?: (paths: string[]) => Promise<void> | void;
 
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
@@ -69,9 +70,9 @@ interface EditorBottomBarProps {
 	toolCatalog: ToolCatalogState;
 
 	// Skills state comes from EditorArea (conversation-level)
-	allSkills: SkillListItem[];
+	allSkills: ComposerSkillCatalogItem[];
 	skillsLoading?: boolean;
-	templateSkills: SkillListItem[];
+	templateSkills: ComposerSkillCatalogItem[];
 	skillsLoadError?: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
@@ -95,7 +96,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
 	onInsertTemplateText,
-	onAttachTemplateResourcePaths,
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
@@ -205,7 +205,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						loadError={skillsLoadError}
 						onRefresh={onRefreshSkills}
 						onInsertTemplateText={onInsertTemplateText}
-						onAttachResourcePaths={onAttachTemplateResourcePaths}
 						isInputLocked={isInputLocked}
 					/>
 

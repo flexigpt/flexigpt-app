@@ -136,6 +136,8 @@ func NewRuntime(
 		return nil, errors.New("session runtime requires a submission preparer")
 	case dependencies.Operations == nil:
 		return nil, errors.New("session runtime requires an operation preparer")
+	case dependencies.Templates == nil:
+		return nil, errors.New("session runtime requires a user-message Skill template preparer")
 	case dependencies.Model == nil:
 		return nil, errors.New("session runtime requires a model executor")
 	case dependencies.Tools == nil:
@@ -187,14 +189,21 @@ func NewRuntime(
 }
 
 func (r *Runtime) Restore(ctx context.Context) error {
-	if r == nil {
-		return ErrRuntimeClosed
-	}
 	if r.deps.Recovery == nil {
 		return nil
 	}
 
 	return r.deps.Recovery.Restore(ctx, runtimeRestorer{runtime: r})
+}
+
+func (r *Runtime) PrepareUserMessageSkillTemplate(ctx context.Context,
+	request UserMessageSkillTemplatePreparationRequest,
+) (UserMessageSkillTemplateResult, error) {
+	if r.deps.Templates == nil {
+		return UserMessageSkillTemplateResult{}, errors.New("no template engine available")
+	}
+
+	return r.deps.Templates.PrepareUserMessageSkillTemplate(ctx, request)
 }
 
 func (r *Runtime) Close() {

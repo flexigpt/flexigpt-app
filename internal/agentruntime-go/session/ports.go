@@ -72,6 +72,31 @@ type SubmissionPreparer interface {
 	) (PreparedSubmission, error)
 }
 
+// UserMessageSkillTemplatePreparationRequest is a Session-owned request to
+// render a user-message Skill template before the user submits a Run. The
+// SessionID is optional so a draft in a new, not-yet-persisted tab can use the
+// same authoritative runtime path.
+type UserMessageSkillTemplatePreparationRequest struct {
+	SessionID SessionID
+	Skill     ArtifactSelection
+	Arguments map[string]string
+}
+
+type UserMessageSkillTemplateResult struct {
+	Skill ArtifactReference `json:"skill"`
+	Text  string            `json:"text"`
+}
+
+// UserMessageSkillTemplatePreparer is intentionally separate from the Skill
+// session controller. Rendering a user-message template must not create,
+// mutate, or expose a Run-owned Skill Runtime session.
+type UserMessageSkillTemplatePreparer interface {
+	PrepareUserMessageSkillTemplate(
+		ctx context.Context,
+		request UserMessageSkillTemplatePreparationRequest,
+	) (UserMessageSkillTemplateResult, error)
+}
+
 type ToolEvaluationDecision string
 
 const (
@@ -399,6 +424,7 @@ type RuntimeDependencies struct {
 	Preparation SubmissionPreparer
 	Operations  ModelOperationPreparer
 	Model       ModelExecutor
+	Templates   UserMessageSkillTemplatePreparer
 	Tools       ToolExecutor
 	Skills      SkillSessionController
 	Apps        AppExecutor

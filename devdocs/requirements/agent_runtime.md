@@ -1399,6 +1399,14 @@ Composer does not:
       been removed from the Session-chat path.
 - [x] MCP Apps route resource reads, Tool requests, and staged context through
       Session/Run/App commands rather than the selected frontend tab.
+- [x] User-message Skill templates render through a dedicated Session Runtime
+      command and no longer call the removed direct Skill Runtime frontend
+      wrapper path.
+- [x] Reopening a persisted Session tab restores Session configuration intent
+      into Composer Agent, Model, model-request defaults, history, Tool,
+      Skill, MCP, Workspace, and inline instruction controls.
+- [x] MCP App context confirmation stages context directly into the owning
+      Run continuation and exposes a Session-owned continuation action.
 - [ ] Management-page component migration remains intentionally deferred.
 
 ### Backend Session-owned execution delivery
@@ -1508,10 +1516,9 @@ Frontend migration remains separately tracked.
 - [x] Breaking SessionStore schema, Wails execution removal, and Session-scoped MCP App routing complete.
 - [x] Frontend Session Wails transport, typed command/query contracts, and
       snapshot observation façade delivered.
-- [ ] Frontend chat command/snapshot/event migration remains pending. The
-      remaining legacy chat source still targets intentionally removed direct
-      completion, Tool, MCP, Skill-session, and conversation-store APIs and
-      must be replaced through the tab-controller Session ownership layer.
+- [x] Frontend chat command, snapshot, event, wait, cancellation, App-context,
+      and Session configuration restoration paths are Session-owned.
+- [ ] Management-page component migration remains intentionally deferred.
 
 ### Backend inference and persistence delivery
 
@@ -1528,7 +1535,8 @@ Frontend migration remains separately tracked.
 - [x] Immutable operation preparation and initial-admission integration complete.
 - [x] Application/Wails assembly and legacy execution removal complete.
 - [x] Session-scoped MCP App routing complete.
-- [ ] Frontend chat and management-UI migration complete.
+- [x] Frontend chat migration complete.
+- [ ] Management UI migration remains deferred.
 
 ### Backend runtime-setup delivery
 
@@ -1565,6 +1573,10 @@ Frontend migration remains separately tracked.
       Skill-session, MCP approval, App, provider, and continuation execution.
 - [x] Frontend model output streaming projects backend-owned operation stream
       state from snapshots rather than maintaining a provider stream lifecycle.
+- [x] Session Runtime owns user-message Skill template preparation before
+      insertion into a Composer draft.
+- [x] Persisted Session configuration intent restores Composer controls when
+      a Session tab is reopened.
 
 ## Definition of done
 

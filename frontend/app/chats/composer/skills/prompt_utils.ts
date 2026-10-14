@@ -4,7 +4,7 @@ const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
 
 export interface SystemInstructionSource {
 	identityKey: string;
-	sourceKind: 'restored-conversation' | 'skill' | 'agent';
+	sourceKind: 'restored-conversation' | 'session' | 'skill' | 'agent';
 	pluginID: string;
 	sourceSlug: string;
 	displayName: string;

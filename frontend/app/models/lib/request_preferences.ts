@@ -1,17 +1,22 @@
 import type { OutputVerbosity, ReasoningLevel } from '@/spec/inference';
 import type { ModelDefaults, ModelRequestPatch } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
-import { ModelRequestClearField } from '@/spec/model';
+import { SessionModelDefaultField } from '@/spec/session';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 
-const CLEAR_FIELD_DEFAULT_KEY: Record<ModelRequestClearField, keyof ModelDefaults> = {
-	[ModelRequestClearField.AdapterParameters]: 'adapterParameters',
-	[ModelRequestClearField.CacheControl]: 'cacheControl',
-	[ModelRequestClearField.Output]: 'output',
-	[ModelRequestClearField.Reasoning]: 'reasoning',
-	[ModelRequestClearField.StopSequences]: 'stopSequences',
-	[ModelRequestClearField.Temperature]: 'temperature',
+const CLEAR_FIELD_DEFAULT_KEY: Record<SessionModelDefaultField, keyof ModelDefaults> = {
+	[SessionModelDefaultField.AdapterParameters]: 'adapterParameters',
+	[SessionModelDefaultField.CacheControl]: 'cacheControl',
+	[SessionModelDefaultField.MaxOutputTokens]: 'maxOutputTokens',
+	[SessionModelDefaultField.MaxPromptTokens]: 'maxPromptTokens',
+	[SessionModelDefaultField.Output]: 'output',
+	[SessionModelDefaultField.Reasoning]: 'reasoning',
+	[SessionModelDefaultField.StopSequences]: 'stopSequences',
+	[SessionModelDefaultField.Stream]: 'stream',
+	[SessionModelDefaultField.SystemPrompt]: 'systemPrompt',
+	[SessionModelDefaultField.Temperature]: 'temperature',
+	[SessionModelDefaultField.TimeoutMS]: 'timeoutMS',
 };
 
 function clonePatch(patch?: ModelRequestPatch): ModelRequestPatch {
@@ -57,7 +62,7 @@ export function editRequestDefaults(
 
 export function removeRequestClear(
 	patch: ModelRequestPatch | undefined,
-	field: ModelRequestClearField
+	field: SessionModelDefaultField
 ): ModelRequestPatch | undefined {
 	const next = clonePatch(patch);
 	next.clear = next.clear?.filter(value => value !== field);
@@ -66,7 +71,7 @@ export function removeRequestClear(
 
 export function inheritRequestDefault(
 	patch: ModelRequestPatch | undefined,
-	field: ModelRequestClearField
+	field: SessionModelDefaultField
 ): ModelRequestPatch | undefined {
 	const next = clonePatch(patch);
 	const key = CLEAR_FIELD_DEFAULT_KEY[field];
@@ -81,7 +86,7 @@ export function inheritRequestDefault(
 
 export function clearRequestDefault(
 	patch: ModelRequestPatch | undefined,
-	field: ModelRequestClearField
+	field: SessionModelDefaultField
 ): ModelRequestPatch | undefined {
 	const next = clonePatch(patch);
 	const key = CLEAR_FIELD_DEFAULT_KEY[field];
@@ -101,13 +106,13 @@ export function setTemperaturePreference(
 	temperature?: number
 ): ModelRequestPatch | undefined {
 	if (temperature === undefined) {
-		return inheritRequestDefault(patch, ModelRequestClearField.Temperature);
+		return inheritRequestDefault(patch, SessionModelDefaultField.Temperature);
 	}
 
 	const next = editRequestDefaults(patch, defaults => {
 		defaults.temperature = temperature;
 	});
-	return removeRequestClear(next, ModelRequestClearField.Temperature);
+	return removeRequestClear(next, SessionModelDefaultField.Temperature);
 }
 
 export function setReasoningLevelPreference(
@@ -132,7 +137,7 @@ export function setReasoningLevelPreference(
 		}
 	});
 
-	return removeRequestClear(next, ModelRequestClearField.Reasoning);
+	return removeRequestClear(next, SessionModelDefaultField.Reasoning);
 }
 
 export function setHybridReasoningPreference(
@@ -140,11 +145,11 @@ export function setHybridReasoningPreference(
 	enabled?: boolean
 ): ModelRequestPatch | undefined {
 	if (enabled === undefined) {
-		return inheritRequestDefault(patch, ModelRequestClearField.Reasoning);
+		return inheritRequestDefault(patch, SessionModelDefaultField.Reasoning);
 	}
 
 	if (!enabled) {
-		return clearRequestDefault(patch, ModelRequestClearField.Reasoning);
+		return clearRequestDefault(patch, SessionModelDefaultField.Reasoning);
 	}
 
 	const next = editRequestDefaults(patch, defaults => {
@@ -154,7 +159,7 @@ export function setHybridReasoningPreference(
 		};
 	});
 
-	return removeRequestClear(next, ModelRequestClearField.Reasoning);
+	return removeRequestClear(next, SessionModelDefaultField.Reasoning);
 }
 
 export function setHybridTokensPreference(
@@ -177,7 +182,7 @@ export function setHybridTokensPreference(
 		}
 	});
 
-	return removeRequestClear(next, ModelRequestClearField.Reasoning);
+	return removeRequestClear(next, SessionModelDefaultField.Reasoning);
 }
 
 export function setOutputVerbosityPreference(
@@ -200,11 +205,11 @@ export function setOutputVerbosityPreference(
 		}
 	});
 
-	return removeRequestClear(next, ModelRequestClearField.Output);
+	return removeRequestClear(next, SessionModelDefaultField.Output);
 }
 
 export function getHybridReasoningPreference(patch: ModelRequestPatch | undefined): boolean | undefined {
-	if (patch?.clear?.includes(ModelRequestClearField.Reasoning)) {
+	if (patch?.clear?.includes(SessionModelDefaultField.Reasoning)) {
 		return false;
 	}
 

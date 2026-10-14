@@ -129,6 +129,13 @@ func (panicTestSkillController) EnsureSkillSession(
 	}, nil
 }
 
+func (panicTestSkillController) PrepareUserMessageSkillTemplate(
+	_ context.Context,
+	_ UserMessageSkillTemplatePreparationRequest,
+) (UserMessageSkillTemplateResult, error) {
+	return UserMessageSkillTemplateResult{}, nil
+}
+
 func (panicTestSkillController) CloseSkillSession(
 	_ context.Context,
 	_ string,
@@ -407,6 +414,7 @@ func newPanicTestRuntime(
 		Operations:  panicTestOperationPreparer{},
 		Model:       model,
 		Tools:       tools,
+		Templates:   panicTestSkillController{},
 		Skills:      panicTestSkillController{},
 		Apps:        panicTestAppExecutor{},
 		Attachments: panicTestAttachmentPreparer{},

@@ -28,6 +28,8 @@ export function OpenAppView(arg1:session.OpenAppViewCommand):Promise<session.Com
 
 export function PauseRun(arg1:session.PauseRunCommand):Promise<session.CommandReceipt>;
 
+export function PrepareUserMessageSkillTemplate(arg1:session.UserMessageSkillTemplatePreparationRequest):Promise<session.UserMessageSkillTemplateResult>;
+
 export function ReadAppResource(arg1:session.ReadAppResourceRequest):Promise<session.AppResourceReadResult>;
 
 export function RenameSession(arg1:session.RenameSessionCommand):Promise<session.CommandReceipt>;

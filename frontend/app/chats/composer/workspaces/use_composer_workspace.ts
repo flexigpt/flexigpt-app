@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef, CapabilityOccurrence } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
+import type { SessionArtifactOverride, SessionMCPServerOverride, SessionWorkspaceSelectionIntent } from '@/spec/session';
 import type {
 	WorkspaceConversationResourceSelectionRef,
 	WorkspaceConversationSelection,
@@ -13,6 +14,7 @@ import type {
 } from '@/spec/workspace';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillSessionSyncMode } from '@/spec/skill';
+import { SessionCollectionOverrideMode } from '@/spec/session';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -59,8 +61,10 @@ export interface ComposerWorkspaceController {
 	blockingError: string | null;
 	selectedContextIDs: Set<string>;
 	selectedSkillIDs: Set<string>;
+	selectedMCPIDs: Set<string>;
 	missingContextRefs: WorkspaceConversationResourceSelectionRef[];
 	missingSkillRefs: WorkspaceConversationResourceSelectionRef[];
+	missingMCPRefs: WorkspaceConversationResourceSelectionRef[];
 	changedCount: number;
 	attentionCount: number;
 	capabilityIssues: CapabilityOccurrence[];
@@ -68,11 +72,13 @@ export interface ComposerWorkspaceController {
 	refreshWorkspaces: () => Promise<void>;
 	attachWorkspace: (workspace: ComposerWorkspaceCandidate) => Promise<void>;
 	restoreSelection: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => Promise<void>;
+	restoreSessionIntent: (intent?: SessionWorkspaceSelectionIntent, syncSkills?: boolean) => Promise<void>;
 	detachWorkspace: (syncSkills?: boolean) => Promise<void>;
 	updateSelectionFromCurrentContents: () => Promise<void>;
 	toggleContext: (context: WorkspacePromptContribution, selected: boolean) => void;
 	toggleSkill: (skill: WorkspaceSkill, selected: boolean) => Promise<void>;
 	setSkillActive: (skill: WorkspaceSkill, active: boolean) => Promise<void>;
+	toggleMCP: (server: WorkspaceMCPServer, selected: boolean) => void;
 	removeContextRef: (artifact: ArtifactRef) => void;
 	removeSkillRef: (artifact: ArtifactRef) => Promise<void>;
 	refreshSelectedWorkspace: () => Promise<void>;
@@ -146,6 +152,132 @@ function selectionFromPlan(
 			.map(r => {
 				return skillRefOf(r);
 			}),
+		mcpRefs: plan.mcpServers.servers.map(server => ({
+			artifact: { ...server.artifact },
+			name: server.name,
+			locator: undefined,
+			definitionDigest: server.definitionDigest,
+			artifactRevision: server.artifactRevision,
+		})),
+	};
+}
+
+function applyArtifactOverrides(
+	baseline: WorkspaceConversationResourceSelectionRef[],
+	overrides: SessionArtifactOverride[] | undefined
+): WorkspaceConversationResourceSelectionRef[] {
+	const byKey = new Map(baseline.map(value => [refKey(value.artifact), value] as const));
+	const order = baseline.map(value => refKey(value.artifact));
+	let replacementStarted = false;
+
+	for (const override of overrides ?? []) {
+		switch (override.mode) {
+			case SessionCollectionOverrideMode.Inherit:
+				continue;
+
+			case SessionCollectionOverrideMode.Remove:
+				byKey.delete(override.key);
+				continue;
+
+			case SessionCollectionOverrideMode.Replace:
+				if (!replacementStarted) {
+					byKey.clear();
+					order.length = 0;
+					replacementStarted = true;
+				}
+				break;
+
+			case SessionCollectionOverrideMode.Add:
+				break;
+		}
+
+		if (!override.value) {
+			continue;
+		}
+
+		const key = refKey(override.value);
+		if (!byKey.has(key)) {
+			order.push(key);
+		}
+		byKey.set(key, {
+			artifact: { rootID: override.value.rootID, artifactID: override.value.artifactID },
+			artifactRevision: override.value.expectedRevision,
+			definitionDigest: override.value.expectedDigest,
+		});
+	}
+
+	return order.flatMap(key => {
+		const value = byKey.get(key);
+		return value ? [value] : [];
+	});
+}
+
+function applyMCPOverrides(
+	baseline: WorkspaceConversationResourceSelectionRef[],
+	overrides: SessionMCPServerOverride[] | undefined
+): WorkspaceConversationResourceSelectionRef[] {
+	const byKey = new Map(baseline.map(value => [refKey(value.artifact), value] as const));
+	const order = baseline.map(value => refKey(value.artifact));
+	let replacementStarted = false;
+
+	for (const override of overrides ?? []) {
+		switch (override.mode) {
+			case SessionCollectionOverrideMode.Inherit:
+				continue;
+			case SessionCollectionOverrideMode.Remove:
+				byKey.delete(override.key);
+				continue;
+			case SessionCollectionOverrideMode.Replace:
+				if (!replacementStarted) {
+					byKey.clear();
+					order.length = 0;
+					replacementStarted = true;
+				}
+				break;
+			case SessionCollectionOverrideMode.Add:
+				break;
+		}
+
+		if (!override.value) {
+			continue;
+		}
+		const key = refKey(override.value.server);
+		if (!byKey.has(key)) {
+			order.push(key);
+		}
+		byKey.set(key, {
+			artifact: {
+				rootID: override.value.server.rootID,
+				artifactID: override.value.server.artifactID,
+			},
+			artifactRevision: override.value.server.expectedRevision,
+			definitionDigest: override.value.server.expectedDigest,
+		});
+	}
+
+	return order.flatMap(key => {
+		const value = byKey.get(key);
+		return value ? [value] : [];
+	});
+}
+
+function selectionFromSessionIntent(
+	candidate: ComposerWorkspaceCandidate,
+	plan: WorkspaceRuntimePlan,
+	intent: SessionWorkspaceSelectionIntent
+): WorkspaceConversationSelection {
+	const baseline = selectionFromPlan(candidate, plan);
+
+	return {
+		...baseline,
+		workspace: {
+			rootID: intent.workspace.rootID,
+			artifactID: intent.workspace.artifactID,
+		},
+		workspaceRevision: intent.workspace.expectedRevision || baseline.workspaceRevision,
+		contextRefs: applyArtifactOverrides(baseline.contextRefs ?? [], intent.context),
+		skillRefs: applyArtifactOverrides(baseline.skillRefs ?? [], intent.skills),
+		mcpRefs: applyMCPOverrides(baseline.mcpRefs ?? [], intent.mcp),
 	};
 }
 
@@ -231,7 +363,8 @@ export function useComposerWorkspace({
 		async (
 			candidate: ComposerWorkspaceCandidate,
 			existingSelection?: WorkspaceConversationSelection,
-			syncSession = SkillSessionSyncMode.EnsureIfEnabled
+			syncSession = SkillSessionSyncMode.EnsureIfEnabled,
+			intent?: SessionWorkspaceSelectionIntent
 		) => {
 			const version = requestVersion.current + 1;
 			requestVersion.current = version;
@@ -246,7 +379,19 @@ export function useComposerWorkspace({
 					return;
 				}
 
-				const nextSelection = cloneSelection(existingSelection) ?? selectionFromPlan(candidate, nextPlan);
+				const baseline = selectionFromPlan(candidate, nextPlan);
+				const restored = cloneSelection(existingSelection);
+				const nextSelection = intent
+					? selectionFromSessionIntent(candidate, nextPlan, intent)
+					: restored
+						? {
+								...baseline,
+								...restored,
+								contextRefs: restored.contextRefs ?? baseline.contextRefs,
+								skillRefs: restored.skillRefs ?? baseline.skillRefs,
+								mcpRefs: restored.mcpRefs ?? baseline.mcpRefs,
+							}
+						: baseline;
 
 				replaceSelection(nextSelection);
 				setWorkspace(candidate);
@@ -346,6 +491,57 @@ export function useComposerWorkspace({
 		[detachWorkspace, directories, replaceSelection, resolveCandidate, setDirectories, syncWorkspaceSkills]
 	);
 
+	const restoreSessionIntent = useCallback(
+		async (intent?: SessionWorkspaceSelectionIntent, syncSkills = true) => {
+			if (!intent) {
+				await detachWorkspace(syncSkills);
+				return;
+			}
+
+			let nextDirectories = directories;
+			let candidate = candidateForRef(candidatesFor(nextDirectories), {
+				rootID: intent.workspace.rootID,
+				artifactID: intent.workspace.artifactID,
+			});
+
+			if (!candidate) {
+				nextDirectories = await workspaceManagementAPI.listComposerWorkspaceDirectories(true);
+				setDirectories(nextDirectories);
+				candidate = candidateForRef(candidatesFor(nextDirectories), {
+					rootID: intent.workspace.rootID,
+					artifactID: intent.workspace.artifactID,
+				});
+			}
+
+			if (!candidate) {
+				replaceSelection({
+					workspace: {
+						rootID: intent.workspace.rootID,
+						artifactID: intent.workspace.artifactID,
+					},
+					workspaceRevision: intent.workspace.expectedRevision,
+				});
+				setWorkspace(undefined);
+				setPlan(undefined);
+				setSelectionError('The Session-selected Workspace is no longer effective in its directory.');
+				await syncWorkspaceSkills(
+					undefined,
+					undefined,
+					syncSkills ? SkillSessionSyncMode.None : SkillSessionSyncMode.None
+				);
+				return;
+			}
+
+			await resolveCandidate(
+				candidate,
+				undefined,
+				syncSkills ? SkillSessionSyncMode.None : SkillSessionSyncMode.None,
+				intent
+			);
+		},
+		[detachWorkspace, directories, replaceSelection, resolveCandidate, setDirectories, syncWorkspaceSkills]
+	);
+
 	const updateSelectionFromCurrentContents = useCallback(async () => {
 		if (!workspace || !plan) {
 			return;
@@ -404,6 +600,30 @@ export function useComposerWorkspace({
 			await syncWorkspaceSkills(next, plan, SkillSessionSyncMode.IfSessionExists);
 		},
 		[plan, replaceSelection, syncWorkspaceSkills]
+	);
+
+	const toggleMCP = useCallback(
+		(server: WorkspaceMCPServer, selected: boolean) => {
+			const current = selectionRef.current;
+			if (!current) {
+				return;
+			}
+
+			const refs = new Map((current.mcpRefs ?? []).map(ref => [refKey(ref.artifact), ref] as const));
+			if (selected) {
+				refs.set(refKey(server.artifact), {
+					artifact: { ...server.artifact },
+					name: server.name,
+					definitionDigest: server.definitionDigest,
+					artifactRevision: server.artifactRevision,
+				});
+			} else {
+				refs.delete(refKey(server.artifact));
+			}
+
+			replaceSelection({ ...current, mcpRefs: [...refs.values()] });
+		},
+		[replaceSelection]
 	);
 
 	const setSkillActive = useCallback(
@@ -539,14 +759,20 @@ export function useComposerWorkspace({
 		() => new Set((selection?.skillRefs ?? []).map(ref => refKey(ref.artifact))),
 		[selection]
 	);
+	const selectedMCPIDs = useMemo(
+		() => new Set((selection?.mcpRefs ?? []).map(ref => refKey(ref.artifact))),
+		[selection]
+	);
 
 	const contexts = plan?.prompt.contributions ?? [];
 	const skills = plan?.skills.skills ?? [];
 	const contextsByRef = new Map(contexts.map(value => [refKey(value.artifact), value]));
 	const skillsByRef = new Map(skills.map(value => [refKey(value.artifact), value]));
+	const mcpByRef = new Map((plan?.mcpServers.servers ?? []).map(value => [refKey(value.artifact), value]));
 
 	const missingContextRefs = (selection?.contextRefs ?? []).filter(ref => !contextsByRef.has(refKey(ref.artifact)));
 	const missingSkillRefs = (selection?.skillRefs ?? []).filter(ref => !skillsByRef.has(refKey(ref.artifact)));
+	const missingMCPRefs = (selection?.mcpRefs ?? []).filter(ref => !mcpByRef.has(refKey(ref.artifact)));
 
 	const changedCount = [...(selection?.contextRefs ?? []), ...(selection?.skillRefs ?? [])].filter(ref => {
 		const current = contextsByRef.get(refKey(ref.artifact)) ?? skillsByRef.get(refKey(ref.artifact));
@@ -588,12 +814,15 @@ export function useComposerWorkspace({
 		blockingError,
 		selectedContextIDs,
 		selectedSkillIDs,
+		selectedMCPIDs,
 		missingContextRefs,
 		missingSkillRefs,
+		missingMCPRefs,
 		changedCount,
 		attentionCount:
 			missingContextRefs.length +
 			missingSkillRefs.length +
+			missingMCPRefs.length +
 			changedCount +
 			capabilityIssues.length +
 			(selectionError ? 1 : 0),
@@ -601,11 +830,13 @@ export function useComposerWorkspace({
 		refreshWorkspaces,
 		attachWorkspace,
 		restoreSelection,
+		restoreSessionIntent,
 		detachWorkspace,
 		updateSelectionFromCurrentContents,
 		toggleContext,
 		toggleSkill,
 		setSkillActive,
+		toggleMCP,
 		removeContextRef,
 		removeSkillRef,
 		refreshSelectedWorkspace,

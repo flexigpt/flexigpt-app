@@ -11,7 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/agentskills-go/provider"
+	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
@@ -540,6 +542,107 @@ func (c *coordinator) ExecuteModel(
 	}
 
 	return result, nil
+}
+
+// PrepareUserMessageSkillTemplate is the only runtime-setup path used by
+// frontend Composer template insertion. The frontend never calls Skill Runtime
+// rendering directly.
+func (c *coordinator) PrepareUserMessageSkillTemplate(
+	ctx context.Context,
+	request sessionRuntime.UserMessageSkillTemplatePreparationRequest,
+) (sessionRuntime.UserMessageSkillTemplateResult, error) {
+	ref, err := artifactRef(request.Skill)
+	if err != nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+
+	resolved, err := c.skillResolver.ResolveSkills(
+		ctx,
+		[]artifactModel.ArtifactRef{ref},
+	)
+	if err != nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+	if len(resolved.Values) != 1 {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+			"skill resolver did not return exactly one user-message template",
+		)
+	}
+
+	value := resolved.Values[0]
+	if value.Artifact != ref {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+			"skill resolver returned another Artifact",
+		)
+	}
+	if !value.Enabled {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+			"selected user-message Skill is disabled",
+		)
+	}
+
+	used := resolvedArtifact(
+		value.Artifact,
+		value.Revision,
+		cryptoutil.Digest(value.DefinitionDigest),
+	)
+	if err := requireSelectionPin(request.Skill, used); err != nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+
+	records, err := c.skillRuntime.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			AllowSkills: []provider.SkillDef{value.Definition},
+		},
+	)
+	if err != nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+
+	found := false
+	for _, record := range records {
+		if record.Def != value.Definition {
+			continue
+		}
+
+		insert, supported := document.NormalizeSkillInsert(record.Insert)
+		if !supported || string(insert) != "user-message" {
+			return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+				"selected skill is not a user-message template",
+			)
+		}
+		found = true
+		break
+	}
+	if !found {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+			"skill runtime did not index the selected template",
+		)
+	}
+
+	rendered, err := c.skillRuntime.RenderSkill(
+		ctx,
+		&skillRuntime.RenderSkillRequest{
+			Body: &skillRuntime.RenderSkillRequestBody{
+				Definition: value.Definition,
+				Arguments:  maps.Clone(request.Arguments),
+			},
+		},
+	)
+	if err != nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+	if rendered == nil || rendered.Body == nil {
+		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+			"skill runtime returned no rendered template",
+		)
+	}
+
+	return sessionRuntime.UserMessageSkillTemplateResult{
+		Skill: sessionArtifactReference(value.Artifact),
+		Text:  rendered.Body.Text,
+	}, nil
 }
 
 func cloneConfiguration(

@@ -113,6 +113,8 @@ import type {
 	SessionRuntimeListItem,
 	SessionSnapshot,
 	SessionSnapshotObserver,
+	SessionUserMessageSkillTemplateCommand,
+	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
 	StageAppContextCommand,
@@ -198,6 +200,10 @@ export interface ISettingStoreAPI {
 
 export interface ISessionRuntimeAPI {
 	subscribeRuntimeEvents(listener: (event: SessionRuntimeEvent) => void): () => void;
+
+	prepareUserMessageSkillTemplate(
+		command: SessionUserMessageSkillTemplateCommand
+	): Promise<SessionUserMessageSkillTemplateResult>;
 
 	openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt>;
 	executeAppTool(command: ExecuteAppToolCommand): Promise<SessionCommandReceipt>;

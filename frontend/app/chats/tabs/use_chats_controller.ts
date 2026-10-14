@@ -355,6 +355,13 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						runtimeError:
 							observation.error instanceof Error ? observation.error.message : 'Session snapshot refresh failed.',
 					}));
+				} else if (observation.kind === SessionSnapshotObservationKind.Deleted) {
+					updateTab(tabId, tab => ({
+						...tab,
+						isBusy: false,
+						isHydrating: false,
+						runtimeError: 'This Session was deleted.',
+					}));
 				}
 			});
 
@@ -369,6 +376,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			if (!tab?.sessionID) {
 				return Promise.resolve();
 			}
+			if (tab.isLoaded && tab.sessionSnapshot) {
+				return Promise.resolve();
+			}
+
+			const existing = hydratePromiseByTabRef.current.get(tabId);
+			if (existing) {
+				return existing;
+			}
 
 			ensureSessionObserver(tabId, tab.sessionID);
 			updateTab(tabId, previous => ({
@@ -376,24 +391,39 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				isHydrating: true,
 			}));
 
-			return sessionManagementAPI
-				.getSessionSnapshot(tab.sessionID)
-				.then(snapshot => {
+			const loadVersion = beginTabLoad(tabId);
+			const load = (async () => {
+				try {
+					const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
+						return;
+					}
+
 					applySessionSnapshot(tabId, snapshot);
-					conversationAreaRef.current?.syncComposerFromConversation(
+					await conversationAreaRef.current?.restoreComposerFromSessionConfiguration(
 						tabId,
-						projectSessionSnapshotToConversation(snapshot, selectedSessionRun(snapshot)?.id)
+						snapshot.session.configuration
 					);
-				})
-				.catch((error: unknown) => {
+				} catch (error) {
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
+						return;
+					}
 					updateTab(tabId, previous => ({
 						...previous,
 						isHydrating: false,
 						runtimeError: error instanceof Error ? error.message : 'Failed to load Session snapshot.',
 					}));
-				});
+				}
+			})().finally(() => {
+				if (hydratePromiseByTabRef.current.get(tabId) === load) {
+					hydratePromiseByTabRef.current.delete(tabId);
+				}
+			});
+
+			hydratePromiseByTabRef.current.set(tabId, load);
+			return load;
 		},
-		[applySessionSnapshot, conversationAreaRef, ensureSessionObserver, updateTab]
+		[applySessionSnapshot, beginTabLoad, conversationAreaRef, ensureSessionObserver, isTabLoadCurrent, updateTab]
 	);
 
 	useEffect(() => {
@@ -746,7 +776,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					return;
 				}
 
-				conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
+				await conversationAreaRef.current?.restoreComposerFromSessionConfiguration(
+					tabId,
+					selectedChat.session.configuration
+				);
 
 				updateTab(tabId, tab => ({
 					...tab,

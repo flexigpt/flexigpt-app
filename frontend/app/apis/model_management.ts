@@ -215,6 +215,8 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		...buildModelParamFromDefaults(item.view.document.providerModelID, providerDefaults, modelDefaults),
 		model: item.list.ref,
 		provider: item.provider.list.ref,
+		modelArtifactRevision: item.view.artifact.revision,
+		modelDefinitionDigest: item.view.definitionDigest,
 		logicalName: item.list.name,
 		providerName: item.provider.view.document.name,
 		providerAdapter: item.provider.view.document.adapter,

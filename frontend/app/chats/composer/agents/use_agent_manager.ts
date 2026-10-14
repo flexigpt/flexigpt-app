@@ -46,6 +46,7 @@ export interface AgentManagerState {
 	reapplySelectedAgent(): Promise<boolean>;
 	trackDefaultAgentWithoutApplying(): Promise<boolean>;
 	clearAgentTracking(): void;
+	restoreSelectedAgent(agent?: ArtifactRef): Promise<boolean>;
 }
 
 function agentKey(ref: ArtifactRef): string {
@@ -68,6 +69,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
 	const initialDefaultRequestRef = useRef(false);
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
+	const pendingRestoredAgentRef = useRef<ArtifactRef | null>(null);
 
 	const setTrackedAgent = useCallback((aKey: string | null, trackingOnly = false) => {
 		selectedAgentKeyRef.current = aKey;
@@ -146,26 +148,39 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			if (isApplyingRef.current) {
 				return false;
 			}
+			const requestSequence = applyRequestSeqRef.current + 1;
+			applyRequestSeqRef.current = requestSequence;
+			isApplyingRef.current = true;
+			setIsApplying(true);
 
 			const option = agentOptions.find(value => value.key === agentKey(agentRef));
 
 			if (!option) {
 				setActionError('The selected Agent is no longer available.');
+				isApplyingRef.current = false;
+				setIsApplying(false);
 				return false;
 			}
 
 			if (!option.isSelectable) {
 				setActionError(option.availabilityReason ?? 'The selected Agent is not currently available.');
+				isApplyingRef.current = false;
+				setIsApplying(false);
 				return false;
 			}
 
 			if (!context.modelOptionsLoaded) {
 				setActionError('Model options are still loading. Try again in a moment.');
+				isApplyingRef.current = false;
+				setIsApplying(false);
 				return false;
 			}
 
 			try {
 				const resolution = await agentManagementAPI.resolveAgent(agentRef);
+				if (applyRequestSeqRef.current !== requestSequence) {
+					return false;
+				}
 				const unavailableRequired = resolution.capabilities.occurrences.find(
 					occurrence => occurrence.required && occurrence.status !== CapabilityResolutionStatus.Available
 				);
@@ -181,9 +196,48 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			} catch (e: unknown) {
 				setActionError(getErrorMessage(e, 'Failed to validate the Agent selection.'));
 				return false;
+			} finally {
+				if (applyRequestSeqRef.current === requestSequence) {
+					isApplyingRef.current = false;
+					setIsApplying(false);
+				}
 			}
 		},
 		[agentOptions, context, setTrackedAgent]
+	);
+
+	const restoreSelectedAgent = useCallback(
+		async (agent?: ArtifactRef): Promise<boolean> => {
+			cancelActiveAgentRequest();
+
+			if (!agent) {
+				pendingRestoredAgentRef.current = null;
+				context.setModelSelectionSource('session');
+				setTrackedAgent(null);
+				setActionError(null);
+				return true;
+			}
+
+			if (loading) {
+				pendingRestoredAgentRef.current = agent;
+				return false;
+			}
+
+			const option = agentOptions.find(candidate => candidate.key === agentKey(agent));
+			if (!option) {
+				pendingRestoredAgentRef.current = null;
+				setTrackedAgent(null);
+				setActionError('The Session-selected Agent is no longer available in the current catalog.');
+				return false;
+			}
+
+			pendingRestoredAgentRef.current = null;
+			context.setModelSelectionSource('agent');
+			setTrackedAgent(option.key, true);
+			setActionError(null);
+			return true;
+		},
+		[agentOptions, cancelActiveAgentRequest, context, loading, setTrackedAgent]
 	);
 
 	const applyDefaultAgent = useCallback(
@@ -272,10 +326,17 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		}
 
 		initialDefaultRequestRef.current = true;
-		void ensureDefaultAgent();
+		void Promise.resolve().then(() => ensureDefaultAgent());
 	}, [ensureDefaultAgent]);
 
 	useEffect(() => {
+		const pendingRestoredAgent = pendingRestoredAgentRef.current;
+		if (pendingRestoredAgent && !loading) {
+			pendingRestoredAgentRef.current = null;
+			void Promise.resolve().then(() => restoreSelectedAgent(pendingRestoredAgent));
+			return;
+		}
+
 		const pendingAction = pendingDefaultActionRef.current;
 		if (!pendingAction) {
 			return;
@@ -316,9 +377,10 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			return;
 		}
 
-		// oxlint-disable-next-line react/set-state-in-effect
-		clearAgentTracking();
-		void ensureDefaultAgent();
+		void Promise.resolve().then(() => {
+			clearAgentTracking();
+			return ensureDefaultAgent();
+		});
 	}, [clearAgentTracking, ensureDefaultAgent, selectedAgent, selectedAgentKey]);
 
 	useEffect(() => {
@@ -355,5 +417,6 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		reapplySelectedAgent,
 		trackDefaultAgentWithoutApplying,
 		clearAgentTracking,
+		restoreSelectedAgent,
 	};
 }

@@ -510,6 +510,17 @@ export interface SessionCommandReceipt {
 	message?: string;
 }
 
+export interface SessionUserMessageSkillTemplateCommand {
+	sessionID?: SessionID;
+	skill: SessionArtifactSelection;
+	arguments?: Record<string, string>;
+}
+
+export interface SessionUserMessageSkillTemplateResult {
+	skill: ArtifactRef;
+	text: string;
+}
+
 export interface SessionRunLimits {
 	maxModelOperations?: number;
 	maxToolAttempts?: number;

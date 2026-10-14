@@ -8,6 +8,7 @@ import type {
 	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
+	SessionUserMessageSkillTemplateResult,
 } from '@/spec/session';
 import type {
 	SessionStoreConversationProjection,
@@ -73,6 +74,18 @@ export function sessionCommandReceiptFromWails(value: unknown, operation: string
 		),
 		starterText: optionalWailsString(receipt.starterText, `${operation}.starterText`),
 		message: optionalWailsString(receipt.message, `${operation}.message`),
+	};
+}
+
+export function sessionUserMessageSkillTemplateResultFromWails(
+	value: unknown,
+	operation: string
+): SessionUserMessageSkillTemplateResult {
+	const result = requiredObject<Record<string, unknown>>(value, operation);
+
+	return {
+		skill: requiredObject(result.skill, `${operation}.skill`),
+		text: requireWailsString(result.text, `${operation}.text`),
 	};
 }
 

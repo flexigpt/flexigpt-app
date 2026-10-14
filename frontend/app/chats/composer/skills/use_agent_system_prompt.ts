@@ -3,6 +3,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
+import type { SessionConfiguration } from '@/spec/session';
+import { SessionCollectionOverrideMode, SessionModelDefaultField } from '@/spec/session';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 
@@ -37,6 +39,7 @@ export interface AgentSystemPromptController {
 	clearAllSystemPromptState(): void;
 	resetForNewConversation(modelDefaultPrompt: string): void;
 	restoreConversationContext(modelDefaultPrompt: string, modelParam?: ModelParam): void;
+	restoreSessionConfiguration(configuration: SessionConfiguration): void;
 }
 
 type IncludeModelDefaultPreference = boolean | 'auto';
@@ -69,6 +72,48 @@ function instructionSkillSource(source: RenderedInstructionSkillSource): SystemI
 		isBuiltIn: false,
 		skillRef: source.skillRef,
 	};
+}
+
+function sessionInstructionSources(configuration: SessionConfiguration): SystemInstructionSource[] {
+	const sources = new Map<string, SystemInstructionSource>();
+	let replacementStarted = false;
+
+	for (const override of configuration.instructions ?? []) {
+		switch (override.mode) {
+			case SessionCollectionOverrideMode.Inherit:
+			case SessionCollectionOverrideMode.Remove:
+				continue;
+
+			case SessionCollectionOverrideMode.Replace:
+				if (!replacementStarted) {
+					sources.clear();
+					replacementStarted = true;
+				}
+				break;
+
+			case SessionCollectionOverrideMode.Add:
+				break;
+		}
+
+		const text = override.value?.text?.trim();
+		if (!text) {
+			continue;
+		}
+
+		sources.set(override.key, {
+			identityKey: `session-instruction:${override.key}`,
+			sourceKind: 'session',
+			pluginID: 'session',
+			pluginDisplayName: 'Session',
+			pluginSlug: 'session',
+			displayName: override.value?.label?.trim() || 'Session instructions',
+			sourceSlug: override.key,
+			text,
+			isBuiltIn: false,
+		});
+	}
+
+	return [...sources.values()];
 }
 
 function restoredPromptState(modelDefaultPrompt: string, modelParam?: ModelParam) {
@@ -223,6 +268,20 @@ export function useAgentSystemPrompt(args: {
 		[setSelectedKeys]
 	);
 
+	const restoreSessionConfiguration = useCallback(
+		(configuration: SessionConfiguration) => {
+			const clearModelDefault = configuration.modelOverrides.clear?.includes(
+				SessionModelDefaultField.SystemPrompt
+			);
+
+			setRestoredPrompt(null);
+			setIncludePreference(clearModelDefault ? false : 'auto');
+			setDynamicSources(sessionInstructionSources(configuration));
+			setSelectedKeys(sessionInstructionSources(configuration).map(source => source.identityKey));
+		},
+		[setSelectedKeys]
+	);
+
 	return {
 		modelDefaultPrompt,
 		instructionSources: sources,
@@ -239,5 +298,6 @@ export function useAgentSystemPrompt(args: {
 		clearAllSystemPromptState,
 		resetForNewConversation,
 		restoreConversationContext,
+		restoreSessionConfiguration,
 	};
 }

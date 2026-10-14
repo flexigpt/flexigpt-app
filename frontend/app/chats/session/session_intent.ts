@@ -110,6 +110,7 @@ function modelOverridesFromComposer(
 		...(defaults?.maxPromptTokens === undefined ? {} : { maxPromptTokens: defaults.maxPromptTokens }),
 		...(defaults?.maxOutputTokens === undefined ? {} : { maxOutputTokens: defaults.maxOutputTokens }),
 		...(defaults?.temperature === undefined ? {} : { temperature: defaults.temperature }),
+		...(defaults?.systemPrompt === undefined ? {} : { systemPrompt: defaults.systemPrompt }),
 		...(defaults?.timeoutMS === undefined ? {} : { timeoutMS: defaults.timeoutMS }),
 		...(defaults?.reasoning ? { reasoning: structuredClone(defaults.reasoning) } : {}),
 		...(defaults?.cacheControl ? { cacheControl: structuredClone(defaults.cacheControl) } : {}),
@@ -220,7 +221,16 @@ function toolOverridesFromChoices(payload: EditorSubmitPayload): SessionToolOver
 			mode: SessionCollectionOverrideModeValue.Add,
 			value: {
 				key,
-				capability: sessionCapabilitySelection(choice.target),
+				capability:
+					choice.target.form === CapabilityTargetForm.Artifact && choice.target.artifact
+						? {
+								artifact: artifactSelection(
+									choice.target.artifact,
+									choice.artifactRevision,
+									choice.definitionDigest
+								),
+							}
+						: sessionCapabilitySelection(choice.target),
 				autoExecute: choice.autoExecute,
 				userArguments: parseOptionalJSON(choice.userArgSchemaInstance, `Tool "${choice.target.name}" options`),
 			},
@@ -272,11 +282,20 @@ function workspaceSelectionFromPayload(payload: EditorSubmitPayload): SessionCon
 	const plan: WorkspaceRuntimePlan | undefined = payload.workspacePlan;
 	const baselineContexts = plan?.prompt.contributions.map(value => value.artifact) ?? [];
 	const baselineSkills = plan?.skills.skills.map(value => value.artifact) ?? [];
+	const selectedMCPRefs = selection.mcpRefs ?? [];
 
 	return {
 		workspace: artifactSelection(selection.workspace, selection.workspaceRevision),
 		context: artifactOverridesForWorkspace(baselineContexts, selection.contextRefs),
 		skills: artifactOverridesForWorkspace(baselineSkills, selection.skillRefs),
+		mcp: selectedMCPRefs.map(value => ({
+			key: artifactKey(value.artifact),
+			mode: SessionCollectionOverrideModeValue.Add,
+			value: {
+				server: artifactSelection(value.artifact, value.artifactRevision, value.definitionDigest),
+				toolExposure: SessionMCPToolExposure.None,
+			},
+		})),
 	};
 }
 
@@ -304,7 +323,12 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	const seenEnabled = new Set<string>();
 	const skills = [];
 
-	for (const ref of payload.enabledSkillRefs ?? []) {
+	for (const selection of payload.enabledSkillSelections ?? payload.enabledSkillRefs ?? []) {
+		const ref = artifactSelection(
+			selection,
+			'expectedRevision' in selection ? selection.expectedRevision : undefined,
+			'expectedDigest' in selection ? selection.expectedDigest : undefined
+		);
 		const key = artifactKey(ref);
 
 		if (seenEnabled.has(key)) {
@@ -315,14 +339,19 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		skills.push({
 			key,
 			mode: SessionCollectionOverrideModeValue.Add,
-			value: artifactSelection(ref),
+			value: ref,
 		});
 	}
 
 	const enabled = new Set(skills.map(value => value.key));
 	const active = [];
 
-	for (const ref of payload.activeSkillRefs ?? []) {
+	for (const selection of payload.activeSkillSelections ?? payload.activeSkillRefs ?? []) {
+		const ref = artifactSelection(
+			selection,
+			'expectedRevision' in selection ? selection.expectedRevision : undefined,
+			'expectedDigest' in selection ? selection.expectedDigest : undefined
+		);
 		const key = artifactKey(ref);
 
 		if (!enabled.has(key)) {
@@ -332,7 +361,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		active.push({
 			key,
 			mode: SessionActivityOverrideModeValue.Activate,
-			value: artifactSelection(ref),
+			value: ref,
 		});
 	}
 
@@ -458,13 +487,13 @@ export async function buildSessionSubmissionIntent(
 	const configuration = emptySessionConfiguration();
 	const skillOverrides = skillOverridesFromPayload(payload);
 
-	configuration.agent = payload.agentRef ? artifactSelection(payload.agentRef) : undefined;
+	configuration.agent = payload.agentSelection ?? (payload.agentRef ? artifactSelection(payload.agentRef) : undefined);
 	configuration.workspace = workspaceSelectionFromPayload(payload);
 	configuration.model =
 		payload.modelSelectionSource === 'agent' && payload.agentRef
 			? undefined
 			: model.model
-				? artifactSelection(model.model)
+				? artifactSelection(model.model, model.modelArtifactRevision, model.modelDefinitionDigest)
 				: undefined;
 	configuration.modelOverrides = modelOverridesFromComposer(model, payload.includeModelDefault);
 	configuration.instructions = instructionOverridesFromPayload(payload);

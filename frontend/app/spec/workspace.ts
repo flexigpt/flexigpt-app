@@ -234,6 +234,7 @@ export interface WorkspaceConversationSelection {
 	workspaceRevision?: number;
 	contextRefs?: WorkspaceConversationResourceSelectionRef[];
 	skillRefs?: WorkspaceConversationResourceSelectionRef[];
+	mcpRefs?: WorkspaceConversationResourceSelectionRef[];
 }
 
 interface WorkspaceConversationContextUsage {

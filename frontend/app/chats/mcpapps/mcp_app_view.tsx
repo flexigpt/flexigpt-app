@@ -482,7 +482,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				onUIMessage: message => {
 					dispatchMCPAppUIMessage(routerInstance, message);
 				},
-				requestModelContextUpdateApproval: async () => {
+				requestModelContextUpdateApproval: async update => {
 					if (!mountedRef.current) {
 						return false;
 					}
@@ -492,6 +492,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 
 					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
+						setPendingContextUpdate(update);
 					});
 				},
 			}),

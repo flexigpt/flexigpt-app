@@ -13,6 +13,7 @@ import type {
 	MCPRuntimeServerID,
 	MCPToolSelection,
 } from '@/spec/mcp';
+import type { SessionConfiguration } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
@@ -62,6 +63,12 @@ import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from
 import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import {
+	effectiveActiveSkillSelections,
+	effectiveArtifactSelections,
+	hydrateSessionMCPOverrides,
+	hydrateSessionToolOverrides,
+} from '@/chats/session/session_composer_restore';
 
 interface SkillStateApplyOptions {
 	syncSession?: SkillSessionSyncMode;
@@ -96,6 +103,7 @@ export interface EditorAreaHandle {
 	setInstalledSkillStateFromAgent: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
 	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
+	restoreSessionConfiguration: (configuration: SessionConfiguration) => Promise<void>;
 }
 
 interface EditorAreaProps {
@@ -360,6 +368,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentActiveSkillRefs,
 		getCurrentInstalledEnabledSkillRefs,
 		getCurrentInstalledActiveSkillRefs,
+		getCurrentInstalledEnabledSkillSelections,
+		getCurrentInstalledActiveSkillSelections,
 	} = useComposerSkills();
 
 	const workspace = useComposerWorkspace({
@@ -1116,6 +1126,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
 					enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
 					activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
+					enabledSkillSelections: getCurrentInstalledEnabledSkillSelections(),
+					activeSkillSelections: getCurrentInstalledActiveSkillSelections(),
 					workspaceSelection: workspace.getSelectionSnapshot(),
 					workspacePlan: workspace.plan,
 				};
@@ -1414,6 +1426,54 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		[loadToolCalls, mcp.mcpContext]
 	);
 
+	const restoreSessionConfiguration = useCallback(
+		async (configuration: SessionConfiguration) => {
+			setSubmitError(null);
+			clearComposerToolsState();
+			clearAttachments();
+			setMCPAppContextUpdates([]);
+
+			const [toolState, mcpContext] = await Promise.all([
+				hydrateSessionToolOverrides(configuration.tools),
+				hydrateSessionMCPOverrides(configuration.mcp),
+			]);
+
+			applyConversationToolsFromChoices(toolState.choices);
+			applyWebSearchFromChoices(toolState.choices);
+			setToolSelectionIssues(toolState.issues);
+			mcp.restoreContext(mcpContext);
+
+			await workspace.restoreSessionIntent(configuration.workspace, false);
+
+			const enabledSelections = effectiveArtifactSelections(configuration.skills);
+			const activeSelections = effectiveActiveSkillSelections(configuration.activeSkills);
+
+			await applyInstalledSkillSelectionState(
+				enabledSelections.map(selection => ({
+					rootID: selection.rootID,
+					artifactID: selection.artifactID,
+				})),
+				activeSelections.map(selection => ({
+					rootID: selection.rootID,
+					artifactID: selection.artifactID,
+				})),
+				{
+					syncSession: SkillSessionSyncMode.None,
+					forceResetSession: true,
+				}
+			);
+		},
+		[
+			applyConversationToolsFromChoices,
+			applyInstalledSkillSelectionState,
+			applyWebSearchFromChoices,
+			clearAttachments,
+			clearComposerToolsState,
+			mcp,
+			workspace,
+		]
+	);
+
 	const finishAssistantTurn = useCallback((_payload: AssistantTurnFinishedPayload) => undefined, []);
 
 	useImperativeHandle(
@@ -1495,6 +1555,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				void workspace.restoreSelection(selection, syncSkills);
 			},
 			finishAssistantTurn,
+			restoreSessionConfiguration,
 		}),
 		[
 			loadExternalMessage,
@@ -1519,6 +1580,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyInstalledSkillSelectionState,
 			isGenerating,
 			onRequestStop,
+			restoreSessionConfiguration,
 		]
 	);
 
@@ -1800,9 +1862,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 							focusEditorAtEnd();
 						}}
 						onInsertTemplateText={handleInsertTemplateText}
-						onAttachTemplateResourcePaths={async (p: string[]) => {
-							await attachPathsAsAttachments(p);
-						}}
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}
 						attachmentMenuState={attachmentMenu}

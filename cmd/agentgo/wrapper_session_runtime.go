@@ -41,6 +41,17 @@ func InitSessionRuntimeWrapper(
 	return nil
 }
 
+func (w *SessionRuntimeWrapper) PrepareUserMessageSkillTemplate(
+	command sessionRuntime.UserMessageSkillTemplatePreparationRequest,
+) (sessionRuntime.UserMessageSkillTemplateResult, error) {
+	return withSessionRuntime(
+		w,
+		func(runtimeValue *sessionRuntime.Runtime) (sessionRuntime.UserMessageSkillTemplateResult, error) {
+			return runtimeValue.PrepareUserMessageSkillTemplate(context.Background(), command)
+		},
+	)
+}
+
 func (w *SessionRuntimeWrapper) OpenAppView(
 	command sessionRuntime.OpenAppViewCommand,
 ) (*sessionRuntime.CommandReceipt, error) {

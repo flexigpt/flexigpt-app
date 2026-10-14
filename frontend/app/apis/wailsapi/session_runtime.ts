@@ -22,6 +22,8 @@ import type {
 	SessionRuntimeEvent,
 	SessionRuntimeListItem,
 	SessionSnapshot,
+	SessionUserMessageSkillTemplateCommand,
+	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
 	StageAppContextCommand,
@@ -38,6 +40,7 @@ import {
 	sessionRuntimeEventFromWails,
 	sessionRuntimeListItemFromWails,
 	sessionSnapshotFromWails,
+	sessionUserMessageSkillTemplateResultFromWails,
 } from '@/apis/wailsapi/session_projection';
 import { wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
@@ -54,6 +57,7 @@ import {
 	ListRuntimeSessions,
 	OpenAppView,
 	PauseRun,
+	PrepareUserMessageSkillTemplate,
 	ReadAppResource,
 	RenameSession,
 	ResolveWait,
@@ -134,6 +138,15 @@ export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
 			runtimeEventListeners.delete(listener);
 			detachRuntimeEventBridgeWhenUnused();
 		};
+	}
+
+	async prepareUserMessageSkillTemplate(
+		command: SessionUserMessageSkillTemplateCommand
+	): Promise<SessionUserMessageSkillTemplateResult> {
+		return sessionUserMessageSkillTemplateResultFromWails(
+			await PrepareUserMessageSkillTemplate(command),
+			'PrepareUserMessageSkillTemplate'
+		);
 	}
 
 	async createSession(command: CreateSessionCommand): Promise<SessionCommandReceipt> {

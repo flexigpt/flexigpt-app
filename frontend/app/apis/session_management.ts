@@ -27,6 +27,8 @@ import type {
 	SessionSnapshot,
 	SessionSnapshotObservation,
 	SessionSnapshotObserver,
+	SessionUserMessageSkillTemplateCommand,
+	SessionUserMessageSkillTemplateResult,
 	SetAutomationHoldCommand,
 	SkipCallCommand,
 	StageAppContextCommand,
@@ -192,6 +194,12 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 		this.sessionObservers.clear();
 
 		unsubscribe?.();
+	}
+
+	prepareUserMessageSkillTemplate(
+		command: SessionUserMessageSkillTemplateCommand
+	): Promise<SessionUserMessageSkillTemplateResult> {
+		return this.runtime.prepareUserMessageSkillTemplate(command);
 	}
 
 	openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt> {

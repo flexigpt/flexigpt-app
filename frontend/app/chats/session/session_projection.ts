@@ -6,6 +6,7 @@ import type {
 	SessionAppInstance,
 	SessionAppRenderTarget,
 	SessionAttachmentReference,
+	SessionAppContextUpdate,
 	SessionRun,
 	SessionSnapshot,
 	SessionToolCall,
@@ -23,6 +24,7 @@ import {
 	SessionToolResultKind,
 } from '@/spec/session';
 import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
+import { MCPContentType } from '@/spec/mcp';
 
 import { deriveUIFieldsFromOutputUnion } from '@/chats/conversation/completion_helper';
 import { selectedSessionRun } from '@/chats/session/session_commands';
@@ -327,6 +329,24 @@ function protocolOutputs(message: SessionTranscriptMessage): OutputUnion[] {
 	return output;
 }
 
+function appContextUpdatesFromSession(values: SessionAppContextUpdate[] | undefined) {
+	return values?.map(update => ({
+		instanceID: update.appInstanceID,
+		server: update.serverID,
+		resourceUri: update.resourceURI,
+		content: update.content?.map(content => ({
+			type: content.type as MCPContentType,
+			text: content.text,
+			uri: content.uri,
+			name: content.name,
+			description: content.description,
+			mimeType: content.mimeType,
+		})),
+		structuredContent: decodeSessionOpaqueJSON(update.structuredContent),
+		updatedAt: update.updatedAt,
+	}));
+}
+
 function projectTranscriptMessage(
 	message: SessionTranscriptMessage,
 	sessionSnapshot: SessionSnapshot,
@@ -355,10 +375,8 @@ function projectTranscriptMessage(
 		createdAt: message.createdAt,
 		role: messageRole(message.role),
 		status: messageStatus(message),
-		// oxlint-disable-next-line no-warning-comments
-		// TODO Here it says can specific only known props, text doesnt exist.
-		// text: message.text,
 		attachments: message.attachments?.map(attachmentFromSession),
+		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
 		inputs: (message.protocolInputs ?? [])
 			.map(raw => decodeSessionOpaqueJSON(raw))
 			.filter(value => value !== undefined) as InputUnion[],
@@ -402,15 +420,15 @@ function projectActiveOperation(
 		role: RoleEnum.Assistant,
 		status: Status.InProgress,
 		uiContent: operation.streamedText || '',
-		// oxlint-disable-next-line no-warning-comments
-		// TODO: Need to fix this. here it says thinking cannot be assigned to Reasoning content.
-		// uiReasoningContents: operation.streamedThinking
-		// 	? [
-		// 			{
-		// 				thinking: [operation.streamedThinking],
-		// 			},
-		// 		]
-		// 	: undefined,
+		uiReasoningContents: operation.streamedThinking
+			? [
+					{
+						id: `session-thinking:${run.id}:${operation.id}`,
+						role: RoleEnum.Assistant,
+						thinking: [operation.streamedThinking],
+					},
+				]
+			: undefined,
 		uiToolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
 	};
 }
@@ -423,11 +441,14 @@ export function projectSessionSnapshotToConversation(snapshot: SessionSnapshot, 
 		: [];
 
 	if (run && run.activeModelOperationID) {
-		const hasPersistedAssistant = messages.some(
+		const hasPersistedAssistantForActiveOperation = snapshot.session.transcript?.some(
 			message =>
-				message.role === RoleEnum.Assistant && message.id !== `session-stream:${run.id}:${run.activeModelOperationID}`
+				message.role === SessionMessageRole.Assistant &&
+				message.operationID === run.activeModelOperationID
 		);
-		const transient = hasPersistedAssistant ? undefined : projectActiveOperation(snapshot, run, appsByID);
+		const transient = hasPersistedAssistantForActiveOperation
+			? undefined
+			: projectActiveOperation(snapshot, run, appsByID);
 
 		if (transient) {
 			messages.push(transient);

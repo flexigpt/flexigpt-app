@@ -38,7 +38,6 @@ export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[]
 			seen.add(key);
 			out.push({ rootID: r.rootID, artifactID: r.artifactID });
 		}
-		continue;
 	}
 	return out;
 }

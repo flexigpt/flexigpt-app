@@ -37,6 +37,8 @@ import type {
 } from '@/spec/skill';
 import type { ResolvedToolView } from '@/spec/tool';
 
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
+
 import type { ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
@@ -49,6 +51,8 @@ export interface ComposerSkillCatalogItem {
 	enabled: boolean;
 	builtIn: boolean;
 	managed: boolean;
+	revision: number;
+	definitionDigest?: string;
 	insert: SkillInsert;
 	hasArguments: boolean;
 	hasResources: boolean;
@@ -59,41 +63,11 @@ export interface SkillManagementPageData {
 	skills: StoreSkillListItem[];
 }
 
-/**
- * Management façade for Skills and Skill Plugins.
- *
- * Session creation, Skill Runtime session ownership, lifecycle tools, and
- * runtime tool invocation are intentionally absent. Those operations are now
- * Run-owned and are accessed only through Session Runtime commands.
- */
 export class SkillManagementAPI {
-	constructor(
-		private readonly store: ISkillStoreAPI,
-		private readonly aggregate: ISkillAggregateAPI,
-		private readonly tools: IToolTargetResolver,
-		private readonly models: ModelManagementAPI
-	) {}
-
-	async loadManagementPageData(): Promise<SkillManagementPageData> {
-		const [plugins, skills] = await Promise.all([
-			this.store.listSkillPluginsForManagement(),
-			this.store.listSkillsForManagement(),
-		]);
-
-		return {
-			plugins,
-			skills,
-		};
-	}
-
-	/**
-	 * Composer catalog projection. This is a management/read façade only:
-	 * it resolves Artifact-backed Skill metadata for selection UI and does not
-	 * create a Skill Runtime session or invoke a Skill tool.
-	 */
-	async listComposerSkillCatalog(): Promise<ComposerSkillCatalogItem[]> {
+	private readonly composerSkillCatalog = createSharedAsyncCatalog<ComposerSkillCatalogItem[]>(async () => {
 		const skills = await this.store.listSkillsForManagement();
-		const summaries = await Promise.all(
+
+		const values = await Promise.all(
 			skills.map(async skill => {
 				try {
 					const summary = await this.aggregate.describeArtifactSkill(skill.ref);
@@ -107,6 +81,8 @@ export class SkillManagementAPI {
 						enabled: skill.enabled,
 						builtIn: skill.builtIn,
 						managed: skill.managed,
+						revision: skill.revision,
+						definitionDigest: skill.definitionDigest,
 						insert: summary.Insert,
 						hasArguments: summary.HasArguments,
 						hasResources: summary.HasResources,
@@ -121,6 +97,8 @@ export class SkillManagementAPI {
 						enabled: skill.enabled,
 						builtIn: skill.builtIn,
 						managed: skill.managed,
+						revision: skill.revision,
+						definitionDigest: skill.definitionDigest,
 						insert: 'instructions' as SkillInsert,
 						hasArguments: false,
 						hasResources: false,
@@ -129,7 +107,47 @@ export class SkillManagementAPI {
 			})
 		);
 
-		return summaries.toSorted((left, right) => left.displayName.localeCompare(right.displayName));
+		return values.toSorted((left, right) => {
+			const display = left.displayName.localeCompare(right.displayName, undefined, {
+				numeric: true,
+				sensitivity: 'base',
+			});
+
+			return display !== 0 ? display : left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+		});
+	});
+
+	constructor(
+		private readonly store: ISkillStoreAPI,
+		private readonly aggregate: ISkillAggregateAPI,
+		private readonly tools: IToolTargetResolver,
+		private readonly models: ModelManagementAPI
+	) {}
+
+	invalidateComposerSkillsCatalog(): void {
+		this.composerSkillCatalog.invalidate();
+	}
+
+	listComposerSkillCatalog(force = false): Promise<ComposerSkillCatalogItem[]> {
+		return this.composerSkillCatalog.load(force);
+	}
+
+	private async mutate<T>(operation: () => Promise<T>): Promise<T> {
+		const result = await operation();
+		this.invalidateComposerSkillsCatalog();
+		return result;
+	}
+
+	async loadManagementPageData(): Promise<SkillManagementPageData> {
+		const [plugins, skills] = await Promise.all([
+			this.store.listSkillPluginsForManagement(),
+			this.store.listSkillsForManagement(),
+		]);
+
+		return {
+			plugins,
+			skills,
+		};
 	}
 
 	getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string> {
@@ -153,31 +171,31 @@ export class SkillManagementAPI {
 	}
 
 	addSkillPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
-		return this.store.addSkillPluginMember(request);
+		return this.mutate(() => this.store.addSkillPluginMember(request));
 	}
 
 	addSkillPath(request: SkillPathRegistration): Promise<SkillPathRegistrationResult> {
-		return this.store.addSkillPath(request);
+		return this.mutate(() => this.store.addSkillPath(request));
 	}
 
 	attachSkillArtifactToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
-		return this.store.attachSkillArtifactToPlugin(request);
+		return this.mutate(() => this.store.attachSkillArtifactToPlugin(request));
 	}
 
 	createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult> {
-		return this.store.createManagedSkill(request);
+		return this.mutate(() => this.store.createManagedSkill(request));
 	}
 
 	replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult> {
-		return this.store.replaceManagedSkill(request);
+		return this.mutate(() => this.store.replaceManagedSkill(request));
 	}
 
 	createSkillPlugin(request: CreatePluginRequest): Promise<PluginView> {
-		return this.store.createSkillPlugin(request);
+		return this.mutate(() => this.store.createSkillPlugin(request));
 	}
 
 	deleteSkillPlugin(request: DeletePluginRequest): Promise<void> {
-		return this.store.deleteSkillPlugin(request);
+		return this.mutate(() => this.store.deleteSkillPlugin(request));
 	}
 
 	getManagedSkillDocument(skill: ArtifactRef): Promise<StoreManagedSkillDocument> {
@@ -213,19 +231,19 @@ export class SkillManagementAPI {
 	}
 
 	purgeSkill(skill: ArtifactRef, expectedRevision: number): Promise<void> {
-		return this.store.purgeSkill(skill, expectedRevision);
+		return this.mutate(() => this.store.purgeSkill(skill, expectedRevision));
 	}
 
 	refreshSkillSource(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<void> {
-		return this.store.refreshSkillSource(rootID, sourceID);
+		return this.mutate(() => this.store.refreshSkillSource(rootID, sourceID));
 	}
 
 	registerSkillDirectory(request: SkillDirectoryRegistration): Promise<StoreArtifactSourceSummary> {
-		return this.store.registerSkillDirectory(request);
+		return this.mutate(() => this.store.registerSkillDirectory(request));
 	}
 
 	removeSkillPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
-		return this.store.removeSkillPluginMember(request);
+		return this.mutate(() => this.store.removeSkillPluginMember(request));
 	}
 
 	resolveSkillCapabilities(skill: ArtifactRef): Promise<CapabilityPlan> {
@@ -237,15 +255,15 @@ export class SkillManagementAPI {
 	}
 
 	setSkillEnabled(skill: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return this.store.setSkillEnabled(skill, expectedRevision, enabled);
+		return this.mutate(() => this.store.setSkillEnabled(skill, expectedRevision, enabled));
 	}
 
 	setSkillPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
-		return this.store.setSkillPluginEnabled(plugin, expectedRevision, enabled);
+		return this.mutate(() => this.store.setSkillPluginEnabled(plugin, expectedRevision, enabled));
 	}
 
 	updateSkillPlugin(request: UpdatePluginRequest): Promise<PluginView> {
-		return this.store.updateSkillPlugin(request);
+		return this.mutate(() => this.store.updateSkillPlugin(request));
 	}
 
 	resolveToolTarget(target: Parameters<IToolTargetResolver['resolveToolTarget']>[0]): Promise<ResolvedToolView> {

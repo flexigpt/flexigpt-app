@@ -11,13 +11,13 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlay } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import type { SessionWaitingRequest, SessionWaitResolution } from '@/spec/session';
+import type { SessionConfiguration, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session';
 import { RoleEnum } from '@/spec/inference';
-import { SessionWaitStatus } from '@/spec/session';
+import { SessionRunState, SessionWaitStatus } from '@/spec/session';
 import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -591,6 +591,7 @@ export interface ConversationAreaHandle {
 	clearStreamForTab: (tabId: string) => void;
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
 	resetComposerForNewConversation: (tabId: string) => Promise<void>;
+	restoreComposerFromSessionConfiguration: (tabId: string, configuration: SessionConfiguration) => Promise<void>;
 
 	focusInput: (tabId: string) => void;
 	openTemplateMenu: (tabId: string) => void;
@@ -670,6 +671,7 @@ function ConversationAreaInner(
 		flushPendingDrops,
 		syncComposerFromConversation,
 		resetComposerForNewConversation,
+		restoreSessionConfiguration,
 		focusInput,
 		openTemplateMenu,
 		openToolMenu,
@@ -799,6 +801,26 @@ function ConversationAreaInner(
 		[runCommand]
 	);
 
+	const continueActiveRun = useCallback(
+		() =>
+			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.continueRun({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+					}),
+					'Continue Run'
+				);
+			}),
+		[runCommand]
+	);
+
+	const hasStagedContinuation =
+		activeRun?.state === SessionRunState.Waiting &&
+		activeRun.continuation.revision > (activeRun.continuation.consumedRevision ?? 0) &&
+		!(activeRun.waitingRequests ?? []).some(wait => wait.status === SessionWaitStatus.Pending);
+
 	const retrySessionToolCall = useCallback(
 		(callId: string) =>
 			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
@@ -879,6 +901,7 @@ function ConversationAreaInner(
 			clearStreamForTab,
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
+			restoreComposerFromSessionConfiguration: restoreSessionConfiguration,
 			applyWorkflowStarter: applyWorkflowStarterToComposer,
 			focusInput,
 			openTemplateMenu,
@@ -907,6 +930,7 @@ function ConversationAreaInner(
 			requestStopResponse,
 			openTemplateMenu,
 			openToolMenu,
+			restoreSessionConfiguration,
 			resetComposerForNewConversation,
 			resetScrollToTop,
 			setScrollTopForTab,
@@ -1136,6 +1160,21 @@ function ConversationAreaInner(
 
 			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 items-end justify-center overflow-hidden">
 				<div className="max-h-full w-11/12 min-w-0 xl:w-5/6">
+					{hasStagedContinuation ? (
+						<div className="mb-2 flex justify-center">
+							<button
+								type="button"
+								className="btn btn-sm btn-primary rounded-xl"
+								onClick={() => {
+									void continueActiveRun().catch(console.error);
+								}}
+							>
+								<FiPlay size={14} />
+								Continue with staged App context
+							</button>
+						</div>
+					) : null}
+
 					{mountedInputTabs.map(tab => (
 						<TabInputPane
 							key={tab.tabId}
