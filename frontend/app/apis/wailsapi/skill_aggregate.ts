@@ -2,15 +2,23 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type { ArtifactSkillFilter, ArtifactSkillSummary, ResolvedArtifactSkill } from '@/spec/skill';
 
 import type { ISkillAggregateAPI } from '@/apis/interface';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { requiredObject, requireWailsString, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	DescribeArtifactSkill,
+	GetArtifactSkillsPrompt,
 	ListArtifactSkillRefs,
 	ResolveArtifactSkill,
 	ResolveArtifactSkills,
 } from '@/apis/wailsjs/go/main/SkillAggregateWrapper';
 
 export class WailsSkillAggregateAPI implements ISkillAggregateAPI {
+	async getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string> {
+		return requireWailsString(
+			await GetArtifactSkillsPrompt(filter as Parameters<typeof GetArtifactSkillsPrompt>[0]),
+			'GetArtifactSkillsPrompt'
+		);
+	}
+
 	async resolveArtifactSkill(skill: ArtifactRef): Promise<ResolvedArtifactSkill> {
 		return requiredObject<ResolvedArtifactSkill>(
 			await ResolveArtifactSkill(skill as Parameters<typeof ResolveArtifactSkill>[0]),

@@ -4,8 +4,6 @@ import {server} from '../models';
 
 export function CancelMCPServerAuthorization(arg1:server.ServerID):Promise<boolean>;
 
-export function CheckMCPToolCall(arg1:server.ServerID,arg2:server.InvokeMCPToolRequestBody):Promise<server.MCPApprovalEvaluation>;
-
 export function CompleteMCPArgument(arg1:server.ServerID,arg2:server.MCPCompleteArgumentRequestBody):Promise<server.MCPCompletionResult>;
 
 export function ConnectMCPServer(arg1:server.ServerID):Promise<server.MCPServerRuntimeSnapshot>;
@@ -13,8 +11,6 @@ export function ConnectMCPServer(arg1:server.ServerID):Promise<server.MCPServerR
 export function DisconnectMCPServer(arg1:server.ServerID):Promise<void>;
 
 export function GetMCPPrompt(arg1:server.ServerID,arg2:string,arg3:Record<string, string>):Promise<server.MCPGetPromptResponseBody>;
-
-export function InvokeMCPTool(arg1:server.ServerID,arg2:server.InvokeMCPToolRequestBody):Promise<server.InvokeMCPToolResponseBody>;
 
 export function ListMCPServerPrompts(arg1:server.ServerID,arg2:number,arg3:string):Promise<server.MCPPromptPage>;
 
@@ -27,5 +23,3 @@ export function ListMCPServerTools(arg1:server.ServerID,arg2:number,arg3:string)
 export function ReadMCPResource(arg1:server.ServerID,arg2:string):Promise<server.MCPReadResourceResponseBody>;
 
 export function RefreshMCPServer(arg1:server.ServerID):Promise<server.MCPServerRuntimeSnapshot>;
-
-export function ResolveMCPToolApproval(arg1:string,arg2:server.MCPApprovalResolution):Promise<server.MCPApprovalResolutionResult>;

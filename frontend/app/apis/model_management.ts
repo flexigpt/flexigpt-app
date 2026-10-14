@@ -16,6 +16,8 @@ import type {
 	ModelProviderView,
 	ModelView,
 	ProviderAPIKeyStatus,
+	SaveModelSettingsRequest,
+	SaveProviderSettingsRequest,
 	UIModelOption,
 } from '@/spec/model';
 import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
@@ -298,8 +300,44 @@ export class ModelManagementAPI {
 		return this.store.getModel(ref);
 	}
 
+	getProviderAPIKeyStatus(ref: ArtifactRef): Promise<ProviderAPIKeyStatus> {
+		return this.store.getProviderAPIKeyStatus(ref);
+	}
+
 	getDefaultProvider(): Promise<ArtifactRef | undefined> {
 		return this.aggregate.getDefaultProvider();
+	}
+
+	async saveProviderSettings(request: SaveProviderSettingsRequest): Promise<ModelProviderView> {
+		const value = await this.aggregate.saveProviderSettings(request);
+		this.invalidateCatalog();
+		return value;
+	}
+
+	async resetProviderSettings(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		expectedSettingsRevision: number
+	): Promise<ModelProviderView> {
+		const value = await this.aggregate.resetProviderSettings(ref, expectedProviderRevision, expectedSettingsRevision);
+		this.invalidateCatalog();
+		return value;
+	}
+
+	async saveModelSettings(request: SaveModelSettingsRequest): Promise<ModelView> {
+		const value = await this.store.saveModelSettings(request);
+		this.invalidateCatalog();
+		return value;
+	}
+
+	async resetModelSettings(
+		ref: ArtifactRef,
+		expectedModelRevision: number,
+		expectedSettingsRevision: number
+	): Promise<ModelView> {
+		const value = await this.store.resetModelSettings(ref, expectedModelRevision, expectedSettingsRevision);
+		this.invalidateCatalog();
+		return value;
 	}
 
 	async setDefaultProvider(provider?: ArtifactRef): Promise<void> {

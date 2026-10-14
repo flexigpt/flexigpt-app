@@ -12,24 +12,40 @@ import type {
 } from '@/spec/agent';
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
 	CreatePluginRequest,
+	PluginCapabilityPlan,
 	PluginDirectMembership,
 	PluginListItem,
 	PluginView,
+	RemovePluginMemberRequest,
 	UpdatePluginRequest,
 } from '@/spec/plugin';
+import { AgentSkillUseMode } from '@/spec/agent';
+import { CapabilityResolutionStatus } from '@/spec/artifact';
 
 import type { IAgentStoreAPI } from '@/apis/interface';
 import {
 	agentViewFromWails,
 	capabilityTargetFromWails,
+	pluginCapabilityPlanFromWails,
 	pluginDirectMembershipFromWails,
 	pluginListItemFromWails,
 	pluginResultFromWails,
 	pluginViewFromWails,
 } from '@/apis/wailsapi/list_item_projection';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
+	enumFromWails,
+	optionalWailsString,
+	requiredObject,
+	requireWailsBoolean,
+	requireWailsString,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
+import {
+	AddAgentPluginArtifactMember,
+	AddAgentPluginMember,
 	CommitAgentImport,
 	CreateAgentPlugin,
 	DeleteAgentPlugin,
@@ -44,36 +60,71 @@ import {
 	ListAgents,
 	ListAgentsForManagement,
 	PreviewAgentImport,
+	RemoveAgentPluginMember,
 	ResolveAgent,
 	ResolveAgentCapabilities,
+	ResolveAgentPluginCapabilities,
 	SetAgentEnabled,
 	SetAgentPluginEnabled,
 	UpdateAgentPlugin,
 } from '@/apis/wailsjs/go/main/AgentStoreWrapper';
 
 function agentCapabilityPlanFromWails(value: unknown, operation: string): AgentCapabilityPlan {
-	const plan = requiredObject<AgentCapabilityPlan>(value, operation);
+	const plan = requiredObject<Record<string, unknown>>(value, operation);
 
 	return {
-		...plan,
-		occurrences: wailsObjectArrayOrEmpty<AgentCapabilityPlan['occurrences'][number]>(
-			plan.occurrences,
-			`${operation}.occurrences`
-		).map((occurrence, index) => ({
-			...occurrence,
-			target:
-				occurrence.target === null || occurrence.target === undefined
-					? undefined
-					: capabilityTargetFromWails(occurrence.target, `${operation}.occurrences[${index}].target`),
-		})),
+		occurrences: wailsObjectArrayOrEmpty(plan.occurrences, `${operation}.occurrences`).map((rawOccurrence, index) => {
+			const occurrence = requiredObject<Record<string, unknown>>(rawOccurrence, `${operation}.occurrences[${index}]`);
+
+			return {
+				path: requireWailsString(occurrence.path, `${operation}.occurrences[${index}].path`),
+				type: requireWailsString(occurrence.type, `${operation}.occurrences[${index}].type`),
+				name: optionalWailsString(occurrence.name, `${operation}.occurrences[${index}].name`),
+				status: enumFromWails(
+					occurrence.status,
+					{
+						Available: CapabilityResolutionStatus.Available,
+						Unavailable: CapabilityResolutionStatus.Unavailable,
+						Ambiguous: CapabilityResolutionStatus.Ambiguous,
+					} satisfies Record<string, CapabilityResolutionStatus>,
+					`${operation}.occurrences[${index}].status`
+				),
+				required: requireWailsBoolean(occurrence.required, `${operation}.occurrences[${index}].required`),
+				target:
+					occurrence.target === null || occurrence.target === undefined
+						? undefined
+						: capabilityTargetFromWails(occurrence.target, `${operation}.occurrences[${index}].target`),
+				autoExecute:
+					occurrence.autoExecute === null || occurrence.autoExecute === undefined
+						? undefined
+						: requireWailsBoolean(occurrence.autoExecute, `${operation}.occurrences[${index}].autoExecute`),
+				includeSystemPrompt:
+					occurrence.includeSystemPrompt === null || occurrence.includeSystemPrompt === undefined
+						? undefined
+						: requireWailsBoolean(
+								occurrence.includeSystemPrompt,
+								`${operation}.occurrences[${index}].includeSystemPrompt`
+							),
+				skillUseMode:
+					occurrence.skillUseMode === null || occurrence.skillUseMode === undefined
+						? undefined
+						: enumFromWails(
+								occurrence.skillUseMode,
+								AgentSkillUseMode,
+								`${operation}.occurrences[${index}].skillUseMode`
+							),
+				code: optionalWailsString(occurrence.code, `${operation}.occurrences[${index}].code`),
+				message: optionalWailsString(occurrence.message, `${operation}.occurrences[${index}].message`),
+			};
+		}),
+		complete: requireWailsBoolean(plan.complete, `${operation}.complete`),
 	};
 }
 
 function agentResolutionFromWails(value: unknown, operation: string): AgentResolution {
-	const resolution = requiredObject<AgentResolution>(value, operation);
+	const resolution = requiredObject<Record<string, unknown>>(value, operation);
 
 	return {
-		...resolution,
 		agent: agentViewFromWails(resolution.agent, `${operation}.agent`),
 		capabilities: agentCapabilityPlanFromWails(resolution.capabilities, `${operation}.capabilities`),
 	};
@@ -111,6 +162,34 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		return agentViewFromWails(
 			await SetAgentEnabled(agent as Parameters<typeof SetAgentEnabled>[0], expectedRevision, enabled),
 			'SetAgentEnabled'
+		);
+	}
+
+	async addAgentPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AddAgentPluginMember(request as Parameters<typeof AddAgentPluginMember>[0]),
+			'AddAgentPluginMember'
+		);
+	}
+
+	async addAgentPluginArtifactMember(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await AddAgentPluginArtifactMember(request as Parameters<typeof AddAgentPluginArtifactMember>[0]),
+			'AddAgentPluginArtifactMember'
+		);
+	}
+
+	async removeAgentPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
+		return pluginViewFromWails(
+			await RemoveAgentPluginMember(request as Parameters<typeof RemoveAgentPluginMember>[0]),
+			'RemoveAgentPluginMember'
+		);
+	}
+
+	async resolveAgentPluginCapabilities(plugin: ArtifactRef): Promise<PluginCapabilityPlan> {
+		return pluginCapabilityPlanFromWails(
+			await ResolveAgentPluginCapabilities(plugin as Parameters<typeof ResolveAgentPluginCapabilities>[0]),
+			'ResolveAgentPluginCapabilities'
 		);
 	}
 

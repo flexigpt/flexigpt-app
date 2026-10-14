@@ -407,6 +407,8 @@ export interface ResolvedArtifactSkill {
 	Artifact: ArtifactRef;
 	Definition: RuntimeSkillDefinition;
 	Version: string;
+	Revision: number;
+	DefinitionDigest: ArtifactDigest;
 	Enabled: boolean;
 }
 

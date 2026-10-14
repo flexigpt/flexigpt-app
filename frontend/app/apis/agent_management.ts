@@ -1,45 +1,35 @@
 // oxlint-disable typescript/parameter-properties
-import type { AgentCapabilityOccurrence, AgentImportDestination, AgentResolution, AgentView } from '@/spec/agent';
-import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
-import type { MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
-import type { PluginListItem, PluginView } from '@/spec/plugin';
-import type { ArtifactSkillSummary, RuntimeSkillRenderResult, SkillRef } from '@/spec/skill';
-import type { TextMaterialization } from '@/spec/text';
-import type { ToolStoreChoice } from '@/spec/tool';
-import { AgentSkillUseMode } from '@/spec/agent';
-import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
-import { MCPToolExposure } from '@/spec/mcp';
-import { SkillInsert } from '@/spec/skill';
-import { TextInsert } from '@/spec/text';
-import { ToolImplType } from '@/spec/tool';
+import type {
+	AgentCapabilityPlan,
+	AgentExportResult,
+	AgentImportCommitRequest,
+	AgentImportCommitResult,
+	AgentImportDestination,
+	AgentImportPreview,
+	AgentImportPreviewRequest,
+	AgentResolution,
+	AgentView,
+	ListAgentsRequest,
+} from '@/spec/agent';
+import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
+import type {
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
+	CreatePluginRequest,
+	PluginCapabilityPlan,
+	PluginDirectMembership,
+	PluginListItem,
+	PluginView,
+	RemovePluginMemberRequest,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
+import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
-import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IAgentStoreAPI, IToolTargetResolver } from '@/apis/interface';
-import type { ModelManagementAPI } from '@/apis/model_management';
-import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
-
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-
-type AgentStarterIssueSeverity = 'error' | 'warning';
-
-type AgentPlugin = PluginListItem | PluginView;
-
-interface AgentMCPRuntimeResolver {
-	resolveMCPRuntimeServerIDs(artifacts: ArtifactRef[]): Promise<Map<string, MCPRuntimeServerID>>;
-}
-
-interface AgentSkillResolver {
-	describeArtifactSkill(skill: ArtifactRef): Promise<ArtifactSkillSummary>;
-	renderArtifactSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RuntimeSkillRenderResult>;
-}
-
-interface AgentTextResolver {
-	materializeText(text: ArtifactRef): Promise<TextMaterialization>;
-}
+import type { IAgentStoreAPI } from '@/apis/interface';
 
 export interface AgentPluginData {
 	plugin: PluginListItem;
@@ -71,92 +61,12 @@ export interface AgentCatalogOption {
 	availabilityReason?: string;
 }
 
-interface AgentPreparedToolSelection {
-	choice: ToolStoreChoice;
-	requiredSDKType?: string;
-	occurrencePath: string;
-}
-
-export interface AgentPreparedInstructionSource {
-	kind: 'skill' | 'text';
-	artifact: ArtifactRef;
-	displayName: string;
-	text: string;
-	sourceTags?: string[];
-}
-
-interface AgentStarterIssue {
-	severity: AgentStarterIssueSeverity;
-	code: string;
-	message: string;
-	path?: string;
-}
-
-export interface PreparedAgentStarter {
-	agent: AgentView;
-	resolution: AgentResolution;
-
-	modelRef?: ArtifactRef;
-	includeModelSystemPrompt?: boolean;
-
-	toolSelections: AgentPreparedToolSelection[];
-	enabledSkillRefs: SkillRef[];
-	activeSkillRefs: SkillRef[];
-	instructionSkillRefs: SkillRef[];
-	instructionSources: AgentPreparedInstructionSource[];
-	instructionText: string;
-	startingText: string;
-
-	mcpContext?: MCPConversationContext;
-
-	/**
-	 * Text Artifacts materialized while preparing the Agent. Instruction and
-	 * user-message Text is already projected into `instructionText` and
-	 * `startingText`; warning and information Text remains diagnostic-only.
-	 */
-	textArtifacts: ArtifactRef[];
-
-	issues: AgentStarterIssue[];
-	canApply: boolean;
-}
-
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
 }
 
-function capabilityTargetLabel(target: CapabilityTarget): string {
-	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
-		return `${target.name} (${target.artifact.rootID}/${target.artifact.artifactID})`;
-	}
-
-	return `${target.name} (${target.providerIdentity ?? 'unknown'}/${target.providerLocalID ?? 'unknown'})`;
-}
-
-function artifactRefFromTarget(target?: CapabilityTarget): ArtifactRef | undefined {
-	if (target?.form !== CapabilityTargetForm.Artifact) {
-		return undefined;
-	}
-
-	return target.artifact;
-}
-
-function pluginRef(plugin: AgentPlugin): ArtifactRef {
-	if ('ref' in plugin) {
-		return plugin.ref;
-	}
-
-	return {
-		rootID: plugin.artifact.rootID,
-		artifactID: plugin.artifact.id,
-	};
-}
-
-function pluginBuiltIn(plugin: AgentPlugin): boolean {
-	if ('builtIn' in plugin) {
-		return plugin.builtIn;
-	}
-
-	return !plugin.baseline && !plugin.editable && !plugin.deletable;
+function pluginRef(plugin: PluginListItem): ArtifactRef {
+	return plugin.ref;
 }
 
 function comparePlugins(left: PluginListItem, right: PluginListItem): number {
@@ -175,42 +85,14 @@ function comparePlugins(left: PluginListItem, right: PluginListItem): number {
 	return agentPluginKey(left).localeCompare(agentPluginKey(right));
 }
 
-function issue(
-	issues: AgentStarterIssue[],
-	severity: AgentStarterIssueSeverity,
-	code: string,
-	message: string,
-	path?: string
-): void {
-	issues.push({
-		severity,
-		code,
-		message,
-		path,
-	});
-}
+function capabilityTargetArtifactRef(
+	target: PluginDirectMembership['members'][number]['target']
+): ArtifactRef | undefined {
+	if (target?.form !== CapabilityTargetForm.Artifact) {
+		return undefined;
+	}
 
-function isAvailableOccurrence(occurrence: AgentCapabilityOccurrence): boolean {
-	return occurrence.status === CapabilityResolutionStatus.Available;
-}
-
-function availabilityIssueForOccurrence(occurrence: AgentCapabilityOccurrence): AgentStarterIssue {
-	return {
-		severity: occurrence.required ? 'error' : 'warning',
-		code: occurrence.code || `agent.recipe.${occurrence.status}`,
-		message:
-			occurrence.message ||
-			`${occurrence.type}${occurrence.name ? ` "${occurrence.name}"` : ''} is ${occurrence.status}.`,
-		path: occurrence.path,
-	};
-}
-
-function skillUseMode(occurrence: AgentCapabilityOccurrence): AgentSkillUseMode {
-	return occurrence.skillUseMode ?? AgentSkillUseMode.Available;
-}
-
-function toolAutoExecute(occurrence: AgentCapabilityOccurrence, fallback: boolean): boolean {
-	return occurrence.autoExecute ?? fallback;
+	return target.artifact;
 }
 
 export function agentArtifactRefKey(ref: ArtifactRef): string {
@@ -221,7 +103,7 @@ export function agentArtifactRef(agent: AgentView): ArtifactRef {
 	return agent.ref;
 }
 
-export function agentPluginKey(plugin: AgentPlugin): string {
+export function agentPluginKey(plugin: PluginListItem): string {
 	return artifactRefKey(pluginRef(plugin));
 }
 
@@ -229,49 +111,55 @@ export function agentDisplayName(agent: AgentView): string {
 	return agent.displayName || agent.name;
 }
 
-export function pluginDisplayName(plugin: Pick<AgentPlugin, 'displayName' | 'name'>): string {
+export function pluginDisplayName(plugin: Pick<PluginListItem, 'displayName' | 'name'>): string {
 	return plugin.displayName || plugin.name;
 }
 
-export function isBuiltInAgentPlugin(plugin: AgentPlugin): boolean {
-	return pluginBuiltIn(plugin);
+export function isBuiltInAgentPlugin(plugin: PluginListItem): boolean {
+	return plugin.builtIn;
 }
 
-export function canEditAgentPluginMetadata(plugin: AgentPlugin): boolean {
+export function canEditAgentPluginMetadata(plugin: PluginListItem): boolean {
 	return plugin.editable && !plugin.baseline;
 }
 
-export function canDeleteAgentPlugin(plugin: AgentPlugin): boolean {
+export function canDeleteAgentPlugin(plugin: PluginListItem): boolean {
 	return plugin.deletable && !plugin.baseline;
 }
 
+/**
+ * Frontend management façade for Agent artifacts and Agent Plugins.
+ *
+ * Session execution does not use this façade as authority. Session runtime
+ * setup independently resolves Agent selections from backend-owned artifact
+ * state when preparing a model operation.
+ */
 export class AgentManagementAPI {
 	private readonly pluginAgentLoads = new Map<string, Promise<AgentView[]>>();
 
-	private readonly composerAgentCatalog = createSharedAsyncCatalog<AgentView[]>(async () => {
+	private readonly agentCatalog = createSharedAsyncCatalog<AgentView[]>(async () => {
 		return (await this.agents.listAgentsForManagement()) ?? [];
 	});
 
-	constructor(
-		private readonly agents: IAgentStoreAPI,
-		private readonly tools: IToolTargetResolver,
-		private readonly models: ModelManagementAPI,
-		private readonly mcp: AgentMCPRuntimeResolver,
-		private readonly skills: AgentSkillResolver,
-		private readonly texts: AgentTextResolver
-	) {}
+	constructor(private readonly agents: IAgentStoreAPI) {}
+
+	private async mutate<T>(operation: () => Promise<T>): Promise<T> {
+		const result = await operation();
+		this.invalidateAgentCatalog();
+		return result;
+	}
 
 	invalidateAgentCatalog(): void {
 		this.pluginAgentLoads.clear();
-		this.composerAgentCatalog.invalidate();
+		this.agentCatalog.invalidate();
 	}
 
 	async preloadAgentCatalog(force = false): Promise<void> {
-		await this.composerAgentCatalog.load(force);
+		await this.agentCatalog.load(force);
 	}
 
 	listAgentCatalogOptions(force = false): Promise<AgentCatalogOption[]> {
-		return this.composerAgentCatalog.load(force).then(agents => this.projectAgentCatalogOptions(agents));
+		return this.agentCatalog.load(force).then(agents => this.projectAgentCatalogOptions(agents));
 	}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
@@ -295,8 +183,12 @@ export class AgentManagementAPI {
 			const hydrated = await Promise.all(
 				missingDestinationPlugins.map(async destination => {
 					const plugin = await this.agents.getAgentPlugin(destination.plugin);
+
 					return {
-						ref: pluginRef(plugin),
+						ref: {
+							rootID: plugin.artifact.rootID,
+							artifactID: plugin.artifact.id,
+						},
 						sourceID: plugin.artifact.binding.sourceID,
 						name: plugin.name,
 						displayName: plugin.displayName,
@@ -354,12 +246,6 @@ export class AgentManagementAPI {
 		};
 	}
 
-	/**
-	 * Plugin-filtered `ListAgents` cannot include built-ins from another
-	 * Root. Resolve the Plugin membership graph and join its ArtifactRefs
-	 * against the shared management catalog instead. This retains direct
-	 * cross-Root built-in memberships without issuing one `GetAgent` per row.
-	 */
 	async loadPluginAgents(
 		plugin: PluginListItem,
 		signal: AbortSignal
@@ -368,22 +254,19 @@ export class AgentManagementAPI {
 		let load = this.pluginAgentLoads.get(key);
 
 		if (!load) {
-			load = Promise.all([this.agents.listAgentPluginMembers(plugin.ref), this.composerAgentCatalog.load(false)]).then(
+			load = Promise.all([this.agents.listAgentPluginMembers(plugin.ref), this.agentCatalog.load(false)]).then(
 				([membership, catalog]) => {
 					const selectedRefs = new Set<string>();
 
 					for (const member of membership.members) {
-						if (member.entry.type !== 'agent') {
-							continue;
+						const direct = capabilityTargetArtifactRef(member.target);
+						if (member.entry.type === 'agent' && direct) {
+							selectedRefs.add(artifactRefKey(direct));
 						}
 
-						const ref = artifactRefFromTarget(member.target);
-						if (ref) {
-							selectedRefs.add(artifactRefKey(ref));
-						}
-						for (const match of member.selectorMatches ?? []) {
-							const selected = artifactRefFromTarget(match.target);
-							if (selected) {
+						for (const selectorMatch of member.selectorMatches ?? []) {
+							const selected = capabilityTargetArtifactRef(selectorMatch.target);
+							if (member.entry.type === 'agent' && selected) {
 								selectedRefs.add(artifactRefKey(selected));
 							}
 						}
@@ -433,396 +316,92 @@ export class AgentManagementAPI {
 		}
 	}
 
-	async prepareAgentStarter(agentRef: ArtifactRef): Promise<PreparedAgentStarter> {
-		return this.prepareAgentStarterFromResolution(await this.agents.resolveAgent(agentRef));
+	listAgents(request: ListAgentsRequest): Promise<AgentView[]> {
+		return this.agents.listAgents(request);
 	}
 
-	async prepareAgentStarterFromResolution(resolution: AgentResolution): Promise<PreparedAgentStarter> {
-		const issues: AgentStarterIssue[] = [];
-		const toolSelections = new Map<string, AgentPreparedToolSelection>();
-		const enabledSkillRefs = new Map<string, SkillRef>();
-		const activeSkillRefs = new Map<string, SkillRef>();
-		const instructionSkillRefs = new Map<string, SkillRef>();
-		const instructionSources = new Map<string, AgentPreparedInstructionSource>();
-		const textArtifacts = new Map<string, ArtifactRef>();
-		const mcpServerIDs = new Set<MCPRuntimeServerID>();
-		const mcpArtifactRefs: ArtifactRef[] = [];
-		const startingTextParts: string[] = [];
+	getAgent(agent: ArtifactRef): Promise<AgentView> {
+		return this.agents.getAgent(agent);
+	}
 
-		let modelRef: ArtifactRef | undefined;
-		let includeModelSystemPrompt: boolean | undefined;
+	resolveAgent(agent: ArtifactRef): Promise<AgentResolution> {
+		return this.agents.resolveAgent(agent);
+	}
 
-		for (const occurrence of resolution.capabilities.occurrences ?? []) {
-			if (!isAvailableOccurrence(occurrence)) {
-				issues.push(availabilityIssueForOccurrence(occurrence));
-				continue;
-			}
+	resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan> {
+		return this.agents.resolveAgentCapabilities(agent);
+	}
 
-			switch (occurrence.type) {
-				case 'model': {
-					if (!occurrence.target) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.model-target-missing',
-							'Resolved Agent Model is missing its capability target.',
-							occurrence.path
-						);
-						continue;
-					}
+	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView> {
+		return this.mutate(() => this.agents.setAgentEnabled(agent, expectedRevision, enabled));
+	}
 
-					try {
-						const resolvedModel = await this.models.resolveMappedModelTarget(occurrence.target);
-						const includeOverride = occurrence.includeSystemPrompt;
-						const resolvedRef = resolvedModel.list.ref;
+	addAgentPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
+		return this.mutate(() => this.agents.addAgentPluginMember(request));
+	}
 
-						if (modelRef && artifactRefKey(modelRef) !== artifactRefKey(resolvedRef)) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.multiple-models',
-								'An Agent starter recipe must resolve to exactly one model.',
-								occurrence.path
-							);
-							continue;
-						}
+	addAgentPluginArtifactMember(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
+		return this.mutate(() => this.agents.addAgentPluginArtifactMember(request));
+	}
 
-						if (
-							includeModelSystemPrompt !== undefined &&
-							includeOverride !== undefined &&
-							includeModelSystemPrompt !== includeOverride
-						) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.conflicting-model-system-prompt-overrides',
-								'Multiple Agent Model relationships provide conflicting includeSystemPrompt overrides.',
-								occurrence.path
-							);
-							continue;
-						}
+	removeAgentPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
+		return this.mutate(() => this.agents.removeAgentPluginMember(request));
+	}
 
-						modelRef = resolvedRef;
-						includeModelSystemPrompt = includeOverride ?? includeModelSystemPrompt;
-					} catch (error) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.model-mapping-failed',
-							`Could not resolve Model target "${capabilityTargetLabel(occurrence.target)}": ${
-								error instanceof Error ? error.message : 'unknown error'
-							}`,
-							occurrence.path
-						);
-					}
-					break;
-				}
+	resolveAgentPluginCapabilities(plugin: ArtifactRef): Promise<PluginCapabilityPlan> {
+		return this.agents.resolveAgentPluginCapabilities(plugin);
+	}
 
-				case 'tool': {
-					if (!occurrence.target) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.tool-target-missing',
-							'Resolved Agent Tool is missing its capability target.',
-							occurrence.path
-						);
-						continue;
-					}
+	listAgentPluginMembers(plugin: ArtifactRef): Promise<PluginDirectMembership> {
+		return this.agents.listAgentPluginMembers(plugin);
+	}
 
-					try {
-						const resolved = await this.tools.resolveToolTarget(occurrence.target);
-						const tool = resolved.tool;
-						const implementation = tool.implementation;
-						const requiredSDKType =
-							implementation.kind === ToolImplType.SDK ? implementation.sdkType?.trim() || undefined : undefined;
+	createAgentPlugin(request: CreatePluginRequest): Promise<PluginView> {
+		return this.mutate(() => this.agents.createAgentPlugin(request));
+	}
 
-						if (implementation.kind === ToolImplType.SDK && !requiredSDKType) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.tool-sdk-metadata-missing',
-								`Tool "${tool.displayName || tool.name}" is missing SDK compatibility metadata.`,
-								occurrence.path
-							);
-							continue;
-						}
+	getAgentPlugin(plugin: ArtifactRef): Promise<PluginView> {
+		return this.agents.getAgentPlugin(plugin);
+	}
 
-						const choice = toolStoreChoiceFromSelection(
-							{
-								choiceID: getUUIDv7(),
-								target: occurrence.target,
-								autoExecute: toolAutoExecute(occurrence, tool.autoExecute),
-							},
-							resolved
-						);
-						const key = toolIdentityKey(choice.target);
-						const existing = toolSelections.get(key);
+	listAgentPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]> {
+		return this.agents.listAgentPlugins(rootID);
+	}
 
-						if (
-							existing &&
-							(existing.choice.autoExecute !== choice.autoExecute || existing.requiredSDKType !== requiredSDKType)
-						) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.conflicting-tool-overrides',
-								`Tool "${tool.displayName || tool.name}" occurs with conflicting Agent relationship behavior.`,
-								occurrence.path
-							);
-							continue;
-						}
+	listAgentPluginsForManagement(): Promise<PluginListItem[]> {
+		return this.agents.listAgentPluginsForManagement();
+	}
 
-						toolSelections.set(key, {
-							choice,
-							requiredSDKType,
-							occurrencePath: occurrence.path,
-						});
-					} catch (error) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.tool-mapping-failed',
-							`Could not resolve Tool target "${capabilityTargetLabel(occurrence.target)}": ${
-								error instanceof Error ? error.message : 'unknown error'
-							}`,
-							occurrence.path
-						);
-					}
-					break;
-				}
+	updateAgentPlugin(request: UpdatePluginRequest): Promise<PluginView> {
+		return this.mutate(() => this.agents.updateAgentPlugin(request));
+	}
 
-				case 'skill': {
-					const skillRef = artifactRefFromTarget(occurrence.target);
-					if (!skillRef) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.skill-artifact-missing',
-							'Resolved Agent Skill does not have an ArtifactRef.',
-							occurrence.path
-						);
-						continue;
-					}
+	setAgentPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
+		return this.mutate(() => this.agents.setAgentPluginEnabled(plugin, expectedRevision, enabled));
+	}
 
-					const key = artifactRefKey(skillRef);
-					const useMode = skillUseMode(occurrence);
+	deleteAgentPlugin(plugin: ArtifactRef, expectedRevision: number): Promise<void> {
+		return this.mutate(() => this.agents.deleteAgentPlugin(plugin, expectedRevision));
+	}
 
-					try {
-						const summary = await this.skills.describeArtifactSkill(skillRef);
-						const ins = summary.Insert.toString();
+	listAgentImportDestinations(): Promise<AgentImportDestination[]> {
+		return this.agents.listAgentImportDestinations();
+	}
 
-						// User-message Skills are Template UI entries. They must
-						// never be rendered into the system prompt or added to a
-						// Skill Runtime session merely because an Agent references
-						// them.
-						if (summary.Insert === SkillInsert.UserMessage) {
-							if (useMode !== AgentSkillUseMode.Available) {
-								issue(
-									issues,
-									'warning',
-									'agent.recipe.user-message-skill-session-mode-ignored',
-									`User-message Skill "${occurrence.name || skillRef.artifactID}" remains a Template UI entry; use.mode "${useMode}" does not create a Skill-session or system-prompt capability.`,
-									occurrence.path
-								);
-							}
-							continue;
-						}
+	previewAgentImport(request: AgentImportPreviewRequest): Promise<AgentImportPreview> {
+		return this.agents.previewAgentImport(request);
+	}
 
-						if (summary.Insert !== SkillInsert.Instructions) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.skill-insert-unsupported',
-								`Skill "${occurrence.name || skillRef.artifactID}" has unsupported insert target "${ins}".`,
-								occurrence.path
-							);
-							continue;
-						}
+	commitAgentImport(request: AgentImportCommitRequest): Promise<AgentImportCommitResult> {
+		return this.mutate(() => this.agents.commitAgentImport(request));
+	}
 
-						switch (useMode) {
-							case AgentSkillUseMode.Instructions: {
-								instructionSkillRefs.set(key, skillRef);
+	exportAgent(agent: ArtifactRef): Promise<AgentExportResult> {
+		return this.agents.exportAgent(agent);
+	}
 
-								const rendered = await this.skills.renderArtifactSkill(skillRef);
-
-								if (rendered.insert !== SkillInsert.Instructions) {
-									issue(
-										issues,
-										'error',
-										'agent.recipe.skill-instruction-render-mismatch',
-										`Skill "${rendered.displayName || rendered.name}" did not render as instructions.`,
-										occurrence.path
-									);
-									continue;
-								}
-
-								if (rendered.text.trim()) {
-									instructionSources.set(`skill:${key}`, {
-										kind: 'skill',
-										artifact: skillRef,
-										displayName: rendered.displayName || rendered.name || occurrence.name || skillRef.artifactID,
-										text: rendered.text.trim(),
-										sourceTags: rendered.tags,
-									});
-								}
-								break;
-							}
-
-							case AgentSkillUseMode.Active:
-								enabledSkillRefs.set(key, skillRef);
-								activeSkillRefs.set(key, skillRef);
-								break;
-
-							case AgentSkillUseMode.Available:
-								enabledSkillRefs.set(key, skillRef);
-								break;
-						}
-					} catch (error) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.skill-inspection-failed',
-							`Could not inspect Agent Skill: ${error instanceof Error ? error.message : 'unknown error'}`,
-							occurrence.path
-						);
-					}
-					break;
-				}
-
-				case 'mcp': {
-					const serverRef = artifactRefFromTarget(occurrence.target);
-					if (!serverRef) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.mcp-artifact-missing',
-							'Resolved Agent MCP does not have an ArtifactRef.',
-							occurrence.path
-						);
-						continue;
-					}
-					mcpArtifactRefs.push(serverRef);
-					break;
-				}
-
-				case 'text': {
-					const textRef = artifactRefFromTarget(occurrence.target);
-					if (!textRef) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.text-artifact-missing',
-							'Resolved Agent Text does not have an ArtifactRef.',
-							occurrence.path
-						);
-						continue;
-					}
-
-					const key = artifactRefKey(textRef);
-					if (textArtifacts.has(key)) {
-						continue;
-					}
-
-					try {
-						const text = await this.texts.materializeText(textRef);
-						textArtifacts.set(key, text.artifact);
-
-						switch (text.insert) {
-							case TextInsert.Instructions:
-								if (text.content.trim()) {
-									instructionSources.set(`text:${key}`, {
-										kind: 'text',
-										artifact: text.artifact,
-										displayName: text.name || occurrence.name || 'Agent instructions',
-										text: text.content.trim(),
-									});
-								}
-								break;
-
-							case TextInsert.UserMessage:
-								if (text.content.trim()) {
-									startingTextParts.push(text.content.trim());
-								}
-								break;
-						}
-					} catch (error) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.text-materialization-failed',
-							`Could not materialize Agent Text: ${error instanceof Error ? error.message : 'unknown error'}`,
-							occurrence.path
-						);
-					}
-					break;
-				}
-
-				case 'mcp.policy':
-				case 'plugin':
-				case 'agent':
-					break;
-
-				default:
-					issue(
-						issues,
-						'warning',
-						'agent.recipe.unsupported-occurrence',
-						`Agent declaration type "${occurrence.type}" does not currently contribute to Composer state.`,
-						occurrence.path
-					);
-			}
-		}
-
-		if (mcpArtifactRefs.length > 0) {
-			try {
-				const resolved = await this.mcp.resolveMCPRuntimeServerIDs(mcpArtifactRefs);
-				for (const runtimeServerID of resolved.values()) {
-					mcpServerIDs.add(runtimeServerID);
-				}
-			} catch (error) {
-				issue(
-					issues,
-					'error',
-					'agent.recipe.mcp-runtime-id-failed',
-					`Could not load MCP runtime identities: ${error instanceof Error ? error.message : 'unknown error'}`
-				);
-			}
-		}
-
-		const mcpContext: MCPConversationContext | undefined =
-			mcpServerIDs.size === 0
-				? undefined
-				: {
-						servers: [...mcpServerIDs].map(server => ({
-							server,
-							toolExposure: MCPToolExposure.All,
-							includeServerInstructions: true,
-						})),
-					};
-
-		const preparedInstructionSources = [...instructionSources.values()];
-
-		return {
-			agent: resolution.agent,
-			resolution,
-			modelRef,
-			includeModelSystemPrompt,
-			toolSelections: [...toolSelections.values()],
-			enabledSkillRefs: [...enabledSkillRefs.values()],
-			activeSkillRefs: [...activeSkillRefs.values()],
-			instructionSkillRefs: [...instructionSkillRefs.values()],
-			instructionSources: preparedInstructionSources,
-			instructionText: preparedInstructionSources
-				.map(source => source.text)
-				.join('\n\n')
-				.trim(),
-			startingText: startingTextParts.join('\n\n').trim(),
-			mcpContext,
-			textArtifacts: [...textArtifacts.values()],
-			issues,
-			canApply: !issues.some(value => value.severity === 'error'),
-		};
+	deleteManagedAgent(agent: ArtifactRef, expectedRevision: number): Promise<void> {
+		return this.mutate(() => this.agents.deleteManagedAgent(agent, expectedRevision));
 	}
 
 	private projectAgentCatalogOptions(agents: AgentView[]): AgentCatalogOption[] {

@@ -466,6 +466,7 @@ export interface MCPApprovalEvaluation {
 	decision: MCPApprovalDecision;
 	reason?: string;
 	approvalID?: string;
+	expiresAt?: MCPTimestamp;
 	summary?: MCPApprovalSummary;
 }
 

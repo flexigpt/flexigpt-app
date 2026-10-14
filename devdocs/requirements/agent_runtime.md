@@ -1370,10 +1370,38 @@ Composer does not:
 
 ## Status
 
+### Frontend transport and management-facade delivery
+
+- [x] Wails transport contracts now match the actual exported Go wrapper
+      methods rather than stale direct-completion, Tool-runtime, Skill-runtime,
+      or MCP-invocation assumptions.
+- [x] Generated Wails bindings remain untouched.
+- [x] Agent Plugin mutation and capability-resolution methods are available
+      through the typed frontend transport and Agent management façade.
+- [x] Model, Tool, Skill, MCP, Workspace, Agent, and Session management
+      façades are the frontend application boundary for supported backend APIs.
+- [x] Session snapshot observation uses flat observation records and enum
+      discriminants rather than frontend-only union contracts.
+- [x] Session and Run observation contracts are shared frontend Session-spec
+      records rather than façade-local types.
+- [x] `observeRun` maps Session deletion and observer-failure notifications to
+      Run-scoped observations with explicit Session and Run identities.
+- [x] Session Wails transport preserves Wails-decoded JSON values and validates
+      only transport envelope fields and runtime-event enum values.
+- [ ] Chat components, old completion helpers, direct Tool execution,
+      direct MCP invocation, direct Skill-session calls, and legacy
+      conversation persistence remain to be migrated to Session commands,
+      snapshots, and runtime events.
+
 ### Backend Session-owned execution delivery
 
 - [x] Session configuration uses typed Agent, Workspace, Model, Tool, Skill,
       MCP, instruction, model-default, and App-context intent.
+- [x] Provider updates remain behind Model Aggregate provider-lifecycle
+      publication and are not reintroduced as frontend completion APIs.
+- [x] MCP invocation, Skill-session lifecycle, Go Tool invocation, and
+      provider completion remain absent from management facades; accepted
+      Session Runtime commands remain their only chat execution entry point.
 - [x] Session configuration uses canonical identity keys instead of list order,
       display labels, or frontend object identity.
 - [x] Agent and Workspace are independently resolved in backend runtime setup.
@@ -1450,7 +1478,7 @@ Frontend migration remains separately tracked.
 | Runtime setup package                     | Delivered                                     |
 | Prepared model-operation pipeline         | Delivered                                     |
 | Durable resolution summary and provenance | Delivered                                     |
-| Frontend Session client                   | Pending                                       |
+| Frontend Session client transport/facade  | Delivered; chat consumers pending             |
 | Frontend owner and override presentation  | Pending                                       |
 | Session-scoped MCP App routing            | Delivered                                     |
 | Breaking SessionStore schema              | Delivered                                     |
@@ -1470,7 +1498,12 @@ Frontend migration remains separately tracked.
 - [x] Focused launcher and Session panic-settlement tests delivered.
 - [x] Authoritative runtime setup, typed intent, immutable preparation, and thin inference complete.
 - [x] Breaking SessionStore schema, Wails execution removal, and Session-scoped MCP App routing complete.
-- [ ] Frontend Session command/snapshot/event migration complete.
+- [x] Frontend Session Wails transport, typed command/query contracts, and
+      snapshot observation façade delivered.
+- [ ] Frontend chat command/snapshot/event migration remains pending. The
+      remaining legacy chat source still targets intentionally removed direct
+      completion, Tool, MCP, Skill-session, and conversation-store APIs and
+      must be replaced through the tab-controller Session ownership layer.
 
 ### Backend inference and persistence delivery
 
@@ -1487,7 +1520,7 @@ Frontend migration remains separately tracked.
 - [x] Immutable operation preparation and initial-admission integration complete.
 - [x] Application/Wails assembly and legacy execution removal complete.
 - [x] Session-scoped MCP App routing complete.
-- [ ] Frontend Session migration complete.
+- [ ] Frontend chat and management-UI migration complete.
 
 ### Backend runtime-setup delivery
 

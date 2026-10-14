@@ -9,17 +9,15 @@ import type {
 	ToolStoreListItem,
 	ToolView,
 } from '@/spec/tool';
-import type { InvokeToolResponse } from '@/spec/toolruntime';
 import { ArtifactState } from '@/spec/artifact';
 import { ToolImplType, ToolStoreChoiceType, toolStoreListItemFromView } from '@/spec/tool';
 
-import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IToolRuntimeAPI, IToolStoreAPI } from '@/apis/interface';
+import type { IToolStoreAPI } from '@/apis/interface';
 
 export interface ToolPluginData {
 	plugin: PluginListItem;
@@ -28,8 +26,6 @@ export interface ToolPluginData {
 	isLoadingTools: boolean;
 	toolLoadError?: string;
 }
-
-type ToolPlugin = PluginListItem | PluginView;
 
 export function toolArtifactRef(tool: ToolView | ToolStoreListItem): ArtifactRef {
 	if ('ref' in tool) {
@@ -42,7 +38,7 @@ export function toolArtifactRef(tool: ToolView | ToolStoreListItem): ArtifactRef
 	};
 }
 
-export function toolPluginRef(plugin: ToolPlugin): ArtifactRef {
+export function toolPluginRef(plugin: PluginListItem | PluginView): ArtifactRef {
 	if ('ref' in plugin) {
 		return plugin.ref;
 	}
@@ -111,11 +107,14 @@ export function toolChoiceFromListItem(
 	};
 }
 
+/**
+ * Management and selection façade for Artifact-backed Tools.
+ *
+ * It deliberately exposes no direct invocation method. Session Runtime owns
+ * accepted tool execution and routes prepared Go, MCP, and Skill bindings.
+ */
 export class ToolManagementAPI {
-	constructor(
-		private readonly store: IToolStoreAPI,
-		private readonly runtime: IToolRuntimeAPI
-	) {}
+	constructor(private readonly store: IToolStoreAPI) {}
 
 	private readonly composerSelectableToolsCatalog = createSharedAsyncCatalog<ToolListItem[]>(() =>
 		this.listSelectableToolsUncached()
@@ -190,16 +189,40 @@ export class ToolManagementAPI {
 		}
 	}
 
-	/**
-	 * Shared static catalog used by all mounted composer tabs.
-	 * Runtime invocation and target resolution remain uncached.
-	 */
 	listComposerSelectableTools(force = false): Promise<ToolListItem[]> {
 		return this.composerSelectableToolsCatalog.load(force);
 	}
 
 	invalidateComposerSelectableTools(): void {
 		this.composerSelectableToolsCatalog.invalidate();
+	}
+
+	listSelectableTools(signal?: AbortSignal): Promise<ToolListItem[]> {
+		return this.listSelectableToolsUncached(signal);
+	}
+
+	mapToolTarget(tool: ArtifactRef): Promise<CapabilityTarget> {
+		return this.store.mapToolTarget(tool);
+	}
+
+	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView> {
+		return this.store.resolveToolTarget(target);
+	}
+
+	async getToolTarget(target: CapabilityTarget): Promise<ToolView> {
+		return (await this.store.resolveToolTarget(target)).tool;
+	}
+
+	async hydrateToolSelection(selection: ToolSelection): Promise<ToolStoreChoice> {
+		return toolStoreChoiceFromSelection(selection, await this.store.resolveToolTarget(selection.target));
+	}
+
+	hydrateToolSelections(selections: ToolSelection[]): Promise<ToolStoreChoice[]> {
+		return mapWithConcurrency(selections, 4, selection => this.hydrateToolSelection(selection));
+	}
+
+	toolListItemFromView(tool: ToolView): ToolStoreListItem {
+		return toolStoreListItemFromView(tool);
 	}
 
 	private async listSelectableToolsUncached(signal?: AbortSignal): Promise<ToolListItem[]> {
@@ -244,46 +267,7 @@ export class ToolManagementAPI {
 		if (signal) {
 			throwIfAborted(signal);
 		}
+
 		return items;
-	}
-
-	listSelectableTools(signal?: AbortSignal): Promise<ToolListItem[]> {
-		return this.listSelectableToolsUncached(signal);
-	}
-
-	mapToolTarget(tool: ArtifactRef): Promise<CapabilityTarget> {
-		return this.store.mapToolTarget(tool);
-	}
-
-	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView> {
-		return this.store.resolveToolTarget(target);
-	}
-
-	async getToolTarget(target: CapabilityTarget): Promise<ToolView> {
-		return (await this.store.resolveToolTarget(target)).tool;
-	}
-
-	async hydrateToolSelection(selection: ToolSelection): Promise<ToolStoreChoice> {
-		return toolStoreChoiceFromSelection(selection, await this.store.resolveToolTarget(selection.target));
-	}
-
-	hydrateToolSelections(selections: ToolSelection[]): Promise<ToolStoreChoice[]> {
-		return mapWithConcurrency(selections, 4, selection => this.hydrateToolSelection(selection));
-	}
-
-	invokeGoToolTarget(target: CapabilityTarget, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse> {
-		return this.store.invokeGoToolTarget(target, args, timeoutMS);
-	}
-
-	/**
-	 * Explicit low-level runtime access. Normal Artifact-backed Tool execution
-	 * should use invokeGoToolTarget so Tool and Plugin enablement are checked.
-	 */
-	invokeGoTool(functionName: string, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse> {
-		return this.runtime.invokeTool(functionName, args, timeoutMS);
-	}
-
-	toolListItemFromView(tool: ToolView): ToolStoreListItem {
-		return toolStoreListItemFromView(tool);
 	}
 }

@@ -27,22 +27,16 @@ import type {
 	PathAttachmentsResult,
 } from '@/spec/attachment';
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody } from '@/spec/inference';
 import type {
-	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
 	ManagedMCPCreateResult,
 	ManagedMCPPolicyUpsertRequest,
 	ManagedMCPPolicyUpsertResult,
 	ManagedMCPReplaceRequest,
 	ManagedMCPReplaceResult,
-	MCPApprovalEvaluation,
-	MCPApprovalResolution,
-	MCPApprovalResolutionResult,
 	MCPAuthSettings,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
-	MCPConversationContext,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
 	MCPPluginPage,
@@ -52,7 +46,6 @@ import type {
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
@@ -74,7 +67,6 @@ import type {
 	ModelListItem,
 	ModelProviderListItem,
 	ModelProviderView,
-	ModelRequestPatch,
 	ModelView,
 	ProviderAPIKeyStatus,
 	SaveModelSettingsRequest,
@@ -94,23 +86,57 @@ import type {
 	RemovePluginMemberRequest,
 	UpdatePluginRequest,
 } from '@/spec/plugin';
+import type {
+	CancelRunCommand,
+	CompleteCallAsErrorCommand,
+	ContinueRunCommand,
+	CreateSessionCommand,
+	DeleteSessionCommand,
+	EditAndResendCommand,
+	ExecuteAppToolCommand,
+	ExecuteCallsCommand,
+	OpenAppViewCommand,
+	PauseRunCommand,
+	ReadAppResourceRequest,
+	RenameSessionCommand,
+	ResolveWaitCommand,
+	ResumeRunCommand,
+	RetryCallCommand,
+	RunID,
+	Session,
+	SessionAppResourceReadResult,
+	SessionCommandReceipt,
+	SessionID,
+	SessionRunObserver,
+	SessionRunSnapshot,
+	SessionRuntimeEvent,
+	SessionRuntimeListItem,
+	SessionSnapshot,
+	SessionSnapshotObserver,
+	SetAutomationHoldCommand,
+	SkipCallCommand,
+	StageAppContextCommand,
+	StartRunCommand,
+	UpdateContinuationInputCommand,
+	UpdateSessionConfigurationCommand,
+} from '@/spec/session';
+import type {
+	SessionStoreConversationProjection,
+	SessionStoreListSessionRunsRequest,
+	SessionStoreListSessionsRequest,
+	SessionStoreRunListItem,
+	SessionStoreSearchSessionsRequest,
+	SessionStoreSessionPage,
+} from '@/spec/sessionstore';
 import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	ArtifactSkillFilter,
 	ArtifactSkillSummary,
-	InvokeSkillToolResponse,
 	ManagedSkillCreateRequest,
 	ManagedSkillCreateResult,
 	ManagedSkillReplaceRequest,
 	ManagedSkillReplaceResult,
 	ResolvedArtifactSkill,
-	RuntimeSkillDefinition,
-	RuntimeSkillListFilter,
-	RuntimeSkillPromptFilter,
-	RuntimeSkillRecord,
-	RuntimeSkillRenderResult,
-	RuntimeSkillSession,
-	RuntimeSkillSessionOptions,
 	SkillDirectoryRegistration,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
@@ -118,8 +144,7 @@ import type {
 	StoreSkillListItem,
 } from '@/spec/skill';
 import type { TextMaterialization } from '@/spec/text';
-import type { ResolvedToolView, ToolSelection, ToolStoreListItem, ToolView } from '@/spec/tool';
-import type { InvokeToolResponse } from '@/spec/toolruntime';
+import type { ResolvedToolView, ToolStoreListItem, ToolView } from '@/spec/tool';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
 	WorkspaceArtifactView,
@@ -134,8 +159,6 @@ import type {
 	WorkspaceRuntimeSelection,
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
-
-import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 export interface ILogger {
 	log(...args: unknown[]): void;
@@ -171,6 +194,56 @@ export interface ISettingStoreAPI {
 	setAppTheme: (theme: AppTheme) => Promise<void>;
 	setDebugSettings: (settings: DebugSettings) => Promise<void>;
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
+}
+
+export interface ISessionRuntimeAPI {
+	subscribeRuntimeEvents(listener: (event: SessionRuntimeEvent) => void): () => void;
+
+	openAppView(command: OpenAppViewCommand): Promise<SessionCommandReceipt>;
+	executeAppTool(command: ExecuteAppToolCommand): Promise<SessionCommandReceipt>;
+	stageAppContext(command: StageAppContextCommand): Promise<SessionCommandReceipt>;
+	readAppResource(request: ReadAppResourceRequest): Promise<SessionAppResourceReadResult>;
+
+	createSession(command: CreateSessionCommand): Promise<SessionCommandReceipt>;
+	updateSessionConfiguration(command: UpdateSessionConfigurationCommand): Promise<SessionCommandReceipt>;
+	renameSession(command: RenameSessionCommand): Promise<SessionCommandReceipt>;
+	deleteSession(command: DeleteSessionCommand): Promise<SessionCommandReceipt>;
+
+	startRun(command: StartRunCommand): Promise<SessionCommandReceipt>;
+	updateContinuationInput(command: UpdateContinuationInputCommand): Promise<SessionCommandReceipt>;
+	continueRun(command: ContinueRunCommand): Promise<SessionCommandReceipt>;
+	executeCalls(command: ExecuteCallsCommand): Promise<SessionCommandReceipt>;
+	retryCall(command: RetryCallCommand): Promise<SessionCommandReceipt>;
+	skipCall(command: SkipCallCommand): Promise<SessionCommandReceipt>;
+	completeCallAsError(command: CompleteCallAsErrorCommand): Promise<SessionCommandReceipt>;
+	resolveWait(command: ResolveWaitCommand): Promise<SessionCommandReceipt>;
+	setAutomationHold(command: SetAutomationHoldCommand): Promise<SessionCommandReceipt>;
+	pauseRun(command: PauseRunCommand): Promise<SessionCommandReceipt>;
+	resumeRun(command: ResumeRunCommand): Promise<SessionCommandReceipt>;
+	cancelRun(command: CancelRunCommand): Promise<SessionCommandReceipt>;
+	editAndResend(command: EditAndResendCommand): Promise<SessionCommandReceipt>;
+
+	getSessionSnapshot(sessionID: SessionID): Promise<SessionSnapshot>;
+	getRunSnapshot(runID: RunID): Promise<SessionRunSnapshot>;
+	listRuntimeSessions(): Promise<SessionRuntimeListItem[]>;
+}
+
+export interface ISessionStoreAPI {
+	readSession(sessionID: SessionID, forceFetch?: boolean): Promise<Session>;
+	readConversation(sessionID: SessionID, forceFetch?: boolean): Promise<SessionStoreConversationProjection>;
+	readRun(sessionID: SessionID, runID: RunID, forceFetch?: boolean): Promise<SessionRunSnapshot>;
+	listSessions(request?: SessionStoreListSessionsRequest): Promise<SessionStoreSessionPage>;
+	searchSessions(request: SessionStoreSearchSessionsRequest): Promise<SessionStoreSessionPage>;
+	listSessionRuns(request: SessionStoreListSessionRunsRequest): Promise<SessionStoreRunListItem[]>;
+	exportSession(sessionID: SessionID): Promise<string>;
+}
+
+export interface ISessionManagementAPI extends ISessionRuntimeAPI, ISessionStoreAPI {
+	observeSession(sessionID: SessionID, listener: SessionSnapshotObserver): () => void;
+
+	observeRun(sessionID: SessionID, runID: RunID, listener: SessionRunObserver): () => void;
+
+	dispose(): void;
 }
 
 export interface IModelStoreAPI {
@@ -233,28 +306,6 @@ export interface IModelAggregateAPI {
 	): Promise<ProviderAPIKeyStatus>;
 }
 
-export interface ICompletionAPI {
-	fetchCompletion(
-		model: ArtifactRef,
-		requestPatch: ModelRequestPatch | undefined,
-		current: StoreConversationMessage,
-		history?: StoreConversationMessage[],
-		toolSelections?: ToolSelection[],
-		mcpContext?: MCPConversationContext,
-		skillSessionID?: string,
-		requestID?: string,
-		signal?: AbortSignal,
-		onStreamTextData?: (text: string) => void,
-		onStreamThinkingData?: (thinking: string) => void
-	): Promise<CompletionResponseBody | undefined>;
-
-	cancelCompletion(requestID: string): Promise<void>;
-}
-
-export interface IToolRuntimeAPI {
-	invokeTool(functionName: string, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
-}
-
 export interface IToolStoreAPI {
 	listToolPlugins(): Promise<PluginListItem[]>;
 
@@ -271,12 +322,6 @@ export interface IToolStoreAPI {
 	mapToolTarget(tool: ArtifactRef): Promise<CapabilityTarget>;
 
 	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView>;
-
-	invokeGoToolTarget(target: CapabilityTarget, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
-}
-
-export interface IToolTargetResolver {
-	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView>;
 }
 
 export interface IAgentStoreAPI {
@@ -291,6 +336,14 @@ export interface IAgentStoreAPI {
 	resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan>;
 
 	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView>;
+
+	addAgentPluginMember(request: AddPluginMemberRequest): Promise<PluginView>;
+
+	addAgentPluginArtifactMember(request: AddPluginArtifactMemberRequest): Promise<PluginView>;
+
+	removeAgentPluginMember(request: RemovePluginMemberRequest): Promise<PluginView>;
+
+	resolveAgentPluginCapabilities(plugin: ArtifactRef): Promise<PluginCapabilityPlan>;
 
 	listAgentPluginMembers(plugin: ArtifactRef): Promise<PluginDirectMembership>;
 
@@ -321,6 +374,10 @@ export interface IAgentStoreAPI {
 
 export interface ITextStoreAPI {
 	materializeText(text: ArtifactRef): Promise<TextMaterialization>;
+}
+
+export interface IToolTargetResolver {
+	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView>;
 }
 
 export interface ISkillStoreAPI {
@@ -381,20 +438,7 @@ export interface ISkillAggregateAPI {
 	listArtifactSkillRefs(filter: ArtifactSkillFilter): Promise<ArtifactRef[]>;
 
 	describeArtifactSkill(skill: ArtifactRef): Promise<ArtifactSkillSummary>;
-}
-
-export interface ISkillRuntimeAPI {
-	createSkillSession(options: RuntimeSkillSessionOptions): Promise<RuntimeSkillSession>;
-
-	closeSkillSession(sessionID: string): Promise<void>;
-
-	getSkillsPrompt(filter?: RuntimeSkillPromptFilter): Promise<string>;
-
-	listRuntimeSkills(filter?: RuntimeSkillListFilter): Promise<RuntimeSkillRecord[]>;
-
-	renderSkill(definition: RuntimeSkillDefinition, args?: Record<string, string>): Promise<RuntimeSkillRenderResult>;
-
-	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
+	getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string>;
 }
 
 export interface IWorkspaceStoreAPI {
@@ -579,8 +623,6 @@ export interface IMCPRuntimeAPI {
 		promptArguments: Record<string, string>
 	): Promise<MCPGetPromptResponseBody>;
 
-	invokeMCPTool(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPRuntimeInvokeToolResponse>;
-
 	listMCPServerPrompts(
 		server: MCPRuntimeServerID,
 		pageSize: number,
@@ -607,6 +649,4 @@ export interface IMCPRuntimeAPI {
 
 	readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody>;
 	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
-	checkMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
-	resolveMCPToolApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult>;
 }

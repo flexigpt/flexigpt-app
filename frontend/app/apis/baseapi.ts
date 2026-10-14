@@ -6,20 +6,18 @@ import type {
 	IAgentStoreAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
-	ICompletionAPI,
-	IConversationStoreAPI,
 	ILogger,
 	IMCPAggregateAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
 	IModelAggregateAPI,
 	IModelStoreAPI,
+	ISessionRuntimeAPI,
+	ISessionStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
-	ISkillRuntimeAPI,
 	ISkillStoreAPI,
 	ITextStoreAPI,
-	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceRuntimeAPI,
 	IWorkspaceStoreAPI,
@@ -27,20 +25,20 @@ import type {
 import { AgentManagementAPI } from '@/apis/agent_management';
 import { MCPManagementAPI } from '@/apis/mcp_management';
 import { ModelManagementAPI } from '@/apis/model_management';
+import { SessionManagementAPI } from '@/apis/session_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 import { ToolManagementAPI } from '@/apis/tool_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
-import { WailsCompletionAPI } from '@/apis/wailsapi/completion';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
 import { WailsModelAggregateAPI } from '@/apis/wailsapi/model_aggregate';
 import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
+import { WailsSessionRuntimeAPI } from '@/apis/wailsapi/session_runtime';
+import { WailsSessionStoreAPI } from '@/apis/wailsapi/session_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
-import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
-import { WailsToolRuntimeAPI } from '@/apis/wailsapi/tool_runtime';
 import { WailsToolStoreAPI } from '@/apis/wailsapi/tool_store';
 import { WailsWorkspaceRuntimeAPI } from '@/apis/wailsapi/workspace_runtime';
 import { WailsWorkspaceStoreAPI } from '@/apis/wailsapi/workspace_store';
@@ -50,21 +48,21 @@ export let log: ILogger;
 
 export let attachmentsDropAPI: IAttachmentsDropAPI;
 export let backendAPI: IBackendAPI;
-export let conversationStoreAPI: IConversationStoreAPI;
 export let settingstoreAPI: ISettingStoreAPI;
-export let completionAPI: ICompletionAPI;
+
+let sessionRuntimeAPI: ISessionRuntimeAPI;
+let sessionStoreAPI: ISessionStoreAPI;
+export let sessionManagementAPI: SessionManagementAPI;
 
 let modelStoreAPI: IModelStoreAPI;
 let modelAggregateAPI: IModelAggregateAPI;
 export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
-let toolRuntimeAPI: IToolRuntimeAPI;
 export let toolManagementAPI: ToolManagementAPI;
 
 let skillStoreAPI: ISkillStoreAPI;
 let skillAggregateAPI: ISkillAggregateAPI;
-let skillRuntimeAPI: ISkillRuntimeAPI;
 export let skillManagementAPI: SkillManagementAPI;
 
 let mcpStoreAPI: IMCPStoreAPI;
@@ -76,44 +74,32 @@ let workspaceStoreAPI: IWorkspaceStoreAPI;
 let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 export let workspaceManagementAPI: WorkspaceManagementAPI;
 
-export let agentStoreAPI: IAgentStoreAPI;
-/** @public */
+let agentStoreAPI: IAgentStoreAPI;
 export let textStoreAPI: ITextStoreAPI;
 export let agentManagementAPI: AgentManagementAPI;
 
-// Conditional initialization
 if (IS_WAILS_PLATFORM) {
-	// Initialize with Wails implementations
 	log = new wailsImpl.WailsLogger();
 	setFrontendErrorLogger(log);
 
 	attachmentsDropAPI = new wailsImpl.WailsAttachmentsDropAPI();
 	backendAPI = new wailsImpl.WailsBackendAPI();
-	conversationStoreAPI = new wailsImpl.WailsConversationStoreAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
-	completionAPI = new WailsCompletionAPI();
+
+	sessionRuntimeAPI = new WailsSessionRuntimeAPI();
+	sessionStoreAPI = new WailsSessionStoreAPI();
+	sessionManagementAPI = new SessionManagementAPI(sessionRuntimeAPI, sessionStoreAPI);
 
 	modelStoreAPI = new WailsModelStoreAPI();
 	modelAggregateAPI = new WailsModelAggregateAPI();
 	modelManagementAPI = new ModelManagementAPI(modelStoreAPI, modelAggregateAPI);
 
-	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
-	textStoreAPI = new wailsImpl.WailsTextStoreAPI();
-
 	toolStoreAPI = new WailsToolStoreAPI();
-	toolRuntimeAPI = new WailsToolRuntimeAPI();
-	toolManagementAPI = new ToolManagementAPI(toolStoreAPI, toolRuntimeAPI);
+	toolManagementAPI = new ToolManagementAPI(toolStoreAPI);
 
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
-	skillRuntimeAPI = new WailsSkillRuntimeAPI();
-	skillManagementAPI = new SkillManagementAPI(
-		skillRuntimeAPI,
-		skillStoreAPI,
-		skillAggregateAPI,
-		toolManagementAPI,
-		modelManagementAPI
-	);
+	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillAggregateAPI, toolManagementAPI, modelManagementAPI);
 
 	mcpStoreAPI = new WailsMCPStoreAPI();
 	mcpRuntimeAPI = new WailsMCPRuntimeAPI();
@@ -126,14 +112,9 @@ if (IS_WAILS_PLATFORM) {
 		modelManagementAPI
 	);
 
-	agentManagementAPI = new AgentManagementAPI(
-		agentStoreAPI,
-		toolManagementAPI,
-		modelManagementAPI,
-		mcpManagementAPI,
-		skillManagementAPI,
-		textStoreAPI
-	);
+	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
+	textStoreAPI = new wailsImpl.WailsTextStoreAPI();
+	agentManagementAPI = new AgentManagementAPI(agentStoreAPI);
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();
 	workspaceRuntimeAPI = new WailsWorkspaceRuntimeAPI();
@@ -144,6 +125,5 @@ if (IS_WAILS_PLATFORM) {
 		modelManagementAPI
 	);
 } else {
-	// Error for unsupported platforms
 	throw new Error('Unsupported platform');
 }

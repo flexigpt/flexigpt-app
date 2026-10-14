@@ -4,13 +4,10 @@ import {model} from '../models';
 import {tool} from '../models';
 import {plugin} from '../models';
 import {composition} from '../models';
-import {llmtoolsutil} from '../models';
 
 export function GetTool(arg1:model.ArtifactRef):Promise<tool.ToolView>;
 
 export function GetToolPlugin(arg1:model.ArtifactRef):Promise<plugin.PluginView>;
-
-export function InvokeGoToolTarget(arg1:composition.CapabilityTarget,arg2:string,arg3:number):Promise<llmtoolsutil.InvokeResponse>;
 
 export function ListPluginTools(arg1:model.ArtifactRef):Promise<Array<tool.ToolListItem>>;
 

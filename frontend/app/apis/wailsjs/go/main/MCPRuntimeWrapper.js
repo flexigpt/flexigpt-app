@@ -6,10 +6,6 @@ export function CancelMCPServerAuthorization(arg1) {
   return window['go']['main']['MCPRuntimeWrapper']['CancelMCPServerAuthorization'](arg1);
 }
 
-export function CheckMCPToolCall(arg1, arg2) {
-  return window['go']['main']['MCPRuntimeWrapper']['CheckMCPToolCall'](arg1, arg2);
-}
-
 export function CompleteMCPArgument(arg1, arg2) {
   return window['go']['main']['MCPRuntimeWrapper']['CompleteMCPArgument'](arg1, arg2);
 }
@@ -24,10 +20,6 @@ export function DisconnectMCPServer(arg1) {
 
 export function GetMCPPrompt(arg1, arg2, arg3) {
   return window['go']['main']['MCPRuntimeWrapper']['GetMCPPrompt'](arg1, arg2, arg3);
-}
-
-export function InvokeMCPTool(arg1, arg2) {
-  return window['go']['main']['MCPRuntimeWrapper']['InvokeMCPTool'](arg1, arg2);
 }
 
 export function ListMCPServerPrompts(arg1, arg2, arg3) {
@@ -52,8 +44,4 @@ export function ReadMCPResource(arg1, arg2) {
 
 export function RefreshMCPServer(arg1) {
   return window['go']['main']['MCPRuntimeWrapper']['RefreshMCPServer'](arg1);
-}
-
-export function ResolveMCPToolApproval(arg1, arg2) {
-  return window['go']['main']['MCPRuntimeWrapper']['ResolveMCPToolApproval'](arg1, arg2);
 }

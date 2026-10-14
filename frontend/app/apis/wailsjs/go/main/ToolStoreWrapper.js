@@ -10,10 +10,6 @@ export function GetToolPlugin(arg1) {
   return window['go']['main']['ToolStoreWrapper']['GetToolPlugin'](arg1);
 }
 
-export function InvokeGoToolTarget(arg1, arg2, arg3) {
-  return window['go']['main']['ToolStoreWrapper']['InvokeGoToolTarget'](arg1, arg2, arg3);
-}
-
 export function ListPluginTools(arg1) {
   return window['go']['main']['ToolStoreWrapper']['ListPluginTools'](arg1);
 }

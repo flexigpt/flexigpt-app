@@ -88,7 +88,11 @@ export function capabilityTargetFromWails(value: unknown, field: string): Capabi
 
 	output.providerIdentity = requireWailsString(target.providerIdentity, `${field}.providerIdentity`);
 	output.providerLocalID = requireWailsString(target.providerLocalID, `${field}.providerLocalID`);
-	output.evidence = requireWailsString(target.evidence, `${field}.evidence`);
+
+	const evidence = optionalWailsString(target.evidence, `${field}.evidence`);
+	if (evidence !== undefined) {
+		output.evidence = evidence;
+	}
 
 	return output;
 }

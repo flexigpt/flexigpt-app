@@ -190,7 +190,7 @@ export function throwIfAborted(signal?: AbortSignal): void {
  * - Raw JSON object
  * - Generated `number[]` byte representation
  */
-function rawJSONFromWails(value: unknown, field: string): JSONRawString {
+export function rawJSONFromWails(value: unknown, field: string): JSONRawString {
 	if (Array.isArray(value) && value.every(item => typeof item === 'number')) {
 		if (
 			!value.every(b => {

@@ -1,10 +1,6 @@
 // oxlint-disable typescript/parameter-properties
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type {
-	InvokeMCPToolRequestBody,
-	MCPApprovalEvaluation,
-	MCPApprovalResolution,
-	MCPApprovalResolutionResult,
 	MCPAuthenticationDeclaration,
 	MCPAuthHealth,
 	MCPAuthHealthState,
@@ -21,7 +17,6 @@ import type {
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
 	MCPRuntimeServerView,
 	MCPServerData,
@@ -32,7 +27,6 @@ import type {
 	MCPServerListItem,
 	MCPServerRuntimeDetails,
 	MCPServerRuntimeSnapshot,
-	MCPServerSecretsView,
 	MCPServerSetupView,
 	MCPServerView,
 	MCPSettings,
@@ -42,7 +36,15 @@ import type {
 	MCPStdioSecretDraft,
 	MCPToolCapability,
 } from '@/spec/mcp';
-import type { PluginListItem } from '@/spec/plugin';
+import type {
+	AddPluginArtifactMemberRequest,
+	AddPluginMemberRequest,
+	ArtifactPluginMembershipView,
+	PluginListItem,
+	PluginView,
+	RemovePluginMemberRequest,
+	UpdatePluginRequest,
+} from '@/spec/plugin';
 import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import {
@@ -676,6 +678,12 @@ export class MCPManagementAPI {
 		this.runtimeReads.clear();
 	}
 
+	private async mutateComposerDeclarations<T>(operation: () => Promise<T>): Promise<T> {
+		const result = await operation();
+		this.invalidateComposerMCPDeclarations();
+		return result;
+	}
+
 	async listMCPPluginsForManagement(): Promise<PluginListItem[]> {
 		return this.collectPages(pageToken => this.store.listMCPPluginsPage(MANAGEMENT_PAGE_SIZE, pageToken));
 	}
@@ -698,6 +706,38 @@ export class MCPManagementAPI {
 	async getMCPPlugin(plugin: ArtifactRef): Promise<MCPPluginView> {
 		const s = await this.store.getMCPPlugin(plugin);
 		return this.toPluginView(pluginListItemFromPluginView(s, false));
+	}
+
+	getMCPPolicy(policy: ArtifactRef) {
+		return this.store.getMCPPolicy(policy);
+	}
+
+	getMCPServerSecrets(server: ArtifactRef) {
+		return this.store.getMCPServerSecrets(server);
+	}
+
+	addMCPPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
+		return this.mutateComposerDeclarations(() => this.store.addMCPPluginMember(request));
+	}
+
+	addMCPServerToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView> {
+		return this.mutateComposerDeclarations(() => this.store.addMCPServerToPlugin(request));
+	}
+
+	removeMCPPluginMember(request: RemovePluginMemberRequest): Promise<PluginView> {
+		return this.mutateComposerDeclarations(() => this.store.removeMCPPluginMember(request));
+	}
+
+	listMCPPluginMemberships(artifact: ArtifactRef): Promise<ArtifactPluginMembershipView[]> {
+		return this.store.listMCPPluginMemberships(artifact);
+	}
+
+	updateMCPPlugin(request: UpdatePluginRequest): Promise<PluginView> {
+		return this.mutateComposerDeclarations(() => this.store.updateMCPPlugin(request));
+	}
+
+	setMCPPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView> {
+		return this.mutateComposerDeclarations(() => this.store.setMCPPluginEnabled(plugin, expectedRevision, enabled));
 	}
 
 	async getMCPServer(server: ArtifactRef, plugin: ArtifactRef): Promise<MCPServerView> {
@@ -775,10 +815,6 @@ export class MCPManagementAPI {
 				}
 			}
 		}
-	}
-
-	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {
-		return this.store.getMCPServerSecrets(server);
 	}
 
 	async getMCPServerSetup(server: ArtifactRef): Promise<MCPServerSetupView> {
@@ -957,11 +993,6 @@ export class MCPManagementAPI {
 		this.invalidateComposerMCPDeclarations();
 
 		return this.getMCPServer(serverRef, plugin.ref);
-	}
-
-	async setMCPPluginEnabled(plugin: MCPPluginView, enabled: boolean): Promise<void> {
-		await this.store.setMCPPluginEnabled(plugin.ref, plugin.plugin.revision, enabled);
-		this.invalidateComposerMCPDeclarations();
 	}
 
 	async deleteMCPServer(plugin: MCPPluginView, server: MCPServerView): Promise<void> {
@@ -1199,18 +1230,6 @@ export class MCPManagementAPI {
 		request: MCPCompleteArgumentRequestBody
 	): Promise<MCPCompletionResult> {
 		return this.runtime.completeMCPArgument(server, request);
-	}
-
-	checkMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation> {
-		return this.runtime.checkMCPToolCall(server, request);
-	}
-
-	resolveMCPToolApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult> {
-		return this.runtime.resolveMCPToolApproval(approvalID, resolution);
-	}
-
-	invokeMCPTool(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPRuntimeInvokeToolResponse> {
-		return this.runtime.invokeMCPTool(server, request);
 	}
 
 	resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView> {
