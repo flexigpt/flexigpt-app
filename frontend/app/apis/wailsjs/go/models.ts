@@ -6206,6 +6206,166 @@ export namespace session {
 		}
 	}
 	
+	export class ResolutionDiagnostic {
+	    severity: string;
+	    code: string;
+	    message: string;
+	    key?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolutionDiagnostic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.severity = source["severity"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	        this.key = source["key"];
+	    }
+	}
+	export class ResolvedArtifact {
+	    rootID: string;
+	    artifactID: string;
+	    revision?: number;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolvedArtifact(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.artifactID = source["artifactID"];
+	        this.revision = source["revision"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class ResolutionItem {
+	    key: string;
+	    kind: string;
+	    owner: string;
+	    state: string;
+	    selected?: ArtifactSelection;
+	    used?: ResolvedArtifact;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolutionItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.kind = source["kind"];
+	        this.owner = source["owner"];
+	        this.state = source["state"];
+	        this.selected = this.convertValues(source["selected"], ArtifactSelection);
+	        this.used = this.convertValues(source["used"], ResolvedArtifact);
+	        this.reason = source["reason"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OperationResolutionSummary {
+	    version: number;
+	    agent?: ResolutionItem;
+	    workspace?: ResolutionItem;
+	    model?: ResolutionItem;
+	    instructions?: ResolutionItem[];
+	    tools?: ResolutionItem[];
+	    skills?: ResolutionItem[];
+	    mcp?: ResolutionItem[];
+	    attachments?: ResolutionItem[];
+	    diagnostics?: ResolutionDiagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationResolutionSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.agent = this.convertValues(source["agent"], ResolutionItem);
+	        this.workspace = this.convertValues(source["workspace"], ResolutionItem);
+	        this.model = this.convertValues(source["model"], ResolutionItem);
+	        this.instructions = this.convertValues(source["instructions"], ResolutionItem);
+	        this.tools = this.convertValues(source["tools"], ResolutionItem);
+	        this.skills = this.convertValues(source["skills"], ResolutionItem);
+	        this.mcp = this.convertValues(source["mcp"], ResolutionItem);
+	        this.attachments = this.convertValues(source["attachments"], ResolutionItem);
+	        this.diagnostics = this.convertValues(source["diagnostics"], ResolutionDiagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OperationPreparationFailureDetails {
+	    code: string;
+	    message: string;
+	    resolution: OperationResolutionSummary;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationPreparationFailureDetails(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.message = source["message"];
+	        this.resolution = this.convertValues(source["resolution"], OperationResolutionSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CommandReceipt {
 	    commandID: string;
 	    accepted: boolean;
@@ -6220,6 +6380,7 @@ export namespace session {
 	    alreadyActiveToolCallIDs?: string[];
 	    starterText?: string;
 	    message?: string;
+	    preparationFailure?: OperationPreparationFailureDetails;
 	
 	    static createFrom(source: any = {}) {
 	        return new CommandReceipt(source);
@@ -6240,7 +6401,26 @@ export namespace session {
 	        this.alreadyActiveToolCallIDs = source["alreadyActiveToolCallIDs"];
 	        this.starterText = source["starterText"];
 	        this.message = source["message"];
+	        this.preparationFailure = this.convertValues(source["preparationFailure"], OperationPreparationFailureDetails);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class CompleteCallAsErrorCommand {
 	    meta: CommandMeta;
@@ -7248,132 +7428,6 @@ export namespace session {
 	
 	
 	
-	export class ResolutionDiagnostic {
-	    severity: string;
-	    code: string;
-	    message: string;
-	    key?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolutionDiagnostic(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.severity = source["severity"];
-	        this.code = source["code"];
-	        this.message = source["message"];
-	        this.key = source["key"];
-	    }
-	}
-	export class ResolvedArtifact {
-	    rootID: string;
-	    artifactID: string;
-	    revision?: number;
-	    digest?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolvedArtifact(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.artifactID = source["artifactID"];
-	        this.revision = source["revision"];
-	        this.digest = source["digest"];
-	    }
-	}
-	export class ResolutionItem {
-	    key: string;
-	    kind: string;
-	    owner: string;
-	    state: string;
-	    selected?: ArtifactSelection;
-	    used?: ResolvedArtifact;
-	    reason?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolutionItem(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.key = source["key"];
-	        this.kind = source["kind"];
-	        this.owner = source["owner"];
-	        this.state = source["state"];
-	        this.selected = this.convertValues(source["selected"], ArtifactSelection);
-	        this.used = this.convertValues(source["used"], ResolvedArtifact);
-	        this.reason = source["reason"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class OperationResolutionSummary {
-	    version: number;
-	    agent?: ResolutionItem;
-	    workspace?: ResolutionItem;
-	    model?: ResolutionItem;
-	    instructions?: ResolutionItem[];
-	    tools?: ResolutionItem[];
-	    skills?: ResolutionItem[];
-	    mcp?: ResolutionItem[];
-	    attachments?: ResolutionItem[];
-	    diagnostics?: ResolutionDiagnostic[];
-	
-	    static createFrom(source: any = {}) {
-	        return new OperationResolutionSummary(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.version = source["version"];
-	        this.agent = this.convertValues(source["agent"], ResolutionItem);
-	        this.workspace = this.convertValues(source["workspace"], ResolutionItem);
-	        this.model = this.convertValues(source["model"], ResolutionItem);
-	        this.instructions = this.convertValues(source["instructions"], ResolutionItem);
-	        this.tools = this.convertValues(source["tools"], ResolutionItem);
-	        this.skills = this.convertValues(source["skills"], ResolutionItem);
-	        this.mcp = this.convertValues(source["mcp"], ResolutionItem);
-	        this.attachments = this.convertValues(source["attachments"], ResolutionItem);
-	        this.diagnostics = this.convertValues(source["diagnostics"], ResolutionDiagnostic);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class OperationPreparation {
 	    state: string;
 	    fingerprint?: string;
@@ -7499,6 +7553,7 @@ export namespace session {
 	    protocolOutputs?: number[][];
 	    toolResults?: ToolResult[];
 	    mcpAppContext?: AppContextUpdate[];
+	    injectedContext?: string[];
 	    operationID?: string;
 	    error?: OperationError;
 	    metadata?: number[];
@@ -7521,6 +7576,7 @@ export namespace session {
 	        this.protocolOutputs = source["protocolOutputs"];
 	        this.toolResults = this.convertValues(source["toolResults"], ToolResult);
 	        this.mcpAppContext = this.convertValues(source["mcpAppContext"], AppContextUpdate);
+	        this.injectedContext = source["injectedContext"];
 	        this.operationID = source["operationID"];
 	        this.error = this.convertValues(source["error"], OperationError);
 	        this.metadata = source["metadata"];
@@ -7682,6 +7738,7 @@ export namespace session {
 		    return a;
 		}
 	}
+	
 	
 	
 	

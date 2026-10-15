@@ -141,7 +141,7 @@ export enum SessionActivityOverrideMode {
 	Deactivate = 'deactivate',
 }
 
-export enum SessionConfigurationOwner {
+enum SessionConfigurationOwner {
 	Platform = 'platform',
 	Model = 'model',
 	Agent = 'agent',
@@ -151,7 +151,7 @@ export enum SessionConfigurationOwner {
 	User = 'user',
 }
 
-export enum SessionResolutionState {
+enum SessionResolutionState {
 	Included = 'included',
 	Excluded = 'excluded',
 	Unavailable = 'unavailable',
@@ -160,13 +160,13 @@ export enum SessionResolutionState {
 	Stale = 'stale',
 }
 
-export enum SessionDiagnosticSeverity {
+enum SessionDiagnosticSeverity {
 	Info = 'info',
 	Warning = 'warning',
 	Error = 'error',
 }
 
-export enum SessionPreparationState {
+enum SessionPreparationState {
 	Pending = 'pending',
 	Prepared = 'prepared',
 	Failed = 'failed',
@@ -225,6 +225,61 @@ export interface SessionCommandMeta {
 	expectedRunRevision?: SessionRevision;
 }
 
+interface SessionResolvedArtifact extends ArtifactRef {
+	revision?: SessionRevision;
+	digest?: string;
+}
+
+interface SessionResolutionItem {
+	key: string;
+	kind: string;
+	owner: SessionConfigurationOwner;
+	state: SessionResolutionState;
+	selected?: SessionArtifactSelection;
+	used?: SessionResolvedArtifact;
+	reason?: string;
+}
+
+interface SessionResolutionDiagnostic {
+	severity: SessionDiagnosticSeverity;
+	code: string;
+	message: string;
+	key?: string;
+}
+
+interface SessionOperationResolutionSummary {
+	version: number;
+	agent?: SessionResolutionItem;
+	workspace?: SessionResolutionItem;
+	model?: SessionResolutionItem;
+	instructions?: SessionResolutionItem[];
+	tools?: SessionResolutionItem[];
+	skills?: SessionResolutionItem[];
+	mcp?: SessionResolutionItem[];
+	attachments?: SessionResolutionItem[];
+	diagnostics?: SessionResolutionDiagnostic[];
+}
+
+interface SessionOperationPreparationFailureDetails {
+	code: string;
+	message: string;
+	resolution: SessionOperationResolutionSummary;
+}
+
+export interface SessionOperationPreparation {
+	state: SessionPreparationState;
+	fingerprint?: string;
+	preparedAt?: string;
+	resolution: SessionOperationResolutionSummary;
+	effectiveSkills?: ArtifactRef[];
+	activeSkills?: ArtifactRef[];
+}
+
+export interface SessionOperationError {
+	code: string;
+	message: string;
+}
+
 export interface SessionCommandReceipt {
 	commandID: CommandID;
 	accepted: boolean;
@@ -239,6 +294,7 @@ export interface SessionCommandReceipt {
 	alreadyActiveToolCallIDs?: ToolCallID[];
 	starterText?: string;
 	message?: string;
+	preparationFailure?: SessionOperationPreparationFailureDetails;
 }
 
 export interface SessionWaitingRequest {

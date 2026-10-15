@@ -25,14 +25,12 @@ import type {
 	SessionAutomationHoldScope,
 	SessionCollectionOverrideMode,
 	SessionCommandMeta,
-	SessionConfigurationOwner,
-	SessionDiagnosticSeverity,
 	SessionID,
 	SessionMessageRole,
 	SessionOpaqueJSON,
+	SessionOperationError,
+	SessionOperationPreparation,
 	SessionOperationState,
-	SessionPreparationState,
-	SessionResolutionState,
 	SessionRevision,
 	SessionRunOutcomeKind,
 	SessionRunState,
@@ -367,55 +365,6 @@ interface SessionSkillSessionState {
 	active?: ArtifactRef[];
 }
 
-interface SessionResolvedArtifact extends ArtifactRef {
-	revision?: SessionRevision;
-	digest?: string;
-}
-
-interface SessionResolutionItem {
-	key: string;
-	kind: string;
-	owner: SessionConfigurationOwner;
-	state: SessionResolutionState;
-	selected?: SessionArtifactSelection;
-	used?: SessionResolvedArtifact;
-	reason?: string;
-}
-
-interface SessionResolutionDiagnostic {
-	severity: SessionDiagnosticSeverity;
-	code: string;
-	message: string;
-	key?: string;
-}
-
-interface SessionOperationResolutionSummary {
-	version: number;
-	agent?: SessionResolutionItem;
-	workspace?: SessionResolutionItem;
-	model?: SessionResolutionItem;
-	instructions?: SessionResolutionItem[];
-	tools?: SessionResolutionItem[];
-	skills?: SessionResolutionItem[];
-	mcp?: SessionResolutionItem[];
-	attachments?: SessionResolutionItem[];
-	diagnostics?: SessionResolutionDiagnostic[];
-}
-
-interface SessionOperationPreparation {
-	state: SessionPreparationState;
-	fingerprint?: string;
-	preparedAt?: string;
-	resolution: SessionOperationResolutionSummary;
-	effectiveSkills?: ArtifactRef[];
-	activeSkills?: ArtifactRef[];
-}
-
-interface SessionOperationError {
-	code: string;
-	message: string;
-}
-
 export interface SessionTranscriptMessage {
 	id: string;
 	createdAt: string;
@@ -428,6 +377,7 @@ export interface SessionTranscriptMessage {
 	protocolOutputs?: SessionOpaqueJSON[];
 	toolResults?: SessionToolResult[];
 	mcpAppContext?: MCPAppContextUpdate[];
+	injectedContext?: string[];
 	operationID?: OperationID;
 	error?: SessionOperationError;
 	metadata?: SessionOpaqueJSON;
