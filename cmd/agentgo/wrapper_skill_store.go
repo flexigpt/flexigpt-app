@@ -42,6 +42,7 @@ func InitSkillStoreWrapper(
 	protection root.ProtectionAPI,
 	definitions definition.API,
 	resolver *composition.Resolver,
+	nativeResources resourceFlow.NativePathAPI,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -51,13 +52,19 @@ func InitSkillStoreWrapper(
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
-		cat == nil || definitions == nil {
+		cat == nil || definitions == nil || nativeResources == nil {
 		return errors.New("skill Store wrapper dependencies are incomplete")
 	}
 
 	support, err := llmsupport.Skill()
 	if err != nil {
 		return err
+	}
+
+	options := []skillAPI.Option{
+		skillAPI.WithCompositionResolver(resolver),
+		skillAPI.WithSupport(support),
+		skillAPI.WithNativeResources(nativeResources),
 	}
 
 	api, err := skillAPI.New(
@@ -69,10 +76,7 @@ func InitSkillStoreWrapper(
 		protection,
 		cat,
 		definitions,
-		skillAPI.WithCompositionResolver(
-			resolver,
-		),
-		skillAPI.WithSupport(support),
+		options...,
 	)
 	if err != nil {
 		return err
@@ -80,6 +84,22 @@ func InitSkillStoreWrapper(
 	wrapper.api = api
 	wrapper.roots = roots
 	return nil
+}
+
+func (w *SkillStoreWrapper) GetArtifactSkillDetails(
+	ref artifactModel.ArtifactRef,
+	expectedRevision uint64,
+) (skillAPI.ArtifactSkillDetails, error) {
+	return withSkillStore(
+		w,
+		func(api *skillAPI.Service) (skillAPI.ArtifactSkillDetails, error) {
+			return api.GetArtifactSkillDetails(
+				context.Background(),
+				ref,
+				expectedRevision,
+			)
+		},
+	)
 }
 
 func withSkillStore[T any](

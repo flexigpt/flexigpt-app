@@ -19,6 +19,7 @@ import type {
 	UpdatePluginRequest,
 } from '@/spec/plugin';
 import type {
+	ArtifactSkillDetails,
 	ManagedSkillCreateRequest,
 	ManagedSkillCreateResult,
 	ManagedSkillReplaceRequest,
@@ -29,6 +30,8 @@ import type {
 	StoreManagedSkillDocument,
 	StoreSkillListItem,
 } from '@/spec/skill';
+import { ArtifactState } from '@/spec/artifact';
+import { SkillInsert } from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
 import {
@@ -40,7 +43,7 @@ import {
 	pluginViewFromWails,
 	storeSkillListItemFromWails,
 } from '@/apis/wailsapi/list_item_projection';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddSkillPath,
 	AddSkillPluginMember,
@@ -48,6 +51,7 @@ import {
 	CreateManagedSkill,
 	CreateSkillPlugin,
 	DeleteSkillPlugin,
+	GetArtifactSkillDetails,
 	GetManagedSkillDocument,
 	GetSkill,
 	GetSkillPlugin,
@@ -69,6 +73,24 @@ import {
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
 
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
+	async getArtifactSkillDetails(skill: ArtifactRef, expectedRevision: number): Promise<ArtifactSkillDetails> {
+		const details = requiredObject<ArtifactSkillDetails>(
+			await GetArtifactSkillDetails(skill as Parameters<typeof GetArtifactSkillDetails>[0], expectedRevision),
+			'GetArtifactSkillDetails'
+		);
+		return {
+			...details,
+			artifact: {
+				...details.artifact,
+				state: enumFromWails(details.artifact.state, ArtifactState, 'GetArtifactSkillDetails.artifact.state'),
+			},
+			document: {
+				...details.document,
+				insert: enumFromWails(details.document.insert, SkillInsert, 'GetArtifactSkillDetails.document.insert'),
+			},
+		};
+	}
+
 	async addSkillPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
 		return pluginViewFromWails(
 			await AddSkillPluginMember(request as Parameters<typeof AddSkillPluginMember>[0]),

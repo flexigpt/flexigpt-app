@@ -101,7 +101,13 @@ if (IS_WAILS_PLATFORM) {
 
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
-	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillAggregateAPI, toolManagementAPI, modelManagementAPI);
+	skillManagementAPI = new SkillManagementAPI(
+		skillStoreAPI,
+		skillAggregateAPI,
+		toolManagementAPI,
+		modelManagementAPI,
+		sessionManagementAPI
+	);
 
 	mcpStoreAPI = new WailsMCPStoreAPI();
 	mcpRuntimeAPI = new WailsMCPRuntimeAPI();

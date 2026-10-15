@@ -5,6 +5,7 @@ import { FiFolderPlus, FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi';
 import type { PluginListItem } from '@/spec/plugin';
 import type { StoreSkillListItem } from '@/spec/skill';
 import { pluginListItemFromPluginView } from '@/spec/plugin';
+import { SkillInsert } from '@/spec/skill';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
@@ -32,6 +33,7 @@ import type { SkillManagementFilter } from '@/skills/lib/skill_management_utils'
 import {
 	canWriteSkillPlugin,
 	skillArtifactKey,
+	SkillManagementInsertFilter,
 	skillMatchesManagementFilter,
 } from '@/skills/lib/skill_management_utils';
 import { SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
@@ -290,7 +292,7 @@ export default function SkillsPage() {
 	const [alert, setAlert] = useState('');
 	const [filter, setFilter] = useState<SkillManagementFilter>({
 		query: '',
-		insert: 'all',
+		insert: SkillManagementInsertFilter.All,
 		tags: [],
 	});
 	const [skillToView, setSkillToView] = useState<StoreSkillListItem | null>(null);
@@ -557,6 +559,15 @@ export default function SkillsPage() {
 		const memberships = data.presentations[skillArtifactKey(skill.ref)]?.memberships;
 		return memberships !== undefined && memberships.length === 0;
 	});
+	const knownTags = [
+		...new Set(data.allSkills.flatMap(skill => data.presentations[skillArtifactKey(skill.ref)]?.document?.tags ?? [])),
+	].toSorted((left, right) => left.localeCompare(right));
+	const instructionCount = data.allSkills.filter(
+		skill => data.presentations[skillArtifactKey(skill.ref)]?.summary?.Insert === SkillInsert.Instructions
+	).length;
+	const templateCount = data.allSkills.filter(
+		skill => data.presentations[skillArtifactKey(skill.ref)]?.summary?.Insert === SkillInsert.UserMessage
+	).length;
 
 	if (isLoading && !hasResolved) {
 		return <Loader text="Loading Skill Plugins..." />;
@@ -624,6 +635,41 @@ export default function SkillsPage() {
 				/>
 
 				<ManagementPageContent>
+					<div className="grid gap-2 sm:grid-cols-3">
+						{[
+							{ label: 'Instruction Skills', count: instructionCount, insert: SkillInsert.Instructions },
+							{ label: 'Templates', count: templateCount, insert: SkillInsert.UserMessage },
+							{ label: 'Known tags', count: knownTags.length, insert: SkillManagementInsertFilter.All },
+						].map(card => (
+							<button
+								key={card.label}
+								type="button"
+								className="bg-base-100 border-base-300 rounded-2xl border p-3 text-left"
+								onClick={() => {
+									setFilter(previous => ({ ...previous, insert: card.insert }));
+								}}
+							>
+								<span className="block text-xs">{card.label}</span>
+								<strong className="text-lg">{card.count}</strong>
+							</button>
+						))}
+					</div>
+					{knownTags.length > 0 ? (
+						<div className="flex flex-wrap gap-1" aria-label="Known Skill tags">
+							{knownTags.map(tag => (
+								<button
+									key={tag}
+									type="button"
+									className="badge badge-ghost cursor-pointer"
+									onClick={() => {
+										setFilter(previous => ({ ...previous, tags: [tag] }));
+									}}
+								>
+									{tag}
+								</button>
+							))}
+						</div>
+					) : null}
 					<div className="bg-base-100 border-base-300 grid gap-3 rounded-2xl border p-3 sm:grid-cols-3">
 						<label className="input flex items-center gap-2 rounded-xl">
 							<FiSearch size={14} />
@@ -646,14 +692,16 @@ export default function SkillsPage() {
 							onChange={event => {
 								setFilter(previous => ({
 									...previous,
-									insert: event.currentTarget.value as SkillManagementFilter['insert'],
+									insert:
+										Object.values(SkillInsert).find(value => (value as string) === event.currentTarget.value) ??
+										SkillManagementInsertFilter.All,
 								}));
 							}}
 							aria-label="Skill behavior filter"
 						>
-							<option value="all">All Skills</option>
-							<option value="instructions">Instruction Skills</option>
-							<option value="user-message">User-message templates</option>
+							<option value={SkillManagementInsertFilter.All}>All Skills</option>
+							<option value={SkillInsert.Instructions}>Instruction Skills</option>
+							<option value={SkillInsert.UserMessage}>User-message templates</option>
 						</select>
 						<input
 							className="input rounded-xl"
@@ -673,8 +721,7 @@ export default function SkillsPage() {
 						/>
 						<div className="text-base-content/60 text-xs sm:col-span-3">
 							{matchingSkills.length} matching Artifact{matchingSkills.length === 1 ? '' : 's'}. Tag and argument
-							metadata is searchable where a document is exposed. Unavailable interpretation is shown in Skill Details
-							rather than guessed.
+							metadata is searchable for verified Skill documents. Unavailable interpretation is shown in Skill Details.
 						</div>
 					</div>
 					{error ? (

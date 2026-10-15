@@ -19,6 +19,13 @@ import type {
 	UpdatePluginRequest,
 } from '@/spec/plugin';
 import type {
+	SessionInstructionSkillPreviewRequest,
+	SessionInstructionSkillPreviewResult,
+	SessionUserMessageSkillTemplateCommand,
+	SessionUserMessageSkillTemplateResult,
+} from '@/spec/session';
+import type {
+	ArtifactSkillDetails,
 	ArtifactSkillFilter,
 	ArtifactSkillSummary,
 	ManagedSkillCreateRequest,
@@ -31,6 +38,7 @@ import type {
 	SkillDocumentInput,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
+	SkillResourceInfo,
 	StoreManagedSkillDocument,
 	StoreSkillListItem,
 } from '@/spec/skill';
@@ -41,7 +49,7 @@ import { SkillInsert } from '@/spec/skill';
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type { ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import type { ISessionManagementAPI, ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
 import {
@@ -54,10 +62,14 @@ import {
 // oxlint-disable typescript/parameter-properties
 
 export interface SkillManagementPresentation {
+	details?: ArtifactSkillDetails;
 	summary?: ArtifactSkillSummary;
 	document?: SkillDocumentInput;
 	memberships?: ArtifactPluginMembershipView[];
 	location?: string;
+	resources?: SkillResourceInfo;
+	runtimeWarnings?: string[];
+	diagnostics?: StoreArtifact['diagnostics'];
 	errors: string[];
 }
 
@@ -94,6 +106,11 @@ export interface ComposerSkillCatalogItem {
 	arguments?: SkillArgument[];
 	tags?: string[];
 	document?: SkillDocumentInput;
+	location?: string;
+	resources?: SkillResourceInfo;
+	sourceID?: string;
+	plugins: Array<{ ref: ArtifactRef; name: string; displayName: string }>;
+	runtimeWarnings?: string[];
 	metadataError?: string;
 	hasArguments: boolean;
 	hasResources: boolean;
@@ -115,7 +132,11 @@ export class SkillManagementAPI {
 		private readonly store: ISkillStoreAPI,
 		private readonly aggregate: ISkillAggregateAPI,
 		private readonly tools: IToolTargetResolver,
-		private readonly models: ModelManagementAPI
+		private readonly models: ModelManagementAPI,
+		private readonly sessions: Pick<
+			ISessionManagementAPI,
+			'previewInstructionSkill' | 'prepareUserMessageSkillTemplate'
+		>
 	) {}
 
 	private readonly presentationLoads = new Map<string, Promise<SkillManagementPresentation>>();
@@ -145,6 +166,14 @@ export class SkillManagementAPI {
 			const presentation = presentations[skillArtifactKey(skill.ref)];
 			const summary = presentation?.summary;
 			const document = presentation?.document;
+			const pluginMemberships = presentation?.memberships ?? [];
+			const sources = plugins
+				.filter(plugin => pluginMemberships.some(membership => sameSkillArtifact(membership.plugin, plugin.ref)))
+				.map(plugin => ({
+					ref: plugin.ref,
+					name: plugin.name,
+					displayName: plugin.displayName || plugin.name,
+				}));
 			return {
 				ref: skill.ref,
 				name: skill.name,
@@ -168,6 +197,11 @@ export class SkillManagementAPI {
 				arguments: document?.arguments,
 				tags: document?.tags,
 				document,
+				location: presentation?.location,
+				resources: presentation?.resources,
+				sourceID: presentation?.details?.artifact.binding.sourceID,
+				plugins: sources,
+				runtimeWarnings: presentation?.runtimeWarnings,
 				metadataError: presentation?.errors.length ? presentation.errors.join('\n') : undefined,
 			} satisfies ComposerSkillCatalogItem;
 		});
@@ -236,11 +270,10 @@ export class SkillManagementAPI {
 		}
 
 		const load = (async (): Promise<SkillManagementPresentation> => {
-			const [summary, document, memberships, resolved] = await Promise.allSettled([
+			const [summary, details, memberships] = await Promise.allSettled([
 				this.aggregate.describeArtifactSkill(skill.ref),
-				skill.managed ? this.store.getManagedSkillDocument(skill.ref) : Promise.resolve(null),
+				this.store.getArtifactSkillDetails(skill.ref, skill.revision),
 				this.store.listSkillPluginMemberships(skill.ref),
-				this.aggregate.resolveArtifactSkill(skill.ref),
 			]);
 			const result: SkillManagementPresentation = { errors: [] };
 
@@ -249,22 +282,20 @@ export class SkillManagementAPI {
 			} else {
 				result.errors.push(errorText(summary.reason, 'Skill interpretation could not be loaded.'));
 			}
-			if (document.status === 'fulfilled' && document.value) {
-				if (document.value.artifact.revision === skill.revision) {
-					result.document = document.value.document;
-				} else {
-					result.errors.push('The Skill changed while its document was loading. Refresh to inspect it.');
-				}
-			} else if (document.status === 'rejected') {
-				result.errors.push(errorText(document.reason, 'Managed document could not be loaded.'));
+			if (details.status === 'fulfilled') {
+				result.details = details.value;
+				result.document = details.value.document;
+				result.location = details.value.location;
+				result.resources = details.value.resources;
+				result.runtimeWarnings = details.value.runtimeWarnings;
+				result.diagnostics = details.value.artifact.diagnostics;
+			} else {
+				result.errors.push(errorText(details.reason, 'Verified Skill details could not be loaded.'));
 			}
 			if (memberships.status === 'fulfilled') {
 				result.memberships = memberships.value;
 			} else {
 				result.errors.push(errorText(memberships.reason, 'Plugin memberships could not be loaded.'));
-			}
-			if (resolved.status === 'fulfilled') {
-				result.location = resolved.value.Definition.location;
 			}
 			return result;
 		})();
@@ -539,21 +570,59 @@ export class SkillManagementAPI {
 		}
 	}
 
-	async readManagedInstructionSource(skill: StoreSkillListItem): Promise<SkillDocumentInput> {
-		if (!skill.managed) {
-			throw new Error('This API surface does not expose a copyable document for this external or built-in Skill.');
+	getArtifactSkillDetails(skill: ArtifactRef, expectedRevision: number): Promise<ArtifactSkillDetails> {
+		return this.store.getArtifactSkillDetails(skill, expectedRevision);
+	}
+
+	previewInstructionSkill(
+		command: SessionInstructionSkillPreviewRequest
+	): Promise<SessionInstructionSkillPreviewResult> {
+		return this.sessions.previewInstructionSkill(command);
+	}
+
+	prepareUserMessageSkillTemplate(
+		command: SessionUserMessageSkillTemplateCommand
+	): Promise<SessionUserMessageSkillTemplateResult> {
+		return this.sessions.prepareUserMessageSkillTemplate(command);
+	}
+
+	async copySkillDocument(skill: StoreSkillListItem): Promise<SkillDocumentInput> {
+		const details = await this.getArtifactSkillDetails(skill.ref, skill.revision);
+		if (details.artifact.revision !== skill.revision) {
+			throw new Error('Skill changed. Refresh before copying its document.');
 		}
-		const [managed, summary] = await Promise.all([
-			this.store.getManagedSkillDocument(skill.ref),
-			this.aggregate.describeArtifactSkill(skill.ref),
+		return details.document;
+	}
+
+	async prepareInstructionSource(skill: StoreSkillListItem): Promise<{
+		text: string;
+		tags?: string[];
+	}> {
+		const [details, summary] = await Promise.all([
+			this.getArtifactSkillDetails(skill.ref, skill.revision),
+			this.describeArtifactSkill(skill.ref),
 		]);
-		if (managed.artifact.revision !== skill.revision) {
-			throw new Error('Skill changed. Refresh before copying its instructions.');
+		if (
+			summary.Insert !== SkillInsert.Instructions ||
+			summary.HasArguments ||
+			summary.HasResources ||
+			details.resources.hasResources ||
+			(details.document.arguments?.length ?? 0) > 0
+		) {
+			throw new Error('Only instruction Skills without arguments or resources can be flattened.');
 		}
-		if (summary.Insert !== SkillInsert.Instructions || summary.HasArguments || summary.HasResources) {
-			throw new Error('Only instruction Skills without arguments or resources can be copied as plain instructions.');
+		const rendered = await this.previewInstructionSkill({
+			skill: {
+				...skill.ref,
+				expectedRevision: skill.revision,
+				...(skill.definitionDigest ? { expectedDigest: skill.definitionDigest } : {}),
+			},
+			arguments: {},
+		});
+		if (!rendered.text.trim()) {
+			throw new Error('This Skill rendered no instruction text.');
 		}
-		return managed.document;
+		return { text: rendered.text, tags: details.document.tags };
 	}
 
 	getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string> {

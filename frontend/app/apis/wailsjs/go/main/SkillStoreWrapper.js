@@ -26,6 +26,10 @@ export function DeleteSkillPlugin(arg1) {
   return window['go']['main']['SkillStoreWrapper']['DeleteSkillPlugin'](arg1);
 }
 
+export function GetArtifactSkillDetails(arg1, arg2) {
+  return window['go']['main']['SkillStoreWrapper']['GetArtifactSkillDetails'](arg1, arg2);
+}
+
 export function GetManagedSkillDocument(arg1) {
   return window['go']['main']['SkillStoreWrapper']['GetManagedSkillDocument'](arg1);
 }

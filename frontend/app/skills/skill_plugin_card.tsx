@@ -581,17 +581,18 @@ export function SkillPluginCard({
 														{presentations[skillArtifactKey(skill.ref)].summary?.Insert}
 													</MetadataPill>
 													<MetadataPill label="Arguments">
-														{presentations[skillArtifactKey(skill.ref)].document?.arguments?.length ??
+														{presentation?.document?.arguments?.length ??
 															(presentations[skillArtifactKey(skill.ref)].summary?.HasArguments ? 'Declared' : 'None')}
 													</MetadataPill>
 													<MetadataPill label="Resources">
-														{presentations[skillArtifactKey(skill.ref)].summary?.HasResources ? 'Present' : 'None'}
+														{presentation?.resources?.totalCount ??
+															(presentation?.summary?.HasResources ? 'Present' : 'None')}
 													</MetadataPill>
 												</>
 											) : (
 												<MetadataPill>Interpretation unavailable</MetadataPill>
 											)}
-											{presentations[skillArtifactKey(skill.ref)]?.document?.tags?.map(tag => (
+											{presentation?.document?.tags?.map(tag => (
 												<MetadataPill key={tag} label="Tag">
 													{tag}
 												</MetadataPill>
@@ -658,21 +659,14 @@ export function SkillPluginCard({
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
-												disabled={!canWrite || !skill.managed || isPending(`${refKey(skill)}:fork`)}
-												title={
-													!skill.managed
-														? 'The current read API does not expose this source document for copying.'
-														: 'Copy the managed document. Package resource files are not copied.'
-												}
+												disabled={!canWrite || !presentation?.document || isPending(`${refKey(skill)}:fork`)}
+												title="Copy the verified document. Package resource files are not copied."
 												onClick={() => {
 													run(`${refKey(skill)}:fork`, async () => {
-														const source = await skillManagementAPI.getManagedSkillDocument(skill.ref);
-														if (source.artifact.revision !== skill.revision) {
-															throw new Error('Skill changed. Refresh before forking.');
-														}
+														const document = await skillManagementAPI.copySkillDocument(skill);
 														setEditorState({
 															mode: 'fork',
-															seed: { document: source.document, enabled: true },
+															seed: { document, enabled: true },
 														});
 													});
 												}}

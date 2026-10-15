@@ -1,14 +1,18 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type { PluginListItem } from '@/spec/plugin';
-import type { SkillArgument, SkillDocumentInput, StoreSkillListItem } from '@/spec/skill';
+import type { SkillArgument, SkillDocumentInput, SkillInsert, StoreSkillListItem } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
 
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 
 export interface SkillManagementFilter {
 	query: string;
-	insert: 'all' | 'instructions' | 'user-message';
+	insert: SkillInsert | SkillManagementInsertFilter.All;
 	tags: string[];
+}
+
+export enum SkillManagementInsertFilter {
+	All = 'all',
 }
 
 export function skillArtifactKey(ref: ArtifactRef): string {
@@ -194,7 +198,7 @@ export function skillMatchesManagementFilter(
 ): boolean {
 	const document = presentation?.document;
 	const insert = document?.insert ?? presentation?.summary?.Insert;
-	if (filter.insert !== 'all' && insert?.toString() !== filter.insert) {
+	if (filter.insert !== SkillManagementInsertFilter.All && insert !== filter.insert) {
 		return false;
 	}
 
@@ -215,6 +219,15 @@ export function skillMatchesManagementFilter(
 		skill.state,
 		insert,
 		presentation?.location,
+		presentation?.details?.artifact.binding.locator,
+		presentation?.details?.artifact.binding.sourceID,
+		...(presentation?.resources?.locations ?? []),
+		...(presentation?.runtimeWarnings ?? []),
+		...(presentation?.diagnostics ?? []).flatMap(diagnostic => [
+			diagnostic.code,
+			diagnostic.message,
+			diagnostic.location?.locator,
+		]),
 		...(document?.tags ?? []),
 		...(document?.arguments ?? []).flatMap(argument => [argument.name, argument.description, argument.default]),
 		...(presentation?.errors ?? []),

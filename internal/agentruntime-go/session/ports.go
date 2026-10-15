@@ -97,6 +97,24 @@ type UserMessageSkillTemplatePreparer interface {
 	) (UserMessageSkillTemplateResult, error)
 }
 
+// InstructionSkillPreviewRequest is read-only and does not create a Run or Skill session.
+type InstructionSkillPreviewRequest struct {
+	Skill     ArtifactSelection `json:"skill"`
+	Arguments map[string]string `json:"arguments,omitempty"`
+}
+
+type InstructionSkillPreviewResult struct {
+	Skill ArtifactReference `json:"skill"`
+	Text  string            `json:"text"`
+}
+
+type InstructionSkillPreviewer interface {
+	PreviewInstructionSkill(
+		ctx context.Context,
+		request InstructionSkillPreviewRequest,
+	) (InstructionSkillPreviewResult, error)
+}
+
 type ToolEvaluationDecision string
 
 const (
@@ -421,18 +439,19 @@ type RecoverySource interface {
 }
 
 type RuntimeDependencies struct {
-	Preparation SubmissionPreparer
-	Operations  ModelOperationPreparer
-	Model       ModelExecutor
-	Templates   UserMessageSkillTemplatePreparer
-	Tools       ToolExecutor
-	Skills      SkillSessionController
-	Apps        AppExecutor
-	Attachments AttachmentPreparer
-	Events      EventPublisher
-	Checkpoints CheckpointSink
-	Diagnostics DiagnosticSink
-	Clock       Clock
-	IDs         IDGenerator
-	Recovery    RecoverySource
+	Preparation       SubmissionPreparer
+	Operations        ModelOperationPreparer
+	Model             ModelExecutor
+	Templates         UserMessageSkillTemplatePreparer
+	InstructionSkills InstructionSkillPreviewer
+	Tools             ToolExecutor
+	Skills            SkillSessionController
+	Apps              AppExecutor
+	Attachments       AttachmentPreparer
+	Events            EventPublisher
+	Checkpoints       CheckpointSink
+	Diagnostics       DiagnosticSink
+	Clock             Clock
+	IDs               IDGenerator
+	Recovery          RecoverySource
 }

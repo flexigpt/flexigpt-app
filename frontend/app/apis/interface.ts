@@ -87,6 +87,8 @@ import type {
 	ResumeRunCommand,
 	RetryCallCommand,
 	Session,
+	SessionInstructionSkillPreviewRequest,
+	SessionInstructionSkillPreviewResult,
 	SessionRunObserver,
 	SessionRunSnapshot,
 	SessionRuntimeListItem,
@@ -130,6 +132,7 @@ import type {
 } from '@/spec/sessionstore';
 import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
+	ArtifactSkillDetails,
 	ArtifactSkillFilter,
 	ArtifactSkillSummary,
 	ManagedSkillCreateRequest,
@@ -202,6 +205,9 @@ export interface ISessionRuntimeAPI {
 	prepareUserMessageSkillTemplate(
 		command: SessionUserMessageSkillTemplateCommand
 	): Promise<SessionUserMessageSkillTemplateResult>;
+	previewInstructionSkill(
+		command: SessionInstructionSkillPreviewRequest
+	): Promise<SessionInstructionSkillPreviewResult>;
 
 	openAppView(command: MCPAppOpenViewCommand): Promise<SessionCommandReceipt>;
 	executeAppTool(command: MCPAppExecuteToolCommand): Promise<SessionCommandReceipt>;
@@ -385,52 +391,30 @@ export interface IToolTargetResolver {
 }
 
 export interface ISkillStoreAPI {
+	getArtifactSkillDetails(skill: ArtifactRef, expectedRevision: number): Promise<ArtifactSkillDetails>;
 	addSkillPluginMember(request: AddPluginMemberRequest): Promise<PluginView>;
-
 	addSkillPath(request: SkillPathRegistration): Promise<SkillPathRegistrationResult>;
-
 	attachSkillArtifactToPlugin(request: AddPluginArtifactMemberRequest): Promise<PluginView>;
-
 	createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult>;
-
 	replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult>;
-
 	createSkillPlugin(request: CreatePluginRequest): Promise<PluginView>;
-
 	deleteSkillPlugin(request: DeletePluginRequest): Promise<void>;
-
 	getManagedSkillDocument(skill: ArtifactRef): Promise<StoreManagedSkillDocument>;
-
 	getSkill(skill: ArtifactRef): Promise<StoreArtifact>;
-
 	getSkillPlugin(plugin: ArtifactRef): Promise<PluginView>;
-
 	listSkillPluginMemberships(skill: ArtifactRef): Promise<ArtifactPluginMembershipView[]>;
-
 	listSkillPlugins(rootID: ArtifactRootID): Promise<PluginListItem[]>;
-
 	listSkillPluginsForManagement(): Promise<PluginListItem[]>;
-
 	listSkills(rootID: ArtifactRootID): Promise<StoreSkillListItem[]>;
-
 	listSkillsForManagement(): Promise<StoreSkillListItem[]>;
-
 	purgeSkill(skill: ArtifactRef, expectedRevision: number): Promise<void>;
-
 	refreshSkillSource(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<void>;
-
 	registerSkillDirectory(request: SkillDirectoryRegistration): Promise<StoreArtifactSourceSummary>;
-
 	removeSkillPluginMember(request: RemovePluginMemberRequest): Promise<PluginView>;
-
 	resolveSkillCapabilities(skill: ArtifactRef): Promise<CapabilityPlan>;
-
 	resolveSkillPlugin(plugin: ArtifactRef): Promise<PluginCapabilityPlan>;
-
 	setSkillPluginEnabled(plugin: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<PluginView>;
-
 	setSkillEnabled(skill: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
-
 	updateSkillPlugin(request: UpdatePluginRequest): Promise<PluginView>;
 }
 

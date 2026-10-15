@@ -58,6 +58,10 @@ export function PrepareUserMessageSkillTemplate(arg1) {
   return window['go']['main']['SessionRuntimeWrapper']['PrepareUserMessageSkillTemplate'](arg1);
 }
 
+export function PreviewInstructionSkill(arg1) {
+  return window['go']['main']['SessionRuntimeWrapper']['PreviewInstructionSkill'](arg1);
+}
+
 export function ReadAppResource(arg1) {
   return window['go']['main']['SessionRuntimeWrapper']['ReadAppResource'](arg1);
 }

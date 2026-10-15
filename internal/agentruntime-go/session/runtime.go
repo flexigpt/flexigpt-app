@@ -207,6 +207,18 @@ func (r *Runtime) PrepareUserMessageSkillTemplate(ctx context.Context,
 	return r.deps.Templates.PrepareUserMessageSkillTemplate(ctx, request)
 }
 
+func (r *Runtime) PreviewInstructionSkill(
+	ctx context.Context,
+	request InstructionSkillPreviewRequest,
+) (InstructionSkillPreviewResult, error) {
+	if r.deps.InstructionSkills == nil {
+		return InstructionSkillPreviewResult{}, errors.New(
+			"no instruction Skill previewer is available",
+		)
+	}
+	return r.deps.InstructionSkills.PreviewInstructionSkill(ctx, request)
+}
+
 func (r *Runtime) Close() {
 	if r == nil {
 		return

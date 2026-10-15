@@ -5,6 +5,7 @@ import { FiAlertCircle, FiCopy, FiFileText, FiPlay, FiRefreshCw } from 'react-ic
 import type { ArtifactRef, StoreArtifact } from '@/spec/artifact';
 import type { PluginListItem } from '@/spec/plugin';
 import type {
+	ArtifactSkillDetails,
 	ManagedSkillReplaceResult,
 	SkillArgument,
 	SkillDocumentInput,
@@ -13,7 +14,7 @@ import type {
 } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
-import { sessionManagementAPI, skillManagementAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
@@ -599,7 +600,7 @@ export function ManagedSkillEditorModal(props: ManagedSkillEditorModalProps) {
 
 function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkillListItem; onClose: () => void }) {
 	const [artifact, setArtifact] = useState<StoreArtifact | null>(null);
-	const [managedDocument, setManagedDocument] = useState<StoreManagedSkillDocument | null>(null);
+	const [details, setDetails] = useState<ArtifactSkillDetails | null>(null);
 	const [summary, setSummary] = useState<{
 		Artifact: ArtifactRef;
 		IsEnabled: boolean;
@@ -612,6 +613,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 	const [templatePreview, setTemplatePreview] = useState<string | null>(null);
 	const [templatePreviewError, setTemplatePreviewError] = useState('');
 	const [templatePreviewLoading, setTemplatePreviewLoading] = useState(false);
+	const [locationCopyError, setLocationCopyError] = useState('');
 	const previewRequestRef = useRef(0);
 
 	useEffect(() => {
@@ -621,7 +623,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 			const [artifactResult, summaryResult, documentResult] = await Promise.allSettled([
 				skillManagementAPI.getSkill(skill.ref),
 				skillManagementAPI.describeArtifactSkill(skill.ref),
-				skill.managed ? skillManagementAPI.getManagedSkillDocument(skill.ref) : Promise.resolve(null),
+				skillManagementAPI.getArtifactSkillDetails(skill.ref, skill.revision),
 			]);
 
 			if (cancelled) {
@@ -639,8 +641,8 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 			if (summaryResult.status === 'fulfilled') {
 				setSummary(summaryResult.value);
 			}
-			if (documentResult.status === 'fulfilled' && documentResult.value) {
-				setManagedDocument(documentResult.value);
+			if (documentResult.status === 'fulfilled') {
+				setDetails(documentResult.value);
 				setTemplateArguments(
 					JSON.stringify(
 						Object.fromEntries(
@@ -654,7 +656,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 				setError(
 					documentResult.reason instanceof Error
 						? documentResult.reason.message
-						: 'Managed document could not be loaded.'
+						: 'Verified Skill document could not be loaded.'
 				);
 			}
 			if (summaryResult.status === 'rejected') {
@@ -678,7 +680,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 	}, [skill]);
 
 	const renderTemplatePreview = () => {
-		if (!summary || summary.Insert !== SkillInsert.UserMessage || templatePreviewLoading) {
+		if (!summary || templatePreviewLoading) {
 			return;
 		}
 		const request = ++previewRequestRef.current;
@@ -689,7 +691,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 		void Promise.resolve()
 			.then(async () => {
 				const argumentsValue = parseTemplateArguments(templateArguments);
-				const response = await sessionManagementAPI.prepareUserMessageSkillTemplate({
+				const command = {
 					skill: {
 						rootID: skill.ref.rootID,
 						artifactID: skill.ref.artifactID,
@@ -697,7 +699,11 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 						...(skill.definitionDigest ? { expectedDigest: skill.definitionDigest } : {}),
 					},
 					arguments: argumentsValue,
-				});
+				};
+				const response =
+					summary.Insert === SkillInsert.UserMessage
+						? await skillManagementAPI.prepareUserMessageSkillTemplate(command)
+						: await skillManagementAPI.previewInstructionSkill(command);
 				if (request === previewRequestRef.current) {
 					setTemplatePreview(response.text);
 				}
@@ -746,6 +752,25 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 					<ManagementInfoRow label="Source locator" mono>
 						{artifact?.binding.locator || '—'}
 					</ManagementInfoRow>
+					<ManagementInfoRow label="Runtime location" mono>
+						<span className="break-all">{details?.location || '—'}</span>
+						<button
+							type="button"
+							className="btn btn-xs btn-ghost ml-2 rounded-lg"
+							disabled={!details?.location}
+							onClick={() => {
+								if (!details?.location || !navigator.clipboard) {
+									setLocationCopyError('Clipboard access is unavailable.');
+									return;
+								}
+								void navigator.clipboard.writeText(details.location).catch(() => {
+									setLocationCopyError('Runtime location could not be copied.');
+								});
+							}}
+						>
+							<FiCopy size={12} /> Copy
+						</button>
+					</ManagementInfoRow>
 					<ManagementInfoRow label="Subresource locator" mono>
 						{artifact?.binding.subresourceLocator || '—'}
 					</ManagementInfoRow>
@@ -753,6 +778,7 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 					<ManagementInfoRow label="Modified">{artifact?.modifiedAt || '—'}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
+			{locationCopyError ? <div className="alert alert-warning rounded-xl text-xs">{locationCopyError}</div> : null}
 			{artifact?.diagnostics?.length ? (
 				<ModalSection title="Source diagnostics">
 					<ul className="space-y-2 text-sm">
@@ -782,20 +808,20 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 				</ModalSection>
 			) : null}
 
-			{managedDocument ? (
-				<ModalSection title="Managed SKILL.md">
+			{details ? (
+				<ModalSection title="Verified SKILL.md">
 					<div className="mb-3 flex flex-wrap gap-2">
-						{(managedDocument.document.tags ?? []).map(tag => (
+						{(details.document.tags ?? []).map(tag => (
 							<MetadataPill key={tag} label="Tag">
 								{tag}
 							</MetadataPill>
 						))}
 					</div>
 
-					{(managedDocument.document.arguments ?? []).length > 0 ? (
+					{(details.document.arguments ?? []).length > 0 ? (
 						<div className="mb-3 space-y-1">
 							<div className="text-sm font-semibold">Arguments</div>
-							{managedDocument.document.arguments?.map(argument => (
+							{details.document.arguments?.map(argument => (
 								<div key={argument.name} className="bg-base-100 rounded-xl px-3 py-2 text-xs">
 									<span className="font-mono">{argument.name}</span>
 									{argument.description ? ` · ${argument.description}` : ''}
@@ -807,18 +833,43 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 
 					<MessageContentCard
 						messageID={`skill-document:${skill.ref.rootID}:${skill.ref.artifactID}`}
-						content={managedDocument.document.markdownBody}
+						content={details.document.markdownBody}
 						isBusy={false}
 						align="items-start text-left"
 						renderAsMarkdown={true}
 					/>
 				</ModalSection>
 			) : null}
+			{details?.runtimeWarnings?.length ? (
+				<ModalSection title="Runtime warnings">
+					<ul className="list-disc space-y-1 pl-5 text-sm">
+						{details.runtimeWarnings.map((warning, index) => (
+							<li key={`${index}:${warning}`}>{warning}</li>
+						))}
+					</ul>
+				</ModalSection>
+			) : null}
+			{details?.resources.hasResources ? (
+				<ModalSection title={`Resources (${details.resources.totalCount})`}>
+					<ul className="space-y-1 text-xs">
+						{details.resources.locations?.map(location => (
+							<li key={location} className="font-mono break-all">
+								{location}
+							</li>
+						))}
+					</ul>
+					{details.resources.moreLocations ? (
+						<p className="mt-2 text-xs">Additional locations were omitted from this bounded listing.</p>
+					) : null}
+				</ModalSection>
+			) : null}
 
-			{summary?.Insert === SkillInsert.UserMessage ? (
-				<ModalSection title="Session template preview">
+			{summary ? (
+				<ModalSection
+					title={summary.Insert === SkillInsert.UserMessage ? 'Session template preview' : 'Instruction Skill preview'}
+				>
 					<div className="text-base-content/70 mb-3 text-sm">
-						This preview uses the Session Runtime template preparation path. It does not create or mutate a Run.
+						This read-only Session Runtime preview does not create or mutate a Run or Skill session.
 					</div>
 
 					<label className="block">

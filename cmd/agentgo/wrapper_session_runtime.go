@@ -52,6 +52,17 @@ func (w *SessionRuntimeWrapper) PrepareUserMessageSkillTemplate(
 	)
 }
 
+func (w *SessionRuntimeWrapper) PreviewInstructionSkill(
+	request sessionRuntime.InstructionSkillPreviewRequest,
+) (sessionRuntime.InstructionSkillPreviewResult, error) {
+	return withSessionRuntime(
+		w,
+		func(runtimeValue *sessionRuntime.Runtime) (sessionRuntime.InstructionSkillPreviewResult, error) {
+			return runtimeValue.PreviewInstructionSkill(context.Background(), request)
+		},
+	)
+}
+
 func (w *SessionRuntimeWrapper) OpenAppView(
 	command sessionRuntime.OpenAppViewCommand,
 ) (*sessionRuntime.CommandReceipt, error) {

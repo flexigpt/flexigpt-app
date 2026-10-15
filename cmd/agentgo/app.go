@@ -391,6 +391,7 @@ func (a *App) initManagers() {
 		artifactComposition.Protection,
 		artifactComposition.Definitions,
 		artifactCompositionResolver,
+		artifactComposition.TrustedNativeResources,
 	)
 	if err != nil {
 		slog.Error(

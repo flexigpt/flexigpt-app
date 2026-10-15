@@ -274,6 +274,16 @@ export interface SessionUserMessageSkillTemplateResult {
 	text: string;
 }
 
+export interface SessionInstructionSkillPreviewRequest {
+	skill: SessionArtifactSelection;
+	arguments?: Record<string, string>;
+}
+
+export interface SessionInstructionSkillPreviewResult {
+	skill: ArtifactRef;
+	text: string;
+}
+
 interface SessionRunLimits {
 	maxModelOperations?: number;
 	maxToolAttempts?: number;

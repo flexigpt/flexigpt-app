@@ -30,6 +30,8 @@ export function PauseRun(arg1:session.PauseRunCommand):Promise<session.CommandRe
 
 export function PrepareUserMessageSkillTemplate(arg1:session.UserMessageSkillTemplatePreparationRequest):Promise<session.UserMessageSkillTemplateResult>;
 
+export function PreviewInstructionSkill(arg1:session.InstructionSkillPreviewRequest):Promise<session.InstructionSkillPreviewResult>;
+
 export function ReadAppResource(arg1:session.ReadAppResourceRequest):Promise<session.AppResourceReadResult>;
 
 export function RenameSession(arg1:session.RenameSessionCommand):Promise<session.CommandReceipt>;

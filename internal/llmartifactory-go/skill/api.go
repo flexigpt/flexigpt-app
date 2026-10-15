@@ -35,6 +35,7 @@ type Service struct {
 	discovery        refreshFlow.API
 	artifacts        artifact.API
 	resources        resourceFlow.API
+	nativeResources  resourceFlow.NativePathAPI
 	managedArtifacts managepackageFlow.API
 	protection       root.ProtectionAPI
 	definitions      definition.API
@@ -89,6 +90,7 @@ func New(
 		discovery:        discovery,
 		artifacts:        artifacts,
 		resources:        resources,
+		nativeResources:  config.nativeResources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
 		cat:              cat,

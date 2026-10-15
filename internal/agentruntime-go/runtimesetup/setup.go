@@ -115,18 +115,19 @@ func New(
 
 	runtimeValue, err := sessionRuntime.NewRuntime(
 		sessionRuntime.RuntimeDependencies{
-			Preparation: coordinator,
-			Operations:  coordinator,
-			Templates:   coordinator,
-			Model:       coordinator,
-			Tools:       router,
-			Skills:      skillExecutor,
-			Apps:        coordinator,
-			Attachments: attachments,
-			Events:      dependencies.Events,
-			Checkpoints: dependencies.Checkpoints,
-			Diagnostics: runtimeDiagnosticLogger{},
-			Recovery:    dependencies.Recovery,
+			Preparation:       coordinator,
+			Operations:        coordinator,
+			Templates:         coordinator,
+			InstructionSkills: coordinator,
+			Model:             coordinator,
+			Tools:             router,
+			Skills:            skillExecutor,
+			Apps:              coordinator,
+			Attachments:       attachments,
+			Events:            dependencies.Events,
+			Checkpoints:       dependencies.Checkpoints,
+			Diagnostics:       runtimeDiagnosticLogger{},
+			Recovery:          dependencies.Recovery,
 		},
 	)
 	if err != nil {

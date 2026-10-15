@@ -18,6 +18,8 @@ export function CreateSkillPlugin(arg1:plugin.CreateRequest):Promise<plugin.Plug
 
 export function DeleteSkillPlugin(arg1:plugin.DeleteRequest):Promise<void>;
 
+export function GetArtifactSkillDetails(arg1:model.ArtifactRef,arg2:number):Promise<skill.ArtifactSkillDetails>;
+
 export function GetManagedSkillDocument(arg1:model.ArtifactRef):Promise<source.ManagedSkillDocument>;
 
 export function GetSkill(arg1:model.ArtifactRef):Promise<model.Artifact>;

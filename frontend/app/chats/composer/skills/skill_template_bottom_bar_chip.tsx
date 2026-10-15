@@ -205,6 +205,13 @@ function SkillTemplateDropdown({
 				{ value: item.description, weight: 3 },
 				{ value: item.ref.rootID, weight: 2 },
 				{ value: item.ref.artifactID, weight: 2 },
+				{ value: item.sourceID, weight: 2 },
+				{ value: item.location, weight: 2 },
+				...item.plugins.flatMap(plugin => [
+					{ value: plugin.name, weight: 3 },
+					{ value: plugin.displayName, weight: 3 },
+				]),
+				...(item.runtimeWarnings ?? []).map(warning => ({ value: warning, weight: 1 })),
 				...(item.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
 				...(item.arguments ?? []).flatMap(argument => [
 					{ value: argument.name, weight: 2 },
@@ -293,9 +300,20 @@ function SkillTemplateDropdown({
 			) : displayedItems.length === 0 ? (
 				<div className={searchableMenuEmptyStateClasses}>No templates match your search.</div>
 			) : (
-				<GroupedMenuSection title="User-message templates" ariaLabel="User-message templates">
-					{displayedItems.map(item => renderSkillTemplateMenuItem(item, onPick))}
-				</GroupedMenuSection>
+				<>
+					{[
+						...Map.groupBy(
+							displayedItems,
+							item =>
+								item.plugins[0]?.displayName ??
+								(item.builtIn ? 'Built-in Skills' : item.sourceID || 'Unattached Skills')
+						),
+					].map(([group, templates]) => (
+						<GroupedMenuSection key={group} title={group} ariaLabel={`${group} templates`}>
+							{templates.map(item => renderSkillTemplateMenuItem(item, onPick))}
+						</GroupedMenuSection>
+					))}
+				</>
 			)}
 		</Menu>
 	);
@@ -420,8 +438,9 @@ function SkillTemplateRenderModalContent({
 					)}
 					{item.hasResources ? (
 						<div className="alert alert-warning rounded-xl text-xs">
-							This template contains resources. The current read API reports their presence, but does not expose
-							attachable paths. This action inserts text only; resource files can be attached separately.
+							This template has {item.resources?.totalCount ?? 'indexed'} resource files. They are visible in Skill
+							Details. This action inserts text only; attach files separately until the Composer attachment handoff is
+							connected.
 						</div>
 					) : null}
 
@@ -568,7 +587,7 @@ function SkillTemplateBottomBarChipInner({
 					title: 'When you insert',
 					items: [
 						'The rendered template text is added directly to the composer.',
-						'Templates with arguments or resources open a configuration dialog first. Resource paths are not available through the current read API.',
+						'Templates with arguments or resources open a configuration dialog first. Resource attachment is not yet connected to this dialog.',
 						'There is no active-template count or clear action after insertion.',
 					],
 				},

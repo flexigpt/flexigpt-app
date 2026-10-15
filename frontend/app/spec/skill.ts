@@ -193,6 +193,14 @@ export interface StoreManagedSkillDocument {
 	document: SkillDocumentInput;
 }
 
+export interface ArtifactSkillDetails {
+	artifact: StoreArtifact;
+	document: SkillDocumentInput;
+	location: string;
+	resources: SkillResourceInfo;
+	runtimeWarnings?: string[];
+}
+
 export interface SkillDirectoryRegistration {
 	rootID: ArtifactRootID;
 	rootPath: string;

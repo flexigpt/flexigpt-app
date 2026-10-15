@@ -256,6 +256,10 @@ export function SkillsBottomBarChip({
 				{ value: skill.ref.rootID, weight: 2 },
 				{ value: skill.ref.artifactID, weight: 2 },
 				{ value: skill.runtimeError, weight: 1 },
+				{ value: skill.location, weight: 2 },
+				...(skill.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
+				...(skill.arguments ?? []).map(argument => ({ value: argument.name, weight: 1 })),
+				...(skill.runtimeWarnings ?? []).map(warning => ({ value: warning, weight: 1 })),
 			],
 			fallbackCompare: compareSkills,
 		});
@@ -360,16 +364,21 @@ export function SkillsBottomBarChip({
 	const openFork = async (item: ComposerSkillCatalogItem) => {
 		setActionError('');
 		try {
-			if (!item.managed) {
-				throw new Error('The current read API does not expose this external or built-in source document for copying.');
-			}
-			const source = await skillManagementAPI.getManagedSkillDocument(item.ref);
-			if (source.artifact.revision !== item.revision) {
-				throw new Error('Skill changed. Refresh before forking.');
-			}
+			const document = await skillManagementAPI.copySkillDocument({
+				ref: item.ref,
+				name: item.name,
+				displayName: item.displayName,
+				description: item.description,
+				state: item.state,
+				enabled: item.enabled,
+				revision: item.revision,
+				definitionDigest: item.definitionDigest,
+				builtIn: item.builtIn,
+				managed: item.managed,
+			});
 			await openManagedAction({
 				mode: 'fork',
-				seed: { document: source.document, enabled: true },
+				seed: { document, enabled: true },
 			});
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Source document could not be loaded.');
@@ -379,7 +388,7 @@ export function SkillsBottomBarChip({
 
 	const addAsInstructions = async (item: ComposerSkillCatalogItem) => {
 		try {
-			const document = await skillManagementAPI.readManagedInstructionSource({
+			const source = await skillManagementAPI.prepareInstructionSource({
 				ref: item.ref,
 				name: item.name,
 				displayName: item.displayName,
@@ -393,9 +402,9 @@ export function SkillsBottomBarChip({
 			});
 			systemPrompt.addAndSelectInstructionSkillSource({
 				displayName: skillLabel(item),
-				prompt: document.markdownBody,
+				prompt: source.text,
 				skillRef: item.ref,
-				sourceTags: document.tags,
+				sourceTags: source.tags,
 			});
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Instructions could not be copied.');
@@ -793,12 +802,8 @@ export function SkillsBottomBarChip({
 											<button
 												type="button"
 												className="btn btn-ghost btn-xs rounded-lg"
-												disabled={isInputLocked || !skill.managed}
-												title={
-													!skill.managed
-														? 'Source-document copying requires the management document query described below.'
-														: 'Copy the managed document; resource files are not copied.'
-												}
+												disabled={isInputLocked || !skill.document}
+												title="Copy the verified document; resource files are not copied."
 												onClick={() => {
 													void openFork(skill);
 												}}
@@ -808,14 +813,8 @@ export function SkillsBottomBarChip({
 											<button
 												type="button"
 												className="btn btn-ghost btn-xs rounded-lg"
-												disabled={
-													isInputLocked ||
-													!skill.managed ||
-													!selectable(skill) ||
-													skill.hasArguments ||
-													skill.hasResources
-												}
-												title="Copy this simple managed Skill as an explicit instruction source. This does not enable its lifecycle."
+												disabled={isInputLocked || !selectable(skill) || skill.hasArguments || skill.hasResources}
+												title="Render this simple Skill as an explicit instruction source. This does not enable its lifecycle."
 												onClick={() => {
 													const identity = `skill-instructions:${skillRefKey(skill.ref)}`;
 													if (systemPrompt.instructionSources.some(source => source.identityKey === identity)) {

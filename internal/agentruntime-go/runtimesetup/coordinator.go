@@ -553,9 +553,49 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 	ctx context.Context,
 	request sessionRuntime.UserMessageSkillTemplatePreparationRequest,
 ) (sessionRuntime.UserMessageSkillTemplateResult, error) {
-	ref, err := artifactRef(request.Skill)
+	skill, text, err := c.renderSelectedSkill(
+		ctx,
+		request.Skill,
+		request.Arguments,
+		document.SkillInsertUserMessage,
+	)
 	if err != nil {
 		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	}
+	return sessionRuntime.UserMessageSkillTemplateResult{
+		Skill: skill,
+		Text:  text,
+	}, nil
+}
+
+func (c *coordinator) PreviewInstructionSkill(
+	ctx context.Context,
+	request sessionRuntime.InstructionSkillPreviewRequest,
+) (sessionRuntime.InstructionSkillPreviewResult, error) {
+	skill, text, err := c.renderSelectedSkill(
+		ctx,
+		request.Skill,
+		request.Arguments,
+		document.SkillInsertInstructions,
+	)
+	if err != nil {
+		return sessionRuntime.InstructionSkillPreviewResult{}, err
+	}
+	return sessionRuntime.InstructionSkillPreviewResult{
+		Skill: skill,
+		Text:  text,
+	}, nil
+}
+
+func (c *coordinator) renderSelectedSkill(
+	ctx context.Context,
+	selection sessionRuntime.ArtifactSelection,
+	arguments map[string]string,
+	expectedInsert document.SkillInsert,
+) (sessionRuntime.ArtifactReference, string, error) {
+	ref, err := artifactRef(selection)
+	if err != nil {
+		return sessionRuntime.ArtifactReference{}, "", err
 	}
 
 	resolved, err := c.skillResolver.ResolveSkills(
@@ -563,22 +603,22 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 		[]artifactModel.ArtifactRef{ref},
 	)
 	if err != nil {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+		return sessionRuntime.ArtifactReference{}, "", err
 	}
 	if len(resolved.Values) != 1 {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
-			"skill resolver did not return exactly one user-message template",
+		return sessionRuntime.ArtifactReference{}, "", errors.New(
+			"skill resolver did not return exactly one Skill",
 		)
 	}
 
 	value := resolved.Values[0]
 	if value.Artifact != ref {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+		return sessionRuntime.ArtifactReference{}, "", errors.New(
 			"skill resolver returned another Artifact",
 		)
 	}
 	if !value.Enabled {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
+		return sessionRuntime.ArtifactReference{}, "", errors.New(
 			"selected user-message Skill is disabled",
 		)
 	}
@@ -588,8 +628,8 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 		value.Revision,
 		cryptoutil.Digest(value.DefinitionDigest),
 	)
-	if err := requireSelectionPin(request.Skill, used); err != nil {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+	if err := requireSelectionPin(selection, used); err != nil {
+		return sessionRuntime.ArtifactReference{}, "", err
 	}
 
 	records, err := c.skillRuntime.ListAgentSkills(
@@ -599,7 +639,7 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 		},
 	)
 	if err != nil {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+		return sessionRuntime.ArtifactReference{}, "", err
 	}
 
 	found := false
@@ -609,17 +649,17 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 		}
 
 		insert, supported := document.NormalizeSkillInsert(record.Insert)
-		if !supported || string(insert) != "user-message" {
-			return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
-				"selected skill is not a user-message template",
+		if !supported || insert != expectedInsert {
+			return sessionRuntime.ArtifactReference{}, "", errors.New(
+				"selected Skill has a different insertion behavior",
 			)
 		}
 		found = true
 		break
 	}
 	if !found {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
-			"skill runtime did not index the selected template",
+		return sessionRuntime.ArtifactReference{}, "", errors.New(
+			"skill runtime did not index the selected Skill",
 		)
 	}
 
@@ -628,23 +668,20 @@ func (c *coordinator) PrepareUserMessageSkillTemplate(
 		&skillRuntime.RenderSkillRequest{
 			Body: &skillRuntime.RenderSkillRequestBody{
 				Definition: value.Definition,
-				Arguments:  maps.Clone(request.Arguments),
+				Arguments:  maps.Clone(arguments),
 			},
 		},
 	)
 	if err != nil {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, err
+		return sessionRuntime.ArtifactReference{}, "", err
 	}
 	if rendered == nil || rendered.Body == nil {
-		return sessionRuntime.UserMessageSkillTemplateResult{}, errors.New(
-			"skill runtime returned no rendered template",
+		return sessionRuntime.ArtifactReference{}, "", errors.New(
+			"skill runtime returned no rendered Skill",
 		)
 	}
 
-	return sessionRuntime.UserMessageSkillTemplateResult{
-		Skill: sessionArtifactReference(value.Artifact),
-		Text:  rendered.Body.Text,
-	}, nil
+	return sessionArtifactReference(value.Artifact), rendered.Body.Text, nil
 }
 
 func cloneConfiguration(

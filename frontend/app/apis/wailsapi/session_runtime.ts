@@ -11,6 +11,8 @@ import type {
 	ResolveWaitCommand,
 	ResumeRunCommand,
 	RetryCallCommand,
+	SessionInstructionSkillPreviewRequest,
+	SessionInstructionSkillPreviewResult,
 	SessionRunSnapshot,
 	SessionRuntimeListItem,
 	SessionSnapshot,
@@ -41,7 +43,7 @@ import {
 	sessionSnapshotFromWails,
 	sessionUserMessageSkillTemplateResultFromWails,
 } from '@/apis/wailsapi/session_projection';
-import { wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CancelRun,
 	CompleteCallAsError,
@@ -57,6 +59,7 @@ import {
 	OpenAppView,
 	PauseRun,
 	PrepareUserMessageSkillTemplate,
+	PreviewInstructionSkill,
 	ReadAppResource,
 	RenameSession,
 	ResolveWait,
@@ -123,6 +126,15 @@ function detachRuntimeEventBridgeWhenUnused(): void {
  * request-scoped completion stream listeners such as text-${requestID}.
  */
 export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
+	async previewInstructionSkill(
+		command: SessionInstructionSkillPreviewRequest
+	): Promise<SessionInstructionSkillPreviewResult> {
+		return requiredObject<SessionInstructionSkillPreviewResult>(
+			await PreviewInstructionSkill(command as Parameters<typeof PreviewInstructionSkill>[0]),
+			'PreviewInstructionSkill'
+		);
+	}
+
 	subscribeRuntimeEvents(listener: RuntimeEventListener): () => void {
 		runtimeEventListeners.add(listener);
 		attachRuntimeEventBridge();

@@ -12,6 +12,8 @@ import type {
 	ResolveWaitCommand,
 	ResumeRunCommand,
 	RetryCallCommand,
+	SessionInstructionSkillPreviewRequest,
+	SessionInstructionSkillPreviewResult,
 	SessionRunObservation,
 	SessionRunObserver,
 	SessionRunSnapshot,
@@ -79,6 +81,12 @@ export class SessionManagementAPI implements ISessionManagementAPI {
 		private readonly runtime: ISessionRuntimeAPI,
 		private readonly store: ISessionStoreAPI
 	) {}
+
+	previewInstructionSkill(
+		command: SessionInstructionSkillPreviewRequest
+	): Promise<SessionInstructionSkillPreviewResult> {
+		return this.runtime.previewInstructionSkill(command);
+	}
 
 	subscribeRuntimeEvents(listener: (event: SessionRuntimeEvent) => void): () => void {
 		return this.runtime.subscribeRuntimeEvents(listener);
