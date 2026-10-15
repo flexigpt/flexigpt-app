@@ -311,6 +311,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachFiles: handleAttachFiles,
 		attachDirectory: handleAttachDirectory,
 		attachURL: handleAttachURL,
+		attachPathsAsAttachments,
 		changeAttachmentMode: handleChangeAttachmentContentBlockMode,
 		removeAttachment: handleRemoveAttachment,
 		removeDirectoryGroup: handleRemoveDirectoryGroup,
@@ -473,6 +474,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			focusEditorAtEnd();
 		},
 		[editor, focusEditorAtEnd]
+	);
+
+	const attachApprovedTemplateResourcePaths = useCallback(
+		(paths: string[], canApply: () => boolean) => {
+			return attachPathsAsAttachments(paths, undefined, {
+				canApply,
+			});
+		},
+		[attachPathsAsAttachments]
 	);
 
 	const handleAttachTool = useCallback(
@@ -1862,6 +1872,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 							focusEditorAtEnd();
 						}}
 						onInsertTemplateText={handleInsertTemplateText}
+						onAttachApprovedTemplateResourcePaths={attachApprovedTemplateResourcePaths}
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}
 						attachmentMenuState={attachmentMenu}

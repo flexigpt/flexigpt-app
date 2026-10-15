@@ -127,13 +127,32 @@ interface UseComposerAttachmentsArgs {
 	focusEditorAtEnd: () => void;
 }
 
+interface AttachPathsAsAttachmentsOptions {
+	/**
+	 * Allows an asynchronous caller, such as template insertion, to prevent a
+	 * completed backend attachment admission from mutating a Composer that has
+	 * become locked while the request was in flight.
+	 */
+	canApply?: () => boolean;
+}
+
+function assertPathAttachmentApplicationAllowed(options: AttachPathsAsAttachmentsOptions | undefined): void {
+	if (options?.canApply && !options.canApply()) {
+		throw new Error('Composer input became locked before attachments could be added.');
+	}
+}
+
 interface UseComposerAttachmentsResult {
 	attachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
 	attachFiles: () => Promise<void>;
 	attachDirectory: () => Promise<void>;
 	attachURL: (url: string) => Promise<void>;
-	attachPathsAsAttachments: (paths: string[], maxFilesPerDir?: number) => Promise<PathAttachmentsResult | undefined>;
+	attachPathsAsAttachments: (
+		paths: string[],
+		maxFilesPerDir?: number,
+		options?: AttachPathsAsAttachmentsOptions
+	) => Promise<PathAttachmentsResult | undefined>;
 	changeAttachmentMode: (att: UIAttachment, mode: AttachmentContentBlockMode) => void;
 	removeAttachment: (att: UIAttachment) => void;
 	removeDirectoryGroup: (groupId: string) => void;
@@ -431,13 +450,23 @@ export function useComposerAttachments({
 	);
 
 	const attachPathsAsAttachments = useCallback(
-		async (paths: string[], maxFilesPerDir = MAX_DIRECTORY_FILES_TO_SCAN) => {
-			const cleanPaths = paths.map(path => path.trim()).filter(Boolean);
+		async (
+			paths: string[],
+			maxFilesPerDir = MAX_DIRECTORY_FILES_TO_SCAN,
+			options: AttachPathsAsAttachmentsOptions = {}
+		) => {
+			// Keep the exact backend-approved path value. In particular, do not
+			// trim a valid filesystem name that happens to begin or end with
+			// whitespace. Deduplication is exact for the same reason.
+			const cleanPaths = [...new Set(paths.filter(path => path.trim().length > 0))];
 			if (cleanPaths.length === 0) {
 				return undefined;
 			}
 
+			assertPathAttachmentApplicationAllowed(options);
 			const result = await backendAPI.getPathsAsAttachments(cleanPaths, maxFilesPerDir);
+			assertPathAttachmentApplicationAllowed(options);
+
 			applyFileAttachments(result.fileAttachments ?? []);
 			for (const dirResult of result.dirAttachments ?? []) {
 				applyDirectoryAttachments(dirResult);

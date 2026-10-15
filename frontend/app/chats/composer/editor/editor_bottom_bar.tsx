@@ -3,6 +3,7 @@ import { memo, useMemo } from 'react';
 
 import type { MenuStore } from '@ariakit/react';
 
+import type { PathAttachmentsResult } from '@/spec/attachment';
 import type { ProviderSDKType } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
@@ -35,6 +36,10 @@ interface EditorBottomBarProps {
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
 	onInsertTemplateText: (text: string) => Promise<void> | void;
+	onAttachApprovedTemplateResourcePaths: (
+		paths: string[],
+		canApply: () => boolean
+	) => Promise<PathAttachmentsResult | undefined>;
 
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
@@ -96,6 +101,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
 	onInsertTemplateText,
+	onAttachApprovedTemplateResourcePaths,
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
@@ -205,6 +211,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						loadError={skillsLoadError}
 						onRefresh={onRefreshSkills}
 						onInsertTemplateText={onInsertTemplateText}
+						onAttachApprovedTemplateResourcePaths={onAttachApprovedTemplateResourcePaths}
 						isInputLocked={isInputLocked}
 					/>
 
