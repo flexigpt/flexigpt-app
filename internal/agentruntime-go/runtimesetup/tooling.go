@@ -164,25 +164,34 @@ func (c *coordinator) prepareTools(
 			*contribution.target,
 		)
 		if err != nil {
+			item := contribution.item
+			item.State = sessionRuntime.ResolutionStateUnavailable
+			item.Reason = err.Error()
 			summary.Tools = append(
 				summary.Tools,
-				sessionRuntime.ResolutionItem{
-					Key:    contribution.key,
-					Kind:   resolutionItemKindTool,
-					Owner:  contribution.owner,
-					State:  sessionRuntime.ResolutionStateUnavailable,
-					Reason: err.Error(),
-				},
+				item,
 			)
+			severity := sessionRuntime.DiagnosticSeverityWarning
+			if contribution.required {
+				severity = sessionRuntime.DiagnosticSeverityError
+			}
 			summary.Diagnostics = append(
 				summary.Diagnostics,
 				sessionRuntime.ResolutionDiagnostic{
-					Severity: sessionRuntime.DiagnosticSeverityWarning,
+					Severity: severity,
 					Code:     "tool_unavailable",
 					Message:  err.Error(),
 					Key:      contribution.key,
 				},
 			)
+			if contribution.required {
+				return nil, preparedBindings{}, operationPreparationError(
+					"agent_required_tool_unavailable",
+					err.Error(),
+					*summary,
+					err,
+				)
+			}
 			continue
 		}
 

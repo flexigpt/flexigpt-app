@@ -79,6 +79,38 @@ func (r *Runtime) dispatchModel(
 		r.mu.Unlock()
 		return
 	}
+	if operation.Automatic &&
+		automationHoldApplies(
+			run.Controls.AutomaticContinuation,
+			operation.ID,
+		) {
+		effects := runtimeEffects{}
+		if run.State != RunStateWaiting {
+			run.State = RunStateWaiting
+			r.touchRunLocked(sessionValue, run)
+			r.recordRunEventLocked(
+				&effects,
+				sessionValue,
+				run,
+				"",
+				RuntimeEventRunStateChanged,
+				operation.ID,
+				"",
+				"",
+				"",
+				RunStateChangedEventData{State: RunStateWaiting},
+			)
+			r.checkpointLocked(
+				&effects,
+				RuntimeEventRunStateChanged,
+				sessionValue,
+				run,
+			)
+		}
+		r.mu.Unlock()
+		r.flushEffects(operationCtx, effects)
+		return
+	}
 
 	operation.State = OperationStatePreparing
 	r.cancels[modelCancelKey(run.ID, operation.ID)] = cancel

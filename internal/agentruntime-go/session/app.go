@@ -285,7 +285,10 @@ func (r *Runtime) ExecuteAppTool(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
-	if run.State.Terminal() || run.Controls.CancellationRequested {
+	if run.State.Terminal() ||
+		run.Controls.CancellationRequested ||
+		run.Controls.Paused ||
+		hasPendingRecoveryReview(run) {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,
@@ -295,7 +298,7 @@ func (r *Runtime) ExecuteAppTool(
 				RunID:           command.RunID,
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     run.Revision,
-				Message:         "terminal or cancelling runs cannot execute app tools",
+				Message:         "run is not dispatchable for app tool execution",
 			},
 		)
 		r.mu.Unlock()
@@ -365,8 +368,10 @@ func (r *Runtime) ExecuteAppTool(
 	}
 	if sessionValue.Revision != sessionRevision ||
 		run.Revision != runRevision ||
+		run.Controls.Paused ||
 		run.State.Terminal() ||
-		run.Controls.CancellationRequested {
+		run.Controls.CancellationRequested ||
+		hasPendingRecoveryReview(run) {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,

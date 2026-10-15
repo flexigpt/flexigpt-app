@@ -63,6 +63,8 @@ export interface ComposerBoxHandle {
 interface ComposerBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
 	isBusy: boolean;
+	isGenerating: boolean;
+	allowContinuationInput?: boolean;
 	isHydrating: boolean;
 	abortRef: RefObject<AbortController | null>;
 	shortcutConfig: ShortcutConfig;
@@ -73,7 +75,18 @@ interface ComposerBoxProps {
 
 export const ComposerBox = memo(
 	forwardRef<ComposerBoxHandle, ComposerBoxProps>(function ComposerBox(
-		{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing, onCancelRun },
+		{
+			onSend,
+			isBusy,
+			isGenerating,
+			allowContinuationInput = false,
+			isHydrating,
+			abortRef,
+			shortcutConfig,
+			editingMessageId,
+			onCancelEditing,
+			onCancelRun,
+		},
 		ref
 	) {
 		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
@@ -248,8 +261,10 @@ export const ComposerBox = memo(
 
 				<EditorArea
 					ref={editorAreaRef}
-					isGenerating={isBusy}
-					isInputLocked={isBusy || isHydrating || !composerContext.hasRunnableModel}
+					isGenerating={isGenerating}
+					isRunActive={isBusy}
+					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
+					isInputLocked={(isBusy && !allowContinuationInput) || isHydrating || !composerContext.hasRunnableModel}
 					currentProviderSDKType={composerContext.chatOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmit}

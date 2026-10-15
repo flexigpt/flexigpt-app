@@ -420,6 +420,12 @@ function projectTranscriptMessage(
 	const operationCalls = message.operationID ? (index.callsByOperationID.get(message.operationID) ?? []) : [];
 	const appsByID = operationRun ? index.appsByRunID.get(operationRun.id) : undefined;
 	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
+	const modelRef = operation?.request.configuration.model
+		? {
+				rootID: operation.request.configuration.model.rootID,
+				artifactID: operation.request.configuration.model.artifactID,
+			}
+		: undefined;
 
 	const toolResults =
 		message.toolResults
@@ -437,6 +443,7 @@ function projectTranscriptMessage(
 		createdAt: message.createdAt,
 		role: messageRole(message.role),
 		status: messageStatus(message, operation?.error),
+		modelRef,
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
 		inputs: (message.protocolInputs ?? [])
@@ -444,7 +451,7 @@ function projectTranscriptMessage(
 			.filter(value => value !== undefined) as InputUnion[],
 		outputs,
 		error: message.error ?? operation?.error,
-		debugDetails: message.runtimeMetadata,
+		debugDetails: message.runtimeMetadata ?? operation?.runtimeMetadata,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
 		uiToolCalls:

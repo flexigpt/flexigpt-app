@@ -56,6 +56,7 @@ export default function ChatsPage() {
 		getConversationForExport,
 		tabBarItems,
 		openConversationIds,
+		openSessionForMCPAppMessage,
 		searchRefreshKey,
 		maxTabs,
 		preloadWorkflowStarter,
@@ -148,6 +149,7 @@ export default function ChatsPage() {
 					initialScrollTopByTab={initialScrollTopByTab}
 					updateTab={updateTab}
 					saveUpdatedConversation={saveUpdatedConversation}
+					openSessionForMCPAppMessage={openSessionForMCPAppMessage}
 				/>
 			</div>
 		</PageFrame>

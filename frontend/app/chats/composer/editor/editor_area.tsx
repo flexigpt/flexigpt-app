@@ -109,6 +109,8 @@ export interface EditorAreaHandle {
 interface EditorAreaProps {
 	isGenerating: boolean;
 	isInputLocked: boolean;
+	isRunActive: boolean;
+	submissionMode?: 'message' | 'continuation';
 	currentProviderSDKType: ProviderSDKType;
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
@@ -246,6 +248,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	{
 		isGenerating,
 		isInputLocked,
+		isRunActive,
+		submissionMode = 'message',
 		currentProviderSDKType,
 		shortcutConfig,
 		onSubmit,
@@ -1587,7 +1591,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				void workspace.detachWorkspace(false);
 			},
 			requestStopResponse: () => {
-				if (isGenerating) {
+				if (isRunActive) {
 					onRequestStop();
 				}
 			},
@@ -1658,7 +1662,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			mcp,
 			applySkillSelectionState,
 			applyInstalledSkillSelectionState,
-			isGenerating,
+			isRunActive,
 			onRequestStop,
 			restoreSessionConfiguration,
 		]
@@ -1671,6 +1675,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
+	const sendActionText = submissionMode === 'continuation' ? 'Stage continuation and continue run' : 'Send message';
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
 		if (workspaceExecutionBlocked) {
@@ -1773,6 +1778,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
 					<div className="bg-base-100 border-base-200 flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
 						<div className="flex min-h-0 min-w-0 grow flex-col p-0">
+							{submissionMode === 'continuation' ? (
+								<div className="border-info/30 bg-info/10 mx-3 mt-2 flex items-center gap-2 rounded-xl border px-2 py-1 text-xs">
+									<FiFastForward size={14} aria-hidden="true" />
+									<span>This input will be staged for the waiting Run and then continued.</span>
+								</div>
+							) : null}
+
 							{editingMessageId && (
 								<div className="flex min-h-0 items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
@@ -1845,6 +1857,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex shrink-0 flex-col items-end justify-end gap-2 p-1">
+							{!isGenerating && isRunActive ? (
+								<HoverTip content="Cancel active run" placement="left">
+									<button
+										type="button"
+										className="btn btn-circle btn-warning btn-sm shrink-0"
+										onClick={onRequestStop}
+										aria-label="Cancel active run"
+									>
+										<FiSquare size={18} />
+									</button>
+								</HoverTip>
+							) : null}
+
 							{isGenerating ? (
 								<HoverTip
 									content={stopResponseShortcut ? `Stop response (${stopResponseShortcut})` : 'Stop response'}
@@ -1907,7 +1932,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 									{/* Send only . Disabled while there are pending tools. */}
 									<HoverTip
-										content={hasPendingToolCalls ? 'Send (enabled after tools finish)' : 'Send message'}
+										content={hasPendingToolCalls ? 'Send (enabled after tools finish)' : sendActionText}
 										placement="left"
 									>
 										<button
@@ -1920,7 +1945,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 												}
 												void doSubmit({ runPendingTools: false });
 											}}
-											aria-label="Send message"
+											aria-label={sendActionText}
 										>
 											<FiSend size={18} />
 										</button>

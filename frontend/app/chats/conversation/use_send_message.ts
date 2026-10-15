@@ -12,7 +12,11 @@ import { sessionManagementAPI } from '@/apis/baseapi';
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
-import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
+import {
+	requireAcceptedSessionCommand,
+	selectedSessionRun,
+	sessionCommandMeta,
+} from '@/chats/session/session_commands';
 import { buildSessionSubmissionIntent } from '@/chats/session/session_intent';
 
 interface UseSendMessageArgs {
@@ -131,6 +135,88 @@ export function useSendMessage({
 		[scrollTabToBottomSoon, tabExists, tabsRef, updateTab]
 	);
 
+	const stageContinuationForTab = useCallback(
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+
+			if (!tab) {
+				return;
+			}
+			if (!options.model) {
+				throw new Error('Select an available Artifact-backed model before continuing this Run.');
+			}
+			if (!tab.sessionID) {
+				throw new Error('A Session is required before continuation input can be staged.');
+			}
+			if (payload.toolOutputs.length > 0) {
+				throw new Error(
+					'Tool results are owned by the active Session Run and cannot be staged from the Composer continuation input.'
+				);
+			}
+
+			try {
+				const snapshot = tab.sessionSnapshot ?? (await sessionManagementAPI.getSessionSnapshot(tab.sessionID));
+				const run = selectedSessionRun(snapshot, tab.activeRunID);
+
+				if (!run || run.state !== SessionRunState.Waiting) {
+					throw new Error('The active Run is not waiting for continuation input.');
+				}
+
+				const submission = await buildSessionSubmissionIntent(payload, options);
+				const stagedAttachments = [...(run.continuation.attachments ?? []), ...(submission.input.attachments ?? [])];
+				const stagedAppContext = [...(run.continuation.mcpAppContext ?? []), ...(submission.input.mcpAppContext ?? [])];
+
+				const continuation = {
+					...run.continuation,
+					...(submission.input.text?.trim() ? { text: submission.input.text } : {}),
+					...(stagedAttachments.length > 0 ? { attachments: stagedAttachments } : {}),
+					...(stagedAppContext.length > 0 ? { mcpAppContext: stagedAppContext } : {}),
+					configuration: submission.configuration,
+				};
+
+				const staged = requireAcceptedSessionCommand(
+					await sessionManagementAPI.updateContinuationInput({
+						meta: sessionCommandMeta(snapshot.session.revision, run.revision),
+						sessionID: tab.sessionID,
+						runID: run.id,
+						expectedInputRevision: run.continuation.revision,
+						input: continuation,
+					}),
+					'Stage continuation input'
+				);
+
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.continueRun({
+						meta: sessionCommandMeta(
+							staged.sessionRevision ?? snapshot.session.revision,
+							staged.runRevision ?? run.revision
+						),
+						sessionID: tab.sessionID,
+						runID: run.id,
+					}),
+					'Continue Run'
+				);
+
+				updateTab(tabId, current => ({
+					...current,
+					isBusy: true,
+					runtimeError: undefined,
+				}));
+				scrollTabToBottomSoon(tabId);
+			} catch (error) {
+				updateTab(tabId, current => ({
+					...current,
+					runtimeError:
+						error instanceof Error
+							? error.message
+							: 'The continuation input could not be accepted by the Session Runtime.',
+				}));
+				throw error;
+			}
+		},
+		[scrollTabToBottomSoon, tabsRef, updateTab]
+	);
+
 	const sendMessageForTab = useCallback(
 		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
@@ -157,12 +243,13 @@ export function useSendMessage({
 					'Edit and resend'
 				);
 				updateTab(tabId, current => ({ ...current, editingMessageId: null, isBusy: true }));
+				scrollTabToBottomSoon(tabId);
 				return;
 			}
 
 			await updateStreamingMessage(tabId, payload, options);
 		},
-		[tabsRef, updateStreamingMessage, updateTab]
+		[tabsRef, updateStreamingMessage, updateTab, scrollTabToBottomSoon]
 	);
 
 	const beginEditMessageForTab = useCallback(
@@ -211,6 +298,7 @@ export function useSendMessage({
 
 	return {
 		sendMessageForTab,
+		stageContinuationForTab,
 		beginEditMessageForTab,
 		cancelEditingForTab,
 	};

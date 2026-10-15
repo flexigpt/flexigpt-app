@@ -453,6 +453,7 @@ type ModelOperation struct {
 	State            OperationState       `json:"state"`
 	StartedAt        time.Time            `json:"startedAt,omitzero"`
 	FinishedAt       time.Time            `json:"finishedAt,omitzero"`
+	Automatic        bool                 `json:"automatic,omitempty"`
 	Request          ModelOperationInput  `json:"request"`
 	StreamedText     string               `json:"streamedText,omitempty"`
 	StreamedThinking string               `json:"streamedThinking,omitempty"`

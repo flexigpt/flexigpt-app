@@ -6,12 +6,14 @@ import { useTabStore } from '@ariakit/react/tab';
 
 import type { Conversation } from '@/spec/session';
 import type { SessionSearchItem } from '@/spec/sessionstore';
+import { RoleEnum } from '@/spec/inference';
 import { SessionSnapshotObservationKind } from '@/spec/session';
 import { SessionRuntimeEventKind } from '@/spec/session_base';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { defaultShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
 import { omitManyKeys } from '@/lib/obj_utils';
+import { generateTitle } from '@/lib/title_utils';
 
 import { sessionManagementAPI } from '@/apis/baseapi';
 
@@ -257,6 +259,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const sessionObserverByTabRef = useRef(new Map<string, () => void>());
 	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
 	const tabLoadVersionRef = useRef(new Map<string, number>());
+	const autoTitleAttemptBySessionIDRef = useRef(new Map<string, string>());
 
 	const beginTabLoad = useCallback((tabId: string): number => {
 		const nextVersion = (tabLoadVersionRef.current.get(tabId) ?? 0) + 1;
@@ -378,6 +381,57 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		[normalizeAndCommitTabs]
 	);
 
+	const maybeAutomaticallyRenameSession = useCallback(
+		(tabId: string, snapshot: NonNullable<ChatTabState['sessionSnapshot']>, conversation: Conversation) => {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+
+			if (!tab || tab.sessionID !== snapshot.session.id || tab.manualTitleLocked) {
+				return;
+			}
+
+			const userMessages = conversation.messages.filter(message => message.role === RoleEnum.User);
+			if (userMessages.length === 0 || userMessages.length > 2) {
+				return;
+			}
+
+			const first = generateTitle(userMessages[0].uiContent);
+			const proposed =
+				userMessages.length === 1
+					? first.title
+					: (() => {
+							const second = generateTitle(userMessages[1].uiContent);
+							return second.score > first.score ? second.title : first.title;
+						})();
+			const nextTitle = sanitizeConversationTitle(proposed);
+			const currentTitle = snapshot.session.title || 'Conversation';
+
+			if (!nextTitle || nextTitle === currentTitle) {
+				return;
+			}
+
+			const attemptKey = `${snapshot.session.revision}:${nextTitle}`;
+			if (autoTitleAttemptBySessionIDRef.current.get(snapshot.session.id) === attemptKey) {
+				return;
+			}
+
+			autoTitleAttemptBySessionIDRef.current.set(snapshot.session.id, attemptKey);
+
+			void sessionManagementAPI
+				.renameSession({
+					meta: sessionCommandMeta(snapshot.session.revision),
+					sessionID: snapshot.session.id,
+					title: nextTitle,
+				})
+				.then(receipt => {
+					requireAcceptedSessionCommand(receipt, 'Rename Session');
+				})
+				.catch((error: unknown) => {
+					console.error('Failed to refine Session title:', error);
+				});
+		},
+		[]
+	);
+
 	const applySessionSnapshot = useCallback(
 		(tabId: string, snapshot: ChatTabState['sessionSnapshot']) => {
 			if (!snapshot) {
@@ -385,6 +439,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}
 
 			const activeRun = selectedSessionRun(snapshot);
+			const conversation = projectSessionSnapshotToConversation(snapshot, activeRun?.id);
 
 			updateTab(tabId, previous => {
 				if (previous.sessionID !== snapshot.session.id) {
@@ -398,7 +453,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					...previous,
 					sessionSnapshot: snapshot,
 					activeRunID: activeRun?.id,
-					conversation: projectSessionSnapshotToConversation(snapshot, activeRun?.id),
+					conversation,
 					isLoaded: true,
 					isHydrating: composerConfigurationRestored ? previous.isHydrating : true,
 					composerConfigurationRestored,
@@ -408,6 +463,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				};
 			});
 
+			maybeAutomaticallyRenameSession(tabId, snapshot, conversation);
+
 			if (activeRun && (activeRun.skillSession.enabled !== undefined || activeRun.skillSession.active !== undefined)) {
 				conversationAreaRef.current?.syncComposerSkillSessionState(
 					tabId,
@@ -416,7 +473,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				);
 			}
 		},
-		[conversationAreaRef, updateTab]
+		[conversationAreaRef, maybeAutomaticallyRenameSession, updateTab]
 	);
 
 	const ensureSessionObserver = useCallback(
@@ -967,6 +1024,54 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		[conversationAreaRef, ensureTabLoaded, loadConversationIntoTab, selectTab]
 	);
 
+	const openSessionForMCPAppMessage = useCallback(
+		async (sessionID: string): Promise<string | null> => {
+			if (!sessionID.trim()) {
+				return null;
+			}
+
+			const existing = tabsRef.current.find(tab => tab.sessionID === sessionID);
+			if (existing) {
+				selectTab(existing.tabId);
+				await ensureTabLoaded(existing.tabId);
+				requestAnimationFrame(() => {
+					conversationAreaRef.current?.focusInput(existing.tabId);
+				});
+				return existing.tabId;
+			}
+
+			try {
+				const snapshot = await sessionManagementAPI.getSessionSnapshot(sessionID);
+				const targetId = getOrCreateScratchTabForStarter();
+
+				if (!targetId) {
+					return null;
+				}
+
+				selectTab(targetId);
+				await loadConversationIntoTab(targetId, {
+					id: snapshot.session.id,
+					title: snapshot.session.title || 'Conversation',
+					modifiedAt: snapshot.session.updatedAt,
+				});
+
+				const loaded = tabsRef.current.find(tab => tab.tabId === targetId && tab.sessionID === snapshot.session.id);
+				if (!loaded) {
+					return null;
+				}
+
+				requestAnimationFrame(() => {
+					conversationAreaRef.current?.focusInput(targetId);
+				});
+				return targetId;
+			} catch (error) {
+				console.error('Failed to open owning Session for MCP App draft:', error);
+				return null;
+			}
+		},
+		[conversationAreaRef, ensureTabLoaded, getOrCreateScratchTabForStarter, loadConversationIntoTab, selectTab]
+	);
+
 	useEffect(() => {
 		void ensureTabLoaded(selectedTabId);
 	}, [ensureTabLoaded, selectedTabId]);
@@ -1061,6 +1166,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		tabBarItems,
 		openConversationIds,
 		searchRefreshKey,
+		openSessionForMCPAppMessage,
 		maxTabs: MAX_TABS,
 		preloadWorkflowStarter,
 	};

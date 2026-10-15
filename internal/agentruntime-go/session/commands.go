@@ -714,10 +714,11 @@ func (r *Runtime) StartRun(
 			command.Meta,
 			fingerprint,
 			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				SessionRevision: sessionValue.Revision,
-				Message:         preparationErr.Error(),
+				CommandID:          command.Meta.ID,
+				SessionID:          command.SessionID,
+				SessionRevision:    sessionValue.Revision,
+				Message:            preparationErr.Error(),
+				PreparationFailure: preparationFailureDetails(preparationErr),
 			},
 		)
 		r.mu.Unlock()
@@ -825,7 +826,8 @@ func (r *Runtime) UpdateContinuationInput(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
-	if run.State.Terminal() {
+	if run.State.Terminal() ||
+		run.Controls.CancellationRequested {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,
@@ -835,7 +837,7 @@ func (r *Runtime) UpdateContinuationInput(
 				RunID:           command.RunID,
 				SessionRevision: sessionValue.Revision,
 				RunRevision:     run.Revision,
-				Message:         "cannot update continuation input for a terminal run",
+				Message:         "cannot update continuation input for a terminal or cancelling run",
 			},
 		)
 		r.mu.Unlock()
@@ -1125,6 +1127,7 @@ func (r *Runtime) ContinueRun(
 		sessionValue,
 		run,
 		command.Meta.ID,
+		false,
 		&effects,
 	)
 	if continuationErr != nil {
@@ -1963,6 +1966,22 @@ func (r *Runtime) SetAutomationHold(
 		r.mu.Unlock()
 		return &receipt, nil
 	}
+	if run.State.Terminal() || run.Controls.CancellationRequested {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				RunID:           command.RunID,
+				SessionRevision: sessionValue.Revision,
+				RunRevision:     run.Revision,
+				Message:         "terminal or cancelling runs cannot change automation controls",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
 	if !command.Tools && !command.Continuation {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
@@ -2036,14 +2055,48 @@ func (r *Runtime) SetAutomationHold(
 		"",
 		run.Controls,
 	)
+
 	if !command.Enabled {
-		r.advanceDriverLocked(
-			sessionValue,
-			run,
-			command.Meta.ID,
-			DriverEvent{Kind: DriverEventControlsChanged},
-			&effects,
-		)
+		active := findModelOperation(run, run.ActiveModelOperationID)
+		if active != nil &&
+			active.State == OperationStateQueued &&
+			active.Automatic &&
+			run.State == RunStateWaiting &&
+			!run.Controls.Paused &&
+			!automationHoldApplies(
+				run.Controls.AutomaticContinuation,
+				active.ID,
+			) {
+			run.State = RunStateRunning
+			r.touchRunLocked(sessionValue, run)
+			r.recordRunEventLocked(
+				&effects,
+				sessionValue,
+				run,
+				command.Meta.ID,
+				RuntimeEventRunStateChanged,
+				active.ID,
+				"",
+				"",
+				"",
+				RunStateChangedEventData{State: run.State},
+			)
+			effects.work = append(effects.work, runtimeWork{
+				Kind:        workModel,
+				SessionID:   sessionValue.ID,
+				RunID:       run.ID,
+				OperationID: active.ID,
+				Automatic:   true,
+			})
+		} else {
+			r.advanceDriverLocked(
+				sessionValue,
+				run,
+				command.Meta.ID,
+				DriverEvent{Kind: DriverEventControlsChanged},
+				&effects,
+			)
+		}
 	}
 
 	receipt := CommandReceipt{
@@ -2465,10 +2518,11 @@ func (r *Runtime) EditAndResend(
 			command.Meta,
 			fingerprint,
 			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				SessionRevision: sessionValue.Revision,
-				Message:         preparationErr.Error(),
+				CommandID:          command.Meta.ID,
+				SessionID:          command.SessionID,
+				SessionRevision:    sessionValue.Revision,
+				Message:            preparationErr.Error(),
+				PreparationFailure: preparationFailureDetails(preparationErr),
 			},
 		)
 		r.mu.Unlock()
@@ -2764,6 +2818,7 @@ func (r *Runtime) startRunLocked(
 		inputMessage.ID,
 		nil,
 		&initial.Prepared,
+		false,
 		effects,
 	)
 	if err != nil {
@@ -2801,6 +2856,7 @@ func (r *Runtime) startModelOperationLocked(
 	currentMessageID string,
 	operationConfiguration *SessionConfiguration,
 	prepared *OperationPreparation,
+	automatic bool,
 	effects *runtimeEffects,
 ) (runtimeWork, error) {
 	if run.Limits.MaxModelOperations > 0 &&
@@ -2834,8 +2890,9 @@ func (r *Runtime) startModelOperationLocked(
 		operationID = OperationID(r.newID())
 	}
 	operation := ModelOperation{
-		ID:    operationID,
-		State: OperationStateQueued,
+		ID:        operationID,
+		State:     OperationStateQueued,
+		Automatic: automatic,
 		Request: ModelOperationInput{
 			Configuration:        effectiveConfiguration,
 			History:              cloneJSON(history),
@@ -2892,6 +2949,7 @@ func (r *Runtime) startModelOperationLocked(
 		SessionID:   sessionValue.ID,
 		RunID:       run.ID,
 		OperationID: operationID,
+		Automatic:   automatic,
 	}, nil
 }
 
@@ -2899,6 +2957,7 @@ func (r *Runtime) beginContinuationModelLocked(
 	sessionValue *Session,
 	run *Run,
 	commandID CommandID,
+	automatic bool,
 	effects *runtimeEffects,
 ) (runtimeWork, error) {
 	if hasPendingRecoveryReview(run) {
@@ -2973,6 +3032,7 @@ func (r *Runtime) beginContinuationModelLocked(
 		inputMessage.ID,
 		operationConfiguration,
 		nil,
+		automatic,
 		effects,
 	)
 	if err != nil {
@@ -3360,6 +3420,7 @@ func (r *Runtime) setPause(
 				SessionID:   sessionID,
 				RunID:       runID,
 				OperationID: active.ID,
+				Automatic:   active.Automatic,
 			})
 		} else {
 			r.advanceDriverLocked(
@@ -3487,6 +3548,7 @@ func (r *Runtime) advanceDriverLocked(
 				sessionValue,
 				run,
 				commandID,
+				intent.Automatic,
 				effects,
 			)
 			if startErr != nil {

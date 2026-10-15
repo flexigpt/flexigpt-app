@@ -178,18 +178,20 @@ func (d *SequentialChatDriver) Advance(
 		}, nil
 	}
 
-	if view.ContinuationRequested ||
-		(allAutomaticAndSuccessful(batch) &&
-			!automationHoldApplies(
-				view.Controls.AutomaticContinuation,
-				current.BatchOperationID,
-			)) {
+	automaticContinuation := !view.ContinuationRequested &&
+		allAutomaticAndSuccessful(batch) &&
+		!automationHoldApplies(
+			view.Controls.AutomaticContinuation,
+			current.BatchOperationID,
+		)
+	if view.ContinuationRequested || automaticContinuation {
 		current.BatchConsumed = true
 		running := RunStateRunning
 		return DriverTransition{
 			NextState: encodeDriverState(d.Kind(), d.Version(), current),
 			Operations: []OperationIntent{{
-				Kind: OperationIntentStartModel,
+				Kind:      OperationIntentStartModel,
+				Automatic: automaticContinuation,
 			}},
 			SetLifecycle: &running,
 		}, nil

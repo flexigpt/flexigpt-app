@@ -19,6 +19,8 @@ import (
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
 
+const kindWorkspaceContext = "workspaceContext"
+
 func (c *coordinator) resolveAgent(
 	ctx context.Context,
 	selection *sessionRuntime.ArtifactSelection,
@@ -147,6 +149,7 @@ func (c *coordinator) resolveAgent(
 				*value,
 				sessionRuntime.ConfigurationOwnerAgent,
 				value.CanonicalKey(),
+				occurrence.Required,
 			); err != nil {
 				return err
 			}
@@ -158,6 +161,7 @@ func (c *coordinator) resolveAgent(
 				owner:       sessionRuntime.ConfigurationOwnerAgent,
 				target:      &target,
 				autoExecute: occurrence.AutoExecute,
+				required:    occurrence.Required,
 				item: sessionRuntime.ResolutionItem{
 					Key:   capabilityTargetKey(target),
 					Kind:  resolutionItemKindTool,
@@ -192,6 +196,7 @@ func (c *coordinator) resolveAgent(
 					State:    sessionRuntime.ResolutionStateIncluded,
 					Selected: value,
 				},
+				required: occurrence.Required,
 			})
 			if occurrence.SkillUseMode == agentAPI.AgentSkillUseModeActive {
 				plan.activeSkills[key] = struct{}{}
@@ -457,6 +462,19 @@ func (c *coordinator) resolveWorkspace(
 			contribution.DefinitionDigest,
 		)
 		if err := requireSelectionPin(selected, used); err != nil {
+			selectedCopy := selected
+			plan.summary.Instructions = append(
+				plan.summary.Instructions,
+				sessionRuntime.ResolutionItem{
+					Key:      key,
+					Kind:     kindWorkspaceContext,
+					Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+					State:    sessionRuntime.ResolutionStateStale,
+					Selected: &selectedCopy,
+					Used:     used,
+					Reason:   err.Error(),
+				},
+			)
 			return operationPreparationError(
 				"workspace_context_stale",
 				err.Error(),
@@ -469,7 +487,7 @@ func (c *coordinator) resolveWorkspace(
 			plan.summary.Instructions,
 			sessionRuntime.ResolutionItem{
 				Key:      key,
-				Kind:     "workspaceContext",
+				Kind:     kindWorkspaceContext,
 				Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
 				State:    sessionRuntime.ResolutionStateIncluded,
 				Selected: &selected,
@@ -490,7 +508,7 @@ func (c *coordinator) resolveWorkspace(
 			plan.summary.Instructions,
 			sessionRuntime.ResolutionItem{
 				Key:      key,
-				Kind:     "workspaceContext",
+				Kind:     kindWorkspaceContext,
 				Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
 				State:    sessionRuntime.ResolutionStateExcluded,
 				Selected: &selectedCopy,
@@ -530,6 +548,19 @@ func (c *coordinator) resolveWorkspace(
 			skill.DefinitionDigest,
 		)
 		if err := requireSelectionPin(selected, used); err != nil {
+			selectedCopy := selected
+			plan.summary.Skills = append(
+				plan.summary.Skills,
+				sessionRuntime.ResolutionItem{
+					Key:      key,
+					Kind:     resolutionItemKindSkill,
+					Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+					State:    sessionRuntime.ResolutionStateStale,
+					Selected: &selectedCopy,
+					Used:     used,
+					Reason:   err.Error(),
+				},
+			)
 			return operationPreparationError(
 				"workspace_skill_stale",
 				err.Error(),
@@ -623,6 +654,19 @@ func (c *coordinator) resolveWorkspace(
 			server.DefinitionDigest,
 		)
 		if err := requireSelectionPin(selected.Server, used); err != nil {
+			selectedServer := selected.Server
+			plan.summary.MCP = append(
+				plan.summary.MCP,
+				sessionRuntime.ResolutionItem{
+					Key:      selected.CanonicalKey(),
+					Kind:     resolutionItemKindMCP,
+					Owner:    sessionRuntime.ConfigurationOwnerWorkspace,
+					State:    sessionRuntime.ResolutionStateStale,
+					Selected: &selectedServer,
+					Used:     used,
+					Reason:   err.Error(),
+				},
+			)
 			return operationPreparationError(
 				"workspace_mcp_stale",
 				err.Error(),
@@ -743,8 +787,9 @@ func (c *coordinator) applySessionOverrides(
 	}
 	plan.skills = skills
 
-	active, err := applyActiveSkillOverrides(
+	active, activeSelections, err := applyActiveSkillOverrides(
 		plan.activeSkills,
+		plan.activeSkillSelections,
 		configuration.ActiveSkills,
 	)
 	if err != nil {
@@ -764,6 +809,7 @@ func (c *coordinator) applySessionOverrides(
 		)
 	}
 	plan.activeSkills = active
+	plan.activeSkillSelections = activeSelections
 
 	mcp, err := applyMCPOverrides(
 		plan.mcp,
@@ -860,6 +906,7 @@ func (c *coordinator) appendArtifactInstruction(
 	selection sessionRuntime.ArtifactSelection,
 	owner sessionRuntime.ConfigurationOwner,
 	key string,
+	required bool,
 ) error {
 	ref, err := artifactRef(selection)
 	if err != nil {
@@ -870,19 +917,44 @@ func (c *coordinator) appendArtifactInstruction(
 			err,
 		)
 	}
+	itemKey := firstNonEmpty(key, selection.CanonicalKey())
 
 	content, used, label, err := c.materializeText(ctx, ref)
 	if err != nil {
+		severity := sessionRuntime.DiagnosticSeverityWarning
+		if required {
+			severity = sessionRuntime.DiagnosticSeverityError
+		}
+		selected := selection
+		plan.summary.Instructions = append(
+			plan.summary.Instructions,
+			sessionRuntime.ResolutionItem{
+				Key:      itemKey,
+				Kind:     resolutionItemKindInstruction,
+				Owner:    owner,
+				State:    sessionRuntime.ResolutionStateUnavailable,
+				Selected: &selected,
+				Reason:   err.Error(),
+			},
+		)
 		plan.summary.Diagnostics = append(
 			plan.summary.Diagnostics,
 			sessionRuntime.ResolutionDiagnostic{
-				Severity: sessionRuntime.DiagnosticSeverityWarning,
+				Severity: severity,
 				Code:     "instruction_unavailable",
 				Message:  err.Error(),
 				Key:      selection.CanonicalKey(),
 			},
 		)
-		//nolint:nilerr // Optional unavailable instructions are recorded as diagnostics.
+		if required {
+			return operationPreparationError(
+				"agent_required_instruction_unavailable",
+				err.Error(),
+				plan.summary,
+				err,
+			)
+		}
+
 		return nil
 	}
 	if err := requireSelectionPin(selection, used); err != nil {
@@ -894,7 +966,6 @@ func (c *coordinator) appendArtifactInstruction(
 		)
 	}
 
-	itemKey := firstNonEmpty(key, selection.CanonicalKey())
 	plan.instructions = append(plan.instructions, instructionContribution{
 		key:   itemKey,
 		owner: owner,
@@ -1214,10 +1285,20 @@ func applySkillOverrides(
 
 func applyActiveSkillOverrides(
 	baseline map[string]struct{},
+	baselineSelections map[string]sessionRuntime.ArtifactSelection,
 	overrides []sessionRuntime.ActiveSkillOverride,
-) (map[string]struct{}, error) {
+) (
+	active map[string]struct{},
+	activeSelection map[string]sessionRuntime.ArtifactSelection,
+	err error,
+) {
 	output := make(map[string]struct{}, len(baseline))
 	maps.Copy(output, baseline)
+	selections := make(
+		map[string]sessionRuntime.ArtifactSelection,
+		len(baselineSelections),
+	)
+	maps.Copy(selections, baselineSelections)
 
 	for _, override := range overrides {
 		switch override.Mode {
@@ -1226,22 +1307,27 @@ func applyActiveSkillOverrides(
 
 		case sessionRuntime.ActivityOverrideDeactivate:
 			delete(output, override.Key)
+			delete(selections, override.Key)
 
 		case sessionRuntime.ActivityOverrideActivate:
 			if override.Value == nil {
-				return nil, errors.New("skill activation override has no value")
+				return nil, nil, errors.New(
+					"skill activation override has no value",
+				)
 			}
-			output[override.Value.CanonicalKey()] = struct{}{}
+			key := override.Value.CanonicalKey()
+			output[key] = struct{}{}
+			selections[key] = *override.Value
 
 		default:
-			return nil, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"unsupported active Skill override mode %q",
 				override.Mode,
 			)
 		}
 	}
 
-	return output, nil
+	return output, selections, nil
 }
 
 // validateActiveSkills keeps the Session invariant explicit: an active Skill
@@ -1429,6 +1515,7 @@ func (c *coordinator) applyInstructionOverrides(
 					*value.Artifact,
 					sessionRuntime.ConfigurationOwnerSession,
 					key,
+					false,
 				); err != nil {
 					return nil, err
 				}

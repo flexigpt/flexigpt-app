@@ -11,7 +11,7 @@ import { MCPContentType } from '@/spec/session_mcp';
 import { isJSONObject } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { backendAPI, sessionManagementAPI } from '@/apis/baseapi';
+import { backendAPI, mcpManagementAPI, sessionManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -315,6 +315,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const [appRequestedHeight, setAppRequestedHeight] = useState<number | null>(null);
 	const [sessionError, setSessionError] = useState<string | null>(null);
 	const [viewID] = useState(() => `mcp-app-view-${getUUIDv7()}`);
+	const [serverLabel, setServerLabel] = useState(instance.server);
 	const revisionsRef = useRef({
 		sessionRevision: instance.session.sessionRevision,
 		runRevision: instance.session.runRevision,
@@ -340,9 +341,33 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	} | null>(null);
 	const pendingAppToolResultsRef = useRef(new Map<string, PendingAppToolResult>());
 	const completedAppToolResultsRef = useRef(new Map<string, MCPAppToolCallResult>());
-
-	const serverLabel = instance.server;
 	const frameHeight = appRequestedHeight ?? clampAppHeight(height);
+
+	useEffect(() => {
+		let cancelled = false;
+		// oxlint-disable-next-line react/set-state-in-effect
+		setServerLabel(instance.server);
+
+		void mcpManagementAPI
+			.findComposerServerByRuntimeID(instance.server)
+			.then(server => {
+				if (cancelled || !server) {
+					return;
+				}
+
+				setServerLabel(
+					server.displayName.trim() || server.logicalName.trim() || `${server.ref.rootID}/${server.ref.artifactID}`
+				);
+			})
+			.catch(() => {
+				// The runtime ID remains a useful fallback when the management
+				// catalog no longer contains the server.
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [instance.server]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -838,7 +863,9 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			<div className="border-base-content/10 bg-base-200 rounded-2xl border p-2">
 				<div className="mb-2 flex items-center justify-between gap-2 text-xs">
 					<span className="truncate font-semibold">{instance.displayName ?? instance.toolName}</span>
-					<span className="text-base-content/60 truncate">{serverLabel}</span>
+					<span className="text-base-content/60 truncate" title={serverLabel}>
+						{serverLabel}
+					</span>
 				</div>
 				<MCPAppSandbox
 					html={loadedResource.html}

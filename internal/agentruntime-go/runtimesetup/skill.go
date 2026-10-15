@@ -25,6 +25,7 @@ func (c *coordinator) prepareSkills(
 	ctx context.Context,
 	contributions []skillContribution,
 	active map[string]struct{},
+	activeSelections map[string]sessionRuntime.ArtifactSelection,
 	summary *sessionRuntime.OperationResolutionSummary,
 ) (
 	preparedOutput preparedSkills,
@@ -108,6 +109,8 @@ func (c *coordinator) prepareSkills(
 			cryptoutil.Digest(value.DefinitionDigest),
 		)
 		item := contribution.item
+		key := artifactKey(value.Artifact)
+		activeSelection, activeSelected := activeSelections[key]
 
 		if contribution.owner == sessionRuntime.ConfigurationOwnerSession {
 			if err := requireSelectionPin(contribution.selection, used); err != nil {
@@ -125,25 +128,64 @@ func (c *coordinator) prepareSkills(
 			}
 		}
 
+		if activeSelected {
+			if err := requireSelectionPin(activeSelection, used); err != nil {
+				selected := activeSelection
+				summary.Skills = append(
+					summary.Skills,
+					sessionRuntime.ResolutionItem{
+						Key:      key,
+						Kind:     resolutionItemKindSkill,
+						Owner:    sessionRuntime.ConfigurationOwnerSession,
+						State:    sessionRuntime.ResolutionStateStale,
+						Selected: &selected,
+						Used:     used,
+						Reason:   err.Error(),
+					},
+				)
+				return preparedSkills{}, nil, nil, nil, operationPreparationError(
+					"active_skill_selection_stale", err.Error(), *summary, err,
+				)
+			}
+		}
+
 		if !value.Enabled {
 			item.State = sessionRuntime.ResolutionStateUnavailable
 			item.Used = used
 			item.Reason = "Skill is disabled"
 			summary.Skills = append(summary.Skills, item)
+			severity := sessionRuntime.DiagnosticSeverityWarning
+			if contribution.owner == sessionRuntime.ConfigurationOwnerSession ||
+				contribution.required ||
+				activeSelected {
+				severity = sessionRuntime.DiagnosticSeverityError
+			}
 			summary.Diagnostics = append(
 				summary.Diagnostics,
 				sessionRuntime.ResolutionDiagnostic{
-					Severity: sessionRuntime.DiagnosticSeverityWarning,
+					Severity: severity,
 					Code:     "skill_disabled",
 					Message:  "Selected Skill is disabled",
 					Key:      contribution.key,
 				},
 			)
 
-			if contribution.owner == sessionRuntime.ConfigurationOwnerSession {
+			if contribution.owner == sessionRuntime.ConfigurationOwnerSession ||
+				contribution.required ||
+				activeSelected {
+				code := "skill_selection_unavailable"
+				message := "selected Skill is disabled"
+				switch {
+				case activeSelected:
+					code = "active_skill_selection_unavailable"
+					message = "selected active Skill is disabled"
+				case contribution.required:
+					code = "agent_required_skill_unavailable"
+					message = "required Agent Skill is disabled"
+				}
 				return preparedSkills{}, nil, nil, nil, operationPreparationError(
-					"skill_selection_unavailable",
-					"selected Skill is disabled",
+					code,
+					message,
 					*summary,
 					nil,
 				)
@@ -151,7 +193,6 @@ func (c *coordinator) prepareSkills(
 			continue
 		}
 
-		key := artifactKey(value.Artifact)
 		output.definitions = append(output.definitions, value.Definition)
 		output.byArtifact[key] = value.Definition
 		output.byDefinition[value.Definition] = reference

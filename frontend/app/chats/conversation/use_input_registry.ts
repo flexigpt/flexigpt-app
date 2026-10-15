@@ -6,6 +6,7 @@ import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { EditorExternalMessage } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import { deriveRestorableConversationContextFromMessages } from '@/chats/conversation/hydration_helper';
 
@@ -25,6 +26,11 @@ interface PendingSkillSessionState {
 	activeRefs: SkillRef[];
 }
 
+interface PendingExternalMessage {
+	tabId: string;
+	message: EditorExternalMessage;
+}
+
 interface UseInputRegistryArgs {
 	tabExists: (tabId: string) => boolean;
 }
@@ -36,6 +42,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const pendingSessionConfigurationsRef = useRef(new Map<string, PendingSessionConfiguration>());
 	const pendingSkillSessionStatesRef = useRef(new Map<string, PendingSkillSessionState>());
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
+	const pendingExternalMessagesRef = useRef(new Map<string, PendingExternalMessage>());
 	const workflowStarterLoadsRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
 	const pendingInputFlushTimerRef = useRef<number | null>(null);
@@ -44,6 +51,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const flushPendingSkillSessionStatesRef = useRef<() => void>(() => {});
 	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
 	const flushPendingSessionConfigurationsRef = useRef<() => void>(() => {});
+	const flushPendingExternalMessagesRef = useRef<() => void>(() => {});
 
 	const schedulePendingInputFlush = useCallback(() => {
 		if (pendingInputFlushTimerRef.current !== null) {
@@ -57,6 +65,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 			flushPendingWorkflowStartersRef.current();
 			flushPendingSessionConfigurationsRef.current();
 			flushPendingSkillSessionStatesRef.current();
+			flushPendingExternalMessagesRef.current();
 		}, 0);
 	}, []);
 
@@ -150,6 +159,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 					if (applied && pendingSessionConfigurationsRef.current.get(tabId) === pending) {
 						pendingSessionConfigurationsRef.current.delete(tabId);
 						flushPendingSkillSessionStatesRef.current();
+						flushPendingExternalMessagesRef.current();
 					}
 				})
 				.catch((error: unknown) => {
@@ -364,6 +374,55 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		[schedulePendingInputFlush, tryApplyConversationContextToTab]
 	);
 
+	const tryApplyExternalMessageToTab = useCallback((tabId: string, message: EditorExternalMessage): boolean => {
+		const input = inputRefs.current.get(tabId);
+		if (!input) {
+			return false;
+		}
+
+		input.loadExternalMessage(message);
+		return true;
+	}, []);
+
+	const flushPendingExternalMessages = useCallback(() => {
+		for (const [tabId, pending] of pendingExternalMessagesRef.current.entries()) {
+			if (!tabExists(tabId)) {
+				pendingExternalMessagesRef.current.delete(tabId);
+				continue;
+			}
+
+			if (pendingSessionConfigurationsRef.current.has(tabId)) {
+				continue;
+			}
+
+			if (tryApplyExternalMessageToTab(tabId, pending.message)) {
+				pendingExternalMessagesRef.current.delete(tabId);
+			}
+		}
+	}, [tabExists, tryApplyExternalMessageToTab]);
+
+	useLayoutEffect(() => {
+		flushPendingExternalMessagesRef.current = flushPendingExternalMessages;
+	}, [flushPendingExternalMessages]);
+
+	const loadExternalMessageForTab = useCallback(
+		(tabId: string, message: EditorExternalMessage): boolean => {
+			if (!tabExists(tabId)) {
+				return false;
+			}
+
+			if (!pendingSessionConfigurationsRef.current.has(tabId) && tryApplyExternalMessageToTab(tabId, message)) {
+				pendingExternalMessagesRef.current.delete(tabId);
+				return true;
+			}
+
+			pendingExternalMessagesRef.current.set(tabId, { tabId, message });
+			schedulePendingInputFlush();
+			return true;
+		},
+		[schedulePendingInputFlush, tabExists, tryApplyExternalMessageToTab]
+	);
+
 	const resetComposerForNewConversation = useCallback(async (tabId: string) => {
 		const input = inputRefs.current.get(tabId);
 		pendingConversationContextsRef.current.delete(tabId);
@@ -390,6 +449,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		pendingConversationContextsRef.current.delete(tabId);
 		pendingSessionConfigurationsRef.current.delete(tabId);
 		pendingSkillSessionStatesRef.current.delete(tabId);
+		pendingExternalMessagesRef.current.delete(tabId);
 		inputRefCallbacksRef.current.delete(tabId);
 	}, []);
 
@@ -400,6 +460,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		queuePendingDrop,
 		flushPendingDrops,
 		syncComposerFromConversation,
+		loadExternalMessageForTab,
 		resetComposerForNewConversation,
 		restoreSessionConfiguration,
 		syncComposerSkillSessionState,

@@ -1133,6 +1133,7 @@ func (r *Runtime) resumeRecoveredModelLocked(
 		latest.Request.Current.ID,
 		&operationConfiguration,
 		nil,
+		false,
 		effects,
 	)
 	if err != nil {

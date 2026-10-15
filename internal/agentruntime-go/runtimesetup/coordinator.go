@@ -150,17 +150,18 @@ type preparedSkills struct {
 }
 
 type operationPlan struct {
-	summary      sessionRuntime.OperationResolutionSummary
-	model        *sessionRuntime.ArtifactSelection
-	modelOwner   sessionRuntime.ConfigurationOwner
-	instructions []instructionContribution
-	tools        []toolContribution
-	skills       []skillContribution
-	activeSkills map[string]struct{}
-	mcp          []sessionRuntime.MCPServerSelection
-	mcpUses      map[string]*sessionRuntime.ResolvedArtifact
-	mcpOwners    map[string]sessionRuntime.ConfigurationOwner
-	userContexts []string
+	summary               sessionRuntime.OperationResolutionSummary
+	model                 *sessionRuntime.ArtifactSelection
+	modelOwner            sessionRuntime.ConfigurationOwner
+	instructions          []instructionContribution
+	tools                 []toolContribution
+	skills                []skillContribution
+	activeSkills          map[string]struct{}
+	activeSkillSelections map[string]sessionRuntime.ArtifactSelection
+	mcp                   []sessionRuntime.MCPServerSelection
+	mcpUses               map[string]*sessionRuntime.ResolvedArtifact
+	mcpOwners             map[string]sessionRuntime.ConfigurationOwner
+	userContexts          []string
 }
 
 type instructionContribution struct {
@@ -177,6 +178,7 @@ type toolContribution struct {
 	target      *composition.CapabilityTarget
 	selection   *sessionRuntime.ToolSelectionIntent
 	autoExecute *bool
+	required    bool
 	item        sessionRuntime.ResolutionItem
 }
 
@@ -186,6 +188,7 @@ type skillContribution struct {
 	selection   sessionRuntime.ArtifactSelection
 	item        sessionRuntime.ResolutionItem
 	instruction bool
+	required    bool
 }
 
 func (c *coordinator) PrepareSubmission(
@@ -214,9 +217,10 @@ func (c *coordinator) PrepareModelOperation(
 		summary: sessionRuntime.OperationResolutionSummary{
 			Version: operationResolutionVersion,
 		},
-		activeSkills: make(map[string]struct{}),
-		mcpUses:      make(map[string]*sessionRuntime.ResolvedArtifact),
-		mcpOwners:    make(map[string]sessionRuntime.ConfigurationOwner),
+		activeSkills:          make(map[string]struct{}),
+		activeSkillSelections: make(map[string]sessionRuntime.ArtifactSelection),
+		mcpUses:               make(map[string]*sessionRuntime.ResolvedArtifact),
+		mcpOwners:             make(map[string]sessionRuntime.ConfigurationOwner),
 	}
 
 	if err := c.resolveAgent(ctx, request.Configuration.Agent, &plan); err != nil {
@@ -315,6 +319,7 @@ func (c *coordinator) PrepareModelOperation(
 		ctx,
 		plan.skills,
 		plan.activeSkills,
+		plan.activeSkillSelections,
 		&plan.summary,
 	)
 	if err != nil {

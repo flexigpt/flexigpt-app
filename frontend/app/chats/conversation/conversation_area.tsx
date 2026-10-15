@@ -179,6 +179,9 @@ function areConversationAreaPropsEqual(prev: ConversationAreaProps, next: Conver
 	if (prev.saveUpdatedConversation !== next.saveUpdatedConversation) {
 		return false;
 	}
+	if (prev.openSessionForMCPAppMessage !== next.openSessionForMCPAppMessage) {
+		return false;
+	}
 
 	if (resolveActiveTab(prev.tabs, prev.selectedTabId) !== resolveActiveTab(next.tabs, next.selectedTabId)) {
 		return false;
@@ -657,6 +660,7 @@ interface ConversationAreaProps {
 	initialScrollTopByTab?: Record<string, number>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
+	openSessionForMCPAppMessage: (sessionID: string) => Promise<string | null>;
 }
 
 interface WaitResolutionState {
@@ -671,7 +675,15 @@ interface SessionActionErrorState {
 }
 
 function ConversationAreaInner(
-	{ tabs, selectedTabId, mountedInputTabIds, shortcutConfig, initialScrollTopByTab, updateTab }: ConversationAreaProps,
+	{
+		tabs,
+		selectedTabId,
+		mountedInputTabIds,
+		shortcutConfig,
+		initialScrollTopByTab,
+		updateTab,
+		openSessionForMCPAppMessage,
+	}: ConversationAreaProps,
 	ref: Ref<ConversationAreaHandle>
 ) {
 	const tabsRef = useRef(tabs);
@@ -723,6 +735,7 @@ function ConversationAreaInner(
 		queuePendingDrop,
 		flushPendingDrops,
 		syncComposerFromConversation,
+		loadExternalMessageForTab,
 		resetComposerForNewConversation,
 		restoreSessionConfiguration,
 		syncComposerSkillSessionState,
@@ -748,35 +761,64 @@ function ConversationAreaInner(
 	});
 
 	useEffect(() => {
+		const resolveMCPAppTargetTab = async (sessionID: string): Promise<string | null> => {
+			const existing = tabsRef.current.find(tab => tab.sessionID === sessionID);
+			if (existing) {
+				return existing.tabId;
+			}
+
+			return openSessionForMCPAppMessage(sessionID);
+		};
+
 		const handleUIMessage = (event: Event) => {
 			const detail = (event as CustomEvent<MCPAppUIMessageEventDetail>).detail;
 			const text = detail?.message?.text?.trim();
-			if (!text) {
+			const sessionID = detail?.instance?.session?.sessionID;
+
+			if (!text || !sessionID) {
 				return;
 			}
 
-			const tabId = selectedTabIdRef.current;
-			if (!tabExists(tabId)) {
-				return;
-			}
+			void resolveMCPAppTargetTab(sessionID)
+				.then(tabId => {
+					if (!tabId || !tabExists(tabId)) {
+						return;
+					}
 
-			inputRefs.current.get(tabId)?.loadExternalMessage({ text });
-			inputRefs.current.get(tabId)?.focus();
+					loadExternalMessageForTab(tabId, { text });
+
+					if (selectedTabIdRef.current === tabId) {
+						inputRefs.current.get(tabId)?.focus();
+					}
+				})
+				.catch((error: unknown) => {
+					console.error('Failed to route MCP App draft message:', error);
+				});
 		};
 
 		const handleModelContextUpdate = (event: Event) => {
 			const detail = (event as CustomEvent<MCPAppModelContextUpdateEventDetail>).detail;
-			if (!detail?.update) {
+			const sessionID = detail?.instance?.session?.sessionID;
+
+			if (!detail?.update || !sessionID) {
 				return;
 			}
 
-			const tabId = selectedTabIdRef.current;
-			if (!tabExists(tabId)) {
-				return;
-			}
+			void resolveMCPAppTargetTab(sessionID)
+				.then(tabId => {
+					if (!tabId || !tabExists(tabId)) {
+						return;
+					}
 
-			inputRefs.current.get(tabId)?.appendMCPAppContextUpdate(detail.update);
-			inputRefs.current.get(tabId)?.focus();
+					inputRefs.current.get(tabId)?.appendMCPAppContextUpdate(detail.update);
+
+					if (selectedTabIdRef.current === tabId) {
+						inputRefs.current.get(tabId)?.focus();
+					}
+				})
+				.catch((error: unknown) => {
+					console.error('Failed to route MCP App context update:', error);
+				});
 		};
 
 		window.addEventListener(MCP_APP_UI_MESSAGE_EVENT, handleUIMessage);
@@ -786,7 +828,7 @@ function ConversationAreaInner(
 			window.removeEventListener(MCP_APP_UI_MESSAGE_EVENT, handleUIMessage);
 			window.removeEventListener(MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, handleModelContextUpdate);
 		};
-	}, [inputRefs, selectedTabIdRef, tabExists]);
+	}, [inputRefs, loadExternalMessageForTab, openSessionForMCPAppMessage, selectedTabIdRef, tabExists]);
 
 	const {
 		setScrollContainerRef,
@@ -815,7 +857,7 @@ function ConversationAreaInner(
 		initialScrollTopByTab,
 	});
 
-	const { sendMessageForTab, beginEditMessageForTab, cancelEditingForTab } = useSendMessage({
+	const { sendMessageForTab, stageContinuationForTab, beginEditMessageForTab, cancelEditingForTab } = useSendMessage({
 		tabsRef,
 		updateTab,
 		scrollTabToBottomSoon,
@@ -970,6 +1012,8 @@ function ConversationAreaInner(
 		!pendingWait &&
 		pendingExecutableToolCallIDs.length === 0 &&
 		(hasStagedContinuation || activeRun.continuationRequested === true);
+	const canComposeContinuationInput =
+		activeRun?.state === SessionRunState.Waiting && !pendingWait && pendingExecutableToolCallIDs.length === 0;
 	const stagedAppContextUpdateCount = activeRun?.continuation.mcpAppContext?.length ?? 0;
 	const hasAutomaticToolCalls = activeRun?.toolCalls?.some(call => call.automatic === true) ?? false;
 	const automationHoldEnabled =
@@ -1498,22 +1542,32 @@ function ConversationAreaInner(
 						</div>
 					) : null}
 
-					{mountedInputTabs.map(tab => (
-						<TabInputPane
-							key={tab.tabId}
-							tabId={tab.tabId}
-							active={tab.tabId === selectedTabId}
-							isBusy={tab.isBusy}
-							isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
-							editingMessageId={tab.editingMessageId}
-							setInputRef={setInputRef}
-							getAbortRef={getAbortRef}
-							shortcutConfig={shortcutConfig}
-							sendMessage={sendMessageForTab}
-							cancelEditing={cancelEditingForTab}
-							cancelRun={cancelRunForTab}
-						/>
-					))}
+					{mountedInputTabs.map(tab =>
+						(() => {
+							const tabRun = tab.sessionSnapshot ? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID) : undefined;
+							const allowContinuationInput = tab.tabId === activeTabId && canComposeContinuationInput;
+
+							return (
+								<TabInputPane
+									key={tab.tabId}
+									tabId={tab.tabId}
+									active={tab.tabId === selectedTabId}
+									isBusy={tab.isBusy}
+									isGenerating={runHasGeneratingModelOperation(tabRun)}
+									isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
+									allowContinuationInput={allowContinuationInput}
+									editingMessageId={tab.editingMessageId}
+									setInputRef={setInputRef}
+									getAbortRef={getAbortRef}
+									shortcutConfig={shortcutConfig}
+									sendMessage={sendMessageForTab}
+									sendContinuation={stageContinuationForTab}
+									cancelEditing={cancelEditingForTab}
+									cancelRun={cancelRunForTab}
+								/>
+							);
+						})()
+					)}
 				</div>
 			</div>
 

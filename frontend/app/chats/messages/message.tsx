@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FiUser, FiZap } from 'react-icons/fi';
+import { FiAlertTriangle, FiUser, FiZap } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ConversationMessage } from '@/spec/session';
@@ -125,6 +125,24 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	return true;
 }
 
+function terminalStateMessage(message: ConversationMessage): string | null {
+	switch (message.status) {
+		case Status.Cancelled:
+			return 'Generation was cancelled before completion.';
+
+		case Status.Incomplete:
+			return 'Generation ended before completion.';
+
+		case Status.Failed:
+			return message.error?.message?.trim()
+				? `Generation failed: ${message.error.message.trim()}`
+				: 'Generation failed before completion.';
+
+		default:
+			return null;
+	}
+}
+
 export const ChatMessage = memo(function ChatMessage({
 	message,
 	isBusy,
@@ -169,6 +187,7 @@ export const ChatMessage = memo(function ChatMessage({
 	const hasError = message.status === Status.Failed || !!message.error;
 	const hasStreamedText = streamSnapshot.text.length > 0;
 	const hasStreamedThinking = streamSnapshot.thinking.length > 0;
+	const terminalState = !isBusy ? terminalStateMessage(message) : null;
 
 	const hasAnyReasoning =
 		message.uiReasoningContents?.some(rc => {
@@ -269,6 +288,17 @@ export const ChatMessage = memo(function ChatMessage({
 									{message.error?.message || 'An error occurred while processing this request.'}
 								</div>
 							)}
+							{terminalState && (hasAnyContent || hasAnyReasoning) ? (
+								<div
+									className={`mt-2 flex items-start gap-2 rounded-xl px-2 py-1 text-xs ${
+										message.status === Status.Failed ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning-content'
+									}`}
+									role={message.status === Status.Failed ? 'alert' : 'status'}
+								>
+									<FiAlertTriangle className="mt-0.5 shrink-0" size={13} aria-hidden="true" />
+									<span>{terminalState}</span>
+								</div>
+							) : null}
 						</div>
 						{/* MCP Apps row. One sandboxed iframe per app-capable MCP tool output. */}
 						{mcpAppViews.length > 0 && (

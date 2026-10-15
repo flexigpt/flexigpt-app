@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { AgentResolution } from '@/spec/agent';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
 import { CapabilityResolutionStatus } from '@/spec/artifact';
@@ -41,6 +42,7 @@ export interface AgentManagerState {
 
 	selectedAgentKey: string | null;
 	selectedAgent: AgentCatalogOption | null;
+	selectedAgentResolution: AgentResolution | null;
 	preparedStarter: null;
 	isTrackingOnly: boolean;
 
@@ -66,6 +68,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const [isApplying, setIsApplying] = useState(false);
 	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
+	const [selectedAgentResolution, setSelectedAgentResolution] = useState<AgentResolution | null>(null);
 
 	const selectedAgentKeyRef = useRef<string | null>(null);
 	const isApplyingRef = useRef(false);
@@ -76,12 +79,15 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
 	const pendingRestoredAgentRef = useRef<PendingRestoredAgent | null>(null);
 
-	const setTrackedAgent = useCallback((aKey: string | null, trackingOnly = false) => {
-		selectedAgentKeyRef.current = aKey;
-		setSelectedAgentKey(aKey);
-
-		setIsTrackingOnly(trackingOnly);
-	}, []);
+	const setTrackedAgent = useCallback(
+		(aKey: string | null, trackingOnly = false, resolution: AgentResolution | null = null) => {
+			selectedAgentKeyRef.current = aKey;
+			setSelectedAgentKey(aKey);
+			setSelectedAgentResolution(resolution);
+			setIsTrackingOnly(trackingOnly);
+		},
+		[]
+	);
 
 	const cancelActiveAgentRequest = useCallback(() => {
 		applyRequestSeqRef.current += 1;
@@ -143,6 +149,37 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	);
 	const isDefaultAgentSelected = selectedAgent !== null && selectedAgent.key === defaultAgent?.key;
 
+	useEffect(() => {
+		if (!selectedAgent) {
+			// oxlint-disable-next-line react/set-state-in-effect
+			setSelectedAgentResolution(current => (current === null ? current : null));
+			return;
+		}
+
+		if (selectedAgentResolution && agentKey(selectedAgentResolution.agent.ref) === selectedAgent.key) {
+			return;
+		}
+
+		let cancelled = false;
+
+		void agentManagementAPI
+			.resolveAgent(selectedAgent.ref)
+			.then(resolution => {
+				if (!cancelled) {
+					setSelectedAgentResolution(resolution);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setSelectedAgentResolution(null);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedAgent, selectedAgentResolution]);
+
 	const hasTrackedAgent = useCallback(() => {
 		const trackedKey = selectedAgentKeyRef.current;
 		return trackedKey !== null && agentOptions.some(option => option.key === trackedKey);
@@ -196,7 +233,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 				}
 
 				context.setModelSelectionSource('agent');
-				setTrackedAgent(option.key);
+				setTrackedAgent(option.key, false, resolution);
 				return true;
 			} catch (e: unknown) {
 				setActionError(getErrorMessage(e, 'Failed to validate the Agent selection.'));
@@ -419,6 +456,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 
 		selectedAgentKey: selectedAgent?.key ?? null,
 		selectedAgent,
+		selectedAgentResolution: selectedAgent ? selectedAgentResolution : null,
 		preparedStarter: null,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		refreshAgents,
