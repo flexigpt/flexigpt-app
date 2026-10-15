@@ -129,12 +129,13 @@ type preparedSkillSession struct {
 }
 
 type preparedOperation struct {
-	configuration inferenceRuntimeSpec.RuntimeConfiguration
-	inputs        []inferenceSpec.InputUnion
-	currentInputs []inferenceSpec.InputUnion
-	toolChoices   []inferenceSpec.ToolChoice
-	bindings      preparedBindings
-	skills        preparedSkills
+	configuration  inferenceRuntimeSpec.RuntimeConfiguration
+	inputs         []inferenceSpec.InputUnion
+	currentInputs  []inferenceSpec.InputUnion
+	currentContext []string
+	toolChoices    []inferenceSpec.ToolChoice
+	bindings       preparedBindings
+	skills         preparedSkills
 }
 
 type preparedBindings struct {
@@ -256,7 +257,12 @@ func (c *coordinator) PrepareModelOperation(
 		)
 	}
 
-	modelPatch, err := modelRequestPatch(request.Configuration.ModelOverrides)
+	modelOverrides,
+		explicitSystemPrompt,
+		clearModelSystemPrompt := splitModelSystemPromptOverride(
+		request.Configuration.ModelOverrides,
+	)
+	modelPatch, err := modelRequestPatch(modelOverrides)
 	if err != nil {
 		return sessionRuntime.OperationPreparation{}, operationPreparationError(
 			"model_override_invalid",
@@ -315,10 +321,14 @@ func (c *coordinator) PrepareModelOperation(
 		return sessionRuntime.OperationPreparation{}, err
 	}
 
-	plan.instructions = append(plan.instructions, skillInstructions...)
+	plan.instructions = insertGeneratedInstructions(
+		plan.instructions,
+		skillInstructions,
+	)
 
 	systemParts := make([]string, 0, len(plan.instructions)+1)
-	if strings.TrimSpace(modelConfig.ModelParam.SystemPrompt) != "" {
+	if !clearModelSystemPrompt &&
+		strings.TrimSpace(modelConfig.ModelParam.SystemPrompt) != "" {
 		systemParts = append(systemParts, modelConfig.ModelParam.SystemPrompt)
 	}
 	for _, contribution := range plan.instructions {
@@ -330,6 +340,10 @@ func (c *coordinator) PrepareModelOperation(
 			plan.summary.Instructions,
 			contribution.item,
 		)
+	}
+	if explicitSystemPrompt != nil &&
+		strings.TrimSpace(*explicitSystemPrompt) != "" {
+		systemParts = append(systemParts, *explicitSystemPrompt)
 	}
 	modelConfig.ModelParam.SystemPrompt = strings.Join(systemParts, "\n\n")
 
@@ -358,7 +372,7 @@ func (c *coordinator) PrepareModelOperation(
 		return sessionRuntime.OperationPreparation{}, err
 	}
 
-	inputs, currentInputs, err := c.buildInputs(
+	inputs, currentInputs, currentContext, err := c.buildInputs(
 		ctx,
 		request.History,
 		request.Current,
@@ -386,12 +400,13 @@ func (c *coordinator) PrepareModelOperation(
 	}
 
 	data := &preparedOperation{
-		configuration: cloneRuntimeConfiguration(modelConfig),
-		inputs:        cloneInputUnions(inputs),
-		currentInputs: cloneInputUnions(currentInputs),
-		toolChoices:   cloneToolChoices(toolChoices),
-		bindings:      bindings,
-		skills:        skills,
+		configuration:  cloneRuntimeConfiguration(modelConfig),
+		inputs:         cloneInputUnions(inputs),
+		currentInputs:  cloneInputUnions(currentInputs),
+		currentContext: append([]string(nil), currentContext...),
+		toolChoices:    cloneToolChoices(toolChoices),
+		bindings:       bindings,
+		skills:         skills,
 	}
 
 	fingerprint, err := preparedOperationFingerprint(
@@ -443,6 +458,7 @@ func (c *coordinator) ExecuteModel(
 	configuration := cloneRuntimeConfiguration(data.configuration)
 	inputs := cloneInputUnions(data.inputs)
 	currentInputs := cloneInputUnions(data.currentInputs)
+	currentContext := append([]string(nil), data.currentContext...)
 	toolChoices := cloneToolChoices(data.toolChoices)
 	bindings := clonePreparedBindings(data.bindings)
 
@@ -496,8 +512,9 @@ func (c *coordinator) ExecuteModel(
 	)
 
 	result := sessionRuntime.ModelExecutionResult{
-		HydratedCurrentInputs: marshalInputUnions(currentInputs),
-		AttachmentsHydrated:   len(request.Current.Attachments) != 0,
+		HydratedCurrentInputs:  marshalInputUnions(currentInputs),
+		HydratedCurrentContext: currentContext,
+		AttachmentsHydrated:    len(request.Current.Attachments) != 0,
 	}
 	if response == nil || response.Body == nil ||
 		response.Body.InferenceResponse == nil {
@@ -1170,6 +1187,87 @@ func requireSelectionPin(
 		return errors.New("selected Artifact definition changed")
 	}
 	return nil
+}
+
+// splitModelSystemPromptOverride keeps Model Artifact prompt defaults in the
+// model-resolution layer while moving the explicit Session/Run prompt layer to
+// the end of system-instruction composition.
+func splitModelSystemPromptOverride(
+	input sessionRuntime.ModelDefaultsOverride,
+) (
+	modelOverrides sessionRuntime.ModelDefaultsOverride,
+	explicitSystemPrompt *string,
+	clearModelSystemPrompt bool,
+) {
+	modelOverrides = input
+	modelOverrides.SystemPrompt = nil
+	modelOverrides.Clear = make(
+		[]sessionRuntime.ModelDefaultField,
+		0,
+		len(input.Clear),
+	)
+
+	for _, field := range input.Clear {
+		if field == sessionRuntime.ModelDefaultFieldSystemPrompt {
+			clearModelSystemPrompt = true
+			continue
+		}
+		modelOverrides.Clear = append(modelOverrides.Clear, field)
+	}
+	if len(modelOverrides.Clear) == 0 {
+		modelOverrides.Clear = nil
+	}
+
+	if input.SystemPrompt != nil {
+		value := *input.SystemPrompt
+		explicitSystemPrompt = &value
+	}
+
+	return modelOverrides, explicitSystemPrompt, clearModelSystemPrompt
+}
+
+func insertGeneratedInstructions(
+	base []instructionContribution,
+	generated []instructionContribution,
+) []instructionContribution {
+	if len(generated) == 0 {
+		return base
+	}
+
+	output := append([]instructionContribution(nil), base...)
+	for _, contribution := range generated {
+		insertAt := len(output)
+		for index := range output {
+			if instructionOwnerOrder(output[index].owner) >
+				instructionOwnerOrder(contribution.owner) {
+				insertAt = index
+				break
+			}
+		}
+
+		output = append(output, instructionContribution{})
+		copy(output[insertAt+1:], output[insertAt:])
+		output[insertAt] = contribution
+	}
+	return output
+}
+
+func instructionOwnerOrder(owner sessionRuntime.ConfigurationOwner) int {
+	switch owner {
+	case sessionRuntime.ConfigurationOwnerPlatform,
+		sessionRuntime.ConfigurationOwnerModel:
+		return 0
+	case sessionRuntime.ConfigurationOwnerAgent:
+		return 1
+	case sessionRuntime.ConfigurationOwnerWorkspace:
+		return 2
+	case sessionRuntime.ConfigurationOwnerSession,
+		sessionRuntime.ConfigurationOwnerRun,
+		sessionRuntime.ConfigurationOwnerUser:
+		return 3
+	default:
+		return 4
+	}
 }
 
 func modelRequestPatch(

@@ -1388,3 +1388,1015 @@ The main remaining UX completeness work is concentrated in:
 5. **Optional title refinement and richer Run-outcome presentation.**
 
 The normal composer, model controls, attachments, Workspace selection, Skill state synchronization, Session hydration, Tool action controls, live output rendering, chat search, tabs, and Session-scoped MCP App Tool result flow are materially closer to the prior UX after these changes.
+
+---
+
+# New analysis after repatch
+
+# UX degradation analysis — Session UI versus old chat UI
+
+This list excludes migration continuity topics such as old tab restoration, legacy conversation access, and old export format. It also excludes Session-era gains and flows that are already covered by an equivalent new UI.
+
+The focus here is only on user-visible degradations: cases where the old UI let a user see, control, preserve, or complete a chat/composer flow and the new UI either does not, only partially does, or presents a misleading actionable control.
+
+## Summary
+
+| ID  | Degradation                                                                 | User-facing effect                                                                                                |
+| --- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | Agent selection no longer applies or shows its starter recipe in Composer   | Selecting an Agent no longer visibly changes Model, Tools, Skills, MCP, instructions, or draft starter text       |
+| 2   | Agent-derived state has no editable/inherited representation                | Users cannot see what comes from an Agent versus their own choices, or remove Agent-derived items in the Composer |
+| 3   | Composer Tool outputs remain visible but are not submitted to Session input | Edit/resend and Tool-output-only sends can appear valid but omit the Tool results                                 |
+| 4   | Composer Tool-output retry is a visible no-op                               | Retry buttons can appear on edited Tool outputs but do not start a Session retry or create a runnable call        |
+| 5   | No normal continuation composer while a Run is waiting                      | Users cannot add ordinary text, attachments, or context while a Run waits for Tools, approval, or continuation    |
+| 6   | Session message projection drops per-turn context/provenance                | Message chips for Tools, MCP, Skills, Workspace, model context, and usage disappear                               |
+| 7   | Cancellation/failure presentation is less explicit                          | Partial responses can end without the old visible “stopped” or “error” terminal line                              |
+| 8   | Immediate send/edit feedback is weaker                                      | No local user/assistant placeholder on send; edit-and-resend does not explicitly follow the new Run to the bottom |
+| 9   | MCP App “Add draft” can target the wrong tab                                | An App tied to one Session can overwrite the Composer in whichever tab is currently selected                      |
+| 10  | Current Composer restoration is Session-level, not Run-level                | Reopening a Session can show Session configuration rather than the latest Run’s effective configuration           |
+| 11  | Session Tool projections lose regular Tool metadata and rich output shape   | Regular Tool calls/results lose Auto/source metadata; image/file Tool outputs become text-only                    |
+| 12  | Automatic title refinement after the second user turn is absent             | Titles stop at the first submission unless changed elsewhere by the backend                                       |
+| 13  | MCP App headers show opaque runtime-server identity                         | Users can see a runtime ID instead of the readable server identity previously shown                               |
+
+The first six are the main completeness gaps. The others are narrower presentation and interaction regressions.
+
+---
+
+# 1. Agent selection no longer applies the Agent recipe to the Composer
+
+## Old behavior
+
+Selecting an Agent prepared a frontend starter recipe and immediately applied it into the Composer.
+
+The old `ComposerBox` had an `applyAgentRuntime` flow that updated:
+
+- selected Model;
+- regular Tool choices;
+- web-search choice;
+- enabled Skills;
+- active Skills;
+- MCP context;
+- Agent instruction sources;
+- model-default system-prompt inclusion;
+- Agent starter/request text when the draft was empty.
+
+The Agent dropdown therefore had immediate visible meaning: selecting an Agent visibly reconfigured the Composer.
+
+## Current behavior
+
+The new `useAgentManager` validates an Agent using `resolveAgent`, then mainly does:
+
+```text
+setModelSelectionSource('agent')
+setTrackedAgent(...)
+```
+
+The new UI later submits:
+
+```text
+agentRef
+agentSelection
+modelSelectionSource: 'agent'
+```
+
+for backend resolution at Run preparation time.
+
+It does not locally apply the Agent’s:
+
+- Model;
+- Tools;
+- web search;
+- Skills;
+- MCP selection;
+- instruction sources;
+- model-default prompt setting;
+- starter text.
+
+This affects ordinary Agent selection, default Agent selection, reapply/reset actions, and workflow URL starters containing an Agent.
+
+## User-visible difference
+
+A user can select an Agent and see the Agent label change, while the surrounding Composer still shows the prior local configuration.
+
+Examples:
+
+```text
+Select Agent “Researcher”
+  -> Agent chip says Researcher
+  -> Model picker may still show previous Model
+  -> Tools picker may still show previous Tools
+  -> Skills picker may still show previous Skills
+  -> MCP picker may still show previous MCP state
+  -> system prompt sources do not show Researcher instructions
+  -> Agent starting text does not appear
+```
+
+The backend may correctly resolve and use the Agent at Run preparation, but the Composer no longer previews what the Agent means to the user.
+
+## Completion needed for UX equivalence
+
+A complete UX path needs a visible Agent-effective Composer state without making frontend resolution authoritative.
+
+That consists of:
+
+1. An Agent preview/effective-resolution representation exposed through the management façade or Session preparation summary.
+2. A Composer presentation layer that can show Agent-provided:
+   - Model;
+   - Tools;
+   - Skills;
+   - MCP;
+   - instructions;
+   - starter text;
+   - model-default prompt behavior.
+3. Clear treatment of those values as:
+   - inherited from Agent;
+   - overridden by user;
+   - removed by user;
+   - unavailable/changed.
+4. Reapply/reset/workflow-starter actions that update the visible inherited state as well as the submitted Agent reference.
+
+The backend can remain the execution authority. The missing part is the visible and editable preview layer.
+
+---
+
+# 2. Agent-derived configuration has no inherited/override UX
+
+This is related to Agent recipe application, but it is a separate degradation in day-to-day use.
+
+## Old behavior
+
+Once an Agent recipe was applied, its contents became visible in normal Composer controls.
+
+For example:
+
+- Agent Tools appeared in Tools;
+- Agent Skills appeared in Skills;
+- Agent MCP appeared in MCP;
+- Agent instructions appeared in the instruction-source list.
+
+The UI did not have a formal ownership model, but users could at least see and alter what had been applied.
+
+## Current behavior
+
+The Agent remains a single selected identity. The Composer controls show local Session/user selections, not the Agent-expanded effective configuration.
+
+The current UI also has no visible representation of:
+
+```text
+Inherited from Agent
+Added by user
+Removed by user
+Replaced by user
+Unavailable
+Changed since selected
+```
+
+This is especially visible for Agent Tools and Agent instructions:
+
+- a user cannot see which Tools the Agent will provide;
+- a user cannot remove one inherited Agent Tool through the Composer;
+- a user cannot see an Agent instruction source and deselect it;
+- a user cannot distinguish an Agent-selected Model from a manually selected one.
+
+## User-visible difference
+
+The old UI was imperfect but concrete: Agent selection changed visible controls.
+
+The new UI is authoritative at execution time but opaque at authoring time.
+
+That makes it harder for a user to answer:
+
+```text
+What will this Agent actually use?
+Which part of this Composer state is mine?
+What will happen if I remove this Tool or Skill?
+Which Model will actually run?
+```
+
+## Completion needed
+
+Completion is an effective-configuration view layered over current Composer controls.
+
+It needs to expose, at minimum:
+
+| Area         | Needed visible state                                              |
+| ------------ | ----------------------------------------------------------------- |
+| Model        | Agent baseline, Session override, Run-used Model                  |
+| Tools        | Agent inherited, user added, user removed, unavailable            |
+| Skills       | Agent inherited, active/enabled state, user override              |
+| MCP          | Agent-derived servers/tools/resources/prompts and local overrides |
+| Instructions | Agent source, Workspace source, user source, model default        |
+| Starter text | Agent-provided draft versus user draft                            |
+
+The Session operation preparation summary already conceptually contains the needed backend-owned facts. The missing portion is projection and display.
+
+---
+
+# 3. Composer Tool outputs are shown as sendable but are omitted from Session submission
+
+This is a direct end-to-end mismatch.
+
+## Old behavior
+
+Old Composer Tool outputs were part of the next user message.
+
+The old flow could:
+
+```text
+Assistant proposes Tool call
+  -> user runs/retries/skips Tool
+  -> Tool output appears in Composer
+  -> user sends
+  -> Tool output is serialized into InputUnion
+  -> model receives it
+```
+
+The old edit flow also preserved Tool outputs when editing/resending a user turn.
+
+## Current behavior
+
+The new `EditorArea` still:
+
+- holds `toolOutputs`;
+- renders Tool output chips;
+- considers Tool outputs valid sendable content;
+- includes them in `EditorSubmitPayload`.
+
+However, `buildSessionSubmissionIntent()` only creates Session user input from:
+
+```text
+text
+attachments
+mcpAppContext
+```
+
+It does not encode:
+
+```text
+payload.toolOutputs
+```
+
+There is no Tool-output field in the generated `SessionUserInput`.
+
+## User-visible difference
+
+A user can encounter this sequence:
+
+```text
+Edit an earlier user message
+  -> Composer shows its Tool result chips
+  -> text may be empty
+  -> Send is enabled because Tool outputs exist
+  -> Session Run starts
+  -> Tool outputs were not included in the Session input
+```
+
+The UI says “this message contains Tool outputs,” while the submitted Session intent does not carry them.
+
+The same applies to a Tool-output-only send: it can look valid in the Composer but become an empty or incomplete Session input.
+
+## Completion needed
+
+UX completion requires one consistent meaning for visible Composer Tool outputs.
+
+That means one of these semantic paths must exist:
+
+1. **Session input supports carried Tool results**, and `buildSessionSubmissionIntent()` serializes them; or
+2. **Tool results remain Run-owned only**, and Composer no longer presents them as ordinary sendable user-message content; or
+3. **Edit-and-resend uses a dedicated Session command shape** that explicitly carries/reuses prior Tool results.
+
+The completion condition is simple from the user perspective:
+
+```text
+If a Tool output chip is visible and makes Send available,
+that Tool result reaches the backend operation being sent.
+```
+
+---
+
+# 4. Composer-side Tool-output retry is a visible no-op
+
+## Old behavior
+
+Errored or skipped Tool outputs in the old Composer could be retried. Retrying recreated a pending local Tool call that the user could run.
+
+## Current behavior
+
+The Composer Tool-output chip can still render a Retry action for:
+
+- errored Tool output;
+- skipped Tool output;
+- MCP Tool output;
+- resolvable Go Tool output;
+- Skill Tool output.
+
+But the new `useComposerTools()` returns:
+
+```text
+handleRetryErroredOutput: () => undefined
+```
+
+The click produces no new Session command, no pending Tool call, and no visible state transition.
+
+## Important distinction
+
+The **Session message-level** Retry button is functional. It calls `retryCall` through the Session runtime for an active Run Tool call.
+
+The degradation is specifically the Composer-side retry affordance on historical/edited Tool output chips.
+
+## Completion needed
+
+The visible Composer retry action needs one of two outcomes:
+
+- map to the owning Session/Run/Tool-call retry command; or
+- not appear when no retry action exists.
+
+For edit/resend, retry semantics may require a new Run or explicit re-execution plan. The current UI exposes the action without such a plan.
+
+---
+
+# 5. No normal continuation Composer while a Run is waiting
+
+This is the largest interaction change after Agent visibility.
+
+## Old behavior
+
+After direct completion finished, the Composer became available again.
+
+When Tool work was pending, a user could still:
+
+- inspect/edit the draft;
+- type follow-up text;
+- add attachments;
+- change Tools;
+- change MCP;
+- change Skills;
+- run Tools;
+- submit Tool outputs and text together;
+- fast-forward Tool execution and send.
+
+The old frontend owned the next transition.
+
+## Current behavior
+
+The new UI considers every non-terminal Run active:
+
+```text
+Queued
+Running
+Waiting
+Paused
+Cancelling
+```
+
+An active Run sets `tab.isBusy`.
+
+The Composer then receives:
+
+```text
+isInputLocked = isBusy || isHydrating || no runnable model
+```
+
+So when a Run is waiting for:
+
+- Tool execution;
+- approval;
+- recovery;
+- continuation;
+- user input;
+- paused state;
+
+the normal Composer is locked.
+
+## What remains available
+
+The new UI exposes Run-specific controls:
+
+- Run pending tools;
+- Run tools and continue;
+- Continue run;
+- generic Session wait modal;
+- staged App context discard;
+- staged App context continuation;
+- cancel Run.
+
+Those actions are useful, but they do not replace normal continuation authoring.
+
+## Missing user flow
+
+There is no frontend UI for general `UpdateContinuationInput` authoring.
+
+The new frontend only calls `updateContinuationInput` to discard staged App context. It does not offer a regular continuation editor for:
+
+```text
+text
+attachments
+Tool choices
+MCP context
+Workspace changes
+Skill changes
+Model changes
+other run/continuation configuration
+```
+
+The wait modal accepts optional JSON input, not ordinary chat composition.
+
+## Completion needed
+
+The Session UI needs a distinct continuation-authoring mode while a Run is Waiting.
+
+From a user perspective, it needs to allow:
+
+```text
+Run is waiting
+  -> user opens continuation input
+  -> user writes text / adds attachments / adjusts allowable context
+  -> user stages it for that Run
+  -> user continues the Run
+```
+
+This does not require reintroducing a second frontend execution loop. It is a Run-scoped Composer mode that emits `UpdateContinuationInput`.
+
+The completion boundary is:
+
+```text
+A waiting Run can receive ordinary user-authored continuation input
+without unlocking a separate concurrent new-chat Composer.
+```
+
+---
+
+# 6. Session message projection drops per-turn context and provenance UI
+
+This is the main historical-chat rendering degradation.
+
+## Old behavior
+
+Old hydrated conversation messages carried enough UI data to render message chips for:
+
+- selected Tools;
+- web-search configuration;
+- unavailable Tool selections;
+- MCP context;
+- MCP resources/templates/prompts;
+- enabled Skills;
+- active Skills;
+- Workspace selection;
+- Workspace send-time usage/outcomes;
+- Tool selection metadata;
+- citations;
+- usage;
+- debug details;
+- model context.
+
+The existing message components were designed around those fields.
+
+## Current behavior
+
+`projectTranscriptMessage()` produces a reduced `ConversationMessage`.
+
+It includes:
+
+- text;
+- attachments;
+- protocol inputs/outputs;
+- error;
+- reasoning;
+- citations;
+- Tool calls;
+- Tool results;
+- MCP App context updates.
+
+It does not populate:
+
+```text
+modelRef
+modelParam
+toolChoices
+toolSelections
+uiToolChoices
+uiToolSelectionIssues
+mcpContext
+mcpToolMappings
+enabledSkillRefs
+activeSkillRefs
+workspaceSelection
+workspaceUsage
+usage
+uiDebugDetails
+```
+
+The UI components for these chips still exist, but they receive no data.
+
+## User-visible losses
+
+### Tools and web search
+
+Old message bars could show which Tools and web-search configuration were selected for that turn.
+
+New Session-projected messages generally show Tool calls/results, but not the Tool choices that enabled them.
+
+### MCP context
+
+Old messages could show:
+
+```text
+MCP
+N servers
+resources
+templates
+prompts
+instructions
+```
+
+New Session-projected messages do not populate `mcpContext`, so that chip is absent.
+
+### Skills
+
+Old messages could show:
+
+```text
+Skills
+N enabled
+N active
+```
+
+New Session-projected messages omit enabled and active Skill refs.
+
+### Workspace
+
+Old messages could show:
+
+- selected Workspace;
+- requested Context;
+- selected Skills;
+- actual send-time Context inclusion/truncation;
+- Skill availability;
+- diagnostics.
+
+New Session-projected messages omit both `workspaceSelection` and `workspaceUsage`.
+
+### Model provenance
+
+Old messages could retain model reference/parameters. The new message projection does not expose the selected/used Model for a historical response.
+
+### Token usage
+
+The old message footer showed input/output/reasoning token counts when available.
+
+The new projection does not populate `usage`, so that footer has nothing to render.
+
+## Completion needed
+
+This needs a Session-safe message execution projection.
+
+The required data does not need to be raw provider request material. It can be a redacted, semantic display model such as:
+
+```text
+MessageExecutionContext
+  -> model identity used
+  -> model revision/digest used
+  -> selected Tools and effective Tool bindings
+  -> MCP selections used
+  -> enabled/active Skills used
+  -> Workspace selection and usage summary
+  -> usage counters
+  -> safe diagnostics
+```
+
+It can be attached either:
+
+- directly to transcript messages; or
+- through operation/message lookup records in the Session snapshot.
+
+The existing message chip components already render most of this material. The missing work is primarily projection/data binding rather than new visual design.
+
+---
+
+# 7. Cancellation and failure states lose explicit terminal messaging
+
+## Old behavior
+
+The old completion finalizer always gave a visible conclusion to an interrupted response.
+
+Examples:
+
+```text
+> Generation stopped before the API returned a final response.
+> Error: API ended abruptly. ...
+> Error: ...
+```
+
+It also merged retained streamed text/thinking into a terminal assistant message.
+
+## Current behavior
+
+The new UI maps Session operation/transcript status into:
+
+```text
+Completed
+Failed
+Cancelled
+Incomplete
+```
+
+but it does not add a frontend terminal explanation.
+
+### Visible consequences
+
+| State                        | Current user-visible result                        |
+| ---------------------------- | -------------------------------------------------- |
+| Cancelled with partial text  | Partial text may simply stop                       |
+| Incomplete with partial text | Partial text may simply stop                       |
+| Failed with text             | Text remains; error is mainly available in details |
+| Failed with no text          | Error fallback is visible                          |
+| Interrupted thinking         | Depends on what Session persisted                  |
+
+For a failed response with existing text, `ChatMessage` does not append the error message inline. The error remains available through the details path if `error` is present.
+
+For cancelled/incomplete responses, there is no equivalent visible terminal label in the message footer.
+
+## Completion needed
+
+A complete Session renderer needs a stable terminal operation presentation independent of direct-completion finalization.
+
+That includes:
+
+- terminal state badge or inline line for Cancelled/Incomplete/Failed;
+- safe error summary;
+- retained partial text;
+- retained partial thinking where available;
+- consistency between the live operation row and final transcript row.
+
+The completion condition is:
+
+```text
+A user can distinguish a completed answer from a stopped,
+cancelled, interrupted, or failed partial answer without opening details.
+```
+
+---
+
+# 8. Send acknowledgement and edit-and-resend scrolling are weaker
+
+## 8.1 No immediate message placeholder after Send
+
+### Old behavior
+
+Submit immediately created:
+
+- a visible user message;
+- an assistant placeholder;
+- “Waiting for response” status.
+
+### Current behavior
+
+New send submits `StartRun` and marks the tab busy. It does not create a local user message or assistant placeholder.
+
+The chat area waits for a Session snapshot to contain:
+
+- the user transcript message; or
+- an active operation transient message.
+
+Until that snapshot arrives, the primary visual confirmation is:
+
+- disabled Composer;
+- busy tab dot.
+
+## Completion needed
+
+A Session-backed optimistic presentation layer can provide immediate acknowledgement without becoming execution authority.
+
+It only needs a temporary display record such as:
+
+```text
+Run accepted
+  -> “Message accepted / preparing response”
+  -> reconciled or replaced by authoritative Session snapshot
+```
+
+That preserves the old feedback quality without introducing a second message persistence model.
+
+---
+
+## 8.2 Edit-and-resend does not explicitly follow the new Run to the bottom
+
+The normal send path calls `scrollTabToBottomSoon()` after starting a Run.
+
+The edit-and-resend path does not.
+
+The old flow inserted the edited user message and assistant placeholder locally, then followed the bottom. The new flow can leave the user at the old edited message while the replacement Run starts elsewhere in the conversation.
+
+## Completion needed
+
+The edit-and-resend acceptance path needs the same scroll/focus behavior as ordinary accepted send, reconciled against the incoming Session snapshot.
+
+---
+
+# 9. MCP App “Add draft” targets the selected tab rather than the owning Session
+
+## Current behavior
+
+The new MCP App event includes an App instance with Session/Run identity.
+
+However, when the App requests a user draft message, `ConversationArea` uses:
+
+```text
+selectedTabIdRef.current
+```
+
+and loads the draft into the selected tab’s Composer.
+
+It does not use:
+
+```text
+instance.session.sessionID
+instance.session.runID
+instance.session.appInstanceID
+```
+
+to find the owning tab.
+
+## User-visible failure case
+
+```text
+Tab A contains an MCP App
+Tab B becomes selected
+The App in Tab A asks to add a draft
+User approves
+The draft replaces Composer content in Tab B
+```
+
+This can overwrite the wrong draft and disconnect App interaction from the conversation that produced it.
+
+## Completion needed
+
+The App-to-draft flow needs a Session-to-tab routing rule.
+
+Its user-facing completion behavior is one of:
+
+```text
+Owning Session tab is open
+  -> load draft there
+
+Owning Session tab is not open
+  -> open/select the owning Session tab, then load draft there
+
+Owning Session is unavailable
+  -> show an App-scoped unavailable/error state
+```
+
+The important distinction is that the action follows the App’s Session identity, not the globally selected tab.
+
+---
+
+# 10. Composer restoration is Session-level rather than latest-Run-level
+
+This is a real frontend gap, though its practical effect depends on Session runtime semantics.
+
+## Current behavior
+
+When opening a Session tab, the frontend restores Composer state from:
+
+```text
+snapshot.session.configuration
+```
+
+It does not restore from:
+
+```text
+selectedRun.configuration
+latest Run configuration
+latest model operation preparation
+```
+
+At the same time, normal subsequent sends provide a configuration to `StartRun`.
+
+The frontend does not call `updateSessionConfiguration` when a user changes Composer state before later Runs.
+
+## User-visible risk
+
+If later Run configuration is not mirrored into `session.configuration` by the backend, reopening a Session can show:
+
+```text
+initial Session configuration
+```
+
+instead of:
+
+```text
+the configuration used for the latest Run
+```
+
+That can affect visible restoration of:
+
+- Model;
+- request overrides;
+- Tools;
+- Skills;
+- MCP;
+- Workspace;
+- instructions;
+- Agent source;
+- history choice.
+
+## Completion needed
+
+The UI needs one authoritative reopening source for “current Composer state.”
+
+That can be either:
+
+1. Session configuration is guaranteed to be updated when later Run configuration is accepted; or
+2. the frontend restores from an explicit latest/effective Run configuration projection; or
+3. the UI distinguishes:
+   - Session default configuration;
+   - latest Run configuration;
+   - active Run effective configuration.
+
+The completion condition is:
+
+```text
+Reopening a Session reproduces the configuration a user expects to continue from.
+```
+
+---
+
+# 11. Session Tool projection loses regular Tool metadata and rich result shape
+
+## Current behavior
+
+For Session Tool calls, `uiToolCallFromSession()` primarily projects:
+
+```text
+id
+callID
+name
+arguments
+choiceID
+type
+status
+errorMessage
+MCP selection, if applicable
+```
+
+It does not project regular Tool choice metadata.
+
+For Tool results, `toolOutputFromResult()` synthesizes a text result from:
+
+```text
+result.text
+result.error
+result.structured
+```
+
+## User-visible differences
+
+### Regular Tool calls
+
+For non-MCP Tool calls, users can lose:
+
+- Tool display name;
+- plugin name;
+- Tool description;
+- Tool version;
+- Tool Artifact identity;
+- Auto marker;
+- original Tool choice details;
+- argument/schema association.
+
+MCP Tool calls retain more identity because binding data is decoded for them.
+
+### Auto-execute indication
+
+The new Run model can know that a Tool call is automatic:
+
+```text
+SessionToolCall.automatic
+```
+
+but that field is not projected into `UIToolCall`.
+
+The message chip can show `Auto` for MCP execution mode, but not necessarily for ordinary automatic Go/Skill calls.
+
+### Rich Tool outputs
+
+Old Tool outputs could contain:
+
+- text;
+- image;
+- file.
+
+New Session projection turns results into text-oriented Tool output. Image/file result presentation is not carried through this projection.
+
+## Completion needed
+
+The Session display projection needs a safe Tool binding/result representation that includes:
+
+```text
+Tool identity
+plugin/display metadata
+auto/manual state
+selection/binding provenance
+arguments
+typed output items
+error/skipped state
+```
+
+The actual execution binding can remain backend-private. The UI only needs display-safe metadata and typed result content.
+
+---
+
+# 12. Automatic title refinement after the second user turn is gone
+
+## Old behavior
+
+The old controller automatically generated a title from early user messages and compared first/second-turn title candidates.
+
+That gave conversations a chance to become better titled after the second user turn.
+
+## Current behavior
+
+The new controller sets the title when creating the Session:
+
+```text
+generateTitle(payload.text || current title)
+```
+
+There is no frontend second-turn title refinement path.
+
+Manual rename remains available.
+
+## Completion needed
+
+The title policy needs an equivalent Session-aware source:
+
+- backend Session title policy; or
+- frontend title refinement followed by Session rename command.
+
+The user-visible completion condition is:
+
+```text
+A newly created chat can still improve its automatic title
+after early follow-up context arrives.
+```
+
+---
+
+# 13. MCP App headers show opaque runtime-server IDs
+
+## Old behavior
+
+The old App view resolved an MCP server through the Composer catalog and displayed a readable Artifact identity such as:
+
+```text
+rootID/artifactID
+```
+
+## Current behavior
+
+The new App instance displays:
+
+```text
+instance.server
+```
+
+which is an opaque runtime server ID.
+
+## User-visible difference
+
+The App header and approval wording can show an implementation-facing identifier rather than a recognizable server name.
+
+This matters most when multiple MCP servers are attached or similarly named.
+
+## Completion needed
+
+The Session App display model needs a safe human-facing server identity, such as:
+
+```text
+displayName
+artifact identity
+plugin/server label
+```
+
+carried with the Session App render target or resolved from a Session-safe server projection.
+
+---
+
+# Condensed completion map
+
+| Degradation                            | Completion boundary                                                   |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| Agent recipe invisible                 | Agent preview/effective configuration projection into Composer        |
+| Agent overrides invisible              | Source/owner/override display for Model/Tools/Skills/MCP/instructions |
+| Tool outputs omitted on send           | Semantic Session Tool-result input/continuation representation        |
+| Composer retry no-op                   | Map retry to Session Run call, or remove nonfunctional action         |
+| Waiting Run locks normal composition   | Run-scoped continuation Composer using `UpdateContinuationInput`      |
+| Message provenance missing             | Per-message or per-operation Session display projection               |
+| Usage/debug missing                    | Safe usage/debug fields in transcript/operation display projection    |
+| Partial cancel/failure unclear         | Terminal status/error renderer preserving partial output              |
+| Send feedback delayed                  | Snapshot-reconciled accepted-Run placeholder/status                   |
+| Edit resend does not follow output     | Same scroll behavior as accepted ordinary send                        |
+| App draft wrong tab                    | Route App UI message by owning Session identity                       |
+| Latest configuration restore uncertain | Explicit Session-vs-Run restoration contract                          |
+| Tool metadata/rich output reduced      | Safe Tool binding and typed-result projection                         |
+| Early title refinement gone            | Session-aware title refinement path                                   |
+| App server identity opaque             | Human-readable server display metadata in Session App target          |

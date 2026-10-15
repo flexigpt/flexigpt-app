@@ -835,7 +835,7 @@ func (r runtimeRestorer) RestoreRetiredSession(
 }
 
 func (r runtimeRestorer) RestoreRun(
-	_ context.Context,
+	ctx context.Context,
 	runValue Run,
 ) error {
 	if r.runtime == nil {
@@ -846,57 +846,93 @@ func (r runtimeRestorer) RestoreRun(
 		return errors.New("recovery run has an empty ID or session ID")
 	}
 
-	r.runtime.mu.Lock()
-	defer r.runtime.mu.Unlock()
+	effects := runtimeEffects{}
+	recoveryCheckpoint := false
 
-	if r.runtime.closed {
-		return ErrRuntimeClosed
-	}
+	restoreErr := func() error {
+		r.runtime.mu.Lock()
+		defer r.runtime.mu.Unlock()
 
-	sessionValue := r.runtime.sessions[runValue.SessionID]
-	if sessionValue == nil {
-		return fmt.Errorf(
-			"recovery run %q references unknown session %q",
-			runValue.ID,
-			runValue.SessionID,
+		if r.runtime.closed {
+			return ErrRuntimeClosed
+		}
+
+		sessionValue := r.runtime.sessions[runValue.SessionID]
+		if sessionValue == nil {
+			return fmt.Errorf(
+				"recovery run %q references unknown session %q",
+				runValue.ID,
+				runValue.SessionID,
+			)
+		}
+
+		copyValue := cloneJSON(runValue)
+		recoveryApplied := normalizeRecoveredRun(
+			&copyValue,
+			r.runtime.now(),
 		)
-	}
+		for index := range copyValue.Apps {
+			copyValue.Apps[index].Route = nil
+			copyValue.Apps[index].UnavailableReason = "App runtime route is unavailable after recovery"
+		}
 
-	copyValue := cloneJSON(runValue)
-	recoveryApplied := normalizeRecoveredRun(&copyValue, r.runtime.now())
-	for index := range copyValue.Apps {
-		copyValue.Apps[index].Route = nil
-		copyValue.Apps[index].UnavailableReason = "App runtime route is unavailable after recovery"
-	}
+		if _, found := r.runtime.runs[copyValue.ID]; found {
+			return fmt.Errorf("recovery run %q is duplicated", copyValue.ID)
+		}
+		if active := r.runtime.activeRunLocked(sessionValue); active != nil &&
+			!copyValue.State.Terminal() {
+			return fmt.Errorf(
+				"recovery run %q conflicts with active run %q in session %q",
+				copyValue.ID,
+				active.ID,
+				copyValue.SessionID,
+			)
+		}
 
-	if _, found := r.runtime.runs[copyValue.ID]; found {
-		return fmt.Errorf("recovery run %q is duplicated", copyValue.ID)
-	}
-	if active := r.runtime.activeRunLocked(sessionValue); active != nil &&
-		!copyValue.State.Terminal() {
-		return fmt.Errorf(
-			"recovery run %q conflicts with active run %q in session %q",
+		r.runtime.runs[copyValue.ID] = &copyValue
+		r.runtime.runToSession[copyValue.ID] = copyValue.SessionID
+
+		associationChanged := !slices.Contains(
+			sessionValue.RunIDs,
 			copyValue.ID,
-			active.ID,
-			copyValue.SessionID,
 		)
+		if associationChanged {
+			sessionValue.RunIDs = append(sessionValue.RunIDs, copyValue.ID)
+		}
+		if recoveryApplied || associationChanged {
+			r.runtime.touchSessionLocked(sessionValue)
+		}
+
+		if recoveryApplied {
+			r.runtime.recordRunEventLocked(
+				&effects,
+				sessionValue,
+				&copyValue,
+				"",
+				RuntimeEventRecoveryApplied,
+				"",
+				"",
+				"",
+				"",
+				RunStateChangedEventData{State: copyValue.State},
+			)
+			r.runtime.checkpointLocked(
+				&effects,
+				RuntimeEventRecoveryApplied,
+				sessionValue,
+				&copyValue,
+			)
+			recoveryCheckpoint = true
+		}
+		return nil
+	}()
+	if restoreErr != nil {
+		return restoreErr
 	}
 
-	r.runtime.runs[copyValue.ID] = &copyValue
-	r.runtime.runToSession[copyValue.ID] = copyValue.SessionID
-
-	associationChanged := !slices.Contains(
-		sessionValue.RunIDs,
-		copyValue.ID,
-	)
-	if associationChanged {
-		sessionValue.RunIDs = append(sessionValue.RunIDs, copyValue.ID)
+	if recoveryCheckpoint {
+		r.runtime.flushEffects(ctx, effects)
 	}
-
-	if recoveryApplied || associationChanged {
-		r.runtime.touchSessionLocked(sessionValue)
-	}
-
 	return nil
 }
 
@@ -1088,13 +1124,14 @@ func (r *Runtime) resumeRecoveredModelLocked(
 		)
 	}
 
+	operationConfiguration := cloneJSON(latest.Request.Configuration)
 	work, err := r.startModelOperationLocked(
 		sessionValue,
 		run,
 		commandID,
 		"",
 		latest.Request.Current.ID,
-		nil,
+		&operationConfiguration,
 		nil,
 		effects,
 	)

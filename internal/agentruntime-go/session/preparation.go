@@ -211,19 +211,26 @@ func (r *Runtime) prepareModelOperationForDispatch(
 		effectiveSkills,
 	)
 
+	allowListChanged := !artifactReferencesEqual(
+		run.SkillSession.Enabled,
+		effectiveSkills,
+	)
+
 	// Skill load/unload tools mutate Run-owned active Skill state. When the
 	// effective allow-list is unchanged, a continuation must retain that
 	// runtime state rather than reset it to static configuration defaults.
-	if artifactReferencesEqual(run.SkillSession.Enabled, effectiveSkills) {
+	if !allowListChanged {
 		activeSkills = filterReferences(
 			cloneJSON(run.SkillSession.Active),
 			effectiveSkills,
 		)
 	}
 
-	run.SkillSession.Generation++
-	run.SkillSession.EstablishedGeneration = 0
-	run.SkillSession.Enabled = cloneJSON(effectiveSkills)
+	if allowListChanged {
+		run.SkillSession.Generation++
+		run.SkillSession.EstablishedGeneration = 0
+		run.SkillSession.Enabled = cloneJSON(effectiveSkills)
+	}
 	run.SkillSession.Active = cloneJSON(activeSkills)
 	r.touchRunLocked(sessionValue, run)
 

@@ -402,10 +402,11 @@ func (r *Runtime) UpdateSessionConfiguration(
 			command.Meta,
 			fingerprint,
 			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				SessionRevision: sessionValue.Revision,
-				Message:         preparationErr.Error(),
+				CommandID:          command.Meta.ID,
+				SessionID:          command.SessionID,
+				SessionRevision:    sessionValue.Revision,
+				Message:            preparationErr.Error(),
+				PreparationFailure: preparationFailureDetails(preparationErr),
 			},
 		)
 		r.mu.Unlock()
@@ -2594,6 +2595,21 @@ func commandReceiptResult(
 	receipt CommandReceipt,
 ) (*CommandReceipt, error) {
 	return &receipt, nil
+}
+
+func preparationFailureDetails(
+	cause error,
+) *OperationPreparationFailureDetails {
+	var failure *OperationPreparationFailureError
+	if !errors.As(cause, &failure) || failure == nil {
+		return nil
+	}
+
+	return &OperationPreparationFailureDetails{
+		Code:       failure.Code,
+		Message:    failure.Error(),
+		Resolution: cloneJSON(failure.Summary),
+	}
 }
 
 func commandFingerprint(value any) (string, error) {

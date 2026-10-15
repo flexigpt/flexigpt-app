@@ -281,10 +281,17 @@ type TranscriptMessage struct {
 	ProtocolOutputs     []json.RawMessage     `json:"protocolOutputs,omitempty"`
 	ToolResults         []ToolResult          `json:"toolResults,omitempty"`
 	MCPAppContext       []AppContextUpdate    `json:"mcpAppContext,omitempty"`
-	OperationID         OperationID           `json:"operationID,omitempty"`
-	Error               *OperationError       `json:"error,omitempty"`
-	Metadata            json.RawMessage       `json:"metadata,omitempty"`
-	RuntimeMetadata     json.RawMessage       `json:"runtimeMetadata,omitempty"`
+
+	// InjectedContext is backend-prepared textual context that was sent before
+	// this user message, such as Workspace, selected MCP, or approved App
+	// context. It is semantic text, not a raw provider input or attachment
+	// payload, so durable replay can reconstruct the same conversation shape.
+	InjectedContext []string `json:"injectedContext,omitempty"`
+
+	OperationID     OperationID     `json:"operationID,omitempty"`
+	Error           *OperationError `json:"error,omitempty"`
+	Metadata        json.RawMessage `json:"metadata,omitempty"`
+	RuntimeMetadata json.RawMessage `json:"runtimeMetadata,omitempty"`
 }
 
 type OperationError struct {
@@ -523,20 +530,27 @@ type CommandMeta struct {
 	ExpectedRunRevision     *Revision `json:"expectedRunRevision,omitempty"`
 }
 
+type OperationPreparationFailureDetails struct {
+	Code       string                     `json:"code"`
+	Message    string                     `json:"message"`
+	Resolution OperationResolutionSummary `json:"resolution"`
+}
+
 type CommandReceipt struct {
-	CommandID                CommandID     `json:"commandID"`
-	Accepted                 bool          `json:"accepted"`
-	Duplicate                bool          `json:"duplicate,omitempty"`
-	SessionID                SessionID     `json:"sessionID,omitempty"`
-	RunID                    RunID         `json:"runID,omitempty"`
-	SessionRevision          Revision      `json:"sessionRevision,omitempty"`
-	RunRevision              Revision      `json:"runRevision,omitempty"`
-	OperationIDs             []OperationID `json:"operationIDs,omitempty"`
-	ToolCallIDs              []ToolCallID  `json:"toolCallIDs,omitempty"`
-	WaitIDs                  []WaitID      `json:"waitIDs,omitempty"`
-	AlreadyActiveToolCallIDs []ToolCallID  `json:"alreadyActiveToolCallIDs,omitempty"`
-	StarterText              string        `json:"starterText,omitempty"`
-	Message                  string        `json:"message,omitempty"`
+	CommandID                CommandID                           `json:"commandID"`
+	Accepted                 bool                                `json:"accepted"`
+	Duplicate                bool                                `json:"duplicate,omitempty"`
+	SessionID                SessionID                           `json:"sessionID,omitempty"`
+	RunID                    RunID                               `json:"runID,omitempty"`
+	SessionRevision          Revision                            `json:"sessionRevision,omitempty"`
+	RunRevision              Revision                            `json:"runRevision,omitempty"`
+	OperationIDs             []OperationID                       `json:"operationIDs,omitempty"`
+	ToolCallIDs              []ToolCallID                        `json:"toolCallIDs,omitempty"`
+	WaitIDs                  []WaitID                            `json:"waitIDs,omitempty"`
+	AlreadyActiveToolCallIDs []ToolCallID                        `json:"alreadyActiveToolCallIDs,omitempty"`
+	StarterText              string                              `json:"starterText,omitempty"`
+	Message                  string                              `json:"message,omitempty"`
+	PreparationFailure       *OperationPreparationFailureDetails `json:"preparationFailure,omitempty"`
 }
 
 type CreateSessionCommand struct {

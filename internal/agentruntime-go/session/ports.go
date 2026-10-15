@@ -31,16 +31,17 @@ type ModelExecutionRequest struct {
 }
 
 type ModelExecutionResult struct {
-	Usable                bool               `json:"usable"`
-	Text                  string             `json:"text,omitempty"`
-	Thinking              string             `json:"thinking,omitempty"`
-	ProtocolOutputs       []json.RawMessage  `json:"protocolOutputs,omitempty"`
-	HydratedCurrentInputs []json.RawMessage  `json:"hydratedCurrentInputs,omitempty"`
-	AttachmentsHydrated   bool               `json:"attachmentsHydrated,omitempty"`
-	ToolCalls             []ToolCallProposal `json:"toolCalls,omitempty"`
-	Error                 *OperationError    `json:"error,omitempty"`
-	Metadata              json.RawMessage    `json:"metadata,omitempty"`
-	RuntimeMetadata       json.RawMessage    `json:"runtimeMetadata,omitempty"`
+	Usable                 bool               `json:"usable"`
+	Text                   string             `json:"text,omitempty"`
+	Thinking               string             `json:"thinking,omitempty"`
+	ProtocolOutputs        []json.RawMessage  `json:"protocolOutputs,omitempty"`
+	HydratedCurrentInputs  []json.RawMessage  `json:"hydratedCurrentInputs,omitempty"`
+	HydratedCurrentContext []string           `json:"-"`
+	AttachmentsHydrated    bool               `json:"attachmentsHydrated,omitempty"`
+	ToolCalls              []ToolCallProposal `json:"toolCalls,omitempty"`
+	Error                  *OperationError    `json:"error,omitempty"`
+	Metadata               json.RawMessage    `json:"metadata,omitempty"`
+	RuntimeMetadata        json.RawMessage    `json:"runtimeMetadata,omitempty"`
 }
 
 type ModelExecutor interface {

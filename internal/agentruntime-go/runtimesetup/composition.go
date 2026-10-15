@@ -83,10 +83,19 @@ func (c *coordinator) resolveAgent(
 	for _, occurrence := range resolution.Capabilities.Occurrences {
 		if occurrence.Status != composition.ResolutionAvailable ||
 			occurrence.Target == nil {
+			diagnostic := agentOccurrenceDiagnostic(occurrence)
 			plan.summary.Diagnostics = append(
 				plan.summary.Diagnostics,
-				agentOccurrenceDiagnostic(occurrence),
+				diagnostic,
 			)
+			if occurrence.Required {
+				return operationPreparationError(
+					"agent_required_capability_unavailable",
+					diagnostic.Message,
+					plan.summary,
+					nil,
+				)
+			}
 			continue
 		}
 
@@ -137,7 +146,7 @@ func (c *coordinator) resolveAgent(
 				plan,
 				*value,
 				sessionRuntime.ConfigurationOwnerAgent,
-				occurrence.Path,
+				value.CanonicalKey(),
 			); err != nil {
 				return err
 			}

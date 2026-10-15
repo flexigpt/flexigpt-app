@@ -599,6 +599,16 @@ func (r *Runtime) finishModelExecution(
 		operation.Request.Current.ID,
 	)
 	if currentIndex >= 0 {
+		if len(result.HydratedCurrentContext) != 0 {
+			sessionValue.Transcript[currentIndex].InjectedContext = append(
+				[]string(nil),
+				result.HydratedCurrentContext...,
+			)
+			operation.Request.Current.InjectedContext = append(
+				[]string(nil),
+				result.HydratedCurrentContext...,
+			)
+		}
 		if len(result.HydratedCurrentInputs) != 0 {
 			sessionValue.Transcript[currentIndex].ProtocolInputs = cloneJSON(
 				result.HydratedCurrentInputs,
