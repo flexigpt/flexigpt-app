@@ -642,6 +642,7 @@ export interface EditAndResendCommand {
 	replaceMessageID: string;
 	runID?: RunID;
 	input: SessionUserInput;
+	carryForwardToolResultIDs?: ToolResultID[];
 	configuration?: SessionConfiguration;
 	limits?: SessionRunLimits;
 }

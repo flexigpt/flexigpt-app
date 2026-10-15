@@ -61,6 +61,11 @@ interface BlockedExternalLink {
 	reason: 'unsafe' | 'open-failed';
 }
 
+interface ResolvedServerLabel {
+	runtimeID: string;
+	label: string;
+}
+
 function isAppMime(mime?: string): boolean {
 	if (!mime) {
 		return false;
@@ -315,7 +320,8 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const [appRequestedHeight, setAppRequestedHeight] = useState<number | null>(null);
 	const [sessionError, setSessionError] = useState<string | null>(null);
 	const [viewID] = useState(() => `mcp-app-view-${getUUIDv7()}`);
-	const [serverLabel, setServerLabel] = useState(instance.server);
+	const [resolvedServerLabel, setResolvedServerLabel] = useState<ResolvedServerLabel | null>(null);
+	const serverLabel = resolvedServerLabel?.runtimeID === instance.server ? resolvedServerLabel.label : instance.server;
 	const revisionsRef = useRef({
 		sessionRevision: instance.session.sessionRevision,
 		runRevision: instance.session.runRevision,
@@ -323,6 +329,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 
 	const approvalResolverRef = useRef<((ok: boolean) => void) | null>(null);
 	const mountedRef = useRef(true);
+	const isMCPAppViewActive = useCallback(() => mountedRef.current, []);
 
 	const bridgeRef = useRef<MCPAppPostMessageBridge | null>(null);
 	const bridgeVersionRef = useRef(0);
@@ -345,19 +352,20 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 
 	useEffect(() => {
 		let cancelled = false;
-		// oxlint-disable-next-line react/set-state-in-effect
-		setServerLabel(instance.server);
+		const runtimeID = instance.server;
 
 		void mcpManagementAPI
-			.findComposerServerByRuntimeID(instance.server)
+			.findComposerServerByRuntimeID(runtimeID)
 			.then(server => {
 				if (cancelled || !server) {
 					return;
 				}
 
-				setServerLabel(
-					server.displayName.trim() || server.logicalName.trim() || `${server.ref.rootID}/${server.ref.artifactID}`
-				);
+				setResolvedServerLabel({
+					runtimeID,
+					label:
+						server.displayName.trim() || server.logicalName.trim() || `${server.ref.rootID}/${server.ref.artifactID}`,
+				});
 			})
 			.catch(() => {
 				// The runtime ID remains a useful fallback when the management
@@ -524,7 +532,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			// oxlint-disable-next-line react/refs
 			new MCPAppRPCRouter({
 				instance: routerInstance,
-				isActive: () => mountedRef.current,
+				isActive: isMCPAppViewActive,
 				executeAppTool: async (toolName, args) => {
 					const receipt = requireAcceptedSessionCommand(
 						await sessionManagementAPI.executeAppTool({
@@ -623,6 +631,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			instance.session.runID,
 			instance.session.serverID,
 			instance.session.sessionID,
+			isMCPAppViewActive,
 			requestOpenLinkApproval,
 			routerInstance,
 			viewID,

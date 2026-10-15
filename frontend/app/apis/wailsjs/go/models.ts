@@ -7235,6 +7235,7 @@ export namespace session {
 	    replaceMessageID: string;
 	    runID?: string;
 	    input: UserInput;
+	    carryForwardToolResultIDs?: string[];
 	    configuration?: SessionConfiguration;
 	    limits?: RunLimits;
 	
@@ -7249,6 +7250,7 @@ export namespace session {
 	        this.replaceMessageID = source["replaceMessageID"];
 	        this.runID = source["runID"];
 	        this.input = this.convertValues(source["input"], UserInput);
+	        this.carryForwardToolResultIDs = source["carryForwardToolResultIDs"];
 	        this.configuration = this.convertValues(source["configuration"], SessionConfiguration);
 	        this.limits = this.convertValues(source["limits"], RunLimits);
 	    }
@@ -7493,6 +7495,7 @@ export namespace session {
 	    type?: string;
 	    kind: string;
 	    text?: string;
+	    contents?: spec.ToolOutputItemUnion[];
 	    structured?: number[];
 	    app?: number[];
 	    error?: string;
@@ -7515,6 +7518,7 @@ export namespace session {
 	        this.type = source["type"];
 	        this.kind = source["kind"];
 	        this.text = source["text"];
+	        this.contents = this.convertValues(source["contents"], spec.ToolOutputItemUnion);
 	        this.structured = source["structured"];
 	        this.app = source["app"];
 	        this.error = source["error"];
@@ -7644,6 +7648,7 @@ export namespace session {
 	    startedAt: any;
 	    // Go type: time
 	    finishedAt: any;
+	    automatic?: boolean;
 	    request: ModelOperationInput;
 	    streamedText?: string;
 	    streamedThinking?: string;
@@ -7652,6 +7657,7 @@ export namespace session {
 	    error?: OperationError;
 	    preparation: OperationPreparation;
 	    usable: boolean;
+	    usage?: spec.Usage;
 	    metadata?: number[];
 	    runtimeMetadata?: number[];
 	
@@ -7665,6 +7671,7 @@ export namespace session {
 	        this.state = source["state"];
 	        this.startedAt = this.convertValues(source["startedAt"], null);
 	        this.finishedAt = this.convertValues(source["finishedAt"], null);
+	        this.automatic = source["automatic"];
 	        this.request = this.convertValues(source["request"], ModelOperationInput);
 	        this.streamedText = source["streamedText"];
 	        this.streamedThinking = source["streamedThinking"];
@@ -7673,6 +7680,7 @@ export namespace session {
 	        this.error = this.convertValues(source["error"], OperationError);
 	        this.preparation = this.convertValues(source["preparation"], OperationPreparation);
 	        this.usable = source["usable"];
+	        this.usage = this.convertValues(source["usage"], spec.Usage);
 	        this.metadata = source["metadata"];
 	        this.runtimeMetadata = source["runtimeMetadata"];
 	    }
@@ -9592,6 +9600,232 @@ export namespace source {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace spec {
+	
+	export class URLCitation {
+	    url: string;
+	    title: string;
+	    citedText: string;
+	    startIndex: number;
+	    endIndex: number;
+	    encryptedIndex: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new URLCitation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.title = source["title"];
+	        this.citedText = source["citedText"];
+	        this.startIndex = source["startIndex"];
+	        this.endIndex = source["endIndex"];
+	        this.encryptedIndex = source["encryptedIndex"];
+	    }
+	}
+	export class Citation {
+	    kind: string;
+	    urlCitation?: URLCitation;
+	
+	    static createFrom(source: any = {}) {
+	        return new Citation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.urlCitation = this.convertValues(source["urlCitation"], URLCitation);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CitationConfig {
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CitationConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	    }
+	}
+	export class ContentItemFile {
+	    id: string;
+	    fileName: string;
+	    fileMIME: string;
+	    fileURL: string;
+	    fileData: string;
+	    additionalContext: string;
+	    citationConfig?: CitationConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContentItemFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.fileName = source["fileName"];
+	        this.fileMIME = source["fileMIME"];
+	        this.fileURL = source["fileURL"];
+	        this.fileData = source["fileData"];
+	        this.additionalContext = source["additionalContext"];
+	        this.citationConfig = this.convertValues(source["citationConfig"], CitationConfig);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ContentItemImage {
+	    id: string;
+	    detail: string;
+	    imageName: string;
+	    imageMIME: string;
+	    imageURL: string;
+	    imageData: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContentItemImage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.detail = source["detail"];
+	        this.imageName = source["imageName"];
+	        this.imageMIME = source["imageMIME"];
+	        this.imageURL = source["imageURL"];
+	        this.imageData = source["imageData"];
+	    }
+	}
+	export class ContentItemText {
+	    text: string;
+	    citations?: Citation[];
+	    signature: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContentItemText(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.citations = this.convertValues(source["citations"], Citation);
+	        this.signature = source["signature"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ToolOutputItemUnion {
+	    kind: string;
+	    textItem?: ContentItemText;
+	    imageItem?: ContentItemImage;
+	    fileItem?: ContentItemFile;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolOutputItemUnion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.textItem = this.convertValues(source["textItem"], ContentItemText);
+	        this.imageItem = this.convertValues(source["imageItem"], ContentItemImage);
+	        this.fileItem = this.convertValues(source["fileItem"], ContentItemFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class Usage {
+	    inputTokensTotal: number;
+	    inputTokensCached: number;
+	    inputTokensUncached: number;
+	    outputTokens: number;
+	    reasoningTokens: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Usage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.inputTokensTotal = source["inputTokensTotal"];
+	        this.inputTokensCached = source["inputTokensCached"];
+	        this.inputTokensUncached = source["inputTokensUncached"];
+	        this.outputTokens = source["outputTokens"];
+	        this.reasoningTokens = source["reasoningTokens"];
+	    }
 	}
 
 }

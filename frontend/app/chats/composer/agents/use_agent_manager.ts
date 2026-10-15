@@ -95,12 +95,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		setIsApplying(false);
 	}, []);
 
-	const loadAgentOptions = useCallback(async (force = false) => {
-		const requestSeq = catalogRequestSeqRef.current + 1;
-		catalogRequestSeqRef.current = requestSeq;
-		setLoading(true);
-		setError(null);
-
+	const fetchAgentOptions = useCallback(async (force: boolean, requestSeq: number) => {
 		try {
 			const nextOptions = await agentManagementAPI.listAgentCatalogOptions(force);
 			if (catalogRequestSeqRef.current !== requestSeq) {
@@ -122,20 +117,40 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		}
 	}, []);
 
+	const loadAgentOptions = useCallback(
+		(force = false) => {
+			const requestSeq = catalogRequestSeqRef.current + 1;
+			catalogRequestSeqRef.current = requestSeq;
+			setLoading(true);
+			setError(null);
+			return fetchAgentOptions(force, requestSeq);
+		},
+		[fetchAgentOptions]
+	);
+
 	const refreshAgents = useCallback(async () => {
 		autoEnsureCatalogKeyRef.current = null;
 		await loadAgentOptions(true);
 	}, [loadAgentOptions]);
 
 	useEffect(() => {
+		const requestSeq = catalogRequestSeqRef.current + 1;
+		catalogRequestSeqRef.current = requestSeq;
 		// oxlint-disable-next-line react/set-state-in-effect
-		void loadAgentOptions(false);
-	}, [loadAgentOptions]);
+		void fetchAgentOptions(false, requestSeq);
+	}, [fetchAgentOptions]);
 
 	const selectedAgent = useMemo(
 		() => agentOptions.find(option => option.key === selectedAgentKey) ?? null,
 		[agentOptions, selectedAgentKey]
 	);
+
+	const currentSelectedAgentResolution =
+		selectedAgent !== null &&
+		selectedAgentResolution !== null &&
+		agentKey(selectedAgentResolution.agent.ref) === selectedAgent.key
+			? selectedAgentResolution
+			: null;
 
 	const baseAgent = useMemo(
 		() =>
@@ -150,13 +165,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const isDefaultAgentSelected = selectedAgent !== null && selectedAgent.key === defaultAgent?.key;
 
 	useEffect(() => {
-		if (!selectedAgent) {
-			// oxlint-disable-next-line react/set-state-in-effect
-			setSelectedAgentResolution(current => (current === null ? current : null));
-			return;
-		}
-
-		if (selectedAgentResolution && agentKey(selectedAgentResolution.agent.ref) === selectedAgent.key) {
+		if (!selectedAgent || currentSelectedAgentResolution) {
 			return;
 		}
 
@@ -178,7 +187,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedAgent, selectedAgentResolution]);
+	}, [currentSelectedAgentResolution, selectedAgent]);
 
 	const hasTrackedAgent = useCallback(() => {
 		const trackedKey = selectedAgentKeyRef.current;
@@ -395,8 +404,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			}
 
 			pendingDefaultActionRef.current = null;
-			// oxlint-disable-next-line react/set-state-in-effect
-			void trackDefaultAgentWithoutApplying();
+			void Promise.resolve().then(() => trackDefaultAgentWithoutApplying());
 			return;
 		}
 
@@ -456,7 +464,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 
 		selectedAgentKey: selectedAgent?.key ?? null,
 		selectedAgent,
-		selectedAgentResolution: selectedAgent ? selectedAgentResolution : null,
+		selectedAgentResolution: currentSelectedAgentResolution,
 		preparedStarter: null,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		refreshAgents,
