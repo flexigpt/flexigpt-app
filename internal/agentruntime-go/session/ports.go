@@ -34,6 +34,7 @@ type ModelExecutionResult struct {
 	Usable                 bool               `json:"usable"`
 	Text                   string             `json:"text,omitempty"`
 	Thinking               string             `json:"thinking,omitempty"`
+	Usage                  *InferenceUsage    `json:"usage,omitempty"`
 	ProtocolOutputs        []json.RawMessage  `json:"protocolOutputs,omitempty"`
 	HydratedCurrentInputs  []json.RawMessage  `json:"hydratedCurrentInputs,omitempty"`
 	HydratedCurrentContext []string           `json:"-"`
@@ -156,12 +157,13 @@ type ToolExecutionRequest struct {
 }
 
 type ToolExecutionResult struct {
-	HasResult  bool            `json:"hasResult"`
-	Kind       ToolResultKind  `json:"kind"`
-	Text       string          `json:"text,omitempty"`
-	Structured json.RawMessage `json:"structured,omitempty"`
-	App        json.RawMessage `json:"app,omitempty"`
-	Error      string          `json:"error,omitempty"`
+	HasResult  bool                      `json:"hasResult"`
+	Kind       ToolResultKind            `json:"kind"`
+	Text       string                    `json:"text,omitempty"`
+	Contents   []InferenceToolOutputItem `json:"contents,omitempty"`
+	Structured json.RawMessage           `json:"structured,omitempty"`
+	App        json.RawMessage           `json:"app,omitempty"`
+	Error      string                    `json:"error,omitempty"`
 
 	AppRoute                *AppRoute           `json:"-"`
 	SkillSessionActive      []ArtifactReference `json:"skillSessionActive,omitempty"`

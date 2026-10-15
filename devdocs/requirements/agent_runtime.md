@@ -351,12 +351,16 @@ Frontend
 
 session
   -> no domain imports
-  -> no inference imports
+  -> may import github.com/flexigpt/inference-go/spec as a neutral
+     provider-protocol DTO dependency
+  -> no import of internal/agentruntime-go/inference
+  -> no provider SDK imports
   -> no Wails imports
   -> no frontend imports
 
 inference
   -> inference-go and provider SDKs
+  -> owns execution and provider adaptation
   -> no Session imports
   -> no Agent imports
   -> no Workspace imports
@@ -980,6 +984,65 @@ Frontend only sends commands.
 
 The frontend must never contain a second auto-execution drainer.
 
+### Historical Tool-output edit and resend
+
+Edit-and-resend may carry selected semantic Tool results from the user message
+being replaced.
+
+The command carries Tool-result identities only. The backend resolves those
+identities from the existing replacement message and never accepts
+frontend-authored Tool-result objects.
+
+Conceptually:
+
+```go
+type EditAndResendCommand struct {
+    ReplaceMessageID          string
+    Input                     UserInput
+    CarryForwardToolResultIDs []ToolResultID
+    Configuration             *SessionConfiguration
+}
+```
+
+The replacement message may contain only carried Tool results. This supports
+editing and resending a continuation after Tool output without silently
+discarding the provider-facing Tool result.
+
+### Historical Tool retry
+
+`RetryCall` remains scoped to a current Run-owned Tool call whose selected
+result has not been consumed by a later model operation.
+
+The runtime does not reinterpret a historical consumed Tool call as a new
+user-initiated external side effect. Historical retry UX uses edit-and-resend
+with carried Tool-result context and lets the model propose a fresh Tool call
+through the normal prepared-binding path.
+
+Direct user-initiated replay of historical external Tool work, if ever
+required, needs a separately named command and explicit Run, binding,
+freshness, policy, approval, and continuation semantics. It must not be
+added by weakening RetryCall.
+
+### Tool-result protocol representation
+
+Provider-shaped Tool data uses inference-go protocol types end-to-end:
+
+```text
+inferenceSpec.ToolType
+inferenceSpec.ToolOutputItemUnion
+inferenceSpec.ToolOutput
+inferenceSpec.Usage
+```
+
+Session retains its own Run/Tool lifecycle state, bindings, attempts, waits,
+and approval semantics. It does not duplicate inference-go Tool content
+unions merely for frontend rendering.
+
+Tool-result text/image/file output items are executor-originated Session
+result data. They are rendered from Session snapshots. Provider continuation
+uses a compatible textual projection unless a future prepared capability path
+explicitly supports richer Tool-output content.
+
 ## Skills
 
 ### Effective Skill set
@@ -1114,6 +1177,45 @@ It does not store:
 - OAuth state
 - App iframe payloads
 - Provider transport debug payloads unless explicitly safe and redacted
+
+Typed Tool-result content is durable execution-result data. It is distinct
+from hydrated user attachments and is retained only when produced by a
+backend Tool executor. SessionStore document-size limits remain the durable
+storage bound.
+
+### Snapshot-backed display projection
+
+No separate Session display-projection API is required.
+
+Frontend derives per-message operation display state from existing
+SessionSnapshot data:
+
+```text
+Assistant message OperationID
+User message <-> ModelOperation.Request.Current.ID
+ToolResult.CallID <-> Run.ToolCalls
+ModelOperation.Preparation.Resolution
+ModelOperation.Preparation.EffectiveSkills
+ModelOperation.Preparation.ActiveSkills
+ModelOperation.Request.Configuration
+ModelOperation.Usage
+```
+
+This display projection is read-only and performs no Artifact resolution,
+provider call, MCP call, filesystem scan, or Session mutation.
+
+`ModelOperation.Usage` stores normalized inference-go token usage:
+
+```text
+input total
+input cached
+input uncached
+output
+reasoning
+```
+
+Cost and provider-specific truncation data remain unavailable until
+inference-go exposes normalized equivalents.
 
 ### Breaking storage policy
 
@@ -1368,6 +1470,40 @@ Composer does not:
 - Own approval promises
 - Persist execution history directly
 
+### Agent preview and effective recipe display
+
+Agent capability resolution is a non-authoritative picker/editor preview.
+The exact effective recipe is Session-contextual because it depends on
+Workspace contributions, Session and Run overrides, current Artifact state,
+materialized instruction sources, effective Skills, and explicit MCP
+selection.
+
+The authoritative display of what was used is the prepared Model-operation
+resolution summary.
+
+No Agent-only full-recipe endpoint is introduced. If product later requires
+an exact pre-send effective preview, it must add one generic Session
+configuration-preview operation that reuses the authoritative runtime-setup
+composition path and returns no private prepared payload.
+
+### Override removal display
+
+The frontend owns draft override state and submits canonical remove/replace
+records. Backend operation resolution records excluded resolution items when
+effective inherited instructions, Tools, or Skills are removed or displaced
+by a Session override.
+
+Agent MCP declarations are candidate-only under the current policy. They are
+not inherited effective MCP servers and therefore have no Agent-MCP removal
+override unless product explicitly changes that policy.
+
+### Reopen configuration semantics
+
+Session configuration is the default for future Runs. A Run stores its
+accepted baseline configuration, while each Model operation stores the exact
+effective configuration used for that operation. Continuation-only overrides
+do not silently promote themselves into Session defaults.
+
 ## Status
 
 ### Frontend transport and management-facade delivery
@@ -1605,6 +1741,20 @@ Frontend migration remains separately tracked.
       state from snapshots rather than maintaining a provider stream lifecycle.
 - [x] Session Runtime owns user-message Skill template preparation before
       insertion into a Composer draft.
+- [x] Edit-and-resend can carry selected existing Tool-result identities
+      without allowing frontend-authored Tool results.
+- [x] Session Tool results use inference-go ToolOutputItemUnion values for
+      typed text/image/file rendering.
+- [x] Model operations retain normalized inference-go Usage for snapshot
+      projection.
+- [x] Per-message Tool, MCP, Skill, Workspace, configuration, and provenance
+      display derives from SessionSnapshot and Run operation records.
+- [x] Agent Tool, Skill, and instruction removals are represented as excluded
+      resolution items after Session override application.
+- [x] Reopen behavior distinguishes Session defaults from exact historical
+      Model-operation configuration.
+- [ ] Cost and provider-specific truncation data await normalized
+      inference-go fields.
 - [x] Persisted Session configuration intent restores Composer controls when
       a Session tab is reopened.
 - [x] Snapshot projection resolves historical Tool calls, Tool results, and

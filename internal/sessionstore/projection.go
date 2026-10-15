@@ -7,11 +7,17 @@ import (
 	"slices"
 	"strings"
 
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const textStr = "text"
+const (
+	textStr  = "text"
+	fileStr  = "file"
+	imageStr = "image"
+)
 
 // Projection is checked and deep-copying. It never returns its input on clone
 // failure, and never persists a live executor authorization or hydrated input.
@@ -179,9 +185,13 @@ func projectToolResults(
 	for index := range input {
 		value := input[index]
 
-		// The existing executor contract may carry binary Tool outputs in
-		// Structured and duplicate them into Text. Project both together.
-		if len(value.Structured) != 0 {
+		if len(value.Contents) != 0 {
+			if text := semanticToolResultContentsText(value.Contents); text != "" {
+				value.Text = text
+			}
+		} else if len(value.Structured) != 0 {
+			// Legacy compatibility path for results created before typed
+			// inference-go ToolOutputItemUnion content was persisted.
 			text, err := semanticToolOutputText(value.Structured)
 			if err != nil {
 				return nil, fmt.Errorf("tool result %q: %w", value.ID, err)
@@ -193,6 +203,40 @@ func projectToolResults(
 		output[index] = value
 	}
 	return output, nil
+}
+
+func semanticToolResultContentsText(
+	contents []sessionRuntime.InferenceToolOutputItem,
+) string {
+	parts := make([]string, 0, len(contents))
+	for _, content := range contents {
+		switch content.Kind {
+		case inferenceSpec.ContentItemKindText:
+			if content.TextItem != nil &&
+				strings.TrimSpace(content.TextItem.Text) != "" {
+				parts = append(parts, content.TextItem.Text)
+			}
+
+		case inferenceSpec.ContentItemKindImage:
+			name := imageStr
+			if content.ImageItem != nil &&
+				strings.TrimSpace(content.ImageItem.ImageName) != "" {
+				name = content.ImageItem.ImageName
+			}
+			parts = append(parts, "[Tool image omitted: "+name+"]")
+
+		case inferenceSpec.ContentItemKindFile:
+			name := fileStr
+			if content.FileItem != nil &&
+				strings.TrimSpace(content.FileItem.FileName) != "" {
+				name = content.FileItem.FileName
+			}
+			parts = append(parts, "[Tool file omitted: "+name+"]")
+		default:
+		}
+	}
+
+	return strings.Join(parts, "\n\n")
 }
 
 func normalizeConfiguration(
@@ -486,7 +530,7 @@ func semanticContents(input []semanticContent) []semanticContent {
 					TextItem: &semanticText{Text: value.TextItem.Text},
 				})
 			}
-		case "image":
+		case imageStr:
 			name := ""
 			if value.ImageItem != nil {
 				name = value.ImageItem.ImageName
@@ -497,7 +541,7 @@ func semanticContents(input []semanticContent) []semanticContent {
 					Text: fmt.Sprintf("[Image content omitted from durable history: %s]", name),
 				},
 			})
-		case "file":
+		case fileStr:
 			name := ""
 			if value.FileItem != nil {
 				name = value.FileItem.FileName
@@ -584,13 +628,13 @@ func semanticToolOutputText(raw json.RawMessage) (string, error) {
 				if value.TextItem != nil {
 					parts = append(parts, value.TextItem.Text)
 				}
-			case "image":
+			case imageStr:
 				name := ""
 				if value.ImageItem != nil {
 					name = value.ImageItem.ImageName
 				}
 				parts = append(parts, "[Tool image omitted: "+name+"]")
-			case "file":
+			case fileStr:
 				name := ""
 				if value.FileItem != nil {
 					name = value.FileItem.FileName

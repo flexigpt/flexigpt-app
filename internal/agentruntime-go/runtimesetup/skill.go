@@ -149,6 +149,27 @@ func (c *coordinator) prepareSkills(
 			}
 		}
 
+		if activeSelected {
+			if err := requireSelectionPin(activeSelection, used); err != nil {
+				selected := activeSelection
+				summary.Skills = append(
+					summary.Skills,
+					sessionRuntime.ResolutionItem{
+						Key:      key,
+						Kind:     resolutionItemKindSkill,
+						Owner:    sessionRuntime.ConfigurationOwnerSession,
+						State:    sessionRuntime.ResolutionStateStale,
+						Selected: &selected,
+						Used:     used,
+						Reason:   err.Error(),
+					},
+				)
+				return preparedSkills{}, nil, nil, nil, operationPreparationError(
+					"active_skill_selection_stale", err.Error(), *summary, err,
+				)
+			}
+		}
+
 		if !value.Enabled {
 			item.State = sessionRuntime.ResolutionStateUnavailable
 			item.Used = used
@@ -482,6 +503,7 @@ func (c *coordinator) invokeSkillTool(
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
 		Text:       string(outputs),
+		Contents:   toolOutputItemsFromLLMToolOutputs(response.Body.Outputs),
 		Structured: outputs,
 	}
 	if response.Body.IsError {
@@ -681,7 +703,7 @@ func skillToolChoices(
 		proposal := sessionRuntime.ToolCallProposal{
 			Name:     choice.Name,
 			ChoiceID: choice.ID,
-			Type:     string(choice.Type),
+			Type:     choice.Type,
 			Required: true,
 			Automatic: definition.name == skillToolLoadName ||
 				definition.name == skillToolUnloadName ||

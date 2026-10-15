@@ -29,7 +29,6 @@ const (
 	resolutionItemKindInstruction = "instruction"
 	resolutionItemKindMCP         = "mcp"
 
-	inputRoleTool    = resolutionItemKindTool
 	toolChoicePrefix = resolutionItemKindTool
 
 	jsonSchemaTypeObject = "object"

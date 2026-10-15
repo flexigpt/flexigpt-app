@@ -619,6 +619,7 @@ func (r *Runtime) finishModelExecution(
 
 	operation.Usable = result.Usable
 	operation.ProtocolOutputs = cloneJSON(result.ProtocolOutputs)
+	operation.Usage = cloneInferenceUsage(result.Usage)
 	operation.Metadata = cloneRaw(result.Metadata)
 	operation.RuntimeMetadata = cloneRaw(result.RuntimeMetadata)
 	operation.Preparation.Private = nil
@@ -2079,6 +2080,7 @@ func (r *Runtime) recordExecutionResultLocked(
 		Type:           call.Type,
 		Kind:           kind,
 		Text:           result.Text,
+		Contents:       cloneJSON(result.Contents),
 		Structured:     cloneRaw(result.Structured),
 		App:            cloneRaw(result.App),
 		Error:          result.Error,
@@ -2205,6 +2207,14 @@ func transcriptMessageIndex(
 func cloneOperationError(
 	value *OperationError,
 ) *OperationError {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
+}
+
+func cloneInferenceUsage(value *InferenceUsage) *InferenceUsage {
 	if value == nil {
 		return nil
 	}

@@ -78,6 +78,7 @@ func (r *Runtime) prepareInitialModelOperation(
 	configuration SessionConfiguration,
 	transcript []TranscriptMessage,
 	input UserInput,
+	toolResults []ToolResult,
 ) (initialModelOperation, error) {
 	current := TranscriptMessage{
 		ID:            currentMessageID,
@@ -87,6 +88,7 @@ func (r *Runtime) prepareInitialModelOperation(
 		Text:          input.Text,
 		Attachments:   cloneJSON(input.Attachments),
 		MCPAppContext: cloneJSON(input.MCPAppContext),
+		ToolResults:   cloneJSON(toolResults),
 		Metadata:      cloneRaw(input.Metadata),
 	}
 

@@ -241,66 +241,46 @@ func assistantMessageInput(
 	}
 }
 
-type toolResultOutputWire struct {
-	ID       string                  `json:"id"`
-	CallID   string                  `json:"callID"`
-	ChoiceID string                  `json:"choiceID,omitempty"`
-	Name     string                  `json:"name"`
-	Type     string                  `json:"type,omitempty"`
-	Role     string                  `json:"role"`
-	Status   string                  `json:"status"`
-	IsError  bool                    `json:"isError"`
-	Contents []toolResultContentWire `json:"contents"`
-}
-
-type toolResultContentWire struct {
-	Kind     string             `json:"kind"`
-	TextItem toolResultTextWire `json:"textItem"`
-}
-
-type toolResultTextWire struct {
-	Text string `json:"text"`
-}
-
 func toolResultInput(
 	result sessionRuntime.ToolResult,
 ) (inferenceSpec.InputUnion, error) {
-	value := toolResultOutputWire{
+	toolOutput := &inferenceSpec.ToolOutput{
+		Type:     providerToolOutputType(result.Type),
 		ID:       string(result.ID),
 		CallID:   firstNonEmpty(result.ProviderCallID, string(result.CallID)),
 		ChoiceID: result.ChoiceID,
 		Name:     result.Name,
-		Type:     result.Type,
-		Role:     inputRoleTool,
-		Status:   "completed",
+		Role:     inferenceSpec.RoleTool,
+		Status:   inferenceSpec.StatusCompleted,
 		IsError:  result.Kind != sessionRuntime.ToolResultKindSuccess,
-		Contents: []toolResultContentWire{{
-			Kind: "text",
-			TextItem: toolResultTextWire{
+		Contents: []inferenceSpec.ToolOutputItemUnion{{
+			Kind: inferenceSpec.ContentItemKindText,
+			TextItem: &inferenceSpec.ContentItemText{
 				Text: toolResultText(result),
 			},
 		}},
 	}
 
-	raw, err := json.Marshal(struct {
-		Kind               string               `json:"kind"`
-		FunctionToolOutput toolResultOutputWire `json:"functionToolOutput"`
-	}{
-		Kind:               "functionToolOutput",
-		FunctionToolOutput: value,
-	})
-	if err != nil {
-		return inferenceSpec.InputUnion{}, err
+	if toolOutput.Type == inferenceSpec.ToolTypeCustom {
+		return inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindCustomToolOutput,
+			CustomToolOutput: toolOutput,
+		}, nil
 	}
 
-	var output inferenceSpec.InputUnion
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return inferenceSpec.InputUnion{}, fmt.Errorf(
-			"adapt Tool result to provider input: %w",
-			err,
-		)
+	return inferenceSpec.InputUnion{
+		Kind:               inferenceSpec.InputKindFunctionToolOutput,
+		FunctionToolOutput: toolOutput,
+	}, nil
+}
+
+func providerToolOutputType(
+	value sessionRuntime.InferenceToolType,
+) inferenceSpec.ToolType {
+	if value == inferenceSpec.ToolTypeCustom {
+		return inferenceSpec.ToolTypeCustom
 	}
-	return output, nil
+	return inferenceSpec.ToolTypeFunction
 }
 
 func contextInput(
@@ -492,7 +472,7 @@ func outputUnionsAsInputs(
 		0,
 		len(values),
 	)
-	for _, raw := range values {
+	for index, raw := range values {
 		var value inferenceSpec.OutputUnion
 		if err := json.Unmarshal(raw, &value); err != nil {
 			return nil, fmt.Errorf(
@@ -500,7 +480,7 @@ func outputUnionsAsInputs(
 				err,
 			)
 		}
-		if input := outputToInput(value); input != nil {
+		if input := outputToInput(value, index); input != nil {
 			output = append(output, *input)
 		}
 	}
@@ -509,6 +489,7 @@ func outputUnionsAsInputs(
 
 func outputToInput(
 	value inferenceSpec.OutputUnion,
+	fallbackIndex int,
 ) *inferenceSpec.InputUnion {
 	switch value.Kind {
 	case inferenceSpec.OutputKindOutputMessage:
@@ -542,7 +523,27 @@ func outputToInput(
 			WebSearchToolOutput: value.WebSearchToolOutput,
 		}
 	default:
-		return nil
+		text := fmt.Sprintf(
+			"[Provider output kind %q is not available in replay.]",
+			value.Kind,
+		)
+		return &inferenceSpec.InputUnion{
+			Kind: inferenceSpec.InputKindOutputMessage,
+			OutputMessage: &inferenceSpec.InputOutputContent{
+				ID: fmt.Sprintf(
+					"runtime-unavailable-output:%d",
+					fallbackIndex,
+				),
+				Role:   inferenceSpec.RoleAssistant,
+				Status: inferenceSpec.StatusCompleted,
+				Contents: []inferenceSpec.InputOutputContentItemUnion{{
+					Kind: inferenceSpec.ContentItemKindText,
+					TextItem: &inferenceSpec.ContentItemText{
+						Text: text,
+					},
+				}},
+			},
+		}
 	}
 }
 
@@ -553,7 +554,43 @@ func toolResultText(result sessionRuntime.ToolResult) string {
 	if strings.TrimSpace(result.Error) != "" {
 		return result.Error
 	}
+	if text := toolResultContentsText(result.Contents); text != "" {
+		return text
+	}
 	return "Tool completed without textual output."
+}
+
+func toolResultContentsText(
+	contents []sessionRuntime.InferenceToolOutputItem,
+) string {
+	parts := make([]string, 0, len(contents))
+	for _, content := range contents {
+		switch content.Kind {
+		case inferenceSpec.ContentItemKindText:
+			if content.TextItem != nil &&
+				strings.TrimSpace(content.TextItem.Text) != "" {
+				parts = append(parts, content.TextItem.Text)
+			}
+
+		case inferenceSpec.ContentItemKindImage:
+			name := "image"
+			if content.ImageItem != nil &&
+				strings.TrimSpace(content.ImageItem.ImageName) != "" {
+				name = content.ImageItem.ImageName
+			}
+			parts = append(parts, "[Tool image: "+name+"]")
+
+		case inferenceSpec.ContentItemKindFile:
+			name := "file"
+			if content.FileItem != nil &&
+				strings.TrimSpace(content.FileItem.FileName) != "" {
+				name = content.FileItem.FileName
+			}
+			parts = append(parts, "[Tool file: "+name+"]")
+		default:
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func cloneInputUnions(

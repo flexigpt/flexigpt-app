@@ -303,7 +303,7 @@ func (c *coordinator) prepareMCPTools(
 		proposal := sessionRuntime.ToolCallProposal{
 			Name:      choice.Name,
 			ChoiceID:  choice.ID,
-			Type:      string(choice.Type),
+			Type:      choice.Type,
 			Required:  true,
 			Automatic: tool.ExecutionMode == mcppolicy.MCPExecutionModeAuto,
 			Binding: sessionRuntime.ToolBinding{
@@ -760,7 +760,7 @@ func (c *coordinator) PrepareAppTool(
 		Proposal: sessionRuntime.ToolCallProposal{
 			Name:      selected.ProviderToolName,
 			ChoiceID:  selected.ChoiceID,
-			Type:      "function",
+			Type:      inferenceSpec.ToolTypeFunction,
 			Arguments: append(json.RawMessage(nil), arguments...),
 			Required:  false,
 			Binding: sessionRuntime.ToolBinding{

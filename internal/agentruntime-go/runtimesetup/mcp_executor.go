@@ -196,6 +196,7 @@ func (e *mcpToolExecutor) ExecuteTool(
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
 		Text:       string(structured),
+		Contents:   toolOutputItemsFromMCPContents(response.Content),
 		Structured: structured,
 		App:        app,
 	}

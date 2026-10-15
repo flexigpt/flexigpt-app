@@ -115,6 +115,7 @@ func (e *goToolExecutor) ExecuteTool(
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
 		Text:       string(rawOutputs),
+		Contents:   toolOutputItemsFromLLMToolOutputs(outputs),
 		Structured: rawOutputs,
 	}
 	if invokeErr != nil {
@@ -306,7 +307,7 @@ func toolChoiceAndBinding(
 
 		choice.Type = inferenceSpec.ToolTypeFunction
 		choice.Arguments = arguments
-		proposal.Type = string(choice.Type)
+		proposal.Type = choice.Type
 		proposal.Binding = sessionRuntime.ToolBinding{
 			Kind: sessionRuntime.ToolBindingKindGo,
 			Data: rawBinding,
@@ -317,7 +318,7 @@ func toolChoiceAndBinding(
 		choice.Type = inferenceSpec.ToolType(
 			resolved.Tool.Implementation.SDKToolType,
 		)
-		proposal.Type = string(choice.Type)
+		proposal.Type = choice.Type
 		proposal.Required = false
 		proposal.ProviderManaged = true
 		proposal.Binding = sessionRuntime.ToolBinding{

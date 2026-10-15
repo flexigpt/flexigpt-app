@@ -3,6 +3,8 @@ package session
 import (
 	"encoding/json"
 	"time"
+
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type (
@@ -17,6 +19,15 @@ type (
 	AppInstanceID string
 	AppViewID     string
 	Revision      uint64
+)
+
+// These are aliases, not Session-owned duplicate protocol types. Session owns
+// execution state around them; inference-go owns their provider-neutral wire
+// representation.
+type (
+	InferenceToolType       = inferenceSpec.ToolType
+	InferenceToolOutputItem = inferenceSpec.ToolOutputItemUnion
+	InferenceUsage          = inferenceSpec.Usage
 )
 
 type MessageRole string
@@ -305,20 +316,21 @@ type ToolBinding struct {
 }
 
 type ToolResult struct {
-	ID             ToolResultID    `json:"id"`
-	AttemptID      ToolAttemptID   `json:"attemptID,omitempty"`
-	CallID         ToolCallID      `json:"callID"`
-	ProviderCallID string          `json:"providerCallID,omitempty"`
-	Name           string          `json:"name"`
-	ChoiceID       string          `json:"choiceID,omitempty"`
-	Type           string          `json:"type,omitempty"`
-	Kind           ToolResultKind  `json:"kind"`
-	Text           string          `json:"text,omitempty"`
-	Structured     json.RawMessage `json:"structured,omitempty"`
-	App            json.RawMessage `json:"app,omitempty"`
-	Error          string          `json:"error,omitempty"`
-	AppInstanceID  AppInstanceID   `json:"appInstanceID,omitempty"`
-	CreatedAt      time.Time       `json:"createdAt"`
+	ID             ToolResultID              `json:"id"`
+	AttemptID      ToolAttemptID             `json:"attemptID,omitempty"`
+	CallID         ToolCallID                `json:"callID"`
+	ProviderCallID string                    `json:"providerCallID,omitempty"`
+	Name           string                    `json:"name"`
+	ChoiceID       string                    `json:"choiceID,omitempty"`
+	Type           InferenceToolType         `json:"type,omitempty"`
+	Kind           ToolResultKind            `json:"kind"`
+	Text           string                    `json:"text,omitempty"`
+	Contents       []InferenceToolOutputItem `json:"contents,omitempty"`
+	Structured     json.RawMessage           `json:"structured,omitempty"`
+	App            json.RawMessage           `json:"app,omitempty"`
+	Error          string                    `json:"error,omitempty"`
+	AppInstanceID  AppInstanceID             `json:"appInstanceID,omitempty"`
+	CreatedAt      time.Time                 `json:"createdAt"`
 }
 
 type ToolAttempt struct {
@@ -333,26 +345,26 @@ type ToolAttempt struct {
 }
 
 type ToolCall struct {
-	ID                    ToolCallID      `json:"id"`
-	OriginOperationID     OperationID     `json:"originOperationID"`
-	ProviderCallID        string          `json:"providerCallID,omitempty"`
-	Name                  string          `json:"name"`
-	ChoiceID              string          `json:"choiceID,omitempty"`
-	Type                  string          `json:"type,omitempty"`
-	Arguments             json.RawMessage `json:"arguments,omitempty"`
-	Binding               ToolBinding     `json:"binding"`
-	Required              bool            `json:"required"`
-	ProviderManaged       bool            `json:"providerManaged,omitempty"`
-	Automatic             bool            `json:"automatic,omitempty"`
-	Source                ToolCallSource  `json:"source,omitempty"`
-	AppInstanceID         AppInstanceID   `json:"appInstanceID,omitempty"`
-	State                 ToolCallState   `json:"state"`
-	Attempts              []ToolAttempt   `json:"attempts,omitempty"`
-	Results               []ToolResult    `json:"results,omitempty"`
-	SelectedResultID      ToolResultID    `json:"selectedResultID,omitempty"`
-	WaitID                WaitID          `json:"waitID,omitempty"`
-	LastFailure           string          `json:"lastFailure,omitempty"`
-	ConsumedByOperationID OperationID     `json:"consumedByOperationID,omitempty"`
+	ID                    ToolCallID        `json:"id"`
+	OriginOperationID     OperationID       `json:"originOperationID"`
+	ProviderCallID        string            `json:"providerCallID,omitempty"`
+	Name                  string            `json:"name"`
+	ChoiceID              string            `json:"choiceID,omitempty"`
+	Type                  InferenceToolType `json:"type,omitempty"`
+	Arguments             json.RawMessage   `json:"arguments,omitempty"`
+	Binding               ToolBinding       `json:"binding"`
+	Required              bool              `json:"required"`
+	ProviderManaged       bool              `json:"providerManaged,omitempty"`
+	Automatic             bool              `json:"automatic,omitempty"`
+	Source                ToolCallSource    `json:"source,omitempty"`
+	AppInstanceID         AppInstanceID     `json:"appInstanceID,omitempty"`
+	State                 ToolCallState     `json:"state"`
+	Attempts              []ToolAttempt     `json:"attempts,omitempty"`
+	Results               []ToolResult      `json:"results,omitempty"`
+	SelectedResultID      ToolResultID      `json:"selectedResultID,omitempty"`
+	WaitID                WaitID            `json:"waitID,omitempty"`
+	LastFailure           string            `json:"lastFailure,omitempty"`
+	ConsumedByOperationID OperationID       `json:"consumedByOperationID,omitempty"`
 
 	// Authorization is executor-private. It is deliberately excluded from
 	// public snapshots and semantic checkpoint serialization.
@@ -360,18 +372,18 @@ type ToolCall struct {
 }
 
 type ToolCallProposal struct {
-	ID              ToolCallID      `json:"id,omitempty"`
-	ProviderCallID  string          `json:"providerCallID,omitempty"`
-	Name            string          `json:"name"`
-	ChoiceID        string          `json:"choiceID,omitempty"`
-	Type            string          `json:"type,omitempty"`
-	Arguments       json.RawMessage `json:"arguments,omitempty"`
-	Binding         ToolBinding     `json:"binding"`
-	Required        bool            `json:"required"`
-	ProviderManaged bool            `json:"providerManaged,omitempty"`
-	Automatic       bool            `json:"automatic,omitempty"`
-	Source          ToolCallSource  `json:"source,omitempty"`
-	Error           string          `json:"error,omitempty"`
+	ID              ToolCallID        `json:"id,omitempty"`
+	ProviderCallID  string            `json:"providerCallID,omitempty"`
+	Name            string            `json:"name"`
+	ChoiceID        string            `json:"choiceID,omitempty"`
+	Type            InferenceToolType `json:"type,omitempty"`
+	Arguments       json.RawMessage   `json:"arguments,omitempty"`
+	Binding         ToolBinding       `json:"binding"`
+	Required        bool              `json:"required"`
+	ProviderManaged bool              `json:"providerManaged,omitempty"`
+	Automatic       bool              `json:"automatic,omitempty"`
+	Source          ToolCallSource    `json:"source,omitempty"`
+	Error           string            `json:"error,omitempty"`
 }
 
 type WaitingRequest struct {
@@ -462,6 +474,7 @@ type ModelOperation struct {
 	Error            *OperationError      `json:"error,omitempty"`
 	Preparation      OperationPreparation `json:"preparation"`
 	Usable           bool                 `json:"usable"`
+	Usage            *InferenceUsage      `json:"usage,omitempty"`
 	Metadata         json.RawMessage      `json:"metadata,omitempty"`
 	RuntimeMetadata  json.RawMessage      `json:"runtimeMetadata,omitempty"`
 }
@@ -670,11 +683,12 @@ type CancelRunCommand struct {
 }
 
 type EditAndResendCommand struct {
-	Meta             CommandMeta           `json:"meta"`
-	SessionID        SessionID             `json:"sessionID"`
-	ReplaceMessageID string                `json:"replaceMessageID"`
-	RunID            RunID                 `json:"runID,omitempty"`
-	Input            UserInput             `json:"input"`
-	Configuration    *SessionConfiguration `json:"configuration,omitempty"`
-	Limits           *RunLimits            `json:"limits,omitempty"`
+	Meta                      CommandMeta           `json:"meta"`
+	SessionID                 SessionID             `json:"sessionID"`
+	ReplaceMessageID          string                `json:"replaceMessageID"`
+	RunID                     RunID                 `json:"runID,omitempty"`
+	Input                     UserInput             `json:"input"`
+	CarryForwardToolResultIDs []ToolResultID        `json:"carryForwardToolResultIDs,omitempty"`
+	Configuration             *SessionConfiguration `json:"configuration,omitempty"`
+	Limits                    *RunLimits            `json:"limits,omitempty"`
 }

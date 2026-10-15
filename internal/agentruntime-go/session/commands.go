@@ -655,6 +655,7 @@ func (r *Runtime) StartRun(
 			prepared.Configuration,
 			transcriptBeforePreparation,
 			prepared.Input,
+			nil,
 		)
 	}
 	r.mu.Lock()
@@ -2294,6 +2295,8 @@ func (r *Runtime) EditAndResend(
 		revision    Revision
 		config      SessionConfiguration
 		persistConf bool
+		toolResults []ToolResult
+		carryErr    error
 		transcript  []TranscriptMessage
 		runID       RunID
 		operationID OperationID
@@ -2312,7 +2315,8 @@ func (r *Runtime) EditAndResend(
 
 	sessionValue := r.sessions[command.SessionID]
 	if sessionValue != nil &&
-		hasUserInput(command.Input) &&
+		(hasUserInput(command.Input) ||
+			len(command.CarryForwardToolResultIDs) != 0) &&
 		expectedSessionRevisionMessage(
 			sessionValue,
 			command.Meta.ExpectedSessionRevision,
@@ -2339,6 +2343,10 @@ func (r *Runtime) EditAndResend(
 			snapshot.operationID = OperationID(r.newID())
 			snapshot.messageID = r.newID()
 			snapshot.persistConf = command.Configuration != nil
+			snapshot.toolResults, snapshot.carryErr = carryForwardToolResults(
+				sessionValue.Transcript[index].ToolResults,
+				command.CarryForwardToolResultIDs,
+			)
 			if command.Configuration != nil {
 				snapshot.config = cloneJSON(*command.Configuration)
 			}
@@ -2351,7 +2359,7 @@ func (r *Runtime) EditAndResend(
 		preparationErr error
 		initial        initialModelOperation
 	)
-	if snapshot.ready {
+	if snapshot.ready && snapshot.carryErr == nil {
 		prepared, preparationErr = r.prepareSubmission(
 			ctx,
 			command.SessionID,
@@ -2370,6 +2378,7 @@ func (r *Runtime) EditAndResend(
 				prepared.Configuration,
 				snapshot.transcript,
 				prepared.Input,
+				snapshot.toolResults,
 			)
 		}
 	}
@@ -2444,7 +2453,8 @@ func (r *Runtime) EditAndResend(
 		return &receipt, nil
 	}
 
-	if !hasUserInput(command.Input) {
+	if !hasUserInput(command.Input) &&
+		len(command.CarryForwardToolResultIDs) == 0 {
 		receipt := r.rejectReceiptLocked(
 			command.Meta,
 			fingerprint,
@@ -2507,6 +2517,20 @@ func (r *Runtime) EditAndResend(
 				SessionID:       command.SessionID,
 				SessionRevision: sessionValue.Revision,
 				Message:         "session changed while edit-and-resend input was being prepared; retry the edit",
+			},
+		)
+		r.mu.Unlock()
+		return &receipt, nil
+	}
+	if snapshot.carryErr != nil {
+		receipt := r.rejectReceiptLocked(
+			command.Meta,
+			fingerprint,
+			CommandReceipt{
+				CommandID:       command.Meta.ID,
+				SessionID:       command.SessionID,
+				SessionRevision: sessionValue.Revision,
+				Message:         snapshot.carryErr.Error(),
 			},
 		)
 		r.mu.Unlock()
@@ -2578,6 +2602,42 @@ func (r *Runtime) EditAndResend(
 	r.flushEffects(ctx, effects)
 
 	return &receipt, nil
+}
+
+func carryForwardToolResults(
+	available []ToolResult,
+	requested []ToolResultID,
+) ([]ToolResult, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+
+	want := make(map[ToolResultID]struct{}, len(requested))
+	for _, id := range requested {
+		if id == "" {
+			return nil, errors.New(
+				"carried Tool result identity is required",
+			)
+		}
+		want[id] = struct{}{}
+	}
+
+	output := make([]ToolResult, 0, len(want))
+	for _, result := range available {
+		if _, found := want[result.ID]; !found {
+			continue
+		}
+		output = append(output, cloneJSON(result))
+		delete(want, result.ID)
+	}
+
+	if len(want) != 0 {
+		return nil, errors.New(
+			"carried Tool result does not belong to the message being replaced",
+		)
+	}
+
+	return output, nil
 }
 
 func (r *Runtime) beginCommandLocked(

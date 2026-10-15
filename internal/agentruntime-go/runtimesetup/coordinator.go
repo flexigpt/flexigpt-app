@@ -539,6 +539,10 @@ func (c *coordinator) ExecuteModel(
 	}
 
 	providerResponse := response.Body.InferenceResponse
+	if providerResponse.Usage != nil {
+		usage := *providerResponse.Usage
+		result.Usage = &usage
+	}
 	result.ProtocolOutputs = marshalOutputUnions(providerResponse.Outputs)
 	if providerResponse.Error != nil {
 		result.Error = &sessionRuntime.OperationError{
@@ -548,7 +552,7 @@ func (c *coordinator) ExecuteModel(
 	}
 
 	text, thinking, calls := decodeCompletionOutputs(
-		result.ProtocolOutputs,
+		providerResponse.Outputs,
 		bindings,
 	)
 	result.Text = text
@@ -556,7 +560,7 @@ func (c *coordinator) ExecuteModel(
 	result.ToolCalls = calls
 	result.Usable = strings.TrimSpace(text) != "" ||
 		len(calls) != 0 ||
-		hasUsableProtocolOutput(result.ProtocolOutputs)
+		hasUsableProtocolOutput(providerResponse.Outputs)
 
 	if executeErr != nil && result.Error == nil {
 		result.Error = &sessionRuntime.OperationError{
