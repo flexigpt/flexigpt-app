@@ -9,7 +9,8 @@ import { generateTitle } from '@/lib/title_utils';
 
 import { sessionManagementAPI } from '@/apis/baseapi';
 
-import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { requireAcceptedSessionCommand, sessionCommandMeta } from '@/chats/session/session_commands';
 import { buildSessionSubmissionIntent } from '@/chats/session/session_intent';
@@ -19,9 +20,16 @@ interface UseSendMessageArgs {
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
 	scrollTabToBottomSoon: (tabId: string) => void;
 	tabExists: (tabId: string) => boolean;
+	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
 }
 
-export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabExists }: UseSendMessageArgs) {
+export function useSendMessage({
+	tabsRef,
+	updateTab,
+	scrollTabToBottomSoon,
+	tabExists,
+	inputRefs,
+}: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
 		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
 			if (!tabExists(tabId)) {
@@ -60,6 +68,7 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 					updateTab(tabId, current => ({
 						...current,
 						sessionID: created.sessionID,
+						composerConfigurationRestored: true,
 						isPersisted: true,
 					}));
 
@@ -174,9 +183,23 @@ export function useSendMessage({ tabsRef, updateTab, scrollTabToBottomSoon, tabE
 				return;
 			}
 
+			const external: EditorExternalMessage = {
+				text: message.uiContent ?? '',
+				attachments: message.attachments,
+				toolChoices: message.uiToolChoices,
+				toolSelectionIssues: message.uiToolSelectionIssues,
+				mcpContext: message.mcpContext,
+				mcpAppContextUpdates: message.mcpAppContextUpdates,
+				toolOutputs: message.uiToolOutputs,
+				enabledSkillRefs: message.enabledSkillRefs,
+				activeSkillRefs: message.activeSkillRefs,
+				workspaceSelection: message.workspaceSelection,
+			};
+
+			inputRefs.current.get(tabId)?.loadExternalMessage(external);
 			updateTab(tabId, current => ({ ...current, editingMessageId: id }));
 		},
-		[tabsRef, updateTab]
+		[inputRefs, tabsRef, updateTab]
 	);
 
 	const cancelEditingForTab = useCallback(

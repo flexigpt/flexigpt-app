@@ -18,6 +18,11 @@ interface AgentComposerContext {
 	setModelSelectionSource: (source: 'session' | 'agent') => void;
 }
 
+interface PendingRestoredAgent {
+	agent: ArtifactRef;
+	modelSelectionSource: 'session' | 'agent';
+}
+
 type PendingDefaultAction = 'ensure' | 'reset' | 'track';
 
 const BASE_AGENT_NAME = 'base';
@@ -46,7 +51,7 @@ export interface AgentManagerState {
 	reapplySelectedAgent(): Promise<boolean>;
 	trackDefaultAgentWithoutApplying(): Promise<boolean>;
 	clearAgentTracking(): void;
-	restoreSelectedAgent(agent?: ArtifactRef): Promise<boolean>;
+	restoreSelectedAgent(agent?: ArtifactRef, modelSelectionSource?: 'session' | 'agent'): Promise<boolean>;
 }
 
 function agentKey(ref: ArtifactRef): string {
@@ -69,7 +74,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
 	const initialDefaultRequestRef = useRef(false);
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
-	const pendingRestoredAgentRef = useRef<ArtifactRef | null>(null);
+	const pendingRestoredAgentRef = useRef<PendingRestoredAgent | null>(null);
 
 	const setTrackedAgent = useCallback((aKey: string | null, trackingOnly = false) => {
 		selectedAgentKeyRef.current = aKey;
@@ -207,7 +212,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	);
 
 	const restoreSelectedAgent = useCallback(
-		async (agent?: ArtifactRef): Promise<boolean> => {
+		async (agent?: ArtifactRef, modelSelectionSource: 'session' | 'agent' = 'agent'): Promise<boolean> => {
 			cancelActiveAgentRequest();
 
 			if (!agent) {
@@ -219,7 +224,10 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			}
 
 			if (loading) {
-				pendingRestoredAgentRef.current = agent;
+				pendingRestoredAgentRef.current = {
+					agent,
+					modelSelectionSource,
+				};
 				return false;
 			}
 
@@ -232,7 +240,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			}
 
 			pendingRestoredAgentRef.current = null;
-			context.setModelSelectionSource('agent');
+			context.setModelSelectionSource(modelSelectionSource);
 			setTrackedAgent(option.key, true);
 			setActionError(null);
 			return true;
@@ -333,7 +341,9 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		const pendingRestoredAgent = pendingRestoredAgentRef.current;
 		if (pendingRestoredAgent && !loading) {
 			pendingRestoredAgentRef.current = null;
-			void Promise.resolve().then(() => restoreSelectedAgent(pendingRestoredAgent));
+			void Promise.resolve().then(() =>
+				restoreSelectedAgent(pendingRestoredAgent.agent, pendingRestoredAgent.modelSelectionSource)
+			);
 			return;
 		}
 

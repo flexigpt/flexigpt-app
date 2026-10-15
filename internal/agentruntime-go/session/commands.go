@@ -2746,6 +2746,7 @@ func (r *Runtime) startRunLocked(
 		commandID,
 		initial.OperationID,
 		inputMessage.ID,
+		nil,
 		&initial.Prepared,
 		effects,
 	)
@@ -2782,6 +2783,7 @@ func (r *Runtime) startModelOperationLocked(
 	commandID CommandID,
 	requestedOperationID OperationID,
 	currentMessageID string,
+	operationConfiguration *SessionConfiguration,
 	prepared *OperationPreparation,
 	effects *runtimeEffects,
 ) (runtimeWork, error) {
@@ -2801,10 +2803,15 @@ func (r *Runtime) startModelOperationLocked(
 		return runtimeWork{}, errors.New("model operation current message must be user-authored")
 	}
 
+	effectiveConfiguration := cloneJSON(run.Configuration)
+	if operationConfiguration != nil {
+		effectiveConfiguration = cloneJSON(*operationConfiguration)
+	}
+
 	history := selectHistory(
 		sessionValue.Transcript,
 		currentMessageID,
-		run.Configuration.History,
+		effectiveConfiguration.History,
 	)
 	operationID := requestedOperationID
 	if operationID == "" {
@@ -2814,7 +2821,7 @@ func (r *Runtime) startModelOperationLocked(
 		ID:    operationID,
 		State: OperationStateQueued,
 		Request: ModelOperationInput{
-			Configuration:        cloneJSON(run.Configuration),
+			Configuration:        effectiveConfiguration,
 			History:              cloneJSON(history),
 			Current:              cloneJSON(current),
 			ContinuationRevision: run.Continuation.ConsumedRevision,
@@ -2918,12 +2925,10 @@ func (r *Runtime) beginContinuationModelLocked(
 	previousRun := cloneJSON(*run)
 	previousEffects := *effects
 
+	var operationConfiguration *SessionConfiguration
 	if staged.Configuration != nil {
-		r.applyRunConfigurationLocked(
-			sessionValue,
-			run,
-			*staged.Configuration,
-		)
+		value := cloneJSON(*staged.Configuration)
+		operationConfiguration = &value
 	}
 
 	inputMessage := TranscriptMessage{
@@ -2950,6 +2955,7 @@ func (r *Runtime) beginContinuationModelLocked(
 		commandID,
 		"",
 		inputMessage.ID,
+		operationConfiguration,
 		nil,
 		effects,
 	)
@@ -2962,7 +2968,8 @@ func (r *Runtime) beginContinuationModelLocked(
 
 	for callIndex := range run.ToolCalls {
 		call := &run.ToolCalls[callIndex]
-		if call.ConsumedByOperationID != "" ||
+		if !isContinuationToolResult(*call) ||
+			call.ConsumedByOperationID != "" ||
 			call.SelectedResultID == "" {
 			continue
 		}
@@ -2986,6 +2993,15 @@ func (r *Runtime) beginContinuationModelLocked(
 	)
 
 	return work, nil
+}
+
+// isContinuationToolResult reports whether a selected result has a matching
+// provider-side Tool call and may therefore be emitted as functionToolOutput.
+//
+// App-originated Tool calls are intentionally non-required and must be staged
+// through App context rather than injected as a model Tool result.
+func isContinuationToolResult(call ToolCall) bool {
+	return call.Required && !call.ProviderManaged
 }
 
 func (r *Runtime) completeCallWithResult(
@@ -3359,20 +3375,6 @@ func (r *Runtime) setPause(
 	r.flushEffects(ctx, effects)
 
 	return &receipt, nil
-}
-
-func (r *Runtime) applyRunConfigurationLocked(
-	sessionValue *Session,
-	run *Run,
-	configuration SessionConfiguration,
-) {
-	run.Configuration = cloneJSON(configuration)
-	sessionValue.Configuration = cloneJSON(configuration)
-	run.SkillSession.Generation++
-	run.SkillSession.EstablishedGeneration = 0
-	run.SkillSession.Enabled = nil
-	run.SkillSession.Active = nil
-	r.touchRunLocked(sessionValue, run)
 }
 
 func (r *Runtime) advanceDriverLocked(
@@ -3856,6 +3858,9 @@ func collectUnconsumedToolResults(run *Run) []ToolResult {
 	output := make([]ToolResult, 0)
 
 	for _, call := range run.ToolCalls {
+		if !isContinuationToolResult(call) {
+			continue
+		}
 		if call.ConsumedByOperationID != "" {
 			continue
 		}

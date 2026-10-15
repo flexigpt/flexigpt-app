@@ -1,3 +1,5 @@
+import type { MCPContent } from '@/spec/session_mcp';
+
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
 import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
@@ -12,11 +14,18 @@ function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSO
 	return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
+export interface MCPAppToolCallResult {
+	accepted?: boolean;
+	content?: MCPContent[];
+	structuredContent?: Record<string, unknown>;
+	isError?: boolean;
+}
+
 export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
 	/** Returns false after the owning App view has been torn down. */
 	isActive?: () => boolean;
-	executeAppTool: (toolName: string, args?: Record<string, unknown>) => Promise<void>;
+	executeAppTool: (toolName: string, args?: Record<string, unknown>) => Promise<MCPAppToolCallResult>;
 	readAppResource: (uri: string) => Promise<unknown>;
 	stageModelContext: (update: MCPAppModelContextUpdatePayload) => Promise<void>;
 	/** Returns true if the user approves opening this URL. */
@@ -116,8 +125,8 @@ export class MCPAppRPCRouter {
 			if (args === null) {
 				return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'tools/call arguments must be an object');
 			}
-			await this.deps.executeAppTool(name, args);
-			return { jsonrpc: '2.0', id: req.id, result: { accepted: true } };
+			const result = await this.deps.executeAppTool(name, args);
+			return { jsonrpc: '2.0', id: req.id, result };
 		} catch (err) {
 			return errorResp(
 				req.id,

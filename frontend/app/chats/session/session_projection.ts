@@ -24,6 +24,7 @@ import { RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
 import {
 	SessionAttachmentReferenceKind,
 	SessionMessageRole,
+	SessionOperationState,
 	SessionRunState,
 	SessionToolBindingKind,
 	SessionToolCallState,
@@ -121,9 +122,18 @@ function messageRole(role: SessionMessageRole): RoleEnum {
 	}
 }
 
-function messageStatus(message: SessionTranscriptMessage): Status {
-	if (message.error || message.status === 'failed') {
+function messageStatus(
+	message: SessionTranscriptMessage,
+	operationError?: NonNullable<SessionTranscriptMessage['error']>
+): Status {
+	if (message.error || operationError || message.status === 'failed') {
 		return Status.Failed;
+	}
+	if (message.status === Status.Cancelled || message.status === 'interrupted') {
+		return Status.Cancelled;
+	}
+	if (message.status === Status.Incomplete) {
+		return Status.Incomplete;
 	}
 	if (message.status === 'completed') {
 		return Status.Completed;
@@ -385,6 +395,7 @@ function appContextUpdatesFromSession(values: MCPAppContextUpdate[] | undefined)
 		instanceID: update.appInstanceID,
 		server: update.serverID,
 		resourceUri: update.resourceURI,
+		viewID: update.viewID,
 		content: update.content?.map(content => ({
 			type: content.type as MCPContentType,
 			text: content.text,
@@ -404,10 +415,11 @@ function projectTranscriptMessage(
 	index: SessionRunIndex
 ): ConversationMessage {
 	const outputs = protocolOutputs(message);
-	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
 	const operationRun = message.operationID ? index.runsByOperationID.get(message.operationID) : undefined;
+	const operation = operationRun?.modelOperations?.find(candidate => candidate.id === message.operationID);
 	const operationCalls = message.operationID ? (index.callsByOperationID.get(message.operationID) ?? []) : [];
 	const appsByID = operationRun ? index.appsByRunID.get(operationRun.id) : undefined;
+	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
 
 	const toolResults =
 		message.toolResults
@@ -424,14 +436,15 @@ function projectTranscriptMessage(
 		id: message.id,
 		createdAt: message.createdAt,
 		role: messageRole(message.role),
-		status: messageStatus(message),
+		status: messageStatus(message, operation?.error),
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
 		inputs: (message.protocolInputs ?? [])
 			.map(raw => decodeSessionOpaqueJSON(raw))
 			.filter(value => value !== undefined) as InputUnion[],
 		outputs,
-		error: message.error,
+		error: message.error ?? operation?.error,
+		debugDetails: message.runtimeMetadata,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
 		uiToolCalls:
@@ -448,9 +461,18 @@ function projectTranscriptMessage(
 function projectActiveOperation(run: SessionRun): ConversationMessage | undefined {
 	const operation = run.modelOperations?.find(candidate => candidate.id === run.activeModelOperationID);
 
-	if (!operation || (!operation.streamedText && !operation.streamedThinking)) {
+	if (!operation) {
 		return undefined;
 	}
+
+	const status =
+		operation.state === SessionOperationState.Failed
+			? Status.Failed
+			: operation.state === SessionOperationState.Cancelled
+				? Status.Cancelled
+				: operation.state === SessionOperationState.Interrupted
+					? Status.Incomplete
+					: Status.InProgress;
 
 	const toolCalls = run.toolCalls
 		?.filter(call => call.originOperationID === operation.id)
@@ -462,7 +484,8 @@ function projectActiveOperation(run: SessionRun): ConversationMessage | undefine
 		id: `session-stream:${run.id}:${operation.id}`,
 		createdAt: operation.startedAt || operation.request.current.createdAt,
 		role: RoleEnum.Assistant,
-		status: Status.InProgress,
+		status,
+		error: operation.error,
 		uiContent: operation.streamedText || '',
 		uiReasoningContents: operation.streamedThinking
 			? [

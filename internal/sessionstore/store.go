@@ -353,6 +353,24 @@ func (s *Store) Restore(
 
 	// No persistence lock or I/O is held while the Session coordinator accepts
 	// restored semantic records.
+	if retiredRestorer, supported := restorer.(sessionRuntime.RetiredSessionRestorer); supported {
+		for _, document := range documents {
+			if document.Kind != documentKindDeleted {
+				continue
+			}
+			if err := retiredRestorer.RestoreRetiredSession(
+				ctx,
+				document.Deletion.SessionID,
+			); err != nil {
+				return fmt.Errorf(
+					"restore retired Session %q: %w",
+					document.Deletion.SessionID,
+					err,
+				)
+			}
+		}
+	}
+
 	for _, document := range documents {
 		if document.Kind != documentKindSession {
 			continue

@@ -215,7 +215,7 @@ export const ComposerBox = memo(
 					composerContext.restoreSessionConfiguration(configuration);
 					systemPrompt.restoreSessionConfiguration(configuration);
 
-					await agent.restoreSelectedAgent(configuration.agent);
+					await agent.restoreSelectedAgent(configuration.agent, configuration.model ? 'session' : 'agent');
 					await editorAreaRef.current?.restoreSessionConfiguration(configuration);
 				},
 			}),

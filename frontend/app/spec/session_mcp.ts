@@ -466,6 +466,7 @@ export interface MCPAppModelContextUpdate {
 	instanceID?: string;
 	server: MCPRuntimeServerID;
 	resourceUri?: string;
+	viewID?: AppViewID;
 	content?: MCPContent[];
 	structuredContent?: SessionOpaqueJSON;
 	updatedAt?: MCPTimestamp;

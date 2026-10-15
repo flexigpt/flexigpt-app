@@ -92,6 +92,12 @@ function refKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
 }
 
+function workspaceOverrideKey(key: string): string {
+	const prefix = 'artifact:';
+
+	return key.startsWith(prefix) ? key.slice(prefix.length) : key;
+}
+
 function workspaceRefOf(candidate: ComposerWorkspaceCandidate): ArtifactRef {
 	return {
 		rootID: candidate.workspace.workspace.artifact.rootID,
@@ -178,7 +184,7 @@ function applyArtifactOverrides(
 				continue;
 
 			case SessionCollectionOverrideMode.Remove:
-				byKey.delete(override.key);
+				byKey.delete(workspaceOverrideKey(override.key));
 				continue;
 
 			case SessionCollectionOverrideMode.Replace:
@@ -227,7 +233,7 @@ function applyMCPOverrides(
 			case SessionCollectionOverrideMode.Inherit:
 				continue;
 			case SessionCollectionOverrideMode.Remove:
-				byKey.delete(override.key);
+				byKey.delete(workspaceOverrideKey(override.key));
 				continue;
 			case SessionCollectionOverrideMode.Replace:
 				if (!replacementStarted) {

@@ -212,17 +212,29 @@ export async function hydrateSessionToolOverrides(
 			}
 
 			const resolved = await toolManagementAPI.resolveToolTarget(target);
-			choices.push(
-				toolStoreChoiceFromSelection(
-					{
-						choiceID: commandChoiceID(),
-						target,
-						autoExecute: value.autoExecute ?? false,
-						userArgSchemaInstance: rawJSONText(value.userArguments),
-					},
-					resolved
-				)
+			const choice = toolStoreChoiceFromSelection(
+				{
+					choiceID: commandChoiceID(),
+					target,
+					autoExecute: value.autoExecute ?? false,
+					userArgSchemaInstance: rawJSONText(value.userArguments),
+				},
+				resolved
 			);
+
+			choices.push({
+				...choice,
+				...(value.capability.artifact?.expectedRevision === undefined
+					? {}
+					: {
+							artifactRevision: value.capability.artifact.expectedRevision,
+						}),
+				...(value.capability.artifact?.expectedDigest
+					? {
+							definitionDigest: value.capability.artifact.expectedDigest,
+						}
+					: {}),
+			});
 		} catch (error) {
 			const target = value.capability.artifact
 				? ({
@@ -323,7 +335,7 @@ export async function hydrateSessionMCPOverrides(
 		}));
 
 		servers.push({
-			server: selection.server.artifactID,
+			server: runtimeServerID,
 			toolExposure: selection.toolExposure,
 			selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
 			includeServerInstructions: selection.includeServerInstructions,

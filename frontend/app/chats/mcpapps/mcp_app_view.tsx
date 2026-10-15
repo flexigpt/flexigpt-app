@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 
+import type { SessionToolResult } from '@/spec/session';
 import type { MCPContent } from '@/spec/session_mcp';
 import { MCP_APP_HTML_MIME_TYPE } from '@/spec/mcp';
 import { SessionRunObservationKind } from '@/spec/session';
@@ -17,6 +18,7 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import type { MCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import type { MCPAppToolCallResult } from '@/chats/mcpapps/mcp_app_rpc_router';
 import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 import { buildMCPAppAllowAttribute, buildMCPAppCSP, getMCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import { dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
@@ -33,6 +35,7 @@ const NORMALIZED_APP_MIME = APP_MIME.toLowerCase().replaceAll(/\s/g, '');
 const DEFAULT_APP_HEIGHT = 480;
 const MIN_APP_HEIGHT = 160;
 const MAX_APP_HEIGHT = 1200;
+const APP_TOOL_RESULT_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_APPROVAL_PREVIEW_LENGTH = 4000;
 const MAX_EXTERNAL_URL_LENGTH = 8192;
 
@@ -45,6 +48,12 @@ interface MCPAppViewProps {
 	toolInput?: unknown;
 	toolResult?: { content?: MCPContent[]; structuredContent?: unknown; isError?: boolean };
 	height?: number;
+}
+
+interface PendingAppToolResult {
+	resolve: (result: MCPAppToolCallResult) => void;
+	reject: (error: Error) => void;
+	timer: number;
 }
 
 interface BlockedExternalLink {
@@ -67,11 +76,7 @@ function decodeMCPBlob(blob: string | number[] | undefined): string {
 	if (typeof blob === 'string') {
 		try {
 			const binary = atob(blob);
-			const bytes = new Uint8Array(binary.length);
-			for (let i = 0; i < binary.length; i += 1) {
-				// oxlint-disable-next-line unicorn/prefer-code-point
-				bytes[i] = binary.charCodeAt(i);
-			}
+			const bytes = Uint8Array.from(binary, character => character.codePointAt(0) ?? 0);
 			return new TextDecoder().decode(bytes);
 		} catch {
 			return '';
@@ -259,6 +264,41 @@ function buildToolInputNotificationParams(
 	return params;
 }
 
+function stringifyOpaqueValue(value: unknown): string {
+	try {
+		return JSON.stringify(value, null, 2) ?? '';
+	} catch {
+		return '';
+	}
+}
+
+function sessionToolResultToAppToolCallResult(result: SessionToolResult): MCPAppToolCallResult {
+	const appPayload = decodeSessionOpaqueJSON<{
+		content?: MCPContent[];
+		structuredContent?: unknown;
+		isError?: boolean;
+	}>(result.app);
+	const structuredContent = appPayload?.structuredContent ?? decodeSessionOpaqueJSON(result.structured);
+	const fallbackText =
+		result.text ||
+		result.error ||
+		(structuredContent === undefined ? '' : stringifyOpaqueValue(structuredContent)) ||
+		'Tool completed without textual output.';
+
+	return {
+		content: Array.isArray(appPayload?.content)
+			? appPayload.content
+			: [
+					{
+						type: MCPContentType.Text,
+						text: fallbackText,
+					},
+				],
+		...(isJSONObject(structuredContent) ? { structuredContent } : {}),
+		isError: appPayload?.isError ?? result.kind !== SessionToolResultKind.Success,
+	};
+}
+
 export function MCPAppView(props: MCPAppViewProps) {
 	return <MCPAppViewContent key={getMCPAppViewKey(props.instance)} {...props} />;
 }
@@ -298,6 +338,8 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		toolUseID: string;
 		value: MCPAppViewProps['toolResult'];
 	} | null>(null);
+	const pendingAppToolResultsRef = useRef(new Map<string, PendingAppToolResult>());
+	const completedAppToolResultsRef = useRef(new Map<string, MCPAppToolCallResult>());
 
 	const serverLabel = instance.server;
 	const frameHeight = appRequestedHeight ?? clampAppHeight(height);
@@ -406,6 +448,52 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		});
 	}, []);
 
+	const settleAppToolResult = useCallback((callID: string, result: MCPAppToolCallResult) => {
+		completedAppToolResultsRef.current.set(callID, result);
+		const pending = pendingAppToolResultsRef.current.get(callID);
+		if (!pending) {
+			return;
+		}
+
+		pendingAppToolResultsRef.current.delete(callID);
+		window.clearTimeout(pending.timer);
+		pending.resolve(result);
+	}, []);
+
+	const waitForAppToolResult = useCallback((callID: string): Promise<MCPAppToolCallResult> => {
+		const completed = completedAppToolResultsRef.current.get(callID);
+		if (completed) {
+			return Promise.resolve(completed);
+		}
+
+		return new Promise<MCPAppToolCallResult>((resolve, reject) => {
+			const timer = window.setTimeout(() => {
+				pendingAppToolResultsRef.current.delete(callID);
+				reject(new Error('Timed out waiting for the MCP App Tool result.'));
+			}, APP_TOOL_RESULT_TIMEOUT_MS);
+
+			pendingAppToolResultsRef.current.set(callID, {
+				resolve,
+				reject,
+				timer,
+			});
+		});
+	}, []);
+
+	useEffect(() => {
+		const pendingAppToolResults = pendingAppToolResultsRef.current;
+		const completedAppToolResults = completedAppToolResultsRef.current;
+
+		return () => {
+			for (const pending of pendingAppToolResults.values()) {
+				window.clearTimeout(pending.timer);
+				pending.reject(new Error('MCP App view was closed before the Tool result arrived.'));
+			}
+			pendingAppToolResults.clear();
+			completedAppToolResults.clear();
+		};
+	}, []);
+
 	const router = useMemo(
 		() =>
 			// oxlint-disable-next-line react/refs
@@ -429,6 +517,12 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 						sessionRevision: receipt.sessionRevision ?? revisionsRef.current.sessionRevision,
 						runRevision: receipt.runRevision ?? revisionsRef.current.runRevision,
 					};
+					const callID = receipt.toolCallIDs?.[0];
+					if (!callID) {
+						return { accepted: true };
+					}
+
+					return waitForAppToolResult(callID);
 				},
 				readAppResource: async resourceURI => {
 					const response = await sessionManagementAPI.readAppResource({
@@ -507,6 +601,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			requestOpenLinkApproval,
 			routerInstance,
 			viewID,
+			waitForAppToolResult,
 		]
 	);
 
@@ -669,33 +764,36 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				runRevision: observation.snapshot.run.revision,
 			};
 
-			const bridge = bridgeRef.current;
-			if (!bridge) {
-				return;
-			}
-
 			for (const call of observation.snapshot.run.toolCalls ?? []) {
 				if (call.source !== SessionToolCallSource.App || call.appInstanceID !== instance.session.appInstanceID) {
 					continue;
 				}
 
 				for (const result of call.results ?? []) {
+					const appToolResult = sessionToolResultToAppToolCallResult(result);
+					settleAppToolResult(call.id, appToolResult);
+
 					if (sentResultIDs.has(result.id)) {
 						continue;
 					}
 					sentResultIDs.add(result.id);
 
+					const bridge = bridgeRef.current;
+					if (!bridge) {
+						continue;
+					}
+
 					bridge.sendNotification('ui/notifications/tool-result', {
 						toolName: result.name,
 						toolUseID: result.providerCallID || result.callID,
-						content: [{ type: 'text', text: result.text || result.error || '' }],
-						structuredContent: decodeSessionOpaqueJSON(result.structured),
-						isError: result.kind !== SessionToolResultKind.Success,
+						content: appToolResult.content,
+						structuredContent: appToolResult.structuredContent,
+						isError: appToolResult.isError,
 					});
 				}
 			}
 		});
-	}, [instance.session.appInstanceID, instance.session.runID, instance.session.sessionID]);
+	}, [instance.session.appInstanceID, instance.session.runID, instance.session.sessionID, settleAppToolResult]);
 
 	useEffect(() => {
 		mountedRef.current = true;

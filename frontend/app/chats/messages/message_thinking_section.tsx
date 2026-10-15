@@ -32,7 +32,7 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 	const finalThinking = useMemo(() => joinReasoningParts(reasoningContents, 'thinking'), [reasoningContents]);
 
 	// Prefer streamed thinking while busy; otherwise show final thinking.
-	const thinkingText = isBusy ? streamedThinking : finalThinking.trimEnd();
+	const thinkingText = isBusy && streamedThinking.length > 0 ? streamedThinking : finalThinking.trimEnd();
 
 	// Thinking is optional: only show when we actually have something to display.
 	const hasSummary = /\S/.test(finalSummary);

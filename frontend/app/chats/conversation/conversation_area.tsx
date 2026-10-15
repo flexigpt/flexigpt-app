@@ -11,13 +11,21 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { FiChevronDown, FiChevronUp, FiPlay } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlay, FiZapOff } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
-import type { Conversation, ConversationMessage, SessionConfiguration } from '@/spec/session';
-import type { SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
-import { RoleEnum } from '@/spec/inference';
-import { SessionRunState, SessionWaitStatus } from '@/spec/session_base';
+import type { UIToolCall } from '@/spec/inference';
+import type { Conversation, ConversationMessage, SessionConfiguration, SessionRun } from '@/spec/session';
+import type { SessionOpaqueJSON, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
+import type { SkillRef } from '@/spec/skill';
+import { RoleEnum, UIToolCallStatus } from '@/spec/inference';
+import {
+	SessionAutomationHoldScope,
+	SessionOperationState,
+	SessionRunState,
+	SessionToolCallState,
+	SessionWaitStatus,
+} from '@/spec/session_base';
 import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -92,6 +100,36 @@ function looksLikeDirectoryPath(path: string): boolean {
 
 function resolveActiveTab(tabs: ChatTabState[], selectedTabId: string): ChatTabState | undefined {
 	return tabs.find(tab => tab.tabId === selectedTabId) ?? tabs[0];
+}
+
+function runHasGeneratingModelOperation(run: SessionRun | undefined): boolean {
+	if (!run?.activeModelOperationID) {
+		return false;
+	}
+
+	const operation = run.modelOperations?.find(candidate => candidate.id === run.activeModelOperationID);
+
+	return (
+		operation?.state === SessionOperationState.Queued ||
+		operation?.state === SessionOperationState.Preparing ||
+		operation?.state === SessionOperationState.Running
+	);
+}
+
+function isSessionToolReadyForUserExecution(state: SessionToolCallState): boolean {
+	return (
+		state === SessionToolCallState.Proposed ||
+		state === SessionToolCallState.Pending ||
+		state === SessionToolCallState.Ready
+	);
+}
+
+function sessionActionErrorMessage(error: unknown): string {
+	if (error instanceof Error && error.message.trim()) {
+		return error.message;
+	}
+
+	return 'The Session Runtime could not accept this action.';
 }
 
 function getMountedInputPaneSignature(
@@ -592,6 +630,7 @@ export interface ConversationAreaHandle {
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
 	resetComposerForNewConversation: (tabId: string) => Promise<void>;
 	restoreComposerFromSessionConfiguration: (tabId: string, configuration: SessionConfiguration) => Promise<void>;
+	syncComposerSkillSessionState: (tabId: string, enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 
 	focusInput: (tabId: string) => void;
 	openTemplateMenu: (tabId: string) => void;
@@ -626,6 +665,11 @@ interface WaitResolutionState {
 	error?: string;
 }
 
+interface SessionActionErrorState {
+	tabId: string;
+	message: string;
+}
+
 function ConversationAreaInner(
 	{ tabs, selectedTabId, mountedInputTabIds, shortcutConfig, initialScrollTopByTab, updateTab }: ConversationAreaProps,
 	ref: Ref<ConversationAreaHandle>
@@ -635,13 +679,15 @@ function ConversationAreaInner(
 
 	const activeTab = useMemo(() => tabs.find(tab => tab.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
 	const activeTabId = activeTab?.tabId ?? '';
-	const activeTabIsBusy = activeTab?.isBusy ?? false;
 	const activeTabIsHydrating = (activeTab?.isHydrating ?? false) || !(activeTab?.isLoaded ?? true);
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const activeRun = activeTab?.sessionSnapshot
 		? selectedSessionRun(activeTab.sessionSnapshot, activeTab.activeRunID)
 		: undefined;
+	const activeTabIsGenerating = runHasGeneratingModelOperation(activeRun);
 	const [waitResolutionState, setWaitResolutionState] = useState<WaitResolutionState | null>(null);
+	const [sessionActionErrorState, setSessionActionErrorState] = useState<SessionActionErrorState | null>(null);
+	const sessionActionError = sessionActionErrorState?.tabId === activeTabId ? sessionActionErrorState.message : null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
 
@@ -679,6 +725,7 @@ function ConversationAreaInner(
 		syncComposerFromConversation,
 		resetComposerForNewConversation,
 		restoreSessionConfiguration,
+		syncComposerSkillSessionState,
 		focusInput,
 		openTemplateMenu,
 		openToolMenu,
@@ -773,6 +820,7 @@ function ConversationAreaInner(
 		updateTab,
 		scrollTabToBottomSoon,
 		tabExists,
+		inputRefs,
 	});
 
 	const runCommand = useCallback(
@@ -791,21 +839,104 @@ function ConversationAreaInner(
 		[activeTab]
 	);
 
+	const runCommandForToolCall = useCallback(
+		async (
+			call: UIToolCall,
+			action: (
+				sessionID: string,
+				sessionRevision: number,
+				runID: string,
+				runRevision: number,
+				callID: string
+			) => Promise<void>
+		) => {
+			const snapshot = activeTab?.sessionSnapshot;
+			if (!snapshot || !activeTab?.sessionID) {
+				throw new Error('The active Session snapshot is unavailable.');
+			}
+
+			const owner = snapshot.runs.find(run =>
+				run.toolCalls?.some(
+					sessionCall =>
+						sessionCall.id === call.id ||
+						(Boolean(sessionCall.providerCallID) && sessionCall.providerCallID === call.callID)
+				)
+			);
+			const sessionCall = owner?.toolCalls?.find(
+				candidate =>
+					candidate.id === call.id || (Boolean(candidate.providerCallID) && candidate.providerCallID === call.callID)
+			);
+
+			if (!owner || !sessionCall) {
+				throw new Error('The owning Run for this Tool call is unavailable.');
+			}
+
+			await action(activeTab.sessionID, snapshot.session.revision, owner.id, owner.revision, sessionCall.id);
+		},
+		[activeTab]
+	);
+
 	const executeSessionToolCall = useCallback(
-		(callId: string) =>
-			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+		(call: UIToolCall, continueRun = false) =>
+			runCommandForToolCall(call, async (sessionID, sessionRevision, runID, runRevision, callID) => {
 				requireAcceptedSessionCommand(
 					await sessionManagementAPI.executeCalls({
 						meta: sessionCommandMeta(sessionRevision, runRevision),
 						sessionID,
 						runID,
-						callIDs: [callId],
-						continue: true,
+						callIDs: [callID],
+						continue: continueRun,
 					}),
 					'Execute Tool call'
 				);
 			}),
-		[runCommand]
+		[runCommandForToolCall]
+	);
+
+	const retrySessionToolCall = useCallback(
+		(call: UIToolCall) =>
+			runCommandForToolCall(call, async (sessionID, sessionRevision, runID, runRevision, callID) => {
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.retryCall({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						callID,
+					}),
+					'Retry Tool call'
+				);
+			}),
+		[runCommandForToolCall]
+	);
+
+	const skipSessionToolCall = useCallback(
+		(call: UIToolCall) =>
+			runCommandForToolCall(call, async (sessionID, sessionRevision, runID, runRevision, callID) => {
+				if (call.status === UIToolCallStatus.Failed) {
+					requireAcceptedSessionCommand(
+						await sessionManagementAPI.completeCallAsError({
+							meta: sessionCommandMeta(sessionRevision, runRevision),
+							sessionID,
+							runID,
+							callID,
+							error: call.errorMessage?.trim() || 'The Tool call failed before producing a usable result.',
+						}),
+						'Submit Tool error'
+					);
+					return;
+				}
+
+				requireAcceptedSessionCommand(
+					await sessionManagementAPI.skipCall({
+						meta: sessionCommandMeta(sessionRevision, runRevision),
+						sessionID,
+						runID,
+						callID,
+					}),
+					'Skip Tool call'
+				);
+			}),
+		[runCommandForToolCall]
 	);
 
 	const continueActiveRun = useCallback(
@@ -823,41 +954,108 @@ function ConversationAreaInner(
 		[runCommand]
 	);
 
+	const pendingWait = activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending);
+	const pendingExecutableToolCallIDs = useMemo(() => {
+		const toolCalls = activeRun?.toolCalls ?? [];
+		return toolCalls.filter(call => isSessionToolReadyForUserExecution(call.state)).map(call => call.id);
+	}, [activeRun?.toolCalls]);
 	const hasStagedContinuation =
 		activeRun?.state === SessionRunState.Waiting &&
 		activeRun.continuation.revision > (activeRun.continuation.consumedRevision ?? 0) &&
-		!(activeRun.waitingRequests ?? []).some(wait => wait.status === SessionWaitStatus.Pending);
+		!pendingWait;
+	const canRunPendingToolCalls =
+		activeRun?.state === SessionRunState.Waiting && !pendingWait && pendingExecutableToolCallIDs.length > 0;
+	const canContinueActiveRun =
+		activeRun?.state === SessionRunState.Waiting &&
+		!pendingWait &&
+		pendingExecutableToolCallIDs.length === 0 &&
+		(hasStagedContinuation || activeRun.continuationRequested === true);
+	const stagedAppContextUpdateCount = activeRun?.continuation.mcpAppContext?.length ?? 0;
+	const hasAutomaticToolCalls = activeRun?.toolCalls?.some(call => call.automatic === true) ?? false;
+	const automationHoldEnabled =
+		activeRun?.controls.automaticTools.enabled === true || activeRun?.controls.automaticContinuation.enabled === true;
 
-	const retrySessionToolCall = useCallback(
-		(callId: string) =>
+	const executePendingSessionToolCalls = useCallback(
+		(continueRun: boolean) =>
 			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				if (pendingExecutableToolCallIDs.length === 0) {
+					throw new Error('There are no pending Tool calls ready to run.');
+				}
+
 				requireAcceptedSessionCommand(
-					await sessionManagementAPI.retryCall({
+					await sessionManagementAPI.executeCalls({
 						meta: sessionCommandMeta(sessionRevision, runRevision),
 						sessionID,
 						runID,
-						callID: callId,
+						callIDs: pendingExecutableToolCallIDs,
+						continue: continueRun,
 					}),
-					'Retry Tool call'
+					continueRun ? 'Run Tools and continue' : 'Run pending Tools'
 				);
 			}),
-		[runCommand]
+		[pendingExecutableToolCallIDs, runCommand]
 	);
 
-	const skipSessionToolCall = useCallback(
-		(callId: string) =>
+	const toggleAutomationHold = useCallback(
+		() =>
 			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+				const enabled = !automationHoldEnabled;
+
 				requireAcceptedSessionCommand(
-					await sessionManagementAPI.skipCall({
+					await sessionManagementAPI.setAutomationHold({
 						meta: sessionCommandMeta(sessionRevision, runRevision),
 						sessionID,
 						runID,
-						callID: callId,
+						tools: true,
+						continuation: true,
+						enabled,
+						...(enabled
+							? {
+									scope: SessionAutomationHoldScope.OneBatch,
+								}
+							: {}),
 					}),
-					'Skip Tool call'
+					enabled ? 'Hold automatic Tools' : 'Resume automatic Tools'
 				);
 			}),
-		[runCommand]
+		[automationHoldEnabled, runCommand]
+	);
+
+	const clearStagedAppContext = useCallback(() => {
+		const continuation = activeRun?.continuation;
+		if (!continuation) {
+			return Promise.reject(new Error('The staged App context is unavailable.'));
+		}
+
+		return runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+			requireAcceptedSessionCommand(
+				await sessionManagementAPI.updateContinuationInput({
+					meta: sessionCommandMeta(sessionRevision, runRevision),
+					sessionID,
+					runID,
+					expectedInputRevision: continuation.revision,
+					input: {
+						...continuation,
+						mcpAppContext: [],
+					},
+				}),
+				'Discard staged App context'
+			);
+		});
+	}, [activeRun?.continuation, runCommand]);
+
+	const runSessionAction = useCallback(
+		(action: () => Promise<void>) => {
+			const tabId = activeTabId;
+			setSessionActionErrorState(null);
+			void action().catch((error: unknown) => {
+				setSessionActionErrorState({
+					tabId,
+					message: sessionActionErrorMessage(error),
+				});
+			});
+		},
+		[activeTabId, setSessionActionErrorState]
 	);
 
 	const cancelRunForTab = useCallback(async (tabId: string) => {
@@ -880,7 +1078,7 @@ function ConversationAreaInner(
 	}, []);
 
 	const resolveWait = useCallback(
-		async (wait: SessionWaitingRequest, resolution: SessionWaitResolution) => {
+		async (wait: SessionWaitingRequest, resolution: SessionWaitResolution, input?: SessionOpaqueJSON) => {
 			setWaitResolutionState({
 				waitID: wait.id,
 				isResolving: true,
@@ -895,6 +1093,7 @@ function ConversationAreaInner(
 							runID,
 							waitID: wait.id,
 							resolution,
+							...(input === undefined ? {} : { input }),
 						}),
 						'Resolve Run wait'
 					);
@@ -911,7 +1110,7 @@ function ConversationAreaInner(
 				});
 			}
 		},
-		[runCommand]
+		[runCommand, setWaitResolutionState]
 	);
 
 	const disposeTabRuntime = useCallback(
@@ -931,6 +1130,7 @@ function ConversationAreaInner(
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
 			restoreComposerFromSessionConfiguration: restoreSessionConfiguration,
+			syncComposerSkillSessionState,
 			applyWorkflowStarter: applyWorkflowStarterToComposer,
 			focusInput,
 			openTemplateMenu,
@@ -963,6 +1163,7 @@ function ConversationAreaInner(
 			resetComposerForNewConversation,
 			resetScrollToTop,
 			setScrollTopForTab,
+			syncComposerSkillSessionState,
 			syncComposerFromConversation,
 		]
 	);
@@ -987,6 +1188,17 @@ function ConversationAreaInner(
 		[activeTabId, getVisibleStreamThinkingForTab]
 	);
 
+	const activeRunToolCallIDs = useMemo(() => {
+		const ids = new Set<string>();
+		for (const call of activeRun?.toolCalls ?? []) {
+			ids.add(call.id);
+			if (call.providerCallID) {
+				ids.add(call.providerCallID);
+			}
+		}
+		return ids;
+	}, [activeRun?.toolCalls]);
+
 	const activeStreamSource = useMemo(
 		() => ({
 			subscribe: subscribeToActiveStream,
@@ -1006,7 +1218,7 @@ function ConversationAreaInner(
 		) => {
 			const isLast = index === messageCount - 1;
 			const isAssistant = message.role === RoleEnum.Assistant;
-			const rowIsBusy = isLast && activeTabIsBusy && isAssistant;
+			const rowIsBusy = isLast && activeTabIsGenerating && isAssistant;
 
 			if (rowIsBusy) {
 				return (
@@ -1019,13 +1231,19 @@ function ConversationAreaInner(
 						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
 						onRunToolCall={call => {
-							void executeSessionToolCall(call.id).catch(console.error);
+							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+								runSessionAction(() => executeSessionToolCall(call));
+							}
 						}}
 						onRetryToolCall={call => {
-							void retrySessionToolCall(call.id).catch(console.error);
+							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+								runSessionAction(() => retrySessionToolCall(call));
+							}
 						}}
 						onSkipToolCall={call => {
-							void skipSessionToolCall(call.id).catch(console.error);
+							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+								runSessionAction(() => skipSessionToolCall(call));
+							}
 						}}
 						streamSource={activeStreamSource}
 					/>
@@ -1042,13 +1260,19 @@ function ConversationAreaInner(
 					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
 					onRunToolCall={call => {
-						void executeSessionToolCall(call.id).catch(console.error);
+						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+							runSessionAction(() => executeSessionToolCall(call));
+						}
 					}}
 					onRetryToolCall={call => {
-						void retrySessionToolCall(call.id).catch(console.error);
+						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+							runSessionAction(() => retrySessionToolCall(call));
+						}
 					}}
 					onSkipToolCall={call => {
-						void skipSessionToolCall(call.id).catch(console.error);
+						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
+							runSessionAction(() => skipSessionToolCall(call));
+						}
 					}}
 				/>
 			);
@@ -1056,12 +1280,14 @@ function ConversationAreaInner(
 		[
 			activeEditingMessageId,
 			activeTabId,
-			activeTabIsBusy,
+			activeRunToolCallIDs,
+			activeTabIsGenerating,
 			beginEditMessageForTab,
 			messageCount,
 			activeStreamSource,
 			executeSessionToolCall,
 			retrySessionToolCall,
+			runSessionAction,
 			skipSessionToolCall,
 		]
 	);
@@ -1125,6 +1351,16 @@ function ConversationAreaInner(
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
+						{activeTab?.runtimeError ? (
+							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
+								<span>{activeTab.runtimeError}</span>
+							</div>
+						) : null}
+						{sessionActionError ? (
+							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
+								<span>{sessionActionError}</span>
+							</div>
+						) : null}
 						{activeTabIsHydrating && messageCount === 0 ? (
 							<div className="flex min-h-128 items-center justify-center py-8">
 								<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
@@ -1134,7 +1370,7 @@ function ConversationAreaInner(
 								key={`${activeTabId}:${activeTab?.conversation.id ?? ''}`}
 								messages={messages}
 								renderItem={itemContent}
-								isBusy={activeTabIsBusy}
+								isBusy={activeTabIsGenerating}
 								deferRichWork={activeTabIsHydrating}
 							/>
 						)}
@@ -1189,17 +1425,75 @@ function ConversationAreaInner(
 
 			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 items-end justify-center overflow-hidden">
 				<div className="max-h-full w-11/12 min-w-0 xl:w-5/6">
-					{hasStagedContinuation ? (
+					{stagedAppContextUpdateCount > 0 ? (
+						<div className="border-info/30 bg-info/10 mb-2 flex flex-wrap items-center justify-center gap-2 rounded-xl border p-2 text-xs">
+							<span>
+								Staged App context: {stagedAppContextUpdateCount} update
+								{stagedAppContextUpdateCount === 1 ? '' : 's'}.
+							</span>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								onClick={() => {
+									runSessionAction(clearStagedAppContext);
+								}}
+							>
+								Discard staged App context
+							</button>
+						</div>
+					) : null}
+
+					{canRunPendingToolCalls ? (
+						<div className="mb-2 flex flex-wrap justify-center gap-2">
+							<button
+								type="button"
+								className="btn btn-sm rounded-xl"
+								onClick={() => {
+									runSessionAction(() => executePendingSessionToolCalls(false));
+								}}
+							>
+								<FiPlay size={14} />
+								Run pending tools
+							</button>
+							<button
+								type="button"
+								className="btn btn-sm btn-primary rounded-xl"
+								onClick={() => {
+									runSessionAction(() => executePendingSessionToolCalls(true));
+								}}
+							>
+								<FiPlay size={14} />
+								Run tools and continue
+							</button>
+						</div>
+					) : null}
+
+					{canContinueActiveRun ? (
 						<div className="mb-2 flex justify-center">
 							<button
 								type="button"
 								className="btn btn-sm btn-primary rounded-xl"
 								onClick={() => {
-									void continueActiveRun().catch(console.error);
+									runSessionAction(continueActiveRun);
 								}}
 							>
 								<FiPlay size={14} />
-								Continue with staged App context
+								{hasStagedContinuation ? 'Continue with staged App context' : 'Continue run'}
+							</button>
+						</div>
+					) : null}
+
+					{hasAutomaticToolCalls || automationHoldEnabled ? (
+						<div className="mb-2 flex justify-center">
+							<button
+								type="button"
+								className={`btn btn-sm rounded-xl ${automationHoldEnabled ? 'btn-warning' : ''}`}
+								onClick={() => {
+									runSessionAction(toggleAutomationHold);
+								}}
+							>
+								<FiZapOff size={14} />
+								{automationHoldEnabled ? 'Resume automatic tools' : 'Hold next automatic tool batch'}
 							</button>
 						</div>
 					) : null}
@@ -1224,7 +1518,6 @@ function ConversationAreaInner(
 			</div>
 
 			{(() => {
-				const pendingWait = activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending);
 				const currentWaitState =
 					pendingWait && waitResolutionState?.waitID === pendingWait.id ? waitResolutionState : undefined;
 
@@ -1233,12 +1526,12 @@ function ConversationAreaInner(
 						wait={pendingWait}
 						isResolving={currentWaitState?.isResolving ?? false}
 						error={currentWaitState?.error}
-						onResolve={resolution => {
+						onResolve={(resolution, input) => {
 							const wait = pendingWait;
 							if (!wait) {
 								return Promise.resolve();
 							}
-							return resolveWait(wait, resolution);
+							return resolveWait(wait, resolution, input);
 						}}
 					/>
 				);

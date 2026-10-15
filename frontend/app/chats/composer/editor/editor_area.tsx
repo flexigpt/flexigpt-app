@@ -1251,7 +1251,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (failedRunnableToolCalls.length > 0) {
 			// oxlint-disable-next-line react/set-state-in-effect
 			finishFastForwardWithError('Some tool calls failed. Retry them or submit an error result before sending.');
-
 			return;
 		}
 
@@ -1442,36 +1441,106 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			clearComposerToolsState();
 			clearAttachments();
 			setMCPAppContextUpdates([]);
+			applyConversationToolsFromChoices([]);
+			applyWebSearchFromChoices([]);
+			setToolSelectionIssues([]);
+			mcp.clear();
 
-			const [toolState, mcpContext] = await Promise.all([
+			const restoreErrors: string[] = [];
+
+			try {
+				await workspace.detachWorkspace(false);
+			} catch (error) {
+				restoreErrors.push(
+					`Workspace reset failed: ${
+						error instanceof Error ? error.message : 'the existing Workspace selection could not be cleared'
+					}`
+				);
+			}
+
+			try {
+				await applyInstalledSkillSelectionState([], [], {
+					syncSession: SkillSessionSyncMode.None,
+					forceResetSession: true,
+				});
+			} catch (error) {
+				restoreErrors.push(
+					`Skill reset failed: ${
+						error instanceof Error ? error.message : 'the existing Skill selection could not be cleared'
+					}`
+				);
+			}
+
+			const [toolStateResult, mcpContextResult] = await Promise.allSettled([
 				hydrateSessionToolOverrides(configuration.tools),
 				hydrateSessionMCPOverrides(configuration.mcp),
 			]);
 
-			applyConversationToolsFromChoices(toolState.choices);
-			applyWebSearchFromChoices(toolState.choices);
-			setToolSelectionIssues(toolState.issues);
-			mcp.restoreContext(mcpContext);
+			if (toolStateResult.status === 'fulfilled') {
+				applyConversationToolsFromChoices(toolStateResult.value.choices);
+				applyWebSearchFromChoices(toolStateResult.value.choices);
+				setToolSelectionIssues(toolStateResult.value.issues);
+			} else {
+				restoreErrors.push(
+					`Tools could not be restored: ${
+						toolStateResult.reason instanceof Error
+							? toolStateResult.reason.message
+							: 'saved Tool selections are unavailable'
+					}`
+				);
+			}
 
-			await workspace.restoreSessionIntent(configuration.workspace, false);
+			if (mcpContextResult.status === 'fulfilled') {
+				mcp.restoreContext(mcpContextResult.value);
+			} else {
+				restoreErrors.push(
+					`MCP context could not be restored: ${
+						mcpContextResult.reason instanceof Error
+							? mcpContextResult.reason.message
+							: 'saved MCP selections are unavailable'
+					}`
+				);
+			}
 
-			const enabledSelections = effectiveArtifactSelections(configuration.skills);
-			const activeSelections = effectiveActiveSkillSelections(configuration.activeSkills);
+			try {
+				await workspace.restoreSessionIntent(configuration.workspace, false);
+			} catch (error) {
+				restoreErrors.push(
+					`Workspace could not be restored: ${
+						error instanceof Error ? error.message : 'saved Workspace selections are unavailable'
+					}`
+				);
+			}
 
-			await applyInstalledSkillSelectionState(
-				enabledSelections.map(selection => ({
-					rootID: selection.rootID,
-					artifactID: selection.artifactID,
-				})),
-				activeSelections.map(selection => ({
-					rootID: selection.rootID,
-					artifactID: selection.artifactID,
-				})),
-				{
-					syncSession: SkillSessionSyncMode.None,
-					forceResetSession: true,
-				}
-			);
+			try {
+				const enabledSelections = effectiveArtifactSelections(configuration.skills);
+				const activeSelections = effectiveActiveSkillSelections(configuration.activeSkills);
+
+				await applyInstalledSkillSelectionState(
+					enabledSelections.map(selection => ({
+						rootID: selection.rootID,
+						artifactID: selection.artifactID,
+					})),
+					activeSelections.map(selection => ({
+						rootID: selection.rootID,
+						artifactID: selection.artifactID,
+					})),
+					{
+						syncSession: SkillSessionSyncMode.None,
+						forceResetSession: true,
+					}
+				);
+			} catch (error) {
+				restoreErrors.push(
+					`Skills could not be restored: ${
+						error instanceof Error ? error.message : 'saved Skill selections are unavailable'
+					}`
+				);
+			}
+
+			if (restoreErrors.length > 0) {
+				setSubmitError(`Some saved Composer settings could not be restored:\n${restoreErrors.join('\n')}`);
+			}
 		},
 		[
 			applyConversationToolsFromChoices,
@@ -1480,6 +1549,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			clearAttachments,
 			clearComposerToolsState,
 			mcp,
+			setToolSelectionIssues,
 			workspace,
 		]
 	);

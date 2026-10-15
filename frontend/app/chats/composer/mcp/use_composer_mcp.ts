@@ -204,21 +204,20 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 
 	useEffect(() => {
 		mountedRef.current = true;
+		const connectionControllers = connectionControllersRef.current;
+		const discoveryPromises = discoveryPromisesRef.current;
+		const connectionPromises = connectionPromisesRef.current;
 
 		return () => {
 			mountedRef.current = false;
 			lifetimeRef.current += 1;
 			catalogPromiseRef.current = undefined;
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			for (const controller of connectionControllersRef.current.values()) {
+			for (const controller of connectionControllers.values()) {
 				controller.abort();
 			}
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			connectionControllersRef.current.clear();
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			discoveryPromisesRef.current.clear();
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			connectionPromisesRef.current.clear();
+			connectionControllers.clear();
+			discoveryPromises.clear();
+			connectionPromises.clear();
 		};
 	}, []);
 
@@ -412,18 +411,79 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 					discoveryError: errors[0],
 				});
 
+				const discoveredToolsByName = new Map(tools.items.map(tool => [tool.toolName, tool] as const));
+				const discoveredResourcesByURI = new Map(resources.items.map(resource => [resource.uri, resource] as const));
+				const discoveredTemplatesByURI = new Map(
+					templates.items.map(template => [template.uriTemplate, template] as const)
+				);
+				const discoveredPromptsByName = new Map(prompts.items.map(prompt => [prompt.promptName, prompt] as const));
+
 				commitSelectedByServerKey(previous => {
 					const selection = previous[key];
-					if (errors.length > 0 || !selection || selection.toolExposure !== MCPToolExposure.All) {
+					if (errors.length > 0 || !selection) {
 						return previous;
 					}
+
+					const selectedTools =
+						selection.toolExposure === MCPToolExposure.All
+							? modelSelectableTools(tools.items).map(tool => toolToSelection(tool))
+							: selection.toolExposure === MCPToolExposure.None
+								? []
+								: selection.selectedTools.map(selectedTool => {
+										const discovered = discoveredToolsByName.get(selectedTool.toolName);
+										if (!discovered) {
+											return selectedTool;
+										}
+
+										const refreshed = toolToSelection(discovered);
+
+										return {
+											...refreshed,
+											choiceID: selectedTool.choiceID ?? refreshed.choiceID,
+											digest: selectedTool.digest ?? refreshed.digest,
+											approvalRule: selectedTool.approvalRule ?? refreshed.approvalRule,
+											executionMode: selectedTool.executionMode ?? refreshed.executionMode,
+											appResourceUri: selectedTool.appResourceUri ?? refreshed.appResourceUri,
+											visibility: selectedTool.visibility ?? refreshed.visibility,
+										};
+									});
 
 					return {
 						...previous,
 						[key]: {
 							...selection,
-							selectedTools: modelSelectableTools(tools.items).map(t => {
-								return toolToSelection(t);
+							selectedTools,
+							selectedResources: selection.selectedResources.map(selectedResource => {
+								const discovered = discoveredResourcesByURI.get(selectedResource.uri);
+
+								return discovered
+									? {
+											...discovered,
+											digest: selectedResource.digest ?? discovered.digest,
+										}
+									: selectedResource;
+							}),
+							selectedResourceTemplates: selection.selectedResourceTemplates.map(selectedTemplate => {
+								const discovered = discoveredTemplatesByURI.get(selectedTemplate.uriTemplate);
+
+								return discovered
+									? {
+											...discovered,
+											digest: selectedTemplate.digest ?? discovered.digest,
+											argumentValues: selectedTemplate.argumentValues,
+										}
+									: selectedTemplate;
+							}),
+							selectedPrompts: selection.selectedPrompts.map(selectedPrompt => {
+								const discovered = discoveredPromptsByName.get(selectedPrompt.promptName);
+
+								return discovered
+									? {
+											...discovered,
+											digest: selectedPrompt.digest ?? discovered.digest,
+											argumentValues: selectedPrompt.argumentValues,
+										}
+									: selectedPrompt;
 							}),
 						},
 					};
@@ -471,14 +531,10 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		[loadDiscoveryForServer]
 	);
 
-	const selectedServerKeys = useMemo(
-		() =>
-			Object.values(selectedByServerKey)
-				.map(selection => mcpServerKey(selection.server))
-				.toSorted()
-				.join('\n'),
-		[selectedByServerKey]
-	);
+	const selectedServerKeys = Object.values(selectedByServerKey)
+		.map(selection => mcpServerKey(selection.server))
+		.toSorted()
+		.join('\n');
 
 	useEffect(() => {
 		for (const selection of Object.values(selectedByServerKeyRef.current)) {

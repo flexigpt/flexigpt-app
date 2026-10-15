@@ -109,6 +109,7 @@ export function buildInitialChatsModel(): InitialChatsModel {
 			isLoaded: !tab.sessionID,
 			isBusy: false,
 			isHydrating: false,
+			composerConfigurationRestored: !tab.sessionID,
 			isPersisted: Boolean(tab.sessionID),
 			manualTitleLocked: tab.manualTitleLocked,
 			editingMessageId: null,

@@ -19,6 +19,7 @@ export interface ChatTabState {
 	isLoaded: boolean;
 	isBusy: boolean;
 	isHydrating: boolean;
+	composerConfigurationRestored: boolean;
 
 	isPersisted: boolean;
 	manualTitleLocked: boolean;
@@ -50,6 +51,7 @@ export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {
 		isLoaded: true,
 		isBusy: false,
 		isHydrating: false,
+		composerConfigurationRestored: true,
 		isPersisted: false,
 		manualTitleLocked: false,
 		editingMessageId: null,

@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { memo, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiFolder, FiLink, FiPaperclip, FiUpload } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -41,16 +41,6 @@ function AttachmentBottomBarChipInner({
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const open = useStoreState(store, 'open');
 	const tooltip = shortcut ? `Attach files, folders, or URLs (${shortcut})` : 'Attach files, folders, or URLs';
-
-	useEffect(() => {
-		if (!isInputLocked) {
-			return;
-		}
-		store.hide();
-
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIsUrlModalOpen(false);
-	}, [isInputLocked, store]);
 
 	const closeMenu = () => {
 		store.hide();
@@ -120,7 +110,7 @@ function AttachmentBottomBarChipInner({
 			</Menu>
 
 			<UrlAttachmentModal
-				isOpen={isUrlModalOpen}
+				isOpen={isUrlModalOpen && !isInputLocked}
 				onClose={() => {
 					setIsUrlModalOpen(false);
 					onUrlAttachmentModalClose?.();
@@ -131,8 +121,29 @@ function AttachmentBottomBarChipInner({
 	);
 }
 
-/**
- * Isolated wrapper for the attachments picker so its menu open/close and
- * URL-modal state changes don't re-render the entire EditorBottomBar.
- */
-export const AttachmentBottomBarChip = memo(AttachmentBottomBarChipInner);
+export function AttachmentBottomBarChip(props: AttachmentBottomBarChipProps) {
+	const { isInputLocked = false, store } = props;
+
+	useEffect(() => {
+		if (isInputLocked) {
+			store.hide();
+		}
+	}, [isInputLocked, store]);
+
+	// A lock transition remounts the stateful picker, which resets the URL
+	// modal without scheduling a state update from an effect.
+	return (
+		<AttachmentBottomBarChipInner
+			key={isInputLocked ? 'locked' : 'unlocked'}
+			store={store}
+			buttonRef={props.buttonRef}
+			shortcut={props.shortcut}
+			onAttachFiles={props.onAttachFiles}
+			onAttachDirectory={props.onAttachDirectory}
+			onAttachURL={props.onAttachURL}
+			onOpenAttachmentUrlModal={props.onOpenAttachmentUrlModal}
+			onUrlAttachmentModalClose={props.onUrlAttachmentModalClose}
+			isInputLocked={isInputLocked}
+		/>
+	);
+}

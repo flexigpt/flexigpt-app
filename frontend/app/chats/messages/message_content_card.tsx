@@ -114,7 +114,8 @@ export const MessageContentCard = memo(function MessageContentCard({
 		};
 	}, [deferRichRendering, renderAsMarkdown, richRenderingReady]);
 
-	const textToRender = isBusy && streamingText !== undefined ? streamingText : content;
+	const hasPublishedStreamingText = typeof streamingText === 'string' && streamingText.length > 0;
+	const textToRender = isBusy && hasPublishedStreamingText ? streamingText : content;
 
 	if (!/\S/.test(textToRender)) {
 		return null;

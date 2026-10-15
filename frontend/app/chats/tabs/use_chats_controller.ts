@@ -272,15 +272,40 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		);
 	}, []);
 
+	const cancelRunForDisposedTab = useCallback((tabId: string) => {
+		const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+		const snapshot = tab?.sessionSnapshot;
+		const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
+
+		if (!tab?.sessionID || !snapshot || !run || !sessionRunIsActive(run)) {
+			return;
+		}
+
+		void sessionManagementAPI
+			.cancelRun({
+				meta: sessionCommandMeta(snapshot.session.revision, run.revision),
+				sessionID: tab.sessionID,
+				runID: run.id,
+				reason: 'Chat tab closed',
+			})
+			.then(receipt => {
+				requireAcceptedSessionCommand(receipt, 'Cancel Run');
+			})
+			.catch((error: unknown) => {
+				console.error('Failed to cancel Run for a disposed chat tab:', error);
+			});
+	}, []);
+
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
+			cancelRunForDisposedTab(tabId);
 			conversationAreaRef.current?.disposeTabRuntime(tabId);
 			lastActivatedAtRef.current.delete(tabId);
 			hydratePromiseByTabRef.current.delete(tabId);
 			saveQueueByTabRef.current.delete(tabId);
 			tabLoadVersionRef.current.delete(tabId);
 		},
-		[conversationAreaRef]
+		[cancelRunForDisposedTab, conversationAreaRef]
 	);
 
 	const commitTabs = useCallback((nextTabs: ChatTabState[]) => {
@@ -366,20 +391,32 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					return previous;
 				}
 
+				const composerConfigurationRestored =
+					previous.sessionID === snapshot.session.id && previous.composerConfigurationRestored;
+
 				return {
 					...previous,
 					sessionSnapshot: snapshot,
 					activeRunID: activeRun?.id,
 					conversation: projectSessionSnapshotToConversation(snapshot, activeRun?.id),
 					isLoaded: true,
-					isHydrating: false,
+					isHydrating: composerConfigurationRestored ? previous.isHydrating : true,
+					composerConfigurationRestored,
 					isPersisted: true,
 					isBusy: sessionRunIsActive(activeRun),
 					runtimeError: undefined,
 				};
 			});
+
+			if (activeRun && (activeRun.skillSession.enabled !== undefined || activeRun.skillSession.active !== undefined)) {
+				conversationAreaRef.current?.syncComposerSkillSessionState(
+					tabId,
+					activeRun.skillSession.enabled ?? [],
+					activeRun.skillSession.active ?? []
+				);
+			}
 		},
-		[updateTab]
+		[conversationAreaRef, updateTab]
 	);
 
 	const ensureSessionObserver = useCallback(
@@ -418,7 +455,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			if (!tab?.sessionID) {
 				return Promise.resolve();
 			}
-			if (tab.isLoaded && tab.sessionSnapshot) {
+			if (tab.isLoaded && tab.sessionSnapshot && tab.composerConfigurationRestored) {
 				return Promise.resolve();
 			}
 
@@ -433,29 +470,67 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				isHydrating: true,
 			}));
 
+			const sessionID = tab.sessionID;
 			const loadVersion = beginTabLoad(tabId);
 			const load = (async () => {
 				try {
-					if (!tab.sessionID) {
-						return;
-					}
-					const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
+					const currentTab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+					const snapshot =
+						currentTab?.sessionID === sessionID && currentTab.sessionSnapshot
+							? currentTab.sessionSnapshot
+							: await sessionManagementAPI.getSessionSnapshot(sessionID);
+
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
 					}
 
 					applySessionSnapshot(tabId, snapshot);
-					await conversationAreaRef.current?.restoreComposerFromSessionConfiguration(
-						tabId,
-						snapshot.session.configuration
-					);
+
+					const area = conversationAreaRef.current;
+					if (!area) {
+						return;
+					}
+
+					await area.restoreComposerFromSessionConfiguration(tabId, snapshot.session.configuration);
+
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
+						return;
+					}
+
+					const activeRun = selectedSessionRun(snapshot);
+					updateTab(tabId, previous => {
+						if (previous.sessionID !== snapshot.session.id) {
+							return previous;
+						}
+
+						return {
+							...previous,
+							isLoaded: true,
+							isHydrating: false,
+							composerConfigurationRestored: true,
+							isBusy: sessionRunIsActive(activeRun),
+						};
+					});
+
+					if (
+						activeRun &&
+						(activeRun.skillSession.enabled !== undefined || activeRun.skillSession.active !== undefined)
+					) {
+						area.syncComposerSkillSessionState(
+							tabId,
+							activeRun.skillSession.enabled ?? [],
+							activeRun.skillSession.active ?? []
+						);
+					}
 				} catch (error) {
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
 					}
 					updateTab(tabId, previous => ({
 						...previous,
+						isLoaded: true,
 						isHydrating: false,
+						composerConfigurationRestored: false,
 						runtimeError: error instanceof Error ? error.message : 'Failed to load Session snapshot.',
 					}));
 				}
@@ -491,13 +566,13 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	}, [ensureSessionObserver, tabs]);
 
 	useEffect(() => {
+		const sessionObservers = sessionObserverByTabRef.current;
+
 		return () => {
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			for (const unsubscribe of sessionObserverByTabRef.current.values()) {
+			for (const unsubscribe of sessionObservers.values()) {
 				unsubscribe();
 			}
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			sessionObserverByTabRef.current.clear();
+			sessionObservers.clear();
 		};
 	}, []);
 
@@ -807,6 +882,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					sessionID: selectedChat.session.id,
 					sessionSnapshot: selectedChat,
 					activeRunID: selectedSessionRun(selectedChat)?.id,
+					composerConfigurationRestored: false,
 					conversation: hydrated,
 					isPersisted: true,
 					manualTitleLocked: false,
@@ -826,13 +902,26 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					selectedChat.session.configuration
 				);
 
+				const selectedRun = selectedSessionRun(selectedChat);
+				if (
+					selectedRun &&
+					(selectedRun.skillSession.enabled !== undefined || selectedRun.skillSession.active !== undefined)
+				) {
+					conversationAreaRef.current?.syncComposerSkillSessionState(
+						tabId,
+						selectedRun.skillSession.enabled ?? [],
+						selectedRun.skillSession.active ?? []
+					);
+				}
+
 				updateTab(tabId, tab => ({
 					...tab,
 					isPersisted: true,
 					editingMessageId: null,
-					isBusy: false,
+					isBusy: sessionRunIsActive(selectedRun),
 					isLoaded: true,
 					isHydrating: false,
+					composerConfigurationRestored: true,
 				}));
 			} catch (error) {
 				if (!isTabLoadCurrent(tabId, loadVersion)) {
@@ -845,6 +934,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					isLoaded: true,
 					isHydrating: false,
 					isBusy: false,
+					composerConfigurationRestored: false,
 					editingMessageId: null,
 				}));
 			}

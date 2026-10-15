@@ -244,6 +244,7 @@ func canonicalJSONValue(input json.RawMessage) (json.RawMessage, error) {
 
 type semanticGoBinding struct {
 	Target    sessionRuntime.CapabilityTarget `json:"target"`
+	Used      sessionRuntime.ResolvedArtifact `json:"used"`
 	TimeoutMS int                             `json:"timeoutMS,omitempty"`
 }
 

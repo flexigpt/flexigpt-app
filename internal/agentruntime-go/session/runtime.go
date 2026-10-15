@@ -807,6 +807,33 @@ func (r runtimeRestorer) RestoreSession(
 	return nil
 }
 
+func (r runtimeRestorer) RestoreRetiredSession(
+	ctx context.Context,
+	id SessionID,
+) error {
+	if r.runtime == nil {
+		return ErrRuntimeClosed
+	}
+
+	effects := runtimeEffects{}
+	r.runtime.mu.Lock()
+	defer func() {
+		r.runtime.mu.Unlock()
+		if len(effects.events) != 0 || len(effects.checkpoints) != 0 {
+			r.runtime.flushEffects(ctx, effects)
+		}
+	}()
+
+	if r.runtime.closed {
+		return ErrRuntimeClosed
+	}
+	if r.runtime.retiredSessionIDs == nil {
+		r.runtime.retiredSessionIDs = make(map[SessionID]struct{})
+	}
+	r.runtime.retiredSessionIDs[id] = struct{}{}
+	return nil
+}
+
 func (r runtimeRestorer) RestoreRun(
 	_ context.Context,
 	runValue Run,
@@ -836,7 +863,7 @@ func (r runtimeRestorer) RestoreRun(
 	}
 
 	copyValue := cloneJSON(runValue)
-	normalizeRecoveredRun(&copyValue, r.runtime.now())
+	recoveryApplied := normalizeRecoveredRun(&copyValue, r.runtime.now())
 	for index := range copyValue.Apps {
 		copyValue.Apps[index].Route = nil
 		copyValue.Apps[index].UnavailableReason = "App runtime route is unavailable after recovery"
@@ -858,11 +885,17 @@ func (r runtimeRestorer) RestoreRun(
 	r.runtime.runs[copyValue.ID] = &copyValue
 	r.runtime.runToSession[copyValue.ID] = copyValue.SessionID
 
-	found := slices.Contains(sessionValue.RunIDs, copyValue.ID)
-	if !found {
+	associationChanged := !slices.Contains(
+		sessionValue.RunIDs,
+		copyValue.ID,
+	)
+	if associationChanged {
 		sessionValue.RunIDs = append(sessionValue.RunIDs, copyValue.ID)
 	}
-	r.runtime.touchSessionLocked(sessionValue)
+
+	if recoveryApplied || associationChanged {
+		r.runtime.touchSessionLocked(sessionValue)
+	}
 
 	return nil
 }
@@ -1061,6 +1094,7 @@ func (r *Runtime) resumeRecoveredModelLocked(
 		commandID,
 		"",
 		latest.Request.Current.ID,
+		nil,
 		nil,
 		effects,
 	)
@@ -1264,13 +1298,18 @@ func firstNonEmpty(values ...string) string {
 func normalizeRecoveredRun(
 	run *Run,
 	now time.Time,
-) {
+) bool {
 	if run == nil {
-		return
+		return false
 	}
-	run.SkillSession.ID = ""
-	run.SkillSession.EstablishedGeneration = 0
-	run.SkillSession.Generation++
+	changed := false
+	if run.SkillSession.ID != "" ||
+		run.SkillSession.EstablishedGeneration != 0 {
+		run.SkillSession.ID = ""
+		run.SkillSession.EstablishedGeneration = 0
+		run.SkillSession.Generation++
+		changed = true
+	}
 
 	requiresRecoveryReview := false
 
@@ -1287,6 +1326,7 @@ func normalizeRecoveredRun(
 				Code:    "recovered_model_interrupted",
 				Message: "model operation was in flight when the runtime stopped",
 			}
+			changed = true
 		default:
 		}
 	}
@@ -1304,6 +1344,7 @@ func normalizeRecoveredRun(
 				if attempt.Error == "" {
 					attempt.Error = "external tool outcome is uncertain after recovery"
 				}
+				changed = true
 			}
 		}
 
@@ -1316,6 +1357,7 @@ func normalizeRecoveredRun(
 			requiresRecoveryReview = true
 			call.State = ToolCallStateFailed
 			call.LastFailure = "external tool outcome requires recovery decision"
+			changed = true
 		default:
 		}
 	}
@@ -1336,6 +1378,7 @@ func normalizeRecoveredRun(
 		wait.Status = WaitStatusInvalid
 		wait.Error = "wait executor state is unavailable after runtime recovery"
 		wait.UpdatedAt = now
+		changed = true
 	}
 
 	if !run.State.Terminal() &&
@@ -1343,27 +1386,47 @@ func normalizeRecoveredRun(
 			run.State == RunStateRunning ||
 			run.State == RunStateCancelling ||
 			requiresRecoveryReview) {
+		if run.State != RunStateWaiting || run.Outcome != nil {
+			changed = true
+		}
 		run.State = RunStateWaiting
 		run.Outcome = nil
-		ensureRecoveryWait(run, now)
+		if ensureRecoveryWait(run, now) {
+			changed = true
+		}
 	}
 
-	run.ActiveModelOperationID = ""
-	run.Controls.Paused = run.State == RunStatePaused
-	run.Controls.CancellationRequested = false
-	run.Revision++
-	run.UpdatedAt = now
+	if run.ActiveModelOperationID != "" {
+		run.ActiveModelOperationID = ""
+		changed = true
+	}
+
+	paused := run.State == RunStatePaused
+	if run.Controls.Paused != paused {
+		run.Controls.Paused = paused
+		changed = true
+	}
+	if run.Controls.CancellationRequested {
+		run.Controls.CancellationRequested = false
+		changed = true
+	}
+
+	if changed {
+		run.Revision++
+		run.UpdatedAt = now
+	}
+	return changed
 }
 
 func ensureRecoveryWait(
 	run *Run,
 	now time.Time,
-) {
+) bool {
 	for _, wait := range run.WaitingRequests {
 		if wait.Kind == WaitKindRecovery &&
 			(wait.Status == WaitStatusPending ||
 				wait.Status == WaitStatusResolving) {
-			return
+			return false
 		}
 	}
 
@@ -1387,6 +1450,7 @@ func ensureRecoveryWait(
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
+	return true
 }
 
 func isRunDispatchCancelKey(

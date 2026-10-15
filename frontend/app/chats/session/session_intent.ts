@@ -11,7 +11,7 @@ import type {
 } from '@/spec/session';
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { MCPServerOverride, MCPServerSelection } from '@/spec/session_mcp';
-import type { WorkspaceRuntimePlan } from '@/spec/workspace';
+import type { WorkspaceConversationResourceSelectionRef, WorkspaceRuntimePlan } from '@/spec/workspace';
 import { CapabilityTargetForm } from '@/spec/artifact';
 import { AttachmentKind } from '@/spec/attachment';
 import { emptySessionConfiguration, SessionModelDefaultField } from '@/spec/session';
@@ -101,6 +101,8 @@ function modelOverridesFromComposer(
 
 	if (includeModelDefault === false) {
 		clear.add(SessionModelDefaultField.SystemPrompt);
+	} else if (includeModelDefault === true) {
+		clear.delete(SessionModelDefaultField.SystemPrompt);
 	}
 
 	return {
@@ -266,6 +268,45 @@ function artifactOverridesForWorkspace(
 	return output;
 }
 
+function mcpOverridesForWorkspace(
+	baselineRefs: ArtifactRef[],
+	selectedRefs: WorkspaceConversationResourceSelectionRef[] | undefined
+): MCPServerOverride[] {
+	const baselineByKey = new Map(baselineRefs.map(ref => [artifactKey(ref), ref] as const));
+	const selectedByKey = new Map(
+		(selectedRefs ?? []).map(selection => [artifactKey(selection.artifact), selection] as const)
+	);
+	const output: MCPServerOverride[] = [];
+
+	for (const [key] of baselineByKey) {
+		if (selectedByKey.has(key)) {
+			continue;
+		}
+
+		output.push({
+			key,
+			mode: SessionCollectionOverrideMode.Remove,
+		});
+	}
+
+	for (const [key, selection] of selectedByKey) {
+		if (baselineByKey.has(key)) {
+			continue;
+		}
+
+		output.push({
+			key,
+			mode: SessionCollectionOverrideMode.Add,
+			value: {
+				server: artifactSelection(selection.artifact, selection.artifactRevision, selection.definitionDigest),
+				toolExposure: MCPToolExposure.None,
+			},
+		});
+	}
+
+	return output;
+}
+
 function workspaceSelectionFromPayload(payload: EditorSubmitPayload): SessionConfiguration['workspace'] {
 	const selection = payload.workspaceSelection;
 
@@ -276,20 +317,13 @@ function workspaceSelectionFromPayload(payload: EditorSubmitPayload): SessionCon
 	const plan: WorkspaceRuntimePlan | undefined = payload.workspacePlan;
 	const baselineContexts = plan?.prompt.contributions.map(value => value.artifact) ?? [];
 	const baselineSkills = plan?.skills.skills.map(value => value.artifact) ?? [];
-	const selectedMCPRefs = selection.mcpRefs ?? [];
+	const baselineMCPServers = plan?.mcpServers.servers.map(value => value.artifact) ?? [];
 
 	return {
 		workspace: artifactSelection(selection.workspace, selection.workspaceRevision),
 		context: artifactOverridesForWorkspace(baselineContexts, selection.contextRefs),
 		skills: artifactOverridesForWorkspace(baselineSkills, selection.skillRefs),
-		mcp: selectedMCPRefs.map(value => ({
-			key: artifactKey(value.artifact),
-			mode: SessionCollectionOverrideMode.Add,
-			value: {
-				server: artifactSelection(value.artifact, value.artifactRevision, value.definitionDigest),
-				toolExposure: MCPToolExposure.None,
-			},
-		})),
+		mcp: mcpOverridesForWorkspace(baselineMCPServers, selection.mcpRefs),
 	};
 }
 
@@ -440,25 +474,23 @@ function appContextUpdatesFromPayload(payload: EditorSubmitPayload) {
 	const output = [];
 
 	for (const update of payload.mcpAppContextUpdates ?? []) {
-		const value = update as typeof update & { viewID?: unknown };
-
 		if (
-			typeof value.instanceID !== 'string' ||
-			!value.instanceID.trim() ||
-			typeof value.server !== 'string' ||
-			!value.server.trim() ||
-			typeof value.viewID !== 'string' ||
-			!value.viewID.trim()
+			typeof update.instanceID !== 'string' ||
+			!update.instanceID.trim() ||
+			typeof update.server !== 'string' ||
+			!update.server.trim() ||
+			typeof update.viewID !== 'string' ||
+			!update.viewID.trim()
 		) {
 			continue;
 		}
 
 		output.push({
-			appInstanceID: value.instanceID,
-			viewID: value.viewID,
-			serverID: value.server,
-			resourceURI: value.resourceUri,
-			content: value.content?.map(content => ({
+			appInstanceID: update.instanceID,
+			viewID: update.viewID,
+			serverID: update.server,
+			resourceURI: update.resourceUri,
+			content: update.content?.map(content => ({
 				type: content.type,
 				text: content.text ?? content.resource?.text,
 				uri: content.uri ?? content.resource?.uri,
@@ -466,8 +498,8 @@ function appContextUpdatesFromPayload(payload: EditorSubmitPayload) {
 				description: content.description,
 				mimeType: content.mimeType ?? content.resource?.mimeType,
 			})),
-			structuredContent: value.structuredContent,
-			updatedAt: value.updatedAt,
+			structuredContent: update.structuredContent,
+			updatedAt: update.updatedAt,
 		});
 	}
 

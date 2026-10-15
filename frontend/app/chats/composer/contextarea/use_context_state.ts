@@ -244,6 +244,7 @@ export function useComposerContextState(): ComposerContextController {
 	const defaultModelRef = useRef(DefaultUIModelOption);
 	const hybridReasoningRef = useRef(isHybridReasoningEnabled);
 	const pendingRestoreRef = useRef<RestorableConversationContext | null>(null);
+	const pendingSessionConfigurationRef = useRef<SessionConfiguration | null>(null);
 
 	const applySelectedModel = useCallback(
 		(
@@ -280,6 +281,41 @@ export function useComposerContextState(): ComposerContextController {
 		return next;
 	}, []);
 
+	const applyRestoredSessionConfiguration = useCallback(
+		(configuration: SessionConfiguration, options: UIModelOption[]) => {
+			const fallback = defaultModelRef.current ?? options[0] ?? DefaultUIModelOption;
+			const resolved = configuration.model ? findRestorableModelOption(options, configuration.model) : undefined;
+			const requestPatch = requestPatchFromSessionOverrides(configuration.modelOverrides);
+			const restored = {
+				...(resolved ?? fallback),
+				...(requestPatch
+					? {
+							requestPatch,
+						}
+					: {}),
+			} as UIModelOption;
+			const reasoningCleared =
+				configuration.modelOverrides.clear?.includes(SessionModelDefaultField.Reasoning) ?? false;
+			const nextHybridReasoningEnabled = isHybridReasoningModel(restored) && !reasoningCleared;
+			const selectionSource: ComposerModelSelectionSource = configuration.model
+				? 'session'
+				: configuration.agent
+					? 'agent'
+					: 'session';
+
+			selectedModelRef.current = restored;
+			hybridReasoningRef.current = nextHybridReasoningEnabled;
+
+			setSelectedModel(restored);
+			setIsHybridReasoningEnabled(nextHybridReasoningEnabled);
+			setIncludePreviousMessages(includePreviousMessagesFromSession(configuration));
+			setModelSelectionSource(selectionSource);
+
+			return restored;
+		},
+		[]
+	);
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -300,6 +336,13 @@ export function useComposerContextState(): ComposerContextController {
 				setHasRunnableModel(true);
 				setModelCatalogUnavailableReason(null);
 				setModelCatalogError(null);
+
+				const pendingSessionConfiguration = pendingSessionConfigurationRef.current;
+				if (pendingSessionConfiguration) {
+					pendingSessionConfigurationRef.current = null;
+					applyRestoredSessionConfiguration(pendingSessionConfiguration, result.options);
+					return;
+				}
 
 				const pendingRestore = pendingRestoreRef.current;
 				if (pendingRestore) {
@@ -340,7 +383,7 @@ export function useComposerContextState(): ComposerContextController {
 		return () => {
 			cancelled = true;
 		};
-	}, [applyRestoredContext]);
+	}, [applyRestoredContext, applyRestoredSessionConfiguration]);
 
 	const handleSetSelectedModel = useCallback(
 		(update: SetStateAction<UIModelOption>) => {
@@ -425,6 +468,7 @@ export function useComposerContextState(): ComposerContextController {
 	const restoreConversationContext = useCallback(
 		(context: RestorableConversationContext) => {
 			pendingRestoreRef.current = context;
+			pendingSessionConfigurationRef.current = null;
 
 			if (!modelOptionsLoaded) {
 				return null;
@@ -440,34 +484,27 @@ export function useComposerContextState(): ComposerContextController {
 	const restoreSessionConfiguration = useCallback(
 		(configuration: SessionConfiguration) => {
 			pendingRestoreRef.current = null;
+			const selectionSource: ComposerModelSelectionSource = configuration.model
+				? 'session'
+				: configuration.agent
+					? 'agent'
+					: 'session';
+			setModelSelectionSource(selectionSource);
 
 			if (!modelOptionsLoaded) {
+				pendingSessionConfigurationRef.current = configuration;
 				return null;
 			}
 
-			const fallback = defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption;
-			const resolved = configuration.model
-				? findRestorableModelOption(allOptionsRef.current, configuration.model)
-				: undefined;
-			const restored = {
-				...(resolved ?? fallback),
-				...(requestPatchFromSessionOverrides(configuration.modelOverrides)
-					? {
-							requestPatch: requestPatchFromSessionOverrides(configuration.modelOverrides),
-						}
-					: {}),
-			} as UIModelOption;
-
-			applySelectedModel(restored, { syncHybridReasoning: true });
-			setIncludePreviousMessages(includePreviousMessagesFromSession(configuration));
-			setModelSelectionSource(configuration.agent ? 'agent' : 'session');
-			return restored;
+			pendingSessionConfigurationRef.current = null;
+			return applyRestoredSessionConfiguration(configuration, allOptionsRef.current);
 		},
-		[applySelectedModel, modelOptionsLoaded]
+		[applyRestoredSessionConfiguration, modelOptionsLoaded]
 	);
 
 	const resetForNewConversation = useCallback(() => {
 		pendingRestoreRef.current = null;
+		pendingSessionConfigurationRef.current = null;
 
 		const next = defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption;
 		setModelSelectionSource('session');

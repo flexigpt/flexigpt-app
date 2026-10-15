@@ -2,6 +2,7 @@ package runtimesetup
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
@@ -82,54 +83,83 @@ func decodeCompletionOutputs(
 			continue
 		}
 
+		arguments, argumentsErr := normalizedArguments(call.Arguments)
+		if argumentsErr != nil {
+			calls = append(calls, unresolvedCompletionToolCall(
+				call,
+				json.RawMessage(`{}`),
+				"provider Tool call arguments are invalid",
+			))
+			continue
+		}
+
 		proposal, found := bindings.byChoice[call.ChoiceID]
-		if !found {
+		if !found && call.ChoiceID == "" {
 			proposal, found = bindings.byName[call.Name]
 		}
 		if !found {
-			calls = append(calls, sessionRuntime.ToolCallProposal{
-				ID:             sessionRuntime.ToolCallID(firstNonEmpty(call.ID, call.CallID)),
-				ProviderCallID: firstNonEmpty(call.CallID, call.ID),
-				Name:           call.Name,
-				ChoiceID:       call.ChoiceID,
-				Type:           call.Type,
-				Arguments:      normalizedArguments(call.Arguments),
-				Required:       true,
-				Binding: sessionRuntime.ToolBinding{
-					Kind: sessionRuntime.ToolBindingKindUnresolved,
-				},
-				Error: "provider Tool call cannot be matched to the immutable prepared bindings",
-			})
+			calls = append(calls, unresolvedCompletionToolCall(
+				call,
+				arguments,
+				"provider Tool call cannot be matched to the immutable prepared bindings",
+			))
+			continue
+		}
+		if call.Name != "" && call.Name != proposal.Name {
+			calls = append(calls, unresolvedCompletionToolCall(
+				call,
+				arguments,
+				"provider Tool call name does not match the immutable prepared binding",
+			))
 			continue
 		}
 
 		proposal = cloneToolProposal(proposal)
 		proposal.ID = sessionRuntime.ToolCallID(firstNonEmpty(call.ID, call.CallID))
 		proposal.ProviderCallID = firstNonEmpty(call.CallID, call.ID)
-		proposal.Name = firstNonEmpty(call.Name, proposal.Name)
-		proposal.ChoiceID = firstNonEmpty(call.ChoiceID, proposal.ChoiceID)
-		if call.Type != "" {
-			proposal.Type = call.Type
-		}
-		proposal.Arguments = normalizedArguments(call.Arguments)
+		proposal.Arguments = arguments
 		calls = append(calls, proposal)
 	}
 
 	return text.String(), thinking.String(), calls
 }
 
-func normalizedArguments(raw json.RawMessage) json.RawMessage {
+func unresolvedCompletionToolCall(
+	call *toolCallWire,
+	arguments json.RawMessage,
+	message string,
+) sessionRuntime.ToolCallProposal {
+	if len(arguments) == 0 {
+		arguments = json.RawMessage(`{}`)
+	}
+
+	return sessionRuntime.ToolCallProposal{
+		ID:             sessionRuntime.ToolCallID(firstNonEmpty(call.ID, call.CallID)),
+		ProviderCallID: firstNonEmpty(call.CallID, call.ID),
+		Name:           call.Name,
+		ChoiceID:       call.ChoiceID,
+		Type:           call.Type,
+		Arguments:      append(json.RawMessage(nil), arguments...),
+		Required:       true,
+		Binding: sessionRuntime.ToolBinding{
+			Kind: sessionRuntime.ToolBindingKindUnresolved,
+		},
+		Error: message,
+	}
+}
+
+func normalizedArguments(raw json.RawMessage) (json.RawMessage, error) {
 	if strings.TrimSpace(string(raw)) == "" {
-		return json.RawMessage(`{}`)
+		return json.RawMessage(`{}`), nil
 	}
 	var encoded string
 	if err := json.Unmarshal(raw, &encoded); err == nil {
 		raw = json.RawMessage(encoded)
 	}
 	if !json.Valid(raw) {
-		return json.RawMessage(`{}`)
+		return nil, errors.New("provider Tool arguments are not valid JSON")
 	}
-	return append(json.RawMessage(nil), raw...)
+	return append(json.RawMessage(nil), raw...), nil
 }
 
 func hasUsableProtocolOutput(outputs []json.RawMessage) bool {

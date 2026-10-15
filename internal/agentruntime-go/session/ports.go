@@ -434,6 +434,13 @@ type RuntimeRestorer interface {
 	RestoreRun(ctx context.Context, r Run) error
 }
 
+// RetiredSessionRestorer restores durable deletion barriers. It is separate
+// from RuntimeRestorer so existing recovery sources need not manufacture a
+// synthetic Session or Run for a tombstone.
+type RetiredSessionRestorer interface {
+	RestoreRetiredSession(ctx context.Context, id SessionID) error
+}
+
 type RecoverySource interface {
 	Restore(ctx context.Context, rr RuntimeRestorer) error
 }
