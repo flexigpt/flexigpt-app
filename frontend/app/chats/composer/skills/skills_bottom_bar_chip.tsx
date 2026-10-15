@@ -1,5 +1,4 @@
-// oxlint-disable unicorn/no-immediate-mutation
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction, SyntheticEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX, FiZap } from 'react-icons/fi';
 
@@ -7,7 +6,7 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { PluginListItem } from '@/spec/plugin';
-import type { SkillDocumentInput, SkillRef } from '@/spec/skill';
+import type { SkillRef } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
@@ -37,7 +36,31 @@ import {
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
 import { skillRefKey } from '@/skills/lib/skill_identity_utils';
+import { canWriteSkillPlugin, makeUniqueSkillName } from '@/skills/lib/skill_management_utils';
 import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
+
+function stopSkillRowAction(event: SyntheticEvent) {
+	event.stopPropagation();
+}
+
+function selectable(item: ComposerSkillCatalogItem): boolean {
+	return (
+		item.runtimeResolved &&
+		item.enabled &&
+		item.state === ArtifactState.Available &&
+		item.insert === SkillInsert.Instructions
+	);
+}
+
+function addSkillRef(refs: SkillRef[], ref: SkillRef): SkillRef[] {
+	const key = skillRefKey(ref);
+	return [...refs.filter(value => skillRefKey(value) !== key), ref];
+}
+
+function removeSkillRef(refs: SkillRef[], ref: SkillRef): SkillRef[] {
+	const key = skillRefKey(ref);
+	return refs.filter(value => skillRefKey(value) !== key);
+}
 
 interface SkillsBottomBarChipProps {
 	store: MenuStore;
@@ -89,63 +112,18 @@ function canActivate(item: ComposerSkillCatalogItem): boolean {
 	return !item.hasArguments;
 }
 
-function uniqueForkName(seed: string, items: ComposerSkillCatalogItem[]): string {
-	const base =
-		seed
-			.trim()
-			.toLowerCase()
-			.replaceAll(/[^a-z0-9-]+/g, '-')
-			.replaceAll(/-+/g, '-')
-			.replaceAll(/^-|-$/g, '')
-			.slice(0, 58) || 'skill';
-
-	const existing = new Set(items.map(item => item.name));
-	let candidate = `${base}-copy`;
-	let index = 2;
-
-	while (existing.has(candidate)) {
-		const suffix = `-copy-${index}`;
-		candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
-		index += 1;
-	}
-
-	return candidate;
-}
-
-function fallbackForkSeed(
-	item: ComposerSkillCatalogItem,
-	allSkills: ComposerSkillCatalogItem[]
-): ManagedSkillEditorSeed {
-	const name = uniqueForkName(item.name, allSkills);
-
-	return {
-		document: {
-			name,
-			displayName: `${skillLabel(item)} Copy`,
-			description: item.description || `Forked from ${skillLabel(item)}.`,
-			insert: SkillInsert.Instructions,
-			arguments: [],
-			tags: ['composer', 'forked'],
-			markdownBody: `# ${skillLabel(item)} Copy
-
-Replace this placeholder with the managed instruction Skill content you want to retain.
-
-The original Skill Artifact remains unchanged.`,
-		},
-		enabled: true,
-	};
-}
-
 function ComposerSkillDestinationModal({
 	isOpen,
 	plugins,
 	action,
+	busy,
 	onClose,
 	onChoose,
 }: {
 	isOpen: boolean;
 	plugins: PluginListItem[];
 	action: PendingManagedSkillAction | null;
+	busy: boolean;
 	onClose: () => void;
 	onChoose: (plugin: PluginListItem, action: PendingManagedSkillAction) => void;
 }) {
@@ -155,9 +133,9 @@ function ComposerSkillDestinationModal({
 		return null;
 	}
 
-	const writablePlugins = plugins.filter(
-		plugin => plugin.editable && plugin.enabled && plugin.state === ArtifactState.Available
-	);
+	const writablePlugins = plugins.filter(p => {
+		return canWriteSkillPlugin(p);
+	});
 	const selected = writablePlugins.find(plugin => `${plugin.ref.rootID}:${plugin.ref.artifactID}` === selectedKey);
 
 	return (
@@ -207,7 +185,7 @@ function ComposerSkillDestinationModal({
 						<button
 							type="button"
 							className="btn btn-primary rounded-xl"
-							disabled={!selected}
+							disabled={!selected || busy}
 							onClick={() => {
 								if (selected) {
 									onChoose(selected, action);
@@ -249,6 +227,7 @@ export function SkillsBottomBarChip({
 	const [editorAction, setEditorAction] = useState<{
 		plugin: PluginListItem;
 		action: PendingManagedSkillAction;
+		existingNames: string[];
 	} | null>(null);
 
 	useEffect(() => {
@@ -258,16 +237,7 @@ export function SkillsBottomBarChip({
 	}, [isInputLocked, store]);
 
 	const instructionSkills = useMemo(
-		() =>
-			allSkills
-				.filter(
-					skill =>
-						skill.runtimeResolved &&
-						skill.insert === SkillInsert.Instructions &&
-						skill.enabled &&
-						skill.state === ArtifactState.Available
-				)
-				.toSorted(compareSkills),
+		() => allSkills.filter(skill => skill.insert !== SkillInsert.UserMessage).toSorted(compareSkills),
 		[allSkills]
 	);
 
@@ -312,56 +282,56 @@ export function SkillsBottomBarChip({
 
 	const enabledCount = enabledKeys.size;
 	const activeCount = activeKeys.size;
+
 	const selectedSystemSourceCount =
-		(systemPrompt.includeModelDefault ? 1 : 0) + systemPrompt.selectedInstructionSourceKeys.length;
-	const configuredCount = enabledCount + activeCount + selectedSystemSourceCount;
-	const firstVisibleSkill = visibleSkills[0] ?? null;
+		(systemPrompt.includeModelDefault && systemPrompt.modelDefaultPrompt.trim() ? 1 : 0) +
+		systemPrompt.selectedInstructionSourceKeys.filter(key =>
+			systemPrompt.instructionSources.some(source => source.identityKey === key && Boolean(source.text.trim()))
+		).length;
+	const configuredCount = enabledCount + selectedSystemSourceCount;
+	const firstVisibleSkill =
+		visibleSkills.find(s => {
+			return selectable(s);
+		}) ?? null;
 
 	const updateEnabled = (item: ComposerSkillCatalogItem, enabled: boolean) => {
+		if (enabled && !selectable(item)) {
+			return;
+		}
+
 		const ref = skillRef(item);
-		const key = skillRefKey(ref);
 
 		setEnabledSkillRefs(previous => {
-			const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
-
 			if (enabled) {
-				next.set(key, ref);
-			} else {
-				next.delete(key);
+				return addSkillRef(previous, ref);
 			}
-
-			return [...next.values()];
+			return removeSkillRef(previous, ref);
 		});
 
 		if (!enabled) {
-			setActiveSkillRefs(previous => previous.filter(value => skillRefKey(value) !== key));
+			setActiveSkillRefs(previous => removeSkillRef(previous, ref));
 		}
 	};
 
 	const updateActive = (item: ComposerSkillCatalogItem, active: boolean) => {
-		const ref = skillRef(item);
-		const key = skillRefKey(ref);
-
-		if (active) {
-			setEnabledSkillRefs(previous => {
-				const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
-				next.set(key, ref);
-				return [...next.values()];
-			});
-			setActiveSkillRefs(previous => {
-				const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
-				next.set(key, ref);
-				return [...next.values()];
-			});
+		if (active && (!selectable(item) || item.hasArguments)) {
 			return;
 		}
 
-		setActiveSkillRefs(previous => previous.filter(value => skillRefKey(value) !== key));
+		const ref = skillRef(item);
+
+		if (active) {
+			setEnabledSkillRefs(previous => addSkillRef(previous, ref));
+			setActiveSkillRefs(previous => addSkillRef(previous, ref));
+			return;
+		}
+
+		setActiveSkillRefs(previous => removeSkillRef(previous, ref));
 	};
 
 	const loadWritablePlugins = async () => {
 		if (pluginsLoading) {
-			return;
+			return false;
 		}
 
 		setPluginsLoading(true);
@@ -369,49 +339,67 @@ export function SkillsBottomBarChip({
 
 		try {
 			setPlugins(await skillManagementAPI.listSkillPluginsForManagement());
+			return true;
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Skill Plugins could not be loaded.');
+			return false;
 		} finally {
 			setPluginsLoading(false);
 		}
 	};
 
 	const openManagedAction = async (action: PendingManagedSkillAction) => {
-		await loadWritablePlugins();
+		if (!(await loadWritablePlugins())) {
+			return;
+		}
+
 		setPendingAction(action);
 		store.hide();
 	};
 
 	const openFork = async (item: ComposerSkillCatalogItem) => {
 		setActionError('');
-
-		let seed = fallbackForkSeed(item, allSkills);
-
-		if (item.managed) {
-			try {
-				const document = await skillManagementAPI.getManagedSkillDocument(item.ref);
-				const sourceDocument: SkillDocumentInput = document.document;
-				seed = {
-					document: {
-						...sourceDocument,
-						name: uniqueForkName(sourceDocument.name, allSkills),
-						displayName: `${sourceDocument.displayName || sourceDocument.name} Copy`,
-					},
-					enabled: true,
-				};
-			} catch (cause) {
-				setActionError(
-					cause instanceof Error
-						? `${cause.message} A blank managed fork draft was prepared instead.`
-						: 'The source document could not be loaded. A blank managed fork draft was prepared instead.'
-				);
+		try {
+			if (!item.managed) {
+				throw new Error('The current read API does not expose this external or built-in source document for copying.');
 			}
+			const source = await skillManagementAPI.getManagedSkillDocument(item.ref);
+			if (source.artifact.revision !== item.revision) {
+				throw new Error('Skill changed. Refresh before forking.');
+			}
+			await openManagedAction({
+				mode: 'fork',
+				seed: { document: source.document, enabled: true },
+			});
+		} catch (cause) {
+			setActionError(cause instanceof Error ? cause.message : 'Source document could not be loaded.');
+			store.show();
 		}
+	};
 
-		await openManagedAction({
-			mode: 'fork',
-			seed,
-		});
+	const addAsInstructions = async (item: ComposerSkillCatalogItem) => {
+		try {
+			const document = await skillManagementAPI.readManagedInstructionSource({
+				ref: item.ref,
+				name: item.name,
+				displayName: item.displayName,
+				description: item.description,
+				state: item.state,
+				enabled: item.enabled,
+				revision: item.revision,
+				definitionDigest: item.definitionDigest,
+				builtIn: item.builtIn,
+				managed: item.managed,
+			});
+			systemPrompt.addAndSelectInstructionSkillSource({
+				displayName: skillLabel(item),
+				prompt: document.markdownBody,
+				skillRef: item.ref,
+				sourceTags: document.tags,
+			});
+		} catch (cause) {
+			setActionError(cause instanceof Error ? cause.message : 'Instructions could not be copied.');
+		}
 	};
 
 	const chipTone =
@@ -517,7 +505,21 @@ export function SkillsBottomBarChip({
 								className="btn btn-ghost btn-xs rounded-lg"
 								disabled={isInputLocked || pluginsLoading}
 								onClick={() => {
-									void openManagedAction({ mode: 'create' });
+									void openManagedAction({
+										mode: 'create',
+										seed: {
+											document: {
+												name: 'instruction-skill',
+												displayName: 'Instruction Skill',
+												description: 'Instruction Skill created from the composer.',
+												insert: SkillInsert.Instructions,
+												arguments: [],
+												tags: ['composer'],
+												markdownBody: '',
+											},
+											enabled: true,
+										},
+									});
 								}}
 								title="Create managed instruction Skill"
 							>
@@ -565,7 +567,7 @@ export function SkillsBottomBarChip({
 							focusFirstSearchableMenuItem(menuContentElement);
 						}}
 						onEnterFirstResult={() => {
-							if (firstVisibleSkill && !isInputLocked) {
+							if (firstVisibleSkill && !isInputLocked && selectable(firstVisibleSkill)) {
 								updateEnabled(firstVisibleSkill, !enabledKeys.has(skillKey(firstVisibleSkill)));
 							}
 						}}
@@ -609,7 +611,12 @@ export function SkillsBottomBarChip({
 								key={source.identityKey}
 								className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
 							>
-								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
+								<span className="min-w-0 text-xs">
+									<span className="block truncate">{source.displayName}</span>
+									{source.sourceTags?.length ? (
+										<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
+									) : null}
+								</span>
 								<input
 									type="checkbox"
 									className="checkbox checkbox-xs"
@@ -631,13 +638,23 @@ export function SkillsBottomBarChip({
 
 					<div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
 						<div className="text-base-content/60 text-xs">
-							{instructionSkills.length} available · {enabledCount} enabled · {activeCount} active
+							{
+								instructionSkills.filter(s => {
+									return selectable(s);
+								}).length
+							}{' '}
+							available · {enabledCount} enabled · {activeCount} active
 						</div>
 						<div className="flex gap-1">
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || instructionSkills.length === 0}
+								disabled={
+									isInputLocked ||
+									instructionSkills.filter(s => {
+										return selectable(s);
+									}).length === 0
+								}
 								onClick={onEnableAll}
 							>
 								Enable all
@@ -680,6 +697,9 @@ export function SkillsBottomBarChip({
 											enabled ? 'border-secondary/50 bg-secondary/10' : 'border-base-300'
 										}`}
 										onClick={() => {
+											if (!selectable(skill) && !enabled) {
+												return;
+											}
 											updateEnabled(skill, !enabled);
 										}}
 									>
@@ -696,21 +716,32 @@ export function SkillsBottomBarChip({
 											</div>
 											{enabled ? <FiCheck size={14} className="text-secondary shrink-0" /> : null}
 										</div>
-
 										<div className="mt-2 ml-6 flex flex-wrap items-center gap-1">
 											{skill.hasArguments ? <span className="badge badge-warning badge-xs">Arguments</span> : null}
 											{skill.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
 											{skill.builtIn ? <span className="badge badge-ghost badge-xs">Built-in</span> : null}
 											{active ? <span className="badge badge-success badge-xs">Active</span> : null}
+											{!selectable(skill) ? (
+												<span
+													className="badge badge-warning badge-xs"
+													title={skill.runtimeError || skill.metadataError}
+												>
+													Unavailable
+												</span>
+											) : null}
 										</div>
-
-										<div className="mt-2 ml-6 flex w-[calc(100%-1.5rem)] justify-end gap-1">
+										{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
+										<div
+											className="mt-2 ml-6 flex w-[calc(100%-1.5rem)] flex-wrap justify-end gap-1"
+											onClick={stopSkillRowAction}
+											onPointerDown={stopSkillRowAction}
+										>
 											{enabled ? (
 												<>
 													<button
 														type="button"
 														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked || !activationAllowed}
+														disabled={isInputLocked || (!active && (!activationAllowed || !selectable(skill)))}
 														title={
 															activationAllowed
 																? active
@@ -740,7 +771,7 @@ export function SkillsBottomBarChip({
 													<button
 														type="button"
 														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked}
+														disabled={isInputLocked || !selectable(skill)}
 														onClick={() => {
 															updateEnabled(skill, true);
 														}}
@@ -750,16 +781,56 @@ export function SkillsBottomBarChip({
 													<button
 														type="button"
 														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked}
+														disabled={isInputLocked || !selectable(skill) || !activationAllowed}
 														onClick={() => {
-															void openFork(skill);
+															updateActive(skill, true);
 														}}
 													>
-														<FiGitBranch size={12} />
-														Fork
+														Enable + activate
 													</button>
 												</>
 											)}
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs rounded-lg"
+												disabled={isInputLocked || !skill.managed}
+												title={
+													!skill.managed
+														? 'Source-document copying requires the management document query described below.'
+														: 'Copy the managed document; resource files are not copied.'
+												}
+												onClick={() => {
+													void openFork(skill);
+												}}
+											>
+												<FiGitBranch size={12} /> Fork
+											</button>
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs rounded-lg"
+												disabled={
+													isInputLocked ||
+													!skill.managed ||
+													!selectable(skill) ||
+													skill.hasArguments ||
+													skill.hasResources
+												}
+												title="Copy this simple managed Skill as an explicit instruction source. This does not enable its lifecycle."
+												onClick={() => {
+													const identity = `skill-instructions:${skillRefKey(skill.ref)}`;
+													if (systemPrompt.instructionSources.some(source => source.identityKey === identity)) {
+														systemPrompt.toggleInstructionSource(identity);
+													} else {
+														void addAsInstructions(skill);
+													}
+												}}
+											>
+												{systemPrompt.selectedInstructionSourceKeys.includes(
+													`skill-instructions:${skillRefKey(skill.ref)}`
+												)
+													? 'Remove from instructions'
+													: 'Add as instructions'}
+											</button>
 										</div>
 									</MenuItem>
 								);
@@ -773,12 +844,43 @@ export function SkillsBottomBarChip({
 				isOpen={pendingAction !== null}
 				plugins={plugins}
 				action={pendingAction}
+				busy={pluginsLoading}
 				onClose={() => {
 					setPendingAction(null);
 				}}
 				onChoose={(plugin, action) => {
-					setPendingAction(null);
-					setEditorAction({ plugin, action });
+					if (pluginsLoading) {
+						return;
+					}
+					setPluginsLoading(true);
+					void skillManagementAPI
+						.listSkills(plugin.ref.rootID)
+						.then(skills => {
+							const existingNames = skills.map(skill => skill.name);
+							const selectedAction =
+								action.mode === 'create' && action.seed
+									? {
+											...action,
+											seed: {
+												...action.seed,
+												document: {
+													...action.seed.document,
+													name: makeUniqueSkillName(action.seed.document.name, existingNames),
+												},
+											},
+										}
+									: action;
+							setPendingAction(null);
+							setEditorAction({ plugin, action: selectedAction, existingNames });
+						})
+						.catch((cause: unknown) => {
+							setActionError(cause instanceof Error ? cause.message : 'Destination could not be inspected.');
+							setPendingAction(null);
+							store.show();
+						})
+						.finally(() => {
+							setPluginsLoading(false);
+						});
 				}}
 			/>
 
@@ -802,17 +904,34 @@ export function SkillsBottomBarChip({
 				}
 				mode={editorAction?.action.mode}
 				seed={editorAction?.action.seed}
+				existingNames={editorAction?.existingNames}
 				onClose={() => {
 					setEditorAction(null);
 				}}
-				onSaved={async artifact => {
+				onSaved={async (artifact, document, enabled) => {
 					setEditorAction(null);
-					await onRefreshSkills();
-					setEnabledSkillRefs(previous => {
-						const next = new Map(previous.map(value => [skillRefKey(value), value] as const));
-						next.set(skillRefKey(artifact), artifact);
-						return [...next.values()];
-					});
+					if (enabled && document.insert === SkillInsert.Instructions) {
+						if ((document.arguments?.length ?? 0) === 0) {
+							// This is the user's newly saved document copy, not trusted
+							// effective execution content or an adopted Agent baseline.
+							systemPrompt.addAndSelectInstructionSkillSource({
+								displayName: document.displayName || document.name,
+								prompt: document.markdownBody,
+								skillRef: artifact,
+								sourceTags: document.tags,
+							});
+						} else {
+							setEnabledSkillRefs(previous => addSkillRef(previous, artifact));
+						}
+					}
+					try {
+						await onRefreshSkills();
+					} catch (cause) {
+						setActionError(
+							`Skill saved, but catalog refresh failed: ${cause instanceof Error ? cause.message : 'unknown error'}`
+						);
+						store.show();
+					}
 				}}
 			/>
 		</>

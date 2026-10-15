@@ -50,6 +50,17 @@ interface SkillTemplateRenderModalProps {
 	onInsert: (args: Record<string, string>) => Promise<void>;
 }
 
+interface SkillTemplatePickerProps {
+	store: MenuStore;
+	open: boolean;
+	loading: boolean;
+	items: ComposerSkillCatalogItem[];
+	loadError?: string | null;
+	onRefresh?: () => Promise<void> | void;
+	isInputLocked: boolean;
+	onInsertRendered: (item: ComposerSkillCatalogItem, args: Record<string, string>) => Promise<void>;
+}
+
 export interface SkillTemplateBottomBarChipProps {
 	store: MenuStore;
 	buttonRef: RefObject<HTMLButtonElement | null>;
@@ -194,12 +205,21 @@ function SkillTemplateDropdown({
 				{ value: item.description, weight: 3 },
 				{ value: item.ref.rootID, weight: 2 },
 				{ value: item.ref.artifactID, weight: 2 },
+				...(item.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
+				...(item.arguments ?? []).flatMap(argument => [
+					{ value: argument.name, weight: 2 },
+					{ value: argument.description, weight: 1 },
+					{ value: argument.default, weight: 1 },
+				]),
 			],
 			fallbackCompare: compareSkillTemplateListItems,
 		});
 	}, [items, searchQuery]);
 
-	const firstTemplate = displayedItems[0] ?? null;
+	const firstTemplate =
+		displayedItems.find(t => {
+			return templateIsSelectable(t);
+		}) ?? null;
 
 	return (
 		<Menu
@@ -286,6 +306,9 @@ function SkillTemplateRenderModalContent({
 	onInsert,
 }: Omit<SkillTemplateRenderModalProps, 'isOpen' | 'onClose'>) {
 	const [argumentsJSON, setArgumentsJSON] = useState('{}');
+	const [argumentValues, setArgumentValues] = useState<Record<string, string>>(() =>
+		Object.fromEntries((item?.arguments ?? []).map(argument => [argument.name, argument.default ?? '']))
+	);
 	const [submitError, setSubmitError] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const { requestClose, unmountingRef } = useModalDialogController();
@@ -303,7 +326,7 @@ function SkillTemplateRenderModalContent({
 
 		void Promise.resolve()
 			.then(async () => {
-				await onInsert(parseTemplateArguments(argumentsJSON));
+				await onInsert(item.arguments !== undefined ? argumentValues : parseTemplateArguments(argumentsJSON));
 				if (unmountingRef.current) {
 					return;
 				}
@@ -345,8 +368,38 @@ function SkillTemplateRenderModalContent({
 						</div>
 					) : null}
 
-					{item.hasArguments ? (
+					{item.hasArguments && item.arguments !== undefined ? (
+						<div className="space-y-3">
+							{item.arguments.map(argument => (
+								<label key={argument.name} className="block">
+									<span className="mb-1 block text-sm font-medium">{argument.name}</span>
+									{argument.description ? (
+										<span className="text-base-content/60 mb-2 block text-xs">{argument.description}</span>
+									) : null}
+									<input
+										className="input w-full rounded-xl"
+										value={argumentValues[argument.name] ?? ''}
+										placeholder={argument.default ?? ''}
+										disabled={submitting}
+										onChange={event => {
+											const value = event.currentTarget.value;
+											setArgumentValues(previous => ({ ...previous, [argument.name]: value }));
+										}}
+									/>
+									{argument.default !== undefined ? (
+										<span className="text-base-content/60 mt-1 block text-xs">
+											Default: {argument.default || '(empty string)'}
+										</span>
+									) : null}
+								</label>
+							))}
+						</div>
+					) : item.hasArguments ? (
 						<div>
+							<p className="text-warning mb-2 text-xs">
+								Argument definitions are not exposed for this source by the current management read API. Known argument
+								names can still be supplied as JSON.
+							</p>
 							<label htmlFor="user-message-skill-arguments" className="label py-1">
 								<span className="text-sm">Arguments JSON</span>
 							</label>
@@ -365,6 +418,12 @@ function SkillTemplateRenderModalContent({
 					) : (
 						<div className="text-base-content/70 text-sm">This template has no declared arguments.</div>
 					)}
+					{item.hasResources ? (
+						<div className="alert alert-warning rounded-xl text-xs">
+							This template contains resources. The current read API reports their presence, but does not expose
+							attachable paths. This action inserts text only; resource files can be attached separately.
+						</div>
+					) : null}
 
 					<ModalActions className="-mx-6 mt-6 -mb-6">
 						<button
@@ -396,8 +455,89 @@ function SkillTemplateRenderModal(props: SkillTemplateRenderModalProps) {
 
 	return (
 		<ModalDialog isOpen={isOpen} onClose={props.onClose} blockCancel>
-			<SkillTemplateRenderModalContent key={skillTemplateKey(item)} item={item} onInsert={props.onInsert} />
+			<SkillTemplateRenderModalContent
+				key={`${skillTemplateKey(item)}:${item.revision}`}
+				item={item}
+				onInsert={props.onInsert}
+			/>
 		</ModalDialog>
+	);
+}
+
+function SkillTemplatePicker({
+	store,
+	open,
+	loading,
+	items,
+	loadError,
+	onRefresh,
+	isInputLocked,
+	onInsertRendered,
+}: SkillTemplatePickerProps) {
+	const [modalItem, setModalItem] = useState<ComposerSkillCatalogItem | null>(null);
+	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
+
+	const handlePick = useCallback(
+		async (item: ComposerSkillCatalogItem) => {
+			setTemplateActionError(null);
+
+			if (isInputLocked || !templateIsSelectable(item)) {
+				setTemplateActionError(item.runtimeError || 'This template is unavailable or disabled.');
+				return;
+			}
+
+			if (item.hasArguments || item.hasResources) {
+				store.hide();
+				setModalItem(item);
+				return;
+			}
+
+			try {
+				await onInsertRendered(item, {});
+			} catch (error) {
+				setTemplateActionError(error instanceof Error ? error.message : 'Template rendering was rejected.');
+			}
+		},
+		[isInputLocked, onInsertRendered, store]
+	);
+
+	const modalIsOpen = modalItem !== null && !isInputLocked;
+
+	return (
+		<>
+			<SkillTemplateDropdown
+				store={store}
+				open={open}
+				loading={loading}
+				items={items}
+				loadError={loadError}
+				actionError={templateActionError}
+				onRetry={
+					onRefresh
+						? () => {
+								void onRefresh();
+							}
+						: undefined
+				}
+				onPick={item => {
+					void handlePick(item);
+				}}
+			/>
+
+			<SkillTemplateRenderModal
+				isOpen={modalIsOpen}
+				item={modalItem}
+				onClose={() => {
+					setModalItem(null);
+				}}
+				onInsert={args => {
+					if (modalItem) {
+						return onInsertRendered(modalItem, args);
+					}
+					return Promise.resolve();
+				}}
+			/>
+		</>
 	);
 }
 
@@ -428,7 +568,7 @@ function SkillTemplateBottomBarChipInner({
 					title: 'When you insert',
 					items: [
 						'The rendered template text is added directly to the composer.',
-						'Templates with arguments or resources open a configuration dialog first.',
+						'Templates with arguments or resources open a configuration dialog first. Resource paths are not available through the current read API.',
 						'There is no active-template count or clear action after insertion.',
 					],
 				},
@@ -440,8 +580,7 @@ function SkillTemplateBottomBarChipInner({
 		[items]
 	);
 	const templateCatalogRefreshAttemptedRef = useRef(false);
-	const [modalItem, setModalItem] = useState<ComposerSkillCatalogItem | null>(null);
-	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
+	const inputLockedRef = useRef(isInputLocked);
 
 	useEffect(() => {
 		const refresh = onRefresh;
@@ -460,16 +599,18 @@ function SkillTemplateBottomBarChipInner({
 	}, [loading, onRefresh, open]);
 
 	useEffect(() => {
-		if (!isInputLocked) {
-			return;
+		inputLockedRef.current = isInputLocked;
+
+		if (isInputLocked) {
+			store.hide();
 		}
-		store.hide();
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setModalItem(null);
 	}, [isInputLocked, store]);
 
 	const handleInsertRendered = useCallback(
 		async (item: ComposerSkillCatalogItem, args: Record<string, string>) => {
+			if (inputLockedRef.current) {
+				throw new Error('Composer input is locked.');
+			}
 			const rendered = await sessionManagementAPI.prepareUserMessageSkillTemplate({
 				skill: {
 					rootID: item.ref.rootID,
@@ -479,29 +620,15 @@ function SkillTemplateBottomBarChipInner({
 				},
 				arguments: args,
 			});
+			if (inputLockedRef.current) {
+				throw new Error(
+					'Template prepared, but the Composer became locked before insertion. Try again when it is available.'
+				);
+			}
 			await onInsertTemplateText(rendered.text);
 			store.hide();
 		},
 		[onInsertTemplateText, store]
-	);
-
-	const handlePick = useCallback(
-		async (item: ComposerSkillCatalogItem) => {
-			setTemplateActionError(null);
-
-			if (item.hasArguments) {
-				store.hide();
-				setModalItem(item);
-				return;
-			}
-
-			try {
-				await handleInsertRendered(item, {});
-			} catch (error) {
-				setTemplateActionError(error instanceof Error ? error.message : 'Template rendering was rejected.');
-			}
-		},
-		[handleInsertRendered, store]
 	);
 
 	return (
@@ -530,37 +657,16 @@ function SkillTemplateBottomBarChipInner({
 				</div>
 			</HoverTip>
 
-			<SkillTemplateDropdown
+			<SkillTemplatePicker
+				key={isInputLocked ? 'input-locked-picker' : 'input-unlocked-picker'}
 				store={store}
 				open={open}
 				loading={loading}
 				items={templates}
 				loadError={loadError}
-				actionError={templateActionError}
-				onRetry={
-					onRefresh
-						? () => {
-								void onRefresh();
-							}
-						: undefined
-				}
-				onPick={item => {
-					void handlePick(item);
-				}}
-			/>
-
-			<SkillTemplateRenderModal
-				isOpen={modalItem !== null}
-				item={modalItem}
-				onClose={() => {
-					setModalItem(null);
-				}}
-				onInsert={args => {
-					if (modalItem) {
-						return handleInsertRendered(modalItem, args);
-					}
-					return Promise.resolve();
-				}}
+				onRefresh={onRefresh}
+				isInputLocked={isInputLocked}
+				onInsertRendered={handleInsertRendered}
 			/>
 		</div>
 	);

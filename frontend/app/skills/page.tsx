@@ -1,19 +1,22 @@
 import type { SubmitEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
-import { FiFolderPlus, FiPlus, FiRefreshCw } from 'react-icons/fi';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FiFolderPlus, FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi';
 
 import type { PluginListItem } from '@/spec/plugin';
 import type { StoreSkillListItem } from '@/spec/skill';
-import { CapabilityTargetForm } from '@/spec/artifact';
+import { pluginListItemFromPluginView } from '@/spec/plugin';
 
-import { mapWithConcurrency } from '@/lib/async_utils';
+import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
+import type { SkillManagementPresentation } from '@/apis/skill_management';
 import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
+import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
@@ -25,6 +28,13 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { PageFrame } from '@/components/page_frame';
 
+import type { SkillManagementFilter } from '@/skills/lib/skill_management_utils';
+import {
+	canWriteSkillPlugin,
+	skillArtifactKey,
+	skillMatchesManagementFilter,
+} from '@/skills/lib/skill_management_utils';
+import { SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
 import { SkillPluginCard } from '@/skills/skill_plugin_card';
 
 interface PluginRow {
@@ -38,97 +48,96 @@ interface PluginRow {
 interface PageData {
 	plugins: PluginRow[];
 	allSkills: StoreSkillListItem[];
+	presentations: Record<string, SkillManagementPresentation>;
 }
 
 function pluginKey(plugin: PluginListItem): string {
 	return `${plugin.ref.rootID}:${plugin.ref.artifactID}`;
 }
 
-function skillKey(skill: StoreSkillListItem): string {
-	return `${skill.ref.rootID}:${skill.ref.artifactID}`;
-}
-
-function sameRef(left: { rootID: string; artifactID: string }, right: { rootID: string; artifactID: string }): boolean {
-	return left.rootID === right.rootID && left.artifactID === right.artifactID;
-}
-
-async function loadPageData(): Promise<PageData> {
+async function loadPageData(signal: AbortSignal, loadedPlugins: ReadonlySet<string>): Promise<PageData> {
 	const data = await skillManagementAPI.loadManagementPageData();
+	throwIfAborted(signal);
 
 	return {
-		plugins: data.plugins.map(plugin => ({
-			plugin,
-			skills: [],
-			skillsLoaded: false,
-			skillsLoading: false,
-		})),
-		allSkills: data.skills,
-	};
-}
-
-async function resolvePluginSkills(
-	plugin: PluginListItem,
-	allSkills: StoreSkillListItem[]
-): Promise<StoreSkillListItem[]> {
-	const resolvedSkillKeys = new Set<string>();
-
-	const plan = await skillManagementAPI.resolveSkillPlugin(plugin.ref).catch(() => undefined);
-	for (const occurrence of plan?.occurrences ?? []) {
-		const target = occurrence.target;
-		if (occurrence.type === 'skill' && target?.form === CapabilityTargetForm.Artifact && target.artifact) {
-			resolvedSkillKeys.add(`${target.artifact.rootID}:${target.artifact.artifactID}`);
-		}
-	}
-
-	const membershipResults = await mapWithConcurrency(allSkills, 8, async skill => {
-		const memberships = await skillManagementAPI.listSkillPluginMemberships(skill.ref).catch(() => []);
-		return {
-			skill,
-			memberOfPlugin: memberships.some(membership => sameRef(membership.plugin, plugin.ref)),
-		};
-	});
-
-	for (const membershipResult of membershipResults) {
-		if (membershipResult.memberOfPlugin) {
-			resolvedSkillKeys.add(skillKey(membershipResult.skill));
-		}
-	}
-
-	return allSkills
-		.filter(skill => resolvedSkillKeys.has(skillKey(skill)))
-		.toSorted((left, right) =>
-			(left.displayName || left.name).localeCompare(right.displayName || right.name, undefined, {
-				numeric: true,
-				sensitivity: 'base',
+		plugins: await Promise.all(
+			data.plugins.map(async plugin => {
+				if (!loadedPlugins.has(pluginKey(plugin))) {
+					return { plugin, skills: [], skillsLoaded: false, skillsLoading: false };
+				}
+				try {
+					const result = await skillManagementAPI.getSkillPluginSkills(plugin.ref, data.skills);
+					throwIfAborted(signal);
+					return {
+						plugin: pluginListItemFromPluginView(result.plugin, plugin.builtIn),
+						skills: result.skills,
+						skillsLoaded: true,
+						skillsLoading: false,
+						skillsError: result.diagnostics.length > 0 ? result.diagnostics.join('\n') : undefined,
+					};
+				} catch (cause) {
+					throwIfAborted(signal);
+					return {
+						plugin,
+						skills: [],
+						skillsLoaded: false,
+						skillsLoading: false,
+						skillsError: getErrorMessage(cause, 'Plugin membership could not be loaded.'),
+					};
+				}
 			})
-		);
+		),
+		allSkills: data.skills,
+		presentations: data.presentations,
+	};
 }
 
 function SkillDirectoryRegistrationModal({
 	isOpen,
 	roots,
+	plugins,
 	onClose,
 	onRegistered,
+	onWarning,
 }: {
 	isOpen: boolean;
 	roots: Array<{ rootID: string; label: string }>;
+	plugins: PluginListItem[];
 	onClose: () => void;
 	onRegistered: () => Promise<void>;
+	onWarning: (message: string) => void;
 }) {
 	const [rootID, setRootID] = useState(roots[0]?.rootID ?? '');
 	const [path, setPath] = useState('');
 	const [sourceDisplayName, setSourceDisplayName] = useState('');
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [destinationKey, setDestinationKey] = useState('unattached');
+	const effectiveRootID = roots.some(root => root.rootID === rootID) ? rootID : (roots[0]?.rootID ?? '');
+	const destinations = plugins.filter(plugin => plugin.ref.rootID === effectiveRootID && canWriteSkillPlugin(plugin));
+	const destination = destinations.find(plugin => pluginKey(plugin) === destinationKey);
+	const destinationValue = destination ? destinationKey : 'unattached';
 
 	if (!isOpen) {
 		return null;
 	}
 
-	const submit: SubmitEventHandler<HTMLFormElement> = event => {
-		event.preventDefault();
+	const chooseDirectory = async () => {
+		try {
+			const selected = await backendAPI.pickDirectoryPath();
+			if (selected) {
+				setPath(selected);
+			}
+		} catch (cause) {
+			setError(getErrorMessage(cause, 'Directory chooser could not be opened.'));
+		}
+	};
 
-		if (!rootID || !path.trim() || !sourceDisplayName.trim()) {
+	const submit: SubmitEventHandler<HTMLFormElement> = async event => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		if (!effectiveRootID || !path.trim() || !sourceDisplayName.trim()) {
 			setError('Root, directory, and source display name are required.');
 			return;
 		}
@@ -136,22 +145,35 @@ function SkillDirectoryRegistrationModal({
 		setSaving(true);
 		setError('');
 
-		void skillManagementAPI
-			.registerSkillDirectory({
-				rootID,
-				rootPath: path.trim(),
-				sourceDisplayName: sourceDisplayName.trim(),
-			})
-			.then(async () => {
+		try {
+			const result = await skillManagementAPI.registerSkillDirectoryAndAttach(
+				{
+					rootID: effectiveRootID,
+					rootPath: path.trim(),
+					sourceDisplayName: sourceDisplayName.trim(),
+				},
+				destination
+			);
+
+			onClose();
+
+			const warnings = [...result.warnings];
+			try {
 				await onRegistered();
-				onClose();
-			})
-			.catch((cause: unknown) => {
-				setError(cause instanceof Error ? cause.message : 'Skill directory could not be registered.');
-			})
-			.finally(() => {
-				setSaving(false);
-			});
+			} catch (cause) {
+				warnings.push(
+					`Directory registered, but the page could not be reloaded: ${getErrorMessage(cause, 'unknown error')}`
+				);
+			}
+
+			if (warnings.length > 0) {
+				onWarning(warnings.join('\n'));
+			}
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Skill directory could not be registered.');
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -165,10 +187,11 @@ function SkillDirectoryRegistrationModal({
 						<select
 							id="skill-directory-root"
 							className="select w-full rounded-xl"
-							value={rootID}
+							value={effectiveRootID}
 							disabled={saving}
 							onChange={event => {
 								setRootID(event.currentTarget.value);
+								setDestinationKey('unattached');
 							}}
 						>
 							{roots.map(root => (
@@ -191,18 +214,7 @@ function SkillDirectoryRegistrationModal({
 								}}
 								placeholder="/path/to/skills"
 							/>
-							<button
-								type="button"
-								className="btn btn-ghost rounded-xl"
-								disabled={saving}
-								onClick={() => {
-									void backendAPI.pickDirectoryPath().then(selected => {
-										if (selected) {
-											setPath(selected);
-										}
-									});
-								}}
-							>
+							<button type="button" className="btn btn-ghost rounded-xl" disabled={saving} onClick={chooseDirectory}>
 								Choose
 							</button>
 						</div>
@@ -221,8 +233,27 @@ function SkillDirectoryRegistrationModal({
 						/>
 					</ModalField>
 
+					<ModalField label="Destination Plugin" htmlFor="skill-directory-destination">
+						<select
+							id="skill-directory-destination"
+							className="select w-full rounded-xl"
+							value={destinationValue}
+							disabled={saving}
+							onChange={event => {
+								setDestinationKey(event.currentTarget.value);
+							}}
+						>
+							<option value="unattached">Register without attaching</option>
+							{destinations.map(plugin => (
+								<option key={pluginKey(plugin)} value={pluginKey(plugin)}>
+									{plugin.displayName || plugin.name}
+								</option>
+							))}
+						</select>
+					</ModalField>
 					<div className="alert alert-info rounded-2xl text-sm">
-						Registered Skill Artifacts appear after refresh. Attach them to a Skill Plugin with “Attach Existing”.
+						Every discovered Skill from this Source is attached to the selected Plugin. Registration without a
+						destination leaves the Skills under Unattached Skills.
 					</div>
 
 					<ModalActions>
@@ -241,11 +272,15 @@ function SkillDirectoryRegistrationModal({
 
 // oxlint-disable-next-line no-restricted-exports
 export default function SkillsPage() {
-	const load = useCallback(async (_signal: AbortSignal) => loadPageData(), []);
+	const loadedPluginsRef = useRef(new Set<string>());
+	const loadGenerationRef = useRef(0);
+	const pluginRequestsRef = useRef(new Map<string, number>());
+	const load = useCallback(async (signal: AbortSignal) => loadPageData(signal, new Set(loadedPluginsRef.current)), []);
 	const { data, error, isLoading, isRefreshing, hasResolved, reloadOrThrow, setData } = useAsyncResource(load, {
 		initialData: {
 			plugins: [],
 			allSkills: [],
+			presentations: {},
 		} satisfies PageData,
 	});
 
@@ -253,20 +288,91 @@ export default function SkillsPage() {
 	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
 	const [creationRootID, setCreationRootID] = useState('');
 	const [alert, setAlert] = useState('');
+	const [filter, setFilter] = useState<SkillManagementFilter>({
+		query: '',
+		insert: 'all',
+		tags: [],
+	});
+	const [skillToView, setSkillToView] = useState<StoreSkillListItem | null>(null);
+	const [skillToPurge, setSkillToPurge] = useState<StoreSkillListItem | null>(null);
+	const [purging, setPurging] = useState(false);
+	const { isPending, runAction } = usePendingActions();
 
 	const refresh = useCallback(async () => {
+		loadGenerationRef.current += 1;
 		skillManagementAPI.invalidateComposerSkillsCatalog();
 		await reloadOrThrow();
 	}, [reloadOrThrow]);
 
+	const reloadAfterMutation = useCallback(
+		async (message: string) => {
+			try {
+				await refresh();
+			} catch (cause) {
+				setAlert(
+					`${message} succeeded, but the page could not be refreshed: ${getErrorMessage(cause, 'unknown error')}`
+				);
+			}
+		},
+		[refresh]
+	);
+
+	const refreshSources = useCallback(async () => {
+		let sourceRefreshError: unknown;
+
+		try {
+			await skillManagementAPI.refreshAllSkillSources();
+		} catch (cause) {
+			sourceRefreshError = cause;
+		}
+
+		try {
+			await refresh();
+		} catch (cause: unknown) {
+			if (sourceRefreshError) {
+				throw new Error(
+					`${getErrorMessage(sourceRefreshError, 'Skill sources could not be refreshed.')}\n${getErrorMessage(
+						cause,
+						'Skill management data could not be reloaded.'
+					)}`,
+					{ cause: cause }
+				);
+			}
+			throw cause;
+		}
+
+		if (sourceRefreshError) {
+			// oxlint-disable-next-line typescript/only-throw-error
+			throw sourceRefreshError;
+		}
+	}, [refresh]);
+
+	const handleRefreshSources = () => {
+		refreshSources().catch((cause: unknown) => {
+			setAlert(getErrorMessage(cause, 'Skill management data could not be refreshed.'));
+		});
+	};
+
+	const handleUnattachedSkillToggle = (skill: StoreSkillListItem) => {
+		runAction(`orphan:${skillArtifactKey(skill.ref)}:toggle`, () => toggleSkill(skill, !skill.enabled)).catch(
+			(cause: unknown) => {
+				setAlert(getErrorMessage(cause, 'Skill enablement could not be changed.'));
+			}
+		);
+	};
+
 	const roots = useMemo(
 		() =>
-			[...new Map(data.plugins.map(row => [row.plugin.ref.rootID, row.plugin.ref.rootID] as const)).entries()].map(
-				([rootID, label]) => ({
-					rootID,
-					label,
-				})
-			),
+			[
+				...new Map(
+					data.plugins
+						.filter(row => row.plugin.baseline && !row.plugin.builtIn)
+						.map(row => [row.plugin.ref.rootID, row.plugin.displayName || row.plugin.name] as const)
+				).entries(),
+			].map(([rootID, label]) => ({
+				rootID,
+				label,
+			})),
 		[data.plugins]
 	);
 
@@ -286,6 +392,11 @@ export default function SkillsPage() {
 
 	const loadPluginSkills = useCallback(
 		async (plugin: PluginListItem) => {
+			const key = pluginKey(plugin);
+			loadedPluginsRef.current.add(key);
+			const generation = loadGenerationRef.current;
+			const request = (pluginRequestsRef.current.get(key) ?? 0) + 1;
+			pluginRequestsRef.current.set(key, request);
 			updatePluginRow(plugin, row => ({
 				...row,
 				skillsLoading: true,
@@ -293,15 +404,22 @@ export default function SkillsPage() {
 			}));
 
 			try {
-				const skills = await resolvePluginSkills(plugin, data.allSkills);
+				const result = await skillManagementAPI.getSkillPluginSkills(plugin.ref);
+				if (generation !== loadGenerationRef.current || pluginRequestsRef.current.get(key) !== request) {
+					return;
+				}
 				updatePluginRow(plugin, row => ({
 					...row,
-					skills,
+					plugin: pluginListItemFromPluginView(result.plugin, row.plugin.builtIn),
+					skills: result.skills,
 					skillsLoaded: true,
 					skillsLoading: false,
-					skillsError: undefined,
+					skillsError: result.diagnostics.length > 0 ? result.diagnostics.join('\n') : undefined,
 				}));
 			} catch (cause) {
+				if (generation !== loadGenerationRef.current || pluginRequestsRef.current.get(key) !== request) {
+					return;
+				}
 				updatePluginRow(plugin, row => ({
 					...row,
 					skillsLoading: false,
@@ -310,31 +428,35 @@ export default function SkillsPage() {
 				throw cause;
 			}
 		},
-		[data.allSkills, updatePluginRow]
+		[updatePluginRow]
 	);
 
 	const refreshPlugin = useCallback(
 		async (plugin: PluginListItem) => {
-			await refresh();
-			await loadPluginSkills(plugin);
+			loadedPluginsRef.current.add(pluginKey(plugin));
+			try {
+				await skillManagementAPI.refreshSkillPluginSources(plugin.ref);
+			} finally {
+				await refresh();
+			}
 		},
-		[loadPluginSkills, refresh]
+		[refresh]
 	);
 
 	const togglePlugin = useCallback(
 		async (plugin: PluginListItem, enabled: boolean) => {
 			await skillManagementAPI.setSkillPluginEnabled(plugin.ref, plugin.revision, enabled);
-			await refresh();
+			await reloadAfterMutation('Plugin enablement change');
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
 
 	const toggleSkill = useCallback(
 		async (skill: StoreSkillListItem, enabled: boolean) => {
 			await skillManagementAPI.setSkillEnabled(skill.ref, skill.revision, enabled);
-			await refresh();
+			await reloadAfterMutation('Skill enablement change');
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
 
 	const attachExisting = useCallback(
@@ -344,59 +466,65 @@ export default function SkillsPage() {
 				expectedRevision: plugin.revision,
 				artifact: skill.ref,
 			});
-			await refresh();
+			await reloadAfterMutation('Skill attachment');
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
 
 	const attachPath = useCallback(
 		async (plugin: PluginListItem, path: string) => {
-			const result = await skillManagementAPI.addSkillPath({
-				rootID: plugin.ref.rootID,
-				path,
-				sourceDisplayName: `${plugin.displayName || plugin.name} external Skill`,
-				enabled: true,
-			});
-
-			await skillManagementAPI.attachSkillArtifactToPlugin({
-				plugin: plugin.ref,
-				expectedRevision: plugin.revision,
-				artifact: {
-					rootID: result.artifact.rootID,
-					artifactID: result.artifact.id,
-				},
-			});
-			await refresh();
+			const result = await skillManagementAPI.addSkillPathAndAttach(plugin, path);
+			await reloadAfterMutation('Skill path registration');
+			if (result.warning) {
+				setAlert(result.warning);
+			}
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
 
 	const detachSkill = useCallback(
 		async (plugin: PluginListItem, skill: StoreSkillListItem) => {
-			const memberships = await skillManagementAPI.listSkillPluginMemberships(skill.ref);
-			const membership = memberships.find(value => sameRef(value.plugin, plugin.ref));
-
-			if (!membership) {
-				throw new Error('This Skill is not a direct member of the selected Plugin.');
-			}
-
-			await skillManagementAPI.removeSkillPluginMember({
-				plugin: membership.plugin,
-				expectedRevision: membership.pluginRevision,
-				index: membership.memberIndex,
-			});
-			await refresh();
+			await skillManagementAPI.detachSkillFromPlugin(plugin, skill);
+			await reloadAfterMutation('Skill detachment');
 		},
-		[refresh]
+		[reloadAfterMutation]
+	);
+
+	const deleteSkillFromPlugin = useCallback(
+		async (plugin: PluginListItem, skill: StoreSkillListItem) => {
+			const result = await skillManagementAPI.deleteSkillFromPlugin(plugin, skill);
+			await reloadAfterMutation('Skill removal');
+			if (result.warning) {
+				setAlert(result.warning);
+			}
+		},
+		[reloadAfterMutation]
 	);
 
 	const purgeSkill = useCallback(
 		async (skill: StoreSkillListItem) => {
 			await skillManagementAPI.purgeSkill(skill.ref, skill.revision);
-			await refresh();
+			await reloadAfterMutation('Managed Artifact deletion');
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
+
+	const confirmPurgeUnattachedSkill = async () => {
+		const skill = skillToPurge;
+		if (!skill || purging) {
+			return;
+		}
+
+		setPurging(true);
+		try {
+			await purgeSkill(skill);
+			setSkillToPurge(null);
+		} catch (cause) {
+			setAlert(getErrorMessage(cause, 'Managed Artifact could not be deleted.'));
+		} finally {
+			setPurging(false);
+		}
+	};
 
 	const deletePlugin = useCallback(
 		async (plugin: PluginListItem) => {
@@ -404,9 +532,9 @@ export default function SkillsPage() {
 				plugin: plugin.ref,
 				expectedRevision: plugin.revision,
 			});
-			await refresh();
+			await reloadAfterMutation('Plugin deletion');
 		},
-		[refresh]
+		[reloadAfterMutation]
 	);
 
 	const createPlugin = useCallback(
@@ -417,10 +545,18 @@ export default function SkillsPage() {
 				displayName,
 				description,
 			});
-			await refresh();
+			await reloadAfterMutation('Plugin creation');
 		},
-		[effectiveCreationRootID, refresh]
+		[effectiveCreationRootID, reloadAfterMutation]
 	);
+
+	const matchingSkills = data.allSkills.filter(skill =>
+		skillMatchesManagementFilter(skill, data.presentations[skillArtifactKey(skill.ref)], filter)
+	);
+	const unattachedSkills = matchingSkills.filter(skill => {
+		const memberships = data.presentations[skillArtifactKey(skill.ref)]?.memberships;
+		return memberships !== undefined && memberships.length === 0;
+	});
 
 	if (isLoading && !hasResolved) {
 		return <Loader text="Loading Skill Plugins..." />;
@@ -455,11 +591,7 @@ export default function SkillsPage() {
 								type="button"
 								className="btn btn-ghost rounded-xl"
 								disabled={isRefreshing}
-								onClick={() => {
-									void refresh().catch((cause: unknown) => {
-										setAlert(getErrorMessage(cause, 'Skill management data could not be refreshed.'));
-									});
-								}}
+								onClick={handleRefreshSources}
 							>
 								<FiRefreshCw size={17} className={isRefreshing ? 'animate-spin' : undefined} />
 								Refresh
@@ -492,6 +624,59 @@ export default function SkillsPage() {
 				/>
 
 				<ManagementPageContent>
+					<div className="bg-base-100 border-base-300 grid gap-3 rounded-2xl border p-3 sm:grid-cols-3">
+						<label className="input flex items-center gap-2 rounded-xl">
+							<FiSearch size={14} />
+							<input
+								type="search"
+								value={filter.query}
+								onChange={event => {
+									setFilter(previous => ({
+										...previous,
+										query: event.currentTarget.value,
+									}));
+								}}
+								placeholder="Search names, descriptions, tags, arguments…"
+								aria-label="Search Skills"
+							/>
+						</label>
+						<select
+							className="select rounded-xl"
+							value={filter.insert}
+							onChange={event => {
+								setFilter(previous => ({
+									...previous,
+									insert: event.currentTarget.value as SkillManagementFilter['insert'],
+								}));
+							}}
+							aria-label="Skill behavior filter"
+						>
+							<option value="all">All Skills</option>
+							<option value="instructions">Instruction Skills</option>
+							<option value="user-message">User-message templates</option>
+						</select>
+						<input
+							className="input rounded-xl"
+							value={filter.tags.join(', ')}
+							onChange={event => {
+								const value = event.currentTarget.value;
+								setFilter(previous => ({
+									...previous,
+									tags: value
+										.split(',')
+										.map(tag => tag.trim())
+										.filter(Boolean),
+								}));
+							}}
+							placeholder="Tags, comma separated"
+							aria-label="Skill tag filter"
+						/>
+						<div className="text-base-content/60 text-xs sm:col-span-3">
+							{matchingSkills.length} matching Artifact{matchingSkills.length === 1 ? '' : 's'}. Tag and argument
+							metadata is searchable where a document is exposed. Unavailable interpretation is shown in Skill Details
+							rather than guessed.
+						</div>
+					</div>
 					{error ? (
 						<ManagementResourceError
 							title="Skill management data could not be loaded"
@@ -516,6 +701,9 @@ export default function SkillsPage() {
 							plugin={row.plugin}
 							skills={row.skills}
 							allSkills={data.allSkills}
+							presentations={data.presentations}
+							filter={filter}
+							onReload={refresh}
 							skillsLoaded={row.skillsLoaded}
 							skillsLoading={row.skillsLoading}
 							skillsError={row.skillsError}
@@ -526,11 +714,66 @@ export default function SkillsPage() {
 							onAttachExisting={attachExisting}
 							onAttachPath={attachPath}
 							onDetachSkill={detachSkill}
-							onPurgeSkill={purgeSkill}
+							onDeleteSkill={deleteSkillFromPlugin}
 							onDeletePlugin={deletePlugin}
 							onError={setAlert}
 						/>
 					))}
+
+					<section className="space-y-3">
+						<h2 className="text-sm font-semibold">Unattached Skills</h2>
+						{unattachedSkills.length === 0 ? (
+							<p className="text-base-content/60 text-sm">No unattached Skills match these filters.</p>
+						) : null}
+						{unattachedSkills.map(skill => (
+							<div
+								key={skillArtifactKey(skill.ref)}
+								className="bg-base-100 border-base-content/10 rounded-2xl border p-3"
+							>
+								<div className="font-medium">{skill.displayName || skill.name}</div>
+								<div className="text-base-content/60 mt-1 text-xs">
+									{skill.ref.rootID}/{skill.ref.artifactID} · {skill.state}
+								</div>
+								<div className="mt-3 flex flex-wrap gap-2">
+									<button
+										type="button"
+										className="btn btn-sm rounded-xl"
+										onClick={() => {
+											setSkillToView(skill);
+										}}
+									>
+										View
+									</button>
+									<button
+										type="button"
+										className="btn btn-sm rounded-xl"
+										disabled={isPending(`orphan:${skillArtifactKey(skill.ref)}:toggle`)}
+										onClick={() => {
+											handleUnattachedSkillToggle(skill);
+										}}
+									>
+										{skill.enabled ? 'Disable' : 'Enable'}
+									</button>
+									{skill.managed && !skill.builtIn ? (
+										<button
+											type="button"
+											className="btn btn-sm rounded-xl"
+											disabled={purging}
+											onClick={() => {
+												setSkillToPurge(skill);
+											}}
+										>
+											Delete Artifact
+										</button>
+									) : null}
+								</div>
+								<p className="text-base-content/60 mt-2 text-xs">
+									Use Attach Existing on a Plugin to attach this Artifact. External source files are not deleted by
+									detachment.
+								</p>
+							</div>
+						))}
+					</section>
 				</ManagementPageContent>
 
 				<ManagementPluginCreateModal
@@ -550,9 +793,35 @@ export default function SkillsPage() {
 					failureMessage="Skill Plugin could not be created."
 				/>
 
+				<SkillArtifactDetailsModal
+					isOpen={skillToView !== null}
+					skill={skillToView}
+					onClose={() => {
+						setSkillToView(null);
+					}}
+				/>
+
+				<DeleteConfirmationModal
+					isOpen={skillToPurge !== null}
+					onClose={() => {
+						if (!purging) {
+							setSkillToPurge(null);
+						}
+					}}
+					onConfirm={confirmPurgeUnattachedSkill}
+					title="Delete Unattached Managed Skill"
+					message={`Permanently delete "${skillToPurge?.displayName || skillToPurge?.name || ''}"? Memberships are checked again before deletion.`}
+					confirmButtonText="Delete"
+				/>
+
 				<SkillDirectoryRegistrationModal
+					key={`skill-directory:${isDirectoryRegistrationOpen ? 'open' : 'closed'}:${roots
+						.map(root => root.rootID)
+						.join('|')}`}
 					isOpen={isDirectoryRegistrationOpen}
 					roots={roots}
+					plugins={data.plugins.map(row => row.plugin)}
+					onWarning={setAlert}
 					onClose={() => {
 						setIsDirectoryRegistrationOpen(false);
 					}}

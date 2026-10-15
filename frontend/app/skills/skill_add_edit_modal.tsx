@@ -1,10 +1,16 @@
 import type { SubmitEventHandler } from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiFileText, FiPlay, FiRefreshCw } from 'react-icons/fi';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FiAlertCircle, FiCopy, FiFileText, FiPlay, FiRefreshCw } from 'react-icons/fi';
 
 import type { ArtifactRef, StoreArtifact } from '@/spec/artifact';
 import type { PluginListItem } from '@/spec/plugin';
-import type { SkillArgument, SkillDocumentInput, StoreManagedSkillDocument, StoreSkillListItem } from '@/spec/skill';
+import type {
+	ManagedSkillReplaceResult,
+	SkillArgument,
+	SkillDocumentInput,
+	StoreManagedSkillDocument,
+	StoreSkillListItem,
+} from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
 import { sessionManagementAPI, skillManagementAPI } from '@/apis/baseapi';
@@ -21,9 +27,14 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
+import {
+	encodeSkillDocument,
+	formatSkillArguments,
+	makeUniqueSkillCopyName,
+	parseSkillArguments,
+} from '@/skills/lib/skill_management_utils';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const ARGUMENT_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type ManagedSkillEditorMode = 'create' | 'edit' | 'fork';
 
@@ -39,7 +50,13 @@ export interface ManagedSkillEditorModalProps {
 	mode?: ManagedSkillEditorMode;
 	seed?: ManagedSkillEditorSeed;
 	onClose: () => void;
-	onSaved: (artifact: ArtifactRef) => Promise<void> | void;
+	existingNames?: readonly string[];
+	prefillDocuments?: ReadonlyArray<{
+		key: string;
+		label: string;
+		document: SkillDocumentInput;
+	}>;
+	onSaved: (artifact: ArtifactRef, document: SkillDocumentInput, enabled: boolean) => Promise<void> | void;
 }
 
 interface ManagedSkillForm {
@@ -51,6 +68,7 @@ interface ManagedSkillForm {
 	tagsText: string;
 	markdownBody: string;
 	enabled: boolean;
+	rawFrontmatter?: Record<string, unknown>;
 }
 
 interface SkillArtifactDetailsModalProps {
@@ -83,109 +101,28 @@ function formFromDocument(document: SkillDocumentInput, enabled: boolean): Manag
 		displayName: document.displayName ?? '',
 		description: document.description,
 		insert: document.insert,
-		argumentsText: argumentsToText(document.arguments),
+		argumentsText: formatSkillArguments(document.arguments),
 		tagsText: (document.tags ?? []).join(', '),
 		markdownBody: document.markdownBody,
 		enabled,
+		rawFrontmatter: document.rawFrontmatter,
 	};
 }
 
-function argumentsToText(argumentsList: SkillArgument[] | undefined): string {
-	return (argumentsList ?? [])
-		.map(argument => [argument.name, argument.description ?? '', argument.default ?? ''].join(' | '))
-		.join('\n');
-}
-
-function parseArguments(raw: string): { values: SkillArgument[]; error?: string } {
-	const seen = new Set<string>();
-	const values: SkillArgument[] = [];
-
-	for (const [index, rawLine] of raw.split('\n').entries()) {
-		const line = rawLine.trim();
-		if (!line) {
-			continue;
-		}
-
-		const columns = line.split('|');
-		if (columns.length > 3) {
-			return {
-				values: [],
-				error: `Argument line ${index + 1} has too many columns. Use: name | description | default.`,
-			};
-		}
-
-		const name = columns[0]?.trim() ?? '';
-		if (!ARGUMENT_NAME_PATTERN.test(name)) {
-			return {
-				values: [],
-				error: `Argument "${name || `on line ${index + 1}`}" is invalid.`,
-			};
-		}
-		if (seen.has(name)) {
-			return {
-				values: [],
-				error: `Argument "${name}" appears more than once.`,
-			};
-		}
-
-		seen.add(name);
-		values.push({
-			name,
-			description: columns[1]?.trim() || undefined,
-			default: columns.length === 3 ? (columns[2]?.trim() ?? '') : undefined,
-		});
-	}
-
-	return { values };
-}
-
-function yamlString(value: string): string {
-	return JSON.stringify(value);
-}
-
-function buildSkillMarkdown(document: SkillDocumentInput): string {
-	const lines = ['---', `name: ${yamlString(document.name)}`, `description: ${yamlString(document.description)}`];
-
-	if (document.displayName?.trim()) {
-		lines.push(`displayName: ${yamlString(document.displayName.trim())}`);
-	}
-
-	lines.push(`insert: ${document.insert}`);
-
-	if ((document.tags ?? []).length > 0) {
-		lines.push('tags:');
-		for (const tag of document.tags ?? []) {
-			lines.push(`  - ${yamlString(tag)}`);
-		}
-	}
-
-	if ((document.arguments ?? []).length > 0) {
-		lines.push('arguments:');
-		for (const argument of document.arguments ?? []) {
-			lines.push(`  - name: ${yamlString(argument.name)}`);
-			if (argument.description?.trim()) {
-				lines.push(`    description: ${yamlString(argument.description.trim())}`);
-			}
-			if (argument.default !== undefined) {
-				lines.push(`    default: ${yamlString(argument.default)}`);
-			}
-		}
-	}
-
-	lines.push('---', '', document.markdownBody.trim(), '');
-	return lines.join('\n');
-}
-
-function makeForkName(seed: string): string {
-	const normalized = seed
-		.trim()
-		.toLowerCase()
-		.replaceAll(/[^a-z0-9-]+/g, '-')
-		.replaceAll(/-+/g, '-')
-		.replaceAll(/^-|-$/g, '')
-		.slice(0, 58);
-
-	return normalized ? `${normalized}-copy` : 'skill-copy';
+function documentFromForm(form: ManagedSkillForm, argumentsList: SkillArgument[]): SkillDocumentInput {
+	return {
+		name: form.name.trim(),
+		displayName: form.displayName.trim() || undefined,
+		description: form.description.trim(),
+		insert: form.insert,
+		arguments: argumentsList,
+		tags: form.tagsText
+			.split(',')
+			.map(tag => tag.trim())
+			.filter(Boolean),
+		markdownBody: form.markdownBody.trim(),
+		rawFrontmatter: form.rawFrontmatter,
+	};
 }
 
 function parseTemplateArguments(raw: string): Record<string, string> {
@@ -237,9 +174,13 @@ function ManagedSkillEditorModalContent({
 	mode = 'create',
 	seed,
 	onClose,
+	existingNames = [],
+	prefillDocuments = [],
 	onSaved,
 }: Omit<ManagedSkillEditorModalProps, 'isOpen'>) {
 	const [loadingDocument, setLoadingDocument] = useState(mode === 'edit' && Boolean(skill));
+	const [documentLoadFailed, setDocumentLoadFailed] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState('');
 	const [form, setForm] = useState<ManagedSkillForm>(() => {
 		const initialDocument = seed?.document ?? emptyDocument();
 		const initialEnabled = seed?.enabled ?? true;
@@ -247,7 +188,7 @@ function ManagedSkillEditorModalContent({
 		if (mode === 'fork') {
 			return {
 				...formFromDocument(initialDocument, initialEnabled),
-				name: makeForkName(initialDocument.name),
+				name: makeUniqueSkillCopyName(initialDocument.name, existingNames),
 				displayName: `${initialDocument.displayName || initialDocument.name || 'Skill'} Copy`,
 			};
 		}
@@ -259,56 +200,107 @@ function ManagedSkillEditorModalContent({
 
 	useEffect(() => {
 		if (mode !== 'edit' || !skill) {
-			// oxlint-disable-next-line react/set-state-in-effect
-			setLoadingDocument(false);
 			return;
 		}
 
 		let cancelled = false;
-		setLoadingDocument(true);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setError('');
 
-		void skillManagementAPI
-			.getManagedSkillDocument(skill.ref)
-			.then((value: StoreManagedSkillDocument) => {
+		const loadDocument = async () => {
+			try {
+				const value: StoreManagedSkillDocument = await skillManagementAPI.getManagedSkillDocument(skill.ref);
 				if (!cancelled) {
+					if (value.artifact.revision !== skill.revision) {
+						setDocumentLoadFailed(true);
+						setError('The Skill changed while its document was loading. Close, refresh, and reopen it.');
+						return;
+					}
 					setForm(formFromDocument(value.document, value.artifact.enabled));
 				}
-			})
-			.catch((cause: unknown) => {
+			} catch (cause) {
 				if (!cancelled) {
+					setDocumentLoadFailed(true);
 					setError(cause instanceof Error ? cause.message : 'Managed Skill document could not be loaded.');
 				}
-			})
-			.finally(() => {
+			} finally {
 				if (!cancelled) {
 					setLoadingDocument(false);
 				}
-			});
+			}
+		};
+
+		void loadDocument();
 
 		return () => {
 			cancelled = true;
 		};
 	}, [mode, skill]);
 
-	const parsedArguments = useMemo(() => parseArguments(form.argumentsText), [form.argumentsText]);
+	const parsedArguments = useMemo(() => parseSkillArguments(form.argumentsText), [form.argumentsText]);
+	const existingNameKeys = useMemo(() => {
+		const keys = new Set<string>();
+		for (const existingName of existingNames) {
+			keys.add(existingName.trim().toLowerCase());
+		}
+		return keys;
+	}, [existingNames]);
 
 	const update = <K extends keyof ManagedSkillForm>(key: K, value: ManagedSkillForm[K]) => {
 		setForm(previous => ({
 			...previous,
 			[key]: value,
 		}));
+		if (!documentLoadFailed) {
+			setError('');
+		}
+	};
+
+	const applyPrefill = (key: string) => {
+		const source = prefillDocuments.find(value => value.key === key);
+		if (!source) {
+			return;
+		}
+
+		setForm(previous => {
+			const nextDocument: SkillDocumentInput = {
+				...source.document,
+				name: previous.name,
+				displayName: previous.displayName || source.document.displayName,
+			};
+			return formFromDocument(nextDocument, previous.enabled);
+		});
 		setError('');
 	};
 
-	const submit: SubmitEventHandler<HTMLFormElement> = event => {
+	const copyGeneratedDocument = async () => {
+		if (parsedArguments.error) {
+			setError(parsedArguments.error);
+			return;
+		}
+		if (typeof navigator === 'undefined' || !navigator.clipboard) {
+			setError('Clipboard access is unavailable.');
+			return;
+		}
+
+		try {
+			const document = documentFromForm(form, parsedArguments.values);
+			const markdown = new TextDecoder().decode(new Uint8Array(encodeSkillDocument(document)));
+			await navigator.clipboard.writeText(markdown);
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Generated SKILL.md could not be copied.');
+		}
+	};
+
+	const submit: SubmitEventHandler<HTMLFormElement> = async event => {
 		event.preventDefault();
+		event.stopPropagation();
 
 		const name = form.name.trim();
 		const description = form.description.trim();
 		const markdownBody = form.markdownBody.trim();
 
+		if (saving || documentLoadFailed) {
+			return;
+		}
 		if (!SKILL_NAME_PATTERN.test(name)) {
 			setError(
 				'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.'
@@ -327,27 +319,23 @@ function ManagedSkillEditorModalContent({
 			setError(parsedArguments.error);
 			return;
 		}
+		if (mode !== 'edit' && existingNameKeys.has(name.toLowerCase())) {
+			setError('A Skill with this name already exists in the destination Root.');
+			return;
+		}
 
-		const document: SkillDocumentInput = {
-			name,
-			displayName: form.displayName.trim() || undefined,
-			description,
-			insert: form.insert,
-			arguments: parsedArguments.values,
-			tags: form.tagsText
-				.split(',')
-				.map(tag => tag.trim())
-				.filter(Boolean),
-			markdownBody,
-		};
-		const skillMD = [...new TextEncoder().encode(buildSkillMarkdown(document))];
+		const document = documentFromForm(form, parsedArguments.values);
+		const skillMD = encodeSkillDocument(document);
 
 		setSaving(true);
 		setError('');
 
-		void (async () => {
+		let saved = false;
+		let result: ManagedSkillReplaceResult;
+
+		try {
 			if (mode === 'edit' && skill) {
-				const result = await skillManagementAPI.replaceManagedSkill({
+				result = await skillManagementAPI.replaceManagedSkill({
 					plugin: plugin.ref,
 					expectedPluginRevision: plugin.revision,
 					artifact: skill.ref,
@@ -356,27 +344,25 @@ function ManagedSkillEditorModalContent({
 					skillMD,
 					enabled: form.enabled,
 				});
-				await onSaved(artifactRefFromStoreArtifact(result.artifact));
-				onClose();
-				return;
+			} else {
+				result = await skillManagementAPI.createManagedSkill({
+					plugin: plugin.ref,
+					expectedPluginRevision: plugin.revision,
+					skillName: name,
+					skillMD,
+					enabled: form.enabled,
+				});
 			}
-
-			const result = await skillManagementAPI.createManagedSkill({
-				plugin: plugin.ref,
-				expectedPluginRevision: plugin.revision,
-				skillName: name,
-				skillMD,
-				enabled: form.enabled,
-			});
-			await onSaved(artifactRefFromStoreArtifact(result.artifact));
+			await onSaved(artifactRefFromStoreArtifact(result.artifact), document, form.enabled);
+			saved = true;
 			onClose();
-		})()
-			.catch((cause: unknown) => {
-				setError(cause instanceof Error ? cause.message : 'Skill could not be saved.');
-			})
-			.finally(() => {
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Skill could not be saved.');
+		} finally {
+			if (!saved) {
 				setSaving(false);
-			});
+			}
+		}
 	};
 
 	const title =
@@ -397,15 +383,44 @@ function ManagedSkillEditorModalContent({
 
 					{mode === 'fork' ? (
 						<div className="alert alert-info rounded-2xl text-sm">
-							The managed copy keeps the selected insert behavior and editable body. Review the copied content before
-							saving.
+							This copies the managed document, including its behavior, arguments, tags, and body. Package resource
+							files are not copied.
 						</div>
 					) : null}
 
 					{loadingDocument ? (
 						<Loader text="Loading managed SKILL.md..." />
+					) : documentLoadFailed ? (
+						<div className="alert alert-warning rounded-2xl text-sm">
+							The managed document was not loaded. Close this editor, refresh the Skill Plugin, and reopen it before
+							saving.
+						</div>
 					) : (
 						<>
+							{mode === 'create' && prefillDocuments.length > 0 ? (
+								<ModalSection title="Prefill">
+									<ModalField label="Copy another managed document">
+										<select
+											className="select w-full rounded-xl"
+											value={selectedPrefillKey}
+											disabled={saving}
+											onChange={event => {
+												const key = event.currentTarget.value;
+												setSelectedPrefillKey(key);
+												applyPrefill(key);
+											}}
+										>
+											<option value="">Choose a managed Skill</option>
+											{prefillDocuments.map(source => (
+												<option key={source.key} value={source.key}>
+													{source.label}
+												</option>
+											))}
+										</select>
+									</ModalField>
+								</ModalSection>
+							) : null}
+
 							<ModalSection title="Identity">
 								<ModalField label="Skill name" htmlFor="managed-skill-name" required>
 									<input
@@ -464,7 +479,9 @@ function ManagedSkillEditorModalContent({
 								<ModalField
 									label="Arguments"
 									htmlFor="managed-skill-arguments"
-									hint="One argument per line: name | description | default."
+									hint={
+										'One argument per line: name | description | default. Escape pipes as \\| and line breaks as \\n. # comments are allowed.'
+									}
 								>
 									<textarea
 										id="managed-skill-arguments"
@@ -529,6 +546,18 @@ function ManagedSkillEditorModalContent({
 									/>
 								</ModalField>
 							</ModalSection>
+
+							<ModalSection title="Generated SKILL.md">
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={saving || Boolean(parsedArguments.error)}
+									onClick={copyGeneratedDocument}
+								>
+									<FiCopy size={14} />
+									Copy complete document
+								</button>
+							</ModalSection>
 						</>
 					)}
 
@@ -536,7 +565,11 @@ function ManagedSkillEditorModalContent({
 						<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
 							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary rounded-xl" disabled={saving || loadingDocument}>
+						<button
+							type="submit"
+							className="btn btn-primary rounded-xl"
+							disabled={saving || loadingDocument || documentLoadFailed}
+						>
 							<FiFileText size={14} />
 							<span>{saving ? 'Saving...' : 'Save Skill'}</span>
 						</button>
@@ -565,6 +598,7 @@ export function ManagedSkillEditorModal(props: ManagedSkillEditorModalProps) {
 }
 
 function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkillListItem; onClose: () => void }) {
+	const [artifact, setArtifact] = useState<StoreArtifact | null>(null);
 	const [managedDocument, setManagedDocument] = useState<StoreManagedSkillDocument | null>(null);
 	const [summary, setSummary] = useState<{
 		Artifact: ArtifactRef;
@@ -575,9 +609,10 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 	} | null>(null);
 	const [error, setError] = useState('');
 	const [templateArguments, setTemplateArguments] = useState('{}');
-	const [templatePreview, setTemplatePreview] = useState('');
+	const [templatePreview, setTemplatePreview] = useState<string | null>(null);
 	const [templatePreviewError, setTemplatePreviewError] = useState('');
-	const [templatePreviewLoading, setTemplatePreviewLoading] = useState(true);
+	const [templatePreviewLoading, setTemplatePreviewLoading] = useState(false);
+	const previewRequestRef = useRef(0);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -597,6 +632,8 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 				setError(
 					artifactResult.reason instanceof Error ? artifactResult.reason.message : 'Skill details could not be loaded.'
 				);
+			} else {
+				setArtifact(artifactResult.value);
 			}
 
 			if (summaryResult.status === 'fulfilled') {
@@ -604,18 +641,47 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 			}
 			if (documentResult.status === 'fulfilled' && documentResult.value) {
 				setManagedDocument(documentResult.value);
+				setTemplateArguments(
+					JSON.stringify(
+						Object.fromEntries(
+							(documentResult.value.document.arguments ?? []).map(argument => [argument.name, argument.default ?? ''])
+						),
+						null,
+						2
+					)
+				);
+			} else if (documentResult.status === 'rejected') {
+				setError(
+					documentResult.reason instanceof Error
+						? documentResult.reason.message
+						: 'Managed document could not be loaded.'
+				);
+			}
+			if (summaryResult.status === 'rejected') {
+				setError(previous =>
+					[
+						previous,
+						summaryResult.reason instanceof Error
+							? summaryResult.reason.message
+							: 'Skill interpretation could not be loaded.',
+					]
+						.filter(Boolean)
+						.join('\n')
+				);
 			}
 		})();
 
 		return () => {
 			cancelled = true;
+			previewRequestRef.current += 1;
 		};
 	}, [skill]);
 
 	const renderTemplatePreview = () => {
-		if (!summary || summary.Insert !== SkillInsert.UserMessage) {
+		if (!summary || summary.Insert !== SkillInsert.UserMessage || templatePreviewLoading) {
 			return;
 		}
+		const request = ++previewRequestRef.current;
 
 		setTemplatePreviewLoading(true);
 		setTemplatePreviewError('');
@@ -632,13 +698,20 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 					},
 					arguments: argumentsValue,
 				});
-				setTemplatePreview(response.text);
+				if (request === previewRequestRef.current) {
+					setTemplatePreview(response.text);
+				}
 			})
 			.catch((cause: unknown) => {
-				setTemplatePreviewError(cause instanceof Error ? cause.message : 'Template rendering was rejected.');
+				if (request === previewRequestRef.current) {
+					setTemplatePreview(null);
+					setTemplatePreviewError(cause instanceof Error ? cause.message : 'Template rendering was rejected.');
+				}
 			})
 			.finally(() => {
-				setTemplatePreviewLoading(false);
+				if (request === previewRequestRef.current) {
+					setTemplatePreviewLoading(false);
+				}
 			});
 	};
 
@@ -667,8 +740,31 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 					<ManagementInfoRow label="Revision">{skill.revision}</ManagementInfoRow>
 					<ManagementInfoRow label="Definition digest">{skill.definitionDigest || '—'}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">{skill.description || '—'}</ManagementInfoRow>
+					<ManagementInfoRow label="Source" mono>
+						{artifact?.binding.sourceID || '—'}
+					</ManagementInfoRow>
+					<ManagementInfoRow label="Source locator" mono>
+						{artifact?.binding.locator || '—'}
+					</ManagementInfoRow>
+					<ManagementInfoRow label="Subresource locator" mono>
+						{artifact?.binding.subresourceLocator || '—'}
+					</ManagementInfoRow>
+					<ManagementInfoRow label="Created">{artifact?.createdAt || '—'}</ManagementInfoRow>
+					<ManagementInfoRow label="Modified">{artifact?.modifiedAt || '—'}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
+			{artifact?.diagnostics?.length ? (
+				<ModalSection title="Source diagnostics">
+					<ul className="space-y-2 text-sm">
+						{artifact.diagnostics.map((diagnostic, index) => (
+							<li key={`${diagnostic.code}:${index}`}>
+								<strong>{diagnostic.code}</strong>: {diagnostic.message}
+								{diagnostic.location?.locator ? ` (${diagnostic.location.locator})` : ''}
+							</li>
+						))}
+					</ul>
+				</ModalSection>
+			) : null}
 
 			{summary ? (
 				<ModalSection title="Runtime interpretation">
@@ -757,11 +853,11 @@ function SkillArtifactDetailsModalContent({ skill, onClose }: { skill: StoreSkil
 						</div>
 					) : null}
 
-					{templatePreview ? (
+					{templatePreview !== null ? (
 						<div className="mt-3">
 							<MessageContentCard
 								messageID={`skill-template-preview:${skill.ref.rootID}:${skill.ref.artifactID}`}
-								content={templatePreview}
+								content={templatePreview || '(Rendered output is empty.)'}
 								isBusy={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}

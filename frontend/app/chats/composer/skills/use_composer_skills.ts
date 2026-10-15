@@ -1,12 +1,16 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
+import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert, SkillSessionSyncMode } from '@/spec/skill';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { resolveStateUpdate } from '@/lib/hook_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
@@ -97,38 +101,50 @@ function isInstructionSkill(item: ComposerSkillCatalogItem): boolean {
 }
 
 export function useComposerSkills(): UseComposerSkillsResult {
-	const [composerSkills, setComposerSkills] = useState<ComposerSkillCatalogItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [activeSkillRefs, setActiveSkillRefsRaw] = useState<SkillRef[]>([]);
-	const [skillsLoading, setSkillsLoading] = useState(true);
-	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
 	const [workspaceSkillRefKeys, setWorkspaceSkillRefKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+	const loadComposerSkills = useCallback(async (_signal: AbortSignal) => {
+		return skillManagementAPI.listComposerSkillCatalog();
+	}, []);
+
+	const {
+		data: composerSkills,
+		error: catalogError,
+		isLoading: skillsLoading,
+		reloadOrThrow,
+	} = useAsyncResource(loadComposerSkills, {
+		initialData: [] satisfies ComposerSkillCatalogItem[],
+	});
+
+	const skillsLoadError = useMemo(() => {
+		return catalogError ? getErrorMessage(catalogError, 'Failed to load the Skills catalog.') : null;
+	}, [catalogError]);
 
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
 	const activeSkillRefsRef = useRef<SkillRef[]>([]);
 	const workspaceRefRef = useRef<WorkspaceRef | undefined>(undefined);
 	const workspaceSkillRefKeysRef = useRef<Set<string>>(new Set());
-	const catalogByRefKeyRef = useRef(new Map<string, ComposerSkillCatalogItem>());
 
 	const runtimeResolvedSkills = useMemo(() => composerSkills.filter(skill => skill.runtimeResolved), [composerSkills]);
 
 	const allSkills = useMemo(
 		() =>
-			runtimeResolvedSkills.filter(s => {
-				return isInstructionSkill(s);
+			composerSkills.filter(s => {
+				return s.insert !== SkillInsert.UserMessage;
 			}),
-		[runtimeResolvedSkills]
+		[composerSkills]
 	);
 	const templateSkills = useMemo(
-		() => runtimeResolvedSkills.filter(skill => skill.insert === SkillInsert.UserMessage),
-		[runtimeResolvedSkills]
+		() => composerSkills.filter(skill => skill.insert === SkillInsert.UserMessage),
+		[composerSkills]
 	);
 
-	useEffect(() => {
-		catalogByRefKeyRef.current = new Map(
-			runtimeResolvedSkills.map(skill => [skillRefKey(catalogItemRef(skill)), skill])
-		);
-	}, [runtimeResolvedSkills]);
+	const catalogByRefKey = useMemo(
+		() => new Map(runtimeResolvedSkills.map(skill => [skillRefKey(catalogItemRef(skill)), skill])),
+		[runtimeResolvedSkills]
+	);
 
 	const updateEnabledSkillRefsState = useCallback((next: SkillRef[]) => {
 		enabledSkillRefsRef.current = next;
@@ -293,32 +309,21 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	);
 
 	const refreshSkills = useCallback(async () => {
-		setSkillsLoading(true);
-		setSkillsLoadError(null);
-
+		skillManagementAPI.invalidateComposerSkillsCatalog();
 		try {
-			setComposerSkills(await skillManagementAPI.listComposerSkillCatalog(true));
-		} catch (error) {
-			console.error('Failed to refresh skills catalog:', error);
-			setSkillsLoadError(
-				error instanceof Error && error.message.trim()
-					? error.message
-					: 'Failed to refresh the skills catalog. Existing skill selections were kept.'
-			);
-		} finally {
-			setSkillsLoading(false);
+			await reloadOrThrow();
+		} catch {
+			// useAsyncResource retains the error for the Composer controls.
 		}
-	}, []);
-
-	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
-		void refreshSkills();
-	}, [refreshSkills]);
+	}, [reloadOrThrow]);
 
 	const enableAllSkills = useCallback(() => {
 		const workspaceKeys = workspaceSkillRefKeysRef.current;
 		const selectable = allSkills
-			.filter(skill => skill.enabled)
+			.filter(
+				skill =>
+					skill.enabled && skill.runtimeResolved && skill.state === ArtifactState.Available && isInstructionSkill(skill)
+			)
 			.map(s => {
 				return catalogItemRef(s);
 			});
@@ -339,10 +344,13 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		});
 	}, [applySkillSelectionState]);
 
-	const selectionForRef = useCallback((ref: SkillRef): SessionArtifactSelection => {
-		const item = catalogByRefKeyRef.current.get(skillRefKey(ref));
-		return item ? catalogItemSelection(item) : { rootID: ref.rootID, artifactID: ref.artifactID };
-	}, []);
+	const selectionForRef = useCallback(
+		(ref: SkillRef): SessionArtifactSelection => {
+			const item = catalogByRefKey.get(skillRefKey(ref));
+			return item ? catalogItemSelection(item) : { rootID: ref.rootID, artifactID: ref.artifactID };
+		},
+		[catalogByRefKey]
+	);
 
 	return {
 		allSkills,
