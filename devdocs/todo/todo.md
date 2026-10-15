@@ -8,6 +8,7 @@
   - [ ] test with some skill that has scripts too
   - [ ] test workspace
   - [ ] test all management pages again properly
+- [ ] times on resp etc will be good
 
 ## M-3
 
@@ -49,6 +50,8 @@
 ## M-Future
 
 - [ ] i18n
+
+- [ ] aggregate tokens and may be integration with usage pais will be good
 
 - [ ] Better Text support: extracted other docs input, sheets and docx mainly.
   - [ ] llmtools: may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
