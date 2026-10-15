@@ -23,7 +23,9 @@ import { usePendingActions } from '@/hooks/use_pending_actions';
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
 
+import type { DropdownItem } from '@/components/dropdown';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { Dropdown } from '@/components/dropdown';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
@@ -199,6 +201,9 @@ function ExistingSkillAttachModal({
 		return null;
 	}
 
+	const candidateDropdownItems = Object.fromEntries(
+		candidates.map(candidate => [refKey(candidate), { isEnabled: true }])
+	) as Record<string, DropdownItem>;
 	const selected = candidates.find(candidate => refKey(candidate) === selectedKey);
 
 	return (
@@ -208,23 +213,25 @@ function ExistingSkillAttachModal({
 				<div className="space-y-4 p-4 sm:p-6">
 					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-					<ModalField label="Skill Artifact" htmlFor="existing-skill-artifact" required>
-						<select
-							id="existing-skill-artifact"
-							className="select w-full rounded-xl"
-							value={selectedKey}
-							disabled={submitting}
-							onChange={event => {
-								setSelectedKey(event.currentTarget.value);
+					<ModalField label="Skill Artifact" required>
+						<Dropdown<string>
+							dropdownItems={candidateDropdownItems}
+							orderedKeys={candidates.map(c => {
+								return refKey(c);
+							})}
+							selectedKey={selected ? selectedKey : ''}
+							onChange={setSelectedKey}
+							filterDisabled={false}
+							title="Select a Skill Artifact"
+							placeholderLabel="Select a Skill Artifact"
+							getDisplayName={key => {
+								const skill = candidates.find(candidate => refKey(candidate) === key);
+								return skill ? `${skill.displayName || skill.name} · ${skill.ref.rootID}` : key;
 							}}
-						>
-							<option value="">Select a Skill Artifact</option>
-							{candidates.map(skill => (
-								<option key={refKey(skill)} value={refKey(skill)}>
-									{skill.displayName || skill.name} · {skill.ref.rootID}
-								</option>
-							))}
-						</select>
+							disabled={submitting || candidates.length === 0}
+							inlineMenu
+							maxMenuHeight={240}
+						/>
 					</ModalField>
 
 					<ModalActions>

@@ -16,6 +16,8 @@ import { SkillInsert } from '@/spec/skill';
 
 import { skillManagementAPI } from '@/apis/baseapi';
 
+import type { DropdownItem } from '@/components/dropdown';
+import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -36,6 +38,18 @@ import {
 } from '@/skills/lib/skill_management_utils';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+const SKILL_INSERT_DROPDOWN_KEYS = [SkillInsert.Instructions, SkillInsert.UserMessage] as const;
+
+const SKILL_INSERT_DROPDOWN_ITEMS: Record<SkillInsert, DropdownItem> = {
+	[SkillInsert.Instructions]: { isEnabled: true },
+	[SkillInsert.UserMessage]: { isEnabled: true },
+};
+
+const SKILL_INSERT_DROPDOWN_LABELS: Record<SkillInsert, string> = {
+	[SkillInsert.Instructions]: 'Instructions',
+	[SkillInsert.UserMessage]: 'User-message template',
+};
 
 export type ManagedSkillEditorMode = 'create' | 'edit' | 'fork';
 
@@ -244,6 +258,14 @@ function ManagedSkillEditorModalContent({
 		}
 		return keys;
 	}, [existingNames]);
+	const prefillDropdownItems = useMemo(
+		() =>
+			Object.fromEntries(prefillDocuments.map(source => [source.key, { isEnabled: true }])) as Record<
+				string,
+				DropdownItem
+			>,
+		[prefillDocuments]
+	);
 
 	const update = <K extends keyof ManagedSkillForm>(key: K, value: ManagedSkillForm[K]) => {
 		setForm(previous => ({
@@ -401,23 +423,22 @@ function ManagedSkillEditorModalContent({
 							{mode === 'create' && prefillDocuments.length > 0 ? (
 								<ModalSection title="Prefill">
 									<ModalField label="Copy another managed document">
-										<select
-											className="select w-full rounded-xl"
-											value={selectedPrefillKey}
-											disabled={saving}
-											onChange={event => {
-												const key = event.currentTarget.value;
+										<Dropdown<string>
+											dropdownItems={prefillDropdownItems}
+											orderedKeys={prefillDocuments.map(source => source.key)}
+											selectedKey={selectedPrefillKey}
+											onChange={key => {
 												setSelectedPrefillKey(key);
 												applyPrefill(key);
 											}}
-										>
-											<option value="">Choose a managed Skill</option>
-											{prefillDocuments.map(source => (
-												<option key={source.key} value={source.key}>
-													{source.label}
-												</option>
-											))}
-										</select>
+											filterDisabled={false}
+											title="Copy another managed document"
+											placeholderLabel="Choose a managed Skill"
+											getDisplayName={key => prefillDocuments.find(source => source.key === key)?.label ?? key}
+											disabled={saving}
+											inlineMenu
+											maxMenuHeight={240}
+										/>
 									</ModalField>
 								</ModalSection>
 							) : null}
@@ -464,17 +485,20 @@ function ManagedSkillEditorModalContent({
 
 							<ModalSection title="Skill behavior">
 								<ModalField label="Insert behavior">
-									<select
-										className="select w-full rounded-xl"
-										value={form.insert}
-										disabled={saving}
-										onChange={event => {
-											update('insert', event.currentTarget.value as SkillInsert);
+									<Dropdown<SkillInsert>
+										dropdownItems={SKILL_INSERT_DROPDOWN_ITEMS}
+										orderedKeys={SKILL_INSERT_DROPDOWN_KEYS}
+										selectedKey={form.insert}
+										onChange={insert => {
+											update('insert', insert);
 										}}
-									>
-										<option value={SkillInsert.Instructions}>Instructions</option>
-										<option value={SkillInsert.UserMessage}>User-message template</option>
-									</select>
+										filterDisabled={false}
+										title="Select Skill insert behavior"
+										getDisplayName={insert => SKILL_INSERT_DROPDOWN_LABELS[insert]}
+										disabled={saving}
+										inlineMenu
+										maxMenuHeight={180}
+									/>
 								</ModalField>
 
 								<ModalField

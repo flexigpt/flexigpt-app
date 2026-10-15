@@ -35,8 +35,10 @@ import {
 } from '@/apis/agent_management';
 import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
+import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
@@ -704,6 +706,14 @@ export default function AgentsPage() {
 	const effectivePluginCreationRootID = pluginCreationRoots.some(value => value.rootID === pluginCreationRootID)
 		? pluginCreationRootID
 		: (pluginCreationRoots[0]?.rootID ?? '');
+	const pluginCreationRootDropdownItems = useMemo(
+		() =>
+			Object.fromEntries(pluginCreationRoots.map(root => [root.rootID, { isEnabled: true }])) as Record<
+				string,
+				DropdownItem
+			>,
+		[pluginCreationRoots]
+	);
 
 	const showAlert = useCallback((message: string) => {
 		setAlertMessage(message);
@@ -1024,20 +1034,17 @@ export default function AgentsPage() {
 					actions={
 						<>
 							{pluginCreationRoots.length > 1 ? (
-								<select
-									className="select select-sm max-w-72 rounded-xl"
-									aria-label="Agent Plugin Root"
-									value={effectivePluginCreationRootID}
-									onChange={event => {
-										setPluginCreationRootID(event.currentTarget.value);
-									}}
-								>
-									{pluginCreationRoots.map(value => (
-										<option key={value.rootID} value={value.rootID}>
-											{value.label}
-										</option>
-									))}
-								</select>
+								<div className="w-56 max-w-72">
+									<Dropdown<string>
+										dropdownItems={pluginCreationRootDropdownItems}
+										orderedKeys={pluginCreationRoots.map(root => root.rootID)}
+										selectedKey={effectivePluginCreationRootID}
+										onChange={setPluginCreationRootID}
+										filterDisabled={false}
+										title="Agent Plugin Root"
+										getDisplayName={rootID => pluginCreationRoots.find(root => root.rootID === rootID)?.label ?? rootID}
+									/>
+								</div>
 							) : null}
 
 							<button

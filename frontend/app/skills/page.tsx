@@ -16,8 +16,10 @@ import { usePendingActions } from '@/hooks/use_pending_actions';
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
 
+import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
@@ -52,6 +54,24 @@ interface PageData {
 	allSkills: StoreSkillListItem[];
 	presentations: Record<string, SkillManagementPresentation>;
 }
+
+const skillInsertDropdownKeys = [
+	SkillManagementInsertFilter.All,
+	SkillInsert.Instructions,
+	SkillInsert.UserMessage,
+] as const;
+
+const skillInsertDropdownItems: Record<SkillManagementFilter['insert'], DropdownItem> = {
+	[SkillManagementInsertFilter.All]: { isEnabled: true },
+	[SkillInsert.Instructions]: { isEnabled: true },
+	[SkillInsert.UserMessage]: { isEnabled: true },
+};
+
+const skillInsertDropdownLabels: Record<SkillManagementFilter['insert'], string> = {
+	[SkillManagementInsertFilter.All]: 'All Skills',
+	[SkillInsert.Instructions]: 'Instruction Skills',
+	[SkillInsert.UserMessage]: 'User-message templates',
+};
 
 function pluginKey(plugin: PluginListItem): string {
 	return `${plugin.ref.rootID}:${plugin.ref.artifactID}`;
@@ -119,6 +139,26 @@ function SkillDirectoryRegistrationModal({
 	const destinations = plugins.filter(plugin => plugin.ref.rootID === effectiveRootID && canWriteSkillPlugin(plugin));
 	const destination = destinations.find(plugin => pluginKey(plugin) === destinationKey);
 	const destinationValue = destination ? destinationKey : 'unattached';
+	const rootDropdownItems = useMemo(
+		() => Object.fromEntries(roots.map(root => [root.rootID, { isEnabled: true }])) as Record<string, DropdownItem>,
+		[roots]
+	);
+	const destinationDropdownItems = useMemo(
+		() =>
+			({
+				unattached: { isEnabled: true },
+				...Object.fromEntries(destinations.map(plugin => [pluginKey(plugin), { isEnabled: true }])),
+			}) as Record<string, DropdownItem>,
+		[destinations]
+	);
+	const destinationLabel = (key: string) => {
+		if (key === 'unattached') {
+			return 'Register without attaching';
+		}
+
+		const plugin = destinations.find(candidate => pluginKey(candidate) === key);
+		return plugin?.displayName || plugin?.name || key;
+	};
 
 	if (!isOpen) {
 		return null;
@@ -185,23 +225,23 @@ function SkillDirectoryRegistrationModal({
 				<form className="space-y-4 p-4 sm:p-6" onSubmit={submit}>
 					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-					<ModalField label="Artifact Root" htmlFor="skill-directory-root" required>
-						<select
-							id="skill-directory-root"
-							className="select w-full rounded-xl"
-							value={effectiveRootID}
-							disabled={saving}
-							onChange={event => {
-								setRootID(event.currentTarget.value);
+					<ModalField label="Artifact Root" required>
+						<Dropdown<string>
+							dropdownItems={rootDropdownItems}
+							orderedKeys={roots.map(root => root.rootID)}
+							selectedKey={effectiveRootID}
+							onChange={value => {
+								setRootID(value);
 								setDestinationKey('unattached');
 							}}
-						>
-							{roots.map(root => (
-								<option key={root.rootID} value={root.rootID}>
-									{root.label}
-								</option>
-							))}
-						</select>
+							filterDisabled={false}
+							title="Select Artifact Root"
+							placeholderLabel="No Artifact Roots available"
+							getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? value}
+							disabled={saving || roots.length === 0}
+							inlineMenu
+							maxMenuHeight={240}
+						/>
 					</ModalField>
 
 					<ModalField label="Directory" htmlFor="skill-directory-path" required>
@@ -235,23 +275,27 @@ function SkillDirectoryRegistrationModal({
 						/>
 					</ModalField>
 
-					<ModalField label="Destination Plugin" htmlFor="skill-directory-destination">
-						<select
-							id="skill-directory-destination"
-							className="select w-full rounded-xl"
-							value={destinationValue}
-							disabled={saving}
-							onChange={event => {
-								setDestinationKey(event.currentTarget.value);
+					<ModalField label="Destination Plugin">
+						<Dropdown<string>
+							dropdownItems={destinationDropdownItems}
+							orderedKeys={[
+								'unattached',
+								...destinations.map(d => {
+									return pluginKey(d);
+								}),
+							]}
+							selectedKey={destinationValue}
+							onChange={value => {
+								setDestinationKey(value);
 							}}
-						>
-							<option value="unattached">Register without attaching</option>
-							{destinations.map(plugin => (
-								<option key={pluginKey(plugin)} value={pluginKey(plugin)}>
-									{plugin.displayName || plugin.name}
-								</option>
-							))}
-						</select>
+							filterDisabled={false}
+							title="Select Destination Plugin"
+							placeholderLabel="Register without attaching"
+							getDisplayName={destinationLabel}
+							disabled={saving}
+							inlineMenu
+							maxMenuHeight={240}
+						/>
 					</ModalField>
 					<div className="alert alert-info rounded-2xl text-sm">
 						Every discovered Skill from this Source is attached to the selected Plugin. Registration without a
@@ -381,6 +425,10 @@ export default function SkillsPage() {
 	const effectiveCreationRootID = roots.some(root => root.rootID === creationRootID)
 		? creationRootID
 		: (roots[0]?.rootID ?? '');
+	const creationRootDropdownItems = useMemo(
+		() => Object.fromEntries(roots.map(root => [root.rootID, { isEnabled: true }])) as Record<string, DropdownItem>,
+		[roots]
+	);
 
 	const updatePluginRow = useCallback(
 		(plugin: PluginListItem, update: (row: PluginRow) => PluginRow) => {
@@ -582,20 +630,17 @@ export default function SkillsPage() {
 					actions={
 						<>
 							{roots.length > 1 ? (
-								<select
-									className="select select-sm max-w-72 rounded-xl"
-									aria-label="Skill Plugin Root"
-									value={effectiveCreationRootID}
-									onChange={event => {
-										setCreationRootID(event.currentTarget.value);
-									}}
-								>
-									{roots.map(root => (
-										<option key={root.rootID} value={root.rootID}>
-											{root.label}
-										</option>
-									))}
-								</select>
+								<div className="w-56 max-w-72">
+									<Dropdown<string>
+										dropdownItems={creationRootDropdownItems}
+										orderedKeys={roots.map(root => root.rootID)}
+										selectedKey={effectiveCreationRootID}
+										onChange={setCreationRootID}
+										filterDisabled={false}
+										title="Skill Plugin Root"
+										getDisplayName={rootID => roots.find(root => root.rootID === rootID)?.label ?? rootID}
+									/>
+								</div>
 							) : null}
 
 							<button
@@ -686,23 +731,20 @@ export default function SkillsPage() {
 								aria-label="Search Skills"
 							/>
 						</label>
-						<select
-							className="select rounded-xl"
-							value={filter.insert}
-							onChange={event => {
+						<Dropdown<SkillManagementFilter['insert']>
+							dropdownItems={skillInsertDropdownItems}
+							orderedKeys={skillInsertDropdownKeys}
+							selectedKey={filter.insert}
+							onChange={insert => {
 								setFilter(previous => ({
 									...previous,
-									insert:
-										Object.values(SkillInsert).find(value => (value as string) === event.currentTarget.value) ??
-										SkillManagementInsertFilter.All,
+									insert,
 								}));
 							}}
-							aria-label="Skill behavior filter"
-						>
-							<option value={SkillManagementInsertFilter.All}>All Skills</option>
-							<option value={SkillInsert.Instructions}>Instruction Skills</option>
-							<option value={SkillInsert.UserMessage}>User-message templates</option>
-						</select>
+							filterDisabled={false}
+							title="Skill behavior filter"
+							getDisplayName={insert => skillInsertDropdownLabels[insert]}
+						/>
 						<input
 							className="input rounded-xl"
 							value={filter.tags.join(', ')}

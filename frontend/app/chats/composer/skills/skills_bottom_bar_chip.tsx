@@ -13,6 +13,7 @@ import { SkillInsert } from '@/spec/skill';
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
 
+import type { DropdownItem } from '@/components/dropdown';
 import {
 	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
@@ -20,6 +21,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { Dropdown } from '@/components/dropdown';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -136,6 +138,9 @@ function ComposerSkillDestinationModal({
 	const writablePlugins = plugins.filter(p => {
 		return canWriteSkillPlugin(p);
 	});
+	const writablePluginDropdownItems = Object.fromEntries(
+		writablePlugins.map(plugin => [`${plugin.ref.rootID}:${plugin.ref.artifactID}`, { isEnabled: true }])
+	) as Record<string, DropdownItem>;
 	const selected = writablePlugins.find(plugin => `${plugin.ref.rootID}:${plugin.ref.artifactID}` === selectedKey);
 
 	return (
@@ -151,25 +156,25 @@ function ComposerSkillDestinationModal({
 						Managed Skills are created inside an editable, enabled Skill Plugin.
 					</div>
 
-					<ModalField label="Skill Plugin" htmlFor="composer-skill-plugin" required>
-						<select
-							id="composer-skill-plugin"
-							className="select w-full rounded-xl"
-							value={selectedKey}
-							onChange={event => {
-								setSelectedKey(event.currentTarget.value);
+					<ModalField label="Skill Plugin" required>
+						<Dropdown<string>
+							dropdownItems={writablePluginDropdownItems}
+							orderedKeys={writablePlugins.map(plugin => `${plugin.ref.rootID}:${plugin.ref.artifactID}`)}
+							selectedKey={selected ? selectedKey : ''}
+							onChange={setSelectedKey}
+							filterDisabled={false}
+							title="Select a Skill Plugin"
+							placeholderLabel="Select a Skill Plugin"
+							getDisplayName={key => {
+								const plugin = writablePlugins.find(
+									candidate => `${candidate.ref.rootID}:${candidate.ref.artifactID}` === key
+								);
+								return plugin ? `${plugin.displayName || plugin.name} · ${plugin.ref.rootID}` : key;
 							}}
-						>
-							<option value="">Select a Skill Plugin</option>
-							{writablePlugins.map(plugin => (
-								<option
-									key={`${plugin.ref.rootID}:${plugin.ref.artifactID}`}
-									value={`${plugin.ref.rootID}:${plugin.ref.artifactID}`}
-								>
-									{plugin.displayName || plugin.name} · {plugin.ref.rootID}
-								</option>
-							))}
-						</select>
+							disabled={busy || writablePlugins.length === 0}
+							inlineMenu
+							maxMenuHeight={240}
+						/>
 					</ModalField>
 
 					{writablePlugins.length === 0 ? (
