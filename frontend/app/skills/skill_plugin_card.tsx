@@ -22,6 +22,12 @@ import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
+import {
+	canManageSkillPlugin,
+	canWriteSkillPlugin,
+	sameSkillArtifact,
+	skillArtifactKey,
+} from '@/apis/skill_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -38,16 +44,10 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { SkillManagementFilter } from '@/skills/lib/skill_management_utils';
 import type { ManagedSkillEditorMode, ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
-import {
-	canManageSkillPlugin,
-	canWriteSkillPlugin,
-	sameSkillArtifact,
-	skillArtifactKey,
-	skillMatchesManagementFilter,
-} from '@/skills/lib/skill_management_utils';
+import type { SkillManagementFilter } from '@/skills/skill_management_utils';
 import { ManagedSkillEditorModal, SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
+import { skillMatchesManagementFilter } from '@/skills/skill_management_utils';
 import { SkillPluginDetailsModal } from '@/skills/skill_plugin_details_modal';
 import { SkillPluginEditModal } from '@/skills/skill_plugin_edit_modal';
 

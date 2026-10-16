@@ -20,8 +20,8 @@ import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
+import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface ToolUserArgsModalProps {
 	isOpen: boolean;

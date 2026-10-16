@@ -23,9 +23,9 @@ import {
 import { MCPToolExposure } from '@/spec/session_mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
+import { toolIdentityKey } from '@/apis/tool_management';
 
 import type { AgentCapabilityExclusion, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 export interface SessionSubmissionIntent {
 	configuration: SessionConfiguration;

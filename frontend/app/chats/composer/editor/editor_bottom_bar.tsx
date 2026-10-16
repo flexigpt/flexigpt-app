@@ -19,9 +19,9 @@ import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/atta
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
 import { KeyboardShortcutsMenu } from '@/chats/composer/editor/keyboard_shortcuts_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';

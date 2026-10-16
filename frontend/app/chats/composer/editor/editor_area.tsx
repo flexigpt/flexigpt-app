@@ -27,6 +27,8 @@ import { formatShortcut } from '@/lib/keyboard_shortcuts';
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 import { useTools } from '@/hooks/use_tool';
 
+import { toolIdentityKey } from '@/apis/tool_management';
+
 import { HoverTip } from '@/components/hover_tip';
 
 import type {
@@ -36,9 +38,9 @@ import type {
 } from '@/chats/composer/editor/editor_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
@@ -55,6 +57,12 @@ import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_docu
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
+import {
+	conversationToolsToChoices,
+	mergeConversationToolsWithNewChoices,
+} from '@/chats/composer/tools/lib/conversation_tool_utils';
+import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/chats/composer/tools/lib/tool_call_utils';
+import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/chats/composer/tools/lib/tool_choice_utils';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
 import { buildWebSearchChoicesForSubmit, getWebSearchConfiguration } from '@/chats/composer/tools/websearch_utils';
@@ -66,10 +74,6 @@ import {
 	hydrateSessionToolOverrides,
 } from '@/chats/session/session_composer_restore';
 import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
-import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
-import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
-import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 interface SkillStateApplyOptions {
 	syncSession?: SkillSessionSyncMode;

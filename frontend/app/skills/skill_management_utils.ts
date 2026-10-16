@@ -1,7 +1,4 @@
-import type { ArtifactRef } from '@/spec/artifact';
-import type { PluginListItem } from '@/spec/plugin';
 import type { SkillArgument, SkillDocumentInput, SkillInsert, StoreSkillListItem } from '@/spec/skill';
-import { ArtifactState } from '@/spec/artifact';
 
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 
@@ -13,22 +10,6 @@ export interface SkillManagementFilter {
 
 export enum SkillManagementInsertFilter {
 	All = 'all',
-}
-
-export function skillArtifactKey(ref: ArtifactRef): string {
-	return JSON.stringify([ref.rootID, ref.artifactID]);
-}
-
-export function sameSkillArtifact(left: ArtifactRef, right: ArtifactRef): boolean {
-	return left.rootID === right.rootID && left.artifactID === right.artifactID;
-}
-
-export function canManageSkillPlugin(plugin: PluginListItem): boolean {
-	return !plugin.builtIn && (plugin.baseline || plugin.editable);
-}
-
-export function canWriteSkillPlugin(plugin: PluginListItem): boolean {
-	return canManageSkillPlugin(plugin) && plugin.enabled && plugin.state === ArtifactState.Available;
 }
 
 export function makeUniqueSkillName(seed: string, existingNames: readonly string[]): string {

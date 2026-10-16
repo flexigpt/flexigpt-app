@@ -7,8 +7,8 @@ import type { ToolStoreChoice } from '@/spec/tool';
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
 
 interface UseComposerToolsArgs {

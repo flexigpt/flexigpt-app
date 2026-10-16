@@ -4,10 +4,9 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { toolChoiceFromListItem } from '@/apis/tool_management';
+import { toolChoiceFromListItem, toolIdentityKey } from '@/apis/tool_management';
 
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
+import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
 
 export type WebSearchChoiceTemplate = Omit<ToolStoreChoice, 'choiceID'> & {
 	toolType: ToolStoreChoiceType.WebSearch;

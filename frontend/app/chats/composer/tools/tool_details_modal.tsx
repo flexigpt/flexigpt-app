@@ -14,6 +14,8 @@ import { redactInternalPresentationFields } from '@/lib/user_facing_presentation
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import { getPrettyToolName } from '@/apis/tool_management';
+
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -21,8 +23,6 @@ import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { mediaItemsFromToolOutputItems, MessageMediaContent } from '@/chats/messages/message_media_content';
-import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
-import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
 function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string {
 	switch (item.kind) {
@@ -94,6 +94,11 @@ function getChoiceDisplayInfo(c: ToolStoreChoice) {
 
 function getToolCallDisplayName(call: UIToolCall): string {
 	return call.mcpToolSelection?.toolName || getPrettyToolName(call.name);
+}
+
+function formatToolOutputSummary(n: string): string {
+	const pretty = getPrettyToolName(n);
+	return `Result: ${pretty}`;
 }
 
 function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; payload: unknown } {

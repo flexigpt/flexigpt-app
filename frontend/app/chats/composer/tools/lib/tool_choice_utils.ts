@@ -1,6 +1,6 @@
 import type { ToolSelection, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import { toolIdentityKey } from '@/apis/tool_management';
 
 /** Editor selection to frontend choice. */
 export function uiToolChoiceToToolStoreChoice(att: UIToolStoreChoice): ToolStoreChoice {
@@ -19,16 +19,6 @@ export function uiToolChoiceToToolStoreChoice(att: UIToolStoreChoice): ToolStore
 		definitionDigest: att.definitionDigest,
 		pluginRef: att.pluginRef,
 		pluginName: att.pluginName,
-	};
-}
-
-/** Exact backend and persistence projection. */
-export function toolSelectionFromChoice(choice: ToolSelection): ToolSelection {
-	return {
-		choiceID: choice.choiceID,
-		target: choice.target,
-		autoExecute: choice.autoExecute,
-		userArgSchemaInstance: choice.userArgSchemaInstance,
 	};
 }
 

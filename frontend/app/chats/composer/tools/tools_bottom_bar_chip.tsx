@@ -11,7 +11,7 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
 
-import { toolArtifactKey, toolDisplayName } from '@/apis/tool_management';
+import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_management';
 
 import {
 	ActionTriggerChipContent,
@@ -31,17 +31,16 @@ import {
 } from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
+import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
 import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
 import {
 	getWebSearchConfiguration,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
 } from '@/chats/composer/tools/websearch_utils';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface ToolsBottomBarChipProps {
 	store: MenuStore;

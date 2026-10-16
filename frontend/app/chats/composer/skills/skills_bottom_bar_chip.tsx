@@ -14,6 +14,7 @@ import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/use
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
+import { canWriteSkillPlugin } from '@/apis/skill_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import {
@@ -40,8 +41,8 @@ import {
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
 import { skillRefKey } from '@/skills/lib/skill_identity_utils';
-import { canWriteSkillPlugin, makeUniqueSkillName } from '@/skills/lib/skill_management_utils';
 import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
+import { makeUniqueSkillName } from '@/skills/skill_management_utils';
 
 function stopSkillRowAction(event: SyntheticEvent) {
 	event.stopPropagation();

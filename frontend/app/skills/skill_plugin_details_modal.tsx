@@ -4,6 +4,7 @@ import type { PluginListItem, PluginView } from '@/spec/plugin';
 import type { StoreSkillListItem } from '@/spec/skill';
 
 import { skillManagementAPI } from '@/apis/baseapi';
+import { canManageSkillPlugin } from '@/apis/skill_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
@@ -12,8 +13,6 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalSection } from '@/components/modal/modal_section';
-
-import { canManageSkillPlugin } from '@/skills/lib/skill_management_utils';
 
 interface SkillPluginDetailsModalProps {
 	isOpen: boolean;

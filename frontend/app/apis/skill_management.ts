@@ -1,3 +1,4 @@
+// oxlint-disable typescript/parameter-properties
 import type {
 	ArtifactRef,
 	ArtifactRootID,
@@ -52,14 +53,21 @@ import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 import type { ISessionManagementAPI, ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
-import {
-	canManageSkillPlugin,
-	canWriteSkillPlugin,
-	sameSkillArtifact,
-	skillArtifactKey,
-} from '@/skills/lib/skill_management_utils';
+export function skillArtifactKey(ref: ArtifactRef): string {
+	return JSON.stringify([ref.rootID, ref.artifactID]);
+}
 
-// oxlint-disable typescript/parameter-properties
+export function sameSkillArtifact(left: ArtifactRef, right: ArtifactRef): boolean {
+	return left.rootID === right.rootID && left.artifactID === right.artifactID;
+}
+
+export function canManageSkillPlugin(plugin: PluginListItem): boolean {
+	return !plugin.builtIn && (plugin.baseline || plugin.editable);
+}
+
+export function canWriteSkillPlugin(plugin: PluginListItem): boolean {
+	return canManageSkillPlugin(plugin) && plugin.enabled && plugin.state === ArtifactState.Available;
+}
 
 export interface SkillManagementPresentation {
 	details?: ArtifactSkillDetails;

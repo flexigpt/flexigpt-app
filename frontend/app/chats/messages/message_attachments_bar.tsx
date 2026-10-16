@@ -35,6 +35,8 @@ import {
 	WorkspaceConversationSkillUsageStatus,
 } from '@/spec/workspace';
 
+import { getPrettyToolName } from '@/apis/tool_management';
+
 import type { MessageBarChipTone } from '@/chats/messages/message_bar_chip_utils';
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
@@ -44,7 +46,6 @@ import {
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
 import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
-import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;

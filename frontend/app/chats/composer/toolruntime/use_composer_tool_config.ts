@@ -8,15 +8,14 @@ import { getErrorMessage } from '@/lib/error_utils';
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import { toolManagementAPI } from '@/apis/baseapi';
-import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
+import { toolIdentityKey, toolStoreChoiceFromSelection } from '@/apis/tool_management';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { toolStoreChoicesToConversationTools } from '@/chats/composer/tools/lib/conversation_tool_utils';
+import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
 import { normalizeWebSearchChoiceTemplates, webSearchTemplateFromChoice } from '@/chats/composer/tools/websearch_utils';
-import { toolStoreChoicesToConversationTools } from '@/tools/lib/conversation_tool_utils';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface UseComposerToolConfigArgs {
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];

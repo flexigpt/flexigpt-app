@@ -3,27 +3,23 @@ import type {
 	ReasoningContent,
 	ToolCall,
 	ToolOutput,
+	ToolOutputItemUnion,
 	UIToolCall,
 	UIToolOutput,
 	URLCitation,
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import type { MCPToolSelection } from '@/spec/session_mcp';
-import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
-import { CitationKind, ContentItemKind, OutputKind, UIToolCallStatus } from '@/spec/inference';
-import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolOutputUnion, ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
+import { CitationKind, ContentItemKind, ImageDetail, OutputKind, UIToolCallStatus } from '@/spec/inference';
+import { ToolImplType, ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { redactInternalPresentationFields } from '@/lib/user_facing_presentation';
 
+import { getPrettyToolName } from '@/apis/tool_management';
+
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
-import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
-import { toolSelectionFromChoice } from '@/tools/lib/tool_choice_utils';
-import {
-	extractPrimaryTextFromToolOutputs,
-	formatToolOutputSummary,
-	mapToolOutputItemsToToolOutputs,
-} from '@/tools/lib/tool_output_utils';
 
 export function getDebugDetailsMarkdown(
 	debugObj?: unknown,
@@ -141,6 +137,41 @@ function findMCPToolSelectionForToolLike(
 	}
 
 	return undefined;
+}
+
+function collectToolCallsFromOutputs(
+	outputs: OutputUnion[] | undefined,
+	existing?: Map<string, ToolCall>
+): Map<string, ToolCall> {
+	const map = existing ?? new Map<string, ToolCall>();
+
+	const addCall = (call?: ToolCall) => {
+		if (call?.callID) {
+			map.set(call.callID, call);
+		}
+	};
+
+	if (!outputs) {
+		return map;
+	}
+
+	for (const o of outputs) {
+		switch (o.kind) {
+			case OutputKind.FunctionToolCall:
+				addCall(o.functionToolCall);
+				break;
+			case OutputKind.CustomToolCall:
+				addCall(o.customToolCall);
+				break;
+			case OutputKind.WebSearchToolCall:
+				addCall(o.webSearchToolCall);
+				break;
+			default:
+				break;
+		}
+	}
+
+	return map;
 }
 
 export function deriveUIFieldsFromOutputUnion(
@@ -276,6 +307,15 @@ export function deriveUIFieldsFromOutputUnion(
 	};
 }
 
+function toolSelectionFromChoice(choice: ToolSelection): ToolSelection {
+	return {
+		choiceID: choice.choiceID,
+		target: choice.target,
+		autoExecute: choice.autoExecute,
+		userArgSchemaInstance: choice.userArgSchemaInstance,
+	};
+}
+
 function deriveUIToolCallFromToolCall(
 	toolCall: ToolCall | undefined,
 	choiceMap: Map<string, ToolStoreChoice>,
@@ -324,6 +364,84 @@ function deriveUIToolCallFromToolCall(
 	};
 }
 
+function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]): ToolOutputUnion[] | undefined {
+	if (!contents?.length) {
+		return undefined;
+	}
+
+	const outputs: ToolOutputUnion[] = [];
+
+	for (const item of contents) {
+		switch (item.kind) {
+			case ContentItemKind.Text: {
+				const text = item.textItem?.text;
+
+				if (text !== null) {
+					outputs.push({
+						kind: ToolOutputKind.Text,
+						textItem: { text: text ?? '' },
+					});
+				}
+				break;
+			}
+
+			case ContentItemKind.Image: {
+				const img = item.imageItem;
+				if (img) {
+					outputs.push({
+						kind: ToolOutputKind.Image,
+						imageItem: {
+							detail: (img.detail ?? ImageDetail.Auto) as string,
+							imageName: img.imageName ?? '',
+							imageMIME: img.imageMIME ?? '',
+							imageData: img.imageData ?? '',
+						},
+					});
+				}
+				break;
+			}
+
+			case ContentItemKind.File: {
+				const file = item.fileItem;
+				if (file) {
+					outputs.push({
+						kind: ToolOutputKind.File,
+						fileItem: {
+							fileName: file.fileName ?? '',
+							fileMIME: file.fileMIME ?? '',
+							fileData: file.fileData ?? '',
+						},
+					});
+				}
+				break;
+			}
+
+			default:
+				// Refusal / other kinds are ignored for tool-store outputs
+				break;
+		}
+	}
+
+	return outputs.length > 0 ? outputs : undefined;
+}
+
+function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): string | undefined {
+	if (!outputs?.length) {
+		return undefined;
+	}
+
+	const texts = outputs
+		.filter(o => o.kind === ToolOutputKind.Text && o.textItem?.text)
+		.map(o => o.textItem?.text.trim())
+		.filter(Boolean);
+
+	if (texts.length === 0) {
+		return undefined;
+	}
+
+	return texts.join('\n\n');
+}
+
 function buildUIToolOutputFromToolOutput(
 	out: ToolOutput,
 	choiceMap: Map<string, ToolStoreChoice>,
@@ -338,7 +456,8 @@ function buildUIToolOutputFromToolOutput(
 		? findMCPToolSelectionForToolLike(call, mcpToolSelectionMap)
 		: findMCPToolSelectionForToolLike(out, mcpToolSelectionMap);
 	const mcpApp = mcpToolSelection?.appResourceUri ? { resourceUri: mcpToolSelection.appResourceUri } : undefined;
-	const summaryBase = formatToolOutputSummary(out.name);
+	const prettyToolName = getPrettyToolName(out.name);
+	const summaryBase = `Result: ${prettyToolName}`;
 
 	const toolOutputs = mapToolOutputItemsToToolOutputs(out.contents);
 

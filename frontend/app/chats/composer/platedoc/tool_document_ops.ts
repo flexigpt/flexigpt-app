@@ -7,12 +7,11 @@ import { ToolImplType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { toolChoiceFromListItem } from '@/apis/tool_management';
+import { toolChoiceFromListItem, toolIdentityKey } from '@/apis/tool_management';
 
 import type { ToolSelectionElementNode } from '@/chats/composer/platedoc/nodes';
 import { KEY_TOOL_SELECTION } from '@/chats/composer/platedoc/nodes';
-import { uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import { uiToolChoiceToToolStoreChoice } from '@/chats/composer/tools/lib/tool_choice_utils';
 
 export interface AttachedToolEntry extends UIToolStoreChoice {
 	toolSnapshot?: ToolView;

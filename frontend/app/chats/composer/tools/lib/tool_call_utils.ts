@@ -1,5 +1,4 @@
-import type { OutputUnion, ToolCall, UIToolCall } from '@/spec/inference';
-import { OutputKind } from '@/spec/inference';
+import type { UIToolCall } from '@/spec/inference';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -27,39 +26,4 @@ export function requiresComposerToolResponse(toolCall: UIToolCall): boolean {
 		clientType &&
 		(Boolean(toolCall.mcpToolSelection) || toolCall.toolStoreChoice?.implementationKind !== ToolImplType.SDK)
 	);
-}
-
-export function collectToolCallsFromOutputs(
-	outputs: OutputUnion[] | undefined,
-	existing?: Map<string, ToolCall>
-): Map<string, ToolCall> {
-	const map = existing ?? new Map<string, ToolCall>();
-
-	const addCall = (call?: ToolCall) => {
-		if (call?.callID) {
-			map.set(call.callID, call);
-		}
-	};
-
-	if (!outputs) {
-		return map;
-	}
-
-	for (const o of outputs) {
-		switch (o.kind) {
-			case OutputKind.FunctionToolCall:
-				addCall(o.functionToolCall);
-				break;
-			case OutputKind.CustomToolCall:
-				addCall(o.customToolCall);
-				break;
-			case OutputKind.WebSearchToolCall:
-				addCall(o.webSearchToolCall);
-				break;
-			default:
-				break;
-		}
-	}
-
-	return map;
 }

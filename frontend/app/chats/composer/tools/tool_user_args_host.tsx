@@ -4,12 +4,13 @@ import type { ToolArgsTarget } from '@/spec/tool';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
 
+import { toolIdentityKey } from '@/apis/tool_management';
+
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
 import { ToolUserArgsModal } from '@/chats/composer/tools/tool_user_args_modal';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface ToolArgsModalHostProps {
 	attachedToolEntries: AttachedToolEntry[];

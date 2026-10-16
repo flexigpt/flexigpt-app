@@ -15,6 +15,7 @@ import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import type { SkillManagementPresentation } from '@/apis/skill_management';
 import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
+import { canWriteSkillPlugin, skillArtifactKey } from '@/apis/skill_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -31,14 +32,9 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { PageFrame } from '@/components/page_frame';
 
-import type { SkillManagementFilter } from '@/skills/lib/skill_management_utils';
-import {
-	canWriteSkillPlugin,
-	skillArtifactKey,
-	SkillManagementInsertFilter,
-	skillMatchesManagementFilter,
-} from '@/skills/lib/skill_management_utils';
+import type { SkillManagementFilter } from '@/skills/skill_management_utils';
 import { SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
+import { SkillManagementInsertFilter, skillMatchesManagementFilter } from '@/skills/skill_management_utils';
 import { SkillPluginCard } from '@/skills/skill_plugin_card';
 
 interface PluginRow {

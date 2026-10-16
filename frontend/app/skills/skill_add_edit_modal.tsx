@@ -35,7 +35,7 @@ import {
 	formatSkillArguments,
 	makeUniqueSkillCopyName,
 	parseSkillArguments,
-} from '@/skills/lib/skill_management_utils';
+} from '@/skills/skill_management_utils';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 

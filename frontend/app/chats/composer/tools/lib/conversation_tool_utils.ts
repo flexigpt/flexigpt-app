@@ -1,7 +1,7 @@
 import type { ToolStoreChoice, ToolView, UIToolUserArgsStatus } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import { toolIdentityKey } from '@/apis/tool_management';
 
 export interface ConversationToolStateEntry {
 	key: string;
