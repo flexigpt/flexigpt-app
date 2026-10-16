@@ -12,11 +12,6 @@ export type ArtifactKind = string;
 export type ArtifactLocator = string;
 export type ArtifactDigest = string;
 
-export enum ArtifactAdoptionMode {
-	Observed = 'observed',
-	Pinned = 'pinned',
-}
-
 export enum ArtifactState {
 	Available = 'available',
 	Missing = 'missing',

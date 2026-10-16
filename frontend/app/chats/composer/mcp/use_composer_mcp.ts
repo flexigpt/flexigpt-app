@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
-	MCPConversationContext,
 	MCPPromptRef,
-	MCPPromptSelection,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
-	MCPRuntimeServerView,
 	MCPToolCapability,
+} from '@/spec/mcp';
+import type {
+	MCPConversationContext,
+	MCPPromptSelection,
+	MCPResourceTemplateSelection,
+	MCPRuntimeServerView,
 	MCPToolSelection,
 } from '@/spec/session_mcp';
-import { MCPServerType, MCPTransportType } from '@/spec/mcp';
-import { MCPServerStatus, MCPToolExposure } from '@/spec/session_mcp';
+import { MCPServerStatus, MCPServerType, MCPTransportType } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/session_mcp';
 
 import { getErrorMessage } from '@/lib/error_utils';
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
 import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
-import { getMCPRuntimeAuthHealth, isServerOperational } from '@/apis/mcp_management';
+import { getMCPRuntimeAuthHealth, isMCPToolVisibleToModel, isServerOperational } from '@/apis/mcp_management';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
 import type {
@@ -37,7 +39,6 @@ import {
 	mcpServerKey,
 	mcpToolKey,
 } from '@/chats/composer/mcp/mcp_composer_types';
-import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/lib/mcp_server_utils';
 
 type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources' | 'resourceTemplates' | 'prompts'>;
 
@@ -180,7 +181,9 @@ function withArgumentValue<T extends { argumentValues?: Record<string, string> }
 }
 
 function modelSelectableTools(tools: MCPToolCapability[]): MCPToolCapability[] {
-	return tools.filter(tool => isMCPToolModelSelectable(tool));
+	return tools.filter(tool => {
+		return tool.enabled && isMCPToolVisibleToModel(tool);
+	});
 }
 
 export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult {

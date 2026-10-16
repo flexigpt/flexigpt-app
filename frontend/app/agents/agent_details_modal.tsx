@@ -15,9 +15,9 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/agent_management_utils';
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
-import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/lib/agent_management_utils';
 
 interface AgentDetailsModalProps {
 	isOpen: boolean;

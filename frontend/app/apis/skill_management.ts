@@ -39,6 +39,7 @@ import type {
 	SkillDocumentInput,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
+	SkillRef,
 	SkillResourceInfo,
 	StoreManagedSkillDocument,
 	StoreSkillListItem,
@@ -52,6 +53,10 @@ import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { ISessionManagementAPI, ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
+
+export function skillRefKey(ref: SkillRef): string {
+	return `${ref.rootID}:${ref.artifactID}`;
+}
 
 export function skillArtifactKey(ref: ArtifactRef): string {
 	return JSON.stringify([ref.rootID, ref.artifactID]);
@@ -67,6 +72,61 @@ export function canManageSkillPlugin(plugin: PluginListItem): boolean {
 
 export function canWriteSkillPlugin(plugin: PluginListItem): boolean {
 	return canManageSkillPlugin(plugin) && plugin.enabled && plugin.state === ArtifactState.Available;
+}
+
+function isSkillArtifactRef(ref: unknown): ref is ArtifactRef {
+	if (ref === null || typeof ref !== 'object') {
+		return false;
+	}
+	const value = ref as Partial<ArtifactRef>;
+	return (
+		typeof value.rootID === 'string' &&
+		value.rootID.trim().length > 0 &&
+		typeof value.artifactID === 'string' &&
+		value.artifactID.trim().length > 0
+	);
+}
+
+function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[] {
+	const seen = new Set<string>();
+	const out: SkillRef[] = [];
+	for (const r of refs ?? []) {
+		if (!isSkillArtifactRef(r)) {
+			continue;
+		}
+		const key = skillRefKey(r);
+		if (!seen.has(key)) {
+			seen.add(key);
+			out.push({ rootID: r.rootID, artifactID: r.artifactID });
+		}
+	}
+	return out;
+}
+
+export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRef[] => {
+	return dedupeSkillRefs(refs ?? []);
+};
+
+export const clampActiveSkillRefsToEnabled = (
+	enabledRefs: SkillRef[] | null | undefined,
+	activeRefs: SkillRef[] | null | undefined
+): SkillRef[] => {
+	const enabled = normalizeSkillRefs(enabledRefs);
+	if (enabled.length === 0) {
+		return [];
+	}
+
+	const allow = new Set(enabled.map(r => skillRefKey(r)));
+	return dedupeSkillRefs(
+		(activeRefs ?? []).filter(ref => {
+			return allow.has(skillRefKey(ref));
+		})
+	);
+};
+
+export function isSkillsToolName(name: string | undefined): boolean {
+	const n = (name ?? '').trim();
+	return n.startsWith('skills-');
 }
 
 export interface SkillManagementPresentation {

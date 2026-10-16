@@ -1,5 +1,17 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPHTTPAuthMode } from '@/spec/mcp';
+import type {
+	MCPApprovalRule,
+	MCPAppVisibility,
+	MCPAuthState,
+	MCPExecutionMode,
+	MCPHTTPAuthMode,
+	MCPPromptRef,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
+	MCPServerRuntimeSnapshot,
+	MCPTimestamp,
+} from '@/spec/mcp';
 import type {
 	AppInstanceID,
 	AppViewID,
@@ -13,54 +25,10 @@ import type {
 	SessionRevision,
 	ToolCallID,
 } from '@/spec/session_base';
-import { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
-
-/**
- * Process-local MCP runtime identity.
- *
- * This is opaque to frontend callers. It is obtained through MCP management
- * resolution and is never constructed from an ArtifactRef in the frontend.
- */
-export type MCPRuntimeServerID = string;
-type MCPRuntimeCatalogID = string;
-type MCPTimestamp = string;
 
 export interface MCPDiscoveryPage<T> {
 	items: T[];
 	nextPageToken?: string;
-}
-
-export enum MCPServerStatus {
-	Disabled = 'disabled',
-	Disconnected = 'disconnected',
-	Connecting = 'connecting',
-	Ready = 'ready',
-	Error = 'error',
-}
-
-export enum MCPAuthHealthState {
-	NotRequired = 'notRequired',
-	NotConfigured = 'notConfigured',
-	AuthorizationNeeded = 'authorizationNeeded',
-	AuthorizationPending = 'authorizationPending',
-	Authorized = 'authorized',
-	Expired = 'expired',
-	InsufficientScope = 'insufficientScope',
-	Error = 'error',
-}
-
-export enum MCPToolRisk {
-	Unknown = 'unknown',
-	Read = 'read',
-	Write = 'write',
-	Destructive = 'destructive',
-	OpenWorld = 'openWorld',
-}
-
-export enum MCPTaskSupport {
-	Forbidden = 'forbidden',
-	Optional = 'optional',
-	Required = 'required',
 }
 
 export enum MCPContentType {
@@ -71,108 +39,9 @@ export enum MCPContentType {
 	Resource = 'resource',
 }
 
-export enum MCPAppVisibility {
-	Model = 'model',
-	App = 'app',
-}
-
 export enum MCPCompletionRefType {
 	Resource = 'resource',
 	Prompt = 'prompt',
-}
-
-interface MCPServerCapabilitiesSummary {
-	tools?: boolean;
-	toolsListChanged?: boolean;
-	resources?: boolean;
-	resourcesSubscribe?: boolean;
-	resourcesListChanged?: boolean;
-	prompts?: boolean;
-	promptsListChanged?: boolean;
-	completions?: boolean;
-	experimental?: Record<string, unknown>;
-	extensions?: Record<string, unknown>;
-}
-
-interface MCPToolAnnotations {
-	destructiveHint?: boolean;
-	idempotentHint: boolean;
-	openWorldHint?: boolean;
-	readOnlyHint: boolean;
-	title?: string;
-}
-
-interface MCPToolAppInfo {
-	resourceUri?: string;
-	visibility?: MCPAppVisibility[];
-}
-
-export interface MCPToolCapability {
-	server: MCPRuntimeServerID;
-	toolName: string;
-	providerToolName: string;
-	choiceID: string;
-
-	title?: string;
-	displayName: string;
-	description?: string;
-
-	inputSchema?: Record<string, unknown>;
-	outputSchema?: Record<string, unknown>;
-
-	annotations?: MCPToolAnnotations;
-	inferredRisk: MCPToolRisk;
-	approvalRule: MCPApprovalRule;
-	executionMode: MCPExecutionMode;
-	taskSupport: MCPTaskSupport;
-	app?: MCPToolAppInfo;
-
-	digest: string;
-	enabled: boolean;
-	stale?: boolean;
-}
-
-export interface MCPArgumentDefinition {
-	name: string;
-	title?: string;
-	description?: string;
-	required?: boolean;
-}
-
-export interface MCPResourceRef {
-	server: MCPRuntimeServerID;
-	uri: string;
-	name?: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	mimeType?: string;
-	size?: number;
-	annotations?: Record<string, unknown>;
-	digest?: string;
-}
-
-export interface MCPResourceTemplateRef {
-	server: MCPRuntimeServerID;
-	uriTemplate: string;
-	name?: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	mimeType?: string;
-	arguments?: Record<string, MCPArgumentDefinition>;
-	annotations?: Record<string, unknown>;
-	digest?: string;
-}
-
-export interface MCPPromptRef {
-	server: MCPRuntimeServerID;
-	promptName: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	arguments?: Record<string, MCPArgumentDefinition>;
-	digest?: string;
 }
 
 export interface MCPResourceTemplateSelection extends MCPResourceTemplateRef {
@@ -277,15 +146,6 @@ export interface MCPCompletionResult {
 	hasMore?: boolean;
 }
 
-export enum MCPAuthState {
-	NotRequired = 'notRequired',
-	Required = 'required',
-	Authorized = 'authorized',
-	Expired = 'expired',
-	InsufficientScope = 'insufficientScope',
-	Error = 'error',
-}
-
 export interface MCPAuthStatus {
 	server: MCPRuntimeServerID;
 	authMode: MCPHTTPAuthMode;
@@ -301,46 +161,6 @@ export interface MCPOAuthAuthorization {
 	server: MCPRuntimeServerID;
 	authorizationURL: string;
 	expiresAt?: MCPTimestamp;
-}
-
-export interface MCPAuthHealth {
-	server: MCPRuntimeServerID;
-	authMode: MCPHTTPAuthMode;
-	state: MCPAuthHealthState;
-	configured: boolean;
-	resource?: string;
-	scopes?: string[];
-	expiresAt?: MCPTimestamp;
-	authorizationPending?: boolean;
-	authorizationURL?: string;
-	authorizationExpiresAt?: MCPTimestamp;
-	oauthRedirectURL?: string;
-	oauthLoopbackListenAddr?: string;
-	oauthLoopbackReady?: boolean;
-	oauthLoopbackError?: string;
-	lastError?: string;
-}
-
-export interface MCPServerRuntimeSnapshot {
-	server: MCPRuntimeServerID;
-	catalog: MCPRuntimeCatalogID;
-	status: MCPServerStatus;
-	generation: number;
-	negotiatedProtocolVersion?: string;
-	serverInfo?: {
-		name?: string;
-		version?: string;
-	};
-	serverCapabilities?: MCPServerCapabilitiesSummary;
-	instructions?: string;
-	lastError?: string;
-	lastConnectedAt?: string;
-	lastSyncedAt?: string;
-	toolCount: number;
-	resourceCount: number;
-	resourceTemplateCount: number;
-	promptCount: number;
-	snapshotDigest?: string;
 }
 
 export interface MCPCompleteArgumentRequestBody {
@@ -537,16 +357,4 @@ export interface MCPAppReadResourceRequest {
 
 export interface MCPAppResourceReadResult {
 	content: SessionOpaqueJSON;
-}
-
-export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
-	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
-}
-
-export function isMCPExecutionMode(value: unknown): value is MCPExecutionMode {
-	return typeof value === 'string' && Object.values(MCPExecutionMode).includes(value as MCPExecutionMode);
-}
-
-export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
-	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
 }

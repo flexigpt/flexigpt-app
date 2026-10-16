@@ -160,8 +160,7 @@
 		"ignore": [
 			"app/apis/wailsjs/**",
 			"app/lib/**",
-			"app/spec/model.ts",
-			"app/skills/lib/skill_artifact_utils.ts"
+			"app/spec/model.ts"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [

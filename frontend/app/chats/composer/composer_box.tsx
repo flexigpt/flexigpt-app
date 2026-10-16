@@ -14,6 +14,7 @@ import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { skillManagementAPI } from '@/apis/baseapi';
+import { normalizeSkillRefs } from '@/apis/skill_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
@@ -29,7 +30,6 @@ import { ContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useComposerContextState } from '@/chats/composer/contextarea/use_context_state';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { useAgentSystemPrompt } from '@/chats/composer/skills/use_agent_system_prompt';
-import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 
 export interface ComposerBoxHandle {
 	getUIModelOption(): UIModelOption;

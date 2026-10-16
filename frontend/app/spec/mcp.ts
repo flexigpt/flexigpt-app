@@ -1,6 +1,9 @@
 import type { ArtifactRef, ArtifactState, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
 import type { PluginListItem, PluginView } from '@/spec/plugin';
-import type { MCPAuthHealth, MCPRuntimeServerID, MCPServerRuntimeSnapshot } from '@/spec/session_mcp';
+
+export type MCPTimestamp = string;
+export type MCPRuntimeServerID = string;
+type MCPRuntimeCatalogID = string;
 
 export const MCP_SCHEMA_VERSION = 'v1';
 export const MCP_APP_HTML_MIME_TYPE = 'text/html;profile=mcp-app';
@@ -25,11 +28,15 @@ export enum MCPTransportType {
 	Stdio = 'stdio',
 }
 
-export enum MCPHTTPAuthMode {
-	None = 'none',
-	APIKey = 'apiKey',
-	OAuth = 'oauth',
-	ClientCredentials = 'clientCredentials',
+export function getMCPTransportLabel(value: MCPTransportType): string {
+	switch (value) {
+		case MCPTransportType.Stdio:
+			return 'Stdio';
+		case MCPTransportType.StreamableHTTP:
+			return 'Streamable HTTP';
+		default:
+			return String(value);
+	}
 }
 
 export enum MCPInputKind {
@@ -53,15 +60,156 @@ export enum MCPTrustLevel {
 	Trusted = 'trusted',
 }
 
+export function getMCPTrustLevelLabel(value: MCPTrustLevel): string {
+	return value === MCPTrustLevel.Trusted ? 'Trusted' : 'Untrusted';
+}
+
+export enum MCPHTTPAuthMode {
+	None = 'none',
+	APIKey = 'apiKey',
+	OAuth = 'oauth',
+	ClientCredentials = 'clientCredentials',
+}
+
+export function getMCPHTTPAuthModeLabel(value: MCPHTTPAuthMode): string {
+	switch (value) {
+		case MCPHTTPAuthMode.None:
+			return 'None';
+		case MCPHTTPAuthMode.APIKey:
+			return 'API Key';
+		case MCPHTTPAuthMode.OAuth:
+			return 'OAuth';
+		case MCPHTTPAuthMode.ClientCredentials:
+			return 'Client Credentials';
+		default:
+			return String(value);
+	}
+}
+
+export enum MCPAuthState {
+	NotRequired = 'notRequired',
+	Required = 'required',
+	Authorized = 'authorized',
+	Expired = 'expired',
+	InsufficientScope = 'insufficientScope',
+	Error = 'error',
+}
+
+export enum MCPAuthHealthState {
+	NotRequired = 'notRequired',
+	NotConfigured = 'notConfigured',
+	AuthorizationNeeded = 'authorizationNeeded',
+	AuthorizationPending = 'authorizationPending',
+	Authorized = 'authorized',
+	Expired = 'expired',
+	InsufficientScope = 'insufficientScope',
+	Error = 'error',
+}
+
+export function getMCPServerAuthHealthStateLabel(state: MCPAuthHealthState | undefined): string {
+	switch (state) {
+		case MCPAuthHealthState.NotConfigured:
+			return 'Auth: config needed';
+		case MCPAuthHealthState.AuthorizationNeeded:
+			return 'OAuth: required';
+		case MCPAuthHealthState.AuthorizationPending:
+			return 'OAuth: pending';
+		case MCPAuthHealthState.Authorized:
+			return 'OAuth: authorized';
+		case MCPAuthHealthState.Expired:
+			return 'OAuth: expired';
+		case MCPAuthHealthState.InsufficientScope:
+			return 'Auth: insufficient scope';
+		case MCPAuthHealthState.Error:
+			return 'Auth: error';
+		default:
+			return 'Auth: unknown';
+	}
+}
+
 export enum MCPApprovalRule {
 	Ask = 'ask',
 	Allow = 'allow',
 	Deny = 'deny',
 }
 
+export function getMCPApprovalRuleLabel(value: MCPApprovalRule): string {
+	switch (value) {
+		case MCPApprovalRule.Allow:
+			return 'Allow';
+		case MCPApprovalRule.Deny:
+			return 'Deny';
+		default:
+			return 'Ask';
+	}
+}
+
 export enum MCPExecutionMode {
 	Manual = 'manual',
 	Auto = 'auto',
+}
+
+export function getMCPExecutionModeLabel(value: MCPExecutionMode): string {
+	return value === MCPExecutionMode.Auto ? 'Auto' : 'Manual';
+}
+
+export enum MCPServerStatus {
+	Disabled = 'disabled',
+	Disconnected = 'disconnected',
+	Connecting = 'connecting',
+	Ready = 'ready',
+	Error = 'error',
+}
+
+export function getMCPStatusLabel(value: MCPServerStatus): string {
+	switch (value) {
+		case MCPServerStatus.Disabled:
+			return 'Disabled';
+		case MCPServerStatus.Disconnected:
+			return 'Disconnected';
+		case MCPServerStatus.Connecting:
+			return 'Connecting';
+		case MCPServerStatus.Ready:
+			return 'Ready';
+		case MCPServerStatus.Error:
+			return 'Error';
+		default:
+			return 'Unknown';
+	}
+}
+
+export enum MCPToolRisk {
+	Unknown = 'unknown',
+	Read = 'read',
+	Write = 'write',
+	Destructive = 'destructive',
+	OpenWorld = 'openWorld',
+}
+
+export function getMCPToolRiskLabel(value: MCPToolRisk): string {
+	switch (value) {
+		case MCPToolRisk.Read:
+			return 'Read';
+		case MCPToolRisk.Write:
+			return 'Write';
+		case MCPToolRisk.Destructive:
+			return 'Destructive';
+		case MCPToolRisk.OpenWorld:
+			return 'Open World';
+		default:
+			return 'Unknown';
+	}
+}
+
+export enum MCPAppVisibility {
+	Model = 'model',
+	App = 'app',
+}
+
+export enum MCPTaskSupport {
+	Forbidden = 'forbidden',
+	Optional = 'optional',
+	Required = 'required',
 }
 
 interface MCPServerPolicy {
@@ -268,10 +416,59 @@ interface MCPEffectivePolicy {
 	digest: string;
 }
 
-/**
- * Management aggregate result. Runtime observations are typed in
- * session_mcp.ts because they are process-local Session/MCP runtime state.
- */
+export interface MCPAuthHealth {
+	server: MCPRuntimeServerID;
+	authMode: MCPHTTPAuthMode;
+	state: MCPAuthHealthState;
+	configured: boolean;
+	resource?: string;
+	scopes?: string[];
+	expiresAt?: MCPTimestamp;
+	authorizationPending?: boolean;
+	authorizationURL?: string;
+	authorizationExpiresAt?: MCPTimestamp;
+	oauthRedirectURL?: string;
+	oauthLoopbackListenAddr?: string;
+	oauthLoopbackReady?: boolean;
+	oauthLoopbackError?: string;
+	lastError?: string;
+}
+
+interface MCPServerCapabilitiesSummary {
+	tools?: boolean;
+	toolsListChanged?: boolean;
+	resources?: boolean;
+	resourcesSubscribe?: boolean;
+	resourcesListChanged?: boolean;
+	prompts?: boolean;
+	promptsListChanged?: boolean;
+	completions?: boolean;
+	experimental?: Record<string, unknown>;
+	extensions?: Record<string, unknown>;
+}
+
+export interface MCPServerRuntimeSnapshot {
+	server: MCPRuntimeServerID;
+	catalog: MCPRuntimeCatalogID;
+	status: MCPServerStatus;
+	generation: number;
+	negotiatedProtocolVersion?: string;
+	serverInfo?: {
+		name?: string;
+		version?: string;
+	};
+	serverCapabilities?: MCPServerCapabilitiesSummary;
+	instructions?: string;
+	lastError?: string;
+	lastConnectedAt?: string;
+	lastSyncedAt?: string;
+	toolCount: number;
+	resourceCount: number;
+	resourceTemplateCount: number;
+	promptCount: number;
+	snapshotDigest?: string;
+}
+
 export interface MCPServerDetails {
 	settings: MCPServerInstallationView;
 	policy: MCPEffectivePolicy;
@@ -324,17 +521,6 @@ export interface MCPPolicyListItem {
 	definitionDigest?: string;
 	builtIn: boolean;
 }
-
-/**
- * UI-facing management projection over one Plugin-backed MCP Server.
- *
- * Durable Server settings remain in this module. Process-local runtime fields
- * are imported from session_mcp.ts.
- */
-
-/**
- * UI-facing projection over a Plugin-backed MCP grouping.
- */
 export interface MCPPluginView {
 	plugin: PluginListItem;
 	ref: ArtifactRef;
@@ -445,4 +631,134 @@ export interface MCPServerDraft {
 	defaultPolicy: MCPPolicy['defaultPolicy'];
 	toolPolicies: Record<string, MCPToolPolicyOverride>;
 	appsPolicy: MCPAppsPolicy;
+}
+
+interface MCPToolAnnotations {
+	destructiveHint?: boolean;
+	idempotentHint: boolean;
+	openWorldHint?: boolean;
+	readOnlyHint: boolean;
+	title?: string;
+}
+
+interface MCPToolAppInfo {
+	resourceUri?: string;
+	visibility?: MCPAppVisibility[];
+}
+
+export interface MCPToolCapability {
+	server: MCPRuntimeServerID;
+	toolName: string;
+	providerToolName: string;
+	choiceID: string;
+
+	title?: string;
+	displayName: string;
+	description?: string;
+
+	inputSchema?: Record<string, unknown>;
+	outputSchema?: Record<string, unknown>;
+
+	annotations?: MCPToolAnnotations;
+	inferredRisk: MCPToolRisk;
+	approvalRule: MCPApprovalRule;
+	executionMode: MCPExecutionMode;
+	taskSupport: MCPTaskSupport;
+	app?: MCPToolAppInfo;
+
+	digest: string;
+	enabled: boolean;
+	stale?: boolean;
+}
+
+export interface MCPResourceRef {
+	server: MCPRuntimeServerID;
+	uri: string;
+	name?: string;
+	title?: string;
+	displayName: string;
+	description?: string;
+	mimeType?: string;
+	size?: number;
+	annotations?: Record<string, unknown>;
+	digest?: string;
+}
+
+export interface MCPArgumentDefinition {
+	name: string;
+	title?: string;
+	description?: string;
+	required?: boolean;
+}
+
+export interface MCPResourceTemplateRef {
+	server: MCPRuntimeServerID;
+	uriTemplate: string;
+	name?: string;
+	title?: string;
+	displayName: string;
+	description?: string;
+	mimeType?: string;
+	arguments?: Record<string, MCPArgumentDefinition>;
+	annotations?: Record<string, unknown>;
+	digest?: string;
+}
+
+export interface MCPPromptRef {
+	server: MCPRuntimeServerID;
+	promptName: string;
+	title?: string;
+	displayName: string;
+	description?: string;
+	arguments?: Record<string, MCPArgumentDefinition>;
+	digest?: string;
+}
+
+const STATUS_BADGE_LAYOUT = 'h-auto max-w-full whitespace-normal break-words px-2 py-1 text-center leading-tight';
+
+export function getMCPStatusBadgeClass(value: MCPServerStatus): string {
+	switch (value) {
+		case MCPServerStatus.Ready:
+			return `${STATUS_BADGE_LAYOUT} badge-success`;
+		case MCPServerStatus.Connecting:
+			return `${STATUS_BADGE_LAYOUT} badge-info`;
+		case MCPServerStatus.Error:
+			return `${STATUS_BADGE_LAYOUT} badge-error`;
+		case MCPServerStatus.Disabled:
+			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
+		default:
+			return `${STATUS_BADGE_LAYOUT} badge-warning`;
+	}
+}
+
+export function getMCPServerAuthHealthStateBadgeClass(state: MCPAuthHealthState | undefined): string {
+	switch (state) {
+		case MCPAuthHealthState.NotRequired:
+			return `${STATUS_BADGE_LAYOUT} badge-ghost`;
+		case MCPAuthHealthState.Authorized:
+			return `${STATUS_BADGE_LAYOUT} badge-success`;
+		case MCPAuthHealthState.AuthorizationPending:
+			return `${STATUS_BADGE_LAYOUT} badge-info`;
+		case MCPAuthHealthState.AuthorizationNeeded:
+		case MCPAuthHealthState.NotConfigured:
+		case MCPAuthHealthState.Expired:
+			return `${STATUS_BADGE_LAYOUT} badge-warning`;
+		case MCPAuthHealthState.Error:
+		case MCPAuthHealthState.InsufficientScope:
+			return `${STATUS_BADGE_LAYOUT} badge-error`;
+		default:
+			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
+	}
+}
+
+export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
+	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
+}
+
+export function isMCPExecutionMode(value: unknown): value is MCPExecutionMode {
+	return typeof value === 'string' && Object.values(MCPExecutionMode).includes(value as MCPExecutionMode);
+}
+
+export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
+	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
 }

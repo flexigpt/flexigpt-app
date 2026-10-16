@@ -5,10 +5,10 @@ import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { ToolImplType } from '@/spec/tool';
 
+import { isSkillsToolName } from '@/apis/skill_management';
 import { getPrettyToolName } from '@/apis/tool_management';
 
 import { isRunnableComposerToolCall } from '@/chats/composer/tools/lib/tool_call_utils';
-import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 
 type OrderedToolChipItem =
 	{ key: string; kind: 'call'; call: UIToolCall } | { key: string; kind: 'output'; output: UIToolOutput };

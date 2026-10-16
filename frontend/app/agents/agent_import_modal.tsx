@@ -16,7 +16,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { formatDateish, getAgentRelationshipBadgeClass } from '@/agents/lib/agent_management_utils';
+import { formatDateish, getAgentRelationshipBadgeClass } from '@/agents/agent_management_utils';
 
 interface AgentImportModalProps {
 	isOpen: boolean;

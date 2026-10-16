@@ -17,9 +17,8 @@ import { ToolImplType, ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { redactInternalPresentationFields } from '@/lib/user_facing_presentation';
 
+import { isSkillsToolName } from '@/apis/skill_management';
 import { getPrettyToolName } from '@/apis/tool_management';
-
-import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 
 export function getDebugDetailsMarkdown(
 	debugObj?: unknown,

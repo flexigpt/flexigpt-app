@@ -1,6 +1,6 @@
 import type { Attachment } from '@/spec/attachment';
 import type { InputUnion, OutputUnion, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
+import type { MCPApprovalRule, MCPAppVisibility, MCPExecutionMode, MCPRuntimeServerID } from '@/spec/mcp';
 import type {
 	Conversation,
 	ConversationMessage,
@@ -17,11 +17,9 @@ import type {
 	MCPAppContextUpdate,
 	MCPAppInstance,
 	MCPAppRenderTarget,
-	MCPAppVisibility,
 	MCPContent,
 	MCPContentType,
 	MCPConversationContext,
-	MCPRuntimeServerID,
 	MCPToolSelection,
 } from '@/spec/session_mcp';
 import type {
@@ -33,6 +31,7 @@ import type {
 } from '@/spec/workspace';
 import { AttachmentKind } from '@/spec/attachment';
 import { RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import {
 	SessionAttachmentReferenceKind,
 	SessionConfigurationOwner,
@@ -44,7 +43,7 @@ import {
 	SessionToolCallState,
 	SessionToolResultKind,
 } from '@/spec/session_base';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode, MCPToolExposure } from '@/spec/session_mcp';
+import { MCPToolExposure } from '@/spec/session_mcp';
 import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 import {
 	WorkspaceConversationContextUsageStatus,

@@ -1,7 +1,7 @@
 import type { UIToolCall } from '@/spec/inference';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
-import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
+import { isSkillsToolName } from '@/apis/skill_management';
 
 export function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
 	if (toolCall.mcpToolSelection) {

@@ -8,13 +8,14 @@ import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import { skillRefKey } from '@/apis/skill_management';
+
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
-import { skillRefKey } from '@/skills/lib/skill_identity_utils';
 import { WorkspaceMCPSetupModal } from '@/workspaces/workspace_mcp_setup_modal';
 
 interface WorkspaceSelectionModalProps {

@@ -14,15 +14,28 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import type { MCPPluginView, MCPServerDraft, MCPServerView, MCPSetupSubmissionValue } from '@/spec/mcp';
-import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/session_mcp';
-import { MCPAuthHealthState, MCPServerStatus } from '@/spec/session_mcp';
+import type {
+	MCPAuthHealth,
+	MCPPluginView,
+	MCPServerDraft,
+	MCPServerRuntimeSnapshot,
+	MCPServerView,
+	MCPSetupSubmissionValue,
+} from '@/spec/mcp';
+import { getMCPStatusBadgeClass, getMCPStatusLabel, MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
-import { getMCPServerSetupStatus, isServerOperational, serverDisplayName } from '@/apis/mcp_management';
+import {
+	getEffectiveMCPServerStatus,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
+	getMCPServerSetupStatus,
+	isServerOperational,
+	serverDisplayName,
+} from '@/apis/mcp_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -34,13 +47,6 @@ import { ManagementPluginCard } from '@/components/managementui/management_plugi
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
-import {
-	getEffectiveMCPServerStatus,
-	getMCPServerAuthHealthBadgeClass,
-	getMCPServerAuthHealthLabel,
-	getMCPStatusBadgeClass,
-	getMCPStatusLabel,
-} from '@/mcpservers/lib/mcp_server_utils';
 import { MCPPluginDetailsModal } from '@/mcpservers/mcp_plugin_details_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';

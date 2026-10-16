@@ -11,7 +11,7 @@ import { ToolStoreChoiceType } from '@/spec/tool';
 import { generateTitle } from '@/lib/title_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
+import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/apis/skill_management';
 
 export function initConversation(title = 'New Conversation'): Conversation {
 	return {

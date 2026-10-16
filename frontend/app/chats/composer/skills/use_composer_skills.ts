@@ -14,13 +14,7 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
-
-import {
-	areSkillRefListsEqual,
-	clampActiveSkillRefsToEnabled,
-	normalizeSkillRefs,
-	skillRefKey,
-} from '@/skills/lib/skill_identity_utils';
+import { clampActiveSkillRefsToEnabled, normalizeSkillRefs, skillRefKey } from '@/apis/skill_management';
 
 interface ApplySkillSelectionStateOptions {
 	syncSession?: SkillSessionSyncMode;
@@ -67,6 +61,22 @@ interface UseComposerSkillsResult {
 	getCurrentActiveSkillSelections: () => SessionArtifactSelection[];
 	getCurrentInstalledActiveSkillSelections: () => SessionArtifactSelection[];
 }
+
+const areSkillRefListsEqual = (a: SkillRef[] | null | undefined, b: SkillRef[] | null | undefined): boolean => {
+	const left = normalizeSkillRefs(a);
+	const right = normalizeSkillRefs(b);
+
+	if (left.length !== right.length) {
+		return false;
+	}
+
+	for (let i = 0; i < left.length; i += 1) {
+		if (skillRefKey(left[i]) !== skillRefKey(right[i])) {
+			return false;
+		}
+	}
+	return true;
+};
 
 function catalogItemRef(item: ComposerSkillCatalogItem): SkillRef {
 	return {

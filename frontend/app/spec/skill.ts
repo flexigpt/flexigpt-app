@@ -1,6 +1,4 @@
 import type {
-	ArtifactAdoptionMode,
-	ArtifactDiagnostic,
 	ArtifactDigest,
 	ArtifactRef,
 	ArtifactRootID,
@@ -90,70 +88,6 @@ interface RuntimeSkillDefinition {
 	name: string;
 	location: string;
 }
-
-/**
- * Management-only projection over Artifact Store Skill entities.
- *
- * Durable identity remains `ArtifactRef` and `ArtifactPluginRef`. These views
- * exist so management components do not need to duplicate joins between
- * Plugin, Artifact, and runtime metadata.
- */
-enum SkillType {
-	FS = 'fs',
-	EmbeddedFS = 'embeddedfs',
-}
-
-enum SkillPresenceStatus {
-	Present = 'present',
-	Missing = 'missing',
-	Error = 'error',
-	Unknown = 'unknown',
-}
-
-interface SkillPresence {
-	status: SkillPresenceStatus;
-	lastCheckedAt?: string;
-	lastSeenAt?: string;
-	missingSince?: string;
-	lastCheckError?: string;
-}
-
-export interface Skill {
-	schemaVersion: string;
-	id: string;
-	ref: ArtifactRef;
-	revision: number;
-	slug: string;
-	name: string;
-	displayName?: string;
-	description?: string;
-	type: SkillType;
-	location: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	resources: SkillResourceInfo;
-	digest?: ArtifactDigest;
-	rawFrontmatter?: Record<string, unknown>;
-	runtimeWarnings?: string[];
-	runtimeError?: string;
-	presence?: SkillPresence;
-	isEnabled: boolean;
-	isBuiltIn: boolean;
-	isManaged: boolean;
-	adoption: ArtifactAdoptionMode;
-	state: ArtifactState;
-	diagnostics?: ArtifactDiagnostic[];
-	createdAt?: string;
-	modifiedAt?: string;
-}
-
-/**
- * Frontend management projection over one backend Plugin.
- *
- * The retained "Plugin" wording is UI-only. Durable backend identity is an
- * ArtifactRef for a Plugin, never an ArtifactPluginRef.
- */
 
 export interface ManagedSkillCreateRequest {
 	plugin: ArtifactRef;

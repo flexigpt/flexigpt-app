@@ -10,10 +10,10 @@ import { SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 
+import { skillRefKey } from '@/apis/skill_management';
+
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import { buildEffectiveSystemPrompt } from '@/chats/composer/skills/prompt_utils';
-import { normalizeSkillSourceTags } from '@/skills/lib/skill_artifact_utils';
-import { skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 interface RenderedInstructionSkillSource {
 	identityKey?: string;
@@ -64,6 +64,19 @@ function previousConversationPrompt(prompt: string): SystemInstructionSource {
 		text: prompt,
 		isBuiltIn: true,
 	};
+}
+
+function normalizeSkillSourceTags(sourceTags?: string[] | null): string[] {
+	const seen = new Set<string>();
+
+	for (const sourceTag of sourceTags ?? []) {
+		const value = sourceTag.trim();
+		if (value) {
+			seen.add(value);
+		}
+	}
+
+	return [...seen];
 }
 
 function instructionSkillSource(source: RenderedInstructionSkillSource): SystemInstructionSource {

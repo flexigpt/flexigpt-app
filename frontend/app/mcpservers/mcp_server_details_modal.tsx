@@ -2,22 +2,38 @@ import type { ReactNode } from 'react';
 import { useCallback } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { MCPPluginView, MCPServerView } from '@/spec/mcp';
 import type {
 	MCPAuthHealth,
+	MCPPluginView,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPServerRuntimeSnapshot,
+	MCPServerView,
 	MCPToolCapability,
-} from '@/spec/session_mcp';
-import { MCPServerType } from '@/spec/mcp';
-import { MCPToolRisk } from '@/spec/session_mcp';
+} from '@/spec/mcp';
+import {
+	getMCPApprovalRuleLabel,
+	getMCPExecutionModeLabel,
+	getMCPHTTPAuthModeLabel,
+	getMCPStatusBadgeClass,
+	getMCPStatusLabel,
+	getMCPToolRiskLabel,
+	getMCPTrustLevelLabel,
+	MCPServerType,
+	MCPToolRisk,
+} from '@/spec/mcp';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
-import { getAuthMode, requireMCPRuntimeServerID } from '@/apis/mcp_management';
+import {
+	getAuthMode,
+	getEffectiveMCPServerStatus,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
+	requireMCPRuntimeServerID,
+} from '@/apis/mcp_management';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
@@ -27,19 +43,6 @@ import { ManagementItemCard } from '@/components/managementui/management_item_ca
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
-
-import {
-	getEffectiveMCPServerStatus,
-	getMCPApprovalRuleLabel,
-	getMCPExecutionModeLabel,
-	getMCPHTTPAuthModeLabel,
-	getMCPServerAuthHealthBadgeClass,
-	getMCPServerAuthHealthLabel,
-	getMCPStatusBadgeClass,
-	getMCPStatusLabel,
-	getMCPToolRiskLabel,
-	getMCPTrustLevelLabel,
-} from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPServerDetailsModalProps {
 	isOpen: boolean;

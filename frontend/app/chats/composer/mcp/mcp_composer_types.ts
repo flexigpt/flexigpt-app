@@ -1,16 +1,20 @@
-import type { MCPPluginView, MCPServerView, MCPTransportType } from '@/spec/mcp';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
-	MCPConversationContext,
+	MCPPluginView,
 	MCPPromptRef,
-	MCPPromptSelection,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
+	MCPServerView,
 	MCPToolCapability,
+	MCPTransportType,
+} from '@/spec/mcp';
+import type {
+	MCPConversationContext,
+	MCPPromptSelection,
+	MCPResourceTemplateSelection,
 	MCPToolSelection,
 } from '@/spec/session_mcp';
 import { MCPToolExposure } from '@/spec/session_mcp';

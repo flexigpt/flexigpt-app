@@ -37,12 +37,18 @@ import type {
 	MCPPluginPage,
 	MCPPolicyListItem,
 	MCPPolicyView,
+	MCPPromptRef,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerListItem,
 	MCPServerPage,
+	MCPServerRuntimeSnapshot,
 	MCPServerSecretsView,
 	MCPSettings,
+	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
 	ManagedModelCreateRequest,
@@ -113,14 +119,8 @@ import type {
 	MCPCompletionResult,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
-	MCPPromptRef,
 	MCPReadResourceResponseBody,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
-	MCPRuntimeServerID,
 	MCPServerRuntimeDetails,
-	MCPServerRuntimeSnapshot,
-	MCPToolCapability,
 } from '@/spec/session_mcp';
 import type {
 	SessionStoreConversationProjection,

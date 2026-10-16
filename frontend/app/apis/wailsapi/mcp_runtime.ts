@@ -1,18 +1,26 @@
 import type {
-	MCPCompleteArgumentRequestBody,
-	MCPCompletionResult,
-	MCPDiscoveryPage,
-	MCPGetPromptResponseBody,
 	MCPPromptRef,
-	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
+} from '@/spec/mcp';
+import type {
+	MCPCompleteArgumentRequestBody,
+	MCPCompletionResult,
+	MCPDiscoveryPage,
+	MCPGetPromptResponseBody,
+	MCPReadResourceResponseBody,
 } from '@/spec/session_mcp';
-import { MCPApprovalRule, MCPExecutionMode } from '@/spec/mcp';
-import { MCPAppVisibility, MCPServerStatus, MCPTaskSupport, MCPToolRisk } from '@/spec/session_mcp';
+import {
+	MCPApprovalRule,
+	MCPAppVisibility,
+	MCPExecutionMode,
+	MCPServerStatus,
+	MCPTaskSupport,
+	MCPToolRisk,
+} from '@/spec/mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
 import {

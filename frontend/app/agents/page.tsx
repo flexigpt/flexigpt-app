@@ -63,7 +63,7 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
-import { formatDateish, textToBase64 } from '@/agents/lib/agent_management_utils';
+import { formatDateish, textToBase64 } from '@/agents/agent_management_utils';
 
 const AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 

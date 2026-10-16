@@ -2,16 +2,22 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type {
 	MCPAuthenticationDeclaration,
+	MCPAuthHealth,
 	MCPAuthSettings,
 	MCPHTTPSecretDraft,
 	MCPPluginView,
 	MCPPolicy,
+	MCPPromptRef,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
 	MCPServerData,
 	MCPServerDetails,
 	MCPServerDocument,
 	MCPServerDraft,
 	MCPServerInstallationDataView,
 	MCPServerListItem,
+	MCPServerRuntimeSnapshot,
 	MCPServerSetupView,
 	MCPServerView,
 	MCPSettings,
@@ -19,6 +25,7 @@ import type {
 	MCPSetupSecretTarget,
 	MCPSetupSubmissionValue,
 	MCPStdioSecretDraft,
+	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
 	AddPluginArtifactMemberRequest,
@@ -30,36 +37,34 @@ import type {
 	UpdatePluginRequest,
 } from '@/spec/plugin';
 import type {
-	MCPAuthHealth,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
-	MCPPromptRef,
 	MCPReadResourceResponseBody,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
-	MCPRuntimeServerID,
 	MCPRuntimeServerView,
 	MCPServerRuntimeDetails,
-	MCPServerRuntimeSnapshot,
-	MCPToolCapability,
 } from '@/spec/session_mcp';
 import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import {
+	getMCPServerAuthHealthStateBadgeClass,
+	getMCPServerAuthHealthStateLabel,
 	MCP_SCHEMA_VERSION,
 	MCPApprovalRule,
+	MCPAppVisibility,
+	MCPAuthHealthState,
+	MCPAuthState,
 	MCPExecutionMode,
 	MCPHTTPAuthMode,
 	MCPInputKind,
 	MCPSecretKind,
+	MCPServerStatus,
 	MCPServerType,
 	MCPTransportType,
 	MCPTrustLevel,
 } from '@/spec/mcp';
 import { pluginListItemFromPluginView } from '@/spec/plugin';
-import { MCPAuthHealthState, MCPAuthState } from '@/spec/session_mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -464,6 +469,16 @@ function buildServerDocument(
 	};
 }
 
+export function isMCPToolVisibleToModel(tool: Pick<MCPToolCapability, 'app'>): boolean {
+	const visibility = tool.app?.visibility;
+
+	if (!visibility || visibility.length === 0) {
+		return true;
+	}
+
+	return visibility.includes(MCPAppVisibility.Model);
+}
+
 export function serverDisplayName(server: MCPServerView): string {
 	return server.document?.displayName || server.artifact.displayName || server.logicalName;
 }
@@ -483,6 +498,37 @@ export function getServerAuthHealthState(
 		return MCPAuthHealthState.NotRequired;
 	}
 	return health?.state;
+}
+
+export function getEffectiveMCPServerStatus(server: MCPServerView, runtimeStatus?: MCPServerStatus): MCPServerStatus {
+	if (!server.enabled) {
+		return MCPServerStatus.Disabled;
+	}
+
+	return runtimeStatus ?? MCPServerStatus.Disconnected;
+}
+
+export function getMCPServerAuthHealthBadgeClass(server: MCPServerView, authHealth?: MCPAuthHealth): string {
+	const state = getServerAuthHealthState(server, authHealth);
+	return getMCPServerAuthHealthStateBadgeClass(state);
+}
+
+export function getMCPServerAuthHealthLabel(server: MCPServerView, authHealth?: MCPAuthHealth): string {
+	const authMode = getAuthMode(server);
+	const state = getServerAuthHealthState(server, authHealth);
+
+	if (authMode === MCPHTTPAuthMode.None) {
+		return 'Auth: not required';
+	}
+
+	if (
+		(authMode === MCPHTTPAuthMode.APIKey || authMode === MCPHTTPAuthMode.ClientCredentials) &&
+		authHealth?.configured
+	) {
+		return state === MCPAuthHealthState.Error ? 'Auth: error' : 'Auth: configured';
+	}
+
+	return getMCPServerAuthHealthStateLabel(state);
 }
 
 export function isServerOperational(server: MCPServerView): boolean {

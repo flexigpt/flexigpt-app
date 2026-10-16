@@ -7,13 +7,9 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { MCPRuntimeServerID } from '@/spec/mcp';
 import type { SessionConfiguration } from '@/spec/session';
-import type {
-	MCPAppModelContextUpdate,
-	MCPConversationContext,
-	MCPRuntimeServerID,
-	MCPToolSelection,
-} from '@/spec/session_mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
@@ -27,6 +23,7 @@ import { formatShortcut } from '@/lib/keyboard_shortcuts';
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 import { useTools } from '@/hooks/use_tool';
 
+import { normalizeSkillRefs } from '@/apis/skill_management';
 import { toolIdentityKey } from '@/apis/tool_management';
 
 import { HoverTip } from '@/components/hover_tip';
@@ -73,7 +70,6 @@ import {
 	hydrateSessionMCPOverrides,
 	hydrateSessionToolOverrides,
 } from '@/chats/session/session_composer_restore';
-import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 
 interface SkillStateApplyOptions {
 	syncSession?: SkillSessionSyncMode;

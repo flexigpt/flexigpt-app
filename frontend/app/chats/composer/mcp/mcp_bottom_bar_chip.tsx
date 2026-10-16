@@ -17,19 +17,36 @@ import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
 import type {
+	MCPAuthHealth,
 	MCPPromptRef,
-	MCPPromptSelection,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
+	MCPServerView,
 	MCPToolCapability,
-} from '@/spec/session_mcp';
-import { MCPHTTPAuthMode } from '@/spec/mcp';
-import { MCPAuthHealthState, MCPCompletionRefType, MCPServerStatus, MCPToolExposure } from '@/spec/session_mcp';
+} from '@/spec/mcp';
+import type { MCPPromptSelection, MCPResourceTemplateSelection } from '@/spec/session_mcp';
+import {
+	getMCPStatusBadgeClass,
+	getMCPStatusLabel,
+	getMCPTransportLabel,
+	MCPAuthHealthState,
+	MCPHTTPAuthMode,
+	MCPServerStatus,
+} from '@/spec/mcp';
+import { MCPCompletionRefType, MCPToolExposure } from '@/spec/session_mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
-import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/apis/mcp_management';
+import {
+	getAuthMode,
+	getEffectiveMCPServerStatus,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
+	getMCPServerSetupStatus,
+	getServerAuthHealthState,
+	isMCPToolVisibleToModel,
+	isServerOperational,
+} from '@/apis/mcp_management';
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
@@ -56,18 +73,6 @@ import {
 	normalizeMCPArgumentDefinitions,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
-import {
-	getEffectiveMCPServerStatus,
-	getMCPServerAuthHealthBadgeClass,
-	getMCPServerAuthHealthLabel,
-	getMCPStatusBadgeClass,
-	getMCPStatusLabel,
-	getMCPTransportLabel,
-	isMCPAuthActionable,
-	isMCPServerConfiguredForUse,
-	isMCPServerConnectionPending,
-	isMCPToolVisibleToModel,
-} from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 
 function stop(e: MouseEvent) {
@@ -77,6 +82,38 @@ function stop(e: MouseEvent) {
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
 	return option.plugin.enabled && option.server.enabled && isServerOperational(option.server);
+}
+
+function isMCPAuthActionable(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
+	if (getAuthMode(server) !== MCPHTTPAuthMode.OAuth) {
+		return false;
+	}
+
+	if (!authHealth?.authorizationURL?.trim()) {
+		return false;
+	}
+
+	return authHealth.state !== MCPAuthHealthState.Authorized && authHealth.state !== MCPAuthHealthState.NotRequired;
+}
+
+function isMCPServerConfiguredForUse(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
+	const setup = getMCPServerSetupStatus(server);
+
+	if (!setup.complete) {
+		return false;
+	}
+
+	const authMode = getAuthMode(server);
+
+	if (authMode === MCPHTTPAuthMode.None) {
+		return true;
+	}
+
+	if (authMode === MCPHTTPAuthMode.APIKey || authMode === MCPHTTPAuthMode.ClientCredentials) {
+		return authHealth?.configured === true;
+	}
+
+	return getServerAuthHealthState(server, authHealth) !== MCPAuthHealthState.NotConfigured;
 }
 
 function isConfiguredOrConnectionPendingMCPOption(option: MCPComposerServerOption) {
@@ -97,6 +134,18 @@ function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
 
 function oauthDismissKey(option: MCPComposerServerOption): string {
 	return `${option.runtimeServerID}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
+}
+
+function isMCPServerConnectionPending(
+	server: MCPServerView,
+	runtimeStatus?: MCPServerStatus,
+	authHealth?: MCPAuthHealth
+): boolean {
+	return (
+		runtimeStatus === MCPServerStatus.Connecting ||
+		authHealth?.authorizationPending === true ||
+		getServerAuthHealthState(server, authHealth) === MCPAuthHealthState.AuthorizationPending
+	);
 }
 
 function CheckboxRow({

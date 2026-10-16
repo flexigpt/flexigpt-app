@@ -3,7 +3,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { MCPPluginView, MCPServerDraft, MCPServerView, MCPStdioSecretDraft } from '@/spec/mcp';
-import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
+import {
+	getMCPApprovalRuleLabel,
+	getMCPExecutionModeLabel,
+	getMCPHTTPAuthModeLabel,
+	getMCPTransportLabel,
+	getMCPTrustLevelLabel,
+	MCPApprovalRule,
+	MCPExecutionMode,
+	MCPHTTPAuthMode,
+	MCPTransportType,
+	MCPTrustLevel,
+} from '@/spec/mcp';
 
 import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { validateSlug } from '@/lib/text_utils';
@@ -20,14 +31,6 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
-
-import {
-	getMCPApprovalRuleLabel,
-	getMCPExecutionModeLabel,
-	getMCPHTTPAuthModeLabel,
-	getMCPTransportLabel,
-	getMCPTrustLevelLabel,
-} from '@/mcpservers/lib/mcp_server_utils';
 
 interface AddEditMCPServerModalProps {
 	isOpen: boolean;

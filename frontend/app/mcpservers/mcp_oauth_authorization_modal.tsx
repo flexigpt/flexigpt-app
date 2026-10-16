@@ -1,18 +1,17 @@
 import { useState } from 'react';
 import { FiAlertCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 
-import type { MCPServerView } from '@/spec/mcp';
-import type { MCPAuthHealth } from '@/spec/session_mcp';
-import { MCPAuthHealthState } from '@/spec/session_mcp';
+import type { MCPAuthHealth, MCPServerView } from '@/spec/mcp';
+import { MCPAuthHealthState } from '@/spec/mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
+
+import { getMCPServerAuthHealthBadgeClass, getMCPServerAuthHealthLabel } from '@/apis/mcp_management';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
-
-import { getMCPServerAuthHealthBadgeClass, getMCPServerAuthHealthLabel } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPOAuthAuthorizationModalProps {
 	isOpen: boolean;

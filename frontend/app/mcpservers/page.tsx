@@ -2,10 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPPluginView, MCPServerDraft, MCPServerView, MCPSettings, MCPSetupSubmissionValue } from '@/spec/mcp';
-import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/session_mcp';
-import { MCPHTTPAuthMode } from '@/spec/mcp';
-import { MCPAuthHealthState, MCPServerStatus } from '@/spec/session_mcp';
+import type {
+	MCPAuthHealth,
+	MCPPluginView,
+	MCPServerDraft,
+	MCPServerRuntimeSnapshot,
+	MCPServerView,
+	MCPSettings,
+	MCPSetupSubmissionValue,
+} from '@/spec/mcp';
+import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';

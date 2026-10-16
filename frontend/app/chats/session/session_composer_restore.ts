@@ -1,12 +1,10 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
+import type { MCPPromptRef, MCPResourceRef, MCPResourceTemplateRef } from '@/spec/mcp';
 import type { SessionActiveSkillOverride, SessionArtifactOverride, SessionToolOverride } from '@/spec/session';
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type {
 	MCPConversationContext,
-	MCPPromptRef,
 	MCPPromptSelection,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
 	MCPServerOverride,
 	MCPServerSelection,

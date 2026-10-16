@@ -45,7 +45,6 @@ import {
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
-import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
 
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
@@ -505,7 +504,7 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 }
 
 function formatSkillRefForChip(ref: SkillRef): string {
-	return formatSkillRef(ref);
+	return `${ref.rootID}/${ref.artifactID}`;
 }
 
 function MessageSkillsContextChip({
