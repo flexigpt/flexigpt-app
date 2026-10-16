@@ -13,6 +13,7 @@ export interface ChatTabState {
 
 	sessionID?: SessionID;
 	activeRunID?: RunID;
+	pendingRunID?: RunID;
 	sessionSnapshot?: SessionSnapshot;
 	runtimeError?: string;
 

@@ -310,6 +310,7 @@ type AppContextContent struct {
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	MIMEType    string `json:"mimeType,omitempty"`
+	Data        []byte `json:"data,omitempty"`
 }
 
 type AppContextUpdate struct {

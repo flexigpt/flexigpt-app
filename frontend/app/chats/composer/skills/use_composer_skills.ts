@@ -64,6 +64,7 @@ interface UseComposerSkillsResult {
 	getCurrentInstalledEnabledSkillRefs: () => SkillRef[];
 	getCurrentInstalledActiveSkillRefs: () => SkillRef[];
 	getCurrentInstalledEnabledSkillSelections: () => SessionArtifactSelection[];
+	getCurrentActiveSkillSelections: () => SessionArtifactSelection[];
 	getCurrentInstalledActiveSkillSelections: () => SessionArtifactSelection[];
 }
 
@@ -375,6 +376,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		getCurrentInstalledActiveSkillRefs,
 		getCurrentInstalledEnabledSkillSelections: () =>
 			getCurrentInstalledEnabledSkillRefs().map(r => {
+				return selectionForRef(r);
+			}),
+		getCurrentActiveSkillSelections: () =>
+			getCurrentActiveSkillRefs().map(r => {
 				return selectionForRef(r);
 			}),
 		getCurrentInstalledActiveSkillSelections: () =>

@@ -237,7 +237,7 @@ export interface WorkspaceConversationSelection {
 	mcpRefs?: WorkspaceConversationResourceSelectionRef[];
 }
 
-interface WorkspaceConversationContextUsage {
+export interface WorkspaceConversationContextUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	locator?: ArtifactLocator;
@@ -252,7 +252,7 @@ interface WorkspaceConversationContextUsage {
 	diagnostics?: ArtifactDiagnostic[];
 }
 
-interface WorkspaceConversationSkillUsage {
+export interface WorkspaceConversationSkillUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	displayName?: string;

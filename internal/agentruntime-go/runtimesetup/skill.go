@@ -149,27 +149,6 @@ func (c *coordinator) prepareSkills(
 			}
 		}
 
-		if activeSelected {
-			if err := requireSelectionPin(activeSelection, used); err != nil {
-				selected := activeSelection
-				summary.Skills = append(
-					summary.Skills,
-					sessionRuntime.ResolutionItem{
-						Key:      key,
-						Kind:     resolutionItemKindSkill,
-						Owner:    sessionRuntime.ConfigurationOwnerSession,
-						State:    sessionRuntime.ResolutionStateStale,
-						Selected: &selected,
-						Used:     used,
-						Reason:   err.Error(),
-					},
-				)
-				return preparedSkills{}, nil, nil, nil, operationPreparationError(
-					"active_skill_selection_stale", err.Error(), *summary, err,
-				)
-			}
-		}
-
 		if !value.Enabled {
 			item.State = sessionRuntime.ResolutionStateUnavailable
 			item.Used = used

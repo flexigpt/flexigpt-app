@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import type { SessionOpaqueJSON, SessionWaitingRequest } from '@/spec/session_base';
-import { SessionWaitResolution, SessionWaitStatus } from '@/spec/session_base';
+import { SessionWaitKind, SessionWaitResolution, SessionWaitStatus } from '@/spec/session_base';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
@@ -38,6 +38,40 @@ function formatSummary(value: unknown): string {
 	} catch {
 		return 'Additional details could not be displayed.';
 	}
+}
+
+function approvalSummary(value: unknown):
+	| {
+			server?: string;
+			serverDisplayName?: string;
+			toolName?: string;
+			risk?: string;
+			arguments?: unknown;
+	  }
+	| undefined {
+	const parsed =
+		typeof value === 'string'
+			? (() => {
+					try {
+						return JSON.parse(value) as unknown;
+					} catch {
+						return undefined;
+					}
+				})()
+			: value;
+
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		return undefined;
+	}
+
+	const summary = parsed as Record<string, unknown>;
+	return {
+		server: typeof summary.server === 'string' ? summary.server : undefined,
+		serverDisplayName: typeof summary.serverDisplayName === 'string' ? summary.serverDisplayName : undefined,
+		toolName: typeof summary.toolName === 'string' ? summary.toolName : undefined,
+		risk: typeof summary.risk === 'string' ? summary.risk : undefined,
+		arguments: summary.arguments,
+	};
 }
 
 function labelForResolution(value: SessionWaitResolution): string {
@@ -80,6 +114,7 @@ export function SessionWaitModal({ wait, isResolving, error, onResolve }: Sessio
 function SessionWaitModalContent({ wait, isResolving, error, onResolve }: ActiveSessionWaitModalProps) {
 	const [inputText, setInputText] = useState('');
 	const [inputError, setInputError] = useState<string | undefined>();
+	const mcpApproval = wait.kind === SessionWaitKind.Approval ? approvalSummary(wait.summary) : undefined;
 
 	const resolve = (resolution: SessionWaitResolution) => {
 		let input: SessionOpaqueJSON = undefined;
@@ -106,6 +141,33 @@ function SessionWaitModalContent({ wait, isResolving, error, onResolve }: Active
 					<div className="space-y-4">
 						{wait.expiresAt ? (
 							<div className="text-base-content/70 text-sm">Expires: {new Date(wait.expiresAt).toLocaleString()}</div>
+						) : null}
+
+						{mcpApproval ? (
+							<div className="border-warning/30 bg-warning/10 rounded-2xl border p-3 text-sm">
+								<div className="font-semibold">MCP approval request</div>
+								<dl className="mt-2 grid gap-2 sm:grid-cols-2">
+									<div>
+										<dt className="text-base-content/60 text-xs">Server</dt>
+										<dd className="wrap-break-word">
+											{mcpApproval.serverDisplayName || mcpApproval.server || 'Unknown server'}
+										</dd>
+									</div>
+									<div>
+										<dt className="text-base-content/60 text-xs">Tool</dt>
+										<dd className="wrap-break-word">{mcpApproval.toolName || 'Unknown tool'}</dd>
+									</div>
+									<div>
+										<dt className="text-base-content/60 text-xs">Risk</dt>
+										<dd>{mcpApproval.risk || 'Unknown'}</dd>
+									</div>
+								</dl>
+								{mcpApproval.arguments !== undefined ? (
+									<pre className="bg-base-100 mt-3 max-h-40 overflow-auto rounded-xl p-2 text-xs whitespace-pre-wrap">
+										{formatSummary(mcpApproval.arguments)}
+									</pre>
+								) : null}
+							</div>
 						) : null}
 
 						<pre className="bg-base-300 max-h-80 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">

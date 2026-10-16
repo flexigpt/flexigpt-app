@@ -82,6 +82,7 @@ interface ToolChipsComposerRowProps {
 	onDiscardToolCall: (id: string) => void;
 	onOpenOutput: (output: UIToolOutput) => void;
 	onRetryErroredOutput: (output: UIToolOutput) => void;
+	onRemoveToolOutput: (id: string) => void;
 	onOpenCallDetails?: (call: UIToolCall) => void;
 }
 
@@ -101,6 +102,7 @@ export function ToolChipsComposerRow({
 	onDiscardToolCall,
 	onOpenOutput,
 	onRetryErroredOutput,
+	onRemoveToolOutput,
 	onOpenCallDetails,
 }: ToolChipsComposerRowProps) {
 	const openCallDetails = onOpenCallDetails ?? noopOpenCallDetails;
@@ -137,6 +139,9 @@ export function ToolChipsComposerRow({
 						}}
 						onRetry={() => {
 							onRetryErroredOutput(item.output);
+						}}
+						onRemove={() => {
+							onRemoveToolOutput(item.output.id);
 						}}
 					/>
 				)
@@ -265,6 +270,7 @@ interface ToolOutputComposerChipViewProps {
 	output: UIToolOutput;
 	onOpen: () => void;
 	onRetry: () => void;
+	onRemove: () => void;
 }
 
 /**
@@ -273,7 +279,7 @@ interface ToolOutputComposerChipViewProps {
  * - "×" discards the output from the next turn.
  * - If `isError` is true and we have enough info, show a "Retry" button.
  */
-function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputComposerChipViewProps) {
+function ToolOutputComposerChipView({ output, onOpen, onRetry, onRemove }: ToolOutputComposerChipViewProps) {
 	const label = getPrettyToolName(output.name);
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
@@ -342,6 +348,16 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 						<span className="ml-1 text-xs">{isSkipped ? 'Run' : 'Retry'}</span>
 					</button>
 				)}
+				<button
+					type="button"
+					className="btn btn-ghost btn-xs text-error gap-0 px-1 py-0 shadow-none"
+					onClick={onRemove}
+					title="Remove this carried Tool result"
+					aria-label="Remove carried Tool result"
+				>
+					<FiX size={12} />
+					<span className="ml-1 text-xs">Remove</span>
+				</button>
 			</div>
 		</div>
 	);

@@ -87,6 +87,7 @@ export function useSendMessage({
 					updateTab(tabId, current => ({
 						...current,
 						activeRunID: started.runID,
+						pendingRunID: started.runID,
 						isBusy: true,
 						runtimeError: undefined,
 					}));
@@ -119,6 +120,7 @@ export function useSendMessage({
 				updateTab(tabId, current => ({
 					...current,
 					activeRunID: started.runID,
+					pendingRunID: started.runID,
 					isBusy: true,
 					runtimeError: undefined,
 				}));
@@ -127,6 +129,7 @@ export function useSendMessage({
 				updateTab(tabId, current => ({
 					...current,
 					isBusy: false,
+					pendingRunID: undefined,
 					runtimeError: error instanceof Error ? error.message : 'Session submission failed.',
 				}));
 				throw error;
@@ -232,17 +235,29 @@ export function useSendMessage({
 					throw new Error('Edit-and-resend requires an existing Session snapshot.');
 				}
 				const submission = await buildSessionSubmissionIntent(payload, options);
-				requireAcceptedSessionCommand(
+				const resent = requireAcceptedSessionCommand(
 					await sessionManagementAPI.editAndResend({
 						meta: sessionCommandMeta(tab.sessionSnapshot.session.revision),
 						sessionID: tab.sessionID,
 						replaceMessageID: tab.editingMessageId,
 						input: submission.input,
 						configuration: submission.configuration,
+						...(payload.carryForwardToolResultIDs?.length
+							? {
+									carryForwardToolResultIDs: payload.carryForwardToolResultIDs,
+								}
+							: {}),
 					}),
 					'Edit and resend'
 				);
-				updateTab(tabId, current => ({ ...current, editingMessageId: null, isBusy: true }));
+				updateTab(tabId, current => ({
+					...current,
+					editingMessageId: null,
+					activeRunID: resent.runID,
+					pendingRunID: resent.runID,
+					isBusy: true,
+					runtimeError: undefined,
+				}));
 				scrollTabToBottomSoon(tabId);
 				return;
 			}

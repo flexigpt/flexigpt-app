@@ -87,7 +87,7 @@ export enum SessionToolCallSource {
 	App = 'app',
 }
 
-enum SessionWaitKind {
+export enum SessionWaitKind {
 	Approval = 'approval',
 	ManualToolExecution = 'manualToolExecution',
 	UserInput = 'userInput',
@@ -141,7 +141,7 @@ export enum SessionActivityOverrideMode {
 	Deactivate = 'deactivate',
 }
 
-enum SessionConfigurationOwner {
+export enum SessionConfigurationOwner {
 	Platform = 'platform',
 	Model = 'model',
 	Agent = 'agent',
@@ -151,7 +151,7 @@ enum SessionConfigurationOwner {
 	User = 'user',
 }
 
-enum SessionResolutionState {
+export enum SessionResolutionState {
 	Included = 'included',
 	Excluded = 'excluded',
 	Unavailable = 'unavailable',
@@ -230,7 +230,7 @@ interface SessionResolvedArtifact extends ArtifactRef {
 	digest?: string;
 }
 
-interface SessionResolutionItem {
+export interface SessionResolutionItem {
 	key: string;
 	kind: string;
 	owner: SessionConfigurationOwner;

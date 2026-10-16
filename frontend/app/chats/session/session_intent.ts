@@ -24,7 +24,7 @@ import { MCPToolExposure } from '@/spec/session_mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
 
-import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type { AgentCapabilityExclusion, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 export interface SessionSubmissionIntent {
@@ -347,9 +347,65 @@ function instructionOverridesFromPayload(payload: EditorSubmitPayload): SessionI
 	];
 }
 
+function agentCapabilityExclusionOverrides(exclusions: AgentCapabilityExclusion[] | undefined): {
+	instructions: SessionInstructionOverride[];
+	tools: SessionToolOverride[];
+	skills: SessionArtifactOverride[];
+	mcp: MCPServerOverride[];
+} {
+	const instructions: SessionInstructionOverride[] = [];
+	const tools: SessionToolOverride[] = [];
+	const skills: SessionArtifactOverride[] = [];
+	const mcp: MCPServerOverride[] = [];
+
+	for (const exclusion of exclusions ?? []) {
+		if (!exclusion.key.trim()) {
+			continue;
+		}
+
+		switch (exclusion.kind) {
+			case 'instruction':
+				if (exclusion.target.form === CapabilityTargetForm.Artifact && exclusion.target.artifact) {
+					instructions.push({
+						key: exclusion.key,
+						mode: SessionCollectionOverrideMode.Remove,
+					});
+				}
+				break;
+
+			case 'tool':
+				tools.push({
+					key: exclusion.key,
+					mode: SessionCollectionOverrideMode.Remove,
+				});
+				break;
+
+			case 'skill':
+				if (exclusion.target.form === CapabilityTargetForm.Artifact && exclusion.target.artifact) {
+					skills.push({
+						key: exclusion.key,
+						mode: SessionCollectionOverrideMode.Remove,
+					});
+				}
+				break;
+
+			case 'mcp':
+				if (exclusion.target.form === CapabilityTargetForm.Artifact && exclusion.target.artifact) {
+					mcp.push({
+						key: exclusion.key,
+						mode: SessionCollectionOverrideMode.Remove,
+					});
+				}
+				break;
+		}
+	}
+
+	return { instructions, tools, skills, mcp };
+}
+
 function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	const seenEnabled = new Set<string>();
-	const skills = [];
+	const skills: SessionArtifactOverride[] = [];
 
 	for (const selection of payload.enabledSkillSelections ?? payload.enabledSkillRefs ?? []) {
 		const ref = artifactSelection(
@@ -371,7 +427,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		});
 	}
 
-	const enabled = new Set(skills.map(value => value.key));
+	const seenActive = new Set<string>();
 	const active = [];
 
 	for (const selection of payload.activeSkillSelections ?? payload.activeSkillRefs ?? []) {
@@ -382,9 +438,10 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		);
 		const key = artifactKey(ref);
 
-		if (!enabled.has(key)) {
+		if (seenActive.has(key)) {
 			continue;
 		}
+		seenActive.add(key);
 
 		active.push({
 			key,
@@ -497,6 +554,7 @@ function appContextUpdatesFromPayload(payload: EditorSubmitPayload) {
 				name: content.name,
 				description: content.description,
 				mimeType: content.mimeType ?? content.resource?.mimeType,
+				data: content.data ?? content.resource?.blob,
 			})),
 			structuredContent: update.structuredContent,
 			updatedAt: update.updatedAt,
@@ -512,6 +570,13 @@ export async function buildSessionSubmissionIntent(
 ): Promise<SessionSubmissionIntent> {
 	const configuration = emptySessionConfiguration();
 	const skillOverrides = skillOverridesFromPayload(payload);
+	const agentExclusions = agentCapabilityExclusionOverrides(payload.agentCapabilityExclusions);
+	const directToolOverrides = toolOverridesFromChoices(payload);
+	const directToolKeys = new Set(directToolOverrides.map(override => override.key));
+	const directSkillKeys = new Set(skillOverrides.skills.map(override => override.key));
+	const instructionOverrides = instructionOverridesFromPayload(payload);
+	const directMCPOverrides = await mcpOverridesFromPayload(payload);
+	const directMCPKeys = new Set(directMCPOverrides.map(override => override.key));
 
 	configuration.agent = payload.agentSelection ?? (payload.agentRef ? artifactSelection(payload.agentRef) : undefined);
 	configuration.workspace = workspaceSelectionFromPayload(payload);
@@ -522,11 +587,20 @@ export async function buildSessionSubmissionIntent(
 				? artifactSelection(model.model, model.modelArtifactRevision, model.modelDefinitionDigest)
 				: undefined;
 	configuration.modelOverrides = modelOverridesFromComposer(model, payload.includeModelDefault);
-	configuration.instructions = instructionOverridesFromPayload(payload);
-	configuration.tools = toolOverridesFromChoices(payload);
-	configuration.skills = skillOverrides.skills;
+	configuration.instructions = [...instructionOverrides, ...agentExclusions.instructions];
+	configuration.tools = [
+		...directToolOverrides,
+		...agentExclusions.tools.filter(override => !directToolKeys.has(override.key)),
+	];
+	configuration.skills = [
+		...skillOverrides.skills,
+		...agentExclusions.skills.filter(override => !directSkillKeys.has(override.key)),
+	];
 	configuration.activeSkills = skillOverrides.active;
-	configuration.mcp = await mcpOverridesFromPayload(payload);
+	configuration.mcp = [
+		...directMCPOverrides,
+		...agentExclusions.mcp.filter(override => !directMCPKeys.has(override.key)),
+	];
 	configuration.history = {
 		all: model.includePreviousMessages === 'all',
 		...(typeof model.includePreviousMessages === 'number'

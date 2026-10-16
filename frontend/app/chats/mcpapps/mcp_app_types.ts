@@ -15,6 +15,9 @@ export interface MCPAppInstance {
 	toolUseID: string;
 	callID: string;
 	displayName?: string;
+	allowToolCalls?: boolean;
+	requireOpenLinkApproval?: boolean;
+	requireContextUpdateApproval?: boolean;
 }
 
 /** JSON-RPC 2.0 envelope. */
@@ -121,5 +124,8 @@ export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInst
 		toolUseID: output.callID || output.id,
 		callID: output.callID || output.id,
 		displayName: output.name,
+		allowToolCalls: app.allowAppInitiatedToolCalls,
+		requireOpenLinkApproval: app.requireApprovalForOpenLink,
+		requireContextUpdateApproval: app.requireApprovalForContextUpdates,
 	};
 }

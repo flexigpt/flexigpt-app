@@ -25,6 +25,7 @@ export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
 	/** Returns false after the owning App view has been torn down. */
 	isActive?: () => boolean;
+	allowAppToolCalls?: boolean;
 	executeAppTool: (toolName: string, args?: Record<string, unknown>) => Promise<MCPAppToolCallResult>;
 	readAppResource: (uri: string) => Promise<unknown>;
 	stageModelContext: (update: MCPAppModelContextUpdatePayload) => Promise<void>;
@@ -112,6 +113,10 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		if (this.deps.allowAppToolCalls === false) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'App-initiated Tool calls are disabled by MCP policy.');
+		}
+
 		const params = isJSONObject(req.params) ? req.params : {};
 
 		const name = typeof params.name === 'string' ? params.name : '';

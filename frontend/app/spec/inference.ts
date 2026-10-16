@@ -484,6 +484,13 @@ export interface UIToolCall {
 	 * Optional. Some tool calls are injected at runtime (e.g. skills-*) and do not
 	 * correspond to a stored ToolSelection.
 	 */
+	/**
+	 * Session Runtime-owned execution preference for this proposed call.
+	 * This is distinct from frontend-only tool picker state and is projected
+	 * directly from SessionToolCall.automatic.
+	 */
+	automatic?: boolean;
+
 	toolStoreChoice?: ToolStoreChoice;
 
 	/** Original selection, including when its current Tool metadata is unavailable. */

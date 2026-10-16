@@ -505,8 +505,8 @@ export class AgentManagementAPI {
 					addIssue(
 						occurrence,
 						'information',
-						'agent_mcp_requires_session_selection',
-						'Agent MCP declarations are candidates. They require an explicit Session MCP selection before execution.'
+						'agent_mcp_requires_connection',
+						'Agent MCP declarations are inherited during Run preparation. The MCP server must still be configured, connected, and allowed by current policy before it can contribute tools or context.'
 					);
 					break;
 

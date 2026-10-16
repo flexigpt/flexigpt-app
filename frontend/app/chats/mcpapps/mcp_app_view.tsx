@@ -443,24 +443,36 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		};
 	}, []);
 
-	const requestOpenLinkApproval = useCallback(async (url: string) => {
-		if (!mountedRef.current) {
-			return false;
-		}
+	const requestOpenLinkApproval = useCallback(
+		async (url: string) => {
+			if (!mountedRef.current) {
+				return false;
+			}
+			const safeURL = normalizeSafeExternalURL(url);
 
-		if (approvalResolverRef.current) {
-			return false;
-		}
-		const safeURL = normalizeSafeExternalURL(url);
-		if (!safeURL) {
-			setBlockedLink({ url, reason: 'unsafe' });
-			return false;
-		}
-		return await new Promise<boolean>(resolve => {
-			approvalResolverRef.current = resolve;
-			setPendingURL(safeURL);
-		});
-	}, []);
+			if (approvalResolverRef.current) {
+				return false;
+			}
+			if (!safeURL) {
+				setBlockedLink({ url, reason: 'unsafe' });
+				return false;
+			}
+			if (routerInstance.requireOpenLinkApproval === false) {
+				try {
+					backendAPI.openURL(safeURL);
+					return true;
+				} catch {
+					setBlockedLink({ url: safeURL, reason: 'open-failed' });
+					return false;
+				}
+			}
+			return await new Promise<boolean>(resolve => {
+				approvalResolverRef.current = resolve;
+				setPendingURL(safeURL);
+			});
+		},
+		[routerInstance.requireOpenLinkApproval]
+	);
 
 	const applySizeChanged = useCallback((params: unknown) => {
 		if (!params || typeof params !== 'object') {
@@ -533,6 +545,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			new MCPAppRPCRouter({
 				instance: routerInstance,
 				isActive: isMCPAppViewActive,
+				allowAppToolCalls: routerInstance.allowToolCalls ?? true,
 				executeAppTool: async (toolName, args) => {
 					const receipt = requireAcceptedSessionCommand(
 						await sessionManagementAPI.executeAppTool({
@@ -587,6 +600,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 									name: content.name,
 									description: content.description,
 									mimeType: content.mimeType ?? content.resource?.mimeType,
+									data: content.data ?? content.resource?.blob,
 								})),
 								structuredContent: update.structuredContent,
 							},
@@ -597,6 +611,18 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 						sessionRevision: receipt.sessionRevision ?? revisionsRef.current.sessionRevision,
 						runRevision: receipt.runRevision ?? revisionsRef.current.runRevision,
 					};
+				},
+				requestModelContextUpdateApproval: async update => {
+					if (routerInstance.requireContextUpdateApproval === false) {
+						return true;
+					}
+					if (!mountedRef.current || approvalResolverRef.current) {
+						return false;
+					}
+					return await new Promise<boolean>(resolve => {
+						approvalResolverRef.current = resolve;
+						setPendingContextUpdate(update);
+					});
 				},
 				requestOpenLinkApproval,
 				requestUIMessageApproval: async message => {
@@ -610,19 +636,6 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				},
 				onUIMessage: message => {
 					dispatchMCPAppUIMessage(routerInstance, message);
-				},
-				requestModelContextUpdateApproval: async update => {
-					if (!mountedRef.current) {
-						return false;
-					}
-					if (approvalResolverRef.current) {
-						return false;
-					}
-
-					return await new Promise<boolean>(resolve => {
-						approvalResolverRef.current = resolve;
-						setPendingContextUpdate(update);
-					});
 				},
 			}),
 		[
@@ -688,7 +701,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 							result: buildMCPAppHostContext({
 								width: iframe.clientWidth,
 								height: iframe.clientHeight,
-								allowToolCalls: true,
+								allowToolCalls: routerInstance.allowToolCalls ?? true,
 							}),
 						};
 					}
@@ -709,7 +722,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			});
 			bridgeRef.current = bridge;
 		},
-		[applySizeChanged, instance.resourceUri]
+		[applySizeChanged, instance.resourceUri, routerInstance.allowToolCalls]
 	);
 
 	useEffect(() => {

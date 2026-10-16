@@ -88,6 +88,7 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 	const unavailableOccurrences = occurrences.filter(
 		occurrence => occurrence.status !== CapabilityResolutionStatus.Available
 	);
+	const excludedCount = manager.capabilityExclusions.length;
 	const sections = AGENT_CAPABILITY_SECTIONS.map(section => ({
 		...section,
 		count: availableOccurrences.filter(occurrence => occurrence.type === section.type).length,
@@ -99,11 +100,16 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 				<span className="font-semibold">{selectedAgent.displayName}</span>
 				<span className="badge badge-secondary badge-xs">Agent selected</span>
 				{manager.isTrackingOnly ? <span className="badge badge-outline badge-xs">Restored Session</span> : null}
+				{excludedCount > 0 ? <span className="badge badge-warning badge-xs">Excluded {excludedCount}</span> : null}
 			</div>
 
 			<div className="text-base-content/70 mt-1">
 				The selected Agent is sent as Session intent. The Session Runtime resolves its effective configuration when the
 				next Run is prepared.
+			</div>
+			<div className="text-base-content/60 mt-1">
+				Agent MCP declarations are inherited as MCP baseline selections. They remain subject to current connection,
+				installation, policy, and approval state.
 			</div>
 
 			{resolution ? (
@@ -130,6 +136,13 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 							{occurrences.length > 0 ? (
 								occurrences.map(occurrence => {
 									const available = occurrence.status === CapabilityResolutionStatus.Available;
+									const exclusion = manager.getCapabilityExclusion(occurrence);
+									const canExclude =
+										available &&
+										(occurrence.type === 'tool' ||
+											occurrence.type === 'skill' ||
+											occurrence.type === 'text' ||
+											occurrence.type === 'mcp');
 
 									return (
 										<div
@@ -143,6 +156,23 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 											<span className={`badge badge-xs shrink-0 ${available ? 'badge-success' : 'badge-warning'}`}>
 												{occurrence.status}
 											</span>
+											{exclusion ? <span className="badge badge-warning badge-xs shrink-0">Excluded</span> : null}
+											{canExclude ? (
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs shrink-0 rounded-lg"
+													onClick={() => {
+														manager.toggleCapabilityExclusion(occurrence);
+													}}
+													title={
+														exclusion
+															? 'Restore this inherited Agent contribution for the next Run.'
+															: 'Exclude this inherited Agent contribution for the next Run.'
+													}
+												>
+													{exclusion ? 'Include' : 'Exclude'}
+												</button>
+											) : null}
 										</div>
 									);
 								})
@@ -153,7 +183,7 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 					</details>
 
 					<div className="text-base-content/60 mt-2">
-						Composer selectors remain available for user selections alongside Agent intent.
+						Composer selectors remain available for explicit user additions and replacements alongside Agent intent.
 					</div>
 				</>
 			) : (

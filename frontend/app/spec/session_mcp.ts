@@ -253,6 +253,9 @@ export interface MCPToolAppRenderInfo {
 	content?: MCPContent[];
 	structuredContent?: SessionOpaqueJSON;
 	isError?: boolean;
+	allowAppInitiatedToolCalls?: boolean;
+	requireApprovalForOpenLink?: boolean;
+	requireApprovalForContextUpdates?: boolean;
 }
 
 export interface MCPReadResourceResponseBody {
@@ -443,6 +446,7 @@ interface MCPAppContextContent {
 	name?: string;
 	description?: string;
 	mimeType?: string;
+	data?: number[];
 }
 
 /**

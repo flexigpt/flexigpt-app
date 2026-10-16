@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@/spec/artifact';
+import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
 import type { SessionArtifactSelection } from '@/spec/session_base';
@@ -6,6 +6,19 @@ import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/se
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceRuntimePlan } from '@/spec/workspace';
+
+type AgentCapabilityExclusionKind = 'instruction' | 'tool' | 'skill' | 'mcp';
+
+/**
+ * Frontend-authored removal intent for an effective Agent baseline
+ * contribution. It carries the backend-owned canonical target rather than a
+ * display name or a transient Composer list identity.
+ */
+export interface AgentCapabilityExclusion {
+	key: string;
+	kind: AgentCapabilityExclusionKind;
+	target: CapabilityTarget;
+}
 
 export interface EditorExternalMessage {
 	text: string;
@@ -28,6 +41,7 @@ export interface EditorSubmitPayload {
 	agentRef?: ArtifactRef;
 	agentSelection?: SessionArtifactSelection;
 	modelSelectionSource?: 'session' | 'agent';
+	agentCapabilityExclusions?: AgentCapabilityExclusion[];
 	attachedTools: UIToolStoreChoice[];
 	attachments: UIAttachment[];
 	toolOutputs: UIToolOutput[];
@@ -41,6 +55,7 @@ export interface EditorSubmitPayload {
 	skillSessionID?: string;
 	workspaceSelection?: WorkspaceConversationSelection;
 	workspacePlan?: WorkspaceRuntimePlan;
+	carryForwardToolResultIDs?: string[];
 }
 
 export interface AssistantTurnFinishedPayload {

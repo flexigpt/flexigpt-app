@@ -130,6 +130,10 @@ func (c *coordinator) resolveAgent(
 			}
 			plan.model = value
 			plan.modelOwner = sessionRuntime.ConfigurationOwnerAgent
+			if occurrence.IncludeSystemPrompt != nil {
+				includeSystemPrompt := *occurrence.IncludeSystemPrompt
+				plan.includeModelSystemPrompt = &includeSystemPrompt
+			}
 
 		case declaration.TypeText:
 			value, found := selectionFromTarget(occurrence.Target)
@@ -203,30 +207,82 @@ func (c *coordinator) resolveAgent(
 			}
 
 		case declaration.TypeMCP:
-			value, found := selectionFromTarget(occurrence.Target)
+			selection, found := selectionFromTarget(occurrence.Target)
 			if !found {
-				plan.summary.Diagnostics = append(
-					plan.summary.Diagnostics,
-					unavailableTargetDiagnostic(
-						occurrence.Path,
-						"Agent MCP capability is not Artifact-backed",
-					),
+				diagnostic := unavailableTargetDiagnostic(
+					occurrence.Path,
+					"Agent MCP capability is not Artifact-backed",
 				)
+				if occurrence.Required {
+					diagnostic.Severity = sessionRuntime.DiagnosticSeverityError
+				}
+				plan.summary.Diagnostics = append(plan.summary.Diagnostics, diagnostic)
+				if occurrence.Required {
+					return operationPreparationError(
+						"agent_required_mcp_unavailable",
+						diagnostic.Message,
+						plan.summary,
+						nil,
+					)
+				}
 				continue
 			}
 
-			plan.summary.MCP = append(
-				plan.summary.MCP,
-				sessionRuntime.ResolutionItem{
-					Key:      value.CanonicalKey(),
-					Kind:     "mcpCandidate",
-					Owner:    sessionRuntime.ConfigurationOwnerAgent,
-					State:    sessionRuntime.ResolutionStateExcluded,
-					Selected: value,
-					Reason: "MCP capability requires an explicit " +
-						"Session selection",
-				},
-			)
+			used, resolveErr := c.resolveArtifactSelection(ctx, *selection)
+			if resolveErr != nil {
+				diagnostic := sessionRuntime.ResolutionDiagnostic{
+					Severity: sessionRuntime.DiagnosticSeverityWarning,
+					Code:     "agent_mcp_unavailable",
+					Message:  resolveErr.Error(),
+					Key:      selection.CanonicalKey(),
+				}
+				if occurrence.Required {
+					diagnostic.Severity = sessionRuntime.DiagnosticSeverityError
+				}
+				plan.summary.Diagnostics = append(plan.summary.Diagnostics, diagnostic)
+				plan.summary.MCP = append(
+					plan.summary.MCP,
+					sessionRuntime.ResolutionItem{
+						Key:      selection.CanonicalKey(),
+						Kind:     resolutionItemKindMCP,
+						Owner:    sessionRuntime.ConfigurationOwnerAgent,
+						State:    sessionRuntime.ResolutionStateUnavailable,
+						Selected: selection,
+						Reason:   resolveErr.Error(),
+					},
+				)
+				if occurrence.Required {
+					return operationPreparationError(
+						"agent_required_mcp_unavailable",
+						resolveErr.Error(),
+						plan.summary,
+						resolveErr,
+					)
+				}
+				continue
+			}
+
+			if plan.mcpUses == nil {
+				plan.mcpUses = make(map[string]*sessionRuntime.ResolvedArtifact)
+			}
+			if plan.mcpOwners == nil {
+				plan.mcpOwners = make(map[string]sessionRuntime.ConfigurationOwner)
+			}
+			if plan.mcpRequired == nil {
+				plan.mcpRequired = make(map[string]bool)
+			}
+
+			key := selection.CanonicalKey()
+			plan.mcp = append(plan.mcp, sessionRuntime.MCPServerSelection{
+				Server:                    *selection,
+				ToolExposure:              sessionRuntime.MCPToolExposureAll,
+				IncludeServerInstructions: true,
+			})
+			plan.mcpUses[key] = used
+			plan.mcpOwners[key] = sessionRuntime.ConfigurationOwnerAgent
+			if occurrence.Required {
+				plan.mcpRequired[key] = true
+			}
 
 		case declaration.TypeModelProvider,
 			declaration.TypeMCPPolicy,
@@ -741,6 +797,7 @@ func (c *coordinator) applySessionOverrides(
 	if configuration.Model != nil {
 		plan.model = configuration.Model
 		plan.modelOwner = sessionRuntime.ConfigurationOwnerSession
+		plan.includeModelSystemPrompt = nil
 	}
 
 	instructions, err := c.applyInstructionOverrides(

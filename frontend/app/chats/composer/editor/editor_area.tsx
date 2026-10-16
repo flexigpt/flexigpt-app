@@ -373,7 +373,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentInstalledEnabledSkillRefs,
 		getCurrentInstalledActiveSkillRefs,
 		getCurrentInstalledEnabledSkillSelections,
-		getCurrentInstalledActiveSkillSelections,
+		getCurrentActiveSkillSelections,
 	} = useComposerSkills();
 
 	const workspace = useComposerWorkspace({
@@ -401,6 +401,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		handleDiscardToolCall,
 		handleRetryErroredOutput,
 		handleAttachedToolsChanged,
+		handleRemoveToolOutput,
 		applyConversationToolsFromChoices,
 		applyWebSearchFromChoices,
 		loadToolCalls,
@@ -1140,9 +1141,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
 					activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
 					enabledSkillSelections: getCurrentInstalledEnabledSkillSelections(),
-					activeSkillSelections: getCurrentInstalledActiveSkillSelections(),
+					// Workspace-owned active Skills must be serialized too. The
+					// backend validates that each requested active Skill remains
+					// part of the effective enabled Skill set.
+					activeSkillSelections: getCurrentActiveSkillSelections(),
 					workspaceSelection: workspace.getSelectionSnapshot(),
 					workspacePlan: workspace.plan,
+					...(editingMessageId && finalToolOutputs.length > 0
+						? {
+								carryForwardToolResultIDs: [...new Set(finalToolOutputs.map(output => output.id).filter(Boolean))],
+							}
+						: {}),
 				};
 
 				lastSubmittedMCPContextRef.current = preparedMCPContext;
@@ -1185,6 +1194,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentInstalledEnabledSkillRefs,
 			getToolRuntimeSnapshot,
 			hasBlockingMCPArgs,
+			editingMessageId,
 			hasBlockingToolArgs,
 			isInputLocked,
 			isSendButtonEnabled,
@@ -1200,7 +1210,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			workspace,
 			workspaceExecutionBlocked,
 			getCurrentInstalledEnabledSkillSelections,
-			getCurrentInstalledActiveSkillSelections,
+			getCurrentActiveSkillSelections,
 		]
 	);
 
@@ -1845,6 +1855,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
 									onRetryErroredOutput={handleRetryErroredOutput}
+									onRemoveToolOutput={handleRemoveToolOutput}
 									onRemoveAttachment={handleRemoveAttachment}
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
 									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}

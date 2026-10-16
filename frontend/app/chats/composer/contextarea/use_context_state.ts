@@ -210,6 +210,7 @@ export interface ComposerContextController {
 	handleSetIsHybridReasoningEnabled: (enabled?: boolean) => void;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
 	setModelSelectionSource: (source: ComposerModelSelectionSource) => void;
+	setAgentModelPreview: (model?: UIModelOption) => void;
 
 	setTemperature(temp?: number): void;
 	setReasoningLevel(level?: ReasoningLevel): void;
@@ -411,6 +412,16 @@ export function useComposerContextState(): ComposerContextController {
 		[applySelectedModel]
 	);
 
+	const setAgentModelPreview = useCallback(
+		(model?: UIModelOption) => {
+			if (model) {
+				applySelectedModel(model, { syncHybridReasoning: true });
+			}
+			setModelSelectionSource('agent');
+		},
+		[applySelectedModel]
+	);
+
 	const setTemperature = useCallback(
 		(temperature?: number) => {
 			applySelectedModel(current => ({
@@ -459,7 +470,6 @@ export function useComposerContextState(): ComposerContextController {
 
 	const applyAdvancedModel = useCallback(
 		(updated: UIModelOption) => {
-			setModelSelectionSource('session');
 			applySelectedModel(updated);
 		},
 		[applySelectedModel]
@@ -539,6 +549,7 @@ export function useComposerContextState(): ComposerContextController {
 		handleSetIsHybridReasoningEnabled,
 		setIncludePreviousMessages,
 		setModelSelectionSource,
+		setAgentModelPreview,
 		setTemperature,
 		setReasoningLevel,
 		setHybridTokens,

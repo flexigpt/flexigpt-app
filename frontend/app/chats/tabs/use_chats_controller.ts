@@ -448,6 +448,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 				const composerConfigurationRestored =
 					previous.sessionID === snapshot.session.id && previous.composerConfigurationRestored;
+				const acknowledgedRunNowVisible =
+					previous.pendingRunID !== undefined && snapshot.runs.some(run => run.id === previous.pendingRunID);
 
 				return {
 					...previous,
@@ -459,6 +461,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					composerConfigurationRestored,
 					isPersisted: true,
 					isBusy: sessionRunIsActive(activeRun),
+					pendingRunID: acknowledgedRunNowVisible ? undefined : previous.pendingRunID,
 					runtimeError: undefined,
 				};
 			});

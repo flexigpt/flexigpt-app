@@ -223,7 +223,15 @@ export const ChatMessage = memo(function ChatMessage({
 		}
 
 		const outputs = message.uiToolOutputs ?? [];
-		const callsById = new Map((message.uiToolCalls ?? []).map(c => [c.callID || c.id, c] as const));
+		const callsById = new Map<string, UIToolCall>();
+		for (const call of message.uiToolCalls ?? []) {
+			if (call.id) {
+				callsById.set(call.id, call);
+			}
+			if (call.callID) {
+				callsById.set(call.callID, call);
+			}
+		}
 		return outputs
 			.map(out => {
 				const instance = buildAppInstanceFromToolOutput(out);

@@ -26,24 +26,30 @@ Status meanings:
   - Raw protocol input/output JSON remains a deliberate semantic persistence and
     redaction boundary. It is not a second frontend-facing provider protocol.
 
-## Implementation status
+## Implementation status after this patch
 
-- ◐ Agent selection is now visibly represented, but Agent recipe application is still incomplete.
+- ◐ Agent selection now has backend-authoritative baseline contribution semantics and visible removal controls.
   - Original degraded behavior: selecting an Agent changed only the Agent label while Model, Tools, Skills, MCP, instruction sources, and draft state continued showing prior Composer state.
   - Required UX: selecting an Agent must make it clear what Agent intent has been selected, what it contributes, and what remains user-controlled.
-  - Patch status: the latest patch adds `selectedAgentResolution` in `use_agent_manager.ts` and an Agent selected badge plus capability summary in `agent_dropdown.tsx`. The dropdown now shows available/unavailable Agent capability records grouped as Model, Tools, Skills, MCP, and Instructions.
+  - Patch status:
+    - Agent MCP declarations are now inherited backend MCP baseline selections rather than candidate-only records.
+    - Required unavailable Agent MCP capabilities fail preparation with a typed `agent_required_mcp_unavailable` preparation failure.
+    - Agent `includeSystemPrompt` now affects backend system-prompt composition while Agent Model ownership remains effective.
+    - the Agent dropdown can exclude/include effective Agent Tool, Skill, instruction Text, and MCP contributions using canonical Session override keys;
+    - exclusion intent is serialized into existing Tool, Skill, instruction, and MCP removal override records.
   - Cross-verify: select an Agent, reopen the Agent menu, verify:
     - the trigger includes Agent selected;
     - the selected Agent row says Agent selected, not locally “Applied”;
     - capability counts and individual resolution rows appear;
     - unavailable required capabilities show their status;
     - restored Session Agent selection reloads a capability preview after catalog availability.
-  - Remaining: the preview is descriptive only. It does not populate ordinary Composer controls with the actual Agent recipe.
+    - excluding an inherited Agent Tool, Skill, instruction, or MCP server produces an excluded item in the next operation resolution summary.
+  - Remaining: the preview remains descriptive. It does not populate every ordinary Composer control with a locally materialized Agent recipe.
   - Backend patch added — Agent instruction/Tool/Skill resolution failures no longer silently downgrade required Agent
     contributions into warnings. Required Agent contributions now produce typed
     preparation failures with a resolution summary.
 
-- △ Agent recipe materialization into Composer controls remains open.
+- △ Exact Agent recipe materialization into all Composer controls remains intentionally open.
   - Original degraded behavior: old Agent selection immediately applied:
     - Model;
     - Tool and web-search selections;
@@ -70,32 +76,25 @@ Status meanings:
     - TODO: decide whether Composer requires an exact pre-admission effective configuration preview, or whether capability preview plus authoritative post-preparation operation resolution is sufficient.
     - If exact preview is required, add one generic Session composition-preview operation. Do not add a parallel Agent-specific starter/recipe endpoint.
 
-- ○ Agent model ownership still has a visible-model versus submitted-model mismatch.
+- ✓ Patched — Agent model ownership and Advanced Parameters no longer silently become Session Model ownership.
   - Original degraded behavior: a user could select Agent A, continue seeing Model A in the dropdown, while the submitted configuration delegated actual model selection to the Agent, potentially using Model B.
   - Required UX: the displayed Model and provider-dependent controls must describe either:
     - the effective Agent Model; or
     - an explicit “Agent chooses model” state.
-  - Current state: the latest patch fixes a related restoration case: a saved explicit Session Model is no longer silently switched back to Agent ownership after reopen. The ordinary “select a new Agent” path still leaves the existing displayed model in place.
+  - Patch status:
+    - an Artifact-backed Agent Model is used as the visible model preview where it is present in the runnable model catalog;
+    - a direct/unavailable Agent Model is displayed as explicit “Agent chooses model” ownership;
+    - choosing a Model in the Model picker intentionally creates a Session override;
+    - Advanced Parameters retain Agent Model ownership unless the user explicitly chooses a Model.
   - Cross-verify: select an Agent with a different Model than the currently visible one, inspect:
     - Model dropdown;
     - reasoning controls;
     - web-search compatibility;
     - advanced parameters;
     - submitted `modelSelectionSource`.
-  - Completion needed: frontend-only ownership handling in `use_context_state.ts` and `use_agent_manager.ts`, informed by an effective Agent Model preview.
-  - Backend note: no additional backend ownership contract is required for the current Agent-versus-explicit-Model distinction. Frontend must render an explicit Model selection or an explicit “Agent chooses model” state.
+  - Remaining: provider-specific controls remain a preview when the Agent selects a direct Model target that has no Artifact-backed runnable catalog entry.
 
-- ○ Saving Advanced Parameters after Agent selection can still switch ownership to Session Model selection.
-  - Original degraded behavior: saving a timeout or output option after selecting an Agent changed `modelSelectionSource` to `'session'`, even when the user had not manually changed Model.
-  - Required UX: editing request parameters should preserve Agent Model ownership unless the user explicitly selects a Model.
-  - Current state: this remains open. `applyAdvancedModel()` still sets Session model ownership unconditionally.
-  - Cross-verify: select an Agent, open Advanced Parameters, change only timeout or streaming, save, then inspect the next submitted configuration.
-  - Completion needed: a frontend-only ownership rule distinguishing:
-    - explicit Model selection;
-    - Agent-selected Model;
-    - request-parameter override.
-
-- △ Agent-derived remove/override semantics remain incomplete.
+- ◐ Agent-derived remove/override semantics are now available for effective Artifact-backed contributions.
   - Original degraded behavior: old Agent recipe contents became ordinary visible Composer state. A user could remove an Agent Tool, disable an Agent Skill, deselect Agent MCP, or remove Agent instruction text.
   - Required UX: inherited Agent contributions need visible source badges and explicit override actions:
     - inherited;
@@ -103,18 +102,14 @@ Status meanings:
     - user-removed;
     - unavailable;
     - changed since selected.
-  - Current state: the latest patch gives an Agent summary but does not add per-item Agent-origin badges or persistent Remove overrides. Existing Session intent types support collection `Add`/`Remove` semantics, but current Composer payload construction largely emits additions.
+  - Patch status:
+    - Agent capability rows expose Include/Exclude actions for Tool, Skill, instruction Text, and MCP targets;
+    - existing Session override records persist those exclusions;
+    - backend operation summaries retain excluded Agent-derived Tool, Skill, and instruction entries;
+    - Agent MCP declarations are now actual inherited backend MCP selections, so MCP remove overrides are meaningful.
+
   - Cross-verify: select an Agent, remove a Tool/Skill/MCP item from visible local Composer state, submit, and inspect whether the backend still receives the Agent baseline.
-  - Completion needed: a frontend Composer baseline/override store plus serialization of explicit removal overrides through existing `SessionConfiguration` override types.
-  - Backend patch added — actual Session `remove` and first `replace` operations now append excluded resolution items for inherited
-    instruction, Tool, and Skill contributions. The frontend can render:
-    - removed by Session override;
-    - replaced by Session override;
-    - inherited but excluded.
-  - Backend policy note: Agent MCP declarations remain candidate-only. They are not inherited effective MCP selections and therefore have no effective Agent-MCP baseline to remove.
-  - **DECISION: Agent MCP inheritance**
-    - TODO: decide whether Agent MCP declarations should remain explicit Session-selection candidates or become inherited effective MCP baseline
-      contributions.
+  - Remaining: user-added contributions that happen to share the same canonical target are intentionally treated as an explicit re-addition rather than a separately source-scoped Agent-only exception.
 
 - △ Agent instruction sources and Agent starter text remain unavailable as editable Composer content.
   - Original degraded behavior: old Agent application added individually selectable Agent instruction sources and inserted Agent starter text only into an empty draft.
@@ -150,18 +145,15 @@ Status meanings:
   - Difference to verify: Fork copies source document rather than rendered instruction text; destination selection is explicit rather than preselected.
   - Completion status: no blocking capability loss. Exact old convenience/default behavior remains a frontend/product choice.
 
-- ○ Workspace active-Skill toggles still need end-to-end submission verification.
+- ✓ Patched — Workspace active-Skill selections are serialized end to end.
   - Original degraded behavior: Workspace modal exposed an Active toggle, but Workspace-owned active Skills were excluded from submitted active-Skill selections.
   - Required UX: toggling a selected Workspace instruction Skill to Active must affect the Run’s effective active Skill set.
-  - Current state: Workspace context/Skill deselection restoration was patched, and general Skill lifecycle synchronization was patched. The separate question is whether the Workspace Active toggle reaches `configuration.activeSkills`.
+  - Patch status: Composer now serializes all active Skill selections, including Workspace-owned active Skills. Backend validates that each active Skill belongs to the effective enabled set.
   - Cross-verify: attach a Workspace, select one Workspace instruction Skill, toggle Active, submit, then inspect the Run’s effective/active Skills. Repeat with Active off.
-  - Completion needed: likely frontend/session-intent work using existing `SessionConfiguration.activeSkills`; backend semantics should confirm Workspace Skill Artifact refs are valid active overrides.
   - Backend patch added —: explicit active-Skill selections retain
     expected revision/digest pins through operation preparation. A stale
     explicitly activated Workspace/Agent Skill now fails as stale, and a
     disabled explicitly active Skill no longer silently disappears.
-  - Frontend work remains: serialize the Workspace Active toggle into existing
-    `SessionConfiguration.activeSkills` override records.
 
 - ✓ Patched — Workspace Context/Skill deselection persistence.
   - Original degraded behavior: unchecking a baseline Workspace Context or Skill reappeared after reopening because removal keys used incompatible formats.
@@ -175,14 +167,16 @@ Status meanings:
     5. verify item remains unchecked;
     6. submit again and inspect effective backend selection.
 
-- ○ Template resource defaults and attachment-error ordering remain changed.
+- ✓ Patched — template resource defaults and insertion ordering.
   - Original degraded behavior: old resource-backed templates selected attachable resources by default and inserted text before attempting attachments.
   - Required UX: if preserving old behavior is desired:
     - all verified resource paths start selected;
     - template text survives a resource-attachment exception;
     - user gets a warning rather than losing insertion.
-  - Current state: new flow uses empty initial resource selection and can block text insertion when attachment preparation throws.
-  - Completion needed: frontend-only adjustments in `skill_template_bottom_bar_chip.tsx`.
+  - Patch status:
+    - verified template resource paths are selected by default;
+    - rendered template text is inserted before selected resource attachment work;
+    - resource attachment failures become visible warnings while preserving inserted template text.
   - Cross-verify: insert a resource-backed template without touching checkboxes, then repeat with an intentionally failing attachment path.
 
 - ✓ Patched — editing an earlier user message loads its original Composer state.
@@ -208,7 +202,7 @@ Status meanings:
     - App context.
       Then cancel and verify the pre-edit Composer state returns.
 
-- ◐ Editing/resending Tool-output follow-ups now has backend support; frontend wiring remains.
+- ✓ Patched — edit/resend carries selected persisted Tool results.
   - Original degraded behavior: old editor could serialize Tool outputs into the next inference input.
   - Required UX: if Tool-output chips are loaded into edit mode and make Send available, those Tool results must reach the next Run semantically.
   - Backend patch added:
@@ -220,8 +214,11 @@ Status meanings:
     - a Tool-result-only replacement message is accepted;
     - general `UserInput` remains unable to accept frontend-authored Tool
       results.
-  - Frontend completion needed: edit mode must preserve selected result IDs and
-    submit `carryForwardToolResultIDs` with `editAndResend`.
+  - Patch status:
+    - carried Tool-result chips can be removed individually while editing;
+    - remaining projected Session Tool-result IDs are submitted as
+      `carryForwardToolResultIDs`;
+    - IDs remain backend-validated against the replaced user message.
   - Cross-verify: edit a user turn containing multiple Tool outputs, carry a
     selected subset, send, and verify the next prepared operation contains the
     selected results and excludes the unselected results.
@@ -244,11 +241,10 @@ Status meanings:
     - final transcript replacement.
       Verify no blank busy body and no disappearance at terminal transition.
 
-- ◐ Send acknowledgement before the first authoritative snapshot remains weaker than old optimistic UI.
+- ✓ Patched — accepted Run acknowledgement before the first snapshot.
   - Original degraded behavior: old send immediately inserted user message and assistant “Waiting for response” placeholder.
   - Required UX: after accepted `StartRun`, user sees immediate acknowledgement before the next snapshot arrives.
-  - Current state: active-operation placeholder behavior is improved once a snapshot contains an operation. There may still be a short accepted-command interval showing only disabled Composer/tab busy state.
-  - Completion needed: frontend-only ephemeral accepted-Run status reconciled against snapshot state.
+  - Patch status: accepted StartRun and EditAndResend receipts set a transient pending Run identity. The conversation displays an authoritative-operation preparation acknowledgement until the corresponding Run appears in a Session snapshot.
   - Cross-verify: delay Session snapshot delivery after `StartRun` acceptance and inspect visible feedback.
 
 - ◐ Waiting-Run continuation authoring is now partially restored.
@@ -311,10 +307,13 @@ Status meanings:
     - If yes, this needs a separately named Session command with explicit Run creation, binding freshness, policy, approval, provider-call identity,
       and continuation semantics. Do not widen `RetryCall` casually.
 
-- ◐ Tool metadata, automatic badges, and rich Tool output now have backend data support.
+- ◐ Tool metadata, automatic badges, and rich Tool output now have frontend projection support.
   - Original degraded behavior: old message chips/details had Tool choice/plugin/version metadata, Auto markers, original arguments, typed file/image/text output items, and web-search detail.
   - Required UX: message-level Tool rendering should preserve safe display metadata and typed outputs.
-  - Current state: Session projection still reduces many regular Tool calls/results to minimal fields and text/structured content.
+  - Patch status:
+    - frontend Session projection now uses typed `SessionToolResult.contents` as the primary Tool output representation;
+    - operation usage, effective/active Skill state, Workspace usage records, and MCP Tool bindings are projected from snapshots;
+    - App Tool call/output matching accepts both runtime call IDs and provider call IDs.
   - Frontend-only portion: `SessionToolCall.automatic` already exists and can be projected into `UIToolCall` for Auto badges. Provider-call/result-ID matching can also be corrected in projection where existing IDs are available.
   - Backend patch added —:
     - Session Tool-call/result/proposal protocol types now use
@@ -327,10 +326,6 @@ Status meanings:
       fallback for durable replay;
     - runtime setup now constructs inference Tool output values directly rather
       than JSON-round-tripping custom Tool-output wire structs.
-  - Frontend completion needed: render `ToolResult.contents` as the primary
-    typed output source. Keep `ToolResult.text` as the provider-compatible
-    textual fallback. Do not use executor-private `structured` JSON as the
-    primary renderer after this backend patch.
   - Remaining: display-safe Tool binding/plugin/version labels and complete
     selected-but-not-called Tool choice presentation remain frontend projection
     work over resolution summaries and existing Tool-call data.
@@ -367,7 +362,7 @@ Status meanings:
     - resolution conflict/error.
   - Remaining: MCP approval is still rendered as generic wait summary rather than the former structured approval card. This is frontend-only if the wait summary contains the relevant metadata.
 
-- ◐ Historical message provenance has applied backend data support; frontend projection remains open.
+- ◐ Historical message provenance is now materially projected from existing snapshots.
   - Original degraded behavior: old message bars/details showed selected Tools, web-search config, unavailable Tool selections, MCP context, Skills, Workspace selection/usage, model context, token usage, and debug details.
   - Required UX: each historical turn should expose safe, per-operation provenance:
     - selected and used Model;
@@ -377,7 +372,11 @@ Status meanings:
     - Workspace selection and actual usage;
     - usage counters;
     - safe diagnostics/debug data.
-  - Patch status: latest patch improves `modelRef` and debug fallback from operation runtime metadata. Full provenance remains absent.
+  - Patch status:
+    - user messages are joined to operations through
+      `ModelOperation.request.current.id`;
+    - assistant messages use `operationID`;
+    - Workspace selection/usage, Model ref, normalized token usage, effective Skills, active Skills, MCP Tool usage, Tool results, and runtime metadata are projected without a new backend display endpoint.
   - Backend snapshot relationships now available:
     - assistant message `operationID`;
     - user message identity matched against
@@ -396,9 +395,7 @@ Status meanings:
       instead of silently disappearing from live provider history;
     - provider-shaped completion output adaptation uses inference-go typed
       output unions in runtime setup.
-  - Frontend completion needed: build a pure SessionSnapshot/Run projection.
-    No separate backend display endpoint is required for Model, Tool, MCP,
-    Skill, Workspace, configuration, diagnostics, or token usage chips.
+  - Remaining: full selected-but-not-called Tool choice display and full MCP resource/prompt selection display need more operation-summary-to-chip rendering work.
   - Remaining backend limitation: `inferenceSpec.Usage` provides normalized
     token counts, but not provider cost or provider-specific truncation data.
   - Cross-verify: inspect a completed Session message containing Model overrides, Tools, web search, MCP resources/prompts, Skills, Workspace Context, and usage. Current frontend still lacks most message chips.
@@ -497,11 +494,15 @@ Status meanings:
   - Patch status: rolling notes mark `viewID` retention fixed.
   - Cross-verify: stage App context, persist/reopen, inspect staged/restored update, then submit/continue and verify it is accepted.
 
-- △ MCP App binary content and policy-aware host behavior remain open.
+- ◐ MCP App binary context and policy-aware host behavior are partially delivered.
   - Original degraded behavior: App context can contain richer MCP content than current staged text/URI/name/description/MIME projection; old host also reflected per-server App policy for Tool advertisement and confirmation.
   - Required UX: App context must preserve intended content types, and host capability/confirmation behavior must match Session App policy.
-  - Current state: view identity and staged context UX are fixed; binary/image/audio/resource-blob payloads and policy-aware host capability declarations remain limited.
-  - Blocked by: Session App-context DTO and Session App policy display/projection contract.
+  - Patch status:
+    - Session App context content now carries byte data in addition to text/URI metadata;
+    - App result metadata carries App Tool-call, external-link, and context-update policy flags;
+    - host `serverTools` capability is suppressed when App Tool calls are disabled;
+    - no-confirmation link/context policy is honored in the host while backend continues enforcing current App policy for staged context and Tool execution.
+  - Remaining: App context is still injected into provider input as a safe JSON/text representation rather than a provider-native binary multimodal input.
   - Cross-verify: App requests:
     - text context;
     - structured context;
@@ -515,11 +516,10 @@ Status meanings:
   - Patch status: latest patch resolves the runtime ID through `mcpManagementAPI.findComposerServerByRuntimeID` and displays server name/logical identity with runtime-ID fallback.
   - Cross-verify: open an App for a known MCP server and verify header/dialog text shows readable server identity; disable/remove catalog visibility and verify runtime ID fallback remains safe.
 
-- ○ MCP App call/input association still needs verification and likely a projection adjustment.
+- ✓ Patched — MCP App Tool input association accepts both runtime and provider call identities.
   - Original degraded behavior: projected Tool calls can use provider call ID while projected Tool outputs use runtime call ID, preventing `ChatMessage` from finding the originating call arguments for an App.
   - Required UX: App view receives the Tool input arguments that produced the App result.
-  - Current state: not listed as fixed in rolling notes.
-  - Completion needed: frontend projection should normalize call/output join identity using existing `providerCallID`/`callID` fields consistently.
+  - Patch status: message rendering indexes both `UIToolCall.id` and `UIToolCall.callID` before joining App Tool outputs to their originating Tool input.
   - Cross-verify: invoke an App-capable MCP Tool with arguments and verify `ui/notifications/tool-input` receives those arguments.
 
 - ✓ Patched — second-turn automatic title refinement, if latest patch is applied.

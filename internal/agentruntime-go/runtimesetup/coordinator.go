@@ -34,6 +34,7 @@ import (
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const operationResolutionVersion = uint32(1)
@@ -72,6 +73,10 @@ type mcpRuntimeAdapter struct {
 			ctx context.Context,
 			serverID mcpServer.ServerID,
 		) (*mcpServer.MCPServerRuntimeSnapshot, error)
+		AppPolicy(
+			ctx context.Context,
+			serverID mcpServer.ServerID,
+		) (mcppolicy.MCPAppsPolicy, error)
 		ListTools(
 			ctx context.Context,
 			serverID mcpServer.ServerID,
@@ -150,18 +155,20 @@ type preparedSkills struct {
 }
 
 type operationPlan struct {
-	summary               sessionRuntime.OperationResolutionSummary
-	model                 *sessionRuntime.ArtifactSelection
-	modelOwner            sessionRuntime.ConfigurationOwner
-	instructions          []instructionContribution
-	tools                 []toolContribution
-	skills                []skillContribution
-	activeSkills          map[string]struct{}
-	activeSkillSelections map[string]sessionRuntime.ArtifactSelection
-	mcp                   []sessionRuntime.MCPServerSelection
-	mcpUses               map[string]*sessionRuntime.ResolvedArtifact
-	mcpOwners             map[string]sessionRuntime.ConfigurationOwner
-	userContexts          []string
+	summary                  sessionRuntime.OperationResolutionSummary
+	model                    *sessionRuntime.ArtifactSelection
+	modelOwner               sessionRuntime.ConfigurationOwner
+	includeModelSystemPrompt *bool
+	instructions             []instructionContribution
+	tools                    []toolContribution
+	skills                   []skillContribution
+	activeSkills             map[string]struct{}
+	activeSkillSelections    map[string]sessionRuntime.ArtifactSelection
+	mcp                      []sessionRuntime.MCPServerSelection
+	mcpUses                  map[string]*sessionRuntime.ResolvedArtifact
+	mcpOwners                map[string]sessionRuntime.ConfigurationOwner
+	mcpRequired              map[string]bool
+	userContexts             []string
 }
 
 type instructionContribution struct {
@@ -221,6 +228,7 @@ func (c *coordinator) PrepareModelOperation(
 		activeSkillSelections: make(map[string]sessionRuntime.ArtifactSelection),
 		mcpUses:               make(map[string]*sessionRuntime.ResolvedArtifact),
 		mcpOwners:             make(map[string]sessionRuntime.ConfigurationOwner),
+		mcpRequired:           make(map[string]bool),
 	}
 
 	if err := c.resolveAgent(ctx, request.Configuration.Agent, &plan); err != nil {
@@ -274,6 +282,11 @@ func (c *coordinator) PrepareModelOperation(
 			plan.summary,
 			err,
 		)
+	}
+	if plan.modelOwner == sessionRuntime.ConfigurationOwnerAgent &&
+		plan.includeModelSystemPrompt != nil &&
+		!*plan.includeModelSystemPrompt {
+		clearModelSystemPrompt = true
 	}
 
 	modelConfig, usedModel, err := c.models.ResolveRuntimeModelWithRequestPatch(
@@ -362,6 +375,7 @@ func (c *coordinator) PrepareModelOperation(
 		plan.mcp,
 		plan.mcpUses,
 		plan.mcpOwners,
+		plan.mcpRequired,
 		&plan.summary,
 	)
 	if err != nil {

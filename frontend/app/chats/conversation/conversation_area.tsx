@@ -696,6 +696,9 @@ function ConversationAreaInner(
 	const activeRun = activeTab?.sessionSnapshot
 		? selectedSessionRun(activeTab.sessionSnapshot, activeTab.activeRunID)
 		: undefined;
+	const pendingRunAcknowledgement =
+		activeTab?.pendingRunID !== undefined &&
+		!activeTab.sessionSnapshot?.runs.some(run => run.id === activeTab.pendingRunID);
 	const activeTabIsGenerating = runHasGeneratingModelOperation(activeRun);
 	const [waitResolutionState, setWaitResolutionState] = useState<WaitResolutionState | null>(null);
 	const [sessionActionErrorState, setSessionActionErrorState] = useState<SessionActionErrorState | null>(null);
@@ -1404,6 +1407,12 @@ function ConversationAreaInner(
 							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
 								<span>{sessionActionError}</span>
 							</div>
+						) : null}
+						{pendingRunAcknowledgement ? (
+							<output className="border-info/30 bg-info/10 mb-2 flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm">
+								<span className="loading loading-dots loading-sm" aria-hidden="true" />
+								<span>Run accepted. Preparing the authoritative operation…</span>
+							</output>
 						) : null}
 						{activeTabIsHydrating && messageCount === 0 ? (
 							<div className="flex min-h-128 items-center justify-center py-8">

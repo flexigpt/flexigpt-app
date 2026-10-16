@@ -55,7 +55,7 @@ import type {
 	MCPProviderToolMapping,
 	MCPServerOverride,
 } from '@/spec/session_mcp';
-import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
+import type { ToolOutputUnion, ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
 interface SessionDirectCapabilitySelection {
@@ -303,6 +303,7 @@ export interface SessionToolResult {
 	kind: SessionToolResultKind;
 	text?: string;
 	structured?: SessionOpaqueJSON;
+	contents?: ToolOutputUnion[];
 	app?: SessionOpaqueJSON;
 	error?: string;
 	appInstanceID?: AppInstanceID;
@@ -391,11 +392,12 @@ interface SessionModelOperationInput {
 	continuationRevision?: SessionRevision;
 }
 
-interface SessionModelOperation {
+export interface SessionModelOperation {
 	id: OperationID;
 	state: SessionOperationState;
 	startedAt?: string;
 	finishedAt?: string;
+	automatic?: boolean;
 	request: SessionModelOperationInput;
 	streamedText?: string;
 	streamedThinking?: string;
@@ -404,6 +406,7 @@ interface SessionModelOperation {
 	error?: SessionOperationError;
 	preparation: SessionOperationPreparation;
 	usable: boolean;
+	usage?: InferenceUsage;
 	metadata?: SessionOpaqueJSON;
 	runtimeMetadata?: SessionOpaqueJSON;
 }

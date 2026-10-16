@@ -25,6 +25,7 @@ func (c *coordinator) prepareMCP(
 	selections []sessionRuntime.MCPServerSelection,
 	uses map[string]*sessionRuntime.ResolvedArtifact,
 	owners map[string]sessionRuntime.ConfigurationOwner,
+	required map[string]bool,
 	summary *sessionRuntime.OperationResolutionSummary,
 ) ([]inferenceSpec.ToolChoice, preparedBindings, []string, error) {
 	choices := make([]inferenceSpec.ToolChoice, 0)
@@ -42,6 +43,7 @@ func (c *coordinator) prepareMCP(
 			owner = sessionRuntime.ConfigurationOwnerSession
 		}
 
+		requiredSelection := required[key]
 		ref, err := artifactRef(selection.Server)
 		if err != nil {
 			return nil, preparedBindings{}, nil, err
@@ -52,13 +54,13 @@ func (c *coordinator) prepareMCP(
 			return nil, preparedBindings{}, nil, err
 		}
 
-		status, err := c.mcpRuntime.runtime.Status(ctx, serverID)
-		if err != nil ||
+		status, statusErr := c.mcpRuntime.runtime.Status(ctx, serverID)
+		if statusErr != nil ||
 			status == nil ||
 			status.Status != mcpServer.MCPServerStatusReady {
 			message := "MCP server is not connected"
-			if err != nil {
-				message = err.Error()
+			if statusErr != nil {
+				message = statusErr.Error()
 			}
 
 			summary.MCP = append(
@@ -76,12 +78,25 @@ func (c *coordinator) prepareMCP(
 			summary.Diagnostics = append(
 				summary.Diagnostics,
 				sessionRuntime.ResolutionDiagnostic{
-					Severity: sessionRuntime.DiagnosticSeverityWarning,
-					Code:     "mcp_unavailable",
-					Message:  message,
-					Key:      key,
+					Severity: func() sessionRuntime.DiagnosticSeverity {
+						if requiredSelection {
+							return sessionRuntime.DiagnosticSeverityError
+						}
+						return sessionRuntime.DiagnosticSeverityWarning
+					}(),
+					Code:    "mcp_unavailable",
+					Message: message,
+					Key:     key,
 				},
 			)
+			if requiredSelection {
+				return nil, preparedBindings{}, nil, operationPreparationError(
+					"agent_required_mcp_unavailable",
+					message,
+					*summary,
+					statusErr,
+				)
+			}
 			continue
 		}
 
@@ -844,7 +859,7 @@ func (c *coordinator) ReadAppResource(
 }
 
 func (c *coordinator) ValidateAppContext(
-	_ context.Context,
+	ctx context.Context,
 	request sessionRuntime.AppContextStagingRequest,
 ) (sessionRuntime.AppContextUpdate, error) {
 	if request.App.Route == nil {
@@ -868,6 +883,22 @@ func (c *coordinator) ValidateAppContext(
 		request.Update.ServerID != request.App.ServerID {
 		return sessionRuntime.AppContextUpdate{}, errors.New(
 			"app context update belongs to another MCP server",
+		)
+	}
+	var binding invocation.MappedToolBinding
+	if err := json.Unmarshal(request.App.Route.Binding.Data, &binding); err != nil {
+		return sessionRuntime.AppContextUpdate{}, err
+	}
+	if err := binding.Validate(); err != nil {
+		return sessionRuntime.AppContextUpdate{}, err
+	}
+	appsPolicy, err := c.mcpRuntime.runtime.AppPolicy(ctx, binding.Server)
+	if err != nil {
+		return sessionRuntime.AppContextUpdate{}, err
+	}
+	if !appsPolicy.Enabled {
+		return sessionRuntime.AppContextUpdate{}, errors.New(
+			"MCP Apps are not enabled for this server",
 		)
 	}
 

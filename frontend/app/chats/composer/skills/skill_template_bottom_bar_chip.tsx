@@ -382,7 +382,9 @@ function SkillTemplateRenderModalContent({
 		Object.fromEntries((item?.arguments ?? []).map(argument => [argument.name, argument.default ?? '']))
 	);
 	const approvedResourcePaths = useMemo(() => approvedTemplateResourcePaths(item), [item]);
-	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>([]);
+	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>(() => {
+		return approvedResourcePaths;
+	});
 	const [submitError, setSubmitError] = useState('');
 	const [resourceAttachmentWarnings, setResourceAttachmentWarnings] = useState<string[]>([]);
 	const [inserted, setInserted] = useState(false);
@@ -848,6 +850,7 @@ function SkillTemplateBottomBarChipInner({
 					'Template prepared, but the Composer became locked before insertion. Try again when it is available.'
 				);
 			}
+			await onInsertTemplateText(rendered.text);
 
 			const requestedResourcePaths = selectedApprovedTemplateResourcePaths(
 				approvedTemplateResourcePaths(item),
@@ -856,27 +859,33 @@ function SkillTemplateBottomBarChipInner({
 			let resourceAttachmentWarnings: string[] | undefined;
 
 			if (requestedResourcePaths.length > 0) {
-				const attachmentResult = await onAttachApprovedTemplateResourcePaths(
-					requestedResourcePaths,
-					() => !inputLockedRef.current
-				);
-				if (!attachmentResult) {
-					throw new Error('Selected template resources could not be prepared for attachment.');
-				}
-
-				const warnings = resourceWarningsFromAttachmentResult(attachmentResult);
-				if (warnings.length > 0) {
-					resourceAttachmentWarnings = warnings;
+				try {
+					const attachmentResult = await onAttachApprovedTemplateResourcePaths(
+						requestedResourcePaths,
+						() => !inputLockedRef.current
+					);
+					if (!attachmentResult) {
+						resourceAttachmentWarnings = ['Selected template resources could not be prepared for attachment.'];
+					} else {
+						const warnings = resourceWarningsFromAttachmentResult(attachmentResult);
+						if (warnings.length > 0) {
+							resourceAttachmentWarnings = warnings;
+						}
+					}
+				} catch (error) {
+					resourceAttachmentWarnings = [
+						error instanceof Error ? error.message : 'Selected template resources could not be attached.',
+					];
 				}
 			}
 
 			if (inputLockedRef.current) {
-				throw new Error(
-					'Template resources were prepared, but the Composer became locked before insertion. Try again when it is available.'
-				);
+				resourceAttachmentWarnings = [
+					...(resourceAttachmentWarnings ?? []),
+					'Template text was inserted, but the Composer became locked before all selected resources could be attached.',
+				];
 			}
 
-			await onInsertTemplateText(rendered.text);
 			store.hide();
 
 			return { resourceAttachmentWarnings };

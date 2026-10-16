@@ -53,11 +53,14 @@ type MCPToolCallProvenance struct {
 }
 
 type MCPToolAppRenderInfo struct {
-	ResourceURI       string       `json:"resourceUri,omitempty"`
-	MimeType          string       `json:"mimeType,omitempty"`
-	Content           []MCPContent `json:"content,omitempty"`
-	StructuredContent any          `json:"structuredContent,omitempty"`
-	IsError           bool         `json:"isError,omitempty"`
+	ResourceURI                      string       `json:"resourceUri,omitempty"`
+	MimeType                         string       `json:"mimeType,omitempty"`
+	Content                          []MCPContent `json:"content,omitempty"`
+	StructuredContent                any          `json:"structuredContent,omitempty"`
+	IsError                          bool         `json:"isError,omitempty"`
+	AllowAppInitiatedToolCalls       bool         `json:"allowAppInitiatedToolCalls,omitempty"`
+	RequireApprovalForOpenLink       bool         `json:"requireApprovalForOpenLink,omitempty"`
+	RequireApprovalForContextUpdates bool         `json:"requireApprovalForContextUpdates,omitempty"`
 }
 
 // InvokeMCPToolResponseBody is the host-side response for a server tool call.

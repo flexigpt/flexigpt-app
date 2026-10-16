@@ -633,6 +633,35 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 	return config, cloneTool(tool), nil
 }
 
+// AppPolicy returns the policy captured for a runtime server session. It is
+// intentionally limited to policy state; callers do not receive secrets,
+// transport clients, or mutable runtime configuration.
+//
+// A disconnected retained session may still serve an existing App view, so
+// this does not require Ready state. Invalidation removes the session and
+// therefore prevents stale App routes from using an obsolete policy.
+func (m *MCPRuntimeManager) AppPolicy(
+	_ context.Context,
+	ref mcpServer.ServerID,
+) (mcppolicy.MCPAppsPolicy, error) {
+	if err := ref.Validate(); err != nil {
+		return mcppolicy.MCPAppsPolicy{}, err
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	state := m.sessions[ref]
+	if m.closed || state == nil || state.config.Server != ref {
+		return mcppolicy.MCPAppsPolicy{}, fmt.Errorf(
+			"%w: MCP server policy is unavailable",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+
+	return mcppolicy.Clone(state.config.Policy).AppsPolicy, nil
+}
+
 func (m *MCPRuntimeManager) CallTool(
 	ctx context.Context,
 	ref mcpServer.ServerID,
@@ -713,7 +742,8 @@ func (m *MCPRuntimeManager) CallTool(
 	body.Provenance.ApprovalID = request.ApprovalID
 	body.Provenance.AppInstanceID = request.AppInstanceID
 
-	if state.config.Policy.AppsPolicy.Enabled &&
+	appsPolicy := state.config.Policy.AppsPolicy
+	if appsPolicy.Enabled &&
 		tool.App != nil &&
 		tool.App.ResourceURI != "" {
 		body.Provenance.AppResourceURI = tool.App.ResourceURI
@@ -724,6 +754,9 @@ func (m *MCPRuntimeManager) CallTool(
 		} else if body.App.ResourceURI == "" {
 			body.App.ResourceURI = tool.App.ResourceURI
 		}
+		body.App.AllowAppInitiatedToolCalls = appsPolicy.AllowAppInitiatedToolCalls
+		body.App.RequireApprovalForOpenLink = appsPolicy.RequireApprovalForOpenLink
+		body.App.RequireApprovalForContextUpdates = appsPolicy.RequireApprovalForContextUpdates
 	}
 	return body, nil
 }

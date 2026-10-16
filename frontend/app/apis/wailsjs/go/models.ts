@@ -5714,6 +5714,7 @@ export namespace session {
 	    name?: string;
 	    description?: string;
 	    mimeType?: string;
+	    data?: number[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AppContextContent(source);
@@ -5727,6 +5728,7 @@ export namespace session {
 	        this.name = source["name"];
 	        this.description = source["description"];
 	        this.mimeType = source["mimeType"];
+	        this.data = source["data"];
 	    }
 	}
 	export class AppContextUpdate {

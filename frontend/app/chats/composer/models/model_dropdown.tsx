@@ -4,6 +4,7 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
 
 import {
@@ -79,12 +80,32 @@ interface ModelDropdownProps {
 	selectedModel: UIModelOption;
 	setSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
 	allOptions: UIModelOption[];
+	modelSelectionSource?: 'session' | 'agent';
+	agentModelRef?: ArtifactRef;
 }
 
-export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: ModelDropdownProps) {
+export function ModelDropdown({
+	selectedModel,
+	setSelectedModel,
+	allOptions,
+	modelSelectionSource = 'session',
+	agentModelRef,
+}: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const providerGroups = useMemo(() => groupModelOptionsByProvider(allOptions), [allOptions]);
+	const agentOwnsModel = modelSelectionSource === 'agent';
+	const agentPreviewMatchesSelected =
+		agentOwnsModel &&
+		agentModelRef?.rootID === selectedModel.model?.rootID &&
+		agentModelRef?.artifactID === selectedModel.model?.artifactID;
+	const triggerLabel = agentOwnsModel
+		? agentPreviewMatchesSelected
+			? `Agent model: ${selectedModel.modelDisplayName}`
+			: agentModelRef
+				? `Agent model: ${agentModelRef.artifactID}`
+				: 'Agent chooses model'
+		: selectedModel.modelDisplayName;
 
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
@@ -131,11 +152,21 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<HoverTip content="Select model" placement="top" wrapperElement="div" wrapperClassName="w-full">
+				<HoverTip
+					content={
+						agentOwnsModel
+							? 'The Agent owns the effective Model selection. Choosing a Model here creates an explicit Session override.'
+							: 'Select model'
+					}
+					placement="top"
+					wrapperElement="div"
+					wrapperClassName="w-full"
+				>
 					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
-							label={selectedModel.modelDisplayName}
+							label={triggerLabel}
 							open={open}
+							suffix={agentOwnsModel ? <span className="badge badge-secondary badge-xs">Agent</span> : undefined}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
@@ -169,6 +200,12 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 							menu.hide();
 						}}
 					/>
+
+					{agentOwnsModel ? (
+						<div className="text-base-content/60 mb-2 px-1 text-xs">
+							Choosing a Model below replaces Agent Model ownership with an explicit Session Model override.
+						</div>
+					) : null}
 
 					{displayedProviderGroups.length === 0 ? (
 						<div className={searchableMenuEmptyStateClasses}>No models match your search.</div>

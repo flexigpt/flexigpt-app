@@ -21,6 +21,7 @@ interface EditorChipsBarProps {
 	onDiscardToolCall?: (id: string) => void;
 	onOpenOutput?: (output: UIToolOutput) => void;
 	onRetryErroredOutput?: (output: UIToolOutput) => void;
+	onRemoveToolOutput?: (id: string) => void;
 	onRemoveAttachment: (att: UIAttachment) => void;
 	onChangeAttachmentContentBlockMode: (att: UIAttachment, mode: AttachmentContentBlockMode) => void;
 	onRemoveDirectoryGroup: (groupId: string) => void;
@@ -49,6 +50,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onDiscardToolCall,
 	onOpenOutput,
 	onRetryErroredOutput,
+	onRemoveToolOutput,
 	onRemoveAttachment,
 	onChangeAttachmentContentBlockMode,
 	onRemoveDirectoryGroup,
@@ -78,6 +80,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	const discardToolCall = onDiscardToolCall ?? (() => {});
 	const openOutput = onOpenOutput ?? (() => {});
 	const retryErroredOutput = onRetryErroredOutput ?? (() => {});
+	const removeToolOutput = onRemoveToolOutput ?? (() => {});
 	const openToolCallDetails = onOpenToolCallDetails ?? (() => {});
 
 	if (!hasAnyChips) {
@@ -119,6 +122,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 				onDiscardToolCall={discardToolCall}
 				onOpenOutput={openOutput}
 				onRetryErroredOutput={retryErroredOutput}
+				onRemoveToolOutput={removeToolOutput}
 				onOpenCallDetails={openToolCallDetails}
 			/>
 		</div>

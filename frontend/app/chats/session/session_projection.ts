@@ -5,12 +5,14 @@ import type {
 	Conversation,
 	ConversationMessage,
 	SessionAttachmentReference,
+	SessionModelOperation,
 	SessionRun,
 	SessionSnapshot,
 	SessionToolCall,
 	SessionToolResult,
 	SessionTranscriptMessage,
 } from '@/spec/session';
+import type { SessionResolutionItem } from '@/spec/session_base';
 import type {
 	MCPAppContextUpdate,
 	MCPAppInstance,
@@ -18,20 +20,37 @@ import type {
 	MCPAppVisibility,
 	MCPContent,
 	MCPContentType,
+	MCPConversationContext,
+	MCPRuntimeServerID,
+	MCPToolSelection,
 } from '@/spec/session_mcp';
+import type {
+	WorkspaceConversationContextUsage,
+	WorkspaceConversationResourceSelectionRef,
+	WorkspaceConversationSelection,
+	WorkspaceConversationSkillUsage,
+	WorkspaceConversationUsage,
+} from '@/spec/workspace';
 import { AttachmentKind } from '@/spec/attachment';
 import { RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
 import {
 	SessionAttachmentReferenceKind,
+	SessionConfigurationOwner,
 	SessionMessageRole,
 	SessionOperationState,
+	SessionResolutionState,
 	SessionRunState,
 	SessionToolBindingKind,
 	SessionToolCallState,
 	SessionToolResultKind,
 } from '@/spec/session_base';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/session_mcp';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode, MCPToolExposure } from '@/spec/session_mcp';
 import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
+import {
+	WorkspaceConversationContextUsageStatus,
+	WorkspaceConversationSelectionStatus,
+	WorkspaceConversationSkillUsageStatus,
+} from '@/spec/workspace';
 
 import { deriveUIFieldsFromOutputUnion } from '@/chats/conversation/completion_helper';
 import { selectedSessionRun } from '@/chats/session/session_commands';
@@ -41,11 +60,17 @@ interface IndexedToolCall {
 	run: SessionRun;
 }
 
+interface IndexedOperation {
+	operation: SessionModelOperation;
+	run: SessionRun;
+}
+
 interface SessionRunIndex {
 	runsByOperationID: Map<string, SessionRun>;
 	callsByOperationID: Map<string, SessionToolCall[]>;
 	callsByID: Map<string, IndexedToolCall>;
 	appsByRunID: Map<string, Map<string, MCPAppInstance>>;
+	operationsByCurrentMessageID: Map<string, IndexedOperation>;
 }
 
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
@@ -83,12 +108,14 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 	const callsByOperationID = new Map<string, SessionToolCall[]>();
 	const callsByID = new Map<string, IndexedToolCall>();
 	const appsByRunID = new Map<string, Map<string, MCPAppInstance>>();
+	const operationsByCurrentMessageID = new Map<string, IndexedOperation>();
 
 	for (const run of snapshot.runs) {
 		appsByRunID.set(run.id, new Map((run.apps ?? []).map(app => [app.id, app] as const)));
 
 		for (const operation of run.modelOperations ?? []) {
 			runsByOperationID.set(operation.id, run);
+			operationsByCurrentMessageID.set(operation.request.current.id, { operation, run });
 		}
 
 		for (const call of run.toolCalls ?? []) {
@@ -104,6 +131,7 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 		callsByOperationID,
 		callsByID,
 		appsByRunID,
+		operationsByCurrentMessageID,
 	};
 }
 
@@ -289,6 +317,195 @@ function mcpSelectionFromBinding(call: SessionToolCall): UIToolCall['mcpToolSele
 	};
 }
 
+function artifactRefFromResolutionItem(
+	item: SessionResolutionItem | undefined
+): WorkspaceConversationResourceSelectionRef | undefined {
+	const rootID = item?.selected?.rootID ?? item?.used?.rootID;
+	const artifactID = item?.selected?.artifactID ?? item?.used?.artifactID;
+
+	if (!rootID || !artifactID) {
+		return undefined;
+	}
+
+	return {
+		artifact: { rootID, artifactID },
+		name: item?.key,
+		artifactRevision: item?.used?.revision ?? item?.selected?.expectedRevision,
+		definitionDigest: item?.used?.digest ?? item?.selected?.expectedDigest,
+	};
+}
+
+function workspaceContextStatus(state: SessionResolutionState): WorkspaceConversationContextUsageStatus {
+	switch (state) {
+		case SessionResolutionState.Included:
+			return WorkspaceConversationContextUsageStatus.Included;
+		case SessionResolutionState.Excluded:
+			return WorkspaceConversationContextUsageStatus.Excluded;
+		case SessionResolutionState.Blocked:
+			return WorkspaceConversationContextUsageStatus.Denied;
+		default:
+			return WorkspaceConversationContextUsageStatus.Unavailable;
+	}
+}
+
+function workspaceSkillStatus(state: SessionResolutionState): WorkspaceConversationSkillUsageStatus {
+	return state === SessionResolutionState.Included
+		? WorkspaceConversationSkillUsageStatus.Available
+		: WorkspaceConversationSkillUsageStatus.Unavailable;
+}
+
+function workspaceProjectionForOperation(operation: SessionModelOperation): {
+	selection?: WorkspaceConversationSelection;
+	usage?: WorkspaceConversationUsage;
+} {
+	const summary = operation.preparation.resolution;
+	const configuredWorkspace = operation.request.configuration.workspace?.workspace;
+	const workspaceItem = summary.workspace;
+	const workspaceRef =
+		workspaceItem?.selected ??
+		(configuredWorkspace
+			? {
+					rootID: configuredWorkspace.rootID,
+					artifactID: configuredWorkspace.artifactID,
+				}
+			: undefined);
+
+	if (!workspaceRef) {
+		return {};
+	}
+
+	const workspace = {
+		rootID: workspaceRef.rootID,
+		artifactID: workspaceRef.artifactID,
+	};
+	const workspaceItems = [
+		...(summary.instructions ?? []).filter(item => item.owner === SessionConfigurationOwner.Workspace),
+		...(summary.skills ?? []).filter(item => item.owner === SessionConfigurationOwner.Workspace),
+		...(summary.mcp ?? []).filter(item => item.owner === SessionConfigurationOwner.Workspace),
+	];
+	const contextItems = (summary.instructions ?? []).filter(
+		item => item.owner === SessionConfigurationOwner.Workspace && item.kind === 'workspaceContext'
+	);
+	const skillItems = (summary.skills ?? []).filter(item => item.owner === SessionConfigurationOwner.Workspace);
+	const mcpItems = (summary.mcp ?? []).filter(item => item.owner === SessionConfigurationOwner.Workspace);
+
+	const contextRefs = contextItems
+		.map(i => {
+			return artifactRefFromResolutionItem(i);
+		})
+		.filter((item): item is WorkspaceConversationResourceSelectionRef => item !== undefined);
+	const skillRefs = skillItems
+		.map(i => {
+			return artifactRefFromResolutionItem(i);
+		})
+		.filter((item): item is WorkspaceConversationResourceSelectionRef => item !== undefined);
+	const mcpRefs = mcpItems
+		.map(i => {
+			return artifactRefFromResolutionItem(i);
+		})
+		.filter((item): item is WorkspaceConversationResourceSelectionRef => item !== undefined);
+
+	const hasUnavailable =
+		workspaceItem?.state === SessionResolutionState.Unavailable ||
+		workspaceItem?.state === SessionResolutionState.Stale ||
+		workspaceItem?.state === SessionResolutionState.Blocked ||
+		workspaceItems.some(
+			item =>
+				item.state === SessionResolutionState.Unavailable ||
+				item.state === SessionResolutionState.Stale ||
+				item.state === SessionResolutionState.Blocked ||
+				item.state === SessionResolutionState.Changed
+		);
+	const usageStatus = hasUnavailable
+		? WorkspaceConversationSelectionStatus.Unavailable
+		: workspaceItems.some(item => item.state !== SessionResolutionState.Included)
+			? WorkspaceConversationSelectionStatus.Partial
+			: WorkspaceConversationSelectionStatus.Ready;
+
+	return {
+		selection: {
+			workspace,
+			workspaceRevision: workspaceItem?.used?.revision ?? configuredWorkspace?.expectedRevision,
+			contextRefs: contextRefs.length > 0 ? contextRefs : undefined,
+			skillRefs: skillRefs.length > 0 ? skillRefs : undefined,
+			mcpRefs: mcpRefs.length > 0 ? mcpRefs : undefined,
+		},
+		usage: {
+			workspace,
+			workspaceRevision: workspaceItem?.used?.revision ?? configuredWorkspace?.expectedRevision,
+			status: usageStatus,
+			contexts: contextItems
+				.map(item => {
+					const ref = artifactRefFromResolutionItem(item);
+					if (!ref) {
+						return undefined;
+					}
+					return {
+						artifact: ref.artifact,
+						name: ref.name,
+						locator: ref.locator,
+						selectedDefinitionDigest: item.selected?.expectedDigest,
+						usedDefinitionDigest: item.used?.digest,
+						usedArtifactRevision: item.used?.revision,
+						status: workspaceContextStatus(item.state),
+						changed: item.state === SessionResolutionState.Changed || item.state === SessionResolutionState.Stale,
+						code: item.reason,
+					};
+				})
+				.filter(Boolean) as WorkspaceConversationContextUsage[],
+			skills: skillItems
+				.map(item => {
+					const ref = artifactRefFromResolutionItem(item);
+					if (!ref) {
+						return undefined;
+					}
+					return {
+						artifact: ref.artifact,
+						name: ref.name,
+						displayName: ref.name,
+						locator: ref.locator,
+						selectedDefinitionDigest: item.selected?.expectedDigest,
+						usedDefinitionDigest: item.used?.digest,
+						usedArtifactRevision: item.used?.revision,
+						status: workspaceSkillStatus(item.state),
+						changed: item.state === SessionResolutionState.Changed || item.state === SessionResolutionState.Stale,
+						sessionAvailable: item.state === SessionResolutionState.Included,
+					};
+				})
+				.filter(Boolean) as WorkspaceConversationSkillUsage[],
+		},
+	};
+}
+
+function mcpContextFromCalls(calls: SessionToolCall[]): MCPConversationContext | undefined {
+	const byServer = new Map<MCPRuntimeServerID, MCPToolSelection[]>();
+
+	for (const call of calls) {
+		const selection = mcpSelectionFromBinding(call);
+		if (!selection) {
+			continue;
+		}
+
+		const selected = byServer.get(selection.server) ?? [];
+		if (!selected.some(candidate => candidate.toolName === selection.toolName)) {
+			selected.push(selection);
+		}
+		byServer.set(selection.server, selected);
+	}
+
+	if (byServer.size === 0) {
+		return undefined;
+	}
+
+	return {
+		servers: [...byServer.entries()].map(([server, selectedTools]) => ({
+			server,
+			toolExposure: MCPToolExposure.Selected,
+			selectedTools,
+		})),
+	};
+}
+
 function appRenderTarget(
 	app: MCPAppInstance | undefined,
 	sessionSnapshot: SessionSnapshot,
@@ -325,6 +542,9 @@ function toolOutputFromResult(
 		content?: MCPContent[];
 		structuredContent?: unknown;
 		isError?: boolean;
+		allowAppInitiatedToolCalls?: boolean;
+		requireApprovalForOpenLink?: boolean;
+		requireApprovalForContextUpdates?: boolean;
 	}>(result.app);
 
 	const structuredText = structured === undefined ? '' : JSON.stringify(structured, null, 2) || '';
@@ -337,14 +557,7 @@ function toolOutputFromResult(
 		choiceID: result.choiceID ?? call?.choiceID ?? '',
 		type: toolChoiceType(result.type || call?.type),
 		summary: result.kind === SessionToolResultKind.Success ? `Result: ${result.name}` : `Tool error: ${result.name}`,
-		toolOutputs: [
-			{
-				kind: ToolOutputKind.Text,
-				textItem: {
-					text,
-				},
-			},
-		],
+		toolOutputs: result.contents?.length ? result.contents : [{ kind: ToolOutputKind.Text, textItem: { text } }],
 		isError: result.kind !== SessionToolResultKind.Success,
 		isSkipped: result.kind === SessionToolResultKind.Skipped,
 		errorMessage: result.error,
@@ -357,6 +570,9 @@ function toolOutputFromResult(
 						content: appPayload?.content,
 						structuredContent: appPayload?.structuredContent,
 						isError: appPayload?.isError,
+						allowAppInitiatedToolCalls: appPayload?.allowAppInitiatedToolCalls,
+						requireApprovalForOpenLink: appPayload?.requireApprovalForOpenLink,
+						requireApprovalForContextUpdates: appPayload?.requireApprovalForContextUpdates,
 					}
 				: undefined,
 		sessionApp: appRenderTarget(app, sessionSnapshot, run),
@@ -403,6 +619,7 @@ function appContextUpdatesFromSession(values: MCPAppContextUpdate[] | undefined)
 			name: content.name,
 			description: content.description,
 			mimeType: content.mimeType,
+			data: content.data,
 		})),
 		structuredContent: decodeSessionOpaqueJSON(update.structuredContent),
 		updatedAt: update.updatedAt,
@@ -415,8 +632,15 @@ function projectTranscriptMessage(
 	index: SessionRunIndex
 ): ConversationMessage {
 	const outputs = protocolOutputs(message);
-	const operationRun = message.operationID ? index.runsByOperationID.get(message.operationID) : undefined;
-	const operation = operationRun?.modelOperations?.find(candidate => candidate.id === message.operationID);
+	const indexedOperation = message.operationID
+		? (() => {
+				const run = index.runsByOperationID.get(message.operationID);
+				const operation = run?.modelOperations?.find(candidate => candidate.id === message.operationID);
+				return operation && run ? { operation, run } : undefined;
+			})()
+		: index.operationsByCurrentMessageID.get(message.id);
+	const operationRun = indexedOperation?.run;
+	const operation = indexedOperation?.operation;
 	const operationCalls = message.operationID ? (index.callsByOperationID.get(message.operationID) ?? []) : [];
 	const appsByID = operationRun ? index.appsByRunID.get(operationRun.id) : undefined;
 	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
@@ -425,7 +649,13 @@ function projectTranscriptMessage(
 				rootID: operation.request.configuration.model.rootID,
 				artifactID: operation.request.configuration.model.artifactID,
 			}
-		: undefined;
+		: operation?.preparation.resolution.model?.used
+			? {
+					rootID: operation.preparation.resolution.model.used.rootID,
+					artifactID: operation.preparation.resolution.model.used.artifactID,
+				}
+			: undefined;
+	const workspaceProjection = operation ? workspaceProjectionForOperation(operation) : {};
 
 	const toolResults =
 		message.toolResults
@@ -442,15 +672,21 @@ function projectTranscriptMessage(
 		id: message.id,
 		createdAt: message.createdAt,
 		role: messageRole(message.role),
-		status: messageStatus(message, operation?.error),
+		status: messageStatus(message, message.role === SessionMessageRole.Assistant ? operation?.error : undefined),
 		modelRef,
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
+		// usage: operation?.usage,
+		enabledSkillRefs: operation?.preparation.effectiveSkills,
+		activeSkillRefs: operation?.preparation.activeSkills,
+		workspaceSelection: workspaceProjection.selection,
+		workspaceUsage: workspaceProjection.usage,
+		mcpContext: mcpContextFromCalls(operationCalls),
 		inputs: (message.protocolInputs ?? [])
 			.map(raw => decodeSessionOpaqueJSON(raw))
 			.filter(value => value !== undefined) as InputUnion[],
 		outputs,
-		error: message.error ?? operation?.error,
+		error: message.error ?? (message.role === SessionMessageRole.Assistant ? operation?.error : undefined),
 		debugDetails: message.runtimeMetadata ?? operation?.runtimeMetadata,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
