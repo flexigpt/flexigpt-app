@@ -1,4 +1,4 @@
-import { OutputFormatKind, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
+import { CacheControlKind, CacheControlTTL, OutputFormatKind, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
 
 const OUTPUT_FORMAT_DISPLAY_NAMES: Record<OutputFormatKind, string> = {
 	[OutputFormatKind.Text]: 'Text',
@@ -46,3 +46,14 @@ export function getReasoningLevelDisplayName(value?: ReasoningLevel): string {
 
 	return REASONING_LEVEL_DISPLAY_NAMES[value] ?? 'Unknown';
 }
+
+export const CACHE_CONTROL_KIND_LABELS: Record<CacheControlKind, string> = {
+	[CacheControlKind.Ephemeral]: 'Ephemeral',
+};
+
+export const CACHE_CONTROL_TTL_LABELS: Record<CacheControlTTL, string> = {
+	[CacheControlTTL.TTL5m]: '5 minutes',
+	[CacheControlTTL.TTL1h]: '1 hour',
+	[CacheControlTTL.TTL24h]: '24 hours',
+	[CacheControlTTL.TTLInMemory]: 'In-memory',
+};

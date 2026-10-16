@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { CacheControlKind } from '@/spec/inference';
+import type { CacheControlKind, CacheControlTTLSelection } from '@/spec/inference';
 import type { ModelCapabilities } from '@/spec/model';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import {
@@ -30,7 +30,6 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
-import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import type {
 	ModelRuntimeDefaultsErrors,
 	ModelRuntimeDefaultsForm,

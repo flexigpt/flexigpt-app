@@ -1,7 +1,8 @@
-import type { CacheControlKind, JSONSchemaParam, OutputVerbosity } from '@/spec/inference';
+import type { CacheControlKind, CacheControlTTLSelection, JSONSchemaParam, OutputVerbosity } from '@/spec/inference';
 import type { ModelCapabilities, ModelDefaults } from '@/spec/model';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import {
+	CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
 	isOutputFormatKind,
 	isOutputVerbosity,
 	isReasoningLevel,
@@ -22,10 +23,8 @@ import {
 	supportsOutputVerbosity,
 } from '@/apis/model_capability_helpers';
 
-import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import {
 	buildCacheControlFromForm,
-	CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
 	getInitialCacheControlKind,
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,

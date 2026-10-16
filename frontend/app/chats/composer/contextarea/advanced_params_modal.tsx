@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
-import type { CacheControlKind } from '@/spec/inference';
+import type { CacheControlKind, CacheControlTTLSelection } from '@/spec/inference';
 import type { ModelOutputFormat, UIModelOption } from '@/spec/model';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 import { SessionModelDefaultField } from '@/spec/session';
@@ -25,7 +25,6 @@ import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import {
 	clearRequestDefault,
 	editRequestDefaults,

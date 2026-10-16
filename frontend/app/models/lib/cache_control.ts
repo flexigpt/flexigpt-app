@@ -1,20 +1,6 @@
-import type { CacheControl } from '@/spec/inference';
-import { CacheControlKind, CacheControlTTL } from '@/spec/inference';
-
-const CACHE_CONTROL_KIND_LABELS: Record<CacheControlKind, string> = {
-	[CacheControlKind.Ephemeral]: 'Ephemeral',
-};
-
-const CACHE_CONTROL_TTL_LABELS: Record<CacheControlTTL, string> = {
-	[CacheControlTTL.TTL5m]: '5 minutes',
-	[CacheControlTTL.TTL1h]: '1 hour',
-	[CacheControlTTL.TTL24h]: '24 hours',
-	[CacheControlTTL.TTLInMemory]: 'In-memory',
-};
-
-export const CACHE_CONTROL_TTL_PROVIDER_DEFAULT = '__provider_default__' as const;
-
-export type CacheControlTTLSelection = CacheControlTTL | typeof CACHE_CONTROL_TTL_PROVIDER_DEFAULT;
+import type { CacheControl, CacheControlKind, CacheControlTTL, CacheControlTTLSelection } from '@/spec/inference';
+import { CACHE_CONTROL_TTL_PROVIDER_DEFAULT } from '@/spec/inference';
+import { CACHE_CONTROL_KIND_LABELS, CACHE_CONTROL_TTL_LABELS } from '@/spec/inference_labels';
 
 export function resolveSupportedCacheControlKinds(
 	supportedKinds: CacheControlKind[] | undefined,
