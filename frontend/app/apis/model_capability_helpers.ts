@@ -1,5 +1,6 @@
+import type { OutputFormatKind } from '@/spec/inference';
 import type { ModelCacheCapabilities, ModelCacheControlCapabilities, ModelCapabilities } from '@/spec/model';
-import { CacheControlKind, CacheControlTTL } from '@/spec/inference';
+import { CacheControlKind, CacheControlTTL, isOutputFormatKind } from '@/spec/inference';
 
 function pick<T>(modelValue: T | undefined, providerValue: T | undefined): T | undefined {
 	return modelValue !== undefined ? modelValue : providerValue;
@@ -200,4 +201,37 @@ export function getTopLevelCacheControlCapabilities(
 	capabilities: ModelCapabilities | undefined
 ): ModelCacheControlCapabilities | undefined {
 	return getEffectiveCacheCapabilities(sdkType, capabilities)?.topLevel;
+}
+
+export function getSupportedOutputFormats(capabilities: ModelCapabilities | undefined): OutputFormatKind[] | undefined {
+	const configured = capabilities?.outputCapabilities?.supportedOutputFormats;
+
+	if (!configured || configured.length === 0) {
+		return undefined;
+	}
+
+	const supported = configured.filter(o => {
+		return isOutputFormatKind(o);
+	});
+	return supported.length > 0 ? supported : undefined;
+}
+
+export function getStopSequencesPolicy(capabilities: ModelCapabilities | undefined): {
+	isSupported: boolean;
+	disallowedWithReasoning: boolean;
+	maxSequences: number;
+} {
+	return {
+		isSupported: capabilities?.stopSequenceCapabilities?.isSupported !== false,
+		disallowedWithReasoning: capabilities?.stopSequenceCapabilities?.disallowedWithReasoning === true,
+		maxSequences: capabilities?.stopSequenceCapabilities?.maxSequences ?? 16,
+	};
+}
+
+export function supportsReasoningSummaryStyle(capabilities: ModelCapabilities | undefined): boolean {
+	return capabilities?.reasoningCapabilities?.supportsSummaryStyle !== false;
+}
+
+export function supportsOutputVerbosity(capabilities: ModelCapabilities | undefined): boolean {
+	return capabilities?.outputCapabilities?.supportsVerbosity !== false;
 }

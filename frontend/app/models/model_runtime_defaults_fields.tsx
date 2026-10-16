@@ -17,7 +17,13 @@ import {
 	getReasoningLevelDisplayName,
 } from '@/spec/inference_labels';
 
-import { getEffectiveCacheCapabilities, getTopLevelCacheControlCapabilities } from '@/apis/model_capability_helpers';
+import {
+	getEffectiveCacheCapabilities,
+	getSupportedOutputFormats,
+	getTopLevelCacheControlCapabilities,
+	supportsOutputVerbosity,
+	supportsReasoningSummaryStyle,
+} from '@/apis/model_capability_helpers';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalField } from '@/components/modal/modal_field';
@@ -38,11 +44,6 @@ import {
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
 } from '@/models/lib/cache_control';
-import {
-	getSupportedOutputFormats,
-	supportsOutputVerbosity,
-	supportsReasoningSummaryStyle,
-} from '@/models/lib/capabilities';
 import {
 	OPTIONAL_BOOLEAN_UNSET,
 	OUTPUT_FORMAT_NONE,

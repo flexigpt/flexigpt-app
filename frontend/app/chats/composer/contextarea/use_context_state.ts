@@ -2,18 +2,18 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
-import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
+import type { ModelParam, OutputVerbosity } from '@/spec/inference';
+import type { IncludePreviousMessages, ModelCapabilities, UIModelOption } from '@/spec/model';
 import type { RestorableConversationContext, SessionConfiguration, SessionModelDefaultsOverride } from '@/spec/session';
-import { ReasoningType } from '@/spec/inference';
+import { isReasoningLevel, orderedReasoningLevels, ReasoningLevel, ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
 import { SessionModelDefaultField } from '@/spec/session';
 
 import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
+import { supportsOutputVerbosity } from '@/apis/model_capability_helpers';
 import { isModelCatalogUnavailableError, modelRefEqual } from '@/apis/model_management';
 
-import { getSupportedReasoningLevels, supportsOutputVerbosity } from '@/models/lib/capabilities';
 import {
 	setHybridReasoningPreference,
 	setHybridTokensPreference,
@@ -187,6 +187,23 @@ function includePreviousMessagesFromSession(configuration: SessionConfiguration)
 	}
 
 	return Math.max(0, configuration.history.includePreviousUserTurns ?? 0);
+}
+
+function getSupportedReasoningLevels(capabilities: ModelCapabilities | undefined): ReasoningLevel[] {
+	const configured = capabilities?.reasoningCapabilities?.supportedReasoningLevels;
+
+	if (!configured || configured.length === 0) {
+		return [...orderedReasoningLevels];
+	}
+
+	const enabled = new Set(
+		configured.filter(l => {
+			return isReasoningLevel(l);
+		})
+	);
+	const supported = orderedReasoningLevels.filter(level => enabled.has(level));
+
+	return supported.length > 0 ? supported : [ReasoningLevel.Low, ReasoningLevel.Medium, ReasoningLevel.High];
 }
 
 type ComposerModelSelectionSource = 'session' | 'agent';

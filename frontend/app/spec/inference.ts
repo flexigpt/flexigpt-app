@@ -15,6 +15,10 @@ export enum ReasoningType {
 	SingleWithLevels = 'singleWithLevels',
 }
 
+export function isReasoningType(value: unknown): value is ReasoningType {
+	return typeof value === 'string' && (Object.values(ReasoningType) as string[]).includes(value);
+}
+
 export enum ReasoningLevel {
 	None = 'none',
 	Minimal = 'minimal',
@@ -23,6 +27,20 @@ export enum ReasoningLevel {
 	High = 'high',
 	XHigh = 'xhigh',
 	Max = 'max',
+}
+
+export const orderedReasoningLevels: ReasoningLevel[] = [
+	ReasoningLevel.None,
+	ReasoningLevel.Minimal,
+	ReasoningLevel.Low,
+	ReasoningLevel.Medium,
+	ReasoningLevel.High,
+	ReasoningLevel.XHigh,
+	ReasoningLevel.Max,
+];
+
+export function isReasoningLevel(value: unknown): value is ReasoningLevel {
+	return typeof value === 'string' && (Object.values(ReasoningLevel) as string[]).includes(value);
 }
 
 export enum Status {
@@ -41,6 +59,10 @@ export enum ReasoningSummaryStyle {
 	Concise = 'concise',
 	Detailed = 'detailed',
 	Omitted = 'omitted',
+}
+
+export function isReasoningSummaryStyle(value: unknown): value is ReasoningSummaryStyle {
+	return typeof value === 'string' && (Object.values(ReasoningSummaryStyle) as string[]).includes(value);
 }
 
 enum ReasoningContext {
@@ -71,9 +93,17 @@ export enum OutputVerbosity {
 	Max = 'max',
 }
 
+export function isOutputVerbosity(value: unknown): value is OutputVerbosity {
+	return typeof value === 'string' && (Object.values(OutputVerbosity) as string[]).includes(value);
+}
+
 export enum OutputFormatKind {
 	Text = 'text',
 	JSONSchema = 'jsonSchema',
+}
+
+export function isOutputFormatKind(value: unknown): value is OutputFormatKind {
+	return typeof value === 'string' && (Object.values(OutputFormatKind) as string[]).includes(value);
 }
 
 export interface JSONSchemaParam {

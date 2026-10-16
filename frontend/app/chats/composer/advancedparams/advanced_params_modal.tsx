@@ -12,7 +12,13 @@ import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschem
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { getEffectiveCacheCapabilities, getTopLevelCacheControlCapabilities } from '@/apis/model_capability_helpers';
+import {
+	getEffectiveCacheCapabilities,
+	getStopSequencesPolicy,
+	getSupportedOutputFormats,
+	getTopLevelCacheControlCapabilities,
+	supportsReasoningSummaryStyle,
+} from '@/apis/model_capability_helpers';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -29,11 +35,6 @@ import {
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
 } from '@/models/lib/cache_control';
-import {
-	getStopSequencesPolicy,
-	getSupportedOutputFormats,
-	supportsReasoningSummaryStyle,
-} from '@/models/lib/capabilities';
 import { parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
 import {
 	clearRequestDefault,
