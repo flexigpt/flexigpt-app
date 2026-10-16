@@ -27,6 +27,7 @@ import type {
 import type { ToolStoreChoiceType } from '@/spec/tool';
 import { AgentSkillUseMode } from '@/spec/agent';
 import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
+import { TextInsert } from '@/spec/text';
 import { ToolImplType, ToolStoreChoiceType as ToolStoreChoiceTypeValue } from '@/spec/tool';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -79,7 +80,7 @@ export interface AgentStarterPreview {
 	enabledSkillRefs: ArtifactRef[];
 	activeSkillRefs: ArtifactRef[];
 	instructionSkillRefs: ArtifactRef[];
-	instructionText?: string;
+	userMessageStarterText?: string;
 	textArtifacts: ArtifactRef[];
 	issues: Array<{
 		severity: 'error' | 'warning' | 'information';
@@ -388,7 +389,7 @@ export class AgentManagementAPI {
 		const activeSkillRefs: ArtifactRef[] = [];
 		const instructionSkillRefs: ArtifactRef[] = [];
 		const textArtifacts: ArtifactRef[] = [];
-		const instructionTextParts: string[] = [];
+		const userMessageStarterTextParts: string[] = [];
 		const mcpCandidates: ArtifactRef[] = [];
 		let modelRef: ArtifactRef | undefined;
 		let includeModelSystemPrompt: boolean | undefined;
@@ -481,19 +482,45 @@ export class AgentManagementAPI {
 					}
 					textArtifacts.push(target.artifact);
 					if (!this.texts) {
+						addIssue(
+							occurrence,
+							occurrence.required ? 'error' : 'warning',
+							'agent_text_preview_unavailable',
+							'Agent Text preview is unavailable in this frontend host.'
+						);
 						break;
 					}
 					try {
 						const materialized = await this.texts.materializeText(target.artifact);
-						if (materialized.content.trim()) {
-							instructionTextParts.push(materialized.content);
+						if (!materialized.content.trim()) {
+							break;
+						}
+
+						switch (materialized.insert) {
+							case TextInsert.Instructions:
+								// Instruction Text is resolved and composed by
+								// backend runtime setup. Do not duplicate it into
+								// frontend-authored session instructions.
+								break;
+
+							case TextInsert.UserMessage:
+								userMessageStarterTextParts.push(materialized.content);
+								break;
+
+							default:
+								addIssue(
+									occurrence,
+									occurrence.required ? 'error' : 'warning',
+									'agent_text_insert_unsupported',
+									`Agent Text "${materialized.name}" has an unsupported insert mode.`
+								);
 						}
 					} catch (error) {
 						addIssue(
 							occurrence,
 							occurrence.required ? 'error' : 'warning',
-							'agent_instruction_preview_unavailable',
-							getErrorMessage(error, 'Agent instruction preview could not be materialized.')
+							'agent_text_preview_unavailable',
+							getErrorMessage(error, 'Agent Text preview could not be materialized.')
 						);
 					}
 					break;
@@ -524,7 +551,7 @@ export class AgentManagementAPI {
 			enabledSkillRefs: uniqueRefs(enabledSkillRefs),
 			activeSkillRefs: uniqueRefs(activeSkillRefs),
 			instructionSkillRefs: uniqueRefs(instructionSkillRefs),
-			instructionText: instructionTextParts.join('\n\n') || undefined,
+			userMessageStarterText: userMessageStarterTextParts.join('\n\n') || undefined,
 			textArtifacts: uniqueRefs(textArtifacts),
 			issues,
 			toolSelections,

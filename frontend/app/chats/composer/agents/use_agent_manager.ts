@@ -10,7 +10,7 @@ import { SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import type { AgentCatalogOption } from '@/apis/agent_management';
+import type { AgentCatalogOption, AgentStarterPreview } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
 import type { AgentCapabilityExclusion } from '@/chats/composer/editor/editor_types';
@@ -23,6 +23,10 @@ interface AgentComposerContext {
 	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
 	setModelSelectionSource: (source: 'session' | 'agent') => void;
 	setAgentModelPreview: (model?: UIModelOption) => void;
+}
+
+interface AgentManagerOptions {
+	applyUserMessageStarter?: (text: string) => boolean;
 }
 
 interface PendingRestoredAgent {
@@ -50,7 +54,7 @@ export interface AgentManagerState {
 	selectedAgentKey: string | null;
 	selectedAgent: AgentCatalogOption | null;
 	selectedAgentResolution: AgentResolution | null;
-	preparedStarter: null;
+	preparedStarter: AgentStarterPreview | null;
 	agentModelRef?: ArtifactRef;
 	isTrackingOnly: boolean;
 	capabilityExclusions: AgentCapabilityExclusion[];
@@ -190,7 +194,7 @@ function agentRemovalKeys(configuration?: SessionConfiguration): string[] {
 	return [...keys];
 }
 
-export function useAgentManager(context: AgentComposerContext): AgentManagerState {
+export function useAgentManager(context: AgentComposerContext, options: AgentManagerOptions = {}): AgentManagerState {
 	const [agentOptions, setAgentOptions] = useState<AgentCatalogOption[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -199,16 +203,33 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
 	const [excludedCapabilityKeys, setExcludedCapabilityKeys] = useState<string[]>([]);
+	const [preparedStarter, setPreparedStarter] = useState<AgentStarterPreview | null>(null);
 	const [selectedAgentResolution, setSelectedAgentResolution] = useState<AgentResolution | null>(null);
 
 	const selectedAgentKeyRef = useRef<string | null>(null);
 	const isApplyingRef = useRef(false);
+	const starterApplierRef = useRef<AgentManagerOptions['applyUserMessageStarter']>(options.applyUserMessageStarter);
 	const applyRequestSeqRef = useRef(0);
 	const catalogRequestSeqRef = useRef(0);
 	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
 	const initialDefaultRequestRef = useRef(false);
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
 	const pendingRestoredAgentRef = useRef<PendingRestoredAgent | null>(null);
+
+	useEffect(() => {
+		starterApplierRef.current = options.applyUserMessageStarter;
+	}, [options.applyUserMessageStarter]);
+
+	const applyPreparedStarter = useCallback((starter: AgentStarterPreview) => {
+		setPreparedStarter(starter);
+
+		const text = starter.userMessageStarterText?.trim();
+		if (text) {
+			// This is intentionally best-effort. A non-empty Composer draft
+			// wins over an Agent user-message starter.
+			starterApplierRef.current?.(text);
+		}
+	}, []);
 
 	const setTrackedAgent = useCallback(
 		(aKey: string | null, trackingOnly = false, resolution: AgentResolution | null = null) => {
@@ -418,10 +439,21 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 					return false;
 				}
 
+				const starter = await agentManagementAPI.prepareAgentStarterFromResolution(resolution);
+				if (applyRequestSeqRef.current !== requestSequence) {
+					return false;
+				}
+				if (!starter.canApply) {
+					const issue = starter.issues.find(value => value.severity === 'error');
+					setActionError(issue?.message || 'The Agent starter could not be prepared.');
+					return false;
+				}
+
 				context.setAgentModelPreview(resolveAgentModelOption(resolution));
 				replaceExcludedCapabilityKeys([]);
 				context.setModelSelectionSource('agent');
 				setTrackedAgent(option.key, false, resolution);
+				applyPreparedStarter(starter);
 				return true;
 			} catch (e: unknown) {
 				setActionError(getErrorMessage(e, 'Failed to validate the Agent selection.'));
@@ -433,7 +465,14 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 				}
 			}
 		},
-		[agentOptions, context, replaceExcludedCapabilityKeys, resolveAgentModelOption, setTrackedAgent]
+		[
+			agentOptions,
+			applyPreparedStarter,
+			context,
+			replaceExcludedCapabilityKeys,
+			resolveAgentModelOption,
+			setTrackedAgent,
+		]
 	);
 
 	const restoreSelectedAgent = useCallback(
@@ -448,6 +487,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			if (!agent) {
 				pendingRestoredAgentRef.current = null;
 				context.setModelSelectionSource('session');
+				setPreparedStarter(null);
 				replaceExcludedCapabilityKeys([]);
 				setTrackedAgent(null);
 				setActionError(null);
@@ -467,6 +507,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 			if (!option) {
 				pendingRestoredAgentRef.current = null;
 				replaceExcludedCapabilityKeys([]);
+				setPreparedStarter(null);
 				setTrackedAgent(null);
 				setActionError('The Session-selected Agent is no longer available in the current catalog.');
 				return false;
@@ -570,6 +611,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		autoEnsureCatalogKeyRef.current = null;
 		context.setModelSelectionSource('session');
 		replaceExcludedCapabilityKeys([]);
+		setPreparedStarter(null);
 		setTrackedAgent(null);
 		setActionError(null);
 	}, [cancelActiveAgentRequest, context, replaceExcludedCapabilityKeys, setTrackedAgent]);
@@ -703,7 +745,7 @@ export function useAgentManager(context: AgentComposerContext): AgentManagerStat
 		selectedAgentKey: selectedAgent?.key ?? null,
 		selectedAgent,
 		selectedAgentResolution: currentSelectedAgentResolution,
-		preparedStarter: null,
+		preparedStarter,
 		agentModelRef,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		capabilityExclusions,

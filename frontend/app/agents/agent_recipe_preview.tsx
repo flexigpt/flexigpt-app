@@ -128,15 +128,6 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 				/>
 			</div>
 
-			{recipe.instructionText ? (
-				<div className="border-base-content/10 rounded-2xl border p-3">
-					<div className="mb-2 text-sm font-semibold">Rendered instruction Skill text</div>
-					<pre className="bg-base-300 max-h-48 overflow-auto rounded-xl p-3 text-xs whitespace-pre-wrap">
-						{recipe.instructionText}
-					</pre>
-				</div>
-			) : null}
-
 			{recipe.textArtifacts.length > 0 ? (
 				<div className="alert alert-warning rounded-2xl text-sm">
 					<FiAlertCircle size={15} />

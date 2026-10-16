@@ -136,24 +136,23 @@ func (c *coordinator) resolveAgent(
 			}
 
 		case declaration.TypeText:
-			value, found := selectionFromTarget(occurrence.Target)
+			selection, found := selectionFromTarget(occurrence.Target)
 			if !found {
 				plan.summary.Diagnostics = append(
 					plan.summary.Diagnostics,
 					unavailableTargetDiagnostic(
 						occurrence.Path,
-						"Agent instruction is not Artifact-backed",
+						"Agent Text is not Artifact-backed",
 					),
 				)
 				continue
 			}
-			if err := c.appendArtifactInstruction(
+			if err := c.appendAgentText(
 				ctx,
 				plan,
-				*value,
-				sessionRuntime.ConfigurationOwnerAgent,
-				value.CanonicalKey(),
+				*selection,
 				occurrence.Required,
+				occurrence.Path,
 			); err != nil {
 				return err
 			}
@@ -976,45 +975,26 @@ func (c *coordinator) appendArtifactInstruction(
 	}
 	itemKey := firstNonEmpty(key, selection.CanonicalKey())
 
-	content, used, label, err := c.materializeText(ctx, ref)
-	if err != nil {
-		severity := sessionRuntime.DiagnosticSeverityWarning
-		if required {
-			severity = sessionRuntime.DiagnosticSeverityError
-		}
-		selected := selection
-		plan.summary.Instructions = append(
-			plan.summary.Instructions,
-			sessionRuntime.ResolutionItem{
-				Key:      itemKey,
-				Kind:     resolutionItemKindInstruction,
-				Owner:    owner,
-				State:    sessionRuntime.ResolutionStateUnavailable,
-				Selected: &selected,
-				Reason:   err.Error(),
-			},
+	materialized, err := c.materializeText(ctx, ref)
+	if err == nil && materialized.insert != string(declaration.InsertInstructions) {
+		err = fmt.Errorf(
+			"text artifact %q has insert %q and cannot be used as a system instruction",
+			ref.ArtifactID,
+			materialized.insert,
 		)
-		plan.summary.Diagnostics = append(
-			plan.summary.Diagnostics,
-			sessionRuntime.ResolutionDiagnostic{
-				Severity: severity,
-				Code:     "instruction_unavailable",
-				Message:  err.Error(),
-				Key:      selection.CanonicalKey(),
-			},
-		)
-		if required {
-			return operationPreparationError(
-				"agent_required_instruction_unavailable",
-				err.Error(),
-				plan.summary,
-				err,
-			)
-		}
-
-		return nil
 	}
-	if err := requireSelectionPin(selection, used); err != nil {
+	if err != nil {
+		return c.recordUnavailableTextContribution(
+			plan,
+			selection,
+			owner,
+			itemKey,
+			required,
+			"agent_required_instruction_unavailable",
+			err,
+		)
+	}
+	if err := requireSelectionPin(selection, materialized.used); err != nil {
 		return operationPreparationError(
 			"instruction_selection_stale",
 			err.Error(),
@@ -1023,40 +1003,197 @@ func (c *coordinator) appendArtifactInstruction(
 		)
 	}
 
+	c.appendMaterializedInstruction(
+		plan,
+		selection,
+		owner,
+		itemKey,
+		materialized,
+	)
+	return nil
+}
+
+// appendAgentText preserves Agent Text semantics by Text insert mode.
+//
+//   - instructions: authoritative backend system-instruction contribution.
+//   - user-message: frontend-only Composer starter material. Runtime setup
+//     validates and records its provenance but never injects a second hidden
+//     user message after the frontend has authored visible input.
+func (c *coordinator) appendAgentText(
+	ctx context.Context,
+	plan *operationPlan,
+	selection sessionRuntime.ArtifactSelection,
+	required bool,
+	occurrencePath string,
+) error {
+	ref, err := artifactRef(selection)
+	if err != nil {
+		return operationPreparationError(
+			"agent_text_selection_invalid",
+			err.Error(),
+			plan.summary,
+			err,
+		)
+	}
+
+	itemKey := selection.CanonicalKey()
+	materialized, err := c.materializeText(ctx, ref)
+	if err != nil {
+		return c.recordUnavailableTextContribution(
+			plan,
+			selection,
+			sessionRuntime.ConfigurationOwnerAgent,
+			itemKey,
+			required,
+			"agent_required_text_unavailable",
+			err,
+		)
+	}
+	if err := requireSelectionPin(selection, materialized.used); err != nil {
+		return operationPreparationError(
+			"agent_text_selection_stale",
+			err.Error(),
+			plan.summary,
+			err,
+		)
+	}
+
+	switch materialized.insert {
+	case string(declaration.InsertInstructions):
+		c.appendMaterializedInstruction(
+			plan,
+			selection,
+			sessionRuntime.ConfigurationOwnerAgent,
+			itemKey,
+			materialized,
+		)
+		return nil
+
+	case "user-message":
+		selected := selection
+		plan.summary.Instructions = append(
+			plan.summary.Instructions,
+			sessionRuntime.ResolutionItem{
+				Key:      itemKey,
+				Kind:     "agentUserMessageStarter",
+				Owner:    sessionRuntime.ConfigurationOwnerAgent,
+				State:    sessionRuntime.ResolutionStateExcluded,
+				Selected: &selected,
+				Used:     materialized.used,
+				Reason: "Agent Text with insert=user-message is Composer starter material and is not " +
+					"automatically injected into backend user input.",
+			},
+		)
+		plan.summary.Diagnostics = append(
+			plan.summary.Diagnostics,
+			sessionRuntime.ResolutionDiagnostic{
+				Severity: sessionRuntime.DiagnosticSeverityInfo,
+				Code:     "agent_user_message_text_frontend_starter",
+				Message:  "Agent user-message Text is applied only to an empty Composer draft.",
+				Key:      firstNonEmpty(occurrencePath, itemKey),
+			},
+		)
+		return nil
+
+	default:
+		return c.recordUnavailableTextContribution(
+			plan,
+			selection,
+			sessionRuntime.ConfigurationOwnerAgent,
+			itemKey,
+			required,
+			"agent_required_text_unavailable",
+			fmt.Errorf(
+				"text artifact %q has unsupported insert mode %q",
+				ref.ArtifactID,
+				materialized.insert,
+			),
+		)
+	}
+}
+
+func (c *coordinator) appendMaterializedInstruction(
+	plan *operationPlan,
+	selection sessionRuntime.ArtifactSelection,
+	owner sessionRuntime.ConfigurationOwner,
+	itemKey string,
+	materialized materializedTextContribution,
+) {
 	plan.instructions = append(plan.instructions, instructionContribution{
 		key:   itemKey,
 		owner: owner,
-		label: label,
-		text:  content,
+		label: materialized.label,
+		text:  materialized.text,
 		item: sessionRuntime.ResolutionItem{
 			Key:      itemKey,
 			Kind:     resolutionItemKindInstruction,
 			Owner:    owner,
 			State:    sessionRuntime.ResolutionStateIncluded,
 			Selected: &selection,
-			Used:     used,
+			Used:     materialized.used,
 		},
 	})
-	return nil
+}
+
+func (c *coordinator) recordUnavailableTextContribution(
+	plan *operationPlan,
+	selection sessionRuntime.ArtifactSelection,
+	owner sessionRuntime.ConfigurationOwner,
+	itemKey string,
+	required bool,
+	requiredFailureCode string,
+	cause error,
+) error {
+	severity := sessionRuntime.DiagnosticSeverityWarning
+	if required {
+		severity = sessionRuntime.DiagnosticSeverityError
+	}
+
+	selected := selection
+	plan.summary.Instructions = append(
+		plan.summary.Instructions,
+		sessionRuntime.ResolutionItem{
+			Key:      itemKey,
+			Kind:     resolutionItemKindInstruction,
+			Owner:    owner,
+			State:    sessionRuntime.ResolutionStateUnavailable,
+			Selected: &selected,
+			Reason:   cause.Error(),
+		},
+	)
+	plan.summary.Diagnostics = append(
+		plan.summary.Diagnostics,
+		sessionRuntime.ResolutionDiagnostic{
+			Severity: severity,
+			Code:     "instruction_unavailable",
+			Message:  cause.Error(),
+			Key:      selection.CanonicalKey(),
+		},
+	)
+	if !required {
+		return nil
+	}
+
+	return operationPreparationError(
+		requiredFailureCode,
+		cause.Error(),
+		plan.summary,
+		cause,
+	)
 }
 
 func (c *coordinator) materializeText(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (
-	text string,
-	used *sessionRuntime.ResolvedArtifact,
-	label string,
-	err error,
-) {
+) (materializedTextContribution, error) {
 	value, err := c.texts.Materialize(ctx, ref)
 	if err != nil {
-		return "", nil, "", err
+		return materializedTextContribution{}, err
 	}
 
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return "", nil, "", err
+		return materializedTextContribution{}, err
 	}
 
 	var wire struct {
@@ -1064,26 +1201,39 @@ func (c *coordinator) materializeText(
 		ArtifactRevision uint64                    `json:"artifactRevision"`
 		DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 		Name             string                    `json:"name"`
+		Insert           string                    `json:"insert"`
 		Content          string                    `json:"content"`
 	}
 	if err := json.Unmarshal(raw, &wire); err != nil {
-		return "", nil, "", fmt.Errorf(
+		return materializedTextContribution{}, fmt.Errorf(
 			"adapt Text materialization: %w",
 			err,
 		)
 	}
 	if wire.Artifact != ref {
-		return "", nil, "", errors.New(
+		return materializedTextContribution{}, errors.New(
 			"text materialization returned another Artifact",
 		)
 	}
+	if wire.Insert != string(declaration.InsertInstructions) &&
+		wire.Insert != "user-message" {
+		return materializedTextContribution{}, fmt.Errorf(
+			"text materialization returned unsupported insert mode %q",
+			wire.Insert,
+		)
+	}
 
-	return wire.Content, &sessionRuntime.ResolvedArtifact{
-		RootID:     string(wire.Artifact.RootID),
-		ArtifactID: string(wire.Artifact.ArtifactID),
-		Revision:   sessionRuntime.Revision(wire.ArtifactRevision),
-		Digest:     string(wire.DefinitionDigest),
-	}, wire.Name, nil
+	return materializedTextContribution{
+		text:   wire.Content,
+		insert: wire.Insert,
+		used: &sessionRuntime.ResolvedArtifact{
+			RootID:     string(wire.Artifact.RootID),
+			ArtifactID: string(wire.Artifact.ArtifactID),
+			Revision:   sessionRuntime.Revision(wire.ArtifactRevision),
+			Digest:     string(wire.DefinitionDigest),
+		},
+		label: wire.Name,
+	}, nil
 }
 
 func selectionFromTarget(

@@ -179,6 +179,13 @@ type instructionContribution struct {
 	item  sessionRuntime.ResolutionItem
 }
 
+type materializedTextContribution struct {
+	text   string
+	insert string
+	used   *sessionRuntime.ResolvedArtifact
+	label  string
+}
+
 type toolContribution struct {
 	key         string
 	owner       sessionRuntime.ConfigurationOwner

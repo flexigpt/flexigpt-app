@@ -71,6 +71,7 @@ interface SessionRunIndex {
 	callsByID: Map<string, IndexedToolCall>;
 	appsByRunID: Map<string, Map<string, MCPAppInstance>>;
 	operationsByCurrentMessageID: Map<string, IndexedOperation>;
+	persistedToolResultIDs: Set<string>;
 }
 
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
@@ -109,6 +110,13 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 	const callsByID = new Map<string, IndexedToolCall>();
 	const appsByRunID = new Map<string, Map<string, MCPAppInstance>>();
 	const operationsByCurrentMessageID = new Map<string, IndexedOperation>();
+	const persistedToolResultIDs = new Set<string>();
+
+	for (const message of snapshot.session.transcript ?? []) {
+		for (const result of message.toolResults ?? []) {
+			persistedToolResultIDs.add(result.id);
+		}
+	}
 
 	for (const run of snapshot.runs) {
 		appsByRunID.set(run.id, new Map((run.apps ?? []).map(app => [app.id, app] as const)));
@@ -132,6 +140,7 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 		callsByID,
 		appsByRunID,
 		operationsByCurrentMessageID,
+		persistedToolResultIDs,
 	};
 }
 
@@ -268,6 +277,14 @@ function toolCallStatus(state: SessionToolCallState): UIToolCallStatus {
 		default:
 			return UIToolCallStatus.Pending;
 	}
+}
+
+function selectedToolResult(call: SessionToolCall): SessionToolResult | undefined {
+	if (!call.selectedResultID) {
+		return undefined;
+	}
+
+	return call.results?.find(result => result.id === call.selectedResultID);
 }
 
 function toolChoiceType(value: string | undefined): ToolStoreChoiceType {
@@ -588,6 +605,7 @@ function uiToolCallFromSession(call: SessionToolCall): UIToolCall {
 		choiceID: call.choiceID ?? '',
 		type: toolChoiceType(call.type),
 		status: toolCallStatus(call.state),
+		automatic: call.automatic,
 		errorMessage: call.lastFailure,
 		mcpToolSelection: mcpSelectionFromBinding(call),
 	};
@@ -626,6 +644,12 @@ function appContextUpdatesFromSession(values: MCPAppContextUpdate[] | undefined)
 	}));
 }
 
+/*
+ * `injectedContext` is intentionally not copied into ConversationMessage
+ * content. It is backend-authored semantic replay material. ProtocolInputs
+ * remain authoritative when present; InjectedContext is the safe fallback
+ * used by runtime setup when protocol inputs are unavailable.
+ */
 function projectTranscriptMessage(
 	message: SessionTranscriptMessage,
 	sessionSnapshot: SessionSnapshot,
@@ -641,7 +665,7 @@ function projectTranscriptMessage(
 		: index.operationsByCurrentMessageID.get(message.id);
 	const operationRun = indexedOperation?.run;
 	const operation = indexedOperation?.operation;
-	const operationCalls = message.operationID ? (index.callsByOperationID.get(message.operationID) ?? []) : [];
+	const operationCalls = operation ? (index.callsByOperationID.get(operation.id) ?? []) : [];
 	const appsByID = operationRun ? index.appsByRunID.get(operationRun.id) : undefined;
 	const derived = outputs.length > 0 ? deriveUIFieldsFromOutputUnion(outputs, new Map()) : { uiContent: '' };
 	const modelRef = operation?.request.configuration.model
@@ -657,16 +681,34 @@ function projectTranscriptMessage(
 			: undefined;
 	const workspaceProjection = operation ? workspaceProjectionForOperation(operation) : {};
 
-	const toolResults =
+	const projectToolResult = (
+		result: SessionToolResult,
+		call: SessionToolCall | undefined,
+		run: SessionRun | undefined
+	): UIToolOutput => {
+		const apps = run ? index.appsByRunID.get(run.id) : appsByID;
+		return toolOutputFromResult(result, call, run, sessionSnapshot, apps);
+	};
+
+	const transcriptToolOutputs =
 		message.toolResults
 			?.map(result => {
 				const indexed = index.callsByID.get(result.callID);
 				const resultRun = indexed?.run ?? operationRun;
-				const resultApps = resultRun ? index.appsByRunID.get(resultRun.id) : appsByID;
-
-				return toolOutputFromResult(result, indexed?.call, resultRun, sessionSnapshot, resultApps);
+				return projectToolResult(result, indexed?.call, resultRun);
 			})
 			.filter(Boolean) ?? [];
+	const pendingOperationToolOutputs =
+		message.role === SessionMessageRole.Assistant
+			? operationCalls.flatMap(call => {
+					const result = selectedToolResult(call);
+					if (!result || index.persistedToolResultIDs.has(result.id)) {
+						return [];
+					}
+
+					return [projectToolResult(result, call, operationRun)];
+				})
+			: [];
 
 	return {
 		id: message.id,
@@ -676,7 +718,7 @@ function projectTranscriptMessage(
 		modelRef,
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
-		// usage: operation?.usage,
+		usage: operation?.usage,
 		enabledSkillRefs: operation?.preparation.effectiveSkills,
 		activeSkillRefs: operation?.preparation.activeSkills,
 		workspaceSelection: workspaceProjection.selection,
@@ -696,7 +738,12 @@ function projectTranscriptMessage(
 						return uiToolCallFromSession(t);
 					})
 				: derived.uiToolCalls,
-		uiToolOutputs: toolResults.length > 0 ? toolResults : derived.uiToolOutputs,
+		uiToolOutputs:
+			transcriptToolOutputs.length > 0
+				? transcriptToolOutputs
+				: pendingOperationToolOutputs.length > 0
+					? pendingOperationToolOutputs
+					: derived.uiToolOutputs,
 		uiCitations: derived.uiCitations,
 	};
 }
@@ -743,6 +790,57 @@ function projectActiveOperation(run: SessionRun): ConversationMessage | undefine
 	};
 }
 
+function projectTerminalRunOutcome(
+	run: SessionRun,
+	transcript: SessionTranscriptMessage[]
+): ConversationMessage | undefined {
+	if (run.state !== SessionRunState.Failed && run.state !== SessionRunState.Cancelled) {
+		return undefined;
+	}
+
+	const operationIDs = new Set((run.modelOperations ?? []).map(operation => operation.id));
+	const alreadyRepresented = transcript.some(message => {
+		if (message.role !== SessionMessageRole.Assistant || !message.operationID) {
+			return false;
+		}
+		if (!operationIDs.has(message.operationID)) {
+			return false;
+		}
+
+		return (
+			Boolean(message.error) ||
+			message.status === 'failed' ||
+			message.status === 'cancelled' ||
+			message.status === 'interrupted'
+		);
+	});
+
+	if (alreadyRepresented) {
+		return undefined;
+	}
+
+	const cancelled = run.state === SessionRunState.Cancelled;
+	const message =
+		run.outcome?.message?.trim() ||
+		(cancelled ? 'The Run was cancelled before a terminal assistant message was recorded.' : 'The Run failed.');
+
+	return {
+		id: `session-run-outcome:${run.id}:${run.revision}`,
+		createdAt: run.updatedAt,
+		role: RoleEnum.Assistant,
+		status: cancelled ? Status.Cancelled : Status.Failed,
+		...(cancelled
+			? {}
+			: {
+					error: {
+						code: run.outcome?.code || 'run_failed',
+						message,
+					},
+				}),
+		uiContent: message,
+	};
+}
+
 export function projectSessionSnapshotToConversation(snapshot: SessionSnapshot, preferredRunID?: string): Conversation {
 	const selectedRun = selectedSessionRun(snapshot, preferredRunID);
 	const index = indexRuns(snapshot);
@@ -761,6 +859,13 @@ export function projectSessionSnapshotToConversation(snapshot: SessionSnapshot, 
 				messages.push(transient);
 			}
 		}
+	}
+
+	const terminalOutcome = selectedRun
+		? projectTerminalRunOutcome(selectedRun, snapshot.session.transcript ?? [])
+		: undefined;
+	if (terminalOutcome) {
+		messages.push(terminalOutcome);
 	}
 
 	return {

@@ -532,23 +532,84 @@ Status meanings:
   - Patch status: rolling notes mark best-effort `cancelRun` on disposed busy tab fixed.
   - Cross-verify: start a streaming Run, close its tab, observe Session Run transitions toward cancellation and confirm no orphaned active Run remains.
 
-## Next steps
+## Session-arena projection audit
 
-- [ ] Verify the applied backend patch against command receipts, Session
-      snapshots, restored SessionStore documents, and provider replay.
-- [ ] Treat Agent effective recipe/baseline/override UX as the next largest
-      frontend-plus-decision work item.
-- [ ] Update edit/resend frontend payload construction to preserve and submit
-      `carryForwardToolResultIDs`.
-- [ ] Build the frontend pure SessionSnapshot/Run display projection using
-      operation/request/call identities and resolution summaries. Do not add a
-      separate display endpoint first.
-- [ ] Verify Workspace Active Skill submission and add active override serialization if it remains absent.
-- [ ] Decide whether direct replay of consumed historical Tool calls is a
-      required product feature. Until then, use model-mediated edit/resend
-      behavior.
-- [ ] Add frontend-only parity refinements for instruction-source inspection, Plugin search, template resource defaults, and structured approval display.
-- [ ] Verify every ✓ item above against actual assembled code and Session snapshots before treating it as closed.
+- ✓ Patched — operation token usage is projected from the existing
+  `ModelOperation.Usage` snapshot field.
+  - Backend status: already present. `finishModelExecution` copies normalized
+    provider usage into `ModelOperation.Usage`, and generated Wails models
+    already expose it.
+  - Frontend issue: `SessionModelOperation` omitted `usage`, which forced the
+    projection to comment out the field.
+  - Patch: frontend Session contract now includes `usage`; snapshot projection
+    exposes it as `ConversationMessage.usage`.
+
+- ✓ Patched — typed Session Tool-result contents are now the primary visual
+  Tool output.
+  - Backend status: Go, MCP, and Skill executors already populate
+    `ToolResult.Contents` using canonical typed text/image/file output items.
+  - Patch: snapshot projection now preserves `result.contents`, retaining the
+    existing text/structured fallback only when typed contents are absent.
+  - Patch: completed selected Tool results are shown under their originating
+    assistant Tool call while a Run is waiting for continuation. Once the
+    result is persisted on the continuation user message, the projection
+    avoids duplicate rendering.
+
+- ✓ Intentional — `TranscriptMessage.InjectedContext` remains backend replay
+  and provenance data rather than user-visible message text.
+  - It records Workspace/MCP/App contextual input injected before the user
+    message.
+  - Historical provider replay uses exact `ProtocolInputs` first and falls
+    back to this semantic context only when exact protocol input is absent.
+  - Rendering it as user text would duplicate backend-provided context and
+    present untrusted external content as user-authored content.
+
+- ✓ Patched — automatic Tool-call state and terminal Run outcomes are visible.
+  - `SessionToolCall.automatic` is projected to UI Tool calls and displays an
+    Auto badge for regular Session-owned Tools.
+  - A failed/cancelled Run without an already represented terminal assistant
+    message receives one snapshot-derived terminal presentation message.
+
+## Closed product decisions
+
+- ✓ No generic Session composition-preview operation is required.
+- ✓ Rich historical UX for selected-but-never-called Tools, MCP resources,
+  MCP prompts, and other non-executed declarations is not required.
+- ✓ Historical external Tool replay remains intentionally unavailable after a
+  result has been consumed; edit/resend carries selected historical result
+  identities instead.
+- ✓ Cost and provider-specific truncation telemetry remain out of scope;
+  normalized token usage is sufficient.
+
+## Agent Text insert semantics
+
+- ✓ Patched — Agent Text uses its declared Text insert mode rather than being
+  treated as an instruction unconditionally.
+  - `text.insert: instructions` is materialized by backend runtime setup and
+    contributes to authoritative system-instruction composition.
+  - `text.insert: user-message` is frontend Composer starter material. It is
+    inserted only into an empty visible draft when the Agent is selected.
+  - Runtime setup records user-message Agent Text provenance but does not
+    inject hidden duplicate user input after Composer authoring.
+  - Multiple user-message Text Artifacts preserve resolved Agent occurrence
+    order and are joined with blank-line separators.
+
+- ✓ Patched — Agent Text and Agent Model prompt behavior are separated.
+  - Model `includeSystemPrompt` controls Model default prompt inclusion only.
+  - Agent Text with `insert: instructions` remains a separate explicit system
+    instruction contribution.
+  - Frontend does not copy Agent instruction Text into
+    `sessionInstructionText`, avoiding duplicated system prompt content.
+
+- ✓ Intentional — restored Sessions do not reapply Agent user-message starter
+  text.
+  - Starter Text is an authoring-time convenience, not durable Session input.
+  - Existing persisted transcript and restored Composer draft state retain
+    precedence over Agent starter Text.
+
+- ✓ Intentional — workflow URL drafts retain precedence over Agent starter Text.
+  - Agent starter application uses `setDraftTextIfEmpty`; it never overwrites
+    a workflow-provided or user-authored draft.
 
 ## Decisions pending and my views
 

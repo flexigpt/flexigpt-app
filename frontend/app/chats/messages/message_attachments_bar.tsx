@@ -334,7 +334,9 @@ function MessageToolCallChip({ call, fullWidth = false, onClick, onRun, onRetry,
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
 	const isAutoExecute =
-		Boolean(call.toolStoreChoice?.autoExecute) || call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
+		Boolean(call.automatic) ||
+		Boolean(call.toolStoreChoice?.autoExecute) ||
+		call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
 	const mcpLabel = call.mcpToolSelection ? `\nMCP tool: ${call.mcpToolSelection.toolName}` : '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;

@@ -97,7 +97,14 @@ export const ComposerBox = memo(
 			modelOptionsLoaded: composerContext.modelOptionsLoaded,
 		});
 
-		const agent = useAgentManager(composerContext);
+		const applyAgentUserMessageStarter = useCallback((text: string): boolean => {
+			return editorAreaRef.current?.setDraftTextIfEmpty(text) ?? false;
+		}, []);
+
+		const agent = useAgentManager(composerContext, {
+			applyUserMessageStarter: applyAgentUserMessageStarter,
+		});
+
 		const resetComposerState = useCallback(() => {
 			setAbortConfirmationRequested(false);
 			agent.clearAgentTracking();

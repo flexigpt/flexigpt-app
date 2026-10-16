@@ -1,6 +1,6 @@
 import type { ArtifactDigest, ArtifactLocator, ArtifactRef } from '@/spec/artifact';
 
-enum TextInsert {
+export enum TextInsert {
 	Instructions = 'instructions',
 	UserMessage = 'user-message',
 }
