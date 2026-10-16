@@ -1,19 +1,25 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ArtifactRef } from '@/spec/artifact';
-import type { ModelParam, OutputVerbosity } from '@/spec/inference';
-import type { IncludePreviousMessages, ModelCapabilities, UIModelOption } from '@/spec/model';
+import type { OutputVerbosity, ReasoningLevel } from '@/spec/inference';
+import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
 import type { RestorableConversationContext, SessionConfiguration, SessionModelDefaultsOverride } from '@/spec/session';
-import { isReasoningLevel, orderedReasoningLevels, ReasoningLevel, ReasoningType } from '@/spec/inference';
+import { ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
 import { SessionModelDefaultField } from '@/spec/session';
 
+import { getSupportedReasoningLevels, supportsOutputVerbosity } from '@/lib/model_capability_helpers';
+
 import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
-import { supportsOutputVerbosity } from '@/apis/model_capability_helpers';
-import { isModelCatalogUnavailableError, modelRefEqual } from '@/apis/model_management';
+import { isModelCatalogUnavailableError } from '@/apis/model_management';
 
+import {
+	buildModelOptionsWithPreviousMessages,
+	findRestorableModelOption,
+	isHybridReasoningModel,
+	resolveRestoredSelectedModel,
+} from '@/chats/composer/models/model_option_helpers';
 import {
 	setHybridReasoningPreference,
 	setHybridTokensPreference,
@@ -22,134 +28,7 @@ import {
 	setTemperaturePreference,
 } from '@/chats/composer/models/request_preferences';
 
-function hasOwn(value: object, key: string): boolean {
-	return Object.hasOwn(value, key);
-}
-
-function isHybridReasoningModel(model: UIModelOption): boolean {
-	return model.reasoning?.type === ReasoningType.HybridWithTokens;
-}
-
-function pickUniqueModelOption(options: UIModelOption[]): UIModelOption | undefined {
-	return options.length === 1 ? options[0] : undefined;
-}
-
-function applyPersistedModelParam(
-	base: UIModelOption,
-	modelParam?: ModelParam,
-	options?: { preserveName?: boolean }
-): UIModelOption {
-	if (!modelParam) {
-		return base;
-	}
-
-	const next: UIModelOption = {
-		...base,
-		stream: modelParam.stream,
-		maxPromptLength: modelParam.maxPromptLength,
-		maxOutputLength: modelParam.maxOutputLength,
-		timeout: modelParam.timeout,
-	};
-
-	if (options?.preserveName !== false) {
-		next.name = modelParam.name;
-	}
-
-	if (hasOwn(modelParam, 'temperature')) {
-		next.temperature = modelParam.temperature;
-	} else {
-		delete next.temperature;
-	}
-
-	if (hasOwn(modelParam, 'reasoning')) {
-		next.reasoning = modelParam.reasoning;
-	} else {
-		delete next.reasoning;
-	}
-
-	if (hasOwn(modelParam, 'outputParam')) {
-		next.outputParam = modelParam.outputParam;
-	} else {
-		delete next.outputParam;
-	}
-
-	if (hasOwn(modelParam, 'stopSequences')) {
-		next.stopSequences = modelParam.stopSequences;
-	} else {
-		delete next.stopSequences;
-	}
-
-	if (hasOwn(modelParam, 'cacheControl')) {
-		next.cacheControl = modelParam.cacheControl;
-	} else {
-		delete next.cacheControl;
-	}
-
-	if (hasOwn(modelParam, 'additionalParametersRawJSON')) {
-		next.additionalParametersRawJSON = modelParam.additionalParametersRawJSON;
-	} else {
-		delete next.additionalParametersRawJSON;
-	}
-
-	return next;
-}
-
-function findRestorableModelOption(
-	allOptions: UIModelOption[],
-	modelRef?: ArtifactRef,
-	modelParam?: ModelParam
-): UIModelOption | undefined {
-	const modelName = modelParam?.name?.trim();
-
-	if (modelRef) {
-		const direct = allOptions.find(option => modelRefEqual(option.model, modelRef));
-		if (direct) {
-			return direct;
-		}
-	}
-
-	if (modelName) {
-		const byName = pickUniqueModelOption(allOptions.filter(option => option.name === modelName));
-		if (byName) {
-			return byName;
-		}
-
-		return pickUniqueModelOption(allOptions.filter(option => option.modelDisplayName === modelName));
-	}
-
-	return undefined;
-}
-
-function resolveRestoredSelectedModel(
-	allOptions: UIModelOption[],
-	fallback: UIModelOption,
-	modelRef?: ArtifactRef,
-	modelParam?: ModelParam
-): UIModelOption {
-	const resolved = findRestorableModelOption(allOptions, modelRef, modelParam);
-
-	if (resolved) {
-		return applyPersistedModelParam(resolved, modelParam, {
-			preserveName: true,
-		});
-	}
-
-	return applyPersistedModelParam(fallback, modelParam, {
-		preserveName: false,
-	});
-}
-
-function buildChatOptions(
-	selectedModel: UIModelOption,
-	includePreviousMessages: IncludePreviousMessages
-): UIModelOption {
-	const base: UIModelOption = {
-		...selectedModel,
-		includePreviousMessages,
-	};
-
-	return base;
-}
+type ComposerModelSelectionSource = 'session' | 'agent';
 
 function requestPatchFromSessionOverrides(overrides: SessionModelDefaultsOverride) {
 	const defaults = {
@@ -189,27 +68,8 @@ function includePreviousMessagesFromSession(configuration: SessionConfiguration)
 	return Math.max(0, configuration.history.includePreviousUserTurns ?? 0);
 }
 
-function getSupportedReasoningLevels(capabilities: ModelCapabilities | undefined): ReasoningLevel[] {
-	const configured = capabilities?.reasoningCapabilities?.supportedReasoningLevels;
-
-	if (!configured || configured.length === 0) {
-		return [...orderedReasoningLevels];
-	}
-
-	const enabled = new Set(
-		configured.filter(l => {
-			return isReasoningLevel(l);
-		})
-	);
-	const supported = orderedReasoningLevels.filter(level => enabled.has(level));
-
-	return supported.length > 0 ? supported : [ReasoningLevel.Low, ReasoningLevel.Medium, ReasoningLevel.High];
-}
-
-type ComposerModelSelectionSource = 'session' | 'agent';
-
 export interface ComposerContextController {
-	chatOptions: UIModelOption;
+	modelOptions: UIModelOption;
 
 	selectedModel: UIModelOption;
 	allOptions: UIModelOption[];
@@ -556,13 +416,13 @@ export function useComposerContextState(): ComposerContextController {
 		return next;
 	}, [setModelSelectionSource]);
 
-	const chatOptions = useMemo(
-		() => buildChatOptions(selectedModel, includePreviousMessages),
+	const modelOptions = useMemo(
+		() => buildModelOptionsWithPreviousMessages(selectedModel, includePreviousMessages),
 		[includePreviousMessages, selectedModel]
 	);
 
 	return {
-		chatOptions,
+		modelOptions,
 		selectedModel,
 		allOptions,
 		modelOptionsLoaded,

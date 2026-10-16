@@ -22,15 +22,14 @@ import {
 	buildCacheControlTTLDropdownItems,
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
-} from '@/lib/model_cache_control_helper';
-
+} from '@/lib/model_cache_control_helpers';
 import {
 	getEffectiveCacheCapabilities,
 	getSupportedOutputFormats,
 	getTopLevelCacheControlCapabilities,
 	supportsOutputVerbosity,
 	supportsReasoningSummaryStyle,
-} from '@/apis/model_capability_helpers';
+} from '@/lib/model_capability_helpers';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalField } from '@/components/modal/modal_field';

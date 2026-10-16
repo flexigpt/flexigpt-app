@@ -1,6 +1,13 @@
 import type { OutputFormatKind } from '@/spec/inference';
 import type { ModelCacheCapabilities, ModelCacheControlCapabilities, ModelCapabilities } from '@/spec/model';
-import { CacheControlKind, CacheControlTTL, isOutputFormatKind } from '@/spec/inference';
+import {
+	CacheControlKind,
+	CacheControlTTL,
+	isOutputFormatKind,
+	isReasoningLevel,
+	orderedReasoningLevels,
+	ReasoningLevel,
+} from '@/spec/inference';
 
 function pick<T>(modelValue: T | undefined, providerValue: T | undefined): T | undefined {
 	return modelValue !== undefined ? modelValue : providerValue;
@@ -226,6 +233,23 @@ export function getStopSequencesPolicy(capabilities: ModelCapabilities | undefin
 		disallowedWithReasoning: capabilities?.stopSequenceCapabilities?.disallowedWithReasoning === true,
 		maxSequences: capabilities?.stopSequenceCapabilities?.maxSequences ?? 16,
 	};
+}
+
+export function getSupportedReasoningLevels(capabilities: ModelCapabilities | undefined): ReasoningLevel[] {
+	const configured = capabilities?.reasoningCapabilities?.supportedReasoningLevels;
+
+	if (!configured || configured.length === 0) {
+		return [...orderedReasoningLevels];
+	}
+
+	const enabled = new Set(
+		configured.filter(l => {
+			return isReasoningLevel(l);
+		})
+	);
+	const supported = orderedReasoningLevels.filter(level => enabled.has(level));
+
+	return supported.length > 0 ? supported : [ReasoningLevel.Low, ReasoningLevel.Medium, ReasoningLevel.High];
 }
 
 export function supportsReasoningSummaryStyle(capabilities: ModelCapabilities | undefined): boolean {

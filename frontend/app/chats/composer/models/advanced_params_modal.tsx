@@ -17,18 +17,17 @@ import {
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
-} from '@/lib/model_cache_control_helper';
-import { parseOptionalPositiveInteger } from '@/lib/number_utils';
-
-import { useModalDialogController } from '@/hooks/use_dialog_controller';
-
+} from '@/lib/model_cache_control_helpers';
 import {
 	getEffectiveCacheCapabilities,
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
 	getTopLevelCacheControlCapabilities,
 	supportsReasoningSummaryStyle,
-} from '@/apis/model_capability_helpers';
+} from '@/lib/model_capability_helpers';
+import { parseOptionalPositiveInteger } from '@/lib/number_utils';
+
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalActions } from '@/components/modal/modal_actions';

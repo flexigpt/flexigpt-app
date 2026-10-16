@@ -7,11 +7,11 @@ import { ModelArtifactType, ModelLookupScope } from '@/spec/model';
 import { getProviderSDKType } from '@/spec/provider_sdk';
 
 import { getErrorMessage } from '@/lib/error_utils';
+import { mergeModelCapabilities } from '@/lib/model_capability_helpers';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { ModelManagementItem, ModelProviderManagementItem } from '@/apis/model_management';
-import { mergeModelCapabilities } from '@/apis/model_capability_helpers';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';

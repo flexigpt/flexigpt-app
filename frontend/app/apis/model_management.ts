@@ -27,10 +27,10 @@ import { ModelLookupScope } from '@/spec/model';
 import { getProviderSDKType } from '@/spec/provider_sdk';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
+import { mergeModelCapabilities } from '@/lib/model_capability_helpers';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
-import { mergeModelCapabilities } from '@/apis/model_capability_helpers';
 
 export interface ModelProviderManagementItem {
 	list: ModelProviderListItem;

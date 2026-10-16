@@ -22,15 +22,14 @@ import {
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
-} from '@/lib/model_cache_control_helper';
-import { parseOptionalPositiveInteger } from '@/lib/number_utils';
-
+} from '@/lib/model_cache_control_helpers';
 import {
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
 	getTopLevelCacheControlCapabilities,
 	supportsOutputVerbosity,
-} from '@/apis/model_capability_helpers';
+} from '@/lib/model_capability_helpers';
+import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 
 export const OUTPUT_FORMAT_NONE = '__none__' as const;
 export const OUTPUT_VERBOSITY_NONE = '__none__' as const;

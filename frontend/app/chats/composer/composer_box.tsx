@@ -215,7 +215,7 @@ export const ComposerBox = memo(
 								? 'agent'
 								: 'session',
 					},
-					composerContext.chatOptions
+					composerContext.modelOptions
 				);
 			},
 			[
@@ -223,7 +223,7 @@ export const ComposerBox = memo(
 				agent.agentModelRef,
 				agent.instructionOnlySkillRefs,
 				agent.capabilityExclusions,
-				composerContext.chatOptions,
+				composerContext.modelOptions,
 				composerContext.hasRunnableModel,
 				composerContext.modelSelectionSource,
 				onSend,
@@ -233,7 +233,7 @@ export const ComposerBox = memo(
 		useImperativeHandle(
 			ref,
 			() => ({
-				getUIModelOption: () => composerContext.chatOptions,
+				getUIModelOption: () => composerContext.modelOptions,
 				focus: () => editorAreaRef.current?.focus(),
 				resetEditor: () => editorAreaRef.current?.resetEditor(),
 				resetForNewConversation,
@@ -336,7 +336,7 @@ export const ComposerBox = memo(
 					isRunActive={isBusy}
 					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
 					isInputLocked={(isBusy && !allowContinuationInput) || isHydrating || !composerContext.hasRunnableModel}
-					currentProviderSDKType={composerContext.chatOptions.providerSDKType}
+					currentProviderSDKType={composerContext.modelOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmit}
 					onRequestStop={() => {
