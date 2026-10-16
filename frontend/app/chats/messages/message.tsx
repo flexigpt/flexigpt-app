@@ -19,6 +19,7 @@ import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar'
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard, useMessageStreamSnapshot } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
+import { mediaItemsFromOutputUnions, MessageMediaContent } from '@/chats/messages/message_media_content';
 import { MessageThinkingSection } from '@/chats/messages/message_thinking_section';
 
 interface ChatMessageProps {
@@ -192,6 +193,11 @@ export const ChatMessage = memo(function ChatMessage({
 	const hasStreamedThinking = streamSnapshot.thinking.length > 0;
 	const terminalState = !isBusy ? terminalStateMessage(message) : null;
 
+	const outputMedia = useMemo(
+		() => (isUser ? [] : mediaItemsFromOutputUnions(message.outputs)),
+		[isUser, message.outputs]
+	);
+
 	const hasAnyReasoning =
 		message.uiReasoningContents?.some(rc => {
 			const sum = (rc?.summary ?? []).some(s => /\S/.test(s ?? ''));
@@ -258,10 +264,11 @@ export const ChatMessage = memo(function ChatMessage({
 		hasMCPAppsView ||
 		hasAnyReasoning ||
 		(isBusy && (hasStreamedText || hasStreamedThinking));
+	const showBodyWithMedia = showBody || outputMedia.length > 0;
 	return (
 		<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
 			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
-			{showBody && (
+			{showBodyWithMedia && (
 				<>
 					<div className={`${leftColSpan} flex justify-end`}>
 						{isUser && (
@@ -293,6 +300,7 @@ export const ChatMessage = memo(function ChatMessage({
 								diffCandidatePaths={diffCandidatePaths}
 								streamingText={isBusy ? streamSnapshot.text : undefined}
 							/>
+							<MessageMediaContent items={outputMedia} />
 							{/* Fallback for error-only messages with no text content */}
 							{!hasAnyContent && hasError && !isBusy && (
 								<div className="text-error text-sm opacity-80">
@@ -355,7 +363,7 @@ export const ChatMessage = memo(function ChatMessage({
 			{/* Row 2 ── footer bar */}
 			<div className={`${leftColSpan} flex justify-end`}>
 				{/* If the card row is hidden, keep the avatar aligned with the footer row */}
-				{!showBody && isUser && (
+				{!showBodyWithMedia && isUser && (
 					<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center">
 						<FiUser size={24} />
 					</div>
@@ -363,7 +371,7 @@ export const ChatMessage = memo(function ChatMessage({
 			</div>
 			<div className="col-span-10 min-w-0 lg:col-span-9">
 				<div
-					className={`flex min-w-0 items-center gap-2 px-2 ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+					className={`flex min-w-0 items-center gap-2 px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 				>
 					{hasAttachmentsBar && (
 						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
@@ -391,7 +399,7 @@ export const ChatMessage = memo(function ChatMessage({
 					)}
 
 					<div
-						className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBody ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
+						className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBodyWithMedia ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
 					>
 						<MessageFooterArea
 							messageID={message.id}
@@ -401,7 +409,7 @@ export const ChatMessage = memo(function ChatMessage({
 							messageDetails={message.uiDebugDetails ?? ''}
 							reasoningContents={message.uiReasoningContents}
 							isBusy={isBusy}
-							bodyPresent={showBody}
+							bodyPresent={showBodyWithMedia}
 							streamText={streamSnapshot.text || baseContent}
 							streamThinking={streamSnapshot.thinking || (hasAnyReasoning ? ' ' : '')}
 							disableMarkdown={!renderMarkdown}
@@ -416,7 +424,7 @@ export const ChatMessage = memo(function ChatMessage({
 			</div>
 			<div className={`${rightColSpan} flex justify-start`}>
 				{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
-				{!showBody && !isUser && (
+				{!showBodyWithMedia && !isUser && (
 					<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">
 						<FiZap size={24} />
 					</div>

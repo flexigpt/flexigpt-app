@@ -1,14 +1,9 @@
-import { FiX } from 'react-icons/fi';
+import { FiChevronRight } from 'react-icons/fi';
 
 import type { ApplyUnifiedDiffDiagnostic } from '@/spec/unified_diff';
 import { ApplyUnifiedDiffDiagnosticLevel } from '@/spec/unified_diff';
 
-import { CollapsedDiagnosticGroup } from '@/components/markdown/collapsed_diagnostic_group';
-import {
-	formatDiagnosticLevelCount,
-	getDiagnosticDisplay,
-	renderDiagnosticEntry,
-} from '@/components/markdown/diagnostic_utils';
+import { getDiagnosticDisplay, renderDiagnosticEntry } from '@/components/markdown/diagnostic_utils';
 
 interface DiagnosticSeverityCounts {
 	total: number;
@@ -113,17 +108,17 @@ function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDiagnostic
 	return (
 		<div className="flex flex-wrap gap-1.5 text-[11px]">
 			{counts.error > 0 ? (
-				<span className="badge badge-outline badge-error">
+				<span className="text-error">
 					{counts.error} error{counts.error === 1 ? '' : 's'}
 				</span>
 			) : null}
 			{counts.warning > 0 ? (
-				<span className="badge badge-outline badge-warning">
+				<span className="text-warning">
 					{counts.warning} warning{counts.warning === 1 ? '' : 's'}
 				</span>
 			) : null}
 			{counts.info > 0 ? (
-				<span className="badge badge-outline badge-info">
+				<span className="text-info">
 					{counts.info} info{counts.info === 1 ? '' : 's'}
 				</span>
 			) : null}
@@ -148,54 +143,22 @@ export function renderDiagnosticsPanel({ title, description, diagnostics, classN
 	);
 
 	return (
-		<div className={`border-base-300 bg-base-100 rounded-xl border p-3 shadow-sm ${className ?? ''}`}>
-			<div className="mb-2 flex items-start justify-between gap-3">
-				<div className="min-w-0">
-					<div className="flex items-center gap-2 text-sm font-semibold">
-						<span className={headerDisplay.textClassName}>{headerDisplay.icon}</span>
-						<span>{title}</span>
-					</div>
-					{description ? <div className="text-base-content/60 mt-1 text-xs">{description}</div> : null}
-				</div>
+		<details className={`group/diagnostics text-base-content/60 text-xs ${className ?? ''}`}>
+			<summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1">
+				<span className="inline-flex items-center gap-2">
+					<FiChevronRight size={11} className="transition-transform group-open/diagnostics:rotate-90" />
+					<span className={headerDisplay.textClassName}>{headerDisplay.icon}</span>
+					<span>{title}</span>
+				</span>
 				{renderDiagnosticSeveritySummary(diagnostics)}
+			</summary>
+			<div className="border-base-300 mt-1 space-y-2 border-l pl-3">
+				{description ? <p className="text-base-content/60">{description}</p> : null}
+				{[...errors, ...warnings, ...info].map((diagnostic, index) =>
+					renderDiagnosticEntry(diagnostic, index, 'diagnostic')
+				)}
+				{footer ? <p className="text-base-content/60">{footer}</p> : null}
 			</div>
-
-			<div className="space-y-3">
-				{errors.length > 0 ? (
-					<div className="space-y-2">
-						<div className="text-error flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase">
-							<FiX size={11} />
-							<span>Errors</span>
-							<span className="badge badge-outline badge-error badge-xs">
-								{formatDiagnosticLevelCount(ApplyUnifiedDiffDiagnosticLevel.Error, errors.length)}
-							</span>
-						</div>
-						<div className="space-y-2">
-							{errors.map((diagnostic, index) => renderDiagnosticEntry(diagnostic, index, 'error'))}
-						</div>
-					</div>
-				) : null}
-
-				<CollapsedDiagnosticGroup
-					label="Warnings"
-					diagnostics={warnings}
-					level={ApplyUnifiedDiffDiagnosticLevel.Warning}
-					keyPrefix="warning"
-				/>
-
-				<CollapsedDiagnosticGroup
-					label="Info"
-					diagnostics={info}
-					level={ApplyUnifiedDiffDiagnosticLevel.Info}
-					keyPrefix="info"
-				/>
-
-				{footer ? (
-					<div className="border-base-300 bg-base-200/40 text-base-content/60 rounded-lg border px-3 py-2 text-xs">
-						{footer}
-					</div>
-				) : null}
-			</div>
-		</div>
+		</details>
 	);
 }

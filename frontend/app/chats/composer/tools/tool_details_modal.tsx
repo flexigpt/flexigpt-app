@@ -20,6 +20,7 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
+import { mediaItemsFromToolOutputItems, MessageMediaContent } from '@/chats/messages/message_media_content';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
@@ -227,6 +228,11 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	// Raw payload, preferring JSON display with a safe text fallback.
 	const rawPayloadMarkdown = `### Additional details\n\n${buildJSONOrTextCodeBlock(payload) ?? '_No additional details available._'}`;
 
+	const outputMedia =
+		state.kind === 'output'
+			? mediaItemsFromToolOutputItems(state.output.toolOutputs, `tool-output:${state.output.id}`)
+			: [];
+
 	// Human-oriented primary content (semantics-first).
 	let primaryContent = '';
 	let baseMessageId = 'tool-details';
@@ -288,6 +294,13 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 							/>
 						</div>
 					)}
+
+					{outputMedia.length > 0 ? (
+						<div className="border-base-300 bg-base-100 mb-4 rounded-xl border p-3">
+							<div className="mb-2 text-sm font-semibold">Generated images and files</div>
+							<MessageMediaContent items={outputMedia} />
+						</div>
+					) : null}
 
 					{/* Raw payload for full inspection */}
 					<div>

@@ -442,6 +442,7 @@ const unicornRules: DummyRuleMap = {
 	'unicorn/text-encoding-identifier-case': 'error',
 	'unicorn/throw-new-error': 'error',
 
+	'unicorn/prefer-code-point': 'off',
 	'unicorn/catch-error-name': 'off',
 	'unicorn/consistent-existence-index-check': 'off',
 	'unicorn/custom-error-definition': 'off',

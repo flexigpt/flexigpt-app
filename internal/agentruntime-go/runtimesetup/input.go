@@ -11,6 +11,7 @@ import (
 
 	attachmentRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/attachment"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (c *coordinator) buildInputs(
@@ -244,6 +245,24 @@ func assistantMessageInput(
 func toolResultInput(
 	result sessionRuntime.ToolResult,
 ) (inferenceSpec.InputUnion, error) {
+	/*
+	 * Preserve normalized rich Tool output when the executor produced it.
+	 *
+	 * This includes image and file output from Go Tools, MCP Tools, and
+	 * Skill Tools. Provider adapters remain responsible for flattening this
+	 * content only when their declared Tool capabilities do not support a
+	 * content-item-list Tool output format.
+	 */
+	contents := jsonutil.CloneJSONInValue(result.Contents)
+	if len(contents) == 0 {
+		contents = []inferenceSpec.ToolOutputItemUnion{{
+			Kind: inferenceSpec.ContentItemKindText,
+			TextItem: &inferenceSpec.ContentItemText{
+				Text: toolResultText(result),
+			},
+		}}
+	}
+
 	toolOutput := &inferenceSpec.ToolOutput{
 		Type:     providerToolOutputType(result.Type),
 		ID:       string(result.ID),
@@ -253,12 +272,7 @@ func toolResultInput(
 		Role:     inferenceSpec.RoleTool,
 		Status:   inferenceSpec.StatusCompleted,
 		IsError:  result.Kind != sessionRuntime.ToolResultKindSuccess,
-		Contents: []inferenceSpec.ToolOutputItemUnion{{
-			Kind: inferenceSpec.ContentItemKindText,
-			TextItem: &inferenceSpec.ContentItemText{
-				Text: toolResultText(result),
-			},
-		}},
+		Contents: contents,
 	}
 
 	if toolOutput.Type == inferenceSpec.ToolTypeCustom {

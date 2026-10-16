@@ -29,17 +29,6 @@ export function getDiagnosticDisplay(level: ApplyUnifiedDiffDiagnosticLevel) {
 	}
 }
 
-export function formatDiagnosticLevelCount(level: ApplyUnifiedDiffDiagnosticLevel, count: number): string {
-	switch (level) {
-		case ApplyUnifiedDiffDiagnosticLevel.Error:
-			return `${count} error${count === 1 ? '' : 's'}`;
-		case ApplyUnifiedDiffDiagnosticLevel.Warning:
-			return `${count} warning${count === 1 ? '' : 's'}`;
-		default:
-			return `${count} info`;
-	}
-}
-
 export function renderDiagnosticEntry(diagnostic: ApplyUnifiedDiffDiagnostic, index: number, keyPrefix: string) {
 	const display = getDiagnosticDisplay(diagnostic.level);
 

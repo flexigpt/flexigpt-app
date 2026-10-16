@@ -32,6 +32,7 @@ interface LazyPanelProps {
 }
 
 const DISPLAY_CANDIDATE_LIMIT = 24;
+const DISPLAY_HUNK_PAGE_SIZE = 32;
 
 function LazyPanel({ summary, className = '', renderContent, defaultOpen = false }: LazyPanelProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -100,18 +101,6 @@ function statusClassName(status: DiffApplyFileView['status']): string {
 	}
 }
 
-function cardClassName(view: DiffApplyFileView): string {
-	if (view.status === 'blocked') {
-		return 'border-error/40 bg-error/5';
-	}
-
-	if (view.status === 'needs-info' || view.status === 'partial') {
-		return 'border-warning/40 bg-warning/5';
-	}
-
-	return 'border-base-300 bg-base-100';
-}
-
 function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyOutcome }) {
 	if (!outcome) {
 		return null;
@@ -120,35 +109,36 @@ function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyO
 	const isProblem = outcome.status === 'blocked' || outcome.status === 'needs-info';
 
 	return (
-		<div
-			className={`mt-3 rounded-lg border px-3 py-2 text-xs/5 whitespace-pre-wrap ${
-				isProblem ? 'border-error/30 bg-error/5 text-error' : 'border-base-300 bg-base-200/40 text-base-content/80'
-			}`}
-			role={isProblem ? 'alert' : 'status'}
-		>
+		<p className={`text-xs/5 whitespace-pre-wrap ${isProblem ? 'text-error' : 'text-base-content/70'}`}>
 			<span className="font-semibold">{label}: </span>
 			{outcome.message}
-		</div>
+		</p>
 	);
 }
 
 function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
 	const { file } = view;
 	const inputPrefix = useId();
+	const [page, setPage] = useState(0);
+	const pageCount = Math.ceil(file.hunks.length / DISPLAY_HUNK_PAGE_SIZE);
+	const visibleHunks = file.hunks.slice(page * DISPLAY_HUNK_PAGE_SIZE, (page + 1) * DISPLAY_HUNK_PAGE_SIZE);
 	const checkedCount = Object.keys(view.hunkOutcomes).length;
 	const readyCount = file.hunks.filter(hunk => view.hunkOutcomes[hunk.id]?.status === 'ready').length;
 	const unavailableCount = file.hunks.filter(hunk => {
 		const status = view.hunkOutcomes[hunk.id]?.status;
 		return status === 'blocked' || status === 'needs-info';
 	}).length;
-	const selectedCount = view.selectedHunkIDs.filter(hunkID => view.hunkOutcomes[hunkID]?.status === 'ready').length;
+	const selectedCount = file.hunks.filter(
+		hunk =>
+			view.selectedHunkIDs.includes(hunk.id) && (!!view.targetPath || view.hunkOutcomes[hunk.id]?.status === 'ready')
+	).length;
 	const canReviewHunks = view.canTryHunks && file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES && !controller.busy;
 
 	return (
 		<div className="space-y-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<p className="text-base-content/60 min-w-0 flex-1 text-xs">
-					Review individual source hunks with the current target. The backend determines applicability.
+					Inspect source or optionally review hunks. An explicit target allows direct submission.
 				</p>
 
 				<button
@@ -161,7 +151,47 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 				>
 					Review hunks
 				</button>
+
+				<button
+					type="button"
+					className="btn btn-xs btn-primary"
+					disabled={!!controller.busy || selectedCount === 0}
+					title="Submit selected source hunks. An explicit target does not require a prior review."
+					onClick={() => {
+						void controller.applySelectedHunks(file.id);
+					}}
+				>
+					Apply selected hunks ({selectedCount})
+				</button>
 			</div>
+
+			{pageCount > 1 ? (
+				<div className="flex items-center justify-between gap-2 text-xs">
+					<button
+						type="button"
+						className="btn btn-xs btn-ghost"
+						disabled={page === 0}
+						onClick={() => {
+							setPage(current => Math.max(0, current - 1));
+						}}
+					>
+						Previous hunks
+					</button>
+					<span>
+						{page + 1} / {pageCount}
+					</span>
+					<button
+						type="button"
+						className="btn btn-xs btn-ghost"
+						disabled={page + 1 >= pageCount}
+						onClick={() => {
+							setPage(current => Math.min(pageCount - 1, current + 1));
+						}}
+					>
+						Next hunks
+					</button>
+				</div>
+			) : null}
 
 			{file.hunks.length > MAX_INTERACTIVE_HUNK_PROBES ? (
 				<div className="text-warning text-xs">
@@ -175,18 +205,15 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 				</div>
 			) : null}
 
-			{checkedCount > 0 ? (
+			{file.hunks.length > 0 ? (
 				<div className="space-y-2">
-					{file.hunks.slice(0, MAX_INTERACTIVE_HUNK_PROBES).map((hunk, index) => {
+					{visibleHunks.map((hunk, pageIndex) => {
+						const index = page * DISPLAY_HUNK_PAGE_SIZE + pageIndex;
 						const outcome = view.hunkOutcomes[hunk.id];
-						const isReady = outcome?.status === 'ready';
-						const isProblem = outcome?.status === 'blocked' || outcome?.status === 'needs-info';
+						const canSelect = !!view.targetPath || outcome?.status === 'ready';
 
 						return (
-							<div
-								key={hunk.id}
-								className={`rounded-lg border p-3 ${isProblem ? 'border-error/30 bg-error/5' : 'border-base-300'}`}
-							>
+							<div key={hunk.id} className="border-base-300 rounded-lg border p-3">
 								{/* oxlint-disable-next-line jsx-a11y/label-has-associated-control */}
 								<label htmlFor={`${inputPrefix}-${index}`} className="flex items-start gap-2 text-xs">
 									<input
@@ -194,7 +221,7 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 										type="checkbox"
 										className="checkbox checkbox-xs mt-0.5"
 										checked={view.selectedHunkIDs.includes(hunk.id)}
-										disabled={!isReady || !!controller.busy}
+										disabled={!canSelect || !!controller.busy}
 										onChange={event => {
 											controller.setHunkSelected(file.id, hunk.id, event.target.checked);
 										}}
@@ -206,15 +233,6 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 										<code className="mt-1 block break-all">{hunk.header}</code>
 									</span>
 								</label>
-								<OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />
-								{outcome?.diagnostics.length ? (
-									<div className="mt-2">
-										{renderDiagnosticsPanel({
-											title: `Hunk ${index + 1} diagnostics`,
-											diagnostics: outcome.diagnostics,
-										})}
-									</div>
-								) : null}
 								<LazyPanel
 									className="mt-2"
 									summary="View hunk source"
@@ -227,25 +245,26 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 										</pre>
 									)}
 								/>
+								{outcome ? (
+									<LazyPanel
+										className="mt-2"
+										summary="Review notes"
+										renderContent={() => <OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />}
+									/>
+								) : null}
+								{outcome?.diagnostics.length ? (
+									<div className="mt-2">
+										{renderDiagnosticsPanel({
+											title: `Hunk ${index + 1} diagnostics`,
+											diagnostics: outcome.diagnostics,
+										})}
+									</div>
+								) : null}
 							</div>
 						);
 					})}
 				</div>
 			) : null}
-
-			<OutcomeNotice label="Selected hunks" outcome={view.applyOutcome} />
-
-			<button
-				type="button"
-				className="btn btn-sm btn-primary"
-				disabled={!!controller.busy || selectedCount === 0}
-				title="Apply only backend-reviewed ready hunks. This does not submit the other hunks."
-				onClick={() => {
-					void controller.applySelectedHunks(file.id);
-				}}
-			>
-				Apply selected hunks ({selectedCount})
-			</button>
 		</div>
 	);
 }
@@ -261,7 +280,12 @@ function FileCard({
 }) {
 	const { file } = view;
 	const inputID = useId();
-	const displayPath = getInteractiveDiffTargetPath(file) || 'Target path unresolved';
+	const displayPath =
+		view.targetPath ||
+		view.applyOutcome?.resolvedTargetPath ||
+		view.reviewOutcome?.resolvedTargetPath ||
+		getInteractiveDiffTargetPath(file) ||
+		'Target path unresolved';
 	const isActive = controller.busy?.activeFileIDs.includes(file.id) ?? false;
 	const candidates = view.candidates.slice(0, DISPLAY_CANDIDATE_LIMIT);
 	const diagnostics = uniqueDiagnostics([
@@ -284,7 +308,7 @@ function FileCard({
 	const showHunks = file.hunks.length > 0;
 
 	return (
-		<section className={`rounded-xl border p-4 shadow-sm ${cardClassName(view)}`} aria-busy={isActive}>
+		<section className="border-base-300 bg-base-100 rounded-xl border p-4 shadow-sm" aria-busy={isActive}>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-2">
@@ -338,22 +362,29 @@ function FileCard({
 						type="button"
 						className="btn btn-xs btn-primary"
 						disabled={!!controller.busy || !view.canApply}
-						title="Apply after a successful file-level backend review."
+						title="Submit with an explicit target or a successful backend review."
 						onClick={() => {
 							void controller.applyFile(file.id);
 						}}
 					>
-						Apply file
+						{view.targetPath ? 'Apply to target' : 'Apply file'}
 					</button>
 				</div>
 			</div>
 
-			<OutcomeNotice label="Review" outcome={view.reviewOutcome} />
-			<OutcomeNotice label="Apply" outcome={view.applyOutcome} />
+			{showHunks ? (
+				<LazyPanel
+					className="mt-3"
+					summary="Inspect hunk source / select hunks"
+					renderContent={() => <HunkPanel view={view} controller={controller} />}
+				/>
+			) : null}
 
 			{view.status === 'pending' && !controller.busy ? (
 				<p className="text-base-content/70 mt-3 text-xs">
-					Not reviewed for the current target and matching options. Choose Review file or Review target.
+					{view.targetPath
+						? 'Explicit target set. Apply directly, or review first if useful.'
+						: 'Not reviewed for the current options. Review this file or choose an explicit target.'}
 				</p>
 			) : null}
 
@@ -408,7 +439,7 @@ function FileCard({
 							className="input input-sm w-full font-mono text-xs"
 							value={view.pathInput}
 							disabled={!!controller.busy}
-							placeholder="Leave blank to let the backend resolve the target"
+							placeholder="Explicit target path; blank uses backend resolution"
 							spellCheck={false}
 							onChange={event => {
 								controller.setTargetPath(file.id, event.target.value);
@@ -433,30 +464,12 @@ function FileCard({
 							Review target
 						</button>
 						<div className="text-base-content/60 mt-1 text-xs">
-							Editing clears the previous review. Review explicitly before applying. Leave this blank to let the backend
-							resolve the target.
+							Editing clears previous results. This explicit override can be applied directly; review is optional. Leave
+							it blank to use backend target resolution.
 						</div>
 					</div>
 				)}
 			/>
-
-			{diagnostics.length > 0 ? (
-				<div className="mt-3">
-					{renderDiagnosticsPanel({
-						title: 'File details',
-						description: 'Parser notes and backend diagnostics for this file section.',
-						diagnostics,
-					})}
-				</div>
-			) : null}
-
-			{showHunks ? (
-				<LazyPanel
-					className="mt-3"
-					summary="Try individual hunks"
-					renderContent={() => <HunkPanel view={view} controller={controller} />}
-				/>
-			) : null}
 
 			<LazyPanel
 				className="mt-3"
@@ -470,6 +483,29 @@ function FileCard({
 					</pre>
 				)}
 			/>
+
+			{view.reviewOutcome || view.applyOutcome ? (
+				<LazyPanel
+					className="mt-3"
+					summary="Review / apply notes"
+					renderContent={() => (
+						<div className="space-y-2">
+							<OutcomeNotice label="Review" outcome={view.reviewOutcome} />
+							<OutcomeNotice label="Apply" outcome={view.applyOutcome} />
+						</div>
+					)}
+				/>
+			) : null}
+
+			{diagnostics.length > 0 ? (
+				<div className="mt-3">
+					{renderDiagnosticsPanel({
+						title: 'File details',
+						description: 'Parser notes and backend diagnostics for this file section.',
+						diagnostics,
+					})}
+				</div>
+			) : null}
 		</section>
 	);
 }
@@ -537,28 +573,40 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					</div>
 				</div>
 
-				<div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:px-5">
-					{renderDiagnosticsPanel({
-						title: 'Patch notes',
-						description: 'These are non-blocking UI parser notes. Backend review remains authoritative.',
-						diagnostics: controller.patchDiagnostics,
-					})}
+				<ModalActions className="bg-base-100">
+					<button
+						type="button"
+						className="btn btn-sm"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Close
+					</button>
 
-					{controller.files.length === 0 ? (
-						<div className="border-base-300 rounded-xl border p-4 text-sm">
-							No file sections could be separated within the interactive UI budget.
-						</div>
-					) : null}
+					<button
+						type="button"
+						className="btn btn-sm"
+						disabled={!!controller.busy || controller.files.length === 0}
+						onClick={() => {
+							void controller.reviewAll();
+						}}
+					>
+						{controller.hasReviewResult ? 'Review again' : 'Review all'}
+					</button>
 
-					{controller.files.map(view => (
-						<FileCard
-							key={view.file.id}
-							view={view}
-							controller={controller}
-							defaultTargetPickerOpen={view.file.id === initiallyOpenTargetFileID}
-						/>
-					))}
-				</div>
+					<button
+						type="button"
+						className="btn btn-sm btn-primary"
+						disabled={!!controller.busy || controller.submittableFileCount === 0}
+						title="Submit files with explicit targets or successful backend reviews."
+						onClick={() => {
+							void controller.applyReady();
+						}}
+					>
+						Apply files ({controller.submittableFileCount})
+					</button>
+				</ModalActions>
 
 				{controller.busy ? (
 					<div className="border-base-300 flex items-center justify-between gap-3 border-t px-5 py-2 text-xs">
@@ -587,40 +635,28 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					</div>
 				)}
 
-				<ModalActions className="bg-base-100">
-					<button
-						type="button"
-						className="btn btn-sm"
-						onClick={() => {
-							requestClose();
-						}}
-					>
-						Close
-					</button>
+				<div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:px-5">
+					{controller.files.length === 0 ? (
+						<div className="border-base-300 rounded-xl border p-4 text-sm">
+							No file sections could be separated within the interactive UI budget.
+						</div>
+					) : null}
 
-					<button
-						type="button"
-						className="btn btn-sm"
-						disabled={!!controller.busy || controller.files.length === 0}
-						onClick={() => {
-							void controller.reviewAll();
-						}}
-					>
-						{controller.hasReviewResult ? 'Review again' : 'Review all'}
-					</button>
+					{controller.files.map(view => (
+						<FileCard
+							key={view.file.id}
+							view={view}
+							controller={controller}
+							defaultTargetPickerOpen={view.file.id === initiallyOpenTargetFileID}
+						/>
+					))}
 
-					<button
-						type="button"
-						className="btn btn-sm btn-primary"
-						disabled={!!controller.busy || controller.readyFileCount === 0}
-						title="Apply only file sections whose latest backend review returned Applicable."
-						onClick={() => {
-							void controller.applyReady();
-						}}
-					>
-						Apply ready ({controller.readyFileCount})
-					</button>
-				</ModalActions>
+					{renderDiagnosticsPanel({
+						title: 'Patch notes',
+						description: 'Non-blocking parser notes. The backend determines request outcomes.',
+						diagnostics: controller.patchDiagnostics,
+					})}
+				</div>
 			</div>
 
 			<ModalBackdrop enabled={true} />

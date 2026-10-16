@@ -282,21 +282,22 @@ function normalizeInteractiveTargetPath(value: string | undefined | null): strin
 }
 
 /**
- * Deduplicate path options without validating or reformatting them.
- * Private normalization helpers are used only for ranking suggestions.
+ * Build absolute-only presentation options. This does not validate patch
+ * applicability and must not be used to reject explicit user overrides.
  */
 export function normalizeInteractiveTargetPaths(values: Array<string | undefined | null>): string[] {
 	const output: string[] = [];
 	const seen = new Set<string>();
 
 	for (const value of values) {
-		const path = value ?? '';
+		const path = normalizeInteractiveTargetPath(value);
+		const identity = targetPathIdentity(path);
 
-		if (!path || seen.has(path)) {
+		if (!path || seen.has(identity)) {
 			continue;
 		}
 
-		seen.add(path);
+		seen.add(identity);
 		output.push(path);
 	}
 
@@ -1162,16 +1163,17 @@ function addRankedInteractiveTarget(
 	rank: number,
 	order: number
 ): void {
-	const path = value;
+	const path = normalizeInteractiveTargetPath(value);
 
 	if (!path) {
 		return;
 	}
 
-	const previous = targets.get(path);
+	const identity = targetPathIdentity(path);
+	const previous = targets.get(identity);
 
 	if (!previous || rank < previous.rank || (rank === previous.rank && order < previous.order)) {
-		targets.set(path, {
+		targets.set(identity, {
 			path,
 			rank,
 			order,
@@ -1224,11 +1226,11 @@ export function inferInteractiveDiffTargets(
 		};
 
 		/*
-		 * Patch paths are suggestions, not eligibility checks. Keep relative
-		 * paths too; an exact attached-file match still ranks above them.
+		 * Only absolute paths are selectable. Relative patch paths are used
+		 * below to derive absolute suggestions, never offered verbatim.
 		 */
-		if (patchPath && patchPath !== DEV_NULL) {
-			addTarget(patchPath, absolutePatchPath ? 1 : 150);
+		if (absolutePatchPath) {
+			addTarget(absolutePatchPath, 1);
 		}
 
 		for (const candidate of externalCandidates) {

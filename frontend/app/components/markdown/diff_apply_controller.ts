@@ -72,6 +72,7 @@ export interface DiffApplyController {
 	hasReviewResult: boolean;
 	reviewedFileCount: number;
 	readyFileCount: number;
+	submittableFileCount: number;
 	appliedFileCount: number;
 	alreadyAppliedFileCount: number;
 	blockedFileCount: number;
@@ -179,19 +180,20 @@ function createUnreviewedFileView(
 	strict: boolean,
 	candidates: string[]
 ): DiffApplyFileView {
+	const targetPath = pathInput.trim();
 	return {
 		...file,
 		pathInput,
-		targetPath: pathInput,
-		effectiveTargetPath: pathInput,
+		targetPath,
+		effectiveTargetPath: targetPath,
 		candidates,
-		fingerprint: createFingerprint(file.file.id, pathInput, strict),
+		fingerprint: createFingerprint(file.file.id, targetPath, strict),
 		reviewOutcome: undefined,
 		applyOutcome: undefined,
 		hunkOutcomes: {},
 		selectedHunkIDs: [],
 		status: 'pending',
-		canApply: false,
+		canApply: targetPath.length > 0,
 		canTryHunks: file.file.hunks.length > 0,
 	};
 }
@@ -229,7 +231,7 @@ export function useDiffApplyController(
 				const suggestion = targetSuggestions.get(file.id);
 				const targetInput = targetInputs[file.id];
 				const pathInput = targetInput?.source === file ? targetInput.value : '';
-				const explicitTargetPath = pathInput;
+				const explicitTargetPath = pathInput.trim();
 				const fingerprint = createFingerprint(file.id, explicitTargetPath, strict);
 				const stored = states[file.id];
 				const state = stored?.fingerprint === fingerprint && stored.source === file ? stored : undefined;
@@ -251,7 +253,7 @@ export function useDiffApplyController(
 					hunkOutcomes: state?.hunkOutcomes ?? {},
 					selectedHunkIDs: state?.selectedHunkIDs ?? [],
 					status,
-					canApply: reviewOutcome?.status === 'ready' && !applyOutcome,
+					canApply: !!explicitTargetPath || (reviewOutcome?.status === 'ready' && !applyOutcome),
 					canTryHunks,
 				};
 			}),
@@ -508,7 +510,12 @@ export function useDiffApplyController(
 					dryRun: phase === 'dry-run',
 					strict: requestStrict,
 					fileTargets,
-					candidatePaths: file.candidates.length > 0 ? file.candidates : undefined,
+					// An explicit override takes precedence over presentation guesses.
+					candidatePaths: file.effectiveTargetPath
+						? [file.effectiveTargetPath]
+						: file.candidates.length > 0
+							? file.candidates
+							: undefined,
 				});
 
 				return interpretScopedApplyResult(output, phase);
@@ -628,10 +635,10 @@ export function useDiffApplyController(
 
 						try {
 							/*
-							 * This is deliberately a direct apply. The user
-							 * explicitly reviewed first, and backend apply
-							 * semantics decide whether the current file still
-							 * accepts this fuzzy patch.
+							 * Submit directly. An explicit target is a user
+							 * override; otherwise a backend review authorized
+							 * submission. Only the backend decides whether
+							 * the current file accepts this fuzzy patch.
 							 */
 							diffText = buildInteractiveDiffRequest(file.file);
 						} catch (error) {
@@ -756,7 +763,11 @@ export function useDiffApplyController(
 			}
 
 			const selectedHunkIDs = file.file.hunks
-				.filter(hunk => file.selectedHunkIDs.includes(hunk.id) && file.hunkOutcomes[hunk.id]?.status === 'ready')
+				.filter(
+					hunk =>
+						file.selectedHunkIDs.includes(hunk.id) &&
+						(!!file.effectiveTargetPath || file.hunkOutcomes[hunk.id]?.status === 'ready')
+				)
 				.map(hunk => hunk.id);
 
 			if (selectedHunkIDs.length === 0) {
@@ -907,7 +918,11 @@ export function useDiffApplyController(
 
 			const file = findCurrentFile(fileID);
 
-			if (!file || file.hunkOutcomes[hunkID]?.status !== 'ready') {
+			if (
+				!file ||
+				!file.file.hunks.some(hunk => hunk.id === hunkID) ||
+				(!file.effectiveTargetPath && file.hunkOutcomes[hunkID]?.status !== 'ready')
+			) {
 				return;
 			}
 
@@ -948,6 +963,7 @@ export function useDiffApplyController(
 		const next = {
 			reviewed: 0,
 			ready: 0,
+			submittable: 0,
 			applied: 0,
 			alreadyApplied: 0,
 			blocked: 0,
@@ -959,6 +975,10 @@ export function useDiffApplyController(
 		for (const file of files) {
 			if (file.reviewOutcome) {
 				next.reviewed += 1;
+			}
+
+			if (file.canApply) {
+				next.submittable += 1;
 			}
 
 			switch (file.status) {
@@ -1002,6 +1022,7 @@ export function useDiffApplyController(
 		hasReviewResult: counts.reviewed > 0,
 		reviewedFileCount: counts.reviewed,
 		readyFileCount: counts.ready,
+		submittableFileCount: counts.submittable,
 		appliedFileCount: counts.applied,
 		alreadyAppliedFileCount: counts.alreadyApplied,
 		blockedFileCount: counts.blocked,

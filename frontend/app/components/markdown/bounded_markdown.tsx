@@ -1,4 +1,3 @@
-// oxlint-disable unicorn/prefer-code-point
 import type { ComponentProps, ReactNode } from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 

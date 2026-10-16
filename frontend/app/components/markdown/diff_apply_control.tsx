@@ -108,14 +108,14 @@ function DiffApplySession({ parsed, candidatePaths, workspaceRoots, consumeIniti
 						onClick={() => {
 							setIsDetailsOpen(true);
 						}}
-						title="Inspect backend review, apply results, and parser notes."
+						title="Inspect targets, source hunks, backend results, and parser notes."
 					>
 						<FiInfo size={12} />
 						{detailsLabel}
 					</button>
 				) : null}
 
-				{controller.readyFileCount > 0 || applyInProgress ? (
+				{controller.submittableFileCount > 0 || applyInProgress ? (
 					<button
 						type="button"
 						className={getButtonClassName('success')}
@@ -123,10 +123,10 @@ function DiffApplySession({ parsed, candidatePaths, workspaceRoots, consumeIniti
 						onClick={() => {
 							void controller.applyReady();
 						}}
-						title="Apply files whose latest backend review returned Applicable."
+						title="Submit files with explicit targets or successful backend reviews."
 					>
 						{applyInProgress ? <FiLoader size={12} className="animate-spin" /> : <FiGitPullRequest size={12} />}
-						{applyInProgress ? 'Applying' : `Apply ${controller.readyFileCount}`}
+						{applyInProgress ? 'Applying' : `Apply ${controller.submittableFileCount}`}
 					</button>
 				) : null}
 			</div>
