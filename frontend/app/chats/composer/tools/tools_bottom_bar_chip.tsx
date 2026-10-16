@@ -5,7 +5,7 @@ import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiRefreshCw, FiTool, FiX } 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
-import type { ProviderSDKType } from '@/spec/inference';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 

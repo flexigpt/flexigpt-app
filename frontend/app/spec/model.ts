@@ -6,11 +6,11 @@ import type {
 	ModelParam,
 	OutputFormatKind,
 	OutputVerbosity,
-	ProviderSDKType,
 	ReasoningLevel,
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SessionModelDefaultField } from '@/spec/session';
 
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';

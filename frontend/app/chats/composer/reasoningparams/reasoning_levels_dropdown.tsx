@@ -1,6 +1,7 @@
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { ReasoningLevel } from '@/spec/inference';
+import { ReasoningLevel } from '@/spec/inference';
+import { getReasoningLevelDisplayName } from '@/spec/inference_labels';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -11,7 +12,13 @@ import {
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
-import { COMPOSER_DEFAULT_REASONING_LEVELS, getReasoningLevelDisplayName } from '@/models/lib/model_option_labels';
+const COMPOSER_DEFAULT_REASONING_LEVELS: readonly ReasoningLevel[] = [
+	ReasoningLevel.None,
+	ReasoningLevel.Minimal,
+	ReasoningLevel.Low,
+	ReasoningLevel.Medium,
+	ReasoningLevel.High,
+];
 
 interface SingleReasoningDropdownProps {
 	reasoningLevel?: ReasoningLevel;

@@ -1,57 +1,6 @@
 import type { MCPAppRenderTarget, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/session_mcp';
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
-export enum ProviderSDKType {
-	ProviderSDKTypeAnthropic = 'providerSDKTypeAnthropicMessages',
-	ProviderSDKTypeOpenAIChatCompletions = 'providerSDKTypeOpenAIChatCompletions',
-	ProviderSDKTypeOpenAIResponses = 'providerSDKTypeOpenAIResponses',
-	ProviderSDKTypeGoogleGenerateContent = 'providerSDKTypeGoogleGenerateContent',
-}
-
-/** @public */
-export const SDK_DISPLAY_NAME: Record<ProviderSDKType, string> = {
-	[ProviderSDKType.ProviderSDKTypeAnthropic]: 'Anthropic Messages API',
-	[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions]: 'OpenAI ChatCompletions API',
-	[ProviderSDKType.ProviderSDKTypeOpenAIResponses]: 'OpenAI Responses API',
-	[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: 'Google GenAI API',
-};
-
-/** @public */
-export const SDK_DEFAULTS: Record<
-	ProviderSDKType,
-	{ chatPath: string; apiKeyHeaderKey: string; defaultHeaders: Record<string, string> }
-> = {
-	[ProviderSDKType.ProviderSDKTypeAnthropic]: {
-		chatPath: '/v1/messages',
-		apiKeyHeaderKey: 'x-api-key',
-		defaultHeaders: {
-			'Content-Type': 'application/json',
-			'anthropic-version': '2023-06-01',
-		},
-	},
-	[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions]: {
-		chatPath: '/v1/chat/completions',
-		apiKeyHeaderKey: 'Authorization',
-		defaultHeaders: {
-			'Content-Type': 'application/json',
-		},
-	},
-	[ProviderSDKType.ProviderSDKTypeOpenAIResponses]: {
-		chatPath: '/v1/responses',
-		apiKeyHeaderKey: 'Authorization',
-		defaultHeaders: {
-			'Content-Type': 'application/json',
-		},
-	},
-	[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: {
-		chatPath: '/',
-		apiKeyHeaderKey: 'x-goog-api-key',
-		defaultHeaders: {
-			'Content-Type': 'application/json',
-		},
-	},
-};
-
 export enum RoleEnum {
 	System = 'system',
 	Developer = 'developer',

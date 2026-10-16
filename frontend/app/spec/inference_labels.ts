@@ -5,6 +5,14 @@ const OUTPUT_FORMAT_DISPLAY_NAMES: Record<OutputFormatKind, string> = {
 	[OutputFormatKind.JSONSchema]: 'JSON Schema',
 };
 
+export function getOutputFormatDisplayName(value?: OutputFormatKind): string {
+	if (value === undefined) {
+		return 'Default';
+	}
+
+	return OUTPUT_FORMAT_DISPLAY_NAMES[value] ?? 'Unknown';
+}
+
 const OUTPUT_VERBOSITY_DISPLAY_NAMES: Record<OutputVerbosity, string> = {
 	[OutputVerbosity.Low]: 'Low',
 	[OutputVerbosity.Medium]: 'Medium',
@@ -12,6 +20,14 @@ const OUTPUT_VERBOSITY_DISPLAY_NAMES: Record<OutputVerbosity, string> = {
 	[OutputVerbosity.XHigh]: 'XHigh',
 	[OutputVerbosity.Max]: 'Max',
 };
+
+export function getOutputVerbosityDisplayName(value?: OutputVerbosity): string {
+	if (value === undefined) {
+		return 'Default';
+	}
+
+	return OUTPUT_VERBOSITY_DISPLAY_NAMES[value] ?? 'Unknown';
+}
 
 const REASONING_LEVEL_DISPLAY_NAMES: Record<ReasoningLevel, string> = {
 	[ReasoningLevel.None]: 'None',
@@ -22,38 +38,6 @@ const REASONING_LEVEL_DISPLAY_NAMES: Record<ReasoningLevel, string> = {
 	[ReasoningLevel.XHigh]: 'XHigh',
 	[ReasoningLevel.Max]: 'Max',
 };
-
-export const OUTPUT_VERBOSITY_VALUES: readonly OutputVerbosity[] = [
-	OutputVerbosity.Low,
-	OutputVerbosity.Medium,
-	OutputVerbosity.High,
-	OutputVerbosity.XHigh,
-	OutputVerbosity.Max,
-];
-
-export const COMPOSER_DEFAULT_REASONING_LEVELS: readonly ReasoningLevel[] = [
-	ReasoningLevel.None,
-	ReasoningLevel.Minimal,
-	ReasoningLevel.Low,
-	ReasoningLevel.Medium,
-	ReasoningLevel.High,
-];
-
-export function getOutputFormatDisplayName(value?: OutputFormatKind): string {
-	if (value === undefined) {
-		return 'Default';
-	}
-
-	return OUTPUT_FORMAT_DISPLAY_NAMES[value] ?? 'Unknown';
-}
-
-export function getOutputVerbosityDisplayName(value?: OutputVerbosity): string {
-	if (value === undefined) {
-		return 'Default';
-	}
-
-	return OUTPUT_VERBOSITY_DISPLAY_NAMES[value] ?? 'Unknown';
-}
 
 export function getReasoningLevelDisplayName(value?: ReasoningLevel): string {
 	if (value === undefined) {

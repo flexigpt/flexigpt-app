@@ -6,8 +6,9 @@ import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPRuntimeServerID } from '@/spec/mcp';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SessionConfiguration } from '@/spec/session';
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';

@@ -4,7 +4,7 @@ import { memo, useMemo } from 'react';
 import type { MenuStore } from '@ariakit/react';
 
 import type { AttachmentContentBlockMode, PathAttachmentsResult, UIAttachment } from '@/spec/attachment';
-import type { ProviderSDKType } from '@/spec/inference';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
 

@@ -1,7 +1,8 @@
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { OutputVerbosity } from '@/spec/inference';
-import { ProviderSDKType } from '@/spec/inference';
+import { OutputVerbosity } from '@/spec/inference';
+import { getOutputVerbosityDisplayName } from '@/spec/inference_labels';
+import { ProviderSDKType } from '@/spec/provider_sdk';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -12,8 +13,6 @@ import {
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
-import { getOutputVerbosityDisplayName, OUTPUT_VERBOSITY_VALUES } from '@/models/lib/model_option_labels';
-
 interface OutputVerbosityDropdownProps {
 	sdkType: ProviderSDKType;
 	verbosity?: OutputVerbosity;
@@ -21,7 +20,7 @@ interface OutputVerbosityDropdownProps {
 	setVerbosity: (v?: OutputVerbosity) => void;
 }
 
-const VERBOSITY_OPTIONS: Array<OutputVerbosity | undefined> = [undefined, ...OUTPUT_VERBOSITY_VALUES];
+const VERBOSITY_OPTIONS: Array<OutputVerbosity | undefined> = [undefined, ...Object.values(OutputVerbosity)];
 
 function labelFor(v?: OutputVerbosity) {
 	if (v === undefined) {

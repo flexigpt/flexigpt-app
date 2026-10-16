@@ -1,4 +1,4 @@
-import type { ProviderSDKType } from '@/spec/inference';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 

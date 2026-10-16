@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { CacheControlKind, ProviderSDKType } from '@/spec/inference';
+import type { CacheControlKind } from '@/spec/inference';
 import type { ModelCapabilities } from '@/spec/model';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import {
 	OutputFormatKind,
 	OutputVerbosity,
@@ -10,6 +11,11 @@ import {
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
+import {
+	getOutputFormatDisplayName,
+	getOutputVerbosityDisplayName,
+	getReasoningLevelDisplayName,
+} from '@/spec/inference_labels';
 
 import { getEffectiveCacheCapabilities, getTopLevelCacheControlCapabilities } from '@/apis/model_capability_helpers';
 
@@ -37,11 +43,6 @@ import {
 	supportsOutputVerbosity,
 	supportsReasoningSummaryStyle,
 } from '@/models/lib/capabilities';
-import {
-	getOutputFormatDisplayName,
-	getOutputVerbosityDisplayName,
-	getReasoningLevelDisplayName,
-} from '@/models/lib/model_option_labels';
 import {
 	OPTIONAL_BOOLEAN_UNSET,
 	OUTPUT_FORMAT_NONE,

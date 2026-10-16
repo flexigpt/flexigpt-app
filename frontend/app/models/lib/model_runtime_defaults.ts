@@ -1,5 +1,6 @@
-import type { CacheControlKind, JSONSchemaParam, OutputVerbosity, ProviderSDKType } from '@/spec/inference';
+import type { CacheControlKind, JSONSchemaParam, OutputVerbosity } from '@/spec/inference';
 import type { ModelCapabilities, ModelDefaults } from '@/spec/model';
+import type { ProviderSDKType } from '@/spec/provider_sdk';
 import { OutputFormatKind, ReasoningLevel, ReasoningSummaryStyle, ReasoningType } from '@/spec/inference';
 
 import { formatJSON, MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
