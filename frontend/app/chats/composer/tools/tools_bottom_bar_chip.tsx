@@ -14,12 +14,12 @@ import type { ToolCatalogState } from '@/hooks/use_tool';
 import { toolArtifactKey, toolDisplayName } from '@/apis/tool_management';
 
 import {
-	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
@@ -70,7 +70,6 @@ interface ToolPluginGroup {
 	key: string;
 	name: string;
 	available: ToolListItem[];
-	conversation: ConversationToolStateEntry[];
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -109,16 +108,6 @@ function itemSearchFields(item: ToolListItem) {
 	];
 }
 
-function choiceSearchFields(choice: ToolStoreChoice) {
-	return [
-		{ value: choice.displayName, weight: 7 },
-		{ value: choice.target.name, weight: 6 },
-		{ value: choice.toolVersion, weight: 4 },
-		{ value: choice.pluginName, weight: 3 },
-		{ value: choice.description, weight: 2 },
-	];
-}
-
 export function ToolsBottomBarChip({
 	store,
 	buttonRef,
@@ -128,7 +117,7 @@ export function ToolsBottomBarChip({
 	conversationToolsState,
 	setConversationToolsState,
 	onAttachTool,
-	onDetachToolByKey,
+
 	onSetAttachedToolAutoExecute,
 	onRemoveAttachedTool,
 	onRemoveAllAttachedTools,
@@ -226,60 +215,39 @@ export function ToolsBottomBarChip({
 					}),
 		[eligibleWebSearch, activeWebSearch, query]
 	);
-	const visibleAttached = useMemo(
+	const configuredToolKeys = useMemo(
 		() =>
-			isSearchQueryActive(query)
-				? rankSearchableItems(attached, {
-						query,
-						getKey: entry => entry.selectionID,
-						getFields: choiceSearchFields,
-					})
-				: attached,
-		[attached, query]
+			new Set([
+				...attached.map(entry => toolIdentityKey(entry.target)),
+				...conversationToolsState.map(entry => toolIdentityKey(entry.toolStoreChoice.target)),
+			]),
+		[attached, conversationToolsState]
 	);
-	const visibleConversation = useMemo(
-		() =>
-			isSearchQueryActive(query)
-				? rankSearchableItems(conversationToolsState, {
-						query,
-						getKey: entry => entry.key,
-						getFields: entry => choiceSearchFields(entry.toolStoreChoice),
-					})
-				: conversationToolsState,
-		[conversationToolsState, query]
+	const visibleAvailableToAdd = useMemo(
+		() => visibleAvailable.filter(item => !configuredToolKeys.has(itemKey(item))),
+		[configuredToolKeys, visibleAvailable]
+	);
+	const visibleWebSearchToAdd = useMemo(
+		() => visibleWebSearch.filter(item => !activeWebSearch || itemKey(item) !== webSearchIdentityKey(activeWebSearch)),
+		[activeWebSearch, visibleWebSearch]
 	);
 
 	const groups = useMemo(() => {
 		const result = new Map<string, ToolPluginGroup>();
-		const conversationKeys = new Set(
-			conversationToolsState.map(entry => toolIdentityKey(entry.toolStoreChoice.target))
-		);
 		const ensure = (key: string, name: string) => {
 			let group = result.get(key);
 			if (!group) {
-				group = { key, name, available: [], conversation: [] };
+				group = { key, name, available: [] };
 				result.set(key, group);
 			}
 			return group;
 		};
 
-		for (const item of visibleAvailable) {
-			const key = itemKey(item);
-			if (conversationKeys.has(key) && !attachedByKey.has(key)) {
-				continue;
-			}
+		for (const item of visibleAvailableToAdd) {
 			ensure(toolArtifactKey(item.pluginRef), item.pluginName).available.push(item);
 		}
-		for (const entry of visibleConversation) {
-			const choice = entry.toolStoreChoice;
-			if (attachedByKey.has(toolIdentityKey(choice.target))) {
-				continue;
-			}
-			const key = choice.pluginRef ? toolArtifactKey(choice.pluginRef) : `unresolved:${choice.target.providerIdentity}`;
-			ensure(key, choice.pluginName || 'Conversation tools').conversation.push(entry);
-		}
 		return [...result.values()].toSorted((left, right) => collator.compare(left.name, right.name));
-	}, [visibleAvailable, visibleConversation, conversationToolsState, attachedByKey]);
+	}, [visibleAvailableToAdd]);
 
 	const missingCount =
 		attached.filter(entry => {
@@ -304,8 +272,7 @@ export function ToolsBottomBarChip({
 		(webSearchBlocked ? 1 : 0);
 
 	const configuredCount = attached.length + conversationToolsState.length + webSearchTemplates.length;
-	const resultCount =
-		visibleAvailable.length + visibleWebSearch.length + visibleAttached.length + visibleConversation.length;
+	const resultCount = visibleAvailableToAdd.length + visibleWebSearchToAdd.length;
 
 	const autoExecuteFor = (item: ToolListItem) => {
 		if (item.toolDefinition.implementation.kind !== ToolImplType.Go) {
@@ -338,13 +305,8 @@ export function ToolsBottomBarChip({
 
 	const renderAvailable = (item: ToolListItem) => {
 		const key = itemKey(item);
-		const isAttached = attachedByKey.has(key);
 		const toggle = () => {
-			if (isAttached) {
-				onDetachToolByKey(key);
-			} else {
-				onAttachTool(item, autoExecuteFor(item));
-			}
+			onAttachTool(item, autoExecuteFor(item));
 		};
 
 		return (
@@ -354,19 +316,14 @@ export function ToolsBottomBarChip({
 				disabled={isInputLocked}
 				display={toolDisplayName(item.toolDefinition)}
 				slug={itemLabel(item)}
-				isSelected={isAttached}
 				supportsAutoExecute={item.toolDefinition.implementation.kind === ToolImplType.Go}
 				autoExecute={autoExecuteFor(item)}
 				onAutoExecuteChange={value => {
-					if (isAttached) {
-						onSetAttachedToolAutoExecute(key, value);
-					} else {
-						setAutoOverrides(previous => ({ ...previous, [key]: value }));
-					}
+					setAutoOverrides(previous => ({ ...previous, [key]: value }));
 				}}
 				onRowClick={toggle}
 				primaryAction={{
-					kind: isAttached ? 'detach' : 'attach',
+					kind: 'attach',
 					onClick: toggle,
 					disabled: isInputLocked,
 				}}
@@ -560,6 +517,53 @@ export function ToolsBottomBarChip({
 		/>
 	);
 
+	const selectedToolsPanel =
+		configuredCount > 0 ? (
+			<>
+				<div className="flex justify-end px-1">
+					<button
+						type="button"
+						className="btn btn-ghost btn-xs text-error rounded-lg"
+						disabled={isInputLocked}
+						onClick={() => {
+							onRemoveAllAttachedTools(attached);
+							setConversationToolsState([]);
+							setWebSearchTemplates([]);
+						}}
+					>
+						Clear all
+					</button>
+				</div>
+
+				{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
+				{activeWebSearch && !activeWebSearchItem ? (
+					<div className="alert alert-warning rounded-xl p-2 text-xs">
+						<div className="min-w-0 flex-1">
+							<div>{activeWebSearch.displayName || activeWebSearch.target.name}</div>
+							<div>This web-search selection is unavailable for the current provider.</div>
+						</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error"
+							disabled={isInputLocked}
+							onClick={() => {
+								setWebSearchTemplates([]);
+							}}
+						>
+							Remove
+						</button>
+					</div>
+				) : null}
+
+				{attached.map(a => {
+					return renderAttached(a);
+				})}
+				{conversationToolsState.map(a => {
+					return renderConversation(a);
+				})}
+			</>
+		) : undefined;
+
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
 			<HoverTip content={hoverContent} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
@@ -594,25 +598,6 @@ export function ToolsBottomBarChip({
 							open={open}
 						/>
 					</MenuButton>
-
-					{configuredCount ? (
-						<button
-							type="button"
-							className={actionTriggerChipClearButtonClasses}
-							disabled={isInputLocked}
-							title="Clear tools"
-							aria-label="Clear tools"
-							onClick={event => {
-								stop(event);
-								onRemoveAllAttachedTools(attached);
-								setConversationToolsState([]);
-								setWebSearchTemplates([]);
-								store.hide();
-							}}
-						>
-							<FiX size={12} />
-						</button>
-					) : null}
 				</div>
 			</HoverTip>
 
@@ -633,7 +618,7 @@ export function ToolsBottomBarChip({
 							onQueryChange={setQuery}
 							placeholder="Search tools..."
 							resultCount={resultCount}
-							totalCount={available.length + eligibleWebSearch.length + attached.length + conversationToolsState.length}
+							totalCount={available.length + eligibleWebSearch.length}
 							disabled={isLoading && !hasResolved}
 							onFocusFirstItem={() => focusFirstSearchableMenuItem(contentElement)}
 							onEnterFirstResult={() => {
@@ -647,8 +632,6 @@ export function ToolsBottomBarChip({
 								const first = visibleAvailable.find(item => !attachedByKey.has(itemKey(item)));
 								if (first) {
 									onAttachTool(first, autoExecuteFor(first));
-								} else if (visibleConversation[0]) {
-									updateConversation(visibleConversation[0].key, previous => ({ ...previous, enabled: true }));
 								}
 							}}
 							onEscape={() => {
@@ -677,63 +660,32 @@ export function ToolsBottomBarChip({
 
 						<div className="space-y-2">
 							<GroupedMenuSection title="Web search" ariaLabel="Web search tools">
-								{activeWebSearch && !activeWebSearchItem ? (
-									<div className="alert alert-warning rounded-xl p-2 text-xs">
-										<div className="min-w-0 flex-1">
-											<div>{activeWebSearch.displayName || activeWebSearch.target.name}</div>
-											<div>
-												{catalogReady
-													? 'This selection is unavailable or incompatible with the current provider.'
-													: 'Waiting for the Tool catalog to verify this selection.'}
-											</div>
-										</div>
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs"
-											disabled={isInputLocked}
-											onClick={() => {
-												setWebSearchTemplates([]);
-											}}
-										>
-											Remove
-										</button>
-									</div>
-								) : null}
-
-								{visibleWebSearch.length > 0 ? (
+								{visibleWebSearchToAdd.length > 0 ? (
 									<>
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs"
-											disabled={isInputLocked}
-											onClick={() => {
-												if (activeWebSearch) {
-													setWebSearchTemplates([]);
-												} else if (eligibleWebSearch[0]) {
-													selectWebSearch(eligibleWebSearch[0]);
-												}
-											}}
-										>
-											{activeWebSearch ? 'Disable web search' : 'Enable web search'}
-										</button>
-										{visibleWebSearch.map(v => {
+										{!activeWebSearch ? (
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs"
+												disabled={isInputLocked}
+												onClick={() => {
+													selectWebSearch(visibleWebSearchToAdd[0]);
+												}}
+											>
+												Enable web search
+											</button>
+										) : null}
+										{visibleWebSearchToAdd.map(v => {
 											return renderWebSearch(v);
 										})}
 									</>
 								) : (
 									<div className={actionTriggerMenuItemClasses}>
-										No matching web-search tool is available for this provider.
+										{activeWebSearch
+											? 'No additional web-search tool is available for this provider.'
+											: 'No matching web-search tool is available for this provider.'}
 									</div>
 								)}
 							</GroupedMenuSection>
-
-							{visibleAttached.length > 0 ? (
-								<GroupedMenuSection title="This message" ariaLabel="Per-message tools" separatorBefore>
-									{visibleAttached.map(v => {
-										return renderAttached(v);
-									})}
-								</GroupedMenuSection>
-							) : null}
 
 							<GroupedMenuSection title="Available tools" ariaLabel="Available tools" separatorBefore>
 								{groups.length > 0 ? (
@@ -743,13 +695,8 @@ export function ToolsBottomBarChip({
 											title={group.name}
 											ariaLabel={`${group.name} tools`}
 											separatorBefore={index > 0}
-											meta={
-												<span className="badge badge-ghost badge-xs">
-													{group.available.length + group.conversation.length}
-												</span>
-											}
+											meta={<span className="badge badge-ghost badge-xs">{group.available.length}</span>}
 										>
-											{group.conversation.map(renderConversation)}
 											{group.available.map(renderAvailable)}
 										</GroupedMenuSection>
 									))
@@ -765,6 +712,10 @@ export function ToolsBottomBarChip({
 								</div>
 							) : null}
 						</div>
+
+						<ComposerDropdownSelectedPanel label="Added tools" count={configuredCount}>
+							{selectedToolsPanel}
+						</ComposerDropdownSelectedPanel>
 					</>
 				) : null}
 			</Menu>

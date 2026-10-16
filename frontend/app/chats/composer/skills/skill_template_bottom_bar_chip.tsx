@@ -78,6 +78,7 @@ export interface SkillTemplateBottomBarChipProps {
 	loading: boolean;
 	loadError?: string | null;
 	onRefresh?: () => Promise<void> | void;
+	onTemplateRendered: (skillRef: ComposerSkillCatalogItem['ref']) => void;
 	onInsertTemplateText: (text: string) => Promise<void> | void;
 	onAttachApprovedTemplateResourcePaths: (
 		paths: string[],
@@ -767,6 +768,7 @@ function SkillTemplateBottomBarChipInner({
 	loading,
 	loadError,
 	onRefresh,
+	onTemplateRendered,
 	onInsertTemplateText,
 	onAttachApprovedTemplateResourcePaths,
 	isInputLocked = false,
@@ -851,6 +853,7 @@ function SkillTemplateBottomBarChipInner({
 				);
 			}
 			await onInsertTemplateText(rendered.text);
+			onTemplateRendered(item.ref);
 
 			const requestedResourcePaths = selectedApprovedTemplateResourcePaths(
 				approvedTemplateResourcePaths(item),
@@ -890,7 +893,7 @@ function SkillTemplateBottomBarChipInner({
 
 			return { resourceAttachmentWarnings };
 		},
-		[onAttachApprovedTemplateResourcePaths, onInsertTemplateText, store]
+		[onAttachApprovedTemplateResourcePaths, onInsertTemplateText, store, onTemplateRendered]
 	);
 
 	return (

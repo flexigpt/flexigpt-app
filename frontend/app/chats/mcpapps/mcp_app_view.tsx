@@ -321,7 +321,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const [sessionError, setSessionError] = useState<string | null>(null);
 	const [viewID] = useState(() => `mcp-app-view-${getUUIDv7()}`);
 	const [resolvedServerLabel, setResolvedServerLabel] = useState<ResolvedServerLabel | null>(null);
-	const serverLabel = resolvedServerLabel?.runtimeID === instance.server ? resolvedServerLabel.label : instance.server;
+	const serverLabel = resolvedServerLabel?.runtimeID === instance.server ? resolvedServerLabel.label : 'MCP server';
 	const revisionsRef = useRef({
 		sessionRevision: instance.session.sessionRevision,
 		runRevision: instance.session.runRevision,
@@ -363,8 +363,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 
 				setResolvedServerLabel({
 					runtimeID,
-					label:
-						server.displayName.trim() || server.logicalName.trim() || `${server.ref.rootID}/${server.ref.artifactID}`,
+					label: server.displayName.trim() || server.logicalName.trim() || 'MCP server',
 				});
 			})
 			.catch(() => {

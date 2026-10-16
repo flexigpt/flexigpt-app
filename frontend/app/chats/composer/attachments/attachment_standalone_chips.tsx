@@ -1,11 +1,19 @@
+import { useMemo } from 'react';
 import { FiChevronUp, FiPaperclip, FiX } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 
+import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import { useSearchableMenuState } from '@/components/searchmenu/searchable_menu_utils';
+
 import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
-import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
+import {
+	getAttachmentDisplayLabel,
+	getUIAttachmentPath,
+	uiAttachmentKey,
+} from '@/chats/composer/attachments/attachment_editor_utils';
 
 interface StandaloneAttachmentsChipProps {
 	attachments: UIAttachment[];
@@ -25,6 +33,21 @@ export function StandaloneAttachmentsChip({
 }: StandaloneAttachmentsChipProps) {
 	const count = attachments.length;
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const open = useStoreState(menu, 'open');
+	const [query, setQuery] = useSearchableMenuState(open);
+	const filteredAttachments = useMemo(() => {
+		const normalized = query.trim().toLocaleLowerCase();
+		if (!normalized) {
+			return attachments;
+		}
+
+		return attachments.filter(attachment =>
+			[getAttachmentDisplayLabel(attachment), getUIAttachmentPath(attachment)]
+				.join('\n')
+				.toLocaleLowerCase()
+				.includes(normalized)
+		);
+	}, [attachments, query]);
 
 	const title = `Attachments\n${count} item${count === 1 ? '' : 's'} attached`;
 	if (count === 0) {
@@ -71,11 +94,25 @@ export function StandaloneAttachmentsChip({
 				gutter={8}
 				overflowPadding={8}
 				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
+				autoFocusOnShow={false}
 			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Attachments</div>
+				<SearchableMenuInput
+					open={open}
+					query={query}
+					onQueryChange={setQuery}
+					placeholder="Search attached files and links…"
+					resultCount={filteredAttachments.length}
+					totalCount={attachments.length}
+					onEscape={() => {
+						menu.hide();
+					}}
+				/>
 
-				{attachments.map(att => (
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">
+					Attachments ({filteredAttachments.length})
+				</div>
+
+				{filteredAttachments.map(att => (
 					<MenuItem
 						key={uiAttachmentKey(att)}
 						store={menu}
@@ -90,6 +127,12 @@ export function StandaloneAttachmentsChip({
 						/>
 					</MenuItem>
 				))}
+
+				{filteredAttachments.length === 0 ? (
+					<div className="text-base-content/60 rounded-xl px-2 py-3 text-center text-xs">
+						No attached files or links match this search.
+					</div>
+				) : null}
 			</Menu>
 		</div>
 	);

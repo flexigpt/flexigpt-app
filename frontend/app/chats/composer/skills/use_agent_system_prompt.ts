@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
 import type { SessionConfiguration } from '@/spec/session';
+import type { SkillRef } from '@/spec/skill';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
 import { SessionModelDefaultField } from '@/spec/session';
 import { SessionCollectionOverrideMode } from '@/spec/session_base';
@@ -29,6 +30,7 @@ export interface AgentSystemPromptController {
 	instructionSources: SystemInstructionSource[];
 	includeModelDefault: boolean;
 	selectedInstructionSourceKeys: string[];
+	selectedInstructionSkillRefs: SkillRef[];
 	resolvedSystemPrompt: string;
 	sessionInstructionText: string;
 
@@ -180,6 +182,25 @@ export function useAgentSystemPrompt(args: {
 		() => rawSelectedKeys.filter(key => sourceByKey.has(key)),
 		[rawSelectedKeys, sourceByKey]
 	);
+
+	const selectedInstructionSkillRefs = useMemo(() => {
+		const selected = new Set(selectedInstructionSourceKeys);
+		const seen = new Set<string>();
+		const refs: SkillRef[] = [];
+
+		for (const source of sources) {
+			if (!source.skillRef || !selected.has(source.identityKey)) {
+				continue;
+			}
+
+			const key = skillRefKey(source.skillRef);
+			if (!seen.has(key)) {
+				seen.add(key);
+				refs.push({ rootID: source.skillRef.rootID, artifactID: source.skillRef.artifactID });
+			}
+		}
+		return refs;
+	}, [selectedInstructionSourceKeys, sources]);
 
 	const resolvedSystemPrompt = useMemo(
 		() =>
@@ -351,6 +372,7 @@ export function useAgentSystemPrompt(args: {
 		instructionSources: sources,
 		includeModelDefault,
 		selectedInstructionSourceKeys,
+		selectedInstructionSkillRefs,
 		resolvedSystemPrompt,
 		sessionInstructionText,
 		setIncludeModelDefault,

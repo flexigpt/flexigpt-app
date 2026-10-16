@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
@@ -13,6 +13,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
@@ -101,14 +102,12 @@ export function ModelDropdown({
 		agentModelRef?.artifactID === model.model?.artifactID;
 	const agentPreviewMatchesSelected = isAgentOwnedModel(selectedModel);
 	const triggerLabel =
-		agentOwnsModel && !agentPreviewMatchesSelected && agentModelRef
-			? agentModelRef.artifactID
-			: selectedModel.modelDisplayName;
+		agentOwnsModel && !agentPreviewMatchesSelected && agentModelRef ? 'Agent model' : selectedModel.modelDisplayName;
 
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
-	const isCurrent = (m: UIModelOption) => modelKey(m) === currentKey;
+	const isCurrent = useCallback((m: UIModelOption) => modelKey(m) === currentKey, [currentKey]);
 
 	const displayedProviderGroups = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
@@ -139,8 +138,19 @@ export function ModelDropdown({
 			.filter(group => group.options.length > 0);
 	}, [allOptions, providerGroups, searchQuery]);
 
-	const displayedModelCount = displayedProviderGroups.reduce((sum, group) => sum + group.options.length, 0);
-	const firstVisibleModel = displayedProviderGroups[0]?.options[0] ?? null;
+	const selectableProviderGroups = useMemo(
+		() =>
+			displayedProviderGroups
+				.map(group => ({
+					...group,
+					options: group.options.filter(model => !isCurrent(model)),
+				}))
+				.filter(group => group.options.length > 0),
+		[displayedProviderGroups, isCurrent]
+	);
+
+	const displayedModelCount = selectableProviderGroups.reduce((sum, group) => sum + group.options.length, 0);
+	const firstVisibleModel = selectableProviderGroups[0]?.options[0] ?? null;
 
 	const selectModel = (model: UIModelOption) => {
 		setSelectedModel(model);
@@ -185,7 +195,7 @@ export function ModelDropdown({
 						onQueryChange={setSearchQuery}
 						placeholder="Search models…"
 						resultCount={displayedModelCount}
-						totalCount={allOptions.length}
+						totalCount={Math.max(0, allOptions.length - 1)}
 						onFocusFirstItem={() => {
 							focusFirstSearchableMenuItem(menuContentElement);
 						}}
@@ -205,11 +215,11 @@ export function ModelDropdown({
 						</div>
 					) : null}
 
-					{displayedProviderGroups.length === 0 ? (
-						<div className={searchableMenuEmptyStateClasses}>No models match your search.</div>
+					{selectableProviderGroups.length === 0 ? (
+						<div className={searchableMenuEmptyStateClasses}>No other models match your search.</div>
 					) : null}
 
-					{displayedProviderGroups.map((group, groupIndex) => (
+					{selectableProviderGroups.map((group, groupIndex) => (
 						<GroupedMenuSection
 							key={group.providerName}
 							title={group.providerDisplayName}
@@ -234,6 +244,14 @@ export function ModelDropdown({
 							))}
 						</GroupedMenuSection>
 					))}
+
+					<ComposerDropdownSelectedPanel label="Current model" count={1}>
+						<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1">
+							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>
+							{agentOwnsModel ? <span className="badge badge-secondary badge-xs">Agent</span> : null}
+							{!agentOwnsModel ? <span className="badge badge-ghost badge-xs">Session</span> : null}
+						</div>
+					</ComposerDropdownSelectedPanel>
 				</Menu>
 			</div>
 		</div>

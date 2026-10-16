@@ -391,7 +391,25 @@ export function SkillsBottomBarChip({
 		}
 	};
 
+	const removeFromSkillSession = (item: ComposerSkillCatalogItem) => {
+		const ref = skillRef(item);
+		setEnabledSkillRefs(previous => removeSkillRef(previous, ref));
+		setActiveSkillRefs(previous => removeSkillRef(previous, ref));
+	};
+
 	const addAsInstructions = async (item: ComposerSkillCatalogItem) => {
+		const ref = skillRef(item);
+		const identity = `skill-instructions:${skillRefKey(ref)}`;
+		const existingSource = systemPrompt.instructionSources.find(source => source.identityKey === identity);
+
+		if (existingSource) {
+			removeFromSkillSession(item);
+			if (!systemPrompt.selectedInstructionSourceKeys.includes(identity)) {
+				systemPrompt.toggleInstructionSource(identity);
+			}
+			return;
+		}
+
 		try {
 			const source = await skillManagementAPI.prepareInstructionSource({
 				ref: item.ref,
@@ -405,6 +423,11 @@ export function SkillsBottomBarChip({
 				builtIn: item.builtIn,
 				managed: item.managed,
 			});
+
+			// This mode is deliberately text-only. Moving a Skill into the
+			// system-instruction channel must remove it from Skill-session state.
+			removeFromSkillSession(item);
+
 			systemPrompt.addAndSelectInstructionSkillSource({
 				displayName: skillLabel(item),
 				prompt: source.text,
@@ -834,12 +857,7 @@ export function SkillsBottomBarChip({
 												disabled={isInputLocked || !selectable(skill) || skill.hasArguments || skill.hasResources}
 												title="Render this simple Skill as an explicit instruction source. This does not enable its lifecycle."
 												onClick={() => {
-													const identity = `skill-instructions:${skillRefKey(skill.ref)}`;
-													if (systemPrompt.instructionSources.some(source => source.identityKey === identity)) {
-														systemPrompt.toggleInstructionSource(identity);
-													} else {
-														void addAsInstructions(skill);
-													}
+													void addAsInstructions(skill);
 												}}
 											>
 												{systemPrompt.selectedInstructionSourceKeys.includes(

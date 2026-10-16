@@ -9,12 +9,12 @@ import { ArtifactState } from '@/spec/artifact';
 import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import {
-	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 
 import type {
@@ -127,6 +127,17 @@ function WorkspaceBottomBarChipContent({
 		[search, state.workspaces]
 	);
 
+	const availableWorkspaces = useMemo(
+		() =>
+			visibleWorkspaces.filter(candidate => {
+				return (
+					state.selection?.workspace.rootID !== candidate.workspace.workspace.artifact.rootID ||
+					state.selection?.workspace.artifactID !== candidate.workspace.workspace.artifact.id
+				);
+			}),
+		[state.selection?.workspace.artifactID, state.selection?.workspace.rootID, visibleWorkspaces]
+	);
+
 	const selected = Boolean(state.selection);
 	const selectedName = selectedWorkspaceName(state);
 	const selectedContextCount = state.selection?.contextRefs?.length ?? 0;
@@ -166,6 +177,52 @@ function WorkspaceBottomBarChipContent({
 			]}
 		/>
 	);
+
+	const selectedWorkspacePanel = selected ? (
+		<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2">
+			<div className="truncate text-xs font-semibold">{selectedName}</div>
+			<div className="text-base-content/60 mt-1 text-xs">
+				{selectedContextCount} Context · {selectedSkillCount} instruction Skills
+			</div>
+			<div className="mt-2 flex flex-wrap gap-2">
+				<button
+					type="button"
+					className="btn btn-xs rounded-lg"
+					onClick={() => {
+						store.hide();
+						setIsSelectionOpen(true);
+					}}
+				>
+					<FiSettings size={12} />
+					Edit selection
+				</button>
+				<button
+					type="button"
+					className="btn btn-ghost btn-xs rounded-lg"
+					disabled={state.selectionLoading}
+					onClick={() => {
+						void state.refreshSelectedWorkspace();
+					}}
+				>
+					<FiRefreshCw size={12} />
+					Refresh status
+				</button>
+				<button
+					type="button"
+					className="btn btn-ghost btn-xs text-error rounded-lg"
+					disabled={isInputLocked}
+					onClick={() => {
+						void state.detachWorkspace().catch((error: unknown) => {
+							setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
+						});
+					}}
+				>
+					<FiX size={12} />
+					Detach
+				</button>
+			</div>
+		</div>
+	) : undefined;
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-workspace>
@@ -212,31 +269,6 @@ function WorkspaceBottomBarChipContent({
 							open={open}
 						/>
 					</MenuButton>
-
-					{selected ? (
-						<button
-							type="button"
-							className={actionTriggerChipClearButtonClasses}
-							disabled={isInputLocked}
-							onClick={event => {
-								event.preventDefault();
-								event.stopPropagation();
-
-								void state
-									.detachWorkspace()
-									.then(() => {
-										store.hide();
-									})
-									.catch((error: unknown) => {
-										setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
-									});
-							}}
-							title="Detach Workspace from future turns"
-							aria-label="Detach Workspace"
-						>
-							<FiX size={12} />
-						</button>
-					) : null}
 				</div>
 			</HoverTip>
 
@@ -352,17 +384,14 @@ function WorkspaceBottomBarChipContent({
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 						Loading Workspace directories...
 					</div>
-				) : visibleWorkspaces.length === 0 ? (
+				) : availableWorkspaces.length === 0 ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						No effective Workspaces match.
+						{selected ? 'All matching Workspaces are already selected below.' : 'No effective Workspaces match.'}
 					</div>
 				) : (
 					<div className="space-y-1">
-						{visibleWorkspaces.map(candidate => {
+						{availableWorkspaces.map(candidate => {
 							const candidateKey = workspaceKey(candidate);
-							const current =
-								state.selection?.workspace.rootID === candidate.workspace.workspace.artifact.rootID &&
-								state.selection?.workspace.artifactID === candidate.workspace.workspace.artifact.id;
 							const available = workspaceIsAvailable(candidate);
 
 							return (
@@ -372,7 +401,7 @@ function WorkspaceBottomBarChipContent({
 									disabled={!available || isInputLocked}
 									className={`${actionTriggerMenuItemClasses} items-start`}
 									onClick={() => {
-										if (current || !available) {
+										if (!available) {
 											return;
 										}
 
@@ -395,9 +424,7 @@ function WorkspaceBottomBarChipContent({
 											{workspaceSubtitle(candidate)}
 										</div>
 									</div>
-									{current ? (
-										<span className="badge badge-secondary badge-xs">Selected</span>
-									) : !available ? (
+									{!available ? (
 										<span className="badge badge-warning badge-xs">Unavailable</span>
 									) : candidate.workspace.origin === WorkspaceDirectoryOrigin.Default ? (
 										<span className="badge badge-info badge-xs">Default</span>
@@ -424,6 +451,10 @@ function WorkspaceBottomBarChipContent({
 						Add Workspace Directory
 					</button>
 				</div>
+
+				<ComposerDropdownSelectedPanel label="Selected Workspace" count={selected ? 1 : 0}>
+					{selectedWorkspacePanel}
+				</ComposerDropdownSelectedPanel>
 			</Menu>
 
 			<WorkspaceDirectoryRegistrationModal

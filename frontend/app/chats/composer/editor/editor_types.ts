@@ -52,6 +52,16 @@ export interface EditorSubmitPayload {
 	enabledSkillSelections?: SessionArtifactSelection[];
 	activeSkillRefs?: SkillRef[];
 	activeSkillSelections?: SessionArtifactSelection[];
+	/**
+	 * Skills whose content was rendered into draft text or inline system
+	 * instructions for this turn. These are intentionally not Skill-session
+	 * participants and must remove a matching inherited Agent/Workspace Skill
+	 * baseline when Session intent is built.
+	 *
+	 * This is frontend-only intent metadata; it is converted into normal
+	 * Session Skill Remove overrides before the request is sent.
+	 */
+	nonSessionSkillRefs?: SkillRef[];
 	skillSessionID?: string;
 	workspaceSelection?: WorkspaceConversationSelection;
 	workspacePlan?: WorkspaceRuntimePlan;

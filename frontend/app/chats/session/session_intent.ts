@@ -45,6 +45,26 @@ function artifactKey(ref: ArtifactRef): string {
 	return `artifact:${ref.rootID}:${ref.artifactID}`;
 }
 
+function nonSessionSkillKeysFromPayload(payload: EditorSubmitPayload): Set<string> {
+	const keys = new Set<string>();
+
+	for (const ref of payload.nonSessionSkillRefs ?? []) {
+		if (!ref.rootID || !ref.artifactID) {
+			continue;
+		}
+		keys.add(artifactKey(ref));
+	}
+
+	return keys;
+}
+
+function nonSessionSkillRemovalOverrides(keys: ReadonlySet<string>): SessionArtifactOverride[] {
+	return [...keys].map(key => ({
+		key,
+		mode: SessionCollectionOverrideMode.Remove,
+	}));
+}
+
 function sessionCapabilityKey(target: CapabilityTarget): string {
 	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
 		return artifactKey(target.artifact);
@@ -403,7 +423,7 @@ function agentCapabilityExclusionOverrides(exclusions: AgentCapabilityExclusion[
 	return { instructions, tools, skills, mcp };
 }
 
-function skillOverridesFromPayload(payload: EditorSubmitPayload) {
+function skillOverridesFromPayload(payload: EditorSubmitPayload, nonSessionSkillKeys: ReadonlySet<string>) {
 	const seenEnabled = new Set<string>();
 	const skills: SessionArtifactOverride[] = [];
 
@@ -414,6 +434,10 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
+
+		if (nonSessionSkillKeys.has(key)) {
+			continue;
+		}
 
 		if (seenEnabled.has(key)) {
 			continue;
@@ -437,6 +461,10 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
+
+		if (nonSessionSkillKeys.has(key)) {
+			continue;
+		}
 
 		if (seenActive.has(key)) {
 			continue;
@@ -569,11 +597,13 @@ export async function buildSessionSubmissionIntent(
 	model: UIModelOption
 ): Promise<SessionSubmissionIntent> {
 	const configuration = emptySessionConfiguration();
-	const skillOverrides = skillOverridesFromPayload(payload);
+	const nonSessionSkillKeys = nonSessionSkillKeysFromPayload(payload);
+	const skillOverrides = skillOverridesFromPayload(payload, nonSessionSkillKeys);
 	const agentExclusions = agentCapabilityExclusionOverrides(payload.agentCapabilityExclusions);
 	const directToolOverrides = toolOverridesFromChoices(payload);
 	const directToolKeys = new Set(directToolOverrides.map(override => override.key));
 	const directSkillKeys = new Set(skillOverrides.skills.map(override => override.key));
+	const nonSessionSkillRemovals = nonSessionSkillRemovalOverrides(nonSessionSkillKeys);
 	const instructionOverrides = instructionOverridesFromPayload(payload);
 	const directMCPOverrides = await mcpOverridesFromPayload(payload);
 	const directMCPKeys = new Set(directMCPOverrides.map(override => override.key));
@@ -594,7 +624,10 @@ export async function buildSessionSubmissionIntent(
 	];
 	configuration.skills = [
 		...skillOverrides.skills,
-		...agentExclusions.skills.filter(override => !directSkillKeys.has(override.key)),
+		...agentExclusions.skills.filter(
+			override => !directSkillKeys.has(override.key) && !nonSessionSkillKeys.has(override.key)
+		),
+		...nonSessionSkillRemovals,
 	];
 	configuration.activeSkills = skillOverrides.active;
 	configuration.mcp = [

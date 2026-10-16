@@ -7,6 +7,8 @@ import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import { isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { CapabilityResolutionStatus } from '@/spec/artifact';
 
+import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
+
 import type { AgentCatalogOption } from '@/apis/agent_management';
 
 import {
@@ -15,6 +17,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
 import { HoverTip } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
@@ -65,13 +68,7 @@ const AGENT_CAPABILITY_SECTIONS = [
 
 function getCapabilityDisplayName(occurrence: AgentCapabilityOccurrence): string {
 	const target = occurrence.target;
-	const name = occurrence.name || target?.name || occurrence.type;
-
-	if (!target?.artifact) {
-		return name;
-	}
-
-	return `${name} · ${target.artifact.rootID}/${target.artifact.artifactID}`;
+	return getPrimaryUserFacingLabel(occurrence.name, target?.name, occurrence.type);
 }
 
 function AgentSelectionSummary({ manager }: AgentDropdownProps) {
@@ -209,9 +206,18 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 	const [viewedAgent, setViewedAgent] = useState<AgentCatalogOption | null>(null);
 
-	const selectedLabel = manager.selectedAgent?.displayName || (manager.loading ? 'Loading Agent...' : 'Agent');
+	const selectedLabel = manager.selectedAgent
+		? getPrimaryUserFacingLabel(manager.selectedAgent.displayName, manager.selectedAgent.agent.name)
+		: manager.loading
+			? 'Loading Agent...'
+			: 'Agent';
 	const triggerTitle = manager.selectedAgent
-		? `${manager.selectedAgent.displayName} / ${manager.selectedAgent.agent.name}`
+		? [
+				manager.selectedAgent.displayName,
+				getDistinctUserFacingLabel(manager.selectedAgent.displayName, manager.selectedAgent.agent.name),
+			]
+				.filter(Boolean)
+				.join(' · ')
 		: 'Apply an Agent starter recipe';
 
 	const sortedAgentOptions = useMemo(
@@ -238,8 +244,10 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 		});
 	}, [searchQuery, sortedAgentOptions]);
 
-	const selectableAgents = displayedAgentOptions.filter(option => option.isSelectable);
-	const unavailableAgents = displayedAgentOptions.filter(option => !option.isSelectable);
+	const selectedAgentOption = sortedAgentOptions.find(option => option.key === manager.selectedAgentKey) ?? null;
+	const unselectedAgentOptions = displayedAgentOptions.filter(option => option.key !== selectedAgentOption?.key);
+	const selectableAgents = unselectedAgentOptions.filter(option => option.isSelectable);
+	const unavailableAgents = unselectedAgentOptions.filter(option => !option.isSelectable);
 	const firstSelectableAgent = selectableAgents[0] ?? null;
 	const resetTargetsBase = manager.baseAgentKey !== null && manager.baseAgentKey === manager.defaultAgentKey;
 	const resetLabel = resetTargetsBase ? 'Clear to base' : 'Reset to default';
@@ -290,9 +298,13 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						<div className="min-w-0 flex-1">
 							<div className="truncate text-xs font-medium">{option.displayName}</div>
 							<div className="mt-1 text-[10px] opacity-70">
-								{option.agent.name}
-								{option.agent.builtIn ? ' / Built-in' : ''}
-								{option.agent.managed ? ' / Managed' : ''}
+								{[
+									getDistinctUserFacingLabel(option.displayName, option.agent.name),
+									option.agent.builtIn ? 'Built-in' : undefined,
+									option.agent.managed ? 'Managed' : undefined,
+								]
+									.filter(Boolean)
+									.join(' · ')}
 							</div>
 							{option.description ? (
 								<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
@@ -434,8 +446,6 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						</HoverTip>
 					</div>
 
-					<AgentSelectionSummary manager={manager} />
-
 					{manager.error ? (
 						<div className="alert alert-error mb-2 rounded-2xl text-xs">
 							<span>{manager.error}</span>
@@ -454,8 +464,8 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							query={searchQuery}
 							onQueryChange={setSearchQuery}
 							placeholder="Search Agents..."
-							resultCount={displayedAgentOptions.length}
-							totalCount={manager.agentOptions.length}
+							resultCount={unselectedAgentOptions.length}
+							totalCount={Math.max(0, manager.agentOptions.length - (selectedAgentOption ? 1 : 0))}
 							disabled={manager.loading}
 							onFocusFirstItem={() => {
 								focusFirstSearchableMenuItem(menuContentElement);
@@ -485,7 +495,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 							No Agents are available.
 						</div>
-					) : displayedAgentOptions.length === 0 ? (
+					) : unselectedAgentOptions.length === 0 ? (
 						<div className={searchableMenuEmptyStateClasses}>No Agents match your search.</div>
 					) : (
 						<div className="space-y-2">
@@ -511,6 +521,19 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							) : null}
 						</div>
 					)}
+
+					<ComposerDropdownSelectedPanel
+						label="Selected Agent"
+						count={selectedAgentOption ? 1 : 0}
+						emptyLabel="Choose an Agent above to apply a starter recipe."
+					>
+						{selectedAgentOption ? (
+							<>
+								<AgentSelectionSummary manager={manager} />
+								{renderAgentOption(selectedAgentOption)}
+							</>
+						) : null}
+					</ComposerDropdownSelectedPanel>
 				</Menu>
 			) : null}
 

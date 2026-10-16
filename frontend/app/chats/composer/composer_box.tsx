@@ -29,6 +29,7 @@ import { ContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useComposerContextState } from '@/chats/composer/contextarea/use_context_state';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { useAgentSystemPrompt } from '@/chats/composer/skills/use_agent_system_prompt';
+import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 
 export interface ComposerBoxHandle {
 	getUIModelOption(): UIModelOption;
@@ -113,11 +114,22 @@ export const ComposerBox = memo(
 				}
 
 				systemPrompt.replaceAgentInstructionSkillSources(
-					sources.map(source => ({
-						displayName: source.skillRef.artifactID,
-						prompt: source.text,
-						skillRef: source.skillRef,
-					}))
+					sources.map((source, index) => {
+						const displayNameCandidate = (source as { displayName?: unknown; name?: unknown }).displayName;
+						const logicalNameCandidate = (source as { name?: unknown }).name;
+						const displayName =
+							typeof displayNameCandidate === 'string' && displayNameCandidate.trim()
+								? displayNameCandidate.trim()
+								: typeof logicalNameCandidate === 'string' && logicalNameCandidate.trim()
+									? logicalNameCandidate.trim()
+									: `Agent instruction ${index + 1}`;
+
+						return {
+							displayName,
+							prompt: source.text,
+							skillRef: source.skillRef,
+						};
+					})
 				);
 			},
 			[systemPrompt]
@@ -173,9 +185,15 @@ export const ComposerBox = memo(
 					return Promise.resolve();
 				}
 
+				const nonSessionSkillRefs = normalizeSkillRefs([
+					...(payload.nonSessionSkillRefs ?? []),
+					...agent.instructionOnlySkillRefs,
+				]);
+
 				return onSend(
 					{
 						...payload,
+						...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
 						agentRef: agent.selectedAgent?.ref,
 						agentSelection: agent.selectedAgent
 							? {
@@ -187,6 +205,11 @@ export const ComposerBox = memo(
 										: {}),
 								}
 							: undefined,
+						...(agent.capabilityExclusions.length > 0
+							? {
+									agentCapabilityExclusions: agent.capabilityExclusions,
+								}
+							: {}),
 						modelSelectionSource:
 							agent.selectedAgent && agent.agentModelRef && composerContext.modelSelectionSource === 'agent'
 								? 'agent'
@@ -198,6 +221,8 @@ export const ComposerBox = memo(
 			[
 				agent.selectedAgent,
 				agent.agentModelRef,
+				agent.instructionOnlySkillRefs,
+				agent.capabilityExclusions,
 				composerContext.chatOptions,
 				composerContext.hasRunnableModel,
 				composerContext.modelSelectionSource,

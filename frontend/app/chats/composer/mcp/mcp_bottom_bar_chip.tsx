@@ -31,11 +31,8 @@ import { MCPAuthHealthState, MCPCompletionRefType, MCPServerStatus, MCPToolExpos
 import { mcpManagementAPI } from '@/apis/baseapi';
 import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/apis/mcp_management';
 
-import {
-	actionTriggerChipClearButtonClasses,
-	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
-} from '@/components/action_trigger_chip';
+import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -962,7 +959,18 @@ export function MCPBottomBarChip({
 		});
 	}, [searchQuery, visibleOptions]);
 
-	const firstVisibleOption = displayedVisibleOptions[0] ?? null;
+	const selectedServerKeys = useMemo(
+		() => new Set(Object.keys(state.selectedByServerKey)),
+		[state.selectedByServerKey]
+	);
+	const availableOptions = displayedVisibleOptions.filter(
+		option => !selectedServerKeys.has(mcpServerKey(option.runtimeServerID))
+	);
+	const selectedOptions = visibleOptions.filter(option => selectedServerKeys.has(mcpServerKey(option.runtimeServerID)));
+	const unavailableSelectedCount = [...selectedServerKeys].filter(
+		key => !state.options.some(option => mcpServerKey(option.runtimeServerID) === key)
+	).length;
+	const firstVisibleOption = availableOptions[0] ?? null;
 
 	const hoverTipContent = useMemo(
 		() => (
@@ -1138,25 +1146,6 @@ export function MCPBottomBarChip({
 							/>
 						</MenuButton>
 
-						{enabledCount > 0 || hasAppContextUpdates ? (
-							<button
-								type="button"
-								className={actionTriggerChipClearButtonClasses}
-								onClick={event => {
-									event.preventDefault();
-									event.stopPropagation();
-									state.clear();
-									onClearAppContextUpdates?.();
-									menu.hide();
-								}}
-								aria-label="Clear MCP context"
-								title="Clear MCP context"
-								disabled={isInputLocked}
-							>
-								<FiX size={12} />
-							</button>
-						) : null}
-
 						<Menu
 							store={menu}
 							gutter={8}
@@ -1186,8 +1175,8 @@ export function MCPBottomBarChip({
 								query={searchQuery}
 								onQueryChange={setSearchQuery}
 								placeholder="Search MCP servers, tools, resources…"
-								resultCount={displayedVisibleOptions.length}
-								totalCount={visibleOptions.length}
+								resultCount={availableOptions.length}
+								totalCount={Math.max(0, visibleOptions.length - selectedOptions.length)}
 								disabled={state.loading || visibleOptions.length === 0}
 								onFocusFirstItem={() => {
 									focusFirstSearchableMenuItem(menuContentElement);
@@ -1201,28 +1190,6 @@ export function MCPBottomBarChip({
 									menu.hide();
 								}}
 							/>
-
-							{hasAppContextUpdates ? (
-								<div className="border-info/30 bg-info/10 mb-2 rounded-xl border p-2 text-xs">
-									<div className="flex items-center justify-between gap-2">
-										<div>
-											MCP app model context queued for next send: {appContextUpdateCount} update
-											{appContextUpdateCount === 1 ? '' : 's'}.
-										</div>
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs rounded-lg"
-											onClick={e => {
-												stop(e);
-												onClearAppContextUpdates?.();
-											}}
-											disabled={isInputLocked}
-										>
-											Clear
-										</button>
-									</div>
-								</div>
-							) : null}
 
 							{state.loading ? (
 								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
@@ -1238,11 +1205,15 @@ export function MCPBottomBarChip({
 												}.`
 											: 'No enabled MCP servers are ready to use.'}
 								</div>
-							) : displayedVisibleOptions.length === 0 ? (
-								<div className={searchableMenuEmptyStateClasses}>No MCP servers match your search.</div>
+							) : availableOptions.length === 0 ? (
+								<div className={searchableMenuEmptyStateClasses}>
+									{selectedOptions.length > 0
+										? 'All matching MCP servers are already added below.'
+										: 'No MCP servers match your search.'}
+								</div>
 							) : (
 								<>
-									{displayedVisibleOptions.map(option => (
+									{availableOptions.map(option => (
 										<ServerRow
 											key={optionKey(option)}
 											option={option}
@@ -1292,6 +1263,71 @@ export function MCPBottomBarChip({
 									</Link>
 								</div>
 							) : null}
+
+							<ComposerDropdownSelectedPanel
+								label="Added MCP context"
+								count={enabledCount + (hasAppContextUpdates ? 1 : 0)}
+								emptyLabel="Select an MCP server above to add it to this message."
+							>
+								{enabledCount > 0 || hasAppContextUpdates ? (
+									<div className="mb-1 flex justify-end px-1">
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs text-error rounded-lg"
+											disabled={isInputLocked}
+											onClick={() => {
+												state.clear();
+												onClearAppContextUpdates?.();
+											}}
+										>
+											Clear all
+										</button>
+									</div>
+								) : null}
+
+								{hasAppContextUpdates ? (
+									<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
+										<div className="flex items-center justify-between gap-2">
+											<div>
+												App context queued for next send: {appContextUpdateCount} update
+												{appContextUpdateCount === 1 ? '' : 's'}.
+											</div>
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs text-error rounded-lg"
+												onClick={() => {
+													onClearAppContextUpdates?.();
+												}}
+												disabled={isInputLocked}
+											>
+												Remove
+											</button>
+										</div>
+									</div>
+								) : null}
+
+								{selectedOptions.map(option => (
+									<ServerRow
+										key={optionKey(option)}
+										option={option}
+										state={state}
+										isInputLocked={isInputLocked}
+										onAuthorize={() => {
+											setManualOAuthModalKey(optionKey(option));
+										}}
+										onToggleSelected={() => {
+											toggleServerOption(option);
+										}}
+									/>
+								))}
+
+								{unavailableSelectedCount > 0 ? (
+									<div className="alert alert-warning rounded-xl p-2 text-xs">
+										{unavailableSelectedCount} saved MCP selection
+										{unavailableSelectedCount === 1 ? ' is' : 's are'} no longer available. Clear it before sending.
+									</div>
+								) : null}
+							</ComposerDropdownSelectedPanel>
 						</Menu>
 					</div>
 				</HoverTip>

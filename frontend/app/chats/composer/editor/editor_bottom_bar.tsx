@@ -3,7 +3,7 @@ import { memo, useMemo } from 'react';
 
 import type { MenuStore } from '@ariakit/react';
 
-import type { PathAttachmentsResult } from '@/spec/attachment';
+import type { AttachmentContentBlockMode, PathAttachmentsResult, UIAttachment } from '@/spec/attachment';
 import type { ProviderSDKType } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
@@ -15,6 +15,7 @@ import type { ToolCatalogState } from '@/hooks/use_tool';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 
+import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
@@ -36,6 +37,12 @@ interface EditorBottomBarProps {
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
 	onInsertTemplateText: (text: string) => Promise<void> | void;
+	onTemplateRendered: (skillRef: SkillRef) => void;
+	attachments: UIAttachment[];
+	directoryGroups: DirectoryAttachmentGroup[];
+	onRemoveAttachment: (attachment: UIAttachment) => void;
+	onChangeAttachmentContentBlockMode: (attachment: UIAttachment, mode: AttachmentContentBlockMode) => void;
+	onRemoveDirectoryGroup: (groupID: string) => void;
 	onAttachApprovedTemplateResourcePaths: (
 		paths: string[],
 		canApply: () => boolean
@@ -101,6 +108,12 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
 	onInsertTemplateText,
+	onTemplateRendered,
+	attachments,
+	directoryGroups,
+	onRemoveAttachment,
+	onChangeAttachmentContentBlockMode,
+	onRemoveDirectoryGroup,
 	onAttachApprovedTemplateResourcePaths,
 	templateMenuState,
 	toolMenuState,
@@ -175,6 +188,11 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onAttachURL={onAttachURL}
 						onOpenAttachmentUrlModal={onOpenAttachmentUrlModal}
 						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
+						attachments={attachments}
+						directoryGroups={directoryGroups}
+						onRemoveAttachment={onRemoveAttachment}
+						onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
+						onRemoveDirectoryGroup={onRemoveDirectoryGroup}
 						isInputLocked={isInputLocked}
 					/>
 
@@ -211,6 +229,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						loadError={skillsLoadError}
 						onRefresh={onRefreshSkills}
 						onInsertTemplateText={onInsertTemplateText}
+						onTemplateRendered={onTemplateRendered}
 						onAttachApprovedTemplateResourcePaths={onAttachApprovedTemplateResourcePaths}
 						isInputLocked={isInputLocked}
 					/>

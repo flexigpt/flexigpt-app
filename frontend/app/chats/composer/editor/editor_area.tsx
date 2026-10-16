@@ -65,6 +65,7 @@ import {
 	hydrateSessionMCPOverrides,
 	hydrateSessionToolOverrides,
 } from '@/chats/session/session_composer_restore';
+import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
 import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
@@ -337,6 +338,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const [mcpAppContextUpdates, setMCPAppContextUpdates] = useState<MCPAppModelContextUpdate[]>([]);
 	const [fastForwardPending, setFastForwardPending] = useState(false);
+	const [renderOnlySkillRefs, setRenderOnlySkillRefs] = useState<SkillRef[]>([]);
 
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
@@ -963,6 +965,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setIsSubmitting(current => (current === next ? current : next));
 	}, []);
 
+	const handleTemplateRendered = useCallback((skillRef: SkillRef) => {
+		setRenderOnlySkillRefs(previous =>
+			normalizeSkillRefs([...previous, { rootID: skillRef.rootID, artifactID: skillRef.artifactID }])
+		);
+	}, []);
+
 	const clearComposerTransientState = useCallback(() => {
 		closeAllMenus();
 		setSubmitError(null);
@@ -973,6 +981,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		clearAttachments();
 		clearComposerToolsState();
 		setMCPAppContextUpdates([]);
+		setRenderOnlySkillRefs([]);
 	}, [clearAttachments, clearComposerToolsState, closeAllMenus, setSubmitting]);
 
 	const startFastForwardRun = useCallback(
@@ -1127,6 +1136,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					return;
 				}
 
+				const nonSessionSkillRefs = normalizeSkillRefs([
+					...systemPrompt.selectedInstructionSkillRefs,
+					...renderOnlySkillRefs,
+				]);
+
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
 					sessionInstructionText: systemPrompt.sessionInstructionText.trim() || undefined,
@@ -1147,6 +1161,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					activeSkillSelections: getCurrentActiveSkillSelections(),
 					workspaceSelection: workspace.getSelectionSnapshot(),
 					workspacePlan: workspace.plan,
+					...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
 					...(editingMessageId && finalToolOutputs.length > 0
 						? {
 								carryForwardToolResultIDs: [...new Set(finalToolOutputs.map(output => output.id).filter(Boolean))],
@@ -1210,6 +1225,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			workspace,
 			workspaceExecutionBlocked,
 			getCurrentInstalledEnabledSkillSelections,
+			renderOnlySkillRefs,
 			getCurrentActiveSkillSelections,
 		]
 	);
@@ -1977,6 +1993,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onUrlAttachmentModalClose={() => {
 							focusEditorAtEnd();
 						}}
+						onTemplateRendered={handleTemplateRendered}
+						attachments={attachments}
+						directoryGroups={directoryGroups}
+						onRemoveAttachment={handleRemoveAttachment}
+						onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
+						onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
 						onInsertTemplateText={handleInsertTemplateText}
 						onAttachApprovedTemplateResourcePaths={attachApprovedTemplateResourcePaths}
 						templateMenuState={templateMenu}

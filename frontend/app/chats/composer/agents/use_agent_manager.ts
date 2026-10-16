@@ -5,6 +5,7 @@ import type { AgentCapabilityOccurrence, AgentResolution } from '@/spec/agent';
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
 import type { SessionConfiguration } from '@/spec/session';
+import type { SkillRef } from '@/spec/skill';
 import { isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { SessionCollectionOverrideMode } from '@/spec/session_base';
@@ -61,6 +62,7 @@ export interface AgentManagerState {
 	preparedStarter: AgentStarterPreview | null;
 	agentModelRef?: ArtifactRef;
 	isTrackingOnly: boolean;
+	instructionOnlySkillRefs: SkillRef[];
 	capabilityExclusions: AgentCapabilityExclusion[];
 
 	refreshAgents(): Promise<void>;
@@ -367,6 +369,37 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		() => resolvedAgentModelRef(currentSelectedAgentResolution),
 		[currentSelectedAgentResolution]
 	);
+
+	/*
+	 * Agent Skills declared as "use as instructions" are rendered into the
+	 * inline system instruction channel. They must never be sent as effective
+	 * Skill-session participants, even when an Agent baseline would otherwise
+	 * resolve them as Skills.
+	 */
+	const instructionOnlySkillRefs = useMemo(() => {
+		const refs: SkillRef[] = [];
+		const seen = new Set<string>();
+
+		for (const occurrence of currentSelectedAgentResolution?.capabilities.occurrences ?? []) {
+			if (
+				occurrence.type !== 'skill' ||
+				!isAgentSkillUseAsInstructions(occurrence.skillUseMode) ||
+				occurrence.target?.form !== CapabilityTargetForm.Artifact ||
+				!occurrence.target.artifact
+			) {
+				continue;
+			}
+
+			const ref = occurrence.target.artifact;
+			const key = agentKey(ref);
+			if (!seen.has(key)) {
+				seen.add(key);
+				refs.push({ rootID: ref.rootID, artifactID: ref.artifactID });
+			}
+		}
+
+		return refs;
+	}, [currentSelectedAgentResolution]);
 
 	const resolveAgentModelOption = useCallback(
 		(resolution: AgentResolution): UIModelOption | undefined => {
@@ -819,6 +852,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		preparedStarter,
 		agentModelRef,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
+		instructionOnlySkillRefs,
 		capabilityExclusions,
 		refreshAgents,
 		selectAgent,

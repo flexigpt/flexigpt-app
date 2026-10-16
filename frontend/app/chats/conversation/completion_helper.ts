@@ -14,6 +14,7 @@ import { CitationKind, ContentItemKind, OutputKind, UIToolCallStatus } from '@/s
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
+import { redactInternalPresentationFields } from '@/lib/user_facing_presentation';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
@@ -32,7 +33,7 @@ export function getDebugDetailsMarkdown(
 	const parts: string[] = [];
 
 	const pushDetailsBlock = (title: string, value: unknown) => {
-		const block = buildJSONOrTextCodeBlock(value) ?? undefined;
+		const block = buildJSONOrTextCodeBlock(redactInternalPresentationFields(value)) ?? undefined;
 		if (!block) {
 			return;
 		}

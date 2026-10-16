@@ -40,7 +40,7 @@ interface UseComposerSkillsResult {
 	installedActiveSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
-	enableAllSkills: () => void;
+	enableAllSkills: (excludedRefs?: SkillRef[]) => void;
 	disableAllSkills: () => void;
 	refreshSkills: () => Promise<void>;
 	applySkillSelectionState: (
@@ -318,23 +318,35 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		}
 	}, [reloadOrThrow]);
 
-	const enableAllSkills = useCallback(() => {
-		const workspaceKeys = workspaceSkillRefKeysRef.current;
-		const selectable = allSkills
-			.filter(
-				skill =>
-					skill.enabled && skill.runtimeResolved && skill.state === ArtifactState.Available && isInstructionSkill(skill)
-			)
-			.map(s => {
-				return catalogItemRef(s);
-			});
+	const enableAllSkills = useCallback(
+		(excludedRefs: SkillRef[] = []) => {
+			const workspaceKeys = workspaceSkillRefKeysRef.current;
+			const excludedKeys = new Set(
+				excludedRefs.map(s => {
+					return skillRefKey(s);
+				})
+			);
+			const selectable = allSkills
+				.filter(
+					skill =>
+						skill.enabled &&
+						skill.runtimeResolved &&
+						skill.state === ArtifactState.Available &&
+						isInstructionSkill(skill) &&
+						!excludedKeys.has(skillRefKey(catalogItemRef(skill)))
+				)
+				.map(s => {
+					return catalogItemRef(s);
+				});
 
-		void applySkillSelectionState(
-			[...enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref))), ...selectable],
-			activeSkillRefsRef.current,
-			{ syncSession: SkillSessionSyncMode.None }
-		);
-	}, [allSkills, applySkillSelectionState]);
+			void applySkillSelectionState(
+				[...enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref))), ...selectable],
+				activeSkillRefsRef.current,
+				{ syncSession: SkillSessionSyncMode.None }
+			);
+		},
+		[allSkills, applySkillSelectionState]
+	);
 
 	const disableAllSkills = useCallback(() => {
 		const workspaceKeys = workspaceSkillRefKeysRef.current;

@@ -1,3 +1,5 @@
+import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
+
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { AgentCatalogOption } from '@/apis/agent_management';
@@ -20,15 +22,16 @@ function AgentViewModalContent({ agent }: Omit<AgentViewModalProps, 'isOpen' | '
 		return null;
 	}
 
-	const artifactIdentity = `${agent.ref.rootID}/${agent.ref.artifactID}`;
+	const displayName = getPrimaryUserFacingLabel(agent.displayName, agent.agent.name);
+	const logicalName = getDistinctUserFacingLabel(displayName, agent.agent.name);
 
 	return (
 		<>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<ModalHeader
-						title={agent.displayName}
-						description={`${agent.agent.name} / revision ${agent.agent.revision}`}
+						title={displayName}
+						description={logicalName}
 						onClose={() => {
 							requestClose();
 						}}
@@ -54,33 +57,28 @@ function AgentViewModalContent({ agent }: Omit<AgentViewModalProps, 'isOpen' | '
 						) : null}
 					</div>
 
-					<section className="border-base-300 rounded-2xl border p-4">
-						<h4 className="mb-3 text-sm font-semibold">Agent metadata</h4>
+					<section className="border-base-300 rounded-2xl border p-4" aria-label="Agent details">
+						<h4 className="mb-3 text-sm font-semibold">Agent details</h4>
 
 						<dl className="grid gap-4 sm:grid-cols-2">
 							<div>
-								<dt className="text-xs font-semibold opacity-70">Artifact</dt>
-								<dd className="mt-1 text-sm break-all">
-									<code>{artifactIdentity}</code>
+								<dt className="text-xs font-semibold opacity-70">Availability</dt>
+								<dd className="mt-1 text-sm">{agent.isSelectable ? 'Available' : 'Unavailable'}</dd>
+							</div>
+
+							<div>
+								<dt className="text-xs font-semibold opacity-70">Source</dt>
+								<dd className="mt-1 text-sm">
+									{agent.agent.builtIn ? 'Built-in Agent' : agent.agent.managed ? 'Managed Agent' : 'Agent'}
 								</dd>
 							</div>
 
-							<div>
-								<dt className="text-xs font-semibold opacity-70">Logical name</dt>
-								<dd className="mt-1 text-sm">{agent.agent.name}</dd>
-							</div>
-
-							<div>
-								<dt className="text-xs font-semibold opacity-70">Artifact state</dt>
-								<dd className="mt-1 text-sm">{agent.agent.state}</dd>
-							</div>
-
-							<div>
-								<dt className="text-xs font-semibold opacity-70">Definition digest</dt>
-								<dd className="mt-1 text-sm break-all">
-									<code>{agent.agent.definitionDigest ?? 'Not supplied'}</code>
-								</dd>
-							</div>
+							{logicalName ? (
+								<div>
+									<dt className="text-xs font-semibold opacity-70">Name</dt>
+									<dd className="mt-1 text-sm">{logicalName}</dd>
+								</div>
+							) : null}
 						</dl>
 					</section>
 

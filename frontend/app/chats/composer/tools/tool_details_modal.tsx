@@ -10,6 +10,7 @@ import {
 	normalizeStructuredDisplayObject,
 	normalizeStructuredJSONStringDeep,
 } from '@/lib/jsonschema_utils';
+import { redactInternalPresentationFields } from '@/lib/user_facing_presentation';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -87,8 +88,7 @@ interface ToolDetailsModalProps {
 
 function getChoiceDisplayInfo(c: ToolStoreChoice) {
 	const display = c.displayName || c.target.name || 'Tool';
-	const slug = `${c.pluginName ? `${c.pluginName}/` : ''}${c.target.name}${c.toolVersion ? `@${c.toolVersion}` : ''}`;
-	return { display, slug };
+	return { display };
 }
 
 function getToolCallDisplayName(call: UIToolCall): string {
@@ -100,27 +100,22 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		case 'selection':
 			return {
 				title: `Tool selection: ${state.selection.target.name}`,
-				payload: { selection: state.selection, resolutionError: state.message },
+				payload: redactInternalPresentationFields({ selection: state.selection, resolutionError: state.message }),
 			};
 		case 'choice': {
 			const c = state.choice;
-			const { display, slug } = getChoiceDisplayInfo(c);
+			const { display } = getChoiceDisplayInfo(c);
 
 			return {
 				title: `Tool choice • ${display}`,
-				payload: {
-					...normalizeStructuredDisplayObject(c),
-					__meta: {
-						identity: slug,
-					},
-				},
+				payload: redactInternalPresentationFields(normalizeStructuredDisplayObject(c)),
 			};
 		}
 		case 'call': {
 			const call = state.call;
 			return {
 				title: `Tool call • ${getToolCallDisplayName(call)}`,
-				payload: normalizeStructuredJSONStringDeep(call),
+				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(call)),
 			};
 		}
 		case 'output': {
@@ -130,7 +125,7 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 				title: `Tool output • ${
 					out.summary && out.summary.length > 0 ? out.summary : formatToolOutputSummary(out.name)
 				}`,
-				payload: normalizeStructuredJSONStringDeep(out),
+				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(out)),
 			};
 		}
 	}
@@ -138,11 +133,11 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 
 // Human-oriented "primary" view for a tool choice.
 function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
-	const { display, slug } = getChoiceDisplayInfo(choice);
+	const { display } = getChoiceDisplayInfo(choice);
 	const lines: string[] = [`### Tool: ${display}`];
 
-	if (slug) {
-		lines.push(`### ID: \`${slug}\``);
+	if (choice.pluginName?.trim() && choice.pluginName.trim() !== display) {
+		lines.push(`### Provided by: ${choice.pluginName.trim()}`);
 	}
 
 	if (choice.description) {
@@ -159,21 +154,7 @@ function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
 
 // Human-oriented "primary" view for a tool call.
 function buildCallPrimaryContent(call: UIToolCall): string {
-	const lines: string[] = [
-		`### Tool: ${getToolCallDisplayName(call)}`,
-		`### Call ID: \`${call.callID}\``,
-		`### Status: \`${call.status}\``,
-	];
-
-	if (call.mcpToolSelection) {
-		lines.push(
-			`### MCP server: \`${call.mcpToolSelection.server}\``,
-			`### MCP tool: \`${call.mcpToolSelection.toolName}\``
-		);
-		if (call.mcpToolSelection.providerToolName) {
-			lines.push(`### Provider tool ID: \`${call.mcpToolSelection.providerToolName}\``);
-		}
-	}
+	const lines: string[] = [`### Tool: ${getToolCallDisplayName(call)}`, `### Status: \`${call.status}\``];
 
 	const errorBlock = buildJSONOrTextCodeBlock(call.errorMessage);
 	if (errorBlock) {
@@ -202,7 +183,7 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 	const titleText = output.summary && output.summary.length > 0 ? output.summary : formatToolOutputSummary(output.name);
 
-	lines.push(`### Summary: ${titleText}`, `### Tool: ${output.name}`, `### Call ID: \`${output.callID}\``);
+	lines.push(`### Summary: ${titleText}`, `### Tool: ${getPrettyToolName(output.name)}`);
 
 	if (output.isSkipped) {
 		lines.push('### Status: `skipped`');
@@ -244,7 +225,7 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	const { title, payload } = buildPayload(state);
 
 	// Raw payload, preferring JSON display with a safe text fallback.
-	const rawPayloadMarkdown = `### Raw Payload\n\n${buildJSONOrTextCodeBlock(payload) ?? '_No raw payload available._'}`;
+	const rawPayloadMarkdown = `### Additional details\n\n${buildJSONOrTextCodeBlock(payload) ?? '_No additional details available._'}`;
 
 	// Human-oriented primary content (semantics-first).
 	let primaryContent = '';
