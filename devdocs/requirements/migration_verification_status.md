@@ -8,6 +8,23 @@ Status meanings:
 - ◐ Partially covered: some user-facing behavior is now present, but the full old flow or target behavior is not yet complete.
 - ○ Frontend follow-up: can be completed with current frontend/facade contracts.
 - △ Backend/display-contract dependency: current frontend contracts do not carry enough information for full parity.
+- “Backend patch added —” below means backend code exists but frontend wiring, snapshot projection, etc may still be outstanding. It does not by itself mean the user-facing item is complete.
+
+- Backend patched implementation baseline - Applied backend changes relevant to this checklist include:
+  - Session lifecycle fixes for automatic continuation holds, cancelling Run
+    continuation admission, terminal automation mutation, and App Tool work
+    blocked by pause/recovery review.
+  - Typed preparation-failure receipts and explicit stale Workspace child
+    resolution items.
+  - Active Skill pin preservation and required Agent Text/Tool/Skill handling.
+  - Excluded resolution items for effective instruction/Tool/Skill removals
+    and replacements.
+  - Canonical `inference-go/spec` use for Tool types, typed Tool-result content,
+    completion-output adaptation, and Model-operation token usage.
+  - Session-native edit/resend Tool-result carry-forward through existing
+    `EditAndResendCommand`.
+  - Raw protocol input/output JSON remains a deliberate semantic persistence and
+    redaction boundary. It is not a second frontend-facing provider protocol.
 
 ## Implementation status
 
@@ -22,6 +39,9 @@ Status meanings:
     - unavailable required capabilities show their status;
     - restored Session Agent selection reloads a capability preview after catalog availability.
   - Remaining: the preview is descriptive only. It does not populate ordinary Composer controls with the actual Agent recipe.
+  - Backend patch added — Agent instruction/Tool/Skill resolution failures no longer silently downgrade required Agent
+    contributions into warnings. Required Agent contributions now produce typed
+    preparation failures with a resolution summary.
 
 - △ Agent recipe materialization into Composer controls remains open.
   - Original degraded behavior: old Agent selection immediately applied:
@@ -43,6 +63,12 @@ Status meanings:
     - starter-text metadata;
     - model-default prompt preference.
   - Relevant boundary: `agentManagementAPI`, Session operation preparation summary, and the Composer’s Agent/Context Bar presentation layer.
+  - Backend status: no Agent-only full-recipe endpoint was added. An exact effective recipe is Session-contextual because it depends on Workspace,
+    Session/Run overrides, effective Skills, explicit MCP selection, and materialized instruction sources.
+
+  - **DECISION: exact pre-send effective preview**
+    - TODO: decide whether Composer requires an exact pre-admission effective configuration preview, or whether capability preview plus authoritative post-preparation operation resolution is sufficient.
+    - If exact preview is required, add one generic Session composition-preview operation. Do not add a parallel Agent-specific starter/recipe endpoint.
 
 - ○ Agent model ownership still has a visible-model versus submitted-model mismatch.
   - Original degraded behavior: a user could select Agent A, continue seeing Model A in the dropdown, while the submitted configuration delegated actual model selection to the Agent, potentially using Model B.
@@ -57,6 +83,7 @@ Status meanings:
     - advanced parameters;
     - submitted `modelSelectionSource`.
   - Completion needed: frontend-only ownership handling in `use_context_state.ts` and `use_agent_manager.ts`, informed by an effective Agent Model preview.
+  - Backend note: no additional backend ownership contract is required for the current Agent-versus-explicit-Model distinction. Frontend must render an explicit Model selection or an explicit “Agent chooses model” state.
 
 - ○ Saving Advanced Parameters after Agent selection can still switch ownership to Session Model selection.
   - Original degraded behavior: saving a timeout or output option after selecting an Agent changed `modelSelectionSource` to `'session'`, even when the user had not manually changed Model.
@@ -79,6 +106,15 @@ Status meanings:
   - Current state: the latest patch gives an Agent summary but does not add per-item Agent-origin badges or persistent Remove overrides. Existing Session intent types support collection `Add`/`Remove` semantics, but current Composer payload construction largely emits additions.
   - Cross-verify: select an Agent, remove a Tool/Skill/MCP item from visible local Composer state, submit, and inspect whether the backend still receives the Agent baseline.
   - Completion needed: a frontend Composer baseline/override store plus serialization of explicit removal overrides through existing `SessionConfiguration` override types.
+  - Backend patch added — actual Session `remove` and first `replace` operations now append excluded resolution items for inherited
+    instruction, Tool, and Skill contributions. The frontend can render:
+    - removed by Session override;
+    - replaced by Session override;
+    - inherited but excluded.
+  - Backend policy note: Agent MCP declarations remain candidate-only. They are not inherited effective MCP selections and therefore have no effective Agent-MCP baseline to remove.
+  - **DECISION: Agent MCP inheritance**
+    - TODO: decide whether Agent MCP declarations should remain explicit Session-selection candidates or become inherited effective MCP baseline
+      contributions.
 
 - △ Agent instruction sources and Agent starter text remain unavailable as editable Composer content.
   - Original degraded behavior: old Agent application added individually selectable Agent instruction sources and inserted Agent starter text only into an empty draft.
@@ -90,6 +126,8 @@ Status meanings:
     - whether a workflow URL draft takes precedence.
   - Current state: Agent capability summary can show a generic `text` or `skill` occurrence, but not materialized instruction text or starter content.
   - Blocked by: display-safe Agent starter recipe/materialization data from the management façade or Session preparation projection.
+  - Backend status: the applied backend patch intentionally does not expose materialized Agent instruction text or starter text through a second
+    Agent-specific API. This remains part of the exact-effective-preview decision above.
 
 - ○ System-instruction source inspection and Skill-plugin search remain minor frontend parity gaps.
   - Original degraded behavior: old instruction-source rows exposed source text and tags through hover/title content; old Skill search included Plugin identity.
@@ -118,6 +156,12 @@ Status meanings:
   - Current state: Workspace context/Skill deselection restoration was patched, and general Skill lifecycle synchronization was patched. The separate question is whether the Workspace Active toggle reaches `configuration.activeSkills`.
   - Cross-verify: attach a Workspace, select one Workspace instruction Skill, toggle Active, submit, then inspect the Run’s effective/active Skills. Repeat with Active off.
   - Completion needed: likely frontend/session-intent work using existing `SessionConfiguration.activeSkills`; backend semantics should confirm Workspace Skill Artifact refs are valid active overrides.
+  - Backend patch added —: explicit active-Skill selections retain
+    expected revision/digest pins through operation preparation. A stale
+    explicitly activated Workspace/Agent Skill now fails as stale, and a
+    disabled explicitly active Skill no longer silently disappears.
+  - Frontend work remains: serialize the Workspace Active toggle into existing
+    `SessionConfiguration.activeSkills` override records.
 
 - ✓ Patched — Workspace Context/Skill deselection persistence.
   - Original degraded behavior: unchecking a baseline Workspace Context or Skill reappeared after reopening because removal keys used incompatible formats.
@@ -164,16 +208,23 @@ Status meanings:
     - App context.
       Then cancel and verify the pre-edit Composer state returns.
 
-- △ Editing/resending Tool-output follow-ups remains blocked by Session input shape.
+- ◐ Editing/resending Tool-output follow-ups now has backend support; frontend wiring remains.
   - Original degraded behavior: old editor could serialize Tool outputs into the next inference input.
   - Required UX: if Tool-output chips are loaded into edit mode and make Send available, those Tool results must reach the next Run semantically.
-  - Current state: visual loading is patched, but `SessionUserInput` has no Tool-output field.
-  - Blocked by: a Session-native representation for:
-    - carried Tool outputs;
-    - Tool-result references;
-    - edit/resend reuse semantics; or
-    - a command-specific Tool-result continuation payload.
-  - Cross-verify: edit a user turn containing Tool outputs, send, and inspect whether the next operation receives those outputs. Current contract indicates it cannot.
+  - Backend patch added:
+    - `EditAndResendCommand` now carries
+      `carryForwardToolResultIDs`;
+    - requested IDs resolve only from the user message being replaced;
+    - selected semantic Tool results are copied into the replacement user
+      message;
+    - a Tool-result-only replacement message is accepted;
+    - general `UserInput` remains unable to accept frontend-authored Tool
+      results.
+  - Frontend completion needed: edit mode must preserve selected result IDs and
+    submit `carryForwardToolResultIDs` with `editAndResend`.
+  - Cross-verify: edit a user turn containing multiple Tool outputs, carry a
+    selected subset, send, and verify the next prepared operation contains the
+    selected results and excludes the unselected results.
 
 - ✓ Patched — edit-and-resend bottom-follow behavior.
   - Original degraded behavior: edit/resend could leave the user at the earlier message while replacement output started elsewhere.
@@ -214,6 +265,10 @@ Status meanings:
     4. send;
     5. verify `updateContinuationInput` accepts staged content and `continueRun` starts the next operation.
   - Remaining: this mode intentionally rejects local `payload.toolOutputs`, because Session input has no Tool-output field. It also does not provide a generic Composer for waits that still have pending Tool calls or an unresolved approval/input wait.
+  - Backend boundary: the applied edit/resend carry-forward patch deliberately does not add arbitrary Tool-result submission to `UserInput` or
+    `ContinuationInput`. Generic continuation Tool-output injection remains unsupported.
+  - **DECISION: generic continuation Tool-result reuse**
+    - TODO: decide whether existing Tool-result references should also be allowed in continuation input, or whether Tool-result reuse remains intentionally limited to edit/resend.
 
 - ✓ Patched — manual Tool execution controls are substantially covered by Session controls.
   - Original degraded behavior: old local Tool queue supported individual run, batch run, fast-forward, skip/error behavior, and manual follow-up.
@@ -235,19 +290,50 @@ Status meanings:
     - Tool in an older Run;
     - command revision conflict/error.
       Verify Run IDs, call IDs, status transitions, and visible errors.
+  - Backend patch added: automatic continuation holds are now checked
+    again immediately before model dispatch. An automatic continuation queued
+    before the hold was set is parked rather than started, then requeued only
+    after the continuation hold is cleared.
+  - Backend patch added: App Tool execution is rejected while a Run
+    is paused or blocked by recovery review. This prevents accepted
+    non-required App Tool calls from being released back to pending state with
+    no later sequential-driver scheduling path.
 
-- ○ Result-level retry/re-run remains incomplete.
+- △ Result-level retry/re-run remains incomplete by deliberate backend policy.
   - Original degraded behavior: old Composer could retry eligible errored/skipped Tool outputs.
   - Required UX: a displayed skipped/error result can offer Retry/Run only when it maps to a valid owning Run/Tool-call action.
   - Current state: call-level Retry is covered. A resolved call with an Error/Skipped selected result may project as succeeded, leaving no retry action.
-  - Completion needed: frontend ownership mapping from `UIToolOutput` to owning Session Run/Tool call, plus a validity check before exposing a result-level retry action. Existing `retryCall` can be used only when the original call remains retryable.
+  - Existing `retryCall` remains valid only when the original Run-owned Tool call remains retryable and its selected result has not been consumed by a later model operation.
+  - Recommended current UX: use edit/resend Tool-result carry-forward and let the model propose a fresh Tool call through normal prepared-binding
+    execution.
+  - **DECISION: direct historical Tool replay**
+    - TODO: decide whether the product requires one-click replay of a consumed historical external Tool side effect.
+    - If yes, this needs a separately named Session command with explicit Run creation, binding freshness, policy, approval, provider-call identity,
+      and continuation semantics. Do not widen `RetryCall` casually.
 
-- ○ Tool metadata, automatic badges, and rich Tool output remain incomplete.
+- ◐ Tool metadata, automatic badges, and rich Tool output now have backend data support.
   - Original degraded behavior: old message chips/details had Tool choice/plugin/version metadata, Auto markers, original arguments, typed file/image/text output items, and web-search detail.
   - Required UX: message-level Tool rendering should preserve safe display metadata and typed outputs.
   - Current state: Session projection still reduces many regular Tool calls/results to minimal fields and text/structured content.
   - Frontend-only portion: `SessionToolCall.automatic` already exists and can be projected into `UIToolCall` for Auto badges. Provider-call/result-ID matching can also be corrected in projection where existing IDs are available.
-  - Backend/display-contract portion: typed file/image result items, complete Tool binding metadata, and full selection provenance need Session result/projection data.
+  - Backend patch added —:
+    - Session Tool-call/result/proposal protocol types now use
+      `inferenceSpec.ToolType`;
+    - `ToolResult.contents` now uses
+      `inferenceSpec.ToolOutputItemUnion`;
+    - Go Tool, Skill Tool, and MCP Tool outputs adapt into canonical
+      text/image/file content items;
+    - SessionStore retains typed Tool output items and derives only safe text
+      fallback for durable replay;
+    - runtime setup now constructs inference Tool output values directly rather
+      than JSON-round-tripping custom Tool-output wire structs.
+  - Frontend completion needed: render `ToolResult.contents` as the primary
+    typed output source. Keep `ToolResult.text` as the provider-compatible
+    textual fallback. Do not use executor-private `structured` JSON as the
+    primary renderer after this backend patch.
+  - Remaining: display-safe Tool binding/plugin/version labels and complete
+    selected-but-not-called Tool choice presentation remain frontend projection
+    work over resolution summaries and existing Tool-call data.
   - Cross-verify: compare Go Tool, Skill Tool, MCP Tool, Web Search, text result, file result, image result, error result, and skipped result.
 
 - ✓ Patched — active Skill lifecycle state is synchronized back into Composer.
@@ -281,7 +367,7 @@ Status meanings:
     - resolution conflict/error.
   - Remaining: MCP approval is still rendered as generic wait summary rather than the former structured approval card. This is frontend-only if the wait summary contains the relevant metadata.
 
-- △ Historical message provenance remains the largest display-projection gap.
+- ◐ Historical message provenance has applied backend data support; frontend projection remains open.
   - Original degraded behavior: old message bars/details showed selected Tools, web-search config, unavailable Tool selections, MCP context, Skills, Workspace selection/usage, model context, token usage, and debug details.
   - Required UX: each historical turn should expose safe, per-operation provenance:
     - selected and used Model;
@@ -292,7 +378,29 @@ Status meanings:
     - usage counters;
     - safe diagnostics/debug data.
   - Patch status: latest patch improves `modelRef` and debug fallback from operation runtime metadata. Full provenance remains absent.
-  - Blocked by: Session transcript/operation display projection data. Existing `ConversationMessage` UI fields and chips can render it once supplied.
+  - Backend snapshot relationships now available:
+    - assistant message `operationID`;
+    - user message identity matched against
+      `ModelOperation.request.current.id`;
+    - Tool result `callID` matched against `Run.toolCalls`;
+    - `ModelOperation.preparation.resolution`;
+    - effective/active Skills in operation preparation;
+    - exact operation configuration in
+      `ModelOperation.request.configuration`;
+    - normalized token usage in `ModelOperation.usage`.
+  - Backend patch added —:
+    - stale Workspace Context/Skill/MCP children are explicit stale resolution
+      items rather than only generic preparation errors;
+    - Session remove/replace effects are explicit excluded resolution items;
+    - unsupported provider output kinds become visible replay placeholders
+      instead of silently disappearing from live provider history;
+    - provider-shaped completion output adaptation uses inference-go typed
+      output unions in runtime setup.
+  - Frontend completion needed: build a pure SessionSnapshot/Run projection.
+    No separate backend display endpoint is required for Model, Tool, MCP,
+    Skill, Workspace, configuration, diagnostics, or token usage chips.
+  - Remaining backend limitation: `inferenceSpec.Usage` provides normalized
+    token counts, but not provider cost or provider-specific truncation data.
   - Cross-verify: inspect a completed Session message containing Model overrides, Tools, web search, MCP resources/prompts, Skills, Workspace Context, and usage. Current frontend still lacks most message chips.
 
 - ✓ Patched — background restored tabs now restore Composer configuration after later activation.
@@ -338,13 +446,23 @@ Status meanings:
   - Patch status: rolling notes mark active-run state retention, visible load errors, and best-effort Run cancellation on tab close as fixed.
   - Cross-verify: open active Session through search, force a load failure, and close a busy tab. Inspect busy state, Composer lock, error alert, and Run cancellation receipt/snapshot.
 
-- △ Reopen behavior still depends on Session configuration versus latest Run configuration contract.
+- ○ Reopen behavior now has a defined backend contract; frontend restoration remains to be aligned.
   - Original degraded behavior: old conversation restoration derived current Composer state from latest user-message context. New UI restores `snapshot.session.configuration`.
   - Required UX: reopening a Session reproduces the configuration the user expects to continue from.
-  - Current state: this remains contract-dependent. Later Run configuration may differ from Session configuration.
-  - Blocked by: either:
-    - backend guarantee that accepted Run configuration updates Session configuration; or
-    - an explicit latest-effective-Run configuration projection for frontend restoration.
+  - Backend contract:
+    - `Session.configuration` is the default for future Runs;
+    - `Run.configuration` is the accepted Run baseline;
+    - `ModelOperation.request.configuration` is the exact configuration used
+      for that operation, including continuation-only overrides;
+    - continuation-only configuration does not silently promote itself into
+      Session defaults.
+  - Frontend completion needed:
+    - use `snapshot.session.configuration` for ordinary future-Run Composer
+      restoration;
+    - use the relevant latest
+      `ModelOperation.request.configuration` for operation inspection or an
+      explicit “continue using last operation settings” action.
+  - No new backend endpoint is required.
   - Cross-verify: change Composer configuration on a later Run, close/reopen, compare restored controls with actual latest Run configuration.
 
 - ✓ Patched — MCP App draft messages route to owning Session.
@@ -369,6 +487,10 @@ Status meanings:
     - error state;
     - timeout/error behavior;
     - additional `tool-result` notification behavior.
+  - Backend patch added —: App Tool execution is rejected while its Run
+    is paused or blocked by a recovery-review wait. This prevents App-side
+    accepted calls from becoming pending non-required calls without a future
+    sequential-driver scheduling path.
 
 - ✓ Patched — MCP App context view identity is retained through staging/restoration.
   - Original degraded behavior: restored App context could lose `viewID`, then fail Session submission filtering.
@@ -412,10 +534,42 @@ Status meanings:
 
 ## Next steps
 
-- [ ] Treat Agent effective recipe/baseline/override UX as the next largest frontend-plus-display-contract work item.
-- [ ] Define a Session-native semantic Tool-result carry/reuse contract for edit/resend and continuation workflows.
-- [ ] Add safe per-message/per-operation display projection for Model, Tool, MCP, Skill, Workspace, usage, and diagnostics.
+- [ ] Verify the applied backend patch against command receipts, Session
+      snapshots, restored SessionStore documents, and provider replay.
+- [ ] Treat Agent effective recipe/baseline/override UX as the next largest
+      frontend-plus-decision work item.
+- [ ] Update edit/resend frontend payload construction to preserve and submit
+      `carryForwardToolResultIDs`.
+- [ ] Build the frontend pure SessionSnapshot/Run display projection using
+      operation/request/call identities and resolution summaries. Do not add a
+      separate display endpoint first.
 - [ ] Verify Workspace Active Skill submission and add active override serialization if it remains absent.
-- [ ] Complete result-level Tool retry behavior using owning Run/Tool-call identity.
+- [ ] Decide whether direct replay of consumed historical Tool calls is a
+      required product feature. Until then, use model-mediated edit/resend
+      behavior.
 - [ ] Add frontend-only parity refinements for instruction-source inspection, Plugin search, template resource defaults, and structured approval display.
 - [ ] Verify every ✓ item above against actual assembled code and Session snapshots before treating it as closed.
+
+## Decisions pending and my views
+
+- **DECISION: exact pre-send effective configuration preview**
+  - TODO: choose capability preview plus post-preparation provenance, or add
+    one generic Session composition-preview operation.
+  - My view: This is mostly not needed.
+
+- **DECISION: Agent MCP inheritance**
+  - TODO: keep Agent MCP candidate-only, or make Agent MCP declarations
+    inherited effective MCP baseline contributions.
+  - My view: This need to be similar to other artifacts MCP need not be special.
+
+- **DECISION: generic continuation Tool-result reuse**
+  - TODO: keep existing-result reuse limited to edit/resend, or add a reference-based continuation-input contract.
+  - My view: I am not sure what does that mean and why is this a decision point. I mean: whatever is needed for the ux should be done and nothing more? A tool result is a submission thing i.e we submit to the model. if the tool call errored we should retry and resend the new tool result to model and old should be dropped. in case of edit and resend, the tool result that was there before should be rehydrated in the composer and then resent. no re run tool call should be available if that tool was already run and sent before and now we are in edit/resent flow.
+
+- **DECISION: direct historical Tool replay**
+  - TODO: retain model-mediated historical retry only, or design a separate user-initiated external-action command.
+  - My view: This is answered by above comment
+
+- **DECISION: cost and truncation telemetry**
+  - TODO: decide whether inference-go should grow normalized provider cost and truncation fields beyond the currently persisted token Usage values.
+  - My view: Not needed as of now. The Usage fields are sufficient
