@@ -1,6 +1,6 @@
 // oxlint-disable max-classes-per-file
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
-import type { CacheControl } from '@/spec/inference';
+import type { CacheControl, ModelParam, OutputParam, ReasoningParam } from '@/spec/inference';
 import type {
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
@@ -11,6 +11,7 @@ import type {
 	ModelCapabilities,
 	ModelDefaults,
 	ModelListItem,
+	ModelOutputDefaults,
 	ModelProviderDocument,
 	ModelProviderListItem,
 	ModelProviderView,
@@ -21,6 +22,7 @@ import type {
 	UIModelOption,
 } from '@/spec/model';
 import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
+import { DefaultModelParams } from '@/spec/inference';
 import { ModelLookupScope } from '@/spec/model';
 import { getProviderSDKType } from '@/spec/provider_sdk';
 
@@ -29,8 +31,6 @@ import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
 import { mergeModelCapabilities } from '@/apis/model_capability_helpers';
-
-import { buildModelParamFromDefaults } from '@/models/lib/model_defaults';
 
 export interface ModelProviderManagementItem {
 	list: ModelProviderListItem;
@@ -147,40 +147,44 @@ export function isModelRunnable(model: ModelManagementItem): boolean {
 	);
 }
 
-function mergeDefaults(base?: ModelDefaults, settings?: ModelDefaults): ModelDefaults | undefined {
-	if (!base && !settings) {
+function mergeDefaults(baseDefaults?: ModelDefaults, overrideDefaults?: ModelDefaults): ModelDefaults | undefined {
+	if (!baseDefaults && !overrideDefaults) {
 		return undefined;
 	}
 
 	return {
-		...base,
-		...settings,
-		...(base?.reasoning || settings?.reasoning
+		...baseDefaults,
+		...overrideDefaults,
+
+		...(baseDefaults?.reasoning || overrideDefaults?.reasoning
 			? {
 					reasoning: {
-						...base?.reasoning,
-						...settings?.reasoning,
+						...baseDefaults?.reasoning,
+						...overrideDefaults?.reasoning,
 					},
 				}
 			: {}),
-		...(base?.cacheControl || settings?.cacheControl
+
+		...(baseDefaults?.cacheControl || overrideDefaults?.cacheControl
 			? {
 					cacheControl: {
-						...base?.cacheControl,
-						...settings?.cacheControl,
+						...baseDefaults?.cacheControl,
+						...overrideDefaults?.cacheControl,
 					} as CacheControl,
 				}
 			: {}),
-		...(base?.output || settings?.output
+
+		...(baseDefaults?.output || overrideDefaults?.output
 			? {
 					output: {
-						...base?.output,
-						...settings?.output,
-						...(base?.output?.format || settings?.output?.format
+						...baseDefaults?.output,
+						...overrideDefaults?.output,
+
+						...(baseDefaults?.output?.format || overrideDefaults?.output?.format
 							? {
 									format: {
-										...base?.output?.format,
-										...settings?.output?.format,
+										...baseDefaults?.output?.format,
+										...overrideDefaults?.output?.format,
 									},
 								}
 							: {}),
@@ -204,6 +208,71 @@ function effectiveProviderCapabilities(provider: ModelProviderManagementItem): M
 
 function effectiveModelCapabilities(model: ModelManagementItem): ModelCapabilities | undefined {
 	return mergeModelCapabilities(model.view.document.capabilities, model.view.settings.capabilities);
+}
+
+function outputParamFromDefaults(value: ModelOutputDefaults | undefined): OutputParam | undefined {
+	if (!value) {
+		return undefined;
+	}
+
+	const output: OutputParam = {};
+
+	if (value.verbosity !== undefined) {
+		output.verbosity = value.verbosity;
+	}
+
+	if (value.format?.kind) {
+		output.format = {
+			kind: value.format.kind,
+			...(value.format.jsonSchema
+				? {
+						jsonSchemaParam: {
+							name: value.format.jsonSchema.name ?? '',
+							description: value.format.jsonSchema.description,
+							schema: typeof value.format.jsonSchema.schema === 'boolean' ? undefined : value.format.jsonSchema.schema,
+							strict: value.format.jsonSchema.strict,
+						},
+					}
+				: {}),
+		};
+	}
+
+	return output.format || output.verbosity ? output : undefined;
+}
+
+function buildModelParamFromDefaults(
+	providerModelID: string,
+	providerDefaults: ModelDefaults | undefined,
+	modelDefaults: ModelDefaults | undefined
+): ModelParam {
+	let defaults = mergeDefaults(providerDefaults, modelDefaults);
+	if (!defaults) {
+		defaults = {};
+	}
+
+	const timeoutMS = typeof defaults.timeoutMS === 'number' ? defaults.timeoutMS : DefaultModelParams.timeout * 1000;
+	const reasoning = defaults.reasoning as ReasoningParam | undefined;
+	const configuredTemperature = typeof defaults.temperature === 'number' ? defaults.temperature : undefined;
+
+	return {
+		name: providerModelID,
+		stream: typeof defaults.stream === 'boolean' ? defaults.stream : DefaultModelParams.stream,
+		maxPromptLength:
+			typeof defaults.maxPromptTokens === 'number' ? defaults.maxPromptTokens : DefaultModelParams.maxPromptLength,
+		maxOutputLength:
+			typeof defaults.maxOutputTokens === 'number' ? defaults.maxOutputTokens : DefaultModelParams.maxOutputLength,
+		temperature: configuredTemperature ?? (reasoning === undefined ? DefaultModelParams.temperature : undefined),
+		reasoning,
+		systemPrompt: typeof defaults.systemPrompt === 'string' ? defaults.systemPrompt : DefaultModelParams.systemPrompt,
+		timeout: Math.ceil(timeoutMS / 1000),
+		cacheControl: defaults.cacheControl as CacheControl | undefined,
+		outputParam: outputParamFromDefaults(defaults.output),
+		stopSequences: defaults.stopSequences,
+		additionalParametersRawJSON:
+			defaults.adapterParameters && Object.keys(defaults.adapterParameters).length > 0
+				? JSON.stringify(defaults.adapterParameters)
+				: undefined,
+	};
 }
 
 function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
