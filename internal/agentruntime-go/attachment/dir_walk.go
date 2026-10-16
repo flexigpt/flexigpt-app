@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+// The frontend may inspect a bounded larger candidate set before choosing
+// the smaller active attachment subset. Runtime admission must therefore
+// safely accept more than the composer-visible active-file limit.
+const (
+	DefaultDirectoryWalkMaxFiles = 4096
+	MaximumDirectoryWalkFiles    = 8192
+)
+
 // WalkDirectoryWithFiles implements:
 //
 //   - Pure BFS over the directory tree starting at dirPath.
@@ -23,7 +31,10 @@ import (
 //     (files + subdirs) in that directory.
 func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (*WalkDirectoryWithFilesResult, error) {
 	if maxFiles < 1 {
-		maxFiles = 1024
+		maxFiles = DefaultDirectoryWalkMaxFiles
+	}
+	if maxFiles > MaximumDirectoryWalkFiles {
+		maxFiles = MaximumDirectoryWalkFiles
 	}
 	if dirPath == "" {
 		// Empty path. Nothing to walk.

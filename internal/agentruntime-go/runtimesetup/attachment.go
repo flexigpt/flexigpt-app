@@ -14,8 +14,6 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 )
 
-const defaultDirectoryAttachmentMaxFiles = 1024
-
 // referenceMaterializer is the Session-facing attachment adapter.
 //
 // Attachment owns file and URL interpretation. Session owns durable attachment
@@ -168,7 +166,7 @@ func (m *referenceMaterializer) prepareReference(
 		walk, err := attachmentRuntime.WalkDirectoryWithFiles(
 			ctx,
 			directoryPath,
-			defaultDirectoryAttachmentMaxFiles,
+			attachmentRuntime.DefaultDirectoryWalkMaxFiles,
 		)
 		if err != nil {
 			return sessionRuntime.AttachmentReference{}, err

@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-const maxTestTotalDirWalkFiles = 1024
+const maxTestTotalDirWalkFiles = 4096
 
 func TestWalkDirectoryWithFiles_CoreScenarios(t *testing.T) {
 	type testCase struct {

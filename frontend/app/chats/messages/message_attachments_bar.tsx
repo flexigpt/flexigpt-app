@@ -574,9 +574,6 @@ function MessageWorkspaceContextChip({
 	const displayName = usage?.displayName || selection?.displayName || 'Workspace';
 	const requestedContexts = selection?.contextRefs ?? [];
 	const requestedSkills = selection?.skillRefs ?? [];
-	const workspaceRef = usage?.workspace ?? selection?.workspace;
-	const workspaceIdentity = workspaceRef ? `${workspaceRef.rootID}/${workspaceRef.artifactID}` : 'unknown';
-	const workspaceRevision = usage?.workspaceRevision ?? selection?.workspaceRevision;
 	const hasRecordedUsage = usage !== undefined;
 	const contexts = usage?.contexts ?? [];
 	const skills = usage?.skills ?? [];
@@ -607,7 +604,7 @@ function MessageWorkspaceContextChip({
 			<MenuButton
 				store={menu}
 				className={getMessageBarChipClassName(warningCount > 0 ? 'secondary' : 'info', false, true)}
-				title={`${displayName}\n${workspaceIdentity}\nWorkspace state recorded for this turn`}
+				title={`${displayName}\nWorkspace state recorded for this turn`}
 				data-message-chip="workspace-context"
 			>
 				<FiFolderPlus size={14} />
@@ -638,9 +635,7 @@ function MessageWorkspaceContextChip({
 					<div className="text-sm font-semibold">{displayName}</div>
 					<div className="text-base-content/60 mt-1 text-xs">
 						{usage
-							? `Recorded at send time${
-									workspaceRevision !== undefined ? ` · Workspace revision ${workspaceRevision}` : ''
-								}`
+							? 'Recorded at send time.'
 							: 'The Workspace selection was recorded, but an exact backend usage result is unavailable.'}
 					</div>
 					{usage ? (
@@ -662,10 +657,10 @@ function MessageWorkspaceContextChip({
 									>
 										<FiFileText size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.locator || item.artifact.artifactID}
-											</div>
+											<div className="truncate text-xs">{item.name || 'Context item'}</div>
+											{item.locator ? (
+												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
+											) : null}
 										</div>
 										<span className="badge badge-secondary badge-xs">Context</span>
 									</div>
@@ -678,10 +673,10 @@ function MessageWorkspaceContextChip({
 									>
 										<FiZap size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.artifact.artifactID}
-											</div>
+											<div className="truncate text-xs">{item.name || 'Skill'}</div>
+											{item.locator ? (
+												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
+											) : null}
 										</div>
 										<span className="badge badge-info badge-xs">Skill</span>
 									</div>
@@ -711,10 +706,10 @@ function MessageWorkspaceContextChip({
 									>
 										<FiFileText size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.locator || item.artifact.artifactID}
-											</div>
+											<div className="truncate text-xs">{item.name || 'Context item'}</div>
+											{item.locator ? (
+												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
+											) : null}
 										</div>
 										<span className="badge badge-ghost badge-xs">{item.status}</span>
 									</div>
@@ -730,12 +725,10 @@ function MessageWorkspaceContextChip({
 									>
 										<FiZap size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">
-												{item.displayName || item.name || item.artifact.artifactID}
-											</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.artifact.artifactID}
-											</div>
+											<div className="truncate text-xs">{item.displayName || item.name || 'Skill'}</div>
+											{item.locator ? (
+												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
+											) : null}
 										</div>
 										{item.sessionAvailable ? <span className="badge badge-info badge-xs">Available</span> : null}
 										{item.active ? <span className="badge badge-success badge-xs">Active</span> : null}
@@ -755,7 +748,7 @@ function MessageWorkspaceContextChip({
 												key={`${diagnostic.code}:${index}`}
 												className="bg-base-100 text-base-content/70 rounded-xl p-2 text-[10px]"
 											>
-												<span className="font-mono">{diagnostic.code}</span>: {diagnostic.message}
+												{diagnostic.message}
 											</div>
 										))}
 									</div>

@@ -1220,11 +1220,7 @@ func requireSelectionPin(
 	}
 	if selection.ExpectedRevision != 0 &&
 		selection.ExpectedRevision != used.Revision {
-		return fmt.Errorf(
-			"selected Artifact revision changed: expected %d, current %d",
-			selection.ExpectedRevision,
-			used.Revision,
-		)
+		return errors.New("the selected version changed")
 	}
 	if selection.ExpectedDigest != "" &&
 		selection.ExpectedDigest != used.Digest {

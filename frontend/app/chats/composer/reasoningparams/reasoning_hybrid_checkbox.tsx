@@ -8,6 +8,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 export function HybridReasoningCheckbox({
@@ -52,34 +53,47 @@ export function HybridReasoningCheckbox({
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
-					<MenuItem
-						className={`${actionTriggerMenuItemClasses} justify-between`}
-						onClick={() => {
+					{preference !== undefined ? (
+						<MenuItem
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setIsReasoningEnabled(undefined);
+							}}
+						>
+							<span>Default</span>
+						</MenuItem>
+					) : null}
+
+					{preference !== true ? (
+						<MenuItem
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setIsReasoningEnabled(true);
+							}}
+						>
+							<span>Enabled</span>
+						</MenuItem>
+					) : null}
+
+					{preference !== false ? (
+						<MenuItem
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setIsReasoningEnabled(false);
+							}}
+						>
+							<span>Disabled</span>
+						</MenuItem>
+					) : null}
+
+					<ComposerCurrentSettingPanel
+						label="Current hybrid reasoning setting"
+						value={preference === undefined ? 'Default' : isReasoningEnabled ? 'Enabled' : 'Disabled'}
+						isDefault={preference === undefined}
+						onUseDefault={() => {
 							setIsReasoningEnabled(undefined);
 						}}
-					>
-						<span>Default</span>
-						{preference === undefined ? <FiCheck /> : null}
-					</MenuItem>
-
-					<MenuItem
-						className={`${actionTriggerMenuItemClasses} justify-between`}
-						onClick={() => {
-							setIsReasoningEnabled(true);
-						}}
-					>
-						<span>Enabled</span>
-						{preference === true ? <FiCheck /> : null}
-					</MenuItem>
-					<MenuItem
-						className={`${actionTriggerMenuItemClasses} justify-between`}
-						onClick={() => {
-							setIsReasoningEnabled(false);
-						}}
-					>
-						<span>Disabled</span>
-						{preference === false ? <FiCheck /> : null}
-					</MenuItem>
+					/>
 				</Menu>
 			</div>
 		</div>

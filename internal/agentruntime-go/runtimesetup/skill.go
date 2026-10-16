@@ -91,6 +91,11 @@ func (c *coordinator) prepareSkills(
 		map[provider.SkillDef]skillContribution,
 		len(resolved.Values),
 	)
+	instructionDefinitions := make(
+		[]provider.SkillDef,
+		0,
+		len(resolved.Values),
+	)
 
 	for _, value := range resolved.Values {
 		reference := sessionArtifactReference(value.Artifact)
@@ -193,6 +198,35 @@ func (c *coordinator) prepareSkills(
 			continue
 		}
 
+		/*
+		 * An Agent contribution whose use mode is "instructions" is not a
+		 * Skill-session contribution by itself.
+		 *
+		 * It is rendered into the system prompt below, but it must not enter
+		 * EffectiveSkills, create a Skill session, or inject Skill lifecycle
+		 * tools. A deliberate Session Skill Add override for the same Artifact
+		 * replaces this contribution with instruction=false before this point,
+		 * which is how an explicit "enable as Skill too" request remains
+		 * supported.
+		 */
+		if contribution.instruction {
+			if _, requestedActive := active[key]; requestedActive {
+				return preparedSkills{}, nil, nil, nil, operationPreparationError(
+					"instruction_skill_active_invalid",
+					"an instruction-only Skill must be explicitly enabled before it can be active",
+					*summary,
+					nil,
+				)
+			}
+
+			if _, alreadyRecorded := instructionByDefinition[value.Definition]; !alreadyRecorded {
+				instructionDefinitions = append(instructionDefinitions, value.Definition)
+			}
+			instructionByDefinition[value.Definition] = contribution
+			usedByDefinition[value.Definition] = used
+			continue
+		}
+
 		output.definitions = append(output.definitions, value.Definition)
 		output.byArtifact[key] = value.Definition
 		output.byDefinition[value.Definition] = reference
@@ -206,9 +240,6 @@ func (c *coordinator) prepareSkills(
 		if _, enabled := active[key]; enabled {
 			activeRefs = append(activeRefs, reference)
 		}
-		if contribution.instruction {
-			instructionByDefinition[value.Definition] = contribution
-		}
 	}
 
 	if len(instructionByDefinition) == 0 {
@@ -218,7 +249,7 @@ func (c *coordinator) prepareSkills(
 	records, err := c.skillRuntime.ListAgentSkills(
 		ctx,
 		&agentskillsRuntime.SkillListFilter{
-			AllowSkills: output.definitions,
+			AllowSkills: instructionDefinitions,
 		},
 	)
 	if err != nil {
@@ -238,7 +269,7 @@ func (c *coordinator) prepareSkills(
 		recordByDefinition[record.Def] = record
 	}
 
-	for _, definition := range output.definitions {
+	for _, definition := range instructionDefinitions {
 		contribution, needed := instructionByDefinition[definition]
 		if !needed {
 			continue

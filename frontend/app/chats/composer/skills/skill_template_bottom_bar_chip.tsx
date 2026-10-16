@@ -9,6 +9,8 @@ import type { PathAttachmentsResult } from '@/spec/attachment';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
+import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
+
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
@@ -20,6 +22,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -93,7 +96,7 @@ const skillTemplateCollator = new Intl.Collator(undefined, {
 });
 
 function getSkillTemplateLabel(item: ComposerSkillCatalogItem): string {
-	return item.displayName || item.name;
+	return getPrimaryUserFacingLabel(item.displayName, item.name);
 }
 
 function skillTemplateKey(item: ComposerSkillCatalogItem): string {
@@ -195,6 +198,7 @@ function parseTemplateArguments(raw: string): Record<string, string> {
 
 function renderSkillTemplateMenuItem(item: ComposerSkillCatalogItem, onPick: (item: ComposerSkillCatalogItem) => void) {
 	const disabled = !templateIsSelectable(item);
+	const secondaryName = getDistinctUserFacingLabel(getSkillTemplateLabel(item), item.name);
 
 	return (
 		<MenuItem
@@ -215,11 +219,7 @@ function renderSkillTemplateMenuItem(item: ComposerSkillCatalogItem, onPick: (it
 
 			<div className="min-w-0 flex-1">
 				<div className="truncate text-xs font-medium">{getSkillTemplateLabel(item)}</div>
-				<div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] opacity-70">
-					<span>{item.name}</span>
-					<span>•</span>
-					<span>{item.ref.rootID}</span>
-				</div>
+				{secondaryName ? <div className="mt-1 truncate text-[10px] opacity-70">{secondaryName}</div> : null}
 			</div>
 
 			<div className="ml-auto flex shrink-0 items-center gap-1">
@@ -368,6 +368,11 @@ function SkillTemplateDropdown({
 							{templates.map(item => renderSkillTemplateMenuItem(item, onPick))}
 						</GroupedMenuSection>
 					))}
+
+					<ComposerDropdownSelectedPanel
+						label="Template state"
+						emptyLabel="Inserted templates become ordinary draft text. No template remains selected or joins a Skill session."
+					/>
 				</>
 			)}
 		</Menu>

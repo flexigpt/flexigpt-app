@@ -41,3 +41,39 @@ export function ComposerDropdownSelectedPanel({
 		</section>
 	);
 }
+
+interface ComposerCurrentSettingPanelProps {
+	label: string;
+	value: ReactNode;
+	isDefault?: boolean;
+	onUseDefault?: () => void;
+	useDefaultLabel?: string;
+}
+
+/**
+ * Sticky current-value panel for scalar composer controls. Collection pickers
+ * use ComposerDropdownSelectedPanel directly; this keeps simple controls thin
+ * without pretending they contain a collection of attached objects.
+ */
+export function ComposerCurrentSettingPanel({
+	label,
+	value,
+	isDefault = false,
+	onUseDefault,
+	useDefaultLabel = 'Use default',
+}: ComposerCurrentSettingPanelProps) {
+	return (
+		<ComposerDropdownSelectedPanel label={label}>
+			<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1 text-xs">
+				<span className="min-w-0 flex-1 truncate">{value}</span>
+				{!isDefault && onUseDefault ? (
+					<button type="button" className="btn btn-ghost btn-xs text-error shrink-0 rounded-lg" onClick={onUseDefault}>
+						{useDefaultLabel}
+					</button>
+				) : (
+					<span className="badge badge-ghost badge-xs shrink-0">Current</span>
+				)}
+			</div>
+		</ComposerDropdownSelectedPanel>
+	);
+}

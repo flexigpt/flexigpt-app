@@ -1,5 +1,3 @@
-import { FiCheck } from 'react-icons/fi';
-
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import {
@@ -8,6 +6,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 import { DEFAULT_REASONING_TOKENS, parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
@@ -23,6 +22,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
+	const availableTokenOptions = defaultTokenOptions.filter(value => value !== tokens);
 
 	function clampTokens(rawValue: string) {
 		const parsed = parseOptionalPositiveInteger(rawValue);
@@ -59,7 +59,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} p-4 text-xs`}
 				>
-					{defaultTokenOptions.map(tk => (
+					{availableTokenOptions.map(tk => (
 						<MenuItem
 							key={tk ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -68,7 +68,6 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 							}}
 						>
 							<span>{tk === undefined ? 'Default' : tk}</span>
-							{tokens === tk ? <FiCheck /> : null}
 						</MenuItem>
 					))}
 
@@ -92,6 +91,15 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 							}}
 						/>
 					</div>
+
+					<ComposerCurrentSettingPanel
+						label="Current effort tokens"
+						value={tokens === undefined ? 'Default' : tokens.toLocaleString()}
+						isDefault={tokens === undefined}
+						onUseDefault={() => {
+							setTokens(undefined);
+						}}
+					/>
 				</Menu>
 			</div>
 		</div>

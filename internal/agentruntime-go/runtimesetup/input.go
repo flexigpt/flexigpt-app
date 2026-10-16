@@ -315,12 +315,12 @@ func appContextText(
 	update sessionRuntime.AppContextUpdate,
 ) (string, error) {
 	raw, err := json.Marshal(struct {
-		ServerID          string                             `json:"serverID"`
+		Source            string                             `json:"source"`
 		ResourceURI       string                             `json:"resourceURI,omitempty"`
 		Content           []sessionRuntime.AppContextContent `json:"content,omitempty"`
 		StructuredContent json.RawMessage                    `json:"structuredContent,omitempty"`
 	}{
-		ServerID:          update.ServerID,
+		Source:            "MCP App",
 		ResourceURI:       update.ResourceURI,
 		Content:           update.Content,
 		StructuredContent: update.StructuredContent,

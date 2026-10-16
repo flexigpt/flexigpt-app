@@ -193,9 +193,9 @@ function WorkspaceDirectorySelectionModalContent({
 
 											<span className="min-w-0 flex-1">
 												<span className="block truncate text-sm font-medium">{skill.displayName || skill.name}</span>
-												<span className="text-base-content/60 block truncate font-mono text-xs">
-													{skill.locator || skill.artifact.artifactID}
-												</span>
+												{skill.locator ? (
+													<span className="text-base-content/60 block truncate text-xs">{skill.locator}</span>
+												) : null}
 											</span>
 
 											<span className="badge badge-ghost badge-xs">{skill.insert || 'unspecified'}</span>
@@ -253,9 +253,7 @@ function WorkspaceDirectorySelectionModalContent({
 										/>
 										<div className="min-w-0 flex-1">
 											<div className="truncate text-sm font-medium">{server.displayName || server.name}</div>
-											<div className="text-base-content/60 truncate font-mono text-xs">
-												{server.artifact.artifactID}
-											</div>
+											<div className="text-base-content/60 text-xs">Workspace MCP server</div>
 										</div>
 										<span className="badge badge-secondary badge-xs">{selected ? 'Selected' : 'Available'}</span>
 									</label>
@@ -269,9 +267,7 @@ function WorkspaceDirectorySelectionModalContent({
 								>
 									<div className="min-w-0 grow">
 										<div className="truncate text-sm font-medium">{target.displayName}</div>
-										<div className="text-base-content/60 truncate font-mono text-xs">
-											{target.artifact.rootID}/{target.artifact.artifactID}
-										</div>
+										<div className="text-base-content/60 text-xs">MCP setup is available for this Workspace.</div>
 									</div>
 
 									<div className="flex flex-wrap items-center gap-2">

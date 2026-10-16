@@ -112,13 +112,15 @@ func (c *coordinator) prepareMCP(
 			},
 		)
 
+		serverLabel := mcpServerDisplayLabel(status)
+
 		if selection.IncludeServerInstructions &&
 			strings.TrimSpace(status.Instructions) != "" {
 			contexts = append(
 				contexts,
 				strings.Join([]string{
 					"### MCP server instructions",
-					"Server: " + string(serverID),
+					"Server: " + serverLabel,
 					status.Instructions,
 				}, "\n\n"),
 			)
@@ -147,6 +149,7 @@ func (c *coordinator) prepareMCP(
 		resourceContexts, resourceDiagnostics, err := c.prepareMCPResources(
 			ctx,
 			serverID,
+			serverLabel,
 			selection,
 		)
 		summary.Diagnostics = append(summary.Diagnostics, resourceDiagnostics...)
@@ -166,6 +169,16 @@ func (c *coordinator) prepareMCP(
 	}
 
 	return choices, bindings, contexts, nil
+}
+
+func mcpServerDisplayLabel(status *mcpServer.MCPServerRuntimeSnapshot) string {
+	if status != nil &&
+		status.ServerInfo != nil &&
+		strings.TrimSpace(status.ServerInfo.Name) != "" {
+		return strings.TrimSpace(status.ServerInfo.Name)
+	}
+
+	return "MCP server"
 }
 
 func (c *coordinator) prepareMCPTools(
@@ -414,6 +427,7 @@ func selectedMCPExecutionMode(
 func (c *coordinator) prepareMCPResources(
 	ctx context.Context,
 	serverID mcpServer.ServerID,
+	serverLabel string,
 	selection sessionRuntime.MCPServerSelection,
 ) ([]string, []sessionRuntime.ResolutionDiagnostic, error) {
 	sections := make([]string, 0)
@@ -478,7 +492,7 @@ func (c *coordinator) prepareMCPResources(
 					sections,
 					strings.Join([]string{
 						"### MCP resource",
-						"Server: " + string(serverID),
+						"Server: " + serverLabel,
 						"URI: " + expected.URI,
 						text,
 					}, "\n\n"),
@@ -567,7 +581,7 @@ func (c *coordinator) prepareMCPResources(
 					sections,
 					strings.Join([]string{
 						"### MCP resource template",
-						"Server: " + string(serverID),
+						"Server: " + serverLabel,
 						"URI: " + uri,
 						text,
 					}, "\n\n"),
@@ -657,7 +671,7 @@ func (c *coordinator) prepareMCPResources(
 					sections,
 					strings.Join([]string{
 						"### MCP prompt",
-						"Server: " + string(serverID),
+						"Server: " + serverLabel,
 						"Name: " + expected.PromptName,
 						strings.Join(parts, "\n\n"),
 					}, "\n\n"),

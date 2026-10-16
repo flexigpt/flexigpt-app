@@ -1,5 +1,3 @@
-import { FiCheck } from 'react-icons/fi';
-
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { ReasoningLevel } from '@/spec/inference';
@@ -10,6 +8,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 import { COMPOSER_DEFAULT_REASONING_LEVELS, getReasoningLevelDisplayName } from '@/models/lib/model_option_labels';
@@ -52,28 +51,39 @@ export function SingleReasoningDropdown({
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
-					<MenuItem
-						className={`${actionTriggerMenuItemClasses} justify-between`}
-						onClick={() => {
-							setReasoningLevel(undefined);
-						}}
-					>
-						<span>Default</span>
-						{reasoningLevel === undefined ? <FiCheck /> : null}
-					</MenuItem>
-
-					{options.map(level => (
+					{reasoningLevel !== undefined ? (
 						<MenuItem
-							key={level}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
 							onClick={() => {
-								setReasoningLevel(level);
+								setReasoningLevel(undefined);
 							}}
 						>
-							<span>{getReasoningLevelDisplayName(level)}</span>
-							{reasoningLevel === level ? <FiCheck /> : null}
+							<span>Default</span>
 						</MenuItem>
-					))}
+					) : null}
+
+					{options
+						.filter(level => level !== reasoningLevel)
+						.map(level => (
+							<MenuItem
+								key={level}
+								className={`${actionTriggerMenuItemClasses} justify-between`}
+								onClick={() => {
+									setReasoningLevel(level);
+								}}
+							>
+								<span>{getReasoningLevelDisplayName(level)}</span>
+							</MenuItem>
+						))}
+
+					<ComposerCurrentSettingPanel
+						label="Current reasoning setting"
+						value={getReasoningLevelDisplayName(reasoningLevel)}
+						isDefault={reasoningLevel === undefined}
+						onUseDefault={() => {
+							setReasoningLevel(undefined);
+						}}
+					/>
 				</Menu>
 			</div>
 		</div>

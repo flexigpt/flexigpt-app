@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -11,6 +10,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 interface PreviousMessagesDropdownProps {
@@ -59,6 +59,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
+	const availableOptions = OPTIONS.filter(option => option !== value);
 	const commitCustomValue = (rawValue: string) => {
 		const nextValue = maybeParseCustomValue(rawValue);
 		if (nextValue === undefined) {
@@ -102,7 +103,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
-					{OPTIONS.map(option => {
+					{availableOptions.map(option => {
 						const key = valueToKey(option);
 						return (
 							<MenuItem
@@ -113,7 +114,6 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 								}}
 							>
 								<span>{displayOptionLabel(option)}</span>
-								{value === option ? <FiCheck /> : null}
 							</MenuItem>
 						);
 					})}
@@ -139,6 +139,16 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 							}}
 						/>
 					</div>
+
+					<ComposerCurrentSettingPanel
+						label="Current history setting"
+						value={displayOptionLabel(value)}
+						isDefault={value === 0}
+						onUseDefault={() => {
+							setValue(0);
+						}}
+						useDefaultLabel="Current turn only"
+					/>
 				</Menu>
 			</div>
 		</div>

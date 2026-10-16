@@ -423,7 +423,7 @@ function agentCapabilityExclusionOverrides(exclusions: AgentCapabilityExclusion[
 	return { instructions, tools, skills, mcp };
 }
 
-function skillOverridesFromPayload(payload: EditorSubmitPayload, nonSessionSkillKeys: ReadonlySet<string>) {
+function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 	const seenEnabled = new Set<string>();
 	const skills: SessionArtifactOverride[] = [];
 
@@ -434,10 +434,6 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload, nonSessionSkill
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
-
-		if (nonSessionSkillKeys.has(key)) {
-			continue;
-		}
 
 		if (seenEnabled.has(key)) {
 			continue;
@@ -461,10 +457,6 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload, nonSessionSkill
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
 		const key = artifactKey(ref);
-
-		if (nonSessionSkillKeys.has(key)) {
-			continue;
-		}
 
 		if (seenActive.has(key)) {
 			continue;
@@ -598,12 +590,23 @@ export async function buildSessionSubmissionIntent(
 ): Promise<SessionSubmissionIntent> {
 	const configuration = emptySessionConfiguration();
 	const nonSessionSkillKeys = nonSessionSkillKeysFromPayload(payload);
-	const skillOverrides = skillOverridesFromPayload(payload, nonSessionSkillKeys);
+	const skillOverrides = skillOverridesFromPayload(payload);
 	const agentExclusions = agentCapabilityExclusionOverrides(payload.agentCapabilityExclusions);
 	const directToolOverrides = toolOverridesFromChoices(payload);
 	const directToolKeys = new Set(directToolOverrides.map(override => override.key));
 	const directSkillKeys = new Set(skillOverrides.skills.map(override => override.key));
-	const nonSessionSkillRemovals = nonSessionSkillRemovalOverrides(nonSessionSkillKeys);
+
+	/*
+	 * A rendered instruction/template source is session-excluding only while
+	 * the same Skill has not also been explicitly enabled for this turn.
+	 *
+	 * This intentionally permits:
+	 *   - add as instructions only       -> text only, no Skill session
+	 *   - enable only                    -> Skill session only
+	 *   - add as instructions + enable   -> both text and Skill session
+	 */
+	const nonSessionOnlySkillKeys = new Set([...nonSessionSkillKeys].filter(key => !directSkillKeys.has(key)));
+	const nonSessionSkillRemovals = nonSessionSkillRemovalOverrides(nonSessionOnlySkillKeys);
 	const instructionOverrides = instructionOverridesFromPayload(payload);
 	const directMCPOverrides = await mcpOverridesFromPayload(payload);
 	const directMCPKeys = new Set(directMCPOverrides.map(override => override.key));
@@ -625,7 +628,7 @@ export async function buildSessionSubmissionIntent(
 	configuration.skills = [
 		...skillOverrides.skills,
 		...agentExclusions.skills.filter(
-			override => !directSkillKeys.has(override.key) && !nonSessionSkillKeys.has(override.key)
+			override => !directSkillKeys.has(override.key) && !nonSessionOnlySkillKeys.has(override.key)
 		),
 		...nonSessionSkillRemovals,
 	];

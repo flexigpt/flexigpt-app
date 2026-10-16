@@ -196,7 +196,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 		titleLines.push('Auto-execute: enabled');
 	}
 	if (toolCall.mcpToolSelection) {
-		titleLines.push(`MCP: ${toolCall.mcpToolSelection.server}/${toolCall.mcpToolSelection.toolName}`);
+		titleLines.push(`MCP tool: ${toolCall.mcpToolSelection.toolName}`);
 	}
 	const title = titleLines.join('\n');
 

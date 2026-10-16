@@ -1,5 +1,3 @@
-import { FiCheck } from 'react-icons/fi';
-
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { OutputVerbosity } from '@/spec/inference';
@@ -11,6 +9,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 import { getOutputVerbosityDisplayName, OUTPUT_VERBOSITY_VALUES } from '@/models/lib/model_option_labels';
@@ -40,6 +39,7 @@ export function OutputVerbosityDropdown({
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
+	const availableOptions = VERBOSITY_OPTIONS.filter(option => option !== verbosity);
 	const tooltipText = disabled
 		? 'Effort/Verbosity not supported by this model/provider'
 		: 'Set effort/verbosity for model output';
@@ -70,7 +70,7 @@ export function OutputVerbosityDropdown({
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
-					{VERBOSITY_OPTIONS.map(option => (
+					{availableOptions.map(option => (
 						<MenuItem
 							key={option ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -79,9 +79,17 @@ export function OutputVerbosityDropdown({
 							}}
 						>
 							<span>{getOutputVerbosityDisplayName(option)}</span>
-							{verbosity === option ? <FiCheck /> : null}
 						</MenuItem>
 					))}
+
+					<ComposerCurrentSettingPanel
+						label="Current output setting"
+						value={getOutputVerbosityDisplayName(verbosity)}
+						isDefault={verbosity === undefined}
+						onUseDefault={() => {
+							setVerbosity(undefined);
+						}}
+					/>
 				</Menu>
 			</div>
 		</div>

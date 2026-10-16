@@ -149,9 +149,7 @@ function SessionWaitModalContent({ wait, isResolving, error, onResolve }: Active
 								<dl className="mt-2 grid gap-2 sm:grid-cols-2">
 									<div>
 										<dt className="text-base-content/60 text-xs">Server</dt>
-										<dd className="wrap-break-word">
-											{mcpApproval.serverDisplayName || mcpApproval.server || 'Unknown server'}
-										</dd>
+										<dd className="wrap-break-word">{mcpApproval.serverDisplayName || 'MCP server'}</dd>
 									</div>
 									<div>
 										<dt className="text-base-content/60 text-xs">Tool</dt>

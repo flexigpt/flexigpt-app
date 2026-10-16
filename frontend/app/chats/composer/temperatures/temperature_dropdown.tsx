@@ -1,5 +1,3 @@
-import { FiCheck } from 'react-icons/fi';
-
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import {
@@ -8,6 +6,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 const defaultTemperatureOptions: Array<number | undefined> = [undefined, 0.0, 0.1, 0.5, 1.0];
@@ -20,6 +19,7 @@ interface TemperatureDropdownProps {
 export function TemperatureDropdown({ temperature, setTemperature }: TemperatureDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
+	const availableTemperatureOptions = defaultTemperatureOptions.filter(value => value !== temperature);
 
 	function clampTemperature(rawValue: string) {
 		const trimmed = rawValue.trim();
@@ -58,7 +58,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} p-4 text-xs`}
 				>
-					{defaultTemperatureOptions.map(tempVal => (
+					{availableTemperatureOptions.map(tempVal => (
 						<MenuItem
 							key={tempVal ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -67,7 +67,6 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 							}}
 						>
 							<span>{tempVal === undefined ? 'Default' : tempVal.toFixed(1)}</span>
-							{temperature === tempVal ? <FiCheck /> : null}
 						</MenuItem>
 					))}
 
@@ -93,6 +92,15 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 							spellCheck="false"
 						/>
 					</div>
+
+					<ComposerCurrentSettingPanel
+						label="Current temperature"
+						value={temperature === undefined ? 'Default' : temperature.toFixed(2)}
+						isDefault={temperature === undefined}
+						onUseDefault={() => {
+							setTemperature(undefined);
+						}}
+					/>
 				</Menu>
 			</div>
 		</div>

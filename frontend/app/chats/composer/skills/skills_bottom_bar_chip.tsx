@@ -10,17 +10,19 @@ import type { SkillRef } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
+import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
+
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
 
 import type { DropdownItem } from '@/components/dropdown';
 import {
-	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { Dropdown } from '@/components/dropdown';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -169,7 +171,7 @@ function ComposerSkillDestinationModal({
 								const plugin = writablePlugins.find(
 									candidate => `${candidate.ref.rootID}:${candidate.ref.artifactID}` === key
 								);
-								return plugin ? `${plugin.displayName || plugin.name} · ${plugin.ref.rootID}` : key;
+								return plugin ? getPrimaryUserFacingLabel(plugin.displayName, plugin.name) : 'Skill Plugin';
 							}}
 							disabled={busy || writablePlugins.length === 0}
 							inlineMenu
@@ -289,17 +291,52 @@ export function SkillsBottomBarChip({
 		[activeSkillRefs]
 	);
 
+	const selectedSourceKeys = useMemo(
+		() => new Set(systemPrompt.selectedInstructionSourceKeys),
+		[systemPrompt.selectedInstructionSourceKeys]
+	);
+	const selectedInstructionSources = useMemo(
+		() => systemPrompt.instructionSources.filter(source => selectedSourceKeys.has(source.identityKey)),
+		[selectedSourceKeys, systemPrompt.instructionSources]
+	);
+	const availableInstructionSources = useMemo(
+		() => systemPrompt.instructionSources.filter(source => !selectedSourceKeys.has(source.identityKey)),
+		[selectedSourceKeys, systemPrompt.instructionSources]
+	);
+	const selectedInstructionSkillKeys = useMemo(
+		() =>
+			new Set(selectedInstructionSources.flatMap(source => (source.skillRef ? [skillRefKey(source.skillRef)] : []))),
+		[selectedInstructionSources]
+	);
+	const availableSkills = useMemo(
+		() =>
+			visibleSkills.filter(
+				skill => !enabledKeys.has(skillKey(skill)) && !selectedInstructionSkillKeys.has(skillKey(skill))
+			),
+		[enabledKeys, selectedInstructionSkillKeys, visibleSkills]
+	);
+	const instructionSkillByKey = useMemo(
+		() => new Map(instructionSkills.map(skill => [skillKey(skill), skill] as const)),
+		[instructionSkills]
+	);
+	const selectedSessionSkills = useMemo(
+		() =>
+			enabledSkillRefs.map(ref => ({
+				ref,
+				skill: instructionSkillByKey.get(skillRefKey(ref)),
+			})),
+		[enabledSkillRefs, instructionSkillByKey]
+	);
+
 	const enabledCount = enabledKeys.size;
 	const activeCount = activeKeys.size;
 
 	const selectedSystemSourceCount =
 		(systemPrompt.includeModelDefault && systemPrompt.modelDefaultPrompt.trim() ? 1 : 0) +
-		systemPrompt.selectedInstructionSourceKeys.filter(key =>
-			systemPrompt.instructionSources.some(source => source.identityKey === key && Boolean(source.text.trim()))
-		).length;
+		selectedInstructionSources.filter(source => Boolean(source.text.trim())).length;
 	const configuredCount = enabledCount + selectedSystemSourceCount;
 	const firstVisibleSkill =
-		visibleSkills.find(s => {
+		availableSkills.find(s => {
 			return selectable(s);
 		}) ?? null;
 
@@ -472,6 +509,139 @@ export function SkillsBottomBarChip({
 		/>
 	);
 
+	const selectedSkillsPanel = (
+		<>
+			{selectedSystemSourceCount > 0 ? (
+				<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2">
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<span className="text-xs font-semibold">System instruction sources</span>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error rounded-lg"
+							disabled={isInputLocked}
+							onClick={() => {
+								systemPrompt.clearInstructionSources();
+							}}
+						>
+							<FiX size={12} />
+							Clear
+						</button>
+					</div>
+
+					{systemPrompt.includeModelDefault && systemPrompt.modelDefaultPrompt.trim() ? (
+						<div className="bg-base-100 flex items-center gap-2 rounded-lg px-2 py-1 text-xs">
+							<span className="min-w-0 flex-1 truncate">Model default instructions</span>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs text-error rounded-lg"
+								disabled={isInputLocked}
+								onClick={() => {
+									systemPrompt.setIncludeModelDefault(false);
+								}}
+							>
+								Remove
+							</button>
+						</div>
+					) : null}
+
+					{selectedInstructionSources.map(source => (
+						<div
+							key={source.identityKey}
+							className="bg-base-100 mt-1 flex min-w-0 items-center gap-2 rounded-lg px-2 py-1"
+						>
+							<span className="min-w-0 flex-1 truncate text-xs">{source.displayName}</span>
+							{source.sourceKind === 'agent' ? <span className="badge badge-secondary badge-xs">Agent</span> : null}
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs text-error rounded-lg"
+								disabled={isInputLocked}
+								onClick={() => {
+									systemPrompt.toggleInstructionSource(source.identityKey);
+								}}
+							>
+								Remove
+							</button>
+						</div>
+					))}
+				</div>
+			) : null}
+
+			{enabledCount > 0 ? (
+				<div className="border-base-300 bg-base-100 rounded-xl border p-2">
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<span className="text-xs font-semibold">Enabled Skill sessions</span>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error rounded-lg"
+							disabled={isInputLocked}
+							onClick={onDisableAll}
+						>
+							<FiX size={12} />
+							Disable all
+						</button>
+					</div>
+
+					{selectedSessionSkills.map(({ ref, skill }) => {
+						const key = skillRefKey(ref);
+						const active = activeKeys.has(key);
+						const label = skill ? skillLabel(skill) : 'Unavailable saved Skill';
+						const secondaryName = skill ? getDistinctUserFacingLabel(label, skill.name) : undefined;
+						const canMoveToInstructions = skill && selectable(skill) && !skill.hasArguments && !skill.hasResources;
+
+						return (
+							<div key={key} className="bg-base-200 mt-1 flex min-w-0 flex-wrap items-center gap-2 rounded-lg p-2">
+								<FiZap size={13} className="shrink-0" />
+								<div className="min-w-0 flex-1">
+									<div className="truncate text-xs font-medium">{label}</div>
+									{secondaryName ? (
+										<div className="text-base-content/60 truncate text-[10px]">{secondaryName}</div>
+									) : null}
+								</div>
+								{active ? <span className="badge badge-success badge-xs">Active</span> : null}
+								{!skill ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
+								{skill ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={isInputLocked || (!active && !canActivate(skill))}
+										onClick={() => {
+											updateActive(skill, !active);
+										}}
+									>
+										{active ? 'Deactivate' : 'Activate'}
+									</button>
+								) : null}
+								{canMoveToInstructions && skill ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={isInputLocked}
+										onClick={() => {
+											void addAsInstructions(skill);
+										}}
+									>
+										Use only as instructions
+									</button>
+								) : null}
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs text-error rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										setEnabledSkillRefs(previous => removeSkillRef(previous, ref));
+										setActiveSkillRefs(previous => removeSkillRef(previous, ref));
+									}}
+								>
+									Disable
+								</button>
+							</div>
+						);
+					})}
+				</div>
+			) : null}
+		</>
+	);
+
 	return (
 		<>
 			<div className="relative shrink-0" data-bottom-bar-skills>
@@ -505,25 +675,6 @@ export function SkillsBottomBarChip({
 								open={open}
 							/>
 						</MenuButton>
-
-						{configuredCount > 0 ? (
-							<button
-								type="button"
-								className={actionTriggerChipClearButtonClasses}
-								onClick={event => {
-									event.preventDefault();
-									event.stopPropagation();
-									onDisableAll();
-									systemPrompt.clearAllSystemPromptState();
-									store.hide();
-								}}
-								disabled={isInputLocked}
-								aria-label="Clear Skills and system instruction sources"
-								title="Clear Skills and system instruction sources"
-							>
-								<FiX size={12} />
-							</button>
-						) : null}
 					</div>
 				</HoverTip>
 
@@ -598,7 +749,7 @@ export function SkillsBottomBarChip({
 						query={searchQuery}
 						onQueryChange={setSearchQuery}
 						placeholder="Search instruction Skills…"
-						resultCount={visibleSkills.length}
+						resultCount={availableSkills.length}
 						totalCount={instructionSkills.length}
 						disabled={loading || instructionSkills.length === 0}
 						onFocusFirstItem={() => {
@@ -616,72 +767,51 @@ export function SkillsBottomBarChip({
 
 					<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
 						<div className="mb-2 flex items-center justify-between gap-2">
-							<div className="text-xs font-semibold">System instruction sources</div>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || selectedSystemSourceCount === 0}
-								onClick={() => {
-									systemPrompt.clearInstructionSources();
-								}}
-							>
-								Clear selected
-							</button>
+							<div className="text-xs font-semibold">Available system instruction sources</div>
 						</div>
 
-						{systemPrompt.modelDefaultPrompt.trim() ? (
-							<label className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1">
-								<span className="text-xs">Model default instructions</span>
-								<input
-									type="checkbox"
-									className="checkbox checkbox-xs"
-									checked={systemPrompt.includeModelDefault}
-									disabled={isInputLocked}
-									onChange={event => {
-										systemPrompt.setIncludeModelDefault(event.currentTarget.checked);
-									}}
-								/>
-							</label>
+						{systemPrompt.modelDefaultPrompt.trim() && !systemPrompt.includeModelDefault ? (
+							<button
+								type="button"
+								className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
+								disabled={isInputLocked}
+								onClick={() => {
+									systemPrompt.setIncludeModelDefault(true);
+								}}
+							>
+								<span className="text-xs">Use model default instructions</span>
+								<FiPlus size={12} />
+							</button>
 						) : null}
 
-						{systemPrompt.instructionSources.map(source => {
-							const sourceSelected = systemPrompt.selectedInstructionSourceKeys.includes(source.identityKey);
-
-							return (
-								<label
-									key={source.identityKey}
-									className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
-								>
-									<span className="min-w-0 text-xs">
-										<span className="flex min-w-0 items-center gap-1">
-											<span className="truncate">{source.displayName}</span>
-											{sourceSelected && source.sourceKind === 'agent' ? (
-												<span className="badge badge-secondary badge-xs">Agent</span>
-											) : null}
-											{sourceSelected && source.sourceKind === 'session' ? (
-												<span className="badge badge-ghost badge-xs">System</span>
-											) : null}
-										</span>
-										{source.sourceTags?.length ? (
-											<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
+						{availableInstructionSources.map(source => (
+							<button
+								key={source.identityKey}
+								type="button"
+								className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
+								disabled={isInputLocked}
+								onClick={() => {
+									systemPrompt.toggleInstructionSource(source.identityKey);
+								}}
+							>
+								<span className="min-w-0 text-xs">
+									<span className="flex min-w-0 items-center gap-1">
+										<span className="truncate">{source.displayName}</span>
+										{source.sourceKind === 'agent' ? (
+											<span className="badge badge-secondary badge-xs">Agent</span>
 										) : null}
 									</span>
-									<input
-										type="checkbox"
-										className="checkbox checkbox-xs"
-										checked={sourceSelected}
-										disabled={isInputLocked}
-										onChange={() => {
-											systemPrompt.toggleInstructionSource(source.identityKey);
-										}}
-									/>
-								</label>
-							);
-						})}
+									{source.sourceTags?.length ? (
+										<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
+									) : null}
+								</span>
+								<FiPlus size={12} className="shrink-0" />
+							</button>
+						))}
 
-						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
+						{!systemPrompt.modelDefaultPrompt.trim() && availableInstructionSources.length === 0 ? (
 							<div className="text-base-content/60 px-2 py-1 text-xs">
-								No flattened Session instruction source is selected.
+								All available instruction sources are already added below.
 							</div>
 						) : null}
 					</div>
@@ -730,11 +860,12 @@ export function SkillsBottomBarChip({
 						<div className={searchableMenuEmptyStateClasses}>No Skills match your search.</div>
 					) : (
 						<div className="space-y-1">
-							{visibleSkills.map(skill => {
+							{availableSkills.map(skill => {
 								const key = skillKey(skill);
 								const enabled = enabledKeys.has(key);
 								const active = activeKeys.has(key);
 								const activationAllowed = canActivate(skill);
+								const secondaryName = getDistinctUserFacingLabel(skillLabel(skill), skill.name);
 
 								return (
 									<MenuItem
@@ -757,9 +888,9 @@ export function SkillsBottomBarChip({
 											<FiZap size={14} className="mt-0.5 shrink-0" />
 											<div className="min-w-0 flex-1">
 												<div className="truncate text-xs font-medium">{skillLabel(skill)}</div>
-												<div className="text-base-content/60 truncate text-[10px]">
-													{skill.name} · {skill.ref.rootID}
-												</div>
+												{secondaryName ? (
+													<div className="text-base-content/60 truncate text-[10px]">{secondaryName}</div>
+												) : null}
 												{skill.description ? (
 													<div className="text-base-content/70 mt-1 line-clamp-2 text-xs">{skill.description}</div>
 												) : null}
@@ -872,6 +1003,10 @@ export function SkillsBottomBarChip({
 							})}
 						</div>
 					)}
+
+					<ComposerDropdownSelectedPanel label="Added Skills and instructions" count={configuredCount}>
+						{selectedSkillsPanel}
+					</ComposerDropdownSelectedPanel>
 				</Menu>
 			</div>
 

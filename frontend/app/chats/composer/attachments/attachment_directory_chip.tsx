@@ -15,6 +15,8 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode } from '@/spec/attachment';
 
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
+
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
 import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
 import {
@@ -233,18 +235,6 @@ export function DirectoryChip({
 				<MenuChevron size={14} />
 			</MenuButton>
 
-			<button
-				type="button"
-				className="btn btn-ghost btn-xs text-error shrink-0 p-0 shadow-none"
-				onClick={() => {
-					onRemoveDirectoryGroup(group.id);
-				}}
-				title="Remove this folder and its attached files"
-				aria-label="Remove folder attachment group"
-			>
-				<FiX size={14} />
-			</button>
-
 			<Menu
 				store={directoryMenu}
 				gutter={8}
@@ -312,17 +302,6 @@ export function DirectoryChip({
 						<div className="mt-2 flex flex-wrap gap-2">
 							<button
 								type="button"
-								className="btn btn-error btn-xs rounded-lg"
-								disabled={matchingAttached.length === 0}
-								onClick={() => {
-									removeFromDirectory(matchingAttached);
-								}}
-							>
-								Remove matches ({matchingAttached.length})
-							</button>
-
-							<button
-								type="button"
 								className="btn btn-xs rounded-lg"
 								disabled={restorableMatches.length === 0}
 								onClick={() => {
@@ -340,34 +319,6 @@ export function DirectoryChip({
 						</div>
 					)}
 				</div>
-
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">
-					Attached ({hasQuery ? matchingAttached.length : attachedCount})
-				</div>
-
-				{matchingAttached.map(attachment => (
-					<MenuItem
-						key={uiAttachmentKey(attachment)}
-						store={directoryMenu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-					>
-						<AttachmentChip
-							attachment={attachment}
-							onRemoveAttachment={() => {
-								removeFromDirectory([attachment]);
-							}}
-							onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
-							fullWidth
-						/>
-					</MenuItem>
-				))}
-
-				{matchingAttached.length === 0 && (
-					<div className="text-base-content/60 rounded-xl px-2 py-3 text-center text-xs">
-						{hasQuery ? 'No attached files match this filter.' : 'No files are currently attached.'}
-					</div>
-				)}
 
 				{removedFiles.length > 0 && (
 					<details
@@ -480,6 +431,61 @@ export function DirectoryChip({
 				{attachedCount === 0 && removedFiles.length === 0 && group.overflowDirs.length === 0 && (
 					<div className="text-base-content/70 text-xs">No readable files could be attached from this folder.</div>
 				)}
+
+				<ComposerDropdownSelectedPanel
+					label="Attached files"
+					count={attachedCount}
+					emptyLabel="No files are currently attached from this folder."
+				>
+					<div className="mb-1 flex flex-wrap justify-end gap-2 px-1">
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error rounded-lg"
+							onClick={() => {
+								onRemoveDirectoryGroup(group.id);
+							}}
+						>
+							<FiX size={12} />
+							Remove folder
+						</button>
+						{hasQuery && !filter.error ? (
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs text-error rounded-lg"
+								disabled={matchingAttached.length === 0}
+								onClick={() => {
+									removeFromDirectory(matchingAttached);
+								}}
+							>
+								Remove matches ({matchingAttached.length})
+							</button>
+						) : null}
+					</div>
+
+					{matchingAttached.map(attachment => (
+						<MenuItem
+							key={uiAttachmentKey(attachment)}
+							store={directoryMenu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+						>
+							<AttachmentChip
+								attachment={attachment}
+								onRemoveAttachment={() => {
+									removeFromDirectory([attachment]);
+								}}
+								onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
+								fullWidth
+							/>
+						</MenuItem>
+					))}
+
+					{matchingAttached.length === 0 ? (
+						<div className="text-base-content/60 rounded-xl px-2 py-3 text-center text-xs">
+							{hasQuery ? 'No attached files match this filter.' : 'No files are currently attached.'}
+						</div>
+					) : null}
+				</ComposerDropdownSelectedPanel>
 			</Menu>
 		</div>
 	);
