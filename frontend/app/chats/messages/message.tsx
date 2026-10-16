@@ -70,6 +70,9 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.debugDetails !== next.message.debugDetails) {
 		return false;
 	}
+	if (prev.message.debugDetailsError !== next.message.debugDetailsError) {
+		return false;
+	}
 	if (prev.message.error !== next.message.error) {
 		return false;
 	}
@@ -405,6 +408,7 @@ export const ChatMessage = memo(function ChatMessage({
 							onDisableMarkdownChange={handleDisableMarkdownChange}
 							usage={message.usage}
 							debugDetails={message.debugDetails}
+							debugDetailsError={message.debugDetailsError}
 							errorDetails={message.error}
 						/>
 					</div>

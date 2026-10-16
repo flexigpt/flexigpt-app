@@ -104,6 +104,43 @@ export function decodeSessionOpaqueJSON<T>(value: unknown): T | undefined {
 	return undefined;
 }
 
+// json.RawMessage can reach Wails as an object, a JSON string, or a byte-array
+// shaped value depending on the transport/runtime version. Preserve the actual
+// debugger payload if it cannot be decoded rather than dropping it.
+function decodeSessionOpaqueJSONForDisplay(value: unknown): unknown {
+	if (value === undefined || value === null) {
+		return undefined;
+	}
+
+	return decodeSessionOpaqueJSON<unknown>(value) ?? value;
+}
+
+function debugDetailsForOperation(
+	message: SessionTranscriptMessage,
+	operation: SessionModelOperation | undefined
+): unknown {
+	// The operation field is the authoritative per-completion debugger result.
+	// Do not use RuntimeMetadata when a modern operation explicitly carries
+	// debugDetails, even if that payload happens to be empty.
+	if (operation?.debugDetails !== undefined && operation.debugDetails !== null) {
+		return decodeSessionOpaqueJSONForDisplay(operation.debugDetails);
+	}
+
+	// Compatibility fallback for historical Session records created before
+	// ModelOperation.debugDetails existed.
+	return decodeSessionOpaqueJSONForDisplay(message.runtimeMetadata ?? operation?.runtimeMetadata);
+}
+
+function debugDetailsErrorForOperation(operation: SessionModelOperation | undefined): string | undefined {
+	const value = operation?.debugDetailsError;
+	if (typeof value !== 'string') {
+		return undefined;
+	}
+
+	const trimmed = value.trim();
+	return trimmed || undefined;
+}
+
 function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 	const runsByOperationID = new Map<string, SessionRun>();
 	const callsByOperationID = new Map<string, SessionToolCall[]>();
@@ -681,6 +718,15 @@ function projectTranscriptMessage(
 			: undefined;
 	const workspaceProjection = operation ? workspaceProjectionForOperation(operation) : {};
 
+	// Usage/debug data belongs to the provider completion, represented by the
+	// assistant output. The current user message also points at the operation
+	// for replay/configuration purposes, but must not receive a duplicate
+	// request/response debugger modal.
+	const isAssistantMessage = message.role === SessionMessageRole.Assistant;
+	const completionUsage = isAssistantMessage ? operation?.usage : undefined;
+	const completionDebugDetails = isAssistantMessage ? debugDetailsForOperation(message, operation) : undefined;
+	const completionDebugDetailsError = isAssistantMessage ? debugDetailsErrorForOperation(operation) : undefined;
+
 	const projectToolResult = (
 		result: SessionToolResult,
 		call: SessionToolCall | undefined,
@@ -718,7 +764,7 @@ function projectTranscriptMessage(
 		modelRef,
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
-		usage: operation?.usage,
+		usage: completionUsage,
 		enabledSkillRefs: operation?.preparation.effectiveSkills,
 		activeSkillRefs: operation?.preparation.activeSkills,
 		workspaceSelection: workspaceProjection.selection,
@@ -729,7 +775,8 @@ function projectTranscriptMessage(
 			.filter(value => value !== undefined) as InputUnion[],
 		outputs,
 		error: message.error ?? (message.role === SessionMessageRole.Assistant ? operation?.error : undefined),
-		debugDetails: message.runtimeMetadata ?? operation?.runtimeMetadata,
+		debugDetails: completionDebugDetails,
+		debugDetailsError: completionDebugDetailsError,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
 		uiToolCalls:

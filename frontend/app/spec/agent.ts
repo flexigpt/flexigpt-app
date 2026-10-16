@@ -29,6 +29,20 @@ export enum AgentSkillUseMode {
 	Instructions = 'instructions',
 }
 
+/**
+ * Agent capability responses have existed with more than one spelling while
+ * the Agent resolver evolved. Normalize at the frontend contract boundary so
+ * an instruction-mode Skill is never silently treated as an ordinary Skill.
+ */
+export function isAgentSkillUseAsInstructions(value: unknown): boolean {
+	if (typeof value !== 'string') {
+		return false;
+	}
+
+	const normalized = value.replaceAll(/[\s_-]/g, '').toLowerCase();
+	return normalized === 'instructions';
+}
+
 export interface AgentView {
 	ref: ArtifactRef;
 	name: string;

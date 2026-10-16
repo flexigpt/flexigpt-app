@@ -925,6 +925,9 @@ export function MCPBottomBarChip({
 	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
 	const hasBlockingArgs = state.argumentsBlocked;
+	const selectedInstructionServerCount = Object.values(state.selectedByServerKey).filter(
+		selection => selection.includeServerInstructions
+	).length;
 	const enabledOperationalOptions = useMemo(() => state.options.filter(isEnabledMCPOption), [state.options]);
 	const visibleOptions = useMemo(
 		() =>
@@ -1117,12 +1120,17 @@ export function MCPBottomBarChip({
 									) : undefined
 								}
 								suffix={
-									hasBlockingArgs ? (
-										<span className="badge badge-warning badge-xs">Args</span>
-									) : hasAppContextUpdates ? (
-										<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
-									) : enabledCount > 0 ? (
-										<FiCheck size={14} className="shrink-0" />
+									enabledCount > 0 || hasBlockingArgs || hasAppContextUpdates ? (
+										<span className="flex shrink-0 items-center gap-1">
+											{enabledCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : null}
+											{selectedInstructionServerCount > 0 ? (
+												<span className="badge badge-secondary badge-xs">System {selectedInstructionServerCount}</span>
+											) : null}
+											{hasBlockingArgs ? <span className="badge badge-warning badge-xs">Args</span> : null}
+											{hasAppContextUpdates ? (
+												<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
+											) : null}
+										</span>
 									) : undefined
 								}
 								open={open}

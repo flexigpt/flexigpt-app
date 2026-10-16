@@ -584,7 +584,12 @@ export function ToolsBottomBarChip({
 							label="Tools"
 							count={configuredCount ? <span className="badge badge-xs">{configuredCount}</span> : undefined}
 							suffix={
-								missingCount ? <span className="badge badge-warning badge-xs">Check {missingCount}</span> : undefined
+								configuredCount > 0 || missingCount > 0 ? (
+									<span className="flex shrink-0 items-center gap-1">
+										{configuredCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : null}
+										{missingCount ? <span className="badge badge-warning badge-xs">Check {missingCount}</span> : null}
+									</span>
+								) : undefined
 							}
 							open={open}
 						/>

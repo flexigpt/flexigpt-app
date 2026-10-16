@@ -564,6 +564,20 @@ func (c *coordinator) ExecuteModel(
 		usage := *providerResponse.Usage
 		result.Usage = &usage
 	}
+
+	// Preserve the exact debugger payload emitted by inference-go for this
+	// provider invocation. Do not derive debug information from prepared
+	// inputs, protocol outputs, or transcript state: those are not necessarily
+	// the actual provider HTTP request/response.
+	debugDetails, debugDetailsErr := marshalProviderDebugDetails(
+		providerResponse.DebugDetails,
+	)
+	if debugDetailsErr != nil {
+		result.DebugDetailsError = debugDetailsErr.Error()
+	} else {
+		result.DebugDetails = debugDetails
+	}
+
 	result.ProtocolOutputs = marshalOutputUnions(providerResponse.Outputs)
 	if providerResponse.Error != nil {
 		result.Error = &sessionRuntime.OperationError{
@@ -1405,6 +1419,26 @@ func cloneRuntimeConfiguration(
 		value.CapabilityOverrides,
 	)
 	return output
+}
+
+// marshalProviderDebugDetails snapshots inference-go's opaque debugger result
+// as JSON at the inference-to-Session boundary.
+//
+// Session state must be JSON/checkpoint safe and must not retain provider
+// package-specific pointers or mutable maps. A JSON snapshot also ensures each
+// ModelOperation owns its own immutable per-call debug payload.
+func marshalProviderDebugDetails(
+	value any,
+) (json.RawMessage, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("marshal provider debug details: %w", err)
+	}
+	return append(json.RawMessage(nil), raw...), nil
 }
 
 func operationPreparationError(

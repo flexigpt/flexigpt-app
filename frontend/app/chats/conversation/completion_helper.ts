@@ -24,7 +24,11 @@ import {
 	mapToolOutputItemsToToolOutputs,
 } from '@/tools/lib/tool_output_utils';
 
-export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string | undefined {
+export function getDebugDetailsMarkdown(
+	debugObj?: unknown,
+	errorObj?: unknown,
+	debugDetailsError?: string
+): string | undefined {
 	const parts: string[] = [];
 
 	const pushDetailsBlock = (title: string, value: unknown) => {
@@ -38,6 +42,13 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 	// 1. Error object should always be first, if present
 	if (errorObj !== undefined && errorObj !== null) {
 		pushDetailsBlock('### Error', errorObj);
+	}
+
+	// A debugger serialization/transport failure is distinct from a provider
+	// completion failure. Show it explicitly instead of silently hiding the
+	// fact that the caller requested debug information.
+	if (typeof debugDetailsError === 'string' && debugDetailsError.trim()) {
+		pushDetailsBlock('### Debug details unavailable', { message: debugDetailsError.trim() });
 	}
 
 	// 2. Handle debug details

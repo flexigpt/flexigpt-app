@@ -95,17 +95,15 @@ export function ModelDropdown({
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const providerGroups = useMemo(() => groupModelOptionsByProvider(allOptions), [allOptions]);
 	const agentOwnsModel = modelSelectionSource === 'agent';
-	const agentPreviewMatchesSelected =
+	const isAgentOwnedModel = (model: UIModelOption) =>
 		agentOwnsModel &&
-		agentModelRef?.rootID === selectedModel.model?.rootID &&
-		agentModelRef?.artifactID === selectedModel.model?.artifactID;
-	const triggerLabel = agentOwnsModel
-		? agentPreviewMatchesSelected
-			? `Agent model: ${selectedModel.modelDisplayName}`
-			: agentModelRef
-				? `Agent model: ${agentModelRef.artifactID}`
-				: 'Agent chooses model'
-		: selectedModel.modelDisplayName;
+		agentModelRef?.rootID === model.model?.rootID &&
+		agentModelRef?.artifactID === model.model?.artifactID;
+	const agentPreviewMatchesSelected = isAgentOwnedModel(selectedModel);
+	const triggerLabel =
+		agentOwnsModel && !agentPreviewMatchesSelected && agentModelRef
+			? agentModelRef.artifactID
+			: selectedModel.modelDisplayName;
 
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
@@ -166,7 +164,7 @@ export function ModelDropdown({
 						<ActionTriggerChipContent
 							label={triggerLabel}
 							open={open}
-							suffix={agentOwnsModel ? <span className="badge badge-secondary badge-xs">Agent</span> : undefined}
+							suffix={selectedModel.model ? <FiCheck size={14} className="shrink-0" /> : undefined}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
@@ -228,6 +226,9 @@ export function ModelDropdown({
 									}}
 								>
 									<span className="min-w-0 truncate">{model.modelDisplayName}</span>
+									{isCurrent(model) && isAgentOwnedModel(model) ? (
+										<span className="badge badge-secondary badge-xs ml-auto">Agent</span>
+									) : null}
 									{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
 								</MenuItem>
 							))}

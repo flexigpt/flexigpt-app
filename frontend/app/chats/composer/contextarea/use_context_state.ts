@@ -210,7 +210,7 @@ export interface ComposerContextController {
 	handleSetIsHybridReasoningEnabled: (enabled?: boolean) => void;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
 	setModelSelectionSource: (source: ComposerModelSelectionSource) => void;
-	setAgentModelPreview: (model?: UIModelOption) => void;
+	setAgentModelPreview: (model: UIModelOption | undefined, agentOwnsModel: boolean) => void;
 
 	setTemperature(temp?: number): void;
 	setReasoningLevel(level?: ReasoningLevel): void;
@@ -238,7 +238,7 @@ export function useComposerContextState(): ComposerContextController {
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIModelOption.includePreviousMessages
 	);
-	const [modelSelectionSource, setModelSelectionSource] = useState<ComposerModelSelectionSource>('session');
+	const [modelSelectionSource, setModelSelectionSourceState] = useState<ComposerModelSelectionSource>('session');
 
 	const selectedModelRef = useRef(selectedModel);
 	const allOptionsRef = useRef(allOptions);
@@ -246,6 +246,12 @@ export function useComposerContextState(): ComposerContextController {
 	const hybridReasoningRef = useRef(isHybridReasoningEnabled);
 	const pendingRestoreRef = useRef<RestorableConversationContext | null>(null);
 	const pendingSessionConfigurationRef = useRef<SessionConfiguration | null>(null);
+	const modelSelectionSourceRef = useRef<ComposerModelSelectionSource>('session');
+
+	const setModelSelectionSource = useCallback((source: ComposerModelSelectionSource) => {
+		modelSelectionSourceRef.current = source;
+		setModelSelectionSourceState(source);
+	}, []);
 
 	const applySelectedModel = useCallback(
 		(
@@ -298,11 +304,6 @@ export function useComposerContextState(): ComposerContextController {
 			const reasoningCleared =
 				configuration.modelOverrides.clear?.includes(SessionModelDefaultField.Reasoning) ?? false;
 			const nextHybridReasoningEnabled = isHybridReasoningModel(restored) && !reasoningCleared;
-			const selectionSource: ComposerModelSelectionSource = configuration.model
-				? 'session'
-				: configuration.agent
-					? 'agent'
-					: 'session';
 
 			selectedModelRef.current = restored;
 			hybridReasoningRef.current = nextHybridReasoningEnabled;
@@ -310,11 +311,15 @@ export function useComposerContextState(): ComposerContextController {
 			setSelectedModel(restored);
 			setIsHybridReasoningEnabled(nextHybridReasoningEnabled);
 			setIncludePreviousMessages(includePreviousMessagesFromSession(configuration));
-			setModelSelectionSource(selectionSource);
+
+			// An omitted Session model means only that there is no explicit
+			// override. Agent ownership is established later by Agent resolution,
+			// not inferred from the absence of configuration.model.
+			setModelSelectionSource('session');
 
 			return restored;
 		},
-		[]
+		[setModelSelectionSource]
 	);
 
 	useEffect(() => {
@@ -393,7 +398,7 @@ export function useComposerContextState(): ComposerContextController {
 				syncHybridReasoning: true,
 			});
 		},
-		[applySelectedModel]
+		[applySelectedModel, setModelSelectionSource]
 	);
 
 	const handleSetIsHybridReasoningEnabled = useCallback(
@@ -413,13 +418,21 @@ export function useComposerContextState(): ComposerContextController {
 	);
 
 	const setAgentModelPreview = useCallback(
-		(model?: UIModelOption) => {
+		(model: UIModelOption | undefined, agentOwnsModel: boolean) => {
 			if (model) {
 				applySelectedModel(model, { syncHybridReasoning: true });
+			} else if (!agentOwnsModel && modelSelectionSourceRef.current === 'agent') {
+				// Moving from an Agent-owned Model to an Agent with no Model must
+				// not leave the previous Agent's model looking like the fallback.
+				// Preserve an explicit user/session choice, but otherwise return
+				// to the catalog default.
+				const fallback = defaultModelRef.current ?? allOptionsRef.current[0] ?? selectedModelRef.current;
+				applySelectedModel(fallback, { syncHybridReasoning: true });
 			}
-			setModelSelectionSource('agent');
+
+			setModelSelectionSource(agentOwnsModel ? 'agent' : 'session');
 		},
-		[applySelectedModel]
+		[applySelectedModel, setModelSelectionSource]
 	);
 
 	const setTemperature = useCallback(
@@ -494,12 +507,10 @@ export function useComposerContextState(): ComposerContextController {
 	const restoreSessionConfiguration = useCallback(
 		(configuration: SessionConfiguration) => {
 			pendingRestoreRef.current = null;
-			const selectionSource: ComposerModelSelectionSource = configuration.model
-				? 'session'
-				: configuration.agent
-					? 'agent'
-					: 'session';
-			setModelSelectionSource(selectionSource);
+
+			// See applyRestoredSessionConfiguration: do not render an Agent
+			// ownership badge until the selected Agent actually resolves a Model.
+			setModelSelectionSource('session');
 
 			if (!modelOptionsLoaded) {
 				pendingSessionConfigurationRef.current = configuration;
@@ -509,7 +520,7 @@ export function useComposerContextState(): ComposerContextController {
 			pendingSessionConfigurationRef.current = null;
 			return applyRestoredSessionConfiguration(configuration, allOptionsRef.current);
 		},
-		[applyRestoredSessionConfiguration, modelOptionsLoaded]
+		[applyRestoredSessionConfiguration, modelOptionsLoaded, setModelSelectionSource]
 	);
 
 	const resetForNewConversation = useCallback(() => {
@@ -527,7 +538,7 @@ export function useComposerContextState(): ComposerContextController {
 		setIncludePreviousMessages(next.includePreviousMessages);
 
 		return next;
-	}, []);
+	}, [setModelSelectionSource]);
 
 	const chatOptions = useMemo(
 		() => buildChatOptions(selectedModel, includePreviousMessages),

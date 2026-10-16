@@ -407,6 +407,8 @@ export interface SessionModelOperation {
 	preparation: SessionOperationPreparation;
 	usable: boolean;
 	usage?: InferenceUsage;
+	debugDetails?: SessionOpaqueJSON;
+	debugDetailsError?: string;
 	metadata?: SessionOpaqueJSON;
 	runtimeMetadata?: SessionOpaqueJSON;
 }
@@ -682,6 +684,11 @@ export interface ConversationMessage {
 	error?: InferenceError;
 	meta?: Record<string, unknown>;
 	debugDetails?: unknown;
+
+	// This is not a model/provider failure. It means the backend received
+	// debugger output but could not safely serialize it for Session transport.
+	// It must remain visible in the existing message-details modal.
+	debugDetailsError?: string;
 
 	uiContent: string;
 	uiDebugDetails?: string;

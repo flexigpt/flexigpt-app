@@ -22,6 +22,8 @@ interface RenderedInstructionSkillSource {
 	sourceTags?: string[];
 }
 
+const AGENT_INSTRUCTION_SOURCE_PREFIX = 'agent-skill-instructions:';
+
 export interface AgentSystemPromptController {
 	modelDefaultPrompt: string;
 	instructionSources: SystemInstructionSource[];
@@ -36,6 +38,9 @@ export interface AgentSystemPromptController {
 	removeInstructionSource(identityKey: string): void;
 	addAndSelectInstructionSkillSource(source: RenderedInstructionSkillSource): void;
 
+	replaceAgentInstructionSkillSources(sources: RenderedInstructionSkillSource[]): void;
+	clearAgentInstructionSkillSources(): void;
+	setAgentInstructionSkillSelected(skillRef: ArtifactRef, selected: boolean): void;
 	clearInstructionSources(): void;
 	clearAllSystemPromptState(): void;
 	resetForNewConversation(modelDefaultPrompt: string): void;
@@ -73,6 +78,20 @@ function instructionSkillSource(source: RenderedInstructionSkillSource): SystemI
 		isBuiltIn: false,
 		skillRef: source.skillRef,
 	};
+}
+
+function agentInstructionSkillSource(source: RenderedInstructionSkillSource): SystemInstructionSource {
+	return {
+		...instructionSkillSource(source),
+		identityKey: source.identityKey ?? `${AGENT_INSTRUCTION_SOURCE_PREFIX}${skillRefKey(source.skillRef)}`,
+		sourceKind: 'agent',
+		pluginDisplayName: 'Agent',
+		pluginSlug: 'agent',
+	};
+}
+
+function agentInstructionSourceKey(skillRef: ArtifactRef): string {
+	return `${AGENT_INSTRUCTION_SOURCE_PREFIX}${skillRefKey(skillRef)}`;
 }
 
 function sessionInstructionSources(configuration: SessionConfiguration): SystemInstructionSource[] {
@@ -234,6 +253,51 @@ export function useAgentSystemPrompt(args: {
 		[upsertAndSelectInstructionSource]
 	);
 
+	const replaceAgentInstructionSkillSources = useCallback(
+		(nextSources: RenderedInstructionSkillSource[]) => {
+			const byKey = new Map<string, SystemInstructionSource>();
+
+			for (const source of nextSources) {
+				const normalized = agentInstructionSkillSource(source);
+				if (!normalized.text.trim()) {
+					continue;
+				}
+				byKey.set(normalized.identityKey, normalized);
+			}
+
+			const normalizedSources = [...byKey.values()];
+			const normalizedKeys = normalizedSources.map(source => source.identityKey);
+
+			setDynamicSources(previous => [
+				...normalizedSources,
+				...previous.filter(source => source.sourceKind !== 'agent'),
+			]);
+
+			// Agent baseline instructions precede explicitly-added Composer
+			// sources, matching Agent-baseline then Session-override semantics.
+			setSelectedKeys([
+				...normalizedKeys,
+				...selectedKeysRef.current.filter(key => !key.startsWith(AGENT_INSTRUCTION_SOURCE_PREFIX)),
+			]);
+		},
+		[setSelectedKeys]
+	);
+
+	const clearAgentInstructionSkillSources = useCallback(() => {
+		setDynamicSources(previous => previous.filter(source => source.sourceKind !== 'agent'));
+		setSelectedKeys(selectedKeysRef.current.filter(key => !key.startsWith(AGENT_INSTRUCTION_SOURCE_PREFIX)));
+	}, [setSelectedKeys]);
+
+	const setAgentInstructionSkillSelected = useCallback(
+		(skillRef: ArtifactRef, selected: boolean) => {
+			const key = agentInstructionSourceKey(skillRef);
+			setSelectedKeys(
+				selected ? [...selectedKeysRef.current, key] : selectedKeysRef.current.filter(candidate => candidate !== key)
+			);
+		},
+		[setSelectedKeys]
+	);
+
 	const clearInstructionSources = useCallback(() => {
 		setRestoredPrompt(null);
 		setIncludePreference(false);
@@ -294,6 +358,9 @@ export function useAgentSystemPrompt(args: {
 		upsertAndSelectInstructionSource,
 		removeInstructionSource,
 		addAndSelectInstructionSkillSource,
+		replaceAgentInstructionSkillSources,
+		clearAgentInstructionSkillSources,
+		setAgentInstructionSkillSelected,
 		clearInstructionSources,
 		clearAllSystemPromptState,
 		resetForNewConversation,

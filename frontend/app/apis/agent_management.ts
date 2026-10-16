@@ -25,7 +25,7 @@ import type {
 	UpdatePluginRequest,
 } from '@/spec/plugin';
 import type { ToolStoreChoiceType } from '@/spec/tool';
-import { AgentSkillUseMode } from '@/spec/agent';
+import { AgentSkillUseMode, isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { TextInsert } from '@/spec/text';
 import { ToolImplType, ToolStoreChoiceType as ToolStoreChoiceTypeValue } from '@/spec/tool';
@@ -471,7 +471,7 @@ export class AgentManagementAPI {
 					if (occurrence.skillUseMode === AgentSkillUseMode.Active) {
 						activeSkillRefs.push(target.artifact);
 					}
-					if (occurrence.skillUseMode === AgentSkillUseMode.Instructions) {
+					if (isAgentSkillUseAsInstructions(occurrence.skillUseMode)) {
 						instructionSkillRefs.push(target.artifact);
 					}
 					break;

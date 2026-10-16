@@ -46,7 +46,7 @@ import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
-import { mapWithConcurrency } from '@/lib/async_utils';
+import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { ISessionManagementAPI, ISkillAggregateAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
@@ -116,6 +116,11 @@ export interface ComposerSkillCatalogItem {
 	hasResources: boolean;
 	runtimeResolved: boolean;
 	runtimeError?: string;
+}
+
+export interface PreparedInstructionSkillSource {
+	skillRef: ArtifactRef;
+	text: string;
 }
 
 export interface SkillManagementPageData {
@@ -578,6 +583,61 @@ export class SkillManagementAPI {
 		command: SessionInstructionSkillPreviewRequest
 	): Promise<SessionInstructionSkillPreviewResult> {
 		return this.sessions.previewInstructionSkill(command);
+	}
+
+	/**
+	 * Renders Agent instruction-mode Skills through the existing management
+	 * facade. Composer code must not call Wails bindings directly.
+	 *
+	 * These are intentionally rendered as explicit Composer instruction
+	 * sources rather than being treated as enabled/active Skill-session state.
+	 */
+	async prepareInstructionSkillSources(
+		skillRefs: ArtifactRef[],
+		signal?: AbortSignal
+	): Promise<PreparedInstructionSkillSource[]> {
+		const seen = new Set<string>();
+		const uniqueRefs = skillRefs.filter(skill => {
+			const key = skillArtifactKey(skill);
+			if (seen.has(key)) {
+				return false;
+			}
+			seen.add(key);
+			return true;
+		});
+
+		if (uniqueRefs.length === 0) {
+			return [];
+		}
+
+		return mapWithConcurrency(
+			uniqueRefs,
+			4,
+			async skillRef => {
+				if (signal) {
+					throwIfAborted(signal);
+				}
+
+				const rendered = await this.previewInstructionSkill({
+					skill: skillRef,
+					arguments: {},
+				});
+
+				if (signal) {
+					throwIfAborted(signal);
+				}
+
+				if (!rendered.text.trim()) {
+					throw new Error(`Instruction Skill "${skillRef.artifactID}" rendered no instruction text.`);
+				}
+
+				return {
+					skillRef: rendered.skill,
+					text: rendered.text,
+				};
+			},
+			signal
+		);
 	}
 
 	prepareUserMessageSkillTemplate(

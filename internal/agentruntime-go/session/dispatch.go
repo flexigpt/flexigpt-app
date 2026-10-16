@@ -620,6 +620,8 @@ func (r *Runtime) finishModelExecution(
 	operation.Usable = result.Usable
 	operation.ProtocolOutputs = cloneJSON(result.ProtocolOutputs)
 	operation.Usage = cloneInferenceUsage(result.Usage)
+	operation.DebugDetails = cloneRaw(result.DebugDetails)
+	operation.DebugDetailsError = result.DebugDetailsError
 	operation.Metadata = cloneRaw(result.Metadata)
 	operation.RuntimeMetadata = cloneRaw(result.RuntimeMetadata)
 	operation.Preparation.Private = nil

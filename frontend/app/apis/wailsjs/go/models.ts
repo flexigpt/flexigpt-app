@@ -7660,6 +7660,8 @@ export namespace session {
 	    preparation: OperationPreparation;
 	    usable: boolean;
 	    usage?: spec.Usage;
+	    debugDetails?: number[];
+	    debugDetailsError?: string;
 	    metadata?: number[];
 	    runtimeMetadata?: number[];
 	
@@ -7683,6 +7685,8 @@ export namespace session {
 	        this.preparation = this.convertValues(source["preparation"], OperationPreparation);
 	        this.usable = source["usable"];
 	        this.usage = this.convertValues(source["usage"], spec.Usage);
+	        this.debugDetails = source["debugDetails"];
+	        this.debugDetailsError = source["debugDetailsError"];
 	        this.metadata = source["metadata"];
 	        this.runtimeMetadata = source["runtimeMetadata"];
 	    }

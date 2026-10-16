@@ -474,9 +474,22 @@ type ModelOperation struct {
 	Error            *OperationError      `json:"error,omitempty"`
 	Preparation      OperationPreparation `json:"preparation"`
 	Usable           bool                 `json:"usable"`
-	Usage            *InferenceUsage      `json:"usage,omitempty"`
-	Metadata         json.RawMessage      `json:"metadata,omitempty"`
-	RuntimeMetadata  json.RawMessage      `json:"runtimeMetadata,omitempty"`
+
+	// Usage is the provider-reported token usage for this one model
+	// operation. It is intentionally separate from Run.Usage, which tracks
+	// runtime operation/attempt counts.
+	Usage *InferenceUsage `json:"usage,omitempty"`
+
+	// DebugDetails is the debugger-produced HTTP/provider trace for this one
+	// model operation. It is an opaque JSON value so Session does not depend on
+	// inference-go/debugclient concrete Go types.
+	DebugDetails json.RawMessage `json:"debugDetails,omitempty"`
+
+	// DebugDetailsError reports that a supplied debugger value could not be
+	// serialized for durable Session transport. It prevents silent loss.
+	DebugDetailsError string          `json:"debugDetailsError,omitempty"`
+	Metadata          json.RawMessage `json:"metadata,omitempty"`
+	RuntimeMetadata   json.RawMessage `json:"runtimeMetadata,omitempty"`
 }
 
 type Run struct {

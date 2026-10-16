@@ -4,6 +4,7 @@ import { FiCheck, FiEye, FiLayers, FiRefreshCcw, FiRefreshCw, FiTrash2 } from 'r
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { AgentCapabilityOccurrence } from '@/spec/agent';
+import { isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { CapabilityResolutionStatus } from '@/spec/artifact';
 
 import type { AgentCatalogOption } from '@/apis/agent_management';
@@ -136,6 +137,8 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 							{occurrences.length > 0 ? (
 								occurrences.map(occurrence => {
 									const available = occurrence.status === CapabilityResolutionStatus.Available;
+									const isSystemInstructionSkill =
+										occurrence.type === 'skill' && isAgentSkillUseAsInstructions(occurrence.skillUseMode);
 									const exclusion = manager.getCapabilityExclusion(occurrence);
 									const canExclude =
 										available &&
@@ -153,6 +156,9 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 											<span className="min-w-0 flex-1 truncate" title={getCapabilityDisplayName(occurrence)}>
 												{getCapabilityDisplayName(occurrence)}
 											</span>
+											{isSystemInstructionSkill ? (
+												<span className="badge badge-secondary badge-xs shrink-0">System</span>
+											) : null}
 											<span className={`badge badge-xs shrink-0 ${available ? 'badge-success' : 'badge-warning'}`}>
 												{occurrence.status}
 											</span>
@@ -386,9 +392,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						icon={<FiLayers size={14} />}
 						label={selectedLabel}
 						open={open}
-						suffix={
-							manager.selectedAgent ? <span className="badge badge-secondary badge-xs">Agent selected</span> : undefined
-						}
+						suffix={manager.selectedAgent ? <FiCheck size={14} className="shrink-0" /> : undefined}
 						className="w-full justify-center"
 						labelClassName="min-w-0 truncate text-center text-xs font-normal"
 					/>

@@ -469,8 +469,9 @@ export function SkillsBottomBarChip({
 									) : undefined
 								}
 								suffix={
-									activeCount > 0 || selectedSystemSourceCount > 0 ? (
+									configuredCount > 0 ? (
 										<span className="flex shrink-0 items-center gap-1">
+											<FiCheck size={14} aria-hidden="true" />
 											{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
 											{selectedSystemSourceCount > 0 ? (
 												<span className="badge badge-secondary badge-xs">System {selectedSystemSourceCount}</span>
@@ -620,28 +621,40 @@ export function SkillsBottomBarChip({
 							</label>
 						) : null}
 
-						{systemPrompt.instructionSources.map(source => (
-							<label
-								key={source.identityKey}
-								className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
-							>
-								<span className="min-w-0 text-xs">
-									<span className="block truncate">{source.displayName}</span>
-									{source.sourceTags?.length ? (
-										<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
-									) : null}
-								</span>
-								<input
-									type="checkbox"
-									className="checkbox checkbox-xs"
-									checked={systemPrompt.selectedInstructionSourceKeys.includes(source.identityKey)}
-									disabled={isInputLocked}
-									onChange={() => {
-										systemPrompt.toggleInstructionSource(source.identityKey);
-									}}
-								/>
-							</label>
-						))}
+						{systemPrompt.instructionSources.map(source => {
+							const sourceSelected = systemPrompt.selectedInstructionSourceKeys.includes(source.identityKey);
+
+							return (
+								<label
+									key={source.identityKey}
+									className="hover:bg-base-200 flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
+								>
+									<span className="min-w-0 text-xs">
+										<span className="flex min-w-0 items-center gap-1">
+											<span className="truncate">{source.displayName}</span>
+											{sourceSelected && source.sourceKind === 'agent' ? (
+												<span className="badge badge-secondary badge-xs">Agent</span>
+											) : null}
+											{sourceSelected && source.sourceKind === 'session' ? (
+												<span className="badge badge-ghost badge-xs">System</span>
+											) : null}
+										</span>
+										{source.sourceTags?.length ? (
+											<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
+										) : null}
+									</span>
+									<input
+										type="checkbox"
+										className="checkbox checkbox-xs"
+										checked={sourceSelected}
+										disabled={isInputLocked}
+										onChange={() => {
+											systemPrompt.toggleInstructionSource(source.identityKey);
+										}}
+									/>
+								</label>
+							);
+						})}
 
 						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
 							<div className="text-base-content/60 px-2 py-1 text-xs">

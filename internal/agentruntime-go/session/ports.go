@@ -31,10 +31,26 @@ type ModelExecutionRequest struct {
 }
 
 type ModelExecutionResult struct {
-	Usable                 bool               `json:"usable"`
-	Text                   string             `json:"text,omitempty"`
-	Thinking               string             `json:"thinking,omitempty"`
-	Usage                  *InferenceUsage    `json:"usage,omitempty"`
+	Usable   bool   `json:"usable"`
+	Text     string `json:"text,omitempty"`
+	Thinking string `json:"thinking,omitempty"`
+
+	// Usage is provider-reported usage for this exact model call. It is not
+	// an aggregate of Run usage counters.
+	Usage *InferenceUsage `json:"usage,omitempty"`
+
+	// DebugDetails is the JSON-safe snapshot returned by inference-go's
+	// FetchCompletionResponse.DebugDetails for this exact model call.
+	//
+	// It is intentionally opaque at the Session boundary. Runtime setup must
+	// copy the debugger-produced value rather than reconstructing a request or
+	// response from transcript/provider-neutral inputs.
+	DebugDetails json.RawMessage `json:"debugDetails,omitempty"`
+
+	// DebugDetailsError is populated only when inference-go supplied debug
+	// details but they could not be encoded safely for Session transport.
+	// This prevents a debug payload from being silently discarded.
+	DebugDetailsError      string             `json:"debugDetailsError,omitempty"`
 	ProtocolOutputs        []json.RawMessage  `json:"protocolOutputs,omitempty"`
 	HydratedCurrentInputs  []json.RawMessage  `json:"hydratedCurrentInputs,omitempty"`
 	HydratedCurrentContext []string           `json:"-"`

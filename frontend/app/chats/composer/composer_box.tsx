@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
@@ -11,6 +12,8 @@ import type { ToolStoreChoice } from '@/spec/tool';
 import { SkillSessionSyncMode } from '@/spec/skill';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
@@ -101,8 +104,41 @@ export const ComposerBox = memo(
 			return editorAreaRef.current?.setDraftTextIfEmpty(text) ?? false;
 		}, []);
 
+		const applyAgentInstructionSkills = useCallback(
+			async (skillRefs: ArtifactRef[], signal: AbortSignal) => {
+				const sources = await skillManagementAPI.prepareInstructionSkillSources(skillRefs, signal);
+
+				if (signal.aborted) {
+					return;
+				}
+
+				systemPrompt.replaceAgentInstructionSkillSources(
+					sources.map(source => ({
+						displayName: source.skillRef.artifactID,
+						prompt: source.text,
+						skillRef: source.skillRef,
+					}))
+				);
+			},
+			[systemPrompt]
+		);
+
+		const clearAgentInstructionSkills = useCallback(() => {
+			systemPrompt.clearAgentInstructionSkillSources();
+		}, [systemPrompt]);
+
+		const setAgentInstructionSkillSelected = useCallback(
+			(skillRef: ArtifactRef, selected: boolean) => {
+				systemPrompt.setAgentInstructionSkillSelected(skillRef, selected);
+			},
+			[systemPrompt]
+		);
+
 		const agent = useAgentManager(composerContext, {
 			applyUserMessageStarter: applyAgentUserMessageStarter,
+			applyAgentInstructionSkills,
+			clearAgentInstructionSkills,
+			setAgentInstructionSkillSelected,
 		});
 
 		const resetComposerState = useCallback(() => {
@@ -152,13 +188,16 @@ export const ComposerBox = memo(
 								}
 							: undefined,
 						modelSelectionSource:
-							agent.selectedAgent && composerContext.modelSelectionSource === 'agent' ? 'agent' : 'session',
+							agent.selectedAgent && agent.agentModelRef && composerContext.modelSelectionSource === 'agent'
+								? 'agent'
+								: 'session',
 					},
 					composerContext.chatOptions
 				);
 			},
 			[
 				agent.selectedAgent,
+				agent.agentModelRef,
 				composerContext.chatOptions,
 				composerContext.hasRunnableModel,
 				composerContext.modelSelectionSource,
