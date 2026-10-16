@@ -27,6 +27,12 @@ import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import {
+	clearRequestDefault,
+	editRequestDefaults,
+	inheritRequestDefault,
+	removeRequestClear,
+} from '@/chats/composer/contextarea/request_preferences';
+import {
 	buildCacheControlFromForm,
 	buildCacheControlKindDropdownItems,
 	buildCacheControlTTLDropdownItems,
@@ -36,12 +42,6 @@ import {
 	resolveSupportedCacheControlTTLs,
 } from '@/models/lib/cache_control';
 import { parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
-import {
-	clearRequestDefault,
-	editRequestDefaults,
-	inheritRequestDefault,
-	removeRequestClear,
-} from '@/models/lib/request_preferences';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;

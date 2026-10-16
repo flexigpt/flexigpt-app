@@ -20,7 +20,7 @@ import {
 	setOutputVerbosityPreference,
 	setReasoningLevelPreference,
 	setTemperaturePreference,
-} from '@/models/lib/request_preferences';
+} from '@/chats/composer/contextarea/request_preferences';
 
 function hasOwn(value: object, key: string): boolean {
 	return Object.hasOwn(value, key);

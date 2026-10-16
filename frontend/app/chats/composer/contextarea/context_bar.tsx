@@ -11,16 +11,16 @@ import { HoverTip } from '@/components/hover_tip';
 
 import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { ComposerContextController } from '@/chats/composer/contextarea/use_context_state';
-import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
 import { AgentDropdown } from '@/chats/composer/agents/agent_dropdown';
-import { ModelDropdown } from '@/chats/composer/models/model_dropdown';
-import { OutputVerbosityDropdown } from '@/chats/composer/outputverbosities/output_verbosity_dropdown';
-import { PreviousMessagesDropdown } from '@/chats/composer/previousmessages/previous_messages_dropdown';
-import { HybridReasoningCheckbox } from '@/chats/composer/reasoningparams/reasoning_hybrid_checkbox';
-import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reasoning_levels_dropdown';
-import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
-import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
-import { getHybridReasoningPreference } from '@/models/lib/request_preferences';
+import { AdvancedParamsModal } from '@/chats/composer/contextarea/advanced_params_modal';
+import { ModelDropdown } from '@/chats/composer/contextarea/model_dropdown';
+import { OutputVerbosityDropdown } from '@/chats/composer/contextarea/output_verbosity_dropdown';
+import { PreviousMessagesDropdown } from '@/chats/composer/contextarea/previous_messages_dropdown';
+import { HybridReasoningCheckbox } from '@/chats/composer/contextarea/reasoning_hybrid_checkbox';
+import { SingleReasoningDropdown } from '@/chats/composer/contextarea/reasoning_levels_dropdown';
+import { ReasoningTokensDropdown } from '@/chats/composer/contextarea/reasoning_tokens_dropdown';
+import { getHybridReasoningPreference } from '@/chats/composer/contextarea/request_preferences';
+import { TemperatureDropdown } from '@/chats/composer/contextarea/temperature_dropdown';
 
 interface ContextBarProps {
 	context: ComposerContextController;
