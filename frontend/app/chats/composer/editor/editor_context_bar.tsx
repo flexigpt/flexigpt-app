@@ -11,7 +11,7 @@ import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/comp
 import { HoverTip } from '@/components/hover_tip';
 
 import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
-import type { ComposerContextController } from '@/chats/composer/editor/use_context_state';
+import type { ComposerContextController } from '@/chats/composer/editor/use_editor_context_state';
 import { AgentDropdown } from '@/chats/composer/agents/agent_dropdown';
 import { AdvancedParamsModal } from '@/chats/composer/models/advanced_params_modal';
 import { ModelDropdown } from '@/chats/composer/models/model_dropdown';

@@ -26,9 +26,9 @@ import type {
 } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
-import { ContextBar } from '@/chats/composer/editor/context_bar';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
-import { useComposerContextState } from '@/chats/composer/editor/use_context_state';
+import { ContextBar } from '@/chats/composer/editor/editor_context_bar';
+import { useComposerContextState } from '@/chats/composer/editor/use_editor_context_state';
 import { useAgentSystemPrompt } from '@/chats/composer/skills/use_agent_system_prompt';
 
 export interface ComposerBoxHandle {
