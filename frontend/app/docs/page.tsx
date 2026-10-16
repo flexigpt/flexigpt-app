@@ -402,7 +402,7 @@ export default function DocsPage() {
 						ref={mainScrollRef}
 						className="min-w-0 flex-1 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain"
 					>
-						<div className="mx-auto w-full space-y-6 p-1 lg:w-11/12 xl:w-3/4 2xl:max-w-5xl">
+						<div className="mx-auto w-full space-y-6 p-1 lg:w-11/12 2xl:max-w-5xl">
 							<section className="bg-base-100 rounded-2xl p-8 shadow-lg">
 								<div className="flex items-start gap-3">
 									<div className="bg-base-200 rounded-2xl p-3">
