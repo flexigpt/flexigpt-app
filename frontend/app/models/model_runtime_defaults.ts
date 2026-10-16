@@ -16,6 +16,13 @@ import {
 import { DEFAULT_REASONING_TOKENS } from '@/spec/model';
 
 import { formatJSON, MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
+import {
+	buildCacheControlFromForm,
+	getInitialCacheControlKind,
+	getInitialCacheControlTTLSelection,
+	resolveSupportedCacheControlKinds,
+	resolveSupportedCacheControlTTLs,
+} from '@/lib/model_cache_control_helper';
 import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 
 import {
@@ -24,14 +31,6 @@ import {
 	getTopLevelCacheControlCapabilities,
 	supportsOutputVerbosity,
 } from '@/apis/model_capability_helpers';
-
-import {
-	buildCacheControlFromForm,
-	getInitialCacheControlKind,
-	getInitialCacheControlTTLSelection,
-	resolveSupportedCacheControlKinds,
-	resolveSupportedCacheControlTTLs,
-} from '@/models/lib/cache_control';
 
 export const OUTPUT_FORMAT_NONE = '__none__' as const;
 export const OUTPUT_VERBOSITY_NONE = '__none__' as const;

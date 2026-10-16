@@ -18,6 +18,13 @@ import {
 } from '@/spec/inference_labels';
 
 import {
+	buildCacheControlKindDropdownItems,
+	buildCacheControlTTLDropdownItems,
+	resolveSupportedCacheControlKinds,
+	resolveSupportedCacheControlTTLs,
+} from '@/lib/model_cache_control_helper';
+
+import {
 	getEffectiveCacheCapabilities,
 	getSupportedOutputFormats,
 	getTopLevelCacheControlCapabilities,
@@ -37,12 +44,6 @@ import type {
 	OutputVerbositySelection,
 	StrictSelection,
 } from '@/models/model_runtime_defaults';
-import {
-	buildCacheControlKindDropdownItems,
-	buildCacheControlTTLDropdownItems,
-	resolveSupportedCacheControlKinds,
-	resolveSupportedCacheControlTTLs,
-} from '@/models/lib/cache_control';
 import {
 	OPTIONAL_BOOLEAN_UNSET,
 	OUTPUT_FORMAT_NONE,

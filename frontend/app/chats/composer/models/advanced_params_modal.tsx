@@ -9,6 +9,15 @@ import { SessionModelDefaultField } from '@/spec/session';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
+import {
+	buildCacheControlFromForm,
+	buildCacheControlKindDropdownItems,
+	buildCacheControlTTLDropdownItems,
+	getInitialCacheControlKind,
+	getInitialCacheControlTTLSelection,
+	resolveSupportedCacheControlKinds,
+	resolveSupportedCacheControlTTLs,
+} from '@/lib/model_cache_control_helper';
 import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -32,15 +41,6 @@ import {
 	inheritRequestDefault,
 	removeRequestClear,
 } from '@/chats/composer/models/request_preferences';
-import {
-	buildCacheControlFromForm,
-	buildCacheControlKindDropdownItems,
-	buildCacheControlTTLDropdownItems,
-	getInitialCacheControlKind,
-	getInitialCacheControlTTLSelection,
-	resolveSupportedCacheControlKinds,
-	resolveSupportedCacheControlTTLs,
-} from '@/models/lib/cache_control';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;
