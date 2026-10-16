@@ -23,14 +23,14 @@ import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 import type { ModelRuntimeDefaultsErrors, ModelRuntimeDefaultsForm } from '@/models/lib/model_runtime_defaults';
-import { displayModelName, makeUniqueLogicalName } from '@/models/lib/management_form_utils';
-import { ModelModalMode } from '@/models/lib/management_types';
 import {
 	buildModelDefaultsFromRuntimeForm,
 	createFallbackModelRuntimeDefaultsForm,
 	createModelRuntimeDefaultsForm,
 	validateModelRuntimeDefaultsForm,
 } from '@/models/lib/model_runtime_defaults';
+import { displayModelName, makeUniqueLogicalName } from '@/models/model_form_utils';
+import { ModelModalMode } from '@/models/model_management_types';
 import { ModelRuntimeDefaultsFields } from '@/models/model_runtime_defaults_fields';
 
 const COPY_SOURCE_NONE = '__copy_source_none__';
