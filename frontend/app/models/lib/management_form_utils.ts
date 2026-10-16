@@ -1,4 +1,4 @@
-import { getProviderSDKOptions } from '@/models/lib/provider_sdk';
+import { getProviderSDKOptions } from '@/spec/provider_sdk';
 
 export function providerSDKDropdownItems(
 	currentAdapter?: string

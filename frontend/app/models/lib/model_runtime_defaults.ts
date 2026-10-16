@@ -4,6 +4,8 @@ import { OutputFormatKind, ReasoningLevel, ReasoningSummaryStyle, ReasoningType 
 
 import { formatJSON, MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
 
+import { getTopLevelCacheControlCapabilities } from '@/apis/model_capability_helpers';
+
 import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import {
 	buildCacheControlFromForm,
@@ -16,7 +18,6 @@ import {
 import {
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
-	getTopLevelCacheControlCapabilities,
 	isOutputFormatKind,
 	isOutputVerbosity,
 	isReasoningLevel,

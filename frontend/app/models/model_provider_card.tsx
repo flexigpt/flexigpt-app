@@ -3,6 +3,7 @@ import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiKey, FiPlus, FiTrash2 } f
 
 import { ArtifactState } from '@/spec/artifact';
 import { ModelLookupScope } from '@/spec/model';
+import { getProviderSDKOption } from '@/spec/provider_sdk';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
@@ -19,7 +20,6 @@ import { ManagementPluginCard } from '@/components/managementui/management_plugi
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
-import { getProviderSDKOption } from '@/models/lib/provider_sdk';
 import { ModelCard } from '@/models/model_card';
 
 interface ModelProviderCardProps {

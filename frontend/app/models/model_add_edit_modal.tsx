@@ -4,12 +4,14 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import type { ModelCapabilities, ModelDocument } from '@/spec/model';
 import { ModelArtifactType, ModelLookupScope } from '@/spec/model';
+import { getProviderSDKType } from '@/spec/provider_sdk';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { ModelManagementItem, ModelProviderManagementItem } from '@/apis/model_management';
+import { mergeModelCapabilities } from '@/apis/model_capability_helpers';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -21,7 +23,6 @@ import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 import type { ModelRuntimeDefaultsErrors, ModelRuntimeDefaultsForm } from '@/models/lib/model_runtime_defaults';
-import { mergeModelCapabilities } from '@/models/lib/capabilities';
 import { displayModelName, makeUniqueLogicalName } from '@/models/lib/management_form_utils';
 import { ModelModalMode } from '@/models/lib/management_types';
 import {
@@ -30,7 +31,6 @@ import {
 	createModelRuntimeDefaultsForm,
 	validateModelRuntimeDefaultsForm,
 } from '@/models/lib/model_runtime_defaults';
-import { getProviderSDKType } from '@/models/lib/provider_sdk';
 import { ModelRuntimeDefaultsFields } from '@/models/model_runtime_defaults_fields';
 
 const COPY_SOURCE_NONE = '__copy_source_none__';

@@ -22,16 +22,15 @@ import type {
 } from '@/spec/model';
 import { ArtifactState, CapabilityTargetForm } from '@/spec/artifact';
 import { ModelLookupScope } from '@/spec/model';
+import { getProviderSDKType } from '@/spec/provider_sdk';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
+import { mergeModelCapabilities } from '@/apis/model_capability_helpers';
 
-import { mergeModelCapabilities } from '@/models/lib/capabilities';
-import { modelRefEqual } from '@/models/lib/document';
 import { buildModelParamFromDefaults } from '@/models/lib/model_defaults';
-import { getProviderSDKType } from '@/models/lib/provider_sdk';
 
 export interface ModelProviderManagementItem {
 	list: ModelProviderListItem;
@@ -68,6 +67,10 @@ export class ModelCatalogUnavailableError extends Error {
 		);
 		this.name = 'ModelCatalogUnavailableError';
 	}
+}
+
+export function modelRefEqual(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 export function isModelCatalogUnavailableError(error: unknown): error is ModelCatalogUnavailableError {

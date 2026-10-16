@@ -11,6 +11,8 @@ import {
 	ReasoningType,
 } from '@/spec/inference';
 
+import { getEffectiveCacheCapabilities, getTopLevelCacheControlCapabilities } from '@/apis/model_capability_helpers';
+
 import { Dropdown } from '@/components/dropdown';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -31,9 +33,7 @@ import {
 	resolveSupportedCacheControlTTLs,
 } from '@/models/lib/cache_control';
 import {
-	getEffectiveCacheCapabilities,
 	getSupportedOutputFormats,
-	getTopLevelCacheControlCapabilities,
 	supportsOutputVerbosity,
 	supportsReasoningSummaryStyle,
 } from '@/models/lib/capabilities';

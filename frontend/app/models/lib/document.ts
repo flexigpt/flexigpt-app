@@ -1,4 +1,3 @@
-import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelAuthentication, ModelConnection } from '@/spec/model';
 import { ModelAuthenticationMode } from '@/spec/model';
 
@@ -9,10 +8,6 @@ import {
 	validateHTTPHeaderName,
 } from '@/lib/http_input_utils';
 import { parseOptionalJSONObject } from '@/lib/jsonschema_utils';
-
-export function modelRefEqual(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
-	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
-}
 
 export function parseProviderConnection(value: string): ModelConnection {
 	const connection = parseOptionalJSONObject<ModelConnection>(value, 'Connection');

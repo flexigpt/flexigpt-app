@@ -4,6 +4,7 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import type { ModelAuthentication, ModelConnection, ModelHeaderPatch, ModelProviderDocument } from '@/spec/model';
 import { ModelArtifactType, ModelAuthenticationMode } from '@/spec/model';
+import { getProviderSDKOption } from '@/spec/provider_sdk';
 
 import { getErrorMessage } from '@/lib/error_utils';
 import {
@@ -30,7 +31,6 @@ import { ReadOnlyValue } from '@/components/read_only_value';
 import { parseProviderAuthentication, parseProviderConnection } from '@/models/lib/document';
 import { makeUniqueLogicalName, providerSDKDropdownItems } from '@/models/lib/management_form_utils';
 import { ModelProviderModalMode, ProviderCredentialAction } from '@/models/lib/management_types';
-import { getProviderSDKOption } from '@/models/lib/provider_sdk';
 
 const COPY_SOURCE_NONE = '__copy_source_none__';
 

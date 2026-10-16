@@ -11,10 +11,9 @@ import { SessionModelDefaultField } from '@/spec/session';
 
 import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
-import { isModelCatalogUnavailableError } from '@/apis/model_management';
+import { isModelCatalogUnavailableError, modelRefEqual } from '@/apis/model_management';
 
 import { getSupportedReasoningLevels, supportsOutputVerbosity } from '@/models/lib/capabilities';
-import { modelRefEqual } from '@/models/lib/document';
 import {
 	setHybridReasoningPreference,
 	setHybridTokensPreference,
