@@ -3,24 +3,24 @@ import { FiSettings, FiSliders } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-import type { UIModelOption } from '@/spec/model';
+import type { ModelRequestPatch, UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
+import { SessionModelDefaultField } from '@/spec/session';
 
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
 import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
-import type { ComposerContextController } from '@/chats/composer/contextarea/use_context_state';
+import type { ComposerContextController } from '@/chats/composer/editor/use_context_state';
 import { AgentDropdown } from '@/chats/composer/agents/agent_dropdown';
-import { AdvancedParamsModal } from '@/chats/composer/contextarea/advanced_params_modal';
-import { ModelDropdown } from '@/chats/composer/contextarea/model_dropdown';
-import { OutputVerbosityDropdown } from '@/chats/composer/contextarea/output_verbosity_dropdown';
-import { PreviousMessagesDropdown } from '@/chats/composer/contextarea/previous_messages_dropdown';
-import { HybridReasoningCheckbox } from '@/chats/composer/contextarea/reasoning_hybrid_checkbox';
-import { SingleReasoningDropdown } from '@/chats/composer/contextarea/reasoning_levels_dropdown';
-import { ReasoningTokensDropdown } from '@/chats/composer/contextarea/reasoning_tokens_dropdown';
-import { getHybridReasoningPreference } from '@/chats/composer/contextarea/request_preferences';
-import { TemperatureDropdown } from '@/chats/composer/contextarea/temperature_dropdown';
+import { AdvancedParamsModal } from '@/chats/composer/models/advanced_params_modal';
+import { ModelDropdown } from '@/chats/composer/models/model_dropdown';
+import { OutputVerbosityDropdown } from '@/chats/composer/models/output_verbosity_dropdown';
+import { PreviousMessagesDropdown } from '@/chats/composer/models/previous_messages_dropdown';
+import { HybridReasoningCheckbox } from '@/chats/composer/models/reasoning_hybrid_checkbox';
+import { SingleReasoningDropdown } from '@/chats/composer/models/reasoning_levels_dropdown';
+import { ReasoningTokensDropdown } from '@/chats/composer/models/reasoning_tokens_dropdown';
+import { TemperatureDropdown } from '@/chats/composer/models/temperature_dropdown';
 
 interface ContextBarProps {
 	context: ComposerContextController;
@@ -61,6 +61,18 @@ function ModelSetupAction({
 			</HoverTip>
 		</div>
 	);
+}
+
+function getHybridReasoningPreference(patch: ModelRequestPatch | undefined): boolean | undefined {
+	if (patch?.clear?.includes(SessionModelDefaultField.Reasoning)) {
+		return false;
+	}
+
+	if (patch?.defaults?.reasoning?.type === ReasoningType.HybridWithTokens) {
+		return true;
+	}
+
+	return undefined;
 }
 
 export function ContextBar({ context, agent }: ContextBarProps) {

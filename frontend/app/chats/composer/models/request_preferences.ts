@@ -207,15 +207,3 @@ export function setOutputVerbosityPreference(
 
 	return removeRequestClear(next, SessionModelDefaultField.Output);
 }
-
-export function getHybridReasoningPreference(patch: ModelRequestPatch | undefined): boolean | undefined {
-	if (patch?.clear?.includes(SessionModelDefaultField.Reasoning)) {
-		return false;
-	}
-
-	if (patch?.defaults?.reasoning?.type === ReasoningType.HybridWithTokens) {
-		return true;
-	}
-
-	return undefined;
-}

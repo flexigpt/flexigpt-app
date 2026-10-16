@@ -30,7 +30,7 @@ import {
 	editRequestDefaults,
 	inheritRequestDefault,
 	removeRequestClear,
-} from '@/chats/composer/contextarea/request_preferences';
+} from '@/chats/composer/models/request_preferences';
 import {
 	buildCacheControlFromForm,
 	buildCacheControlKindDropdownItems,
