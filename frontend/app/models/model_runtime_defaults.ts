@@ -13,8 +13,10 @@ import {
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
+import { DEFAULT_REASONING_TOKENS } from '@/spec/model';
 
 import { formatJSON, MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
+import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 
 import {
 	getStopSequencesPolicy,
@@ -34,7 +36,6 @@ import {
 export const OUTPUT_FORMAT_NONE = '__none__' as const;
 export const OUTPUT_VERBOSITY_NONE = '__none__' as const;
 export const OPTIONAL_BOOLEAN_UNSET = '__unset__' as const;
-export const DEFAULT_REASONING_TOKENS = 1024;
 
 export type OutputFormatSelection = OutputFormatKind | typeof OUTPUT_FORMAT_NONE;
 export type OutputVerbositySelection = OutputVerbosity | typeof OUTPUT_VERBOSITY_NONE;
@@ -66,20 +67,6 @@ export interface ModelRuntimeDefaultsForm {
 }
 
 export type ModelRuntimeDefaultsErrors = Partial<Record<keyof ModelRuntimeDefaultsForm, string>>;
-
-export function parseOptionalPositiveInteger(value: string): number | undefined {
-	const trimmed = value.trim();
-	if (!trimmed) {
-		return undefined;
-	}
-
-	const numberValue = Number(trimmed);
-	if (!Number.isFinite(numberValue) || !Number.isInteger(numberValue) || numberValue <= 0) {
-		return Number.NaN;
-	}
-
-	return numberValue;
-}
 
 function parseTemperature(value: string): number | undefined {
 	const trimmed = value.trim();

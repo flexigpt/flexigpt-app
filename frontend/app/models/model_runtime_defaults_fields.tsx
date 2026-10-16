@@ -36,7 +36,7 @@ import type {
 	OutputFormatSelection,
 	OutputVerbositySelection,
 	StrictSelection,
-} from '@/models/lib/model_runtime_defaults';
+} from '@/models/model_runtime_defaults';
 import {
 	buildCacheControlKindDropdownItems,
 	buildCacheControlTTLDropdownItems,
@@ -48,7 +48,7 @@ import {
 	OUTPUT_FORMAT_NONE,
 	OUTPUT_VERBOSITY_NONE,
 	parseStopSequences,
-} from '@/models/lib/model_runtime_defaults';
+} from '@/models/model_runtime_defaults';
 
 function FieldError({ error }: { error?: string }) {
 	if (!error) {

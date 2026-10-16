@@ -1,5 +1,9 @@
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
+import { DEFAULT_REASONING_TOKENS } from '@/spec/model';
+
+import { parseOptionalPositiveInteger } from '@/lib/number_utils';
+
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
@@ -8,8 +12,6 @@ import {
 } from '@/components/action_trigger_chip';
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
-
-import { DEFAULT_REASONING_TOKENS, parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
 
 const defaultTokenOptions: Array<number | undefined> = [undefined, DEFAULT_REASONING_TOKENS, 8192, 32000];
 

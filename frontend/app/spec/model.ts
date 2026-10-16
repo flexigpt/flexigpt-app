@@ -15,6 +15,7 @@ import type { SessionModelDefaultField } from '@/spec/session';
 
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID = '__conversation__';
+export const DEFAULT_REASONING_TOKENS = 1024;
 
 export type IncludePreviousMessages = number | 'all';
 

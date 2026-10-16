@@ -9,6 +9,7 @@ import { SessionModelDefaultField } from '@/spec/session';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
+import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -40,7 +41,6 @@ import {
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
 } from '@/models/lib/cache_control';
-import { parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;
