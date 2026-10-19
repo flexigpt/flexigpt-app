@@ -14,6 +14,7 @@ import {
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
@@ -154,6 +155,9 @@ export function ModelDropdown({
 
 	const displayedModelCount = selectableProviderGroups.reduce((sum, group) => sum + group.options.length, 0);
 	const firstVisibleModel = selectableProviderGroups[0]?.options[0] ?? null;
+	const modelHeaderMeta = isSearchQueryActive(searchQuery)
+		? `${displayedModelCount} match${displayedModelCount === 1 ? '' : 'es'}`
+		: `${allOptions.length} available`;
 
 	const selectModel = (model: UIModelOption) => {
 		setSelectedModel(model);
@@ -164,16 +168,21 @@ export function ModelDropdown({
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
 				<HoverTip
-					content={
-						agentOwnsModel
-							? 'The Agent owns the effective Model selection. Choosing a Model here creates an explicit Session override.'
-							: 'Select model'
-					}
+					content={agentOwnsModel ? 'Choose a session Model override' : 'Choose a model'}
 					placement="top"
 					wrapperElement="div"
 					wrapperClassName="w-full"
 				>
-					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
+					<MenuButton
+						store={menu}
+						className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center ${
+							open
+								? 'border-base-300 bg-base-300/60'
+								: agentOwnsModel
+									? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+									: ''
+						}`}
+					>
 						<ActionTriggerChipContent
 							label={triggerLabel}
 							open={open}
@@ -198,8 +207,6 @@ export function ModelDropdown({
 							query={searchQuery}
 							onQueryChange={setSearchQuery}
 							placeholder="Search models…"
-							resultCount={displayedModelCount}
-							totalCount={Math.max(0, allOptions.length - 1)}
 							onFocusFirstItem={() => {
 								focusFirstSearchableMenuItem(menuContentElement);
 							}}
@@ -214,15 +221,9 @@ export function ModelDropdown({
 						/>
 
 						<div className={actionTriggerMenuHeaderRowClasses}>
-							<div className="text-xs font-semibold">Models</div>
-							<span className="badge badge-ghost badge-xs">{allOptions.length} available</span>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Models</div>
+							<span className={actionTriggerMenuMetaClasses}>{modelHeaderMeta}</span>
 						</div>
-
-						{agentOwnsModel ? (
-							<div className="text-base-content/60 mb-2 px-1 text-xs">
-								Choosing a Model below replaces Agent Model ownership with an explicit Session Model override.
-							</div>
-						) : null}
 					</ActionTriggerMenuHeader>
 
 					<ActionTriggerMenuBody>
@@ -260,11 +261,12 @@ export function ModelDropdown({
 					<ComposerDropdownSelectedPanel
 						label="Current model"
 						ariaLabel="Current model"
-						summary={
-							<span className={`badge badge-xs ${agentOwnsModel ? 'badge-secondary' : 'badge-ghost'}`}>
-								{agentOwnsModel ? 'Agent' : 'Session'}
-							</span>
+						help={
+							agentOwnsModel
+								? 'Choosing a Model above replaces Agent Model ownership with an explicit Session Model override.'
+								: 'The current Session Model is used for the next message unless another selector changes it.'
 						}
+						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session source'}</span>}
 					>
 						<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1">
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>

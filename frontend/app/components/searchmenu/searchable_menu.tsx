@@ -1,5 +1,5 @@
 import type { KeyboardEvent, RefObject } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { FiSearch, FiX } from 'react-icons/fi';
 
 interface SearchableMenuInputProps {
@@ -8,6 +8,10 @@ interface SearchableMenuInputProps {
 	onQueryChange: (next: string) => void;
 	placeholder?: string;
 	inputRef?: RefObject<HTMLInputElement | null>;
+	/**
+	 * Retained temporarily for call-site compatibility. Match and availability
+	 * counts belong in the menu title row, not inside the search input.
+	 */
 	resultCount?: number;
 	totalCount?: number;
 	disabled?: boolean;
@@ -25,8 +29,6 @@ export function SearchableMenuInput({
 	onQueryChange,
 	placeholder = 'Search…',
 	inputRef,
-	resultCount,
-	totalCount,
 	disabled = false,
 	onFocusFirstItem,
 	onEnterFirstResult,
@@ -82,13 +84,6 @@ export function SearchableMenuInput({
 		}
 	};
 
-	const countLabel = useMemo(() => {
-		if (resultCount === undefined || totalCount === undefined) {
-			return null;
-		}
-		return `${resultCount}/${totalCount}`;
-	}, [resultCount, totalCount]);
-
 	return (
 		<div className={`bg-base-100 ${className}`}>
 			<label className="relative block">
@@ -130,10 +125,6 @@ export function SearchableMenuInput({
 					>
 						<FiX size={11} />
 					</button>
-				) : countLabel ? (
-					<span className="text-base-content/45 pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
-						{countLabel}
-					</span>
 				) : null}
 			</label>
 		</div>

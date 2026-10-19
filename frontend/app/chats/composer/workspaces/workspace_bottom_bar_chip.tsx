@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSearch, FiSettings, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSettings, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -10,15 +10,19 @@ import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import {
 	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
-import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { HoverTip } from '@/components/hover_tip';
+import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import { useSearchableMenuState } from '@/components/searchmenu/searchable_menu_utils';
 
 import type {
 	ComposerWorkspaceCandidate,
@@ -120,7 +124,7 @@ function WorkspaceBottomBarChipContent({
 	isInputLocked = false,
 }: WorkspaceBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const [search, setSearch] = useState('');
+	const [search, setSearch] = useSearchableMenuState(open);
 	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
 	const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
@@ -146,55 +150,26 @@ function WorkspaceBottomBarChipContent({
 	const selectedContextCount = state.selection?.contextRefs?.length ?? 0;
 	const selectedSkillCount = state.selection?.skillRefs?.length ?? 0;
 	const discoveredMCPCount = state.plan?.mcpServers.servers.length ?? 0;
+	const workspaceHeaderMeta = search.trim()
+		? `${availableWorkspaces.length} match${availableWorkspaces.length === 1 ? '' : 'es'}`
+		: `${availableWorkspaces.length} available`;
 
-	const hoverContent = (
-		<HoverTipContent
-			title="Workspace"
-			description="Attach one effective repository Workspace to this conversation."
-			sections={[
-				{
-					id: 'selection',
-					title: 'Current selection',
-					items: selected
-						? [
-								selectedName,
-								`${selectedContextCount} Context contribution${selectedContextCount === 1 ? '' : 's'} selected`,
-								`${selectedSkillCount} instruction Skill${selectedSkillCount === 1 ? '' : 's'} selected`,
-								`${discoveredMCPCount} discovered MCP server${discoveredMCPCount === 1 ? '' : 's'} loaded`,
-								state.attentionCount > 0
-									? `${state.attentionCount} item${state.attentionCount === 1 ? '' : 's'} need attention`
-									: 'Current Workspace capabilities resolved',
-							]
-						: ['No Workspace is attached.'],
-				},
-				{
-					id: 'behavior',
-					title: 'Behavior',
-					items: [
-						'Only effective Workspace declarations can be selected.',
-						'Default policy Workspaces disappear when repository manifests exist.',
-						'Workspace Context is composed again for each send.',
-						'MCP installation inputs and secrets remain managed by MCP setup.',
-					],
-				},
-			]}
-		/>
-	);
+	const hoverContent = selected ? 'Change the attached Workspace' : 'Choose a Workspace';
 
 	const selectedWorkspacePanel = selected ? (
 		<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2">
 			<div className="truncate text-xs font-semibold">{selectedName}</div>
 			<div className="text-base-content/60 mt-1 text-xs">
-				{selectedContextCount} Context · {selectedSkillCount} instruction Skills
+				{selectedContextCount} Context · {selectedSkillCount} instruction Skills · {discoveredMCPCount} MCP servers
 			</div>
 		</div>
 	) : undefined;
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-workspace>
-			<HoverTip content={hoverContent} placement="top" wrapperElement="div" tooltipClassName="max-w-sm">
+			<HoverTip content={hoverContent} placement="top" wrapperElement="div">
 				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${
+					className={`${actionTriggerChipSurfaceClasses} ${
 						selected
 							? state.attentionCount > 0
 								? 'border-warning/50 bg-warning/10'
@@ -207,29 +182,19 @@ function WorkspaceBottomBarChipContent({
 					<MenuButton
 						store={store}
 						disabled={isInputLocked}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+						className={actionTriggerChipMenuButtonClasses}
 						aria-label="Select Workspace"
 					>
 						<ActionTriggerChipContent
 							icon={<FiFolderPlus size={14} />}
 							label={selected ? selectedName : 'Workspace'}
-							count={
-								selectedContextCount > 0 ? (
-									<span className="badge badge-secondary badge-xs">Context {selectedContextCount}</span>
-								) : undefined
-							}
 							suffix={
 								selected ? (
-									<span className="flex items-center gap-1">
-										{selectedSkillCount > 0 ? (
-											<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
-										) : null}
-										{state.attentionCount > 0 ? (
-											<FiAlertCircle size={14} className="text-warning" />
-										) : (
-											<FiCheck size={14} className="shrink-0" />
-										)}
-									</span>
+									state.attentionCount > 0 ? (
+										<FiAlertCircle size={14} className="text-warning" />
+									) : (
+										<FiCheck size={14} className="shrink-0" />
+									)
 								) : null
 							}
 							open={open}
@@ -247,57 +212,52 @@ function WorkspaceBottomBarChipContent({
 				className={actionTriggerMenuWideClasses}
 			>
 				<ActionTriggerMenuHeader>
-					<div className="input input-sm mb-2 flex items-center gap-2 rounded-xl">
-						<label htmlFor="composer-workspace-search" className="sr-only">
-							Search Workspaces
-						</label>
-						<FiSearch size={13} aria-hidden="true" />
-						<input
-							id="composer-workspace-search"
-							type="search"
-							className="grow"
-							value={search}
-							onChange={event => {
-								setSearch(event.currentTarget.value);
-							}}
-							placeholder="Search effective Workspaces..."
-							aria-label="Search effective Workspaces"
-							spellCheck="false"
-						/>
-					</div>
+					<SearchableMenuInput
+						open={open}
+						query={search}
+						onQueryChange={setSearch}
+						placeholder="Search effective Workspaces…"
+						disabled={state.workspacesLoading && state.workspaces.length === 0}
+						onEscape={() => {
+							store.hide();
+						}}
+					/>
 
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="text-base-content/70 text-xs font-semibold">Effective Workspaces</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							disabled={state.workspacesLoading}
-							onClick={() => {
-								void state.refreshWorkspaces();
-							}}
-							aria-label="Refresh Workspace directory list"
-							title="Refresh Workspace directory list"
-						>
-							<FiRefreshCw size={12} />
-						</button>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Effective Workspaces</div>
+						<div className="flex shrink-0 items-center gap-2">
+							<span className={actionTriggerMenuMetaClasses}>{workspaceHeaderMeta}</span>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || state.workspacesLoading}
+								onClick={() => {
+									void state.refreshWorkspaces();
+								}}
+								aria-label="Refresh Workspace directory list"
+								title="Refresh Workspace directory list"
+							>
+								<FiRefreshCw size={12} />
+							</button>
+						</div>
 					</div>
 
 					{state.workspacesLoadError ? (
-						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+						<div className="alert alert-warning rounded-xl text-xs">
 							<FiAlertCircle size={14} />
 							<span>{state.workspacesLoadError}</span>
 						</div>
 					) : null}
 
 					{actionError ? (
-						<div className="alert alert-error mb-2 rounded-xl text-xs">
+						<div className="alert alert-error rounded-xl text-xs">
 							<FiAlertCircle size={14} />
 							<span>{actionError}</span>
 						</div>
 					) : null}
 				</ActionTriggerMenuHeader>
 
-				<ActionTriggerMenuBody>
+				<ActionTriggerMenuBody className="space-y-2">
 					{state.workspacesLoading && state.workspaces.length === 0 ? (
 						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 							Loading Workspace directories...
@@ -355,7 +315,7 @@ function WorkspaceBottomBarChipContent({
 						</div>
 					)}
 
-					<div className="border-base-300 mt-2 border-t pt-2">
+					<div className="border-base-300 border-t pt-2">
 						<button
 							type="button"
 							className="btn btn-ghost btn-sm w-full justify-start rounded-xl"
@@ -372,19 +332,19 @@ function WorkspaceBottomBarChipContent({
 				</ActionTriggerMenuBody>
 
 				<ComposerDropdownSelectedPanel
-					label="Selected Workspace"
-					ariaLabel="Selected Workspace"
+					label="Added Workspace"
+					ariaLabel="Added Workspace"
 					isEmpty={!selected}
-					emptyLabel="No Workspace is selected for this conversation."
+					emptyLabel="Choose an effective Workspace above to add it to this conversation."
+					help="A Workspace contributes repository context, instruction Skills, and discovered MCP configuration. Only one Workspace can be attached."
 					summary={
 						selected ? (
 							<>
-								<span className="badge badge-secondary badge-xs">1 selected</span>
-								{selectedContextCount > 0 ? (
-									<span className="badge badge-secondary badge-xs">Context {selectedContextCount}</span>
-								) : null}
-								{selectedSkillCount > 0 ? (
-									<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
+								<span>
+									1 added · {selectedContextCount} Context · {selectedSkillCount} Skills
+								</span>
+								{state.attentionCount > 0 ? (
+									<span className="text-warning">{state.attentionCount} need attention</span>
 								) : null}
 							</>
 						) : undefined

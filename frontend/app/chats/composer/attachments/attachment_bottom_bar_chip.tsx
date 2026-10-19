@@ -14,8 +14,10 @@ import {
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
 
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
@@ -52,7 +54,20 @@ function AttachmentBottomBarChipInner({
 	const open = useStoreState(store, 'open');
 	const tooltip = shortcut ? `Attach files, folders, or URLs (${shortcut})` : 'Attach files, folders, or URLs';
 
-	const selectedCount = attachments.length + directoryGroups.length;
+	const attachmentCount = attachments.length;
+	const directoryCount = directoryGroups.length;
+	const hasAddedAttachments = attachmentCount > 0 || directoryCount > 0;
+	const addedAttachmentSummary = [
+		attachmentCount > 0 ? `${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}` : null,
+		directoryCount > 0 ? `${directoryCount} folder${directoryCount === 1 ? '' : 's'}` : null,
+	]
+		.filter((value): value is string => value !== null)
+		.join(' · ');
+	const chipTone = open
+		? 'border-base-300 bg-base-300/60'
+		: hasAddedAttachments
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: '';
 
 	const closeMenu = () => {
 		store.hide();
@@ -81,7 +96,9 @@ function AttachmentBottomBarChipInner({
 					ref={buttonRef}
 					store={store}
 					disabled={isInputLocked}
-					className={`${actionTriggerChipButtonClasses} hover:text-base-content ${isInputLocked ? 'opacity-60' : ''}`}
+					className={`${actionTriggerChipButtonClasses} ${chipTone} hover:text-base-content ${
+						isInputLocked ? 'opacity-60' : ''
+					}`}
 					aria-label={tooltip}
 				>
 					<ActionTriggerChipContent icon={<FiPaperclip size={16} />} label="Attachments" open={open} />
@@ -99,8 +116,8 @@ function AttachmentBottomBarChipInner({
 			>
 				<ActionTriggerMenuHeader>
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="text-xs font-semibold">Add attachments</div>
-						{selectedCount > 0 ? <span className="badge badge-ghost badge-xs">{selectedCount} added</span> : null}
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Attachments</div>
+						<span className={actionTriggerMenuMetaClasses}>{addedAttachmentSummary || '0 added'}</span>
 					</div>
 				</ActionTriggerMenuHeader>
 
@@ -128,6 +145,28 @@ function AttachmentBottomBarChipInner({
 						<span>Link or URL...</span>
 					</MenuItem>
 				</ActionTriggerMenuBody>
+
+				<ComposerDropdownSelectedPanel
+					label="Added attachments"
+					ariaLabel="Added attachments"
+					isEmpty={!hasAddedAttachments}
+					emptyLabel="Choose Files, Folder, or Link / URL above to add it to this message."
+					help="Added files and folders appear in the composer attachment bar, where they can be reviewed or removed."
+					summary={hasAddedAttachments ? <span>{addedAttachmentSummary}</span> : undefined}
+				>
+					<div className="bg-base-200 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-1 text-xs">
+						{attachmentCount > 0 ? (
+							<span>
+								{attachmentCount} file or link{attachmentCount === 1 ? '' : 's'}
+							</span>
+						) : null}
+						{directoryCount > 0 ? (
+							<span>
+								{directoryCount} folder group{directoryCount === 1 ? '' : 's'}
+							</span>
+						) : null}
+					</div>
+				</ComposerDropdownSelectedPanel>
 			</Menu>
 
 			<UrlAttachmentModal

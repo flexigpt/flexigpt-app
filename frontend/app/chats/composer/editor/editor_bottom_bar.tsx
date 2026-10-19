@@ -23,7 +23,7 @@ import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conv
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
 import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
-import { KeyboardShortcutsMenu } from '@/chats/composer/editor/keyboard_shortcuts_menu';
+import { KeyboardShortcutsMenu } from '@/chats/composer/editor/keyboard_shortcuts_bottom_bar_chip';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import { SkillTemplateBottomBarChip } from '@/chats/composer/skills/skill_template_bottom_bar_chip';
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';

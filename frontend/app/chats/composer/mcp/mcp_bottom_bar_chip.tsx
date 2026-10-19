@@ -50,14 +50,16 @@ import {
 
 import {
 	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
-import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -271,8 +273,9 @@ function DiscoverySection({
 				>
 					{open ? <FiChevronDown size={13} /> : <FiChevronRight size={13} />}
 					<span className="min-w-0 flex-1 font-semibold">{title}</span>
-					<span className="badge badge-ghost badge-xs rounded-lg">{presentCount} present</span>
-					<span className="badge badge-info badge-xs rounded-lg">{selectedCount} selected</span>
+					<span className="text-base-content/60 ml-auto text-[11px] whitespace-nowrap">
+						{presentCount} available · {selectedCount} selected
+					</span>
 				</button>
 				{showBulkActions ? (
 					<BulkSelectionChips
@@ -780,7 +783,7 @@ function ServerRow({
 
 	return (
 		<div
-			className="border-base-300 data-active-item:bg-base-200 mb-2 rounded-xl border p-2 outline-none"
+			className="border-base-300 data-active-item:bg-base-200 rounded-xl border p-2 outline-none"
 			tabIndex={0}
 			role="menuitemcheckbox"
 			aria-checked={selected}
@@ -1028,66 +1031,20 @@ export function MCPBottomBarChip({
 	).length;
 	const hasSelectedMCPContext = selectedServerKeys.size > 0 || hasAppContextUpdates;
 	const firstVisibleOption = availableOptions[0] ?? null;
+	const mcpHeaderMeta = isSearchQueryActive(searchQuery)
+		? `${availableOptions.length} match${availableOptions.length === 1 ? '' : 'es'}`
+		: `${availableOptions.length} available`;
+	const selectedMCPContextSummary = [
+		enabledCount > 0 ? `${enabledCount} server${enabledCount === 1 ? '' : 's'}` : null,
+		selectedInstructionServerCount > 0
+			? `${selectedInstructionServerCount} instruction set${selectedInstructionServerCount === 1 ? '' : 's'}`
+			: null,
+		hasAppContextUpdates ? `${appContextUpdateCount} app update${appContextUpdateCount === 1 ? '' : 's'}` : null,
+	]
+		.filter((value): value is string => value !== null)
+		.join(' · ');
 
-	const hoverTipContent = useMemo(
-		() => (
-			<HoverTipContent
-				title={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
-				description="Choose MCP servers and the tools, resources, prompts, and instructions they provide for the next message."
-				sections={[
-					{
-						id: 'current-state',
-						title: 'Current state',
-						items: [
-							`${enabledCount} MCP ${enabledCount === 1 ? 'server' : 'servers'} selected`,
-							`Tools: ${state.selectedToolCount} selected`,
-							`Resources: ${state.selectedResourceCount} selected`,
-							`Prompts: ${state.selectedPromptCount} selected`,
-							state.requiredArgumentMissingCount > 0
-								? `Required arguments: ${state.requiredArgumentMissingCount} missing`
-								: 'Required arguments: complete',
-							hasAppContextUpdates
-								? `App context updates: ${appContextUpdateCount} queued for the next send`
-								: 'App context updates: none queued',
-						],
-					},
-					...(hasBlockingArgs
-						? [
-								{
-									id: 'before-sending',
-									title: <span className="text-warning">Before sending</span>,
-									items: [
-										state.requiredArgumentMissingCount > 0
-											? `Fill ${state.requiredArgumentMissingCount} required MCP argument${state.requiredArgumentMissingCount === 1 ? '' : 's'}.`
-											: 'Complete the required MCP arguments before sending.',
-									],
-								},
-							]
-						: []),
-					...(enabledCount > 0 || hasAppContextUpdates
-						? [
-								{
-									id: 'clear-action',
-									title: 'Clear action',
-									items: ['Clear removes selected MCP context and discards queued app context updates.'],
-								},
-							]
-						: []),
-				]}
-			/>
-		),
-		[
-			appContextUpdateCount,
-			enabledCount,
-			hasAppContextUpdates,
-			hasBlockingArgs,
-			shortcut,
-			state.requiredArgumentMissingCount,
-			state.selectedPromptCount,
-			state.selectedResourceCount,
-			state.selectedToolCount,
-		]
-	);
+	const hoverTipContent = shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP context';
 
 	const manualOAuthModalOption = useMemo(() => {
 		if (!manualOAuthModalKey) {
@@ -1165,37 +1122,22 @@ export function MCPBottomBarChip({
 					placement="top"
 					wrapperElement="div"
 					wrapperClassName="inline-flex max-w-full"
-					tooltipClassName="max-w-sm"
 				>
-					<div
-						className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
-					>
+					<div className={`${actionTriggerChipSurfaceClasses} ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}>
 						<MenuButton
 							store={menu}
-							className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+							className={actionTriggerChipMenuButtonClasses}
 							aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
 							disabled={isInputLocked}
 						>
 							<ActionTriggerChipContent
 								icon={<FiServer size={14} />}
 								label="MCP"
-								count={
-									enabledCount > 0 ? (
-										<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
-									) : undefined
-								}
 								suffix={
-									enabledCount > 0 || hasBlockingArgs || hasAppContextUpdates ? (
-										<span className="flex shrink-0 items-center gap-1">
-											{enabledCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : null}
-											{selectedInstructionServerCount > 0 ? (
-												<span className="badge badge-secondary badge-xs">System {selectedInstructionServerCount}</span>
-											) : null}
-											{hasBlockingArgs ? <span className="badge badge-warning badge-xs">Args</span> : null}
-											{hasAppContextUpdates ? (
-												<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
-											) : null}
-										</span>
+									hasBlockingArgs ? (
+										<span className="badge badge-warning badge-xs">Check</span>
+									) : enabledCount > 0 || hasAppContextUpdates ? (
+										<FiCheck size={14} aria-hidden="true" />
 									) : undefined
 								}
 								open={open}
@@ -1208,7 +1150,7 @@ export function MCPBottomBarChip({
 							gutter={8}
 							overflowPadding={8}
 							portal
-							className={`${actionTriggerMenuWideClasses} max-h-[75vh] w-2xl max-w-[90vw]`}
+							className={actionTriggerMenuWideClasses}
 							autoFocusOnShow={false}
 						>
 							<ActionTriggerMenuHeader>
@@ -1217,8 +1159,6 @@ export function MCPBottomBarChip({
 									query={searchQuery}
 									onQueryChange={setSearchQuery}
 									placeholder="Search MCP servers, tools, resources…"
-									resultCount={availableOptions.length}
-									totalCount={Math.max(0, visibleOptions.length - selectedOptions.length)}
 									disabled={state.loading || visibleOptions.length === 0}
 									onFocusFirstItem={() => {
 										focusFirstSearchableMenuItem(menuContentElement);
@@ -1234,23 +1174,26 @@ export function MCPBottomBarChip({
 								/>
 
 								<div className={actionTriggerMenuHeaderRowClasses}>
-									<div className="text-xs font-semibold">MCP servers</div>
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs rounded-lg"
-										onClick={e => {
-											stop(e);
-											void state.refreshAll();
-										}}
-										disabled={isInputLocked || state.loading}
-									>
-										<FiRefreshCw size={12} />
-										<span className="ml-1">Refresh</span>
-									</button>
+									<div className="min-w-0 flex-1 truncate text-xs font-semibold">MCP servers</div>
+									<div className="flex shrink-0 items-center gap-2">
+										<span className={actionTriggerMenuMetaClasses}>{mcpHeaderMeta}</span>
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs rounded-lg"
+											onClick={e => {
+												stop(e);
+												void state.refreshAll();
+											}}
+											disabled={isInputLocked || state.loading}
+										>
+											<FiRefreshCw size={12} />
+											<span className="ml-1">Refresh</span>
+										</button>
+									</div>
 								</div>
 							</ActionTriggerMenuHeader>
 
-							<ActionTriggerMenuBody>
+							<ActionTriggerMenuBody className="space-y-2">
 								{state.loading ? (
 									<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
 								) : state.error ? (
@@ -1291,7 +1234,7 @@ export function MCPBottomBarChip({
 								)}
 
 								{!state.loading && !state.error && hasManagementHint ? (
-									<div className="border-base-300 text-base-content/70 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-xs">
+									<div className="bg-base-200/60 text-base-content/70 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl p-2 text-xs">
 										{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
 										{configurationPendingServerCount > 0 ? (
 											<span>
@@ -1329,21 +1272,14 @@ export function MCPBottomBarChip({
 								label="Added MCP context"
 								ariaLabel="Added MCP context"
 								isEmpty={!hasSelectedMCPContext}
-								emptyLabel="No MCP servers or queued app-context updates have been added to this message."
+								emptyLabel="Choose an MCP server above to add its context to this message."
+								help="Selected MCP servers can contribute tools, resources, prompts, and instructions to the next message. Resolve required argument warnings before sending."
 								summary={
 									hasSelectedMCPContext ? (
 										<>
-											{selectedServerKeys.size > 0 ? (
-												<span className="badge badge-ghost badge-xs">Servers {enabledCount}</span>
-											) : null}
-											{state.selectedToolCount > 0 ? (
-												<span className="badge badge-ghost badge-xs">Tools {state.selectedToolCount}</span>
-											) : null}
-											{hasAppContextUpdates ? (
-												<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
-											) : null}
+											<span>{selectedMCPContextSummary}</span>
 											{unavailableSelectedCount > 0 ? (
-												<span className="badge badge-warning badge-xs">Check {unavailableSelectedCount}</span>
+												<span className="text-warning">{unavailableSelectedCount} need attention</span>
 											) : null}
 										</>
 									) : undefined

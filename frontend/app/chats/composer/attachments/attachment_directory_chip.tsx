@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiAlertTriangle, FiChevronDown, FiChevronUp, FiFileText, FiFolder, FiPlus, FiX } from 'react-icons/fi';
+import {
+	FiAlertTriangle,
+	FiChevronDown,
+	FiChevronUp,
+	FiFileText,
+	FiFolder,
+	FiPlus,
+	FiSearch,
+	FiX,
+} from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -192,7 +201,13 @@ export function DirectoryChip({
 	const restorableMatches = matchingRemoved.slice(0, availableSlots);
 	const overflowFileCount = group.overflowDirs.reduce((sum, overflow) => sum + (overflow.fileCount ?? 0), 0);
 
-	const knownScannedCount = Math.max(group.scannedFileCount, attachedCount + removedFiles.length);
+	const directoryHeaderMeta = filter.error
+		? 'Invalid filter'
+		: hasQuery
+			? `${matchingAttached.length} added match${matchingAttached.length === 1 ? '' : 'es'} · ${
+					matchingRemoved.length
+				} not-added match${matchingRemoved.length === 1 ? '' : 'es'}`
+			: `${attachedCount} added · ${removedFiles.length} not added`;
 
 	const tooltipLines: string[] = [];
 	if (group.dirPath && group.dirPath !== group.label) {
@@ -227,21 +242,21 @@ export function DirectoryChip({
 
 	return (
 		<div
-			className="bg-base-200 hover:bg-base-300/80 text-base-content flex shrink-0 items-center gap-2 rounded-2xl px-2 py-0"
+			className="bg-base-200 hover:bg-base-300/80 text-base-content flex h-7 min-h-0 shrink-0 items-center gap-1 rounded-full px-2 text-xs"
 			title={title}
 			data-attachment-chip="directory"
 		>
 			<FiFolder className="shrink-0" size={14} />
 			<span className="min-w-0 flex-1 truncate">{group.label}</span>
 			<span className="text-base-content/60 whitespace-nowrap">
-				{attachedCount} attached
-				{removedFiles.length > 0 ? ` · ${removedFiles.length} out` : ''}
+				{attachedCount} added
+				{removedFiles.length > 0 ? ` · ${removedFiles.length} not added` : ''}
 				{overflowFileCount > 0 ? ` +${overflowFileCount} more` : ''}
 			</span>
 
 			<MenuButton
 				store={directoryMenu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
+				className="btn btn-ghost btn-xs h-5 min-h-0 rounded-full p-0 shadow-none"
 				aria-label={`Show files in folder ${group.dirPath || group.label}`}
 				title={group.dirPath || group.label}
 			>
@@ -253,13 +268,15 @@ export function DirectoryChip({
 				gutter={8}
 				overflowPadding={8}
 				portal
-				className={`${actionTriggerMenuWideClasses} max-h-128 w-xl max-w-[calc(100vw-1rem)] min-w-72`}
+				className={actionTriggerMenuWideClasses}
 				autoFocusOnShow={false}
 			>
 				<ActionTriggerMenuHeader>
-					<label
-						className={`input input-sm flex w-full items-center gap-2 rounded-xl ${filter.error ? 'input-error' : ''}`}
-					>
+					<label className="relative block">
+						<FiSearch
+							size={12}
+							className="text-base-content/50 pointer-events-none absolute top-1/2 left-2 -translate-y-1/2"
+						/>
 						<input
 							ref={filterInputRef}
 							type="search"
@@ -272,15 +289,19 @@ export function DirectoryChip({
 									event.stopPropagation();
 								}
 							}}
-							className="grow"
+							className={`input input-xs bg-base-200 border-base-300 h-7 w-full rounded-xl pr-8 pl-7 text-xs outline-none ${
+								filter.error ? 'input-error' : ''
+							}`}
 							placeholder="Filter: test.go, *_test.go, !*.go, /regex/i"
 							aria-label={`Search files in ${group.label}`}
+							autoComplete="off"
+							autoCorrect="off"
 							spellCheck={false}
 						/>
 						{query && (
 							<button
 								type="button"
-								className="btn btn-ghost btn-xs p-0"
+								className="btn btn-ghost btn-xs absolute top-1/2 right-1 size-5 min-h-0 -translate-y-1/2 rounded-full p-0"
 								onClick={() => {
 									setQuery('');
 								}}
@@ -292,28 +313,25 @@ export function DirectoryChip({
 						)}
 					</label>
 
-					<div className={`${actionTriggerMenuHeaderRowClasses} items-start`}>
-						<div className="min-w-0">
-							<div className="truncate text-xs font-semibold" title={group.dirPath}>
-								Files in “{group.label}”
-							</div>
-							<div className="text-base-content/60 mt-1 text-xs">
-								{attachedCount} attached · {removedFiles.length} not attached · {knownScannedCount} scanned
-								{group.hasMore ? ' · more not scanned' : ''}
-							</div>
+					<div className={actionTriggerMenuHeaderRowClasses}>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold" title={group.dirPath}>
+							Files in “{group.label}”
 						</div>
-						<span className="badge badge-ghost badge-xs shrink-0">Limit {MAX_FILES_PER_DIRECTORY}</span>
+						<span
+							className={`shrink-0 text-[11px] whitespace-nowrap ${
+								filter.error ? 'text-error' : 'text-base-content/60'
+							}`}
+						>
+							{directoryHeaderMeta}
+						</span>
 					</div>
 
-					<div className={`px-1 pb-1 text-xs ${filter.error ? 'text-error' : 'text-base-content/60'}`}>
-						{filter.error ??
-							(hasQuery
-								? `${matchingAttached.length} attached match · ${matchingRemoved.length} not attached match`
-								: 'Text, * and ? globs, ! to invert, or /expression/flags.')}
-					</div>
+					{filter.error ? <div className="alert alert-error rounded-xl p-2 text-xs">{filter.error}</div> : null}
+				</ActionTriggerMenuHeader>
 
-					{hasQuery && !filter.error && (
-						<div className="mt-2 flex flex-wrap gap-2">
+				<ActionTriggerMenuBody className="space-y-2">
+					{hasQuery && !filter.error ? (
+						<div className="flex flex-wrap gap-2 px-1">
 							<button
 								type="button"
 								className="btn btn-xs rounded-lg"
@@ -331,13 +349,11 @@ export function DirectoryChip({
 								Add matches ({restorableMatches.length})
 							</button>
 						</div>
-					)}
-				</ActionTriggerMenuHeader>
+					) : null}
 
-				<ActionTriggerMenuBody className="space-y-2">
 					{removedFiles.length > 0 && (
 						<details
-							className="border-base-300 mb-1"
+							className="border-base-300 rounded-xl border p-1"
 							open={removedOpen}
 							onToggle={event => {
 								setRemovedOpen(event.currentTarget.open);
@@ -345,8 +361,10 @@ export function DirectoryChip({
 						>
 							<summary className="hover:bg-base-200 flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold">
 								{removedOpen ? <FiChevronDown size={13} /> : <FiChevronUp size={13} />}
-								<span>Not attached ({removedFiles.length})</span>
-								{hasQuery && <span className="text-base-content/60 ml-auto">{matchingRemoved.length} match</span>}
+								<span>Not added</span>
+								<span className="text-base-content/60 ml-auto text-[11px]">
+									{hasQuery ? `${matchingRemoved.length}/${removedFiles.length} shown` : `${removedFiles.length} files`}
+								</span>
 							</summary>
 
 							<div className="mt-1 space-y-1">
@@ -388,8 +406,8 @@ export function DirectoryChip({
 					)}
 
 					{group.overflowDirs.length > 0 && (
-						<div className="border-base-300 mb-1">
-							<div className="text-base-content/70 text-xs font-semibold">Not scanned or unreadable</div>
+						<div className="border-base-300 rounded-xl border p-2">
+							<div className="text-base-content/70 mb-1 text-xs font-semibold">Not scanned or unreadable</div>
 
 							{group.overflowDirs.map(overflow => {
 								const relativePath = overflow.relativePath || overflow.dirPath;
@@ -454,14 +472,17 @@ export function DirectoryChip({
 				</ActionTriggerMenuBody>
 
 				<ComposerDropdownSelectedPanel
-					label="Attached files"
-					ariaLabel={`Attached files from ${group.label}`}
+					label="Added files"
+					ariaLabel={`Added files from ${group.label}`}
 					isEmpty={attachedCount === 0}
-					emptyLabel="No files are currently attached from this folder."
+					emptyLabel="Choose Add on a not-added file above to include it from this folder."
+					help={`Filter supports text, * and ? globs, ! to invert, and /expression/flags. Up to ${MAX_FILES_PER_DIRECTORY} files can be added from this folder.`}
 					summary={
 						attachedCount > 0 ? (
-							<span className="badge badge-ghost badge-xs">
-								{hasQuery && !filter.error ? `${matchingAttached.length}/${attachedCount}` : attachedCount} attached
+							<span>
+								{hasQuery && !filter.error
+									? `${matchingAttached.length}/${attachedCount} shown`
+									: `${attachedCount} added`}
 							</span>
 						) : undefined
 					}

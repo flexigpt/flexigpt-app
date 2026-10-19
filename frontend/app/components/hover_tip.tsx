@@ -40,34 +40,35 @@ interface HoverTipSection {
 
 interface HoverTipContentProps {
 	title: ReactNode;
-	description: ReactNode;
-	sections: HoverTipSection[];
+	description?: ReactNode;
+	sections?: HoverTipSection[];
 }
 
-export function HoverTipContent({ title, description, sections }: HoverTipContentProps) {
+/**
+ * @public
+ * Legacy-compatible compact tip content.
+ *
+ * Composer controls should generally use a short string instead. Persistent
+ * explanation belongs in the dropdown's current/added panel, not in a hover
+ * surface. This component intentionally avoids dialog-like cards and borders.
+ */
+export function HoverTipContent({ title, description, sections = [] }: HoverTipContentProps) {
 	return (
-		<div className="space-y-2 whitespace-normal">
-			<div className="text-xs/4 font-semibold">{title}</div>
-
-			<div className="border-info/30 bg-info/10 text-base-content/80 rounded-lg border px-2 py-1.5 text-[11px]/4">
-				<div>{description}</div>
-			</div>
-
-			{sections.map(section => (
-				<section key={section.id} className="border-base-300 border-t pt-2">
-					<div className="text-base-content/70 text-[10px] font-semibold tracking-wide uppercase">{section.title}</div>
-					<ul className="mt-1 space-y-1">
-						{section.items.map((item, index) => (
-							<li key={`${section.id}-${index}`} className="flex items-start gap-1.5 text-[11px]/4">
-								<span className="text-base-content/50 shrink-0" aria-hidden="true">
-									-
-								</span>
+		<div className="space-y-1.5 whitespace-normal">
+			<div className="text-[11px]/4 font-semibold">{title}</div>
+			{description ? <div className="text-base-content/75 text-[11px]/4">{description}</div> : null}
+			{sections.length > 0 ? (
+				<ul className="text-base-content/70 space-y-0.5 text-[11px]/4">
+					{sections.map(section =>
+						section.items.map((item, index) => (
+							<li key={`${section.id}-${index}`} className="flex items-start gap-1.5">
+								<span className="text-base-content/50 shrink-0">{section.title}:</span>
 								<span>{item}</span>
 							</li>
-						))}
-					</ul>
-				</section>
-			))}
+						))
+					)}
+				</ul>
+			) : null}
 		</div>
 	);
 }
@@ -78,7 +79,7 @@ export function HoverTip({
 	placement = 'top',
 	gutter = 8,
 	overflowPadding = 8,
-	showDelay = 400,
+	showDelay = 500,
 	hideDelay = 100,
 	disabled = false,
 	suspended = false,
@@ -235,8 +236,10 @@ export function HoverTip({
 
 	const hideAfterTooltipLeave = useCallback(() => {
 		isTooltipHoveredRef.current = false;
-		scheduleHideIfInactive();
-	}, [scheduleHideIfInactive]);
+		// A tooltip is transient. Once the pointer leaves its body it must
+		// close, even if the anchor remains hovered or keyboard-focused.
+		hideTip();
+	}, [hideTip]);
 
 	const hideOnEscape: KeyboardEventHandler<HTMLElement> = useCallback(
 		event => {
@@ -274,7 +277,7 @@ export function HoverTip({
 					portal
 					onMouseEnter={keepTipVisible}
 					onMouseLeave={hideAfterTooltipLeave}
-					className={`rounded-box bg-base-100 text-base-content border-base-300 pointer-events-auto z-1000 max-w-xs border px-3 py-2 text-xs/4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
+					className={`bg-base-100 text-base-content border-base-300 pointer-events-auto z-1000 max-w-72 rounded-xl border px-2.5 py-1.5 text-[11px]/4 whitespace-normal shadow-lg ${tooltipClassName}`}
 				>
 					{content}
 				</Tooltip>

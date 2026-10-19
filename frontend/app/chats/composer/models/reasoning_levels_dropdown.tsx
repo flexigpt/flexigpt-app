@@ -6,8 +6,12 @@ import { getReasoningLevelDisplayName } from '@/spec/inference_labels';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
 	actionTriggerMenuCompactClasses,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
@@ -35,12 +39,22 @@ export function SingleReasoningDropdown({
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
+	const availableLevels = options.filter(level => level !== reasoningLevel);
+	const availableOptionCount = availableLevels.length + (reasoningLevel === undefined ? 0 : 1);
+	const triggerTone = open
+		? 'border-base-300 bg-base-300/60'
+		: reasoningLevel !== undefined
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: '';
 
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<HoverTip content="Set reasoning level" placement="top" wrapperElement="div" wrapperClassName="w-full">
-					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
+				<HoverTip content="Choose reasoning effort." placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<MenuButton
+						store={menu}
+						className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center ${triggerTone}`}
+					>
 						<ActionTriggerChipContent
 							label={`Reasoning: ${getReasoningLevelDisplayName(reasoningLevel)}`}
 							open={open}
@@ -56,22 +70,30 @@ export function SingleReasoningDropdown({
 					gutter={8}
 					overflowPadding={8}
 					autoFocusOnShow
-					className={`${actionTriggerMenuCompactClasses} text-xs`}
+					className={actionTriggerMenuCompactClasses}
 				>
-					{reasoningLevel !== undefined ? (
-						<MenuItem
-							className={`${actionTriggerMenuItemClasses} justify-between`}
-							onClick={() => {
-								setReasoningLevel(undefined);
-							}}
-						>
-							<span>Default</span>
-						</MenuItem>
-					) : null}
+					<ActionTriggerMenuHeader>
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Reasoning level</div>
+							<span className={actionTriggerMenuMetaClasses}>
+								{availableOptionCount} option{availableOptionCount === 1 ? '' : 's'}
+							</span>
+						</div>
+					</ActionTriggerMenuHeader>
 
-					{options
-						.filter(level => level !== reasoningLevel)
-						.map(level => (
+					<ActionTriggerMenuBody className="space-y-1">
+						{reasoningLevel !== undefined ? (
+							<MenuItem
+								className={`${actionTriggerMenuItemClasses} justify-between`}
+								onClick={() => {
+									setReasoningLevel(undefined);
+								}}
+							>
+								<span>Default</span>
+							</MenuItem>
+						) : null}
+
+						{availableLevels.map(level => (
 							<MenuItem
 								key={level}
 								className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -82,10 +104,12 @@ export function SingleReasoningDropdown({
 								<span>{getReasoningLevelDisplayName(level)}</span>
 							</MenuItem>
 						))}
+					</ActionTriggerMenuBody>
 
 					<ComposerCurrentSettingPanel
-						label="Current reasoning setting"
+						label="Current reasoning"
 						value={getReasoningLevelDisplayName(reasoningLevel)}
+						help="Use Default to defer to the model or provider. Higher reasoning levels may require more latency and token budget."
 						isDefault={reasoningLevel === undefined}
 						onUseDefault={() => {
 							setReasoningLevel(undefined);

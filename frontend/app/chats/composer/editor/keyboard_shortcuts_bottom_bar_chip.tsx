@@ -12,6 +12,7 @@ import {
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
@@ -33,7 +34,7 @@ export function KeyboardShortcutsMenu({ shortcutConfig }: KeyboardShortcutsMenuP
 			<HoverTip content="Keyboard shortcuts" placement="top">
 				<MenuButton
 					store={shortcutsMenu}
-					className={`${actionTriggerChipButtonClasses} ${shortcutsOpen ? 'bg-base-300/80' : ''}`}
+					className={`${actionTriggerChipButtonClasses} ${shortcutsOpen ? 'border-base-300 bg-base-300/60' : ''}`}
 					aria-label="Keyboard shortcuts"
 				>
 					<ActionTriggerChipContent label="Shortcuts" open={shortcutsOpen} labelClassName="text-xs font-normal" />
@@ -50,8 +51,8 @@ export function KeyboardShortcutsMenu({ shortcutConfig }: KeyboardShortcutsMenuP
 			>
 				<ActionTriggerMenuHeader>
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="text-xs font-semibold">Keyboard shortcuts</div>
-						<span className="badge badge-ghost badge-xs">{shortcutItems.length}</span>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Keyboard shortcuts</div>
+						<span className={actionTriggerMenuMetaClasses}>{shortcutItems.length} available</span>
 					</div>
 				</ActionTriggerMenuHeader>
 

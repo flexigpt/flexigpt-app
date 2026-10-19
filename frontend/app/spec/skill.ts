@@ -12,13 +12,6 @@ import type { PluginView } from '@/spec/plugin';
 
 export type SkillRef = ArtifactRef;
 
-/** @public */
-export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
-	'builtin.skills-load',
-	'builtin.skills-unload',
-	'builtin.skills-readresource',
-]);
-
 export enum SkillSessionSyncMode {
 	None = 'none',
 	IfSessionExists = 'if-session-exists',

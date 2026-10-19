@@ -19,16 +19,18 @@ import { canWriteSkillPlugin, skillRefKey } from '@/apis/skill_management';
 import type { DropdownItem } from '@/components/dropdown';
 import {
 	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { Dropdown } from '@/components/dropdown';
-import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
@@ -346,7 +348,11 @@ export function SkillsBottomBarChip({
 	const selectedSystemSourceCount =
 		(systemPrompt.includeModelDefault && systemPrompt.modelDefaultPrompt.trim() ? 1 : 0) +
 		selectedInstructionSources.filter(source => Boolean(source.text.trim())).length;
+	const availableInstructionSourceCount = (hasAvailableModelDefault ? 1 : 0) + availableInstructionSources.length;
 	const configuredCount = enabledCount + selectedSystemSourceCount;
+	const skillHeaderMeta = isSearchQueryActive(searchQuery)
+		? `${availableSkills.length} match${availableSkills.length === 1 ? '' : 'es'}`
+		: `${selectableInstructionSkillCount} available · ${configuredCount} added`;
 	const firstVisibleSkill =
 		availableSkills.find(s => {
 			return selectable(s);
@@ -495,31 +501,7 @@ export function SkillsBottomBarChip({
 				? 'border-base-300 bg-base-300/60'
 				: 'border-transparent';
 
-	const hoverTip = (
-		<HoverTipContent
-			title={shortcut ? `Instruction Skills (${shortcut})` : 'Instruction Skills'}
-			description="Session Runtime owns effective Skill resolution, Skill sessions, lifecycle tools, and active Skill state."
-			sections={[
-				{
-					id: 'current-state',
-					title: 'Current state',
-					items: [
-						`Enabled Skills: ${enabledCount}`,
-						`Active Skills: ${activeCount}`,
-						`System instruction sources: ${selectedSystemSourceCount}`,
-						`Available instruction Skills: ${instructionSkills.length}`,
-					],
-				},
-				{
-					id: 'template-behavior',
-					title: 'Template behavior',
-					items: [
-						'User-message Skills are rendered through the Templates menu and are not active Skill-session state.',
-					],
-				},
-			]}
-		/>
-	);
+	const hoverTip = shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills';
 
 	const selectedSkillsPanel = (
 		<>
@@ -634,32 +616,17 @@ export function SkillsBottomBarChip({
 		<>
 			<div className="relative shrink-0" data-bottom-bar-skills>
 				<HoverTip content={hoverTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
-					<div className={`${actionTriggerChipSurfaceClasses} border ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}>
+					<div className={`${actionTriggerChipSurfaceClasses} ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}>
 						<MenuButton
 							store={store}
-							className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+							className={actionTriggerChipMenuButtonClasses}
 							aria-label={shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills'}
 							disabled={isInputLocked}
 						>
 							<ActionTriggerChipContent
 								icon={<FiFilePlus size={14} />}
 								label="Skills"
-								count={
-									enabledCount > 0 ? (
-										<span className="badge badge-success badge-xs">Enabled {enabledCount}</span>
-									) : undefined
-								}
-								suffix={
-									configuredCount > 0 ? (
-										<span className="flex shrink-0 items-center gap-1">
-											<FiCheck size={14} aria-hidden="true" />
-											{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
-											{selectedSystemSourceCount > 0 ? (
-												<span className="badge badge-secondary badge-xs">System {selectedSystemSourceCount}</span>
-											) : null}
-										</span>
-									) : undefined
-								}
+								suffix={configuredCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : undefined}
 								open={open}
 							/>
 						</MenuButton>
@@ -680,8 +647,6 @@ export function SkillsBottomBarChip({
 							query={searchQuery}
 							onQueryChange={setSearchQuery}
 							placeholder="Search instruction Skills…"
-							resultCount={availableSkills.length}
-							totalCount={instructionSkills.length}
 							disabled={loading || instructionSkills.length === 0}
 							onFocusFirstItem={() => {
 								focusFirstSearchableMenuItem(menuContentElement);
@@ -697,68 +662,72 @@ export function SkillsBottomBarChip({
 						/>
 
 						<div className={actionTriggerMenuHeaderRowClasses}>
-							<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
-							<div className="flex items-center gap-1">
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									disabled={isInputLocked || pluginsLoading}
-									onClick={() => {
-										void openManagedAction({
-											mode: 'create',
-											seed: {
-												document: {
-													name: 'instruction-skill',
-													displayName: 'Instruction Skill',
-													description: 'Instruction Skill created from the composer.',
-													insert: SkillInsert.Instructions,
-													arguments: [],
-													tags: ['composer'],
-													markdownBody: '',
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Instruction Skills</div>
+							<div className="flex shrink-0 items-center gap-2">
+								<span className={actionTriggerMenuMetaClasses}>{skillHeaderMeta}</span>
+								<div className="flex items-center gap-1">
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={isInputLocked || pluginsLoading}
+										onClick={() => {
+											void openManagedAction({
+												mode: 'create',
+												seed: {
+													document: {
+														name: 'instruction-skill',
+														displayName: 'Instruction Skill',
+														description: 'Instruction Skill created from the composer.',
+														insert: SkillInsert.Instructions,
+														arguments: [],
+														tags: ['composer'],
+														markdownBody: '',
+													},
+													enabled: true,
 												},
-												enabled: true,
-											},
-										});
-									}}
-									title="Create managed instruction Skill"
-								>
-									<FiPlus size={12} />
-									Create
-								</button>
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									disabled={isInputLocked || loading}
-									onClick={() => {
-										void onRefreshSkills();
-									}}
-									title="Refresh Skill catalog"
-								>
-									<FiRefreshCw size={12} />
-									Refresh
-								</button>
+											});
+										}}
+										title="Create managed instruction Skill"
+									>
+										<FiPlus size={12} />
+										Create
+									</button>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={isInputLocked || loading}
+										onClick={() => {
+											void onRefreshSkills();
+										}}
+										title="Refresh Skill catalog"
+									>
+										<FiRefreshCw size={12} />
+										Refresh
+									</button>
+								</div>
 							</div>
 						</div>
 
 						{loadError ? (
-							<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<div className="alert alert-warning rounded-xl text-xs">
 								<FiAlertCircle size={14} />
 								<span>{loadError}</span>
 							</div>
 						) : null}
 
 						{actionError ? (
-							<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<div className="alert alert-warning rounded-xl text-xs">
 								<FiAlertCircle size={14} />
 								<span>{actionError}</span>
 							</div>
 						) : null}
 					</ActionTriggerMenuHeader>
 
-					<ActionTriggerMenuBody>
-						<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
+					<ActionTriggerMenuBody className="space-y-2">
+						<div className="border-base-300 bg-base-100 rounded-xl border p-2">
 							<div className="mb-2 flex items-center justify-between gap-2">
 								<div className="text-xs font-semibold">Available system instruction sources</div>
+								<span className="text-base-content/60 text-[11px]">{availableInstructionSourceCount} available</span>
 							</div>
 
 							{hasAvailableModelDefault ? (
@@ -807,10 +776,7 @@ export function SkillsBottomBarChip({
 							) : null}
 						</div>
 
-						<div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-							<div className="text-base-content/60 text-xs">
-								{selectableInstructionSkillCount} available · {enabledCount} enabled · {activeCount} active
-							</div>
+						<div className="flex justify-end px-1">
 							<div className="flex gap-1">
 								<button
 									type="button"
@@ -990,18 +956,13 @@ export function SkillsBottomBarChip({
 						label="Added Skills and instructions"
 						ariaLabel="Added Skills and instructions"
 						isEmpty={configuredCount === 0}
-						emptyLabel="No Skill sessions or system instruction sources have been added."
+						emptyLabel="Choose a system instruction source or enable a Skill above to add it."
+						help="Enabled Skills and selected system instruction sources are used for the next Run. Active is preload state, not an extra attachment."
 						summary={
 							configuredCount > 0 ? (
-								<>
-									{enabledCount > 0 ? (
-										<span className="badge badge-success badge-xs">Enabled {enabledCount}</span>
-									) : null}
-									{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
-									{selectedSystemSourceCount > 0 ? (
-										<span className="badge badge-secondary badge-xs">System {selectedSystemSourceCount}</span>
-									) : null}
-								</>
+								<span>
+									{configuredCount} added{activeCount > 0 ? ` · ${activeCount} active` : ''}
+								</span>
 							) : undefined
 						}
 						actions={

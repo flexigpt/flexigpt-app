@@ -1,10 +1,20 @@
 import { useMemo } from 'react';
-import { FiChevronUp, FiPaperclip, FiX } from 'react-icons/fi';
+import { FiPaperclip, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 
+import {
+	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
+	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
+	actionTriggerMenuMetaClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
+import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import { useSearchableMenuState } from '@/components/searchmenu/searchable_menu_utils';
 
@@ -49,90 +59,90 @@ export function StandaloneAttachmentsChip({
 		);
 	}, [attachments, query]);
 
-	const title = `Attachments\n${count} item${count === 1 ? '' : 's'} attached`;
 	if (count === 0) {
 		return null;
 	}
 
 	return (
-		<div
-			className="bg-base-200 text-base-content flex shrink-0 items-center gap-1 rounded-2xl px-2 py-0"
-			title={title}
-			data-attachment-chip="attachments-group"
-		>
-			<FiPaperclip size={14} />
-			<span className="max-w-24 truncate">Attachments</span>
-			<span className="text-base-content/60 whitespace-nowrap">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show attached files and links"
-				title="Show attached files and links"
+		<div className="relative shrink-0" data-attachment-chip="attachments-group">
+			<div
+				className={`${actionTriggerChipSurfaceClasses} ${
+					open ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+				}`}
 			>
-				<FiChevronUp size={14} />
-			</MenuButton>
-
-			{/* Remove all standalone attachments */}
-			<button
-				type="button"
-				className="btn btn-ghost btn-xs text-error shrink-0 p-0 shadow-none"
-				onClick={() => {
-					// Call the existing single-remove handler for each attachment.
-					for (const att of attachments) {
-						onRemoveAttachment(att);
-					}
-				}}
-				title="Remove all attachments"
-				aria-label="Remove all attachments"
-			>
-				<FiX size={14} />
-			</button>
+				<MenuButton
+					store={menu}
+					className={actionTriggerChipMenuButtonClasses}
+					aria-label="Show attached files and links"
+				>
+					<ActionTriggerChipContent icon={<FiPaperclip size={14} />} label="Attachments" open={open} />
+				</MenuButton>
+			</div>
 
 			<Menu
 				store={menu}
 				gutter={8}
 				overflowPadding={8}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				portal
+				className={actionTriggerMenuWideClasses}
 				autoFocusOnShow={false}
 			>
-				<SearchableMenuInput
-					open={open}
-					query={query}
-					onQueryChange={setQuery}
-					placeholder="Search attached files and links…"
-					resultCount={filteredAttachments.length}
-					totalCount={attachments.length}
-					onEscape={() => {
-						menu.hide();
-					}}
-				/>
-
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">
-					Attachments ({filteredAttachments.length})
-				</div>
-
-				{filteredAttachments.map(att => (
-					<MenuItem
-						key={uiAttachmentKey(att)}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-					>
-						<AttachmentChip
-							attachment={att}
-							onRemoveAttachment={onRemoveAttachment}
-							onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
-							fullWidth
-						/>
-					</MenuItem>
-				))}
-
-				{filteredAttachments.length === 0 ? (
-					<div className="text-base-content/60 rounded-xl px-2 py-3 text-center text-xs">
-						No attached files or links match this search.
+				<ActionTriggerMenuHeader>
+					<SearchableMenuInput
+						open={open}
+						query={query}
+						onQueryChange={setQuery}
+						placeholder="Search added files and links…"
+						onEscape={() => {
+							menu.hide();
+						}}
+					/>
+					<div className={actionTriggerMenuHeaderRowClasses}>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Attachments</div>
+						<span className={actionTriggerMenuMetaClasses}>
+							{query.trim() ? `${filteredAttachments.length} matches` : `${count} added`}
+						</span>
 					</div>
-				) : null}
+				</ActionTriggerMenuHeader>
+
+				<ComposerDropdownSelectedPanel
+					label="Added files and links"
+					ariaLabel="Added files and links"
+					isEmpty={filteredAttachments.length === 0}
+					emptyLabel="No added files or links match this search. Clear the search to review all added items."
+					help="These attachments are included with this message. Remove individual items below or clear the full set."
+					summary={<span>{query.trim() ? `${filteredAttachments.length}/${count} shown` : `${count} added`}</span>}
+					actions={
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error rounded-lg"
+							onClick={() => {
+								for (const att of attachments) {
+									onRemoveAttachment(att);
+								}
+							}}
+						>
+							<FiX size={12} />
+							Clear all
+						</button>
+					}
+				>
+					{filteredAttachments.map(att => (
+						<MenuItem
+							key={uiAttachmentKey(att)}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 rounded-xl"
+						>
+							<AttachmentChip
+								attachment={att}
+								onRemoveAttachment={onRemoveAttachment}
+								onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
+								fullWidth
+							/>
+						</MenuItem>
+					))}
+				</ComposerDropdownSelectedPanel>
 			</Menu>
 		</div>
 	);

@@ -18,16 +18,18 @@ import { skillManagementAPI } from '@/apis/baseapi';
 
 import {
 	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
-import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
@@ -284,6 +286,9 @@ function SkillTemplateDropdown({
 		displayedItems.find(t => {
 			return templateIsSelectable(t);
 		}) ?? null;
+	const templateHeaderMeta = isSearchQueryActive(searchQuery)
+		? `${displayedItems.length} match${displayedItems.length === 1 ? '' : 'es'}`
+		: `${items.length} available`;
 
 	return (
 		<Menu
@@ -302,8 +307,6 @@ function SkillTemplateDropdown({
 						query={searchQuery}
 						onQueryChange={setSearchQuery}
 						placeholder="Search templates…"
-						resultCount={displayedItems.length}
-						totalCount={items.length}
 						disabled={loading || items.length === 0}
 						onFocusFirstItem={() => {
 							focusFirstSearchableMenuItem(menuContentElement);
@@ -319,16 +322,8 @@ function SkillTemplateDropdown({
 					/>
 
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="min-w-0">
-							<div className="flex justify-between">
-								<div className="text-xs font-semibold">Templates</div>
-								<span className="badge badge-ghost badge-xs">Available {items.length}</span>
-							</div>
-							<div className="mt-1 text-xs opacity-70">
-								Templates are skills with <span className="font-mono">insert: user-message</span>. They render into
-								composer text. Selected indexed resources are added as ordinary Composer attachments.
-							</div>
-						</div>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Templates</div>
+						<span className={actionTriggerMenuMetaClasses}>{templateHeaderMeta}</span>
 					</div>
 
 					{loadError ? (
@@ -346,7 +341,7 @@ function SkillTemplateDropdown({
 						</div>
 					) : null}
 					{actionError ? (
-						<div className="alert alert-error mb-2 rounded-xl text-xs">
+						<div className="alert alert-error rounded-xl text-xs">
 							<FiAlertCircle size={14} className="shrink-0" />
 							<div className="grow">{actionError}</div>
 						</div>
@@ -385,10 +380,11 @@ function SkillTemplateDropdown({
 
 			{!open ? null : (
 				<ComposerDropdownSelectedPanel
-					label="Template state"
-					ariaLabel="Template state"
+					label="Template insertion"
+					ariaLabel="Template insertion"
 					isEmpty
-					emptyLabel="Inserted templates become ordinary draft text. No template remains selected or joins a Skill session."
+					emptyLabel="Choose a template above to render it into the composer."
+					help="Templates render into ordinary draft text. They do not remain selected or join a Skill session after insertion."
 				/>
 			)}
 		</Menu>
@@ -795,28 +791,7 @@ function SkillTemplateBottomBarChipInner({
 	isInputLocked = false,
 }: SkillTemplateBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const hoverTipContent = (
-		<HoverTipContent
-			title={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
-			description="Templates are user-message skills that render into plain composer text."
-			sections={[
-				{
-					id: 'current-state',
-					title: 'Current state',
-					items: ['No template is active. Inserted templates do not remain selected after insertion.'],
-				},
-				{
-					id: 'insertion-behavior',
-					title: 'When you insert',
-					items: [
-						'The rendered template text is added directly to the composer.',
-						'Templates with arguments or indexed resources open a configuration dialog first. Selected verified resource files are added as ordinary Composer attachments.',
-						'There is no active-template count or clear action after insertion.',
-					],
-				},
-			]}
-		/>
-	);
+	const hoverTipContent = shortcut ? `Insert template (${shortcut})` : 'Insert a template';
 	const templates = useMemo(
 		() => items.filter(item => item.insert === SkillInsert.UserMessage).toSorted(compareSkillTemplateListItems),
 		[items]
@@ -924,10 +899,9 @@ function SkillTemplateBottomBarChipInner({
 				placement="top"
 				wrapperElement="div"
 				wrapperClassName="inline-flex max-w-full"
-				tooltipClassName="max-w-sm"
 			>
 				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${
+					className={`${actionTriggerChipSurfaceClasses} ${
 						open ? 'border-base-300 bg-base-300/60' : 'border-transparent'
 					} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
@@ -935,7 +909,7 @@ function SkillTemplateBottomBarChipInner({
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+						className={actionTriggerChipMenuButtonClasses}
 						aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
 					>
 						<ActionTriggerChipContent icon={<FiFile size={14} />} label="Templates" open={open} />

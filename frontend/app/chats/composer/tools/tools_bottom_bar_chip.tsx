@@ -15,16 +15,18 @@ import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_m
 
 import {
 	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
-import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -275,6 +277,9 @@ export function ToolsBottomBarChip({
 
 	const configuredCount = attached.length + conversationToolsState.length + webSearchTemplates.length;
 	const resultCount = visibleAvailableToAdd.length + visibleWebSearchToAdd.length;
+	const toolsHeaderMeta = isSearchQueryActive(query)
+		? `${resultCount} match${resultCount === 1 ? '' : 'es'}`
+		: `${resultCount} available · ${configuredCount} added`;
 
 	const autoExecuteFor = (item: ToolListItem) => {
 		if (item.toolDefinition.implementation.kind !== ToolImplType.Go) {
@@ -496,28 +501,7 @@ export function ToolsBottomBarChip({
 		);
 	};
 
-	const hoverContent = (
-		<HoverTipContent
-			title={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
-			description="Choose per-message tools, conversation tools, and provider web search."
-			sections={[
-				{
-					id: 'current-state',
-					title: 'Current state',
-					items: [
-						`Per-message tools: ${attached.length}`,
-						`Conversation tools: ${conversationToolsState.length}`,
-						activeWebSearch
-							? webSearchBlocked
-								? 'Web search: requires attention'
-								: 'Web search: enabled'
-							: 'Web search: disabled',
-						missingCount ? `Unresolved tools or invalid options: ${missingCount}` : 'Required options: complete',
-					],
-				},
-			]}
-		/>
-	);
+	const hoverContent = shortcut ? `Attach tools (${shortcut})` : 'Attach tools';
 
 	const selectedToolsPanel =
 		configuredCount > 0 ? (
@@ -555,31 +539,29 @@ export function ToolsBottomBarChip({
 		<div className="relative shrink-0" data-bottom-bar-tools>
 			<HoverTip content={hoverContent} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
 				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${
+					className={`${actionTriggerChipSurfaceClasses} ${
 						missingCount
-							? 'border-warning/70 bg-warning/10'
+							? 'border-warning/70 bg-warning/10 hover:bg-warning/15'
 							: configuredCount
 								? 'border-primary/50 bg-primary/10'
 								: 'border-transparent'
-					}`}
+					} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
 					<MenuButton
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 border-none bg-transparent p-0 font-normal shadow-none"
+						className={actionTriggerChipMenuButtonClasses}
 						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 					>
 						<ActionTriggerChipContent
 							icon={<FiTool size={14} />}
 							label="Tools"
-							count={configuredCount ? <span className="badge badge-xs">{configuredCount}</span> : undefined}
 							suffix={
-								configuredCount > 0 || missingCount > 0 ? (
-									<span className="flex shrink-0 items-center gap-1">
-										{configuredCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : null}
-										{missingCount ? <span className="badge badge-warning badge-xs">Check {missingCount}</span> : null}
-									</span>
+								missingCount ? (
+									<span className="badge badge-warning badge-xs">Check</span>
+								) : configuredCount > 0 ? (
+									<FiCheck size={14} aria-hidden="true" />
 								) : undefined
 							}
 							open={open}
@@ -605,8 +587,6 @@ export function ToolsBottomBarChip({
 								query={query}
 								onQueryChange={setQuery}
 								placeholder="Search tools..."
-								resultCount={resultCount}
-								totalCount={available.length + eligibleWebSearch.length}
 								disabled={isLoading && !hasResolved}
 								onFocusFirstItem={() => focusFirstSearchableMenuItem(contentElement)}
 								onEnterFirstResult={() => {
@@ -628,18 +608,21 @@ export function ToolsBottomBarChip({
 							/>
 
 							<div className={actionTriggerMenuHeaderRowClasses}>
-								<span className="text-xs font-semibold">
-									{isLoading || isRefreshing ? 'Loading tools...' : 'Tools'}
-								</span>
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs"
-									disabled={isLoading || isRefreshing || isInputLocked}
-									onClick={refresh}
-								>
-									<FiRefreshCw size={12} />
-									Refresh
-								</button>
+								<span className="min-w-0 flex-1 truncate text-xs font-semibold">Tools</span>
+								<div className="flex shrink-0 items-center gap-2">
+									<span className={actionTriggerMenuMetaClasses}>
+										{isLoading || isRefreshing ? 'Loading…' : toolsHeaderMeta}
+									</span>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={isLoading || isRefreshing || isInputLocked}
+										onClick={refresh}
+									>
+										<FiRefreshCw size={12} />
+										Refresh
+									</button>
+								</div>
 							</div>
 
 							{catalogError ? (
@@ -686,7 +669,9 @@ export function ToolsBottomBarChip({
 											title={group.name}
 											ariaLabel={`${group.name} tools`}
 											separatorBefore={index > 0}
-											meta={<span className="badge badge-ghost badge-xs">{group.available.length}</span>}
+											meta={
+												<span className="text-base-content/60 text-[11px]">{group.available.length} available</span>
+											}
 										>
 											{group.available.map(renderAvailable)}
 										</GroupedMenuSection>
@@ -708,10 +693,14 @@ export function ToolsBottomBarChip({
 							label="Added tools"
 							ariaLabel="Added tools"
 							isEmpty={configuredCount === 0}
-							emptyLabel="No per-message tools, conversation tools, or web-search provider have been added."
+							emptyLabel="Choose a tool or enable web search above to add it to this message."
+							help="Added tools are available for the next message."
 							summary={
 								configuredCount > 0 ? (
-									<span className="badge badge-ghost badge-xs">{configuredCount} added</span>
+									<>
+										<span>{configuredCount} added</span>
+										{missingCount > 0 ? <span className="text-warning">{missingCount} need attention</span> : null}
+									</>
 								) : undefined
 							}
 							actions={

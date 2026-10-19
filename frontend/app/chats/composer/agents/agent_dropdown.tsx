@@ -18,6 +18,7 @@ import {
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
@@ -96,21 +97,10 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 	})).filter(section => section.count > 0);
 
 	return (
-		<div className="border-secondary/30 bg-secondary/10 mb-2 rounded-xl border p-2 text-xs">
+		<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2 text-xs">
 			<div className="flex flex-wrap items-center gap-2">
-				<span className="font-semibold">{selectedAgent.displayName}</span>
-				<span className="badge badge-secondary badge-xs">Agent selected</span>
-				{manager.isTrackingOnly ? <span className="badge badge-outline badge-xs">Restored Session</span> : null}
+				<span className="font-semibold">Capability preview</span>
 				{excludedCount > 0 ? <span className="badge badge-warning badge-xs">Excluded {excludedCount}</span> : null}
-			</div>
-
-			<div className="text-base-content/70 mt-1">
-				The selected Agent is sent as Session intent. The Session Runtime resolves its effective configuration when the
-				next Run is prepared.
-			</div>
-			<div className="text-base-content/60 mt-1">
-				Agent MCP declarations are inherited as MCP baseline selections. They remain subject to current connection,
-				installation, policy, and approval state.
 			</div>
 
 			{resolution ? (
@@ -187,10 +177,6 @@ function AgentSelectionSummary({ manager }: AgentDropdownProps) {
 							)}
 						</div>
 					</details>
-
-					<div className="text-base-content/60 mt-2">
-						Composer selectors remain available for explicit user additions and replacements alongside Agent intent.
-					</div>
 				</>
 			) : (
 				<div className="text-base-content/60 mt-2">Loading Agent capability preview…</div>
@@ -214,14 +200,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 		: manager.loading
 			? 'Loading Agent...'
 			: 'Agent';
-	const triggerTitle = manager.selectedAgent
-		? [
-				manager.selectedAgent.displayName,
-				getDistinctUserFacingLabel(manager.selectedAgent.displayName, manager.selectedAgent.agent.name),
-			]
-				.filter(Boolean)
-				.join(' · ')
-		: 'Apply an Agent starter recipe';
+	const triggerTitle = manager.selectedAgent ? 'Change the selected Agent' : 'Apply an Agent starter recipe';
 
 	const sortedAgentOptions = useMemo(
 		() => [...manager.agentOptions].toSorted(compareAgentOptions),
@@ -253,6 +232,9 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 	const selectableAgents = unselectedAgentOptions.filter(option => option.isSelectable);
 	const unavailableAgents = unselectedAgentOptions.filter(option => !option.isSelectable);
 	const firstSelectableAgent = selectableAgents[0] ?? null;
+	const agentHeaderMeta = isSearchQueryActive(searchQuery)
+		? `${selectableAgents.length} match${selectableAgents.length === 1 ? '' : 'es'}`
+		: `${selectableAgents.length} available`;
 	const resetTargetsBase = manager.baseAgentKey !== null && manager.baseAgentKey === manager.defaultAgentKey;
 	const resetLabel = resetTargetsBase ? 'Clear to base' : 'Reset to default';
 
@@ -262,13 +244,13 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 		const isDefault = option.key === manager.defaultAgentKey;
 		const disabled = manager.loading || manager.isApplying || !option.isSelectable;
 		const statusTip = manager.isTrackingOnly
-			? 'This Agent is tracked from restored Session state.'
-			: 'The Session Runtime will resolve this Agent authoritatively when the next Run starts.';
+			? 'Tracked from restored Session state.'
+			: 'Applied when the next Run is prepared.';
 		const resetTip = isDefault
-			? 'The default Agent is already active.'
+			? 'The default Agent is already selected.'
 			: resetTargetsBase
-				? 'Apply the built-in Base Agent starter recipe.'
-				: 'The Base Agent is unavailable, so apply the selectable default Agent instead.';
+				? 'Use the Base Agent.'
+				: 'Use the available default Agent.';
 
 		return (
 			<div
@@ -403,7 +385,16 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 	return (
 		<div className="relative w-full">
 			<HoverTip content={triggerTitle} placement="top" wrapperElement="div" wrapperClassName="w-full">
-				<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full justify-center`}>
+				<MenuButton
+					store={menu}
+					className={`${actionTriggerChipButtonClasses} w-full justify-center ${
+						manager.selectedAgent
+							? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+							: open
+								? 'border-base-300 bg-base-300/60'
+								: ''
+					}`}
+				>
 					<ActionTriggerChipContent
 						icon={<FiLayers size={14} />}
 						label={selectedLabel}
@@ -431,8 +422,6 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 								query={searchQuery}
 								onQueryChange={setSearchQuery}
 								placeholder="Search Agents..."
-								resultCount={unselectedAgentOptions.length}
-								totalCount={Math.max(0, manager.agentOptions.length - (selectedAgentOption ? 1 : 0))}
 								disabled={manager.loading}
 								onFocusFirstItem={() => {
 									focusFirstSearchableMenuItem(menuContentElement);
@@ -453,43 +442,39 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							/>
 						) : null}
 
-						<div className={`${actionTriggerMenuHeaderRowClasses} items-start`}>
-							<div className="min-w-0">
-								<div className="text-xs font-semibold">Agents</div>
-								<div className="mt-1 text-xs opacity-70">
-									Agent selection is persisted as Session intent. The backend re-resolves the Agent, Model, Tools,
-									Skills, MCP capabilities, and instructions when it prepares the next immutable Run operation.
-								</div>
-							</div>
-
-							<HoverTip
-								content="Reload available Agents"
-								placement="top"
-								wrapperElement="div"
-								wrapperClassName="inline-flex"
-							>
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs shrink-0 rounded-lg"
-									disabled={manager.loading || manager.isApplying}
-									onClick={() => {
-										void manager.refreshAgents();
-									}}
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Agents</div>
+							<div className="flex shrink-0 items-center gap-2">
+								<span className={actionTriggerMenuMetaClasses}>{agentHeaderMeta}</span>
+								<HoverTip
+									content="Reload available Agents"
+									placement="top"
+									wrapperElement="div"
+									wrapperClassName="inline-flex"
 								>
-									<FiRefreshCw size={13} />
-									<span>Refresh</span>
-								</button>
-							</HoverTip>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										disabled={manager.loading || manager.isApplying}
+										onClick={() => {
+											void manager.refreshAgents();
+										}}
+									>
+										<FiRefreshCw size={13} />
+										<span>Refresh</span>
+									</button>
+								</HoverTip>
+							</div>
 						</div>
 
 						{manager.error ? (
-							<div className="alert alert-error mb-2 rounded-2xl text-xs">
+							<div className="alert alert-error rounded-xl text-xs">
 								<span>{manager.error}</span>
 							</div>
 						) : null}
 
 						{manager.actionError ? (
-							<div className="alert alert-error mb-2 rounded-2xl text-xs whitespace-pre-wrap">
+							<div className="alert alert-error rounded-xl text-xs whitespace-pre-wrap">
 								<span>{manager.actionError}</span>
 							</div>
 						) : null}
@@ -538,17 +523,18 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						isEmpty={!selectedAgentOption && !hasUnavailableSelectedAgent}
 						summary={
 							selectedAgentOption ? (
-								<span className="badge badge-secondary badge-xs">1 selected</span>
+								<span>1 selected</span>
 							) : hasUnavailableSelectedAgent ? (
-								<span className="badge badge-warning badge-xs">Unavailable</span>
+								<span className="text-warning">Saved selection unavailable</span>
 							) : undefined
 						}
-						emptyLabel="Choose an Agent above to apply a starter recipe."
+						emptyLabel="Choose an Agent above to apply its starter recipe."
+						help="Applying an Agent saves Session intent. The runtime resolves its effective Model, Tools, Skills, MCP, and instructions for the next Run."
 					>
 						{selectedAgentOption ? (
 							<>
-								<AgentSelectionSummary manager={manager} />
 								{renderAgentOption(selectedAgentOption)}
+								<AgentSelectionSummary manager={manager} />
 							</>
 						) : hasUnavailableSelectedAgent ? (
 							<div className="alert alert-warning rounded-xl p-2 text-xs">

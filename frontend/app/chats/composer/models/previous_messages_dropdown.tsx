@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { useState } from 'react';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -7,8 +8,14 @@ import type { IncludePreviousMessages } from '@/spec/model';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
 	actionTriggerMenuCompactClasses,
+	actionTriggerMenuFieldCardClasses,
+	actionTriggerMenuFieldInputClasses,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
+	actionTriggerMenuMetaClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
@@ -28,7 +35,10 @@ function displayButtonValue(value: IncludePreviousMessages): string {
 	if (value === 'all') {
 		return 'All';
 	}
-	return String(value);
+	if (value === 0) {
+		return 'Current';
+	}
+	return `${value} turn${value === 1 ? '' : 's'}`;
 }
 
 function displayOptionLabel(value: IncludePreviousMessages): string {
@@ -41,32 +51,40 @@ function displayOptionLabel(value: IncludePreviousMessages): string {
 	return `${value} previous user turn${value === 1 ? '' : 's'}`;
 }
 
-function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | undefined {
-	const trimmed = rawValue.trim();
-	if (!trimmed) {
-		return undefined;
-	}
-
-	const parsed = Math.trunc(Number(trimmed));
-	if (!Number.isSafeInteger(parsed) || parsed < 0) {
-		return 0;
-	}
-
-	return parsed;
-}
-
 export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
 	const availableOptions = OPTIONS.filter(option => option !== value);
+	const [customError, setCustomError] = useState<string | null>(null);
+	const isOverride = value !== 0;
+	const triggerTone = open
+		? 'border-base-300 bg-base-300/60'
+		: isOverride
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: '';
+
 	const commitCustomValue = (rawValue: string) => {
-		const nextValue = maybeParseCustomValue(rawValue);
-		if (nextValue === undefined) {
-			return;
+		const trimmed = rawValue.trim();
+		if (!trimmed) {
+			setCustomError(null);
+			return false;
+		}
+
+		if (!/^\d+$/.test(trimmed)) {
+			setCustomError('Enter a whole number of previous user turns.');
+			return false;
+		}
+
+		const nextValue = Number(trimmed);
+		if (!Number.isSafeInteger(nextValue)) {
+			setCustomError('Enter a safe whole number of previous user turns.');
+			return false;
 		}
 
 		setValue(nextValue);
+		setCustomError(null);
+		return true;
 	};
 
 	return (
@@ -76,18 +94,14 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					placement="top"
 					wrapperElement="div"
 					wrapperClassName="w-full"
-					content={
-						<div className="space-y-1">
-							<p>
-								- Send &quot;N&quot; previous pure user turns excluding current message. <br />
-								- A pure user turn is one without any tool outputs. <br />
-							</p>
-						</div>
-					}
+					content="Choose prior user-turn history."
 				>
-					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
+					<MenuButton
+						store={menu}
+						className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center ${triggerTone}`}
+					>
 						<ActionTriggerChipContent
-							label={`Prev user turns: ${displayButtonValue(value)}`}
+							label={`History: ${displayButtonValue(value)}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
@@ -101,50 +115,91 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					gutter={8}
 					overflowPadding={8}
 					autoFocusOnShow
-					className={`${actionTriggerMenuCompactClasses} text-xs`}
+					className={actionTriggerMenuCompactClasses}
 				>
-					{availableOptions.map(option => {
-						const key = valueToKey(option);
-						return (
-							<MenuItem
-								key={key}
-								className={`${actionTriggerMenuItemClasses} justify-between`}
-								onClick={() => {
-									setValue(option);
-								}}
-							>
-								<span>{displayOptionLabel(option)}</span>
-							</MenuItem>
-						);
-					})}
+					<ActionTriggerMenuHeader>
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Previous user turns</div>
+							<span className={actionTriggerMenuMetaClasses}>{availableOptions.length} presets</span>
+						</div>
+					</ActionTriggerMenuHeader>
 
-					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
-						<input
-							key={valueToKey(value)}
-							data-disable-chat-shortcuts="true"
-							type="text"
-							name="include-previous-messages"
-							className="input input-xs w-full"
-							placeholder="<n> previous user turns"
-							defaultValue={value === 'all' ? '' : String(value)}
-							spellCheck="false"
-							onBlur={e => {
-								commitCustomValue(e.currentTarget.value);
-							}}
-							onKeyDown={e => {
-								if (e.key === 'Enter') {
-									e.preventDefault();
-									commitCustomValue(e.currentTarget.value);
-								}
-							}}
-						/>
-					</div>
+					<ActionTriggerMenuBody className="space-y-2">
+						<div className="space-y-1">
+							{availableOptions.map(option => {
+								const key = valueToKey(option);
+								return (
+									<MenuItem
+										key={key}
+										className={`${actionTriggerMenuItemClasses} justify-between`}
+										onClick={() => {
+											setCustomError(null);
+											setValue(option);
+										}}
+									>
+										<span>{displayOptionLabel(option)}</span>
+									</MenuItem>
+								);
+							})}
+						</div>
+
+						<div className={actionTriggerMenuFieldCardClasses}>
+							<label htmlFor="include-previous-messages" className="block text-xs font-semibold">
+								Custom number of turns
+							</label>
+							<div className="text-base-content/60 mt-1 mb-2 text-[11px]">
+								Enter 0 or a whole number of previous pure user turns.
+							</div>
+							<input
+								id="include-previous-messages"
+								key={valueToKey(value)}
+								data-disable-chat-shortcuts="true"
+								type="text"
+								name="include-previous-messages"
+								inputMode="numeric"
+								autoComplete="off"
+								className={`${actionTriggerMenuFieldInputClasses} ${customError ? 'input-error' : ''}`}
+								placeholder="For example: 4"
+								defaultValue={value === 'all' ? '' : String(value)}
+								spellCheck={false}
+								aria-invalid={customError ? 'true' : undefined}
+								aria-describedby={customError ? 'previous-messages-error' : undefined}
+								onChange={() => {
+									setCustomError(null);
+								}}
+								onClick={event => {
+									event.stopPropagation();
+								}}
+								onBlur={event => {
+									commitCustomValue(event.currentTarget.value);
+								}}
+								onKeyDown={event => {
+									if (event.key !== 'Escape') {
+										event.stopPropagation();
+									}
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										if (commitCustomValue(event.currentTarget.value)) {
+											menu.hide();
+										}
+									}
+								}}
+							/>
+							{customError ? (
+								<div id="previous-messages-error" role="alert" className="text-error mt-1 text-[11px]">
+									{customError}
+								</div>
+							) : null}
+						</div>
+					</ActionTriggerMenuBody>
 
 					<ComposerCurrentSettingPanel
-						label="Current history setting"
+						label="Current history"
 						value={displayOptionLabel(value)}
+						help="This controls how many earlier pure user turns are sent with the current message. Turns containing tool output are not included."
 						isDefault={value === 0}
 						onUseDefault={() => {
+							setCustomError(null);
 							setValue(0);
 						}}
 						useDefaultLabel="Current turn only"
