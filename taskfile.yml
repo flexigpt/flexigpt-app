@@ -13,7 +13,7 @@ includes:
 
   go:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
-    checksum: e4cc5aea758c6d79d92c78021d32a5b8c9cf086933000f3a715b0b83266f99ed
+    checksum: 4f3a7e4d867c78ddd8ab2aa72e2edd27b345323013ee1e5b5d9604f1de237240
     dir: "{{.ROOT_DIR}}"
     internal: true
     vars:
@@ -72,8 +72,8 @@ tasks:
     cmds:
       - corepack enable
       - asdf reshim nodejs
-      - corepack prepare pnpm@12.6.0 --activate
-      - corepack use pnpm@12.6.0
+      - corepack prepare pnpm@12.14.0 --activate
+      - corepack use pnpm@12.14.0
       - asdf reshim nodejs
 
   upgrade-nodejs:

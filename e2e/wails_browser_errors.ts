@@ -9,7 +9,7 @@ function isKnownWailsV216BrowserOverlayError(error: Error): boolean {
 }
 
 /**
- * Wails v2.16.0 browser IPC starts a broken Svelte reconnect-overlay.
+ * Wails browser IPC starts a broken Svelte reconnect-overlay.
  *
  * This fixture ignores only that exact vendor error. Any other pageerror
  * remains a failing test result.
@@ -41,13 +41,10 @@ export const test = base.extend<WailsBrowserErrorFixtures>({
 				page.off("pageerror", onPageError);
 
 				if (ignoredErrors.length > 0) {
-					await testInfo.attach(
-						"ignored-wails-v2.16.0-browser-overlay-errors.txt",
-						{
-							body: ignoredErrors.join("\n\n"),
-							contentType: "text/plain",
-						},
-					);
+					await testInfo.attach("ignored-wails-browser-overlay-errors.txt", {
+						body: ignoredErrors.join("\n\n"),
+						contentType: "text/plain",
+					});
 				}
 
 				expect(unexpectedErrors, "Unexpected browser page errors").toEqual([]);
