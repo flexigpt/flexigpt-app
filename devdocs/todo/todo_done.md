@@ -1120,3 +1120,5 @@
 - [x] diff now has inspect path and then review again. we want Review first and then on that click review should already be done. should not cause perf regression.
 - [x] in case where manually path is entered, even if we put the target, the review doesn't work.
 - [x] need font mono in header things properly
+- [x] attachments should have search too
+- [x] ui consistency in all composer controls

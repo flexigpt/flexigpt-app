@@ -8,12 +8,13 @@
   - [ ] test with some skill that has scripts too
   - [ ] test workspace
   - [ ] test all management pages again properly
+
 - [ ] times on resp etc will be good
 
 ## M-3
 
-- [x] see if artifactory needs to be a repo.
-- [ ] same with llm artifacts. and then complete it with agentruntime repo.
+- [x] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
+
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - [x] setup steps for local or custom models
   - recommended models
