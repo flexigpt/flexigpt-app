@@ -10,6 +10,9 @@ import type { UIModelOption } from '@/spec/model';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -189,67 +192,82 @@ export function ModelDropdown({
 					autoFocusOnShow={false}
 					className={actionTriggerMenuWideClasses}
 				>
-					<SearchableMenuInput
-						open={open}
-						query={searchQuery}
-						onQueryChange={setSearchQuery}
-						placeholder="Search models…"
-						resultCount={displayedModelCount}
-						totalCount={Math.max(0, allOptions.length - 1)}
-						onFocusFirstItem={() => {
-							focusFirstSearchableMenuItem(menuContentElement);
-						}}
-						onEnterFirstResult={() => {
-							if (firstVisibleModel) {
-								selectModel(firstVisibleModel);
-							}
-						}}
-						onEscape={() => {
-							menu.hide();
-						}}
-					/>
+					<ActionTriggerMenuHeader>
+						<SearchableMenuInput
+							open={open}
+							query={searchQuery}
+							onQueryChange={setSearchQuery}
+							placeholder="Search models…"
+							resultCount={displayedModelCount}
+							totalCount={Math.max(0, allOptions.length - 1)}
+							onFocusFirstItem={() => {
+								focusFirstSearchableMenuItem(menuContentElement);
+							}}
+							onEnterFirstResult={() => {
+								if (firstVisibleModel) {
+									selectModel(firstVisibleModel);
+								}
+							}}
+							onEscape={() => {
+								menu.hide();
+							}}
+						/>
 
-					{agentOwnsModel ? (
-						<div className="text-base-content/60 mb-2 px-1 text-xs">
-							Choosing a Model below replaces Agent Model ownership with an explicit Session Model override.
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="text-xs font-semibold">Models</div>
+							<span className="badge badge-ghost badge-xs">{allOptions.length} available</span>
 						</div>
-					) : null}
 
-					{selectableProviderGroups.length === 0 ? (
-						<div className={searchableMenuEmptyStateClasses}>No other models match your search.</div>
-					) : null}
+						{agentOwnsModel ? (
+							<div className="text-base-content/60 mb-2 px-1 text-xs">
+								Choosing a Model below replaces Agent Model ownership with an explicit Session Model override.
+							</div>
+						) : null}
+					</ActionTriggerMenuHeader>
 
-					{selectableProviderGroups.map((group, groupIndex) => (
-						<GroupedMenuSection
-							key={group.providerName}
-							title={group.providerDisplayName}
-							ariaLabel={`${group.providerDisplayName} models`}
-							separatorBefore={groupIndex > 0}
-						>
-							{group.options.map(model => (
-								<MenuItem
-									key={modelKey(model)}
-									data-searchable-menu-item="true"
-									className={`${actionTriggerMenuItemClasses} justify-between`}
-									onClick={() => {
-										selectModel(model);
-									}}
-								>
-									<span className="min-w-0 truncate">{model.modelDisplayName}</span>
-									{isCurrent(model) && isAgentOwnedModel(model) ? (
-										<span className="badge badge-secondary badge-xs ml-auto">Agent</span>
-									) : null}
-									{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
-								</MenuItem>
-							))}
-						</GroupedMenuSection>
-					))}
+					<ActionTriggerMenuBody>
+						{selectableProviderGroups.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>No other models match your search.</div>
+						) : null}
 
-					<ComposerDropdownSelectedPanel label="Current model" count={1}>
+						{selectableProviderGroups.map((group, groupIndex) => (
+							<GroupedMenuSection
+								key={group.providerName}
+								title={group.providerDisplayName}
+								ariaLabel={`${group.providerDisplayName} models`}
+								separatorBefore={groupIndex > 0}
+							>
+								{group.options.map(model => (
+									<MenuItem
+										key={modelKey(model)}
+										data-searchable-menu-item="true"
+										className={`${actionTriggerMenuItemClasses} justify-between`}
+										onClick={() => {
+											selectModel(model);
+										}}
+									>
+										<span className="min-w-0 truncate">{model.modelDisplayName}</span>
+										{isCurrent(model) && isAgentOwnedModel(model) ? (
+											<span className="badge badge-secondary badge-xs ml-auto">Agent</span>
+										) : null}
+										{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
+									</MenuItem>
+								))}
+							</GroupedMenuSection>
+						))}
+					</ActionTriggerMenuBody>
+
+					<ComposerDropdownSelectedPanel
+						label="Current model"
+						ariaLabel="Current model"
+						summary={
+							<span className={`badge badge-xs ${agentOwnsModel ? 'badge-secondary' : 'badge-ghost'}`}>
+								{agentOwnsModel ? 'Agent' : 'Session'}
+							</span>
+						}
+					>
 						<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1">
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>
-							{agentOwnsModel ? <span className="badge badge-secondary badge-xs">Agent</span> : null}
-							{!agentOwnsModel ? <span className="badge badge-ghost badge-xs">Session</span> : null}
 						</div>
 					</ComposerDropdownSelectedPanel>
 				</Menu>

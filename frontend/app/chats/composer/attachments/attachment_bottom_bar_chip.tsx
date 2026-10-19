@@ -10,6 +10,9 @@ import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -105,32 +108,45 @@ function AttachmentBottomBarChipInner({
 				data-menu-kind="attachments"
 				autoFocusOnShow
 			>
-				<MenuItem
-					onClick={() => {
-						void handlePickFiles();
-					}}
-					className={actionTriggerMenuItemClasses}
-				>
-					<FiUpload size={14} />
-					<span>Multiple Files...</span>
-				</MenuItem>
-				<MenuItem
-					onClick={() => {
-						void handlePickDirectory();
-					}}
-					className={actionTriggerMenuItemClasses}
-				>
-					<FiFolder size={14} />
-					<span>Folder...</span>
-				</MenuItem>
-				<MenuItem onClick={handlePickURL} className={actionTriggerMenuItemClasses}>
-					<FiLink size={14} />
-					<span>Link or URL...</span>
-				</MenuItem>
+				<ActionTriggerMenuHeader>
+					<div className={actionTriggerMenuHeaderRowClasses}>
+						<div className="text-xs font-semibold">Add attachments</div>
+						{selectedCount > 0 ? <span className="badge badge-ghost badge-xs">{selectedCount} added</span> : null}
+					</div>
+				</ActionTriggerMenuHeader>
+
+				<ActionTriggerMenuBody>
+					<MenuItem
+						onClick={() => {
+							void handlePickFiles();
+						}}
+						className={actionTriggerMenuItemClasses}
+					>
+						<FiUpload size={14} />
+						<span>Multiple Files...</span>
+					</MenuItem>
+					<MenuItem
+						onClick={() => {
+							void handlePickDirectory();
+						}}
+						className={actionTriggerMenuItemClasses}
+					>
+						<FiFolder size={14} />
+						<span>Folder...</span>
+					</MenuItem>
+					<MenuItem onClick={handlePickURL} className={actionTriggerMenuItemClasses}>
+						<FiLink size={14} />
+						<span>Link or URL...</span>
+					</MenuItem>
+				</ActionTriggerMenuBody>
 
 				<ComposerDropdownSelectedPanel
 					label="Added to this message"
-					count={selectedCount}
+					ariaLabel="Added attachments to this message"
+					isEmpty={selectedCount === 0}
+					summary={
+						selectedCount > 0 ? <span className="badge badge-ghost badge-xs">{selectedCount} added</span> : undefined
+					}
 					emptyLabel="Attachments selected for this message will appear here."
 				>
 					{directoryGroups.map(group => (

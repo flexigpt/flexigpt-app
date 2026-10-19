@@ -16,6 +16,9 @@ import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_m
 import {
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -519,21 +522,6 @@ export function ToolsBottomBarChip({
 	const selectedToolsPanel =
 		configuredCount > 0 ? (
 			<>
-				<div className="flex justify-end px-1">
-					<button
-						type="button"
-						className="btn btn-ghost btn-xs text-error rounded-lg"
-						disabled={isInputLocked}
-						onClick={() => {
-							onRemoveAllAttachedTools(attached);
-							setConversationToolsState([]);
-							setWebSearchTemplates([]);
-						}}
-					>
-						Clear all
-					</button>
-				</div>
-
 				{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
 				{activeWebSearch && !activeWebSearchItem ? (
 					<div className="alert alert-warning rounded-xl p-2 text-xs">
@@ -611,53 +599,57 @@ export function ToolsBottomBarChip({
 			>
 				{open ? (
 					<>
-						<SearchableMenuInput
-							open={open}
-							query={query}
-							onQueryChange={setQuery}
-							placeholder="Search tools..."
-							resultCount={resultCount}
-							totalCount={available.length + eligibleWebSearch.length}
-							disabled={isLoading && !hasResolved}
-							onFocusFirstItem={() => focusFirstSearchableMenuItem(contentElement)}
-							onEnterFirstResult={() => {
-								if (isInputLocked) {
-									return;
-								}
-								if (visibleWebSearch[0]) {
-									selectWebSearch(visibleWebSearch[0]);
-									return;
-								}
-								const first = visibleAvailable.find(item => !attachedByKey.has(itemKey(item)));
-								if (first) {
-									onAttachTool(first, autoExecuteFor(first));
-								}
-							}}
-							onEscape={() => {
-								store.hide();
-							}}
-						/>
+						<ActionTriggerMenuHeader>
+							<SearchableMenuInput
+								open={open}
+								query={query}
+								onQueryChange={setQuery}
+								placeholder="Search tools..."
+								resultCount={resultCount}
+								totalCount={available.length + eligibleWebSearch.length}
+								disabled={isLoading && !hasResolved}
+								onFocusFirstItem={() => focusFirstSearchableMenuItem(contentElement)}
+								onEnterFirstResult={() => {
+									if (isInputLocked) {
+										return;
+									}
+									if (visibleWebSearch[0]) {
+										selectWebSearch(visibleWebSearch[0]);
+										return;
+									}
+									const first = visibleAvailable.find(item => !attachedByKey.has(itemKey(item)));
+									if (first) {
+										onAttachTool(first, autoExecuteFor(first));
+									}
+								}}
+								onEscape={() => {
+									store.hide();
+								}}
+							/>
 
-						<div className="flex items-center justify-between px-2 py-1 text-xs">
-							<span>{isLoading || isRefreshing ? 'Loading tools...' : 'Built-in Tool Plugins'}</span>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs"
-								disabled={isLoading || isRefreshing || isInputLocked}
-								onClick={refresh}
-							>
-								<FiRefreshCw size={12} />
-								Refresh
-							</button>
-						</div>
-
-						{catalogError ? (
-							<div className="alert alert-warning rounded-xl p-2 text-xs">
-								The Tool catalog could not be loaded. Refresh to retry.
+							<div className={actionTriggerMenuHeaderRowClasses}>
+								<span className="text-xs font-semibold">
+									{isLoading || isRefreshing ? 'Loading tools...' : 'Tools'}
+								</span>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs"
+									disabled={isLoading || isRefreshing || isInputLocked}
+									onClick={refresh}
+								>
+									<FiRefreshCw size={12} />
+									Refresh
+								</button>
 							</div>
-						) : null}
 
-						<div className="space-y-2">
+							{catalogError ? (
+								<div className="alert alert-warning rounded-xl p-2 text-xs">
+									The Tool catalog could not be loaded. Refresh to retry.
+								</div>
+							) : null}
+						</ActionTriggerMenuHeader>
+
+						<ActionTriggerMenuBody className="space-y-2">
 							<GroupedMenuSection title="Web search" ariaLabel="Web search tools">
 								{visibleWebSearchToAdd.length > 0 ? (
 									<>
@@ -710,9 +702,35 @@ export function ToolsBottomBarChip({
 									<span>Resolve unavailable tools and invalid tool options before sending.</span>
 								</div>
 							) : null}
-						</div>
+						</ActionTriggerMenuBody>
 
-						<ComposerDropdownSelectedPanel label="Added tools" count={configuredCount}>
+						<ComposerDropdownSelectedPanel
+							label="Added tools"
+							ariaLabel="Added tools"
+							isEmpty={configuredCount === 0}
+							emptyLabel="No per-message tools, conversation tools, or web-search provider have been added."
+							summary={
+								configuredCount > 0 ? (
+									<span className="badge badge-ghost badge-xs">{configuredCount} added</span>
+								) : undefined
+							}
+							actions={
+								configuredCount > 0 ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs text-error rounded-lg"
+										disabled={isInputLocked}
+										onClick={() => {
+											onRemoveAllAttachedTools(attached);
+											setConversationToolsState([]);
+											setWebSearchTemplates([]);
+										}}
+									>
+										Clear all
+									</button>
+								) : undefined
+							}
+						>
 							{selectedToolsPanel}
 						</ComposerDropdownSelectedPanel>
 					</>

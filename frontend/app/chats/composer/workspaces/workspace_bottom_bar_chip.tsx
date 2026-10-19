@@ -11,6 +11,9 @@ import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 import {
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -184,43 +187,6 @@ function WorkspaceBottomBarChipContent({
 			<div className="text-base-content/60 mt-1 text-xs">
 				{selectedContextCount} Context · {selectedSkillCount} instruction Skills
 			</div>
-			<div className="mt-2 flex flex-wrap gap-2">
-				<button
-					type="button"
-					className="btn btn-xs rounded-lg"
-					onClick={() => {
-						store.hide();
-						setIsSelectionOpen(true);
-					}}
-				>
-					<FiSettings size={12} />
-					Edit selection
-				</button>
-				<button
-					type="button"
-					className="btn btn-ghost btn-xs rounded-lg"
-					disabled={state.selectionLoading}
-					onClick={() => {
-						void state.refreshSelectedWorkspace();
-					}}
-				>
-					<FiRefreshCw size={12} />
-					Refresh status
-				</button>
-				<button
-					type="button"
-					className="btn btn-ghost btn-xs text-error rounded-lg"
-					disabled={isInputLocked}
-					onClick={() => {
-						void state.detachWorkspace().catch((error: unknown) => {
-							setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
-						});
-					}}
-				>
-					<FiX size={12} />
-					Detach
-				</button>
-			</div>
 		</div>
 	) : undefined;
 
@@ -280,179 +246,191 @@ function WorkspaceBottomBarChipContent({
 				autoFocusOnShow={false}
 				className={actionTriggerMenuWideClasses}
 			>
-				<div className="mb-2 flex items-center justify-between gap-2 px-1">
-					<div className="text-base-content/70 text-xs font-semibold">Effective Workspaces</div>
-					<button
-						type="button"
-						className="btn btn-ghost btn-xs rounded-lg"
-						disabled={state.workspacesLoading}
-						onClick={() => {
-							void state.refreshWorkspaces();
-						}}
-						aria-label="Refresh Workspace directory list"
-						title="Refresh Workspace directory list"
-					>
-						<FiRefreshCw size={12} />
-					</button>
-				</div>
-
-				{state.workspacesLoadError ? (
-					<div className="alert alert-warning mb-2 rounded-xl text-xs">
-						<FiAlertCircle size={14} />
-						<span>{state.workspacesLoadError}</span>
+				<ActionTriggerMenuHeader>
+					<div className="input input-sm mb-2 flex items-center gap-2 rounded-xl">
+						<label htmlFor="composer-workspace-search" className="sr-only">
+							Search Workspaces
+						</label>
+						<FiSearch size={13} aria-hidden="true" />
+						<input
+							id="composer-workspace-search"
+							type="search"
+							className="grow"
+							value={search}
+							onChange={event => {
+								setSearch(event.currentTarget.value);
+							}}
+							placeholder="Search effective Workspaces..."
+							aria-label="Search effective Workspaces"
+							spellCheck="false"
+						/>
 					</div>
-				) : null}
 
-				{actionError ? (
-					<div className="alert alert-error mb-2 rounded-xl text-xs">
-						<FiAlertCircle size={14} />
-						<span>{actionError}</span>
+					<div className={actionTriggerMenuHeaderRowClasses}>
+						<div className="text-base-content/70 text-xs font-semibold">Effective Workspaces</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs rounded-lg"
+							disabled={state.workspacesLoading}
+							onClick={() => {
+								void state.refreshWorkspaces();
+							}}
+							aria-label="Refresh Workspace directory list"
+							title="Refresh Workspace directory list"
+						>
+							<FiRefreshCw size={12} />
+						</button>
 					</div>
-				) : null}
 
-				{selected ? (
-					<div className="border-secondary/30 bg-secondary/10 mb-2 rounded-xl border p-2">
-						<div className="truncate text-xs font-semibold">{selectedName}</div>
-						<div className="text-base-content/60 mt-1 text-xs">
-							{selectedContextCount} Context · {selectedSkillCount} instruction Skills
+					{state.workspacesLoadError ? (
+						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} />
+							<span>{state.workspacesLoadError}</span>
 						</div>
-						<div className="mt-2 flex flex-wrap gap-2">
-							<button
-								type="button"
-								className="btn btn-xs rounded-lg"
-								onClick={() => {
-									store.hide();
-									setIsSelectionOpen(true);
-								}}
-							>
-								<FiSettings size={12} />
-								Edit selection
-							</button>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={state.selectionLoading}
-								onClick={() => {
-									void state.refreshSelectedWorkspace();
-								}}
-							>
-								<FiRefreshCw size={12} />
-								Refresh status
-							</button>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs text-error rounded-lg"
-								disabled={isInputLocked}
-								onClick={() => {
-									void state
-										.detachWorkspace()
-										.then(() => {
-											store.hide();
-										})
-										.catch((error: unknown) => {
+					) : null}
+
+					{actionError ? (
+						<div className="alert alert-error mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} />
+							<span>{actionError}</span>
+						</div>
+					) : null}
+				</ActionTriggerMenuHeader>
+
+				<ActionTriggerMenuBody>
+					{state.workspacesLoading && state.workspaces.length === 0 ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+							Loading Workspace directories...
+						</div>
+					) : availableWorkspaces.length === 0 ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+							{selected ? 'All matching Workspaces are already selected below.' : 'No effective Workspaces match.'}
+						</div>
+					) : (
+						<div className="space-y-1">
+							{availableWorkspaces.map(candidate => {
+								const candidateKey = workspaceKey(candidate);
+								const available = workspaceIsAvailable(candidate);
+
+								return (
+									<MenuItem
+										key={candidateKey}
+										hideOnClick={false}
+										disabled={!available || isInputLocked}
+										className={`${actionTriggerMenuItemClasses} items-start`}
+										onClick={() => {
+											if (!available) {
+												return;
+											}
+
+											setActionError(null);
+
+											void state
+												.attachWorkspace(candidate)
+												.then(() => {
+													store.hide();
+												})
+												.catch((error: unknown) => {
+													setActionError(error instanceof Error ? error.message : 'Workspace could not be selected.');
+												});
+										}}
+									>
+										<FiFolderPlus size={14} className="mt-0.5 shrink-0" />
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs font-medium">{workspaceDisplayName(candidate)}</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">
+												{workspaceSubtitle(candidate)}
+											</div>
+										</div>
+										{!available ? (
+											<span className="badge badge-warning badge-xs">Unavailable</span>
+										) : candidate.workspace.origin === WorkspaceDirectoryOrigin.Default ? (
+											<span className="badge badge-info badge-xs">Default</span>
+										) : (
+											<span className="badge badge-ghost badge-xs">Manifest</span>
+										)}
+									</MenuItem>
+								);
+							})}
+						</div>
+					)}
+
+					<div className="border-base-300 mt-2 border-t pt-2">
+						<button
+							type="button"
+							className="btn btn-ghost btn-sm w-full justify-start rounded-xl"
+							disabled={isInputLocked}
+							onClick={() => {
+								store.hide();
+								setIsDirectoryRegistrationOpen(true);
+							}}
+						>
+							<FiFolderPlus size={14} />
+							Add Workspace Directory
+						</button>
+					</div>
+				</ActionTriggerMenuBody>
+
+				<ComposerDropdownSelectedPanel
+					label="Selected Workspace"
+					ariaLabel="Selected Workspace"
+					isEmpty={!selected}
+					emptyLabel="No Workspace is selected for this conversation."
+					summary={
+						selected ? (
+							<>
+								<span className="badge badge-secondary badge-xs">1 selected</span>
+								{selectedContextCount > 0 ? (
+									<span className="badge badge-secondary badge-xs">Context {selectedContextCount}</span>
+								) : null}
+								{selectedSkillCount > 0 ? (
+									<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
+								) : null}
+							</>
+						) : undefined
+					}
+					actions={
+						selected ? (
+							<>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={() => {
+										store.hide();
+										setIsSelectionOpen(true);
+									}}
+									title="Edit Workspace selection"
+								>
+									<FiSettings size={12} />
+								</button>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={state.selectionLoading}
+									onClick={() => {
+										void state.refreshSelectedWorkspace();
+									}}
+									title="Refresh Workspace status"
+								>
+									<FiRefreshCw size={12} />
+								</button>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs text-error rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										void state.detachWorkspace().catch((error: unknown) => {
 											setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
 										});
-								}}
-							>
-								<FiX size={12} />
-								Detach
-							</button>
-						</div>
-					</div>
-				) : null}
-
-				<div className="input input-sm mb-2 flex items-center gap-2 rounded-xl">
-					<label htmlFor="composer-workspace-search" className="sr-only">
-						Search Workspaces
-					</label>
-					<FiSearch size={13} aria-hidden="true" />
-					<input
-						id="composer-workspace-search"
-						type="search"
-						className="grow"
-						value={search}
-						onChange={event => {
-							setSearch(event.currentTarget.value);
-						}}
-						placeholder="Search effective Workspaces..."
-						aria-label="Search effective Workspaces"
-						spellCheck="false"
-					/>
-				</div>
-
-				{state.workspacesLoading && state.workspaces.length === 0 ? (
-					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						Loading Workspace directories...
-					</div>
-				) : availableWorkspaces.length === 0 ? (
-					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						{selected ? 'All matching Workspaces are already selected below.' : 'No effective Workspaces match.'}
-					</div>
-				) : (
-					<div className="space-y-1">
-						{availableWorkspaces.map(candidate => {
-							const candidateKey = workspaceKey(candidate);
-							const available = workspaceIsAvailable(candidate);
-
-							return (
-								<MenuItem
-									key={candidateKey}
-									hideOnClick={false}
-									disabled={!available || isInputLocked}
-									className={`${actionTriggerMenuItemClasses} items-start`}
-									onClick={() => {
-										if (!available) {
-											return;
-										}
-
-										setActionError(null);
-
-										void state
-											.attachWorkspace(candidate)
-											.then(() => {
-												store.hide();
-											})
-											.catch((error: unknown) => {
-												setActionError(error instanceof Error ? error.message : 'Workspace could not be selected.');
-											});
 									}}
+									title="Detach Workspace"
 								>
-									<FiFolderPlus size={14} className="mt-0.5 shrink-0" />
-									<div className="min-w-0 flex-1">
-										<div className="truncate text-xs font-medium">{workspaceDisplayName(candidate)}</div>
-										<div className="text-base-content/60 truncate font-mono text-[10px]">
-											{workspaceSubtitle(candidate)}
-										</div>
-									</div>
-									{!available ? (
-										<span className="badge badge-warning badge-xs">Unavailable</span>
-									) : candidate.workspace.origin === WorkspaceDirectoryOrigin.Default ? (
-										<span className="badge badge-info badge-xs">Default</span>
-									) : (
-										<span className="badge badge-ghost badge-xs">Manifest</span>
-									)}
-								</MenuItem>
-							);
-						})}
-					</div>
-				)}
-
-				<div className="border-base-300 mt-2 border-t pt-2">
-					<button
-						type="button"
-						className="btn btn-ghost btn-sm w-full justify-start rounded-xl"
-						disabled={isInputLocked}
-						onClick={() => {
-							store.hide();
-							setIsDirectoryRegistrationOpen(true);
-						}}
-					>
-						<FiFolderPlus size={14} />
-						Add Workspace Directory
-					</button>
-				</div>
-
-				<ComposerDropdownSelectedPanel label="Selected Workspace" count={selected ? 1 : 0}>
+									<FiX size={12} />
+								</button>
+							</>
+						) : undefined
+					}
+				>
 					{selectedWorkspacePanel}
 				</ComposerDropdownSelectedPanel>
 			</Menu>

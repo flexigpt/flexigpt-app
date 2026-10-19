@@ -8,6 +8,9 @@ import { buildShortcutDisplay } from '@/lib/keyboard_shortcuts';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -45,30 +48,47 @@ export function KeyboardShortcutsMenu({ shortcutConfig }: KeyboardShortcutsMenuP
 				className={actionTriggerMenuWideClasses}
 				autoFocusOnShow
 			>
-				{chatShortcuts.length > 0 && (
-					<>
-						<div className="app-text-neutral/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Chat shortcuts</div>
-						{chatShortcuts.map(item => (
-							<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
-								<span className="flex-1 text-left">{item.label}</span>
-								<span className="app-text-neutral ml-auto w-30 text-left text-xs whitespace-nowrap">{item.keys}</span>
-							</MenuItem>
-						))}
-					</>
-				)}
+				<ActionTriggerMenuHeader>
+					<div className={actionTriggerMenuHeaderRowClasses}>
+						<div className="text-xs font-semibold">Keyboard shortcuts</div>
+						<span className="badge badge-ghost badge-xs">{shortcutItems.length}</span>
+					</div>
+				</ActionTriggerMenuHeader>
 
-				{composerShortcuts.length > 0 && (
-					<>
-						{chatShortcuts.length > 0 && <div className="border-base-200 mx-2 mt-1 border-t" />}
-						<div className="app-text-neutral/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Composer shortcuts</div>
-						{composerShortcuts.map(item => (
-							<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
-								<span className="flex-1 text-left">{item.label}</span>
-								<span className="app-text-neutral ml-auto w-30 text-left text-xs whitespace-nowrap">{item.keys}</span>
-							</MenuItem>
-						))}
-					</>
-				)}
+				<ActionTriggerMenuBody>
+					{shortcutItems.length === 0 ? (
+						<div className="border-base-300/70 bg-base-200/40 text-base-content/60 rounded-xl border border-dashed p-2 text-xs">
+							No keyboard shortcuts are currently available.
+						</div>
+					) : null}
+
+					{chatShortcuts.length > 0 && (
+						<>
+							<div className="app-text-neutral/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Chat shortcuts</div>
+							{chatShortcuts.map(item => (
+								<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
+									<span className="flex-1 text-left">{item.label}</span>
+									<span className="app-text-neutral ml-auto w-30 text-left text-xs whitespace-nowrap">{item.keys}</span>
+								</MenuItem>
+							))}
+						</>
+					)}
+
+					{composerShortcuts.length > 0 && (
+						<>
+							{chatShortcuts.length > 0 && <div className="border-base-200 mx-2 mt-1 border-t" />}
+							<div className="app-text-neutral/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">
+								Composer shortcuts
+							</div>
+							{composerShortcuts.map(item => (
+								<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
+									<span className="flex-1 text-left">{item.label}</span>
+									<span className="app-text-neutral ml-auto w-30 text-left text-xs whitespace-nowrap">{item.keys}</span>
+								</MenuItem>
+							))}
+						</>
+					)}
+				</ActionTriggerMenuBody>
 			</Menu>
 		</div>
 	);

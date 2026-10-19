@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX, FiZap } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiZap } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -20,6 +20,9 @@ import type { DropdownItem } from '@/components/dropdown';
 import {
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -247,6 +250,13 @@ export function SkillsBottomBarChip({
 		() => allSkills.filter(skill => skill.insert !== SkillInsert.UserMessage).toSorted(compareSkills),
 		[allSkills]
 	);
+	const selectableInstructionSkillCount = useMemo(
+		() =>
+			instructionSkills.filter(s => {
+				return selectable(s);
+			}).length,
+		[instructionSkills]
+	);
 
 	const visibleSkills = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
@@ -303,6 +313,8 @@ export function SkillsBottomBarChip({
 		() => systemPrompt.instructionSources.filter(source => !selectedSourceKeys.has(source.identityKey)),
 		[selectedSourceKeys, systemPrompt.instructionSources]
 	);
+	const hasAvailableModelDefault = Boolean(systemPrompt.modelDefaultPrompt.trim() && !systemPrompt.includeModelDefault);
+	const hasAvailableInstructionSources = hasAvailableModelDefault || availableInstructionSources.length > 0;
 	const selectedInstructionSkillKeys = useMemo(
 		() =>
 			new Set(selectedInstructionSources.flatMap(source => (source.skillRef ? [skillRefKey(source.skillRef)] : []))),
@@ -513,20 +525,7 @@ export function SkillsBottomBarChip({
 		<>
 			{selectedSystemSourceCount > 0 ? (
 				<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2">
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<span className="text-xs font-semibold">System instruction sources</span>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs text-error rounded-lg"
-							disabled={isInputLocked}
-							onClick={() => {
-								systemPrompt.clearInstructionSources();
-							}}
-						>
-							<FiX size={12} />
-							Clear
-						</button>
-					</div>
+					<div className="mb-2 text-xs font-semibold">System instruction sources</div>
 
 					{systemPrompt.includeModelDefault && systemPrompt.modelDefaultPrompt.trim() ? (
 						<div className="bg-base-100 flex items-center gap-2 rounded-lg px-2 py-1 text-xs">
@@ -568,18 +567,7 @@ export function SkillsBottomBarChip({
 
 			{enabledCount > 0 ? (
 				<div className="border-base-300 bg-base-100 rounded-xl border p-2">
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<span className="text-xs font-semibold">Enabled Skill sessions</span>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs text-error rounded-lg"
-							disabled={isInputLocked}
-							onClick={onDisableAll}
-						>
-							<FiX size={12} />
-							Disable all
-						</button>
-					</div>
+					<div className="mb-2 text-xs font-semibold">Enabled Skill sessions</div>
 
 					{selectedSessionSkills.map(({ ref, skill }) => {
 						const key = skillRefKey(ref);
@@ -686,325 +674,364 @@ export function SkillsBottomBarChip({
 					autoFocusOnShow={false}
 					portal
 				>
-					<div className="mb-2 flex items-center justify-between gap-2 px-1">
-						<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
-						<div className="flex items-center gap-1">
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || pluginsLoading}
-								onClick={() => {
-									void openManagedAction({
-										mode: 'create',
-										seed: {
-											document: {
-												name: 'instruction-skill',
-												displayName: 'Instruction Skill',
-												description: 'Instruction Skill created from the composer.',
-												insert: SkillInsert.Instructions,
-												arguments: [],
-												tags: ['composer'],
-												markdownBody: '',
+					<ActionTriggerMenuHeader>
+						<SearchableMenuInput
+							open={open}
+							query={searchQuery}
+							onQueryChange={setSearchQuery}
+							placeholder="Search instruction Skills…"
+							resultCount={availableSkills.length}
+							totalCount={instructionSkills.length}
+							disabled={loading || instructionSkills.length === 0}
+							onFocusFirstItem={() => {
+								focusFirstSearchableMenuItem(menuContentElement);
+							}}
+							onEnterFirstResult={() => {
+								if (firstVisibleSkill && !isInputLocked && selectable(firstVisibleSkill)) {
+									updateEnabled(firstVisibleSkill, !enabledKeys.has(skillKey(firstVisibleSkill)));
+								}
+							}}
+							onEscape={() => {
+								store.hide();
+							}}
+						/>
+
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
+							<div className="flex items-center gap-1">
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={isInputLocked || pluginsLoading}
+									onClick={() => {
+										void openManagedAction({
+											mode: 'create',
+											seed: {
+												document: {
+													name: 'instruction-skill',
+													displayName: 'Instruction Skill',
+													description: 'Instruction Skill created from the composer.',
+													insert: SkillInsert.Instructions,
+													arguments: [],
+													tags: ['composer'],
+													markdownBody: '',
+												},
+												enabled: true,
 											},
-											enabled: true,
-										},
-									});
-								}}
-								title="Create managed instruction Skill"
-							>
-								<FiPlus size={12} />
-								Create
-							</button>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || loading}
-								onClick={() => {
-									void onRefreshSkills();
-								}}
-								title="Refresh Skill catalog"
-							>
-								<FiRefreshCw size={12} />
-								Refresh
-							</button>
-						</div>
-					</div>
-
-					{loadError ? (
-						<div className="alert alert-warning mb-2 rounded-xl text-xs">
-							<FiAlertCircle size={14} />
-							<span>{loadError}</span>
-						</div>
-					) : null}
-
-					{actionError ? (
-						<div className="alert alert-warning mb-2 rounded-xl text-xs">
-							<FiAlertCircle size={14} />
-							<span>{actionError}</span>
-						</div>
-					) : null}
-
-					<SearchableMenuInput
-						open={open}
-						query={searchQuery}
-						onQueryChange={setSearchQuery}
-						placeholder="Search instruction Skills…"
-						resultCount={availableSkills.length}
-						totalCount={instructionSkills.length}
-						disabled={loading || instructionSkills.length === 0}
-						onFocusFirstItem={() => {
-							focusFirstSearchableMenuItem(menuContentElement);
-						}}
-						onEnterFirstResult={() => {
-							if (firstVisibleSkill && !isInputLocked && selectable(firstVisibleSkill)) {
-								updateEnabled(firstVisibleSkill, !enabledKeys.has(skillKey(firstVisibleSkill)));
-							}
-						}}
-						onEscape={() => {
-							store.hide();
-						}}
-					/>
-
-					<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
-						<div className="mb-2 flex items-center justify-between gap-2">
-							<div className="text-xs font-semibold">Available system instruction sources</div>
+										});
+									}}
+									title="Create managed instruction Skill"
+								>
+									<FiPlus size={12} />
+									Create
+								</button>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={isInputLocked || loading}
+									onClick={() => {
+										void onRefreshSkills();
+									}}
+									title="Refresh Skill catalog"
+								>
+									<FiRefreshCw size={12} />
+									Refresh
+								</button>
+							</div>
 						</div>
 
-						{systemPrompt.modelDefaultPrompt.trim() && !systemPrompt.includeModelDefault ? (
-							<button
-								type="button"
-								className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
-								disabled={isInputLocked}
-								onClick={() => {
-									systemPrompt.setIncludeModelDefault(true);
-								}}
-							>
-								<span className="text-xs">Use model default instructions</span>
-								<FiPlus size={12} />
-							</button>
-						) : null}
-
-						{availableInstructionSources.map(source => (
-							<button
-								key={source.identityKey}
-								type="button"
-								className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
-								disabled={isInputLocked}
-								onClick={() => {
-									systemPrompt.toggleInstructionSource(source.identityKey);
-								}}
-							>
-								<span className="min-w-0 text-xs">
-									<span className="flex min-w-0 items-center gap-1">
-										<span className="truncate">{source.displayName}</span>
-										{source.sourceKind === 'agent' ? (
-											<span className="badge badge-secondary badge-xs">Agent</span>
-										) : null}
-									</span>
-									{source.sourceTags?.length ? (
-										<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
-									) : null}
-								</span>
-								<FiPlus size={12} className="shrink-0" />
-							</button>
-						))}
-
-						{!systemPrompt.modelDefaultPrompt.trim() && availableInstructionSources.length === 0 ? (
-							<div className="text-base-content/60 px-2 py-1 text-xs">
-								All available instruction sources are already added below.
+						{loadError ? (
+							<div className="alert alert-warning mb-2 rounded-xl text-xs">
+								<FiAlertCircle size={14} />
+								<span>{loadError}</span>
 							</div>
 						) : null}
-					</div>
 
-					<div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-						<div className="text-base-content/60 text-xs">
-							{
-								instructionSkills.filter(s => {
-									return selectable(s);
-								}).length
-							}{' '}
-							available · {enabledCount} enabled · {activeCount} active
-						</div>
-						<div className="flex gap-1">
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={
-									isInputLocked ||
-									instructionSkills.filter(s => {
-										return selectable(s);
-									}).length === 0
-								}
-								onClick={onEnableAll}
-							>
-								Enable all
-							</button>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs text-error rounded-lg"
-								disabled={isInputLocked || enabledCount === 0}
-								onClick={onDisableAll}
-							>
-								Disable all
-							</button>
-						</div>
-					</div>
+						{actionError ? (
+							<div className="alert alert-warning mb-2 rounded-xl text-xs">
+								<FiAlertCircle size={14} />
+								<span>{actionError}</span>
+							</div>
+						) : null}
+					</ActionTriggerMenuHeader>
 
-					{loading ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading Skills…</div>
-					) : instructionSkills.length === 0 ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-							No runtime-resolved instruction Skills are available.
-						</div>
-					) : visibleSkills.length === 0 ? (
-						<div className={searchableMenuEmptyStateClasses}>No Skills match your search.</div>
-					) : (
-						<div className="space-y-1">
-							{availableSkills.map(skill => {
-								const key = skillKey(skill);
-								const enabled = enabledKeys.has(key);
-								const active = activeKeys.has(key);
-								const activationAllowed = canActivate(skill);
-								const secondaryName = getDistinctUserFacingLabel(skillLabel(skill), skill.name);
+					<ActionTriggerMenuBody>
+						<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
+							<div className="mb-2 flex items-center justify-between gap-2">
+								<div className="text-xs font-semibold">Available system instruction sources</div>
+							</div>
 
-								return (
-									<MenuItem
-										key={key}
-										store={store}
-										hideOnClick={false}
-										disabled={isInputLocked}
-										data-searchable-menu-item="true"
-										className={`data-active-item:bg-base-200 flex flex-col items-start rounded-xl border p-2 ${
-											enabled ? 'border-secondary/50 bg-secondary/10' : 'border-base-300'
-										}`}
-										onClick={() => {
-											if (!selectable(skill) && !enabled) {
-												return;
-											}
-											updateEnabled(skill, !enabled);
-										}}
-									>
-										<div className="flex w-full items-start gap-2">
-											<FiZap size={14} className="mt-0.5 shrink-0" />
-											<div className="min-w-0 flex-1">
-												<div className="truncate text-xs font-medium">{skillLabel(skill)}</div>
-												{secondaryName ? (
-													<div className="text-base-content/60 truncate text-[10px]">{secondaryName}</div>
-												) : null}
-												{skill.description ? (
-													<div className="text-base-content/70 mt-1 line-clamp-2 text-xs">{skill.description}</div>
+							{hasAvailableModelDefault ? (
+								<button
+									type="button"
+									className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
+									disabled={isInputLocked}
+									onClick={() => {
+										systemPrompt.setIncludeModelDefault(true);
+									}}
+								>
+									<span className="text-xs">Use model default instructions</span>
+									<FiPlus size={12} />
+								</button>
+							) : null}
+
+							{availableInstructionSources.map(source => (
+								<button
+									key={source.identityKey}
+									type="button"
+									className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
+									disabled={isInputLocked}
+									onClick={() => {
+										systemPrompt.toggleInstructionSource(source.identityKey);
+									}}
+								>
+									<span className="min-w-0 text-xs">
+										<span className="flex min-w-0 items-center gap-1">
+											<span className="truncate">{source.displayName}</span>
+											{source.sourceKind === 'agent' ? (
+												<span className="badge badge-secondary badge-xs">Agent</span>
+											) : null}
+										</span>
+										{source.sourceTags?.length ? (
+											<span className="text-base-content/60 block text-[10px]">{source.sourceTags.join(', ')}</span>
+										) : null}
+									</span>
+									<FiPlus size={12} className="shrink-0" />
+								</button>
+							))}
+
+							{!hasAvailableInstructionSources ? (
+								<div className="text-base-content/60 px-2 py-1 text-xs">
+									All available instruction sources are already added below.
+								</div>
+							) : null}
+						</div>
+
+						<div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+							<div className="text-base-content/60 text-xs">
+								{selectableInstructionSkillCount} available · {enabledCount} enabled · {activeCount} active
+							</div>
+							<div className="flex gap-1">
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={isInputLocked || selectableInstructionSkillCount === 0}
+									onClick={onEnableAll}
+								>
+									Enable all
+								</button>
+							</div>
+						</div>
+
+						{loading ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								Loading Skills…
+							</div>
+						) : instructionSkills.length === 0 ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								No runtime-resolved instruction Skills are available.
+							</div>
+						) : visibleSkills.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>No Skills match your search.</div>
+						) : availableSkills.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>
+								{isSearchQueryActive(searchQuery)
+									? 'All matching instruction Skills are already added below.'
+									: 'All available instruction Skills are already added below.'}
+							</div>
+						) : (
+							<div className="space-y-1">
+								{availableSkills.map(skill => {
+									const key = skillKey(skill);
+									const enabled = enabledKeys.has(key);
+									const active = activeKeys.has(key);
+									const activationAllowed = canActivate(skill);
+									const secondaryName = getDistinctUserFacingLabel(skillLabel(skill), skill.name);
+
+									return (
+										<MenuItem
+											key={key}
+											store={store}
+											hideOnClick={false}
+											disabled={isInputLocked}
+											data-searchable-menu-item="true"
+											className={`data-active-item:bg-base-200 flex flex-col items-start rounded-xl border p-2 ${
+												enabled ? 'border-secondary/50 bg-secondary/10' : 'border-base-300'
+											}`}
+											onClick={() => {
+												if (!selectable(skill) && !enabled) {
+													return;
+												}
+												updateEnabled(skill, !enabled);
+											}}
+										>
+											<div className="flex w-full items-start gap-2">
+												<FiZap size={14} className="mt-0.5 shrink-0" />
+												<div className="min-w-0 flex-1">
+													<div className="truncate text-xs font-medium">{skillLabel(skill)}</div>
+													{secondaryName ? (
+														<div className="text-base-content/60 truncate text-[10px]">{secondaryName}</div>
+													) : null}
+													{skill.description ? (
+														<div className="text-base-content/70 mt-1 line-clamp-2 text-xs">{skill.description}</div>
+													) : null}
+												</div>
+												{enabled ? <FiCheck size={14} className="text-secondary shrink-0" /> : null}
+											</div>
+											<div className="mt-2 ml-6 flex flex-wrap items-center gap-1">
+												{skill.hasArguments ? <span className="badge badge-warning badge-xs">Arguments</span> : null}
+												{skill.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
+												{skill.builtIn ? <span className="badge badge-ghost badge-xs">Built-in</span> : null}
+												{active ? <span className="badge badge-success badge-xs">Active</span> : null}
+												{!selectable(skill) ? (
+													<span
+														className="badge badge-warning badge-xs"
+														title={skill.runtimeError || skill.metadataError}
+													>
+														Unavailable
+													</span>
 												) : null}
 											</div>
-											{enabled ? <FiCheck size={14} className="text-secondary shrink-0" /> : null}
-										</div>
-										<div className="mt-2 ml-6 flex flex-wrap items-center gap-1">
-											{skill.hasArguments ? <span className="badge badge-warning badge-xs">Arguments</span> : null}
-											{skill.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
-											{skill.builtIn ? <span className="badge badge-ghost badge-xs">Built-in</span> : null}
-											{active ? <span className="badge badge-success badge-xs">Active</span> : null}
-											{!selectable(skill) ? (
-												<span
-													className="badge badge-warning badge-xs"
-													title={skill.runtimeError || skill.metadataError}
+											{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
+											<div
+												className="mt-2 ml-6 flex w-[calc(100%-1.5rem)] flex-wrap justify-end gap-1"
+												onClick={stopSkillRowAction}
+												onPointerDown={stopSkillRowAction}
+											>
+												{enabled ? (
+													<>
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs rounded-lg"
+															disabled={isInputLocked || (!active && (!activationAllowed || !selectable(skill)))}
+															title={
+																activationAllowed
+																	? active
+																		? 'Deactivate this Skill for the next Run.'
+																		: 'Activate this Skill for the next Run.'
+																	: 'Argument-backed Skills can be enabled but cannot be preloaded as active.'
+															}
+															onClick={() => {
+																updateActive(skill, !active);
+															}}
+														>
+															{active ? 'Deactivate' : 'Activate'}
+														</button>
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs text-error rounded-lg"
+															disabled={isInputLocked}
+															onClick={() => {
+																updateEnabled(skill, false);
+															}}
+														>
+															Disable
+														</button>
+													</>
+												) : (
+													<>
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs rounded-lg"
+															disabled={isInputLocked || !selectable(skill)}
+															onClick={() => {
+																updateEnabled(skill, true);
+															}}
+														>
+															Enable
+														</button>
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs rounded-lg"
+															disabled={isInputLocked || !selectable(skill) || !activationAllowed}
+															onClick={() => {
+																updateActive(skill, true);
+															}}
+														>
+															Enable + activate
+														</button>
+													</>
+												)}
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isInputLocked || !skill.document}
+													title="Copy the verified document; resource files are not copied."
+													onClick={() => {
+														void openFork(skill);
+													}}
 												>
-													Unavailable
-												</span>
-											) : null}
-										</div>
-										{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
-										<div
-											className="mt-2 ml-6 flex w-[calc(100%-1.5rem)] flex-wrap justify-end gap-1"
-											onClick={stopSkillRowAction}
-											onPointerDown={stopSkillRowAction}
-										>
-											{enabled ? (
-												<>
-													<button
-														type="button"
-														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked || (!active && (!activationAllowed || !selectable(skill)))}
-														title={
-															activationAllowed
-																? active
-																	? 'Deactivate this Skill for the next Run.'
-																	: 'Activate this Skill for the next Run.'
-																: 'Argument-backed Skills can be enabled but cannot be preloaded as active.'
-														}
-														onClick={() => {
-															updateActive(skill, !active);
-														}}
-													>
-														{active ? 'Deactivate' : 'Activate'}
-													</button>
-													<button
-														type="button"
-														className="btn btn-ghost btn-xs text-error rounded-lg"
-														disabled={isInputLocked}
-														onClick={() => {
-															updateEnabled(skill, false);
-														}}
-													>
-														Disable
-													</button>
-												</>
-											) : (
-												<>
-													<button
-														type="button"
-														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked || !selectable(skill)}
-														onClick={() => {
-															updateEnabled(skill, true);
-														}}
-													>
-														Enable
-													</button>
-													<button
-														type="button"
-														className="btn btn-ghost btn-xs rounded-lg"
-														disabled={isInputLocked || !selectable(skill) || !activationAllowed}
-														onClick={() => {
-															updateActive(skill, true);
-														}}
-													>
-														Enable + activate
-													</button>
-												</>
-											)}
-											<button
-												type="button"
-												className="btn btn-ghost btn-xs rounded-lg"
-												disabled={isInputLocked || !skill.document}
-												title="Copy the verified document; resource files are not copied."
-												onClick={() => {
-													void openFork(skill);
-												}}
-											>
-												<FiGitBranch size={12} /> Fork
-											</button>
-											<button
-												type="button"
-												className="btn btn-ghost btn-xs rounded-lg"
-												disabled={isInputLocked || !selectable(skill) || skill.hasArguments || skill.hasResources}
-												title="Render this simple Skill as an explicit instruction source. This does not enable its lifecycle."
-												onClick={() => {
-													void addAsInstructions(skill);
-												}}
-											>
-												{systemPrompt.selectedInstructionSourceKeys.includes(
-													`skill-instructions:${skillRefKey(skill.ref)}`
-												)
-													? 'Remove from instructions'
-													: 'Add as instructions'}
-											</button>
-										</div>
-									</MenuItem>
-								);
-							})}
-						</div>
-					)}
+													<FiGitBranch size={12} /> Fork
+												</button>
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isInputLocked || !selectable(skill) || skill.hasArguments || skill.hasResources}
+													title="Render this simple Skill as an explicit instruction source. This does not enable its lifecycle."
+													onClick={() => {
+														void addAsInstructions(skill);
+													}}
+												>
+													{systemPrompt.selectedInstructionSourceKeys.includes(
+														`skill-instructions:${skillRefKey(skill.ref)}`
+													)
+														? 'Remove from instructions'
+														: 'Add as instructions'}
+												</button>
+											</div>
+										</MenuItem>
+									);
+								})}
+							</div>
+						)}
+					</ActionTriggerMenuBody>
 
-					<ComposerDropdownSelectedPanel label="Added Skills and instructions" count={configuredCount}>
+					<ComposerDropdownSelectedPanel
+						label="Added Skills and instructions"
+						ariaLabel="Added Skills and instructions"
+						isEmpty={configuredCount === 0}
+						emptyLabel="No Skill sessions or system instruction sources have been added."
+						summary={
+							configuredCount > 0 ? (
+								<>
+									{enabledCount > 0 ? (
+										<span className="badge badge-success badge-xs">Enabled {enabledCount}</span>
+									) : null}
+									{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
+									{selectedSystemSourceCount > 0 ? (
+										<span className="badge badge-secondary badge-xs">System {selectedSystemSourceCount}</span>
+									) : null}
+								</>
+							) : undefined
+						}
+						actions={
+							configuredCount > 0 ? (
+								<>
+									{enabledCount > 0 ? (
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs text-error rounded-lg"
+											disabled={isInputLocked}
+											onClick={onDisableAll}
+										>
+											Disable Skills
+										</button>
+									) : null}
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs text-error rounded-lg"
+										disabled={isInputLocked}
+										onClick={() => {
+											onDisableAll();
+											systemPrompt.clearInstructionSources();
+										}}
+									>
+										Clear all
+									</button>
+								</>
+							) : undefined
+						}
+					>
 						{selectedSkillsPanel}
 					</ComposerDropdownSelectedPanel>
 				</Menu>

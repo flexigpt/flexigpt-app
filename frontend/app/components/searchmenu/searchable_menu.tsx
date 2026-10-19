@@ -90,7 +90,7 @@ export function SearchableMenuInput({
 	}, [resultCount, totalCount]);
 
 	return (
-		<div className={`bg-base-100 sticky top-0 z-10 mb-2 pb-2 ${className}`}>
+		<div className={`bg-base-100 ${className}`}>
 			<label className="relative block">
 				<FiSearch
 					size={12}

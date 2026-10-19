@@ -14,6 +14,9 @@ import type { AgentCatalogOption } from '@/apis/agent_management';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -245,6 +248,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 	}, [searchQuery, sortedAgentOptions]);
 
 	const selectedAgentOption = sortedAgentOptions.find(option => option.key === manager.selectedAgentKey) ?? null;
+	const hasUnavailableSelectedAgent = Boolean(manager.selectedAgentKey && !selectedAgentOption);
 	const unselectedAgentOptions = displayedAgentOptions.filter(option => option.key !== selectedAgentOption?.key);
 	const selectableAgents = unselectedAgentOptions.filter(option => option.isSelectable);
 	const unavailableAgents = unselectedAgentOptions.filter(option => !option.isSelectable);
@@ -420,111 +424,125 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 					className={actionTriggerMenuWideClasses}
 					autoFocusOnShow={false}
 				>
-					<div className="mb-2 flex items-start justify-between gap-2 px-1">
-						<div className="text-xs opacity-70">
-							Agent selection is persisted as Session intent. The backend re-resolves the Agent, Model, Tools, Skills,
-							MCP capabilities, and instructions when it prepares the next immutable Run operation.
-						</div>
-
-						<HoverTip
-							content="Reload available Agents"
-							placement="top"
-							wrapperElement="div"
-							wrapperClassName="inline-flex"
-						>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs shrink-0 rounded-lg"
-								disabled={manager.loading || manager.isApplying}
-								onClick={() => {
-									void manager.refreshAgents();
+					<ActionTriggerMenuHeader>
+						{manager.agentOptions.length > 0 ? (
+							<SearchableMenuInput
+								open={open}
+								query={searchQuery}
+								onQueryChange={setSearchQuery}
+								placeholder="Search Agents..."
+								resultCount={unselectedAgentOptions.length}
+								totalCount={Math.max(0, manager.agentOptions.length - (selectedAgentOption ? 1 : 0))}
+								disabled={manager.loading}
+								onFocusFirstItem={() => {
+									focusFirstSearchableMenuItem(menuContentElement);
 								}}
-							>
-								<FiRefreshCw size={13} />
-								<span>Refresh</span>
-							</button>
-						</HoverTip>
-					</div>
-
-					{manager.error ? (
-						<div className="alert alert-error mb-2 rounded-2xl text-xs">
-							<span>{manager.error}</span>
-						</div>
-					) : null}
-
-					{manager.actionError ? (
-						<div className="alert alert-error mb-2 rounded-2xl text-xs whitespace-pre-wrap">
-							<span>{manager.actionError}</span>
-						</div>
-					) : null}
-
-					{manager.agentOptions.length > 0 ? (
-						<SearchableMenuInput
-							open={open}
-							query={searchQuery}
-							onQueryChange={setSearchQuery}
-							placeholder="Search Agents..."
-							resultCount={unselectedAgentOptions.length}
-							totalCount={Math.max(0, manager.agentOptions.length - (selectedAgentOption ? 1 : 0))}
-							disabled={manager.loading}
-							onFocusFirstItem={() => {
-								focusFirstSearchableMenuItem(menuContentElement);
-							}}
-							onEnterFirstResult={() => {
-								if (!firstSelectableAgent || manager.loading || manager.isApplying) {
-									return;
-								}
-
-								void manager.selectAgent(firstSelectableAgent.ref).then(applied => {
-									if (applied) {
-										menu.hide();
+								onEnterFirstResult={() => {
+									if (!firstSelectableAgent || manager.loading || manager.isApplying) {
+										return;
 									}
-								});
-							}}
-							onEscape={() => {
-								menu.hide();
-							}}
-						/>
-					) : null}
+									void manager.selectAgent(firstSelectableAgent.ref).then(applied => {
+										if (applied) {
+											menu.hide();
+										}
+									});
+								}}
+								onEscape={() => {
+									menu.hide();
+								}}
+							/>
+						) : null}
 
-					{manager.loading && manager.agentOptions.length === 0 ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-							Loading Agents...
-						</div>
-					) : manager.agentOptions.length === 0 ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-							No Agents are available.
-						</div>
-					) : unselectedAgentOptions.length === 0 ? (
-						<div className={searchableMenuEmptyStateClasses}>No Agents match your search.</div>
-					) : (
-						<div className="space-y-2">
-							{selectableAgents.length > 0 ? (
-								<GroupedMenuSection title="Available" ariaLabel="Available Agents">
-									{selectableAgents.map(a => {
-										return renderAgentOption(a);
-									})}
-								</GroupedMenuSection>
-							) : null}
+						<div className={`${actionTriggerMenuHeaderRowClasses} items-start`}>
+							<div className="min-w-0">
+								<div className="text-xs font-semibold">Agents</div>
+								<div className="mt-1 text-xs opacity-70">
+									Agent selection is persisted as Session intent. The backend re-resolves the Agent, Model, Tools,
+									Skills, MCP capabilities, and instructions when it prepares the next immutable Run operation.
+								</div>
+							</div>
 
-							{unavailableAgents.length > 0 ? (
-								<GroupedMenuSection
-									title="Unavailable"
-									ariaLabel="Unavailable Agents"
-									separatorBefore={selectableAgents.length > 0}
+							<HoverTip
+								content="Reload available Agents"
+								placement="top"
+								wrapperElement="div"
+								wrapperClassName="inline-flex"
+							>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs shrink-0 rounded-lg"
+									disabled={manager.loading || manager.isApplying}
+									onClick={() => {
+										void manager.refreshAgents();
+									}}
 								>
-									<GroupedMenuSubheading tone="warning">Unavailable</GroupedMenuSubheading>
-									{unavailableAgents.map(a => {
-										return renderAgentOption(a);
-									})}
-								</GroupedMenuSection>
-							) : null}
+									<FiRefreshCw size={13} />
+									<span>Refresh</span>
+								</button>
+							</HoverTip>
 						</div>
-					)}
+
+						{manager.error ? (
+							<div className="alert alert-error mb-2 rounded-2xl text-xs">
+								<span>{manager.error}</span>
+							</div>
+						) : null}
+
+						{manager.actionError ? (
+							<div className="alert alert-error mb-2 rounded-2xl text-xs whitespace-pre-wrap">
+								<span>{manager.actionError}</span>
+							</div>
+						) : null}
+					</ActionTriggerMenuHeader>
+
+					<ActionTriggerMenuBody>
+						{manager.loading && manager.agentOptions.length === 0 ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								Loading Agents...
+							</div>
+						) : manager.agentOptions.length === 0 ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								No Agents are available.
+							</div>
+						) : unselectedAgentOptions.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>No Agents match your search.</div>
+						) : (
+							<div className="space-y-2">
+								{selectableAgents.length > 0 ? (
+									<GroupedMenuSection title="Available" ariaLabel="Available Agents">
+										{selectableAgents.map(a => {
+											return renderAgentOption(a);
+										})}
+									</GroupedMenuSection>
+								) : null}
+
+								{unavailableAgents.length > 0 ? (
+									<GroupedMenuSection
+										title="Unavailable"
+										ariaLabel="Unavailable Agents"
+										separatorBefore={selectableAgents.length > 0}
+									>
+										<GroupedMenuSubheading tone="warning">Unavailable</GroupedMenuSubheading>
+										{unavailableAgents.map(a => {
+											return renderAgentOption(a);
+										})}
+									</GroupedMenuSection>
+								) : null}
+							</div>
+						)}
+					</ActionTriggerMenuBody>
 
 					<ComposerDropdownSelectedPanel
 						label="Selected Agent"
-						count={selectedAgentOption ? 1 : 0}
+						ariaLabel="Selected Agent"
+						isEmpty={!selectedAgentOption && !hasUnavailableSelectedAgent}
+						summary={
+							selectedAgentOption ? (
+								<span className="badge badge-secondary badge-xs">1 selected</span>
+							) : hasUnavailableSelectedAgent ? (
+								<span className="badge badge-warning badge-xs">Unavailable</span>
+							) : undefined
+						}
 						emptyLabel="Choose an Agent above to apply a starter recipe."
 					>
 						{selectedAgentOption ? (
@@ -532,6 +550,10 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 								<AgentSelectionSummary manager={manager} />
 								{renderAgentOption(selectedAgentOption)}
 							</>
+						) : hasUnavailableSelectedAgent ? (
+							<div className="alert alert-warning rounded-xl p-2 text-xs">
+								The saved Agent selection is not currently available. Choose an available Agent above to replace it.
+							</div>
 						) : null}
 					</ComposerDropdownSelectedPanel>
 				</Menu>

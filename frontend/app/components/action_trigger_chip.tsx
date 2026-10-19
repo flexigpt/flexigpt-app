@@ -8,13 +8,34 @@ export const actionTriggerChipSurfaceClasses =
 	'app-text-neutral bg-base-200/70 hover:bg-base-300/80 flex h-7 min-h-0 items-center overflow-hidden rounded-full px-2 shadow-none';
 
 export const actionTriggerMenuWideClasses =
-	'rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-120 max-w-lg min-w-60 overflow-y-auto border p-2 text-xs shadow-xl outline-none';
+	'rounded-box bg-base-100 text-base-content border-base-300 z-50 flex max-h-120 max-w-lg min-w-60 flex-col overflow-hidden border p-2 text-xs shadow-xl outline-none';
 
 export const actionTriggerMenuCompactClasses =
-	'rounded-box bg-base-100 text-base-content z-50 max-h-72 min-w-48 max-w-sm overflow-y-auto border border-base-300 p-1 shadow-xl outline-none';
+	'rounded-box bg-base-100 text-base-content z-50 flex max-h-72 min-w-48 max-w-sm flex-col overflow-hidden border border-base-300 p-1 shadow-xl outline-none';
 
 export const actionTriggerMenuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300';
+
+/**
+ * Place inside ActionTriggerMenuHeader, after SearchableMenuInput when the
+ * menu has a search field. The header therefore always follows:
+ *
+ *   search -> title/actions/errors
+ */
+export const actionTriggerMenuHeaderRowClasses = 'flex min-w-0 items-center justify-between gap-2 px-1 py-0';
+
+interface ActionTriggerMenuRegionProps {
+	children: ReactNode;
+	className?: string;
+}
+
+export function ActionTriggerMenuHeader({ children, className = '' }: ActionTriggerMenuRegionProps) {
+	return <div className={`bg-base-100 border-base-300 z-10 mb-1 shrink-0 border-b ${className}`}>{children}</div>;
+}
+
+export function ActionTriggerMenuBody({ children, className = '' }: ActionTriggerMenuRegionProps) {
+	return <div className={`min-h-0 flex-auto overflow-y-auto overscroll-contain ${className}`}>{children}</div>;
+}
 
 interface ActionTriggerChipContentProps {
 	icon?: ReactNode;

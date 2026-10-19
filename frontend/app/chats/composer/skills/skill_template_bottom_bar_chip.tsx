@@ -19,6 +19,9 @@ import { skillManagementAPI } from '@/apis/baseapi';
 import {
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -293,8 +296,29 @@ function SkillTemplateDropdown({
 			autoFocusOnShow={false}
 		>
 			{!open ? null : (
-				<>
-					<div className="mb-2 flex items-center justify-between gap-2 px-1">
+				<ActionTriggerMenuHeader>
+					<SearchableMenuInput
+						open={open}
+						query={searchQuery}
+						onQueryChange={setSearchQuery}
+						placeholder="Search templates…"
+						resultCount={displayedItems.length}
+						totalCount={items.length}
+						disabled={loading || items.length === 0}
+						onFocusFirstItem={() => {
+							focusFirstSearchableMenuItem(menuContentElement);
+						}}
+						onEnterFirstResult={() => {
+							if (firstTemplate) {
+								onPick(firstTemplate);
+							}
+						}}
+						onEscape={() => {
+							store.hide();
+						}}
+					/>
+
+					<div className={actionTriggerMenuHeaderRowClasses}>
 						<div className="text-base-content/70 text-xs font-semibold">Templates</div>
 						<span className="badge badge-ghost badge-xs">Available {items.length}</span>
 					</div>
@@ -323,57 +347,45 @@ function SkillTemplateDropdown({
 							<div className="grow">{actionError}</div>
 						</div>
 					) : null}
-					<SearchableMenuInput
-						open={open}
-						query={searchQuery}
-						onQueryChange={setSearchQuery}
-						placeholder="Search templates…"
-						resultCount={displayedItems.length}
-						totalCount={items.length}
-						disabled={loading || items.length === 0}
-						onFocusFirstItem={() => {
-							focusFirstSearchableMenuItem(menuContentElement);
-						}}
-						onEnterFirstResult={() => {
-							if (firstTemplate) {
-								onPick(firstTemplate);
-							}
-						}}
-						onEscape={() => {
-							store.hide();
-						}}
-					/>
-				</>
+				</ActionTriggerMenuHeader>
 			)}
 
-			{!open ? null : loading ? (
-				<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading templates…</div>
-			) : items.length === 0 ? (
-				<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-					No user-message skill templates available
-				</div>
-			) : displayedItems.length === 0 ? (
-				<div className={searchableMenuEmptyStateClasses}>No templates match your search.</div>
-			) : (
-				<>
-					{[
-						...Map.groupBy(
-							displayedItems,
-							item =>
-								item.plugins[0]?.displayName ??
-								(item.builtIn ? 'Built-in Skills' : item.sourceID || 'Unattached Skills')
-						),
-					].map(([group, templates]) => (
-						<GroupedMenuSection key={group} title={group} ariaLabel={`${group} templates`}>
-							{templates.map(item => renderSkillTemplateMenuItem(item, onPick))}
-						</GroupedMenuSection>
-					))}
+			{!open ? null : (
+				<ActionTriggerMenuBody>
+					{loading ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+							Loading templates…
+						</div>
+					) : items.length === 0 ? (
+						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+							No user-message skill templates available
+						</div>
+					) : displayedItems.length === 0 ? (
+						<div className={searchableMenuEmptyStateClasses}>No templates match your search.</div>
+					) : (
+						[
+							...Map.groupBy(
+								displayedItems,
+								item =>
+									item.plugins[0]?.displayName ??
+									(item.builtIn ? 'Built-in Skills' : item.sourceID || 'Unattached Skills')
+							),
+						].map(([group, templates]) => (
+							<GroupedMenuSection key={group} title={group} ariaLabel={`${group} templates`}>
+								{templates.map(item => renderSkillTemplateMenuItem(item, onPick))}
+							</GroupedMenuSection>
+						))
+					)}
+				</ActionTriggerMenuBody>
+			)}
 
-					<ComposerDropdownSelectedPanel
-						label="Template state"
-						emptyLabel="Inserted templates become ordinary draft text. No template remains selected or joins a Skill session."
-					/>
-				</>
+			{!open ? null : (
+				<ComposerDropdownSelectedPanel
+					label="Template state"
+					ariaLabel="Template state"
+					isEmpty
+					emptyLabel="Inserted templates become ordinary draft text. No template remains selected or joins a Skill session."
+				/>
 			)}
 		</Menu>
 	);

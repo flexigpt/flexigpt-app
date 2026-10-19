@@ -48,7 +48,14 @@ import {
 	isServerOperational,
 } from '@/apis/mcp_management';
 
-import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
+import {
+	ActionTriggerChipContent,
+	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenuBody,
+	ActionTriggerMenuHeader,
+	actionTriggerMenuHeaderRowClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
@@ -1017,8 +1024,9 @@ export function MCPBottomBarChip({
 	);
 	const selectedOptions = visibleOptions.filter(option => selectedServerKeys.has(mcpServerKey(option.runtimeServerID)));
 	const unavailableSelectedCount = [...selectedServerKeys].filter(
-		key => !state.options.some(option => mcpServerKey(option.runtimeServerID) === key)
+		key => !selectedOptions.some(option => mcpServerKey(option.runtimeServerID) === key)
 	).length;
+	const hasSelectedMCPContext = selectedServerKeys.size > 0 || hasAppContextUpdates;
 	const firstVisibleOption = availableOptions[0] ?? null;
 
 	const hoverTipContent = useMemo(
@@ -1200,126 +1208,148 @@ export function MCPBottomBarChip({
 							gutter={8}
 							overflowPadding={8}
 							portal
-							className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
+							className={`${actionTriggerMenuWideClasses} max-h-[75vh] w-2xl max-w-[90vw]`}
 							autoFocusOnShow={false}
 						>
-							<div className="mb-2 flex items-center justify-between gap-2">
-								<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									onClick={e => {
-										stop(e);
-										void state.refreshAll();
+							<ActionTriggerMenuHeader>
+								<SearchableMenuInput
+									open={open}
+									query={searchQuery}
+									onQueryChange={setSearchQuery}
+									placeholder="Search MCP servers, tools, resources…"
+									resultCount={availableOptions.length}
+									totalCount={Math.max(0, visibleOptions.length - selectedOptions.length)}
+									disabled={state.loading || visibleOptions.length === 0}
+									onFocusFirstItem={() => {
+										focusFirstSearchableMenuItem(menuContentElement);
 									}}
-									disabled={isInputLocked || state.loading}
-								>
-									<FiRefreshCw size={12} />
-									<span className="ml-1">Refresh</span>
-								</button>
-							</div>
+									onEnterFirstResult={() => {
+										if (firstVisibleOption) {
+											toggleServerOption(firstVisibleOption);
+										}
+									}}
+									onEscape={() => {
+										menu.hide();
+									}}
+								/>
 
-							<SearchableMenuInput
-								open={open}
-								query={searchQuery}
-								onQueryChange={setSearchQuery}
-								placeholder="Search MCP servers, tools, resources…"
-								resultCount={availableOptions.length}
-								totalCount={Math.max(0, visibleOptions.length - selectedOptions.length)}
-								disabled={state.loading || visibleOptions.length === 0}
-								onFocusFirstItem={() => {
-									focusFirstSearchableMenuItem(menuContentElement);
-								}}
-								onEnterFirstResult={() => {
-									if (firstVisibleOption) {
-										toggleServerOption(firstVisibleOption);
-									}
-								}}
-								onEscape={() => {
-									menu.hide();
-								}}
-							/>
-
-							{state.loading ? (
-								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
-							) : state.error ? (
-								<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
-							) : visibleOptions.length === 0 ? (
-								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
-									{state.options.length === 0
-										? 'No MCP servers have been added yet.'
-										: configurationPendingServerCount > 0
-											? `Configuration pending for ${configurationPendingServerCount} MCP server${
-													configurationPendingServerCount === 1 ? '' : 's'
-												}.`
-											: 'No enabled MCP servers are ready to use.'}
-								</div>
-							) : availableOptions.length === 0 ? (
-								<div className={searchableMenuEmptyStateClasses}>
-									{selectedOptions.length > 0
-										? 'All matching MCP servers are already added below.'
-										: 'No MCP servers match your search.'}
-								</div>
-							) : (
-								<>
-									{availableOptions.map(option => (
-										<ServerRow
-											key={optionKey(option)}
-											option={option}
-											state={state}
-											isInputLocked={isInputLocked}
-											onAuthorize={() => {
-												setManualOAuthModalKey(optionKey(option));
-											}}
-											onToggleSelected={() => {
-												toggleServerOption(option);
-											}}
-										/>
-									))}
-								</>
-							)}
-
-							{!state.loading && !state.error && hasManagementHint ? (
-								<div className="border-base-300 text-base-content/70 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-xs">
-									{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
-									{configurationPendingServerCount > 0 ? (
-										<span>
-											Configuration pending for {configurationPendingServerCount} MCP server
-											{configurationPendingServerCount === 1 ? '' : 's'}.
-										</span>
-									) : null}
-									{hiddenDisabledServerCount > 0 ? (
-										<span>
-											{hiddenDisabledServerCount} disabled MCP server
-											{hiddenDisabledServerCount === 1 ? '' : 's'} hidden.
-										</span>
-									) : null}
-									{hiddenUnavailableServerCount > 0 ? (
-										<span>
-											{hiddenUnavailableServerCount} unavailable MCP server
-											{hiddenUnavailableServerCount === 1 ? '' : 's'} hidden.
-										</span>
-									) : null}
-									<Link
-										to="/mcpservers"
-										className="link link-info"
-										onClick={event => {
-											event.stopPropagation();
-											menu.hide();
+								<div className={actionTriggerMenuHeaderRowClasses}>
+									<div className="text-xs font-semibold">MCP servers</div>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										onClick={e => {
+											stop(e);
+											void state.refreshAll();
 										}}
+										disabled={isInputLocked || state.loading}
 									>
-										Manage MCP servers
-									</Link>
+										<FiRefreshCw size={12} />
+										<span className="ml-1">Refresh</span>
+									</button>
 								</div>
-							) : null}
+							</ActionTriggerMenuHeader>
+
+							<ActionTriggerMenuBody>
+								{state.loading ? (
+									<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
+								) : state.error ? (
+									<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
+								) : visibleOptions.length === 0 ? (
+									<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
+										{state.options.length === 0
+											? 'No MCP servers have been added yet.'
+											: configurationPendingServerCount > 0
+												? `Configuration pending for ${configurationPendingServerCount} MCP server${
+														configurationPendingServerCount === 1 ? '' : 's'
+													}.`
+												: 'No enabled MCP servers are ready to use.'}
+									</div>
+								) : availableOptions.length === 0 ? (
+									<div className={searchableMenuEmptyStateClasses}>
+										{selectedOptions.length > 0
+											? 'All matching MCP servers are already added below.'
+											: 'No MCP servers match your search.'}
+									</div>
+								) : (
+									<>
+										{availableOptions.map(option => (
+											<ServerRow
+												key={optionKey(option)}
+												option={option}
+												state={state}
+												isInputLocked={isInputLocked}
+												onAuthorize={() => {
+													setManualOAuthModalKey(optionKey(option));
+												}}
+												onToggleSelected={() => {
+													toggleServerOption(option);
+												}}
+											/>
+										))}
+									</>
+								)}
+
+								{!state.loading && !state.error && hasManagementHint ? (
+									<div className="border-base-300 text-base-content/70 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-xs">
+										{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
+										{configurationPendingServerCount > 0 ? (
+											<span>
+												Configuration pending for {configurationPendingServerCount} MCP server
+												{configurationPendingServerCount === 1 ? '' : 's'}.
+											</span>
+										) : null}
+										{hiddenDisabledServerCount > 0 ? (
+											<span>
+												{hiddenDisabledServerCount} disabled MCP server
+												{hiddenDisabledServerCount === 1 ? '' : 's'} hidden.
+											</span>
+										) : null}
+										{hiddenUnavailableServerCount > 0 ? (
+											<span>
+												{hiddenUnavailableServerCount} unavailable MCP server
+												{hiddenUnavailableServerCount === 1 ? '' : 's'} hidden.
+											</span>
+										) : null}
+										<Link
+											to="/mcpservers"
+											className="link link-info"
+											onClick={event => {
+												event.stopPropagation();
+												menu.hide();
+											}}
+										>
+											Manage MCP servers
+										</Link>
+									</div>
+								) : null}
+							</ActionTriggerMenuBody>
 
 							<ComposerDropdownSelectedPanel
 								label="Added MCP context"
-								count={enabledCount + (hasAppContextUpdates ? 1 : 0)}
-								emptyLabel="Select an MCP server above to add it to this message."
-							>
-								{enabledCount > 0 || hasAppContextUpdates ? (
-									<div className="mb-1 flex justify-end px-1">
+								ariaLabel="Added MCP context"
+								isEmpty={!hasSelectedMCPContext}
+								emptyLabel="No MCP servers or queued app-context updates have been added to this message."
+								summary={
+									hasSelectedMCPContext ? (
+										<>
+											{selectedServerKeys.size > 0 ? (
+												<span className="badge badge-ghost badge-xs">Servers {enabledCount}</span>
+											) : null}
+											{state.selectedToolCount > 0 ? (
+												<span className="badge badge-ghost badge-xs">Tools {state.selectedToolCount}</span>
+											) : null}
+											{hasAppContextUpdates ? (
+												<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
+											) : null}
+											{unavailableSelectedCount > 0 ? (
+												<span className="badge badge-warning badge-xs">Check {unavailableSelectedCount}</span>
+											) : null}
+										</>
+									) : undefined
+								}
+								actions={
+									hasSelectedMCPContext ? (
 										<button
 											type="button"
 											className="btn btn-ghost btn-xs text-error rounded-lg"
@@ -1331,9 +1361,9 @@ export function MCPBottomBarChip({
 										>
 											Clear all
 										</button>
-									</div>
-								) : null}
-
+									) : undefined
+								}
+							>
 								{hasAppContextUpdates ? (
 									<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
 										<div className="flex items-center justify-between gap-2">
@@ -1372,8 +1402,9 @@ export function MCPBottomBarChip({
 
 								{unavailableSelectedCount > 0 ? (
 									<div className="alert alert-warning rounded-xl p-2 text-xs">
-										{unavailableSelectedCount} saved MCP selection
-										{unavailableSelectedCount === 1 ? ' is' : 's are'} no longer available. Clear it before sending.
+										{unavailableSelectedCount} selected MCP server
+										{unavailableSelectedCount === 1 ? ' is' : 's are'} not currently available in this composer. Clear
+										the selection before sending.
 									</div>
 								) : null}
 							</ComposerDropdownSelectedPanel>
