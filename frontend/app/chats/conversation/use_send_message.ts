@@ -18,7 +18,9 @@ import {
 	selectedSessionRun,
 	sessionCommandMeta,
 } from '@/chats/session/session_commands';
+import { getSessionRunComposerState } from '@/chats/session/session_composer_state';
 import { buildSessionSubmissionIntent } from '@/chats/session/session_intent';
+import { sessionConfigurationForMessage } from '@/chats/session/session_projection';
 
 interface UseSendMessageArgs {
 	tabsRef: RefObject<ChatTabState[]>;
@@ -162,22 +164,36 @@ export function useSendMessage({
 			}
 
 			try {
-				const snapshot = tab.sessionSnapshot ?? (await sessionManagementAPI.getSessionSnapshot(tab.sessionID));
+				// Tool execution and wait resolution can advance the revision
+				// between the last rendered snapshot and clicking Send.
+				const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
 				const run = selectedSessionRun(snapshot, tab.activeRunID);
 
-				if (!run || run.state !== SessionRunState.Waiting) {
-					throw new Error('The active Run is not waiting for continuation input.');
+				if (!run || !getSessionRunComposerState(run).canComposeContinuationInput) {
+					throw new Error('Resolve pending Tool calls or approval requests before continuing this Run.');
+				}
+				const cs = getSessionRunComposerState(run);
+				if (!cs.canComposeContinuationInput) {
+					throw new Error('Resolve pending Tool calls or approval requests before continuing this Run.');
 				}
 
 				const submission = await buildSessionSubmissionIntent(payload, options);
-				const stagedAttachments = [...(run.continuation.attachments ?? []), ...(submission.input.attachments ?? [])];
-				const stagedAppContext = [...(run.continuation.mcpAppContext ?? []), ...(submission.input.mcpAppContext ?? [])];
+				const unconsumedContinuation =
+					run.continuation.revision > (run.continuation.consumedRevision ?? 0) ? run.continuation : undefined;
+				const stagedAttachments = [
+					...(unconsumedContinuation?.attachments ?? []),
+					...(submission.input.attachments ?? []),
+				];
+				const stagedAppContext = [
+					...(unconsumedContinuation?.mcpAppContext ?? []),
+					...(submission.input.mcpAppContext ?? []),
+				];
 
 				const continuation = {
 					...run.continuation,
-					...(submission.input.text?.trim() ? { text: submission.input.text } : {}),
-					...(stagedAttachments.length > 0 ? { attachments: stagedAttachments } : {}),
-					...(stagedAppContext.length > 0 ? { mcpAppContext: stagedAppContext } : {}),
+					text: submission.input.text?.trim() ? submission.input.text : unconsumedContinuation?.text,
+					attachments: stagedAttachments,
+					mcpAppContext: stagedAppContext,
 					configuration: submission.configuration,
 				};
 
@@ -192,17 +208,32 @@ export function useSendMessage({
 					'Stage continuation input'
 				);
 
-				requireAcceptedSessionCommand(
-					await sessionManagementAPI.continueRun({
-						meta: sessionCommandMeta(
-							staged.sessionRevision ?? snapshot.session.revision,
-							staged.runRevision ?? run.revision
-						),
-						sessionID: tab.sessionID,
-						runID: run.id,
-					}),
-					'Continue Run'
-				);
+				try {
+					requireAcceptedSessionCommand(
+						await sessionManagementAPI.continueRun({
+							meta: sessionCommandMeta(
+								staged.sessionRevision ?? snapshot.session.revision,
+								staged.runRevision ?? run.revision
+							),
+							sessionID: tab.sessionID,
+							runID: run.id,
+						}),
+						'Continue Run'
+					);
+				} catch (error) {
+					// The draft was accepted into continuation input already.
+					// Keeping it in the editor would stage attachments/context
+					// a second time when the user retries.
+					const refreshed = await sessionManagementAPI.getSessionSnapshot(tab.sessionID).catch(() => undefined);
+					updateTab(tabId, current => ({
+						...current,
+						...(refreshed ? { sessionSnapshot: refreshed } : {}),
+						runtimeError: `Input was staged, but the Run could not be continued. Send again to retry. ${
+							error instanceof Error ? error.message : ''
+						}`.trim(),
+					}));
+					return submission.configuration;
+				}
 
 				updateTab(tabId, current => ({
 					...current,
@@ -232,14 +263,21 @@ export function useSendMessage({
 				return undefined;
 			}
 			if (tab.isBusy || tab.isHydrating) {
-				return undefined;
+				throw new Error('Wait for the current operation to finish before sending.');
 			}
 
 			if (tab.editingMessageId) {
 				if (!tab.sessionID || !tab.sessionSnapshot) {
 					throw new Error('Edit-and-resend requires an existing Session snapshot.');
 				}
-				const submission = await buildSessionSubmissionIntent(payload, options);
+				const originalConfiguration = sessionConfigurationForMessage(tab.sessionSnapshot, tab.editingMessageId);
+				const submission = await buildSessionSubmissionIntent(
+					{
+						...payload,
+						sessionConfigurationBaseline: originalConfiguration ?? payload.sessionConfigurationBaseline,
+					},
+					options
+				);
 				const resent = requireAcceptedSessionCommand(
 					await sessionManagementAPI.editAndResend({
 						meta: sessionCommandMeta(tab.sessionSnapshot.session.revision),
@@ -292,6 +330,10 @@ export function useSendMessage({
 
 			const external: EditorExternalMessage = {
 				text: message.uiContent ?? '',
+				isEditing: true,
+				sessionConfiguration: tab.sessionSnapshot
+					? sessionConfigurationForMessage(tab.sessionSnapshot, message.id)
+					: undefined,
 				attachments: message.attachments,
 				toolChoices: message.uiToolChoices,
 				toolSelectionIssues: message.uiToolSelectionIssues,

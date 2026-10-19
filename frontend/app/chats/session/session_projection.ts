@@ -5,6 +5,7 @@ import type {
 	Conversation,
 	ConversationMessage,
 	SessionAttachmentReference,
+	SessionConfiguration,
 	SessionModelOperation,
 	SessionRun,
 	SessionSnapshot,
@@ -159,7 +160,12 @@ function indexRuns(snapshot: SessionSnapshot): SessionRunIndex {
 
 		for (const operation of run.modelOperations ?? []) {
 			runsByOperationID.set(operation.id, run);
-			operationsByCurrentMessageID.set(operation.request.current.id, { operation, run });
+			// A result-only continuation can refer to the same current user
+			// message. Its later configuration must not replace the original
+			// message's configuration during rehydration.
+			if (!operationsByCurrentMessageID.has(operation.request.current.id)) {
+				operationsByCurrentMessageID.set(operation.request.current.id, { operation, run });
+			}
 		}
 
 		for (const call of run.toolCalls ?? []) {
@@ -614,6 +620,11 @@ function toolOutputFromResult(
 		isError: result.kind !== SessionToolResultKind.Success,
 		isSkipped: result.kind === SessionToolResultKind.Skipped,
 		errorMessage: result.error,
+		arguments: call
+			? typeof call.arguments === 'string'
+				? call.arguments
+				: JSON.stringify(call.arguments ?? {})
+			: undefined,
 		mcpToolSelection: call ? mcpSelectionFromBinding(call) : undefined,
 		mcpApp:
 			app || appPayload?.resourceUri || appPayload?.resourceURI
@@ -645,6 +656,78 @@ function uiToolCallFromSession(call: SessionToolCall): UIToolCall {
 		errorMessage: call.lastFailure,
 		mcpToolSelection: mcpSelectionFromBinding(call),
 	};
+}
+
+export function projectSessionRunToolActivity(
+	snapshot: SessionSnapshot,
+	run: SessionRun | undefined
+): {
+	calls: UIToolCall[];
+	outputs: UIToolOutput[];
+} {
+	if (!run || !sessionRunIsActive(run)) {
+		return {
+			calls: [],
+			outputs: [],
+		};
+	}
+
+	const appsByID = new Map((run.apps ?? []).map(app => [app.id, app] as const));
+	const persistedResultIDs = new Set(
+		(snapshot.session.transcript ?? []).flatMap(message => (message.toolResults ?? []).map(result => result.id))
+	);
+	// Model operations are appended by the Session Runtime. Once the next
+	// operation exists, calls/results from the preceding operation belong to
+	// history rather than the composer.
+	const latestOperationID = run.modelOperations?.at(-1)?.id ?? run.activeModelOperationID;
+	const composerCalls = (run.toolCalls ?? []).filter(call => {
+		if (latestOperationID && call.originOperationID !== latestOperationID) {
+			return false;
+		}
+
+		const result = selectedToolResult(call);
+		const unresolved = call.state !== SessionToolCallState.Resolved && call.state !== SessionToolCallState.Observed;
+
+		return unresolved || Boolean(result && !persistedResultIDs.has(result.id));
+	});
+	const results = composerCalls
+		.flatMap(call => {
+			const result = selectedToolResult(call);
+			return result && !persistedResultIDs.has(result.id) ? [{ call, result }] : [];
+		})
+		.toSorted((left, right) => left.result.createdAt.localeCompare(right.result.createdAt));
+
+	return {
+		calls: composerCalls.map(c => {
+			return uiToolCallFromSession(c);
+		}),
+		outputs: results.map(({ call, result }) => toolOutputFromResult(result, call, run, snapshot, appsByID)),
+	};
+}
+
+/**
+ * Session transcript projections intentionally do not resolve Tool Artifacts
+ * synchronously. Edit hydration must use the configuration of the original
+ * operation, not the current Session configuration or the calls the model
+ * happened to make.
+ */
+export function sessionConfigurationForMessage(
+	snapshot: SessionSnapshot,
+	messageID: string
+): SessionConfiguration | undefined {
+	const message = snapshot.session.transcript?.find(candidate => candidate.id === messageID);
+
+	for (const run of snapshot.runs) {
+		const operation = run.modelOperations?.find(candidate =>
+			message?.operationID ? candidate.id === message.operationID : candidate.request.current.id === messageID
+		);
+
+		if (operation) {
+			return operation.request.configuration;
+		}
+	}
+
+	return undefined;
 }
 
 function protocolOutputs(message: SessionTranscriptMessage): OutputUnion[] {
@@ -778,12 +861,13 @@ function projectTranscriptMessage(
 		debugDetailsError: completionDebugDetailsError,
 		uiContent: derived.uiContent || message.text || '',
 		uiReasoningContents: derived.uiReasoningContents,
-		uiToolCalls:
-			operationCalls.length > 0
+		uiToolCalls: isAssistantMessage
+			? operationCalls.length > 0
 				? operationCalls.map(t => {
 						return uiToolCallFromSession(t);
 					})
-				: derived.uiToolCalls,
+				: derived.uiToolCalls
+			: undefined,
 		uiToolOutputs:
 			transcriptToolOutputs.length > 0
 				? transcriptToolOutputs

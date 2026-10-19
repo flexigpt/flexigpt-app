@@ -23,6 +23,13 @@ export interface AgentCapabilityExclusion {
 
 export interface EditorExternalMessage {
 	text: string;
+	/** Capture/restore edit context only for actual message edits. */
+	isEditing?: boolean;
+	/**
+	 * Original operation configuration, used to resolve saved selections
+	 * which are not synchronously materialized in a Session message projection.
+	 */
+	sessionConfiguration?: SessionConfiguration;
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
 	toolSelectionIssues?: ToolSelectionIssue[];

@@ -8,6 +8,7 @@ import {
 	FiSend,
 	FiSquare,
 	FiTool,
+	FiTrash2,
 	FiX,
 	FiZapOff,
 } from 'react-icons/fi';
@@ -16,7 +17,7 @@ import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { UIToolOutput } from '@/spec/inference';
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SessionConfiguration } from '@/spec/session';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
@@ -48,6 +49,7 @@ import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_
 import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
+import { SessionToolActivityChips } from '@/chats/composer/editor/session_tool_activity_chips';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEditorValueFromPlainText, insertPlainTextAsSingleBlock } from '@/chats/composer/platedoc/platedoc_utils';
 import {
@@ -127,9 +129,15 @@ interface EditorAreaProps {
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
 	showPendingToolControls: boolean;
-	showContinueRunControl: boolean;
+	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
-	onContinueRun: () => void;
+	sessionToolCalls: UIToolCall[];
+	sessionToolOutputs: UIToolOutput[];
+	onRunSessionToolCall: (call: UIToolCall) => void;
+	onRetrySessionToolCall: (call: UIToolCall) => void;
+	onSkipSessionToolCall: (call: UIToolCall) => void;
+	stagedAppContextUpdateCount: number;
+	onDiscardStagedAppContext: () => void;
 }
 
 function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined) {
@@ -150,7 +158,7 @@ function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined)
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
 	{
 		isGenerating,
-		isInputLocked,
+		isInputLocked: inputLocked,
 		isRunActive,
 		submissionMode = 'message',
 		currentProviderSDKType,
@@ -164,12 +172,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		automationHoldEnabled,
 		onToggleAutomationHold,
 		showPendingToolControls,
-		showContinueRunControl,
+		canContinueWithoutDraft,
 		onRunPendingTools,
-		onContinueRun,
+		sessionToolCalls,
+		sessionToolOutputs,
+		onRunSessionToolCall,
+		onRetrySessionToolCall,
+		onSkipSessionToolCall,
+		stagedAppContextUpdateCount,
+		onDiscardStagedAppContext,
 	},
 	ref
 ) {
+	const [externalMessageRestorePending, setExternalMessageRestorePending] = useState(false);
+	const [externalMessageRestoreFailed, setExternalMessageRestoreFailed] = useState(false);
+	const externalMessageRestoreVersionRef = useRef(0);
+	const isInputLocked = inputLocked || externalMessageRestorePending;
+	const hasContinuationToSend = submissionMode === 'continuation' && canContinueWithoutDraft && !editingMessageId;
+
 	const {
 		editor,
 		contentRef,
@@ -321,7 +341,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		webSearchConfiguration.blocked ||
 		hasBlockingMCPArgs ||
 		incompatibleSDKSelection ||
-		toolSelectionIssues.length > 0;
+		toolSelectionIssues.length > 0 ||
+		externalMessageRestoreFailed;
 
 	const handleOpenConversationToolDetails = useCallback((entry: ConversationToolStateEntry) => {
 		setToolDetailsState({ kind: 'choice', choice: entry.toolStoreChoice });
@@ -345,7 +366,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		return attachments.filter(attachment => !ownedAttachmentKeys.has(uiAttachmentKey(attachment)));
 	}, [attachments, directoryGroups]);
-	const hasEditorChips = attachments.length > 0 || directoryGroups.length > 0 || toolOutputs.length > 0;
+	const hasEditorChips =
+		attachments.length > 0 ||
+		directoryGroups.length > 0 ||
+		toolOutputs.length > 0 ||
+		sessionToolCalls.length > 0 ||
+		sessionToolOutputs.length > 0;
 
 	useEffect(() => {
 		return () => {
@@ -738,7 +764,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return false;
 		}
 
-		if (hasText) {
+		if (hasText || hasContinuationToSend) {
 			return true;
 		}
 
@@ -750,6 +776,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [
 		attachments.length,
 		hasBlockingToolArgs,
+		hasContinuationToSend,
 		hasText,
 		isInputLocked,
 		isSubmitting,
@@ -761,21 +788,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy: isGenerating || isSubmitting || workspaceExecutionBlocked,
-		canSubmit: () => {
-			if (isInputLocked || isSubmitting || workspaceExecutionBlocked || hasBlockingToolArgs) {
-				return false;
-			}
-
-			if (hasText) {
-				return true;
-			}
-
-			const hasAttachments = attachments.length > 0;
-			const hasOutputs = toolOutputs.length > 0;
-			const hasMCPContent = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
-
-			return hasAttachments || hasOutputs || hasMCPContent;
-		},
+		canSubmit: () => isSendButtonEnabled && !isSubmittingRef.current,
 		insertSoftBreak: () => {
 			editor.tf.insertSoftBreak();
 		},
@@ -833,6 +846,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, []);
 
 	const clearComposerTransientState = useCallback(() => {
+		externalMessageRestoreVersionRef.current += 1;
+		setExternalMessageRestorePending(false);
+		setExternalMessageRestoreFailed(false);
 		closeAllMenus();
 		setSubmitError(null);
 		setSubmitting(false);
@@ -886,7 +902,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const hasToolOutputsToSend = finalToolOutputs.length > 0;
 			const hasMCPContentToSend = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
 
-			if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend && !hasMCPContentToSend) {
+			if (
+				!hasNonEmptyText &&
+				!hasAttachmentsToSend &&
+				!hasToolOutputsToSend &&
+				!hasMCPContentToSend &&
+				!hasContinuationToSend
+			) {
 				setSubmitError('Nothing to send. Add text, attachments, tool outputs, or MCP context first.');
 				return;
 			}
@@ -981,6 +1003,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentInstalledEnabledSkillSelections,
 		hasBlockingMCPArgs,
 		hasBlockingToolArgs,
+		hasContinuationToSend,
 		isInputLocked,
 		isSendButtonEnabled,
 		mcp,
@@ -1013,25 +1036,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			isLoadingExternalMessageRef.current = true;
 
 			try {
-				if (!preEditConversationToolsRef.current) {
+				// External MCP/App drafts are not message edits.
+				if (incoming.isEditing && !preEditConversationToolsRef.current) {
 					preEditConversationToolsRef.current = conversationToolsState;
 				}
-				if (!preEditWebSearchTemplatesRef.current) {
+				if (incoming.isEditing && !preEditWebSearchTemplatesRef.current) {
 					preEditWebSearchTemplatesRef.current = webSearchTemplates;
 				}
-				if (!preEditToolSelectionIssuesRef.current) {
+				if (incoming.isEditing && !preEditToolSelectionIssuesRef.current) {
 					preEditToolSelectionIssuesRef.current = toolSelectionIssues;
 				}
-				if (preEditMCPContextRef.current === null) {
+				if (incoming.isEditing && preEditMCPContextRef.current === null) {
 					preEditMCPContextRef.current = mcp.mcpContext;
 				}
-				if (!preEditEnabledSkillRefsRef.current) {
+				if (incoming.isEditing && !preEditEnabledSkillRefsRef.current) {
 					preEditEnabledSkillRefsRef.current = getCurrentEnabledSkillRefs();
 				}
-				if (!preEditActiveSkillRefsRef.current) {
+				if (incoming.isEditing && !preEditActiveSkillRefsRef.current) {
 					preEditActiveSkillRefsRef.current = getCurrentActiveSkillRefs();
 				}
-				if (preEditWorkspaceSelectionRef.current === null) {
+				if (incoming.isEditing && preEditWorkspaceSelectionRef.current === null) {
 					preEditWorkspaceSelectionRef.current = workspace.getSelectionSnapshot();
 				}
 
@@ -1040,19 +1064,71 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				replaceEditorDocument(buildEditorValueFromPlainText(incoming.text ?? ''), 'end');
 				loadAttachmentsFromMessage(incoming.attachments);
 
-				const incomingToolChoices = incoming.toolChoices ?? [];
-				applyConversationToolsFromChoices(incomingToolChoices);
-				applyWebSearchFromChoices(incomingToolChoices);
-				setToolSelectionIssues(incoming.toolSelectionIssues ?? []);
-				mcp.restoreContext(incoming.mcpContext);
+				const replaceContext = incoming.isEditing === true;
+				if (replaceContext || incoming.toolChoices !== undefined) {
+					const choices = incoming.toolChoices ?? [];
+					applyConversationToolsFromChoices(choices);
+					applyWebSearchFromChoices(choices);
+					setToolSelectionIssues(incoming.toolSelectionIssues ?? []);
+				}
+				if (replaceContext || incoming.mcpContext !== undefined) {
+					mcp.restoreContext(incoming.mcpContext);
+				}
 				setMCPAppContextUpdates(incoming.mcpAppContextUpdates ?? []);
 
-				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
-					syncSession: SkillSessionSyncMode.None,
-					forceResetSession: true,
-				});
-				void workspace.restoreSelection(incoming.workspaceSelection, false);
+				if (replaceContext || incoming.enabledSkillRefs !== undefined || incoming.activeSkillRefs !== undefined) {
+					void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
+						syncSession: SkillSessionSyncMode.None,
+						forceResetSession: true,
+					});
+				}
+				if (replaceContext || incoming.workspaceSelection !== undefined) {
+					void workspace.restoreSelection(incoming.workspaceSelection, false);
+				}
 				setToolOutputs(incoming.toolOutputs ?? []);
+
+				const configuration = incoming.sessionConfiguration;
+				if (configuration) {
+					const restoreVersion = externalMessageRestoreVersionRef.current;
+					setExternalMessageRestorePending(true);
+
+					void Promise.all([
+						incoming.toolChoices === undefined
+							? hydrateSessionToolOverrides(configuration.tools)
+							: Promise.resolve({
+									choices: incoming.toolChoices,
+									issues: incoming.toolSelectionIssues ?? [],
+								}),
+						hydrateSessionMCPOverrides(configuration.mcp),
+					])
+						.then(([tools, context]) => {
+							if (externalMessageRestoreVersionRef.current !== restoreVersion) {
+								return;
+							}
+
+							applyConversationToolsFromChoices(tools.choices);
+							applyWebSearchFromChoices(tools.choices);
+							setToolSelectionIssues(tools.issues);
+							mcp.restoreContext(context ?? incoming.mcpContext);
+						})
+						.catch((error: unknown) => {
+							if (externalMessageRestoreVersionRef.current !== restoreVersion) {
+								return;
+							}
+
+							setExternalMessageRestoreFailed(true);
+							setSubmitError(
+								`The original message settings could not be restored. Cancel editing and reopen the message. ${
+									error instanceof Error ? error.message : ''
+								}`.trim()
+							);
+						})
+						.finally(() => {
+							if (externalMessageRestoreVersionRef.current === restoreVersion) {
+								setExternalMessageRestorePending(false);
+							}
+						});
+				}
 			} finally {
 				externalMessageLoadReleaseTimerRef.current = window.setTimeout(() => {
 					externalMessageLoadReleaseTimerRef.current = null;
@@ -1141,6 +1217,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const restoreSessionConfiguration = useCallback(
 		async (configuration: SessionConfiguration) => {
+			// Invalidate an older edit hydration before restoring a Session.
+			externalMessageRestoreVersionRef.current += 1;
+			setExternalMessageRestorePending(false);
+			setExternalMessageRestoreFailed(false);
 			setSubmitError(null);
 			setToolOutputs([]);
 			clearAttachedToolValidation();
@@ -1296,7 +1376,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			loadExternalMessage,
 			setDraftText,
 			setDraftTextIfEmpty,
-			resetEditor,
+			resetEditor: () => {
+				resetEditor();
+				clearPreEditSnapshot();
+			},
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
 			setToolSelectionIssues,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
@@ -1344,6 +1427,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyInstalledSkillSelectionState,
 			applySkillSelectionState,
 			applyWebSearchFromChoices,
+			clearPreEditSnapshot,
 			focusEditorAtEnd,
 			loadExternalMessage,
 			mcp,
@@ -1370,7 +1454,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
-	const sendActionText = submissionMode === 'continuation' ? 'Stage continuation and continue run' : 'Send message';
+	const sendActionText = submissionMode === 'continuation' ? 'Send and continue Run' : 'Send message';
 
 	const erroredToolOutputsReadyToSubmit =
 		toolOutputs.some(output => output.isError && !output.isSkipped) && !hasBlockingToolArgs && !isInputLocked;
@@ -1427,13 +1511,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
 					<div className="bg-base-100 border-base-200 flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
 						<div className="flex min-h-0 min-w-0 grow flex-col p-0">
-							{submissionMode === 'continuation' ? (
-								<div className="border-info/30 bg-info/10 mx-3 mt-2 flex items-center gap-2 rounded-xl border px-2 py-1 text-xs">
-									<FiFastForward size={14} aria-hidden="true" />
-									<span>This input will be staged for the waiting Run and then continued.</span>
-								</div>
-							) : null}
-
 							{editingMessageId ? (
 								<div className="flex min-h-0 items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
@@ -1502,6 +1579,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 												onRemoveOverflowDir={handleRemoveOverflowDir}
 											/>
 										))}
+
+										<SessionToolActivityChips
+											runtimeCalls={sessionToolCalls}
+											runtimeOutputs={sessionToolOutputs}
+											draftOutputs={toolOutputs}
+											onRunCall={onRunSessionToolCall}
+											onRetryCall={onRetrySessionToolCall}
+											onSkipCall={onSkipSessionToolCall}
+											onInspectCall={call => {
+												setToolDetailsState({ kind: 'call', call });
+											}}
+											onInspectOutput={output => {
+												setToolDetailsState({ kind: 'output', output });
+											}}
+											onRemoveDraftOutput={output => {
+												setToolOutputs(previous => previous.filter(candidate => candidate.id !== output.id));
+											}}
+										/>
 									</div>
 								) : null}
 							</div>
@@ -1538,19 +1633,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</>
 							) : null}
 
-							{showContinueRunControl ? (
-								<HoverTip content="Continue the waiting Session Run" placement="left">
-									<button
-										type="button"
-										className="btn btn-circle btn-primary btn-sm shrink-0"
-										onClick={onContinueRun}
-										aria-label="Continue Session Run"
-									>
-										<FiFastForward size={18} />
-									</button>
-								</HoverTip>
-							) : null}
-
 							{showAutomationControl ? (
 								<HoverTip
 									content={
@@ -1569,6 +1651,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										aria-label={automationHoldEnabled ? 'Resume automatic tools' : 'Hold automatic tools'}
 									>
 										<FiZapOff size={18} />
+									</button>
+								</HoverTip>
+							) : null}
+
+							{stagedAppContextUpdateCount > 0 ? (
+								<HoverTip
+									content={`Discard ${stagedAppContextUpdateCount} staged MCP App context update${
+										stagedAppContextUpdateCount === 1 ? '' : 's'
+									}`}
+									placement="left"
+								>
+									<button
+										type="button"
+										className="btn btn-circle btn-info btn-sm shrink-0"
+										onClick={onDiscardStagedAppContext}
+										aria-label="Discard staged MCP App context"
+									>
+										<FiTrash2 size={16} />
 									</button>
 								</HoverTip>
 							) : null}

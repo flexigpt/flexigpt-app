@@ -10,12 +10,10 @@
   - [ ] test all management pages again properly
 
 - [ ] times on resp etc will be good
-- [ ] hold next automation batch will be good to be inside the editor only with tool tip at max.
-- [ ] see if there are any other floating things anyplace in ui.
 
 ## M-3
 
-- [x] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
+- [ ] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
 
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - [x] setup steps for local or custom models

@@ -29,9 +29,6 @@ interface ChatMessageProps {
 	deferRichRendering: boolean;
 	diffCandidatePaths?: string[];
 	onEdit: () => void;
-	onRunToolCall?: (call: UIToolCall) => void;
-	onRetryToolCall?: (call: UIToolCall) => void;
-	onSkipToolCall?: (call: UIToolCall) => void;
 	streamSource?: MessageStreamSource;
 }
 
@@ -154,9 +151,6 @@ export const ChatMessage = memo(function ChatMessage({
 	deferRichRendering,
 	diffCandidatePaths,
 	onEdit,
-	onRunToolCall,
-	onRetryToolCall,
-	onSkipToolCall,
 	streamSource,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
@@ -391,9 +385,6 @@ export const ChatMessage = memo(function ChatMessage({
 								onToolChoiceDetails={handleToolChoiceDetails}
 								onToolCallDetails={handleToolCallDetails}
 								onToolOutputDetails={handleToolOutputDetails}
-								onRunToolCall={onRunToolCall}
-								onRetryToolCall={onRetryToolCall}
-								onSkipToolCall={onSkipToolCall}
 							/>
 						</div>
 					)}

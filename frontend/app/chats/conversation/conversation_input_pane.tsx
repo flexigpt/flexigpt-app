@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo } from 'react';
 
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
 import type { SessionConfiguration } from '@/spec/session';
 
@@ -35,9 +36,15 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
 	showPendingToolControls: boolean;
-	showContinueRunControl: boolean;
+	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
-	onContinueRun: () => void;
+	sessionToolCalls: UIToolCall[];
+	sessionToolOutputs: UIToolOutput[];
+	onRunSessionToolCall: (call: UIToolCall) => void;
+	onRetrySessionToolCall: (call: UIToolCall) => void;
+	onSkipSessionToolCall: (call: UIToolCall) => void;
+	stagedAppContextUpdateCount: number;
+	onDiscardStagedAppContext: () => void;
 }) {
 	const {
 		tabId,
@@ -57,9 +64,15 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		automationHoldEnabled,
 		onToggleAutomationHold,
 		showPendingToolControls,
-		showContinueRunControl,
+		canContinueWithoutDraft,
 		onRunPendingTools,
-		onContinueRun,
+		sessionToolCalls,
+		sessionToolOutputs,
+		onRunSessionToolCall,
+		onRetrySessionToolCall,
+		onSkipSessionToolCall,
+		stagedAppContextUpdateCount,
+		onDiscardStagedAppContext,
 	} = props;
 
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
@@ -92,9 +105,15 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				automationHoldEnabled={automationHoldEnabled}
 				onToggleAutomationHold={onToggleAutomationHold}
 				showPendingToolControls={showPendingToolControls}
-				showContinueRunControl={showContinueRunControl}
+				canContinueWithoutDraft={canContinueWithoutDraft}
 				onRunPendingTools={onRunPendingTools}
-				onContinueRun={onContinueRun}
+				sessionToolCalls={sessionToolCalls}
+				sessionToolOutputs={sessionToolOutputs}
+				onRunSessionToolCall={onRunSessionToolCall}
+				onRetrySessionToolCall={onRetrySessionToolCall}
+				onSkipSessionToolCall={onSkipSessionToolCall}
+				stagedAppContextUpdateCount={stagedAppContextUpdateCount}
+				onDiscardStagedAppContext={onDiscardStagedAppContext}
 			/>
 		</div>
 	);

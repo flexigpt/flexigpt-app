@@ -18,13 +18,7 @@ import type { UIToolCall } from '@/spec/inference';
 import type { Conversation, ConversationMessage, SessionConfiguration, SessionRun } from '@/spec/session';
 import type { SessionOpaqueJSON, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
 import { RoleEnum, UIToolCallStatus } from '@/spec/inference';
-import {
-	SessionAutomationHoldScope,
-	SessionOperationState,
-	SessionRunState,
-	SessionToolCallState,
-	SessionWaitStatus,
-} from '@/spec/session_base';
+import { SessionAutomationHoldScope, SessionOperationState } from '@/spec/session_base';
 import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -48,6 +42,8 @@ import {
 	selectedSessionRun,
 	sessionCommandMeta,
 } from '@/chats/session/session_commands';
+import { getSessionRunComposerState } from '@/chats/session/session_composer_state';
+import { projectSessionRunToolActivity } from '@/chats/session/session_projection';
 import { SessionWaitModal } from '@/chats/session/session_wait_modal';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
@@ -111,14 +107,6 @@ function runHasGeneratingModelOperation(run: SessionRun | undefined): boolean {
 		operation?.state === SessionOperationState.Queued ||
 		operation?.state === SessionOperationState.Preparing ||
 		operation?.state === SessionOperationState.Running
-	);
-}
-
-function isSessionToolReadyForUserExecution(state: SessionToolCallState): boolean {
-	return (
-		state === SessionToolCallState.Proposed ||
-		state === SessionToolCallState.Pending ||
-		state === SessionToolCallState.Ready
 	);
 }
 
@@ -699,10 +687,21 @@ function ConversationAreaInner(
 	const activeTabIsGenerating = runHasGeneratingModelOperation(activeRun);
 	const [waitResolutionState, setWaitResolutionState] = useState<WaitResolutionState | null>(null);
 	const [sessionActionErrorState, setSessionActionErrorState] = useState<SessionActionErrorState | null>(null);
+	const sessionActionsInFlightRef = useRef(new Set<string>());
 	const sessionActionError = sessionActionErrorState?.tabId === activeTabId ? sessionActionErrorState.message : null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
 
+	const activeSessionToolActivity = useMemo(
+		() =>
+			activeTab?.sessionSnapshot ? projectSessionRunToolActivity(activeTab?.sessionSnapshot, activeRun) : undefined,
+		[activeRun, activeTab?.sessionSnapshot]
+	);
+
+	const activeRunComposerState = getSessionRunComposerState(
+		activeRun,
+		(activeSessionToolActivity?.outputs.length ?? 0) > 0
+	);
 	const activeConversationContentIsHydrating = activeTabIsHydrating && messageCount === 0;
 
 	useLayoutEffect(() => {
@@ -856,16 +855,23 @@ function ConversationAreaInner(
 		async (
 			action: (sessionID: string, sessionRevision: number, runID: string, runRevision: number) => Promise<void>
 		) => {
-			const snapshot = activeTab?.sessionSnapshot;
-			const run = snapshot ? selectedSessionRun(snapshot, activeTab.activeRunID) : undefined;
+			const tab = tabsRef.current.find(candidate => candidate.tabId === activeTabId);
+			const snapshot = tab?.sessionSnapshot;
+			const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
 
-			if (!snapshot || !run || !activeTab?.sessionID) {
+			if (!snapshot || !run || !tab?.sessionID) {
 				throw new Error('The active Run snapshot is unavailable.');
 			}
+			if (tab.editingMessageId) {
+				throw new Error('Finish or cancel editing before changing the active Run.');
+			}
+			if (!getSessionRunComposerState(run).isActive) {
+				throw new Error('This Run is no longer active.');
+			}
 
-			await action(activeTab.sessionID, snapshot.session.revision, run.id, run.revision);
+			await action(tab.sessionID, snapshot.session.revision, run.id, run.revision);
 		},
-		[activeTab]
+		[activeTabId]
 	);
 
 	const runCommandForToolCall = useCallback(
@@ -879,9 +885,13 @@ function ConversationAreaInner(
 				callID: string
 			) => Promise<void>
 		) => {
-			const snapshot = activeTab?.sessionSnapshot;
-			if (!snapshot || !activeTab?.sessionID) {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === activeTabId);
+			const snapshot = tab?.sessionSnapshot;
+			if (!snapshot || !tab?.sessionID) {
 				throw new Error('The active Session snapshot is unavailable.');
+			}
+			if (tab.editingMessageId) {
+				throw new Error('Finish or cancel editing before changing Tool calls.');
 			}
 
 			const owner = snapshot.runs.find(run =>
@@ -899,10 +909,14 @@ function ConversationAreaInner(
 			if (!owner || !sessionCall) {
 				throw new Error('The owning Run for this Tool call is unavailable.');
 			}
+			const selectedRun = selectedSessionRun(snapshot, tab.activeRunID);
+			if (owner.id !== selectedRun?.id || !getSessionRunComposerState(owner).isActive) {
+				throw new Error('This Tool call no longer belongs to the active Run.');
+			}
 
-			await action(activeTab.sessionID, snapshot.session.revision, owner.id, owner.revision, sessionCall.id);
+			await action(tab.sessionID, snapshot.session.revision, owner.id, owner.revision, sessionCall.id);
 		},
-		[activeTab]
+		[activeTabId]
 	);
 
 	const executeSessionToolCall = useCallback(
@@ -968,40 +982,11 @@ function ConversationAreaInner(
 		[runCommandForToolCall]
 	);
 
-	const continueActiveRun = useCallback(
-		() =>
-			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
-				requireAcceptedSessionCommand(
-					await sessionManagementAPI.continueRun({
-						meta: sessionCommandMeta(sessionRevision, runRevision),
-						sessionID,
-						runID,
-					}),
-					'Continue Run'
-				);
-			}),
-		[runCommand]
-	);
-
-	const pendingWait = activeRun?.waitingRequests?.find(wait => wait.status === SessionWaitStatus.Pending);
-	const pendingExecutableToolCallIDs = useMemo(() => {
-		const toolCalls = activeRun?.toolCalls ?? [];
-		return toolCalls.filter(call => isSessionToolReadyForUserExecution(call.state)).map(call => call.id);
-	}, [activeRun?.toolCalls]);
-	const hasStagedContinuation =
-		activeRun?.state === SessionRunState.Waiting &&
-		activeRun.continuation.revision > (activeRun.continuation.consumedRevision ?? 0) &&
-		!pendingWait;
-	const canRunPendingToolCalls =
-		activeRun?.state === SessionRunState.Waiting && !pendingWait && pendingExecutableToolCallIDs.length > 0;
-	const canContinueActiveRun =
-		activeRun?.state === SessionRunState.Waiting &&
-		!pendingWait &&
-		pendingExecutableToolCallIDs.length === 0 &&
-		(hasStagedContinuation || activeRun.continuationRequested === true);
-	const canComposeContinuationInput =
-		activeRun?.state === SessionRunState.Waiting && !pendingWait && pendingExecutableToolCallIDs.length === 0;
-	const stagedAppContextUpdateCount = activeRun?.continuation.mcpAppContext?.length ?? 0;
+	const { pendingWait, pendingExecutableToolCallIDs, canRunPendingToolCalls } = activeRunComposerState;
+	const stagedAppContextUpdateCount =
+		!activeEditingMessageId && activeRunComposerState.hasStagedContinuation
+			? (activeRun?.continuation.mcpAppContext?.length ?? 0)
+			: 0;
 	const hasAutomaticToolCalls = activeRun?.toolCalls?.some(call => call.automatic === true) ?? false;
 	const automationHoldEnabled =
 		activeRun?.controls.automaticTools.enabled === true || activeRun?.controls.automaticContinuation.enabled === true;
@@ -1078,13 +1063,24 @@ function ConversationAreaInner(
 	const runSessionAction = useCallback(
 		(action: () => Promise<void>) => {
 			const tabId = activeTabId;
+			// A double click, or two inline controls clicked before the next
+			// snapshot, must not issue competing revision-sensitive commands.
+			if (sessionActionsInFlightRef.current.has(tabId)) {
+				return;
+			}
+			sessionActionsInFlightRef.current.add(tabId);
 			setSessionActionErrorState(null);
-			void action().catch((error: unknown) => {
-				setSessionActionErrorState({
-					tabId,
-					message: sessionActionErrorMessage(error),
+			void Promise.resolve()
+				.then(action)
+				.catch((error: unknown) => {
+					setSessionActionErrorState({
+						tabId,
+						message: sessionActionErrorMessage(error),
+					});
+				})
+				.finally(() => {
+					sessionActionsInFlightRef.current.delete(tabId);
 				});
-			});
 		},
 		[activeTabId, setSessionActionErrorState]
 	);
@@ -1194,17 +1190,6 @@ function ConversationAreaInner(
 		]
 	);
 
-	const activeRunToolCallIDs = useMemo(() => {
-		const ids = new Set<string>();
-		for (const call of activeRun?.toolCalls ?? []) {
-			ids.add(call.id);
-			if (call.providerCallID) {
-				ids.add(call.providerCallID);
-			}
-		}
-		return ids;
-	}, [activeRun?.toolCalls]);
-
 	const itemContent = useCallback(
 		(
 			index: number,
@@ -1226,21 +1211,6 @@ function ConversationAreaInner(
 						tabId={activeTabId}
 						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
-						onRunToolCall={call => {
-							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-								runSessionAction(() => executeSessionToolCall(call));
-							}
-						}}
-						onRetryToolCall={call => {
-							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-								runSessionAction(() => retrySessionToolCall(call));
-							}
-						}}
-						onSkipToolCall={call => {
-							if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-								runSessionAction(() => skipSessionToolCall(call));
-							}
-						}}
 					/>
 				);
 			}
@@ -1254,36 +1224,10 @@ function ConversationAreaInner(
 					tabId={activeTabId}
 					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
-					onRunToolCall={call => {
-						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-							runSessionAction(() => executeSessionToolCall(call));
-						}
-					}}
-					onRetryToolCall={call => {
-						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-							runSessionAction(() => retrySessionToolCall(call));
-						}
-					}}
-					onSkipToolCall={call => {
-						if (activeRunToolCallIDs.has(call.id) || activeRunToolCallIDs.has(call.callID)) {
-							runSessionAction(() => skipSessionToolCall(call));
-						}
-					}}
 				/>
 			);
 		},
-		[
-			activeEditingMessageId,
-			activeTabId,
-			activeRunToolCallIDs,
-			activeTabIsGenerating,
-			beginEditMessageForTab,
-			messageCount,
-			executeSessionToolCall,
-			retrySessionToolCall,
-			runSessionAction,
-			skipSessionToolCall,
-		]
+		[activeEditingMessageId, activeTabId, activeTabIsGenerating, beginEditMessageForTab, messageCount]
 	);
 
 	const mountedInputTabs = useMemo(
@@ -1425,28 +1369,22 @@ function ConversationAreaInner(
 
 			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 items-end justify-center overflow-hidden">
 				<div className="max-h-full w-11/12 min-w-0 xl:w-5/6">
-					{stagedAppContextUpdateCount > 0 ? (
-						<div className="border-info/30 bg-info/10 mb-2 flex flex-wrap items-center justify-center gap-2 rounded-xl border p-2 text-xs">
-							<span>
-								Staged App context: {stagedAppContextUpdateCount} update
-								{stagedAppContextUpdateCount === 1 ? '' : 's'}.
-							</span>
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								onClick={() => {
-									runSessionAction(clearStagedAppContext);
-								}}
-							>
-								Discard staged App context
-							</button>
-						</div>
-					) : null}
-
 					{mountedInputTabs.map(tab =>
 						(() => {
 							const tabRun = tab.sessionSnapshot ? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID) : undefined;
-							const allowContinuationInput = tab.tabId === activeTabId && canComposeContinuationInput;
+							const suppressRuntimeActivity =
+								Boolean(tab.editingMessageId) || tab.isHydrating || !(tab.isLoaded ?? true);
+							const activity = suppressRuntimeActivity
+								? undefined
+								: tab.tabId === activeTabId
+									? activeSessionToolActivity
+									: tab.sessionSnapshot
+										? projectSessionRunToolActivity(tab.sessionSnapshot, tabRun)
+										: undefined;
+							const composerState = getSessionRunComposerState(tabRun, (activity?.outputs.length ?? 0) > 0);
+							const allowContinuationInput = !suppressRuntimeActivity && composerState.canComposeContinuationInput;
+							const showRuntimeControls =
+								tab.tabId === activeTabId && !suppressRuntimeActivity && composerState.isActive;
 
 							return (
 								<TabInputPane
@@ -1464,18 +1402,39 @@ function ConversationAreaInner(
 									sendContinuation={stageContinuationForTab}
 									cancelEditing={cancelEditingForTab}
 									cancelRun={cancelRunForTab}
-									showAutomationControl={tab.tabId === activeTabId && (hasAutomaticToolCalls || automationHoldEnabled)}
+									showAutomationControl={showRuntimeControls && (hasAutomaticToolCalls || automationHoldEnabled)}
 									automationHoldEnabled={tab.tabId === activeTabId && automationHoldEnabled}
 									onToggleAutomationHold={() => {
 										runSessionAction(toggleAutomationHold);
 									}}
-									showPendingToolControls={tab.tabId === activeTabId && canRunPendingToolCalls}
-									showContinueRunControl={tab.tabId === activeTabId && canContinueActiveRun}
+									showPendingToolControls={showRuntimeControls && canRunPendingToolCalls}
+									canContinueWithoutDraft={allowContinuationInput && composerState.canContinueWithoutDraft}
 									onRunPendingTools={continueRun => {
 										runSessionAction(() => executePendingSessionToolCalls(continueRun));
 									}}
-									onContinueRun={() => {
-										runSessionAction(continueActiveRun);
+									sessionToolCalls={activity?.calls ?? []}
+									sessionToolOutputs={activity?.outputs ?? []}
+									onRunSessionToolCall={call => {
+										if (tab.tabId !== activeTabId) {
+											return;
+										}
+										runSessionAction(() => executeSessionToolCall(call));
+									}}
+									onRetrySessionToolCall={call => {
+										if (tab.tabId !== activeTabId) {
+											return;
+										}
+										runSessionAction(() => retrySessionToolCall(call));
+									}}
+									onSkipSessionToolCall={call => {
+										if (tab.tabId !== activeTabId) {
+											return;
+										}
+										runSessionAction(() => skipSessionToolCall(call));
+									}}
+									stagedAppContextUpdateCount={tab.tabId === activeTabId ? stagedAppContextUpdateCount : 0}
+									onDiscardStagedAppContext={() => {
+										runSessionAction(clearStagedAppContext);
 									}}
 								/>
 							);

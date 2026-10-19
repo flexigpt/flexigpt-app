@@ -2,6 +2,7 @@ import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } 
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
 import type { RestorableConversationContext, SessionConfiguration } from '@/spec/session';
 import type { MCPAppModelContextUpdate } from '@/spec/session_mcp';
@@ -70,9 +71,15 @@ interface ComposerBoxProps {
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
 	showPendingToolControls: boolean;
-	showContinueRunControl: boolean;
+	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
-	onContinueRun: () => void;
+	sessionToolCalls: UIToolCall[];
+	sessionToolOutputs: UIToolOutput[];
+	onRunSessionToolCall: (call: UIToolCall) => void;
+	onRetrySessionToolCall: (call: UIToolCall) => void;
+	onSkipSessionToolCall: (call: UIToolCall) => void;
+	stagedAppContextUpdateCount: number;
+	onDiscardStagedAppContext: () => void;
 }
 
 export const ComposerBox = memo(
@@ -91,9 +98,15 @@ export const ComposerBox = memo(
 			automationHoldEnabled,
 			onToggleAutomationHold,
 			showPendingToolControls,
-			showContinueRunControl,
+			canContinueWithoutDraft,
 			onRunPendingTools,
-			onContinueRun,
+			sessionToolCalls,
+			sessionToolOutputs,
+			onRunSessionToolCall,
+			onRetrySessionToolCall,
+			onSkipSessionToolCall,
+			stagedAppContextUpdateCount,
+			onDiscardStagedAppContext,
 		},
 		ref
 	) {
@@ -188,7 +201,7 @@ export const ComposerBox = memo(
 			async (payload: EditorSubmitPayload): Promise<void> => {
 				setAbortConfirmationRequested(false);
 				if (!composerContext.hasRunnableModel) {
-					return;
+					throw new Error('Select an available model before sending.');
 				}
 
 				const nonSessionSkillRefs = normalizeSkillRefs([
@@ -232,9 +245,13 @@ export const ComposerBox = memo(
 					composerContext.modelOptions
 				);
 
-				if (acceptedConfiguration) {
-					sessionConfigurationBaselineRef.current = structuredClone(acceptedConfiguration);
+				if (!acceptedConfiguration) {
+					// Resolving without acceptance makes EditorArea clear a
+					// draft which was never submitted.
+					throw new Error('The message was not accepted. Your draft has been kept.');
 				}
+
+				sessionConfigurationBaselineRef.current = structuredClone(acceptedConfiguration);
 			},
 			[
 				agent.selectedAgent,
@@ -369,9 +386,15 @@ export const ComposerBox = memo(
 					automationHoldEnabled={automationHoldEnabled}
 					onToggleAutomationHold={onToggleAutomationHold}
 					showPendingToolControls={showPendingToolControls}
-					showContinueRunControl={showContinueRunControl}
+					canContinueWithoutDraft={canContinueWithoutDraft}
 					onRunPendingTools={onRunPendingTools}
-					onContinueRun={onContinueRun}
+					sessionToolCalls={sessionToolCalls}
+					sessionToolOutputs={sessionToolOutputs}
+					onRunSessionToolCall={onRunSessionToolCall}
+					onRetrySessionToolCall={onRetrySessionToolCall}
+					onSkipSessionToolCall={onSkipSessionToolCall}
+					stagedAppContextUpdateCount={stagedAppContextUpdateCount}
+					onDiscardStagedAppContext={onDiscardStagedAppContext}
 				/>
 			</div>
 		);

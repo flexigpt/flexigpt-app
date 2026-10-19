@@ -26,7 +26,6 @@ import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 import { artifactRefKey } from '@/spec/artifact';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
-import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { ToolStoreChoiceType } from '@/spec/tool';
 import {
@@ -303,15 +302,12 @@ interface MessageToolCallChipProps {
 	call: UIToolCall;
 	fullWidth?: boolean;
 	onClick?: () => void;
-	onRun?: (call: UIToolCall) => void;
-	onRetry?: (call: UIToolCall) => void;
-	onSkip?: (call: UIToolCall) => void;
 }
 
 /**
  * Read‑only chip for an assistant-suggested tool call under the assistant bubble.
  */
-function MessageToolCallChip({ call, fullWidth = false, onClick, onRun, onRetry, onSkip }: MessageToolCallChipProps) {
+function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCallChipProps) {
 	const tmpCall: UIToolCall = {
 		id: call.id || call.callID,
 		callID: call.callID,
@@ -337,17 +333,6 @@ function MessageToolCallChip({ call, fullWidth = false, onClick, onRun, onRetry,
 	const mcpLabel = call.mcpToolSelection ? `\nMCP tool: ${call.mcpToolSelection.toolName}` : '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 
-	const action =
-		call.status === UIToolCallStatus.Pending
-			? onRun
-				? { label: 'Run', invoke: onRun }
-				: undefined
-			: call.status === UIToolCallStatus.Failed
-				? onRetry
-					? { label: 'Retry', invoke: onRetry }
-					: undefined
-				: undefined;
-
 	return (
 		<MessageBarChip
 			icon={<FiTerminal size={14} />}
@@ -359,30 +344,6 @@ function MessageToolCallChip({ call, fullWidth = false, onClick, onRun, onRetry,
 			trailing={
 				<>
 					{isAutoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
-					{action ? (
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							onClick={event => {
-								event.stopPropagation();
-								action.invoke(call);
-							}}
-						>
-							{action.label}
-						</button>
-					) : null}
-					{(call.status === UIToolCallStatus.Pending || call.status === UIToolCallStatus.Failed) && onSkip ? (
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs text-error rounded-lg"
-							onClick={event => {
-								event.stopPropagation();
-								onSkip(call);
-							}}
-						>
-							{call.status === UIToolCallStatus.Failed ? 'Submit error' : 'Skip'}
-						</button>
-					) : null}
 					<FiCode className="text-base-content/60" title="Details" size={14} />
 				</>
 			}
@@ -838,18 +799,9 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 interface ToolCallsGroupChipProps {
 	calls: UIToolCall[];
 	onToolCallDetails?: (call: UIToolCall) => void;
-	onRunToolCall?: (call: UIToolCall) => void;
-	onRetryToolCall?: (call: UIToolCall) => void;
-	onSkipToolCall?: (call: UIToolCall) => void;
 }
 
-function ToolCallsGroupChip({
-	calls,
-	onToolCallDetails,
-	onRunToolCall,
-	onRetryToolCall,
-	onSkipToolCall,
-}: ToolCallsGroupChipProps) {
+function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProps) {
 	const count = calls.length;
 
 	return (
@@ -863,14 +815,7 @@ function ToolCallsGroupChip({
 			dataMessageChip="tool-calls-group"
 			itemKey={call => call.id || call.callID}
 			renderItem={(call, options) => (
-				<MessageToolCallChip
-					call={call}
-					fullWidth={options.fullWidth}
-					onClick={options.onClick}
-					onRun={onRunToolCall}
-					onRetry={onRetryToolCall}
-					onSkip={onSkipToolCall}
-				/>
+				<MessageToolCallChip call={call} fullWidth={options.fullWidth} onClick={options.onClick} />
 			)}
 			onItemDetails={onToolCallDetails}
 		/>
@@ -975,9 +920,6 @@ interface MessageAttachmentsBarProps {
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
 	onToolCallDetails?: (call: UIToolCall) => void;
 	onToolOutputDetails?: (output: UIToolOutput) => void;
-	onRunToolCall?: (call: UIToolCall) => void;
-	onRetryToolCall?: (call: UIToolCall) => void;
-	onSkipToolCall?: (call: UIToolCall) => void;
 }
 
 /**
@@ -1004,9 +946,6 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 	onToolChoiceDetails,
 	onToolCallDetails,
 	onToolOutputDetails,
-	onRunToolCall,
-	onRetryToolCall,
-	onSkipToolCall,
 }: MessageAttachmentsBarProps) {
 	const choices = toolChoices ?? [];
 	const calls = toolCalls ?? [];
@@ -1120,15 +1059,7 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 			)}
 
 			{/* Suggested function/custom tool calls */}
-			{hasToolCalls && (
-				<ToolCallsGroupChip
-					calls={normalToolCalls}
-					onToolCallDetails={onToolCallDetails}
-					onRunToolCall={onRunToolCall}
-					onRetryToolCall={onRetryToolCall}
-					onSkipToolCall={onSkipToolCall}
-				/>
-			)}
+			{hasToolCalls && <ToolCallsGroupChip calls={normalToolCalls} onToolCallDetails={onToolCallDetails} />}
 
 			{/* Web‑search calls (already executed by provider) */}
 			{hasWebSearchCalls && <WebSearchCallsGroupChip calls={webSearchCalls} onCallDetails={onToolCallDetails} />}
