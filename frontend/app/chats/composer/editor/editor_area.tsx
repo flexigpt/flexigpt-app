@@ -43,9 +43,11 @@ import type { AgentSystemPromptController } from '@/chats/composer/skills/use_ag
 import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
+import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
+import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
-import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEditorValueFromPlainText, insertPlainTextAsSingleBlock } from '@/chats/composer/platedoc/platedoc_utils';
 import {
@@ -321,10 +323,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		incompatibleSDKSelection ||
 		toolSelectionIssues.length > 0;
 
-	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
-		setToolDetailsState({ kind: 'output', output });
-	}, []);
-
 	const handleOpenConversationToolDetails = useCallback((entry: ConversationToolStateEntry) => {
 		setToolDetailsState({ kind: 'choice', choice: entry.toolStoreChoice });
 	}, []);
@@ -333,13 +331,21 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolDetailsState({ kind: 'choice', choice: uiToolChoiceToToolStoreChoice(entry) });
 	}, []);
 
-	const handleRemoveToolOutput = useCallback((id: string) => {
-		setToolOutputs(previous => previous.filter(output => output.id !== id));
-	}, []);
-
 	const attachedToolIdentityKeys = useMemo(() => {
 		return new Set(attachedToolEntries.map(entry => toolIdentityKey(entry.target)));
 	}, [attachedToolEntries]);
+
+	const standaloneAttachments = useMemo(() => {
+		const ownedAttachmentKeys = new Set<string>();
+		for (const group of directoryGroups) {
+			for (const attachmentKey of group.ownedAttachmentKeys) {
+				ownedAttachmentKeys.add(attachmentKey);
+			}
+		}
+
+		return attachments.filter(attachment => !ownedAttachmentKeys.has(uiAttachmentKey(attachment)));
+	}, [attachments, directoryGroups]);
+	const hasEditorChips = attachments.length > 0 || directoryGroups.length > 0 || toolOutputs.length > 0;
 
 	useEffect(() => {
 		return () => {
@@ -1471,19 +1477,33 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 							</div>
 
 							<div className="w-full min-w-0 shrink-0 items-center overflow-x-auto overscroll-contain p-1 text-xs">
-								<EditorChipsBar
-									attachments={attachments}
-									directoryGroups={directoryGroups}
-									toolOutputs={toolOutputs}
-									onOpenOutput={handleOpenToolOutput}
-									onRemoveToolOutput={handleRemoveToolOutput}
-									onRemoveAttachment={handleRemoveAttachment}
-									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
-									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
-									onRemoveDirectoryAttachments={handleRemoveDirectoryAttachments}
-									onRestoreDirectoryAttachments={handleRestoreDirectoryAttachments}
-									onRemoveOverflowDir={handleRemoveOverflowDir}
-								/>
+								{hasEditorChips ? (
+									<div
+										className="app-scrollbar-thin flex w-max shrink-0 flex-nowrap items-center gap-1 p-1"
+										style={{ scrollbarGutter: 'stable' }}
+									>
+										{/* Aggregated chip for standalone attachments */}
+										<StandaloneAttachmentsChip
+											attachments={standaloneAttachments}
+											onRemoveAttachment={handleRemoveAttachment}
+											onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
+										/>
+
+										{/* Folder groups */}
+										{directoryGroups.map(group => (
+											<DirectoryChip
+												key={group.id}
+												group={group}
+												attachments={attachments}
+												onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
+												onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
+												onRemoveDirectoryAttachments={handleRemoveDirectoryAttachments}
+												onRestoreDirectoryAttachments={handleRestoreDirectoryAttachments}
+												onRemoveOverflowDir={handleRemoveOverflowDir}
+											/>
+										))}
+									</div>
+								) : null}
 							</div>
 						</div>
 
