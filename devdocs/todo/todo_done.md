@@ -1124,3 +1124,5 @@
 - [x] ui consistency in all composer controls
 - [x] hold next automation batch will be good to be inside the editor only with tool tip at max.
 - [x] see if there are any other floating things anyplace in ui.
+- [x] directory chip: two borders are there side by side if there is nothing removed yet. also remove folder should be someplace else.
+- [x] need counts for attachments

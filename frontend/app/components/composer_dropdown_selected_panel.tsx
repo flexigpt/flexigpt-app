@@ -14,6 +14,10 @@ interface ComposerDropdownSelectedPanelProps {
 	 * a domain has selected content from `children` alone.
 	 */
 	isEmpty?: boolean;
+	/**
+	 * Set this to false when the preceding menu region already renders a divider.
+	 */
+	separatorBefore?: boolean;
 	className?: string;
 }
 
@@ -32,6 +36,7 @@ export function ComposerDropdownSelectedPanel({
 	children,
 	emptyLabel = 'Nothing has been added yet.',
 	isEmpty,
+	separatorBefore = true,
 	className = '',
 }: ComposerDropdownSelectedPanelProps) {
 	const hasContent = children !== undefined && children !== null;
@@ -40,7 +45,9 @@ export function ComposerDropdownSelectedPanel({
 
 	return (
 		<section
-			className={`border-base-300 bg-base-100 z-20 mt-2 shrink-0 border-t pt-2 ${className}`}
+			className={`bg-base-100 z-20 shrink-0 ${
+				separatorBefore ? 'border-base-300 mt-2 border-t pt-2' : ''
+			} ${className}`}
 			data-composer-dropdown-selected
 			data-empty={showEmpty ? 'true' : undefined}
 			aria-label={resolvedAriaLabel}

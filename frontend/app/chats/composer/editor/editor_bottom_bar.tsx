@@ -39,6 +39,7 @@ interface EditorBottomBarProps {
 	onInsertTemplateText: (text: string) => Promise<void> | void;
 	onTemplateRendered: (skillRef: SkillRef) => void;
 	attachments: UIAttachment[];
+	removedStandaloneAttachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
 	onAttachApprovedTemplateResourcePaths: (
 		paths: string[],
@@ -106,6 +107,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onInsertTemplateText,
 	onTemplateRendered,
 	attachments,
+	removedStandaloneAttachments,
 	directoryGroups,
 	onAttachApprovedTemplateResourcePaths,
 	templateMenuState,
@@ -182,6 +184,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onOpenAttachmentUrlModal={onOpenAttachmentUrlModal}
 						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
 						attachments={attachments}
+						removedStandaloneAttachments={removedStandaloneAttachments}
 						directoryGroups={directoryGroups}
 						isInputLocked={isInputLocked}
 					/>

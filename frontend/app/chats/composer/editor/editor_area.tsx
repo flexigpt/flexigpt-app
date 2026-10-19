@@ -237,6 +237,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const {
 		attachments,
 		directoryGroups,
+		removedStandaloneAttachments,
 		attachFiles: handleAttachFiles,
 		attachDirectory: handleAttachDirectory,
 		attachURL: handleAttachURL,
@@ -245,10 +246,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		removeAttachment: handleRemoveAttachment,
 		removeDirectoryGroup: handleRemoveDirectoryGroup,
 		removeDirectoryAttachments: handleRemoveDirectoryAttachments,
+		restoreStandaloneAttachments: handleRestoreStandaloneAttachments,
 		restoreDirectoryAttachments: handleRestoreDirectoryAttachments,
 		removeOverflowDir: handleRemoveOverflowDir,
 		applyAttachmentsDrop,
 		clearAttachments,
+		clearStandaloneAttachments: handleClearStandaloneAttachments,
 		loadAttachmentsFromMessage,
 	} = useComposerAttachments({
 		isBusy: isGenerating,
@@ -368,6 +371,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [attachments, directoryGroups]);
 	const hasEditorChips =
 		attachments.length > 0 ||
+		removedStandaloneAttachments.length > 0 ||
 		directoryGroups.length > 0 ||
 		toolOutputs.length > 0 ||
 		sessionToolCalls.length > 0 ||
@@ -1195,9 +1199,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		const hasTextNow = hasTextRef.current;
-		const hasAttachmentsLocal = attachments.length > 0;
+		const hasAttachmentCandidates =
+			attachments.length > 0 || removedStandaloneAttachments.length > 0 || directoryGroups.length > 0;
 		const hasToolOutputsLocal = toolOutputs.length > 0;
-		const isEffectivelyEmpty = !hasTextNow && !hasAttachmentsLocal && !hasToolOutputsLocal;
+		const isEffectivelyEmpty = !hasTextNow && !hasAttachmentCandidates && !hasToolOutputsLocal;
 
 		if (editingMessageId && isEffectivelyEmpty) {
 			restorePreEditContext();
@@ -1206,10 +1211,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [
 		attachments.length,
 		cancelEditing,
+		directoryGroups.length,
 		editingMessageId,
 		handleAttachedToolsChanged,
 		hasTextRef,
 		onEditorChange,
+		removedStandaloneAttachments.length,
 		restorePreEditContext,
 		submitError,
 		toolOutputs.length,
@@ -1562,7 +1569,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										{/* Aggregated chip for standalone attachments */}
 										<StandaloneAttachmentsChip
 											attachments={standaloneAttachments}
+											removedAttachments={removedStandaloneAttachments}
 											onRemoveAttachment={handleRemoveAttachment}
+											onRestoreAttachments={handleRestoreStandaloneAttachments}
+											onClearAttachments={handleClearStandaloneAttachments}
 											onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
 										/>
 
@@ -1736,6 +1746,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onTemplateRendered={handleTemplateRendered}
 						attachments={attachments}
 						directoryGroups={directoryGroups}
+						removedStandaloneAttachments={removedStandaloneAttachments}
 						onInsertTemplateText={handleInsertTemplateText}
 						onAttachApprovedTemplateResourcePaths={attachApprovedTemplateResourcePaths}
 						templateMenuState={templateMenu}

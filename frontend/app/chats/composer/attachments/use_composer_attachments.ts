@@ -122,6 +122,36 @@ function releaseOwnedKeysFromDirectoryGroups(
 	return changed ? next : groups;
 }
 
+function moveAttachmentsToDirectoryRemoved(
+	groups: DirectoryAttachmentGroup[],
+	attachmentsByKey: ReadonlyMap<string, UIAttachment>
+): DirectoryAttachmentGroup[] {
+	let changed = false;
+
+	const next = groups.map(group => {
+		const removedForGroup = group.attachmentKeys.flatMap(key => {
+			const attachment = attachmentsByKey.get(key);
+			return attachment ? [attachment] : [];
+		});
+
+		if (removedForGroup.length === 0) {
+			return group;
+		}
+
+		changed = true;
+		const removedKeys = new Set(removedForGroup.map(attachment => uiAttachmentKey(attachment)));
+
+		return {
+			...group,
+			attachmentKeys: group.attachmentKeys.filter(key => !removedKeys.has(key)),
+			ownedAttachmentKeys: group.ownedAttachmentKeys.filter(key => !removedKeys.has(key)),
+			removedAttachments: mergeUniqueAttachments(group.removedAttachments ?? [], removedForGroup),
+		};
+	});
+
+	return changed ? next : groups;
+}
+
 interface UseComposerAttachmentsArgs {
 	isBusy: boolean;
 	focusEditorAtEnd: () => void;
@@ -144,6 +174,7 @@ function assertPathAttachmentApplicationAllowed(options: AttachPathsAsAttachment
 
 interface UseComposerAttachmentsResult {
 	attachments: UIAttachment[];
+	removedStandaloneAttachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
 	attachFiles: () => Promise<void>;
 	attachDirectory: () => Promise<void>;
@@ -157,10 +188,12 @@ interface UseComposerAttachmentsResult {
 	removeAttachment: (att: UIAttachment) => void;
 	removeDirectoryGroup: (groupId: string) => void;
 	removeDirectoryAttachments: (groupId: string, attachments: UIAttachment[]) => void;
+	restoreStandaloneAttachments: (attachments: UIAttachment[]) => void;
 	restoreDirectoryAttachments: (groupId: string, attachments: UIAttachment[]) => void;
 	removeOverflowDir: (groupId: string, dirPath: string) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	clearAttachments: () => void;
+	clearStandaloneAttachments: () => void;
 	loadAttachmentsFromMessage: (incomingAttachments: Attachment[] | null | undefined) => void;
 }
 
@@ -169,14 +202,22 @@ export function useComposerAttachments({
 	focusEditorAtEnd,
 }: UseComposerAttachmentsArgs): UseComposerAttachmentsResult {
 	const [attachments, setAttachmentsState] = useState<UIAttachment[]>([]);
+	const [removedStandaloneAttachments, setRemovedStandaloneAttachmentsState] = useState<UIAttachment[]>([]);
 	const [directoryGroups, setDirectoryGroupsState] = useState<DirectoryAttachmentGroup[]>([]);
 	const attachmentsRef = useRef<UIAttachment[]>([]);
+	const removedStandaloneAttachmentsRef = useRef<UIAttachment[]>([]);
 	const directoryGroupsRef = useRef<DirectoryAttachmentGroup[]>([]);
 
 	const setAttachments = useCallback((update: SetStateAction<UIAttachment[]>) => {
 		const next = resolveStateUpdate(update, attachmentsRef.current);
 		attachmentsRef.current = next;
 		setAttachmentsState(prev => (prev === next ? prev : next));
+	}, []);
+
+	const setRemovedStandaloneAttachments = useCallback((update: SetStateAction<UIAttachment[]>) => {
+		const next = resolveStateUpdate(update, removedStandaloneAttachmentsRef.current);
+		removedStandaloneAttachmentsRef.current = next;
+		setRemovedStandaloneAttachmentsState(prev => (prev === next ? prev : next));
 	}, []);
 
 	const setDirectoryGroups = useCallback((update: SetStateAction<DirectoryAttachmentGroup[]>) => {
@@ -187,11 +228,13 @@ export function useComposerAttachments({
 
 	const clearAttachments = useCallback(() => {
 		setAttachments([]);
+		setRemovedStandaloneAttachments([]);
 		setDirectoryGroups([]);
-	}, [setAttachments, setDirectoryGroups]);
+	}, [setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]);
 
 	const loadAttachmentsFromMessage = useCallback(
 		(incomingAttachments: Attachment[] | null | undefined) => {
+			setRemovedStandaloneAttachments([]);
 			setAttachments(() => {
 				if (!incomingAttachments || incomingAttachments.length === 0) {
 					return [];
@@ -229,7 +272,7 @@ export function useComposerAttachments({
 			// We don’t attempt to reconstruct directoryGroups; show flat chips instead.
 			setDirectoryGroups([]);
 		},
-		[setAttachments, setDirectoryGroups]
+		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
 	);
 
 	const applyFileAttachments = useCallback(
@@ -238,6 +281,7 @@ export function useComposerAttachments({
 				return;
 			}
 			const keysToReleaseFromDirectoryOwnership = new Set<string>();
+			const restoredStandaloneKeys = new Set<string>();
 			setAttachments(prev => {
 				const existing = new Set(prev.map(k => uiAttachmentKey(k)));
 				const next: UIAttachment[] = [...prev];
@@ -249,6 +293,7 @@ export function useComposerAttachments({
 					}
 
 					const key = uiAttachmentKey(att);
+					restoredStandaloneKeys.add(key);
 					if (existing.has(key)) {
 						// If the user explicitly attaches a file that already exists only because
 						// it came from a directory selection, treat it as independently retained.
@@ -261,11 +306,18 @@ export function useComposerAttachments({
 				}
 				return next;
 			});
+
+			if (restoredStandaloneKeys.size > 0) {
+				setRemovedStandaloneAttachments(prev =>
+					prev.filter(attachment => !restoredStandaloneKeys.has(uiAttachmentKey(attachment)))
+				);
+			}
+
 			if (keysToReleaseFromDirectoryOwnership.size > 0) {
 				setDirectoryGroups(prev => releaseOwnedKeysFromDirectoryGroups(prev, keysToReleaseFromDirectoryOwnership));
 			}
 		},
-		[setAttachments, setDirectoryGroups]
+		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
 	);
 
 	const applyDirectoryAttachments = useCallback(
@@ -312,6 +364,7 @@ export function useComposerAttachments({
 			const availableSlots = Math.max(0, MAX_FILES_PER_DIRECTORY - currentAttachedCount);
 			const activeCandidates = candidates.slice(0, availableSlots);
 			const removedCandidates = candidates.slice(availableSlots);
+			const activeCandidateKeys = new Set(activeCandidates.map(attachment => uiAttachmentKey(attachment)));
 			const attachmentKeysForGroup: string[] = [];
 			const ownedAttachmentKeysForGroup: string[] = [];
 
@@ -339,6 +392,12 @@ export function useComposerAttachments({
 				}
 				return [...prev, ...added];
 			});
+
+			if (activeCandidateKeys.size > 0) {
+				setRemovedStandaloneAttachments(prev =>
+					prev.filter(attachment => !activeCandidateKeys.has(uiAttachmentKey(attachment)))
+				);
+			}
 
 			setDirectoryGroups(prev => {
 				const existingIndex = prev.findIndex(group => group.dirPath === dirPath);
@@ -392,7 +451,7 @@ export function useComposerAttachments({
 				return next;
 			});
 		},
-		[setAttachments, setDirectoryGroups]
+		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
 	);
 
 	const attachFiles = useCallback(async () => {
@@ -441,12 +500,13 @@ export function useComposerAttachments({
 				}
 				return [...prev, att];
 			});
+			setRemovedStandaloneAttachments(prev => prev.filter(attachment => uiAttachmentKey(attachment) !== key));
 
 			if (!isBusy) {
 				focusEditorAtEnd();
 			}
 		},
-		[focusEditorAtEnd, isBusy, setAttachments]
+		[focusEditorAtEnd, isBusy, setAttachments, setRemovedStandaloneAttachments]
 	);
 
 	const attachPathsAsAttachments = useCallback(
@@ -492,26 +552,67 @@ export function useComposerAttachments({
 	const removeAttachment = useCallback(
 		(att: UIAttachment) => {
 			const targetKey = uiAttachmentKey(att);
+			const isStandaloneAttachment = !directoryGroupsRef.current.some(group =>
+				group.ownedAttachmentKeys.includes(targetKey)
+			);
 
 			setAttachments(prev => prev.filter(a => uiAttachmentKey(a) !== targetKey));
+			if (isStandaloneAttachment) {
+				setRemovedStandaloneAttachments(prev => mergeUniqueAttachments(prev, [att]));
+			}
 
-			// A global removal also moves the file into the "not attached" group of every directory that referenced it.
-			setDirectoryGroups(prevGroups => {
-				return prevGroups.map(group => {
-					if (!group.attachmentKeys.includes(targetKey)) {
-						return group;
-					}
-
-					return {
-						...group,
-						attachmentKeys: group.attachmentKeys.filter(key => key !== targetKey),
-						ownedAttachmentKeys: group.ownedAttachmentKeys.filter(key => key !== targetKey),
-						removedAttachments: mergeUniqueAttachments(group.removedAttachments ?? [], [att]),
-					};
-				});
-			});
+			// A global removal also moves the file into the "not attached" group
+			// of every directory that referenced it.
+			setDirectoryGroups(prevGroups => moveAttachmentsToDirectoryRemoved(prevGroups, new Map([[targetKey, att]])));
 		},
-		[setAttachments, setDirectoryGroups]
+		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
+	);
+
+	const clearStandaloneAttachments = useCallback(() => {
+		const directoryOwnedKeys = new Set<string>();
+		for (const group of directoryGroupsRef.current) {
+			for (const key of group.ownedAttachmentKeys) {
+				directoryOwnedKeys.add(key);
+			}
+		}
+
+		const activeStandaloneAttachments = attachmentsRef.current.filter(
+			attachment => !directoryOwnedKeys.has(uiAttachmentKey(attachment))
+		);
+		if (activeStandaloneAttachments.length > 0) {
+			const attachmentsByKey = new Map<string, UIAttachment>();
+			for (const attachment of activeStandaloneAttachments) {
+				attachmentsByKey.set(uiAttachmentKey(attachment), attachment);
+			}
+
+			setAttachments(prev => prev.filter(attachment => !attachmentsByKey.has(uiAttachmentKey(attachment))));
+			setDirectoryGroups(prevGroups => moveAttachmentsToDirectoryRemoved(prevGroups, attachmentsByKey));
+		}
+
+		setRemovedStandaloneAttachments([]);
+	}, [setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]);
+
+	const restoreStandaloneAttachments = useCallback(
+		(attachmentsToRestore: UIAttachment[]) => {
+			const requestedKeys = new Set(attachmentsToRestore.map(attachment => uiAttachmentKey(attachment)));
+			if (requestedKeys.size === 0) {
+				return;
+			}
+
+			const restored = removedStandaloneAttachmentsRef.current.filter(attachment =>
+				requestedKeys.has(uiAttachmentKey(attachment))
+			);
+			if (restored.length === 0) {
+				return;
+			}
+
+			const restoredKeys = new Set(restored.map(attachment => uiAttachmentKey(attachment)));
+			setAttachments(prev => mergeUniqueAttachments(prev, restored));
+			setRemovedStandaloneAttachments(prev =>
+				prev.filter(attachment => !restoredKeys.has(uiAttachmentKey(attachment)))
+			);
+		},
+		[setAttachments, setRemovedStandaloneAttachments]
 	);
 
 	const removeDirectoryAttachments = useCallback(
@@ -615,6 +716,10 @@ export function useComposerAttachments({
 				});
 				const restoredKeySet = new Set(restoredKeys);
 				const globallyExisting = new Set(attachmentsRef.current.map(uiAttachmentKey));
+
+				setRemovedStandaloneAttachments(prev =>
+					prev.filter(attachment => !restoredKeySet.has(uiAttachmentKey(attachment)))
+				);
 				const newlyOwnedKeys = restoredKeys.filter(key => !globallyExisting.has(key));
 				const attachmentsToAdd = restored.filter(att => !globallyExisting.has(uiAttachmentKey(att)));
 
@@ -632,7 +737,7 @@ export function useComposerAttachments({
 				return next;
 			});
 		},
-		[setAttachments, setDirectoryGroups]
+		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
 	);
 
 	const removeDirectoryGroup = useCallback(
@@ -714,6 +819,7 @@ export function useComposerAttachments({
 
 	return {
 		attachments,
+		removedStandaloneAttachments,
 		directoryGroups,
 		attachFiles,
 		attachDirectory,
@@ -723,10 +829,12 @@ export function useComposerAttachments({
 		removeAttachment,
 		removeDirectoryGroup,
 		removeDirectoryAttachments,
+		restoreStandaloneAttachments,
 		restoreDirectoryAttachments,
 		removeOverflowDir,
 		applyAttachmentsDrop,
 		clearAttachments,
+		clearStandaloneAttachments,
 		loadAttachmentsFromMessage,
 	};
 }

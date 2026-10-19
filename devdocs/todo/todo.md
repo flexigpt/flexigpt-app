@@ -10,6 +10,10 @@
   - [ ] test all management pages again properly
 
 - [ ] times on resp etc will be good
+- [ ] plate doc weird behavior with cursor. sometimes it gos up and sometimes it doesn't when we use arrows etc. this looks liek happening during streaming in other tab
+- [ ] add as code in md output format skill too
+- [ ] add wails considerations etc skill in my repo.
+- [ ] if i say cancel a request, it comes as context cancelled now nad not actual error like before. also text or thinking is not retained.
 
 ## M-3
 

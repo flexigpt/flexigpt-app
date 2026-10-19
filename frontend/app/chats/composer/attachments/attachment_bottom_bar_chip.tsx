@@ -21,6 +21,7 @@ import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_se
 import { HoverTip } from '@/components/hover_tip';
 
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
+import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
 
 interface AttachmentBottomBarChipProps {
@@ -33,6 +34,7 @@ interface AttachmentBottomBarChipProps {
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
 	attachments: UIAttachment[];
+	removedStandaloneAttachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
 	isInputLocked?: boolean;
 }
@@ -47,6 +49,7 @@ function AttachmentBottomBarChipInner({
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
 	attachments,
+	removedStandaloneAttachments,
 	directoryGroups,
 	isInputLocked = false,
 }: AttachmentBottomBarChipProps) {
@@ -56,16 +59,39 @@ function AttachmentBottomBarChipInner({
 
 	const attachmentCount = attachments.length;
 	const directoryCount = directoryGroups.length;
-	const hasAddedAttachments = attachmentCount > 0 || directoryCount > 0;
+	const activeAttachmentKeys = new Set(attachments.map(attachment => uiAttachmentKey(attachment)));
+	const notAddedAttachmentKeys = new Set<string>();
+
+	for (const attachment of removedStandaloneAttachments) {
+		const key = uiAttachmentKey(attachment);
+		if (!activeAttachmentKeys.has(key)) {
+			notAddedAttachmentKeys.add(key);
+		}
+	}
+	for (const group of directoryGroups) {
+		for (const attachment of group.removedAttachments ?? []) {
+			const key = uiAttachmentKey(attachment);
+			if (!activeAttachmentKeys.has(key)) {
+				notAddedAttachmentKeys.add(key);
+			}
+		}
+	}
+
+	const notAddedAttachmentCount = notAddedAttachmentKeys.size;
+	const attachmentStatusSummary =
+		attachmentCount > 0 || notAddedAttachmentCount > 0
+			? `${attachmentCount} added${notAddedAttachmentCount > 0 ? ` · ${notAddedAttachmentCount} not added` : ''}`
+			: null;
+	const hasAttachmentChoices = attachmentStatusSummary !== null || directoryCount > 0;
 	const addedAttachmentSummary = [
-		attachmentCount > 0 ? `${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}` : null,
+		attachmentStatusSummary,
 		directoryCount > 0 ? `${directoryCount} folder${directoryCount === 1 ? '' : 's'}` : null,
 	]
 		.filter((value): value is string => value !== null)
 		.join(' · ');
 	const chipTone = open
 		? 'border-base-300 bg-base-300/60'
-		: hasAddedAttachments
+		: hasAttachmentChoices
 			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
 			: '';
 
@@ -149,23 +175,11 @@ function AttachmentBottomBarChipInner({
 				<ComposerDropdownSelectedPanel
 					label="Added attachments"
 					ariaLabel="Added attachments"
-					isEmpty={!hasAddedAttachments}
+					isEmpty={!hasAttachmentChoices}
 					emptyLabel="Choose Files, Folder, or Link / URL above to add it to this message."
-					help="Added files and folders appear in the composer attachment bar, where they can be reviewed or removed."
-					summary={hasAddedAttachments ? <span>{addedAttachmentSummary}</span> : undefined}
+					help="Added files and folders appear in the composer attachment bar. Not-added candidates remain available there until restored, cleared, or sent."
 				>
-					<div className="bg-base-200 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-1 text-xs">
-						{attachmentCount > 0 ? (
-							<span>
-								{attachmentCount} file or link{attachmentCount === 1 ? '' : 's'}
-							</span>
-						) : null}
-						{directoryCount > 0 ? (
-							<span>
-								{directoryCount} folder group{directoryCount === 1 ? '' : 's'}
-							</span>
-						) : null}
-					</div>
+					{null}
 				</ComposerDropdownSelectedPanel>
 			</Menu>
 
@@ -204,6 +218,7 @@ export function AttachmentBottomBarChip(props: AttachmentBottomBarChipProps) {
 			onOpenAttachmentUrlModal={props.onOpenAttachmentUrlModal}
 			onUrlAttachmentModalClose={props.onUrlAttachmentModalClose}
 			attachments={props.attachments}
+			removedStandaloneAttachments={props.removedStandaloneAttachments}
 			directoryGroups={props.directoryGroups}
 			isInputLocked={isInputLocked}
 		/>

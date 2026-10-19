@@ -16,6 +16,10 @@ import type { UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode } from '@/spec/attachment';
 
 import {
+	ActionTriggerChipContent,
+	actionTriggerChipMenuButtonClasses,
+	actionTriggerChipRemoveButtonClasses,
+	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
@@ -201,6 +205,12 @@ export function DirectoryChip({
 	const restorableMatches = matchingRemoved.slice(0, availableSlots);
 	const overflowFileCount = group.overflowDirs.reduce((sum, overflow) => sum + (overflow.fileCount ?? 0), 0);
 
+	const hasDirectoryMenuBodyContent =
+		(hasQuery && !filter.error) ||
+		removedFiles.length > 0 ||
+		group.overflowDirs.length > 0 ||
+		(attachedCount === 0 && removedFiles.length === 0 && group.overflowDirs.length === 0);
+
 	const directoryHeaderMeta = filter.error
 		? 'Invalid filter'
 		: hasQuery
@@ -223,8 +233,11 @@ export function DirectoryChip({
 		);
 	}
 
+	const directoryChipSummary = `${attachedCount} added${
+		removedFiles.length > 0 ? ` · ${removedFiles.length} not added` : ''
+	}${overflowFileCount > 0 ? ` +${overflowFileCount} more` : ''}`;
+
 	const title = tooltipLines.join('\n');
-	const MenuChevron = menuOpen ? FiChevronDown : FiChevronUp;
 
 	const removeFromDirectory = (files: UIAttachment[]) => {
 		if (files.length === 0) {
@@ -241,27 +254,41 @@ export function DirectoryChip({
 	};
 
 	return (
-		<div
-			className="bg-base-200 hover:bg-base-300/80 text-base-content flex h-7 min-h-0 shrink-0 items-center gap-1 rounded-full px-2 text-xs"
-			title={title}
-			data-attachment-chip="directory"
-		>
-			<FiFolder className="shrink-0" size={14} />
-			<span className="min-w-0 flex-1 truncate">{group.label}</span>
-			<span className="text-base-content/60 whitespace-nowrap">
-				{attachedCount} added
-				{removedFiles.length > 0 ? ` · ${removedFiles.length} not added` : ''}
-				{overflowFileCount > 0 ? ` +${overflowFileCount} more` : ''}
-			</span>
-
-			<MenuButton
-				store={directoryMenu}
-				className="btn btn-ghost btn-xs h-5 min-h-0 rounded-full p-0 shadow-none"
-				aria-label={`Show files in folder ${group.dirPath || group.label}`}
-				title={group.dirPath || group.label}
+		<div className="relative shrink-0" data-attachment-chip="directory">
+			<div
+				className={`${actionTriggerChipSurfaceClasses} ${
+					menuOpen ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+				}`}
+				title={title}
 			>
-				<MenuChevron size={14} />
-			</MenuButton>
+				<MenuButton
+					store={directoryMenu}
+					className={actionTriggerChipMenuButtonClasses}
+					aria-label={`Show files in folder ${group.dirPath || group.label}`}
+					title={title}
+				>
+					<ActionTriggerChipContent
+						className="text-base-content"
+						icon={<FiFolder size={14} />}
+						label={group.label}
+						secondaryLabel={directoryChipSummary}
+						secondaryLabelClassName="text-base-content/60 shrink-0 whitespace-nowrap text-xs"
+						open={menuOpen}
+					/>
+				</MenuButton>
+
+				<button
+					type="button"
+					className={`${actionTriggerChipRemoveButtonClasses} ml-1`}
+					onClick={() => {
+						onRemoveDirectoryGroup(group.id);
+					}}
+					title="Remove folder and all attached files"
+					aria-label={`Remove folder ${group.label} and all attached files`}
+				>
+					<FiX size={14} />
+				</button>
+			</div>
 
 			<Menu
 				store={directoryMenu}
@@ -474,6 +501,7 @@ export function DirectoryChip({
 				<ComposerDropdownSelectedPanel
 					label="Added files"
 					ariaLabel={`Added files from ${group.label}`}
+					separatorBefore={hasDirectoryMenuBodyContent}
 					isEmpty={attachedCount === 0}
 					emptyLabel="Choose Add on a not-added file above to include it from this folder."
 					help={`Filter supports text, * and ? globs, ! to invert, and /expression/flags. Up to ${MAX_FILES_PER_DIRECTORY} files can be added from this folder.`}
@@ -487,30 +515,18 @@ export function DirectoryChip({
 						) : undefined
 					}
 					actions={
-						<>
+						hasQuery && !filter.error ? (
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs text-error rounded-lg"
+								disabled={matchingAttached.length === 0}
 								onClick={() => {
-									onRemoveDirectoryGroup(group.id);
+									removeFromDirectory(matchingAttached);
 								}}
 							>
-								<FiX size={12} />
-								Remove folder
+								Remove matches ({matchingAttached.length})
 							</button>
-							{hasQuery && !filter.error ? (
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs text-error rounded-lg"
-									disabled={matchingAttached.length === 0}
-									onClick={() => {
-										removeFromDirectory(matchingAttached);
-									}}
-								>
-									Remove matches ({matchingAttached.length})
-								</button>
-							) : null}
-						</>
+						) : null
 					}
 				>
 					{matchingAttached.map(attachment => (
