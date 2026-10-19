@@ -27,6 +27,7 @@ type ReplaceEditorDocumentFocusMode = 'none' | 'preserve' | 'end';
 
 interface UseComposerDocumentArgs {
 	isBusy: boolean;
+	isActive: boolean;
 }
 
 interface UseComposerDocumentResult {
@@ -45,6 +46,10 @@ interface UseComposerDocumentResult {
 	focusEditorPreservingSelection: () => void;
 }
 
+function rangeBelongsToElement(domRange: Range, element: HTMLElement): boolean {
+	return element.contains(domRange.commonAncestorContainer);
+}
+
 function getUsefulRangeRect(domRange: Range): DOMRect | undefined {
 	const rects = [...domRange.getClientRects()].filter(rect => rect.width > 0 || rect.height > 0);
 	if (rects.length > 0) {
@@ -59,7 +64,7 @@ function getUsefulRangeRect(domRange: Range): DOMRect | undefined {
 	return undefined;
 }
 
-export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseComposerDocumentResult {
+export function useComposerDocument({ isBusy, isActive }: UseComposerDocumentArgs): UseComposerDocumentResult {
 	const initialEditorValue = useMemo<Value>(() => createEmptyEditorValue(), []);
 	const editorPlugins = useMemo(() => createComposerEditorPlugins(), []);
 	const editor = usePlateEditor({
@@ -69,10 +74,14 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef(editor);
+	const isActiveRef = useRef(isActive);
 
 	useLayoutEffect(() => {
 		editorRef.current = editor;
 	}, [editor]);
+	useLayoutEffect(() => {
+		isActiveRef.current = isActive;
+	}, [isActive]);
 
 	// doc version tick to re-run selection computations on any editor change
 	const [docVersion, setDocVersion] = useState(0);
@@ -143,7 +152,11 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const runAfterNextPaint = useCallback((fn: () => void) => {
 		window.requestAnimationFrame(() => {
-			fn();
+			// Delayed focus work from a previously active tab must never steal
+			// selection or scroll from the tab the user switched to.
+			if (isActiveRef.current) {
+				fn();
+			}
 		});
 	}, []);
 
@@ -190,7 +203,11 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const scrollDomRangeIntoEditorView = useCallback((domRange: Range | null | undefined) => {
 		const container = contentRef.current;
-		if (!container) {
+		if (!container || !isActiveRef.current) {
+			return;
+		}
+
+		if (domRange && !rangeBelongsToElement(domRange, container)) {
 			return;
 		}
 
@@ -218,6 +235,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const scheduleScrollIntoEditorView = useCallback(
 		(domRange: Range | null | undefined) => {
+			if (!isActiveRef.current) {
+				return;
+			}
+
 			pendingScrollRangeRef.current = domRange ? domRange.cloneRange() : null;
 
 			if (scrollSelectionFrameRef.current !== null) {
@@ -226,6 +247,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 			scrollSelectionFrameRef.current = window.requestAnimationFrame(() => {
 				scrollSelectionFrameRef.current = null;
+				if (!isActiveRef.current) {
+					pendingScrollRangeRef.current = null;
+					return;
+				}
 				scrollDomRangeIntoEditorView(pendingScrollRangeRef.current);
 				pendingScrollRangeRef.current = null;
 			});
@@ -242,9 +267,17 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const scrollEditorSelectionIntoView = useCallback(() => {
 		const sel = window.getSelection();
+		const container = contentRef.current;
+		if (!isActiveRef.current || !container) {
+			return;
+		}
+
 		if (sel && sel.rangeCount > 0) {
 			try {
 				const range = sel.getRangeAt(0).cloneRange();
+				if (!rangeBelongsToElement(range, container)) {
+					return;
+				}
 				range.collapse(false);
 
 				scheduleScrollIntoEditorView(range);
@@ -259,7 +292,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const focusEditorPreservingSelection = useCallback(() => {
 		const currentEditor = editorRef.current;
-		if (!currentEditor || isBusy) {
+		if (!currentEditor || isBusy || !isActiveRef.current) {
 			return;
 		}
 
@@ -276,7 +309,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const focusEditorAtEnd = useCallback(() => {
 		const currentEditor = editorRef.current;
-		if (!currentEditor || isBusy) {
+		if (!currentEditor || isBusy || !isActiveRef.current) {
 			return;
 		}
 
@@ -296,6 +329,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const autoChunkIfNeeded = useCallback(() => {
 		if (isAutoChunkingRef.current) {
+			return;
+		}
+		if (!isActiveRef.current) {
+			// Never normalize a hidden editor while another tab owns selection.
 			return;
 		}
 		if (!contentRef.current) {

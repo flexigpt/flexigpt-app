@@ -75,6 +75,7 @@ function ChatTabsBarContent({
 	const [editingTabId, setEditingTabId] = useState<string | null>(null);
 	const [draftTitle, setDraftTitle] = useState('');
 	const renameInputRef = useRef<HTMLInputElement | null>(null);
+	const finishingRenameTabIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		if (!editingTabId) {
@@ -90,19 +91,30 @@ function ChatTabsBarContent({
 	}, [editingTabId]);
 
 	const finishRename = useCallback(() => {
-		if (!editingTabId) {
+		const tabId = editingTabId;
+		if (!tabId || finishingRenameTabIdRef.current === tabId) {
 			return;
 		}
+		finishingRenameTabIdRef.current = tabId;
 
-		const currentTitle = tabs.find(tab => tab.tabId === editingTabId)?.title ?? '';
+		const currentTitle = tabs.find(tab => tab.tabId === tabId)?.title ?? '';
 		const cleaned = sanitizeConversationTitle(draftTitle.trim());
 
 		if (cleaned && cleaned !== currentTitle) {
-			onRenameTab(editingTabId, cleaned);
+			onRenameTab(tabId, cleaned);
 		}
 
 		setEditingTabId(null);
 	}, [draftTitle, editingTabId, onRenameTab, tabs]);
+
+	const cancelRename = useCallback(() => {
+		if (editingTabId) {
+			// The input blur fired by unmounting must not commit the discarded
+			// draft after Escape was pressed.
+			finishingRenameTabIdRef.current = editingTabId;
+		}
+		setEditingTabId(null);
+	}, [editingTabId]);
 
 	const elements: ReactNode[] = [];
 
@@ -144,10 +156,12 @@ function ChatTabsBarContent({
 							onKeyDown={e => {
 								e.stopPropagation();
 								if (e.key === 'Enter') {
+									e.preventDefault();
 									finishRename();
 								}
 								if (e.key === 'Escape') {
-									setEditingTabId(null);
+									e.preventDefault();
+									cancelRename();
 								}
 							}}
 							onMouseDown={e => {
@@ -182,6 +196,7 @@ function ChatTabsBarContent({
 										}}
 										onClick={e => {
 											e.stopPropagation();
+											finishingRenameTabIdRef.current = null;
 											setEditingTabId(tab.tabId);
 											setDraftTitle(tab.title);
 										}}

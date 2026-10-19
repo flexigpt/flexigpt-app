@@ -29,6 +29,7 @@ import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scr
 
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { MCPAppModelContextUpdateEventDetail, MCPAppUIMessageEventDetail } from '@/chats/mcpapps/mcp_app_events';
+import type { AssistantResponseTiming } from '@/chats/messages/message_footer';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
 import { useAttachmentsDropTarget } from '@/chats/conversation/use_attachments_drop_target';
@@ -520,6 +521,37 @@ type MessageItemRenderer = (
 	deferRichRendering: boolean
 ) => ReactNode;
 
+function assistantResponseTimingByMessageID(
+	snapshot: ChatTabState['sessionSnapshot']
+): Map<string, AssistantResponseTiming> {
+	const byOperationID = new Map<string, AssistantResponseTiming>();
+	const byMessageID = new Map<string, AssistantResponseTiming>();
+
+	for (const run of snapshot?.runs ?? []) {
+		for (const operation of run.modelOperations ?? []) {
+			if (!operation.startedAt && !operation.finishedAt) {
+				continue;
+			}
+
+			const timing: AssistantResponseTiming = {
+				startedAt: operation.startedAt,
+				finishedAt: operation.finishedAt,
+			};
+			byOperationID.set(operation.id, timing);
+			byMessageID.set(`session-stream:${run.id}:${operation.id}`, timing);
+		}
+	}
+
+	for (const message of snapshot?.session.transcript ?? []) {
+		const timing = byOperationID.get(message.operationID ?? '');
+		if (timing) {
+			byMessageID.set(message.id, timing);
+		}
+	}
+
+	return byMessageID;
+}
+
 interface ConversationMessageRowProps extends Omit<ComponentProps<typeof ChatMessage>, 'onEdit'> {
 	tabId: string;
 	onEditMessage: (tabId: string, messageID: string) => void;
@@ -691,6 +723,11 @@ function ConversationAreaInner(
 	const sessionActionError = sessionActionErrorState?.tabId === activeTabId ? sessionActionErrorState.message : null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
+
+	const responseTimingByMessageID = useMemo(
+		() => assistantResponseTimingByMessageID(activeTab?.sessionSnapshot),
+		[activeTab?.sessionSnapshot]
+	);
 
 	const activeSessionToolActivity = useMemo(
 		() =>
@@ -1200,6 +1237,7 @@ function ConversationAreaInner(
 			const isLast = index === messageCount - 1;
 			const isAssistant = message.role === RoleEnum.Assistant;
 			const rowIsBusy = isLast && activeTabIsGenerating && isAssistant;
+			const responseTiming = isAssistant ? responseTimingByMessageID.get(message.id) : undefined;
 
 			if (rowIsBusy) {
 				return (
@@ -1211,6 +1249,7 @@ function ConversationAreaInner(
 						tabId={activeTabId}
 						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
+						responseTiming={responseTiming}
 					/>
 				);
 			}
@@ -1224,10 +1263,18 @@ function ConversationAreaInner(
 					tabId={activeTabId}
 					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
+					responseTiming={responseTiming}
 				/>
 			);
 		},
-		[activeEditingMessageId, activeTabId, activeTabIsGenerating, beginEditMessageForTab, messageCount]
+		[
+			activeEditingMessageId,
+			activeTabId,
+			activeTabIsGenerating,
+			beginEditMessageForTab,
+			messageCount,
+			responseTimingByMessageID,
+		]
 	);
 
 	const mountedInputTabs = useMemo(
@@ -1396,6 +1443,7 @@ function ConversationAreaInner(
 									isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
 									allowContinuationInput={allowContinuationInput}
 									editingMessageId={tab.editingMessageId}
+									runtimeRevision={tabRun?.revision}
 									setInputRef={setInputRef}
 									shortcutConfig={shortcutConfig}
 									sendMessage={sendMessageForTab}

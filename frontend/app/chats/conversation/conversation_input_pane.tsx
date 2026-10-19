@@ -10,7 +10,7 @@ import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { ComposerBox } from '@/chats/composer/composer_box';
 
-export const TabInputPane = memo(function TabInputPane(props: {
+function TabInputPaneInner(props: {
 	tabId: string;
 	active: boolean;
 	isBusy: boolean;
@@ -18,6 +18,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	isHydrating: boolean;
 	allowContinuationInput: boolean;
 	editingMessageId: string | null;
+	runtimeRevision?: number;
 	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
 	shortcutConfig: ShortcutConfig;
 	sendMessage: (
@@ -91,6 +92,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 			<ComposerBox
 				ref={composerRef}
 				onSend={onSend}
+				isActive={active}
 				isBusy={isBusy}
 				isGenerating={isGenerating}
 				isHydrating={isHydrating}
@@ -116,5 +118,35 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				onDiscardStagedAppContext={onDiscardStagedAppContext}
 			/>
 		</div>
+	);
+}
+
+export const TabInputPane = memo(TabInputPaneInner, (previous, next) => {
+	if (previous.tabId !== next.tabId || previous.active !== next.active) {
+		return false;
+	}
+
+	// Hidden composers intentionally retain their draft state, but must not
+	// receive every background Session streaming update. They get the latest
+	// props as soon as they become active again.
+	if (!next.active) {
+		return true;
+	}
+
+	return (
+		previous.isBusy === next.isBusy &&
+		previous.isGenerating === next.isGenerating &&
+		previous.isHydrating === next.isHydrating &&
+		previous.allowContinuationInput === next.allowContinuationInput &&
+		previous.editingMessageId === next.editingMessageId &&
+		previous.runtimeRevision === next.runtimeRevision &&
+		previous.shortcutConfig === next.shortcutConfig &&
+		previous.showAutomationControl === next.showAutomationControl &&
+		previous.automationHoldEnabled === next.automationHoldEnabled &&
+		previous.showPendingToolControls === next.showPendingToolControls &&
+		previous.canContinueWithoutDraft === next.canContinueWithoutDraft &&
+		previous.sessionToolCalls === next.sessionToolCalls &&
+		previous.sessionToolOutputs === next.sessionToolOutputs &&
+		previous.stagedAppContextUpdateCount === next.stagedAppContextUpdateCount
 	);
 });

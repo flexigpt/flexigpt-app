@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
@@ -59,6 +59,7 @@ export interface ComposerBoxHandle {
 
 interface ComposerBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<SessionConfiguration | undefined>;
+	isActive: boolean;
 	isBusy: boolean;
 	isGenerating: boolean;
 	allowContinuationInput?: boolean;
@@ -87,6 +88,7 @@ export const ComposerBox = memo(
 		{
 			onSend,
 			isBusy,
+			isActive,
 			isGenerating,
 			allowContinuationInput = false,
 			isHydrating,
@@ -118,6 +120,13 @@ export const ComposerBox = memo(
 			modelDefaultPrompt: composerContext.selectedModel.systemPrompt,
 			modelOptionsLoaded: composerContext.modelOptionsLoaded,
 		});
+
+		useEffect(() => {
+			if (!isActive || !isBusy) {
+				// oxlint-disable-next-line react/set-state-in-effect
+				setAbortConfirmationRequested(false);
+			}
+		}, [isActive, isBusy]);
 
 		const applyAgentUserMessageStarter = useCallback((text: string): boolean => {
 			return editorAreaRef.current?.setDraftTextIfEmpty(text) ?? false;
@@ -352,7 +361,7 @@ export const ComposerBox = memo(
 				</div>
 
 				<DeleteConfirmationModal
-					isOpen={isBusy && abortConfirmationRequested}
+					isOpen={isActive && isBusy && abortConfirmationRequested}
 					onClose={() => {
 						setAbortConfirmationRequested(false);
 					}}
@@ -368,6 +377,7 @@ export const ComposerBox = memo(
 				<EditorArea
 					ref={editorAreaRef}
 					isGenerating={isGenerating}
+					isActive={isActive}
 					isRunActive={isBusy}
 					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
 					isInputLocked={(isBusy && !allowContinuationInput) || isHydrating || !composerContext.hasRunnableModel}

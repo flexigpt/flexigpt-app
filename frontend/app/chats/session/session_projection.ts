@@ -1,5 +1,5 @@
 import type { Attachment } from '@/spec/attachment';
-import type { InputUnion, OutputUnion, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { InputUnion, OutputUnion, ReasoningContent, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPApprovalRule, MCPAppVisibility, MCPExecutionMode, MCPRuntimeServerID } from '@/spec/mcp';
 import type {
 	Conversation,
@@ -201,23 +201,50 @@ function messageRole(role: SessionMessageRole): RoleEnum {
 	}
 }
 
-function messageStatus(
-	message: SessionTranscriptMessage,
-	operationError?: NonNullable<SessionTranscriptMessage['error']>
-): Status {
-	if (message.error || operationError || message.status === 'failed') {
-		return Status.Failed;
-	}
-	if (message.status === Status.Cancelled || message.status === 'interrupted') {
+function messageStatus(message: SessionTranscriptMessage, operation?: SessionModelOperation): Status {
+	if (message.status === Status.Cancelled || operation?.state === SessionOperationState.Cancelled) {
 		return Status.Cancelled;
 	}
-	if (message.status === Status.Incomplete) {
+	if (
+		message.status === Status.Incomplete ||
+		message.status === 'interrupted' ||
+		operation?.state === SessionOperationState.Interrupted
+	) {
 		return Status.Incomplete;
+	}
+	if (
+		message.error ||
+		operation?.error ||
+		message.status === 'failed' ||
+		operation?.state === SessionOperationState.Failed
+	) {
+		return Status.Failed;
 	}
 	if (message.status === 'completed') {
 		return Status.Completed;
 	}
 	return Status.None;
+}
+
+function terminalReasoningContents(
+	operation: SessionModelOperation | undefined,
+	derived: ReasoningContent[] | undefined,
+	terminal: boolean
+): ReasoningContent[] | undefined {
+	const streamedThinking = operation?.streamedThinking ?? '';
+	if (!terminal || !streamedThinking.trim() || !operation) {
+		return derived;
+	}
+
+	const summary = derived?.flatMap(value => value.summary ?? []) ?? [];
+	return [
+		{
+			id: `session-terminal-thinking:${operation.id}`,
+			role: RoleEnum.Assistant,
+			...(summary.length > 0 ? { summary } : {}),
+			thinking: [streamedThinking],
+		},
+	];
 }
 
 function attachmentFromSession(value: SessionAttachmentReference): Attachment {
@@ -800,11 +827,18 @@ function projectTranscriptMessage(
 			: undefined;
 	const workspaceProjection = operation ? workspaceProjectionForOperation(operation) : {};
 
+	const isAssistantMessage = message.role === SessionMessageRole.Assistant;
+	const projectedStatus = messageStatus(message, operation);
+	const uiReasoningContents = terminalReasoningContents(
+		operation,
+		derived.uiReasoningContents,
+		projectedStatus === Status.Cancelled || projectedStatus === Status.Failed || projectedStatus === Status.Incomplete
+	);
+
 	// Usage/debug data belongs to the provider completion, represented by the
 	// assistant output. The current user message also points at the operation
 	// for replay/configuration purposes, but must not receive a duplicate
 	// request/response debugger modal.
-	const isAssistantMessage = message.role === SessionMessageRole.Assistant;
 	const completionUsage = isAssistantMessage ? operation?.usage : undefined;
 	const completionDebugDetails = isAssistantMessage ? debugDetailsForOperation(message, operation) : undefined;
 	const completionDebugDetailsError = isAssistantMessage ? debugDetailsErrorForOperation(operation) : undefined;
@@ -842,7 +876,7 @@ function projectTranscriptMessage(
 		id: message.id,
 		createdAt: message.createdAt,
 		role: messageRole(message.role),
-		status: messageStatus(message, message.role === SessionMessageRole.Assistant ? operation?.error : undefined),
+		status: projectedStatus,
 		modelRef,
 		attachments: message.attachments?.map(attachmentFromSession),
 		mcpAppContextUpdates: appContextUpdatesFromSession(message.mcpAppContext),
@@ -859,8 +893,11 @@ function projectTranscriptMessage(
 		error: message.error ?? (message.role === SessionMessageRole.Assistant ? operation?.error : undefined),
 		debugDetails: completionDebugDetails,
 		debugDetailsError: completionDebugDetailsError,
-		uiContent: derived.uiContent || message.text || '',
-		uiReasoningContents: derived.uiReasoningContents,
+		// Session Text is the canonicalized final stream. Prefer it over a
+		// partial or error-shaped provider payload so cancellation never
+		// replaces already displayed assistant content.
+		uiContent: message.text || derived.uiContent || '',
+		uiReasoningContents,
 		uiToolCalls: isAssistantMessage
 			? operationCalls.length > 0
 				? operationCalls.map(t => {
@@ -949,25 +986,34 @@ function projectTerminalRunOutcome(
 		return undefined;
 	}
 
+	const latestOperation = run.modelOperations?.at(-1);
 	const cancelled = run.state === SessionRunState.Cancelled;
-	const message =
+	const outcomeMessage =
 		run.outcome?.message?.trim() ||
 		(cancelled ? 'The Run was cancelled before a terminal assistant message was recorded.' : 'The Run failed.');
+	const terminalError = latestOperation?.error ?? {
+		code: run.outcome?.code || (cancelled ? 'cancelled' : 'run_failed'),
+		message: outcomeMessage,
+	};
 
 	return {
 		id: `session-run-outcome:${run.id}:${run.revision}`,
 		createdAt: run.updatedAt,
 		role: RoleEnum.Assistant,
 		status: cancelled ? Status.Cancelled : Status.Failed,
-		...(cancelled
-			? {}
-			: {
-					error: {
-						code: run.outcome?.code || 'run_failed',
-						message,
+		error: terminalError,
+		// Never replace terminal partial output with a generic cancellation
+		// sentence. ChatMessage renders terminalError after this preserved body.
+		uiContent: latestOperation?.streamedText ?? '',
+		uiReasoningContents: latestOperation?.streamedThinking
+			? [
+					{
+						id: `session-run-outcome-thinking:${run.id}:${latestOperation.id}`,
+						role: RoleEnum.Assistant,
+						thinking: [latestOperation.streamedThinking],
 					},
-				}),
-		uiContent: message,
+				]
+			: undefined,
 	};
 }
 

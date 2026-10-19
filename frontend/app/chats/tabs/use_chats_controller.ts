@@ -256,7 +256,15 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	// tab.isPersisted is UI state and must not decide whether the next write
 	// can use PutMessagesToConversation. In particular, a failed initial
 	// PutConversation must not be followed by a message-only update.
-	const sessionObserverByTabRef = useRef(new Map<string, () => void>());
+	const sessionObserverByTabRef = useRef(
+		new Map<
+			string,
+			{
+				sessionID: string;
+				unsubscribe: () => void;
+			}
+		>()
+	);
 	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
 	const tabLoadVersionRef = useRef(new Map<string, number>());
 	const autoTitleAttemptBySessionIDRef = useRef(new Map<string, string>());
@@ -277,6 +285,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
+			const observer = sessionObserverByTabRef.current.get(tabId);
+			if (observer) {
+				observer.unsubscribe();
+				sessionObserverByTabRef.current.delete(tabId);
+			}
+
 			conversationAreaRef.current?.disposeTabRuntime(tabId);
 			lastActivatedAtRef.current.delete(tabId);
 			hydratePromiseByTabRef.current.delete(tabId);
@@ -414,12 +428,26 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}
 
 			const activeRun = selectedSessionRun(snapshot);
-			const conversation = projectSessionSnapshotToConversation(snapshot, activeRun?.id);
+			const projectedConversation = projectSessionSnapshotToConversation(snapshot, activeRun?.id);
 
 			updateTab(tabId, previous => {
 				if (previous.sessionID !== snapshot.session.id) {
 					return previous;
 				}
+
+				const pendingTitle = previous.pendingTitle;
+				const pendingTitleAcknowledged =
+					pendingTitle &&
+					(projectedConversation.title === pendingTitle.title ||
+						(pendingTitle.acknowledgedRevision !== undefined &&
+							snapshot.session.revision >= pendingTitle.acknowledgedRevision));
+				const conversation =
+					pendingTitle && !pendingTitleAcknowledged
+						? {
+								...projectedConversation,
+								title: pendingTitle.title,
+							}
+						: projectedConversation;
 
 				const composerConfigurationRestored =
 					previous.sessionID === snapshot.session.id && previous.composerConfigurationRestored;
@@ -437,19 +465,25 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					isPersisted: true,
 					isBusy: sessionRunIsActive(activeRun),
 					pendingRunID: acknowledgedRunNowVisible ? undefined : previous.pendingRunID,
+					pendingTitle: pendingTitleAcknowledged ? undefined : pendingTitle,
 					runtimeError: undefined,
 				};
 			});
 
-			maybeAutomaticallyRenameSession(tabId, snapshot, conversation);
+			maybeAutomaticallyRenameSession(tabId, snapshot, projectedConversation);
 		},
 		[maybeAutomaticallyRenameSession, updateTab]
 	);
 
 	const ensureSessionObserver = useCallback(
 		(tabId: string, sessionID: string) => {
-			if (sessionObserverByTabRef.current.has(tabId)) {
+			const existing = sessionObserverByTabRef.current.get(tabId);
+			if (existing?.sessionID === sessionID) {
 				return;
+			}
+			if (existing) {
+				existing.unsubscribe();
+				sessionObserverByTabRef.current.delete(tabId);
 			}
 
 			const unsubscribe = sessionManagementAPI.observeSession(sessionID, observation => {
@@ -471,7 +505,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				}
 			});
 
-			sessionObserverByTabRef.current.set(tabId, unsubscribe);
+			sessionObserverByTabRef.current.set(tabId, {
+				sessionID,
+				unsubscribe,
+			});
 		},
 		[applySessionSnapshot, updateTab]
 	);
@@ -563,20 +600,18 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	);
 
 	useEffect(() => {
-		const wanted = new Set(tabs.filter(tab => Boolean(tab.sessionID)).map(tab => `${tab.tabId}:${tab.sessionID}`));
-
 		for (const tab of tabs) {
 			if (tab.sessionID) {
 				ensureSessionObserver(tab.tabId, tab.sessionID);
 			}
 		}
 
-		for (const [tabId, unsubscribe] of sessionObserverByTabRef.current.entries()) {
+		for (const [tabId, observer] of sessionObserverByTabRef.current.entries()) {
 			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
-			if (tab?.sessionID && wanted.has(`${tabId}:${tab.sessionID}`)) {
+			if (tab?.sessionID === observer.sessionID) {
 				continue;
 			}
-			unsubscribe();
+			observer.unsubscribe();
 			sessionObserverByTabRef.current.delete(tabId);
 		}
 	}, [ensureSessionObserver, tabs]);
@@ -586,7 +621,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 		return () => {
 			for (const unsubscribe of sessionObservers.values()) {
-				unsubscribe();
+				unsubscribe.unsubscribe();
 			}
 			sessionObservers.clear();
 		};
@@ -851,28 +886,104 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		cycleTabBy(-1);
 	}, [cycleTabBy]);
 
-	const renameTabTitle = useCallback((tabId: string, newTitle: string) => {
-		const tab = tabsRef.current.find(t => t.tabId === tabId);
-		if (!tab || !tab.sessionID || !tab.sessionSnapshot) {
-			return;
-		}
+	const renameTabTitle = useCallback(
+		(tabId: string, newTitle: string) => {
+			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+			if (!tab?.sessionID) {
+				return;
+			}
 
-		const sanitized = sanitizeConversationTitle(newTitle.trim());
-		if (!sanitized || sanitized === tab.conversation.title) {
-			return;
-		}
+			const sanitized = sanitizeConversationTitle(newTitle.trim());
+			if (!sanitized || sanitized === tab.conversation.title) {
+				return;
+			}
 
-		void sessionManagementAPI
-			.renameSession({
-				meta: sessionCommandMeta(tab.sessionSnapshot.session.revision),
-				sessionID: tab.sessionID,
-				title: sanitized,
-			})
-			.then(receipt => {
-				requireAcceptedSessionCommand(receipt, 'Rename Session');
-			})
-			.catch(console.error);
-	}, []);
+			const sessionID = tab.sessionID;
+			updateTab(tabId, current => ({
+				...current,
+				conversation: {
+					...current.conversation,
+					title: sanitized,
+					modifiedAt: new Date().toISOString(),
+				},
+				manualTitleLocked: true,
+				pendingTitle: {
+					title: sanitized,
+					previousTitle: current.pendingTitle?.previousTitle ?? current.conversation.title,
+				},
+				runtimeError: undefined,
+			}));
+
+			void (async () => {
+				try {
+					let snapshot = await sessionManagementAPI.getSessionSnapshot(sessionID);
+					let receipt = await sessionManagementAPI.renameSession({
+						meta: sessionCommandMeta(snapshot.session.revision),
+						sessionID,
+						title: sanitized,
+					});
+
+					// Automatic title refinement can race a manual title edit.
+					// Retry once from a fresh authoritative revision so the
+					// explicit user edit wins without requiring another click.
+					if (!receipt.accepted && receipt.message?.includes('revision mismatch')) {
+						snapshot = await sessionManagementAPI.getSessionSnapshot(sessionID);
+						receipt = await sessionManagementAPI.renameSession({
+							meta: sessionCommandMeta(snapshot.session.revision),
+							sessionID,
+							title: sanitized,
+						});
+					}
+
+					requireAcceptedSessionCommand(receipt, 'Rename Session');
+
+					const acknowledgedRevision = receipt.sessionRevision;
+					updateTab(tabId, current => {
+						if (current.sessionID !== sessionID || current.pendingTitle?.title !== sanitized) {
+							return current;
+						}
+
+						return {
+							...current,
+							pendingTitle: {
+								...current.pendingTitle,
+								...(acknowledgedRevision === undefined ? {} : { acknowledgedRevision }),
+							},
+						};
+					});
+
+					scheduleSearchRefresh();
+
+					const authoritative = await sessionManagementAPI.getSessionSnapshot(sessionID).catch((error: unknown) => {
+						console.error('Renamed Session but could not refresh its snapshot:', error);
+						return undefined;
+					});
+					if (authoritative) {
+						applySessionSnapshot(tabId, authoritative);
+					}
+				} catch (error) {
+					const message = error instanceof Error ? error.message : 'The Session title could not be renamed.';
+
+					updateTab(tabId, current => {
+						if (current.sessionID !== sessionID || current.pendingTitle?.title !== sanitized) {
+							return current;
+						}
+
+						return {
+							...current,
+							conversation: {
+								...current.conversation,
+								title: current.pendingTitle.previousTitle,
+							},
+							pendingTitle: undefined,
+							runtimeError: `Rename failed: ${message}`,
+						};
+					});
+				}
+			})();
+		},
+		[applySessionSnapshot, scheduleSearchRefresh, updateTab]
+	);
 
 	const loadConversationIntoTab = useCallback(
 		async (tabId: string, item: SessionSearchItem) => {
@@ -902,6 +1013,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					conversation: hydrated,
 					isPersisted: true,
 					manualTitleLocked: false,
+					pendingTitle: undefined,
 					editingMessageId: null,
 					isBusy: sessionRunIsActive(selectedSessionRun(selectedChat)),
 					isLoaded: true,

@@ -115,6 +115,7 @@ export interface EditorAreaHandle {
 
 interface EditorAreaProps {
 	isGenerating: boolean;
+	isActive: boolean;
 	isInputLocked: boolean;
 	isRunActive: boolean;
 	submissionMode?: 'message' | 'continuation';
@@ -159,6 +160,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	{
 		isGenerating,
 		isInputLocked: inputLocked,
+		isActive,
 		isRunActive,
 		submissionMode = 'message',
 		currentProviderSDKType,
@@ -206,6 +208,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		focusEditorPreservingSelection,
 	} = useComposerDocument({
 		isBusy: isInputLocked,
+		isActive,
 	});
 
 	const templateMenu = useMenuStore({ placement: 'top', focusLoop: true });
@@ -538,6 +541,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		mcpMenu.hide();
 		workspaceMenu.hide();
 	}, [attachmentMenu, mcpMenu, skillsMenu, templateMenu, toolMenu, workspaceMenu]);
+
+	useEffect(() => {
+		if (!isActive) {
+			closeAllMenus();
+		}
+	}, [closeAllMenus, isActive]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -1542,7 +1551,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									spellCheck={false}
 									autoCorrect="off"
 									autoCapitalize="off"
-									readOnly={isInputLocked}
+									readOnly={isInputLocked || !isActive}
+									tabIndex={isActive ? 0 : -1}
 									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
@@ -1788,7 +1798,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onRefreshSkills={refreshSkills}
 						systemPrompt={systemPrompt}
 						workspaceActiveSkillRefs={activeSkillRefs}
-						isInputLocked={workspaceControlsLocked}
+						isInputLocked={workspaceControlsLocked || !isActive}
 						mcpState={mcp}
 						skillsLoadError={skillsLoadError}
 						mcpAppContextUpdateCount={mcpAppContextUpdates.length}
@@ -1800,7 +1810,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			</form>
 
 			<ToolDetailsModal
-				state={toolDetailsState}
+				state={isActive ? toolDetailsState : null}
 				onClose={() => {
 					setToolDetailsState(null);
 				}}
@@ -1811,7 +1821,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setAttachedToolUserArgSchemaInstance={handleSetAttachedToolUserArgSchemaInstance}
 				conversationToolsState={conversationToolsState}
 				setConversationToolsState={setConversationToolsState}
-				toolArgsTarget={toolArgsTarget}
+				toolArgsTarget={isActive ? toolArgsTarget : null}
 				setToolArgsTarget={setToolArgsTarget}
 				recomputeAttachedToolArgsBlocked={handleAttachedToolsChanged}
 				webSearchTemplates={webSearchTemplates}

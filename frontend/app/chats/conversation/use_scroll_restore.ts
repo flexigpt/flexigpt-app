@@ -163,6 +163,7 @@ export function useScrollRestore({
 	const scrollTopByTabRef = useRef(initialPositions);
 	const autoFollowByTabRef = useRef(new Map<string, boolean>());
 	const shouldAutoFollowRef = useRef(true);
+	const selectedTabGenerationRef = useRef(0);
 
 	const activeTabIsHydratingRef = useRef(activeTabIsHydrating);
 
@@ -195,6 +196,16 @@ export function useScrollRestore({
 	const resizeObserverRafRef = useRef<number | null>(null);
 	const messageJumpTimerRef = useRef<number | null>(null);
 	const observedContentSizeRef = useRef<{ width: number; height: number } | null>(null);
+
+	useLayoutEffect(() => {
+		selectedTabGenerationRef.current += 1;
+		shouldAutoFollowRef.current = autoFollowByTabRef.current.get(selectedTabId) ?? false;
+
+		if (resizeObserverRafRef.current !== null) {
+			window.cancelAnimationFrame(resizeObserverRafRef.current);
+			resizeObserverRafRef.current = null;
+		}
+	}, [selectedTabId]);
 
 	const persistScrollPosition = useCallback((tabId: string, el: HTMLElement) => {
 		scrollTopByTabRef.current.set(tabId, el.scrollTop);
@@ -470,6 +481,8 @@ export function useScrollRestore({
 
 			observedContentSizeRef.current = { width, height };
 			messagePositionsDirtyRef.current = true;
+			const observedTabId = selectedTabIdRef.current;
+			const observedTabGeneration = selectedTabGenerationRef.current;
 
 			if (resizeObserverRafRef.current !== null) {
 				return;
@@ -477,6 +490,9 @@ export function useScrollRestore({
 
 			resizeObserverRafRef.current = window.requestAnimationFrame(() => {
 				resizeObserverRafRef.current = null;
+				if (selectedTabIdRef.current !== observedTabId || selectedTabGenerationRef.current !== observedTabGeneration) {
+					return;
+				}
 
 				const scrollerEl = scrollContainerRef.current;
 				const tabId = selectedTabIdRef.current;
@@ -516,9 +532,11 @@ export function useScrollRestore({
 
 	const scrollTabToBottomSoon = useCallback(
 		(tabId: string) => {
+			const expectedTabGeneration = selectedTabGenerationRef.current;
+
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
-					if (selectedTabIdRef.current !== tabId) {
+					if (selectedTabIdRef.current !== tabId || selectedTabGenerationRef.current !== expectedTabGeneration) {
 						return;
 					}
 

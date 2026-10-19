@@ -8,6 +8,7 @@ import { RoleEnum, Status } from '@/spec/inference';
 
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { MessageStreamSource } from '@/chats/messages/message_content_card';
+import type { AssistantResponseTiming } from '@/chats/messages/message_footer';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { buildAppInstanceFromToolOutput } from '@/chats/mcpapps/mcp_app_types';
 import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
@@ -30,6 +31,7 @@ interface ChatMessageProps {
 	diffCandidatePaths?: string[];
 	onEdit: () => void;
 	streamSource?: MessageStreamSource;
+	responseTiming?: AssistantResponseTiming;
 }
 
 function stringArraysEqual(left?: string[], right?: string[]): boolean {
@@ -57,6 +59,12 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 	if (prev.streamSource !== next.streamSource) {
+		return false;
+	}
+	if (
+		prev.responseTiming?.startedAt !== next.responseTiming?.startedAt ||
+		prev.responseTiming?.finishedAt !== next.responseTiming?.finishedAt
+	) {
 		return false;
 	}
 
@@ -129,10 +137,14 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 function terminalStateMessage(message: ConversationMessage): string | null {
 	switch (message.status) {
 		case Status.Cancelled:
-			return 'Generation was cancelled before completion.';
+			return message.error?.message?.trim()
+				? `Generation was cancelled: ${message.error.message.trim()}`
+				: 'Generation was cancelled before completion.';
 
 		case Status.Incomplete:
-			return 'Generation ended before completion.';
+			return message.error?.message?.trim()
+				? `Generation ended before completion: ${message.error.message.trim()}`
+				: 'Generation ended before completion.';
 
 		case Status.Failed:
 			return message.error?.message?.trim()
@@ -152,6 +164,7 @@ export const ChatMessage = memo(function ChatMessage({
 	diffCandidatePaths,
 	onEdit,
 	streamSource,
+	responseTiming,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const streamSnapshot = useMessageStreamSnapshot(streamSource, isBusy);
@@ -182,7 +195,9 @@ export const ChatMessage = memo(function ChatMessage({
 
 	const baseContent = message.uiContent ?? '';
 	const hasAnyContent = /\S/.test(baseContent);
-	const hasError = message.status === Status.Failed || !!message.error;
+	const hasTerminalFailure =
+		message.status === Status.Failed || message.status === Status.Cancelled || message.status === Status.Incomplete;
+	const hasError = hasTerminalFailure || !!message.error;
 	const hasStreamedText = streamSnapshot.text.length > 0;
 	const hasStreamedThinking = streamSnapshot.thinking.length > 0;
 	const terminalState = !isBusy ? terminalStateMessage(message) : null;
@@ -295,21 +310,22 @@ export const ChatMessage = memo(function ChatMessage({
 								streamingText={isBusy ? streamSnapshot.text : undefined}
 							/>
 							<MessageMediaContent items={outputMedia} />
-							{/* Fallback for error-only messages with no text content */}
-							{!hasAnyContent && hasError && !isBusy && (
+							{!hasAnyContent && hasError && !terminalState && !isBusy ? (
 								<div className="text-error text-sm opacity-80">
 									{message.error?.message || 'An error occurred while processing this request.'}
 								</div>
-							)}
-							{terminalState && (hasAnyContent || hasAnyReasoning) ? (
+							) : null}
+							{terminalState ? (
 								<div
 									className={`mt-2 flex items-start gap-2 rounded-xl px-2 py-1 text-xs ${
-										message.status === Status.Failed ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning-content'
+										message.status === Status.Incomplete
+											? 'bg-warning/10 text-warning-content'
+											: 'bg-error/10 text-error'
 									}`}
-									role={message.status === Status.Failed ? 'alert' : 'status'}
+									role={message.status === Status.Incomplete ? 'status' : 'alert'}
 								>
 									<FiAlertTriangle className="mt-0.5 shrink-0" size={13} aria-hidden="true" />
-									<span>{terminalState}</span>
+									<span className="italic">{terminalState}</span>
 								</div>
 							) : null}
 						</div>
@@ -409,6 +425,7 @@ export const ChatMessage = memo(function ChatMessage({
 							debugDetails={message.debugDetails}
 							debugDetailsError={message.debugDetailsError}
 							errorDetails={message.error}
+							responseTiming={responseTiming}
 						/>
 					</div>
 				</div>

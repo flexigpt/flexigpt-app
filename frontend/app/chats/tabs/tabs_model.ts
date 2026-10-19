@@ -7,6 +7,12 @@ import { initConversation } from '@/chats/conversation/hydration_helper';
 
 export const MAX_TABS = 16;
 
+interface PendingTabTitle {
+	title: string;
+	previousTitle: string;
+	acknowledgedRevision?: number;
+}
+
 export interface ChatTabState {
 	tabId: string;
 	conversation: Conversation;
@@ -24,6 +30,7 @@ export interface ChatTabState {
 
 	isPersisted: boolean;
 	manualTitleLocked: boolean;
+	pendingTitle?: PendingTabTitle;
 
 	editingMessageId: string | null;
 }

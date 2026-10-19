@@ -581,6 +581,14 @@ func (r *Runtime) finishModelExecution(
 		}
 	}
 
+	if run.Controls.CancellationRequested &&
+		isContextCancellationError(result.Error) {
+		result.Error = &OperationError{
+			Code:    string(RunStateCancelled),
+			Message: "Generation was stopped by the user.",
+		}
+	}
+
 	preferStreamedOutput := result.Error != nil ||
 		run.Controls.CancellationRequested ||
 		errors.Is(executeErr, context.Canceled)
@@ -669,8 +677,17 @@ func (r *Runtime) finishModelExecution(
 		result.Error != nil ||
 		len(result.ToolCalls) != 0 {
 		status := "completed"
-		if result.Error != nil {
+		switch operation.State {
+		case OperationStateCancelled:
+			status = "cancelled"
+		case OperationStateInterrupted:
+			status = "interrupted"
+		case OperationStateFailed:
 			status = "failed"
+		default:
+			if result.Error != nil {
+				status = "failed"
+			}
 		}
 
 		sessionValue.Transcript = append(
@@ -2255,6 +2272,20 @@ func canonicalModelOutput(
 		return streamedValue
 	}
 	return finalValue
+}
+
+func isContextCancellationError(value *OperationError) bool {
+	if value == nil {
+		return true
+	}
+
+	text := strings.ToLower(value.Code + "\n" + value.Message)
+	return strings.Contains(text, "context canceled") ||
+		strings.Contains(text, "context cancelled") ||
+		strings.Contains(text, "request canceled") ||
+		strings.Contains(text, "request cancelled") ||
+		strings.Contains(text, "operation cancelled") ||
+		strings.Contains(text, "operation canceled")
 }
 
 func modelCancelKey(
