@@ -1131,14 +1131,22 @@ function ConversationAreaInner(
 			throw new Error('The selected Run snapshot is unavailable.');
 		}
 
-		requireAcceptedSessionCommand(
-			await sessionManagementAPI.cancelRun({
-				meta: sessionCommandMeta(snapshot.session.revision, run.revision),
-				sessionID: tab.sessionID,
-				runID: run.id,
-			}),
-			'Cancel Run'
-		);
+		// Cancellation is intentionally best-effort. Streaming changes Session
+		// and Run revisions continuously, so a revision captured by the UI is
+		// expected to be stale by the time the user presses Stop.
+		const receipt = await sessionManagementAPI.cancelRun({
+			meta: sessionCommandMeta(),
+			sessionID: tab.sessionID,
+			runID: run.id,
+		});
+
+		// This is harmless when a completion won the race with Stop. The next
+		// authoritative snapshot will show the terminal response.
+		if (!receipt.accepted && receipt.message?.includes('already terminal')) {
+			return;
+		}
+
+		requireAcceptedSessionCommand(receipt, 'Cancel Run');
 	}, []);
 
 	const resolveWait = useCallback(
@@ -1443,7 +1451,7 @@ function ConversationAreaInner(
 									isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
 									allowContinuationInput={allowContinuationInput}
 									editingMessageId={tab.editingMessageId}
-									runtimeRevision={tabRun?.revision}
+									runtimeStateUpdatedAt={tabRun?.updatedAt}
 									setInputRef={setInputRef}
 									shortcutConfig={shortcutConfig}
 									sendMessage={sendMessageForTab}

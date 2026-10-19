@@ -436,11 +436,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				}
 
 				const pendingTitle = previous.pendingTitle;
-				const pendingTitleAcknowledged =
-					pendingTitle &&
-					(projectedConversation.title === pendingTitle.title ||
-						(pendingTitle.acknowledgedRevision !== undefined &&
-							snapshot.session.revision >= pendingTitle.acknowledgedRevision));
+				const pendingTitleAcknowledged = pendingTitle?.title === projectedConversation.title;
 				const conversation =
 					pendingTitle && !pendingTitleAcknowledged
 						? {
@@ -914,54 +910,17 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				runtimeError: undefined,
 			}));
 
-			void (async () => {
-				try {
-					let snapshot = await sessionManagementAPI.getSessionSnapshot(sessionID);
-					let receipt = await sessionManagementAPI.renameSession({
-						meta: sessionCommandMeta(snapshot.session.revision),
-						sessionID,
-						title: sanitized,
-					});
-
-					// Automatic title refinement can race a manual title edit.
-					// Retry once from a fresh authoritative revision so the
-					// explicit user edit wins without requiring another click.
-					if (!receipt.accepted && receipt.message?.includes('revision mismatch')) {
-						snapshot = await sessionManagementAPI.getSessionSnapshot(sessionID);
-						receipt = await sessionManagementAPI.renameSession({
-							meta: sessionCommandMeta(snapshot.session.revision),
-							sessionID,
-							title: sanitized,
-						});
-					}
-
+			void sessionManagementAPI
+				.renameSession({
+					meta: sessionCommandMeta(),
+					sessionID,
+					title: sanitized,
+				})
+				.then(receipt => {
 					requireAcceptedSessionCommand(receipt, 'Rename Session');
-
-					const acknowledgedRevision = receipt.sessionRevision;
-					updateTab(tabId, current => {
-						if (current.sessionID !== sessionID || current.pendingTitle?.title !== sanitized) {
-							return current;
-						}
-
-						return {
-							...current,
-							pendingTitle: {
-								...current.pendingTitle,
-								...(acknowledgedRevision === undefined ? {} : { acknowledgedRevision }),
-							},
-						};
-					});
-
 					scheduleSearchRefresh();
-
-					const authoritative = await sessionManagementAPI.getSessionSnapshot(sessionID).catch((error: unknown) => {
-						console.error('Renamed Session but could not refresh its snapshot:', error);
-						return undefined;
-					});
-					if (authoritative) {
-						applySessionSnapshot(tabId, authoritative);
-					}
-				} catch (error) {
+				})
+				.catch((error: unknown) => {
 					const message = error instanceof Error ? error.message : 'The Session title could not be renamed.';
 
 					updateTab(tabId, current => {
@@ -979,10 +938,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 							runtimeError: `Rename failed: ${message}`,
 						};
 					});
-				}
-			})();
+				});
 		},
-		[applySessionSnapshot, scheduleSearchRefresh, updateTab]
+		[scheduleSearchRefresh, updateTab]
 	);
 
 	const loadConversationIntoTab = useCallback(

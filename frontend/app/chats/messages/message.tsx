@@ -315,7 +315,7 @@ export const ChatMessage = memo(function ChatMessage({
 									{message.error?.message || 'An error occurred while processing this request.'}
 								</div>
 							) : null}
-							{terminalState ? (
+							{!isUser && terminalState ? (
 								<div
 									className={`mt-2 flex items-start gap-2 rounded-xl px-2 py-1 text-xs ${
 										message.status === Status.Incomplete

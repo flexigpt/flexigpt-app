@@ -2189,34 +2189,24 @@ func (r *Runtime) CancelRun(
 		r.mu.Unlock()
 		return commandReceiptResult(receipt)
 	}
-	if message := expectedRevisionsMessage(sessionValue, run, command.Meta); message != "" {
-		receipt := r.rejectReceiptLocked(
-			command.Meta,
-			fingerprint,
-			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				RunID:           command.RunID,
-				SessionRevision: sessionValue.Revision,
-				RunRevision:     run.Revision,
-				Message:         message,
-			},
-		)
-		r.mu.Unlock()
-		return &receipt, nil
-	}
+
+	// Cancellation is an idempotent intent for this exact Run. A model stream
+	// advances Session and Run revisions frequently, so revision preconditions
+	// would make the Stop button fail during its normal use case.
 	if run.State.Terminal() {
-		receipt := r.rejectReceiptLocked(
+		receipt := CommandReceipt{
+			CommandID:       command.Meta.ID,
+			Accepted:        true,
+			SessionID:       command.SessionID,
+			RunID:           command.RunID,
+			SessionRevision: sessionValue.Revision,
+			RunRevision:     run.Revision,
+			Message:         "run is already terminal",
+		}
+		r.finishCommandLocked(
 			command.Meta,
 			fingerprint,
-			CommandReceipt{
-				CommandID:       command.Meta.ID,
-				SessionID:       command.SessionID,
-				RunID:           command.RunID,
-				SessionRevision: sessionValue.Revision,
-				RunRevision:     run.Revision,
-				Message:         "run is already terminal",
-			},
+			receipt,
 		)
 		r.mu.Unlock()
 		return &receipt, nil

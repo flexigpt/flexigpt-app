@@ -1126,3 +1126,7 @@
 - [x] see if there are any other floating things anyplace in ui.
 - [x] directory chip: two borders are there side by side if there is nothing removed yet. also remove folder should be someplace else.
 - [x] need counts for attachments
+- [x] times on resp etc will be good i.e we should show timings of one round trip that happened. mostly in the footer someplace. just assistant round trip time would be good.
+- [x] title rename is not working in ui i.e if i press edit button on title and rename then i do not get any change anyhwere. there is no backend error
+- [x] plate doc has weird behavior with cursor. sometimes it goes up and sometimes it doesn't, this is when we use arrows etc and there is already a multi line input. this looks like happening during streaming in other tab most probably. may be normally too, but streaming is confirmed issue.
+- [x] if i say cancel a request i.e from stop button, it comes as context cancelled now and not actual error like before. also text or thinking that was streamed is not retained in ui and it shows full assistant replaced with context cancelled. we need to show actual error as appended text with italics and some color error to the bottom of any already streamed thinking or content. that shoudl not go away until user actually closes it. in the backend the streamed one should be retained until either user edits a previous message and sends so we start a new chain or let the partial response be there as empty on error.

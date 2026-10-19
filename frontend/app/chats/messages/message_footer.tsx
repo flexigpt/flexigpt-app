@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
 import type { InferenceUsage, ReasoningContent } from '@/spec/inference';
@@ -56,46 +56,77 @@ function timestampMilliseconds(value: string | undefined): number | undefined {
 }
 
 function formatElapsedDuration(milliseconds: number): string {
-	if (milliseconds < 1_000) {
-		return `${Math.max(0, Math.round(milliseconds))}ms`;
+	const totalSeconds = Math.max(0, Math.floor(milliseconds / 1_000));
+
+	if (totalSeconds === 0) {
+		return '<1s';
 	}
 
-	if (milliseconds < 60_000) {
-		return `${(milliseconds / 1_000).toFixed(milliseconds < 10_000 ? 1 : 0)}s`;
+	if (totalSeconds < 60) {
+		return `${totalSeconds}s`;
 	}
 
-	const totalSeconds = Math.round(milliseconds / 1_000);
 	const minutes = Math.floor(totalSeconds / 60);
 	const seconds = totalSeconds % 60;
 	return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
 }
 
-function AssistantResponseTimingLabel({ timing, isBusy }: { timing?: AssistantResponseTiming; isBusy: boolean }) {
-	const [now, setNow] = useState(() => Date.now());
-	const startedAt = timestampMilliseconds(timing?.startedAt);
-	const finishedAt = timestampMilliseconds(timing?.finishedAt);
+const getInitialElapsedSeconds = () => 0;
 
-	useEffect(() => {
-		if (!isBusy || !startedAt || finishedAt) {
-			return;
+function useElapsedSeconds(startedAt: number | undefined, isRunning: boolean): number {
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			if (!isRunning || startedAt === undefined) {
+				return () => {};
+			}
+
+			let timer: number | undefined;
+
+			const scheduleNextSecond = () => {
+				const elapsed = Math.max(0, Date.now() - startedAt);
+				const remainingToNextSecond = 1_000 - (elapsed % 1_000);
+
+				timer = window.setTimeout(
+					() => {
+						onStoreChange();
+						scheduleNextSecond();
+					},
+					Math.max(25, remainingToNextSecond)
+				);
+			};
+
+			scheduleNextSecond();
+
+			return () => {
+				if (timer !== undefined) {
+					window.clearTimeout(timer);
+				}
+			};
+		},
+		[isRunning, startedAt]
+	);
+
+	const getSnapshot = useCallback(() => {
+		if (!isRunning || startedAt === undefined) {
+			return 0;
 		}
 
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setNow(Date.now());
-		const timer = window.setInterval(() => {
-			setNow(Date.now());
-		}, 250);
+		return Math.floor(Math.max(0, Date.now() - startedAt) / 1_000);
+	}, [isRunning, startedAt]);
 
-		return () => {
-			window.clearInterval(timer);
-		};
-	}, [finishedAt, isBusy, startedAt]);
+	return useSyncExternalStore(subscribe, getSnapshot, getInitialElapsedSeconds);
+}
 
-	if (!startedAt) {
+function AssistantResponseTimingLabel({ timing, isBusy }: { timing?: AssistantResponseTiming; isBusy: boolean }) {
+	const startedAt = timestampMilliseconds(timing?.startedAt);
+	const finishedAt = timestampMilliseconds(timing?.finishedAt);
+	const elapsedSeconds = useElapsedSeconds(startedAt, isBusy && finishedAt === undefined);
+
+	if (startedAt === undefined) {
 		return null;
 	}
 
-	const elapsed = Math.max(0, (finishedAt ?? now) - startedAt);
+	const elapsed = Math.max(0, finishedAt === undefined ? elapsedSeconds * 1_000 : finishedAt - startedAt);
 	const formatted = formatElapsedDuration(elapsed);
 
 	return (

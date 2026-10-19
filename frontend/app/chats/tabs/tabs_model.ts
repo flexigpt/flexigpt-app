@@ -10,7 +10,6 @@ export const MAX_TABS = 16;
 interface PendingTabTitle {
 	title: string;
 	previousTitle: string;
-	acknowledgedRevision?: number;
 }
 
 export interface ChatTabState {
