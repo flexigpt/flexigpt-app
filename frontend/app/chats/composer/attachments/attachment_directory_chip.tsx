@@ -337,7 +337,7 @@ export function DirectoryChip({
 				<ActionTriggerMenuBody className="space-y-2">
 					{removedFiles.length > 0 && (
 						<details
-							className="border-base-300 border-t pt-2"
+							className="border-base-300 mb-1"
 							open={removedOpen}
 							onToggle={event => {
 								setRemovedOpen(event.currentTarget.open);
@@ -388,7 +388,7 @@ export function DirectoryChip({
 					)}
 
 					{group.overflowDirs.length > 0 && (
-						<div className="border-base-300 space-y-1 border-t pt-2">
+						<div className="border-base-300 mb-1">
 							<div className="text-base-content/70 text-xs font-semibold">Not scanned or unreadable</div>
 
 							{group.overflowDirs.map(overflow => {

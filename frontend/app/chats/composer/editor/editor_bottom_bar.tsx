@@ -3,7 +3,7 @@ import { memo, useMemo } from 'react';
 
 import type { MenuStore } from '@ariakit/react';
 
-import type { AttachmentContentBlockMode, PathAttachmentsResult, UIAttachment } from '@/spec/attachment';
+import type { PathAttachmentsResult, UIAttachment } from '@/spec/attachment';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem } from '@/spec/tool';
@@ -40,14 +40,10 @@ interface EditorBottomBarProps {
 	onTemplateRendered: (skillRef: SkillRef) => void;
 	attachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
-	onRemoveAttachment: (attachment: UIAttachment) => void;
-	onChangeAttachmentContentBlockMode: (attachment: UIAttachment, mode: AttachmentContentBlockMode) => void;
-	onRemoveDirectoryGroup: (groupID: string) => void;
 	onAttachApprovedTemplateResourcePaths: (
 		paths: string[],
 		canApply: () => boolean
 	) => Promise<PathAttachmentsResult | undefined>;
-
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
 	attachmentMenuState: MenuStore;
@@ -111,9 +107,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onTemplateRendered,
 	attachments,
 	directoryGroups,
-	onRemoveAttachment,
-	onChangeAttachmentContentBlockMode,
-	onRemoveDirectoryGroup,
 	onAttachApprovedTemplateResourcePaths,
 	templateMenuState,
 	toolMenuState,
@@ -190,9 +183,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
 						attachments={attachments}
 						directoryGroups={directoryGroups}
-						onRemoveAttachment={onRemoveAttachment}
-						onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
-						onRemoveDirectoryGroup={onRemoveDirectoryGroup}
 						isInputLocked={isInputLocked}
 					/>
 

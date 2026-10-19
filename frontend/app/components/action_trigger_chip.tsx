@@ -22,7 +22,7 @@ export const actionTriggerMenuItemClasses =
  *
  *   search -> title/actions/errors
  */
-export const actionTriggerMenuHeaderRowClasses = 'flex min-w-0 items-center justify-between gap-2 px-1 py-0';
+export const actionTriggerMenuHeaderRowClasses = 'flex min-w-0 items-center justify-between gap-2 p-1';
 
 interface ActionTriggerMenuRegionProps {
 	children: ReactNode;

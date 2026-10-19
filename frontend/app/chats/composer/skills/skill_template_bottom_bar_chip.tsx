@@ -319,16 +319,20 @@ function SkillTemplateDropdown({
 					/>
 
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="text-base-content/70 text-xs font-semibold">Templates</div>
-						<span className="badge badge-ghost badge-xs">Available {items.length}</span>
+						<div className="min-w-0">
+							<div className="flex justify-between">
+								<div className="text-xs font-semibold">Templates</div>
+								<span className="badge badge-ghost badge-xs">Available {items.length}</span>
+							</div>
+							<div className="mt-1 text-xs opacity-70">
+								Templates are skills with <span className="font-mono">insert: user-message</span>. They render into
+								composer text. Selected indexed resources are added as ordinary Composer attachments.
+							</div>
+						</div>
 					</div>
-					<div className="text-base-content/70 mb-2 px-1 text-xs">
-						Templates are skills with <span className="font-mono">insert: user-message</span>. They render into composer
-						text. Selected indexed resources are added as ordinary Composer attachments; the template itself does not
-						remain selected after insertion.
-					</div>
+
 					{loadError ? (
-						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+						<div className="alert alert-warning rounded-xl text-xs">
 							<FiAlertCircle size={14} className="shrink-0" />
 							<div className="grow">
 								<div className="font-semibold">Templates could not be refreshed</div>
