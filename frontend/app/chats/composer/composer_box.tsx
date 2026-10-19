@@ -1,9 +1,7 @@
-import type { RefObject } from 'react';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { UIToolCall } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
 import type { RestorableConversationContext, SessionConfiguration } from '@/spec/session';
 import type { MCPAppModelContextUpdate } from '@/spec/session_mcp';
@@ -19,11 +17,7 @@ import { normalizeSkillRefs } from '@/apis/skill_management';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
-import type {
-	AssistantTurnFinishedPayload,
-	EditorExternalMessage,
-	EditorSubmitPayload,
-} from '@/chats/composer/editor/editor_types';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
@@ -46,8 +40,6 @@ export interface ComposerBoxHandle {
 	requestStopResponse(): void;
 	loadWorkflowStarter(starter: ChatWorkflowStarter): Promise<boolean>;
 	loadExternalMessage(message: EditorExternalMessage): void;
-	loadToolCalls(toolCalls: UIToolCall[]): void;
-	finishAssistantTurn(payload: AssistantTurnFinishedPayload): void;
 	setConversationToolsFromChoices(tools: ToolStoreChoice[]): void;
 	setWebSearchFromChoices(tools: ToolStoreChoice[]): void;
 	appendMCPAppContextUpdate(update: MCPAppModelContextUpdate): void;
@@ -70,14 +62,17 @@ interface ComposerBoxProps {
 	isGenerating: boolean;
 	allowContinuationInput?: boolean;
 	isHydrating: boolean;
-	abortRef: RefObject<AbortController | null>;
 	shortcutConfig: ShortcutConfig;
 	editingMessageId: string | null;
 	onCancelEditing: () => void;
-	onCancelRun?: () => Promise<void>;
+	onCancelRun: () => Promise<void>;
 	showAutomationControl: boolean;
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
+	showPendingToolControls: boolean;
+	showContinueRunControl: boolean;
+	onRunPendingTools: (continueRun: boolean) => void;
+	onContinueRun: () => void;
 }
 
 export const ComposerBox = memo(
@@ -88,7 +83,6 @@ export const ComposerBox = memo(
 			isGenerating,
 			allowContinuationInput = false,
 			isHydrating,
-			abortRef,
 			shortcutConfig,
 			editingMessageId,
 			onCancelEditing,
@@ -96,6 +90,10 @@ export const ComposerBox = memo(
 			showAutomationControl,
 			automationHoldEnabled,
 			onToggleAutomationHold,
+			showPendingToolControls,
+			showContinueRunControl,
+			onRunPendingTools,
+			onContinueRun,
 		},
 		ref
 	) {
@@ -282,8 +280,6 @@ export const ComposerBox = memo(
 					return applied;
 				},
 				loadExternalMessage: message => editorAreaRef.current?.loadExternalMessage(message),
-				loadToolCalls: calls => editorAreaRef.current?.loadToolCalls(calls),
-				finishAssistantTurn: payload => editorAreaRef.current?.finishAssistantTurn(payload),
 				setConversationToolsFromChoices: tools => editorAreaRef.current?.setConversationToolsFromChoices(tools),
 				setWebSearchFromChoices: tools => editorAreaRef.current?.setWebSearchFromChoices(tools),
 				appendMCPAppContextUpdate: update => editorAreaRef.current?.appendMCPAppContextUpdate(update),
@@ -345,11 +341,7 @@ export const ComposerBox = memo(
 					}}
 					onConfirm={() => {
 						setAbortConfirmationRequested(false);
-						if (onCancelRun) {
-							void onCancelRun().catch(console.error);
-							return;
-						}
-						abortRef.current?.abort();
+						void onCancelRun().catch(console.error);
 					}}
 					title="Abort generation?"
 					message="Partial output already received remains in the conversation. Stop the request?"
@@ -376,6 +368,10 @@ export const ComposerBox = memo(
 					showAutomationControl={showAutomationControl}
 					automationHoldEnabled={automationHoldEnabled}
 					onToggleAutomationHold={onToggleAutomationHold}
+					showPendingToolControls={showPendingToolControls}
+					showContinueRunControl={showContinueRunControl}
+					onRunPendingTools={onRunPendingTools}
+					onContinueRun={onContinueRun}
 				/>
 			</div>
 		);

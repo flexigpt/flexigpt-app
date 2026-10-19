@@ -16,15 +16,13 @@ import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
-import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPRuntimeServerID } from '@/spec/mcp';
+import type { UIToolOutput } from '@/spec/inference';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { SessionConfiguration } from '@/spec/session';
-import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/session_mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
-import { UIToolCallStatus } from '@/spec/inference';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import { ToolImplType } from '@/spec/tool';
 
@@ -39,11 +37,7 @@ import { toolIdentityKey } from '@/apis/tool_management';
 
 import { HoverTip } from '@/components/hover_tip';
 
-import type {
-	AssistantTurnFinishedPayload,
-	EditorExternalMessage,
-	EditorSubmitPayload,
-} from '@/chats/composer/editor/editor_types';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
@@ -63,13 +57,12 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
-import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
+import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import {
 	conversationToolsToChoices,
 	mergeConversationToolsWithNewChoices,
 } from '@/chats/composer/tools/lib/conversation_tool_utils';
-import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/chats/composer/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/chats/composer/tools/lib/tool_choice_utils';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
@@ -102,7 +95,6 @@ export interface EditorAreaHandle {
 	setDraftText: (text: string) => void;
 	setDraftTextIfEmpty: (text: string) => boolean;
 	resetEditor: () => void;
-	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setToolSelectionIssues: (issues: ToolSelectionIssue[]) => void;
 	setMCPContextFromMessage: (context?: MCPConversationContext) => void;
@@ -114,7 +106,6 @@ export interface EditorAreaHandle {
 	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
 	setInstalledSkillStateFromAgent: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
-	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 	restoreSessionConfiguration: (configuration: SessionConfiguration) => Promise<void>;
 }
 
@@ -133,111 +124,10 @@ interface EditorAreaProps {
 	showAutomationControl: boolean;
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
-}
-
-function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolSelection[] {
-	const out: MCPToolSelection[] = [];
-
-	for (const server of context?.servers ?? []) {
-		for (const tool of server.selectedTools ?? []) {
-			out.push({
-				...tool,
-				server: tool.server ?? server.server,
-			});
-		}
-	}
-
-	return out;
-}
-
-function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MCPToolSelection): MCPToolSelection {
-	return {
-		...contextSelection,
-		...selection,
-		server: selection.server ?? contextSelection.server,
-		toolName: selection.toolName || contextSelection.toolName,
-		providerToolName: selection.providerToolName || contextSelection.providerToolName,
-		choiceID: selection.choiceID || contextSelection.choiceID,
-		digest: selection.digest || contextSelection.digest,
-		approvalRule: selection.approvalRule ?? contextSelection.approvalRule,
-		executionMode: selection.executionMode ?? contextSelection.executionMode,
-		appResourceUri: selection.appResourceUri || contextSelection.appResourceUri,
-		visibility: selection.visibility ?? contextSelection.visibility,
-	};
-}
-
-function sameMCPRuntimeServerID(left: MCPRuntimeServerID | undefined, right: MCPRuntimeServerID | undefined): boolean {
-	return left === right;
-}
-
-function findMCPToolSelectionForCall(
-	toolCall: UIToolCall,
-	context?: MCPConversationContext
-): MCPToolSelection | undefined {
-	const contextSelections = getMCPContextToolSelections(context);
-	if (contextSelections.length === 0) {
-		return undefined;
-	}
-
-	const selection = toolCall.mcpToolSelection;
-
-	if (selection?.choiceID) {
-		const bySelectionChoiceID = contextSelections.find(candidate => candidate.choiceID === selection.choiceID);
-		if (bySelectionChoiceID) {
-			return bySelectionChoiceID;
-		}
-	}
-
-	if (toolCall.choiceID) {
-		const byCallChoiceID = contextSelections.find(candidate => candidate.choiceID === toolCall.choiceID);
-		if (byCallChoiceID) {
-			return byCallChoiceID;
-		}
-	}
-
-	if (!selection) {
-		return undefined;
-	}
-
-	return contextSelections.find(candidate => {
-		if (!sameMCPRuntimeServerID(selection.server, candidate.server)) {
-			return false;
-		}
-		if (selection.toolName && selection.toolName === candidate.toolName) {
-			return true;
-		}
-		if (selection.providerToolName && selection.providerToolName === candidate.providerToolName) {
-			return true;
-		}
-		if (toolCall.name && toolCall.name === candidate.providerToolName) {
-			return true;
-		}
-
-		return false;
-	});
-}
-
-function enrichMCPToolCallsFromContext(toolCalls: UIToolCall[], context?: MCPConversationContext): UIToolCall[] {
-	let changed = false;
-
-	const next = toolCalls.map(toolCall => {
-		const contextSelection = findMCPToolSelectionForCall(toolCall, context);
-		if (!contextSelection) {
-			return toolCall;
-		}
-
-		const mcpToolSelection = toolCall.mcpToolSelection
-			? mergeMCPToolSelection(toolCall.mcpToolSelection, contextSelection)
-			: contextSelection;
-
-		changed = true;
-		return {
-			...toolCall,
-			mcpToolSelection,
-		};
-	});
-
-	return changed ? next : toolCalls;
+	showPendingToolControls: boolean;
+	showContinueRunControl: boolean;
+	onRunPendingTools: (continueRun: boolean) => void;
+	onContinueRun: () => void;
 }
 
 function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined) {
@@ -253,10 +143,6 @@ function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined)
 			'[data-searchable-menu-item="true"]:not([aria-disabled="true"]):not(:disabled), [role="menuitem"]'
 		)
 		?.focus();
-}
-
-interface SubmitOptions {
-	runPendingTools: boolean;
 }
 
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
@@ -275,11 +161,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		showAutomationControl,
 		automationHoldEnabled,
 		onToggleAutomationHold,
+		showPendingToolControls,
+		showContinueRunControl,
+		onRunPendingTools,
+		onContinueRun,
 	},
 	ref
 ) {
-	const lastSubmittedMCPContextRef = useRef<MCPConversationContext | undefined>(undefined);
-
 	const {
 		editor,
 		contentRef,
@@ -314,9 +202,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		return typeof EventTarget !== 'undefined' ? new EventTarget() : null;
 	}, []);
 
-	// Track whether a menu was opened via shortcut so we can:
-	// - force focus into the menu (arrow-key nav)
-	// - optionally restore focus to editor on close (Esc)
 	const menuOpenedByShortcutRef = useRef({
 		templates: false,
 		tools: false,
@@ -354,12 +239,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const submitVisualFrameRef = useRef<number | null>(null);
 
 	const [mcpAppContextUpdates, setMCPAppContextUpdates] = useState<MCPAppModelContextUpdate[]>([]);
-	const [fastForwardPending, setFastForwardPending] = useState(false);
+	const [toolOutputs, setToolOutputs] = useState<UIToolOutput[]>([]);
 	const [renderOnlySkillRefs, setRenderOnlySkillRefs] = useState<SkillRef[]>([]);
 
-	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
-	// This prevents a race where Plate fires onChange after clearComposerTransientState
-	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
 	const isLoadingExternalMessageRef = useRef(false);
 	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
 	const toolCatalog = useTools();
@@ -402,35 +284,20 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const workspaceSelectionPending = workspace.selectionLoading;
 	const workspaceExecutionBlocked = workspaceSelectionPending || workspace.blockingError !== null;
-	const workspaceControlsLocked = isInputLocked || isSubmitting || fastForwardPending || workspaceSelectionPending;
+	const workspaceControlsLocked = isInputLocked || isSubmitting || workspaceSelectionPending;
 
 	const {
-		toolCalls,
-		toolOutputs,
-		setToolOutputs,
 		conversationToolsState,
 		setConversationToolsState,
 		webSearchTemplates,
 		setWebSearchTemplates,
 		toolArgsBlocked,
-		hasPendingToolCalls,
-		hasRunningToolCalls,
-		runAllPendingToolCalls,
-		handleRunSingleToolCall,
-		handleDiscardToolCall,
-		handleRetryErroredOutput,
-		handleAttachedToolsChanged,
-		handleRemoveToolOutput,
+		recomputeAttachedToolArgsBlocked: handleAttachedToolsChanged,
+		clearAttachedToolValidation,
 		applyConversationToolsFromChoices,
 		applyWebSearchFromChoices,
-		loadToolCalls,
-		clearComposerToolsState,
-		getToolRuntimeSnapshot,
-	} = useComposerTools({
-		isBusy: isGenerating,
-		isSubmitting,
+	} = useComposerToolConfig({
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
-		externalExecutionBlocked: fastForwardPending || workspaceExecutionBlocked,
 	});
 
 	const webSearchConfiguration = getWebSearchConfiguration(
@@ -458,16 +325,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
 
-	const handleOpenToolCallDetails = useCallback((call: UIToolCall) => {
-		setToolDetailsState({ kind: 'call', call });
-	}, []);
-
 	const handleOpenConversationToolDetails = useCallback((entry: ConversationToolStateEntry) => {
 		setToolDetailsState({ kind: 'choice', choice: entry.toolStoreChoice });
 	}, []);
 
 	const handleOpenAttachedToolDetails = useCallback((entry: AttachedToolEntry) => {
 		setToolDetailsState({ kind: 'choice', choice: uiToolChoiceToToolStoreChoice(entry) });
+	}, []);
+
+	const handleRemoveToolOutput = useCallback((id: string) => {
+		setToolOutputs(previous => previous.filter(output => output.id !== id));
 	}, []);
 
 	const attachedToolIdentityKeys = useMemo(() => {
@@ -548,8 +415,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleRemoveAttachedTool = useCallback(
 		(entry: AttachedToolEntry) => {
-			const identityKey = toolIdentityKey(entry.target);
-			handleDetachAttachedToolByKey(identityKey);
+			handleDetachAttachedToolByKey(toolIdentityKey(entry.target));
 		},
 		[handleDetachAttachedToolByKey]
 	);
@@ -593,12 +459,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const handleSetAttachedToolUserArgSchemaInstance = useCallback(
 		(selectionID: string, newInstance: string) => {
 			setAttachedToolUserArgSchemaInstanceBySelectionID(editor, selectionID, newInstance);
+			handleAttachedToolsChanged();
 		},
-		[editor]
+		[editor, handleAttachedToolsChanged]
 	);
 
-	// When editing an earlier message we temporarily override the current
-	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
 	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
 	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
 	const preEditToolSelectionIssuesRef = useRef<ToolSelectionIssue[] | null>(null);
@@ -607,7 +472,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
 	const preEditWorkspaceSelectionRef = useRef<WorkspaceConversationSelection | undefined | null>(null);
 
-	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
 	const toolMenuOpen = useStoreState(toolMenu, 'open');
 	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
@@ -656,7 +520,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			focusMenuSearchOrFirstItem(templateMenuEl);
 		});
-	}, [templateMenuOpen, templateMenuEl, focusEditorPreservingSelection]);
+	}, [focusEditorPreservingSelection, templateMenuEl, templateMenuOpen]);
 
 	useEffect(() => {
 		if (!toolMenuOpen) {
@@ -675,7 +539,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			focusMenuSearchOrFirstItem(toolMenuEl);
 		});
-	}, [toolMenuOpen, toolMenuEl, focusEditorPreservingSelection]);
+	}, [focusEditorPreservingSelection, toolMenuEl, toolMenuOpen]);
 
 	useEffect(() => {
 		if (!attachmentMenuOpen) {
@@ -699,7 +563,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			focusMenuSearchOrFirstItem(attachmentMenuEl);
 		});
-	}, [attachmentMenuOpen, attachmentMenuEl, focusEditorPreservingSelection]);
+	}, [attachmentMenuEl, attachmentMenuOpen, focusEditorPreservingSelection]);
 
 	useEffect(() => {
 		if (!skillsMenuOpen) {
@@ -762,11 +626,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isInputLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.templates = true;
 
+		menuOpenedByShortcutRef.current.templates = true;
 		closeAllMenus();
 		templateMenu.show();
-		// Make Ariakit's "return focus" behavior deterministic on close.
 		templateButtonRef.current?.focus({ preventScroll: true });
 	}, [closeAllMenus, isInputLocked, templateMenu]);
 
@@ -774,8 +637,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isInputLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.tools = true;
 
+		menuOpenedByShortcutRef.current.tools = true;
 		closeAllMenus();
 		toolMenu.show();
 		toolButtonRef.current?.focus({ preventScroll: true });
@@ -785,19 +648,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isInputLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.attachments = true;
 
+		menuOpenedByShortcutRef.current.attachments = true;
 		closeAllMenus();
 		attachmentMenu.show();
 		attachmentButtonRef.current?.focus({ preventScroll: true });
-	}, [isInputLocked, closeAllMenus, attachmentMenu]);
+	}, [attachmentMenu, closeAllMenus, isInputLocked]);
 
 	const openSkillsPicker = useCallback(() => {
 		if (isInputLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.skills = true;
 
+		menuOpenedByShortcutRef.current.skills = true;
 		closeAllMenus();
 		skillsMenu.show();
 	}, [closeAllMenus, isInputLocked, skillsMenu]);
@@ -806,8 +669,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isInputLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.mcp = true;
 
+		menuOpenedByShortcutRef.current.mcp = true;
 		closeAllMenus();
 		mcpMenu.show();
 	}, [closeAllMenus, isInputLocked, mcpMenu]);
@@ -816,41 +679,42 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (workspaceControlsLocked) {
 			return;
 		}
-		menuOpenedByShortcutRef.current.workspace = true;
 
+		menuOpenedByShortcutRef.current.workspace = true;
 		closeAllMenus();
 		workspaceMenu.show();
 	}, [closeAllMenus, workspaceControlsLocked, workspaceMenu]);
 
 	const restorePreEditContext = useCallback(() => {
-		const prevConv = preEditConversationToolsRef.current;
-		const prevWs = preEditWebSearchTemplatesRef.current;
-		const prevMCP = preEditMCPContextRef.current;
-		const prevSkills = preEditEnabledSkillRefsRef.current;
-		const prevActive = preEditActiveSkillRefsRef.current;
-		const prevWorkspace = preEditWorkspaceSelectionRef.current;
+		const previousConversationTools = preEditConversationToolsRef.current;
+		const previousWebSearchTemplates = preEditWebSearchTemplatesRef.current;
+		const previousMCPContext = preEditMCPContextRef.current;
+		const previousEnabledSkills = preEditEnabledSkillRefsRef.current;
+		const previousActiveSkills = preEditActiveSkillRefsRef.current;
+		const previousWorkspace = preEditWorkspaceSelectionRef.current;
 
-		if (prevConv) {
-			setConversationToolsState(prevConv);
+		if (previousConversationTools) {
+			setConversationToolsState(previousConversationTools);
 		}
-		if (prevWs) {
-			setWebSearchTemplates(prevWs);
+		if (previousWebSearchTemplates) {
+			setWebSearchTemplates(previousWebSearchTemplates);
 		}
 		if (preEditToolSelectionIssuesRef.current) {
 			setToolSelectionIssues(preEditToolSelectionIssuesRef.current);
 		}
-		if (prevMCP !== null) {
-			mcp.restoreContext(prevMCP ?? undefined);
+		if (previousMCPContext !== null) {
+			mcp.restoreContext(previousMCPContext ?? undefined);
 		}
-		if (prevSkills || prevActive) {
+		if (previousEnabledSkills || previousActiveSkills) {
 			void applySkillSelectionState(
-				prevSkills ?? getCurrentEnabledSkillRefs(),
-				prevActive ?? getCurrentActiveSkillRefs()
+				previousEnabledSkills ?? getCurrentEnabledSkillRefs(),
+				previousActiveSkills ?? getCurrentActiveSkillRefs()
 			);
 		}
-		if (prevWorkspace !== null) {
-			void workspace.restoreSelection(prevWorkspace, false);
+		if (previousWorkspace !== null) {
+			void workspace.restoreSelection(previousWorkspace, false);
 		}
+
 		clearPreEditSnapshot();
 	}, [
 		applySkillSelectionState,
@@ -864,17 +728,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const isSendButtonEnabled = useMemo(() => {
-		// Cannot block on tools def loading here.
-		if (isInputLocked) {
-			return false;
-		}
-		if (isSubmitting) {
-			return false;
-		}
-		if (workspaceExecutionBlocked) {
-			return false;
-		}
-		if (hasBlockingToolArgs) {
+		if (isInputLocked || isSubmitting || workspaceExecutionBlocked || hasBlockingToolArgs) {
 			return false;
 		}
 
@@ -888,38 +742,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		return hasAttachments || hasOutputs || hasMCPContent;
 	}, [
-		isInputLocked,
-		isSubmitting,
+		attachments.length,
 		hasBlockingToolArgs,
 		hasText,
-		attachments.length,
-		toolOutputs.length,
-		workspaceExecutionBlocked,
+		isInputLocked,
+		isSubmitting,
 		mcp.selectedServerCount,
 		mcpAppContextUpdates.length,
+		toolOutputs.length,
+		workspaceExecutionBlocked,
 	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
-		isBusy: isGenerating || isSubmitting || fastForwardPending || workspaceExecutionBlocked,
+		isBusy: isGenerating || isSubmitting || workspaceExecutionBlocked,
 		canSubmit: () => {
-			if (isInputLocked) {
+			if (isInputLocked || isSubmitting || workspaceExecutionBlocked || hasBlockingToolArgs) {
 				return false;
-			}
-			if (isSubmitting) {
-				return false;
-			}
-			if (workspaceExecutionBlocked) {
-				return false;
-			}
-			if (hasBlockingToolArgs) {
-				return false;
-			}
-
-			// Default Enter behavior is "run pending tools, then send", so allow
-			// submission when pending tools exist even if they are currently the
-			// only content source.
-			if (hasPendingToolCalls && !hasRunningToolCalls) {
-				return true;
 			}
 
 			if (hasText) {
@@ -946,31 +784,31 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (event.key !== 'PageUp' && event.key !== 'PageDown') {
 				return;
 			}
-			const editorEl = contentRef.current;
-			if (!editorEl) {
+
+			const editorElement = contentRef.current;
+			if (!editorElement) {
 				return;
 			}
+
 			event.preventDefault();
 			event.stopPropagation();
+
 			const direction = event.key === 'PageDown' ? 1 : -1;
-			const delta = Math.max(120, editorEl.clientHeight * 0.85) * direction;
-			const maxTop = Math.max(0, editorEl.scrollHeight - editorEl.clientHeight);
-			editorEl.scrollTop = Math.max(0, Math.min(maxTop, editorEl.scrollTop + delta));
+			const delta = Math.max(120, editorElement.clientHeight * 0.85) * direction;
+			const maxTop = Math.max(0, editorElement.scrollHeight - editorElement.clientHeight);
+			editorElement.scrollTop = Math.max(0, Math.min(maxTop, editorElement.scrollTop + delta));
 		},
 		[contentRef, onKeyDown]
 	);
 
 	const setSubmitting = useCallback((next: boolean, options?: { deferVisual?: boolean }) => {
 		isSubmittingRef.current = next;
+
 		if (submitVisualFrameRef.current !== null) {
 			window.cancelAnimationFrame(submitVisualFrameRef.current);
 			submitVisualFrameRef.current = null;
 		}
 
-		// Important: submitting=true is only a visual/UI state. Triggering that
-		// rerender synchronously right after an imperative Plate mutation is the
-		// fragile part in this repro. Keep the ref in sync immediately for logic,
-		// but defer the React render by one frame.
 		if (next && options?.deferVisual) {
 			submitVisualFrameRef.current = window.requestAnimationFrame(() => {
 				submitVisualFrameRef.current = null;
@@ -992,344 +830,172 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		closeAllMenus();
 		setSubmitError(null);
 		setSubmitting(false);
-		setFastForwardPending(false);
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
 		clearAttachments();
-		clearComposerToolsState();
+		setToolOutputs([]);
+		clearAttachedToolValidation();
 		setMCPAppContextUpdates([]);
 		setRenderOnlySkillRefs([]);
-	}, [clearAttachments, clearComposerToolsState, closeAllMenus, setSubmitting]);
-
-	const startFastForwardRun = useCallback(
-		(pendingRunnableToolCallIDs: string[]) => {
-			if (pendingRunnableToolCallIDs.length === 0) {
-				return;
-			}
-
-			setSubmitError(null);
-			setFastForwardPending(true);
-
-			void (async () => {
-				try {
-					for (const id of pendingRunnableToolCallIDs) {
-						await handleRunSingleToolCall(id);
-					}
-				} catch (err) {
-					setFastForwardPending(false);
-					setSubmitError((err as Error)?.message || 'Failed to run pending tool calls.');
-				}
-			})();
-		},
-		[handleRunSingleToolCall]
-	);
+	}, [clearAttachedToolValidation, clearAttachments, closeAllMenus, setSubmitting]);
 
 	const resetEditor = useCallback(() => {
 		clearComposerTransientState();
 		resetEditorDocument();
 	}, [clearComposerTransientState, resetEditorDocument]);
 
-	/**
-	 * Main submit logic, parameterized by whether to run pending tool calls
-	 * before sending.
-	 */
-	const doSubmit = useCallback(
-		async (options: SubmitOptions) => {
-			const { runPendingTools } = options;
-
-			if (isSubmittingRef.current) {
-				return;
-			}
-			if (isInputLocked) {
-				return;
-			}
-
-			// Pure send path: if we're *not* running tools, bail out when we
-			//    don't already have something to send.
-			if (!runPendingTools && !isSendButtonEnabled) {
-				return;
-			}
-
-			// Guard explicitly here as well, so even programmatic calls respect it.
-			if (hasBlockingToolArgs) {
-				setSubmitError(
-					hasBlockingMCPArgs
-						? 'Some MCP prompts or resource templates require arguments. Fill the required arguments before sending.'
-						: 'Some tools or web-search options require configuration. Fill the required options before sending.'
-				);
-				return;
-			}
-
-			if (workspaceExecutionBlocked) {
-				setSubmitError(
-					workspace.blockingError ?? 'Workspace selection is still resolving. Wait for it to finish before sending.'
-				);
-				return;
-			}
-
-			// The tool picker can remain mounted after attaching a tool.
-			// Close all menus before submit-driven state changes so no Ariakit menu
-			// subtree spans the attached-tool -> conversation-tool transition.
-			closeAllMenus();
-
-			setSubmitError(null);
-			const pendingRunnableToolCallIDs = runPendingTools
-				? toolCalls
-						.filter(toolCall => toolCall.status === UIToolCallStatus.Pending && isRunnableComposerToolCall(toolCall))
-						.map(toolCall => toolCall.id)
-				: [];
-			const hadPendingTools = pendingRunnableToolCallIDs.length > 0;
-
-			if (hadPendingTools) {
-				startFastForwardRun(pendingRunnableToolCallIDs);
-				return;
-			}
-
-			setSubmitting(true);
-
-			let didSend = false;
-			let submittedToolChoices: ToolStoreChoice[] | null = null;
-
-			try {
-				// Build final message content after tools have run.
-				// Always read from the live tool runtime snapshot here. Auto-execute
-				// can complete and trigger submit before React re-renders the latest
-				// toolOutputs / hasPendingToolCalls values into this component.
-				const runtimeAfterRun = getToolRuntimeSnapshot();
-
-				const textToSend = editor.api.string([]);
-				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
-				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
-					toolCall =>
-						(toolCall.status === UIToolCallStatus.Pending || toolCall.status === UIToolCallStatus.Running) &&
-						requiresComposerToolResponse(toolCall)
-				);
-				const failedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
-					toolCall => toolCall.status === UIToolCallStatus.Failed && requiresComposerToolResponse(toolCall)
-				);
-
-				if (unfinishedRunnableToolCalls.length > 0) {
-					// Fast-forward should be silent while tools are still progressing.
-					// The chips already show running state, so avoid flashing an inline
-					// composer alert for this transient condition.
-					if (!hadPendingTools) {
-						setSubmitError('Waiting for all tool calls to finish before sending.');
-					}
-					return;
-				}
-				if (failedRunnableToolCalls.length > 0) {
-					setSubmitError('Some tool calls failed. Retry them or submit an error result before sending.');
-					return;
-				}
-
-				const hasNonEmptyText = textToSend.trim().length > 0;
-				const hasAttachmentsToSend = attachments.length > 0;
-				const hasToolOutputsToSend = finalToolOutputs.length > 0;
-				const hasMCPContentToSend = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
-
-				// Enforce the "non-empty message" invariant *after* tools have run.
-				if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend && !hasMCPContentToSend) {
-					setSubmitError(
-						hadPendingTools
-							? 'Tool calls did not produce any outputs, so there is nothing to send yet.'
-							: 'Nothing to send. Add text, attachments, or tool outputs first.'
-					);
-					return;
-				}
-
-				// 5) Tool choices (editor-attached + conversation-level).
-				const attachedTools = getAttachedTools(editor);
-				const explicitChoices = attachedTools.map(c => uiToolChoiceToToolStoreChoice(c));
-				const conversationChoices = conversationToolsToChoices(conversationToolsState);
-				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
-
-				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
-
-				let preparedMCPContext: MCPConversationContext | undefined;
-				try {
-					preparedMCPContext = await mcp.prepareForSubmit();
-				} catch (err) {
-					setSubmitError((err as Error)?.message || 'Fill required MCP arguments before sending.');
-					return;
-				}
-
-				const nonSessionSkillRefs = normalizeSkillRefs([
-					...systemPrompt.selectedInstructionSkillRefs,
-					...renderOnlySkillRefs,
-				]);
-
-				const payload: EditorSubmitPayload = {
-					text: textToSend,
-					additionalSessionInstructionText: systemPrompt.additionalSessionInstructionText.trim() || undefined,
-					selectedSessionInstructionOverrides:
-						systemPrompt.selectedSessionInstructionOverrides.length > 0
-							? structuredClone(systemPrompt.selectedSessionInstructionOverrides)
-							: undefined,
-					includeModelDefault: systemPrompt.includeModelDefault,
-					attachedTools,
-					attachments,
-					toolOutputs: finalToolOutputs,
-					finalToolChoices,
-					mcpContext: preparedMCPContext,
-					mcpAppContextUpdates:
-						mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
-					enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
-					activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
-					enabledSkillSelections: getCurrentInstalledEnabledSkillSelections(),
-					// Workspace-owned active Skills must be serialized too. The
-					// backend validates that each requested active Skill remains
-					// part of the effective enabled Skill set.
-					activeSkillSelections: getCurrentActiveSkillSelections(),
-					workspaceSelection: workspace.getSelectionSnapshot(),
-					workspacePlan: workspace.plan,
-					...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
-					...(toolSelectionIssues.length > 0
-						? {
-								unresolvedToolSelections: structuredClone(toolSelectionIssues),
-							}
-						: {}),
-					...(editingMessageId && finalToolOutputs.length > 0
-						? {
-								carryForwardToolResultIDs: [...new Set(finalToolOutputs.map(output => output.id).filter(Boolean))],
-							}
-						: {}),
-				};
-
-				lastSubmittedMCPContextRef.current = preparedMCPContext;
-				try {
-					await onSubmit(payload);
-				} catch (error: unknown) {
-					setSubmitError(error instanceof Error ? error.message : 'The Session Runtime rejected this submission.');
-					return;
-				}
-				setSubmitError(null);
-				submittedToolChoices = finalToolChoices;
-
-				didSend = true;
-			} finally {
-				setSubmitting(false);
-
-				// Only clear the editor if we actually sent something.
-				if (didSend) {
-					resetEditor();
-
-					// If we were editing, the old snapshot is no longer relevant.
-					clearPreEditSnapshot();
-
-					if (submittedToolChoices && submittedToolChoices.length > 0) {
-						setConversationToolsState(prev =>
-							mergeConversationToolsWithNewChoices(prev, submittedToolChoices as ToolStoreChoice[])
-						);
-					}
-				}
-			}
-		},
-		[
-			systemPrompt,
-			attachments,
-			clearPreEditSnapshot,
-			closeAllMenus,
-			conversationToolsState,
-			editor,
-			getCurrentInstalledActiveSkillRefs,
-			getCurrentInstalledEnabledSkillRefs,
-			getToolRuntimeSnapshot,
-			hasBlockingMCPArgs,
-			editingMessageId,
-			hasBlockingToolArgs,
-			isInputLocked,
-			isSendButtonEnabled,
-			mcp,
-			mcpAppContextUpdates,
-			onSubmit,
-			resetEditor,
-			setConversationToolsState,
-			setSubmitting,
-			startFastForwardRun,
-			toolCalls,
-			webSearchTemplates,
-			workspace,
-			workspaceExecutionBlocked,
-			getCurrentInstalledEnabledSkillSelections,
-			renderOnlySkillRefs,
-			getCurrentActiveSkillSelections,
-			toolSelectionIssues,
-		]
-	);
-
-	/**
-	 * Default form submit / Enter: "run pending tools, then send".
-	 */
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		if (e) {
-			e.preventDefault();
-		}
-		void doSubmit({ runPendingTools: true });
-	};
-
-	const finishFastForwardWithError = useCallback((message: string) => {
-		setFastForwardPending(false);
-		setSubmitError(message);
-	}, []);
-
-	const finishFastForwardAndSubmit = useCallback(() => {
-		setFastForwardPending(false);
-		void doSubmit({
-			runPendingTools: false,
-		});
-	}, [doSubmit]);
-
-	useEffect(() => {
-		if (!fastForwardPending) {
-			return;
-		}
-		if (isGenerating || isInputLocked || isSubmittingRef.current) {
+	const doSubmit = useCallback(async () => {
+		if (isSubmittingRef.current || isInputLocked || !isSendButtonEnabled) {
 			return;
 		}
 
 		if (hasBlockingToolArgs) {
+			setSubmitError(
+				hasBlockingMCPArgs
+					? 'Some MCP prompts or resource templates require arguments. Fill the required arguments before sending.'
+					: 'Some tools or web-search options require configuration. Fill the required options before sending.'
+			);
 			return;
 		}
 
-		const unfinishedRunnableToolCalls = toolCalls.filter(
-			toolCall =>
-				(toolCall.status === UIToolCallStatus.Pending || toolCall.status === UIToolCallStatus.Running) &&
-				isRunnableComposerToolCall(toolCall)
-		);
-
-		if (unfinishedRunnableToolCalls.length > 0) {
+		if (workspaceExecutionBlocked) {
+			setSubmitError(
+				workspace.blockingError ?? 'Workspace selection is still resolving. Wait for it to finish before sending.'
+			);
 			return;
 		}
 
-		const failedRunnableToolCalls = toolCalls.filter(
-			toolCall => toolCall.status === UIToolCallStatus.Failed && isRunnableComposerToolCall(toolCall)
-		);
+		closeAllMenus();
+		setSubmitError(null);
+		setSubmitting(true);
 
-		if (failedRunnableToolCalls.length > 0) {
-			// oxlint-disable-next-line react/set-state-in-effect
-			finishFastForwardWithError('Some tool calls failed. Retry them or submit an error result before sending.');
-			return;
+		let didSend = false;
+		let submittedToolChoices: ToolStoreChoice[] | null = null;
+
+		try {
+			const textToSend = editor.api.string([]);
+			const finalToolOutputs = toolOutputs;
+			const hasNonEmptyText = textToSend.trim().length > 0;
+			const hasAttachmentsToSend = attachments.length > 0;
+			const hasToolOutputsToSend = finalToolOutputs.length > 0;
+			const hasMCPContentToSend = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
+
+			if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend && !hasMCPContentToSend) {
+				setSubmitError('Nothing to send. Add text, attachments, tool outputs, or MCP context first.');
+				return;
+			}
+
+			const attachedTools = getAttachedTools(editor);
+			const explicitChoices = attachedTools.map(choice => uiToolChoiceToToolStoreChoice(choice));
+			const conversationChoices = conversationToolsToChoices(conversationToolsState);
+			const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
+			const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
+
+			let preparedMCPContext: MCPConversationContext | undefined;
+			try {
+				preparedMCPContext = await mcp.prepareForSubmit();
+			} catch (error) {
+				setSubmitError(error instanceof Error ? error.message : 'Fill required MCP arguments before sending.');
+				return;
+			}
+
+			const nonSessionSkillRefs = normalizeSkillRefs([
+				...systemPrompt.selectedInstructionSkillRefs,
+				...renderOnlySkillRefs,
+			]);
+
+			const payload: EditorSubmitPayload = {
+				text: textToSend,
+				additionalSessionInstructionText: systemPrompt.additionalSessionInstructionText.trim() || undefined,
+				selectedSessionInstructionOverrides:
+					systemPrompt.selectedSessionInstructionOverrides.length > 0
+						? structuredClone(systemPrompt.selectedSessionInstructionOverrides)
+						: undefined,
+				includeModelDefault: systemPrompt.includeModelDefault,
+				attachedTools,
+				attachments,
+				toolOutputs: finalToolOutputs,
+				finalToolChoices,
+				mcpContext: preparedMCPContext,
+				mcpAppContextUpdates:
+					mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
+				enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
+				activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
+				enabledSkillSelections: getCurrentInstalledEnabledSkillSelections(),
+				activeSkillSelections: getCurrentActiveSkillSelections(),
+				workspaceSelection: workspace.getSelectionSnapshot(),
+				workspacePlan: workspace.plan,
+				...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
+				...(toolSelectionIssues.length > 0
+					? {
+							unresolvedToolSelections: structuredClone(toolSelectionIssues),
+						}
+					: {}),
+				...(editingMessageId && finalToolOutputs.length > 0
+					? {
+							carryForwardToolResultIDs: [...new Set(finalToolOutputs.map(output => output.id).filter(Boolean))],
+						}
+					: {}),
+			};
+
+			try {
+				await onSubmit(payload);
+			} catch (error: unknown) {
+				setSubmitError(error instanceof Error ? error.message : 'The Session Runtime rejected this submission.');
+				return;
+			}
+
+			setSubmitError(null);
+			submittedToolChoices = finalToolChoices;
+			didSend = true;
+		} finally {
+			setSubmitting(false);
+
+			if (didSend) {
+				resetEditor();
+				clearPreEditSnapshot();
+
+				if (submittedToolChoices && submittedToolChoices.length > 0) {
+					setConversationToolsState(previous =>
+						mergeConversationToolsWithNewChoices(previous, submittedToolChoices as ToolStoreChoice[])
+					);
+				}
+			}
 		}
-
-		if (!hasText && attachments.length === 0 && toolOutputs.length === 0) {
-			finishFastForwardWithError('Tool calls did not produce any outputs, so there is nothing to send yet.');
-			return;
-		}
-
-		finishFastForwardAndSubmit();
 	}, [
-		attachments.length,
-		doSubmit,
-		fastForwardPending,
-		finishFastForwardAndSubmit,
-		finishFastForwardWithError,
+		attachments,
+		clearPreEditSnapshot,
+		closeAllMenus,
+		conversationToolsState,
+		editingMessageId,
+		editor,
+		getCurrentActiveSkillSelections,
+		getCurrentInstalledActiveSkillRefs,
+		getCurrentInstalledEnabledSkillRefs,
+		getCurrentInstalledEnabledSkillSelections,
+		hasBlockingMCPArgs,
 		hasBlockingToolArgs,
-		hasText,
-		isGenerating,
 		isInputLocked,
-		toolCalls,
-		toolOutputs.length,
+		isSendButtonEnabled,
+		mcp,
+		mcpAppContextUpdates,
+		onSubmit,
+		renderOnlySkillRefs,
+		resetEditor,
+		setConversationToolsState,
+		setSubmitting,
+		systemPrompt,
+		toolOutputs,
+		toolSelectionIssues,
+		webSearchTemplates,
+		workspace,
+		workspaceExecutionBlocked,
 	]);
+
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
+		event.preventDefault();
+		void doSubmit();
+	};
 
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
@@ -1337,9 +1003,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				window.clearTimeout(externalMessageLoadReleaseTimerRef.current);
 				externalMessageLoadReleaseTimerRef.current = null;
 			}
+
 			isLoadingExternalMessageRef.current = true;
+
 			try {
-				// Snapshot current context so Cancel Editing can restore it.
 				if (!preEditConversationToolsRef.current) {
 					preEditConversationToolsRef.current = conversationToolsState;
 				}
@@ -1361,30 +1028,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (preEditWorkspaceSelectionRef.current === null) {
 					preEditWorkspaceSelectionRef.current = workspace.getSelectionSnapshot();
 				}
+
 				clearComposerTransientState();
 
-				// 1) Reset document to plain text paragraphs.
-				const plain = incoming.text ?? '';
-				const value = buildEditorValueFromPlainText(plain);
-				replaceEditorDocument(value, 'end');
-
-				// 2) Rebuild flat attachment chips from incoming attachment state.
+				replaceEditorDocument(buildEditorValueFromPlainText(incoming.text ?? ''), 'end');
 				loadAttachmentsFromMessage(incoming.attachments);
 
-				// 3) Restore tool choices into conversation-level state.
 				const incomingToolChoices = incoming.toolChoices ?? [];
 				applyConversationToolsFromChoices(incomingToolChoices);
 				applyWebSearchFromChoices(incomingToolChoices);
 				setToolSelectionIssues(incoming.toolSelectionIssues ?? []);
 				mcp.restoreContext(incoming.mcpContext);
 				setMCPAppContextUpdates(incoming.mcpAppContextUpdates ?? []);
-				// 4) Restore enabled/active skills together so invariants hold immediately.
+
 				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
 					syncSession: SkillSessionSyncMode.None,
 					forceResetSession: true,
 				});
 				void workspace.restoreSelection(incoming.workspaceSelection, false);
-				// 5) Restore any tool outputs that were previously attached to this message.
 				setToolOutputs(incoming.toolOutputs ?? []);
 			} finally {
 				externalMessageLoadReleaseTimerRef.current = window.setTimeout(() => {
@@ -1404,7 +1065,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			loadAttachmentsFromMessage,
 			mcp,
 			replaceEditorDocument,
-			setToolOutputs,
 			toolSelectionIssues,
 			webSearchTemplates,
 			workspace,
@@ -1416,6 +1076,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			closeAllMenus();
 			setSubmitError(null);
 			replaceEditorDocument(buildEditorValueFromPlainText(text), 'end');
+
 			window.requestAnimationFrame(() => {
 				focusEditorAtEnd();
 			});
@@ -1425,19 +1086,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const setDraftTextIfEmpty = useCallback(
 		(text: string) => {
-			if (text.trim().length === 0) {
-				return false;
-			}
-
-			const hasCurrentText = hasTextRef.current;
-			if (hasCurrentText) {
+			if (text.trim().length === 0 || hasTextRef.current) {
 				return false;
 			}
 
 			setDraftText(text);
 			return true;
 		},
-		[setDraftText, hasTextRef]
+		[hasTextRef, setDraftText]
 	);
 
 	const handleEditorDocumentChange = useCallback(() => {
@@ -1447,27 +1103,21 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		handleAttachedToolsChanged();
+
 		if (submitError) {
 			setSubmitError(null);
 		}
-		// Skip auto-cancel while loadExternalMessage is in progress.
-		// The transient state (cleared attachments / tool outputs) is not yet restored.
+
 		if (isLoadingExternalMessageRef.current) {
 			return;
 		}
 
-		// Auto-cancel editing when the editor is completely empty
-		// (no text, no tools, no attachments, no tool outputs).
 		const hasTextNow = hasTextRef.current;
-
 		const hasAttachmentsLocal = attachments.length > 0;
 		const hasToolOutputsLocal = toolOutputs.length > 0;
-		// Tools alone are not considered enough to keep edit mode alive.
 		const isEffectivelyEmpty = !hasTextNow && !hasAttachmentsLocal && !hasToolOutputsLocal;
 
-		// Only do this while editing an older message.
 		if (editingMessageId && isEffectivelyEmpty) {
-			// IMPORTANT: do NOT call resetEditor here; we only exit edit mode.
 			restorePreEditContext();
 			cancelEditing();
 		}
@@ -1483,19 +1133,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		toolOutputs.length,
 	]);
 
-	const handleLoadToolCalls = useCallback(
-		(toolCallsToLoad: UIToolCall[]) => {
-			loadToolCalls(
-				enrichMCPToolCallsFromContext(toolCallsToLoad, lastSubmittedMCPContextRef.current ?? mcp.mcpContext)
-			);
-		},
-		[loadToolCalls, mcp.mcpContext]
-	);
-
 	const restoreSessionConfiguration = useCallback(
 		async (configuration: SessionConfiguration) => {
 			setSubmitError(null);
-			clearComposerToolsState();
+			setToolOutputs([]);
+			clearAttachedToolValidation();
 			clearAttachments();
 			setMCPAppContextUpdates([]);
 			applyConversationToolsFromChoices([]);
@@ -1603,15 +1245,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyConversationToolsFromChoices,
 			applyInstalledSkillSelectionState,
 			applyWebSearchFromChoices,
+			clearAttachedToolValidation,
 			clearAttachments,
-			clearComposerToolsState,
 			mcp,
-			setToolSelectionIssues,
 			workspace,
 		]
 	);
-
-	const finishAssistantTurn = useCallback((_payload: AssistantTurnFinishedPayload) => undefined, []);
 
 	useImperativeHandle(
 		ref,
@@ -1652,7 +1291,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setDraftText,
 			setDraftTextIfEmpty,
 			resetEditor,
-			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
 			setToolSelectionIssues,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
@@ -1670,7 +1308,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 							setSubmitError('The MCP App context could not be added because its server is unavailable or disabled.');
 							return;
 						}
-						setMCPAppContextUpdates(prev => [...prev, update]);
+
+						setMCPAppContextUpdates(previous => [...previous, update]);
 					})
 					.catch(() => {
 						setSubmitError('The MCP server catalog could not be loaded.');
@@ -1691,33 +1330,30 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setWorkspaceSelectionFromMessage: (selection, syncSkills = true) => {
 				void workspace.restoreSelection(selection, syncSkills);
 			},
-			finishAssistantTurn,
 			restoreSessionConfiguration,
 		}),
 		[
-			loadExternalMessage,
-			setDraftText,
-			setDraftTextIfEmpty,
-			resetEditor,
-			handleLoadToolCalls,
 			applyConversationToolsFromChoices,
-			applyWebSearchFromChoices,
 			applyAttachmentsDrop,
-			finishAssistantTurn,
+			applyInstalledSkillSelectionState,
+			applySkillSelectionState,
+			applyWebSearchFromChoices,
 			focusEditorAtEnd,
+			loadExternalMessage,
+			mcp,
+			onRequestStop,
+			isRunActive,
+			openAttachmentPicker,
+			openMCPPicker,
+			openSkillsPicker,
 			openTemplatePicker,
 			openToolPicker,
-			openAttachmentPicker,
-			openSkillsPicker,
-			openMCPPicker,
 			openWorkspacePicker,
-			workspace,
-			mcp,
-			applySkillSelectionState,
-			applyInstalledSkillSelectionState,
-			isRunActive,
-			onRequestStop,
+			resetEditor,
 			restoreSessionConfiguration,
+			setDraftText,
+			setDraftTextIfEmpty,
+			workspace,
 		]
 	);
 
@@ -1730,57 +1366,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
 	const sendActionText = submissionMode === 'continuation' ? 'Stage continuation and continue run' : 'Send message';
 
-	const handleRunToolsOnlyClick = useCallback(async () => {
-		if (workspaceExecutionBlocked) {
-			setSubmitError(
-				workspace.blockingError ?? 'Workspace selection is still resolving. Wait for it to finish before running tools.'
-			);
-			return;
-		}
-
-		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) {
-			return;
-		}
-		await runAllPendingToolCalls();
-	}, [
-		fastForwardPending,
-		hasPendingToolCalls,
-		hasRunningToolCalls,
-		isInputLocked,
-		isSubmitting,
-		runAllPendingToolCalls,
-		workspace.blockingError,
-		workspaceExecutionBlocked,
-	]);
-
-	// Button-state helpers:
-	// - Play: run tools only (enabled when there are pending tools and none are running).
-	// - Fast-forward: run tools then send (enabled when there are pending tools and
-	//   templates are satisfied; "sendability" will be re-checked after tools run).
-	// - Send: send only (enabled when send is allowed and there are no pending tools).
-	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls && !fastForwardPending;
-	const canRunToolsOnly =
-		hasPendingToolCalls &&
-		!hasRunningToolCalls &&
-		!isInputLocked &&
-		!isSubmitting &&
-		!fastForwardPending &&
-		!workspaceExecutionBlocked;
-	const canRunToolsAndSend =
-		hasPendingToolCalls &&
-		!hasRunningToolCalls &&
-		!isInputLocked &&
-		!isSubmitting &&
-		!fastForwardPending &&
-		!workspaceExecutionBlocked &&
-		!hasBlockingToolArgs;
-
 	const erroredToolOutputsReadyToSubmit =
-		toolOutputs.some(output => output.isError && !output.isSkipped) &&
-		!hasPendingToolCalls &&
-		!hasRunningToolCalls &&
-		!hasBlockingToolArgs &&
-		!isInputLocked;
+		toolOutputs.some(output => output.isError && !output.isSkipped) && !hasBlockingToolArgs && !isInputLocked;
 
 	return (
 		<div className="mx-0 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
@@ -1791,6 +1378,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						<span>{submitError}</span>
 					</div>
 				) : null}
+
 				{toolSelectionIssues.length > 0 ? (
 					<div className="alert alert-warning mx-4 mt-3 mb-1 block text-sm">
 						<p>Some saved Tool selections are unavailable. Remove and reselect them before sending.</p>
@@ -1816,15 +1404,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						))}
 					</div>
 				) : null}
+
 				{incompatibleSDKSelection ? (
 					<div className="alert alert-warning mx-4 mt-3 mb-1 text-sm">
 						A selected provider Tool is incompatible with the current model provider.
 					</div>
 				) : null}
+
 				{!submitError && erroredToolOutputsReadyToSubmit ? (
 					<output className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm">
 						<FiTool size={16} className="mt-0.5" />
-						<span>A tool returned an error result. Submit it to the model, or retry the tool before sending.</span>
+						<span>A carried Tool result contains an error. Submit it to the model or remove it before sending.</span>
 					</output>
 				) : null}
 
@@ -1838,7 +1428,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							) : null}
 
-							{editingMessageId && (
+							{editingMessageId ? (
 								<div className="flex min-h-0 items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
 										<FiEdit2 size={14} />
@@ -1853,8 +1443,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										<FiX size={14} />
 									</button>
 								</div>
-							)}
-							{/* Row: editor with send/stop button on the right */}
+							) : null}
+
 							<div className="flex min-h-24 min-w-0 grow gap-2 overflow-hidden p-1">
 								<PlateContent
 									ref={contentRef}
@@ -1879,25 +1469,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									}}
 								/>
 							</div>
-							{/* Unified chips bar: attachments, directories, tools, tool calls & outputs (scrollable) */}
+
 							<div className="w-full min-w-0 shrink-0 items-center overflow-x-auto overscroll-contain p-1 text-xs">
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}
-									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
-									isBusy={
-										isGenerating ||
-										isSubmitting ||
-										isInputLocked ||
-										fastForwardPending ||
-										hasRunningToolCalls ||
-										workspaceExecutionBlocked
-									}
-									onRunToolCall={handleRunSingleToolCall}
-									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
-									onRetryErroredOutput={handleRetryErroredOutput}
 									onRemoveToolOutput={handleRemoveToolOutput}
 									onRemoveAttachment={handleRemoveAttachment}
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
@@ -1905,12 +1483,54 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onRemoveDirectoryAttachments={handleRemoveDirectoryAttachments}
 									onRestoreDirectoryAttachments={handleRestoreDirectoryAttachments}
 									onRemoveOverflowDir={handleRemoveOverflowDir}
-									onOpenToolCallDetails={handleOpenToolCallDetails}
 								/>
 							</div>
 						</div>
-						{/* Primary / secondary actions anchored at bottom-right */}
+
 						<div className="flex shrink-0 flex-col items-end justify-end gap-2 p-1">
+							{showPendingToolControls ? (
+								<>
+									<HoverTip content="Run pending Session tools" placement="left">
+										<button
+											type="button"
+											className="btn btn-circle btn-neutral btn-sm shrink-0"
+											onClick={() => {
+												onRunPendingTools(false);
+											}}
+											aria-label="Run pending Session tools"
+										>
+											<FiPlay size={18} />
+										</button>
+									</HoverTip>
+
+									<HoverTip content="Run pending Session tools and continue the Run" placement="left">
+										<button
+											type="button"
+											className="btn btn-circle btn-primary btn-sm shrink-0"
+											onClick={() => {
+												onRunPendingTools(true);
+											}}
+											aria-label="Run pending Session tools and continue"
+										>
+											<FiFastForward size={18} />
+										</button>
+									</HoverTip>
+								</>
+							) : null}
+
+							{showContinueRunControl ? (
+								<HoverTip content="Continue the waiting Session Run" placement="left">
+									<button
+										type="button"
+										className="btn btn-circle btn-primary btn-sm shrink-0"
+										onClick={onContinueRun}
+										aria-label="Continue Session Run"
+									>
+										<FiFastForward size={18} />
+									</button>
+								</HoverTip>
+							) : null}
+
 							{showAutomationControl ? (
 								<HoverTip
 									content={
@@ -1961,77 +1581,28 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									</button>
 								</HoverTip>
 							) : (
-								<>
-									{/* Run tools only (Play) */}
-									{hasPendingToolCalls && (
-										<HoverTip content="Run tools only" placement="left">
-											<button
-												type="button"
-												className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
-													!canRunToolsOnly ? 'btn-disabled' : ''
-												}`}
-												disabled={!canRunToolsOnly}
-												onClick={() => {
-													if (!canRunToolsOnly) {
-														return;
-													}
-													void handleRunToolsOnlyClick();
-												}}
-												aria-label="Run tools only"
-											>
-												<FiPlay size={18} />
-											</button>
-										</HoverTip>
-									)}
-
-									{/* Run tools and send (Fast-forward) */}
-									{hasPendingToolCalls && (
-										<HoverTip content="Run tools and send" placement="left">
-											<button
-												type="button"
-												className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
-													!canRunToolsAndSend ? 'btn-disabled' : ''
-												}`}
-												disabled={!canRunToolsAndSend}
-												onClick={() => {
-													if (!canRunToolsAndSend) {
-														return;
-													}
-													void doSubmit({ runPendingTools: true });
-												}}
-												aria-label="Run tools and send"
-											>
-												<FiFastForward size={18} />
-											</button>
-										</HoverTip>
-									)}
-
-									{/* Send only . Disabled while there are pending tools. */}
-									<HoverTip
-										content={hasPendingToolCalls ? 'Send (enabled after tools finish)' : sendActionText}
-										placement="left"
+								<HoverTip content={sendActionText} placement="left">
+									<button
+										type="button"
+										className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
+											!isSendButtonEnabled ? 'btn-disabled' : ''
+										}`}
+										disabled={!isSendButtonEnabled}
+										onClick={() => {
+											if (!isSendButtonEnabled) {
+												return;
+											}
+											void doSubmit();
+										}}
+										aria-label={sendActionText}
 									>
-										<button
-											type="button"
-											className={`btn btn-circle btn-neutral btn-sm shrink-0 ${!canSendOnly ? 'btn-disabled' : ''}`}
-											disabled={!canSendOnly}
-											onClick={() => {
-												if (!canSendOnly) {
-													return;
-												}
-												void doSubmit({ runPendingTools: false });
-											}}
-											aria-label={sendActionText}
-										>
-											<FiSend size={18} />
-										</button>
-									</HoverTip>
-								</>
+										<FiSend size={18} />
+									</button>
+								</HoverTip>
 							)}
 						</div>
 					</div>
 
-					{/* Bottom bar for composer pickers and keyboard shortcuts */}
 					<EditorBottomBar
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}

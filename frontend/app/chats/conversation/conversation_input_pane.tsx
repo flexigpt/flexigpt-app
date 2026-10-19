@@ -18,7 +18,6 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	allowContinuationInput: boolean;
 	editingMessageId: string | null;
 	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
-	getAbortRef: (tabId: string) => { current: AbortController | null };
 	shortcutConfig: ShortcutConfig;
 	sendMessage: (
 		tabId: string,
@@ -35,6 +34,10 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	showAutomationControl: boolean;
 	automationHoldEnabled: boolean;
 	onToggleAutomationHold: () => void;
+	showPendingToolControls: boolean;
+	showContinueRunControl: boolean;
+	onRunPendingTools: (continueRun: boolean) => void;
+	onContinueRun: () => void;
 }) {
 	const {
 		tabId,
@@ -45,7 +48,6 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		allowContinuationInput,
 		editingMessageId,
 		setInputRef,
-		getAbortRef,
 		shortcutConfig,
 		sendMessage,
 		sendContinuation,
@@ -54,6 +56,10 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		showAutomationControl,
 		automationHoldEnabled,
 		onToggleAutomationHold,
+		showPendingToolControls,
+		showContinueRunControl,
+		onRunPendingTools,
+		onContinueRun,
 	} = props;
 
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
@@ -76,7 +82,6 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				isGenerating={isGenerating}
 				isHydrating={isHydrating}
 				allowContinuationInput={allowContinuationInput}
-				abortRef={getAbortRef(tabId)}
 				shortcutConfig={shortcutConfig}
 				editingMessageId={editingMessageId}
 				onCancelEditing={onCancelEditing}
@@ -86,6 +91,10 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				showAutomationControl={showAutomationControl}
 				automationHoldEnabled={automationHoldEnabled}
 				onToggleAutomationHold={onToggleAutomationHold}
+				showPendingToolControls={showPendingToolControls}
+				showContinueRunControl={showContinueRunControl}
+				onRunPendingTools={onRunPendingTools}
+				onContinueRun={onContinueRun}
 			/>
 		</div>
 	);

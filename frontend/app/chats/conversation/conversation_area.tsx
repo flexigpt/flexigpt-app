@@ -11,7 +11,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { FiChevronDown, FiChevronUp, FiPlay } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
@@ -41,7 +41,6 @@ import { useAttachmentsDropTarget } from '@/chats/conversation/use_attachments_d
 import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
 import { useSendMessage } from '@/chats/conversation/use_send_message';
-import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
 import { MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, MCP_APP_UI_MESSAGE_EVENT } from '@/chats/mcpapps/mcp_app_events';
 import { ChatMessage } from '@/chats/messages/message';
 import {
@@ -628,7 +627,6 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 
 export interface ConversationAreaHandle {
 	disposeTabRuntime: (tabId: string) => void;
-	clearStreamForTab: (tabId: string) => void;
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
 	resetComposerForNewConversation: (tabId: string) => Promise<void>;
 	restoreComposerFromSessionConfiguration: (tabId: string, configuration: SessionConfiguration) => Promise<void>;
@@ -686,6 +684,7 @@ function ConversationAreaInner(
 ) {
 	const tabsRef = useRef(tabs);
 	const selectedTabIdRef = useRef(selectedTabId);
+	const tabIDSetRef = useRef(new Set(tabs.map(tab => tab.tabId)));
 
 	const activeTab = useMemo(() => tabs.find(tab => tab.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
 	const activeTabId = activeTab?.tabId ?? '';
@@ -708,26 +707,14 @@ function ConversationAreaInner(
 
 	useLayoutEffect(() => {
 		tabsRef.current = tabs;
+		tabIDSetRef.current = new Set(tabs.map(tab => tab.tabId));
 	}, [tabs]);
 
 	useLayoutEffect(() => {
 		selectedTabIdRef.current = selectedTabId;
 	}, [selectedTabId]);
 
-	const {
-		tabExists,
-		getAbortRef,
-		clearStreamForTab,
-		getVisibleStreamTextForTab,
-		getVisibleStreamThinkingForTab,
-		getStreamVersionSnapshot,
-		subscribeToStream,
-		disposeStreamRuntime,
-	} = useStreamingRuntime({
-		tabs,
-		selectedTabId,
-		selectedTabIdRef,
-	});
+	const tabExists = useCallback((tabId: string) => tabIDSetRef.current.has(tabId), []);
 
 	const {
 		inputRefs,
@@ -1159,18 +1146,16 @@ function ConversationAreaInner(
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
-			disposeStreamRuntime(tabId);
 			disposeInputRuntime(tabId);
 			disposeScrollRuntime(tabId);
 		},
-		[disposeInputRuntime, disposeScrollRuntime, disposeStreamRuntime]
+		[disposeInputRuntime, disposeScrollRuntime]
 	);
 
 	useImperativeHandle(
 		ref,
 		() => ({
 			disposeTabRuntime,
-			clearStreamForTab,
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
 			restoreComposerFromSessionConfiguration: restoreSessionConfiguration,
@@ -1190,7 +1175,6 @@ function ConversationAreaInner(
 		}),
 		[
 			applyWorkflowStarterToComposer,
-			clearStreamForTab,
 			disposeTabRuntime,
 			focusInput,
 			getScrollTopByTabSnapshot,
@@ -1210,26 +1194,6 @@ function ConversationAreaInner(
 		]
 	);
 
-	const subscribeToActiveStream = useCallback(
-		(cb: () => void) => subscribeToStream(activeTabId, cb),
-		[activeTabId, subscribeToStream]
-	);
-
-	const getActiveStreamSnapshot = useCallback(
-		() => getStreamVersionSnapshot(activeTabId),
-		[activeTabId, getStreamVersionSnapshot]
-	);
-
-	const getActiveStreamText = useCallback(
-		() => getVisibleStreamTextForTab(activeTabId),
-		[activeTabId, getVisibleStreamTextForTab]
-	);
-
-	const getActiveStreamThinking = useCallback(
-		() => getVisibleStreamThinkingForTab(activeTabId),
-		[activeTabId, getVisibleStreamThinkingForTab]
-	);
-
 	const activeRunToolCallIDs = useMemo(() => {
 		const ids = new Set<string>();
 		for (const call of activeRun?.toolCalls ?? []) {
@@ -1240,16 +1204,6 @@ function ConversationAreaInner(
 		}
 		return ids;
 	}, [activeRun?.toolCalls]);
-
-	const activeStreamSource = useMemo(
-		() => ({
-			subscribe: subscribeToActiveStream,
-			getVersionSnapshot: getActiveStreamSnapshot,
-			getText: getActiveStreamText,
-			getThinking: getActiveStreamThinking,
-		}),
-		[getActiveStreamSnapshot, getActiveStreamText, getActiveStreamThinking, subscribeToActiveStream]
-	);
 
 	const itemContent = useCallback(
 		(
@@ -1287,7 +1241,6 @@ function ConversationAreaInner(
 								runSessionAction(() => skipSessionToolCall(call));
 							}
 						}}
-						streamSource={activeStreamSource}
 					/>
 				);
 			}
@@ -1326,7 +1279,6 @@ function ConversationAreaInner(
 			activeTabIsGenerating,
 			beginEditMessageForTab,
 			messageCount,
-			activeStreamSource,
 			executeSessionToolCall,
 			retrySessionToolCall,
 			runSessionAction,
@@ -1491,46 +1443,6 @@ function ConversationAreaInner(
 						</div>
 					) : null}
 
-					{canRunPendingToolCalls ? (
-						<div className="mb-2 flex flex-wrap justify-center gap-2">
-							<button
-								type="button"
-								className="btn btn-sm rounded-xl"
-								onClick={() => {
-									runSessionAction(() => executePendingSessionToolCalls(false));
-								}}
-							>
-								<FiPlay size={14} />
-								Run pending tools
-							</button>
-							<button
-								type="button"
-								className="btn btn-sm btn-primary rounded-xl"
-								onClick={() => {
-									runSessionAction(() => executePendingSessionToolCalls(true));
-								}}
-							>
-								<FiPlay size={14} />
-								Run tools and continue
-							</button>
-						</div>
-					) : null}
-
-					{canContinueActiveRun ? (
-						<div className="mb-2 flex justify-center">
-							<button
-								type="button"
-								className="btn btn-sm btn-primary rounded-xl"
-								onClick={() => {
-									runSessionAction(continueActiveRun);
-								}}
-							>
-								<FiPlay size={14} />
-								{hasStagedContinuation ? 'Continue with staged App context' : 'Continue run'}
-							</button>
-						</div>
-					) : null}
-
 					{mountedInputTabs.map(tab =>
 						(() => {
 							const tabRun = tab.sessionSnapshot ? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID) : undefined;
@@ -1547,7 +1459,6 @@ function ConversationAreaInner(
 									allowContinuationInput={allowContinuationInput}
 									editingMessageId={tab.editingMessageId}
 									setInputRef={setInputRef}
-									getAbortRef={getAbortRef}
 									shortcutConfig={shortcutConfig}
 									sendMessage={sendMessageForTab}
 									sendContinuation={stageContinuationForTab}
@@ -1557,6 +1468,14 @@ function ConversationAreaInner(
 									automationHoldEnabled={tab.tabId === activeTabId && automationHoldEnabled}
 									onToggleAutomationHold={() => {
 										runSessionAction(toggleAutomationHold);
+									}}
+									showPendingToolControls={tab.tabId === activeTabId && canRunPendingToolCalls}
+									showContinueRunControl={tab.tabId === activeTabId && canContinueActiveRun}
+									onRunPendingTools={continueRun => {
+										runSessionAction(() => executePendingSessionToolCalls(continueRun));
+									}}
+									onContinueRun={() => {
+										runSessionAction(continueActiveRun);
 									}}
 								/>
 							);

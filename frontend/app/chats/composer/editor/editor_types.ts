@@ -76,7 +76,3 @@ export interface EditorSubmitPayload {
 	workspacePlan?: WorkspaceRuntimePlan;
 	carryForwardToolResultIDs?: string[];
 }
-
-export interface AssistantTurnFinishedPayload {
-	loadedRunnableToolCallCount: number;
-}

@@ -8,7 +8,6 @@ import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/atta
 import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
 import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
-import { ToolChipsComposerRow } from '@/chats/composer/tools/tool_chips_composer';
 
 interface EditorChipsBarProps {
 	attachments: UIAttachment[];
@@ -45,19 +44,12 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	directoryGroups,
 	toolCalls = [],
 	toolOutputs = [],
-	isBusy = false,
-	onRunToolCall,
-	onDiscardToolCall,
-	onOpenOutput,
-	onRetryErroredOutput,
-	onRemoveToolOutput,
 	onRemoveAttachment,
 	onChangeAttachmentContentBlockMode,
 	onRemoveDirectoryGroup,
 	onRemoveDirectoryAttachments,
 	onRestoreDirectoryAttachments,
 	onRemoveOverflowDir,
-	onOpenToolCallDetails,
 }: EditorChipsBarProps) {
 	const hasVisibleToolCalls = toolCalls.some(
 		toolCall => toolCall.status !== UIToolCallStatus.Discarded && toolCall.status !== UIToolCallStatus.Succeeded
@@ -75,13 +67,6 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	}
 
 	const standaloneAttachments = attachments.filter(att => !ownedKeys.has(uiAttachmentKey(att)));
-
-	const runToolCall = onRunToolCall ?? (() => {});
-	const discardToolCall = onDiscardToolCall ?? (() => {});
-	const openOutput = onOpenOutput ?? (() => {});
-	const retryErroredOutput = onRetryErroredOutput ?? (() => {});
-	const removeToolOutput = onRemoveToolOutput ?? (() => {});
-	const openToolCallDetails = onOpenToolCallDetails ?? (() => {});
 
 	if (!hasAnyChips) {
 		return null;
@@ -112,19 +97,6 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 					onRemoveOverflowDir={onRemoveOverflowDir}
 				/>
 			))}
-
-			{/* Tool-call chips (pending/running/failed) and tool output chips */}
-			<ToolChipsComposerRow
-				toolCalls={toolCalls}
-				toolOutputs={toolOutputs}
-				isBusy={isBusy}
-				onRunToolCall={runToolCall}
-				onDiscardToolCall={discardToolCall}
-				onOpenOutput={openOutput}
-				onRetryErroredOutput={retryErroredOutput}
-				onRemoveToolOutput={removeToolOutput}
-				onOpenCallDetails={openToolCallDetails}
-			/>
 		</div>
 	);
 });
