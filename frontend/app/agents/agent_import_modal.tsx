@@ -3,10 +3,10 @@ import { FiAlertCircle, FiCheck, FiFileText, FiUpload } from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentImportPreview } from '@/spec/agent';
 import { AgentImportIssueSeverity } from '@/spec/agent';
+import { artifactRefKey } from '@/spec/artifact';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import { agentArtifactRefKey } from '@/apis/agent_management';
 import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
@@ -227,7 +227,7 @@ function AgentImportModalContent({
 							<ModalField label="Agent Plugin" htmlFor="agent-import-destination" required>
 								<Dropdown<string>
 									dropdownItems={dropdownItems}
-									orderedKeys={destinations.map(destination => agentArtifactRefKey(destination.plugin))}
+									orderedKeys={destinations.map(destination => artifactRefKey(destination.plugin))}
 									selectedKey={destinationKey}
 									onChange={value => {
 										setDestinationKey(value);

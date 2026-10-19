@@ -14,7 +14,7 @@ import type {
 	WorkspaceRuntimePlan,
 	WorkspaceSkill,
 } from '@/spec/workspace';
-import { ArtifactState } from '@/spec/artifact';
+import { artifactRefKey, ArtifactState } from '@/spec/artifact';
 import { SessionCollectionOverrideMode } from '@/spec/session_base';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
@@ -86,10 +86,6 @@ export interface ComposerWorkspaceController {
 	refreshSelectedWorkspace: () => Promise<void>;
 	createWorkspaceDirectory: (path: string) => Promise<void>;
 	getSelectionSnapshot: () => WorkspaceConversationSelection | undefined;
-}
-
-function refKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
 }
 
 function workspaceOverrideKey(key: string): string {
@@ -174,8 +170,8 @@ function applyArtifactOverrides(
 	baseline: WorkspaceConversationResourceSelectionRef[],
 	overrides: SessionArtifactOverride[] | undefined
 ): WorkspaceConversationResourceSelectionRef[] {
-	const byKey = new Map(baseline.map(value => [refKey(value.artifact), value] as const));
-	const order = baseline.map(value => refKey(value.artifact));
+	const byKey = new Map(baseline.map(value => [artifactRefKey(value.artifact), value] as const));
+	const order = baseline.map(value => artifactRefKey(value.artifact));
 	let replacementStarted = false;
 
 	for (const override of overrides ?? []) {
@@ -203,7 +199,7 @@ function applyArtifactOverrides(
 			continue;
 		}
 
-		const key = refKey(override.value);
+		const key = artifactRefKey(override.value);
 		if (!byKey.has(key)) {
 			order.push(key);
 		}
@@ -224,8 +220,8 @@ function applyMCPOverrides(
 	baseline: WorkspaceConversationResourceSelectionRef[],
 	overrides: MCPServerOverride[] | undefined
 ): WorkspaceConversationResourceSelectionRef[] {
-	const byKey = new Map(baseline.map(value => [refKey(value.artifact), value] as const));
-	const order = baseline.map(value => refKey(value.artifact));
+	const byKey = new Map(baseline.map(value => [artifactRefKey(value.artifact), value] as const));
+	const order = baseline.map(value => artifactRefKey(value.artifact));
 	let replacementStarted = false;
 
 	for (const override of overrides ?? []) {
@@ -249,7 +245,7 @@ function applyMCPOverrides(
 		if (!override.value) {
 			continue;
 		}
-		const key = refKey(override.value.server);
+		const key = artifactRefKey(override.value.server);
 		if (!byKey.has(key)) {
 			order.push(key);
 		}
@@ -302,7 +298,7 @@ function candidateForRef(
 	candidates: ComposerWorkspaceCandidate[],
 	ref: ArtifactRef
 ): ComposerWorkspaceCandidate | undefined {
-	return candidates.find(candidate => refKey(workspaceRefOf(candidate)) === refKey(ref));
+	return candidates.find(candidate => artifactRefKey(workspaceRefOf(candidate)) === artifactRefKey(ref));
 }
 
 function isCandidateAvailable(candidate: ComposerWorkspaceCandidate): boolean {
@@ -354,13 +350,15 @@ export function useComposerWorkspace({
 			nextPlan: WorkspaceRuntimePlan | undefined,
 			syncSession: SkillSessionSyncMode
 		) => {
-			const selected = new Set((nextSelection?.skillRefs ?? []).map(ref => refKey(ref.artifact)));
+			const selected = new Set((nextSelection?.skillRefs ?? []).map(ref => artifactRefKey(ref.artifact)));
 			const enabled = (nextPlan?.skills.skills ?? [])
-				.filter(skill => skill.insert === WorkspaceInsertTarget.Instructions && selected.has(refKey(skill.artifact)))
+				.filter(
+					skill => skill.insert === WorkspaceInsertTarget.Instructions && selected.has(artifactRefKey(skill.artifact))
+				)
 				.map(skill => skill.artifact as SkillRef);
 
-			const enabledKeys = new Set(enabled.map(value => refKey(value)));
-			const active = getCurrentActiveSkillRefs().filter(value => enabledKeys.has(refKey(value)));
+			const enabledKeys = new Set(enabled.map(value => artifactRefKey(value)));
+			const active = getCurrentActiveSkillRefs().filter(value => enabledKeys.has(artifactRefKey(value)));
 
 			await applyWorkspaceSkillSelectionState(nextSelection?.workspace, enabled, active, { syncSession });
 		},
@@ -558,11 +556,11 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const refs = new Map((current.contextRefs ?? []).map(ref => [refKey(ref.artifact), ref]));
+			const refs = new Map((current.contextRefs ?? []).map(ref => [artifactRefKey(ref.artifact), ref]));
 			if (selected) {
-				refs.set(refKey(context.artifact), contextRefOf(context));
+				refs.set(artifactRefKey(context.artifact), contextRefOf(context));
 			} else {
-				refs.delete(refKey(context.artifact));
+				refs.delete(artifactRefKey(context.artifact));
 			}
 
 			replaceSelection({
@@ -584,11 +582,11 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const refs = new Map((current.skillRefs ?? []).map(ref => [refKey(ref.artifact), ref]));
+			const refs = new Map((current.skillRefs ?? []).map(ref => [artifactRefKey(ref.artifact), ref]));
 			if (selected) {
-				refs.set(refKey(skill.artifact), skillRefOf(skill));
+				refs.set(artifactRefKey(skill.artifact), skillRefOf(skill));
 			} else {
-				refs.delete(refKey(skill.artifact));
+				refs.delete(artifactRefKey(skill.artifact));
 			}
 
 			const next = {
@@ -608,16 +606,16 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const refs = new Map((current.mcpRefs ?? []).map(ref => [refKey(ref.artifact), ref] as const));
+			const refs = new Map((current.mcpRefs ?? []).map(ref => [artifactRefKey(ref.artifact), ref] as const));
 			if (selected) {
-				refs.set(refKey(server.artifact), {
+				refs.set(artifactRefKey(server.artifact), {
 					artifact: { ...server.artifact },
 					name: server.name,
 					definitionDigest: server.definitionDigest,
 					artifactRevision: server.artifactRevision,
 				});
 			} else {
-				refs.delete(refKey(server.artifact));
+				refs.delete(artifactRefKey(server.artifact));
 			}
 
 			replaceSelection({ ...current, mcpRefs: [...refs.values()] });
@@ -636,32 +634,33 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const selectedSkillKeys = new Set((current.skillRefs ?? []).map(ref => refKey(ref.artifact)));
-			if (!selectedSkillKeys.has(refKey(skill.artifact))) {
+			const selectedSkillKeys = new Set((current.skillRefs ?? []).map(ref => artifactRefKey(ref.artifact)));
+			if (!selectedSkillKeys.has(artifactRefKey(skill.artifact))) {
 				return;
 			}
 
 			const enabled = plan.skills.skills
 				.filter(
 					candidate =>
-						candidate.insert === WorkspaceInsertTarget.Instructions && selectedSkillKeys.has(refKey(candidate.artifact))
+						candidate.insert === WorkspaceInsertTarget.Instructions &&
+						selectedSkillKeys.has(artifactRefKey(candidate.artifact))
 				)
 				.map(candidate => candidate.artifact as SkillRef);
 			const enabledKeys = new Set(
 				enabled.map(e => {
-					return refKey(e);
+					return artifactRefKey(e);
 				})
 			);
 			const activeByKey = new Map(
 				getCurrentActiveSkillRefs()
-					.filter(ref => enabledKeys.has(refKey(ref)))
-					.map(ref => [refKey(ref), ref] as const)
+					.filter(ref => enabledKeys.has(artifactRefKey(ref)))
+					.map(ref => [artifactRefKey(ref), ref] as const)
 			);
 
 			if (active) {
-				activeByKey.set(refKey(skill.artifact), skill.artifact as SkillRef);
+				activeByKey.set(artifactRefKey(skill.artifact), skill.artifact as SkillRef);
 			} else {
-				activeByKey.delete(refKey(skill.artifact));
+				activeByKey.delete(artifactRefKey(skill.artifact));
 			}
 
 			await applyWorkspaceSkillSelectionState(current.workspace, enabled, [...activeByKey.values()], {
@@ -680,7 +679,9 @@ export function useComposerWorkspace({
 
 			replaceSelection({
 				...current,
-				contextRefs: (current.contextRefs ?? []).filter(ref => refKey(ref.artifact) !== refKey(artifact)),
+				contextRefs: (current.contextRefs ?? []).filter(
+					ref => artifactRefKey(ref.artifact) !== artifactRefKey(artifact)
+				),
 			});
 		},
 		[replaceSelection]
@@ -695,7 +696,7 @@ export function useComposerWorkspace({
 
 			const next = {
 				...current,
-				skillRefs: (current.skillRefs ?? []).filter(ref => refKey(ref.artifact) !== refKey(artifact)),
+				skillRefs: (current.skillRefs ?? []).filter(ref => artifactRefKey(ref.artifact) !== artifactRefKey(artifact)),
 			};
 			replaceSelection(next);
 			await syncWorkspaceSkills(next, plan, SkillSessionSyncMode.IfSessionExists);
@@ -751,30 +752,32 @@ export function useComposerWorkspace({
 	);
 
 	const selectedContextIDs = useMemo(
-		() => new Set((selection?.contextRefs ?? []).map(ref => refKey(ref.artifact))),
+		() => new Set((selection?.contextRefs ?? []).map(ref => artifactRefKey(ref.artifact))),
 		[selection]
 	);
 	const selectedSkillIDs = useMemo(
-		() => new Set((selection?.skillRefs ?? []).map(ref => refKey(ref.artifact))),
+		() => new Set((selection?.skillRefs ?? []).map(ref => artifactRefKey(ref.artifact))),
 		[selection]
 	);
 	const selectedMCPIDs = useMemo(
-		() => new Set((selection?.mcpRefs ?? []).map(ref => refKey(ref.artifact))),
+		() => new Set((selection?.mcpRefs ?? []).map(ref => artifactRefKey(ref.artifact))),
 		[selection]
 	);
 
 	const contexts = plan?.prompt.contributions ?? [];
 	const skills = plan?.skills.skills ?? [];
-	const contextsByRef = new Map(contexts.map(value => [refKey(value.artifact), value]));
-	const skillsByRef = new Map(skills.map(value => [refKey(value.artifact), value]));
-	const mcpByRef = new Map((plan?.mcpServers.servers ?? []).map(value => [refKey(value.artifact), value]));
+	const contextsByRef = new Map(contexts.map(value => [artifactRefKey(value.artifact), value]));
+	const skillsByRef = new Map(skills.map(value => [artifactRefKey(value.artifact), value]));
+	const mcpByRef = new Map((plan?.mcpServers.servers ?? []).map(value => [artifactRefKey(value.artifact), value]));
 
-	const missingContextRefs = (selection?.contextRefs ?? []).filter(ref => !contextsByRef.has(refKey(ref.artifact)));
-	const missingSkillRefs = (selection?.skillRefs ?? []).filter(ref => !skillsByRef.has(refKey(ref.artifact)));
-	const missingMCPRefs = (selection?.mcpRefs ?? []).filter(ref => !mcpByRef.has(refKey(ref.artifact)));
+	const missingContextRefs = (selection?.contextRefs ?? []).filter(
+		ref => !contextsByRef.has(artifactRefKey(ref.artifact))
+	);
+	const missingSkillRefs = (selection?.skillRefs ?? []).filter(ref => !skillsByRef.has(artifactRefKey(ref.artifact)));
+	const missingMCPRefs = (selection?.mcpRefs ?? []).filter(ref => !mcpByRef.has(artifactRefKey(ref.artifact)));
 
 	const changedCount = [...(selection?.contextRefs ?? []), ...(selection?.skillRefs ?? [])].filter(ref => {
-		const current = contextsByRef.get(refKey(ref.artifact)) ?? skillsByRef.get(refKey(ref.artifact));
+		const current = contextsByRef.get(artifactRefKey(ref.artifact)) ?? skillsByRef.get(artifactRefKey(ref.artifact));
 		return (
 			current !== undefined &&
 			((ref.definitionDigest !== undefined && ref.definitionDigest !== current.definitionDigest) ||

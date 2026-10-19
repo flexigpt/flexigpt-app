@@ -26,7 +26,7 @@ import type {
 } from '@/spec/plugin';
 import type { ToolStoreChoiceType } from '@/spec/tool';
 import { AgentSkillUseMode, isAgentSkillUseAsInstructions } from '@/spec/agent';
-import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
+import { artifactRefKey, ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { TextInsert } from '@/spec/text';
 import { ToolImplType, ToolStoreChoiceType as ToolStoreChoiceTypeValue } from '@/spec/tool';
 
@@ -90,10 +90,6 @@ export interface AgentStarterPreview {
 	}>;
 }
 
-function artifactRefKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
-}
-
 function pluginRef(plugin: PluginListItem): ArtifactRef {
 	return plugin.ref;
 }
@@ -122,10 +118,6 @@ function capabilityTargetArtifactRef(
 	}
 
 	return target.artifact;
-}
-
-export function agentArtifactRefKey(ref: ArtifactRef): string {
-	return artifactRefKey(ref);
 }
 
 export function agentArtifactRef(agent: AgentView): ArtifactRef {

@@ -7,7 +7,7 @@ import type { UIModelOption } from '@/spec/model';
 import type { SessionConfiguration } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 import { isAgentSkillUseAsInstructions } from '@/spec/agent';
-import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
+import { artifactRefKey, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { getErrorMessage } from '@/lib/error_utils';
@@ -64,6 +64,7 @@ export interface AgentManagerState {
 	isTrackingOnly: boolean;
 	instructionOnlySkillRefs: SkillRef[];
 	capabilityExclusions: AgentCapabilityExclusion[];
+	releasedCapabilityExclusionKeys: string[];
 
 	refreshAgents(): Promise<void>;
 	selectAgent(agentRef: ArtifactRef): Promise<boolean>;
@@ -79,10 +80,6 @@ export interface AgentManagerState {
 	): Promise<boolean>;
 	getCapabilityExclusion(occurrence: AgentCapabilityOccurrence): AgentCapabilityExclusion | undefined;
 	toggleCapabilityExclusion(occurrence: AgentCapabilityOccurrence): void;
-}
-
-function agentKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
 }
 
 function capabilityTargetKey(target: CapabilityTarget): string {
@@ -209,6 +206,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
 	const [excludedCapabilityKeys, setExcludedCapabilityKeys] = useState<string[]>([]);
+	const [releasedCapabilityExclusionKeys, setReleasedCapabilityExclusionKeys] = useState<string[]>([]);
 	const [preparedStarter, setPreparedStarter] = useState<AgentStarterPreview | null>(null);
 	const [selectedAgentResolution, setSelectedAgentResolution] = useState<AgentResolution | null>(null);
 
@@ -349,7 +347,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const currentSelectedAgentResolution =
 		selectedAgent !== null &&
 		selectedAgentResolution !== null &&
-		agentKey(selectedAgentResolution.agent.ref) === selectedAgent.key
+		artifactRefKey(selectedAgentResolution.agent.ref) === selectedAgent.key
 			? selectedAgentResolution
 			: null;
 
@@ -391,7 +389,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			}
 
 			const ref = occurrence.target.artifact;
-			const key = agentKey(ref);
+			const key = artifactRefKey(ref);
 			if (!seen.has(key)) {
 				seen.add(key);
 				refs.push({ rootID: ref.rootID, artifactID: ref.artifactID });
@@ -471,7 +469,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				return false;
 			}
 
-			const option = agentOptions.find(value => value.key === agentKey(agentRef));
+			const option = agentOptions.find(value => value.key === artifactRefKey(agentRef));
 			if (!option) {
 				setActionError('The selected Agent is no longer available.');
 				return false;
@@ -528,6 +526,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				const localAgentModelRef = resolvedAgentModelRef(resolution);
 				context.setAgentModelPreview(resolveAgentModelOption(resolution), localAgentModelRef !== undefined);
 				replaceExcludedCapabilityKeys([]);
+				setReleasedCapabilityExclusionKeys([]);
 				setTrackedAgent(option.key, false, resolution);
 				return true;
 			} catch (e: unknown) {
@@ -564,6 +563,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			cancelActiveAgentRequest();
 			const exclusionKeys = agentRemovalKeys(configuration);
 			agentInstructionSkillsClearerRef.current?.();
+			setReleasedCapabilityExclusionKeys([]);
 
 			// Do not claim Agent ownership until its resolved capability plan proves it.
 			context.setModelSelectionSource('session');
@@ -587,7 +587,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				return false;
 			}
 
-			const option = agentOptions.find(candidate => candidate.key === agentKey(agent));
+			const option = agentOptions.find(candidate => candidate.key === artifactRefKey(agent));
 			if (!option) {
 				pendingRestoredAgentRef.current = null;
 				replaceExcludedCapabilityKeys([]);
@@ -701,6 +701,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		context.setModelSelectionSource('session');
 		replaceExcludedCapabilityKeys([]);
 		setPreparedStarter(null);
+		setReleasedCapabilityExclusionKeys([]);
 		setTrackedAgent(null);
 		setActionError(null);
 	}, [cancelActiveAgentRequest, context, replaceExcludedCapabilityKeys, setTrackedAgent]);
@@ -737,6 +738,10 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				// the matching Agent Skill is excluded.
 				agentInstructionSkillSelectionRef.current?.(exclusion.target.artifact, wasExcluded);
 			}
+
+			setReleasedCapabilityExclusionKeys(previous =>
+				wasExcluded ? [...new Set([...previous, exclusion.key])] : previous.filter(key => key !== exclusion.key)
+			);
 
 			setExcludedCapabilityKeys(previous =>
 				previous.includes(exclusion.key) ? previous.filter(key => key !== exclusion.key) : [...previous, exclusion.key]
@@ -854,6 +859,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		instructionOnlySkillRefs,
 		capabilityExclusions,
+		releasedCapabilityExclusionKeys,
 		refreshAgents,
 		selectAgent,
 		ensureDefaultAgent,

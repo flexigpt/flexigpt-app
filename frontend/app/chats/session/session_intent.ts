@@ -2,6 +2,7 @@ import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type { UIModelOption } from '@/spec/model';
 import type {
+	SessionActiveSkillOverride,
 	SessionArtifactOverride,
 	SessionConfiguration,
 	SessionInstructionOverride,
@@ -12,7 +13,7 @@ import type {
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { MCPServerOverride, MCPServerSelection } from '@/spec/session_mcp';
 import type { WorkspaceConversationResourceSelectionRef, WorkspaceRuntimePlan } from '@/spec/workspace';
-import { CapabilityTargetForm } from '@/spec/artifact';
+import { artifactRefKey, CapabilityTargetForm } from '@/spec/artifact';
 import { AttachmentKind } from '@/spec/attachment';
 import { emptySessionConfiguration, SessionModelDefaultField } from '@/spec/session';
 import {
@@ -41,8 +42,352 @@ function artifactSelection(ref: ArtifactRef, revision?: number, digest?: string)
 	};
 }
 
-function artifactKey(ref: ArtifactRef): string {
-	return `artifact:${ref.rootID}:${ref.artifactID}`;
+function cloneConfigurationValue<T>(value: T): T {
+	return structuredClone(value);
+}
+
+function sameArtifactSelection(
+	left: SessionArtifactSelection | undefined,
+	right: SessionArtifactSelection | undefined
+): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
+}
+
+function preserveArtifactSelectionPins(
+	previous: SessionArtifactSelection | undefined,
+	next: SessionArtifactSelection
+): SessionArtifactSelection {
+	if (!sameArtifactSelection(previous, next)) {
+		return cloneConfigurationValue(next);
+	}
+
+	return {
+		...cloneConfigurationValue(next),
+		...(previous?.expectedRevision === undefined ? {} : { expectedRevision: previous.expectedRevision }),
+		...(previous?.expectedDigest ? { expectedDigest: previous.expectedDigest } : {}),
+	};
+}
+
+// oxlint-disable-next-line typescript/consistent-type-definitions
+type CollectionOverride<T> = {
+	key: string;
+	mode: SessionCollectionOverrideMode;
+	value?: T;
+};
+
+function mergeCollectionOverrides<T, O extends CollectionOverride<T>>(
+	baseline: O[] | undefined,
+	generated: O[] | undefined,
+	mergeValue: (previous: T | undefined, next: T) => T,
+	releasedRemoveKeys: ReadonlySet<string>
+): O[] | undefined {
+	if (!baseline?.length) {
+		return generated?.length ? cloneConfigurationValue(generated) : undefined;
+	}
+
+	const generatedByKey = new Map<string, O>();
+	for (const override of generated ?? []) {
+		generatedByKey.set(override.key, override);
+	}
+
+	const emittedGeneratedKeys = new Set<string>();
+	const output: O[] = [];
+
+	for (const previous of baseline) {
+		const next = generatedByKey.get(previous.key);
+
+		if (previous.mode === SessionCollectionOverrideMode.Inherit) {
+			output.push(cloneConfigurationValue(previous));
+			continue;
+		}
+
+		if (previous.mode === SessionCollectionOverrideMode.Remove) {
+			if (releasedRemoveKeys.has(previous.key) && !next) {
+				continue;
+			}
+
+			if (next?.mode === SessionCollectionOverrideMode.Remove) {
+				output.push(cloneConfigurationValue(next));
+				emittedGeneratedKeys.add(next.key);
+			} else {
+				output.push(cloneConfigurationValue(previous));
+			}
+			continue;
+		}
+
+		if (previous.mode === SessionCollectionOverrideMode.Replace && previous.value === undefined) {
+			output.push(cloneConfigurationValue(previous));
+			continue;
+		}
+
+		if (!previous.value) {
+			continue;
+		}
+
+		if (!next) {
+			if (previous.mode === SessionCollectionOverrideMode.Replace) {
+				output.push({
+					key: previous.key,
+					mode: SessionCollectionOverrideMode.Replace,
+				} as O);
+			}
+			continue;
+		}
+
+		if (next.mode === SessionCollectionOverrideMode.Remove) {
+			output.push(cloneConfigurationValue(next));
+			emittedGeneratedKeys.add(next.key);
+			continue;
+		}
+
+		if (next.value) {
+			output.push({
+				...cloneConfigurationValue(next),
+				mode: previous.mode,
+				value: mergeValue(previous.value, next.value),
+			} as O);
+			emittedGeneratedKeys.add(next.key);
+			continue;
+		}
+
+		output.push(cloneConfigurationValue(next));
+		emittedGeneratedKeys.add(next.key);
+	}
+
+	for (const next of generated ?? []) {
+		if (!emittedGeneratedKeys.has(next.key)) {
+			output.push(cloneConfigurationValue(next));
+		}
+	}
+
+	return output.length > 0 ? output : undefined;
+}
+
+function mergeToolOverrideValue(
+	previous: NonNullable<SessionToolOverride['value']> | undefined,
+	next: NonNullable<SessionToolOverride['value']>
+): NonNullable<SessionToolOverride['value']> {
+	const previousArtifact = previous?.capability.artifact;
+	const nextArtifact = next.capability.artifact;
+
+	return {
+		...cloneConfigurationValue(next),
+		capability: {
+			...cloneConfigurationValue(next.capability),
+			...(nextArtifact
+				? {
+						artifact: preserveArtifactSelectionPins(previousArtifact, nextArtifact),
+					}
+				: {}),
+		},
+	};
+}
+
+function preserveExpectedDigest<T extends { expectedDigest?: string }>(previous: T | undefined, next: T): T {
+	if (previous?.expectedDigest === undefined) {
+		return cloneConfigurationValue(next);
+	}
+
+	return {
+		...cloneConfigurationValue(next),
+		expectedDigest: previous.expectedDigest,
+	};
+}
+
+function mergeMCPServerSelection(
+	previous: MCPServerSelection | undefined,
+	next: MCPServerSelection
+): MCPServerSelection {
+	const previousTools = new Map((previous?.selectedTools ?? []).map(value => [value.toolName, value] as const));
+	const previousResources = new Map((previous?.resources ?? []).map(value => [value.uri, value] as const));
+	const previousTemplates = new Map(
+		(previous?.resourceTemplates ?? []).map(value => [value.uriTemplate, value] as const)
+	);
+	const previousPrompts = new Map((previous?.prompts ?? []).map(value => [value.promptName, value] as const));
+
+	return {
+		...cloneConfigurationValue(next),
+		...(previous?.key ? { key: previous.key } : {}),
+		server: preserveArtifactSelectionPins(previous?.server, next.server),
+		selectedTools: next.selectedTools?.map(value => preserveExpectedDigest(previousTools.get(value.toolName), value)),
+		resources: next.resources?.map(value => preserveExpectedDigest(previousResources.get(value.uri), value)),
+		resourceTemplates: next.resourceTemplates?.map(value =>
+			preserveExpectedDigest(previousTemplates.get(value.uriTemplate), value)
+		),
+		prompts: next.prompts?.map(value => preserveExpectedDigest(previousPrompts.get(value.promptName), value)),
+	};
+}
+
+function mergeActiveSkillOverrides(
+	baseline: SessionActiveSkillOverride[] | undefined,
+	generated: SessionActiveSkillOverride[] | undefined,
+	releasedRemoveKeys: ReadonlySet<string>
+): SessionActiveSkillOverride[] | undefined {
+	if (!baseline?.length) {
+		return generated?.length ? cloneConfigurationValue(generated) : undefined;
+	}
+
+	const generatedByKey = new Map<string, SessionActiveSkillOverride>();
+	for (const override of generated ?? []) {
+		generatedByKey.set(override.key, override);
+	}
+
+	const emittedGeneratedKeys = new Set<string>();
+	const output: SessionActiveSkillOverride[] = [];
+
+	for (const previous of baseline) {
+		const next = generatedByKey.get(previous.key);
+
+		if (previous.mode === SessionActivityOverrideMode.Inherit) {
+			output.push(cloneConfigurationValue(previous));
+			continue;
+		}
+
+		if (previous.mode === SessionActivityOverrideMode.Deactivate) {
+			if (releasedRemoveKeys.has(previous.key) && !next) {
+				continue;
+			}
+
+			if (next?.mode === SessionActivityOverrideMode.Deactivate) {
+				output.push(cloneConfigurationValue(next));
+				emittedGeneratedKeys.add(next.key);
+			} else {
+				output.push(cloneConfigurationValue(previous));
+			}
+			continue;
+		}
+
+		if (!next) {
+			continue;
+		}
+
+		if (next.mode === SessionActivityOverrideMode.Activate && next.value) {
+			output.push({
+				...cloneConfigurationValue(next),
+				value: preserveArtifactSelectionPins(previous.value, next.value),
+			});
+			emittedGeneratedKeys.add(next.key);
+			continue;
+		}
+
+		output.push(cloneConfigurationValue(next));
+		emittedGeneratedKeys.add(next.key);
+	}
+
+	for (const next of generated ?? []) {
+		if (!emittedGeneratedKeys.has(next.key)) {
+			output.push(cloneConfigurationValue(next));
+		}
+	}
+
+	return output.length > 0 ? output : undefined;
+}
+
+function mergeInstructionOverrides(
+	baseline: SessionInstructionOverride[] | undefined,
+	generated: SessionInstructionOverride[] | undefined,
+	releasedRemoveKeys: ReadonlySet<string>
+): SessionInstructionOverride[] | undefined {
+	const next = [...(generated ?? [])];
+	const generatedKeys = new Set(next.map(override => override.key));
+
+	for (const previous of baseline ?? []) {
+		if (previous.value?.artifact && !generatedKeys.has(previous.key)) {
+			next.push(cloneConfigurationValue(previous));
+		}
+	}
+
+	return mergeCollectionOverrides<NonNullable<SessionInstructionOverride['value']>, SessionInstructionOverride>(
+		baseline,
+		next,
+		(previous, current) => ({
+			...cloneConfigurationValue(current),
+			...(current.artifact
+				? {
+						artifact: preserveArtifactSelectionPins(previous?.artifact, current.artifact),
+					}
+				: {}),
+		}),
+		releasedRemoveKeys
+	);
+}
+
+function mergeWorkspaceIntent(
+	baseline: SessionConfiguration['workspace'],
+	generated: SessionConfiguration['workspace'],
+	releasedRemoveKeys: ReadonlySet<string>
+): SessionConfiguration['workspace'] {
+	if (!generated) {
+		return undefined;
+	}
+	if (!baseline) {
+		return cloneConfigurationValue(generated);
+	}
+
+	return {
+		...cloneConfigurationValue(generated),
+		workspace: preserveArtifactSelectionPins(baseline.workspace, generated.workspace),
+		context: mergeCollectionOverrides<SessionArtifactSelection, SessionArtifactOverride>(
+			baseline.context,
+			generated.context,
+			(previous, current) => preserveArtifactSelectionPins(previous, current),
+			releasedRemoveKeys
+		),
+		skills: mergeCollectionOverrides<SessionArtifactSelection, SessionArtifactOverride>(
+			baseline.skills,
+			generated.skills,
+			(previous, current) => preserveArtifactSelectionPins(previous, current),
+			releasedRemoveKeys
+		),
+		mcp: mergeCollectionOverrides(baseline.mcp, generated.mcp, mergeMCPServerSelection, releasedRemoveKeys),
+	};
+}
+
+function mergeSessionConfiguration(
+	baseline: SessionConfiguration,
+	generated: SessionConfiguration,
+	payload: EditorSubmitPayload
+): SessionConfiguration {
+	const releasedRemoveKeys = new Set(payload.agentCapabilityInclusionKeys);
+	const unresolvedToolKeys = new Set(
+		(payload.unresolvedToolSelections ?? []).map(issue => sessionCapabilityKey(issue.selection.target))
+	);
+	const generatedTools = [...(generated.tools ?? [])];
+	const generatedToolKeys = new Set(generatedTools.map(override => override.key));
+
+	for (const previous of baseline.tools ?? []) {
+		if (previous.value && unresolvedToolKeys.has(previous.key) && !generatedToolKeys.has(previous.key)) {
+			generatedTools.push(cloneConfigurationValue(previous));
+		}
+	}
+
+	return {
+		...cloneConfigurationValue(baseline),
+		agent: generated.agent
+			? preserveArtifactSelectionPins(baseline.agent, generated.agent)
+			: cloneConfigurationValue(baseline.agent),
+		workspace:
+			payload.workspaceSelection && !payload.workspacePlan && baseline.workspace
+				? cloneConfigurationValue(baseline.workspace)
+				: mergeWorkspaceIntent(baseline.workspace, generated.workspace, releasedRemoveKeys),
+		model: generated.model
+			? preserveArtifactSelectionPins(baseline.model, generated.model)
+			: payload.modelSelectionSource === 'agent' && payload.agentRef
+				? undefined
+				: cloneConfigurationValue(baseline.model),
+		modelOverrides: cloneConfigurationValue(generated.modelOverrides),
+		instructions: mergeInstructionOverrides(baseline.instructions, generated.instructions, releasedRemoveKeys),
+		tools: mergeCollectionOverrides(baseline.tools, generatedTools, mergeToolOverrideValue, releasedRemoveKeys),
+		skills: mergeCollectionOverrides<SessionArtifactSelection, SessionArtifactOverride>(
+			baseline.skills,
+			generated.skills,
+			(previous, current) => preserveArtifactSelectionPins(previous, current),
+			releasedRemoveKeys
+		),
+		activeSkills: mergeActiveSkillOverrides(baseline.activeSkills, generated.activeSkills, releasedRemoveKeys),
+		mcp: mergeCollectionOverrides(baseline.mcp, generated.mcp, mergeMCPServerSelection, releasedRemoveKeys),
+		history: cloneConfigurationValue(generated.history),
+	};
 }
 
 function nonSessionSkillKeysFromPayload(payload: EditorSubmitPayload): Set<string> {
@@ -52,7 +397,7 @@ function nonSessionSkillKeysFromPayload(payload: EditorSubmitPayload): Set<strin
 		if (!ref.rootID || !ref.artifactID) {
 			continue;
 		}
-		keys.add(artifactKey(ref));
+		keys.add(artifactRefKey(ref));
 	}
 
 	return keys;
@@ -67,7 +412,7 @@ function nonSessionSkillRemovalOverrides(keys: ReadonlySet<string>): SessionArti
 
 function sessionCapabilityKey(target: CapabilityTarget): string {
 	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
-		return artifactKey(target.artifact);
+		return artifactRefKey(target.artifact);
 	}
 
 	return ['direct', target.providerIdentity ?? '', target.providerLocalID ?? '', target.type, target.name].join(':');
@@ -260,8 +605,8 @@ function artifactOverridesForWorkspace(
 	baselineRefs: ArtifactRef[],
 	selectedRefs: Array<{ artifact: ArtifactRef }> | undefined
 ): SessionArtifactOverride[] {
-	const selectedByKey = new Map((selectedRefs ?? []).map(value => [artifactKey(value.artifact), value.artifact]));
-	const baselineByKey = new Map(baselineRefs.map(ref => [artifactKey(ref), ref]));
+	const selectedByKey = new Map((selectedRefs ?? []).map(value => [artifactRefKey(value.artifact), value.artifact]));
+	const baselineByKey = new Map(baselineRefs.map(ref => [artifactRefKey(ref), ref]));
 	const output: SessionArtifactOverride[] = [];
 
 	for (const [key] of baselineByKey) {
@@ -292,9 +637,9 @@ function mcpOverridesForWorkspace(
 	baselineRefs: ArtifactRef[],
 	selectedRefs: WorkspaceConversationResourceSelectionRef[] | undefined
 ): MCPServerOverride[] {
-	const baselineByKey = new Map(baselineRefs.map(ref => [artifactKey(ref), ref] as const));
+	const baselineByKey = new Map(baselineRefs.map(ref => [artifactRefKey(ref), ref] as const));
 	const selectedByKey = new Map(
-		(selectedRefs ?? []).map(selection => [artifactKey(selection.artifact), selection] as const)
+		(selectedRefs ?? []).map(selection => [artifactRefKey(selection.artifact), selection] as const)
 	);
 	const output: MCPServerOverride[] = [];
 
@@ -348,23 +693,117 @@ function workspaceSelectionFromPayload(payload: EditorSubmitPayload): SessionCon
 }
 
 function instructionOverridesFromPayload(payload: EditorSubmitPayload): SessionInstructionOverride[] {
-	const text = payload.sessionInstructionText?.trim();
+	const output = (payload.selectedSessionInstructionOverrides ?? []).map(override => structuredClone(override));
+	const text = payload.additionalSessionInstructionText?.trim();
 
 	if (!text) {
-		return [];
+		return output;
 	}
 
-	return [
-		{
-			key: 'inline:composer-system-instructions',
-			mode: SessionCollectionOverrideMode.Add,
-			value: {
-				key: 'inline:composer-system-instructions',
-				label: 'Composer system instructions',
-				text,
-			},
+	const key = 'inline:composer-system-instructions';
+	const inlineOverride: SessionInstructionOverride = {
+		key,
+		mode: SessionCollectionOverrideMode.Add,
+		value: {
+			key,
+			label: 'Composer system instructions',
+			text,
 		},
+	};
+	const existingIndex = output.findIndex(override => override.key === key);
+
+	if (existingIndex >= 0) {
+		output[existingIndex] = inlineOverride;
+	} else {
+		output.push(inlineOverride);
+	}
+
+	return output;
+}
+
+function buildSessionConfiguration(
+	payload: EditorSubmitPayload,
+	model: UIModelOption,
+	directToolOverrides: SessionToolOverride[],
+	skillOverrides: ReturnType<typeof skillOverridesFromPayload>,
+	agentExclusions: ReturnType<typeof agentCapabilityExclusionOverrides>,
+	directMCPOverrides: MCPServerOverride[]
+): SessionConfiguration {
+	const configuration = emptySessionConfiguration();
+	const nonSessionSkillKeys = nonSessionSkillKeysFromPayload(payload);
+	const directToolKeys = new Set(directToolOverrides.map(override => override.key));
+	const directSkillKeys = new Set(skillOverrides.skills.map(override => override.key));
+	const nonSessionOnlySkillKeys = new Set([...nonSessionSkillKeys].filter(key => !directSkillKeys.has(key)));
+	const nonSessionSkillRemovals = nonSessionSkillRemovalOverrides(nonSessionOnlySkillKeys);
+	const instructionOverrides = instructionOverridesFromPayload(payload);
+	const directMCPKeys = new Set(directMCPOverrides.map(override => override.key));
+
+	configuration.agent = payload.agentSelection ?? (payload.agentRef ? artifactSelection(payload.agentRef) : undefined);
+	configuration.workspace = workspaceSelectionFromPayload(payload);
+	configuration.model =
+		payload.modelSelectionSource === 'agent' && payload.agentRef
+			? undefined
+			: model.model
+				? artifactSelection(model.model, model.modelArtifactRevision, model.modelDefinitionDigest)
+				: undefined;
+	configuration.modelOverrides = modelOverridesFromComposer(model, payload.includeModelDefault);
+	configuration.instructions = [...instructionOverrides, ...agentExclusions.instructions];
+	configuration.tools = [
+		...directToolOverrides,
+		...agentExclusions.tools.filter(override => !directToolKeys.has(override.key)),
 	];
+	configuration.skills = [
+		...skillOverrides.skills,
+		...agentExclusions.skills.filter(
+			override => !directSkillKeys.has(override.key) && !nonSessionOnlySkillKeys.has(override.key)
+		),
+		...nonSessionSkillRemovals,
+	];
+	configuration.activeSkills = skillOverrides.active;
+	configuration.mcp = [
+		...directMCPOverrides,
+		...agentExclusions.mcp.filter(override => !directMCPKeys.has(override.key)),
+	];
+	configuration.history = {
+		all: model.includePreviousMessages === 'all',
+		...(typeof model.includePreviousMessages === 'number'
+			? {
+					includePreviousUserTurns: Math.max(0, model.includePreviousMessages),
+				}
+			: {}),
+	};
+
+	return configuration;
+}
+
+export async function buildSessionSubmissionIntent(
+	payload: EditorSubmitPayload,
+	model: UIModelOption
+): Promise<SessionSubmissionIntent> {
+	const skillOverrides = skillOverridesFromPayload(payload);
+	const agentExclusions = agentCapabilityExclusionOverrides(payload.agentCapabilityExclusions);
+	const directToolOverrides = toolOverridesFromChoices(payload);
+	const directMCPOverrides = await mcpOverridesFromPayload(payload);
+	const generatedConfiguration = buildSessionConfiguration(
+		payload,
+		model,
+		directToolOverrides,
+		skillOverrides,
+		agentExclusions,
+		directMCPOverrides
+	);
+	const configuration = payload.sessionConfigurationBaseline
+		? mergeSessionConfiguration(payload.sessionConfigurationBaseline, generatedConfiguration, payload)
+		: generatedConfiguration;
+
+	return {
+		configuration,
+		input: {
+			text: payload.text,
+			attachments: payload.attachments.map(sessionAttachmentFromComposer),
+			mcpAppContext: appContextUpdatesFromPayload(payload),
+		},
+	};
 }
 
 function agentCapabilityExclusionOverrides(exclusions: AgentCapabilityExclusion[] | undefined): {
@@ -433,7 +872,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 			'expectedRevision' in selection ? (selection.expectedRevision as number | undefined) : undefined,
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
-		const key = artifactKey(ref);
+		const key = artifactRefKey(ref);
 
 		if (seenEnabled.has(key)) {
 			continue;
@@ -456,7 +895,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 			'expectedRevision' in selection ? (selection.expectedRevision as number | undefined) : undefined,
 			'expectedDigest' in selection ? (selection.expectedDigest as string | undefined) : undefined
 		);
-		const key = artifactKey(ref);
+		const key = artifactRefKey(ref);
 
 		if (seenActive.has(key)) {
 			continue;
@@ -538,7 +977,7 @@ async function mcpOverridesFromPayload(payload: EditorSubmitPayload): Promise<MC
 		};
 
 		overrides.push({
-			key: artifactKey(ref),
+			key: artifactRefKey(ref),
 			mode: SessionCollectionOverrideMode.Add,
 			value: selection,
 		});
@@ -582,76 +1021,4 @@ function appContextUpdatesFromPayload(payload: EditorSubmitPayload) {
 	}
 
 	return output;
-}
-
-export async function buildSessionSubmissionIntent(
-	payload: EditorSubmitPayload,
-	model: UIModelOption
-): Promise<SessionSubmissionIntent> {
-	const configuration = emptySessionConfiguration();
-	const nonSessionSkillKeys = nonSessionSkillKeysFromPayload(payload);
-	const skillOverrides = skillOverridesFromPayload(payload);
-	const agentExclusions = agentCapabilityExclusionOverrides(payload.agentCapabilityExclusions);
-	const directToolOverrides = toolOverridesFromChoices(payload);
-	const directToolKeys = new Set(directToolOverrides.map(override => override.key));
-	const directSkillKeys = new Set(skillOverrides.skills.map(override => override.key));
-
-	/*
-	 * A rendered instruction/template source is session-excluding only while
-	 * the same Skill has not also been explicitly enabled for this turn.
-	 *
-	 * This intentionally permits:
-	 *   - add as instructions only       -> text only, no Skill session
-	 *   - enable only                    -> Skill session only
-	 *   - add as instructions + enable   -> both text and Skill session
-	 */
-	const nonSessionOnlySkillKeys = new Set([...nonSessionSkillKeys].filter(key => !directSkillKeys.has(key)));
-	const nonSessionSkillRemovals = nonSessionSkillRemovalOverrides(nonSessionOnlySkillKeys);
-	const instructionOverrides = instructionOverridesFromPayload(payload);
-	const directMCPOverrides = await mcpOverridesFromPayload(payload);
-	const directMCPKeys = new Set(directMCPOverrides.map(override => override.key));
-
-	configuration.agent = payload.agentSelection ?? (payload.agentRef ? artifactSelection(payload.agentRef) : undefined);
-	configuration.workspace = workspaceSelectionFromPayload(payload);
-	configuration.model =
-		payload.modelSelectionSource === 'agent' && payload.agentRef
-			? undefined
-			: model.model
-				? artifactSelection(model.model, model.modelArtifactRevision, model.modelDefinitionDigest)
-				: undefined;
-	configuration.modelOverrides = modelOverridesFromComposer(model, payload.includeModelDefault);
-	configuration.instructions = [...instructionOverrides, ...agentExclusions.instructions];
-	configuration.tools = [
-		...directToolOverrides,
-		...agentExclusions.tools.filter(override => !directToolKeys.has(override.key)),
-	];
-	configuration.skills = [
-		...skillOverrides.skills,
-		...agentExclusions.skills.filter(
-			override => !directSkillKeys.has(override.key) && !nonSessionOnlySkillKeys.has(override.key)
-		),
-		...nonSessionSkillRemovals,
-	];
-	configuration.activeSkills = skillOverrides.active;
-	configuration.mcp = [
-		...directMCPOverrides,
-		...agentExclusions.mcp.filter(override => !directMCPKeys.has(override.key)),
-	];
-	configuration.history = {
-		all: model.includePreviousMessages === 'all',
-		...(typeof model.includePreviousMessages === 'number'
-			? {
-					includePreviousUserTurns: Math.max(0, model.includePreviousMessages),
-				}
-			: {}),
-	};
-
-	return {
-		configuration,
-		input: {
-			text: payload.text,
-			attachments: payload.attachments.map(sessionAttachmentFromComposer),
-			mcpAppContext: appContextUpdatesFromPayload(payload),
-		},
-	};
 }

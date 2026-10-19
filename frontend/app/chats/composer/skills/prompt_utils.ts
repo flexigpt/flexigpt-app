@@ -1,3 +1,4 @@
+import type { SessionInstructionOverride } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 
 const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
@@ -14,6 +15,7 @@ export interface SystemInstructionSource {
 	pluginSlug?: string;
 	isBuiltIn: boolean;
 	skillRef?: SkillRef;
+	sessionOverride?: SessionInstructionOverride;
 }
 
 function normalizePromptPart(value: string): string {

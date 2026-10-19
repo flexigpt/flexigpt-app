@@ -11,13 +11,12 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { FiChevronDown, FiChevronUp, FiPlay, FiZapOff } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlay } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
 import type { Conversation, ConversationMessage, SessionConfiguration, SessionRun } from '@/spec/session';
 import type { SessionOpaqueJSON, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
-import type { SkillRef } from '@/spec/skill';
 import { RoleEnum, UIToolCallStatus } from '@/spec/inference';
 import {
 	SessionAutomationHoldScope,
@@ -633,7 +632,6 @@ export interface ConversationAreaHandle {
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
 	resetComposerForNewConversation: (tabId: string) => Promise<void>;
 	restoreComposerFromSessionConfiguration: (tabId: string, configuration: SessionConfiguration) => Promise<void>;
-	syncComposerSkillSessionState: (tabId: string, enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 
 	focusInput: (tabId: string) => void;
 	openTemplateMenu: (tabId: string) => void;
@@ -741,7 +739,6 @@ function ConversationAreaInner(
 		loadExternalMessageForTab,
 		resetComposerForNewConversation,
 		restoreSessionConfiguration,
-		syncComposerSkillSessionState,
 		focusInput,
 		openTemplateMenu,
 		openToolMenu,
@@ -1043,6 +1040,29 @@ function ConversationAreaInner(
 		[pendingExecutableToolCallIDs, runCommand]
 	);
 
+	const clearStagedAppContext = useCallback(() => {
+		const continuation = activeRun?.continuation;
+		if (!continuation) {
+			return Promise.reject(new Error('The staged App context is unavailable.'));
+		}
+
+		return runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
+			requireAcceptedSessionCommand(
+				await sessionManagementAPI.updateContinuationInput({
+					meta: sessionCommandMeta(sessionRevision, runRevision),
+					sessionID,
+					runID,
+					expectedInputRevision: continuation.revision,
+					input: {
+						...continuation,
+						mcpAppContext: [],
+					},
+				}),
+				'Discard staged App context'
+			);
+		});
+	}, [activeRun?.continuation, runCommand]);
+
 	const toggleAutomationHold = useCallback(
 		() =>
 			runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
@@ -1067,29 +1087,6 @@ function ConversationAreaInner(
 			}),
 		[automationHoldEnabled, runCommand]
 	);
-
-	const clearStagedAppContext = useCallback(() => {
-		const continuation = activeRun?.continuation;
-		if (!continuation) {
-			return Promise.reject(new Error('The staged App context is unavailable.'));
-		}
-
-		return runCommand(async (sessionID, sessionRevision, runID, runRevision) => {
-			requireAcceptedSessionCommand(
-				await sessionManagementAPI.updateContinuationInput({
-					meta: sessionCommandMeta(sessionRevision, runRevision),
-					sessionID,
-					runID,
-					expectedInputRevision: continuation.revision,
-					input: {
-						...continuation,
-						mcpAppContext: [],
-					},
-				}),
-				'Discard staged App context'
-			);
-		});
-	}, [activeRun?.continuation, runCommand]);
 
 	const runSessionAction = useCallback(
 		(action: () => Promise<void>) => {
@@ -1177,7 +1174,6 @@ function ConversationAreaInner(
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
 			restoreComposerFromSessionConfiguration: restoreSessionConfiguration,
-			syncComposerSkillSessionState,
 			applyWorkflowStarter: applyWorkflowStarterToComposer,
 			focusInput,
 			openTemplateMenu,
@@ -1210,7 +1206,6 @@ function ConversationAreaInner(
 			resetComposerForNewConversation,
 			resetScrollToTop,
 			setScrollTopForTab,
-			syncComposerSkillSessionState,
 			syncComposerFromConversation,
 		]
 	);
@@ -1536,21 +1531,6 @@ function ConversationAreaInner(
 						</div>
 					) : null}
 
-					{hasAutomaticToolCalls || automationHoldEnabled ? (
-						<div className="mb-2 flex justify-center">
-							<button
-								type="button"
-								className={`btn btn-sm rounded-xl ${automationHoldEnabled ? 'btn-warning' : ''}`}
-								onClick={() => {
-									runSessionAction(toggleAutomationHold);
-								}}
-							>
-								<FiZapOff size={14} />
-								{automationHoldEnabled ? 'Resume automatic tools' : 'Hold next automatic tool batch'}
-							</button>
-						</div>
-					) : null}
-
 					{mountedInputTabs.map(tab =>
 						(() => {
 							const tabRun = tab.sessionSnapshot ? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID) : undefined;
@@ -1573,6 +1553,11 @@ function ConversationAreaInner(
 									sendContinuation={stageContinuationForTab}
 									cancelEditing={cancelEditingForTab}
 									cancelRun={cancelRunForTab}
+									showAutomationControl={tab.tabId === activeTabId && (hasAutomaticToolCalls || automationHoldEnabled)}
+									automationHoldEnabled={tab.tabId === activeTabId && automationHoldEnabled}
+									onToggleAutomationHold={() => {
+										runSessionAction(toggleAutomationHold);
+									}}
 								/>
 							);
 						})()

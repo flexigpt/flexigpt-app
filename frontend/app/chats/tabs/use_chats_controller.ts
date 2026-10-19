@@ -275,40 +275,15 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		);
 	}, []);
 
-	const cancelRunForDisposedTab = useCallback((tabId: string) => {
-		const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
-		const snapshot = tab?.sessionSnapshot;
-		const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
-
-		if (!tab?.sessionID || !snapshot || !run || !sessionRunIsActive(run)) {
-			return;
-		}
-
-		void sessionManagementAPI
-			.cancelRun({
-				meta: sessionCommandMeta(snapshot.session.revision, run.revision),
-				sessionID: tab.sessionID,
-				runID: run.id,
-				reason: 'Chat tab closed',
-			})
-			.then(receipt => {
-				requireAcceptedSessionCommand(receipt, 'Cancel Run');
-			})
-			.catch((error: unknown) => {
-				console.error('Failed to cancel Run for a disposed chat tab:', error);
-			});
-	}, []);
-
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
-			cancelRunForDisposedTab(tabId);
 			conversationAreaRef.current?.disposeTabRuntime(tabId);
 			lastActivatedAtRef.current.delete(tabId);
 			hydratePromiseByTabRef.current.delete(tabId);
 			saveQueueByTabRef.current.delete(tabId);
 			tabLoadVersionRef.current.delete(tabId);
 		},
-		[cancelRunForDisposedTab, conversationAreaRef]
+		[conversationAreaRef]
 	);
 
 	const commitTabs = useCallback((nextTabs: ChatTabState[]) => {
@@ -467,16 +442,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			});
 
 			maybeAutomaticallyRenameSession(tabId, snapshot, conversation);
-
-			if (activeRun && (activeRun.skillSession.enabled !== undefined || activeRun.skillSession.active !== undefined)) {
-				conversationAreaRef.current?.syncComposerSkillSessionState(
-					tabId,
-					activeRun.skillSession.enabled ?? [],
-					activeRun.skillSession.active ?? []
-				);
-			}
 		},
-		[conversationAreaRef, maybeAutomaticallyRenameSession, updateTab]
+		[maybeAutomaticallyRenameSession, updateTab]
 	);
 
 	const ensureSessionObserver = useCallback(
@@ -571,17 +538,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 							isBusy: sessionRunIsActive(activeRun),
 						};
 					});
-
-					if (
-						activeRun &&
-						(activeRun.skillSession.enabled !== undefined || activeRun.skillSession.active !== undefined)
-					) {
-						area.syncComposerSkillSessionState(
-							tabId,
-							activeRun.skillSession.enabled ?? [],
-							activeRun.skillSession.active ?? []
-						);
-					}
 				} catch (error) {
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
@@ -963,16 +919,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				);
 
 				const selectedRun = selectedSessionRun(selectedChat);
-				if (
-					selectedRun &&
-					(selectedRun.skillSession.enabled !== undefined || selectedRun.skillSession.active !== undefined)
-				) {
-					conversationAreaRef.current?.syncComposerSkillSessionState(
-						tabId,
-						selectedRun.skillSession.enabled ?? [],
-						selectedRun.skillSession.active ?? []
-					);
-				}
 
 				updateTab(tabId, tab => ({
 					...tab,

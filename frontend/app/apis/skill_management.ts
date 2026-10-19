@@ -45,7 +45,7 @@ import type {
 	StoreSkillListItem,
 } from '@/spec/skill';
 import type { ResolvedToolView } from '@/spec/tool';
-import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
+import { artifactRefKey, ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
@@ -55,7 +55,7 @@ import type { ISessionManagementAPI, ISkillAggregateAPI, ISkillStoreAPI, IToolTa
 import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
 export function skillRefKey(ref: SkillRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
+	return artifactRefKey(ref);
 }
 
 export function skillArtifactKey(ref: ArtifactRef): string {

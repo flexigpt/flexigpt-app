@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo } from 'react';
 
 import type { UIModelOption } from '@/spec/model';
+import type { SessionConfiguration } from '@/spec/session';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
@@ -19,10 +20,21 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
 	getAbortRef: (tabId: string) => { current: AbortController | null };
 	shortcutConfig: ShortcutConfig;
-	sendMessage: (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
-	sendContinuation: (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
+	sendMessage: (
+		tabId: string,
+		payload: EditorSubmitPayload,
+		options: UIModelOption
+	) => Promise<SessionConfiguration | undefined>;
+	sendContinuation: (
+		tabId: string,
+		payload: EditorSubmitPayload,
+		options: UIModelOption
+	) => Promise<SessionConfiguration | undefined>;
 	cancelEditing: (tabId: string) => void;
 	cancelRun: (tabId: string) => Promise<void>;
+	showAutomationControl: boolean;
+	automationHoldEnabled: boolean;
+	onToggleAutomationHold: () => void;
 }) {
 	const {
 		tabId,
@@ -39,6 +51,9 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		sendContinuation,
 		cancelEditing,
 		cancelRun,
+		showAutomationControl,
+		automationHoldEnabled,
+		onToggleAutomationHold,
 	} = props;
 
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
@@ -68,6 +83,9 @@ export const TabInputPane = memo(function TabInputPane(props: {
 				onCancelRun={() => {
 					return cancelRun(tabId);
 				}}
+				showAutomationControl={showAutomationControl}
+				automationHoldEnabled={automationHoldEnabled}
+				onToggleAutomationHold={onToggleAutomationHold}
 			/>
 		</div>
 	);

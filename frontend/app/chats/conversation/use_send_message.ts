@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
 import type { UIModelOption } from '@/spec/model';
+import type { SessionConfiguration } from '@/spec/session';
 import { RoleEnum } from '@/spec/inference';
 import { SessionRunState } from '@/spec/session_base';
 
@@ -27,6 +28,8 @@ interface UseSendMessageArgs {
 	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
 }
 
+type SessionSubmissionResult = SessionConfiguration | undefined;
+
 export function useSendMessage({
 	tabsRef,
 	updateTab,
@@ -35,9 +38,9 @@ export function useSendMessage({
 	inputRefs,
 }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
-		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption): Promise<SessionSubmissionResult> => {
 			if (!tabExists(tabId)) {
-				return;
+				return undefined;
 			}
 
 			if (!options.model) {
@@ -46,7 +49,7 @@ export function useSendMessage({
 
 			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
 			if (!tab) {
-				return;
+				return undefined;
 			}
 
 			try {
@@ -92,7 +95,7 @@ export function useSendMessage({
 						runtimeError: undefined,
 					}));
 					scrollTabToBottomSoon(tabId);
-					return;
+					return submission.configuration;
 				}
 
 				const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
@@ -125,6 +128,7 @@ export function useSendMessage({
 					runtimeError: undefined,
 				}));
 				scrollTabToBottomSoon(tabId);
+				return submission.configuration;
 			} catch (error) {
 				updateTab(tabId, current => ({
 					...current,
@@ -139,11 +143,11 @@ export function useSendMessage({
 	);
 
 	const stageContinuationForTab = useCallback(
-		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption): Promise<SessionSubmissionResult> => {
 			const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
 
 			if (!tab) {
-				return;
+				return undefined;
 			}
 			if (!options.model) {
 				throw new Error('Select an available Artifact-backed model before continuing this Run.');
@@ -206,6 +210,7 @@ export function useSendMessage({
 					runtimeError: undefined,
 				}));
 				scrollTabToBottomSoon(tabId);
+				return submission.configuration;
 			} catch (error) {
 				updateTab(tabId, current => ({
 					...current,
@@ -221,13 +226,13 @@ export function useSendMessage({
 	);
 
 	const sendMessageForTab = useCallback(
-		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption): Promise<SessionSubmissionResult> => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
 			if (!tab) {
-				return;
+				return undefined;
 			}
 			if (tab.isBusy || tab.isHydrating) {
-				return;
+				return undefined;
 			}
 
 			if (tab.editingMessageId) {
@@ -259,10 +264,10 @@ export function useSendMessage({
 					runtimeError: undefined,
 				}));
 				scrollTabToBottomSoon(tabId);
-				return;
+				return submission.configuration;
 			}
 
-			await updateStreamingMessage(tabId, payload, options);
+			return updateStreamingMessage(tabId, payload, options);
 		},
 		[tabsRef, updateStreamingMessage, updateTab, scrollTabToBottomSoon]
 	);

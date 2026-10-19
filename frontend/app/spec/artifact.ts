@@ -30,6 +30,10 @@ export interface ArtifactRef {
 	artifactID: ArtifactID;
 }
 
+export function artifactRefKey(ref: ArtifactRef): string {
+	return `${ref.rootID}:${ref.artifactID}`;
+}
+
 interface ArtifactDiagnosticLocation {
 	locator?: ArtifactLocator;
 	subresourceLocator?: ArtifactLocator;

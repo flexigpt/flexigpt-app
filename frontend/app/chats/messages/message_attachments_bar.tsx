@@ -18,13 +18,13 @@ import {
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
+import { artifactRefKey } from '@/spec/artifact';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
@@ -45,10 +45,6 @@ import {
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
-
-function artifactRefKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
-}
 
 /**
  * Get a path/URL for tooltip display, similar to getUIAttachmentPath

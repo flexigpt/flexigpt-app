@@ -1,6 +1,16 @@
 import type { KeyboardEvent as ReactKeyboardEvent, SubmitEventHandler } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiSquare, FiTool, FiX } from 'react-icons/fi';
+import {
+	FiAlertTriangle,
+	FiEdit2,
+	FiFastForward,
+	FiPlay,
+	FiSend,
+	FiSquare,
+	FiTool,
+	FiX,
+	FiZapOff,
+} from 'react-icons/fi';
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
@@ -120,6 +130,9 @@ interface EditorAreaProps {
 	editingMessageId: string | null;
 	cancelEditing: () => void;
 	systemPrompt: AgentSystemPromptController;
+	showAutomationControl: boolean;
+	automationHoldEnabled: boolean;
+	onToggleAutomationHold: () => void;
 }
 
 function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolSelection[] {
@@ -259,6 +272,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		editingMessageId,
 		cancelEditing,
 		systemPrompt,
+		showAutomationControl,
+		automationHoldEnabled,
+		onToggleAutomationHold,
 	},
 	ref
 ) {
@@ -1144,7 +1160,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
-					sessionInstructionText: systemPrompt.sessionInstructionText.trim() || undefined,
+					additionalSessionInstructionText: systemPrompt.additionalSessionInstructionText.trim() || undefined,
+					selectedSessionInstructionOverrides:
+						systemPrompt.selectedSessionInstructionOverrides.length > 0
+							? structuredClone(systemPrompt.selectedSessionInstructionOverrides)
+							: undefined,
 					includeModelDefault: systemPrompt.includeModelDefault,
 					attachedTools,
 					attachments,
@@ -1163,6 +1183,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					workspaceSelection: workspace.getSelectionSnapshot(),
 					workspacePlan: workspace.plan,
 					...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
+					...(toolSelectionIssues.length > 0
+						? {
+								unresolvedToolSelections: structuredClone(toolSelectionIssues),
+							}
+						: {}),
 					...(editingMessageId && finalToolOutputs.length > 0
 						? {
 								carryForwardToolResultIDs: [...new Set(finalToolOutputs.map(output => output.id).filter(Boolean))],
@@ -1228,6 +1253,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentInstalledEnabledSkillSelections,
 			renderOnlySkillRefs,
 			getCurrentActiveSkillSelections,
+			toolSelectionIssues,
 		]
 	);
 
@@ -1885,6 +1911,28 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex shrink-0 flex-col items-end justify-end gap-2 p-1">
+							{showAutomationControl ? (
+								<HoverTip
+									content={
+										automationHoldEnabled
+											? 'Resume automatic tools and continuation'
+											: 'Hold the next automatic tool and continuation batch'
+									}
+									placement="left"
+								>
+									<button
+										type="button"
+										className={`btn btn-circle btn-sm shrink-0 ${
+											automationHoldEnabled ? 'btn-warning' : 'btn-neutral'
+										}`}
+										onClick={onToggleAutomationHold}
+										aria-label={automationHoldEnabled ? 'Resume automatic tools' : 'Hold automatic tools'}
+									>
+										<FiZapOff size={18} />
+									</button>
+								</HoverTip>
+							) : null}
+
 							{!isGenerating && isRunActive ? (
 								<HoverTip content="Cancel active run" placement="left">
 									<button

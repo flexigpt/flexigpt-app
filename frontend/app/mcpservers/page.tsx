@@ -11,6 +11,7 @@ import type {
 	MCPSettings,
 	MCPSetupSubmissionValue,
 } from '@/spec/mcp';
+import { artifactRefKey } from '@/spec/artifact';
 import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
@@ -50,10 +51,6 @@ interface OAuthTarget {
 
 const STATUS_READ_CONCURRENCY = 4;
 const PLUGIN_PREFETCH_CONCURRENCY = 3;
-
-function artifactKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
-}
 
 function getMatchingAuthHealth(server: MCPServerView, value: MCPAuthHealth | undefined): MCPAuthHealth | undefined {
 	if (!value) {
@@ -301,7 +298,7 @@ export default function MCPServersPage() {
 
 	const loadPluginServers = useCallback(
 		(pluginRef: ArtifactRef, refreshStatus = true): Promise<void> => {
-			const key = artifactKey(pluginRef);
+			const key = artifactRefKey(pluginRef);
 			const existingLoad = pluginLoadsRef.current.get(key);
 
 			if (existingLoad) {
@@ -554,9 +551,9 @@ export default function MCPServersPage() {
 			try {
 				await mapWithConcurrency(refs, STATUS_READ_CONCURRENCY, async ref => {
 					const plugin = pluginsRef.current.find(item =>
-						item.servers.some(server => artifactKey(server.ref) === artifactKey(ref))
+						item.servers.some(server => artifactRefKey(server.ref) === artifactRefKey(ref))
 					);
-					const server = plugin?.servers.find(item => artifactKey(item.ref) === artifactKey(ref));
+					const server = plugin?.servers.find(item => artifactRefKey(item.ref) === artifactRefKey(ref));
 
 					if (!cancelled && server) {
 						await refreshSingleServer(server);
@@ -628,7 +625,7 @@ export default function MCPServersPage() {
 	}, []);
 
 	const openAuthorizationURL = useCallback((server: ArtifactRef, url: string, once: boolean) => {
-		const key = `${artifactKey(server)}:${url}`;
+		const key = `${artifactRefKey(server)}:${url}`;
 
 		if (once && openedAuthorizationURLsRef.current.has(key)) {
 			return;
@@ -652,7 +649,7 @@ export default function MCPServersPage() {
 		}
 
 		for (const plugin of plugins) {
-			const server = plugin.servers.find(item => artifactKey(item.ref) === artifactKey(oauthTarget.server));
+			const server = plugin.servers.find(item => artifactRefKey(item.ref) === artifactRefKey(oauthTarget.server));
 
 			if (server) {
 				return {
@@ -684,9 +681,9 @@ export default function MCPServersPage() {
 			return;
 		}
 
-		const targetKey = artifactKey(oauthTarget.server);
+		const targetKey = artifactRefKey(oauthTarget.server);
 		const timer = window.setTimeout(() => {
-			setOAuthTarget(current => (current && artifactKey(current.server) === targetKey ? null : current));
+			setOAuthTarget(current => (current && artifactRefKey(current.server) === targetKey ? null : current));
 		}, 700);
 
 		return () => {

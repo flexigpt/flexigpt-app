@@ -1,6 +1,7 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
+import type { SessionConfiguration, SessionInstructionOverride } from '@/spec/session';
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
@@ -35,13 +36,20 @@ export interface EditorExternalMessage {
 
 export interface EditorSubmitPayload {
 	text: string;
-	resolvedSystemPrompt?: string;
-	sessionInstructionText?: string;
+	/**
+	 * Text authored by non-session instruction sources, such as an explicit
+	 * flattened Skill source. Restored Session instruction overrides are kept
+	 * separately so their raw mode, key, and pinned Artifact selection survive.
+	 */
+	additionalSessionInstructionText?: string;
+	selectedSessionInstructionOverrides?: SessionInstructionOverride[];
 	includeModelDefault?: boolean;
 	agentRef?: ArtifactRef;
 	agentSelection?: SessionArtifactSelection;
 	modelSelectionSource?: 'session' | 'agent';
 	agentCapabilityExclusions?: AgentCapabilityExclusion[];
+	agentCapabilityInclusionKeys?: string[];
+	sessionConfigurationBaseline?: SessionConfiguration;
 	attachedTools: UIToolStoreChoice[];
 	attachments: UIAttachment[];
 	toolOutputs: UIToolOutput[];
@@ -52,6 +60,7 @@ export interface EditorSubmitPayload {
 	enabledSkillSelections?: SessionArtifactSelection[];
 	activeSkillRefs?: SkillRef[];
 	activeSkillSelections?: SessionArtifactSelection[];
+	unresolvedToolSelections?: ToolSelectionIssue[];
 	/**
 	 * Skills whose content was rendered into draft text or inline system
 	 * instructions for this turn. These are intentionally not Skill-session

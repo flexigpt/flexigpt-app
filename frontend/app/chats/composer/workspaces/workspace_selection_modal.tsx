@@ -4,6 +4,7 @@ import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiSettings, FiZap } fr
 import type { ArtifactRef } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceMCPServer, WorkspaceRuntimePlan } from '@/spec/workspace';
+import { artifactRefKey } from '@/spec/artifact';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -31,10 +32,6 @@ interface WorkspaceMCPSetupTarget {
 	displayName: string;
 	status: string;
 	runtimeLoaded: boolean;
-}
-
-function artifactRefKey(ref: ArtifactRef): string {
-	return `${ref.rootID}:${ref.artifactID}`;
 }
 
 function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSetupTarget[] {

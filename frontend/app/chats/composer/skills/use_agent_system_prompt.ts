@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { ModelParam } from '@/spec/inference';
-import type { SessionConfiguration } from '@/spec/session';
+import type { SessionConfiguration, SessionInstructionOverride } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY, PREVIOUS_CONVO_SYSTEM_PROMPT_PLUGINID } from '@/spec/model';
 import { SessionModelDefaultField } from '@/spec/session';
@@ -32,7 +32,8 @@ export interface AgentSystemPromptController {
 	selectedInstructionSourceKeys: string[];
 	selectedInstructionSkillRefs: SkillRef[];
 	resolvedSystemPrompt: string;
-	sessionInstructionText: string;
+	selectedSessionInstructionOverrides: SessionInstructionOverride[];
+	additionalSessionInstructionText: string;
 
 	setIncludeModelDefault(next: boolean): void;
 	toggleInstructionSource(identityKey: string): void;
@@ -145,6 +146,7 @@ function sessionInstructionSources(configuration: SessionConfiguration): SystemI
 			sourceSlug: override.key,
 			text,
 			isBuiltIn: false,
+			sessionOverride: structuredClone(override),
 		});
 	}
 
@@ -215,6 +217,24 @@ export function useAgentSystemPrompt(args: {
 		return refs;
 	}, [selectedInstructionSourceKeys, sources]);
 
+	const selectedSessionInstructionOverrides = useMemo(() => {
+		const selectedKeys = new Set(selectedInstructionSourceKeys);
+
+		return sources.flatMap(source => {
+			if (source.sourceKind !== 'session' || !source.sessionOverride || !selectedKeys.has(source.identityKey)) {
+				return [];
+			}
+
+			return [structuredClone(source.sessionOverride)];
+		});
+	}, [selectedInstructionSourceKeys, sources]);
+
+	const nonSessionInstructionSourcesByKey = useMemo(
+		() =>
+			new Map(sources.filter(source => source.sourceKind !== 'session').map(source => [source.identityKey, source])),
+		[sources]
+	);
+
 	const resolvedSystemPrompt = useMemo(
 		() =>
 			buildEffectiveSystemPrompt({
@@ -226,15 +246,17 @@ export function useAgentSystemPrompt(args: {
 		[includeModelDefault, modelDefaultPrompt, selectedInstructionSourceKeys, sourceByKey]
 	);
 
-	const sessionInstructionText = useMemo(
+	const additionalSessionInstructionText = useMemo(
 		() =>
 			buildEffectiveSystemPrompt({
 				modelDefaultPrompt: '',
 				includeModelDefault: false,
-				selectedInstructionSourceKeys,
-				instructionSourcesByKey: sourceByKey,
+				selectedInstructionSourceKeys: selectedInstructionSourceKeys.filter(key =>
+					nonSessionInstructionSourcesByKey.has(key)
+				),
+				instructionSourcesByKey: nonSessionInstructionSourcesByKey,
 			}),
-		[selectedInstructionSourceKeys, sourceByKey]
+		[nonSessionInstructionSourcesByKey, selectedInstructionSourceKeys]
 	);
 
 	const setSelectedKeys = useCallback((next: string[]) => {
@@ -387,7 +409,8 @@ export function useAgentSystemPrompt(args: {
 		selectedInstructionSourceKeys,
 		selectedInstructionSkillRefs,
 		resolvedSystemPrompt,
-		sessionInstructionText,
+		selectedSessionInstructionOverrides,
+		additionalSessionInstructionText,
 		setIncludeModelDefault,
 		toggleInstructionSource,
 		upsertAndSelectInstructionSource,

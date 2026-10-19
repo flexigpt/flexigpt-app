@@ -65,7 +65,7 @@ export interface ComposerBoxHandle {
 }
 
 interface ComposerBoxProps {
-	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
+	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<SessionConfiguration | undefined>;
 	isBusy: boolean;
 	isGenerating: boolean;
 	allowContinuationInput?: boolean;
@@ -75,6 +75,9 @@ interface ComposerBoxProps {
 	editingMessageId: string | null;
 	onCancelEditing: () => void;
 	onCancelRun?: () => Promise<void>;
+	showAutomationControl: boolean;
+	automationHoldEnabled: boolean;
+	onToggleAutomationHold: () => void;
 }
 
 export const ComposerBox = memo(
@@ -90,11 +93,15 @@ export const ComposerBox = memo(
 			editingMessageId,
 			onCancelEditing,
 			onCancelRun,
+			showAutomationControl,
+			automationHoldEnabled,
+			onToggleAutomationHold,
 		},
 		ref
 	) {
 		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
 		const editorAreaRef = useRef<EditorAreaHandle>(null);
+		const sessionConfigurationBaselineRef = useRef<SessionConfiguration | undefined>(undefined);
 		const composerContext = useComposerContextState();
 		const systemPrompt = useAgentSystemPrompt({
 			modelDefaultPrompt: composerContext.selectedModel.systemPrompt,
@@ -156,6 +163,7 @@ export const ComposerBox = memo(
 		const resetComposerState = useCallback(() => {
 			setAbortConfirmationRequested(false);
 			agent.clearAgentTracking();
+			sessionConfigurationBaselineRef.current = undefined;
 
 			const editor = editorAreaRef.current;
 			editor?.resetEditor();
@@ -179,10 +187,10 @@ export const ComposerBox = memo(
 		}, [agent, resetComposerState]);
 
 		const handleSubmit = useCallback(
-			(payload: EditorSubmitPayload) => {
+			async (payload: EditorSubmitPayload): Promise<void> => {
 				setAbortConfirmationRequested(false);
 				if (!composerContext.hasRunnableModel) {
-					return Promise.resolve();
+					return;
 				}
 
 				const nonSessionSkillRefs = normalizeSkillRefs([
@@ -190,9 +198,12 @@ export const ComposerBox = memo(
 					...agent.instructionOnlySkillRefs,
 				]);
 
-				return onSend(
+				const acceptedConfiguration = await onSend(
 					{
 						...payload,
+						sessionConfigurationBaseline: sessionConfigurationBaselineRef.current
+							? structuredClone(sessionConfigurationBaselineRef.current)
+							: undefined,
 						...(nonSessionSkillRefs.length > 0 ? { nonSessionSkillRefs } : {}),
 						agentRef: agent.selectedAgent?.ref,
 						agentSelection: agent.selectedAgent
@@ -210,6 +221,11 @@ export const ComposerBox = memo(
 									agentCapabilityExclusions: agent.capabilityExclusions,
 								}
 							: {}),
+						...(agent.releasedCapabilityExclusionKeys.length > 0
+							? {
+									agentCapabilityInclusionKeys: agent.releasedCapabilityExclusionKeys,
+								}
+							: {}),
 						modelSelectionSource:
 							agent.selectedAgent && agent.agentModelRef && composerContext.modelSelectionSource === 'agent'
 								? 'agent'
@@ -217,12 +233,17 @@ export const ComposerBox = memo(
 					},
 					composerContext.modelOptions
 				);
+
+				if (acceptedConfiguration) {
+					sessionConfigurationBaselineRef.current = structuredClone(acceptedConfiguration);
+				}
 			},
 			[
 				agent.selectedAgent,
 				agent.agentModelRef,
 				agent.instructionOnlySkillRefs,
 				agent.capabilityExclusions,
+				agent.releasedCapabilityExclusionKeys,
 				composerContext.modelOptions,
 				composerContext.hasRunnableModel,
 				composerContext.modelSelectionSource,
@@ -295,11 +316,16 @@ export const ComposerBox = memo(
 				restoreSessionConfiguration: async configuration => {
 					setAbortConfirmationRequested(false);
 					editorAreaRef.current?.resetEditor();
+					sessionConfigurationBaselineRef.current = structuredClone(configuration);
 
 					composerContext.restoreSessionConfiguration(configuration);
 					systemPrompt.restoreSessionConfiguration(configuration);
 
-					await agent.restoreSelectedAgent(configuration.agent, configuration.model ? 'session' : 'agent');
+					await agent.restoreSelectedAgent(
+						configuration.agent,
+						configuration.model ? 'session' : 'agent',
+						configuration
+					);
 					await editorAreaRef.current?.restoreSessionConfiguration(configuration);
 				},
 			}),
@@ -347,6 +373,9 @@ export const ComposerBox = memo(
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}
 					systemPrompt={systemPrompt}
+					showAutomationControl={showAutomationControl}
+					automationHoldEnabled={automationHoldEnabled}
+					onToggleAutomationHold={onToggleAutomationHold}
 				/>
 			</div>
 		);
