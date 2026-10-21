@@ -67,7 +67,7 @@ import {
 	SetAgentEnabled,
 	SetAgentPluginEnabled,
 	UpdateAgentPlugin,
-} from '@/apis/wailsjs/go/main/AgentStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/agentstorewrapper';
 
 function agentCapabilityPlanFromWails(value: unknown, operation: string): AgentCapabilityPlan {
 	const plan = requiredObject<Record<string, unknown>>(value, operation);

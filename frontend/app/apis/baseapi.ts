@@ -28,8 +28,9 @@ import { ModelManagementAPI } from '@/apis/model_management';
 import { SessionManagementAPI } from '@/apis/session_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 import { ToolManagementAPI } from '@/apis/tool_management';
-// oxlint-disable-next-line import/no-namespace
-import * as wailsImpl from '@/apis/wailsapi';
+import { WailsAgentStoreAPI } from '@/apis/wailsapi/agent_store';
+import { WailsAttachmentsDropAPI } from '@/apis/wailsapi/attachmentsdrop';
+import { WailsBackendAPI, WailsLogger } from '@/apis/wailsapi/backend';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
@@ -37,8 +38,10 @@ import { WailsModelAggregateAPI } from '@/apis/wailsapi/model_aggregate';
 import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
 import { WailsSessionRuntimeAPI } from '@/apis/wailsapi/session_runtime';
 import { WailsSessionStoreAPI } from '@/apis/wailsapi/session_store';
+import { WailsSettingStoreAPI } from '@/apis/wailsapi/settingstore';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
+import { WailsTextStoreAPI } from '@/apis/wailsapi/text_store';
 import { WailsToolStoreAPI } from '@/apis/wailsapi/tool_store';
 import { WailsWorkspaceRuntimeAPI } from '@/apis/wailsapi/workspace_runtime';
 import { WailsWorkspaceStoreAPI } from '@/apis/wailsapi/workspace_store';
@@ -81,12 +84,12 @@ export let agentManagementAPI: AgentManagementAPI;
 export let textStoreAPI: ITextStoreAPI;
 
 if (IS_WAILS_PLATFORM) {
-	log = new wailsImpl.WailsLogger();
+	log = new WailsLogger();
 	setFrontendErrorLogger(log);
 
-	attachmentsDropAPI = new wailsImpl.WailsAttachmentsDropAPI();
-	backendAPI = new wailsImpl.WailsBackendAPI();
-	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
+	attachmentsDropAPI = new WailsAttachmentsDropAPI();
+	backendAPI = new WailsBackendAPI();
+	settingstoreAPI = new WailsSettingStoreAPI();
 
 	sessionRuntimeAPI = new WailsSessionRuntimeAPI();
 	sessionStoreAPI = new WailsSessionStoreAPI();
@@ -120,8 +123,8 @@ if (IS_WAILS_PLATFORM) {
 		modelManagementAPI
 	);
 
-	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
-	textStoreAPI = new wailsImpl.WailsTextStoreAPI();
+	agentStoreAPI = new WailsAgentStoreAPI();
+	textStoreAPI = new WailsTextStoreAPI();
 	agentManagementAPI = new AgentManagementAPI(agentStoreAPI, toolManagementAPI, textStoreAPI);
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();

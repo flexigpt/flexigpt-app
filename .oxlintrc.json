@@ -22,7 +22,7 @@
 		"**/dist/**",
 		"**/out/**",
 		"frontend/.react-router/**",
-		"frontend/app/apis/wailsjs/**"
+		"frontend/app/apis/wailsbinding/**"
 	],
 	"rules": {},
 	"env": {

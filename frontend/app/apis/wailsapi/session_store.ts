@@ -26,7 +26,7 @@ import {
 	ReadSessionConversation,
 	ReadSessionRun,
 	SearchSessions,
-} from '@/apis/wailsjs/go/main/SessionStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/sessionstorewrapper';
 
 export class WailsSessionStoreAPI implements ISessionStoreAPI {
 	async readSession(sessionID: SessionID, forceFetch = false): Promise<Session> {

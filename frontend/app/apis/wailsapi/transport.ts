@@ -7,18 +7,137 @@ function isByte(value: unknown): value is number {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255;
 }
 
+const WAILS_ENUM_ZERO_VALUE = '';
+const WAILS_ENUM_ZERO_MEMBER = '$zero';
+
+function wailsEnumZeroError(field: string): Error {
+	return new Error(
+		`Invalid ${field}: Go enum zero value is not allowed. ` +
+			`Wails generates this value as ${JSON.stringify(WAILS_ENUM_ZERO_MEMBER)}.`
+	);
+}
+
+/**
+ * Wails v3 models a Go []byte as a base64 string. Frontend contracts retain
+ * byte arrays so application code remains independent of Wails transport
+ * details.
+ */
+export function goBytesToWails(value: readonly number[], field: string): string {
+	const bytes = new Uint8Array(value.length);
+
+	for (let index = 0; index < value.length; index += 1) {
+		const byte = value[index];
+
+		if (!isByte(byte)) {
+			throw new TypeError(`${field}[${index}] must be a byte.`);
+		}
+
+		bytes[index] = byte;
+	}
+
+	if (typeof globalThis.btoa !== 'function') {
+		throw new TypeError(`Base64 encoding is unavailable while serializing ${field}.`);
+	}
+
+	let binary = '';
+	const chunkSize = 0x8000;
+
+	for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+		binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+	}
+
+	return globalThis.btoa(binary);
+}
+
+/**
+ * Accepts the generated v3 base64 representation of Go []byte values.
+ * Numeric arrays are accepted as a compatibility fallback for persisted or
+ * mocked legacy transport fixtures.
+ */
+export function goBytesFromWails(value: unknown, field: string): number[] | undefined {
+	if (value === null || value === undefined) {
+		return undefined;
+	}
+
+	if (value instanceof Uint8Array) {
+		return [...value];
+	}
+
+	if (Array.isArray(value)) {
+		return value.map((item, index) => {
+			if (!isByte(item)) {
+				throw new TypeError(`${field}[${index}] must be a byte.`);
+			}
+
+			return item;
+		});
+	}
+
+	if (typeof value !== 'string' || typeof globalThis.atob !== 'function') {
+		throw new TypeError(`${field} returned an invalid Go []byte value.`);
+	}
+
+	try {
+		return Array.from(globalThis.atob(value), character => character.charCodeAt(0));
+	} catch {
+		throw new TypeError(`${field} returned invalid base64 data.`);
+	}
+}
+
 /**
  * Wails transports Go string aliases as plain JavaScript strings. Validate
  * values at the bridge boundary before exposing frontend enum types.
  */
-export function enumFromWails<T extends string>(value: unknown, enumValues: Record<string, T>, field: string): T {
-	const allowed = Object.values(enumValues) as T[];
+export function enumFromWails<T extends string>(
+	value: unknown,
+	enumValues: Readonly<Record<string, T>>,
+	field: string
+): T {
+	if (value === WAILS_ENUM_ZERO_VALUE || value === WAILS_ENUM_ZERO_MEMBER) {
+		throw wailsEnumZeroError(field);
+	}
+
+	const allowed = Object.values(enumValues).filter(candidate => candidate !== WAILS_ENUM_ZERO_VALUE) as T[];
 
 	if (typeof value !== 'string' || !allowed.includes(value as T)) {
 		throw new Error(`Invalid ${field}: ${String(value)}`);
 	}
 
 	return value as T;
+}
+
+function checkedWailsString<TWails extends string>(value: string): TWails {
+	return value as TWails;
+}
+
+/**
+ * Validates a frontend enum before it is sent through a Wails binding.
+ *
+ * `TWails` exists only because independently declared TypeScript enums are
+ * nominally incompatible even when their serialized string values match.
+ * The cast is safe because `enumFromWails` verifies the exact wire value
+ * before it is exposed as the generated binding enum type.
+ */
+export function enumToWails<TFrontend extends string, TWails extends string = TFrontend>(
+	value: unknown,
+	enumValues: Readonly<Record<string, TFrontend>>,
+	field: string
+): TWails {
+	const parsed = enumFromWails(value, enumValues, field);
+
+	return checkedWailsString<TWails>(parsed);
+}
+
+export function optionalEnumFromWails<T extends string>(
+	value: unknown,
+	enumValues: Readonly<Record<string, T>>,
+	field: string
+): T | undefined {
+	if (value === null || value === undefined) {
+		return undefined;
+	}
+
+	return enumFromWails(value, enumValues, field);
 }
 
 export function wailsArrayOrEmpty<T = unknown>(value: unknown, field: string): T[] {
@@ -74,6 +193,10 @@ export function requireNonBlankString(value: unknown, field: string): string {
 	}
 
 	return value;
+}
+
+export function nonBlankStringToWails<TWails extends string>(value: unknown, field: string): TWails {
+	return checkedWailsString<TWails>(requireNonBlankString(value, field));
 }
 
 export async function collectAllPages<T>(

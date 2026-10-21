@@ -35,7 +35,7 @@ const (
 )
 
 type CoreServer struct {
-	Type ServerType `json:"type,omitempty"`
+	Type ServerType `json:"type"`
 
 	Command string            `json:"command,omitempty"`
 	Args    []string          `json:"args,omitempty"`

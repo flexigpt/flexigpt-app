@@ -1,3 +1,5 @@
+import { Events } from '@wailsio/runtime';
+
 import type {
 	CancelRunCommand,
 	CompleteCallAsErrorCommand,
@@ -32,8 +34,10 @@ import type {
 	MCPAppResourceReadResult,
 	MCPAppStageContextCommand,
 } from '@/spec/session_mcp';
+import { SessionWaitResolution } from '@/spec/session_base';
 
 import type { ISessionRuntimeAPI } from '@/apis/interface';
+import type { ResolveWaitCommand as WailsResolveWaitCommand } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session/models';
 import {
 	mcpAppResourceReadResultFromWails,
 	sessionCommandReceiptFromWails,
@@ -43,7 +47,7 @@ import {
 	sessionSnapshotFromWails,
 	sessionUserMessageSkillTemplateResultFromWails,
 } from '@/apis/wailsapi/session_projection';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumToWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CancelRun,
 	CompleteCallAsError,
@@ -71,8 +75,7 @@ import {
 	StartRun,
 	UpdateContinuationInput,
 	UpdateSessionConfiguration,
-} from '@/apis/wailsjs/go/main/SessionRuntimeWrapper';
-import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/sessionruntimewrapper';
 
 const SESSION_RUNTIME_EVENT_NAME = 'session-runtime:event';
 
@@ -80,6 +83,7 @@ type RuntimeEventListener = (event: SessionRuntimeEvent) => void;
 
 const runtimeEventListeners = new Set<RuntimeEventListener>();
 let runtimeEventBridgeAttached = false;
+let runtimeEventBridgeUnsubscribe: (() => void) | undefined;
 
 function dispatchRuntimeEvent(raw: unknown): void {
 	let event: SessionRuntimeEvent;
@@ -105,7 +109,11 @@ function attachRuntimeEventBridge(): void {
 		return;
 	}
 
-	EventsOn(SESSION_RUNTIME_EVENT_NAME, dispatchRuntimeEvent);
+	// Events.On supplies the emitted custom-event payload itself. Do not use
+	// payload.data here: SessionRuntimeEvent has its own data field.
+	runtimeEventBridgeUnsubscribe = Events.On(SESSION_RUNTIME_EVENT_NAME, payload => {
+		dispatchRuntimeEvent(payload);
+	});
 	runtimeEventBridgeAttached = true;
 }
 
@@ -114,8 +122,30 @@ function detachRuntimeEventBridgeWhenUnused(): void {
 		return;
 	}
 
-	EventsOff(SESSION_RUNTIME_EVENT_NAME);
+	const unsubscribe = runtimeEventBridgeUnsubscribe;
+	runtimeEventBridgeUnsubscribe = undefined;
 	runtimeEventBridgeAttached = false;
+
+	unsubscribe?.();
+}
+
+function userMessageSkillTemplateRequestForWails(command: SessionUserMessageSkillTemplateCommand) {
+	return {
+		...command,
+		sessionID: command.sessionID ?? '',
+		arguments: command.arguments ?? null,
+	};
+}
+
+function resolveWaitCommandToWails(command: ResolveWaitCommand): WailsResolveWaitCommand {
+	return {
+		...command,
+		resolution: enumToWails<SessionWaitResolution, WailsResolveWaitCommand['resolution']>(
+			command.resolution,
+			SessionWaitResolution,
+			'ResolveWaitCommand.resolution'
+		),
+	};
 }
 
 /**
@@ -155,7 +185,9 @@ export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
 		command: SessionUserMessageSkillTemplateCommand
 	): Promise<SessionUserMessageSkillTemplateResult> {
 		return sessionUserMessageSkillTemplateResultFromWails(
-			await PrepareUserMessageSkillTemplate(command as Parameters<typeof PrepareUserMessageSkillTemplate>[0]),
+			await PrepareUserMessageSkillTemplate(
+				userMessageSkillTemplateRequestForWails(command) as Parameters<typeof PrepareUserMessageSkillTemplate>[0]
+			),
 			'PrepareUserMessageSkillTemplate'
 		);
 	}
@@ -230,10 +262,7 @@ export class WailsSessionRuntimeAPI implements ISessionRuntimeAPI {
 	}
 
 	async resolveWait(command: ResolveWaitCommand): Promise<SessionCommandReceipt> {
-		return sessionCommandReceiptFromWails(
-			await ResolveWait(command as Parameters<typeof ResolveWait>[0]),
-			'ResolveWait'
-		);
+		return sessionCommandReceiptFromWails(await ResolveWait(resolveWaitCommandToWails(command)), 'ResolveWait');
 	}
 
 	async setAutomationHold(command: SetAutomationHoldCommand): Promise<SessionCommandReceipt> {

@@ -1,12 +1,18 @@
+import { Events } from '@wailsio/runtime';
+
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { IAttachmentsDropAPI } from '@/apis/interface';
 import { pathAttachmentsResultFromWails } from '@/apis/wailsapi/attachment_projection';
-import { requireWailsString, wailsArrayOrEmpty } from '@/apis/wailsapi/transport';
-import { GetPathsAsAttachments } from '@/apis/wailsjs/go/main/App';
-import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
+import {
+	requiredObject,
+	requireWailsFiniteNumber,
+	requireWailsString,
+	wailsArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
+import { GetPathsAsAttachments } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/app';
 
 import { MAX_DIRECTORY_FILES_TO_SCAN } from '@/chats/composer/attachments/attachment_editor_utils';
 
@@ -18,6 +24,7 @@ const nativeFileDropSupported = import.meta.env.VITE_WAILS_NATIVE_FILE_DROP !== 
 let inited = false;
 let listenerUsers = 0;
 let activeTarget: DropTarget | null = null;
+let fileDropUnsubscribe: (() => void) | undefined;
 let pending: AttachmentsDroppedPayload[] = [];
 let onNoTarget: ((payload: AttachmentsDroppedPayload) => void) | null = null;
 
@@ -68,10 +75,46 @@ async function handleFileDrop(x: number, y: number, paths: string[]) {
 	}
 }
 
+function nativeFileDropFromWails(args: readonly unknown[]): {
+	x: number;
+	y: number;
+	paths: string[];
+} {
+	const [first, second, third] = args;
+
+	// Wails v2 delivered x, y, paths as positional arguments. Retaining this
+	// branch makes the bridge tolerant while moving the subscription itself to
+	// the v3 event API.
+	if (typeof first === 'number' && typeof second === 'number') {
+		return {
+			x: requireWailsFiniteNumber(first, `${FILE_DROP_EVENT}.x`),
+			y: requireWailsFiniteNumber(second, `${FILE_DROP_EVENT}.y`),
+			paths: wailsArrayOrEmpty<string>(third, `${FILE_DROP_EVENT}.paths`),
+		};
+	}
+
+	const event = requiredObject<Record<string, unknown>>(first, FILE_DROP_EVENT);
+	const payload =
+		event.paths !== undefined || event.Paths !== undefined
+			? event
+			: requiredObject<Record<string, unknown>>(event.data, `${FILE_DROP_EVENT}.data`);
+
+	return {
+		x: requireWailsFiniteNumber(payload.x ?? payload.X, `${FILE_DROP_EVENT}.x`),
+		y: requireWailsFiniteNumber(payload.y ?? payload.Y, `${FILE_DROP_EVENT}.y`),
+		paths: wailsArrayOrEmpty<string>(payload.paths ?? payload.Paths, `${FILE_DROP_EVENT}.paths`),
+	};
+}
+
 function initWailsDropListener(): () => void {
 	if (!inited) {
-		EventsOn(FILE_DROP_EVENT, (x: number, y: number, paths: string[]) => {
-			void handleFileDrop(x, y, paths);
+		fileDropUnsubscribe = Events.On(FILE_DROP_EVENT, (...args: unknown[]) => {
+			try {
+				const drop = nativeFileDropFromWails(args);
+				void handleFileDrop(drop.x, drop.y, drop.paths);
+			} catch (error) {
+				console.error('Invalid Wails file-drop event payload', error);
+			}
 		});
 		inited = true;
 	}
@@ -79,6 +122,7 @@ function initWailsDropListener(): () => void {
 	listenerUsers += 1;
 
 	let stopped = false;
+
 	return () => {
 		if (stopped) {
 			return;
@@ -88,8 +132,11 @@ function initWailsDropListener(): () => void {
 		listenerUsers = Math.max(0, listenerUsers - 1);
 
 		if (listenerUsers === 0 && inited) {
-			EventsOff(FILE_DROP_EVENT);
+			const unsubscribe = fileDropUnsubscribe;
+			fileDropUnsubscribe = undefined;
 			inited = false;
+
+			unsubscribe?.();
 		}
 	};
 }

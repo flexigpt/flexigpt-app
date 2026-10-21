@@ -1,9 +1,11 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { PluginListItem, PluginView } from '@/spec/plugin';
 import type { ResolvedToolView, ToolImplementationView, ToolStoreListItem, ToolView } from '@/spec/tool';
+import { CapabilityTargetForm, CapabilityTargetProvenance } from '@/spec/artifact';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { IToolStoreAPI } from '@/apis/interface';
+import type { CapabilityTarget as WailsCapabilityTarget } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/models';
 import {
 	capabilityTargetFromWails,
 	pluginListItemFromWails,
@@ -12,7 +14,9 @@ import {
 } from '@/apis/wailsapi/list_item_projection';
 import {
 	enumFromWails,
+	enumToWails,
 	jsonSchemaFromWails,
+	nonBlankStringToWails,
 	optionalWailsString,
 	requiredObject,
 	requireNonBlankString,
@@ -27,7 +31,7 @@ import {
 	ResolveToolTarget,
 	SetToolEnabled,
 	SetToolPluginEnabled,
-} from '@/apis/wailsjs/go/main/ToolStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/toolstorewrapper';
 
 function toolViewFromWails(value: unknown, operation: string): ToolView {
 	const tool = requiredObject<ToolView>(value, operation);
@@ -74,6 +78,47 @@ function resolvedToolViewFromWails(value: unknown, operation: string): ResolvedT
 	};
 }
 
+function capabilityTargetToWails(target: CapabilityTarget): WailsCapabilityTarget {
+	const operation = 'ResolveToolTarget.target';
+	const form = enumToWails<CapabilityTargetForm, WailsCapabilityTarget['form']>(
+		target.form,
+		CapabilityTargetForm,
+		`${operation}.form`
+	);
+	const provenance = enumToWails<CapabilityTargetProvenance, WailsCapabilityTarget['provenance']>(
+		target.provenance,
+		CapabilityTargetProvenance,
+		`${operation}.provenance`
+	);
+	const base = {
+		form,
+		type: nonBlankStringToWails<WailsCapabilityTarget['type']>(target.type, `${operation}.type`),
+		name: requireNonBlankString(target.name, `${operation}.name`),
+		provenance,
+	};
+
+	if (target.form === CapabilityTargetForm.Artifact) {
+		if (!target.artifact) {
+			throw new Error('Artifact capability targets require an Artifact reference.');
+		}
+
+		return {
+			...base,
+			artifact: {
+				rootID: target.artifact.rootID,
+				artifactID: target.artifact.artifactID,
+			},
+		};
+	}
+
+	return {
+		...base,
+		providerIdentity: requireNonBlankString(target.providerIdentity, `${operation}.providerIdentity`),
+		providerLocalID: requireNonBlankString(target.providerLocalID, `${operation}.providerLocalID`),
+		...(target.evidence === undefined ? {} : { evidence: target.evidence }),
+	};
+}
+
 export class WailsToolStoreAPI implements IToolStoreAPI {
 	async listToolPlugins(): Promise<PluginListItem[]> {
 		return wailsObjectArrayOrEmpty(await ListToolPlugins(), 'ListToolPlugins').map((value, index) =>
@@ -115,9 +160,6 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 	}
 
 	async resolveToolTarget(target: CapabilityTarget): Promise<ResolvedToolView> {
-		return resolvedToolViewFromWails(
-			await ResolveToolTarget(target as Parameters<typeof ResolveToolTarget>[0]),
-			'ResolveToolTarget'
-		);
+		return resolvedToolViewFromWails(await ResolveToolTarget(capabilityTargetToWails(target)), 'ResolveToolTarget');
 	}
 }

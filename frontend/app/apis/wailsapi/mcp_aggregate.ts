@@ -20,6 +20,13 @@ import { MCPAuthHealthState, MCPAuthState, MCPHTTPAuthMode, MCPServerStatus } fr
 import type { IMCPAggregateAPI } from '@/apis/interface';
 import { pluginResultFromWails } from '@/apis/wailsapi/list_item_projection';
 import {
+	managedMCPCreateRequestToWails,
+	managedMCPPolicyUpsertRequestToWails,
+	managedMCPReplaceRequestToWails,
+	mcpPolicyFromWails,
+	mcpServerDocumentFromWails,
+} from '@/apis/wailsapi/mcp_projection';
+import {
 	enumFromWails,
 	optionalWailsString,
 	requiredObject,
@@ -40,7 +47,7 @@ import {
 	SaveMCPServerSettings,
 	SetMCPServerSecret,
 	UpdateMCPServer,
-} from '@/apis/wailsjs/go/main/MCPAggregateWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/mcpaggregatewrapper';
 
 export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	async getMCPServer(server: ArtifactRef): Promise<MCPServerDetails> {
@@ -63,14 +70,14 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 
 	async createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
 		return pluginResultFromWails<ManagedMCPCreateResult>(
-			await CreateMCPServer(request as Parameters<typeof CreateMCPServer>[0]),
+			await CreateMCPServer(managedMCPCreateRequestToWails(request)),
 			'CreateMCPServer'
 		);
 	}
 
 	async updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult> {
 		return pluginResultFromWails<ManagedMCPReplaceResult>(
-			await UpdateMCPServer(request as Parameters<typeof UpdateMCPServer>[0]),
+			await UpdateMCPServer(managedMCPReplaceRequestToWails(request)),
 			'UpdateMCPServer'
 		);
 	}
@@ -81,7 +88,7 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 
 	async saveMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult> {
 		return pluginResultFromWails<ManagedMCPPolicyUpsertResult>(
-			await SaveMCPPolicy(request as Parameters<typeof SaveMCPPolicy>[0]),
+			await SaveMCPPolicy(managedMCPPolicyUpsertRequestToWails(request)),
 			'SaveMCPPolicy'
 		);
 	}
@@ -162,11 +169,11 @@ function mcpServerRuntimeDetailsFromWails(value: unknown, operation: string): MC
 		...details,
 		connection: mcpServerRuntimeSnapshotFromWails(details.connection, `${operation}.connection`),
 		authorization:
-			details.authorization === undefined
+			details.authorization === null || details.authorization === undefined
 				? undefined
 				: mcpAuthStatusFromWails(details.authorization, `${operation}.authorization`),
 		pendingAuthorization:
-			details.pendingAuthorization === undefined
+			details.pendingAuthorization === null || details.pendingAuthorization === undefined
 				? undefined
 				: mcpOAuthAuthorizationFromWails(details.pendingAuthorization, `${operation}.pendingAuthorization`),
 	};
@@ -178,6 +185,10 @@ function serverDetailsFromWails(value: unknown, operation: string): MCPServerDet
 	return {
 		...details,
 		settings: installationViewFromWails(details.settings, `${operation}.settings`),
+		policy: {
+			...details.policy,
+			body: mcpPolicyFromWails(details.policy.body, `${operation}.policy.body`),
+		},
 		authorization: mcpAuthHealthFromWails(details.authorization, `${operation}.authorization`),
 		connection: mcpServerRuntimeSnapshotFromWails(details.connection, `${operation}.connection`),
 	};
@@ -205,6 +216,7 @@ function installationViewFromWails(value: unknown, operation: string): MCPServer
 
 	return {
 		...view,
+		document: mcpServerDocumentFromWails(view.document, `${operation}.document`),
 		installation: {
 			selectedConnectionProfile: optionalWailsString(
 				rawInstallation.selectedConnectionProfile,

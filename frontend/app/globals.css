@@ -306,10 +306,10 @@ code .line::before {
 
 /* app draggable regions */
 .app-drag {
-	--app-draggable: drag;
+	--wails-draggable: drag;
 	user-select: none;
 }
 
 .app-no-drag {
-	--app-draggable: no-drag;
+	--wails-draggable: no-drag;
 }

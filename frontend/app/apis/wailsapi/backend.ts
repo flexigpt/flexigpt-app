@@ -1,12 +1,13 @@
 // oxlint-disable max-classes-per-file
+import { Application, Browser, Window } from '@wailsio/runtime';
 import { sprintf } from 'sprintf-js';
 
 import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
-import type { texttool as texttoolSpec } from '@/apis/wailsjs/go/models';
 import {
+	attachmentFromWails,
 	directoryAttachmentsResultFromWails,
 	pathAttachmentsResultFromWails,
 } from '@/apis/wailsapi/attachment_projection';
@@ -29,18 +30,13 @@ import {
 	PickFiles,
 	Ping,
 	SaveFile,
-} from '@/apis/wailsjs/go/main/App';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/app';
 import {
-	BrowserOpenURL,
-	LogDebug,
-	LogError,
-	LogInfo,
-	LogWarning,
-	Quit,
-	WindowIsMaximised,
-	WindowMinimise,
-	WindowToggleMaximise,
-} from '@/apis/wailsjs/runtime/runtime';
+	Debug as FrontendLogDebug,
+	Error as FrontendLogError,
+	Info as FrontendLogInfo,
+	Warn as FrontendLogWarn,
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/logservice';
 
 function stringifyLogArg(arg: unknown): string {
 	if (typeof arg === 'string') {
@@ -78,83 +74,79 @@ function formatMessage(args: unknown[]): string {
 	return args.map(a => stringifyLogArg(a)).join(' ');
 }
 
-function isRuntimeAvailable(): boolean {
-	return typeof window !== 'undefined' && 'runtime' in window;
+function toWailsFileFilters(filters?: readonly FileFilter[]): Array<{ DisplayName: string; Extensions: string[] }> {
+	return (filters ?? []).map(filter => ({
+		DisplayName: filter.DisplayName,
+		Extensions: [...filter.Extensions],
+	}));
+}
+
+function submitFrontendLog(operation: string, request: PromiseLike<void>): void {
+	void Promise.resolve(request).catch((error: unknown) => {
+		console.error(`Failed to write frontend ${operation} log`, error);
+	});
+}
+
+function writeFrontendLog(level: 'debug' | 'error' | 'info' | 'warn', args: unknown[]): void {
+	const message = formatMessage(args);
+
+	if (!message) {
+		return;
+	}
+
+	switch (level) {
+		case 'debug':
+			submitFrontendLog('debug', FrontendLogDebug(message));
+			return;
+		case 'error':
+			// oxlint-disable-next-line unicorn/throw-new-error
+			submitFrontendLog('error', FrontendLogError(message));
+			return;
+		case 'warn':
+			submitFrontendLog('warn', FrontendLogWarn(message));
+			return;
+		case 'info':
+			submitFrontendLog('info', FrontendLogInfo(message));
+	}
 }
 
 export class WailsLogger implements ILogger {
 	log(...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				LogInfo(msg);
-			}
-		} else {
-			console.log(...args);
-		}
+		writeFrontendLog('info', args);
 	}
 
 	error(...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				// oxlint-disable-next-line unicorn/throw-new-error
-				LogError(msg);
-			}
-		} else {
-			console.error(...args);
-		}
+		writeFrontendLog('error', args);
 	}
 
 	info(...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				LogInfo(msg);
-			}
-		} else {
-			console.info(...args);
-		}
+		writeFrontendLog('info', args);
 	}
 
 	debug(...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				LogDebug(msg);
-			}
-		} else {
-			console.debug(...args);
-		}
+		writeFrontendLog('debug', args);
 	}
 
 	warn(...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				LogWarning(msg);
-			}
-		} else {
-			console.warn(...args);
-		}
+		writeFrontendLog('warn', args);
 	}
 }
 
 export class WailsBackendAPI implements IBackendAPI {
 	appQuit(): void {
-		Quit();
+		void Application.Quit();
 	}
 
 	appWindowMinimise(): void {
-		WindowMinimise();
+		void Window.Minimise();
 	}
 
 	appWindowToggleMaximise(): void {
-		WindowToggleMaximise();
+		void Window.ToggleMaximise();
 	}
 
 	async isAppWindowMaximised(): Promise<boolean> {
-		return requireWailsBoolean(await WindowIsMaximised(), 'WindowIsMaximised');
+		return requireWailsBoolean(await Window.IsMaximised(), 'Window.IsMaximised');
 	}
 
 	async getAppVersion(): Promise<string> {
@@ -185,35 +177,24 @@ export class WailsBackendAPI implements IBackendAPI {
 
 	// Implement the log method
 	log(level: string, ...args: unknown[]): void {
-		const msg = formatMessage(args);
-		if (isRuntimeAvailable()) {
-			if (msg) {
-				switch (level) {
-					case 'info':
-						LogInfo(msg);
-						break;
-					case 'error':
-						// oxlint-disable-next-line unicorn/throw-new-error
-						LogError(msg);
-						break;
-					case 'debug':
-						LogDebug(msg);
-						break;
-					case 'warn':
-						LogWarning(msg);
-						break;
-					default:
-						LogInfo(msg);
-						break;
-				}
-			}
-		} else {
-			console.log(...args);
+		switch (level.toLowerCase()) {
+			case 'debug':
+				writeFrontendLog('debug', args);
+				return;
+			case 'error':
+				writeFrontendLog('error', args);
+				return;
+			case 'warn':
+			case 'warning':
+				writeFrontendLog('warn', args);
+				return;
+			default:
+				writeFrontendLog('info', args);
 		}
 	}
 
 	openURL(url: string): void {
-		BrowserOpenURL(requireNonBlankString(url, 'url'));
+		void Browser.OpenURL(requireNonBlankString(url, 'url'));
 	}
 
 	async openURLAsAttachment(rawURL: string): Promise<Attachment | undefined> {
@@ -222,19 +203,28 @@ export class WailsBackendAPI implements IBackendAPI {
 			return undefined;
 		}
 
-		return requireWailsBody(attachment as Attachment, 'OpenURLAsAttachment');
+		return attachmentFromWails(attachment, 'OpenURLAsAttachment');
 	}
 
 	async saveFile(defaultFilename: string, contentBase64: string, additionalFilters?: Array<FileFilter>): Promise<void> {
-		await SaveFile(defaultFilename, contentBase64, additionalFilters ?? []);
+		await SaveFile(
+			defaultFilename,
+			contentBase64,
+			toWailsFileFilters(additionalFilters) as unknown as Parameters<typeof SaveFile>[2]
+		);
 	}
 
 	async openMultipleFilesAsAttachments(
 		allowMultiple: boolean,
 		additionalFilters?: Array<FileFilter>
 	): Promise<Attachment[]> {
-		const attachments = await OpenMultipleFilesAsAttachments(allowMultiple, additionalFilters ?? []);
-		return wailsObjectArrayOrEmpty<Attachment>(attachments, 'OpenMultipleFilesAsAttachments');
+		const attachments = await OpenMultipleFilesAsAttachments(
+			allowMultiple,
+			toWailsFileFilters(additionalFilters) as unknown as Parameters<typeof OpenMultipleFilesAsAttachments>[1]
+		);
+		return wailsObjectArrayOrEmpty(attachments, 'OpenMultipleFilesAsAttachments').map((attachment, index) =>
+			attachmentFromWails(attachment, `OpenMultipleFilesAsAttachments[${index}]`)
+		);
 	}
 
 	async openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult> {
@@ -249,7 +239,7 @@ export class WailsBackendAPI implements IBackendAPI {
 	}
 
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
-		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
+		const resp = await ApplyUnifiedDiff(args as Parameters<typeof ApplyUnifiedDiff>[0]);
 		return requireWailsBody(resp as ApplyUnifiedDiffOut | null | undefined, 'ApplyUnifiedDiff');
 	}
 }

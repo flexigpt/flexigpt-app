@@ -10,6 +10,10 @@ import type {
 } from '@/spec/model';
 
 import type { IModelAggregateAPI } from '@/apis/interface';
+import {
+	managedProviderCreateRequestToWails,
+	managedProviderReplaceRequestToWails,
+} from '@/apis/wailsapi/model_request_projection';
 import { optionalWailsBody, requiredObject } from '@/apis/wailsapi/transport';
 import {
 	ClearDefaultProvider,
@@ -23,7 +27,7 @@ import {
 	SetProviderAPIKey,
 	SetProviderEnabled,
 	UpdateProvider,
-} from '@/apis/wailsjs/go/main/ModelAggregateWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/modelaggregatewrapper';
 
 export class WailsModelAggregateAPI implements IModelAggregateAPI {
 	async getDefaultProvider(): Promise<ArtifactRef | undefined> {
@@ -84,14 +88,14 @@ export class WailsModelAggregateAPI implements IModelAggregateAPI {
 
 	async createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
 		return requiredObject<ManagedProviderResult>(
-			await CreateProvider(request as Parameters<typeof CreateProvider>[0]),
+			await CreateProvider(managedProviderCreateRequestToWails(request)),
 			'CreateProvider'
 		);
 	}
 
 	async updateProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
 		return requiredObject<ManagedProviderResult>(
-			await UpdateProvider(request as Parameters<typeof UpdateProvider>[0]),
+			await UpdateProvider(managedProviderReplaceRequestToWails(request)),
 			'UpdateProvider'
 		);
 	}

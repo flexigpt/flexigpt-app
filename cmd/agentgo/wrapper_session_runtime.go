@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
@@ -279,11 +279,11 @@ func withSessionRuntime[T any](
 	})
 }
 
-// setAppContext binds the core subscription to the Wails transport after the
-// application context is available. Runtime snapshots remain authoritative:
+// setApplication binds the core subscription to the Wails v3 transport.
+// The context controls forwarding lifetime. Snapshots remain authoritative:
 // the event is only a notification to refresh attached Session/Run views.
-func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
-	if w == nil || ctx == nil {
+func (w *SessionRuntimeWrapper) setApplication(ctx context.Context, desktop *application.App) {
+	if w == nil || ctx == nil || desktop == nil {
 		return
 	}
 
@@ -333,7 +333,7 @@ func (w *SessionRuntimeWrapper) setAppContext(ctx context.Context) {
 					if !open {
 						return
 					}
-					runtime.EventsEmit(ctx, sessionRuntimeEventName, event)
+					desktop.Event.Emit(sessionRuntimeEventName, event)
 				}
 			}
 		},

@@ -39,6 +39,7 @@
 		"@platejs/tabbable": "^53.0.0",
 		"@react-router/node": "^8.4.0",
 		"@udecode/cn": "^52.3.4",
+		"@wailsio/runtime": "3.0.0-beta.34",
 		"class-variance-authority": "^0.7.1",
 		"compromise": "^14.18.0",
 		"isbot": "^5.2.2",
@@ -158,7 +159,7 @@
 			"enumMembers"
 		],
 		"ignore": [
-			"app/apis/wailsjs/**",
+			"app/apis/wailsbinding/**",
 			"app/lib/**",
 			"app/spec/model.ts"
 		],

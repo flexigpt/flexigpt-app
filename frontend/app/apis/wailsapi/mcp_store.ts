@@ -28,6 +28,7 @@ import {
 	pluginListItemFromWails,
 	pluginViewFromWails,
 } from '@/apis/wailsapi/list_item_projection';
+import { mcpPolicyViewFromWails, mcpServerSecretsViewFromWails } from '@/apis/wailsapi/mcp_projection';
 import { optionalWailsString, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddMCPPluginMember,
@@ -48,16 +49,7 @@ import {
 	SaveMCPSettings,
 	SetMCPPluginEnabled,
 	UpdateMCPPlugin,
-} from '@/apis/wailsjs/go/main/MCPStoreWrapper';
-
-function mcpServerSecretsViewFromWails(value: unknown, operation: string): MCPServerSecretsView {
-	const view = requiredObject<MCPServerSecretsView>(value, operation);
-
-	return {
-		...view,
-		inputs: wailsObjectArrayOrEmpty<MCPServerSecretsView['inputs'][number]>(view.inputs, `${operation}.inputs`),
-	};
-}
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/mcpstorewrapper';
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	async addMCPPluginMember(request: AddPluginMemberRequest): Promise<PluginView> {
@@ -90,10 +82,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async getMCPPolicy(policy: ArtifactRef): Promise<MCPPolicyView> {
-		return requiredObject<MCPPolicyView>(
-			await GetMCPPolicy(policy as Parameters<typeof GetMCPPolicy>[0]),
-			'GetMCPPolicy'
-		);
+		return mcpPolicyViewFromWails(await GetMCPPolicy(policy as Parameters<typeof GetMCPPolicy>[0]), 'GetMCPPolicy');
 	}
 
 	async getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {

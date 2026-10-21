@@ -5,15 +5,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/logger"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	assets "github.com/flexigpt/flexigpt-app/frontend"
 	"github.com/flexigpt/flexigpt-app/internal/logrotate"
@@ -25,131 +20,129 @@ import (
 var Version string
 
 func main() {
-	appDisplayTitle := "FlexiGPT - " + Version
-	wailsLogLevel := logger.INFO
-	wailsProdLogLevel := logger.INFO
+	appDisplayTitle := AppTitle + " - " + Version
+	aboutMessage := "An AI app platform.\n\nCopyright © 2023 - Present"
 
-	// Create an instance of the app structure.
+	// Allocate stable wrapper instances and preserve the existing data paths.
 	app := newApp()
+
 	slogOpts := &slog.HandlerOptions{
 		Level: &appSlogLevelVar,
 	}
 
-	var stdoutHandler slog.Handler = slog.NewTextHandler(os.Stdout, slogOpts)
-	stdoutLogger := slog.New(stdoutHandler)
+	stdoutLogger := slog.New(slog.NewTextHandler(os.Stdout, slogOpts))
 
-	// Init logger.
-	opts := logrotate.Options{
+	writer, err := logrotate.New(stdoutLogger, logrotate.Options{
 		Directory:            filepath.Join(app.dataBasePath, "logs"),
-		MaximumFileSize:      10 * 1024 * 1024, // 10 MB
+		MaximumFileSize:      10 * 1024 * 1024,
 		MaximumLifetime:      24 * time.Hour,
 		FileNameFunc:         logrotate.DefaultFilenameFunc,
 		FlushAfterEveryWrite: true,
-	}
-	writer, err := logrotate.New(stdoutLogger, opts)
+	})
 	if err != nil {
 		slog.Error("failed to create log writer", "error", err)
 		panic("init failed")
 	}
 	defer writer.Close()
 
-	var handler slog.Handler = slog.NewTextHandler(writer, slogOpts)
-	slogger := slog.New(handler)
+	slogger := slog.New(slog.NewTextHandler(writer, slogOpts))
 	slog.SetDefault(slogger)
+	logService := NewLogService(slogger)
 
+	// Also handles initialization panics and an unsuccessful desktop.Run().
+	// Registered after writer.Close so managers close before the logger.
+	defer app.shutdown(context.Background())
+
+	// Keep hydration, baseline provisioning, and runtime composition ahead
+	// of frontend access to the registered services.
 	app.initManagers()
-	// EmbeddedFSWalker(assets).
 
-	wailsLogger := NewSlogLoggerAdapter(slogger)
-	slog.Info("initialized", "app", appDisplayTitle)
-
-	// Create application with options.
-	err = wails.Run(&options.App{
-		Title:             appDisplayTitle,
-		Frameless:         true,
-		MinWidth:          1024,
-		MinHeight:         768,
-		StartHidden:       false,
-		HideWindowOnClose: false,
-		BackgroundColour:  &options.RGBA{R: 255, G: 255, B: 255, A: 255},
-		AssetServer: &assetserver.Options{
-			Assets: assets.Assets,
+	desktop := application.New(application.Options{
+		Name:        AppTitle,
+		Description: aboutMessage,
+		Icon:        assets.Icon,
+		Logger:      slogger,
+		Services: []application.Service{
+			application.NewService(app),
+			application.NewService(logService),
+			application.NewService(app.settingStoreAPI),
+			application.NewService(app.sessionStoreAPI),
+			application.NewService(app.modelStoreAPI),
+			application.NewService(app.modelAggregateAPI),
+			application.NewService(app.toolStoreAPI),
+			application.NewService(app.toolRuntimeAPI),
+			application.NewService(app.skillStoreAPI),
+			application.NewService(app.skillAggregateAPI),
+			application.NewService(app.skillRuntimeAPI),
+			application.NewService(app.workspaceRuntimeAPI),
+			application.NewService(app.workspaceStoreAPI),
+			application.NewService(app.mcpStoreAPI),
+			application.NewService(app.mcpRuntimeAPI),
+			application.NewService(app.mcpAggregateAPI),
+			application.NewService(app.completionAPI),
+			application.NewService(app.agentStoreAPI),
+			application.NewService(app.textStoreAPI),
+			application.NewService(app.sessionRuntimeAPI),
 		},
-		Menu:                     nil,
-		Logger:                   wailsLogger,
-		LogLevel:                 wailsLogLevel,
-		LogLevelProduction:       wailsProdLogLevel,
-		EnableDefaultContextMenu: true,
-		OnStartup: func(ctx context.Context) {
-			app.startup(ctx)
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets.Assets),
 		},
-
-		OnDomReady:      app.domReady,
-		OnBeforeClose:   app.beforeClose,
-		CSSDragProperty: "--app-draggable",
-		CSSDragValue:    "drag",
-		DragAndDrop: &options.DragAndDrop{
-			EnableFileDrop:     true,
-			DisableWebViewDrop: false,
-		},
-
-		OnShutdown:       app.shutdown,
-		WindowStartState: options.Normal,
-		Bind: []any{
-			app,
-			app.settingStoreAPI,
-			app.sessionStoreAPI,
-			app.modelStoreAPI,
-			app.modelAggregateAPI,
-			app.toolStoreAPI,
-			app.toolRuntimeAPI,
-			app.skillStoreAPI,
-			app.skillAggregateAPI,
-			app.skillRuntimeAPI,
-			app.workspaceRuntimeAPI,
-			app.workspaceStoreAPI,
-			app.mcpStoreAPI,
-			app.mcpRuntimeAPI,
-			app.mcpAggregateAPI,
-			app.completionAPI,
-			app.agentStoreAPI,
-			app.textStoreAPI,
-			app.sessionRuntimeAPI,
-		},
-
-		Windows: &windows.Options{
-			WebviewIsTransparent:              false,
-			WindowIsTranslucent:               false,
-			DisableWindowIcon:                 false,
-			DisableFramelessWindowDecorations: false,
-		},
-
-		Mac: &mac.Options{
-			TitleBar: &mac.TitleBar{
-				TitlebarAppearsTransparent: true,
-				HideTitle:                  false,
-				HideTitleBar:               true,
-				FullSizeContent:            false,
-				UseToolbar:                 false,
-				HideToolbarSeparator:       false,
-			},
-			About: &mac.AboutInfo{
-				Title:   appDisplayTitle,
-				Message: "An AI app platform.\n\nCopyright © 2023 - Present",
-				Icon:    assets.Icon,
-			},
-			WebviewIsTransparent: true,
-			WindowIsTranslucent:  true,
-		},
-
-		Linux: &linux.Options{
-			ProgramName:         appDisplayTitle,
-			Icon:                assets.Icon,
-			WindowIsTranslucent: false,
-			WebviewGpuPolicy:    linux.WebviewGpuPolicyOnDemand,
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
-	if err != nil {
+	app.desktop = desktop
+
+	backgroundColour := application.NewRGB(255, 255, 255)
+	if runtime.GOOS == "darwin" {
+		// Allow the translucent macOS backdrop to show through the webview.
+		backgroundColour = application.NewRGBA(255, 255, 255, 0)
+	}
+
+	app.window = desktop.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:               "main",
+		Title:              appDisplayTitle,
+		URL:                "/",
+		Width:              1024,
+		Height:             768,
+		MinWidth:           1024,
+		MinHeight:          768,
+		Frameless:          true,
+		BackgroundColour:   backgroundColour,
+		ZoomControlEnabled: true,
+		EnableFileDrop:     true,
+		Mac: application.MacWindow{
+			TitleBar: application.MacTitleBar{
+				AppearsTransparent: true,
+				Hide:               true,
+			},
+			Backdrop: application.MacBackdropTranslucent,
+		},
+		Linux: application.LinuxWindow{
+			Icon:             assets.Icon,
+			WebviewGpuPolicy: application.WebviewGpuPolicyOnDemand,
+		},
+	})
+
+	if runtime.GOOS == "darwin" {
+		menu := desktop.NewMenu()
+		menu.AddRole(application.AppMenu)
+		menu.AddRole(application.EditMenu)
+
+		helpMenu := menu.AddSubmenu("Help")
+		helpMenu.Add("About " + AppTitle).OnClick(func(_ *application.Context) {
+			desktop.Dialog.Info().
+				SetTitle(appDisplayTitle).
+				SetMessage(aboutMessage).
+				Show()
+		})
+
+		desktop.Menu.Set(menu)
+	}
+
+	slog.Info("initialized", "app", appDisplayTitle)
+
+	if err := desktop.Run(); err != nil {
 		panic(err)
 	}
 }

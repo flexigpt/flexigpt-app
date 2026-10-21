@@ -4,6 +4,6 @@
 /stories/
 /frontend/.react-router/
 /frontend/dist/
-/frontend/app/apis/wailsjs/
+/frontend/app/apis/wailsbinding/
 /build/flatpak/shared-modules/
 /LICENSE

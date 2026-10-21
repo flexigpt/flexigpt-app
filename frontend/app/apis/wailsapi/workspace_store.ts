@@ -24,7 +24,7 @@ import {
 	RemoveWorkspaceDirectory,
 	SetWorkspaceDirectoryArtifactEnabled,
 	SetWorkspaceDirectoryEnabled,
-} from '@/apis/wailsjs/go/main/WorkspaceStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/workspacestorewrapper';
 
 function projectWorkspaceDirectory(value: unknown, operation: string): WorkspaceDirectoryView {
 	const directory = requiredObject<WorkspaceDirectoryView>(value, operation);

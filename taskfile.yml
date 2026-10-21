@@ -138,6 +138,12 @@ tasks:
       # we dont setup task inside github action, so redirecting these prod builds to pnpm
       - "{{.WIN_BUILD_COMMAND}}"
 
+  wails-bindings:
+    desc: Generate Wails v3 TypeScript service bindings.
+    cmds:
+      - pnpm run touch:tmp
+      - cd "{{.GO_BACKEND_DIR}}" && wails3 generate bindings -ts -i -noindex -names -d "{{.ROOT_DIR}}/frontend/app/apis/wailsbinding"
+
   build-withbindings:
     desc: Build the Wails application with generated bindings and developer tools enabled.
     cmds:

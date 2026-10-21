@@ -58,6 +58,13 @@ export function sessionCommandReceiptFromWails(value: unknown, operation: string
 		),
 		starterText: optionalWailsString(receipt.starterText, `${operation}.starterText`),
 		message: optionalWailsString(receipt.message, `${operation}.message`),
+		preparationFailure:
+			receipt.preparationFailure === null || receipt.preparationFailure === undefined
+				? undefined
+				: requiredObject<NonNullable<SessionCommandReceipt['preparationFailure']>>(
+						receipt.preparationFailure,
+						`${operation}.preparationFailure`
+					),
 	};
 }
 

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
+import wails from '@wailsio/runtime/plugins/vite';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
@@ -68,7 +69,7 @@ export default defineConfig(({ mode }) => {
 			port: 5173,
 			strictPort: true,
 		},
-		plugins: [reactRouter(), tailwindcss()],
+		plugins: [reactRouter(), tailwindcss(), wails('app/apis/wailsbinding')],
 		resolve: {
 			tsconfigPaths: true,
 		},
@@ -134,7 +135,7 @@ export default defineConfig(({ mode }) => {
 			setupFiles: './vitest.setup.ts',
 			coverage: {
 				reporter: ['text', 'html'],
-				exclude: ['wailsjs', 'dist', 'vite.config.ts'],
+				exclude: ['wailsbinding', 'dist', 'vite.config.ts'],
 			},
 		},
 	};

@@ -8,8 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/flexigpt/llmtools-go/texttool"
 
@@ -194,15 +192,17 @@ func (a *App) saveFile(
 	contentBase64 string,
 	additionalFilters []attachmentRuntime.FileFilter,
 ) error {
-	if a.ctx == nil {
-		return errors.New("context is not initialized")
+	if a.desktop == nil || a.window == nil {
+		return errors.New("wails application is not initialized")
 	}
 
-	saveDialogOptions := runtime.SaveDialogOptions{
-		DefaultFilename: defaultFilename,
-		Filters:         dialogFilters(additionalFilters),
+	dialog := a.desktop.Dialog.SaveFile().
+		AttachToWindow(a.window).
+		SetFilename(defaultFilename)
+	for _, filter := range additionalFilters {
+		dialog.AddFilter(filter.DisplayName, filter.Pattern())
 	}
-	savePath, err := runtime.SaveFileDialog(a.ctx, saveDialogOptions)
+	savePath, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return err
 	}
@@ -225,26 +225,12 @@ func (a *App) openMultipleFilesAsAttachments(
 	allowMultiple bool,
 	additionalFilters []attachmentRuntime.FileFilter,
 ) (attachments []attachmentRuntime.Attachment, err error) {
-	if a.ctx == nil {
-		return nil, errors.New("context is not initialized")
-	}
-
-	opts := runtime.OpenDialogOptions{
-		Filters:              dialogFilters(additionalFilters),
-		ShowHiddenFiles:      true,
-		CanCreateDirectories: false,
-	}
-
-	paths := []string{}
-	if allowMultiple {
-		paths, err = runtime.OpenMultipleFilesDialog(a.ctx, opts)
-	} else {
-		p, e := runtime.OpenFileDialog(a.ctx, opts)
-		if e == nil && p != "" {
-			paths = append(paths, p)
-		}
-		err = e
-	}
+	paths, err := a.promptOpenPaths(
+		allowMultiple,
+		false,
+		true,
+		additionalFilters,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -288,44 +274,19 @@ func (a *App) openMultipleFilesAsAttachments(
 }
 
 func (a *App) pickDirectory() (string, error) {
-	if a.ctx == nil {
-		return "", errors.New("context is not initialized")
-	}
-
-	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		ShowHiddenFiles:      true,
-		CanCreateDirectories: false,
-	})
+	paths, err := a.promptOpenPaths(false, true, true, nil)
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(path), nil
+	if len(paths) == 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(paths[0]), nil
 }
 
 func (a *App) pickFiles(allowMultiple bool) ([]string, error) {
-	if a.ctx == nil {
-		return nil, errors.New("context is not initialized")
-	}
-
-	options := runtime.OpenDialogOptions{
-		ShowHiddenFiles:      true,
-		CanCreateDirectories: false,
-	}
-
-	var (
-		paths []string
-		err   error
-	)
-	if allowMultiple {
-		paths, err = runtime.OpenMultipleFilesDialog(a.ctx, options)
-	} else {
-		var path string
-		path, err = runtime.OpenFileDialog(a.ctx, options)
-		if path != "" {
-			paths = []string{path}
-		}
-	}
+	paths, err := a.promptOpenPaths(allowMultiple, false, true, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -340,19 +301,15 @@ func (a *App) pickFiles(allowMultiple bool) ([]string, error) {
 }
 
 func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachmentRuntime.DirectoryAttachmentsResult, error) {
-	if a.ctx == nil {
-		return nil, errors.New("context is not initialized")
-	}
-
-	dialogOpts := runtime.OpenDialogOptions{
-		ShowHiddenFiles:      false,
-		CanCreateDirectories: false,
-	}
-
-	dirPath, err := runtime.OpenDirectoryDialog(a.ctx, dialogOpts)
+	paths, err := a.promptOpenPaths(false, true, false, nil)
 	if err != nil {
 		return nil, err
 	}
+	if len(paths) == 0 {
+		// User cancelled; do not walk an empty path.
+		return &attachmentRuntime.DirectoryAttachmentsResult{}, nil
+	}
+	dirPath := paths[0]
 	walkRes, err := attachmentRuntime.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
 	if err != nil {
 		return nil, err
@@ -379,46 +336,45 @@ func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachmentRuntime.Direc
 	return out, nil
 }
 
-var defaultRuntimeFilters = func() []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(attachmentRuntime.DefaultFileFilters))
-	for idx := range attachmentRuntime.DefaultFileFilters {
-		runtimeFilters = append(
-			runtimeFilters,
-			runtime.FileFilter{
-				DisplayName: attachmentRuntime.DefaultFileFilters[idx].DisplayName,
-				Pattern:     attachmentRuntime.DefaultFileFilters[idx].Pattern(),
-			},
-		)
+// promptOpenPaths returns paths only; attachment construction stays separate.
+// Do not add default filters: macOS must allow unknown extensions and dotfiles.
+func (a *App) promptOpenPaths(
+	allowMultiple bool,
+	chooseDirectories bool,
+	showHiddenFiles bool,
+	filters []attachmentRuntime.FileFilter,
+) ([]string, error) {
+	if a.desktop == nil || a.window == nil {
+		return nil, errors.New("wails application is not initialized")
 	}
-	return runtimeFilters
-}()
 
-// dialogFilters returns nil when no explicit filters are provided.
-// This is important for macOS: providing filters makes NSOpenPanel/NSSavePanel
-// restrict selectable/savable file types, which can hide/disable "unknown"
-// extensions (e.g. .bazel/.cmake) and dotfiles depending on type mapping.
-func dialogFilters(additionalFilters []attachmentRuntime.FileFilter) []runtime.FileFilter {
-	if len(additionalFilters) == 0 {
-		return nil
+	dialog := a.desktop.Dialog.OpenFile().
+		AttachToWindow(a.window).
+		CanChooseFiles(!chooseDirectories).
+		CanChooseDirectories(chooseDirectories).
+		CanCreateDirectories(false).
+		ShowHiddenFiles(showHiddenFiles)
+	for _, filter := range filters {
+		dialog.AddFilter(filter.DisplayName, filter.Pattern())
 	}
-	// Only use the explicit filters requested by the caller.
-	return getRuntimeFilters(additionalFilters, false)
-}
 
-func getRuntimeFilters(additionalFilters []attachmentRuntime.FileFilter, includeDefault bool) []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(additionalFilters)+len(attachmentRuntime.DefaultFileFilters))
+	if allowMultiple {
+		paths, err := dialog.PromptForMultipleSelection()
+		if err != nil {
+			return nil, err
+		}
+		if paths == nil {
+			return []string{}, nil
+		}
+		return paths, nil
+	}
 
-	for idx := range additionalFilters {
-		runtimeFilters = append(
-			runtimeFilters,
-			runtime.FileFilter{
-				DisplayName: additionalFilters[idx].DisplayName,
-				Pattern:     additionalFilters[idx].Pattern(),
-			},
-		)
+	path, err := dialog.PromptForSingleSelection()
+	if err != nil {
+		return nil, err
 	}
-	if includeDefault {
-		runtimeFilters = append(runtimeFilters, defaultRuntimeFilters...)
+	if path == "" {
+		return []string{}, nil
 	}
-	return runtimeFilters
+	return []string{path}, nil
 }

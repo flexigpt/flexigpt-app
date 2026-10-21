@@ -43,7 +43,7 @@ import {
 	pluginViewFromWails,
 	storeSkillListItemFromWails,
 } from '@/apis/wailsapi/list_item_projection';
-import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumFromWails, goBytesToWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddSkillPath,
 	AddSkillPluginMember,
@@ -70,7 +70,28 @@ import {
 	SetSkillEnabled,
 	SetSkillPluginEnabled,
 	UpdateSkillPlugin,
-} from '@/apis/wailsjs/go/main/SkillStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/skillstorewrapper';
+
+function managedSkillRequestForWails<T extends ManagedSkillCreateRequest | ManagedSkillReplaceRequest>(request: T) {
+	const { files, skillMD, ...rest } = request;
+
+	return {
+		...rest,
+		...(skillMD === undefined
+			? {}
+			: {
+					skillMD: goBytesToWails(skillMD, 'ManagedSkillRequest.skillMD'),
+				}),
+		...(files === undefined
+			? {}
+			: {
+					files: files.map((file, index) => ({
+						...file,
+						content: goBytesToWails(file.content, `ManagedSkillRequest.files[${index}].content`),
+					})),
+				}),
+	};
+}
 
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async getArtifactSkillDetails(skill: ArtifactRef, expectedRevision: number): Promise<ArtifactSkillDetails> {
@@ -113,15 +134,19 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	}
 
 	async createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult> {
+		const wailsRequest = managedSkillRequestForWails(request);
+
 		return pluginResultFromWails<ManagedSkillCreateResult>(
-			await CreateManagedSkill(request as Parameters<typeof CreateManagedSkill>[0]),
+			await CreateManagedSkill(wailsRequest as unknown as Parameters<typeof CreateManagedSkill>[0]),
 			'CreateManagedSkill'
 		);
 	}
 
 	async replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult> {
+		const wailsRequest = managedSkillRequestForWails(request);
+
 		return pluginResultFromWails<ManagedSkillReplaceResult>(
-			await ReplaceManagedSkill(request as Parameters<typeof ReplaceManagedSkill>[0]),
+			await ReplaceManagedSkill(wailsRequest as unknown as Parameters<typeof ReplaceManagedSkill>[0]),
 			'ReplaceManagedSkill'
 		);
 	}

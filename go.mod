@@ -13,7 +13,7 @@ require (
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/wailsapp/wails/v2 v2.17.0
+	github.com/wailsapp/wails/v3 v3.0.0-beta.34
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/oauth2 v0.37.0
 )
@@ -23,7 +23,6 @@ require (
 	cloud.google.com/go/auth v0.20.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
-	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -31,7 +30,6 @@ require (
 	github.com/andybalholm/cascadia v1.3.5 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.82.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/bep/debounce v1.2.1 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.5 // indirect
@@ -42,7 +40,6 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/forPelevin/gomoji v1.3.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.9.2 // indirect
 	github.com/go-git/go-git/v5 v5.19.3 // indirect
@@ -63,14 +60,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
-	github.com/labstack/echo/v4 v4.15.4 // indirect
-	github.com/labstack/gommon v0.5.0 // indirect
-	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
-	github.com/leaanthony/gosod v1.0.4 // indirect
-	github.com/leaanthony/slicer v1.6.0 // indirect
-	github.com/leaanthony/u v1.1.1 // indirect
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0 // indirect
 	github.com/markusmobius/go-dateparser v1.4.7 // indirect
 	github.com/markusmobius/go-dateutil/v2 v2.9.1 // indirect
@@ -83,12 +73,9 @@ require (
 	github.com/openai/openai-go/v3 v3.82.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pjbgf/sha1cd v0.7.0 // indirect
-	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
-	github.com/samber/lo v1.51.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
@@ -99,10 +86,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/tkrajina/go-reflector v0.5.8 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wasilibs/go-re2 v1.12.0 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20250123031827-cd30c44769bb // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect

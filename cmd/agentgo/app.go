@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/adrg/xdg"
 )
@@ -23,7 +24,11 @@ const (
 )
 
 type App struct {
-	ctx context.Context
+	ctx          context.Context
+	cancel       context.CancelFunc
+	desktop      *application.App
+	window       *application.WebviewWindow
+	shutdownOnce sync.Once
 
 	settingStoreAPI       *SettingStoreWrapper
 	sessionStoreAPI       *SessionStoreWrapper
@@ -60,6 +65,26 @@ type App struct {
 	artifactInitializationError error
 }
 
+// ServiceStartup only attaches the Wails transport. Managers have already
+// been initialized, including protected topology and mutable-root baselines.
+func (a *App) ServiceStartup(
+	_ context.Context,
+	_ application.ServiceOptions,
+) error {
+	if a.desktop == nil || a.window == nil {
+		return errors.New("wails application is not initialized")
+	}
+	if a.sessionRuntimeAPI != nil {
+		a.sessionRuntimeAPI.setApplication(a.ctx, a.desktop)
+	}
+	return nil
+}
+
+func (a *App) ServiceShutdown() error {
+	a.shutdown(context.Background())
+	return nil
+}
+
 func newApp() *App {
 	if xdg.DataHome == "" {
 		slog.Error(
@@ -69,7 +94,8 @@ func newApp() *App {
 		panic("failed to initialize app: xdg paths not set")
 	}
 
-	app := &App{}
+	ctx, cancel := context.WithCancel(context.Background())
+	app := &App{ctx: ctx, cancel: cancel}
 	storageName := topology.MustApplicationStorageName
 	app.dataBasePath = filepath.Join(
 		xdg.DataHome,
@@ -647,37 +673,20 @@ func (a *App) initManagers() {
 		)
 	}
 	slog.Info("session runtime initialized")
-	if a.ctx != nil {
-		a.sessionRuntimeAPI.setAppContext(a.ctx)
+}
+
+// shutdown is also used by fail-closed initialization and deferred cleanup.
+func (a *App) shutdown(_ context.Context) {
+	if a == nil {
+		return
 	}
+	a.shutdownOnce.Do(a.closeManagers)
 }
 
-// startup is called at application startup.
-func (a *App) startup(ctx context.Context) { //nolint:all
-	a.ctx = ctx
-
-	if a.sessionRuntimeAPI != nil {
-		a.sessionRuntimeAPI.setAppContext(a.ctx)
+func (a *App) closeManagers() {
+	if a.cancel != nil {
+		a.cancel()
 	}
-
-	// Load the frontend.
-	runtime.WindowShow(a.ctx)
-}
-
-// domReady is called after front-end resources have been loaded.
-func (a *App) domReady(ctx context.Context) { //nolint:all
-	// Add action here.
-}
-
-// beforeClose is called when the application is about to quit,
-// either by clicking the window close button or calling runtime.Quit.
-// Returning true will cause the application to continue, false will continue shutdown as normal.
-func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
-	return false
-}
-
-// shutdown is called at application termination.
-func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
 	if a.sessionRuntimeAPI != nil {

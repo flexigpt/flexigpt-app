@@ -12,6 +12,10 @@ import type {
 } from '@/spec/model';
 
 import type { IModelStoreAPI } from '@/apis/interface';
+import {
+	managedModelCreateRequestToWails,
+	managedModelReplaceRequestToWails,
+} from '@/apis/wailsapi/model_request_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CreateModel,
@@ -25,7 +29,7 @@ import {
 	SaveModelSettings,
 	SetModelEnabled,
 	UpdateModel,
-} from '@/apis/wailsjs/go/main/ModelStoreWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/modelstorewrapper';
 
 export class WailsModelStoreAPI implements IModelStoreAPI {
 	async listProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]> {
@@ -62,14 +66,14 @@ export class WailsModelStoreAPI implements IModelStoreAPI {
 
 	async createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
 		return requiredObject<ManagedModelResult>(
-			await CreateModel(request as Parameters<typeof CreateModel>[0]),
+			await CreateModel(managedModelCreateRequestToWails(request)),
 			'CreateModel'
 		);
 	}
 
 	async updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
 		return requiredObject<ManagedModelResult>(
-			await UpdateModel(request as Parameters<typeof UpdateModel>[0]),
+			await UpdateModel(managedModelReplaceRequestToWails(request)),
 			'UpdateModel'
 		);
 	}

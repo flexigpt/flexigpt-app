@@ -29,6 +29,8 @@ import { Sidebar } from '@/components/sidebar';
 
 // oxlint-disable-next-line import/no-unassigned-import
 import '@/globals.css';
+// oxlint-disable-next-line import/no-unassigned-import
+import '@wailsio/runtime';
 
 import type { Route } from './+types/root';
 

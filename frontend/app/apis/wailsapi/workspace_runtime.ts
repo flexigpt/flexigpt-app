@@ -16,7 +16,7 @@ import {
 	LoadWorkspaceMCPServers,
 	LoadWorkspaceSkills,
 	ResolveWorkspaceRuntimePlan,
-} from '@/apis/wailsjs/go/main/WorkspaceRuntimeWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/workspaceruntimewrapper';
 
 function projectWorkspacePromptPlan(value: unknown, operation: string): WorkspacePromptPlan {
 	const plan = requiredObject<WorkspacePromptPlan>(value, operation);

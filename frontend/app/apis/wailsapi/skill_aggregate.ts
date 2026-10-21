@@ -9,7 +9,7 @@ import {
 	ListArtifactSkillRefs,
 	ResolveArtifactSkill,
 	ResolveArtifactSkills,
-} from '@/apis/wailsjs/go/main/SkillAggregateWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/skillaggregatewrapper';
 
 export class WailsSkillAggregateAPI implements ISkillAggregateAPI {
 	async getArtifactSkillsPrompt(filter: ArtifactSkillFilter): Promise<string> {

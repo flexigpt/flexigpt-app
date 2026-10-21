@@ -9,6 +9,7 @@ import type {
 import type {
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
+	MCPContent,
 	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
 	MCPReadResourceResponseBody,
@@ -21,10 +22,12 @@ import {
 	MCPTaskSupport,
 	MCPToolRisk,
 } from '@/spec/mcp';
+import { MCPContentType } from '@/spec/session_mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
 import {
 	enumFromWails,
+	goBytesFromWails,
 	optionalWailsString,
 	requiredObject,
 	requireWailsBoolean,
@@ -43,7 +46,7 @@ import {
 	ListMCPServerTools,
 	ReadMCPResource,
 	RefreshMCPServer,
-} from '@/apis/wailsjs/go/main/MCPRuntimeWrapper';
+} from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/mcpruntimewrapper';
 
 function runtimeSnapshotFromWails(value: unknown, operation: string): MCPServerRuntimeSnapshot {
 	const snapshot = requiredObject<MCPServerRuntimeSnapshot>(value, operation);
@@ -51,6 +54,63 @@ function runtimeSnapshotFromWails(value: unknown, operation: string): MCPServerR
 	return {
 		...snapshot,
 		status: enumFromWails(snapshot.status, MCPServerStatus, `${operation}.status`),
+	};
+}
+
+function mcpContentFromWails(value: unknown, operation: string): MCPContent {
+	const rawContent = requiredObject<Record<string, unknown>>(value, operation);
+	const content = requiredObject<MCPContent>(value, operation);
+	let resource: MCPContent['resource'];
+
+	if (rawContent.resource !== null && rawContent.resource !== undefined) {
+		const rawResource = requiredObject<Record<string, unknown>>(rawContent.resource, `${operation}.resource`);
+
+		resource = {
+			...rawResource,
+			blob: goBytesFromWails(rawResource.blob, `${operation}.resource.blob`),
+		} as MCPContent['resource'];
+	}
+
+	return {
+		...content,
+		type: enumFromWails(rawContent.type, MCPContentType, `${operation}.type`),
+		data: goBytesFromWails(rawContent.data, `${operation}.data`),
+		resource,
+	};
+}
+
+function mcpPromptResponseFromWails(value: unknown, operation: string): MCPGetPromptResponseBody {
+	const rawResponse = requiredObject<Record<string, unknown>>(value, operation);
+	const response = requiredObject<MCPGetPromptResponseBody>(value, operation);
+
+	return {
+		...response,
+		messages:
+			rawResponse.messages === null || rawResponse.messages === undefined
+				? undefined
+				: (wailsObjectArrayOrEmpty(rawResponse.messages, `${operation}.messages`).map((rawMessage, index) => {
+						const message = requiredObject<Record<string, unknown>>(rawMessage, `${operation}.messages[${index}]`);
+
+						return {
+							...message,
+							content: mcpContentFromWails(message.content, `${operation}.messages[${index}].content`),
+						};
+					}) as MCPGetPromptResponseBody['messages']),
+	};
+}
+
+function mcpReadResourceResponseFromWails(value: unknown, operation: string): MCPReadResourceResponseBody {
+	const rawResponse = requiredObject<Record<string, unknown>>(value, operation);
+	const response = requiredObject<MCPReadResourceResponseBody>(value, operation);
+
+	return {
+		...response,
+		contents:
+			rawResponse.contents === null || rawResponse.contents === undefined
+				? undefined
+				: (wailsObjectArrayOrEmpty(rawResponse.contents, `${operation}.contents`).map((content, index) =>
+						mcpContentFromWails(content, `${operation}.contents[${index}]`)
+					) as MCPReadResourceResponseBody['contents']),
 	};
 }
 
@@ -64,7 +124,7 @@ function mcpToolCapabilityFromWails(value: unknown, operation: string): MCPToolC
 		executionMode: enumFromWails(tool.executionMode, MCPExecutionMode, `${operation}.executionMode`),
 		taskSupport: enumFromWails(tool.taskSupport, MCPTaskSupport, `${operation}.taskSupport`),
 		app:
-			tool.app === undefined
+			tool.app === null || tool.app === undefined
 				? undefined
 				: {
 						...tool.app,
@@ -122,7 +182,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		promptName: string,
 		promptArguments: Record<string, string>
 	): Promise<MCPGetPromptResponseBody> {
-		return requiredObject<MCPGetPromptResponseBody>(
+		return mcpPromptResponseFromWails(
 			await GetMCPPrompt(server as Parameters<typeof GetMCPPrompt>[0], promptName, promptArguments),
 			'GetMCPPrompt'
 		);
@@ -182,7 +242,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	}
 
 	async readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {
-		return requiredObject<MCPReadResourceResponseBody>(
+		return mcpReadResourceResponseFromWails(
 			await ReadMCPResource(server as Parameters<typeof ReadMCPResource>[0], uri),
 			'ReadMCPResource'
 		);

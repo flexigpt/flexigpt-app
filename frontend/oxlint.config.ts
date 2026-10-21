@@ -238,6 +238,7 @@ const tsRules: DummyRuleMap = {
 	'typescript/return-await': ['error', 'error-handling-correctness-only'],
 	'typescript/switch-exhaustiveness-check': ['error', { considerDefaultExhaustiveForUnions: true }],
 
+	'typescript/prefer-ts-expect-error': 'off',
 	'typescript/no-misused-promises': 'off',
 	'typescript/no-unsafe-argument': 'off',
 	'typescript/no-unsafe-assignment': 'off',
@@ -507,7 +508,7 @@ export default defineConfig({
 
 	extends: [baseConfig as OxlintConfig],
 
-	ignorePatterns: [...new Set([...baseIgnorePatterns, 'dist/**', 'app/apis/wailsjs/**', '.react-router/**'])],
+	ignorePatterns: [...new Set([...baseIgnorePatterns, 'dist/**', 'app/apis/wailsbinding/**', '.react-router/**'])],
 
 	jsPlugins: [
 		{

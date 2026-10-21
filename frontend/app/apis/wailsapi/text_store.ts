@@ -4,7 +4,7 @@ import { TextInsert } from '@/spec/text';
 
 import type { ITextStoreAPI } from '@/apis/interface';
 import { enumFromWails, requiredObject } from '@/apis/wailsapi/transport';
-import { MaterializeText } from '@/apis/wailsjs/go/main/TextStoreWrapper';
+import { MaterializeText } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/textstorewrapper';
 
 export class WailsTextStoreAPI implements ITextStoreAPI {
 	async materializeText(text: ArtifactRef): Promise<TextMaterialization> {
