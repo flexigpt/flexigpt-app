@@ -1,6 +1,14 @@
 name: Setup Environment Variables
 description: Loads env vars
-inputs: {}
+inputs:
+  tag:
+    description: Requested application version tag.
+    required: false
+    default: ""
+  release:
+    description: Whether to publish a release from the requested tag.
+    required: false
+    default: "false"
 runs:
   using: "composite"
   steps:
@@ -10,24 +18,31 @@ runs:
 
     - name: Set Version Tag
       shell: bash
+      env:
+        REQUESTED_TAG: ${{ inputs.tag }}
       run: |
         # Prefer explicit tag input (workflow_dispatch / workflow_call),
         # otherwise fall back to the ref name (e.g. for push tag events).
-        TAG_INPUT="${{ github.event.inputs.tag }}"
+        TAG_INPUT="${REQUESTED_TAG}"
         if [[ -n "${TAG_INPUT}" ]]; then
           VERSION_TAG="${TAG_INPUT}"
         else
           VERSION_TAG="${GITHUB_REF_NAME}"
         fi
+        [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          echo "Version tag must match vX.Y.Z" >&2; exit 1;
+        }
         echo "VERSION_TAG=${VERSION_TAG}" >> "$GITHUB_ENV"
 
     - name: Check tag exists and set RELEASE_MODE
       shell: bash
+      env:
+        REQUESTED_RELEASE: ${{ inputs.release }}
       run: |
         # RELEASE_MODE is driven by the "release" input on both workflow_dispatch
         # and workflow_call. For plain push events this stays "false".
-        RELEASE_INPUT="${{ github.event.inputs.release }}"
-        TAG_INPUT="${{ github.event.inputs.tag }}"
+        RELEASE_INPUT="${REQUESTED_RELEASE}"
+        TAG_INPUT="${VERSION_TAG}"
         if [[ "${RELEASE_INPUT}" == "true" && -n "${TAG_INPUT}" ]]; then
           git fetch --tags --quiet
           if git rev-parse "refs/tags/${TAG_INPUT}" >/dev/null 2>&1; then
@@ -44,7 +59,7 @@ runs:
       if: env.RELEASE_MODE == 'true'
       shell: bash
       run: |
-        TAG_INPUT="${{ github.event.inputs.tag }}"
+        TAG_INPUT="${VERSION_TAG}"
         git fetch --tags
         git checkout "refs/tags/${TAG_INPUT}"
 

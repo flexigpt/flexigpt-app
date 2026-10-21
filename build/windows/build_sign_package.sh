@@ -28,6 +28,7 @@ done
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+REQUESTED_VERSION_TAG="${VERSION_TAG}"
 if [[ -f "build/buildvars.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -35,14 +36,15 @@ if [[ -f "build/buildvars.env" ]]; then
   set +a
 fi
 
-: "${WIN_BUILD_COMMAND:?Must set WIN_BUILD_COMMAND}"
+export VERSION_TAG="${REQUESTED_VERSION_TAG}"
+
 : "${WIN_INSTALLER_PATH:?Must set WIN_INSTALLER_PATH}"
 : "${COMMON_BUILD_NAME:?Must set COMMON_BUILD_NAME}"
 
 
 echo "==> Generating licenses..."
 chmod +x build/licenses/gen_licenses.sh
-build/licenses/gen_licenses.sh --version "${VERSION_TAG}"
+task licenses:gen
 
 echo "==> Verifying generated license files..."
 LICENSE_GO="build/licenses/go-dependency-licenses.txt"
@@ -59,10 +61,8 @@ for f in "${LICENSE_GO}" "${LICENSE_JS}"; do
   fi
 done
 
-echo "==> Building Windows app with: ${WIN_BUILD_COMMAND}"
-export VERSION_TAG="${VERSION_TAG}"
-eval "${WIN_BUILD_COMMAND}"
-
+echo "==> Building Windows application..."
+task build-win-binary
 
 if [[ "${DO_SIGN}" == "true" ]]; then
   echo "==> Signing requested..."
@@ -72,11 +72,18 @@ if [[ "${DO_SIGN}" == "true" ]]; then
   fi
 
   if command -v powershell.exe >/dev/null 2>&1; then
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/sign_windows.ps1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/sign_windows.ps1 -Target app
   else
     echo "ERROR: powershell.exe not found; cannot sign"
     exit 1
   fi
+fi
+
+echo "==> Building Windows installer..."
+task package-win-installer
+
+if [[ "${DO_SIGN}" == "true" ]]; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/sign_windows.ps1 -Target installer
 fi
 
 echo "==> Done."

@@ -115,7 +115,8 @@ export function sessionRuntimeListItemFromWails(value: unknown, operation: strin
 }
 
 export function sessionRuntimeEventFromWails(value: unknown, operation: string): SessionRuntimeEvent {
-	const event = requiredObject<Record<string, unknown>>(value, operation);
+	const rEvent = requiredObject<Record<string, unknown>>(value, operation);
+	const event = requiredObject<Record<string, unknown>>(rEvent.data, operation);
 
 	return {
 		sessionID: requireWailsString(event.sessionID, `${operation}.sessionID`),

@@ -3,7 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "build/main.js",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/flexigpt/flexigpt-app.git"
@@ -14,12 +13,7 @@
 		"node": "24.14.0"
 	},
 	"scripts": {
-		"touch:tmp": "node -e \"require('fs-extra').ensureFileSync('frontend/dist/client/a.tmp')\"",
-		"check:version": "node -e \"const t=process.env.VERSION_TAG;if(!t){console.error('VERSION_TAG not set');process.exit(1);}if(!/^v\\d+\\.\\d+\\.\\d+$/.test(t)){console.error('VERSION_TAG must match vX.Y.Z');process.exit(1);}\"",
-		"build:linux": "cd ./cmd/agentgo && pnpm -F frontend run build:wails  && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -tags webkit2_41 -platform linux/amd64 -ldflags=\"-X main.Version=$VERSION_TAG\"",
-		"build:mac": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -platform darwin/universal -ldflags=\"-X main.Version=$VERSION_TAG\"",
-		"build:win": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -nsis -platform windows/amd64 -ldflags=\"-X main.Version=%VERSION_TAG%\"",
-		"licenses:gen": "bash ./build/licenses/gen_licenses.sh",
+		"touch:tmp": "node -e \"const fs=require('node:fs');fs.mkdirSync('frontend/dist/client',{recursive:true});fs.closeSync(fs.openSync('frontend/dist/client/a.tmp','a'));\"",
 		"test:e2e": "node ./e2e/run.ts",
 		"test:e2e:headed": "node ./e2e/run.ts --headed",
 		"comment1": "Keep application data even after success: FLEXIGPT_E2E_KEEP_DATA=1 pnpm run test:e2e",
@@ -33,9 +27,9 @@
 		"@playwright/test": "^1.64.1",
 		"@types/node": "24.1.0",
 		"browserslist": "^4.29.3",
-		"fs-extra": "^11.4.1",
 		"oxlint": "^1.88.0",
 		"oxlint-tsgolint": "^7.0.2004",
-		"typescript": "^7.0.2"
+		"typescript": "^7.0.2",
+		"yaml": "^2.9.0"
 	}
 }

@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        description: "Git ref or commit SHA to build. Empty uses the workflow ref."
+        required: false
+        default: ""
+        type: string
 
   workflow_call:
     inputs:
@@ -40,6 +45,10 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        required: false
+        default: ""
+        type: string
     secrets:
       MACOS_SIGN_APPLE_USERNAME:
         required: false
@@ -122,10 +131,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref || github.sha }}
           submodules: "recursive"
 
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-env
+        with:
+          tag: ${{ inputs.tag }}
+          release: ${{ inputs.release }}
 
       - name: Setup Tools
         uses: ./.github/actions/setup-tools
@@ -171,7 +184,7 @@ jobs:
           fi
           echo "SIGN_FLAGS: ${SIGN_FLAGS}"
           echo "NOTARIZE_FLAGS: ${NOTARIZE_FLAGS}"
-          ./build/darwin/build_sign_notarize.sh --version "${VERSION_TAG}" ${SIGN_FLAGS} ${NOTARIZE_FLAGS}
+          task package-mac -- ${SIGN_FLAGS} ${NOTARIZE_FLAGS}
 
       - name: Copy file
         shell: bash

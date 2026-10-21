@@ -31,6 +31,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Load buildvars.env (for local runs; CI may already export these).
+REQUESTED_VERSION_TAG="${VERSION_TAG}"
 if [[ -f "build/buildvars.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -38,6 +39,7 @@ if [[ -f "build/buildvars.env" ]]; then
   set +a
 fi
 
+VERSION_TAG="${REQUESTED_VERSION_TAG:-${VERSION_TAG}}"
 : "${LICENSE_TEMPLATE_PATH:?Must set LICENSE_TEMPLATE_PATH}"
 : "${LICENSE_OUTPUT_DIR:?Must set LICENSE_OUTPUT_DIR}"
 : "${LICENSE_JS_FILENAME:?Must set LICENSE_JS_FILENAME}"
@@ -70,6 +72,8 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # Run frontend generator
+echo "==> Generating Wails bindings..."
+task wails-bindings
 pnpm -C "${ROOT_DIR}/frontend" run licenses:gen
 [[ -s "${JS_OUT}" ]] || die "JS licenses output missing/empty at: ${JS_OUT}"
 

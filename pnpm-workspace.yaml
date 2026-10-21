@@ -14,3 +14,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - "@wailsio/runtime"
+
+permissions:
+  compromise:
+    skills: false

@@ -64,9 +64,10 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		// App-wide global settings remain at the top level
-		envDir: false,
+		envDir: '.',
 		server: {
-			port: 5173,
+			host: '127.0.0.1',
+			port: Number(process.env.WAILS_VITE_PORT || 5173),
 			strictPort: true,
 		},
 		plugins: [reactRouter(), tailwindcss(), wails('app/apis/wailsbinding')],

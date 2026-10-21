@@ -5,7 +5,15 @@ version: "3"
 dotenv:
   - "build/buildvars.env"
 
+env:
+  VERSION_TAG: '{{.VERSION_TAG | default ""}}'
+  FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
+
 includes:
+  desktop:
+    taskfile: ./build/Taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+
   git:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/git.yml
     checksum: b22093001cd4d15f3ccf39ba4ccf16e509468379ac24d25f79196f277a7f02b0
@@ -89,6 +97,7 @@ tasks:
     desc: Install Wails, Go license tooling, and the configured Go development tools.
     cmds:
       - "{{.INSTALL_TOOL_WAILS}}"
+      - "{{.INSTALL_TOOL_TASK}}"
       - "{{.INSTALL_TOOL_GO_LICENSES}}"
       - task: go:install-tools
       - cmd: echo '***If updating wails or licences-go or golangci-lint, search for their previous versions and then update all places.***'
@@ -120,35 +129,122 @@ tasks:
           echo 'See if your Path is properly set via zshrc or bashrc and reflected vscode.'
         silent: true
 
+  check-version:
+    desc: Validate that VERSION_TAG matches the project release version format.
+    cmds:
+      - >-
+        node -e "const tag=process.env.VERSION_TAG;if(!/^v\d+\.\d+\.\d+$/.test(tag||'')){console.error('VERSION_TAG must match vX.Y.Z');process.exit(1);}"
+
   build-linux:
     desc: Build the Linux production application package.
+    deps:
+      - check-version
     cmds:
-      # we dont setup task inside github action, so redirecting these prod builds to pnpm
-      - "{{.LINUX_BUILD_COMMAND}}"
+      - task: build
+        vars:
+          PLATFORM: linux
+          ARCH: amd64
+          CONFIG: production
 
   build-mac:
     desc: Build the macOS production application package.
+    deps:
+      - check-version
     cmds:
-      # we dont setup task inside github action, so redirecting these prod builds to pnpm
-      - "{{.MACOS_BUILD_COMMAND}}"
+      - task: build
+        vars:
+          PLATFORM: darwin
+          ARCH: universal
+          CONFIG: production
 
   build-win:
     desc: Build the Windows production application package.
+    deps:
+      - check-version
     cmds:
-      # we dont setup task inside github action, so redirecting these prod builds to pnpm
-      - "{{.WIN_BUILD_COMMAND}}"
+      - task: licenses:gen
+      - task: build-win-binary
+      - task: package-win-installer
+
+  build-win-binary:
+    desc: Build the Windows production executable without packaging or signing.
+    deps:
+      - check-version
+    cmds:
+      - task: build
+        vars:
+          PLATFORM: windows
+          ARCH: amd64
+          CONFIG: production
+
+  package-win-installer:
+    desc: Package the existing Windows executable and license files with custom NSIS.
+    deps:
+      - check-version
+    cmds:
+      - task: desktop:installer
+
+  licenses:gen:
+    desc: Generate project, Go, and frontend dependency license files.
+    cmds:
+      - bash ./build/licenses/gen_licenses.sh --version "$VERSION_TAG"
+
+  package-mac:
+    desc: Run the existing macOS build, signing, and notarization pipeline.
+    deps:
+      - check-version
+    cmds:
+      - bash ./build/darwin/build_sign_notarize.sh --version "$VERSION_TAG" {{.CLI_ARGS}}
+
+  package-win:
+    desc: Run the existing Windows build, signing, and NSIS packaging pipeline.
+    deps:
+      - check-version
+    cmds:
+      - bash ./build/windows/build_sign_package.sh --version "$VERSION_TAG" {{.CLI_ARGS}}
+
+  flatpak:build-module:
+    desc: Build and install the application inside Flatpak Builder.
+    deps:
+      - check-version
+    preconditions:
+      - sh: test -n "${FLATPAK_DEST:-}"
+        msg: "flatpak:build-module requires the Flatpak Builder environment"
+    cmds:
+      - bash ./build/flatpak/build_flatpak.sh
 
   wails-bindings:
     desc: Generate Wails v3 TypeScript service bindings.
     cmds:
-      - pnpm run touch:tmp
-      - cd "{{.GO_BACKEND_DIR}}" && wails3 generate bindings -ts -i -noindex -names -d "{{.ROOT_DIR}}/frontend/app/apis/wailsbinding"
+      - task: desktop:bindings
+
+  build:
+    desc: Build the desktop application through the project Wails v3 tasks.
+    cmds:
+      - task: desktop:build
+
+  dev:
+    desc: Run Wails v3 development mode through the project watcher configuration.
+    env:
+      WAILS_VITE_PORT: '{{.WAILS_VITE_PORT | default "5173"}}'
+      FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
+    cmds:
+      - wails3 dev -config ./build/config.yml -port "{{.WAILS_VITE_PORT | default "5173"}}"
 
   build-withbindings:
-    desc: Build the Wails application with generated bindings and developer tools enabled.
+    desc: Build a complete debug desktop application, generate bindings, and capture output.
+    env:
+      VERSION_TAG: "{{.COMMON_APP_DEV_VERSION}}"
+      FLEXIGPT_DEV_SERVER: "0"
     cmds:
-      - pnpm run touch:tmp
-      - cd "{{.GO_BACKEND_DIR}}" && wails build -devtools -m -tags webkit2_41 -clean -v 2 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}" > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
+      - node -e "require('node:fs').mkdirSync(process.argv[1],{recursive:true})" "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
+      - >-
+        node "{{.ROOT_DIR}}/build/desktop.mjs" build
+        "{{.PLATFORM | default OS}}"
+        "{{.ARCH | default ARCH}}"
+        debug
+        "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
+        > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
 
   pack-flatpak:
     desc: Run the Flatpak packaging workflow locally with act.
@@ -168,13 +264,13 @@ tasks:
   run-dev:
     desc: Start the Wails application in development mode.
     cmds:
-      - pnpm run touch:tmp
-      - cd "{{.GO_BACKEND_DIR}}" && wails dev -s -v 2 -tags webkit2_41 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}"
+      - task: dev
+        vars:
+          VERSION_TAG: "{{.COMMON_APP_DEV_VERSION}}"
 
   run-watch:
-    desc: Build the frontend for Wails and start the development application.
+    desc: Start frontend hot reload and native Go rebuilds.
     cmds:
-      - pnpm -F frontend run build:wails
       - task: run-dev
 
   lint-gopls:

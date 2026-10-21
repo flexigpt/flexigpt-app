@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+# Included by the repository's root taskfile.yml.
+# ROOT_DIR therefore refers to the repository root.
+tasks:
+  build:
+    desc: Compile the desktop application using the project packaging layout.
+    env:
+      FLEXIGPT_DEV_SERVER: "0"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - >-
+        node build/desktop.mjs build
+        "{{.PLATFORM | default OS}}"
+        "{{.ARCH | default ARCH}}"
+        "{{.CONFIG | default "debug"}}"
+        "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
+
+  bindings:
+    desc: Generate the application TypeScript bindings.
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - node build/desktop.mjs bindings
+
+  installer:
+    desc: Package the compiled Windows application using the custom NSIS script.
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - node build/desktop.mjs installer
+
+  dev:frontend:
+    desc: Run the React Router development server.
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - node build/desktop.mjs frontend
+
+  dev:build:
+    desc: Rebuild the native development executable.
+    dir: "{{.ROOT_DIR}}"
+    env:
+      FLEXIGPT_DEV_SERVER: "1"
+    cmds:
+      - >-
+        node build/desktop.mjs build
+        "{{OS}}"
+        "{{ARCH}}"
+        debug
+        "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
+
+  dev:run:
+    desc: Run the native development executable.
+    dir: "{{.ROOT_DIR}}"
+    env:
+      WAILS_VITE_PORT: '{{.WAILS_VITE_PORT | default "5173"}}'
+    cmds:
+      - node build/desktop.mjs run

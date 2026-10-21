@@ -1,0 +1,78 @@
+name: "Build Branch Tip Packages"
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch whose current tip should be packaged"
+        required: true
+        default: "main"
+        type: string
+      version:
+        description: "Version embedded in artifacts. It need not be an existing Git tag."
+        required: true
+        default: "v0.0.1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-source:
+    name: Resolve branch tip
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout requested branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate version and record commit
+        id: commit
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ inputs.branch }}
+          VERSION_TAG: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "version must match vX.Y.Z" >&2
+            exit 1
+          }
+          SHA="$(git rev-parse HEAD)"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Building branch ${SOURCE_BRANCH} at ${SHA}"
+
+  macos:
+    name: "macOS package"
+    needs: resolve-source
+    uses: ./.github/workflows/macpkg.yml
+    with:
+      tag: ${{ inputs.version }}
+      ref: ${{ needs.resolve-source.outputs.sha }}
+      sign: false
+      notarize: false
+      release: false
+
+  linux:
+    name: "Flatpak package"
+    needs: resolve-source
+    uses: ./.github/workflows/flatpak.yml
+    with:
+      tag: ${{ inputs.version }}
+      ref: ${{ needs.resolve-source.outputs.sha }}
+      release: false
+
+  windows:
+    name: "Windows package"
+    needs: resolve-source
+    uses: ./.github/workflows/nsispak.yml
+    with:
+      tag: ${{ inputs.version }}
+      ref: ${{ needs.resolve-source.outputs.sha }}
+      sign: false
+      release: false

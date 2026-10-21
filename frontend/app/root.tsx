@@ -15,7 +15,6 @@ import {
 import type { AppTheme } from '@/spec/setting';
 import { CustomThemeDark, CustomThemeLight, ThemeType } from '@/spec/setting';
 
-import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { recordFrontendCrash, reportFrontendError } from '@/lib/frontend_error_reporter';
 
 import { ensureWorker } from '@/hooks/use_highlight';
@@ -29,12 +28,8 @@ import { Sidebar } from '@/components/sidebar';
 
 // oxlint-disable-next-line import/no-unassigned-import
 import '@/globals.css';
-// oxlint-disable-next-line import/no-unassigned-import
-import '@wailsio/runtime';
 
 import type { Route } from './+types/root';
-
-const manualInjectWailsRuntime = IS_WAILS_PLATFORM && import.meta.env.VITE_WAILS_RUNTIME_INJECTION !== 'auto';
 
 export function CustomThemeProvider({ children }: { children: ReactNode }) {
 	const startup: AppTheme = (() => {
@@ -69,13 +64,6 @@ export function Layout({ children }: { children: ReactNode }) {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				{manualInjectWailsRuntime && (
-					<>
-						<meta name="wails-options" content="noautoinject" />
-						<script src="/wails/ipc.js" />
-						<script src="/wails/runtime.js" />
-					</>
-				)}
 				<Meta />
 				<Links />
 			</head>
@@ -103,11 +91,16 @@ function domReady() {
 	});
 }
 
+async function loadWailsRuntime(): Promise<void> {
+	await import('@wailsio/runtime');
+}
+
 // oxlint-disable-next-line react/only-export-components
 export async function clientLoader() {
 	// Wait for DOM content to be loaded and Wails runtime to be injected
 	await domReady();
 	try {
+		await loadWailsRuntime();
 		attachmentsDropAPI.startListener();
 	} catch (error) {
 		reportFrontendError(error, { phase: 'root.client_loader.attachments_drop_start' });

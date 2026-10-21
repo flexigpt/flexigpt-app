@@ -19,12 +19,12 @@
 		"fmt": "prettier -c . --ignore-path ../.prettierignore",
 		"fmt:fix": "prettier -w . --ignore-path ../.prettierignore",
 		"clean": "rimraf ./dist",
-		"run:wailsdev": "cp .env.dev .env && cross-env VITE_PLATFORM=wails react-router dev",
-		"build:pre": "node -e \"const fs=require('fs'); if(fs.existsSync('.env.prod')) fs.copyFileSync('.env.prod','.env');\" && pnpm run typecheck",
-		"build:wails": "echo 'Starting rimraf for building.' && rimraf ./dist && echo 'Done rimraf for building.' && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build",
+		"run:wailsdev": "cross-env VITE_PLATFORM=wails react-router dev --mode dev",
+		"build:pre": "pnpm run typecheck",
+		"build:wails": "pnpm run clean && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build --mode prod",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
-		"licenses:gen": "pnpm run build:pre && echo 'Done build pre for licenses building.' && cross-env GEN_LICENSES=true VITE_PLATFORM=wails react-router build --mode production && echo 'Done licenses building.'"
+		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true VITE_PLATFORM=wails react-router build --mode prod"
 	},
 	"keywords": [],
 	"author": "ppipada",

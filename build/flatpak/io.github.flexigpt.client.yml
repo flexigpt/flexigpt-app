@@ -46,12 +46,12 @@ build-options:
   build-args:
     - --share=network
   env:
-    - GOROOT=/app/sdk/golang
-    - GOBIN=/app/go/bin
-    - CGO_ENABLED=0
-    - NODEROOT=/app/sdk/node
-    - XDG_CONFIG_HOME=/app/xdgdirs/config
-    - XDG_DATA_HOME=/app/xdgdirs/data
+    GOROOT: /app/sdk/golang
+    GOBIN: /app/go/bin
+    CGO_ENABLED: "1"
+    NODEROOT: /app/sdk/node
+    XDG_CONFIG_HOME: /app/xdgdirs/config
+    XDG_DATA_HOME: /app/xdgdirs/data
 
 modules:
   # - shared-modules/libsecret/libsecret.json
@@ -78,7 +78,12 @@ modules:
   - name: pnpm
     buildsystem: simple
     build-commands:
-      - PATH=$PATH:$GOROOT/bin:$NODEROOT/bin npm install -g pnpm
+      - PATH=$PATH:$GOROOT/bin:$NODEROOT/bin npm install -g pnpm@12.14.0
+
+  - name: task
+    buildsystem: simple
+    build-commands:
+      - $GOROOT/bin/go install github.com/go-task/task/v3/cmd/task@v3.53.1
 
   - name: wails
     buildsystem: simple
@@ -88,8 +93,7 @@ modules:
   - name: FlexiGPT
     buildsystem: simple
     build-commands:
-      - chmod +x build/flatpak/build_flatpak.sh
-      - ./build/flatpak/build_flatpak.sh
+      - PATH=$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin task flatpak:build-module
     sources:
       - type: dir
         path: ../../

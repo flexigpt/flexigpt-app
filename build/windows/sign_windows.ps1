@@ -1,3 +1,8 @@
+param(
+  [ValidateSet("app", "installer", "all")]
+  [string]$Target = "all"
+)
+
 $ErrorActionPreference = "Stop"
 
 # assumes CI exported required env vars (bash script sources build/buildvars.env with export)
@@ -6,13 +11,8 @@ if (-not $env:SIGN_WINDOWS_CERT) { throw "SIGN_WINDOWS_CERT not set" }
 if (-not $env:SIGN_WINDOWS_CERT_PASSWORD) { throw "SIGN_WINDOWS_CERT_PASSWORD not set" }
 if (-not $env:COMMON_BUILD_NAME) { throw "COMMON_BUILD_NAME not set" }
 
-$certDir = "certificate"
-New-Item -ItemType Directory -Force -Path $certDir | Out-Null
-
-$b64Path = Join-Path $certDir "certificate.txt"
+$certDir = Join-Path ([System.IO.Path]::GetTempPath()) ("flexigpt-sign-" + [guid]::NewGuid())
 $pfxPath = Join-Path $certDir "certificate.pfx"
-Set-Content -Path $b64Path -Value $env:SIGN_WINDOWS_CERT -NoNewline -Encoding Ascii
-certutil -decode $b64Path $pfxPath | Out-Null
 
 # Try to locate signtool.exe in typical Windows Kits locations
 $signtoolCandidates = @(
@@ -44,13 +44,36 @@ if (-not $installerExe) {
   $installerExe = "build/bin/$($env:COMMON_BUILD_NAME)-amd64-installer.exe"
 }
 
-if (-not (Test-Path $appExe)) { throw "App exe not found: $appExe" }
-if (-not (Test-Path $installerExe)) { throw "Installer exe not found: $installerExe" }
+$files = @()
+if ($Target -eq "app" -or $Target -eq "all") {
+  $files += $appExe
+}
+if ($Target -eq "installer" -or $Target -eq "all") {
+  $files += $installerExe
+}
+foreach ($file in $files) {
+  if (-not (Test-Path -LiteralPath $file)) {
+    throw "Signing target not found: $file"
+  }
+}
 
-Write-Host "Signing app exe: $appExe"
-& $signtool sign /fd sha256 /tr http://ts.ssl.com /td sha256 /f $pfxPath /p $env:SIGN_WINDOWS_CERT_PASSWORD $appExe
+try {
+  New-Item -ItemType Directory -Force -Path $certDir | Out-Null
+  [System.IO.File]::WriteAllBytes(
+    $pfxPath,
+    [System.Convert]::FromBase64String($env:SIGN_WINDOWS_CERT)
+  )
 
-Write-Host "Signing installer exe: $installerExe"
-& $signtool sign /fd sha256 /tr http://ts.ssl.com /td sha256 /f $pfxPath /p $env:SIGN_WINDOWS_CERT_PASSWORD $installerExe
+  foreach ($file in $files) {
+    Write-Host "Signing: $file"
+    & $signtool sign /fd sha256 /tr http://ts.ssl.com /td sha256 /f $pfxPath /p $env:SIGN_WINDOWS_CERT_PASSWORD $file
+    if ($LASTEXITCODE -ne 0) { throw "signtool sign failed: $file" }
+    & $signtool verify /pa $file
+    if ($LASTEXITCODE -ne 0) { throw "signtool verify failed: $file" }
+  }
+}
+finally {
+  Remove-Item -LiteralPath $certDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host "Signing done."

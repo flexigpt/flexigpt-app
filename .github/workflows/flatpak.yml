@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        description: "Git ref or commit SHA to build. Empty uses the workflow ref."
+        required: false
+        default: ""
+        type: string
 
   workflow_call:
     inputs:
@@ -22,6 +27,10 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build-flatpak:
@@ -38,10 +47,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref || github.sha }}
           submodules: "recursive"
 
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-env
+        with:
+          tag: ${{ inputs.tag }}
+          release: ${{ inputs.release }}
 
       - name: "Determine prerequisites"
         id: prereq

@@ -6,12 +6,12 @@ set -a
 . build/buildvars.env
 set +a
 
-echo "==== ENVIRONMENT VARIABLES ===="
-env | sort
-echo "==============================="
+export PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin"
+
+echo "Building Flatpak version: ${VERSION_TAG}"
 
 chmod +x build/flatpak/render_templates.sh
-./build/flatpak/render_templates.sh --version $VERSION_TAG
+./build/flatpak/render_templates.sh --version "$VERSION_TAG"
 
 mkdir -p "$XDG_CONFIG_HOME"
 mkdir -p "$XDG_DATA_HOME"
@@ -24,7 +24,7 @@ PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" "$GOROOT/bin/go" mod download
 # Licenses (Go + JS) - generated at build time, packaged into Flatpak
 ###############################################################################
 chmod +x build/licenses/gen_licenses.sh
-PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" build/licenses/gen_licenses.sh --version "$VERSION_TAG"
+task licenses:gen
 # Verify expected outputs exist (canonical names)
 LIC_GO="build/licenses/go-dependency-licenses.txt"
 LIC_JS="build/licenses/js-dependency-licenses.txt"
@@ -39,7 +39,7 @@ for f in "${LIC_GO}" "${LIC_JS}"; do
   fi
 done
 
-PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" pnpm run build:linux
+task build-linux
 
 # Cleanup unneeded files
 rm -rf node_modules
@@ -52,6 +52,8 @@ install -Dm00755 build/bin/FlexiGPT "$FLATPAK_DEST/bin/FlexiGPT"
 install -Dm00644 frontend/public/icon_256x256.png "$FLATPAK_DEST/share/icons/hicolor/256x256/apps/$FLATPAK_ID.png"
 install -Dm00644 build/flatpak/"$FLATPAK_ID".desktop "$FLATPAK_DEST/share/applications/$FLATPAK_ID.desktop"
 install -Dm00644 build/flatpak/"$FLATPAK_ID".appdata.xml "$FLATPAK_DEST/share/appdata/$FLATPAK_ID.appdata.xml"
+install -Dm00644 build/flatpak/"$FLATPAK_ID".mime.xml "$FLATPAK_DEST/share/mime/packages/$FLATPAK_ID.xml"
+update-mime-database "$FLATPAK_DEST/share/mime"
 
 # Standard Flatpak license location
 LICENSES_DEST_DIR="$FLATPAK_DEST/share/licenses/$FLATPAK_ID"

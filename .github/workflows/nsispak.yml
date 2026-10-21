@@ -17,6 +17,11 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        description: "Git ref or commit SHA to build. Empty uses the workflow ref."
+        required: false
+        default: ""
+        type: string
   workflow_call:
     inputs:
       tag:
@@ -34,6 +39,10 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        required: false
+        default: ""
+        type: string
     secrets:
       SIGN_WINDOWS_CERT:
         required: false
@@ -61,10 +70,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref || github.sha }}
           submodules: "recursive"
 
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-env
+        with:
+          tag: ${{ inputs.tag }}
+          release: ${{ inputs.release }}
 
       - name: Setup Tools
         uses: ./.github/actions/setup-tools
@@ -110,7 +123,7 @@ jobs:
           if [[ "${SIGNING_ENABLED}" == "true" ]]; then
             SIGN_FLAG="--sign"
           fi
-          bash ./build/windows/build_sign_package.sh --version "${VERSION_TAG}" ${SIGN_FLAG}
+          task package-win -- ${SIGN_FLAG}
 
       - name: Zip licenses (artifact)
         shell: powershell

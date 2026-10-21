@@ -1,0 +1,35 @@
+version: "3"
+
+fileAssociations:
+  - ext: wails
+    name: Wails
+    description: Wails Application File
+    iconName: appicon
+    role: None
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend/dist
+      - build/bin
+      - out
+      - .task
+    file:
+      - .DS_Store
+    watched_extension:
+      - "*.go"
+      - go.mod
+      - go.sum
+    git_ignore: true
+  executes:
+    - cmd: task desktop:dev:frontend
+      type: background
+    - cmd: task desktop:dev:build
+      type: blocking
+    - cmd: task desktop:dev:run
+      type: primary

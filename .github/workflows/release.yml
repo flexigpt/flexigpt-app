@@ -33,6 +33,7 @@ jobs:
     uses: ./.github/workflows/macpkg.yml
     with:
       tag: ${{ inputs.tag }}
+      ref: refs/tags/${{ inputs.tag }}
       sign: ${{ inputs.sign }}
       notarize: ${{ inputs.notarize }}
       release: ${{ inputs.release }}
@@ -43,6 +44,7 @@ jobs:
     uses: ./.github/workflows/flatpak.yml
     with:
       tag: ${{ inputs.tag }}
+      ref: refs/tags/${{ inputs.tag }}
       release: ${{ inputs.release }}
     secrets: inherit
 
@@ -51,6 +53,7 @@ jobs:
     uses: ./.github/workflows/nsispak.yml
     with:
       tag: ${{ inputs.tag }}
+      ref: refs/tags/${{ inputs.tag }}
       sign: ${{ inputs.sign }}
       notarize: ${{ inputs.notarize }}
       release: ${{ inputs.release }}

@@ -91,7 +91,7 @@ function dispatchRuntimeEvent(raw: unknown): void {
 	try {
 		event = sessionRuntimeEventFromWails(raw, SESSION_RUNTIME_EVENT_NAME);
 	} catch (error) {
-		console.error('Invalid session runtime event payload:', error);
+		console.error('Invalid session runtime event payload:', error, JSON.stringify(raw, undefined, 2));
 		return;
 	}
 

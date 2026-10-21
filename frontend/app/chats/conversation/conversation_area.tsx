@@ -1379,45 +1379,43 @@ function ConversationAreaInner(
 
 				<div className="pointer-events-none absolute right-4 bottom-4 z-30 xl:right-24">
 					<div className="pointer-events-auto flex flex-col items-center gap-2">
-						{!isAtTop ? (
-							<ButtonScrollToTop
-								onScrollToTop={scrollActiveToTop}
-								iconSize={32}
-								show={!isAtTop}
-								className="btn btn-md border-none bg-transparent shadow-none"
-							/>
-						) : null}
-						{canJumpToPreviousMessage ? (
-							<button
-								type="button"
-								className="btn btn-md border-none bg-transparent shadow-none"
-								onClick={scrollActiveToPreviousMessage}
-								aria-label="Jump to previous message"
-								title="Jump to previous message"
-							>
-								<FiChevronUp size={32} />
-							</button>
-						) : null}
+						<ButtonScrollToTop
+							onScrollToTop={scrollActiveToTop}
+							iconSize={32}
+							show={!isAtTop}
+							className="btn btn-md border-none bg-transparent shadow-none"
+						/>
+						<button
+							type="button"
+							disabled={!canJumpToPreviousMessage}
+							className={`btn btn-md border-none bg-transparent shadow-none transition-opacity duration-150 ${
+								canJumpToPreviousMessage ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
+							}`}
+							onClick={scrollActiveToPreviousMessage}
+							aria-label="Jump to previous message"
+							title="Jump to previous message"
+						>
+							<FiChevronUp size={32} />
+						</button>
 
-						{canJumpToNextMessage ? (
-							<button
-								type="button"
-								className="btn btn-md border-none bg-transparent shadow-none"
-								onClick={scrollActiveToNextMessage}
-								aria-label="Jump to next message"
-								title="Jump to next message"
-							>
-								<FiChevronDown size={32} />
-							</button>
-						) : null}
-						{!isAtBottom ? (
-							<ButtonScrollToBottom
-								onScrollToBottom={scrollActiveToBottom}
-								iconSize={32}
-								show={!isAtBottom}
-								className="btn btn-md border-none bg-transparent shadow-none"
-							/>
-						) : null}
+						<button
+							type="button"
+							disabled={!canJumpToNextMessage}
+							className={`btn btn-md border-none bg-transparent shadow-none transition-opacity duration-150 ${
+								canJumpToNextMessage ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
+							}`}
+							onClick={scrollActiveToNextMessage}
+							aria-label="Jump to next message"
+							title="Jump to next message"
+						>
+							<FiChevronDown size={32} />
+						</button>
+						<ButtonScrollToBottom
+							onScrollToBottom={scrollActiveToBottom}
+							iconSize={32}
+							show={!isAtBottom}
+							className="btn btn-md border-none bg-transparent shadow-none"
+						/>
 					</div>
 				</div>
 			</div>

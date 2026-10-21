@@ -69,6 +69,8 @@ if [[ "$NOTARIZE_APP" == true && "$SIGN_APP" != true ]]; then
   exit 1
 fi
 
+export VERSION_TAG
+
 ################################################################################
 # Step 1: Render all needed templates at the start
 ################################################################################
@@ -90,7 +92,7 @@ build/darwin/render_templates.sh $RENDER_FLAGS
 ################################################################################
 echo "Generating licenses..."
 chmod +x build/licenses/gen_licenses.sh
-build/licenses/gen_licenses.sh --version "${VERSION_TAG}"
+task licenses:gen
 LIC_GO="./build/licenses/go-dependency-licenses.txt"
 LIC_JS="./build/licenses/js-dependency-licenses.txt"
 for f in "${LIC_GO}" "${LIC_JS}"; do
@@ -102,11 +104,10 @@ done
 # Step 2: Build .app
 ################################################################################
 
-: "${MACOS_BUILD_COMMAND:?Must set MACOS_BUILD_COMMAND}"
 : "${MACOS_APP_BUNDLE_PATH:?Must set MACOS_APP_BUNDLE_PATH}"
 
-echo "Building .app with command: ${MACOS_BUILD_COMMAND}"
-eval "${MACOS_BUILD_COMMAND}"
+echo "Building .app through the root Taskfile..."
+task build-mac
 
 ################################################################################
 # Step 2.5: Include licenses into .app bundle (MUST happen before signing)
@@ -131,6 +132,7 @@ if [[ "$SIGN_APP" == true ]]; then
   gon -log-level=info "$MACOS_GON_SIGN_JSON_PATH"
 else
   echo "No signing requested. Skipping signing steps."
+  codesign --force --deep --sign - "${MACOS_APP_BUNDLE_PATH}"
 fi
 
 ################################################################################
