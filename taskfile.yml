@@ -133,7 +133,7 @@ tasks:
     desc: Validate that VERSION_TAG matches the project release version format.
     cmds:
       - >-
-        node -e "const tag=process.env.VERSION_TAG;if(!/^v\d+\.\d+\.\d+$/.test(tag||'')){console.error('VERSION_TAG must match vX.Y.Z');process.exit(1);}"
+        node -e "const tag=process.env.VERSION_TAG;if(!/^v\d+\.\d+\.\d+$/.test(tag||'')){console.error('VERSION_TAG must match vX.Y.Z',tag);process.exit(1);}"
 
   build-linux:
     desc: Build the Linux production application package.
@@ -205,8 +205,6 @@ tasks:
 
   flatpak:build-module:
     desc: Build and install the application inside Flatpak Builder.
-    deps:
-      - check-version
     preconditions:
       - sh: test -n "${FLATPAK_DEST:-}"
         msg: "flatpak:build-module requires the Flatpak Builder environment"

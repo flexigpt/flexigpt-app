@@ -1,12 +1,5 @@
 version: "3"
 
-fileAssociations:
-  - ext: wails
-    name: Wails
-    description: Wails Application File
-    iconName: appicon
-    role: None
-
 dev_mode:
   root_path: .
   log_level: warn

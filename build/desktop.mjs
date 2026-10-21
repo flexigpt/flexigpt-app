@@ -211,8 +211,6 @@ function generateWindowsAssets(directory, version) {
 		directory,
 		"-name",
 		buildName,
-		"-company",
-		env.COMMON_DEVELOPER_NAME,
 		"-productname",
 		env.COMMON_PRODUCT_NAME,
 		"-description",
