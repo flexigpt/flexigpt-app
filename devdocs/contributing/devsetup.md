@@ -28,13 +28,13 @@
   - You can execute it directly. Dev console is available in this mode.
   - Debug console in the app is available via `Ctrl + Shift + F12`
 
-- Build wails app and run it as a dev server: `task run-watch`
+- Build wails app and run it as a dev server: `task run-dev`
   - Ideally this is to be used mainly for UI development via the local server running inside the browser.
   - Wails has some issues reloading both backend and frontend file changes together in some cases.
 
 - Packaging commands
   - Ideally this should be done in github actions as secrets etc are setup there properly.
-  - Create a flatpak on a local machine with some local defaults: `task pack-flatpak`
+  - Create a flatpak on a local machine with some local defaults: `task ghact-flatpak`
 
 ## VSCode setup
 

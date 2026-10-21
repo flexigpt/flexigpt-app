@@ -93,7 +93,7 @@ modules:
   - name: FlexiGPT
     buildsystem: simple
     build-commands:
-      - PATH=$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin task flatpak:build-module
+      - PATH=$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin task package-flatpak
     sources:
       - type: dir
         path: ../../

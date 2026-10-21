@@ -63,6 +63,17 @@ tasks:
     cmds:
       - task: go:depgraph
 
+  check-version:
+    desc: Validate that VERSION_TAG matches the project release version format.
+    cmds:
+      - >-
+        node -e "const tag=process.env.VERSION_TAG;if(!/^v\d+\.\d+\.\d+$/.test(tag||'')){console.error('VERSION_TAG must match vX.Y.Z',tag);process.exit(1);}"
+
+  licenses:gen:
+    desc: Generate project, Go, and frontend dependency license files.
+    cmds:
+      - bash ./build/licenses/gen_licenses.sh --version "$VERSION_TAG"
+
   upgrade-do:
     desc: Upgrade JavaScript and Go dependencies.
     cmds:
@@ -129,12 +140,6 @@ tasks:
           echo 'See if your Path is properly set via zshrc or bashrc and reflected vscode.'
         silent: true
 
-  check-version:
-    desc: Validate that VERSION_TAG matches the project release version format.
-    cmds:
-      - >-
-        node -e "const tag=process.env.VERSION_TAG;if(!/^v\d+\.\d+\.\d+$/.test(tag||'')){console.error('VERSION_TAG must match vX.Y.Z',tag);process.exit(1);}"
-
   build-linux:
     desc: Build the Linux production application package.
     deps:
@@ -184,11 +189,6 @@ tasks:
     cmds:
       - task: desktop:installer
 
-  licenses:gen:
-    desc: Generate project, Go, and frontend dependency license files.
-    cmds:
-      - bash ./build/licenses/gen_licenses.sh --version "$VERSION_TAG"
-
   package-mac:
     desc: Run the existing macOS build, signing, and notarization pipeline.
     deps:
@@ -203,23 +203,18 @@ tasks:
     cmds:
       - bash ./build/windows/build_sign_package.sh --version "$VERSION_TAG" {{.CLI_ARGS}}
 
-  flatpak:build-module:
+  package-flatpak:
     desc: Build and install the application inside Flatpak Builder.
     preconditions:
       - sh: test -n "${FLATPAK_DEST:-}"
-        msg: "flatpak:build-module requires the Flatpak Builder environment"
+        msg: "package-flatpak requires the Flatpak Builder environment"
     cmds:
       - bash ./build/flatpak/build_flatpak.sh
 
-  wails-bindings:
+  bindings:
     desc: Generate Wails v3 TypeScript service bindings.
     cmds:
       - task: desktop:bindings
-
-  build:
-    desc: Build the desktop application through the project Wails v3 tasks.
-    cmds:
-      - task: desktop:build
 
   dev:
     desc: Run Wails v3 development mode through the project watcher configuration.
@@ -228,6 +223,11 @@ tasks:
       FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
     cmds:
       - wails3 dev -config ./build/config.yml -port "{{.WAILS_VITE_PORT | default "5173"}}"
+
+  build:
+    desc: Build the desktop application through the project Wails v3 tasks.
+    cmds:
+      - task: desktop:build
 
   build-withbindings:
     desc: Build a complete debug desktop application, generate bindings, and capture output.
@@ -244,17 +244,17 @@ tasks:
         "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
         > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
 
-  pack-flatpak:
+  ghact-flatpak:
     desc: Run the Flatpak packaging workflow locally with act.
     cmds:
       - gh act -v workflow_dispatch -W "./.github/workflows/flatpak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
-  pack-nsis:
+  ghact-nsis:
     desc: Run the NSIS Windows installer packaging workflow locally with act.
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/nsispak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
-  pack-macpkg:
+  ghact-macpkg:
     desc: Run the macOS package workflow locally with act.
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/macpkg.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
@@ -265,11 +265,6 @@ tasks:
       - task: dev
         vars:
           VERSION_TAG: "{{.COMMON_APP_DEV_VERSION}}"
-
-  run-watch:
-    desc: Start frontend hot reload and native Go rebuilds.
-    cmds:
-      - task: run-dev
 
   lint-gopls:
     desc: Run Go linting through gopls.
