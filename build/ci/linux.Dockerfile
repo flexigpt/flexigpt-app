@@ -23,11 +23,16 @@ RUN apt-get update \
         curl \
         git \
         gzip \
+        libgtk-4-dev \
+        libwebkitgtk-6.0-dev \
         make \
+        pkg-config \
         python3 \
         tar \
         unzip \
         xz-utils \
+    && pkg-config --modversion gtk4 \
+    && pkg-config --modversion webkitgtk-6.0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN test -n "${GO_VERSION}" \
@@ -85,10 +90,7 @@ RUN apt-get update \
         cloc \
         desktop-file-utils \
         graphviz \
-        libgtk-4-dev \
         libnss3 \
-        libwebkitgtk-6.0-dev \
-        pkg-config \
         shared-mime-info \
         xvfb \
         zip \
