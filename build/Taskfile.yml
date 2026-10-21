@@ -1,57 +1,193 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: "3"
 
-# Included by the repository's root taskfile.yml.
-# ROOT_DIR therefore refers to the repository root.
+# The platform MJS files validate all values before using them.
+env:
+  VERSION_TAG: '{{.VERSION_TAG | default ""}}'
+  SIGN: '{{.SIGN | default "false"}}'
+  NOTARIZE: '{{.NOTARIZE | default "false"}}'
+  FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
+  WAILS_VITE_PORT: '{{.WAILS_VITE_PORT | default "5173"}}'
+
 tasks:
-  build:
-    desc: Compile the desktop application using the project packaging layout.
+  check-version:
+    internal: true
+    cmds:
+      - node build/support.mjs validate-version
+
+  embed-prepare:
+    internal: true
+    cmds:
+      - node build/support.mjs embed-prepare
+
+  embed-clean:
+    internal: true
+    cmds:
+      - node build/support.mjs embed-clean
+
+  build-lin:
+    cmds:
+      - node build/lin.mjs build
+
+  build-linux:
+    internal: true
+    cmds:
+      - task: build-lin
+
+  build-mac:
+    cmds:
+      - node build/mac.mjs build
+
+  build-darwin:
+    internal: true
+    cmds:
+      - task: build-mac
+
+  build-win:
+    cmds:
+      - node build/win.mjs build
+
+  build-windows:
+    internal: true
+    cmds:
+      - task: build-win
+
+  build-dev-lin:
+    cmds:
+      - node build/lin.mjs build-dev
+
+  build-dev-linux:
+    internal: true
+    cmds:
+      - task: build-dev-lin
+
+  build-dev-mac:
+    cmds:
+      - node build/mac.mjs build-dev
+
+  build-dev-darwin:
+    internal: true
+    cmds:
+      - task: build-dev-mac
+
+  build-dev-win:
+    cmds:
+      - node build/win.mjs build-dev
+
+  build-dev-windows:
+    internal: true
+    cmds:
+      - task: build-dev-win
+
+  package-lin:
+    cmds:
+      - node build/lin.mjs package
+
+  package-mac:
+    cmds:
+      - node build/mac.mjs package
+
+  package-win:
+    cmds:
+      - node build/win.mjs package
+
+  flatpak-install:
+    desc: Install the application into the active Flatpak Builder destination.
+    cmds:
+      - node build/lin.mjs flatpak-install
+
+  sign-lin:
     env:
-      FLEXIGPT_DEV_SERVER: "0"
-    dir: "{{.ROOT_DIR}}"
+      SIGN: "true"
     cmds:
-      - >-
-        node build/desktop.mjs build
-        "{{.PLATFORM | default OS}}"
-        "{{.ARCH | default ARCH}}"
-        "{{.CONFIG | default "debug"}}"
-        "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
+      - node build/lin.mjs package
 
-  bindings:
-    desc: Generate the application TypeScript bindings.
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - node build/desktop.mjs bindings
-
-  installer:
-    desc: Package the compiled Windows application using the custom NSIS script.
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - node build/desktop.mjs installer
-
-  dev:frontend:
-    desc: Run the React Router development server.
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - node build/desktop.mjs frontend
-
-  dev:build:
-    desc: Rebuild the native development executable.
-    dir: "{{.ROOT_DIR}}"
+  sign-mac:
     env:
-      FLEXIGPT_DEV_SERVER: "1"
+      SIGN: "true"
     cmds:
-      - >-
-        node build/desktop.mjs build
-        "{{OS}}"
-        "{{ARCH}}"
-        debug
-        "{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}"
+      - node build/mac.mjs package
 
-  dev:run:
-    desc: Run the native development executable.
-    dir: "{{.ROOT_DIR}}"
+  sign-win:
     env:
-      WAILS_VITE_PORT: '{{.WAILS_VITE_PORT | default "5173"}}'
+      SIGN: "true"
     cmds:
-      - node build/desktop.mjs run
+      - node build/win.mjs package
+
+  run-dev-lin:
+    cmds:
+      - node build/lin.mjs dev
+
+  run-dev-mac:
+    cmds:
+      - node build/mac.mjs dev
+
+  run-dev-win:
+    cmds:
+      - node build/win.mjs dev
+
+  bindings-lin:
+    cmds:
+      - node build/lin.mjs bindings
+
+  bindings-linux:
+    internal: true
+    cmds:
+      - task: bindings-lin
+
+  bindings-mac:
+    cmds:
+      - node build/mac.mjs bindings
+
+  bindings-darwin:
+    internal: true
+    cmds:
+      - task: bindings-mac
+
+  bindings-win:
+    cmds:
+      - node build/win.mjs bindings
+
+  bindings-windows:
+    internal: true
+    cmds:
+      - task: bindings-win
+
+  licenses-lin:
+    cmds:
+      - node build/lin.mjs licenses
+
+  licenses-linux:
+    internal: true
+    cmds:
+      - task: licenses-lin
+
+  licenses-mac:
+    cmds:
+      - node build/mac.mjs licenses
+
+  licenses-darwin:
+    internal: true
+    cmds:
+      - task: licenses-mac
+
+  licenses-win:
+    cmds:
+      - node build/win.mjs licenses
+
+  licenses-windows:
+    internal: true
+    cmds:
+      - task: licenses-win
+
+  setup-lin:
+    cmds:
+      - node build/lin.mjs setup
+
+  setup-win:
+    cmds:
+      - node build/win.mjs setup
+
+  ci-image-lin:
+    cmds:
+      - node build/lin.mjs ci-image-lin

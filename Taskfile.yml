@@ -1,0 +1,428 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv:
+  - build/buildvars.env
+
+env:
+  VERSION_TAG: '{{.VERSION_TAG | default ""}}'
+  FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
+  GOLANGCI_LINT_CACHE: "{{.ROOT_DIR}}/build/out/cache/golangci-lint"
+
+includes:
+  build:
+    taskfile: ./build/Taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+    internal: true
+
+  git:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/git.yml
+    checksum: b22093001cd4d15f3ccf39ba4ccf16e509468379ac24d25f79196f277a7f02b0
+    flatten: true
+
+  go:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
+    checksum: 4f3a7e4d867c78ddd8ab2aa72e2edd27b345323013ee1e5b5d9604f1de237240
+    dir: "{{.ROOT_DIR}}"
+    internal: true
+    vars:
+      GREETING: Hello, these are FlexiGPT tasks!
+      GO_MODULE_PATH: "{{.COMMON_PRODUCT_GITPATH}}"
+      DEPGRAPH_ENTRY_POINT: "{{.GO_MAIN_ENTRYPOINT}}"
+      DEPGRAPH_ONLYPREFIXES: "{{.COMMON_PRODUCT_GITPATH}},command-line-arguments"
+
+tasks:
+  default:
+    desc: Run the established Go default suite and print configured variables.
+    cmds:
+      - task: go:default
+      - task: go:print-all-vars
+
+  help:
+    desc: List public project tasks.
+    cmds:
+      - task --list
+
+  check-version:
+    desc: Validate VERSION_TAG in vX.Y.Z format.
+    cmds:
+      - task: build:check-version
+
+  build-lin:
+    desc: Build the Linux production application.
+    cmds:
+      - task: build:build-lin
+
+  build-linux:
+    desc: Compatibility alias for build-lin.
+    cmds:
+      - task: build-lin
+
+  build-mac:
+    desc: Build the universal macOS production application bundle.
+    cmds:
+      - task: build:build-mac
+
+  build-win:
+    desc: Build the Windows production executable.
+    cmds:
+      - task: build:build-win
+
+  build-win-binary:
+    desc: Compatibility alias for the Windows executable-only build.
+    cmds:
+      - task: build-win
+
+  build-dev-lin:
+    desc: Build a standalone Linux development application.
+    cmds:
+      - task: build:build-dev-lin
+
+  build-dev-mac:
+    desc: Build a standalone macOS development application.
+    cmds:
+      - task: build:build-dev-mac
+
+  build-dev-win:
+    desc: Build a standalone Windows development application.
+    cmds:
+      - task: build:build-dev-win
+
+  build-withbindings:
+    desc: Host-only compatibility alias for a standalone development build.
+    cmds:
+      - task: "build:build-dev-{{OS}}"
+
+  package-lin:
+    desc: Build and package the Linux Flatpak bundle.
+    cmds:
+      - task: build:package-lin
+
+  package-mac:
+    desc: Build and package the macOS PKG installer.
+    cmds:
+      - task: build:package-mac
+
+  package-win:
+    desc: Build and package the Windows NSIS installer.
+    cmds:
+      - task: build:package-win
+
+  package-win-installer:
+    desc: Compatibility alias that rebuilds and packages the Windows installer.
+    cmds:
+      - task: package-win
+
+  package-flatpak:
+    desc: Install the application into the active Flatpak Builder destination.
+    cmds:
+      - task: build:flatpak-install
+
+  sign-lin:
+    desc: Build and GPG-sign the Linux Flatpak bundle.
+    cmds:
+      - task: build:sign-lin
+
+  sign-mac:
+    desc: Build, sign, optionally notarize, and package macOS.
+    cmds:
+      - task: build:sign-mac
+
+  sign-win:
+    desc: Build, sign, and package Windows.
+    cmds:
+      - task: build:sign-win
+
+  bindings:
+    desc: Generate Wails bindings for the current host.
+    cmds:
+      - task: "build:bindings-{{OS}}"
+
+  bindings-lin:
+    desc: Generate Linux Wails bindings.
+    cmds:
+      - task: build:bindings-lin
+
+  bindings-mac:
+    desc: Generate macOS Wails bindings.
+    cmds:
+      - task: build:bindings-mac
+
+  bindings-win:
+    desc: Generate Windows Wails bindings.
+    cmds:
+      - task: build:bindings-win
+
+  licenses:gen:
+    desc: Generate project, Go, JavaScript, and combined license reports.
+    cmds:
+      - task: "build:licenses-{{OS}}"
+
+  licensesgo:
+    desc: Compatibility alias for full project license generation.
+    cmds:
+      - task: licenses:gen
+
+  run-dev:
+    desc: Host-only compatibility alias for the platform-specific development task.
+    cmds:
+      - task: "build:run-dev-{{OS}}"
+
+  dev:
+    desc: Host-only compatibility alias for run-dev.
+    cmds:
+      - task: run-dev
+
+  run-dev-lin:
+    desc: Run Linux Wails development mode.
+    cmds:
+      - task: build:run-dev-lin
+
+  run-dev-mac:
+    desc: Run macOS Wails development mode.
+    cmds:
+      - task: build:run-dev-mac
+
+  run-dev-win:
+    desc: Run Windows Wails development mode.
+    cmds:
+      - task: build:run-dev-win
+
+  setup-lin:
+    desc: Validate Linux GTK and WebKit native prerequisites.
+    cmds:
+      - task: build:setup-lin
+
+  setup-win:
+    desc: Install or validate Windows NSIS tooling.
+    cmds:
+      - task: build:setup-win
+
+  ci-image-lin:
+    desc: Publish the Linux quality CI image.
+    cmds:
+      - task: build:ci-image-lin
+
+  deps-js:
+    desc: Install locked JavaScript dependencies.
+    run: once
+    cmds:
+      - pnpm install --frozen-lockfile --prefer-offline
+
+  lint-go:
+    desc: Run the configured Go lint suite.
+    cmds:
+      - task: build:embed-prepare
+      - task: go:lint
+
+  lint-gopls:
+    desc: Run Go linting through gopls.
+    cmds:
+      - task: build:embed-prepare
+      - task: go:lint-gopls
+
+  lint-go-fix-specific:
+    desc: Apply automatic fixes for one configured Go linter.
+    cmds:
+      - task: go:lint-fix-specific
+        vars:
+          SPECIFIC_LINTER: '{{.SPECIFIC_LINTER | default "godot"}}'
+
+  lint-go-sort:
+    desc: Sort Go imports using the established Go task suite.
+    cmds:
+      - task: go:lint-sort
+
+  lint-go-fix:
+    desc: Apply configured Go lint fixes.
+    cmds:
+      - task: go:lint-fix
+
+  lint-node:
+    desc: Lint the frontend.
+    cmds:
+      - task: deps-js
+      - pnpm -F frontend run lint
+
+  lint-build:
+    desc: Type-check build implementation files.
+    cmds:
+      - task: deps-js
+      - pnpm exec tsc --project build/tsconfig.json
+
+  lint-e2e:
+    desc: Lint E2E source.
+    cmds:
+      - task: deps-js
+      - pnpm run lint:e2e
+
+  lint:
+    desc: Run all Go, frontend, build, and E2E lint checks.
+    cmds:
+      - task: lint-go
+      - task: lint-node
+      - task: lint-build
+      - task: lint-e2e
+
+  test-go:
+    desc: Run the established Go coverage suite.
+    cmds:
+      - task: build:embed-prepare
+      - task: go:coverage
+
+  test-go-native:
+    desc: Run native Go tests without collecting coverage.
+    cmds:
+      - task: build:embed-prepare
+      - go test ./...
+
+  test-go-coverage:
+    desc: Run uncached Go tests with an atomic full coverage profile.
+    cmds:
+      - task: build:embed-prepare
+      - go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out
+
+  test-all-go:
+    desc: Run Go tests including integration and generated catalog tests.
+    cmds:
+      - task: build:embed-prepare
+      - task: go:coverage
+        vars:
+          GO_TEST_TAGS: "integration generated_catalog"
+
+  test-node:
+    desc: Run frontend tests.
+    cmds:
+      - task: deps-js
+      - pnpm -F frontend run test
+
+  typecheck-e2e:
+    desc: Type-check E2E source.
+    cmds:
+      - task: deps-js
+      - pnpm run typecheck:e2e
+
+  test:
+    desc: Run standard Go and frontend test suites.
+    cmds:
+      - task: test-go
+      - task: test-node
+
+  test-e2e:
+    desc: Run E2E tests on the current host.
+    cmds:
+      - task: deps-js
+      - pnpm run test:e2e
+
+  test-e2e-lin:
+    desc: Run E2E tests through Xvfb on Linux.
+    cmds:
+      - task: deps-js
+      - pnpm run test:e2e:linux
+
+  test-e2e-report:
+    desc: Open the Playwright E2E report.
+    cmds:
+      - pnpm run test:e2e:report
+
+  ci:
+    desc: Run the complete CI quality suite in the Linux CI image.
+    cmds:
+      - task: deps-js
+      - task: lint-go
+      - task: test-go-coverage
+      - task: lint-node
+      - task: lint-build
+      - task: lint-e2e
+      - task: typecheck-e2e
+      - task: test-node
+
+  fmt-go:
+    desc: Format Go source.
+    cmds:
+      - task: go:fmt
+
+  fmt:
+    desc: Format frontend and Go source.
+    cmds:
+      - task: deps-js
+      - pnpm -F frontend run fmt:fix
+      - task: go:fmt
+
+  lt-go:
+    desc: Run Go linting and Go tests.
+    cmds:
+      - task: lint-go
+      - task: test-go
+
+  lt:
+    desc: Run all linting and standard test suites.
+    cmds:
+      - task: lint
+      - task: test
+
+  cloc:
+    desc: Count repository lines using project exclusions.
+    cmds:
+      - >-
+        cloc --vcs=git --ignored=ignored.txt --exclude_ext=yaml,sum,mod,md5
+        --force-lang=Mustache,tmpl --force-lang=INI,env --force-lang=INI,dev
+        --force-lang=INI,prod
+        --not-match-f='LICENSE$|\.npmrc$|\.prettierignore$|\.gitignore$|\.gitattributes$|\.gitmodules$'
+        .
+
+  cloc-multi:
+    desc: Run the multi-repository CLOC workflow locally with act.
+    cmds:
+      - gh act workflow_dispatch -W .github/workflows/cloc-report.yml --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
+
+  godepgraph:
+    desc: Generate the Go dependency graph.
+    cmds:
+      - task: go:depgraph
+
+  upgrade-do:
+    desc: Upgrade JavaScript and Go dependencies.
+    cmds:
+      - pnpm up -r
+      - task: go:upgrade-do
+
+  upgrade-check:
+    desc: Check JavaScript and Go dependency updates.
+    cmds:
+      - task: go:upgrade-check
+      - pnpm outdated -r || true
+
+  upgrade-pnpm:
+    desc: Activate the configured pnpm release through Corepack.
+    cmds:
+      - corepack enable
+      - asdf reshim nodejs
+      - corepack prepare pnpm@{{.PNPM_VERSION}} --activate
+      - corepack use pnpm@{{.PNPM_VERSION}}
+      - asdf reshim nodejs
+
+  upgrade-nodejs:
+    desc: Install the configured Node.js version through asdf.
+    cmds:
+      - asdf install nodejs v{{.NODE_VERSION}}
+      - asdf set nodejs v{{.NODE_VERSION}}
+      - task: upgrade-pnpm
+
+  install-go-tools:
+    desc: Install Wails, Task, go-licenses, golangci-lint, and configured Go tools.
+    cmds:
+      - go install github.com/wailsapp/wails/v3/cmd/wails3@{{.WAILS_VERSION}}
+      - go install github.com/google/go-licenses/v2@{{.GO_LICENSES_VERSION}}
+      - go install github.com/go-task/task/v3/cmd/task@v{{.TASK_VERSION}}
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v{{.GOLANGCI_LINT_VERSION}}
+      - task: go:install-tools
+
+  upgrade-go:
+    desc: Install the configured Go version through asdf and reinstall tooling.
+    cmds:
+      - asdf install golang {{.GO_VERSION}}
+      - asdf set golang {{.GO_VERSION}}
+      - task: install-go-tools
+      - asdf reshim golang {{.GO_VERSION}}

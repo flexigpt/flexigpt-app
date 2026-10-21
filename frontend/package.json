@@ -22,9 +22,10 @@
 		"run:wailsdev": "cross-env VITE_PLATFORM=wails react-router dev --mode dev",
 		"build:pre": "pnpm run typecheck",
 		"build:wails": "pnpm run clean && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build --mode prod",
+		"build:wails:licenses": "pnpm run clean && pnpm run build:pre && cross-env GEN_LICENSES=true VITE_PLATFORM=wails react-router build --mode prod",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
-		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true VITE_PLATFORM=wails react-router build --mode prod"
+		"licenses:gen": "pnpm run build:wails:licenses"
 	},
 	"keywords": [],
 	"author": "ppipada",

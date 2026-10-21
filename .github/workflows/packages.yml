@@ -1,0 +1,260 @@
+name: Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version in vX.Y.Z form
+        required: true
+        default: v0.0.1
+        type: string
+      ref:
+        description: Branch, SHA, or refs/tags/vX.Y.Z. Leave empty only for a tag-based release.
+        required: false
+        default: main
+        type: string
+      sign_linux:
+        description: GPG-sign the Flatpak repository commit and bundle
+        type: boolean
+        default: false
+      sign_macos:
+        description: Sign the macOS application and installer
+        type: boolean
+        default: false
+      notarize:
+        description: Notarize the signed macOS package
+        type: boolean
+        default: false
+      sign_windows:
+        description: Sign the Windows application and installer
+        type: boolean
+        default: false
+      release:
+        description: Publish packages to the existing version tag
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: packages-${{ inputs.tag }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || format('refs/tags/{0}', inputs.tag) }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - name: Validate package request and selected source
+        id: source
+        shell: bash
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+          SELECTED_REF: ${{ inputs.ref || format('refs/tags/{0}', inputs.tag) }}
+          RELEASE_MODE: ${{ inputs.release }}
+          SIGN_LINUX: ${{ inputs.sign_linux }}
+          SIGN_MACOS: ${{ inputs.sign_macos }}
+          SIGN_WINDOWS: ${{ inputs.sign_windows }}
+          NOTARIZE: ${{ inputs.notarize }}
+        run: |
+          set -euo pipefail
+
+          task check-version
+
+          if [[ "${NOTARIZE}" == "true" && "${SIGN_MACOS}" != "true" ]]; then
+            echo "notarize requires sign_macos=true" >&2
+            exit 1
+          fi
+
+          if [[ "${RELEASE_MODE}" == "true" ||
+                "${SIGN_LINUX}" == "true" ||
+                "${SIGN_MACOS}" == "true" ||
+                "${SIGN_WINDOWS}" == "true" ||
+                "${NOTARIZE}" == "true" ]]; then
+            EXPECTED_REF="refs/tags/${VERSION_TAG}"
+
+            if [[ "${SELECTED_REF}" != "${EXPECTED_REF}" ]]; then
+              echo "release, signing, and notarization require ref=${EXPECTED_REF}" >&2
+              exit 1
+            fi
+
+            TAG_SHA="$(git rev-parse "${EXPECTED_REF}^{commit}")"
+            HEAD_SHA="$(git rev-parse HEAD)"
+
+            if [[ "${TAG_SHA}" != "${HEAD_SHA}" ]]; then
+              echo "checked out source does not match ${EXPECTED_REF}" >&2
+              exit 1
+            fi
+          fi
+
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    environment: ${{ inputs.sign_linux && 'distribution' || 'unsigned-packaging' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build/out/cache/flatpak-builder
+            build/out/cache/flatpak-repo
+          key: flatpak-amd64-${{ hashFiles('build/flatpak/io.github.flexigpt.client.yml') }}-${{ github.sha }}
+          restore-keys: |
+            flatpak-amd64-${{ hashFiles('build/flatpak/io.github.flexigpt.client.yml') }}-
+      - name: Package unsigned Linux
+        if: ${{ !inputs.sign_linux }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+        run: task package-lin
+      - name: Package signed Linux
+        if: ${{ inputs.sign_linux }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+          FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+          FLATPAK_GPG_PASSPHRASE: ${{ secrets.FLATPAK_GPG_PASSPHRASE }}
+        run: task sign-lin
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-linux
+          path: build/out/artifacts/lin/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: logs-linux
+          path: build/out/logs/
+          if-no-files-found: ignore
+
+  macos:
+    needs: source
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    environment: ${{ inputs.sign_macos && 'distribution' || 'unsigned-packaging' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - uses: actions/cache@v4
+        with:
+          path: build/out/tools
+          key: tools-macos-${{ hashFiles('build/buildvars.env', 'go.sum') }}
+          restore-keys: |
+            tools-macos-
+      - name: Package unsigned macOS
+        if: ${{ !inputs.sign_macos }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+          NOTARIZE: ${{ inputs.notarize }}
+        run: task package-mac
+      - name: Package signed macOS
+        if: ${{ inputs.sign_macos }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+          NOTARIZE: ${{ inputs.notarize }}
+          MACOS_SIGN_APPLE_USERNAME: ${{ secrets.MACOS_SIGN_APPLE_USERNAME }}
+          MACOS_SIGN_APPLE_TEAM_ID: ${{ secrets.MACOS_SIGN_APPLE_TEAM_ID }}
+          MACOS_SIGN_APPLE_DEVELOPER_IDENTITY: ${{ secrets.MACOS_SIGN_APPLE_DEVELOPER_IDENTITY }}
+          MACOS_SIGN_APPLE_APP_PASSWORD: ${{ secrets.MACOS_SIGN_APPLE_APP_PASSWORD }}
+          MACOS_SIGN_APP_CERT: ${{ secrets.MACOS_SIGN_APP_CERT }}
+          MACOS_SIGN_APP_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_APP_CERT_PASSWORD }}
+          MACOS_SIGN_INSTALLER_ID: ${{ secrets.MACOS_SIGN_INSTALLER_ID }}
+          MACOS_SIGN_INSTALLER_CERT: ${{ secrets.MACOS_SIGN_INSTALLER_CERT }}
+          MACOS_SIGN_INSTALLER_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_INSTALLER_CERT_PASSWORD }}
+        run: task sign-mac
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-macos
+          path: build/out/artifacts/mac/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: logs-macos
+          path: build/out/logs/
+          if-no-files-found: ignore
+
+  windows:
+    needs: source
+    runs-on: windows-2022
+    timeout-minutes: 60
+    environment: ${{ inputs.sign_windows && 'distribution' || 'unsigned-packaging' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - uses: actions/cache@v4
+        with:
+          path: build/out/tools
+          key: tools-windows-${{ hashFiles('build/buildvars.env', 'go.sum') }}
+          restore-keys: |
+            tools-windows-
+      - name: Prepare Windows installer tooling
+        run: task setup-win
+      - name: Package unsigned Windows
+        if: ${{ !inputs.sign_windows }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+        run: task package-win
+      - name: Package signed Windows
+        if: ${{ inputs.sign_windows }}
+        env:
+          VERSION_TAG: ${{ inputs.tag }}
+          SIGN_WINDOWS_CERT: ${{ secrets.SIGN_WINDOWS_CERT }}
+          SIGN_WINDOWS_CERT_PASSWORD: ${{ secrets.SIGN_WINDOWS_CERT_PASSWORD }}
+        run: task sign-win
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-windows
+          path: build/out/artifacts/win/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: logs-windows
+          path: build/out/logs/
+          if-no-files-found: ignore
+
+  publish:
+    needs: [source, linux, macos, windows]
+    if: ${{ inputs.release }}
+    runs-on: ubuntu-24.04
+    environment: distribution
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: release-files
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ needs.source.outputs.sha }}
+          fail_on_unmatched_files: true
+          files: release-files/*

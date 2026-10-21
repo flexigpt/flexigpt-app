@@ -2,16 +2,15 @@ version: "3"
 
 dev_mode:
   root_path: .
-  log_level: warn
+  log_level: info
   debounce: 1000
   ignore:
     dir:
       - .git
+      - .task
       - node_modules
       - frontend/dist
-      - build/bin
-      - out
-      - .task
+      - build
     file:
       - .DS_Store
     watched_extension:
@@ -20,9 +19,9 @@ dev_mode:
       - go.sum
     git_ignore: true
   executes:
-    - cmd: task desktop:dev:frontend
+    - cmd: node build/lin.mjs frontend
       type: background
-    - cmd: task desktop:dev:build
+    - cmd: node build/lin.mjs dev-build
       type: blocking
-    - cmd: task desktop:dev:run
+    - cmd: node build/lin.mjs dev-run
       type: primary

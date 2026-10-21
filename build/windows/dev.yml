@@ -1,0 +1,27 @@
+version: "3"
+
+dev_mode:
+  root_path: .
+  log_level: info
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - .task
+      - node_modules
+      - frontend/dist
+      - build
+    file:
+      - .DS_Store
+    watched_extension:
+      - "*.go"
+      - go.mod
+      - go.sum
+    git_ignore: true
+  executes:
+    - cmd: node build/win.mjs frontend
+      type: background
+    - cmd: node build/win.mjs dev-build
+      type: blocking
+    - cmd: node build/win.mjs dev-run
+      type: primary

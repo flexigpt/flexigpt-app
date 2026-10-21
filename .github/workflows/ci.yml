@@ -1,0 +1,74 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+
+jobs:
+  quality:
+    name: Lint and test
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ vars.LINUX_CI_IMAGE || 'ghcr.io/flexigpt/flexigpt-app-ci-linux:ubuntu24.04-v2' }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: build/out/cache/golangci-lint
+          key: golangci-linux-v2.13.0-${{ hashFiles('go.mod', 'go.sum', '.golangci*') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-linux-v2.13.0-${{ hashFiles('go.mod', 'go.sum', '.golangci*') }}-
+      - name: Run repository quality suite
+        run: task ci
+      - name: Check coverage policy
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.testcoverage.yml
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: quality-coverage
+          path: coverage.out
+          if-no-files-found: ignore
+
+  test-macos:
+    name: Native Go tests on macOS
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - name: Run native macOS Go tests
+        run: task test-go-native
+
+  test-windows:
+    name: Native Go tests on Windows
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - name: Run native Windows Go tests
+        run: task test-go-native

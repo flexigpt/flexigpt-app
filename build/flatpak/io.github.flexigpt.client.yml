@@ -12,54 +12,38 @@ finish-args:
   - --device=dri
   - --share=network
   - --filesystem=host
-  # keep client-side decorations. Ubuntu mate has csd stripping and injects some gtk libs like appmenu,canberra etc
   - --env=GTK_CSD=1
-  # block the host’s nocsd shim
   - --unset-env=LD_PRELOAD
   - --talk-name=org.freedesktop.secrets
   - --talk-name=com.canonical.AppMenu.Registrar
   - --talk-name=org.freedesktop.Flatpak
-  # disable WebKit accelerated compositing for nvidia drivers.
-  # - --env=WEBKIT_DISABLE_COMPOSITING_MODE=1
-  # This should not be enabled here as this is a issue in nvidia + x11 + legacy window manager combination
-  # - IF you use Nvidia propriety drivers, you will face a DMA buf issue. Below are the issue links and workaround for it:
-  # - Upstream bugs:
-  #   - [Webkit issue 180739](https://bugs.webkit.org/show_bug.cgi?id=180739)
-  #   - [Webkit issue 262607](https://bugs.webkit.org/show_bug.cgi?id=262607)
-  #   - [Debian issue 1082139](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1082139)
-  #   - [Wails issue 2977](https://github.com/wailsapp/wails/issues/2977)
-  #  - You can workaround this by running the app as:
-  #    - `WEBKIT_DISABLE_COMPOSITING_MODE=1 flatpak run io.github.flexigpt.client`.
-  #    - OR use `WEBKIT_DISABLE_DMABUF_RENDERER=1` instead in above run command.
-  #    - OR if you are ok with making system chnages:
-  #      - `cat /sys/module/nvidia_drm/parameters/modeset`
-  #      - If you see printed N then you need to enable it with: `echo options nvidia_drm modeset=1 | sudo tee /etc/modprobe.d/nvidia_drm.conf`
-  #      - Restart machine
-
-cleanup-commands:
-  - "rm -rf /app/sdk/golang"
-  - "rm -rf /app/go/bin"
-  - "rm -rf /app/sdk/node"
-  - "rm -rf /app/xdgdirs"
 
 build-options:
   build-args:
     - --share=network
+  append-path: /app/sdk/golang/bin:/app/sdk/node/bin:/app/go/bin
   env:
     GOROOT: /app/sdk/golang
     GOBIN: /app/go/bin
     CGO_ENABLED: "1"
     NODEROOT: /app/sdk/node
+    FLEXIGPT_TOOLS_DIR: /app/go/bin
     XDG_CONFIG_HOME: /app/xdgdirs/config
     XDG_DATA_HOME: /app/xdgdirs/data
+    VERSION_TAG: __FLEXIGPT_VERSION_TAG__
+    SOURCE_DATE_EPOCH: __FLEXIGPT_SOURCE_DATE_EPOCH__
+
+cleanup:
+  - /sdk
+  - /go
+  - /xdgdirs
 
 modules:
-  # - shared-modules/libsecret/libsecret.json
   - name: golang
     buildsystem: simple
     build-commands:
-      - mkdir -p $GOROOT
-      - mv $(pwd)/* $GOROOT
+      - mkdir -p "$GOROOT"
+      - cp -a . "$GOROOT"
     sources:
       - type: archive
         url: https://go.dev/dl/go1.27.0.linux-amd64.tar.gz
@@ -68,8 +52,8 @@ modules:
   - name: nodejs
     buildsystem: simple
     build-commands:
-      - mkdir -p $NODEROOT
-      - mv $(pwd)/* $NODEROOT
+      - mkdir -p "$NODEROOT"
+      - cp -a . "$NODEROOT"
     sources:
       - type: archive
         url: https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.xz
@@ -78,22 +62,31 @@ modules:
   - name: pnpm
     buildsystem: simple
     build-commands:
-      - PATH=$PATH:$GOROOT/bin:$NODEROOT/bin npm install -g pnpm@12.14.0
-
-  - name: task
-    buildsystem: simple
-    build-commands:
-      - $GOROOT/bin/go install github.com/go-task/task/v3/cmd/task@v3.53.1
+      - npm install --global pnpm@12.14.0
 
   - name: wails
     buildsystem: simple
     build-commands:
-      - $GOROOT/bin/go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.34
+      - GOBIN=/app/go/bin /app/sdk/golang/bin/go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.34
+
+  - name: go-licenses
+    buildsystem: simple
+    build-commands:
+      - GOBIN=/app/go/bin /app/sdk/golang/bin/go install github.com/google/go-licenses/v2@v2.0.1
 
   - name: FlexiGPT
     buildsystem: simple
     build-commands:
-      - PATH=$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin task package-flatpak
+      - node build/lin.mjs flatpak-install
     sources:
       - type: dir
-        path: ../../
+        path: __FLEXIGPT_SOURCE_DIR__
+        skip:
+          - .git
+          - .flatpak-builder
+          - .task
+          - node_modules
+          - frontend/node_modules
+          - frontend/dist
+          - build/bin
+          - build/out
