@@ -23,6 +23,7 @@
 		"**/build/bin": true,
 		"coverage.out": true
 	},
+	"search.useIgnoreFiles": true,
 
 	// ============================================
 	// File Associations
