@@ -146,8 +146,9 @@ catalog_generated.next.json
 /dist
 
 
-
+/bin/
 /build/bin/
+/build/.wails-config-*.yml
 /build/out/
 /build/.task/
 /build/licenses/

@@ -27,6 +27,57 @@ function linuxEnvironment(devServer) {
 
 /**
  * @param {Project} project
+ * @param {string} name
+ */
+function requiredHostTool(project, name) {
+	const directories = (project.env.PATH ?? "")
+		.split(path.delimiter)
+		.filter(Boolean);
+
+	for (const directory of directories) {
+		const candidate = path.join(directory, name);
+
+		try {
+			fs.accessSync(candidate, fs.constants.X_OK);
+			return candidate;
+		} catch {
+			// Continue searching PATH.
+		}
+	}
+
+	throw new Error(
+		`${name} is required for Flatpak packaging but was not found on PATH. ` +
+			`Install the host packages "flatpak" and "flatpak-builder". ` +
+			`On Debian or Ubuntu: sudo apt-get update && ` +
+			`sudo apt-get install --yes flatpak-builder`,
+	);
+}
+
+/**
+ * Flatpak Builder is a host prerequisite. It creates the SDK sandbox that
+ * installs the pinned Go, Node, pnpm, Wails, and license tooling declared in
+ * the manifest. It is deliberately not installed by the application build.
+ *
+ * @param {Project} project
+ * @returns {Promise<{flatpak: string, builder: string}>}
+ */
+async function flatpakHostTools(project) {
+	project.step("Verify Flatpak packaging host tools");
+
+	const flatpak = requiredHostTool(project, "flatpak");
+	const builder = requiredHostTool(project, "flatpak-builder");
+
+	await project.run(flatpak, ["--version"]);
+	await project.run(builder, ["--version"]);
+
+	return {
+		flatpak,
+		builder,
+	};
+}
+
+/**
+ * @param {Project} project
  * @param {boolean} production
  * @param {boolean} devServer
  */
@@ -70,7 +121,7 @@ export async function build(project, production, devServer = false) {
 	}
 
 	const executable = project.abs(
-		production ? "build/bin" : "build/out/dev/lin",
+		production ? "bin" : "build/out/dev/lin",
 		project.value("COMMON_BUILD_NAME"),
 	);
 
@@ -78,8 +129,7 @@ export async function build(project, production, devServer = false) {
 
 	project.step("Compile Linux application");
 
-	await project.run(
-		"go",
+	await project.go(
 		goBuildArgs({
 			production,
 			tags: prepared.tags,
@@ -351,9 +401,10 @@ async function prepareFlatpakSigning(project) {
 /** @param {Project} project */
 async function packageFlatpak(project) {
 	nativeHost();
+
+	const { flatpak, builder } = await flatpakHostTools(project);
 	project.resetWork();
 	project.resetArtifacts();
-	project.validateBuildConfiguration();
 
 	const version = project.version();
 	const sourceDateEpoch = await project.epoch();
@@ -373,7 +424,7 @@ async function packageFlatpak(project) {
 
 		project.step("Ensure Flathub runtime remote is configured");
 
-		await project.run("flatpak", [
+		await project.run(flatpak, [
 			"remote-add",
 			"--user",
 			"--if-not-exists",
@@ -384,7 +435,7 @@ async function packageFlatpak(project) {
 		project.step("Build Flatpak application");
 
 		await project.run(
-			"flatpak-builder",
+			builder,
 			[
 				"--user",
 				"--force-clean",
@@ -404,7 +455,7 @@ async function packageFlatpak(project) {
 
 		project.step("Create Flatpak bundle");
 
-		await project.run("flatpak", [
+		await project.run(flatpak, [
 			"build-bundle",
 			"--arch=x86_64",
 			...signing.args,
@@ -416,7 +467,7 @@ async function packageFlatpak(project) {
 
 		const artifactName = `${project.value("COMMON_BUILD_NAME")}-linux-amd64-${version}.flatpak`;
 
-		const localBundle = project.abs("build/bin", artifactName);
+		const localBundle = project.abs("bin", artifactName);
 		project.copy(bundle, localBundle);
 		project.artifact(localBundle, artifactName);
 	} finally {
@@ -504,6 +555,15 @@ export async function runAction(project, action) {
 					},
 					timeoutMs: 0,
 				},
+			);
+			break;
+
+		case "package-setup":
+			nativeHost();
+			await flatpakHostTools(project);
+			project.log(
+				"INFO",
+				"Flatpak and Flatpak Builder host tooling are available",
 			);
 			break;
 

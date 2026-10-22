@@ -47,6 +47,16 @@ tasks:
     cmds:
       - task --list
 
+  build:
+    desc: Build a debug application through the current platform build task.
+    cmds:
+      - task: build-dev
+
+  package:
+    desc: Package the current platform through the current platform package task.
+    cmds:
+      - task: "package-{{OS}}"
+
   cloc:
     desc: Count repository lines using project exclusions.
     cmds:

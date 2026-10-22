@@ -605,6 +605,21 @@ export class Project {
 		return await this.run("pnpm", args, options);
 	}
 
+	/**
+	 * The Flatpak SDK supplies Go at an explicit path. Native builds continue
+	 * to use the Go executable available on the host PATH.
+	 *
+	 * @param {string[]} args
+	 * @param {RunOptions} [options]
+	 */
+	async go(args, options = {}) {
+		return await this.run(
+			this.env.FLEXIGPT_GO_EXECUTABLE ?? "go",
+			args,
+			options,
+		);
+	}
+
 	validateBuildConfiguration() {
 		this.step("Validate pinned application toolchain versions");
 		validatePinnedVersions(this.env);
@@ -686,7 +701,7 @@ export class Project {
 			);
 		}
 
-		await this.run("go", ["mod", "download"]);
+		await this.go(["mod", "download"]);
 	}
 
 	/**
@@ -719,7 +734,7 @@ export class Project {
 
 			fs.mkdirSync(directory, { recursive: true });
 
-			await this.run("go", ["install", `${modulePath}@${version}`], {
+			await this.go(["install", `${modulePath}@${version}`], {
 				env: {
 					GOBIN: directory,
 					GOFLAGS: "",
@@ -735,8 +750,7 @@ export class Project {
 		const expected = this.value("WAILS_VERSION");
 
 		const actual = (
-			await this.run(
-				"go",
+			await this.go(
 				[
 					"list",
 					"-m",

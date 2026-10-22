@@ -1,0 +1,19 @@
+version: "3"
+
+name: FlexiGPT
+outputfilename: FlexiGPT
+
+frontend:
+  dir: ../frontend
+  install: pnpm install --frozen-lockfile
+  build: pnpm run build:wails
+  dev: pnpm run run:wailsdev
+
+info:
+  companyName: Pankaj Pipada
+  productName: FlexiGPT
+  productVersion: "0.0.1"
+  productDescription: FlexiGPT - An AI application platform
+  copyright: Copyright 2023 - Present Pankaj Pipada
+  comments: FlexiGPT - An AI application platform
+  identifier: io.github.flexigpt.client

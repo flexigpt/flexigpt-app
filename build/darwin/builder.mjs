@@ -105,8 +105,7 @@ export async function build(project, production, devServer = false) {
 
 		project.step(`Compile macOS ${architecture} executable`);
 
-		await project.run(
-			"go",
+		await project.go(
 			goBuildArgs({
 				production,
 				tags: prepared.tags,
@@ -125,23 +124,17 @@ export async function build(project, production, devServer = false) {
 		binaries.push(project.file(binary));
 	}
 
+	const wails = await project.wailsTool();
+
 	if (production) {
 		project.step("Create universal macOS executable");
 
-		await project.run("xcrun", [
+		await project.run(wails, [
+			"tool",
 			"lipo",
-			"-create",
-			...binaries,
 			"-output",
 			executable,
-		]);
-
-		await project.run("xcrun", [
-			"lipo",
-			"-verify_arch",
-			"x86_64",
-			"arm64",
-			executable,
+			...binaries,
 		]);
 	} else {
 		project.copy(binaries[0], executable, 0o755);
@@ -171,7 +164,6 @@ export async function build(project, production, devServer = false) {
 
 	await project.run("plutil", ["-lint", plist]);
 
-	const wails = await project.wailsTool();
 	const icon = path.join(project.work, "iconfile.icns");
 
 	project.step("Generate macOS application icon");

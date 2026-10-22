@@ -165,6 +165,11 @@ tasks:
     cmds:
       - node build/flatpak/builder.mjs setup
 
+  setup-flatpak:
+    desc: Verify host Flatpak and Flatpak Builder tooling for Linux packaging.
+    cmds:
+      - node build/flatpak/builder.mjs package-setup
+
   setup-windows:
     desc: Install or verify required Windows NSIS tooling.
     cmds:

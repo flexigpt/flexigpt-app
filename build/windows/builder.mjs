@@ -51,6 +51,40 @@ function makensis(project) {
 }
 
 /**
+ * Wails build assets are configured through build/config.yml. Keep the
+ * committed configuration at the development version and render a short-lived
+ * copy beside it so relative frontend paths retain their meaning.
+ *
+ * @param {Project} project
+ * @param {string} version
+ */
+function versionedWailsConfig(project, version) {
+	const source = project.file(project.abs("build/config.yml"));
+	const developmentVersion = project.value("COMMON_APP_DEV_VERSION").slice(1);
+	const expected = `productVersion: "${developmentVersion}"`;
+	const contents = fs.readFileSync(source, "utf8");
+
+	if (!contents.includes(expected)) {
+		throw new Error(
+			`build/config.yml must contain ${expected} to generate versioned Windows build assets`,
+		);
+	}
+
+	const config = project.abs(
+		"build",
+		`.wails-config-${process.pid}-${Date.now()}.yml`,
+	);
+
+	fs.writeFileSync(
+		config,
+		contents.replace(expected, `productVersion: "${version.slice(1)}"`),
+		{ mode: 0o600 },
+	);
+
+	return config;
+}
+
+/**
  * @param {Project} project
  * @param {string} version
  */
@@ -60,37 +94,22 @@ async function windowsAssets(project, version) {
 
 	const wails = await project.wailsTool();
 
-	project.step("Generate Windows Wails build assets");
+	const config = versionedWailsConfig(project, version);
 
-	await project.run(wails, [
-		"generate",
-		"build-assets",
-		"-dir",
-		directory,
-		"-name",
-		project.value("COMMON_BUILD_NAME"),
-		"-productname",
-		project.value("COMMON_PRODUCT_NAME"),
-		"-version",
-		version.slice(1),
-		"-identifier",
-		project.value("COMMON_BUNDLE_ID"),
-		"-copyright",
-		project.value("COMMON_PRODUCT_COPYRIGHT"),
-		"-comments",
-		project.value("COMMON_PRODUCT_DESCRIPTION"),
-	]);
+	try {
+		project.step("Generate Windows Wails build assets from build/config.yml");
 
-	const config = project.file(path.join(directory, "config.yml"));
-
-	await project.run(wails, [
-		"update",
-		"build-assets",
-		"-config",
-		config,
-		"-dir",
-		directory,
-	]);
+		await project.run(wails, [
+			"update",
+			"build-assets",
+			"-config",
+			config,
+			"-dir",
+			directory,
+		]);
+	} finally {
+		fs.rmSync(config, { force: true });
+	}
 
 	const windows = path.join(directory, "windows");
 	const icon = path.join(directory, "icon.ico");
@@ -213,8 +232,7 @@ export async function build(project, production, devServer = false) {
 
 		project.step("Compile Windows application");
 
-		await project.run(
-			"go",
+		await project.go(
 			goBuildArgs({
 				production,
 				tags: prepared.tags,

@@ -25,6 +25,7 @@ build-options:
   env:
     GOROOT: /app/sdk/golang
     GOBIN: /app/go/bin
+    FLEXIGPT_GO_EXECUTABLE: /app/sdk/golang/bin/go
     CGO_ENABLED: "1"
     NODEROOT: /app/sdk/node
     FLEXIGPT_TOOLS_DIR: /app/go/bin
@@ -87,12 +88,13 @@ modules:
         export GOROOT="/app/sdk/golang"
         export NODEROOT="/app/sdk/node"
         export GOBIN="/app/go/bin"
+        export FLEXIGPT_GO_EXECUTABLE="/app/sdk/golang/bin/go"
         export PATH="/app/sdk/golang/bin:/app/sdk/node/bin:/app/go/bin:${PATH}"
-        command -v go
-        go version
-        command -v node
-        node --version
-        node build/flatpak/builder.mjs flatpak-install
+        test -x "${FLEXIGPT_GO_EXECUTABLE}"
+        "${FLEXIGPT_GO_EXECUTABLE}" version
+        test -x "/app/sdk/node/bin/node"
+        /app/sdk/node/bin/node --version
+        /app/sdk/node/bin/node build/flatpak/builder.mjs flatpak-install
     sources:
       - type: dir
         path: __FLEXIGPT_SOURCE_DIR__
@@ -103,5 +105,6 @@ modules:
           - node_modules
           - frontend/node_modules
           - frontend/dist
+          - bin
           - build/bin
           - build/out
