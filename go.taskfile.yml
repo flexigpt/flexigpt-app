@@ -42,7 +42,7 @@ tasks:
     cmds:
       - >-
         powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
-        "$directory = 'frontend/dist/client'; [void](New-Item -ItemType Directory -Force -Path $directory); [void](New-Item -ItemType File -Force -Path (Join-Path $directory 'a.tmp'))"
+        "New-Item -ItemType Directory -Force -Path 'frontend/dist/client' -ErrorAction Stop; New-Item -ItemType File -Force -Path 'frontend/dist/client/a.tmp' -ErrorAction Stop"
 
   go-embed-clean:
     internal: true
@@ -67,7 +67,7 @@ tasks:
     cmds:
       - >-
         powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
-        "$file = 'frontend/dist/client/a.tmp'; if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }"
+        "if (Test-Path -LiteralPath 'frontend/dist/client/a.tmp') { Remove-Item -LiteralPath 'frontend/dist/client/a.tmp' -Force -ErrorAction Stop }"
 
   embed-prepare:
     desc: Create the ignored Go embed placeholder at frontend/dist/client/a.tmp.
