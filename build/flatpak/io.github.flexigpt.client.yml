@@ -42,11 +42,15 @@ cleanup:
 modules:
   - name: golang
     buildsystem: simple
+    build-options:
+      no-debuginfo: true
+      strip: false
     build-commands:
       - mkdir -p "$GOROOT"
       - cp -a . "$GOROOT"
       - test -x "$GOROOT/bin/go"
-
+      - |
+        find "$GOROOT/src" -type d -name testdata -prune -exec rm -rf {} +
     sources:
       - type: archive
         url: https://go.dev/dl/go__FLEXIGPT_GO_VERSION__.linux-amd64.tar.gz

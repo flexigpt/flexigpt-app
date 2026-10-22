@@ -113,6 +113,7 @@ async function windowsAssets(project, version) {
 
 	const windows = path.join(directory, "windows");
 	const icon = path.join(directory, "icon.ico");
+	const macIcon = path.join(directory, "icon.icns");
 
 	await project.run(
 		wails,
@@ -123,6 +124,8 @@ async function windowsAssets(project, version) {
 			project.abs(project.value("COMMON_ICON_PNG")),
 			"-windowsfilename",
 			icon,
+			"-macfilename",
+			macIcon,
 		],
 		{
 			cwd: directory,

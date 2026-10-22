@@ -129,12 +129,20 @@ export async function build(project, production, devServer = false) {
 	if (production) {
 		project.step("Create universal macOS executable");
 
-		await project.run(wails, [
-			"tool",
+		await project.run("xcrun", [
 			"lipo",
+			"-create",
+			...binaries,
 			"-output",
 			executable,
-			...binaries,
+		]);
+
+		await project.run("xcrun", [
+			"lipo",
+			"-verify_arch",
+			"x86_64",
+			"arm64",
+			executable,
 		]);
 	} else {
 		project.copy(binaries[0], executable, 0o755);
@@ -165,6 +173,7 @@ export async function build(project, production, devServer = false) {
 	await project.run("plutil", ["-lint", plist]);
 
 	const icon = path.join(project.work, "iconfile.icns");
+	const windowsIcon = path.join(project.work, "iconfile.ico");
 
 	project.step("Generate macOS application icon");
 
@@ -177,6 +186,8 @@ export async function build(project, production, devServer = false) {
 			project.abs(project.value("COMMON_ICON_PNG")),
 			"-macfilename",
 			icon,
+			"-windowsfilename",
+			windowsIcon,
 		],
 		{
 			cwd: project.work,
