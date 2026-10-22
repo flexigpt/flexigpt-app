@@ -22,7 +22,7 @@ jobs:
     name: Lint and test
     runs-on: ubuntu-24.04
     container:
-      image: ${{ vars.LINUX_CI_IMAGE || 'ghcr.io/flexigpt/flexigpt-app-ci-linux:ubuntu24.04-v2' }}
+      image: ${{ vars.LINUX_CI_IMAGE || 'ghcr.io/flexigpt/flexigpt-app-ci-linux:ubuntu24.04-v1' }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

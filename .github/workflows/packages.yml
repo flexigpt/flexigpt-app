@@ -105,7 +105,6 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
-    environment: ${{ inputs.sign_linux && 'distribution' || 'unsigned-packaging' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -149,7 +148,6 @@ jobs:
     needs: source
     runs-on: macos-15-intel
     timeout-minutes: 90
-    environment: ${{ inputs.sign_macos && 'distribution' || 'unsigned-packaging' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -199,7 +197,6 @@ jobs:
     needs: source
     runs-on: windows-2022
     timeout-minutes: 60
-    environment: ${{ inputs.sign_windows && 'distribution' || 'unsigned-packaging' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -242,7 +239,6 @@ jobs:
     needs: [source, linux, macos, windows]
     if: ${{ inputs.release }}
     runs-on: ubuntu-24.04
-    environment: distribution
     permissions:
       contents: write
     steps:
