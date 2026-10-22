@@ -13,7 +13,7 @@ includes:
   build:
     taskfile: ./build/Taskfile.yml
     dir: "{{.ROOT_DIR}}"
-    internal: true
+    flatten: true
 
   git:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/git.yml
@@ -114,46 +114,6 @@ tasks:
       - task: install-go-tools
       - asdf reshim golang {{.GO_VERSION}}
 
-  check-version:
-    desc: Validate VERSION_TAG in vX.Y.Z format.
-    cmds:
-      - task: build:check-version
-
-  package-linux:
-    desc: Build and package the Linux Flatpak bundle.
-    cmds:
-      - task: build:package-linux
-
-  package-darwin:
-    desc: Build and package the macOS PKG installer.
-    cmds:
-      - task: build:package-darwin
-
-  package-windows:
-    desc: Build and package the Windows NSIS installer.
-    cmds:
-      - task: build:package-windows
-
-  package-flatpak-install:
-    desc: Install the application into the active Flatpak Builder destination.
-    cmds:
-      - task: build:flatpak-install
-
-  sign-linux:
-    desc: Build and GPG-sign the Linux Flatpak bundle.
-    cmds:
-      - task: build:sign-linux
-
-  sign-darwin:
-    desc: Build, sign, optionally notarize, and package macOS.
-    cmds:
-      - task: build:sign-darwin
-
-  sign-windows:
-    desc: Build, sign, and package Windows.
-    cmds:
-      - task: build:sign-windows
-
   licenses:
     desc: Generate project, Go, JavaScript, and combined license reports.
     cmds:
@@ -178,16 +138,6 @@ tasks:
     desc: Run a OS specific standalone development task.
     cmds:
       - task: "build:run-dev-{{OS}}"
-
-  setup-linux:
-    desc: Validate Linux GTK and WebKit native prerequisites.
-    cmds:
-      - task: build:setup-linux
-
-  setup-windows:
-    desc: Install or validate Windows NSIS tooling.
-    cmds:
-      - task: build:setup-windows
 
   lint-go:
     desc: Run the configured Go lint suite.
