@@ -1086,13 +1086,18 @@ export class Project {
 		this.copy(source, temporary);
 		fs.renameSync(temporary, destination);
 
+		const size = fs.statSync(destination).size;
 		const hash = createHash("sha256")
 			.update(fs.readFileSync(destination))
 			.digest("hex");
 
 		fs.writeFileSync(`${destination}.sha256`, `${hash}  ${name}\n`);
 
-		this.log("INFO", `Artifact ready: ${destination}`);
+		this.log(
+			"INFO",
+			`Artifact ready: ${destination} ` +
+				`(${(size / 1024 ** 2).toFixed(2)} MiB; ${size} bytes)`,
+		);
 	}
 
 	async epoch() {

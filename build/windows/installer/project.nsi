@@ -3,6 +3,10 @@ Unicode true
 !cd "${__FILEDIR__}"
 !include "wails_tools.nsh"
 
+; The default NSIS zlib compressor is materially larger for the embedded
+; Go executable and frontend asset payload.
+SetCompressor /SOLID lzma
+
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
 VIFileVersion "${INFO_PRODUCTVERSION}.0"
 
