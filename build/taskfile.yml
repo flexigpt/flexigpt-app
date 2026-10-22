@@ -89,11 +89,6 @@ tasks:
     cmds:
       - node build/windows/builder.mjs package
 
-  flatpak-install:
-    desc: Install the application into the active Flatpak Builder destination.
-    cmds:
-      - node build/flatpak/builder.mjs flatpak-install
-
   sign-linux:
     desc: Package a GPG-signed Linux Flatpak bundle.
     env:
@@ -174,3 +169,15 @@ tasks:
     desc: Install or verify required Windows NSIS tooling.
     cmds:
       - node build/windows/builder.mjs setup
+
+  flatpak-test:
+    desc: Install, inspect, and run the built Flatpak in an isolated local profile.
+    platforms: [linux]
+    cmds:
+      - node build/flatpak/builder.mjs test
+
+  flatpak-test-clean:
+    desc: Remove the isolated Flatpak test profile and application data.
+    platforms: [linux]
+    cmds:
+      - node build/flatpak/builder.mjs test-clean

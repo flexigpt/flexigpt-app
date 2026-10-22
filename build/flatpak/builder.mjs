@@ -76,6 +76,117 @@ async function flatpakHostTools(project) {
 	};
 }
 
+/** @param {Project} project */
+function flatpakTestRoot(project) {
+	return project.abs("build/out/flatpak-test");
+}
+
+/** @param {Project} project */
+async function testFlatpak(project) {
+	nativeHost();
+
+	const flatpak = requiredHostTool(project, "flatpak");
+	const version = project.version(true);
+	const artifactName = `${project.value("COMMON_BUILD_NAME")}-linux-amd64-${version}.flatpak`;
+	const bundle = project.abs("build/out/artifacts/lin", artifactName);
+
+	if (!fs.existsSync(bundle)) {
+		throw new Error(
+			`Flatpak bundle is missing: ${bundle}. ` +
+				`Build it first with VERSION_TAG=${version} task package-linux`,
+		);
+	}
+
+	project.file(bundle);
+
+	const testRoot = flatpakTestRoot(project);
+	const home = path.join(testRoot, "home");
+	const data = path.join(home, ".local", "share");
+	const config = path.join(home, ".config");
+	const cache = path.join(home, ".cache");
+	const inheritedDataDirs =
+		project.env.XDG_DATA_DIRS || "/usr/local/share:/usr/share";
+
+	fs.mkdirSync(data, { recursive: true });
+	fs.mkdirSync(config, { recursive: true });
+	fs.mkdirSync(cache, { recursive: true });
+
+	const environment = {
+		HOME: home,
+		XDG_DATA_HOME: data,
+		XDG_CONFIG_HOME: config,
+		XDG_CACHE_HOME: cache,
+		XDG_DATA_DIRS: [
+			path.join(data, "flatpak", "exports", "share"),
+			inheritedDataDirs,
+		].join(path.delimiter),
+	};
+
+	project.step(`Install and inspect Flatpak bundle ${artifactName}`);
+
+	await project.run(flatpak, ["--version"]);
+
+	await project.run(
+		flatpak,
+		[
+			"remote-add",
+			"--user",
+			"--if-not-exists",
+			"flathub",
+			"https://flathub.org/repo/flathub.flatpakrepo",
+		],
+		{
+			env: environment,
+			timeoutMs: 60 * 60 * 1000,
+		},
+	);
+
+	await project.run(
+		flatpak,
+		[
+			"install",
+			"--user",
+			"--noninteractive",
+			"--reinstall",
+			"--bundle",
+			bundle,
+		],
+		{
+			env: environment,
+			timeoutMs: 60 * 60 * 1000,
+		},
+	);
+
+	await project.run(
+		flatpak,
+		["info", "--user", project.value("COMMON_BUNDLE_ID")],
+		{
+			env: environment,
+		},
+	);
+
+	project.step("Run isolated Flatpak test application");
+
+	await project.run(
+		flatpak,
+		["run", "--user", project.value("COMMON_BUNDLE_ID")],
+		{
+			env: environment,
+			timeoutMs: 0,
+		},
+	);
+}
+
+/** @param {Project} project */
+async function cleanFlatpakTest(project) {
+	nativeHost();
+
+	const testRoot = flatpakTestRoot(project);
+
+	fs.rmSync(testRoot, { recursive: true, force: true });
+	project.log("INFO", `Removed isolated Flatpak test profile: ${testRoot}`);
+}
+
 /**
  * @param {Project} project
  * @param {boolean} production
@@ -509,6 +620,14 @@ export async function runAction(project, action) {
 
 		case "flatpak-install":
 			await flatpakInstall(project);
+			break;
+
+		case "test":
+			await testFlatpak(project);
+			break;
+
+		case "test-clean":
+			await cleanFlatpakTest(project);
 			break;
 
 		case "dev": {

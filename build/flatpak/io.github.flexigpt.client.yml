@@ -15,6 +15,7 @@ finish-args:
   - --env=GTK_CSD=1
   - --unset-env=LD_PRELOAD
   - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.a11y.Bus
   - --talk-name=com.canonical.AppMenu.Registrar
   - --talk-name=org.freedesktop.Flatpak
 
