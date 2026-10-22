@@ -80,7 +80,7 @@ COPY . /workspace
 
 RUN task install-go-tools \
     && go mod download \
-    && pnpm fetch --frozen-lockfile
+    && pnpm fetch
 
 FROM tools AS ci
 
