@@ -19,6 +19,8 @@ import (
 
 var Version string
 
+const applicationID = "io.github.flexigpt.client"
+
 func main() {
 	appDisplayTitle := AppTitle + " - " + Version
 	aboutMessage := "An AI app platform.\n\nCopyright © 2023 - Present"
@@ -87,6 +89,9 @@ func main() {
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		Linux: application.LinuxOptions{
+			ApplicationID: applicationID,
 		},
 	})
 	app.desktop = desktop
