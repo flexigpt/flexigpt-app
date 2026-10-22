@@ -18,6 +18,7 @@ finish-args:
   - --talk-name=org.a11y.Bus
   - --talk-name=com.canonical.AppMenu.Registrar
   - --talk-name=org.freedesktop.Flatpak
+  - --system-talk-name=org.freedesktop.login1
 
 build-options:
   build-args:
