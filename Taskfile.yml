@@ -57,6 +57,65 @@ tasks:
     cmds:
       - task: "package-{{OS}}"
 
+  flatpak-test:
+    desc: Install, inspect, and run the built Flatpak in an isolated local profile.
+    platforms: [linux]
+    vars:
+      FLATPAK_TEST_ROOT: "{{.ROOT_DIR}}/build/out/flatpak-test"
+      FLATPAK_TEST_VERSION: "{{.VERSION_TAG | default .COMMON_APP_DEV_VERSION}}"
+      FLATPAK_TEST_BUNDLE: "{{.ROOT_DIR}}/build/out/artifacts/lin/{{.COMMON_BUILD_NAME}}-linux-amd64-{{.FLATPAK_TEST_VERSION}}.flatpak"
+    cmds:
+      - |
+        set -eu
+
+        TEST_ROOT="{{.FLATPAK_TEST_ROOT}}"
+        BUNDLE="{{.FLATPAK_TEST_BUNDLE}}"
+        APP_ID="{{.COMMON_BUNDLE_ID}}"
+
+        if ! command -v flatpak >/dev/null 2>&1; then
+          echo "flatpak is required to test the package" >&2
+          exit 1
+        fi
+
+        if [ ! -f "${BUNDLE}" ]; then
+          echo "Flatpak bundle is missing: ${BUNDLE}" >&2
+          echo "Build it first with: VERSION_TAG={{.FLATPAK_TEST_VERSION}} task package-linux" >&2
+          exit 1
+        fi
+
+        export HOME="${TEST_ROOT}/home"
+        export XDG_DATA_HOME="${HOME}/.local/share"
+        export XDG_CONFIG_HOME="${HOME}/.config"
+        export XDG_CACHE_HOME="${HOME}/.cache"
+
+        mkdir -p "${XDG_DATA_HOME}" "${XDG_CONFIG_HOME}" "${XDG_CACHE_HOME}"
+
+        flatpak remote-add --user --if-not-exists \
+          flathub \
+          https://flathub.org/repo/flathub.flatpakrepo
+
+        flatpak install --user --noninteractive --reinstall --bundle "${BUNDLE}"
+        flatpak info --user "${APP_ID}"
+        flatpak run --user "${APP_ID}"
+
+  flatpak-test-clean:
+    desc: Remove the isolated Flatpak test profile, runtime cache, and test application data.
+    platforms: [linux]
+    vars:
+      FLATPAK_TEST_ROOT: "{{.ROOT_DIR}}/build/out/flatpak-test"
+    cmds:
+      - |
+        set -eu
+
+        TEST_ROOT="{{.FLATPAK_TEST_ROOT}}"
+
+        if [ -d "${TEST_ROOT}" ]; then
+          rm -rf "${TEST_ROOT}"
+          echo "Removed isolated Flatpak test profile: ${TEST_ROOT}"
+        else
+          echo "No isolated Flatpak test profile exists: ${TEST_ROOT}"
+        fi
+
   cloc:
     desc: Count repository lines using project exclusions.
     cmds:
