@@ -56,12 +56,10 @@ RUN test -n "${GO_VERSION}" \
 ENV GOPATH=/go
 ENV GOMODCACHE=/go/pkg/mod
 ENV PNPM_HOME=/opt/pnpm
-ENV NPM_CONFIG_STORE_DIR=/opt/pnpm/store
-ENV PATH=/opt/flexigpt/bin:/go/bin:/opt/pnpm/bin:/usr/local/go/bin:/opt/node/bin:${PATH}
+ENV pnpm_config_store_dir=/opt/pnpm/store
+ENV PATH=/opt/flexigpt/bin:/go/bin:/opt/pnpm:/opt/pnpm/bin:/usr/local/go/bin:/opt/node/bin:${PATH}
 
-RUN npm config set prefix /opt/pnpm \
-    && npm install --global "pnpm@${PNPM_VERSION}" \
-    && pnpm config set store-dir /opt/pnpm/store \
+RUN npm install --global "pnpm@${PNPM_VERSION}" \
     && mkdir --parents /opt/flexigpt/bin \
     && GOBIN=/opt/flexigpt/bin go install "github.com/go-task/task/v3/cmd/task@v${TASK_VERSION}" \
     && GOBIN=/opt/flexigpt/bin go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}" \
