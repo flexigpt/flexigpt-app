@@ -111,7 +111,7 @@ jobs:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             build/out/cache/flatpak-builder
@@ -154,7 +154,7 @@ jobs:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: build/out/tools
           key: tools-macos-${{ hashFiles('build/buildvars.env', 'go.sum') }}
@@ -203,7 +203,7 @@ jobs:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: build/out/tools
           key: tools-windows-${{ hashFiles('build/buildvars.env', 'go.sum') }}
@@ -242,7 +242,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: package-*
           merge-multiple: true
