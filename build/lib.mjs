@@ -23,16 +23,7 @@ import { parseEnv } from "node:util";
  */
 
 export const root = fileURLToPath(new URL("../", import.meta.url));
-const placeholder = path.join(
-	root,
-	"frontend",
-	"dist",
-	"client",
-	"build-placeholder.txt",
-);
-
-const placeholderContents =
-	"FlexiGPT temporary Go embed placeholder. Safe to remove after ci checks.\n";
+const placeholder = path.join(root, "frontend", "dist", "client", "a.tmp");
 
 /** @param {string} version */
 export function validateVersion(version) {
@@ -54,7 +45,7 @@ export function validateVersion(version) {
 
 export function prepareEmbedPlaceholder() {
 	fs.mkdirSync(path.dirname(placeholder), { recursive: true });
-	fs.writeFileSync(placeholder, placeholderContents, { mode: 0o644 });
+	fs.closeSync(fs.openSync(placeholder, "a", 0o644));
 	console.log(`Prepared Go embed placeholder: ${placeholder}`);
 }
 
@@ -63,7 +54,9 @@ export function cleanEmbedPlaceholder() {
 		return;
 	}
 
-	if (fs.readFileSync(placeholder, "utf8") === placeholderContents) {
+	const stat = fs.statSync(placeholder);
+
+	if (stat.isFile() && stat.size === 0) {
 		fs.rmSync(placeholder, { force: true });
 		console.log(`Removed Go embed placeholder: ${placeholder}`);
 	}
@@ -810,12 +803,14 @@ export class Project {
 	async bindings(tags) {
 		this.step("Generate Wails TypeScript bindings");
 
-		const placeholder = this.abs("frontend/dist/client/build-placeholder.txt");
+		const placeholder = this.abs("frontend/dist/client/a.tmp");
 		const existed = fs.existsSync(placeholder);
-		const previous = existed ? fs.readFileSync(placeholder) : undefined;
 
 		fs.mkdirSync(path.dirname(placeholder), { recursive: true });
-		fs.writeFileSync(placeholder, "Temporary Wails binding placeholder.\n");
+
+		if (!existed) {
+			fs.closeSync(fs.openSync(placeholder, "a", 0o644));
+		}
 
 		try {
 			const wails = await this.wailsTool();
@@ -838,9 +833,7 @@ export class Project {
 				cwd: this.abs(this.value("GO_BACKEND_DIR")),
 			});
 		} finally {
-			if (previous) {
-				fs.writeFileSync(placeholder, previous);
-			} else {
+			if (!existed) {
 				fs.rmSync(placeholder, { force: true });
 			}
 		}

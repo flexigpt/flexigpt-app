@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  lint-e2e:
+    desc: Lint E2E source files.
+    cmds:
+      - pnpm run lint:e2e
+
+  typecheck-e2e:
+    desc: Type-check E2E TypeScript source files.
+    cmds:
+      - pnpm run typecheck:e2e
+
+  test-e2e:
+    desc: Run E2E tests on the current host.
+    cmds:
+      - pnpm run test:e2e
+
+  test-e2e-headed:
+    desc: Run E2E tests with a visible browser window.
+    cmds:
+      - pnpm run test:e2e:headed
+
+  test-e2e-lin:
+    desc: Run E2E tests through Xvfb on Linux.
+    cmds:
+      - pnpm run test:e2e:linux
+
+  test-e2e-report:
+    desc: Open the Playwright E2E report.
+    cmds:
+      - pnpm run test:e2e:report

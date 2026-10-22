@@ -13,6 +13,7 @@
 		"node": "24.14.0"
 	},
 	"scripts": {
+		"typecheck:build": "tsc --project ./build/tsconfig.json",
 		"test:e2e": "node ./e2e/run.ts",
 		"test:e2e:headed": "node ./e2e/run.ts --headed",
 		"comment1": "Keep application data even after success: FLEXIGPT_E2E_KEEP_DATA=1 pnpm run test:e2e",

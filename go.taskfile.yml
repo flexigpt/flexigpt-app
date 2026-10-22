@@ -1,0 +1,186 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+env:
+  GOLANGCI_LINT_CACHE: "{{.ROOT_DIR}}/build/out/cache/golangci-lint"
+
+includes:
+  upstream:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
+    checksum: 4f3a7e4d867c78ddd8ab2aa72e2edd27b345323013ee1e5b5d9604f1de237240
+    dir: "{{.ROOT_DIR}}"
+    internal: true
+    vars:
+      GREETING: Hello, these are FlexiGPT tasks!
+      GO_MODULE_PATH: "{{.COMMON_PRODUCT_GITPATH}}"
+      DEPGRAPH_ENTRY_POINT: "{{.GO_MAIN_ENTRYPOINT}}"
+      DEPGRAPH_ONLYPREFIXES: "{{.COMMON_PRODUCT_GITPATH}},command-line-arguments"
+
+tasks:
+  go-embed-placeholder:
+    internal: true
+    cmds:
+      - task: "go-embed-placeholder-{{OS}}"
+
+  go-embed-placeholder-linux:
+    internal: true
+    platforms: [linux]
+    cmds:
+      - mkdir -p frontend/dist/client
+      - touch frontend/dist/client/a.tmp
+
+  go-embed-placeholder-darwin:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - mkdir -p frontend/dist/client
+      - touch frontend/dist/client/a.tmp
+
+  go-embed-placeholder-windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+        "$directory = 'frontend/dist/client'; [void](New-Item -ItemType Directory -Force -Path $directory); [void](New-Item -ItemType File -Force -Path (Join-Path $directory 'a.tmp'))"
+
+  go-embed-clean:
+    internal: true
+    cmds:
+      - task: "go-embed-clean-{{OS}}"
+
+  go-embed-clean-linux:
+    internal: true
+    platforms: [linux]
+    cmds:
+      - rm -f frontend/dist/client/a.tmp
+
+  go-embed-clean-darwin:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - rm -f frontend/dist/client/a.tmp
+
+  go-embed-clean-windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+        "$file = 'frontend/dist/client/a.tmp'; if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }"
+
+  embed-prepare:
+    desc: Create the ignored Go embed placeholder at frontend/dist/client/a.tmp.
+    cmds:
+      - task: go-embed-placeholder
+
+  embed-clean:
+    desc: Remove the ignored Go embed placeholder.
+    cmds:
+      - task: go-embed-clean
+
+  go-default:
+    desc: Run the upstream Go default suite.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:default
+
+  go-print-all-vars:
+    desc: Print variables exposed by the upstream Go task suite.
+    cmds:
+      - task: upstream:print-all-vars
+
+  godepgraph:
+    desc: Generate the Go dependency graph.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:depgraph
+
+  go-upgrade-do:
+    desc: Upgrade Go module dependencies through the upstream Go task suite.
+    cmds:
+      - task: upstream:upgrade-do
+
+  go-upgrade-check:
+    desc: Check available Go module dependency updates.
+    cmds:
+      - task: upstream:upgrade-check
+
+  install-ci-tools:
+    desc: Install Go tools required by the CI lint and test suite.
+    cmds:
+      - task: upstream:install-tools
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+
+  install-go-tools:
+    desc: Install Wails, Task, go-licenses, golangci-lint, and configured Go tools.
+    cmds:
+      - go install github.com/wailsapp/wails/v3/cmd/wails3@{{.WAILS_VERSION}}
+      - go install github.com/google/go-licenses/v2@{{.GO_LICENSES_VERSION}}
+      - go install github.com/go-task/task/v3/cmd/task@v{{.TASK_VERSION}}
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - task: upstream:install-tools
+
+  upgrade-go:
+    desc: Install the configured Go version through asdf and reinstall Go tooling.
+    cmds:
+      - asdf install golang {{.GO_VERSION}}
+      - asdf set golang {{.GO_VERSION}}
+      - task: install-go-tools
+      - asdf reshim golang {{.GO_VERSION}}
+
+  lint-go:
+    desc: Run the configured Go lint suite.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:lint
+
+  lint-gopls:
+    desc: Run Go linting through gopls.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:lint-gopls
+
+  lint-go-sort:
+    desc: Sort Go imports using the upstream Go task suite.
+    cmds:
+      - task: upstream:lint-sort
+
+  lint-go-fix:
+    desc: Apply configured automatic Go lint fixes.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:lint-fix
+
+  lint-go-fix-specific:
+    desc: Apply automatic fixes for one configured Go linter.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:lint-fix-specific
+        vars:
+          SPECIFIC_LINTER: '{{.SPECIFIC_LINTER | default "godot"}}'
+
+  test-go-coverage:
+    desc: Run the established Go coverage suite.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:coverage
+
+  test-go:
+    desc: Run Go tests without coverage analysis.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:test
+
+  test-all-go:
+    desc: Run Go tests including integration and generated catalog tests.
+    cmds:
+      - task: go-embed-placeholder
+      - task: upstream:coverage
+        vars:
+          GO_TEST_TAGS: "integration generated_catalog"
+
+  fmt-go:
+    desc: Format Go source files.
+    cmds:
+      - task: upstream:fmt

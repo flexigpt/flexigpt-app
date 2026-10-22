@@ -1,0 +1,116 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv:
+  - build/buildvars.env
+
+env:
+  VERSION_TAG: '{{.VERSION_TAG | default ""}}'
+  FLEXIGPT_EXTRA_TAGS: '{{.EXTRA_TAGS | default .FLEXIGPT_EXTRA_TAGS | default ""}}'
+  GOLANGCI_LINT_CACHE: "{{.ROOT_DIR}}/build/out/cache/golangci-lint"
+
+includes:
+  build:
+    taskfile: ./build/taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+    flatten: true
+
+  ts:
+    taskfile: ./ts.taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+    flatten: true
+
+  e2e:
+    taskfile: ./e2e/taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+    flatten: true
+
+  go:
+    taskfile: ./go.taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+    flatten: true
+
+  git:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/git.yml
+    checksum: b22093001cd4d15f3ccf39ba4ccf16e509468379ac24d25f79196f277a7f02b0
+    flatten: true
+
+tasks:
+  default:
+    desc: Run the established Go default suite and print configured variables.
+    cmds:
+      - task: go-default
+      - task: go-print-all-vars
+
+  help:
+    desc: List public project tasks.
+    cmds:
+      - task --list
+
+  cloc:
+    desc: Count repository lines using project exclusions.
+    cmds:
+      - >-
+        cloc --vcs=git --ignored=ignored.txt --exclude_ext=yaml,sum,mod,md5
+        --force-lang=Mustache,tmpl --force-lang=INI,env --force-lang=INI,dev
+        --force-lang=INI,prod
+        --not-match-f='LICENSE$|\.npmrc$|\.prettierignore$|\.gitignore$|\.gitattributes$|\.gitmodules$'
+        .
+
+  cloc-multi:
+    desc: Run the multi-repository CLOC workflow locally with act.
+    cmds:
+      - gh act workflow_dispatch -W .github/workflows/cloc-report.yml --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
+
+  upgrade-do:
+    desc: Upgrade JavaScript and Go dependencies.
+    cmds:
+      - task: upgrade-node-dependencies
+      - task: go-upgrade-do
+
+  upgrade-check:
+    desc: Check JavaScript and Go dependency updates.
+    cmds:
+      - task: go-upgrade-check
+      - task: check-node-upgrades
+
+  lint:
+    desc: Run all Go, frontend, build, and E2E lint checks.
+    cmds:
+      - task: lint-go
+      - task: lint-node
+      - task: lint-build
+      - task: lint-e2e
+
+  test:
+    desc: Run standard Go and frontend test suites.
+    cmds:
+      - task: test-go-coverage
+      - task: test-node
+
+  ci:
+    desc: Run the complete CI lint and test suite.
+    cmds:
+      - task: check-toolchain
+      - task: install-ci-tools
+      - task: lint
+      - task: typecheck-e2e
+      - task: test
+
+  fmt:
+    desc: Format frontend and Go source files.
+    cmds:
+      - task: fmt-node
+      - task: fmt-go
+
+  lt-go:
+    desc: Run Go linting and Go tests.
+    cmds:
+      - task: lint-go
+      - task: test-go-coverage
+
+  lt:
+    desc: Run all linting and standard test suites.
+    cmds:
+      - task: lint
+      - task: test

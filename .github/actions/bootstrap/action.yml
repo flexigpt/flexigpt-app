@@ -1,5 +1,5 @@
 name: Bootstrap project tools
-description: Install the pinned tools needed before the root Taskfile can run.
+description: Install the pinned tools needed before the root taskfile can run.
 
 inputs:
   setup_go:

@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  upgrade-node-dependencies:
+    desc: Upgrade workspace JavaScript dependencies.
+    cmds:
+      - pnpm up -r
+
+  check-node-upgrades:
+    desc: Report available workspace JavaScript dependency updates.
+    cmds:
+      - pnpm outdated -r || true
+
+  upgrade-pnpm:
+    desc: Activate the configured pnpm release through Corepack.
+    cmds:
+      - corepack enable
+      - asdf reshim nodejs
+      - corepack prepare pnpm@{{.PNPM_VERSION}} --activate
+      - corepack use pnpm@{{.PNPM_VERSION}}
+      - asdf reshim nodejs
+
+  upgrade-nodejs:
+    desc: Install the configured Node.js version through asdf and activate pnpm.
+    cmds:
+      - asdf install nodejs v{{.NODE_VERSION}}
+      - asdf set nodejs v{{.NODE_VERSION}}
+      - task: upgrade-pnpm
+
+  typecheck-node:
+    desc: Type-check the frontend TypeScript project.
+    cmds:
+      - pnpm --filter frontend run typecheck
+
+  lint-node:
+    desc: Lint the frontend project.
+    cmds:
+      - pnpm --filter frontend run lint
+
+  lint-build:
+    desc: Type-check JavaScript build implementation files.
+    cmds:
+      - pnpm run typecheck:build
+
+  test-node:
+    desc: Run frontend unit tests.
+    cmds:
+      - pnpm --filter frontend run test
+
+  fmt-node:
+    desc: Format frontend source files.
+    cmds:
+      - pnpm --filter frontend run fmt:fix

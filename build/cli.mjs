@@ -1,6 +1,9 @@
 // oxlint-disable typescript/no-redundant-type-constituents
 // @ts-check
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import {
 	cleanEmbedPlaceholder,
 	loadBuildVars,
@@ -63,14 +66,19 @@ const utilities = {
 	"embed-clean": cleanEmbedPlaceholder,
 };
 
-try {
-	const [action = "", ...args] = process.argv.slice(2);
-	if (args.length !== 0 || !Object.hasOwn(utilities, action)) {
-		throw new Error(
-			`Usage: node build/cli.mjs <${Object.keys(utilities).join("|")}>`,
-		);
+if (
+	process.argv[1] &&
+	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+	try {
+		const [action = "", ...args] = process.argv.slice(2);
+		if (args.length !== 0 || !Object.hasOwn(utilities, action)) {
+			throw new Error(
+				`Usage: node build/cli.mjs <${Object.keys(utilities).join("|")}>`,
+			);
+		}
+		utilities[action]();
+	} catch (error) {
+		fail(error);
 	}
-	utilities[action]();
-} catch (error) {
-	fail(error);
 }

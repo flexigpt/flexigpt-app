@@ -1,7 +1,6 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: "3"
 
-# The platform MJS files validate all values before using them.
 env:
   VERSION_TAG: '{{.VERSION_TAG | default ""}}'
   SIGN: '{{.SIGN | default "false"}}'
@@ -11,54 +10,82 @@ env:
 
 tasks:
   check-toolchain:
+    desc: Validate pinned Node, pnpm, Go, Wails, and Task versions.
     cmds:
       - node build/cli.mjs validate-toolchain
 
   check-version:
+    desc: Validate VERSION_TAG in vX.Y.Z form.
     cmds:
       - node build/cli.mjs validate-version
 
-  embed-prepare:
+  licenses:
+    desc: Generate license notices for the current host platform.
     cmds:
-      - node build/cli.mjs embed-prepare
+      - task: "licenses-{{OS}}"
 
-  embed-clean:
+  bindings:
+    desc: Generate Wails TypeScript bindings for the current host platform.
     cmds:
-      - node build/cli.mjs embed-clean
+      - task: "bindings-{{OS}}"
+
+  build-prod:
+    desc: Build a production application for the current host platform.
+    cmds:
+      - task: "build-{{OS}}"
+
+  build-dev:
+    desc: Build a standalone development application for the current host platform.
+    cmds:
+      - task: "build-dev-{{OS}}"
+
+  run-dev:
+    desc: Run the native Wails development workflow for the current host platform.
+    cmds:
+      - task: "run-dev-{{OS}}"
 
   build-linux:
+    desc: Build the Linux production application binary.
     cmds:
       - node build/flatpak/builder.mjs build
 
   build-darwin:
+    desc: Build the macOS production application bundle.
     cmds:
       - node build/darwin/builder.mjs build
 
   build-windows:
+    desc: Build the Windows production application executable.
     cmds:
       - node build/windows/builder.mjs build
 
   build-dev-linux:
+    desc: Build a standalone Linux development application.
     cmds:
       - node build/flatpak/builder.mjs build-dev
 
   build-dev-darwin:
+    desc: Build a standalone macOS development application.
     cmds:
       - node build/darwin/builder.mjs build-dev
 
   build-dev-windows:
+    desc: Build a standalone Windows development application.
     cmds:
       - node build/windows/builder.mjs build-dev
 
   package-linux:
+    desc: Package the Linux application as a Flatpak bundle.
     cmds:
       - node build/flatpak/builder.mjs package
 
   package-darwin:
+    desc: Package the macOS application as a PKG installer.
     cmds:
       - node build/darwin/builder.mjs package
 
   package-windows:
+    desc: Package the Windows application as an NSIS installer.
     cmds:
       - node build/windows/builder.mjs package
 
@@ -68,63 +95,77 @@ tasks:
       - node build/flatpak/builder.mjs flatpak-install
 
   sign-linux:
+    desc: Package a GPG-signed Linux Flatpak bundle.
     env:
       SIGN: "true"
     cmds:
       - node build/flatpak/builder.mjs package
 
   sign-darwin:
+    desc: Package a signed macOS installer.
     env:
       SIGN: "true"
     cmds:
       - node build/darwin/builder.mjs package
 
   sign-windows:
+    desc: Package signed Windows application and installer artifacts.
     env:
       SIGN: "true"
     cmds:
       - node build/windows/builder.mjs package
 
   run-dev-linux:
+    desc: Run the Linux Wails development workflow.
     cmds:
       - node build/flatpak/builder.mjs dev
 
   run-dev-darwin:
+    desc: Run the macOS Wails development workflow.
     cmds:
       - node build/darwin/builder.mjs dev
 
   run-dev-windows:
+    desc: Run the Windows Wails development workflow.
     cmds:
       - node build/windows/builder.mjs dev
 
   bindings-linux:
+    desc: Generate Linux Wails TypeScript bindings.
     cmds:
       - node build/flatpak/builder.mjs bindings
 
   bindings-darwin:
+    desc: Generate macOS Wails TypeScript bindings.
     cmds:
       - node build/darwin/builder.mjs bindings
 
   bindings-windows:
+    desc: Generate Windows Wails TypeScript bindings.
     cmds:
       - node build/windows/builder.mjs bindings
 
   licenses-linux:
+    desc: Generate Linux project and dependency license notices.
     cmds:
       - node build/flatpak/builder.mjs licenses
 
   licenses-darwin:
+    desc: Generate macOS project and dependency license notices.
     cmds:
       - node build/darwin/builder.mjs licenses
 
   licenses-windows:
+    desc: Generate Windows project and dependency license notices.
     cmds:
       - node build/windows/builder.mjs licenses
 
   setup-linux:
+    desc: Verify required Linux GTK and WebKit development packages.
     cmds:
       - node build/flatpak/builder.mjs setup
 
   setup-windows:
+    desc: Install or verify required Windows NSIS tooling.
     cmds:
       - node build/windows/builder.mjs setup
