@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Version in vX.Y.Z form
+        description: Package version in vX.Y.Z form. Release and signing require an existing matching Git tag.
         required: true
         default: v0.0.1
         type: string
       ref:
-        description: Branch, SHA, or refs/tags/vX.Y.Z. Leave empty only for a tag-based release.
+        description: Optional preview source branch, SHA, or refs/tags/vX.Y.Z. Leave empty for default-branch previews and all release/signing/notarization runs.
         required: false
-        default: main
+        default: ""
         type: string
       sign_linux:
         description: GPG-sign the Flatpak repository commit and bundle
@@ -45,13 +45,18 @@ concurrency:
 jobs:
   source:
     runs-on: ubuntu-26.04
+    env:
+      PACKAGE_MODE: >-
+        ${{ (inputs.release || inputs.sign_linux || inputs.sign_macos || inputs.sign_windows || inputs.notarize) && 'tag' || 'preview' }}
+      PACKAGE_SOURCE_REF: >-
+        ${{ (inputs.release || inputs.sign_linux || inputs.sign_macos || inputs.sign_windows || inputs.notarize) && format('refs/tags/{0}', inputs.tag) || inputs.ref || github.event.repository.default_branch }}
     outputs:
       sha: ${{ steps.source.outputs.sha }}
       flatpak_runtime: ${{ steps.source.outputs.flatpak_runtime }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref || format('refs/tags/{0}', inputs.tag) }}
+          ref: ${{ env.PACKAGE_SOURCE_REF }}
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
@@ -63,31 +68,27 @@ jobs:
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.tag }}
-          SELECTED_REF: ${{ inputs.ref || format('refs/tags/{0}', inputs.tag) }}
-          RELEASE_MODE: ${{ inputs.release }}
-          SIGN_LINUX: ${{ inputs.sign_linux }}
-          SIGN_MACOS: ${{ inputs.sign_macos }}
-          SIGN_WINDOWS: ${{ inputs.sign_windows }}
+          REQUESTED_REF: ${{ inputs.ref }}
+          PACKAGE_MODE: ${{ env.PACKAGE_MODE }}
+          PACKAGE_SOURCE_REF: ${{ env.PACKAGE_SOURCE_REF }}
           NOTARIZE: ${{ inputs.notarize }}
         run: |
           set -euo pipefail
 
           task check-version
 
+          echo "Selected package source: ${PACKAGE_SOURCE_REF}"
+
           if [[ "${NOTARIZE}" == "true" && "${SIGN_MACOS}" != "true" ]]; then
             echo "notarize requires sign_macos=true" >&2
             exit 1
           fi
 
-          if [[ "${RELEASE_MODE}" == "true" ||
-                "${SIGN_LINUX}" == "true" ||
-                "${SIGN_MACOS}" == "true" ||
-                "${SIGN_WINDOWS}" == "true" ||
-                "${NOTARIZE}" == "true" ]]; then
+          if [[ "${PACKAGE_MODE}" == "tag" ]]; then
             EXPECTED_REF="refs/tags/${VERSION_TAG}"
 
-            if [[ "${SELECTED_REF}" != "${EXPECTED_REF}" ]]; then
-              echo "release, signing, and notarization require ref=${EXPECTED_REF}" >&2
+            if [[ -n "${REQUESTED_REF}" ]]; then
+              echo "release, signing, and notarization select ${EXPECTED_REF} automatically; leave ref empty" >&2
               exit 1
             fi
 
