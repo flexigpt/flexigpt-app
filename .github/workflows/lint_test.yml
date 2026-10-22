@@ -64,7 +64,7 @@ jobs:
         with:
           setup_pnpm: "false"
       - name: Run native macOS Go tests
-        run: task test-go-native
+        run: task test-go
 
   test-windows:
     name: Native Go tests on Windows
@@ -78,4 +78,4 @@ jobs:
         with:
           setup_pnpm: "false"
       - name: Run native Windows Go tests
-        run: task test-go-native
+        run: task test-go

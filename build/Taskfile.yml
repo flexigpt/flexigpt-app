@@ -11,184 +11,120 @@ env:
 
 tasks:
   check-toolchain:
-    internal: true
     cmds:
-      - node build/lib.mjs validate-toolchain
+      - node build/cli.mjs validate-toolchain
 
   check-version:
-    internal: true
     cmds:
-      - node build/lib.mjs validate-version
+      - node build/cli.mjs validate-version
 
   embed-prepare:
-    internal: true
     cmds:
-      - node build/lib.mjs embed-prepare
+      - node build/cli.mjs embed-prepare
 
   embed-clean:
-    internal: true
     cmds:
-      - node build/lib.mjs embed-clean
-
-  build-lin:
-    cmds:
-      - node build/lin.mjs build
+      - node build/cli.mjs embed-clean
 
   build-linux:
-    internal: true
     cmds:
-      - task: build-lin
-
-  build-mac:
-    cmds:
-      - node build/mac.mjs build
+      - node build/flatpak/builder.mjs build
 
   build-darwin:
-    internal: true
     cmds:
-      - task: build-mac
-
-  build-win:
-    cmds:
-      - node build/win.mjs build
+      - node build/darwin/builder.mjs build
 
   build-windows:
-    internal: true
     cmds:
-      - task: build-win
-
-  build-dev-lin:
-    cmds:
-      - node build/lin.mjs build-dev
+      - node build/windows/builder.mjs build
 
   build-dev-linux:
-    internal: true
     cmds:
-      - task: build-dev-lin
-
-  build-dev-mac:
-    cmds:
-      - node build/mac.mjs build-dev
+      - node build/flatpak/builder.mjs build-dev
 
   build-dev-darwin:
-    internal: true
     cmds:
-      - task: build-dev-mac
-
-  build-dev-win:
-    cmds:
-      - node build/win.mjs build-dev
+      - node build/darwin/builder.mjs build-dev
 
   build-dev-windows:
-    internal: true
     cmds:
-      - task: build-dev-win
+      - node build/windows/builder.mjs build-dev
 
-  package-lin:
+  package-linux:
     cmds:
-      - node build/lin.mjs package
+      - node build/flatpak/builder.mjs package
 
-  package-mac:
+  package-darwin:
     cmds:
-      - node build/mac.mjs package
+      - node build/darwin/builder.mjs package
 
-  package-win:
+  package-windows:
     cmds:
-      - node build/win.mjs package
+      - node build/windows/builder.mjs package
 
   flatpak-install:
     desc: Install the application into the active Flatpak Builder destination.
     cmds:
-      - node build/lin.mjs flatpak-install
+      - node build/flatpak/builder.mjs flatpak-install
 
-  sign-lin:
+  sign-linux:
     env:
       SIGN: "true"
     cmds:
-      - node build/lin.mjs package
+      - node build/flatpak/builder.mjs package
 
-  sign-mac:
+  sign-darwin:
     env:
       SIGN: "true"
     cmds:
-      - node build/mac.mjs package
+      - node build/darwin/builder.mjs package
 
-  sign-win:
+  sign-windows:
     env:
       SIGN: "true"
     cmds:
-      - node build/win.mjs package
+      - node build/windows/builder.mjs package
 
-  run-dev-lin:
+  run-dev-linux:
     cmds:
-      - node build/lin.mjs dev
+      - node build/flatpak/builder.mjs dev
 
-  run-dev-mac:
+  run-dev-darwin:
     cmds:
-      - node build/mac.mjs dev
+      - node build/darwin/builder.mjs dev
 
-  run-dev-win:
+  run-dev-windows:
     cmds:
-      - node build/win.mjs dev
-
-  bindings-lin:
-    cmds:
-      - node build/lin.mjs bindings
+      - node build/windows/builder.mjs dev
 
   bindings-linux:
-    internal: true
     cmds:
-      - task: bindings-lin
-
-  bindings-mac:
-    cmds:
-      - node build/mac.mjs bindings
+      - node build/flatpak/builder.mjs bindings
 
   bindings-darwin:
-    internal: true
     cmds:
-      - task: bindings-mac
-
-  bindings-win:
-    cmds:
-      - node build/win.mjs bindings
+      - node build/darwin/builder.mjs bindings
 
   bindings-windows:
-    internal: true
     cmds:
-      - task: bindings-win
-
-  licenses-lin:
-    cmds:
-      - node build/lin.mjs licenses
+      - node build/windows/builder.mjs bindings
 
   licenses-linux:
-    internal: true
     cmds:
-      - task: licenses-lin
-
-  licenses-mac:
-    cmds:
-      - node build/mac.mjs licenses
+      - node build/flatpak/builder.mjs licenses
 
   licenses-darwin:
-    internal: true
     cmds:
-      - task: licenses-mac
-
-  licenses-win:
-    cmds:
-      - node build/win.mjs licenses
+      - node build/darwin/builder.mjs licenses
 
   licenses-windows:
-    internal: true
     cmds:
-      - task: licenses-win
+      - node build/windows/builder.mjs licenses
 
-  setup-lin:
+  setup-linux:
     cmds:
-      - node build/lin.mjs setup
+      - node build/flatpak/builder.mjs setup
 
-  setup-win:
+  setup-windows:
     cmds:
-      - node build/win.mjs setup
+      - node build/windows/builder.mjs setup

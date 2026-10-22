@@ -34,9 +34,8 @@ const placeholder = path.join(
 const placeholderContents =
 	"FlexiGPT temporary Go embed placeholder. Safe to remove after ci checks.\n";
 
-function validateVersion() {
-	const version = process.env.VERSION_TAG ?? "";
-
+/** @param {string} version */
+export function validateVersion(version) {
 	if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
 		throw new Error("VERSION_TAG must have the form vX.Y.Z");
 	}
@@ -50,16 +49,16 @@ function validateVersion() {
 		throw new Error("VERSION_TAG components must not exceed 65535");
 	}
 
-	console.log(`Validated VERSION_TAG=${version}`);
+	return version;
 }
 
-function prepareEmbedPlaceholder() {
+export function prepareEmbedPlaceholder() {
 	fs.mkdirSync(path.dirname(placeholder), { recursive: true });
 	fs.writeFileSync(placeholder, placeholderContents, { mode: 0o644 });
 	console.log(`Prepared Go embed placeholder: ${placeholder}`);
 }
 
-function cleanEmbedPlaceholder() {
+export function cleanEmbedPlaceholder() {
 	if (!fs.existsSync(placeholder)) {
 		return;
 	}
@@ -88,14 +87,14 @@ function requiredSimpleName(value) {
 	return value;
 }
 
-function loadBuildVars() {
+export function loadBuildVars() {
 	return parseEnv(
 		fs.readFileSync(path.join(root, "build/buildvars.env"), "utf8"),
 	);
 }
 
 /** @param {NodeJS.ProcessEnv} vars */
-function validatePinnedVersions(vars) {
+export function validatePinnedVersions(vars) {
 	const pinned = (/** @type {string} */ name) => {
 		const value = vars[name];
 		if (!value) {
@@ -168,6 +167,45 @@ function validatePinnedVersions(vars) {
 			throw new Error(`.tool-versions ${tool} differs from buildvars.env`);
 		}
 	}
+}
+
+/**
+ * @param {{
+ *   production: boolean,
+ *   tags: readonly string[],
+ *   version: string,
+ *   output: string,
+ *   backendDir: string,
+ *   windowsGui?: boolean
+ * }} options
+ */
+export function goBuildArgs({
+	production,
+	tags,
+	version,
+	output,
+	backendDir,
+	windowsGui = false,
+}) {
+	const linkerFlags = [
+		...(production ? ["-s", "-w"] : []),
+		...(production && windowsGui ? ["-H", "windowsgui"] : []),
+		"-X",
+		`main.Version=${validateVersion(version)}`,
+	].join(" ");
+
+	return [
+		"build",
+		"-mod=readonly",
+		"-trimpath",
+		"-buildvcs=false",
+		...(tags.length > 0 ? ["-tags", tags.join(",")] : []),
+		"-ldflags",
+		linkerFlags,
+		"-o",
+		output,
+		`./${backendDir}`,
+	];
 }
 
 export class Project {
@@ -765,20 +803,7 @@ export class Project {
 			this.env.VERSION_TAG ||
 			(development ? this.value("COMMON_APP_DEV_VERSION") : "");
 
-		if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
-			throw new Error("VERSION_TAG must have the form vX.Y.Z");
-		}
-
-		if (
-			version
-				.slice(1)
-				.split(".")
-				.some((part) => Number(part) > 65535)
-		) {
-			throw new Error("VERSION_TAG components must not exceed 65535");
-		}
-
-		return version;
+		return validateVersion(version);
 	}
 
 	/** @param {string[]} tags */
@@ -867,8 +892,13 @@ export class Project {
 
 		const directory = this.abs(this.value("LICENSE_OUTPUT_DIR"));
 
+		const jsOutput = this.file(this.abs(this.value("LICENSE_JS_FILENAME")));
+
 		for (const name of licenseNames) {
-			fs.rmSync(path.join(directory, name), { force: true });
+			const filename = path.join(directory, name);
+			if (filename !== jsOutput) {
+				fs.rmSync(filename, { force: true });
+			}
 		}
 
 		fs.mkdirSync(directory, { recursive: true });
@@ -923,7 +953,6 @@ export class Project {
 		}
 
 		const goOutput = this.abs(this.value("LICENSE_GO_FILENAME"));
-		const jsOutput = this.file(this.abs(this.value("LICENSE_JS_FILENAME")));
 
 		fs.writeFileSync(goOutput, reports.join("\n"));
 
@@ -951,7 +980,10 @@ export class Project {
 	/** @param {string} destination */
 	copyLicenses(destination) {
 		for (const name of licenseNames) {
-			this.copy(this.abs("build/licenses", name), path.join(destination, name));
+			this.copy(
+				this.abs(this.value("LICENSE_OUTPUT_DIR"), name),
+				path.join(destination, name),
+			);
 		}
 	}
 
@@ -1070,26 +1102,20 @@ export class Project {
 }
 
 /**
- * @param {string} platform
- * @param {(project: Project, action: string) => Promise<void>} handler
+ * @template T
+ * @param {Project} project
+ * @param {(project: Project) => T | Promise<T>} operation
  */
-export async function main(platform, handler) {
-	const action = process.argv[2] ?? "";
-
-	if (!/^[a-z][a-z-]*$/.test(action)) {
-		console.error("A valid build action is required");
-		process.exitCode = 1;
-		return;
-	}
-
-	const project = new Project(platform, action);
+export async function runProject(project, operation) {
+	const { platform, action } = project;
 
 	try {
 		project.load();
 		project.log("INFO", `Starting ${platform}/${action}`);
-		await handler(project, action);
+		const result = await operation(project);
 		project.log("INFO", `Completed ${platform}/${action}`);
 		project.writeSummary("success");
+		return result;
 	} catch (error) {
 		const message =
 			error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -1097,39 +1123,6 @@ export async function main(platform, handler) {
 		project.log("ERROR", message);
 		project.log("ERROR", `Logs are available in ${project.logDir}`);
 		project.writeSummary("failure", message);
-		process.exitCode = 1;
+		throw error;
 	}
-}
-
-try {
-	const action = process.argv[2];
-
-	switch (action) {
-		case "validate-version":
-			validateVersion();
-			break;
-
-		case "validate-toolchain":
-			validatePinnedVersions(loadBuildVars());
-			console.log("Validated toolchain pins in build/buildvars.env");
-			break;
-
-		case "embed-prepare":
-			prepareEmbedPlaceholder();
-			break;
-
-		case "embed-clean":
-			cleanEmbedPlaceholder();
-			break;
-
-		default:
-			throw new Error(
-				"Usage: node build/lib.mjs <validate-version|validate-toolchain|embed-prepare|embed-clean>",
-			);
-	}
-} catch (error) {
-	console.error(
-		error instanceof Error ? (error.stack ?? error.message) : error,
-	);
-	process.exitCode = 1;
 }

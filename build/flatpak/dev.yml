@@ -19,9 +19,9 @@ dev_mode:
       - go.sum
     git_ignore: true
   executes:
-    - cmd: node build/lin.mjs frontend
+    - cmd: node build/flatpak/builder.mjs frontend
       type: background
-    - cmd: node build/lin.mjs dev-build
+    - cmd: node build/flatpak/builder.mjs dev-build
       type: blocking
-    - cmd: node build/lin.mjs dev-run
+    - cmd: node build/flatpak/builder.mjs dev-run
       type: primary

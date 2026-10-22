@@ -3,9 +3,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { main } from "./lib.mjs";
+import { main } from "../cli.mjs";
+import { goBuildArgs } from "../lib.mjs";
 
-/** @typedef {import("./lib.mjs").Project} Project */
+/** @typedef {import("../lib.mjs").Project} Project */
 
 function nativeHost() {
 	if (process.platform !== "win32" || process.arch !== "x64") {
@@ -42,7 +43,7 @@ function makensis(project) {
 
 	if (!fs.existsSync(executable)) {
 		throw new Error(
-			"NSIS is missing. Run task setup-win from an elevated terminal.",
+			"NSIS is missing. Run task setup-windows from an elevated terminal.",
 		);
 	}
 
@@ -167,7 +168,7 @@ async function prepare(project, production, devServer) {
  * @param {boolean} production
  * @param {boolean} [devServer]
  */
-async function build(project, production, devServer = false) {
+export async function build(project, production, devServer = false) {
 	const prepared = await prepare(project, production, devServer);
 
 	if (production) {
@@ -216,18 +217,14 @@ async function build(project, production, devServer = false) {
 
 		await project.run(
 			"go",
-			[
-				"build",
-				"-mod=readonly",
-				"-trimpath",
-				"-buildvcs=false",
-				...(prepared.tags.length > 0 ? ["-tags", prepared.tags.join(",")] : []),
-				"-ldflags",
-				`${production ? "-s -w -H windowsgui " : ""}-X main.Version=${prepared.version}`,
-				"-o",
-				executable,
-				`./${project.value("GO_BACKEND_DIR")}`,
-			],
+			goBuildArgs({
+				production,
+				tags: prepared.tags,
+				version: prepared.version,
+				output: executable,
+				backendDir: project.value("GO_BACKEND_DIR"),
+				windowsGui: true,
+			}),
 			{
 				env: prepared.nativeEnvironment,
 			},
@@ -387,7 +384,12 @@ async function packageWindows(project) {
 	);
 }
 
-await main("win", async (project, action) => {
+/**
+ * @param {Project} project
+ * @param {string} action
+ * @param {string[]} [args]
+ */
+export async function runAction(project, action, args = []) {
 	switch (action) {
 		case "build":
 			await build(project, true);
@@ -416,9 +418,9 @@ await main("win", async (project, action) => {
 			break;
 
 		case "sign-file": {
-			const filename = process.argv[3];
+			const filename = args[0];
 
-			if (!filename || process.argv.length !== 4) {
+			if (!filename || args.length !== 1) {
 				throw new Error("sign-file requires exactly one target file");
 			}
 
@@ -497,4 +499,6 @@ await main("win", async (project, action) => {
 		default:
 			throw new Error(`Unknown Windows action: ${action}`);
 	}
-});
+}
+
+await main("win", runAction);

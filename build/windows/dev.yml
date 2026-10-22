@@ -19,9 +19,9 @@ dev_mode:
       - go.sum
     git_ignore: true
   executes:
-    - cmd: node build/win.mjs frontend
+    - cmd: node build/windows/builder.mjs frontend
       type: background
-    - cmd: node build/win.mjs dev-build
+    - cmd: node build/windows/builder.mjs dev-build
       type: blocking
-    - cmd: node build/win.mjs dev-run
+    - cmd: node build/windows/builder.mjs dev-run
       type: primary

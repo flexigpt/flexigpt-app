@@ -4,9 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { main, root } from "./lib.mjs";
+import { main } from "../cli.mjs";
+import { goBuildArgs, root } from "../lib.mjs";
 
-/** @typedef {import("./lib.mjs").Project} Project */
+/** @typedef {import("../lib.mjs").Project} Project */
 
 function nativeHost() {
 	if (process.platform !== "linux" || process.arch !== "x64") {
@@ -61,7 +62,7 @@ async function prepare(project, production, devServer) {
  * @param {boolean} production
  * @param {boolean} [devServer]
  */
-async function build(project, production, devServer = false) {
+export async function build(project, production, devServer = false) {
 	const prepared = await prepare(project, production, devServer);
 
 	if (production) {
@@ -79,18 +80,13 @@ async function build(project, production, devServer = false) {
 
 	await project.run(
 		"go",
-		[
-			"build",
-			"-mod=readonly",
-			"-trimpath",
-			"-buildvcs=false",
-			...(prepared.tags.length > 0 ? ["-tags", prepared.tags.join(",")] : []),
-			"-ldflags",
-			`${production ? "-s -w " : ""}-X main.Version=${prepared.version}`,
-			"-o",
-			executable,
-			`./${project.value("GO_BACKEND_DIR")}`,
-		],
+		goBuildArgs({
+			production,
+			tags: prepared.tags,
+			version: prepared.version,
+			output: executable,
+			backendDir: project.value("GO_BACKEND_DIR"),
+		}),
 		{
 			env: prepared.nativeEnvironment,
 		},
@@ -107,7 +103,7 @@ async function generateLicenses(project) {
 }
 
 /**
- * @param {import("./lib.mjs").Project} project
+ * @param {import("../lib.mjs").Project} project
  * @param {fs.PathOrFileDescriptor} destination
  * @param {string} version
  * @param {string} sourceDateEpoch
@@ -122,11 +118,20 @@ function renderFlatpakManifest(project, destination, version, sourceDateEpoch) {
 		["__FLEXIGPT_VERSION_TAG__", JSON.stringify(version)],
 		["__FLEXIGPT_SOURCE_DATE_EPOCH__", JSON.stringify(sourceDateEpoch)],
 		["__FLEXIGPT_SOURCE_DIR__", JSON.stringify(root)],
-		["__FLEXIGPT_FLATPAK_RUNTIME_VERSION__", project.value("FLATPAK_RUNTIME_VERSION")],
+		[
+			"__FLEXIGPT_FLATPAK_RUNTIME_VERSION__",
+			project.value("FLATPAK_RUNTIME_VERSION"),
+		],
 		["__FLEXIGPT_GO_VERSION__", project.value("GO_VERSION")],
-		["__FLEXIGPT_GO_LINUX_AMD64_SHA256__", project.value("GO_LINUX_AMD64_SHA256")],
+		[
+			"__FLEXIGPT_GO_LINUX_AMD64_SHA256__",
+			project.value("GO_LINUX_AMD64_SHA256"),
+		],
 		["__FLEXIGPT_NODE_VERSION__", project.value("NODE_VERSION")],
-		["__FLEXIGPT_NODE_LINUX_X64_SHA256__", project.value("NODE_LINUX_X64_SHA256")],
+		[
+			"__FLEXIGPT_NODE_LINUX_X64_SHA256__",
+			project.value("NODE_LINUX_X64_SHA256"),
+		],
 		["__FLEXIGPT_PNPM_VERSION__", project.value("PNPM_VERSION")],
 		["__FLEXIGPT_WAILS_VERSION__", project.value("WAILS_VERSION")],
 		["__FLEXIGPT_GO_LICENSES_VERSION__", project.value("GO_LICENSES_VERSION")],
@@ -419,7 +424,11 @@ async function packageFlatpak(project) {
 	}
 }
 
-await main("lin", async (project, action) => {
+/**
+ * @param {Project} project
+ * @param {string} action
+ */
+export async function runAction(project, action) {
 	switch (action) {
 		case "build":
 			await build(project, true);
@@ -510,4 +519,6 @@ await main("lin", async (project, action) => {
 		default:
 			throw new Error(`Unknown Linux action: ${action}`);
 	}
-});
+}
+
+await main("lin", runAction);

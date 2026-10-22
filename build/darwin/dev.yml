@@ -19,9 +19,9 @@ dev_mode:
       - go.sum
     git_ignore: true
   executes:
-    - cmd: node build/mac.mjs frontend
+    - cmd: node build/darwin/builder.mjs frontend
       type: background
-    - cmd: node build/mac.mjs dev-build
+    - cmd: node build/darwin/builder.mjs dev-build
       type: blocking
-    - cmd: node build/mac.mjs dev-run
+    - cmd: node build/darwin/builder.mjs dev-run
       type: primary

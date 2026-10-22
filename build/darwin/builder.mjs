@@ -5,9 +5,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { main } from "./lib.mjs";
+import { main } from "../cli.mjs";
+import { goBuildArgs } from "../lib.mjs";
 
-/** @typedef {import("./lib.mjs").Project} Project */
+/** @typedef {import("../lib.mjs").Project} Project */
 /** @typedef {"amd64" | "arm64"} MacArchitecture */
 
 function nativeHost() {
@@ -67,7 +68,7 @@ async function prepare(project, production, devServer) {
  * @param {boolean} production
  * @param {boolean} [devServer]
  */
-async function build(project, production, devServer = false) {
+export async function build(project, production, devServer = false) {
 	const prepared = await prepare(project, production, devServer);
 
 	if (production) {
@@ -106,18 +107,13 @@ async function build(project, production, devServer = false) {
 
 		await project.run(
 			"go",
-			[
-				"build",
-				"-mod=readonly",
-				"-trimpath",
-				"-buildvcs=false",
-				...(prepared.tags.length > 0 ? ["-tags", prepared.tags.join(",")] : []),
-				"-ldflags",
-				`${production ? "-s -w " : ""}-X main.Version=${prepared.version}`,
-				"-o",
-				binary,
-				`./${project.value("GO_BACKEND_DIR")}`,
-			],
+			goBuildArgs({
+				production,
+				tags: prepared.tags,
+				version: prepared.version,
+				output: binary,
+				backendDir: project.value("GO_BACKEND_DIR"),
+			}),
 			{
 				env: {
 					...nativeEnvironment(project, architecture),
@@ -590,7 +586,11 @@ async function packageMac(project) {
 	);
 }
 
-await main("mac", async (project, action) => {
+/**
+ * @param {Project} project
+ * @param {string} action
+ */
+export async function runAction(project, action) {
 	switch (action) {
 		case "build":
 			await build(project, true);
@@ -675,4 +675,6 @@ await main("mac", async (project, action) => {
 		default:
 			throw new Error(`Unknown macOS action: ${action}`);
 	}
-});
+}
+
+await main("mac", runAction);

@@ -77,7 +77,7 @@ modules:
   - name: FlexiGPT
     buildsystem: simple
     build-commands:
-      - node build/lin.mjs flatpak-install
+      - node build/flatpak/builder.mjs flatpak-install
     sources:
       - type: dir
         path: __FLEXIGPT_SOURCE_DIR__

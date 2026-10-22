@@ -137,7 +137,7 @@ jobs:
         if: ${{ !inputs.sign_linux }}
         env:
           VERSION_TAG: ${{ inputs.tag }}
-        run: task package-lin
+        run: task package-linux
       - name: Package signed Linux
         if: ${{ inputs.sign_linux }}
         env:
@@ -145,7 +145,7 @@ jobs:
           FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
           FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
           FLATPAK_GPG_PASSPHRASE: ${{ secrets.FLATPAK_GPG_PASSPHRASE }}
-        run: task sign-lin
+        run: task sign-linux
       - uses: actions/upload-artifact@v7
         with:
           name: package-linux
@@ -177,7 +177,7 @@ jobs:
         env:
           VERSION_TAG: ${{ inputs.tag }}
           NOTARIZE: ${{ inputs.notarize }}
-        run: task package-mac
+        run: task package-darwin
       - name: Package signed macOS
         if: ${{ inputs.sign_macos }}
         env:
@@ -192,7 +192,7 @@ jobs:
           MACOS_SIGN_INSTALLER_ID: ${{ secrets.MACOS_SIGN_INSTALLER_ID }}
           MACOS_SIGN_INSTALLER_CERT: ${{ secrets.MACOS_SIGN_INSTALLER_CERT }}
           MACOS_SIGN_INSTALLER_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_INSTALLER_CERT_PASSWORD }}
-        run: task sign-mac
+        run: task sign-darwin
       - uses: actions/upload-artifact@v7
         with:
           name: package-macos
@@ -220,19 +220,19 @@ jobs:
           path: build/out/tools
           key: tools-windows-${{ hashFiles('build/buildvars.env') }}
       - name: Prepare Windows installer tooling
-        run: task setup-win
+        run: task setup-windows
       - name: Package unsigned Windows
         if: ${{ !inputs.sign_windows }}
         env:
           VERSION_TAG: ${{ inputs.tag }}
-        run: task package-win
+        run: task package-windows
       - name: Package signed Windows
         if: ${{ inputs.sign_windows }}
         env:
           VERSION_TAG: ${{ inputs.tag }}
           SIGN_WINDOWS_CERT: ${{ secrets.SIGN_WINDOWS_CERT }}
           SIGN_WINDOWS_CERT_PASSWORD: ${{ secrets.SIGN_WINDOWS_CERT_PASSWORD }}
-        run: task sign-win
+        run: task sign-windows
       - uses: actions/upload-artifact@v7
         with:
           name: package-windows
