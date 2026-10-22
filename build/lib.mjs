@@ -625,7 +625,7 @@ export class Project {
 		validatePinnedVersions(this.env);
 	}
 
-	async dependencies() {
+	async installDependencies() {
 		this.step("Prepare locked JavaScript and Go dependencies");
 
 		const pnpmVersion = (
@@ -706,22 +706,62 @@ export class Project {
 
 	/**
 	 * @param {string} name
+	 * @param {string} version
+	 * @param {boolean} [includePath]
+	 */
+	findTool(name, version, includePath = true) {
+		const extension = process.platform === "win32" ? ".exe" : "";
+		const directories = [
+			this.env.FLEXIGPT_TOOLS_DIR ?? "",
+			this.abs(
+				"build/out/tools",
+				`${process.platform}-${process.arch}`,
+				`${name}-${version}`,
+			),
+			...(includePath
+				? (this.env.PATH ?? this.env.Path ?? "").split(path.delimiter)
+				: []),
+		].filter(Boolean);
+
+		for (const directory of directories) {
+			const executable = path.resolve(directory, `${name}${extension}`);
+
+			if (fs.existsSync(executable)) {
+				return this.file(executable);
+			}
+		}
+
+		return undefined;
+	}
+
+	/**
+	 * @param {string} name
 	 * @param {string} modulePath
 	 * @param {string} version
 	 */
 	async tool(name, modulePath, version) {
-		const extension = process.platform === "win32" ? ".exe" : "";
-		const suppliedDirectory = this.env.FLEXIGPT_TOOLS_DIR;
+		const installed = this.findTool(name, version);
+		if (!installed) {
+			throw new Error(
+				`${name}@${version} is not installed. ` +
+					`Run task install-go-tools or go install ${modulePath}@${version} explicitly.`,
+			);
+		}
+		return installed;
+	}
 
-		if (suppliedDirectory) {
-			const supplied = path.resolve(suppliedDirectory, `${name}${extension}`);
-
-			if (fs.existsSync(supplied)) {
-				this.log("INFO", `Using preinstalled tool: ${supplied}`);
-				return this.file(supplied);
-			}
+	/**
+	 * @param {string} name
+	 * @param {string} modulePath
+	 * @param {string} version
+	 */
+	async installTool(name, modulePath, version) {
+		const installed = this.findTool(name, version, false);
+		if (installed) {
+			return installed;
 		}
 
+		const extension = process.platform === "win32" ? ".exe" : "";
 		const directory = this.abs(
 			"build/out/tools",
 			`${process.platform}-${process.arch}`,
@@ -729,19 +769,16 @@ export class Project {
 		);
 		const executable = path.join(directory, `${name}${extension}`);
 
-		if (!fs.existsSync(executable)) {
-			this.step(`Install ${name}@${version}`);
+		this.step(`Install ${name}@${version}`);
+		fs.mkdirSync(directory, { recursive: true });
 
-			fs.mkdirSync(directory, { recursive: true });
-
-			await this.go(["install", `${modulePath}@${version}`], {
-				env: {
-					GOBIN: directory,
-					GOFLAGS: "",
-					GOWORK: "off",
-				},
-			});
-		}
+		await this.go(["install", `${modulePath}@${version}`], {
+			env: {
+				GOBIN: directory,
+				GOFLAGS: "",
+				GOWORK: "off",
+			},
+		});
 
 		return this.file(executable);
 	}
@@ -1117,6 +1154,45 @@ export class Project {
 		}
 
 		return epoch;
+	}
+}
+
+/**
+ * Install only in production or CI. Local development uses installed tools.
+ *
+ * @param {Project} project
+ * @param {{production?: boolean, dependencies?: boolean, wails?: boolean}} [options]
+ */
+export async function prepareBuildDependencies(
+	project,
+	{ production = false, dependencies = true, wails = true } = {},
+) {
+	if (
+		!production &&
+		project.env.CI !== "true" &&
+		project.env.GITHUB_ACTIONS !== "true"
+	) {
+		return;
+	}
+
+	if (dependencies) {
+		await project.installDependencies();
+	}
+
+	if (wails) {
+		await project.installTool(
+			"wails3",
+			"github.com/wailsapp/wails/v3/cmd/wails3",
+			project.value("WAILS_VERSION"),
+		);
+	}
+
+	if (production) {
+		await project.installTool(
+			"go-licenses",
+			"github.com/google/go-licenses/v2",
+			project.value("GO_LICENSES_VERSION"),
+		);
 	}
 }
 

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { main } from "../cli.mjs";
-import { goBuildArgs } from "../lib.mjs";
+import { goBuildArgs, prepareBuildDependencies } from "../lib.mjs";
 
 /** @typedef {import("../lib.mjs").Project} Project */
 
@@ -47,6 +47,25 @@ function makensis(project) {
 		);
 	}
 
+	return executable;
+}
+
+/** @param {Project} project */
+export async function setupWindows(project) {
+	nativeHost();
+
+	if (!fs.existsSync(makensisPath(project))) {
+		await project.run("choco", [
+			"install",
+			"nsis",
+			`--version=${project.value("NSIS_VERSION")}`,
+			"--yes",
+			"--no-progress",
+		]);
+	}
+
+	const executable = makensis(project);
+	project.log("INFO", "Windows NSIS tooling is available");
 	return executable;
 }
 
@@ -168,7 +187,7 @@ async function prepare(project, production, devServer) {
 	const version = project.version(!production);
 	const tags = project.tags(production);
 
-	await project.dependencies();
+	await prepareBuildDependencies(project, { production });
 	await project.frontend(tags, production, devServer);
 
 	return {
@@ -336,7 +355,7 @@ async function packageWindows(project) {
 		project.value("SIGN_WINDOWS_CERT_PASSWORD");
 	}
 
-	const nsis = makensis(project);
+	const nsis = await setupWindows(project);
 	const { executable, assets } = await build(project, true);
 
 	if (signing) {
@@ -425,6 +444,7 @@ export async function runAction(project, action, args = []) {
 		case "bindings":
 			nativeHost();
 			project.validateBuildConfiguration();
+			await prepareBuildDependencies(project, { dependencies: false });
 			await project.bindings(project.tags(false));
 			break;
 
@@ -450,7 +470,7 @@ export async function runAction(project, action, args = []) {
 		case "dev": {
 			nativeHost();
 			project.validateBuildConfiguration();
-			await project.dependencies();
+			await prepareBuildDependencies(project);
 
 			const wails = await project.wailsTool();
 
@@ -472,7 +492,7 @@ export async function runAction(project, action, args = []) {
 
 		case "frontend":
 			nativeHost();
-			await project.dependencies();
+			await prepareBuildDependencies(project, { wails: false });
 
 			await project.pnpm(["--filter", "frontend", "run", "run:wailsdev"], {
 				timeoutMs: 0,
@@ -497,23 +517,9 @@ export async function runAction(project, action, args = []) {
 			);
 			break;
 
-		case "setup": {
-			nativeHost();
-
-			if (!fs.existsSync(makensisPath(project))) {
-				await project.run("choco", [
-					"install",
-					"nsis",
-					`--version=${project.value("NSIS_VERSION")}`,
-					"--yes",
-					"--no-progress",
-				]);
-			}
-
-			makensis(project);
-			project.log("INFO", "Windows NSIS tooling is available");
+		case "setup":
+			await setupWindows(project);
 			break;
-		}
 
 		default:
 			throw new Error(`Unknown Windows action: ${action}`);

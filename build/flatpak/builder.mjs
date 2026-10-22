@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { main } from "../cli.mjs";
-import { goBuildArgs, root } from "../lib.mjs";
+import { goBuildArgs, prepareBuildDependencies, root } from "../lib.mjs";
 
 /** @typedef {import("../lib.mjs").Project} Project */
 
@@ -23,6 +23,21 @@ function linuxEnvironment(devServer) {
 		CGO_ENABLED: "1",
 		FLEXIGPT_DEV_SERVER: devServer ? "1" : "0",
 	};
+}
+
+/**
+ * @param {Project} project
+ * @param {string[]} tags
+ */
+export async function inspectLinuxDependencies(project, tags) {
+	project.step("Validate Linux GTK and WebKit development packages");
+
+	await project.run("pkg-config", [
+		"--exists",
+		...(tags.includes("gtk3")
+			? ["gtk+-3.0", "webkit2gtk-4.1"]
+			: ["gtk4", "webkitgtk-6.0"]),
+	]);
 }
 
 /**
@@ -200,16 +215,8 @@ async function prepare(project, production, devServer) {
 	const version = project.version(!production);
 	const tags = project.tags(production);
 
-	project.step("Validate Linux GTK and WebKit development packages");
-
-	await project.run("pkg-config", [
-		"--exists",
-		...(tags.includes("gtk3")
-			? ["gtk+-3.0", "webkit2gtk-4.1"]
-			: ["gtk4", "webkitgtk-6.0"]),
-	]);
-
-	await project.dependencies();
+	await inspectLinuxDependencies(project, tags);
+	await prepareBuildDependencies(project, { production });
 	await project.frontend(tags, production, devServer);
 
 	return {
@@ -607,6 +614,7 @@ export async function runAction(project, action) {
 		case "bindings":
 			nativeHost();
 			project.validateBuildConfiguration();
+			await prepareBuildDependencies(project, { dependencies: false });
 			await project.bindings(project.tags(false));
 			break;
 
@@ -633,7 +641,7 @@ export async function runAction(project, action) {
 		case "dev": {
 			nativeHost();
 			project.validateBuildConfiguration();
-			await project.dependencies();
+			await prepareBuildDependencies(project);
 
 			const wails = await project.wailsTool();
 
@@ -655,7 +663,7 @@ export async function runAction(project, action) {
 
 		case "frontend":
 			nativeHost();
-			await project.dependencies();
+			await prepareBuildDependencies(project, { wails: false });
 
 			await project.pnpm(["--filter", "frontend", "run", "run:wailsdev"], {
 				timeoutMs: 0,
@@ -688,7 +696,7 @@ export async function runAction(project, action) {
 
 		case "setup":
 			nativeHost();
-			await project.run("pkg-config", ["--exists", "gtk4", "webkitgtk-6.0"]);
+			await inspectLinuxDependencies(project, []);
 			project.log(
 				"INFO",
 				"Linux GTK4 and WebKitGTK 6.0 dependencies are available",

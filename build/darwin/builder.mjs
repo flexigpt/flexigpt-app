@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { main } from "../cli.mjs";
-import { goBuildArgs } from "../lib.mjs";
+import { goBuildArgs, prepareBuildDependencies } from "../lib.mjs";
 
 /** @typedef {import("../lib.mjs").Project} Project */
 /** @typedef {"amd64" | "arm64"} MacArchitecture */
@@ -48,7 +48,7 @@ async function prepare(project, production, devServer) {
 	const version = project.version(!production);
 	const tags = project.tags(production, project.env.MACOS_EXTRA_TAGS ?? "");
 
-	await project.dependencies();
+	await prepareBuildDependencies(project, { production });
 	await project.frontend(tags, production, devServer);
 
 	/** @type {MacArchitecture[]} */
@@ -505,6 +505,8 @@ async function packageMac(project) {
 						...(keychain ? ["--keychain", keychain] : []),
 					]
 				: []),
+			"--compression",
+			"lzma",
 			"--component",
 			bundle,
 			"/Applications",
@@ -610,6 +612,7 @@ export async function runAction(project, action) {
 		case "bindings":
 			nativeHost();
 			project.validateBuildConfiguration();
+			await prepareBuildDependencies(project, { dependencies: false });
 
 			await project.bindings(
 				project.tags(false, project.env.MACOS_EXTRA_TAGS ?? ""),
@@ -627,7 +630,7 @@ export async function runAction(project, action) {
 		case "dev": {
 			nativeHost();
 			project.validateBuildConfiguration();
-			await project.dependencies();
+			await prepareBuildDependencies(project);
 
 			const wails = await project.wailsTool();
 
@@ -649,7 +652,7 @@ export async function runAction(project, action) {
 
 		case "frontend":
 			nativeHost();
-			await project.dependencies();
+			await prepareBuildDependencies(project, { wails: false });
 
 			await project.pnpm(["--filter", "frontend", "run", "run:wailsdev"], {
 				timeoutMs: 0,
