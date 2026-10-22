@@ -161,7 +161,7 @@ async function flatpakInstall(project) {
 	project.step("Build application inside the Flatpak SDK");
 
 	const executable = await build(project, true);
-	const id = project.value("FLATPAK_ID");
+	const id = project.value("COMMON_BUNDLE_ID");
 	const epoch = Number(project.value("SOURCE_DATE_EPOCH"));
 
 	if (!Number.isSafeInteger(epoch) || epoch <= 0) {
@@ -410,7 +410,7 @@ async function packageFlatpak(project) {
 			...signing.args,
 			repository,
 			bundle,
-			project.value("FLATPAK_ID"),
+			project.value("COMMON_BUNDLE_ID"),
 			"master",
 		]);
 

@@ -44,20 +44,26 @@ modules:
     build-commands:
       - mkdir -p "$GOROOT"
       - cp -a . "$GOROOT"
+      - test -x "$GOROOT/bin/go"
+
     sources:
       - type: archive
         url: https://go.dev/dl/go__FLEXIGPT_GO_VERSION__.linux-amd64.tar.gz
         sha256: __FLEXIGPT_GO_LINUX_AMD64_SHA256__
+        strip-components: 1
 
   - name: nodejs
     buildsystem: simple
     build-commands:
       - mkdir -p "$NODEROOT"
       - cp -a . "$NODEROOT"
+      - test -x "$NODEROOT/bin/node"
+
     sources:
       - type: archive
         url: https://nodejs.org/dist/v__FLEXIGPT_NODE_VERSION__/node-v__FLEXIGPT_NODE_VERSION__-linux-x64.tar.xz
         sha256: __FLEXIGPT_NODE_LINUX_X64_SHA256__
+        strip-components: 1
 
   - name: pnpm
     buildsystem: simple
@@ -77,7 +83,16 @@ modules:
   - name: FlexiGPT
     buildsystem: simple
     build-commands:
-      - node build/flatpak/builder.mjs flatpak-install
+      - |
+        export GOROOT="/app/sdk/golang"
+        export NODEROOT="/app/sdk/node"
+        export GOBIN="/app/go/bin"
+        export PATH="/app/sdk/golang/bin:/app/sdk/node/bin:/app/go/bin:${PATH}"
+        command -v go
+        go version
+        command -v node
+        node --version
+        node build/flatpak/builder.mjs flatpak-install
     sources:
       - type: dir
         path: __FLEXIGPT_SOURCE_DIR__
