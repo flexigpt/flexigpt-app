@@ -139,10 +139,10 @@ export async function build(project, production, devServer = false) {
 
 		await project.run("xcrun", [
 			"lipo",
+			executable,
 			"-verify_arch",
 			"x86_64",
 			"arm64",
-			executable,
 		]);
 	} else {
 		project.copy(binaries[0], executable, 0o755);
