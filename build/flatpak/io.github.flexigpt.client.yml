@@ -34,11 +34,6 @@ build-options:
     VERSION_TAG: __FLEXIGPT_VERSION_TAG__
     SOURCE_DATE_EPOCH: __FLEXIGPT_SOURCE_DATE_EPOCH__
 
-cleanup:
-  - /sdk
-  - /go
-  - /xdgdirs
-
 modules:
   - name: golang
     buildsystem: simple
@@ -59,6 +54,9 @@ modules:
 
   - name: nodejs
     buildsystem: simple
+    build-options:
+      no-debuginfo: true
+      strip: false
     build-commands:
       - mkdir -p "$NODEROOT"
       - cp -a . "$NODEROOT"
@@ -72,16 +70,25 @@ modules:
 
   - name: pnpm
     buildsystem: simple
+    build-options:
+      no-debuginfo: true
+      strip: false
     build-commands:
       - npm install --global pnpm@__FLEXIGPT_PNPM_VERSION__
 
   - name: wails
     buildsystem: simple
+    build-options:
+      no-debuginfo: true
+      strip: false
     build-commands:
       - GOBIN=/app/go/bin /app/sdk/golang/bin/go install github.com/wailsapp/wails/v3/cmd/wails3@__FLEXIGPT_WAILS_VERSION__
 
   - name: go-licenses
     buildsystem: simple
+    build-options:
+      no-debuginfo: true
+      strip: false
     build-commands:
       - GOBIN=/app/go/bin /app/sdk/golang/bin/go install github.com/google/go-licenses/v2@__FLEXIGPT_GO_LICENSES_VERSION__
 
@@ -99,6 +106,7 @@ modules:
         test -x "/app/sdk/node/bin/node"
         /app/sdk/node/bin/node --version
         /app/sdk/node/bin/node build/flatpak/builder.mjs flatpak-install
+        rm -rf /app/sdk /app/go /app/xdgdirs
     sources:
       - type: dir
         path: __FLEXIGPT_SOURCE_DIR__

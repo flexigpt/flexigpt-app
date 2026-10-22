@@ -945,6 +945,7 @@ export class Project {
 				{
 					capture: true,
 					echo: false,
+					echoStderr: false,
 					env: {
 						...nativeEnvironment,
 						GOFLAGS: flags,
@@ -956,6 +957,8 @@ export class Project {
 				throw new Error(`Go license report is empty for ${target}`);
 			}
 
+			// Non-fatal go-licenses warnings remain in the command stderr log.
+			// A non-zero go-licenses exit still fails the package build.
 			reports.push(`Target: ${target}\n${report}`);
 		}
 
@@ -1094,10 +1097,14 @@ export class Project {
 
 	async epoch() {
 		const epoch = (
-			await this.run("git", ["log", "-1", "--format=%ct"], {
-				capture: true,
-				echo: false,
-			})
+			await this.run(
+				"git",
+				["-c", `safe.directory=${root}`, "log", "-1", "--format=%ct"],
+				{
+					capture: true,
+					echo: false,
+				},
+			)
 		).trim();
 
 		if (!/^\d+$/.test(epoch)) {

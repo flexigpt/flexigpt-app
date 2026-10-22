@@ -37,6 +37,32 @@ function Write-BuildLog {
     }
 }
 
+function Get-SHA256Hash {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path
+    )
+
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+
+        try {
+            $bytes = $algorithm.ComputeHash($stream)
+            $hex = ([System.BitConverter]::ToString($bytes)).Replace("-", "")
+            return $hex.ToLowerInvariant()
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
 try {
     $LicenseDirectory = [System.IO.Path]::GetFullPath($LicenseDirectory)
     $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
@@ -87,7 +113,7 @@ try {
         throw "License archive is empty: $OutputPath"
     }
 
-    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $OutputPath).Hash
+    $hash = Get-SHA256Hash -Path $OutputPath
     Write-BuildLog -Level INFO -Message "Created license archive SHA256=$hash"
 }
 catch {
