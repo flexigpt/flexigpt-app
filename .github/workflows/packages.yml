@@ -44,9 +44,10 @@ concurrency:
 
 jobs:
   source:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}
+      flatpak_runtime: ${{ steps.source.outputs.flatpak_runtime }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -54,6 +55,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
+        with:
+          setup_go: "false"
+          setup_pnpm: "false"
       - name: Validate package request and selected source
         id: source
         shell: bash
@@ -96,14 +100,21 @@ jobs:
             fi
           fi
 
+          FLATPAK_RUNTIME_VERSION="$(sed -n 's/^FLATPAK_RUNTIME_VERSION=//p' build/buildvars.env)"
+          if [[ ! "${FLATPAK_RUNTIME_VERSION}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid FLATPAK_RUNTIME_VERSION in build/buildvars.env" >&2
+            exit 1
+          fi
+          echo "flatpak_runtime=${FLATPAK_RUNTIME_VERSION}" >> "$GITHUB_OUTPUT"
+
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   linux:
     needs: source
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 90
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-${{ needs.source.outputs.flatpak_runtime }}
       options: --privileged
     steps:
       - uses: actions/checkout@v7
@@ -111,12 +122,15 @@ jobs:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
+        with:
+          setup_go: "false"
+          setup_pnpm: "false"
       - uses: actions/cache@v6
         with:
           path: |
             build/out/cache/flatpak-builder
             build/out/cache/flatpak-repo
-          key: flatpak-amd64-${{ hashFiles('build/flatpak/io.github.flexigpt.client.yml') }}-${{ github.sha }}
+          key: flatpak-amd64-${{ hashFiles('build/flatpak/io.github.flexigpt.client.yml') }}-${{ needs.source.outputs.sha }}
           restore-keys: |
             flatpak-amd64-${{ hashFiles('build/flatpak/io.github.flexigpt.client.yml') }}-
       - name: Package unsigned Linux
@@ -157,9 +171,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: build/out/tools
-          key: tools-macos-${{ hashFiles('build/buildvars.env', 'go.sum') }}
-          restore-keys: |
-            tools-macos-
+          key: tools-macos-${{ hashFiles('build/buildvars.env') }}
       - name: Package unsigned macOS
         if: ${{ !inputs.sign_macos }}
         env:
@@ -206,9 +218,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: build/out/tools
-          key: tools-windows-${{ hashFiles('build/buildvars.env', 'go.sum') }}
-          restore-keys: |
-            tools-windows-
+          key: tools-windows-${{ hashFiles('build/buildvars.env') }}
       - name: Prepare Windows installer tooling
         run: task setup-win
       - name: Package unsigned Windows
@@ -238,7 +248,7 @@ jobs:
   publish:
     needs: [source, linux, macos, windows]
     if: ${{ inputs.release }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:

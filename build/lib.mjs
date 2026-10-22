@@ -23,8 +23,54 @@ import { parseEnv } from "node:util";
  */
 
 export const root = fileURLToPath(new URL("../", import.meta.url));
+const placeholder = path.join(
+	root,
+	"frontend",
+	"dist",
+	"client",
+	"build-placeholder.txt",
+);
 
-export const licenseNames = [
+const placeholderContents =
+	"FlexiGPT temporary Go embed placeholder. Safe to remove after ci checks.\n";
+
+function validateVersion() {
+	const version = process.env.VERSION_TAG ?? "";
+
+	if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+		throw new Error("VERSION_TAG must have the form vX.Y.Z");
+	}
+
+	if (
+		version
+			.slice(1)
+			.split(".")
+			.some((part) => Number(part) > 65535)
+	) {
+		throw new Error("VERSION_TAG components must not exceed 65535");
+	}
+
+	console.log(`Validated VERSION_TAG=${version}`);
+}
+
+function prepareEmbedPlaceholder() {
+	fs.mkdirSync(path.dirname(placeholder), { recursive: true });
+	fs.writeFileSync(placeholder, placeholderContents, { mode: 0o644 });
+	console.log(`Prepared Go embed placeholder: ${placeholder}`);
+}
+
+function cleanEmbedPlaceholder() {
+	if (!fs.existsSync(placeholder)) {
+		return;
+	}
+
+	if (fs.readFileSync(placeholder, "utf8") === placeholderContents) {
+		fs.rmSync(placeholder, { force: true });
+		console.log(`Removed Go embed placeholder: ${placeholder}`);
+	}
+}
+
+const licenseNames = [
 	"PROJECT_LICENSE.txt",
 	"THIRD_PARTY_NOTICES.txt",
 	"go-dependency-licenses.txt",
@@ -40,6 +86,88 @@ function requiredSimpleName(value) {
 	}
 
 	return value;
+}
+
+function loadBuildVars() {
+	return parseEnv(
+		fs.readFileSync(path.join(root, "build/buildvars.env"), "utf8"),
+	);
+}
+
+/** @param {NodeJS.ProcessEnv} vars */
+function validatePinnedVersions(vars) {
+	const pinned = (/** @type {string} */ name) => {
+		const value = vars[name];
+		if (!value) {
+			throw new Error(`Required configuration is missing: ${name}`);
+		}
+		return value;
+	};
+
+	const nodeVersion = pinned("NODE_VERSION");
+	if (process.versions.node !== nodeVersion) {
+		throw new Error(
+			`Node version mismatch: expected ${nodeVersion}, received ${process.versions.node}`,
+		);
+	}
+
+	const packageJson = JSON.parse(
+		fs.readFileSync(path.join(root, "package.json"), "utf8"),
+	);
+	if (packageJson.engines?.node !== nodeVersion) {
+		throw new Error("package.json Node engine differs from buildvars.env");
+	}
+
+	const managerVersion = /^pnpm@([^+]+)(?:\+.*)?$/.exec(
+		packageJson.packageManager ?? "",
+	)?.[1];
+	if (managerVersion !== pinned("PNPM_VERSION")) {
+		throw new Error("package.json pnpm version differs from buildvars.env");
+	}
+
+	const goMod = fs.readFileSync(path.join(root, "go.mod"), "utf8");
+	const goVersion = /^go\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)/m.exec(goMod)?.[1];
+	const configuredGo = pinned("GO_VERSION");
+	const configuredGoMajorMinor = configuredGo.split(".").slice(0, 2).join(".");
+	if (goVersion !== configuredGoMajorMinor && goVersion !== configuredGo) {
+		throw new Error(
+			`Go module version mismatch: go.mod=${goVersion ?? "missing"}; configured=${configuredGo}`,
+		);
+	}
+
+	const moduleWailsVersion =
+		/^\s*github\.com\/wailsapp\/wails\/v3\s+(v[^\s]+)/m.exec(goMod)?.[1];
+	if (moduleWailsVersion !== pinned("WAILS_VERSION")) {
+		throw new Error("go.mod Wails version differs from buildvars.env");
+	}
+
+	const frontendPackage = JSON.parse(
+		fs.readFileSync(path.join(root, "frontend/package.json"), "utf8"),
+	);
+	const runtimeVersion = frontendPackage.dependencies?.["@wailsio/runtime"];
+	const expectedRuntimeVersion = pinned("WAILS_VERSION").replace(/^v/, "");
+	if (runtimeVersion !== expectedRuntimeVersion) {
+		throw new Error(
+			`Wails runtime mismatch: frontend=${runtimeVersion}; CLI=${expectedRuntimeVersion}`,
+		);
+	}
+
+	const asdfVersions = Object.fromEntries(
+		fs
+			.readFileSync(path.join(root, ".tool-versions"), "utf8")
+			.trim()
+			.split(/\r?\n/)
+			.map((line) => line.split(/\s+/)),
+	);
+	for (const [tool, version] of Object.entries({
+		golang: configuredGo,
+		nodejs: `v${nodeVersion}`,
+		task: pinned("TASK_VERSION"),
+	})) {
+		if (asdfVersions[tool] !== version) {
+			throw new Error(`.tool-versions ${tool} differs from buildvars.env`);
+		}
+	}
 }
 
 export class Project {
@@ -72,9 +200,7 @@ export class Project {
 	}
 
 	load() {
-		const defaults = parseEnv(
-			fs.readFileSync(this.abs("build/buildvars.env"), "utf8"),
-		);
+		const defaults = loadBuildVars();
 
 		this.env = { ...defaults, ...this.env };
 
@@ -450,47 +576,7 @@ export class Project {
 
 	validateBuildConfiguration() {
 		this.step("Validate pinned application toolchain versions");
-
-		const nodeVersion = this.value("NODE_VERSION");
-		if (process.versions.node !== nodeVersion) {
-			throw new Error(
-				`Node version mismatch: expected ${nodeVersion}, received ${process.versions.node}`,
-			);
-		}
-
-		const goMod = fs.readFileSync(this.abs("go.mod"), "utf8");
-		const goVersion = /^go\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)/m.exec(goMod)?.[1];
-
-		if (!goVersion) {
-			throw new Error("Unable to read the Go version directive from go.mod");
-		}
-
-		const configuredGoMajorMinor = this.value("GO_VERSION")
-			.split(".")
-			.slice(0, 2)
-			.join(".");
-
-		if (!goVersion.startsWith(configuredGoMajorMinor)) {
-			throw new Error(
-				`Go module version mismatch: go.mod=${goVersion}; configured=${this.value("GO_VERSION")}`,
-			);
-		}
-
-		const frontendPackage = JSON.parse(
-			fs.readFileSync(this.abs("frontend/package.json"), "utf8"),
-		);
-
-		const runtimeVersion = frontendPackage.dependencies?.["@wailsio/runtime"];
-		const expectedRuntimeVersion = this.value("WAILS_VERSION").replace(
-			/^v/,
-			"",
-		);
-
-		if (runtimeVersion !== expectedRuntimeVersion) {
-			throw new Error(
-				`Wails runtime mismatch: frontend=${runtimeVersion}; CLI=${expectedRuntimeVersion}`,
-			);
-		}
+		validatePinnedVersions(this.env);
 	}
 
 	async dependencies() {
@@ -1013,4 +1099,37 @@ export async function main(platform, handler) {
 		project.writeSummary("failure", message);
 		process.exitCode = 1;
 	}
+}
+
+try {
+	const action = process.argv[2];
+
+	switch (action) {
+		case "validate-version":
+			validateVersion();
+			break;
+
+		case "validate-toolchain":
+			validatePinnedVersions(loadBuildVars());
+			console.log("Validated toolchain pins in build/buildvars.env");
+			break;
+
+		case "embed-prepare":
+			prepareEmbedPlaceholder();
+			break;
+
+		case "embed-clean":
+			cleanEmbedPlaceholder();
+			break;
+
+		default:
+			throw new Error(
+				"Usage: node build/lib.mjs <validate-version|validate-toolchain|embed-prepare|embed-clean>",
+			);
+	}
+} catch (error) {
+	console.error(
+		error instanceof Error ? (error.stack ?? error.message) : error,
+	);
+	process.exitCode = 1;
 }

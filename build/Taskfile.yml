@@ -10,20 +10,25 @@ env:
   WAILS_VITE_PORT: '{{.WAILS_VITE_PORT | default "5173"}}'
 
 tasks:
+  check-toolchain:
+    internal: true
+    cmds:
+      - node build/lib.mjs validate-toolchain
+
   check-version:
     internal: true
     cmds:
-      - node build/support.mjs validate-version
+      - node build/lib.mjs validate-version
 
   embed-prepare:
     internal: true
     cmds:
-      - node build/support.mjs embed-prepare
+      - node build/lib.mjs embed-prepare
 
   embed-clean:
     internal: true
     cmds:
-      - node build/support.mjs embed-clean
+      - node build/lib.mjs embed-clean
 
   build-lin:
     cmds:
@@ -187,7 +192,3 @@ tasks:
   setup-win:
     cmds:
       - node build/win.mjs setup
-
-  ci-image-lin:
-    cmds:
-      - node build/lin.mjs ci-image-lin

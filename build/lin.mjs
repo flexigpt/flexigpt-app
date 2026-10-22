@@ -122,6 +122,14 @@ function renderFlatpakManifest(project, destination, version, sourceDateEpoch) {
 		["__FLEXIGPT_VERSION_TAG__", JSON.stringify(version)],
 		["__FLEXIGPT_SOURCE_DATE_EPOCH__", JSON.stringify(sourceDateEpoch)],
 		["__FLEXIGPT_SOURCE_DIR__", JSON.stringify(root)],
+		["__FLEXIGPT_FLATPAK_RUNTIME_VERSION__", project.value("FLATPAK_RUNTIME_VERSION")],
+		["__FLEXIGPT_GO_VERSION__", project.value("GO_VERSION")],
+		["__FLEXIGPT_GO_LINUX_AMD64_SHA256__", project.value("GO_LINUX_AMD64_SHA256")],
+		["__FLEXIGPT_NODE_VERSION__", project.value("NODE_VERSION")],
+		["__FLEXIGPT_NODE_LINUX_X64_SHA256__", project.value("NODE_LINUX_X64_SHA256")],
+		["__FLEXIGPT_PNPM_VERSION__", project.value("PNPM_VERSION")],
+		["__FLEXIGPT_WAILS_VERSION__", project.value("WAILS_VERSION")],
+		["__FLEXIGPT_GO_LICENSES_VERSION__", project.value("GO_LICENSES_VERSION")],
 	]);
 
 	let rendered = template;
@@ -130,7 +138,7 @@ function renderFlatpakManifest(project, destination, version, sourceDateEpoch) {
 		rendered = rendered.replaceAll(marker, value);
 	}
 
-	if (/__FLEXIGPT_[A-Z_]+__/.test(rendered)) {
+	if (/__FLEXIGPT_[A-Z0-9_]+__/.test(rendered)) {
 		throw new Error("Flatpak manifest contains an unresolved build marker");
 	}
 
@@ -411,74 +419,6 @@ async function packageFlatpak(project) {
 	}
 }
 
-/**
- * @param {Project} project
- * @param {"ci"} target
- * @param {string} imageSuffix
- * @param {string} tag
- */
-async function publishContainerImage(project, target, imageSuffix, tag) {
-	nativeHost();
-
-	const repository = (
-		project.env.GITHUB_REPOSITORY ??
-		project.env.CI_IMAGE_REPOSITORY ??
-		""
-	).toLowerCase();
-
-	if (!repository) {
-		throw new Error(
-			"GITHUB_REPOSITORY or CI_IMAGE_REPOSITORY is required to publish a CI image",
-		);
-	}
-
-	const image = `ghcr.io/${repository}-${imageSuffix}`;
-	const cache = `ghcr.io/${repository}-ci-cache:buildcache`;
-
-	const buildArguments = [
-		"GO_VERSION",
-		"GO_LINUX_AMD64_SHA256",
-		"NODE_VERSION",
-		"NODE_LINUX_X64_SHA256",
-		"PNPM_VERSION",
-		"TASK_VERSION",
-		"WAILS_VERSION",
-		"GO_LICENSES_VERSION",
-		"GOLANGCI_LINT_VERSION",
-	].flatMap((key) => ["--build-arg", `${key}=${project.value(key)}`]);
-
-	const tags = ["--tag", `${image}:${tag}`];
-
-	if (project.env.GITHUB_SHA) {
-		tags.push("--tag", `${image}:sha-${project.env.GITHUB_SHA}`);
-	}
-
-	project.step(`Publish ${target} CI image ${image}:${tag}`);
-
-	await project.run(
-		"docker",
-		[
-			"buildx",
-			"build",
-			"--target",
-			target,
-			"--push",
-			...tags,
-			"--cache-from",
-			`type=registry,ref=${cache}`,
-			"--cache-to",
-			`type=registry,ref=${cache},mode=max`,
-			...buildArguments,
-			"--file",
-			"build/ci/linux.Dockerfile",
-			".",
-		],
-		{
-			timeoutMs: 90 * 60 * 1000,
-		},
-	);
-}
-
 await main("lin", async (project, action) => {
 	switch (action) {
 		case "build":
@@ -564,15 +504,6 @@ await main("lin", async (project, action) => {
 			project.log(
 				"INFO",
 				"Linux GTK4 and WebKitGTK 6.0 dependencies are available",
-			);
-			break;
-
-		case "ci-image-lin":
-			await publishContainerImage(
-				project,
-				"ci",
-				"ci-linux",
-				project.value("CI_LINUX_IMAGE_TAG"),
 			);
 			break;
 

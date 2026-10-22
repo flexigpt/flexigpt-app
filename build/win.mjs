@@ -28,12 +28,17 @@ function powerShell(project) {
 }
 
 /** @param {Project} project */
-function makensis(project) {
-	const executable = path.join(
+function makensisPath(project) {
+	return path.join(
 		project.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)",
 		"NSIS",
 		"makensis.exe",
 	);
+}
+
+/** @param {Project} project */
+function makensis(project) {
+	const executable = makensisPath(project);
 
 	if (!fs.existsSync(executable)) {
 		throw new Error(
@@ -474,7 +479,7 @@ await main("win", async (project, action) => {
 		case "setup": {
 			nativeHost();
 
-			if (!fs.existsSync(makensis(project))) {
+			if (!fs.existsSync(makensisPath(project))) {
 				await project.run("choco", [
 					"install",
 					"nsis",

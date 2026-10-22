@@ -198,11 +198,6 @@ tasks:
     cmds:
       - task: build:setup-win
 
-  ci-image-lin:
-    desc: Publish the Linux quality CI image.
-    cmds:
-      - task: build:ci-image-lin
-
   deps-js:
     desc: Install locked JavaScript dependencies.
     run: once
@@ -327,8 +322,10 @@ tasks:
       - pnpm run test:e2e:report
 
   ci:
-    desc: Run the complete CI quality suite in the Linux CI image.
+    desc: Run the complete CI lint test suite on a native Linux host.
     cmds:
+      - task: build:check-toolchain
+      - task: install-ci-tools
       - task: deps-js
       - task: lint-go
       - task: test-go-coverage
@@ -409,6 +406,12 @@ tasks:
       - asdf install nodejs v{{.NODE_VERSION}}
       - asdf set nodejs v{{.NODE_VERSION}}
       - task: upgrade-pnpm
+
+  install-ci-tools:
+    desc: Install Go tools needed by the CI lint test suite.
+    cmds:
+      - task: go:install-tools
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
 
   install-go-tools:
     desc: Install Wails, Task, go-licenses, golangci-lint, and configured Go tools.

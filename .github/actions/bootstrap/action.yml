@@ -1,80 +1,56 @@
 name: Bootstrap project tools
-description: Bootstrap only the tools required before the root Taskfile can run.
+description: Install the pinned tools needed before the root Taskfile can run.
 
 inputs:
-  preinstalled:
-    description: The runner image already contains Go, Node, pnpm, and Task.
-    required: false
-    default: "false"
   setup_go:
-    description: Install the Go version declared by go.mod.
+    description: Install the Go version declared by build/buildvars.env.
     required: false
     default: "true"
   setup_node:
-    description: Install Node.js and pnpm declared by package.json.
+    description: Install the Node.js version declared by build/buildvars.env.
+    required: false
+    default: "true"
+  setup_pnpm:
+    description: Install pinned pnpm and cache its store.
     required: false
     default: "true"
 
 runs:
   using: composite
   steps:
-    - if: ${{ inputs.preinstalled != 'true' && inputs.setup_go == 'true' }}
-      uses: actions/setup-go@v7
-      with:
-        go-version-file: go.mod
-        cache: true
-
-    - if: ${{ inputs.preinstalled != 'true' && inputs.setup_node == 'true' }}
-      uses: pnpm/action-setup@v6
-      with:
-        run_install: false
-
-    - if: ${{ inputs.preinstalled != 'true' && inputs.setup_node == 'true' }}
-      uses: actions/setup-node@v7
-      with:
-        node-version-file: package.json
-        cache: pnpm
-
-    - name: Ensure pinned Task CLI
+    - name: Read pinned tool versions
+      id: pins
       shell: bash
-      env:
-        PREINSTALLED: ${{ inputs.preinstalled }}
       run: |
         set -euo pipefail
-
-        TASK_VERSION="$(
-          sed -n 's/^TASK_VERSION=//p' "$GITHUB_WORKSPACE/build/buildvars.env"
-        )"
-
-        [[ "${TASK_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-          echo "Invalid TASK_VERSION in build/buildvars.env" >&2
-          exit 1
-        }
-
-        if command -v task >/dev/null 2>&1; then
-          INSTALLED_TASK_VERSION="$(task --version)"
-
-          if [[ "${INSTALLED_TASK_VERSION}" == *"${TASK_VERSION}"* ]]; then
-            task --version
-            exit 0
-          fi
-
-          if [[ "${PREINSTALLED}" == "true" ]]; then
-            echo "Preinstalled Task version is incompatible: ${INSTALLED_TASK_VERSION}" >&2
-            echo "Expected Task version ${TASK_VERSION}" >&2
+        for name in GO_VERSION NODE_VERSION PNPM_VERSION TASK_VERSION; do
+          version="$(sed -n "s/^${name}=//p" build/buildvars.env)"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid ${name} in build/buildvars.env" >&2
             exit 1
           fi
-        fi
+          printf '%s=%s\n' "${name}" "${version}" >> "$GITHUB_OUTPUT"
+        done
 
-        if [[ "${PREINSTALLED}" == "true" ]]; then
-          echo "The preinstalled image does not provide task" >&2
-          exit 1
-        fi
+    - if: ${{ inputs.setup_go == 'true' }}
+      uses: actions/setup-go@v7
+      with:
+        go-version: ${{ steps.pins.outputs.GO_VERSION }}
+        cache: true
 
-        command -v go >/dev/null 2>&1 || {
-          echo "Go is required to bootstrap Task" >&2
-          exit 1
-        }
+    - if: ${{ inputs.setup_node == 'true' && inputs.setup_pnpm == 'true' }}
+      uses: pnpm/action-setup@v6
+      with:
+        version: ${{ steps.pins.outputs.PNPM_VERSION }}
+        run_install: false
 
-        go install "github.com/go-task/task/v3/cmd/task@v${TASK_VERSION}"
-        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+    - if: ${{ inputs.setup_node == 'true' }}
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ steps.pins.outputs.NODE_VERSION }}
+        cache: ${{ inputs.setup_pnpm == 'true' && 'pnpm' || '' }}
+
+    - uses: arduino/setup-task@v2
+      with:
+        version: ${{ steps.pins.outputs.TASK_VERSION }}
+        repo-token: ${{ github.token }}

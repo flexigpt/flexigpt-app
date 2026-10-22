@@ -8,35 +8,38 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
-  group: quality-${{ github.ref }}
+  group: lint-test-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CI: "true"
 
 jobs:
-  quality:
+  test-lint-linux:
     name: Lint and test
-    runs-on: ubuntu-24.04
-    container:
-      image: ${{ vars.LINUX_CI_IMAGE || 'ghcr.io/flexigpt/flexigpt-app-ci-linux:ubuntu24.04-v1' }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: >-
+            build-essential
+            libgtk-4-dev
+            libwebkitgtk-6.0-dev
+            pkg-config
+          version: ubuntu26.04-gtk4-webkit6-1
       - uses: actions/cache@v6
         with:
           path: build/out/cache/golangci-lint
-          key: golangci-linux-v2.13.0-${{ hashFiles('go.mod', 'go.sum', '.golangci*') }}-${{ github.sha }}
+          key: golangci-ubuntu26.04-${{ hashFiles('build/buildvars.env', 'go.mod', 'go.sum', '.golangci*') }}-${{ github.sha }}
           restore-keys: |
-            golangci-linux-v2.13.0-${{ hashFiles('go.mod', 'go.sum', '.golangci*') }}-
-      - name: Run repository quality suite
+            golangci-ubuntu26.04-${{ hashFiles('build/buildvars.env', 'go.mod', 'go.sum', '.golangci*') }}-
+      - name: Run repository ci suite
         run: task ci
       - name: Check coverage policy
         uses: vladopajic/go-test-coverage@v2
@@ -45,7 +48,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: quality-coverage
+          name: ci-coverage
           path: coverage.out
           if-no-files-found: ignore
 
@@ -58,6 +61,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
+        with:
+          setup_pnpm: "false"
       - name: Run native macOS Go tests
         run: task test-go-native
 
@@ -70,5 +75,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
+        with:
+          setup_pnpm: "false"
       - name: Run native Windows Go tests
         run: task test-go-native
