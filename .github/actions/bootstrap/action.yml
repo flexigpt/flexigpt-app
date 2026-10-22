@@ -46,7 +46,7 @@ runs:
           sed -n 's/^TASK_VERSION=//p' "$GITHUB_WORKSPACE/build/buildvars.env"
         )"
 
-        [[ "${TASK_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+        [[ "${TASK_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
           echo "Invalid TASK_VERSION in build/buildvars.env" >&2
           exit 1
         }
@@ -78,4 +78,3 @@ runs:
 
         go install "github.com/go-task/task/v3/cmd/task@v${TASK_VERSION}"
         echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
