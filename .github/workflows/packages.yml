@@ -72,12 +72,16 @@ jobs:
           PACKAGE_MODE: ${{ env.PACKAGE_MODE }}
           PACKAGE_SOURCE_REF: ${{ env.PACKAGE_SOURCE_REF }}
           NOTARIZE: ${{ inputs.notarize }}
+          RELEASE_MODE: ${{ inputs.release }}
+          SIGN_LINUX: ${{ inputs.sign_linux }}
+          SIGN_MACOS: ${{ inputs.sign_macos }}
+          SIGN_WINDOWS: ${{ inputs.sign_windows }}
         run: |
           set -euo pipefail
 
           task check-version
 
-          echo "Selected package source: ${PACKAGE_SOURCE_REF}"
+          echo "Selected package source: ${PACKAGE_SOURCE_REF} mode: ${PACKAGE_MODE}"
 
           if [[ "${NOTARIZE}" == "true" && "${SIGN_MACOS}" != "true" ]]; then
             echo "notarize requires sign_macos=true" >&2
