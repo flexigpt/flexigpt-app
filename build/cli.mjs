@@ -9,7 +9,7 @@ import {
 	runProject,
 	validatePinnedVersions,
 	validateVersion,
-} from "../lib.mjs";
+} from "./lib.mjs";
 
 /** @param {unknown} error */
 function fail(error) {
@@ -40,7 +40,9 @@ export async function main(platform, handler, argv = process.argv.slice(2)) {
 	}
 
 	try {
-		await runProject(project, (current) => handler(current, action, args));
+		await runProject(project, (/** @type {any} */ current) =>
+			handler(current, action, args),
+		);
 	} catch {
 		// runProject already logged the error with secret redaction.
 		process.exitCode = 1;
