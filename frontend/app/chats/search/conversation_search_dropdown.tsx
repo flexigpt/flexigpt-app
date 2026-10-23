@@ -93,18 +93,16 @@ export function ConversationSearchDropdown({
 				left = query ? `No results for "${query}"` : NO_CONVERSATIONS;
 				right = query ? SEARCHED_ALL : '';
 			}
-		} else {
-			if (query.length === 0) {
-				left = 'Titles';
-				right = 'Type to search';
-			} else if (query.length < 3) {
-				if (showSearchAllHintShortQuery) {
-					left = 'Title matches';
-					right = PRESS_ENTER_TO_SEARCH;
-				} else {
-					left = 'Title & message matches';
-					right = SEARCHED_ALL;
-				}
+		} else if (query.length === 0) {
+			left = 'Titles';
+			right = 'Type to search';
+		} else if (query.length < 3) {
+			if (showSearchAllHintShortQuery) {
+				left = 'Title matches';
+				right = PRESS_ENTER_TO_SEARCH;
+			} else {
+				left = 'Title & message matches';
+				right = SEARCHED_ALL;
 			}
 		}
 
