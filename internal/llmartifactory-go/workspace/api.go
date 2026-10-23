@@ -439,16 +439,19 @@ func (a *Service) RemoveWorkspaceDirectory(
 		return storeSpec.ErrConflict
 	}
 
-	ownedSources := make(map[sourceModel.SourceID]struct{}, 2)
+	retiredSources := make([]sourceModel.Summary, 0, 2)
 	retire := func(current sourceModel.Summary) error {
-		ownedSources[current.ID] = struct{}{}
-		_, err := a.sources.Retire(
+		next, err := a.sources.Retire(
 			ctx,
 			ref.RootID,
 			current.ID,
 			current.Revision,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+		retiredSources = append(retiredSources, next)
+		return nil
 	}
 
 	// Retire policy first so a partial operation cannot expose the default.
@@ -463,25 +466,20 @@ func (a *Service) RemoveWorkspaceDirectory(
 		}
 	}
 
-	records, err := a.cat.ListByRoot(
-		ctx,
-		ref.RootID,
-		catalogModel.ListOptions{},
-	)
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		if _, owned := ownedSources[record.Binding.SourceID]; !owned {
-			continue
+	for _, sourceValue := range retiredSources {
+		if err := a.purgeWorkspaceSourceArtifacts(
+			ctx,
+			ref.RootID,
+			sourceValue.ID,
+		); err != nil {
+			return err
 		}
-		if record.State != artifactModel.StateMissing {
-			return fmt.Errorf(
-				"%w: retired Workspace Source still has a non-missing Artifact",
-				storeSpec.ErrConflict,
-			)
-		}
-		if err := a.artifacts.Purge(ctx, record.Ref(), record.Revision); err != nil {
+		if err := a.sources.Purge(
+			ctx,
+			ref.RootID,
+			sourceValue.ID,
+			sourceValue.Revision,
+		); err != nil {
 			return err
 		}
 	}
@@ -571,6 +569,10 @@ func (a *Service) ensureWorkspaceSources(
 	rootID rootModel.RootID,
 	rootPath string,
 ) (dir, policy sourceModel.Summary, err error) {
+	if err := a.purgeRetiredWorkspaceSources(ctx, rootID); err != nil {
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
+	}
+
 	directoryDiscovery, err := a.defaultDiscovery()
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err

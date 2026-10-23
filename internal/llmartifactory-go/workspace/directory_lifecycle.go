@@ -210,6 +210,10 @@ func (a *Service) defaultWorkspaceRecord(
 	ctx context.Context,
 	values workspaceSourceSet,
 ) (artifactModel.Artifact, bool, error) {
+	if err := a.purgeRetiredWorkspaceSources(ctx, values.Directory.RootID); err != nil {
+		return artifactModel.Artifact{}, false, err
+	}
+
 	entries, err := a.cat.ListBySource(
 		ctx,
 		values.Policy.RootID,
@@ -244,6 +248,90 @@ func (a *Service) defaultWorkspaceRecord(
 			storeSpec.ErrIdentityConflict,
 		)
 	}
+}
+
+func (a *Service) purgeRetiredWorkspaceSources(
+	ctx context.Context,
+	rootID rootModel.RootID,
+) error {
+	for _, profile := range []support.SourceProfile{
+		a.config.Support.PolicySource,
+		a.config.Support.DirectorySource,
+	} {
+		sourceValue, err := a.sources.FindByStorageKey(
+			ctx,
+			rootID,
+			profile.StorageKey,
+		)
+		switch {
+		case errors.Is(err, storeSpec.ErrSourceNotFound),
+			errors.Is(err, storeSpec.ErrNotFound):
+			continue
+		case err != nil:
+			return err
+		}
+
+		if !profile.Matches(sourceValue) {
+			return fmt.Errorf(
+				"%w: Workspace storage key %q belongs to an incompatible Source",
+				storeSpec.ErrConflict,
+				profile.StorageKey,
+			)
+		}
+		if sourceValue.RetiredAt == nil {
+			continue
+		}
+
+		if err := a.purgeWorkspaceSourceArtifacts(
+			ctx,
+			rootID,
+			sourceValue.ID,
+		); err != nil {
+			return err
+		}
+		if err := a.sources.Purge(
+			ctx,
+			rootID,
+			sourceValue.ID,
+			sourceValue.Revision,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *Service) purgeWorkspaceSourceArtifacts(
+	ctx context.Context,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) error {
+	entries, err := a.cat.ListBySource(
+		ctx,
+		rootID,
+		sourceID,
+		catalogModel.ListOptions{},
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.State != artifactModel.StateMissing {
+			return fmt.Errorf(
+				"%w: retired Workspace Source still has a non-missing Artifact",
+				storeSpec.ErrConflict,
+			)
+		}
+		if err := a.artifacts.Purge(
+			ctx,
+			entry.Ref(),
+			entry.Revision,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *Service) refreshEffectiveWorkspaces(

@@ -288,6 +288,29 @@ func (s *Service) Get(
 	return value.Summary(), nil
 }
 
+func (s *Service) FindByStorageKey(
+	ctx context.Context,
+	rootID rootModel.RootID,
+	storageKey storeSpec.StorageKey,
+) (sourceModel.Summary, error) {
+	if err := rootID.Validate(); err != nil {
+		return sourceModel.Summary{}, err
+	}
+	if err := storageKey.Validate(); err != nil {
+		return sourceModel.Summary{}, err
+	}
+
+	value, err := s.repository.FindByStorageKey(
+		ctx,
+		rootID,
+		storageKey,
+	)
+	if err != nil {
+		return sourceModel.Summary{}, err
+	}
+	return value.Summary(), nil
+}
+
 func (s *Service) List(ctx context.Context, rootID rootModel.RootID) ([]sourceModel.Summary, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err

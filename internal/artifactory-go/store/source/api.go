@@ -5,6 +5,7 @@ import (
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type API interface {
@@ -13,6 +14,16 @@ type API interface {
 	Discard(ctx context.Context, rootID rootModel.RootID, sourceID sourceModel.SourceID, expectedRevision uint64) error
 	Get(ctx context.Context, rootID rootModel.RootID, sourceID sourceModel.SourceID) (sourceModel.Summary, error)
 	List(ctx context.Context, rootID rootModel.RootID) ([]sourceModel.Summary, error)
+
+	// FindByStorageKey returns the Source owning one Root-local physical
+	// storage identity, including a retired Source. It exists for explicit
+	// lifecycle reconciliation such as re-registering a removed Workspace
+	// directory. Ordinary listing continues to expose only active Sources.
+	FindByStorageKey(
+		ctx context.Context,
+		rootID rootModel.RootID,
+		storageKey storeSpec.StorageKey,
+	) (sourceModel.Summary, error)
 
 	// PrepareDiscovery performs a revision-checked additive declaration
 	// discovery update. It does not refresh Source content.

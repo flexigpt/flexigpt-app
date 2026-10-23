@@ -785,9 +785,10 @@ export function useComposerWorkspace({
 		);
 	}).length;
 
-	const capabilityIssues = (plan?.capabilities.occurrences ?? []).filter(
-		occurrence => occurrence.status.toString() !== 'available'
-	);
+	const capabilityIssues = (plan?.capabilities.occurrences ?? []).filter(occurrence => {
+		return occurrence.required && occurrence.status.toString() !== 'available';
+	});
+
 	const blockingError = selectionLoading
 		? 'Workspace selection is still resolving. Wait for it to finish before sending.'
 		: selection && !workspace

@@ -107,8 +107,8 @@ function WorkspaceDirectorySelectionModalContent({
 						<div className="alert alert-warning rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
 							<span>
-								Some Workspace declarations are unavailable or ambiguous. Available Context, Skills, and MCP setup
-								remain usable.
+								Some required Workspace declarations are unavailable or ambiguous. Available Context, Skills, and MCP
+								setup remain usable.
 							</span>
 						</div>
 					) : null}
