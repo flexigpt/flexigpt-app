@@ -27,6 +27,7 @@ type Document struct {
 	MediaType        string
 	Content          string
 	Locator          storeSpec.Locator
+	SourceLocators   []storeSpec.Locator
 }
 
 type Adapter struct {
@@ -74,7 +75,7 @@ func (a *Adapter) Resolve(
 	if err != nil {
 		return Document{}, err
 	}
-	content, err := a.contentForDocument(ctx, resolved, declarationValue)
+	content, sourceLocators, err := a.contentForDocument(ctx, resolved, declarationValue)
 	if err != nil {
 		return Document{}, err
 	}
@@ -87,6 +88,7 @@ func (a *Adapter) Resolve(
 		MediaType:        declarationValue.MediaType,
 		Content:          content,
 		Locator:          resolved.Artifact.Binding.Locator,
+		SourceLocators:   sourceLocators,
 	}, nil
 }
 
@@ -135,6 +137,7 @@ func (a *Adapter) ResolveWithContentSource(
 			MediaType:        declarationValue.MediaType,
 			Content:          *declarationValue.Content,
 			Locator:          resolved.Artifact.Binding.Locator,
+			SourceLocators:   nil,
 		}, nil
 	}
 	if declarationValue.Locator == nil {
@@ -163,36 +166,9 @@ func (a *Adapter) ResolveWithContentSource(
 	if err != nil {
 		return Document{}, err
 	}
-	var output strings.Builder
-	var generation string
-	var revision uint64
-	for index, entry := range entries {
-		if index == 0 {
-			generation = entry.SourceGeneration
-			revision = entry.SourceRevision
-		}
-		if entry.SourceGeneration != generation || entry.SourceRevision != revision {
-			return Document{}, fmt.Errorf(
-				"%w: Text Source changed during materialization",
-				storeSpec.ErrRefreshRequired,
-			)
-		}
-		if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
-			return Document{}, fmt.Errorf(
-				"%w: Text source %q is not valid UTF-8 text",
-				storeSpec.ErrInvalid,
-				entry.Locator,
-			)
-		}
-		if index != 0 {
-			output.WriteString("\n\n")
-		}
-		if len(entries) > 1 {
-			output.WriteString("--- ")
-			output.WriteString(string(entry.Locator))
-			output.WriteString(" ---\n")
-		}
-		output.Write(entry.Content)
+	content, sourceLocators, err := materializeSourceEntries(entries, nil)
+	if err != nil {
+		return Document{}, err
 	}
 	return Document{
 		Artifact:         resolved.Artifact.Ref(),
@@ -201,8 +177,9 @@ func (a *Adapter) ResolveWithContentSource(
 		Name:             declarationValue.Name,
 		Insert:           declarationValue.Insert,
 		MediaType:        declarationValue.MediaType,
-		Content:          output.String(),
+		Content:          content,
 		Locator:          resolved.Artifact.Binding.Locator,
+		SourceLocators:   sourceLocators,
 	}, nil
 }
 
@@ -210,12 +187,12 @@ func (a *Adapter) contentForDocument(
 	ctx context.Context,
 	resolved resourceModel.ResolvedArtifact,
 	document textv1.TextDocument,
-) (string, error) {
+) (string, []storeSpec.Locator, error) {
 	if document.Content != nil {
-		return *document.Content, nil
+		return *document.Content, nil, nil
 	}
 	if document.Locator == nil {
-		return "", fmt.Errorf(
+		return "", nil, fmt.Errorf(
 			"%w: Text has neither inline content nor locator",
 			storeSpec.ErrReferenceUnresolved,
 		)
@@ -226,7 +203,7 @@ func (a *Adapter) contentForDocument(
 		resolved.Artifact.Binding.Locator,
 	)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	entries, err := a.resources.ReadSourceTree(
 		ctx,
@@ -239,20 +216,57 @@ func (a *Adapter) contentForDocument(
 		storeSpec.MaxScanBytes,
 	)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
+	return materializeSourceEntries(
+		entries,
+		&sourceEntriesExpectation{
+			revision:   resolved.RefreshState.SourceRevision,
+			generation: resolved.RefreshState.SourceGeneration,
+		},
+	)
+}
+
+type sourceEntriesExpectation struct {
+	revision   uint64
+	generation string
+}
+
+func materializeSourceEntries(
+	entries []resourceModel.VerifiedEntry,
+	expected *sourceEntriesExpectation,
+) (string, []storeSpec.Locator, error) {
 	var output strings.Builder
+	locators := make([]storeSpec.Locator, 0, len(entries))
+	var generation string
+	var revision uint64
+
 	for index, entry := range entries {
-		if entry.SourceRevision != resolved.RefreshState.SourceRevision ||
-			entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
-			return "", fmt.Errorf(
+		switch {
+		case expected != nil &&
+			(entry.SourceRevision != expected.revision ||
+				entry.SourceGeneration != expected.generation):
+			return "", nil, fmt.Errorf(
+				"%w: Text Source changed during materialization",
+				storeSpec.ErrRefreshRequired,
+			)
+
+		case expected == nil && index == 0:
+			revision = entry.SourceRevision
+			generation = entry.SourceGeneration
+
+		case expected == nil &&
+			(entry.SourceRevision != revision ||
+				entry.SourceGeneration != generation):
+			return "", nil, fmt.Errorf(
 				"%w: Text Source changed during materialization",
 				storeSpec.ErrRefreshRequired,
 			)
 		}
+
 		if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
-			return "", fmt.Errorf(
+			return "", nil, fmt.Errorf(
 				"%w: Text source %q is not valid UTF-8 text",
 				storeSpec.ErrInvalid,
 				entry.Locator,
@@ -267,6 +281,7 @@ func (a *Adapter) contentForDocument(
 			output.WriteString(" ---\n")
 		}
 		output.Write(entry.Content)
+		locators = append(locators, entry.Locator)
 	}
-	return output.String(), nil
+	return output.String(), locators, nil
 }

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheckCircle, FiFileText, FiRefreshCw, FiSettings, FiTrash2 } from 'react-icons/fi';
+import { FiAlertCircle, FiCheckCircle, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { WorkspaceArtifactView, WorkspaceDirectoryView, WorkspaceRuntimePlan } from '@/spec/workspace';
+import { artifactRefKey, ArtifactState } from '@/spec/artifact';
 import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -11,7 +12,6 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { Loader } from '@/components/loader';
-import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -19,6 +19,7 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
+import { WorkspaceDefaultPolicyDisclosure } from '@/workspaces/workspace_default_policy_disclosure';
 
 interface WorkspaceDirectoryManagementModalProps {
 	isOpen: boolean;
@@ -26,7 +27,6 @@ interface WorkspaceDirectoryManagementModalProps {
 	onClose: () => void;
 	onChanged: (directory: WorkspaceDirectoryView) => void;
 	onRequestRemove: (directory: WorkspaceDirectoryView) => void;
-	onShowDefaultPolicy: () => void;
 }
 
 type EffectiveWorkspace = WorkspaceDirectoryView['workspaces'][number];
@@ -125,7 +125,17 @@ function capabilityTypeLabel(type: string): string {
 	}
 }
 
-function WorkspaceRuntimeContents({ workspace }: { workspace: EffectiveWorkspace }) {
+function WorkspaceRuntimeContents({
+	workspace,
+	artifactViews,
+	onSetArtifactEnabled,
+	disabled,
+}: {
+	workspace: EffectiveWorkspace;
+	artifactViews: ReadonlyMap<string, WorkspaceArtifactView>;
+	onSetArtifactEnabled: (artifact: WorkspaceArtifactView, enabled: boolean) => void | Promise<void>;
+	disabled: boolean;
+}) {
 	const workspaceRootID = workspace.workspace.artifact.rootID;
 	const workspaceArtifactID = workspace.workspace.artifact.id;
 
@@ -180,7 +190,14 @@ function WorkspaceRuntimeContents({ workspace }: { workspace: EffectiveWorkspace
 
 				{(isLoading || isRefreshing) && !plan ? <Loader text="Resolving repository contents..." /> : null}
 
-				{plan ? <WorkspaceContents plan={plan} /> : null}
+				{plan ? (
+					<WorkspaceContents
+						plan={plan}
+						artifactViews={artifactViews}
+						onSetArtifactEnabled={onSetArtifactEnabled}
+						disabled={disabled}
+					/>
+				) : null}
 			</section>
 
 			{capabilityIssues.length > 0 ? (
@@ -211,7 +228,6 @@ function WorkspaceDirectoryManagementModalContent({
 	onClose,
 	onChanged,
 	onRequestRemove,
-	onShowDefaultPolicy,
 }: Omit<WorkspaceDirectoryManagementModalProps, 'isOpen'>) {
 	const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState(
 		directory.workspaces[0] ? effectiveWorkspaceKey(directory.workspaces[0]) : ''
@@ -243,7 +259,6 @@ function WorkspaceDirectoryManagementModalContent({
 	const {
 		data: artifacts,
 		error: artifactLoadError,
-		isLoading: isLoadingArtifacts,
 		isRefreshing: isRefreshingArtifacts,
 		reloadOrThrow: reloadArtifactsOrThrow,
 		setData: setArtifacts,
@@ -251,7 +266,10 @@ function WorkspaceDirectoryManagementModalContent({
 		initialData: null as WorkspaceArtifactView[] | null,
 	});
 
-	const isReloadingArtifacts = isLoadingArtifacts || isRefreshingArtifacts;
+	const artifactsByKey = useMemo(
+		() => new Map((artifacts ?? []).map(artifact => [artifactRefKey(artifact.artifact), artifact] as const)),
+		[artifacts]
+	);
 
 	const reloadArtifacts = useCallback(async () => {
 		await reloadArtifactsOrThrow().catch(() => undefined);
@@ -292,7 +310,7 @@ function WorkspaceDirectoryManagementModalContent({
 		}
 	};
 
-	const setArtifactEnabled = async (artifact: WorkspaceArtifactView) => {
+	const setArtifactEnabled = async (artifact: WorkspaceArtifactView, enabled: boolean) => {
 		const key = `artifact:${artifact.artifact.artifactID}`;
 		setActionError('');
 		setBusy(key);
@@ -302,7 +320,7 @@ function WorkspaceDirectoryManagementModalContent({
 				directory.ref,
 				artifact.artifact,
 				artifact.revision,
-				!artifact.enabled
+				enabled
 			);
 
 			setArtifacts(
@@ -337,6 +355,15 @@ function WorkspaceDirectoryManagementModalContent({
 						<FiAlertCircle size={15} />
 						<span>{actionError}</span>
 					</div>
+				) : null}
+
+				{artifactLoadError ? (
+					<ManagementResourceError
+						title="Workspace item controls could not be loaded"
+						error={artifactLoadError}
+						isRetrying={isRefreshingArtifacts}
+						onRetry={reloadArtifactsOrThrow}
+					/>
 				) : null}
 
 				<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center">
@@ -387,35 +414,32 @@ function WorkspaceDirectoryManagementModalContent({
 								return (
 									<div
 										key={key}
-										className={`border-base-content/10 bg-base-100 flex min-w-0 items-center gap-2 rounded-2xl border p-2 ${
+										className={`border-base-content/10 bg-base-100 flex min-w-0 flex-col gap-2 rounded-2xl border p-2 ${
 											selected ? 'border-secondary/50 bg-secondary/10' : ''
 										}`}
 									>
-										<button
-											type="button"
-											className="min-w-0 grow rounded-xl p-2 text-left"
-											onClick={() => {
-												setSelectedWorkspaceKey(key);
-											}}
-										>
-											<div className="truncate text-sm font-medium">{effectiveWorkspaceTitle(entry)}</div>
-											<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
-												{entry.origin === WorkspaceDirectoryOrigin.Default
-													? 'Automatic repository setup'
-													: path.path || 'Repository workspace file'}
-											</div>
-										</button>
-
-										<StatusBadge tone={entry.origin === WorkspaceDirectoryOrigin.Default ? 'info' : 'success'}>
-											{entry.origin === WorkspaceDirectoryOrigin.Default ? 'Automatic' : 'Repository'}
-										</StatusBadge>
-
-										{entry.origin === WorkspaceDirectoryOrigin.Default ? (
-											<button type="button" className="btn btn-ghost btn-xs rounded-lg" onClick={onShowDefaultPolicy}>
-												<FiFileText size={13} />
-												View setup
+										<div className="flex min-w-0 items-center gap-2">
+											<button
+												type="button"
+												className="min-w-0 grow rounded-xl p-2 text-left"
+												onClick={() => {
+													setSelectedWorkspaceKey(key);
+												}}
+											>
+												<div className="truncate text-sm font-medium">{effectiveWorkspaceTitle(entry)}</div>
+												<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
+													{entry.origin === WorkspaceDirectoryOrigin.Default
+														? 'Automatic repository setup'
+														: path.path || 'Repository workspace file'}
+												</div>
 											</button>
-										) : null}
+
+											<StatusBadge tone={entry.origin === WorkspaceDirectoryOrigin.Default ? 'info' : 'success'}>
+												{entry.origin === WorkspaceDirectoryOrigin.Default ? 'Automatic' : 'Repository'}
+											</StatusBadge>
+										</div>
+
+										{entry.origin === WorkspaceDirectoryOrigin.Default ? <WorkspaceDefaultPolicyDisclosure /> : null}
 									</div>
 								);
 							})}
@@ -435,6 +459,9 @@ function WorkspaceDirectoryManagementModalContent({
 					<WorkspaceRuntimeContents
 						key={`${effectiveWorkspaceKey(selectedWorkspace)}:${selectedWorkspace.workspace.artifact.revision}:${runtimePlanVersion}`}
 						workspace={selectedWorkspace}
+						artifactViews={artifactsByKey}
+						onSetArtifactEnabled={setArtifactEnabled}
+						disabled={Boolean(busy)}
 					/>
 				) : null}
 
@@ -462,93 +489,54 @@ function WorkspaceDirectoryManagementModalContent({
 					</section>
 				) : null}
 
-				<details className="border-base-content/10 bg-base-100 rounded-2xl border">
-					<summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-semibold">
-						<FiSettings size={15} />
-						<span>Advanced discovery controls</span>
-						<span className="text-base-content/50 ml-auto text-xs">{artifacts?.length ?? 0} items</span>
-					</summary>
-
-					<div className="border-base-content/10 space-y-3 border-t p-4">
-						<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-							<div className="text-base-content/65 min-w-0 grow text-xs">
-								Include or exclude individual repository items. Workspace setup files are listed here because changing
-								them can affect which Workspace is available.
+				{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (
+					<section className="space-y-2">
+						<div>
+							<div className="text-sm font-semibold">Excluded items</div>
+							<div className="text-base-content/60 mt-0.5 text-xs">
+								These repository items are available but are not currently added by this Workspace.
 							</div>
-							<button
-								type="button"
-								className="btn btn-ghost btn-sm rounded-xl"
-								disabled={isReloadingArtifacts}
-								onClick={() => {
-									void reloadArtifacts();
-								}}
-							>
-								<FiRefreshCw size={14} />
-								{isReloadingArtifacts ? 'Loading...' : 'Reload items'}
-							</button>
 						</div>
 
-						{artifactLoadError ? (
-							<ManagementResourceError
-								title="Repository items could not be loaded"
-								error={artifactLoadError}
-								isRetrying={isRefreshingArtifacts}
-								onRetry={reloadArtifactsOrThrow}
-							/>
-						) : null}
+						{artifacts
+							.filter(artifact => artifact.state === ArtifactState.Available && !artifact.enabled)
+							.map(artifact => {
+								const isText = artifact.kind === 'text';
+								const path = artifactPath(artifact);
 
-						{isReloadingArtifacts && artifacts === null ? (
-							<div className="text-base-content/60 text-sm">Loading repository items...</div>
-						) : null}
-
-						{artifacts?.map(artifact => {
-							const key = `artifact:${artifact.artifact.artifactID}`;
-							const path = artifactPath(artifact);
-							const state = artifact.state.toString();
-
-							return (
-								<div
-									key={artifact.artifact.artifactID}
-									className="border-base-content/10 bg-base-200/40 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
-								>
-									<div className="min-w-0 grow">
-										<div className="flex flex-wrap items-center gap-2">
-											<div className="truncate text-sm font-medium">{artifactTitle(artifact)}</div>
-											<StatusBadge>{artifactKindLabel(artifact.kind)}</StatusBadge>
-											<StatusBadge tone={artifact.enabled ? 'success' : 'warning'}>
-												{artifact.enabled ? 'Included' : 'Excluded'}
-											</StatusBadge>
-											{state !== 'available' ? <StatusBadge tone="warning">{state}</StatusBadge> : null}
-										</div>
-										{path ? <div className="text-base-content/60 mt-1 truncate font-mono text-xs">{path}</div> : null}
-									</div>
-
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										disabled={Boolean(busy)}
-										onClick={() => {
-											void setArtifactEnabled(artifact);
-										}}
+								return (
+									<div
+										key={artifact.artifact.artifactID}
+										className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
 									>
-										{busy === key ? 'Saving...' : artifact.enabled ? 'Exclude' : 'Include'}
-									</button>
-								</div>
-							);
-						})}
+										<div className="min-w-0 grow">
+											<div className="flex flex-wrap items-center gap-2">
+												<div className="truncate text-sm font-medium">
+													{isText ? 'Repository file group' : artifactTitle(artifact)}
+												</div>
+												<StatusBadge tone="warning">Excluded</StatusBadge>
+												<StatusBadge>{artifactKindLabel(artifact.kind)}</StatusBadge>
+											</div>
+											<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
+												{isText ? 'Source files selected by this Workspace' : path || 'Repository Workspace setup'}
+											</div>
+										</div>
 
-						{artifacts !== null && artifacts.length === 0 ? (
-							<ManagementEmptyState>No repository items were discovered.</ManagementEmptyState>
-						) : null}
-
-						{artifacts?.some(artifact => artifact.kind === 'mcp') ? (
-							<div className="text-base-content/60 text-xs">
-								MCP credentials and installation values remain in MCP management and are never exposed through Workspace
-								APIs.
-							</div>
-						) : null}
-					</div>
-				</details>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											disabled={Boolean(busy)}
+											onClick={() => {
+												void setArtifactEnabled(artifact, true);
+											}}
+										>
+											Include
+										</button>
+									</div>
+								);
+							})}
+					</section>
+				) : null}
 			</div>
 
 			<ModalActions className="justify-between">
@@ -610,7 +598,6 @@ export function WorkspaceDirectoryManagementModal(props: WorkspaceDirectoryManag
 				onClose={props.onClose}
 				onChanged={props.onChanged}
 				onRequestRemove={props.onRequestRemove}
-				onShowDefaultPolicy={props.onShowDefaultPolicy}
 			/>
 		</ModalDialog>
 	);

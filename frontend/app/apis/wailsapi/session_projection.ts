@@ -23,13 +23,9 @@ import {
 	requireWailsBoolean,
 	requireWailsFiniteNumber,
 	requireWailsString,
-	wailsArrayOrEmpty,
+	stringArrayFromWails,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
-
-function stringArrayFromWails(value: unknown, field: string): string[] {
-	return wailsArrayOrEmpty(value, field).map((item, index) => requireWailsString(item, `${field}[${index}]`));
-}
 
 export function sessionCommandReceiptFromWails(value: unknown, operation: string): SessionCommandReceipt {
 	const receipt = requiredObject<Record<string, unknown>>(value, operation);

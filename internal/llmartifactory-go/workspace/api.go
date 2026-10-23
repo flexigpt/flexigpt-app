@@ -213,21 +213,16 @@ func (a *Service) ListWorkspaceDirectoryArtifacts(
 	output := make(
 		[]WorkspaceArtifactView,
 		0,
-		len(directoryEntries)+1,
+		len(directoryEntries)+len(policyEntries),
 	)
 	for _, entry := range directoryEntries {
 		output = append(output, workspaceArtifactCatalogViewOf(entry))
 	}
 	for _, entry := range policyEntries {
-		if entry.Binding.Locator !=
-			a.policySource.Locator ||
-			entry.Binding.SubresourceLocator != "" ||
-			entry.Kind != workspaceDomain.WorkspaceArtifactKind ||
-			string(entry.LogicalName) != a.policy.ID {
+		if entry.Binding.Locator != a.policySource.Locator {
 			continue
 		}
 		output = append(output, workspaceArtifactCatalogViewOf(entry))
-		break
 	}
 
 	sort.Slice(output, func(left, right int) bool {
@@ -936,10 +931,7 @@ func (a *Service) isWorkspaceDirectoryCatalogArtifact(
 		return true
 	}
 	return value.Binding.SourceID == values.Policy.ID &&
-		value.Binding.Locator == a.policySource.Locator &&
-		value.Binding.SubresourceLocator == "" &&
-		value.Kind == workspaceDomain.WorkspaceArtifactKind &&
-		string(value.LogicalName) == a.policy.ID
+		value.Binding.Locator == a.policySource.Locator
 }
 
 func (a *Service) isWorkspaceManifestLocator(

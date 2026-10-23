@@ -10,7 +10,12 @@ import { WorkspaceInsertTarget, WorkspacePromptCompositionStatus } from '@/spec/
 
 import type { IWorkspaceRuntimeAPI } from '@/apis/interface';
 import { capabilityPlanFromWails } from '@/apis/wailsapi/list_item_projection';
-import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import {
+	enumFromWails,
+	requiredObject,
+	stringArrayFromWails,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	ComposeWorkspacePrompt,
 	LoadWorkspaceMCPServers,
@@ -35,6 +40,10 @@ function projectWorkspacePromptPlan(value: unknown, operation: string): Workspac
 			WorkspaceInsertTarget,
 			`${operation}.contributions.insert`
 		) as WorkspaceInsertTarget;
+		contribution.sourceLocators = stringArrayFromWails(
+			contribution.sourceLocators,
+			`${operation}.contributions.sourceLocators`
+		);
 	}
 	for (const decision of decisions) {
 		decision.status = enumFromWails(decision.status, WorkspacePromptCompositionStatus, `${operation}.decisions.status`);

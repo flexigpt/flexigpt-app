@@ -140,6 +140,10 @@ export function optionalEnumFromWails<T extends string>(
 	return enumFromWails(value, enumValues, field);
 }
 
+export function stringArrayFromWails(value: unknown, field: string): string[] {
+	return wailsArrayOrEmpty(value, field).map((item, index) => requireWailsString(item, `${field}[${index}]`));
+}
+
 export function wailsArrayOrEmpty<T = unknown>(value: unknown, field: string): T[] {
 	if (value === null || value === undefined) {
 		return [];

@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import { FiBookOpen, FiFileText, FiServer, FiZap } from 'react-icons/fi';
 
 import type {
+	WorkspaceArtifactView,
 	WorkspaceMCPServer,
 	WorkspacePromptContribution,
 	WorkspaceRuntimePlan,
 	WorkspaceSkill,
 } from '@/spec/workspace';
-import { artifactRefKey } from '@/spec/artifact';
+import { artifactRefKey, ArtifactState } from '@/spec/artifact';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
@@ -24,11 +25,13 @@ export interface WorkspaceContentSelectionState {
 interface WorkspaceContentsProps {
 	plan: WorkspaceRuntimePlan;
 	selection?: WorkspaceContentSelectionState;
+	artifactViews?: ReadonlyMap<string, WorkspaceArtifactView>;
 	disabled?: boolean;
 	onToggleContext?: (context: WorkspacePromptContribution, selected: boolean) => void;
 	onToggleSkill?: (skill: WorkspaceSkill, selected: boolean) => void;
 	onSetSkillActive?: (skill: WorkspaceSkill, active: boolean) => void;
 	onToggleMCP?: (server: WorkspaceMCPServer, selected: boolean) => void;
+	onSetArtifactEnabled?: (artifact: WorkspaceArtifactView, enabled: boolean) => void | Promise<void>;
 	renderMCPAction?: (server: WorkspaceMCPServer) => ReactNode;
 }
 
@@ -52,6 +55,20 @@ function normalizeWorkspacePath(locator: string | undefined): string {
 
 	const normalized = locator.replaceAll('\\', '/').replace(/^\.\/+/, '');
 	return normalized === '.' ? '' : normalized;
+}
+
+function isWorkspaceManifestPath(locator: string): boolean {
+	const segments = locator.split('/');
+	const filename = (segments.at(-1) ?? '').toLowerCase();
+
+	return (
+		filename === 'workspace.yaml' ||
+		filename === 'workspace.yml' ||
+		filename === 'workspace.json' ||
+		filename.endsWith('.workspace.yaml') ||
+		filename.endsWith('.workspace.yml') ||
+		filename.endsWith('.workspace.json')
+	);
 }
 
 export function workspacePathParts(locator: string | undefined): WorkspacePathParts {
@@ -87,7 +104,7 @@ function contributionSourceLocators(context: WorkspacePromptContribution): strin
 
 	if (unique.size === 0) {
 		const fallback = normalizeWorkspacePath(context.locator);
-		if (fallback) {
+		if (fallback && !isWorkspaceManifestPath(fallback)) {
 			unique.add(fallback);
 		}
 	}
@@ -97,7 +114,15 @@ function contributionSourceLocators(context: WorkspacePromptContribution): strin
 
 function includedContextCount(context: WorkspacePromptContribution): number {
 	const locators = contributionSourceLocators(context);
-	return locators.length || 1;
+	if (locators.length > 0) {
+		return locators.length;
+	}
+
+	return context.includedBytes > 0 ? 1 : 0;
+}
+
+function hasVisibleContext(context: WorkspacePromptContribution): boolean {
+	return contributionSourceLocators(context).length > 0 || context.includedBytes > 0;
 }
 
 export function getWorkspaceContentCounts(
@@ -117,6 +142,10 @@ export function getWorkspaceContentCounts(
 	let referenceFiles = 0;
 
 	for (const context of plan.prompt.contributions) {
+		if (!hasVisibleContext(context)) {
+			continue;
+		}
+
 		if (selection?.selectedContextIDs && !selection.selectedContextIDs.has(artifactRefKey(context.artifact))) {
 			continue;
 		}
@@ -236,9 +265,13 @@ function WorkspaceContentCard({
 
 					{children}
 				</div>
-
-				{actions ? <div className="shrink-0">{actions}</div> : null}
 			</div>
+
+			{actions ? (
+				<div className="border-base-content/10 mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+					{actions}
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -271,22 +304,47 @@ function WorkspaceContentSection({
 export function WorkspaceContents({
 	plan,
 	selection,
+	artifactViews,
 	disabled = false,
 	onToggleContext,
 	onToggleSkill,
 	onSetSkillActive,
 	onToggleMCP,
+	onSetArtifactEnabled,
 	renderMCPAction,
 }: WorkspaceContentsProps) {
+	const renderArtifactControl = (artifactRef: WorkspaceArtifactView['artifact'], label: string): ReactNode => {
+		const artifact = artifactViews?.get(artifactRefKey(artifactRef));
+		if (!artifact || !onSetArtifactEnabled) {
+			return undefined;
+		}
+
+		return (
+			<button
+				type="button"
+				className="btn btn-sm btn-ghost rounded-xl"
+				disabled={disabled || artifact.state !== ArtifactState.Available}
+				onClick={() => {
+					void onSetArtifactEnabled(artifact, !artifact.enabled);
+				}}
+			>
+				{artifact.enabled ? `Exclude ${label}` : `Include ${label}`}
+			</button>
+		);
+	};
+
 	const instructionContexts = plan.prompt.contributions.filter(
-		context => context.insert === WorkspaceInsertTarget.Instructions
+		context => context.insert === WorkspaceInsertTarget.Instructions && hasVisibleContext(context)
 	);
 	const referenceContexts = plan.prompt.contributions.filter(
-		context => context.insert !== WorkspaceInsertTarget.Instructions
+		context => context.insert !== WorkspaceInsertTarget.Instructions && hasVisibleContext(context)
 	);
 	const selectionMode = selection !== undefined;
 	const hasContents =
-		plan.prompt.contributions.length > 0 || plan.skills.skills.length > 0 || plan.mcpServers.servers.length > 0;
+		instructionContexts.length > 0 ||
+		referenceContexts.length > 0 ||
+		plan.skills.skills.length > 0 ||
+		plan.mcpServers.servers.length > 0;
 
 	if (!hasContents) {
 		return (
@@ -305,12 +363,14 @@ export function WorkspaceContents({
 				? instruction
 					? 'Repository instruction files'
 					: 'Repository reference files'
-				: context.name || (instruction ? 'Inline repository instructions' : 'Inline repository reference');
+				: instruction
+					? 'Repository instruction files'
+					: 'Repository reference files';
 		const description =
 			locators.length > 0
 				? `${locators.length} ${locators.length === 1 ? 'file is' : 'files are'} added together.`
 				: context.locator
-					? `Content from ${context.locator}.`
+					? 'No matching repository files are currently available.'
 					: 'Inline content supplied by this Workspace.';
 
 		return (
@@ -327,6 +387,7 @@ export function WorkspaceContents({
 				onSelectedChange={next => {
 					onToggleContext?.(context, next);
 				}}
+				actions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
 			>
 				<WorkspacePathList locators={locators} />
 				{context.truncated ? (
@@ -344,6 +405,22 @@ export function WorkspaceContents({
 		const selected = selection ? (instruction ? selection.selectedSkillIDs.has(key) : true) : true;
 		const active = selection?.activeSkillIDs?.has(key) ?? false;
 		const path = normalizeWorkspacePath(skill.locator);
+		const artifactControl = renderArtifactControl(skill.artifact, 'Skill');
+		const activeControl =
+			instruction && selected && onSetSkillActive ? (
+				<label className="flex items-center gap-2 text-xs">
+					<span>Active</span>
+					<input
+						type="checkbox"
+						className="toggle toggle-accent toggle-sm"
+						checked={active}
+						disabled={disabled}
+						onChange={event => {
+							onSetSkillActive(skill, event.currentTarget.checked);
+						}}
+					/>
+				</label>
+			) : undefined;
 
 		return (
 			<WorkspaceContentCard
@@ -365,19 +442,11 @@ export function WorkspaceContents({
 					onToggleSkill?.(skill, next);
 				}}
 				actions={
-					instruction && selected && onSetSkillActive ? (
-						<label className="flex items-center gap-2 text-xs">
-							<span>Active</span>
-							<input
-								type="checkbox"
-								className="toggle toggle-accent toggle-sm"
-								checked={active}
-								disabled={disabled}
-								onChange={event => {
-									onSetSkillActive(skill, event.currentTarget.checked);
-								}}
-							/>
-						</label>
+					artifactControl || activeControl ? (
+						<>
+							{artifactControl}
+							{activeControl}
+						</>
 					) : undefined
 				}
 			>
@@ -391,6 +460,7 @@ export function WorkspaceContents({
 		const selected = selection ? selection.selectedMCPIDs.has(key) : true;
 		const locator = normalizeWorkspacePath(server.locator);
 		const entry = server.subresourceLocator?.trim();
+		const artifactControl = renderArtifactControl(server.artifact, 'MCP server');
 
 		return (
 			<WorkspaceContentCard
@@ -412,7 +482,14 @@ export function WorkspaceContents({
 				onSelectedChange={next => {
 					onToggleMCP?.(server, next);
 				}}
-				actions={renderMCPAction?.(server)}
+				actions={
+					artifactControl || renderMCPAction?.(server) ? (
+						<>
+							{artifactControl}
+							{renderMCPAction?.(server)}
+						</>
+					) : undefined
+				}
 			>
 				<WorkspacePathList locators={locator ? [locator] : []} />
 			</WorkspaceContentCard>

@@ -20,7 +20,6 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
-import { WorkspaceDefaultPolicyModal } from '@/workspaces/workspace_default_policy_modal';
 import { WorkspaceDirectoryCard } from '@/workspaces/workspace_directory_card';
 import { WorkspaceDirectoryManagementModal } from '@/workspaces/workspace_directory_management_modal';
 import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
@@ -87,7 +86,6 @@ export default function WorkspaceDirectoryManagement() {
 
 	const [search, setSearch] = useState('');
 	const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-	const [isPolicyOpen, setIsPolicyOpen] = useState(false);
 	const [managedDirectoryKey, setManagedDirectoryKey] = useState<string | null>(null);
 	const [directoryToRemove, setDirectoryToRemove] = useState<WorkspaceDirectoryRemovalTarget | null>(null);
 	const [actionError, setActionError] = useState('');
@@ -339,19 +337,8 @@ export default function WorkspaceDirectoryManagement() {
 							expectedRevision: value.directorySource.revision,
 						});
 					}}
-					onShowDefaultPolicy={() => {
-						setManagedDirectoryKey(null);
-						setIsPolicyOpen(true);
-					}}
 				/>
 			) : null}
-
-			<WorkspaceDefaultPolicyModal
-				isOpen={isPolicyOpen}
-				onClose={() => {
-					setIsPolicyOpen(false);
-				}}
-			/>
 
 			<ModalConfirmDialog
 				isOpen={directoryToRemove !== null}
