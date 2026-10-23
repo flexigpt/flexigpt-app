@@ -102,8 +102,71 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
+  teams:
+    - locator: "team.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "team.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "team.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - pattern: "*.team.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.team.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.team.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
+  loops:
+    - locator: "loop.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "loop.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "loop.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - pattern: "*.loop.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.loop.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.loop.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
+  workflows:
+    - locator: "workflow.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "workflow.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "workflow.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - pattern: "*.workflow.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.workflow.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - pattern: "*.workflow.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
   agentMarkdown:
     - locator: "AGENT.md"
+      format: "markdown"
+      decoderID: "agent-markdown"
+    - pattern: "*.agent.md"
       format: "markdown"
       decoderID: "agent-markdown"
 
@@ -244,6 +307,24 @@ documentUses:
       - "plugins"
     defaultLocator: "plugin.yaml"
 
+  teamPackage:
+    documentSets:
+      - "teams"
+    defaultLocator: "team.yaml"
+    decoderID: "artifact-declaration-yaml"
+
+  loopPackage:
+    documentSets:
+      - "loops"
+    defaultLocator: "loop.yaml"
+    decoderID: "artifact-declaration-yaml"
+
+  workflowPackage:
+    documentSets:
+      - "workflows"
+    defaultLocator: "workflow.yaml"
+    decoderID: "artifact-declaration-yaml"
+
   managedPlugin:
     documentSets:
       - "plugins"
@@ -296,8 +377,6 @@ markdownRules:
   text:
     documentUses:
       - "workspaceMarkdown"
-    extensions:
-      - ".md"
     excludeDocumentUses:
       - "skillPackage"
     excludeRules:
@@ -344,40 +423,34 @@ discovery:
     root: "."
     recursive: true
     authoritative: true
-    includePatterns:
-      - "**/*.json"
-      - "**/*.yaml"
-      - "**/*.yml"
-      - "**/*.agent.md"
-      - "**/docs/**/*.md"
+    includePatterns: []
+    excludePatterns:
+      - ".git/**"
+      - "**/.git/**"
+      - ".hg/**"
+      - "**/.hg/**"
+      - ".svn/**"
+      - "**/.svn/**"
+      - "node_modules/**"
+      - "**/node_modules/**"
+      - "vendor/**"
+      - "**/vendor/**"
+      - ".venv/**"
+      - "**/.venv/**"
     documentSets:
-      - "plugins"
-      - "mcpConfigs"
-      - "agents"
-      - "skillPackages"
-      - "agentMarkdown"
       - "workspaceManifests"
-      - "workspaceMarkdown"
-      - "workspaceInstructions"
     decoderHints:
       - locator: "."
         recursive: true
         decoderIDs:
-          - "text-markdown"
-
-  selector:
-    root: "."
-    recursive: true
-    authoritative: true
-    includePatterns:
-      - "**/*.json"
-      - "**/*.yaml"
-      - "**/*.yml"
-    documentSets:
-      - "plugins"
-      - "mcpConfigs"
-      - "agents"
-      - "skillPackages"
+          - "agent.skill-markdown"
+          - "agent-markdown"
+    allowedDecoderIDs:
+      - "artifact-declaration-json"
+      - "artifact-declaration-yaml"
+      - "artifact.mcp-json"
+      - "agent.skill-markdown"
+      - "agent-markdown"
 
 discoveryUses:
   skill:
@@ -392,6 +465,38 @@ discoveryUses:
     profiles:
       - "workspace"
 
-  selector:
-    profiles:
-      - "selector"
+workspaceDiscovery:
+  bootstrapDiscoveryUse: "workspace"
+  selectorTypes:
+    skill:
+      documentUses:
+        - "skillPackage"
+    agent:
+      documentUses:
+        - "managedAgent"
+        - "agentMarkdown"
+    plugin:
+      documentUses:
+        - "plugin"
+    mcp:
+      documentUses:
+        - "mcpConfig"
+    "mcp.policy":
+      documentUses:
+        - "managedMCPPolicy"
+    model:
+      documentUses:
+        - "modelPackage"
+        - "modelProviderPackage"
+    tool:
+      documentUses:
+        - "toolPackage"
+    team:
+      documentUses:
+        - "teamPackage"
+    loop:
+      documentUses:
+        - "loopPackage"
+    workflow:
+      documentUses:
+        - "workflowPackage"

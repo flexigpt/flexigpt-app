@@ -444,18 +444,16 @@ func Tool() (toolAPI.Support, error) {
 }
 
 func Workspace() (workspaceAPI.Support, error) {
-	discovery, err := topology.DiscoverySpecForUse(
-		topology.DiscoveryUseWorkspace,
-	)
+	discovery, err := topology.WorkspaceBootstrapDiscoverySpec()
 	if err != nil {
 		return workspaceAPI.Support{}, err
 	}
-	selectorPatterns, err := topology.DiscoveryIncludePatternsForUse(
-		topology.DiscoveryUseSelector,
-	)
+
+	selectorPatterns, err := workspaceSelectorPatterns()
 	if err != nil {
 		return workspaceAPI.Support{}, err
 	}
+
 	manifestPatterns := topology.WorkspaceManifestPatterns()
 	skillDocuments, err := documents(topology.DocumentUseSkillPackage)
 	if err != nil {
@@ -473,16 +471,46 @@ func Workspace() (workspaceAPI.Support, error) {
 			Kind:        iofs.Kind,
 			DisplayName: "Workspace base policy source",
 		},
-		RootStorageKeyPrefix:    storeSpec.StorageKey("workspace-directory-root-"),
-		DirectoryDiscovery:      discovery,
-		ManifestPatterns:        append([]string(nil), manifestPatterns...),
-		SelectorIncludePatterns: append([]string(nil), selectorPatterns...),
-		SkillDocuments:          skillDocuments,
+		RootStorageKeyPrefix: storeSpec.StorageKey("workspace-directory-root-"),
+		DirectoryDiscovery:   discovery,
+		ManifestPatterns:     append([]string(nil), manifestPatterns...),
+		SelectorPatterns:     selectorPatterns,
+		SkillDocuments:       skillDocuments,
 	}
 	if err := value.Validate(); err != nil {
 		return workspaceAPI.Support{}, err
 	}
 	return value, nil
+}
+
+func workspaceSelectorPatterns() (
+	map[declaration.Type][]string,
+	error,
+) {
+	types := []declaration.Type{
+		declaration.TypeSkill,
+		declaration.TypeAgent,
+		declaration.TypePlugin,
+		declaration.TypeMCP,
+		declaration.TypeMCPPolicy,
+		declaration.TypeModel,
+		declaration.TypeTool,
+		declaration.TypeTeam,
+		declaration.TypeLoop,
+		declaration.TypeWorkflow,
+	}
+
+	output := make(map[declaration.Type][]string, len(types))
+	for _, declarationType := range types {
+		patterns, err := topology.WorkspaceSelectorPatterns(
+			string(declarationType),
+		)
+		if err != nil {
+			return nil, err
+		}
+		output[declarationType] = patterns
+	}
+	return output, nil
 }
 
 func Candidates(

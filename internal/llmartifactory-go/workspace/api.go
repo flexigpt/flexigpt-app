@@ -670,7 +670,7 @@ func (a *Service) listManifestIntent(
 		directoryID,
 		".",
 		a.config.Support.ManifestPatterns,
-		nil,
+		a.config.Support.directoryExcludePatterns(),
 		storeSpec.DefaultMaxEntries,
 		storeSpec.MaxScanBytes,
 	)

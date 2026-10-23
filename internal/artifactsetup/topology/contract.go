@@ -41,7 +41,6 @@ const (
 	DiscoveryUseSkill                                  = "skill"
 	DiscoveryUseMCP                                    = "mcp"
 	DiscoveryUseWorkspace                              = "workspace"
-	DiscoveryUseSelector                               = "selector"
 	MarkdownRuleAgent                                  = "agent"
 	MarkdownRuleText                                   = "text"
 	MarkdownRuleDefaultText                            = "defaultText"
@@ -99,16 +98,26 @@ type discoveryUseWire struct {
 	Profiles []string `json:"profiles"`
 }
 
+type workspaceSelectorDiscoveryWire struct {
+	DocumentUses []string `json:"documentUses"`
+}
+
+type workspaceDiscoveryWire struct {
+	BootstrapDiscoveryUse string                                    `json:"bootstrapDiscoveryUse"`
+	SelectorTypes         map[string]workspaceSelectorDiscoveryWire `json:"selectorTypes"`
+}
+
 type contractTopologyWire struct {
 	PackageVersions struct {
 		Unversioned storeSpec.LogicalVersion `json:"unversioned"`
 	} `json:"packageVersions"`
 
-	Documents     map[string][]documentAliasWire  `json:"documents"`
-	DocumentUses  map[string]documentUseWire      `json:"documentUses"`
-	MarkdownRules map[string]markdownRuleWire     `json:"markdownRules"`
-	Discovery     map[string]discoveryProfileWire `json:"discovery"`
-	DiscoveryUses map[string]discoveryUseWire     `json:"discoveryUses"`
+	Documents          map[string][]documentAliasWire  `json:"documents"`
+	DocumentUses       map[string]documentUseWire      `json:"documentUses"`
+	MarkdownRules      map[string]markdownRuleWire     `json:"markdownRules"`
+	Discovery          map[string]discoveryProfileWire `json:"discovery"`
+	DiscoveryUses      map[string]discoveryUseWire     `json:"discoveryUses"`
+	WorkspaceDiscovery workspaceDiscoveryWire          `json:"workspaceDiscovery"`
 }
 
 type documentAlias struct {
@@ -138,10 +147,43 @@ type contractTopology struct {
 	markdownRules             map[string]markdownRule
 	discoveryProfiles         map[string]sourceModel.DiscoverySpec
 	discoveryUses             map[string]sourceModel.DiscoverySpec
+	workspaceBootstrap        sourceModel.DiscoverySpec
+	workspaceSelectorPatterns map[string][]string
 	unversionedPackageVersion storeSpec.LogicalVersion
 }
 
 var configuredContractTopology = mustLoadContractTopology(contractTopologyYAML)
+
+func WorkspaceBootstrapDiscoverySpec() (sourceModel.DiscoverySpec, error) {
+	value := configuredContractTopology.workspaceBootstrap.Clone()
+	if err := value.Validate(); err != nil {
+		return sourceModel.DiscoverySpec{}, err
+	}
+	return value, nil
+}
+
+func WorkspaceSelectorPatterns(
+	declarationType string,
+) ([]string, error) {
+	if err := storeSpec.ValidateRequiredText(
+		"Workspace selector declaration type",
+		declarationType,
+		storeSpec.MaxKindBytes,
+	); err != nil {
+		return nil, err
+	}
+
+	patterns, found := configuredContractTopology.
+		workspaceSelectorPatterns[declarationType]
+	if !found {
+		return nil, fmt.Errorf(
+			"%w: Workspace discovery has no selector patterns for type %q",
+			storeSpec.ErrNotFound,
+			declarationType,
+		)
+	}
+	return append([]string(nil), patterns...), nil
+}
 
 func DocumentFiles(use string) ([]storeSpec.Locator, error) {
 	value, found := configuredContractTopology.documentUses[use]
@@ -671,18 +713,127 @@ func loadContractTopology(raw []byte) (contractTopology, error) {
 		return contractTopology{}, err
 	}
 
+	workspaceBootstrap, workspaceSelectorPatterns, err := parseWorkspaceDiscovery(
+		wire.WorkspaceDiscovery,
+		discoveryUses,
+		documentUses,
+	)
+	if err != nil {
+		return contractTopology{}, err
+	}
+
 	value := contractTopology{
 		documentSets:              documentSets,
 		documentUses:              documentUses,
 		markdownRules:             markdownRules,
 		discoveryProfiles:         discoveryProfiles,
 		discoveryUses:             discoveryUses,
+		workspaceBootstrap:        workspaceBootstrap,
+		workspaceSelectorPatterns: workspaceSelectorPatterns,
 		unversionedPackageVersion: wire.PackageVersions.Unversioned,
 	}
 	if err := validateRequiredContractBindings(value); err != nil {
 		return contractTopology{}, err
 	}
 	return value, nil
+}
+
+func parseWorkspaceDiscovery(
+	value workspaceDiscoveryWire,
+	discoveryUses map[string]sourceModel.DiscoverySpec,
+	documentUses map[string]documentUse,
+) (sourceModel.DiscoverySpec, map[string][]string, error) {
+	if err := storeSpec.ValidateIdentifier(
+		"Workspace bootstrap discovery use",
+		value.BootstrapDiscoveryUse,
+		storeSpec.MaxKindBytes,
+	); err != nil {
+		return sourceModel.DiscoverySpec{}, nil, err
+	}
+
+	bootstrap, found := discoveryUses[value.BootstrapDiscoveryUse]
+	if !found {
+		return sourceModel.DiscoverySpec{}, nil, fmt.Errorf(
+			"%w: Workspace bootstrap discovery use %q is unknown",
+			storeSpec.ErrInvalid,
+			value.BootstrapDiscoveryUse,
+		)
+	}
+	if len(value.SelectorTypes) == 0 {
+		return sourceModel.DiscoverySpec{}, nil, fmt.Errorf(
+			"%w: Workspace selector discovery declarations are required",
+			storeSpec.ErrInvalid,
+		)
+	}
+
+	output := make(map[string][]string, len(value.SelectorTypes))
+	for declarationType, selector := range value.SelectorTypes {
+		if err := storeSpec.ValidateRequiredText(
+			"Workspace selector declaration type",
+			declarationType,
+			storeSpec.MaxKindBytes,
+		); err != nil {
+			return sourceModel.DiscoverySpec{}, nil, err
+		}
+
+		patterns, err := patternsForWorkspaceDocumentUses(
+			declarationType,
+			selector.DocumentUses,
+			documentUses,
+		)
+		if err != nil {
+			return sourceModel.DiscoverySpec{}, nil, err
+		}
+		output[declarationType] = patterns
+	}
+	return bootstrap.Clone(), output, nil
+}
+
+func patternsForWorkspaceDocumentUses(
+	declarationType string,
+	uses []string,
+	documentUses map[string]documentUse,
+) ([]string, error) {
+	if len(uses) == 0 {
+		return nil, fmt.Errorf(
+			"%w: Workspace selector type %q has no document uses",
+			storeSpec.ErrInvalid,
+			declarationType,
+		)
+	}
+
+	seenUses := make(map[string]struct{}, len(uses))
+	seenPatterns := make(map[string]struct{})
+	output := make([]string, 0)
+	for _, useName := range uses {
+		if _, duplicate := seenUses[useName]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: Workspace selector type %q repeats document use %q",
+				storeSpec.ErrInvalid,
+				declarationType,
+				useName,
+			)
+		}
+		seenUses[useName] = struct{}{}
+
+		use, found := documentUses[useName]
+		if !found {
+			return nil, fmt.Errorf(
+				"%w: Workspace selector type %q references unknown document use %q",
+				storeSpec.ErrInvalid,
+				declarationType,
+				useName,
+			)
+		}
+		for _, pattern := range documentPatterns(use.aliases) {
+			if _, duplicate := seenPatterns[pattern]; duplicate {
+				continue
+			}
+			seenPatterns[pattern] = struct{}{}
+			output = append(output, pattern)
+		}
+	}
+	return output, nil
 }
 
 func parseDocumentSets(
@@ -1405,7 +1556,6 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DiscoveryUseSkill,
 		DiscoveryUseMCP,
 		DiscoveryUseWorkspace,
-		DiscoveryUseSelector,
 	} {
 		if _, found := value.discoveryUses[name]; !found {
 			return fmt.Errorf(
@@ -1414,6 +1564,34 @@ func validateRequiredContractBindings(value contractTopology) error {
 				name,
 			)
 		}
+	}
+
+	for _, declarationType := range []string{
+		"skill",
+		"agent",
+		"plugin",
+		"mcp",
+		"mcp.policy",
+		"model",
+		"tool",
+		"team",
+		"loop",
+		"workflow",
+	} {
+		if _, found := value.workspaceSelectorPatterns[declarationType]; !found {
+			return fmt.Errorf(
+				"%w: workspace selector discovery for type %q is required",
+				storeSpec.ErrInvalid,
+				declarationType,
+			)
+		}
+	}
+
+	if err := value.workspaceBootstrap.Validate(); err != nil {
+		return fmt.Errorf(
+			"workspace bootstrap discovery: %w",
+			err,
+		)
 	}
 	return nil
 }

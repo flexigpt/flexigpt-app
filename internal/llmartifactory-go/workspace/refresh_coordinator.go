@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"path"
 
@@ -38,6 +39,18 @@ func (c *workspaceRefreshCoordinator) RequirementsForSelector(
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
+
+	patterns, found := c.support.selectorPatternsFor(
+		request.Selector.Type,
+	)
+	if !found {
+		return nil, fmt.Errorf(
+			"%w: Workspace selector type %q has no discovery contract",
+			storeSpec.ErrUnsupported,
+			request.Selector.Type,
+		)
+	}
+
 	current, err := c.sources.Get(
 		ctx,
 		request.Parent.RootID,
@@ -59,10 +72,14 @@ func (c *workspaceRefreshCoordinator) RequirementsForSelector(
 		return nil, err
 	}
 
-	include := append([]string(nil), request.Selector.Include...)
-	if len(include) == 0 {
-		include = append([]string(nil), c.support.SelectorIncludePatterns...)
-	}
+	// Selector.Include remains a composition-level filter. It cannot widen
+	// source admission beyond the declaration-type patterns selected by the
+	// application contract.
+	exclude := appendUniqueDiscoveryPatterns(
+		c.support.directoryExcludePatterns(),
+		request.Selector.Exclude,
+	)
+
 	return []corerefresh.Requirement{{
 		RootID:   current.RootID,
 		SourceID: current.ID,
@@ -70,8 +87,8 @@ func (c *workspaceRefreshCoordinator) RequirementsForSelector(
 			DirectoryRoots: []sourceModel.DirectoryRoot{{
 				Root:            base,
 				Recursive:       true,
-				IncludePatterns: include,
-				ExcludePatterns: append([]string(nil), request.Selector.Exclude...),
+				IncludePatterns: patterns,
+				ExcludePatterns: exclude,
 			}},
 			RequireAuthoritative: true,
 		},
@@ -87,6 +104,13 @@ func (c *workspaceRefreshCoordinator) RequirementsForLocatedMember(
 	}
 	header := request.Member.Header()
 	if header.Locator == nil {
+		return nil, nil
+	}
+
+	// A contained source-backed Text declaration reads raw source content
+	// through Text materialization. It must not trigger declaration discovery
+	// for every file below its locator.
+	if header.Type == declaration.TypeText {
 		return nil, nil
 	}
 
@@ -193,6 +217,23 @@ func (c *workspaceRefreshCoordinator) locatedRefreshCandidates(
 		}
 		seen[candidate] = struct{}{}
 		output = append(output, candidate)
+	}
+	return output
+}
+
+func appendUniqueDiscoveryPatterns(
+	groups ...[]string,
+) []string {
+	seen := make(map[string]struct{})
+	output := make([]string, 0)
+	for _, group := range groups {
+		for _, pattern := range group {
+			if _, duplicate := seen[pattern]; duplicate {
+				continue
+			}
+			seen[pattern] = struct{}{}
+			output = append(output, pattern)
+		}
 	}
 	return output
 }
