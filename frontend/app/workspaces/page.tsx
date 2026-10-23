@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FiEye, FiFolderPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
+import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
 import type { WorkspaceDirectoryListItem, WorkspaceDirectoryView } from '@/spec/workspace';
 import { workspaceDirectoryListItemFromView } from '@/spec/workspace';
@@ -16,14 +16,13 @@ import { Loader } from '@/components/loader';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
-import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
-import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
 import { WorkspaceDefaultPolicyModal } from '@/workspaces/workspace_default_policy_modal';
 import { WorkspaceDirectoryCard } from '@/workspaces/workspace_directory_card';
+import { WorkspaceDirectoryManagementModal } from '@/workspaces/workspace_directory_management_modal';
 import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
 
 const DIRECTORY_PAGE_SIZE = 100;
@@ -37,50 +36,6 @@ interface WorkspaceDirectoryRemovalTarget {
 	ref: WorkspaceDirectoryListItem['ref'];
 	displayName: string;
 	expectedRevision: number;
-}
-
-function WorkspaceDirectorySummaryCard({
-	directory,
-	isLoading,
-	error,
-	onManage,
-	onRequestRemove,
-}: {
-	directory: WorkspaceDirectoryListItem;
-	isLoading: boolean;
-	error?: string;
-	onManage: () => void;
-	onRequestRemove: () => void;
-}) {
-	return (
-		<ManagementPluginCard
-			title={directory.rootDisplayName}
-			identity={<span className="font-mono text-xs">{directory.rootID}</span>}
-			description="Repository-oriented Workspace directory"
-			status={
-				<>
-					<StatusBadge tone={directory.enabled ? 'success' : 'warning'}>
-						{directory.enabled ? 'Enabled' : 'Disabled'}
-					</StatusBadge>
-					<StatusBadge>Summary loaded</StatusBadge>
-				</>
-			}
-			actions={
-				<>
-					<button type="button" className="btn btn-sm btn-ghost rounded-xl" disabled={isLoading} onClick={onManage}>
-						<FiEye size={15} />
-						<span>{isLoading ? 'Loading...' : 'Manage'}</span>
-					</button>
-					<button type="button" className="btn btn-sm btn-ghost text-error rounded-xl" onClick={onRequestRemove}>
-						<FiTrash2 size={15} />
-						<span>Remove</span>
-					</button>
-				</>
-			}
-		>
-			{error ? <div className="alert alert-warning mt-3 rounded-2xl text-sm">{error}</div> : null}
-		</ManagementPluginCard>
-	);
 }
 
 async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<WorkspaceDirectoryListItem[]> {
@@ -133,6 +88,7 @@ export default function WorkspaceDirectoryManagement() {
 	const [search, setSearch] = useState('');
 	const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 	const [isPolicyOpen, setIsPolicyOpen] = useState(false);
+	const [managedDirectoryKey, setManagedDirectoryKey] = useState<string | null>(null);
 	const [directoryToRemove, setDirectoryToRemove] = useState<WorkspaceDirectoryRemovalTarget | null>(null);
 	const [actionError, setActionError] = useState('');
 	const [detailsByDirectoryKey, setDetailsByDirectoryKey] = useState<Record<string, WorkspaceDirectoryView>>({});
@@ -145,14 +101,10 @@ export default function WorkspaceDirectoryManagement() {
 			return directories;
 		}
 
-		return directories.filter(directory =>
-			[directory.rootDisplayName, directory.rootID, directory.directorySourceID, directory.policyID]
-				.filter(Boolean)
-				.join('\n')
-				.toLowerCase()
-				.includes(query)
-		);
+		return directories.filter(directory => directory.rootDisplayName.toLowerCase().includes(query));
 	}, [directories, search]);
+
+	const managedDirectory = managedDirectoryKey ? detailsByDirectoryKey[managedDirectoryKey] : undefined;
 
 	const replaceDirectory = useCallback(
 		(next: WorkspaceDirectoryView) => {
@@ -177,7 +129,11 @@ export default function WorkspaceDirectoryManagement() {
 	const loadDirectoryDetails = useCallback(
 		async (directory: WorkspaceDirectoryListItem) => {
 			const key = directoryKey(directory);
-			if (detailsByDirectoryKey[key] || loadingDirectoryKeys.has(key)) {
+			if (detailsByDirectoryKey[key]) {
+				setManagedDirectoryKey(key);
+				return;
+			}
+			if (loadingDirectoryKeys.has(key)) {
 				return;
 			}
 
@@ -191,6 +147,7 @@ export default function WorkspaceDirectoryManagement() {
 			try {
 				const detail = await workspaceManagementAPI.getWorkspaceDirectory(directory.ref);
 				replaceDirectory(detail);
+				setManagedDirectoryKey(key);
 			} catch (cause) {
 				setDirectoryErrors(previous => ({
 					...previous,
@@ -233,6 +190,8 @@ export default function WorkspaceDirectoryManagement() {
 		try {
 			await workspaceManagementAPI.removeWorkspaceDirectory(directoryToRemove.ref, directoryToRemove.expectedRevision);
 			setDirectories(previous => previous.filter(value => directoryKey(value) !== directoryToRemove.ref.rootID));
+			setDetailsByDirectoryKey(previous => omitManyKeys(previous, [directoryToRemove.ref.rootID]));
+			setManagedDirectoryKey(previous => (previous === directoryToRemove.ref.rootID ? null : previous));
 			setDirectoryToRemove(null);
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Workspace directory removal failed.');
@@ -248,7 +207,7 @@ export default function WorkspaceDirectoryManagement() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Workspaces"
-					description="Select repository directories and manage the effective Workspace declarations discovered in each one."
+					description="Add repositories and review the exact files, Skills, and integrations each Workspace contributes."
 					width="wide"
 					actions={
 						<button
@@ -275,15 +234,12 @@ export default function WorkspaceDirectoryManagement() {
 					) : null}
 
 					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
-						<div className="font-semibold">How Workspace declarations work</div>
+						<div className="font-semibold">How repository Workspaces work</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
-							<li>A directory without a Workspace manifest receives the compiled default policy.</li>
-							<li>
-								Add `workspace.yaml`, `workspace.yml`, `workspace.json`, or `*.workspace.*` to replace the default
-								policy with repository declarations.
-							</li>
-							<li>Multiple valid Workspace manifests become peer Workspaces that conversations can select.</li>
-							<li>Invalid Workspace manifests intentionally block default-policy fallback until fixed.</li>
+							<li>Automatic setup detects instruction files such as `AGENTS.md` and `CLAUDE.md`.</li>
+							<li>README and documentation files are shown separately from model instructions.</li>
+							<li>Repository Skills and MCP servers are listed with their relative source paths.</li>
+							<li>Add `workspace.yaml` only when the repository needs a customized setup.</li>
 						</ul>
 					</div>
 
@@ -301,7 +257,7 @@ export default function WorkspaceDirectoryManagement() {
 								onChange={event => {
 									setSearch(event.currentTarget.value);
 								}}
-								placeholder="Search directory roots and Workspace declarations..."
+								placeholder="Search repositories..."
 							/>
 							{search ? (
 								<button
@@ -325,26 +281,9 @@ export default function WorkspaceDirectoryManagement() {
 					<div className="space-y-4 pb-8">
 						{visibleDirectories.map(directory => {
 							const key = directoryKey(directory);
-							const detail = detailsByDirectoryKey[key];
 
-							return detail ? (
+							return (
 								<WorkspaceDirectoryCard
-									key={directory.ref.rootID}
-									directory={detail}
-									onChanged={replaceDirectory}
-									onRequestRemove={value => {
-										setDirectoryToRemove({
-											ref: value.ref,
-											displayName: value.root.displayName,
-											expectedRevision: value.directorySource.revision,
-										});
-									}}
-									onShowDefaultPolicy={() => {
-										setIsPolicyOpen(true);
-									}}
-								/>
-							) : (
-								<WorkspaceDirectorySummaryCard
 									key={directory.ref.rootID}
 									directory={directory}
 									isLoading={loadingDirectoryKeys.has(key)}
@@ -383,6 +322,29 @@ export default function WorkspaceDirectoryManagement() {
 				}}
 				onRegister={registerDirectory}
 			/>
+
+			{managedDirectory ? (
+				<WorkspaceDirectoryManagementModal
+					isOpen
+					directory={managedDirectory}
+					onClose={() => {
+						setManagedDirectoryKey(null);
+					}}
+					onChanged={replaceDirectory}
+					onRequestRemove={value => {
+						setManagedDirectoryKey(null);
+						setDirectoryToRemove({
+							ref: value.ref,
+							displayName: value.root.displayName,
+							expectedRevision: value.directorySource.revision,
+						});
+					}}
+					onShowDefaultPolicy={() => {
+						setManagedDirectoryKey(null);
+						setIsPolicyOpen(true);
+					}}
+				/>
+			) : null}
 
 			<WorkspaceDefaultPolicyModal
 				isOpen={isPolicyOpen}

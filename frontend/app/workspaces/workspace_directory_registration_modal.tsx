@@ -21,7 +21,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 	onClose,
 	onRegister,
 	title = 'Add Workspace Directory',
-	description = 'Choose one repository directory. FlexiGPT discovers the effective Workspaces available there.',
+	description = 'Choose a repository. FlexiGPT finds its instruction files, documentation, Skills, MCP servers, and optional Workspace setup.',
 }: Omit<WorkspaceDirectoryRegistrationModalProps, 'isOpen'>) {
 	const [path, setPath] = useState('');
 	const [error, setError] = useState('');
@@ -80,7 +80,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 					label="Repository"
 					htmlFor="workspace-directory-path"
 					required
-					hint="The directory path remains private to the backend Source configuration."
+					hint="Only repository-relative file paths are shown in Workspace views."
 				>
 					<div className="flex flex-col gap-2 sm:flex-row">
 						<input

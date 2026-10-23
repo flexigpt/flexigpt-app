@@ -110,6 +110,8 @@ export interface WorkspaceMCPServer {
     "displayName"?: string;
     "builtIn": boolean;
     "version": cryptoutil$0.Digest;
+    "locator"?: spec$0.Locator;
+    "subresourceLocator"?: spec$0.SubresourceLocator;
 }
 
 export interface WorkspaceMCPServerLoadPlan {
@@ -136,6 +138,7 @@ export interface WorkspacePromptContribution {
     "insert": declaration$0.InsertTarget;
     "mediaType"?: string;
     "locator"?: spec$0.Locator;
+    "sourceLocators"?: spec$0.Locator[] | null;
     "originalBytes": number;
     "includedBytes": number;
     "truncated": boolean;
@@ -160,8 +163,9 @@ export interface WorkspacePromptPlan {
 
 /**
  * WorkspaceRuntimePlan contains consumer-safe runtime planning output.
- * Runtime-only paths, source bytes, MCP installation state, secret
- * references, and resolver graphs are deliberately excluded.
+ * Repository-relative source locators may be exposed for user-facing
+ * presentation. Native paths, source bytes, MCP installation state, secret
+ * references, and resolver graphs remain excluded.
  */
 export interface WorkspaceRuntimePlan {
     "workspace": domain$0.WorkspaceView;

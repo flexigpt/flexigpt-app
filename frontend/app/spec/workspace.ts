@@ -152,6 +152,7 @@ export interface WorkspacePromptContribution {
 	insert: WorkspaceInsertTarget;
 	mediaType?: string;
 	locator?: ArtifactLocator;
+	sourceLocators?: ArtifactLocator[];
 	originalBytes: number;
 	includedBytes: number;
 	truncated: boolean;
@@ -198,6 +199,8 @@ export interface WorkspaceMCPServer {
 	displayName?: string;
 	builtIn: boolean;
 	version: ArtifactDigest;
+	locator?: ArtifactLocator;
+	subresourceLocator?: ArtifactLocator;
 }
 
 export interface WorkspaceMCPServerLoadPlan {

@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiSettings, FiZap } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiRefreshCw, FiSettings, FiX } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
-import type { WorkspaceMCPServer, WorkspaceRuntimePlan } from '@/spec/workspace';
+import type {
+	WorkspaceConversationResourceSelectionRef,
+	WorkspaceMCPServer,
+	WorkspaceRuntimePlan,
+} from '@/spec/workspace';
 import { artifactRefKey } from '@/spec/artifact';
-import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
-
-import { skillRefKey } from '@/apis/skill_management';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -17,6 +18,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
+import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceMCPSetupModal } from '@/workspaces/workspace_mcp_setup_modal';
 
 interface WorkspaceSelectionModalProps {
@@ -34,6 +36,13 @@ interface WorkspaceMCPSetupTarget {
 	runtimeLoaded: boolean;
 }
 
+interface MissingSelection {
+	key: string;
+	type: string;
+	ref: WorkspaceConversationResourceSelectionRef;
+	remove: () => void | Promise<void>;
+}
+
 function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSetupTarget[] {
 	if (!plan) {
 		return [];
@@ -49,15 +58,15 @@ function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSe
 			continue;
 		}
 
-		const key = artifactRefKey(occurrence.target?.artifact);
+		const key = artifactRefKey(occurrence.target.artifact);
 		if (targets.has(key)) {
 			continue;
 		}
 
 		const loaded = loadedByArtifact.get(key);
 		targets.set(key, {
-			artifact: occurrence.target?.artifact,
-			displayName: loaded?.displayName || loaded?.name || occurrence.name || occurrence.target?.artifact.artifactID,
+			artifact: occurrence.target.artifact,
+			displayName: loaded?.displayName || loaded?.name || occurrence.name || occurrence.target.artifact.artifactID,
 			status: occurrence.status,
 			runtimeLoaded: loaded !== undefined,
 		});
@@ -70,6 +79,34 @@ function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSe
 	);
 }
 
+function capabilityTypeLabel(type: string): string {
+	switch (type) {
+		case 'text':
+			return 'Repository file';
+		case 'skill':
+			return 'Skill';
+		case 'mcp':
+			return 'MCP server';
+		case 'agent':
+			return 'Agent';
+		case 'model':
+			return 'Model';
+		case 'tool':
+			return 'Tool';
+		default:
+			return type;
+	}
+}
+
+function missingSelectionLabel(ref: WorkspaceConversationResourceSelectionRef): string {
+	if (ref.name) {
+		return ref.name;
+	}
+
+	const path = workspacePathParts(ref.locator);
+	return path.name || 'Previously selected item';
+}
+
 function WorkspaceDirectorySelectionModalContent({
 	state,
 	activeSkillRefs,
@@ -77,25 +114,70 @@ function WorkspaceDirectorySelectionModalContent({
 }: Omit<WorkspaceSelectionModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose } = useModalDialogController();
 	const [setupTarget, setSetupTarget] = useState<WorkspaceMCPSetupTarget | null>(null);
+	const [actionError, setActionError] = useState('');
 
-	const activeSkillKeys = new Set(activeSkillRefs.map(value => skillRefKey(value)));
+	const activeSkillIDs = useMemo(() => new Set(activeSkillRefs.map(value => artifactRefKey(value))), [activeSkillRefs]);
 	const workspaceName =
-		state.workspace?.workspace.workspace.artifact.displayName ??
-		state.selection?.displayName ??
+		state.workspace?.workspace.workspace.artifact.displayName ||
+		state.workspace?.workspace.workspace.artifact.logicalName ||
+		state.selection?.displayName ||
 		'Unavailable Workspace';
-	const selectedMCPIDs = state.selectedMCPIDs;
 	const mcpTargets = useMemo(() => mcpSetupTargets(state.plan), [state.plan]);
+	const mcpTargetsByArtifact = useMemo(
+		() => new Map(mcpTargets.map(target => [artifactRefKey(target.artifact), target])),
+		[mcpTargets]
+	);
+	const unloadedMCPTargets = mcpTargets.filter(target => !target.runtimeLoaded);
+
+	const missingSelections: MissingSelection[] = [
+		...state.missingContextRefs.map(ref => ({
+			key: `context:${artifactRefKey(ref.artifact)}`,
+			type: 'Repository file',
+			ref,
+			remove: () => {
+				state.removeContextRef(ref.artifact);
+			},
+		})),
+		...state.missingSkillRefs.map(ref => ({
+			key: `skill:${artifactRefKey(ref.artifact)}`,
+			type: 'Skill',
+			ref,
+			remove: () => state.removeSkillRef(ref.artifact),
+		})),
+		...state.missingMCPRefs.map(ref => ({
+			key: `mcp:${artifactRefKey(ref.artifact)}`,
+			type: 'MCP server',
+			ref,
+			remove: () => {
+				state.removeMCPRef(ref.artifact);
+			},
+		})),
+	];
+
+	const runAsyncAction = (action: () => Promise<void>, fallback: string) => {
+		setActionError('');
+		void action().catch((error: unknown) => {
+			setActionError(error instanceof Error ? error.message : fallback);
+		});
+	};
 
 	return (
 		<>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 flex max-h-[88vh] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
-					title="Workspace Conversation Selection"
-					description={`Choose Context, instruction Skills, and MCP setup for ${workspaceName}. These choices affect future turns only.`}
+					title="Workspace contents"
+					description={`Choose what ${workspaceName} adds to this conversation. Repository-relative paths are shown instead of internal declaration names.`}
 					onClose={requestClose}
 				/>
 
-				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+					{actionError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{actionError}</span>
+						</div>
+					) : null}
+
 					{state.selectionError ? (
 						<div className="alert alert-warning rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
@@ -103,222 +185,178 @@ function WorkspaceDirectorySelectionModalContent({
 						</div>
 					) : null}
 
-					{state.capabilityIssues.length > 0 ? (
-						<div className="alert alert-warning rounded-2xl text-sm">
+					{state.changedCount > 0 ? (
+						<div className="alert alert-info rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
 							<span>
-								Some required Workspace declarations are unavailable or ambiguous. Available Context, Skills, and MCP
-								setup remain usable.
+								{state.changedCount} saved item{state.changedCount === 1 ? ' has' : 's have'} changed since this
+								conversation selected them. Use Current Contents to accept the latest versions.
 							</span>
 						</div>
 					) : null}
 
-					<ModalSection
-						title="Context"
-						description="Selected Text contributions are composed by the backend on every send."
-					>
-						<div className="space-y-2">
-							{state.contexts.map(context => {
-								const selected = state.selectedContextIDs.has(artifactRefKey(context.artifact));
-
-								return (
-									<label
-										key={artifactRefKey(context.artifact)}
-										className={`border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3 ${
-											selected ? 'border-secondary/50 bg-secondary/10' : ''
-										}`}
-									>
-										<input
-											type="checkbox"
-											className="checkbox checkbox-sm mt-0.5"
-											checked={selected}
-											disabled={isInputLocked}
-											onChange={event => {
-												state.toggleContext(context, event.currentTarget.checked);
-											}}
-										/>
-										<FiFileText size={15} className="mt-0.5 shrink-0" />
-										<span className="min-w-0 flex-1">
-											<span className="block truncate text-sm font-medium">{context.name}</span>
-											<span className="text-base-content/60 block truncate font-mono text-xs">
-												{context.locator || '(inline Text)'}
-											</span>
-										</span>
-										<span className="badge badge-ghost badge-xs">{context.insert}</span>
-									</label>
+					{state.plan ? (
+						<WorkspaceContents
+							plan={state.plan}
+							selection={{
+								selectedContextIDs: state.selectedContextIDs,
+								selectedSkillIDs: state.selectedSkillIDs,
+								selectedMCPIDs: state.selectedMCPIDs,
+								activeSkillIDs,
+							}}
+							disabled={isInputLocked}
+							onToggleContext={(context, selected) => {
+								state.toggleContext(context, selected);
+							}}
+							onToggleSkill={(skill, selected) => {
+								runAsyncAction(() => state.toggleSkill(skill, selected), 'The Skill selection could not be changed.');
+							}}
+							onSetSkillActive={(skill, active) => {
+								runAsyncAction(
+									() => state.setSkillActive(skill, active),
+									'The active Skill state could not be changed.'
 								);
-							})}
-
-							{state.contexts.length === 0 ? (
-								<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
-									No materializable Workspace Context contributions were found.
-								</div>
-							) : null}
-						</div>
-					</ModalSection>
-
-					<ModalSection
-						title="Workspace Skills"
-						description="Instruction Skills can enter the normal conversation Skill session. User-message Skills remain ordinary runtime capabilities."
-					>
-						<div className="space-y-2">
-							{state.skills.map(skill => {
-								const instruction = skill.insert === WorkspaceInsertTarget.Instructions;
-								const selected = state.selectedSkillIDs.has(artifactRefKey(skill.artifact));
-								const active = activeSkillKeys.has(skillRefKey(skill.artifact as SkillRef));
+							}}
+							onToggleMCP={(server, selected) => {
+								state.toggleMCP(server, selected);
+							}}
+							renderMCPAction={server => {
+								const target = mcpTargetsByArtifact.get(artifactRefKey(server.artifact));
+								if (!target) {
+									return null;
+								}
 
 								return (
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										disabled={isInputLocked || target.status !== 'available'}
+										onClick={() => {
+											setSetupTarget(target);
+										}}
+									>
+										<FiSettings size={14} />
+										Configure
+									</button>
+								);
+							}}
+						/>
+					) : (
+						<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
+							Workspace contents are not currently available.
+						</div>
+					)}
+
+					{unloadedMCPTargets.length > 0 ? (
+						<ModalSection
+							title="MCP servers needing setup"
+							description="These integrations are referenced by the Workspace but are not currently loaded."
+						>
+							<div className="space-y-2">
+								{unloadedMCPTargets.map(target => (
 									<div
-										key={artifactRefKey(skill.artifact)}
-										className={`border-base-content/10 bg-base-100 rounded-2xl border p-3 ${
-											selected ? 'border-secondary/50 bg-secondary/10' : ''
-										}`}
+										key={artifactRefKey(target.artifact)}
+										className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
 									>
-										<div className="flex items-start gap-3">
-											{instruction ? (
-												<input
-													type="checkbox"
-													className="checkbox checkbox-sm mt-0.5"
-													checked={selected}
-													disabled={isInputLocked}
-													onChange={event => {
-														void state.toggleSkill(skill, event.currentTarget.checked);
-													}}
-												/>
-											) : (
-												<FiZap size={15} className="mt-0.5 shrink-0" />
-											)}
+										<div className="min-w-0 grow">
+											<div className="truncate text-sm font-medium">{target.displayName}</div>
+											<div className="text-base-content/60 mt-1 text-xs">
+												Configure this MCP server to make it available to the Workspace.
+											</div>
+										</div>
 
-											<span className="min-w-0 flex-1">
-												<span className="block truncate text-sm font-medium">{skill.displayName || skill.name}</span>
-												{skill.locator ? (
-													<span className="text-base-content/60 block truncate text-xs">{skill.locator}</span>
-												) : null}
+										<div className="flex items-center gap-2">
+											<span
+												className={`badge badge-xs ${target.status === 'available' ? 'badge-warning' : 'badge-error'}`}
+											>
+												{target.status}
 											</span>
-
-											<span className="badge badge-ghost badge-xs">{skill.insert || 'unspecified'}</span>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												disabled={isInputLocked || target.status !== 'available'}
+												onClick={() => {
+													setSetupTarget(target);
+												}}
+											>
+												<FiSettings size={14} />
+												Configure
+											</button>
 										</div>
-
-										{instruction && selected ? (
-											<label className="mt-3 flex justify-end gap-2 text-xs">
-												<span>Active</span>
-												<input
-													type="checkbox"
-													className="toggle toggle-accent toggle-sm"
-													checked={active}
-													disabled={isInputLocked}
-													onChange={event => {
-														void state.setSkillActive(skill, event.currentTarget.checked);
-													}}
-												/>
-											</label>
-										) : null}
 									</div>
-								);
-							})}
+								))}
+							</div>
+						</ModalSection>
+					) : null}
 
-							{state.skills.length === 0 ? (
-								<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
-									No Workspace Skills were loaded.
-								</div>
-							) : null}
-						</div>
-					</ModalSection>
+					{missingSelections.length > 0 ? (
+						<ModalSection
+							title="Saved items no longer available"
+							description="Remove unavailable saved items or refresh the Workspace before sending."
+						>
+							<div className="space-y-2">
+								{missingSelections.map(item => {
+									const path = workspacePathParts(item.ref.locator);
 
-					<ModalSection
-						title="Discovered MCP Servers"
-						description="MCP declarations are resolved by the Workspace. Setup values and secrets remain in MCP management storage and are never persisted in Workspace selection data."
-					>
-						<div className="space-y-2">
-							{(state.plan?.mcpServers.servers ?? []).map(server => {
-								const selected = selectedMCPIDs.has(artifactRefKey(server.artifact));
+									return (
+										<div
+											key={item.key}
+											className="border-warning/40 bg-warning/10 flex items-center gap-3 rounded-2xl border p-3"
+										>
+											<div className="min-w-0 grow">
+												<div className="flex flex-wrap items-center gap-2">
+													<div className="truncate text-sm font-medium">{missingSelectionLabel(item.ref)}</div>
+													<span className="badge badge-warning badge-xs">{item.type}</span>
+												</div>
+												{path.path ? (
+													<div className="text-base-content/60 mt-1 truncate font-mono text-xs">{path.path}</div>
+												) : null}
+											</div>
 
-								return (
-									<label
-										key={`select:${artifactRefKey(server.artifact)}`}
-										className={`border-base-content/10 bg-base-100 flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ${
-											selected ? 'border-secondary/50 bg-secondary/10' : ''
-										}`}
-									>
-										<input
-											type="checkbox"
-											className="checkbox checkbox-sm"
-											checked={selected}
-											disabled={isInputLocked}
-											onChange={event => {
-												state.toggleMCP(server, event.currentTarget.checked);
-											}}
-										/>
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-sm font-medium">{server.displayName || server.name}</div>
-											<div className="text-base-content/60 text-xs">Workspace MCP server</div>
+											<button
+												type="button"
+												className="btn btn-ghost btn-sm text-error rounded-xl"
+												disabled={isInputLocked}
+												onClick={() => {
+													setActionError('');
+													void (async () => {
+														try {
+															await item.remove();
+														} catch (error) {
+															setActionError(
+																error instanceof Error ? error.message : 'The unavailable item could not be removed.'
+															);
+														}
+													})();
+												}}
+											>
+												<FiX size={14} />
+												Remove
+											</button>
 										</div>
-										<span className="badge badge-secondary badge-xs">{selected ? 'Selected' : 'Available'}</span>
-									</label>
-								);
-							})}
-
-							{mcpTargets.map(target => (
-								<div
-									key={artifactRefKey(target.artifact)}
-									className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
-								>
-									<div className="min-w-0 grow">
-										<div className="truncate text-sm font-medium">{target.displayName}</div>
-										<div className="text-base-content/60 text-xs">MCP setup is available for this Workspace.</div>
-									</div>
-
-									<div className="flex flex-wrap items-center gap-2">
-										<span
-											className={`badge badge-xs ${
-												target.runtimeLoaded
-													? 'badge-success'
-													: target.status === 'available'
-														? 'badge-warning'
-														: 'badge-error'
-											}`}
-										>
-											{target.runtimeLoaded ? 'Runtime loaded' : target.status}
-										</span>
-
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											disabled={isInputLocked || target.status !== 'available'}
-											onClick={() => {
-												setSetupTarget(target);
-											}}
-										>
-											<FiSettings size={14} />
-											Setup
-										</button>
-									</div>
-								</div>
-							))}
-
-							{mcpTargets.length === 0 && (state.plan?.mcpServers.servers.length ?? 0) === 0 ? (
-								<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
-									No MCP declarations are reachable from this Workspace.
-								</div>
-							) : null}
-						</div>
-					</ModalSection>
+									);
+								})}
+							</div>
+						</ModalSection>
+					) : null}
 
 					{state.capabilityIssues.length > 0 ? (
-						<ModalSection title="Capability Diagnostics">
+						<ModalSection
+							title="Items that need attention"
+							description="Other available Workspace content remains usable."
+						>
 							<div className="space-y-2">
-								{state.capabilityIssues.map(issue => (
+								{state.capabilityIssues.map((issue, index) => (
 									<div
-										key={`${issue.path}:${issue.type}:${issue.name || ''}`}
+										key={`${issue.path}:${issue.type}:${issue.name || ''}:${index}`}
 										className="border-warning/40 bg-warning/10 rounded-2xl border p-3 text-sm"
 									>
-										<div className="font-medium">
-											{issue.type}
-											{issue.name ? `/${issue.name}` : ''}
+										<div className="flex flex-wrap items-center gap-2">
+											<span className="badge badge-warning badge-xs">{capabilityTypeLabel(issue.type)}</span>
+											<div className="font-medium">{issue.name || `Required ${capabilityTypeLabel(issue.type)}`}</div>
 										</div>
-										<div className="text-base-content/70 mt-1">
-											{issue.status}
-											{issue.message ? `: ${issue.message}` : ''}
+										<div className="text-base-content/70 mt-1 text-xs">
+											{issue.message || `This item is currently ${issue.status}.`}
 										</div>
 									</div>
 								))}
@@ -333,7 +371,7 @@ function WorkspaceDirectorySelectionModalContent({
 						className="btn btn-ghost rounded-xl"
 						disabled={isInputLocked || state.selectionLoading}
 						onClick={() => {
-							void state.refreshSelectedWorkspace();
+							runAsyncAction(() => state.refreshSelectedWorkspace(), 'The Workspace could not be refreshed.');
 						}}
 					>
 						<FiRefreshCw size={14} />
@@ -344,7 +382,10 @@ function WorkspaceDirectorySelectionModalContent({
 						className="btn btn-ghost rounded-xl"
 						disabled={isInputLocked || state.selectionLoading || !state.plan}
 						onClick={() => {
-							void state.updateSelectionFromCurrentContents();
+							runAsyncAction(
+								() => state.updateSelectionFromCurrentContents(),
+								'The current Workspace contents could not be selected.'
+							);
 						}}
 					>
 						<FiCheck size={14} />
@@ -370,7 +411,10 @@ function WorkspaceDirectorySelectionModalContent({
 					setSetupTarget(null);
 				}}
 				onSaved={() => {
-					void state.refreshSelectedWorkspace();
+					runAsyncAction(
+						() => state.refreshSelectedWorkspace(),
+						'The Workspace could not be refreshed after MCP setup.'
+					);
 				}}
 			/>
 		</>

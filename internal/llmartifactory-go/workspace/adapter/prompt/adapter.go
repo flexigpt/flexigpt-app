@@ -2,7 +2,9 @@ package prompt
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -26,6 +28,7 @@ type Contribution struct {
 	Insert           declaration.InsertTarget   `json:"-"`
 	MediaType        string                     `json:"-"`
 	Locator          storeSpec.Locator          `json:"-"`
+	SourceLocators   []storeSpec.Locator        `json:"-"`
 	Content          string                     `json:"-"`
 	OriginalBytes    int                        `json:"-"`
 	IncludedBytes    int                        `json:"-"`
@@ -51,6 +54,7 @@ type Plan struct {
 
 type Adapter struct {
 	artifacts artifact.API
+	resources resourceFlow.API
 	text      *materialize.Adapter
 	engine    *contextengine.Engine
 	policy    contextengine.CompositionPolicy
@@ -77,6 +81,7 @@ func New(
 	}
 	return &Adapter{
 		artifacts: artifacts,
+		resources: resources,
 		text:      t,
 		engine:    contextengine.NewEngine(),
 		policy:    policy,
@@ -277,6 +282,12 @@ func (a *Adapter) resolveContribution(
 		if err != nil {
 			return Contribution{}, err
 		}
+		sourceLocators := a.sourceLocatorsForContribution(
+			ctx,
+			record,
+			workspace,
+			value.Locator,
+		)
 		return Contribution{
 			Artifact:         value.Artifact,
 			ArtifactRevision: value.ArtifactRevision,
@@ -286,6 +297,7 @@ func (a *Adapter) resolveContribution(
 			Insert:           value.Insert,
 			MediaType:        value.MediaType,
 			Locator:          value.Locator,
+			SourceLocators:   sourceLocators,
 			Content:          value.Content,
 		}, nil
 
@@ -296,6 +308,104 @@ func (a *Adapter) resolveContribution(
 			record.Kind,
 		)
 	}
+}
+
+// sourceLocatorsForContribution projects repository-relative source files for
+// management and Composer presentation. Resolution remains best effort so
+// presentation metadata cannot make an otherwise usable prompt fail.
+func (a *Adapter) sourceLocatorsForContribution(
+	ctx context.Context,
+	record artifactModel.Artifact,
+	workspace workspaceDomain.Workspace,
+	materializedLocator storeSpec.Locator,
+) []storeSpec.Locator {
+	fallback := sourceLocatorFallback(materializedLocator)
+
+	definition, err := a.artifacts.GetDefinition(ctx, record.Ref())
+	if err != nil {
+		return fallback
+	}
+	entry, err := declaration.DecodeCanonicalEntryJSON(definition.Body)
+	if err != nil {
+		return fallback
+	}
+	header := entry.Header()
+	if header.Locator == nil {
+		return fallback
+	}
+
+	var wire struct {
+		Parameters struct {
+			Include []string `json:"include,omitempty"`
+			Exclude []string `json:"exclude,omitempty"`
+		} `json:"parameters,omitzero"`
+	}
+	if err := json.Unmarshal(definition.Body, &wire); err != nil {
+		return fallback
+	}
+
+	target, err := declaration.ResolveSourceRelativePathLocator(
+		*header.Locator,
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return fallback
+	}
+
+	if len(wire.Parameters.Include) == 0 {
+		if target == "" || target == "." {
+			return fallback
+		}
+		return []storeSpec.Locator{target}
+	}
+
+	sourceID := record.Binding.SourceID
+	if record.RootID == workspace.Artifact.RootID &&
+		workspace.CompositionSourceID != "" &&
+		sourceID != workspace.CompositionSourceID {
+		sourceID = workspace.CompositionSourceID
+	}
+
+	entries, err := a.resources.ReadSourceTree(
+		ctx,
+		record.RootID,
+		sourceID,
+		target,
+		wire.Parameters.Include,
+		wire.Parameters.Exclude,
+		storeSpec.DefaultMaxEntries,
+		storeSpec.MaxScanBytes,
+	)
+	if err != nil {
+		return fallback
+	}
+
+	output := make([]storeSpec.Locator, 0, len(entries))
+	seen := make(map[storeSpec.Locator]struct{}, len(entries))
+	for _, value := range entries {
+		if value.Locator == "" || value.Locator == "." {
+			continue
+		}
+		if _, duplicate := seen[value.Locator]; duplicate {
+			continue
+		}
+		seen[value.Locator] = struct{}{}
+		output = append(output, value.Locator)
+	}
+	slices.Sort(output)
+	if len(output) == 0 {
+		return fallback
+	}
+	return output
+}
+
+func sourceLocatorFallback(
+	value storeSpec.Locator,
+) []storeSpec.Locator {
+	if value == "" || value == "." {
+		return nil
+	}
+	return []storeSpec.Locator{value}
 }
 
 func selectedArtifact(

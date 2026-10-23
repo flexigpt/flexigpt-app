@@ -94,6 +94,7 @@ type WorkspacePromptContribution struct {
 	Insert           declaration.InsertTarget   `json:"insert"`
 	MediaType        string                     `json:"mediaType,omitempty"`
 	Locator          storeSpec.Locator          `json:"locator,omitempty"`
+	SourceLocators   []storeSpec.Locator        `json:"sourceLocators,omitempty"`
 	OriginalBytes    int                        `json:"originalBytes"`
 	IncludedBytes    int                        `json:"includedBytes"`
 	Truncated        bool                       `json:"truncated"`
@@ -133,13 +134,15 @@ type WorkspaceSkillLoadPlan struct {
 }
 
 type WorkspaceMCPServer struct {
-	Artifact         artifactModel.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64                    `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-	Name             storeSpec.LogicalName     `json:"name"`
-	DisplayName      string                    `json:"displayName,omitempty"`
-	BuiltIn          bool                      `json:"builtIn"`
-	Version          cryptoutil.Digest         `json:"version"`
+	Artifact           artifactModel.ArtifactRef    `json:"artifact"`
+	ArtifactRevision   uint64                       `json:"artifactRevision"`
+	DefinitionDigest   cryptoutil.Digest            `json:"definitionDigest"`
+	Name               storeSpec.LogicalName        `json:"name"`
+	DisplayName        string                       `json:"displayName,omitempty"`
+	BuiltIn            bool                         `json:"builtIn"`
+	Version            cryptoutil.Digest            `json:"version"`
+	Locator            storeSpec.Locator            `json:"locator,omitempty"`
+	SubresourceLocator storeSpec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }
 
 type WorkspaceMCPServerLoadPlan struct {
@@ -148,8 +151,9 @@ type WorkspaceMCPServerLoadPlan struct {
 }
 
 // WorkspaceRuntimePlan contains consumer-safe runtime planning output.
-// Runtime-only paths, source bytes, MCP installation state, secret
-// references, and resolver graphs are deliberately excluded.
+// Repository-relative source locators may be exposed for user-facing
+// presentation. Native paths, source bytes, MCP installation state, secret
+// references, and resolver graphs remain excluded.
 type WorkspaceRuntimePlan struct {
 	Workspace    workspaceDomain.WorkspaceView `json:"workspace"`
 	Capabilities composition.CapabilityPlan    `json:"capabilities"`

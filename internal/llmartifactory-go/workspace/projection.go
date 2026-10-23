@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -33,9 +34,13 @@ func projectWorkspacePromptPlan(
 				Insert:           contribution.Insert,
 				MediaType:        contribution.MediaType,
 				Locator:          contribution.Locator,
-				OriginalBytes:    contribution.OriginalBytes,
-				IncludedBytes:    contribution.IncludedBytes,
-				Truncated:        contribution.Truncated,
+				SourceLocators: append(
+					[]storeSpec.Locator(nil),
+					contribution.SourceLocators...,
+				),
+				OriginalBytes: contribution.OriginalBytes,
+				IncludedBytes: contribution.IncludedBytes,
+				Truncated:     contribution.Truncated,
 			},
 		)
 	}
@@ -85,13 +90,15 @@ func projectWorkspaceMCPServerLoadPlan(
 	}
 	for _, server := range value.Servers {
 		output.Servers = append(output.Servers, WorkspaceMCPServer{
-			Artifact:         server.Artifact,
-			ArtifactRevision: server.Server.ArtifactRevision,
-			DefinitionDigest: server.Server.DefinitionDigest,
-			Name:             server.Server.Document.LogicalName,
-			DisplayName:      server.Server.Document.DisplayName,
-			BuiltIn:          server.Server.BuiltIn,
-			Version:          server.Server.Version,
+			Artifact:           server.Artifact,
+			ArtifactRevision:   server.Server.ArtifactRevision,
+			DefinitionDigest:   server.Server.DefinitionDigest,
+			Name:               server.Server.Document.LogicalName,
+			DisplayName:        server.Server.Document.DisplayName,
+			BuiltIn:            server.Server.BuiltIn,
+			Version:            server.Server.Version,
+			Locator:            server.Locator,
+			SubresourceLocator: server.SubresourceLocator,
 		})
 	}
 	return output

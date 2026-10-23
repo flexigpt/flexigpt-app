@@ -29,6 +29,7 @@ import type {
 	ComposerWorkspaceController,
 } from '@/chats/composer/workspaces/use_composer_workspace';
 import { WorkspaceDirectorySelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
+import { getWorkspaceContentCounts } from '@/workspaces/workspace_contents';
 import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
 
 interface WorkspaceBottomBarChipProps {
@@ -50,7 +51,7 @@ function workspaceDisplayName(candidate: ComposerWorkspaceCandidate): string {
 
 function workspaceSubtitle(candidate: ComposerWorkspaceCandidate): string {
 	if (candidate.workspace.origin === WorkspaceDirectoryOrigin.Default) {
-		return `${candidate.directory.root.displayName} · Default policy`;
+		return `${candidate.directory.root.displayName} · Automatic setup`;
 	}
 
 	return candidate.workspace.manifestLocator ?? candidate.workspace.workspace.artifact.binding.locator;
@@ -147,9 +148,14 @@ function WorkspaceBottomBarChipContent({
 
 	const selected = Boolean(state.selection);
 	const selectedName = selectedWorkspaceName(state);
-	const selectedContextCount = state.selection?.contextRefs?.length ?? 0;
-	const selectedSkillCount = state.selection?.skillRefs?.length ?? 0;
-	const discoveredMCPCount = state.plan?.mcpServers.servers.length ?? 0;
+	const contentCounts = getWorkspaceContentCounts(state.plan, {
+		selectedContextIDs: state.selectedContextIDs,
+		selectedSkillIDs: state.selectedSkillIDs,
+		selectedMCPIDs: state.selectedMCPIDs,
+	});
+	const selectedFileCount = contentCounts.instructionFiles + contentCounts.referenceFiles;
+	const selectedSkillCount = contentCounts.skills;
+	const selectedMCPCount = contentCounts.mcpServers;
 	const workspaceHeaderMeta = search.trim()
 		? `${availableWorkspaces.length} match${availableWorkspaces.length === 1 ? '' : 'es'}`
 		: `${availableWorkspaces.length} available`;
@@ -160,7 +166,7 @@ function WorkspaceBottomBarChipContent({
 		<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2">
 			<div className="truncate text-xs font-semibold">{selectedName}</div>
 			<div className="text-base-content/60 mt-1 text-xs">
-				{selectedContextCount} Context · {selectedSkillCount} instruction Skills · {discoveredMCPCount} MCP servers
+				{selectedFileCount} files · {selectedSkillCount} Skills · {selectedMCPCount} MCP servers
 			</div>
 		</div>
 	) : undefined;
@@ -216,7 +222,7 @@ function WorkspaceBottomBarChipContent({
 						open={open}
 						query={search}
 						onQueryChange={setSearch}
-						placeholder="Search effective Workspaces…"
+						placeholder="Search Workspaces…"
 						disabled={state.workspacesLoading && state.workspaces.length === 0}
 						onEscape={() => {
 							store.hide();
@@ -224,7 +230,7 @@ function WorkspaceBottomBarChipContent({
 					/>
 
 					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Effective Workspaces</div>
+						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Repository Workspaces</div>
 						<div className="flex shrink-0 items-center gap-2">
 							<span className={actionTriggerMenuMetaClasses}>{workspaceHeaderMeta}</span>
 							<button
@@ -305,9 +311,9 @@ function WorkspaceBottomBarChipContent({
 										{!available ? (
 											<span className="badge badge-warning badge-xs">Unavailable</span>
 										) : candidate.workspace.origin === WorkspaceDirectoryOrigin.Default ? (
-											<span className="badge badge-info badge-xs">Default</span>
+											<span className="badge badge-info badge-xs">Automatic</span>
 										) : (
-											<span className="badge badge-ghost badge-xs">Manifest</span>
+											<span className="badge badge-ghost badge-xs">Repository</span>
 										)}
 									</MenuItem>
 								);
@@ -335,13 +341,13 @@ function WorkspaceBottomBarChipContent({
 					label="Added Workspace"
 					ariaLabel="Added Workspace"
 					isEmpty={!selected}
-					emptyLabel="Choose an effective Workspace above to add it to this conversation."
-					help="A Workspace contributes repository context, instruction Skills, and discovered MCP configuration. Only one Workspace can be attached."
+					emptyLabel="Choose a Workspace above to add its repository contents to this conversation."
+					help="A Workspace can add instruction files, reference files, Skills, and MCP servers. Only one Workspace can be attached."
 					summary={
 						selected ? (
 							<>
 								<span>
-									1 added · {selectedContextCount} Context · {selectedSkillCount} Skills
+									1 Workspace · {selectedFileCount} files · {selectedSkillCount} Skills · {selectedMCPCount} MCP
 								</span>
 								{state.attentionCount > 0 ? (
 									<span className="text-warning">{state.attentionCount} need attention</span>

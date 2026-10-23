@@ -55,15 +55,15 @@ function WorkspaceDefaultPolicyModalContent({ onClose }: Pick<WorkspaceDefaultPo
 		<ModalDialog isOpen onClose={onClose} blockCancel>
 			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
-					title="Default Workspace Policy"
-					description="This policy is applied only when the selected directory has no Workspace manifest. Copy it into the repository as workspace.yaml to customize it."
+					title="Automatic Workspace Setup"
+					description="This setup is used when a repository has no workspace.yaml file. It detects common instruction files, documentation, Skills, and integrations."
 					onClose={onClose}
 				/>
 
 				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
 					{error ? (
 						<ManagementResourceError
-							title="Default Workspace policy could not be loaded"
+							title="Automatic Workspace setup could not be loaded"
 							error={error}
 							isRetrying={isRefreshing}
 							onRetry={reloadOrThrow}
@@ -74,14 +74,13 @@ function WorkspaceDefaultPolicyModalContent({ onClose }: Pick<WorkspaceDefaultPo
 
 					{policy ? (
 						<>
-							<ModalSection title="How to customize a repository">
+							<ModalSection title="Customize this repository">
 								<ul className="text-base-content/70 list-disc space-y-1 pl-5 text-sm">
-									<li>Copy this document to `workspace.yaml` in the repository root.</li>
-									<li>Edit its members to select the declarations and source-backed Text you want.</li>
-									<li>Refresh the Workspace directory after saving the manifest.</li>
+									<li>Copy this setup to `workspace.yaml` in the repository root.</li>
+									<li>Choose the files, Skills, and integrations the repository should add.</li>
+									<li>Refresh the repository in Workspace management after saving it.</li>
 									<li>
-										Add `*.workspace.yaml`, `*.workspace.yml`, or `*.workspace.json` files to expose multiple peer
-										Workspaces for one repository.
+										Add `*.workspace.yaml`, `*.workspace.yml`, or `*.workspace.json` to offer multiple Workspace setups.
 									</li>
 								</ul>
 							</ModalSection>

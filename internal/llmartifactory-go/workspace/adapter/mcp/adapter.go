@@ -30,8 +30,10 @@ type ServerResolver interface {
 }
 
 type WorkspaceServer struct {
-	Artifact artifactModel.ArtifactRef `json:"-"`
-	Server   serverMCPDomain.Resolved  `json:"-"`
+	Artifact           artifactModel.ArtifactRef    `json:"-"`
+	Locator            storeSpec.Locator            `json:"-"`
+	SubresourceLocator storeSpec.SubresourceLocator `json:"-"`
+	Server             serverMCPDomain.Resolved     `json:"-"`
 }
 
 type LoadPlan struct {
@@ -101,8 +103,10 @@ func (a *Adapter) Load(
 			continue
 		}
 		output.Servers = append(output.Servers, WorkspaceServer{
-			Artifact: ref,
-			Server:   read.Resolved,
+			Artifact:           ref,
+			Locator:            record.Binding.Locator,
+			SubresourceLocator: record.Binding.SubresourceLocator,
+			Server:             read.Resolved,
 		})
 	}
 	return output, nil

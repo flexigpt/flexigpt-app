@@ -83,6 +83,7 @@ export interface ComposerWorkspaceController {
 	toggleMCP: (server: WorkspaceMCPServer, selected: boolean) => void;
 	removeContextRef: (artifact: ArtifactRef) => void;
 	removeSkillRef: (artifact: ArtifactRef) => Promise<void>;
+	removeMCPRef: (artifact: ArtifactRef) => void;
 	refreshSelectedWorkspace: () => Promise<void>;
 	createWorkspaceDirectory: (path: string) => Promise<void>;
 	getSelectionSnapshot: () => WorkspaceConversationSelection | undefined;
@@ -704,6 +705,21 @@ export function useComposerWorkspace({
 		[plan, replaceSelection, syncWorkspaceSkills]
 	);
 
+	const removeMCPRef = useCallback(
+		(artifact: ArtifactRef) => {
+			const current = selectionRef.current;
+			if (!current) {
+				return;
+			}
+
+			replaceSelection({
+				...current,
+				mcpRefs: (current.mcpRefs ?? []).filter(ref => artifactRefKey(ref.artifact) !== artifactRefKey(artifact)),
+			});
+		},
+		[replaceSelection]
+	);
+
 	const refreshSelectedWorkspace = useCallback(async () => {
 		const current = workspace;
 		const currentSelection = selectionRef.current;
@@ -842,6 +858,7 @@ export function useComposerWorkspace({
 		toggleMCP,
 		removeContextRef,
 		removeSkillRef,
+		removeMCPRef,
 		refreshSelectedWorkspace,
 		createWorkspaceDirectory,
 		getSelectionSnapshot: () => cloneSelection(selectionRef.current),
