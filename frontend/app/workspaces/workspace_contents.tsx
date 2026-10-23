@@ -179,7 +179,7 @@ function WorkspacePathList({ locators }: { locators: string[] }) {
 	}
 
 	return (
-		<div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
+		<div className="mt-1 max-h-48 space-y-1 overflow-y-auto">
 			{locators.map((locator, index) => {
 				const path = workspacePathParts(locator);
 
@@ -213,7 +213,8 @@ function WorkspaceContentCard({
 	canSelect,
 	disabled,
 	onSelectedChange,
-	actions,
+	leadingActions,
+	normalActions,
 	children,
 	statusLabel,
 }: {
@@ -226,7 +227,8 @@ function WorkspaceContentCard({
 	canSelect: boolean;
 	disabled: boolean;
 	onSelectedChange?: (selected: boolean) => void;
-	actions?: ReactNode;
+	leadingActions?: ReactNode;
+	normalActions?: ReactNode;
 	children?: ReactNode;
 	statusLabel?: string;
 }) {
@@ -267,9 +269,10 @@ function WorkspaceContentCard({
 				</div>
 			</div>
 
-			{actions ? (
-				<div className="border-base-content/10 mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3">
-					{actions}
+			{leadingActions || normalActions ? (
+				<div className="mt-4 flex flex-wrap items-center justify-end gap-2 p-0">
+					{leadingActions ? <div className="flex flex-wrap items-center gap-2">{leadingActions}</div> : null}
+					{normalActions ? <div className="ml-auto flex flex-wrap items-center gap-2">{normalActions}</div> : null}
 				</div>
 			) : null}
 		</div>
@@ -322,7 +325,7 @@ export function WorkspaceContents({
 		return (
 			<button
 				type="button"
-				className="btn btn-sm btn-ghost rounded-xl"
+				className="btn btn-sm border-primary rounded-xl"
 				disabled={disabled || artifact.state !== ArtifactState.Available}
 				onClick={() => {
 					void onSetArtifactEnabled(artifact, !artifact.enabled);
@@ -387,7 +390,7 @@ export function WorkspaceContents({
 				onSelectedChange={next => {
 					onToggleContext?.(context, next);
 				}}
-				actions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
+				leadingActions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
 			>
 				<WorkspacePathList locators={locators} />
 				{context.truncated ? (
@@ -441,14 +444,8 @@ export function WorkspaceContents({
 				onSelectedChange={next => {
 					onToggleSkill?.(skill, next);
 				}}
-				actions={
-					artifactControl || activeControl ? (
-						<>
-							{artifactControl}
-							{activeControl}
-						</>
-					) : undefined
-				}
+				leadingActions={artifactControl}
+				normalActions={activeControl}
 			>
 				<WorkspacePathList locators={path ? [path] : []} />
 			</WorkspaceContentCard>
@@ -461,6 +458,7 @@ export function WorkspaceContents({
 		const locator = normalizeWorkspacePath(server.locator);
 		const entry = server.subresourceLocator?.trim();
 		const artifactControl = renderArtifactControl(server.artifact, 'MCP server');
+		const mcpAction = renderMCPAction?.(server);
 
 		return (
 			<WorkspaceContentCard
@@ -482,14 +480,8 @@ export function WorkspaceContents({
 				onSelectedChange={next => {
 					onToggleMCP?.(server, next);
 				}}
-				actions={
-					artifactControl || renderMCPAction?.(server) ? (
-						<>
-							{artifactControl}
-							{renderMCPAction?.(server)}
-						</>
-					) : undefined
-				}
+				leadingActions={artifactControl}
+				normalActions={mcpAction}
 			>
 				<WorkspacePathList locators={locator ? [locator] : []} />
 			</WorkspaceContentCard>
@@ -497,7 +489,7 @@ export function WorkspaceContents({
 	};
 
 	return (
-		<div className="space-y-5">
+		<div className="space-y-4">
 			{instructionContexts.length > 0 ? (
 				<WorkspaceContentSection
 					title="Instructions"

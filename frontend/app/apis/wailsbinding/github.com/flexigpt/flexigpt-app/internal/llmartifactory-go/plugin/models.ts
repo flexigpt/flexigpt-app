@@ -84,7 +84,7 @@ export interface DirectMember {
 
 /**
  * DirectMembership is the resolved immediate membership of one Plugin.
- *
+ * 
  * It intentionally does not recursively expand a selected Agent, Skill, MCP,
  * Tool, Team, Loop, Workflow, or nested Plugin capability graph. Recursive
  * expansion remains ResolveCapabilities.
@@ -109,7 +109,7 @@ export interface DirectSelectorMatch {
 
 /**
  * ListItem is a lightweight Plugin projection.
- *
+ * 
  * Members are not returned in ordinary listings. The member count is enough
  * for management pages to determine whether deletion can be offered. Read
  * returns PluginView when a caller explicitly selects one Plugin.

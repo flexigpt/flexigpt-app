@@ -349,7 +349,7 @@ function WorkspaceDirectoryManagementModalContent({
 				closeDisabled={Boolean(busy)}
 			/>
 
-			<div className="app-scrollbar-thin min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+			<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
 				{actionError ? (
 					<div className="alert alert-error rounded-2xl text-sm" role="alert">
 						<FiAlertCircle size={15} />
@@ -539,8 +539,23 @@ function WorkspaceDirectoryManagementModalContent({
 				) : null}
 			</div>
 
-			<ModalActions className="justify-between">
-				<div className="flex flex-wrap items-center gap-2">
+			<ModalActions
+				className="flex justify-between gap-2"
+				leading={
+					<button
+						type="button"
+						className="btn btn-error rounded-xl"
+						disabled={Boolean(busy)}
+						onClick={() => {
+							onRequestRemove(directory);
+						}}
+					>
+						<FiTrash2 size={14} />
+						Remove
+					</button>
+				}
+			>
+				<div className="ml-auto flex items-center justify-end gap-2">
 					<button
 						type="button"
 						className="btn btn-ghost rounded-xl"
@@ -564,22 +579,10 @@ function WorkspaceDirectoryManagementModalContent({
 						{busy === 'enabled' ? 'Saving...' : directory.enabled ? 'Pause repository' : 'Enable repository'}
 					</button>
 
-					<button
-						type="button"
-						className="btn btn-ghost text-error rounded-xl"
-						disabled={Boolean(busy)}
-						onClick={() => {
-							onRequestRemove(directory);
-						}}
-					>
-						<FiTrash2 size={14} />
-						Remove
+					<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
+						Done
 					</button>
 				</div>
-
-				<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
-					Done
-				</button>
 			</ModalActions>
 		</div>
 	);
