@@ -505,8 +505,6 @@ async function packageMac(project) {
 						...(keychain ? ["--keychain", keychain] : []),
 					]
 				: []),
-			"--compression",
-			"lzma",
 			"--component",
 			bundle,
 			"/Applications",
