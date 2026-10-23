@@ -77,7 +77,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 				) : null}
 
 				<ModalField
-					label="Repository directory"
+					label="Repository"
 					htmlFor="workspace-directory-path"
 					required
 					hint="The directory path remains private to the backend Source configuration."

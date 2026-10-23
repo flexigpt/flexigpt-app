@@ -577,10 +577,12 @@ func (r *Resolver) resolveContainedMember(
 	if err != nil {
 		return nil, err
 	}
+
+	// A contained declaration is emitted by the decoder that admitted its
+	// parent declaration. Its Artifact binding must therefore remain in the
+	// parent's Source. CompositionSourceID controls local relationship lookup
+	// and source-backed content materialization, not contained Artifact origin.
 	sourceID := from.Binding.SourceID
-	if state.usesCompositionSource(rootID) {
-		sourceID = state.compositionSourceID
-	}
 
 	header := target.Header()
 	records, err := r.catalog.FindByIdentity(
