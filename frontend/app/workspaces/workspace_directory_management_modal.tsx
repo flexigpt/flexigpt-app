@@ -377,7 +377,7 @@ function WorkspaceDirectoryManagementModalContent({
 							</div>
 						</div>
 
-						<div className="grid gap-2 md:grid-cols-2">
+						<div>
 							{directory.workspaces.map(entry => {
 								const key = effectiveWorkspaceKey(entry);
 								const selected = key === effectiveWorkspaceKey(selectedWorkspace ?? entry);

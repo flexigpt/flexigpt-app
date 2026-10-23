@@ -82,7 +82,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 					required
 					hint="Only repository-relative file paths are shown in Workspace views."
 				>
-					<div className="flex flex-col gap-2 sm:flex-row">
+					<div className="flex gap-2">
 						<input
 							id="workspace-directory-path"
 							type="text"
@@ -98,13 +98,13 @@ function WorkspaceDirectoryRegistrationModalContent({
 						/>
 						<button
 							type="button"
-							className="btn btn-ghost rounded-xl"
+							className="btn btn-ghost rounded-xl p-0 text-xs"
 							disabled={isSubmitting}
 							onClick={() => {
 								void chooseDirectory();
 							}}
 						>
-							<FiFolder size={15} />
+							<FiFolder size={12} />
 							Choose directory
 						</button>
 					</div>
