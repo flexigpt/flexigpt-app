@@ -82,10 +82,11 @@ func (d *Decoder) Decode(
 	}
 
 	expectedName := expectedSkillName(d.layout, candidate.Locator)
-	value, warnings, err := skillSource.DecodeSkillDocument(
+	value, warnings, err := skillSource.DecodeSkillDocumentAt(
 		d.documents,
 		candidate.Content,
 		expectedName,
+		candidate.Locator,
 	)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{

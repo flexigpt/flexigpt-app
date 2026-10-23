@@ -35,22 +35,25 @@ func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate ingestModel.Candidate,
 ) ingestModel.Recognition {
-	switch {
-	case IsMCPConfig(candidate.Content):
-		return ingestModel.RecognitionPreferred
-	case d.isMCPConfigCandidate(candidate):
-		return ingestModel.RecognitionPossible
-	default:
+	if !d.isMCPConfigCandidate(candidate) {
 		return ingestModel.RecognitionNone
 	}
+
+	if IsMCPConfig(candidate.Content) {
+		return ingestModel.RecognitionPreferred
+	}
+	return ingestModel.RecognitionPossible
 }
 
 func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate ingestModel.Candidate,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	switch {
-	case IsMCPConfig(candidate.Content):
+	if !d.isMCPConfigCandidate(candidate) {
+		return nil, nil
+	}
+
+	if IsMCPConfig(candidate.Content) {
 		values, err := DecodeMCPConfig(
 			candidate.Content,
 		)
@@ -58,19 +61,15 @@ func (d *Decoder) Decode(
 			return nil, decoderError(candidate.Locator, "", err)
 		}
 		return decodedValues(values), nil
-
-	case d.isMCPConfigCandidate(candidate):
-		return nil, decoderError(
-			candidate.Locator,
-			"",
-			fmt.Errorf(
-				"%w: MCP configuration requires mcpServers",
-				storeSpec.ErrInvalid,
-			),
-		)
-
 	}
-	return nil, nil
+	return nil, decoderError(
+		candidate.Locator,
+		"",
+		fmt.Errorf(
+			"%w: MCP configuration requires mcpServers",
+			storeSpec.ErrInvalid,
+		),
+	)
 }
 
 func (d *Decoder) isMCPConfigCandidate(

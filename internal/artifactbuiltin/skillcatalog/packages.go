@@ -298,10 +298,11 @@ func canonicalPluginPackage(
 			)
 		}
 
-		definitionValue, _, err := skillSource.DecodeSkillDocument(
+		definitionValue, _, err := skillSource.DecodeSkillDocumentAt(
 			documents,
 			content,
 			header.Name,
+			documentLocator,
 		)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(

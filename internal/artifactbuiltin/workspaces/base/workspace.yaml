@@ -10,16 +10,49 @@ members:
     parameters:
       mediaType: text/markdown
       include:
+        - "AGENTS.md"
         - "**/AGENTS.md"
+        - "CLAUDE.md"
         - "**/CLAUDE.md"
+        - "GEMINI.md"
         - "**/GEMINI.md"
+        - "COPILOT.md"
         - "**/COPILOT.md"
+        - "INSTRUCTIONS.md"
         - "**/INSTRUCTIONS.md"
+        - ".cursorrules"
         - "**/.cursorrules"
+        - ".windsurfrules"
         - "**/.windsurfrules"
+        - ".github/copilot-instructions.md"
         - "**/.github/copilot-instructions.md"
+        - ".cursor/rules/*.md"
         - "**/.cursor/rules/**/*.md"
+        - ".github/instructions/*.md"
         - "**/.github/instructions/**/*.md"
+      exclude:
+        - ".agents/**"
+        - "**/.agents/**"
+        - ".skills/**"
+        - "**/.skills/**"
+        - ".git/**"
+        - "**/.git/**"
+        - ".hg/**"
+        - "**/.hg/**"
+        - ".svn/**"
+        - "**/.svn/**"
+        - "node_modules/**"
+        - "**/node_modules/**"
+        - "vendor/**"
+        - "**/vendor/**"
+        - ".venv/**"
+        - "**/.venv/**"
+        - "AGENT.md"
+        - "**/AGENT.md"
+        - "*.agent.md"
+        - "**/*.agent.md"
+        - "SKILL.md"
+        - "**/SKILL.md"
   - type: text
     name: default-workspace-context
     insert: user-message
@@ -27,12 +60,39 @@ members:
     parameters:
       mediaType: text/markdown
       include:
+        - "README.md"
         - "**/README.md"
+        - "llms.txt"
         - "**/llms.txt"
+        - "docs/*.md"
         - "docs/**/*.md"
+      exclude:
+        - ".agents/**"
+        - "**/.agents/**"
+        - ".skills/**"
+        - "**/.skills/**"
+        - ".git/**"
+        - "**/.git/**"
+        - ".hg/**"
+        - "**/.hg/**"
+        - ".svn/**"
+        - "**/.svn/**"
+        - "node_modules/**"
+        - "**/node_modules/**"
+        - "vendor/**"
+        - "**/vendor/**"
+        - ".venv/**"
+        - "**/.venv/**"
+        - "AGENT.md"
+        - "**/AGENT.md"
+        - "*.agent.md"
+        - "**/*.agent.md"
+        - "SKILL.md"
+        - "**/SKILL.md"
   - type: skill
     base: .
     include:
+      - "SKILL.md"
       - "**/SKILL.md"
   - type: agent
     base: .
@@ -43,8 +103,6 @@ members:
   - type: mcp.policy
     base: .
   - type: model
-    base: .
-  - type: tool
     base: .
   - type: team
     base: .

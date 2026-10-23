@@ -1573,7 +1573,6 @@ func validateRequiredContractBindings(value contractTopology) error {
 		"mcp",
 		"mcp.policy",
 		"model",
-		"tool",
 		"team",
 		"loop",
 		"workflow",

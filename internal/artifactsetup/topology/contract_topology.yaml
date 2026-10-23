@@ -396,6 +396,19 @@ discovery:
     recursive: true
     authoritative: true
     includePatterns: []
+    excludePatterns:
+      - ".git/**"
+      - "**/.git/**"
+      - ".hg/**"
+      - "**/.hg/**"
+      - ".svn/**"
+      - "**/.svn/**"
+      - "node_modules/**"
+      - "**/node_modules/**"
+      - "vendor/**"
+      - "**/vendor/**"
+      - ".venv/**"
+      - "**/.venv/**"
     documentSets:
       - "skillPackages"
     decoderHints:
@@ -410,14 +423,28 @@ discovery:
     root: "."
     recursive: true
     authoritative: true
-    includePatterns:
-      - "**/*.json"
-      - "**/*.yaml"
-      - "**/*.yml"
+    includePatterns: []
+    excludePatterns:
+      - ".git/**"
+      - "**/.git/**"
+      - ".hg/**"
+      - "**/.hg/**"
+      - ".svn/**"
+      - "**/.svn/**"
+      - "node_modules/**"
+      - "**/node_modules/**"
+      - "vendor/**"
+      - "**/vendor/**"
+      - ".venv/**"
+      - "**/.venv/**"
     documentSets:
       - "plugins"
       - "mcpConfigs"
       - "mcpPolicies"
+    allowedDecoderIDs:
+      - "artifact-declaration-json"
+      - "artifact-declaration-yaml"
+      - "artifact.mcp-json"
 
   workspace:
     root: "."
@@ -488,9 +515,6 @@ workspaceDiscovery:
       documentUses:
         - "modelPackage"
         - "modelProviderPackage"
-    tool:
-      documentUses:
-        - "toolPackage"
     team:
       documentUses:
         - "teamPackage"

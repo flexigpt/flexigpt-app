@@ -2,6 +2,7 @@ package source
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/flexigpt/agentskills-go/document"
@@ -54,15 +55,42 @@ func DecodeSkillDocument(
 	content []byte,
 	expectedName string,
 ) (definitionModel.Definition, []diagnostic.Diagnostic, error) {
+	return DecodeSkillDocumentAt(
+		documents,
+		content,
+		expectedName,
+		documents.Default.Locator,
+	)
+}
+
+// DecodeSkillDocumentAt preserves the actual configured Skill document name.
+func DecodeSkillDocumentAt(
+	documents support.Documents,
+	content []byte,
+	expectedName string,
+	documentLocator storeSpec.Locator,
+) (definitionModel.Definition, []diagnostic.Diagnostic, error) {
 	if err := documents.Validate(); err != nil {
 		return definitionModel.Definition{}, nil, err
+	}
+	if err := documentLocator.ValidatePortable(false); err != nil {
+		return definitionModel.Definition{}, nil, err
+	}
+
+	documentFile := storeSpec.Locator(path.Base(string(documentLocator)))
+	if !documents.Matches(documentFile) {
+		return definitionModel.Definition{}, nil, fmt.Errorf(
+			"%w: Skill source document %q is not configured",
+			storeSpec.ErrInvalid,
+			documentLocator,
+		)
 	}
 
 	doc, warnings, err := ParseSkillDocument(content, expectedName)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
-	value, err := definitionForSkillDocument(documents, doc)
+	value, err := definitionForSkillDocument(documentFile, doc)
 	if err != nil {
 		return definitionModel.Definition{}, nil, err
 	}
@@ -165,10 +193,18 @@ func ValidateDefinition(
 }
 
 func definitionForSkillDocument(
-	documents support.Documents,
+	documentFile storeSpec.Locator,
 	doc document.SkillDocument,
 ) (definitionModel.Definition, error) {
-	documentFile := SkillDefinitionFileName(documents)
+	if err := documentFile.ValidatePortable(false); err != nil {
+		return definitionModel.Definition{}, err
+	}
+	if path.Base(string(documentFile)) != string(documentFile) {
+		return definitionModel.Definition{}, fmt.Errorf(
+			"%w: Skill source document must be a package-root filename",
+			storeSpec.ErrInvalid,
+		)
+	}
 	sourceLocator := declaration.ScalarLocator(
 		"./" + string(documentFile),
 	)
