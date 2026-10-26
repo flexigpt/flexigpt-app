@@ -1,0 +1,41 @@
+type: agent
+name: code-chat
+displayName: Code Chat
+description: Implement changes from attached code and specifications in chat without local tools.
+labels:
+  category: core
+
+members:
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: professional-writing
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: code-delivery
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: text
+    name: code-chat-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach the specification and relevant source files with repository-relative paths. Describe the requested implementation.>
+
+        Implement the change from the supplied material. Deliver complete new or replacement files and exact-path diffs for modified files. Complete every supported part in this response and identify precise verification limits.

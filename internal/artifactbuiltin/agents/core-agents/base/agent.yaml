@@ -11,3 +11,15 @@ members:
     scope: builtin
     use:
       mode: instructions
+
+  - type: skill
+    name: professional-writing
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions

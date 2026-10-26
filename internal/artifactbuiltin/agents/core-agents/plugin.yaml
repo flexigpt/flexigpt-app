@@ -1,7 +1,7 @@
 type: plugin
 name: core-agents
 displayName: Core Agents
-description: Built-in general-purpose Agents for local development, local reading, and focused text editing.
+description: Built-in Agents for general chat, attachment-based code implementation, local reading, and workspace editing.
 labels:
   category: core
 
@@ -9,6 +9,10 @@ members:
   - type: agent
     name: base
     locator: ./base/agent.yaml
+
+  - type: agent
+    name: code-chat
+    locator: ./code-chat/agent.yaml
 
   - type: agent
     name: local-dev-workspace

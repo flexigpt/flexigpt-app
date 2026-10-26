@@ -13,6 +13,12 @@ members:
       mode: instructions
 
   - type: skill
+    name: professional-writing
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
     name: use-explicit-tools-batched
     scope: builtin
     use:
