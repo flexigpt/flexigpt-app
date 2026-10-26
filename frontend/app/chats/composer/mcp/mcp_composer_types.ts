@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
@@ -74,6 +75,7 @@ export interface UseComposerMCPResult {
 
 	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
 	ensureServerSelected: (server: MCPRuntimeServerID) => Promise<boolean>;
+	adoptAgentServer: (server: ArtifactRef) => Promise<boolean>;
 	setToolExposure: (server: MCPRuntimeServerID, exposure: MCPToolExposure) => void;
 	setIncludeServerInstructions: (server: MCPRuntimeServerID, include: boolean) => void;
 	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;

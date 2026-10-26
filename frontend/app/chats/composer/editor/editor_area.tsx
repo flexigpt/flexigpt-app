@@ -16,6 +16,7 @@ import {
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
@@ -111,6 +112,9 @@ export interface EditorAreaHandle {
 	setInstalledSkillStateFromAgent: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
 	restoreSessionConfiguration: (configuration: SessionConfiguration) => Promise<void>;
+	adoptAgentTool: (choice: ToolStoreChoice) => void;
+	adoptAgentSkill: (ref: SkillRef, active: boolean) => void;
+	adoptAgentMCPServer: (ref: ArtifactRef) => Promise<boolean>;
 }
 
 interface EditorAreaProps {
@@ -1354,6 +1358,68 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		]
 	);
 
+	const adoptAgentTool = useCallback(
+		(choice: ToolStoreChoice) => {
+			const key = toolIdentityKey(choice.target);
+
+			setConversationToolsState(previous => {
+				const existing = previous.find(entry => entry.key === key);
+
+				if (!existing) {
+					return [
+						...previous,
+						{
+							key,
+							toolStoreChoice: { ...choice },
+							enabled: true,
+						},
+					];
+				}
+
+				return previous.map(entry =>
+					entry.key === key
+						? {
+								...entry,
+								toolStoreChoice: { ...choice },
+								enabled: true,
+							}
+						: entry
+				);
+			});
+		},
+		[setConversationToolsState]
+	);
+
+	const adoptAgentSkill = useCallback(
+		(sRef: SkillRef, active: boolean) => {
+			const enabled = normalizeSkillRefs([...getCurrentInstalledEnabledSkillRefs(), sRef]);
+			const nextActive = active
+				? normalizeSkillRefs([...getCurrentInstalledActiveSkillRefs(), sRef])
+				: getCurrentInstalledActiveSkillRefs();
+
+			void applyInstalledSkillSelectionState(enabled, nextActive, {
+				syncSession: SkillSessionSyncMode.None,
+			});
+		},
+		[applyInstalledSkillSelectionState, getCurrentInstalledActiveSkillRefs, getCurrentInstalledEnabledSkillRefs]
+	);
+
+	const adoptAgentMCPServer = useCallback(
+		async (aRef: ArtifactRef): Promise<boolean> => {
+			try {
+				const adopted = await mcp.adoptAgentServer(aRef);
+				if (!adopted) {
+					setSubmitError('The Agent MCP server is unavailable in the current Composer catalog.');
+				}
+				return adopted;
+			} catch (error) {
+				setSubmitError(error instanceof Error ? error.message : 'The Agent MCP server could not be adopted.');
+				return false;
+			}
+		},
+		[mcp]
+	);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -1436,8 +1502,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				void workspace.restoreSelection(selection, syncSkills);
 			},
 			restoreSessionConfiguration,
+			adoptAgentTool,
+			adoptAgentSkill,
+			adoptAgentMCPServer,
 		}),
 		[
+			adoptAgentMCPServer,
+			adoptAgentSkill,
+			adoptAgentTool,
 			applyConversationToolsFromChoices,
 			applyAttachmentsDrop,
 			applyInstalledSkillSelectionState,

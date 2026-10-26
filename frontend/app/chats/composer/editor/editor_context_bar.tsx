@@ -100,6 +100,9 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 				allOptions={context.allOptions}
 				modelSelectionSource={context.modelSelectionSource}
 				agentModelRef={agent.agentModelRef}
+				onUseAgentModel={() => {
+					void agent.reapplySelectedAgent();
+				}}
 			/>
 
 			{context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && (

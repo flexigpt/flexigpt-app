@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPPromptRef,
 	MCPResourceRef,
@@ -863,6 +864,46 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		[commitSelectedByServerKey, loadDeclarationCatalog]
 	);
 
+	const adoptAgentServer = useCallback(
+		async (artifact: ArtifactRef): Promise<boolean> => {
+			await loadDeclarationCatalog();
+
+			const option = optionsRef.current.find(
+				value => value.server.ref.rootID === artifact.rootID && value.server.ref.artifactID === artifact.artifactID
+			);
+
+			if (!option || !option.plugin.enabled || !option.server.enabled || !isServerOperational(option.server)) {
+				return false;
+			}
+
+			const key = mcpServerKey(option.runtimeServerID);
+
+			commitSelectedByServerKey(previous => {
+				if (previous[key]) {
+					return previous;
+				}
+
+				return {
+					...previous,
+					[key]: {
+						server: option.runtimeServerID,
+						snapshotDigest: option.runtime?.snapshotDigest,
+						toolExposure: MCPToolExposure.All,
+						selectedTools: [],
+						selectedResources: [],
+						selectedResourceTemplates: [],
+						selectedPrompts: [],
+						includeServerInstructions: true,
+					},
+				};
+			});
+
+			void ensureDiscoveryLoaded(option.runtimeServerID);
+			return true;
+		},
+		[commitSelectedByServerKey, ensureDiscoveryLoaded, loadDeclarationCatalog]
+	);
+
 	const setToolExposure = useCallback(
 		(server: MCPRuntimeServerID, exposure: MCPToolExposure) => {
 			const key = mcpServerKey(server);
@@ -1195,6 +1236,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		openAuthURL,
 		setServerSelected,
 		ensureServerSelected,
+		adoptAgentServer,
 		setToolExposure,
 		setIncludeServerInstructions,
 		toggleTool,

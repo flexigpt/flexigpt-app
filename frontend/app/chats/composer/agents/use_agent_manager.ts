@@ -65,12 +65,14 @@ export interface AgentManagerState {
 	instructionOnlySkillRefs: SkillRef[];
 	capabilityExclusions: AgentCapabilityExclusion[];
 	releasedCapabilityExclusionKeys: string[];
+	agentSelectionPinRefreshRequested: boolean;
 
 	refreshAgents(): Promise<void>;
 	selectAgent(agentRef: ArtifactRef): Promise<boolean>;
 	ensureDefaultAgent(): Promise<boolean>;
 	resetToDefaultAgent(): Promise<boolean>;
 	reapplySelectedAgent(): Promise<boolean>;
+	acknowledgeAgentSelectionPinRefresh(): void;
 	trackDefaultAgentWithoutApplying(): Promise<boolean>;
 	clearAgentTracking(): void;
 	restoreSelectedAgent(
@@ -209,6 +211,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const [releasedCapabilityExclusionKeys, setReleasedCapabilityExclusionKeys] = useState<string[]>([]);
 	const [preparedStarter, setPreparedStarter] = useState<AgentStarterPreview | null>(null);
 	const [selectedAgentResolution, setSelectedAgentResolution] = useState<AgentResolution | null>(null);
+	const [agentSelectionPinRefreshRequested, setAgentSelectionPinRefreshRequested] = useState(false);
 
 	const selectedAgentKeyRef = useRef<string | null>(null);
 	const isApplyingRef = useRef(false);
@@ -262,6 +265,33 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				starterApplierRef.current?.(text);
 			}
 			return true;
+		},
+		[]
+	);
+
+	const projectAgentInstructionSkills = useCallback(
+		async (resolution: AgentResolution, signal: AbortSignal, excludedKeys: ReadonlySet<string>) => {
+			const refs = resolution.capabilities.occurrences.flatMap(occurrence => {
+				if (
+					occurrence.type !== 'skill' ||
+					!isAgentSkillUseAsInstructions(occurrence.skillUseMode) ||
+					occurrence.target?.form !== CapabilityTargetForm.Artifact ||
+					!occurrence.target.artifact
+				) {
+					return [];
+				}
+
+				return [occurrence.target.artifact];
+			});
+
+			await agentInstructionSkillsApplierRef.current?.(refs, signal);
+
+			for (const ref of refs) {
+				const key = `artifact:${ref.rootID}:${ref.artifactID}`;
+				if (excludedKeys.has(key)) {
+					agentInstructionSkillSelectionRef.current?.(ref, false);
+				}
+			}
 		},
 		[]
 	);
@@ -347,7 +377,8 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const currentSelectedAgentResolution =
 		selectedAgent !== null &&
 		selectedAgentResolution !== null &&
-		artifactRefKey(selectedAgentResolution.agent.ref) === selectedAgent.key
+		artifactRefKey(selectedAgentResolution.agent.ref) === selectedAgent.key &&
+		selectedAgentResolution.agent.revision === selectedAgent.agent.revision
 			? selectedAgentResolution
 			: null;
 
@@ -436,8 +467,18 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 
 		void agentManagementAPI
 			.resolveAgent(selectedAgent.ref)
-			.then(resolution => {
+			.then(async resolution => {
 				if (!cancelled) {
+					await projectAgentInstructionSkills(
+						resolution,
+						new AbortController().signal,
+						new Set(excludedCapabilityKeys)
+					);
+
+					if (cancelled) {
+						return;
+					}
+
 					if (context.modelSelectionSource === 'agent') {
 						context.setAgentModelPreview(
 							resolveAgentModelOption(resolution),
@@ -456,7 +497,14 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		return () => {
 			cancelled = true;
 		};
-	}, [context, currentSelectedAgentResolution, resolveAgentModelOption, selectedAgent]);
+	}, [
+		context,
+		currentSelectedAgentResolution,
+		excludedCapabilityKeys,
+		projectAgentInstructionSkills,
+		resolveAgentModelOption,
+		selectedAgent,
+	]);
 
 	const hasTrackedAgent = useCallback(() => {
 		const trackedKey = selectedAgentKeyRef.current;
@@ -484,6 +532,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			}
 
 			const requestSequence = applyRequestSeqRef.current + 1;
+			const isReapplyingCurrentAgent = selectedAgentKeyRef.current === option.key;
 			const requestAbortController = new AbortController();
 			const isCurrentRequest = () =>
 				applyRequestSeqRef.current === requestSequence && !requestAbortController.signal.aborted;
@@ -523,10 +572,21 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 					return false;
 				}
 
+				await projectAgentInstructionSkills(
+					resolution,
+					requestAbortController.signal,
+					isReapplyingCurrentAgent ? new Set(excludedCapabilityKeys) : new Set()
+				);
+				if (!isCurrentRequest()) {
+					return false;
+				}
+
 				const localAgentModelRef = resolvedAgentModelRef(resolution);
 				context.setAgentModelPreview(resolveAgentModelOption(resolution), localAgentModelRef !== undefined);
-				replaceExcludedCapabilityKeys([]);
-				setReleasedCapabilityExclusionKeys([]);
+				if (!isReapplyingCurrentAgent) {
+					replaceExcludedCapabilityKeys([]);
+					setReleasedCapabilityExclusionKeys([]);
+				}
 				setTrackedAgent(option.key, false, resolution);
 				return true;
 			} catch (e: unknown) {
@@ -548,6 +608,8 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			agentOptions,
 			applyPreparedStarter,
 			context,
+			excludedCapabilityKeys,
+			projectAgentInstructionSkills,
 			replaceExcludedCapabilityKeys,
 			resolveAgentModelOption,
 			setTrackedAgent,
@@ -575,6 +637,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				replaceExcludedCapabilityKeys([]);
 				setTrackedAgent(null);
 				setActionError(null);
+				setAgentSelectionPinRefreshRequested(false);
 				return true;
 			}
 
@@ -601,6 +664,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			replaceExcludedCapabilityKeys(exclusionKeys);
 			try {
 				const resolution = await agentManagementAPI.resolveAgent(agent);
+				await projectAgentInstructionSkills(resolution, new AbortController().signal, new Set(exclusionKeys));
 				if (modelSelectionSource === 'agent') {
 					const localAgentModelRef = resolvedAgentModelRef(resolution);
 					context.setAgentModelPreview(resolveAgentModelOption(resolution), localAgentModelRef !== undefined);
@@ -613,6 +677,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				setTrackedAgent(option.key, true);
 			}
 			setActionError(null);
+			setAgentSelectionPinRefreshRequested(false);
 			return true;
 		},
 		[
@@ -620,6 +685,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			cancelActiveAgentRequest,
 			context,
 			loading,
+			projectAgentInstructionSkills,
 			replaceExcludedCapabilityKeys,
 			resolveAgentModelOption,
 			setTrackedAgent,
@@ -662,8 +728,16 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			return false;
 		}
 
-		return selectAgent(option.ref);
+		const applied = await selectAgent(option.ref);
+		if (applied) {
+			setAgentSelectionPinRefreshRequested(true);
+		}
+		return applied;
 	}, [agentOptions, selectAgent]);
+
+	const acknowledgeAgentSelectionPinRefresh = useCallback(() => {
+		setAgentSelectionPinRefreshRequested(false);
+	}, []);
 
 	const trackDefaultAgentWithoutApplying = useCallback(async (): Promise<boolean> => {
 		if (hasTrackedAgent()) {
@@ -702,6 +776,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		replaceExcludedCapabilityKeys([]);
 		setPreparedStarter(null);
 		setReleasedCapabilityExclusionKeys([]);
+		setAgentSelectionPinRefreshRequested(false);
 		setTrackedAgent(null);
 		setActionError(null);
 	}, [cancelActiveAgentRequest, context, replaceExcludedCapabilityKeys, setTrackedAgent]);
@@ -860,11 +935,13 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		instructionOnlySkillRefs,
 		capabilityExclusions,
 		releasedCapabilityExclusionKeys,
+		agentSelectionPinRefreshRequested,
 		refreshAgents,
 		selectAgent,
 		ensureDefaultAgent,
 		resetToDefaultAgent,
 		reapplySelectedAgent,
+		acknowledgeAgentSelectionPinRefresh,
 		trackDefaultAgentWithoutApplying,
 		clearAgentTracking,
 		restoreSelectedAgent,

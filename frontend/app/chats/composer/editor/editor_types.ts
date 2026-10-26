@@ -1,7 +1,7 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
-import type { SessionConfiguration, SessionInstructionOverride } from '@/spec/session';
+import type { SessionActiveSkillOverride, SessionConfiguration, SessionInstructionOverride } from '@/spec/session';
 import type { SessionArtifactSelection } from '@/spec/session_base';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
 import type { SkillRef } from '@/spec/skill';
@@ -53,9 +53,12 @@ export interface EditorSubmitPayload {
 	includeModelDefault?: boolean;
 	agentRef?: ArtifactRef;
 	agentSelection?: SessionArtifactSelection;
+	agentSelectionRefreshRequested?: boolean;
 	modelSelectionSource?: 'session' | 'agent';
 	agentCapabilityExclusions?: AgentCapabilityExclusion[];
 	agentCapabilityInclusionKeys?: string[];
+	agentSkillActivityOverrides?: SessionActiveSkillOverride[];
+	agentSkillActivityInclusionKeys?: string[];
 	sessionConfigurationBaseline?: SessionConfiguration;
 	attachedTools: UIToolStoreChoice[];
 	attachments: UIAttachment[];

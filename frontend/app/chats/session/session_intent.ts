@@ -364,7 +364,9 @@ function mergeSessionConfiguration(
 	return {
 		...cloneConfigurationValue(baseline),
 		agent: generated.agent
-			? preserveArtifactSelectionPins(baseline.agent, generated.agent)
+			? payload.agentSelectionRefreshRequested
+				? cloneConfigurationValue(generated.agent)
+				: preserveArtifactSelectionPins(baseline.agent, generated.agent)
 			: cloneConfigurationValue(baseline.agent),
 		workspace:
 			payload.workspaceSelection && !payload.workspacePlan && baseline.workspace
@@ -886,8 +888,7 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		});
 	}
 
-	const seenActive = new Set<string>();
-	const active = [];
+	const activeByKey = new Map<string, SessionActiveSkillOverride>();
 
 	for (const selection of payload.activeSkillSelections ?? payload.activeSkillRefs ?? []) {
 		const ref = artifactSelection(
@@ -897,21 +898,28 @@ function skillOverridesFromPayload(payload: EditorSubmitPayload) {
 		);
 		const key = artifactRefKey(ref);
 
-		if (seenActive.has(key)) {
+		if (activeByKey.has(key)) {
 			continue;
 		}
-		seenActive.add(key);
 
-		active.push({
+		activeByKey.set(key, {
 			key,
 			mode: SessionActivityOverrideMode.Activate,
 			value: ref,
 		});
 	}
 
+	for (const override of payload.agentSkillActivityOverrides ?? []) {
+		if (!override.key || activeByKey.has(override.key)) {
+			continue;
+		}
+
+		activeByKey.set(override.key, structuredClone(override));
+	}
+
 	return {
 		skills,
-		active,
+		active: [...activeByKey.values()],
 	};
 }
 

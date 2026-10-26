@@ -20,6 +20,7 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
+import { AgentBaselinePanel } from '@/chats/composer/agents/agent_baseline_panel';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { ContextBar } from '@/chats/composer/editor/editor_context_bar';
@@ -115,6 +116,7 @@ export const ComposerBox = memo(
 		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
 		const editorAreaRef = useRef<EditorAreaHandle>(null);
 		const sessionConfigurationBaselineRef = useRef<SessionConfiguration | undefined>(undefined);
+		const preEditConfigurationRef = useRef<SessionConfiguration | undefined>(undefined);
 		const composerContext = useComposerContextState();
 		const systemPrompt = useAgentSystemPrompt({
 			modelDefaultPrompt: composerContext.selectedModel.systemPrompt,
@@ -180,6 +182,48 @@ export const ComposerBox = memo(
 			setAgentInstructionSkillSelected,
 		});
 
+		const restoreComposerConfiguration = useCallback(
+			async (configuration: SessionConfiguration) => {
+				composerContext.restoreSessionConfiguration(configuration);
+				systemPrompt.restoreSessionConfiguration(configuration);
+
+				await agent.restoreSelectedAgent(configuration.agent, configuration.model ? 'session' : 'agent', configuration);
+			},
+			[agent, composerContext, systemPrompt]
+		);
+
+		const loadExternalMessage = useCallback(
+			(message: EditorExternalMessage) => {
+				if (message.isEditing && message.sessionConfiguration) {
+					if (!preEditConfigurationRef.current && sessionConfigurationBaselineRef.current) {
+						preEditConfigurationRef.current = structuredClone(sessionConfigurationBaselineRef.current);
+					}
+
+					sessionConfigurationBaselineRef.current = structuredClone(message.sessionConfiguration);
+					void restoreComposerConfiguration(message.sessionConfiguration).catch((error: unknown) => {
+						console.error('Failed to restore Composer state for edit:', error);
+					});
+				}
+
+				editorAreaRef.current?.loadExternalMessage(message);
+			},
+			[restoreComposerConfiguration]
+		);
+
+		const cancelEditingAndRestoreComposer = useCallback(() => {
+			const previous = preEditConfigurationRef.current;
+			preEditConfigurationRef.current = undefined;
+
+			if (previous) {
+				sessionConfigurationBaselineRef.current = structuredClone(previous);
+				void restoreComposerConfiguration(previous).catch((error: unknown) => {
+					console.error('Failed to restore Composer state after edit cancellation:', error);
+				});
+			}
+
+			onCancelEditing();
+		}, [onCancelEditing, restoreComposerConfiguration]);
+
 		const resetComposerState = useCallback(() => {
 			setAbortConfirmationRequested(false);
 			agent.clearAgentTracking();
@@ -236,6 +280,11 @@ export const ComposerBox = memo(
 										: {}),
 								}
 							: undefined,
+						...(agent.agentSelectionPinRefreshRequested
+							? {
+									agentSelectionRefreshRequested: true,
+								}
+							: {}),
 						...(agent.capabilityExclusions.length > 0
 							? {
 									agentCapabilityExclusions: agent.capabilityExclusions,
@@ -261,13 +310,11 @@ export const ComposerBox = memo(
 				}
 
 				sessionConfigurationBaselineRef.current = structuredClone(acceptedConfiguration);
+				preEditConfigurationRef.current = undefined;
+				agent.acknowledgeAgentSelectionPinRefresh();
 			},
 			[
-				agent.selectedAgent,
-				agent.agentModelRef,
-				agent.instructionOnlySkillRefs,
-				agent.capabilityExclusions,
-				agent.releasedCapabilityExclusionKeys,
+				agent,
 				composerContext.modelOptions,
 				composerContext.hasRunnableModel,
 				composerContext.modelSelectionSource,
@@ -305,7 +352,7 @@ export const ComposerBox = memo(
 
 					return applied;
 				},
-				loadExternalMessage: message => editorAreaRef.current?.loadExternalMessage(message),
+				loadExternalMessage,
 				setConversationToolsFromChoices: tools => editorAreaRef.current?.setConversationToolsFromChoices(tools),
 				setWebSearchFromChoices: tools => editorAreaRef.current?.setWebSearchFromChoices(tools),
 				appendMCPAppContextUpdate: update => editorAreaRef.current?.appendMCPAppContextUpdate(update),
@@ -339,25 +386,41 @@ export const ComposerBox = memo(
 					setAbortConfirmationRequested(false);
 					editorAreaRef.current?.resetEditor();
 					sessionConfigurationBaselineRef.current = structuredClone(configuration);
+					preEditConfigurationRef.current = undefined;
 
-					composerContext.restoreSessionConfiguration(configuration);
-					systemPrompt.restoreSessionConfiguration(configuration);
-
-					await agent.restoreSelectedAgent(
-						configuration.agent,
-						configuration.model ? 'session' : 'agent',
-						configuration
-					);
+					await restoreComposerConfiguration(configuration);
 					await editorAreaRef.current?.restoreSessionConfiguration(configuration);
 				},
 			}),
-			[agent, composerContext, resetForNewConversation, resetComposerState, systemPrompt]
+			[
+				agent,
+				composerContext,
+				loadExternalMessage,
+				resetForNewConversation,
+				resetComposerState,
+				restoreComposerConfiguration,
+				systemPrompt,
+			]
 		);
 
 		return (
 			<div className="bg-base-200 flex w-full min-w-0 flex-col overflow-hidden">
 				<div className="shrink-0">
 					<ContextBar context={composerContext} agent={agent} />
+					<AgentBaselinePanel
+						manager={agent}
+						modelSelectionSource={composerContext.modelSelectionSource}
+						onAdoptTool={choice => {
+							editorAreaRef.current?.adoptAgentTool(choice);
+						}}
+						onAdoptSkill={(sRef, active) => {
+							editorAreaRef.current?.adoptAgentSkill(sRef, active);
+						}}
+						onAdoptMCP={mRef => editorAreaRef.current?.adoptAgentMCPServer(mRef) ?? Promise.resolve(false)}
+						onOpenSkills={() => {
+							editorAreaRef.current?.openSkillsMenu();
+						}}
+					/>
 				</div>
 
 				<DeleteConfirmationModal
@@ -390,7 +453,7 @@ export const ComposerBox = memo(
 						}
 					}}
 					editingMessageId={editingMessageId}
-					cancelEditing={onCancelEditing}
+					cancelEditing={cancelEditingAndRestoreComposer}
 					systemPrompt={systemPrompt}
 					showAutomationControl={showAutomationControl}
 					automationHoldEnabled={automationHoldEnabled}

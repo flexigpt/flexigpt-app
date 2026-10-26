@@ -87,6 +87,7 @@ interface ModelDropdownProps {
 	allOptions: UIModelOption[];
 	modelSelectionSource?: 'session' | 'agent';
 	agentModelRef?: ArtifactRef;
+	onUseAgentModel?: () => void;
 }
 
 export function ModelDropdown({
@@ -95,6 +96,7 @@ export function ModelDropdown({
 	allOptions,
 	modelSelectionSource = 'session',
 	agentModelRef,
+	onUseAgentModel,
 }: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);
 	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
@@ -260,6 +262,20 @@ export function ModelDropdown({
 								: ''
 						}
 						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session source'}</span>}
+						actions={
+							!agentOwnsModel && agentModelRef && onUseAgentModel ? (
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={() => {
+										onUseAgentModel();
+										menu.hide();
+									}}
+								>
+									Use Agent model
+								</button>
+							) : undefined
+						}
 					>
 						<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1">
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>
