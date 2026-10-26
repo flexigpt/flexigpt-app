@@ -19,7 +19,6 @@ import { skillManagementAPI } from '@/apis/baseapi';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -892,21 +891,17 @@ function SkillTemplateBottomBarChipInner({
 				wrapperElement="div"
 				wrapperClassName="inline-flex max-w-full"
 			>
-				<div
-					className={`${actionTriggerChipSurfaceClasses} ${
+				<MenuButton
+					ref={buttonRef}
+					store={store}
+					disabled={isInputLocked}
+					className={`${actionTriggerChipButtonClasses} ${
 						open ? 'border-base-300 bg-base-300/60' : 'border-transparent'
 					} ${isInputLocked ? 'opacity-60' : ''}`}
+					aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
 				>
-					<MenuButton
-						ref={buttonRef}
-						store={store}
-						disabled={isInputLocked}
-						className={actionTriggerChipButtonClasses}
-						aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
-					>
-						<ActionTriggerChipContent icon={<FiFile size={14} />} label="Templates" open={open} />
-					</MenuButton>
-				</div>
+					<ActionTriggerChipContent icon={<FiFile size={14} />} label="Templates" open={open} />
+				</MenuButton>
 			</HoverTip>
 
 			<SkillTemplatePicker

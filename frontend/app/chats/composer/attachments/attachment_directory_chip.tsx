@@ -19,7 +19,6 @@ import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipRemoveButtonClasses,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -255,15 +254,12 @@ export function DirectoryChip({
 
 	return (
 		<div className="relative shrink-0" data-attachment-chip="directory">
-			<div
-				className={`${actionTriggerChipSurfaceClasses} ${
-					menuOpen ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-				}`}
-				title={title}
-			>
+			<div className="flex items-center gap-1">
 				<MenuButton
 					store={directoryMenu}
-					className={actionTriggerChipButtonClasses}
+					className={`${actionTriggerChipButtonClasses} ${
+						menuOpen ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+					}`}
 					aria-label={`Show files in folder ${group.dirPath || group.label}`}
 					title={title}
 				>
@@ -272,14 +268,13 @@ export function DirectoryChip({
 						icon={<FiFolder size={14} />}
 						label={group.label}
 						secondaryLabel={directoryChipSummary}
-						secondaryLabelClassName="text-base-content/60 shrink-0 whitespace-nowrap text-xs"
 						open={menuOpen}
 					/>
 				</MenuButton>
 
 				<button
 					type="button"
-					className={`${actionTriggerChipRemoveButtonClasses} ml-1`}
+					className={actionTriggerChipRemoveButtonClasses}
 					onClick={() => {
 						onRemoveDirectoryGroup(group.id);
 					}}

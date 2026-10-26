@@ -3,25 +3,22 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import { Menu } from '@ariakit/react';
 
-export const actionTriggerChipButtonClasses =
-	'btn btn-xs app-text-neutral h-7 min-h-0 items-center overflow-hidden rounded-full border border-transparent bg-base-200/70 px-2 text-left normal-case shadow-none transition-colors hover:bg-base-300/80';
-
-export const actionTriggerChipSurfaceClasses =
-	'app-text-neutral flex h-7 min-h-0 items-center overflow-hidden rounded-full border border-transparent bg-base-200/70 px-2 shadow-none transition-colors hover:bg-base-300/80';
-
-export const actionTriggerChipRemoveButtonClasses =
-	'btn btn-ghost btn-xs text-error hover:bg-error/10 size-5 min-h-0 shrink-0 rounded-full p-0 shadow-none';
-
 const actionTriggerMenuClasses =
 	'rounded-box bg-base-100 text-base-content border-base-300 z-50 flex min-h-0 min-w-60 max-w-lg flex-col overflow-hidden border p-2 text-xs shadow-xl outline-none';
+
+export const actionTriggerMenuItemClasses =
+	'flex min-h-7 items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300';
 
 export const actionTriggerMenuFieldCardClasses = 'border-base-300 bg-base-200/40 rounded-xl border p-2';
 
 export const actionTriggerMenuFieldInputClasses =
 	'input input-xs bg-base-100 border-base-300 h-7 w-full rounded-xl text-xs';
 
-export const actionTriggerMenuItemClasses =
-	'flex min-h-7 items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300';
+export const actionTriggerChipButtonClasses =
+	'btn btn-xs app-text-neutral h-7 min-h-0 items-center overflow-hidden rounded-full border border-transparent bg-base-200/70 px-2 text-left normal-case shadow-none transition-colors hover:bg-base-300/80';
+
+export const actionTriggerChipRemoveButtonClasses =
+	'btn btn-ghost btn-xs text-error hover:bg-error/10 size-5 min-h-0 shrink-0 rounded-full p-0 shadow-none';
 
 /**
  * Place inside ActionTriggerMenuHeader, after SearchableMenuInput when the
@@ -108,7 +105,7 @@ export function ActionTriggerChipContent({
 	showChevron = true,
 	className = '',
 	labelClassName = 'min-w-0 max-w-28 truncate text-xs font-normal',
-	secondaryLabelClassName = 'max-w-28 truncate text-xs opacity-70',
+	secondaryLabelClassName = 'max-w-28 truncate text-xs opacity-70 font-normal',
 }: ActionTriggerChipContentProps) {
 	return (
 		<span className={`flex min-w-0 items-center gap-1 ${className}`}>

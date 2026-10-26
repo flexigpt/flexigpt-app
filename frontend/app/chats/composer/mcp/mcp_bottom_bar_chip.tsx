@@ -51,7 +51,6 @@ import {
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -1123,198 +1122,93 @@ export function MCPBottomBarChip({
 					wrapperElement="div"
 					wrapperClassName="inline-flex max-w-full"
 				>
-					<div className={`${actionTriggerChipSurfaceClasses} ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}>
-						<MenuButton
-							store={menu}
-							className={actionTriggerChipButtonClasses}
-							aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
-							disabled={isInputLocked}
-						>
-							<ActionTriggerChipContent
-								icon={<FiServer size={14} />}
-								label="MCP"
-								suffix={
-									hasBlockingArgs ? (
-										<span className="badge badge-warning badge-xs">Check</span>
-									) : enabledCount > 0 || hasAppContextUpdates ? (
-										<FiCheck size={14} aria-hidden="true" />
-									) : undefined
+					<MenuButton
+						store={menu}
+						className={`${actionTriggerChipButtonClasses} ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
+						aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
+						disabled={isInputLocked}
+					>
+						<ActionTriggerChipContent
+							icon={<FiServer size={14} />}
+							label="MCP"
+							suffix={
+								hasBlockingArgs ? (
+									<span className="badge badge-warning badge-xs">Check</span>
+								) : enabledCount > 0 || hasAppContextUpdates ? (
+									<FiCheck size={14} aria-hidden="true" />
+								) : undefined
+							}
+							open={open}
+							labelClassName="max-w-20 truncate text-xs font-normal"
+						/>
+					</MenuButton>
+				</HoverTip>
+
+				<ActionTriggerMenu store={menu}>
+					<ActionTriggerMenuHeader>
+						<SearchableMenuInput
+							open={open}
+							query={searchQuery}
+							onQueryChange={setSearchQuery}
+							placeholder="Search MCP servers, tools, resources…"
+							disabled={state.loading || visibleOptions.length === 0}
+							onFocusFirstItem={() => {
+								focusFirstSearchableMenuItem(menuContentElement);
+							}}
+							onEnterFirstResult={() => {
+								if (firstVisibleOption) {
+									toggleServerOption(firstVisibleOption);
 								}
-								open={open}
-								labelClassName="max-w-20 truncate text-xs font-normal"
-							/>
-						</MenuButton>
+							}}
+							onEscape={() => {
+								menu.hide();
+							}}
+						/>
 
-						<ActionTriggerMenu store={menu}>
-							<ActionTriggerMenuHeader>
-								<SearchableMenuInput
-									open={open}
-									query={searchQuery}
-									onQueryChange={setSearchQuery}
-									placeholder="Search MCP servers, tools, resources…"
-									disabled={state.loading || visibleOptions.length === 0}
-									onFocusFirstItem={() => {
-										focusFirstSearchableMenuItem(menuContentElement);
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">MCP servers</div>
+							<div className="flex shrink-0 items-center gap-2">
+								<span className={actionTriggerMenuMetaClasses}>{mcpHeaderMeta}</span>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={e => {
+										stop(e);
+										void state.refreshAll();
 									}}
-									onEnterFirstResult={() => {
-										if (firstVisibleOption) {
-											toggleServerOption(firstVisibleOption);
-										}
-									}}
-									onEscape={() => {
-										menu.hide();
-									}}
-								/>
+									disabled={isInputLocked || state.loading}
+								>
+									<FiRefreshCw size={12} />
+									<span className="ml-1">Refresh</span>
+								</button>
+							</div>
+						</div>
+					</ActionTriggerMenuHeader>
 
-								<div className={actionTriggerMenuHeaderRowClasses}>
-									<div className="min-w-0 flex-1 truncate text-xs font-semibold">MCP servers</div>
-									<div className="flex shrink-0 items-center gap-2">
-										<span className={actionTriggerMenuMetaClasses}>{mcpHeaderMeta}</span>
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs rounded-lg"
-											onClick={e => {
-												stop(e);
-												void state.refreshAll();
-											}}
-											disabled={isInputLocked || state.loading}
-										>
-											<FiRefreshCw size={12} />
-											<span className="ml-1">Refresh</span>
-										</button>
-									</div>
-								</div>
-							</ActionTriggerMenuHeader>
-
-							<ActionTriggerMenuBody className="space-y-2">
-								{state.loading ? (
-									<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
-								) : state.error ? (
-									<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
-								) : visibleOptions.length === 0 ? (
-									<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
-										{state.options.length === 0
-											? 'No MCP servers have been added yet.'
-											: configurationPendingServerCount > 0
-												? `Configuration pending for ${configurationPendingServerCount} MCP server${
-														configurationPendingServerCount === 1 ? '' : 's'
-													}.`
-												: 'No enabled MCP servers are ready to use.'}
-									</div>
-								) : availableOptions.length === 0 ? (
-									<div className={searchableMenuEmptyStateClasses}>
-										{selectedOptions.length > 0
-											? 'All matching MCP servers are already added below.'
-											: 'No MCP servers match your search.'}
-									</div>
-								) : (
-									<>
-										{availableOptions.map(option => (
-											<ServerRow
-												key={optionKey(option)}
-												option={option}
-												state={state}
-												isInputLocked={isInputLocked}
-												onAuthorize={() => {
-													setManualOAuthModalKey(optionKey(option));
-												}}
-												onToggleSelected={() => {
-													toggleServerOption(option);
-												}}
-											/>
-										))}
-									</>
-								)}
-
-								{!state.loading && !state.error && hasManagementHint ? (
-									<div className="bg-base-200/60 text-base-content/70 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl p-2 text-xs">
-										{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
-										{configurationPendingServerCount > 0 ? (
-											<span>
-												Configuration pending for {configurationPendingServerCount} MCP server
-												{configurationPendingServerCount === 1 ? '' : 's'}.
-											</span>
-										) : null}
-										{hiddenDisabledServerCount > 0 ? (
-											<span>
-												{hiddenDisabledServerCount} disabled MCP server
-												{hiddenDisabledServerCount === 1 ? '' : 's'} hidden.
-											</span>
-										) : null}
-										{hiddenUnavailableServerCount > 0 ? (
-											<span>
-												{hiddenUnavailableServerCount} unavailable MCP server
-												{hiddenUnavailableServerCount === 1 ? '' : 's'} hidden.
-											</span>
-										) : null}
-										<Link
-											to="/mcpservers"
-											className="link link-info"
-											onClick={event => {
-												event.stopPropagation();
-												menu.hide();
-											}}
-										>
-											Manage MCP servers
-										</Link>
-									</div>
-								) : null}
-							</ActionTriggerMenuBody>
-
-							<ComposerDropdownSelectedPanel
-								label="Added MCP context"
-								ariaLabel="Added MCP context"
-								isEmpty={!hasSelectedMCPContext}
-								emptyLabel="Choose an MCP server above to add its context to this message."
-								help="Selected MCP servers can contribute tools, resources, prompts, and instructions to the next message. Resolve required argument warnings before sending."
-								summary={
-									hasSelectedMCPContext ? (
-										<>
-											<span>{selectedMCPContextSummary}</span>
-											{unavailableSelectedCount > 0 ? (
-												<span className="text-warning">{unavailableSelectedCount} need attention</span>
-											) : null}
-										</>
-									) : undefined
-								}
-								actions={
-									hasSelectedMCPContext ? (
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs text-error rounded-lg"
-											disabled={isInputLocked}
-											onClick={() => {
-												state.clear();
-												onClearAppContextUpdates?.();
-											}}
-										>
-											Clear all
-										</button>
-									) : undefined
-								}
-							>
-								{hasAppContextUpdates ? (
-									<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
-										<div className="flex items-center justify-between gap-2">
-											<div>
-												App context queued for next send: {appContextUpdateCount} update
-												{appContextUpdateCount === 1 ? '' : 's'}.
-											</div>
-											<button
-												type="button"
-												className="btn btn-ghost btn-xs text-error rounded-lg"
-												onClick={() => {
-													onClearAppContextUpdates?.();
-												}}
-												disabled={isInputLocked}
-											>
-												Remove
-											</button>
-										</div>
-									</div>
-								) : null}
-
-								{selectedOptions.map(option => (
+					<ActionTriggerMenuBody className="space-y-2">
+						{state.loading ? (
+							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
+						) : state.error ? (
+							<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
+						) : visibleOptions.length === 0 ? (
+							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
+								{state.options.length === 0
+									? 'No MCP servers have been added yet.'
+									: configurationPendingServerCount > 0
+										? `Configuration pending for ${configurationPendingServerCount} MCP server${
+												configurationPendingServerCount === 1 ? '' : 's'
+											}.`
+										: 'No enabled MCP servers are ready to use.'}
+							</div>
+						) : availableOptions.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>
+								{selectedOptions.length > 0
+									? 'All matching MCP servers are already added below.'
+									: 'No MCP servers match your search.'}
+							</div>
+						) : (
+							<>
+								{availableOptions.map(option => (
 									<ServerRow
 										key={optionKey(option)}
 										option={option}
@@ -1328,18 +1222,119 @@ export function MCPBottomBarChip({
 										}}
 									/>
 								))}
+							</>
+						)}
 
-								{unavailableSelectedCount > 0 ? (
-									<div className="alert alert-warning rounded-xl p-2 text-xs">
-										{unavailableSelectedCount} selected MCP server
-										{unavailableSelectedCount === 1 ? ' is' : 's are'} not currently available in this composer. Clear
-										the selection before sending.
-									</div>
+						{!state.loading && !state.error && hasManagementHint ? (
+							<div className="bg-base-200/60 text-base-content/70 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl p-2 text-xs">
+								{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
+								{configurationPendingServerCount > 0 ? (
+									<span>
+										Configuration pending for {configurationPendingServerCount} MCP server
+										{configurationPendingServerCount === 1 ? '' : 's'}.
+									</span>
 								) : null}
-							</ComposerDropdownSelectedPanel>
-						</ActionTriggerMenu>
-					</div>
-				</HoverTip>
+								{hiddenDisabledServerCount > 0 ? (
+									<span>
+										{hiddenDisabledServerCount} disabled MCP server
+										{hiddenDisabledServerCount === 1 ? '' : 's'} hidden.
+									</span>
+								) : null}
+								{hiddenUnavailableServerCount > 0 ? (
+									<span>
+										{hiddenUnavailableServerCount} unavailable MCP server
+										{hiddenUnavailableServerCount === 1 ? '' : 's'} hidden.
+									</span>
+								) : null}
+								<Link
+									to="/mcpservers"
+									className="link link-info"
+									onClick={event => {
+										event.stopPropagation();
+										menu.hide();
+									}}
+								>
+									Manage MCP servers
+								</Link>
+							</div>
+						) : null}
+					</ActionTriggerMenuBody>
+
+					<ComposerDropdownSelectedPanel
+						label="Added MCP context"
+						ariaLabel="Added MCP context"
+						isEmpty={!hasSelectedMCPContext}
+						emptyLabel="Choose an MCP server above to add its context to this message."
+						help="Selected MCP servers can contribute tools, resources, prompts, and instructions to the next message. Resolve required argument warnings before sending."
+						summary={
+							hasSelectedMCPContext ? (
+								<>
+									<span>{selectedMCPContextSummary}</span>
+									{unavailableSelectedCount > 0 ? (
+										<span className="text-warning">{unavailableSelectedCount} need attention</span>
+									) : null}
+								</>
+							) : undefined
+						}
+						actions={
+							hasSelectedMCPContext ? (
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs text-error rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										state.clear();
+										onClearAppContextUpdates?.();
+									}}
+								>
+									Clear all
+								</button>
+							) : undefined
+						}
+					>
+						{hasAppContextUpdates ? (
+							<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
+								<div className="flex items-center justify-between gap-2">
+									<div>
+										App context queued for next send: {appContextUpdateCount} update
+										{appContextUpdateCount === 1 ? '' : 's'}.
+									</div>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs text-error rounded-lg"
+										onClick={() => {
+											onClearAppContextUpdates?.();
+										}}
+										disabled={isInputLocked}
+									>
+										Remove
+									</button>
+								</div>
+							</div>
+						) : null}
+
+						{selectedOptions.map(option => (
+							<ServerRow
+								key={optionKey(option)}
+								option={option}
+								state={state}
+								isInputLocked={isInputLocked}
+								onAuthorize={() => {
+									setManualOAuthModalKey(optionKey(option));
+								}}
+								onToggleSelected={() => {
+									toggleServerOption(option);
+								}}
+							/>
+						))}
+
+						{unavailableSelectedCount > 0 ? (
+							<div className="alert alert-warning rounded-xl p-2 text-xs">
+								{unavailableSelectedCount} selected MCP server
+							</div>
+						) : null}
+					</ComposerDropdownSelectedPanel>
+				</ActionTriggerMenu>
 			</div>
 			<MCPOAuthAuthorizationModal
 				isOpen={oauthModalOption !== null}

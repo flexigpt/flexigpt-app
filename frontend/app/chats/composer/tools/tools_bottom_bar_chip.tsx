@@ -16,7 +16,6 @@ import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_m
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -538,36 +537,32 @@ export function ToolsBottomBarChip({
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
 			<HoverTip content={hoverContent} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
-				<div
-					className={`${actionTriggerChipSurfaceClasses} ${
+				<MenuButton
+					ref={buttonRef}
+					store={store}
+					disabled={isInputLocked}
+					className={`${actionTriggerChipButtonClasses} ${
 						missingCount
 							? 'border-warning/70 bg-warning/10 hover:bg-warning/15'
 							: configuredCount
 								? 'border-primary/50 bg-primary/10'
 								: 'border-transparent'
 					} ${isInputLocked ? 'opacity-60' : ''}`}
+					aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 				>
-					<MenuButton
-						ref={buttonRef}
-						store={store}
-						disabled={isInputLocked}
-						className={actionTriggerChipButtonClasses}
-						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
-					>
-						<ActionTriggerChipContent
-							icon={<FiTool size={14} />}
-							label="Tools"
-							suffix={
-								missingCount ? (
-									<span className="badge badge-warning badge-xs">Check</span>
-								) : configuredCount > 0 ? (
-									<FiCheck size={14} aria-hidden="true" />
-								) : undefined
-							}
-							open={open}
-						/>
-					</MenuButton>
-				</div>
+					<ActionTriggerChipContent
+						icon={<FiTool size={14} />}
+						label="Tools"
+						suffix={
+							missingCount ? (
+								<span className="badge badge-warning badge-xs">Check</span>
+							) : configuredCount > 0 ? (
+								<FiCheck size={14} aria-hidden="true" />
+							) : undefined
+						}
+						open={open}
+					/>
+				</MenuButton>
 			</HoverTip>
 
 			<ActionTriggerMenu store={store} data-menu-kind="tools">

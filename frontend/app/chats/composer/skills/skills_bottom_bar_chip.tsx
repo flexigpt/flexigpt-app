@@ -20,7 +20,6 @@ import type { DropdownItem } from '@/components/dropdown';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -616,21 +615,19 @@ export function SkillsBottomBarChip({
 		<>
 			<div className="relative shrink-0" data-bottom-bar-skills>
 				<HoverTip content={hoverTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
-					<div className={`${actionTriggerChipSurfaceClasses} ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}>
-						<MenuButton
-							store={store}
-							className={actionTriggerChipButtonClasses}
-							aria-label={shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills'}
-							disabled={isInputLocked}
-						>
-							<ActionTriggerChipContent
-								icon={<FiFilePlus size={14} />}
-								label="Skills"
-								suffix={configuredCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : undefined}
-								open={open}
-							/>
-						</MenuButton>
-					</div>
+					<MenuButton
+						store={store}
+						className={`${actionTriggerChipButtonClasses} ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}
+						aria-label={shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills'}
+						disabled={isInputLocked}
+					>
+						<ActionTriggerChipContent
+							icon={<FiFilePlus size={14} />}
+							label="Skills"
+							suffix={configuredCount > 0 ? <FiCheck size={14} aria-hidden="true" /> : undefined}
+							open={open}
+						/>
+					</MenuButton>
 				</HoverTip>
 
 				<ActionTriggerMenu store={store}>

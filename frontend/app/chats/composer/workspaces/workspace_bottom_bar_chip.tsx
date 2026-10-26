@@ -11,7 +11,6 @@ import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -174,8 +173,10 @@ function WorkspaceBottomBarChipContent({
 	return (
 		<div className="relative shrink-0" data-bottom-bar-workspace>
 			<HoverTip content={hoverContent} placement="top" wrapperElement="div">
-				<div
-					className={`${actionTriggerChipSurfaceClasses} ${
+				<MenuButton
+					store={store}
+					disabled={isInputLocked}
+					className={`${actionTriggerChipButtonClasses} ${
 						selected
 							? state.attentionCount > 0
 								? 'border-warning/50 bg-warning/10'
@@ -184,29 +185,23 @@ function WorkspaceBottomBarChipContent({
 								? 'border-base-300 bg-base-300/60'
 								: 'border-transparent'
 					} ${isInputLocked ? 'opacity-60' : ''}`}
+					aria-label="Select Workspace"
 				>
-					<MenuButton
-						store={store}
-						disabled={isInputLocked}
-						className={actionTriggerChipButtonClasses}
-						aria-label="Select Workspace"
-					>
-						<ActionTriggerChipContent
-							icon={<FiFolderPlus size={14} />}
-							label={selected ? selectedName : 'Workspace'}
-							suffix={
-								selected ? (
-									state.attentionCount > 0 ? (
-										<FiAlertCircle size={14} className="text-warning" />
-									) : (
-										<FiCheck size={14} className="shrink-0" />
-									)
-								) : null
-							}
-							open={open}
-						/>
-					</MenuButton>
-				</div>
+					<ActionTriggerChipContent
+						icon={<FiFolderPlus size={14} />}
+						label={selected ? selectedName : 'Workspace'}
+						suffix={
+							selected ? (
+								state.attentionCount > 0 ? (
+									<FiAlertCircle size={14} className="text-warning" />
+								) : (
+									<FiCheck size={14} className="shrink-0" />
+								)
+							) : null
+						}
+						open={open}
+					/>
+				</MenuButton>
 			</HoverTip>
 
 			<ActionTriggerMenu store={store}>

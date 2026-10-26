@@ -9,7 +9,6 @@ import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipRemoveButtonClasses,
-	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
@@ -94,25 +93,26 @@ export function StandaloneAttachmentsChip({
 
 	return (
 		<div className="relative shrink-0" data-attachment-chip="attachments-group">
-			<div
-				className={`${actionTriggerChipSurfaceClasses} ${
-					open ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-				}`}
-			>
-				<MenuButton store={menu} className={actionTriggerChipButtonClasses} aria-label="Show attached files and links">
+			<div className="flex items-center gap-1">
+				<MenuButton
+					store={menu}
+					className={`${actionTriggerChipButtonClasses} ${
+						open ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+					}`}
+					aria-label="Show attached files and links"
+				>
 					<ActionTriggerChipContent
 						className="text-base-content"
 						icon={<FiPaperclip size={14} />}
 						label="Attachments"
 						secondaryLabel={attachmentSummary}
-						secondaryLabelClassName="text-base-content/60 shrink-0 whitespace-nowrap text-xs"
 						open={open}
 					/>
 				</MenuButton>
 
 				<button
 					type="button"
-					className={`${actionTriggerChipRemoveButtonClasses} ml-1`}
+					className={actionTriggerChipRemoveButtonClasses}
 					onClick={() => {
 						menu.hide();
 						onClearAttachments();
