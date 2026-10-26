@@ -18,6 +18,7 @@ import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -134,11 +135,11 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 
 	return (
 		<>
-			<div className="modal-box bg-base-200 fixed top-1/2 left-1/2 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl -translate-1/2 overflow-hidden rounded-2xl p-0">
-				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-					<ModalHeader title={displayName} description={secondaryName} onClose={onClose} />
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
+				<ModalHeader title={displayName} description={secondaryName} onClose={onClose} />
 
-					<div className="space-y-5">
+				<div className="app-scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:p-6">
+					<div className="space-y-5 pb-1">
 						<ModalSection title="Agent metadata">
 							<ManagementInfoGrid>
 								<ManagementInfoRow label="Name" mono>
@@ -149,7 +150,6 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 								<ManagementInfoRow label="Enabled">{agent.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 								<ManagementInfoRow label="State">{agent.state}</ManagementInfoRow>
 								<ManagementInfoRow label="Revision">{agent.revision}</ManagementInfoRow>
-								<ManagementInfoRow label="Definition">{agent.definitionDigest || '—'}</ManagementInfoRow>
 								<ManagementInfoRow label="Description">
 									<span className="whitespace-pre-wrap">{agent.description || '—'}</span>
 								</ManagementInfoRow>
@@ -166,9 +166,25 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 						<ModalSection
 							title="Agent YAML"
 							description="Managed Agent declarations are immutable. Export, edit externally, then import under a new name or after deletion."
+							actionsAlign="center"
+							actions={
+								exportResult ? (
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost inline-flex items-center justify-center gap-2 rounded-xl"
+										disabled={isSavingYAML}
+										onClick={() => {
+											void saveYAML();
+										}}
+									>
+										<FiDownload size={15} className="shrink-0" />
+										<span>{isSavingYAML ? 'Saving...' : 'Export YAML'}</span>
+									</button>
+								) : undefined
+							}
 						>
 							{yamlSaveError ? (
-								<div className="alert alert-error mb-3 rounded-2xl text-sm">
+								<div className="alert alert-error rounded-xl text-sm">
 									<FiAlertCircle size={16} />
 									<span>{yamlSaveError}</span>
 								</div>
@@ -181,32 +197,16 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 							) : null}
 
 							{exportError ? (
-								<div className="alert alert-warning rounded-2xl text-sm">
+								<div className="alert alert-warning rounded-xl text-sm">
 									<FiAlertCircle size={16} />
 									<span>{exportError}</span>
 								</div>
 							) : null}
 
 							{exportResult ? (
-								<div className="space-y-3">
-									<div className="flex justify-end">
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											disabled={isSavingYAML}
-											onClick={() => {
-												void saveYAML();
-											}}
-										>
-											<FiDownload size={15} />
-											<span>{isSavingYAML ? 'Saving...' : 'Export YAML'}</span>
-										</button>
-									</div>
-
-									<pre className="bg-base-300 max-h-96 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-										{exportResult.content}
-									</pre>
-								</div>
+								<pre className="app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 text-xs leading-5 whitespace-pre-wrap">
+									{exportResult.content}
+								</pre>
 							) : null}
 						</ModalSection>
 
@@ -241,40 +241,54 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 										const isExcluded = canToggleCapability && Boolean(capabilityControls?.isExcluded(occurrence));
 
 										return (
-											<div key={occurrence.path} className="border-base-content/10 rounded-2xl border p-3">
-												<div className="flex flex-wrap items-center gap-2">
-													<span className="font-medium">
-														{occurrence.type}
-														{occurrence.name ? `: ${occurrence.name}` : ''}
-													</span>
-													<span
-														className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
-													>
-														{occurrence.status}
-													</span>
-													{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
-													{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
-												</div>
+											<div key={occurrence.path} className="border-base-content/10 rounded-xl border p-3">
+												<div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+													<div className="min-w-0">
+														<div className="flex flex-wrap items-center gap-2">
+															<span className="badge badge-ghost badge-sm shrink-0 capitalize">{occurrence.type}</span>
+															<span className="min-w-0 font-medium break-words">
+																{occurrence.name || `Unnamed ${occurrence.type}`}
+															</span>
+														</div>
 
-												<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-													{occurrence.message ? (
-														<div className="text-warning text-xs">{occurrence.message}</div>
-													) : (
-														<span />
-													)}
+														{occurrence.message ? (
+															<div className="text-warning mt-2 text-xs leading-5">{occurrence.message}</div>
+														) : null}
+													</div>
 
-													{canToggleCapability ? (
-														<button
-															type="button"
-															className="btn btn-ghost btn-xs rounded-lg"
-															onClick={() => {
-																capabilityControls?.onToggle(occurrence);
-															}}
+													<div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+														<span
+															className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
 														>
-															{isExcluded ? 'Include' : 'Exclude'}
-														</button>
-													) : null}
+															{occurrence.status}
+														</span>
+														{occurrence.required ? (
+															<span className="badge badge-outline badge-sm">Required</span>
+														) : null}
+														{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
+
+														{canToggleCapability ? (
+															<button
+																type="button"
+																className="btn btn-ghost btn-xs inline-flex items-center justify-center rounded-lg"
+																title={
+																	isExcluded
+																		? 'Restore this inherited Agent contribution for the next Run.'
+																		: 'Exclude this inherited Agent contribution for the next Run.'
+																}
+																onClick={() => {
+																	capabilityControls?.onToggle(occurrence);
+																}}
+															>
+																{isExcluded ? 'Include' : 'Exclude'}
+															</button>
+														) : null}
+													</div>
 												</div>
+
+												{occurrence.message ? (
+													<div className="text-warning mt-3 text-xs leading-5">{occurrence.message}</div>
+												) : null}
 											</div>
 										);
 									})}
@@ -287,49 +301,57 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 						</ModalSection>
 
 						<ModalSection title="MCP setup">
-							{!exportResult && !exportError ? (
+							{!resolution && !resolutionError ? (
 								<div className="text-base-content/70 text-sm">Loading MCP setup descriptors...</div>
-							) : setupDescriptors.length === 0 ? (
+							) : null}
+
+							{resolutionError ? (
 								<div className="text-base-content/70 text-sm">
-									No managed MCP setup descriptors are available for this Agent.
+									MCP setup is unavailable until this Agents declarations can be resolved.
 								</div>
-							) : (
-								<div className="space-y-3">
+							) : null}
+
+							{resolution && setupDescriptors.length === 0 ? (
+								<div className="text-base-content/70 text-sm">This Agent does not declare any MCP servers.</div>
+							) : null}
+
+							{resolution && setupDescriptors.length > 0 ? (
+								<div className="space-y-2">
 									{setupDescriptors.map(descriptor => (
 										<div
 											key={descriptor.occurrencePath}
-											className="border-base-content/10 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+											className="border-base-content/10 bg-base-100/40 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
 										>
 											<div className="min-w-0">
 												<div className="flex items-center gap-2 font-medium">
-													<FiServer size={15} />
-													<span>{descriptor.name}</span>
+													<FiServer size={15} className="shrink-0" />
+													<span className="truncate">{descriptor.name}</span>
 												</div>
 											</div>
 
 											<button
 												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
+												className="btn btn-sm btn-ghost inline-flex shrink-0 items-center justify-center gap-2 rounded-xl"
 												onClick={() => {
 													setSetupDescriptor(descriptor);
 												}}
 											>
-												<FiFileText size={15} />
+												<FiFileText size={15} className="shrink-0" />
 												<span>{descriptor.artifact ? 'Configure' : 'View setup status'}</span>
 											</button>
 										</div>
 									))}
 								</div>
-							)}
+							) : null}
 						</ModalSection>
 					</div>
-
-					<ModalActions>
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
-							Close
-						</button>
-					</ModalActions>
 				</div>
+
+				<ModalActions>
+					<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
+						Close
+					</button>
+				</ModalActions>
 			</div>
 
 			<AgentMCPSetupModal
@@ -356,6 +378,7 @@ export function AgentDetailsModal({ isOpen, agent, onClose, capabilityControls }
 				onClose={onClose}
 				capabilityControls={capabilityControls}
 			/>
+			<ModalBackdrop enabled={true} />
 		</ModalDialog>
 	);
 }

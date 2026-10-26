@@ -69,8 +69,8 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 				{recipe.canApply ? <FiCheck size={15} /> : <FiAlertCircle size={15} />}
 				<span>
 					{recipe.canApply
-						? 'This Agent can currently be projected into the supported Composer starter recipe.'
-						: 'This Agent contains declarations the current Composer projection cannot safely materialize.'}
+						? 'This agent can currently be used as a composer starter recipe.'
+						: 'This agent contains declarations the current composer cannot materialize.'}
 				</span>
 			</div>
 
@@ -107,12 +107,12 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 					title="Tools"
 					subtitle={`${recipe.toolSelections.length} selected`}
 					metadata={
-						<>
-							<FiTool size={14} />
+						<div className="flex items-center gap-2">
+							<FiTool size={14} className="shrink-0" />
 							<MetadataPill label="Web search">
 								{recipe.toolSelections.filter(item => item.choice.toolType === ToolStoreChoiceType.WebSearch).length}
 							</MetadataPill>
-						</>
+						</div>
 					}
 				/>
 
@@ -120,10 +120,10 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 					title="Skills"
 					subtitle={`${recipe.enabledSkillRefs.length} enabled, ${recipe.activeSkillRefs.length} active`}
 					metadata={
-						<>
-							<FiZap size={14} />
+						<div className="flex items-center gap-2">
+							<FiZap size={14} className="shrink-0" />
 							<MetadataPill label="Instruction Skills">{recipe.instructionSkillRefs.length}</MetadataPill>
-						</>
+						</div>
 					}
 				/>
 			</div>
