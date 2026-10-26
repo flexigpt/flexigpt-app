@@ -1,72 +1,34 @@
 ---
 name: test-implementation
-description: Write or update unit, integration, or regression tests, then verify with focused shell commands. Use when the user wants new tests written, a bug fix confirmed by tests, or backfilled coverage. Matches the existing test style.
+description: Deliver complete unit, integration, or regression tests from workspace or attached code, using supported repository conventions and evidence-based verification.
 ---
 
 # Test Implementation
 
-Write or update tests, then verify with focused commands. Match the codebase's existing test style. Do not rewrite unrelated tests.
+Complete the requested test coverage and all required fixtures and helpers in this turn.
 
-## Use when
+## Scope
 
-- writing or updating unit, integration, or regression tests
-- confirming a fix with new test coverage
-- backfilling tests for known behavior
-- closing a coverage gap identified earlier
+- Implement the requested tests and supporting test artifacts.
+- Apply production-code changes when explicitly included in the authorized task.
+- Preserve unrelated tests, fixtures, and snapshots.
 
-## Do not use when
+## Execution
 
-- the user only wants a test plan
-- the user wants production code written
-- the user wants a code review
-- the user wants bug diagnosis
+- Map every requested behavior and edge case to a test and its expected outcome.
+- Inspect available neighboring tests, contracts, and dependency declarations.
+- Match the existing framework and style. When examples are absent, use a declared framework or a suitable supported standard-library facility.
+- Implement complete tests, fixtures, and helpers together; identify newly introduced support code explicitly.
+- Prefer the smallest test level that exercises the required behavior.
+- Run focused tests first, then affected suites and build checks.
+- Record actual commands, working directories, outcomes, and relevant failure details.
+- Repair failures caused by the test change. Isolate exact contract or environment blockers and complete independent cases.
+- With attachment-only delivery, source-check the tests and record execution as pending.
 
-## Execution model
+## Delivery
 
-Workflow phases:
-
-    discover test style -> choose targets -> plan cases -> implement -> focused verification -> report evidence
-
-Discover existing style first. Before writing, inspect at least one existing test file in the same area to learn: framework, assertion style, naming convention, fixture strategy, test doubles approach, file location, and how integration vs unit tests are separated. If no existing tests exist, ask for the preferred framework before writing.
-
-Plan before writing. List the cases to implement and their level (unit, integration, regression) before adding code. Cases should map to a requirement, bug, or behavior under test.
-
-Implement narrowly. Add or modify only the tests required for the requested behavior. Do not refactor unrelated tests. Do not change production code unless explicitly asked.
-
-Verify focused. Run only the new or modified tests where possible. Capture command output. If running tests is unavailable, mark verification `proposed only` and explain.
-
-## Hard rules
-
-- Match the existing test style and framework exactly; do not introduce a new framework unless asked.
-- Prefer narrow, focused tests for the requested behavior.
-- Do not rewrite unrelated tests, snapshots, or fixtures.
-- Do not modify production code unless explicitly asked.
-- Do not claim tests passed without command output captured in the artifact.
-- Use shell only for focused test or build commands; explain briefly why each command is needed.
-- If tests cannot be executed, say `proposed only` and do not claim verification.
-- Do not invent helpers, fixtures, or test data that do not exist in the codebase without naming them as new additions.
-- Works standalone; does not require any companion prompt.
-
-## Artifact format
-
-Use only sections that matter.
-
-test-scope: what behavior is being covered, source tie (requirement, bug, code path).
-
-existing-test-style: framework, naming, assertion, fixture, and structure observed; cite the example file.
-
-planned-tests: ordered list of (case | level | target file | source tie).
-
-files-changed: list of test files added or modified; brief reason per file.
-
-verification-commands: exact commands to run only the new or modified tests.
-
-verification-results: command output (success/failure summary); if unavailable, mark `proposed only`.
-
-gaps: cases planned but not implemented, or behaviors not covered confidently, with reasons.
-
-status: `complete`, `partial`, `blocked`, or `proposed only`.
-
-## Response format
-
-End each response with: `completed-phases`, `current-phase`, `delivery-mode` (direct edit | ready-to-apply output | analysis only), `status`, key assumptions or blockers, `next-step` (only if useful).
+- Provide full new or deliberate replacement files and exact-path unified diffs for existing modifications.
+- Report covered cases, remaining requirements, and verification evidence.
+- Distinguish authored tests, applied changes, and executed checks.
+- End implementation responses with `## Implementation status` and `## Next steps` task lists.
+- Keep remaining test implementation, integration, and verification assistant-owned.

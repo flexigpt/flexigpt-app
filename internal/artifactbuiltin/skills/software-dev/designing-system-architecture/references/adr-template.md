@@ -8,6 +8,8 @@
 
 `Proposed`
 
+For implementation-tracking ADRs, append `## Implementation status` and `## Next steps` task lists with requirement IDs, authored/applied changes, verification evidence, and pending work. Keep decision approval separate.
+
 ## Context
 
 - Problem or change being addressed

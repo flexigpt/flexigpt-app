@@ -10,8 +10,8 @@
   - [ ] test all management pages again properly
 
 - [ ] add as code in md, output format skill too
-- [ ] add wails considerations skill in flexigpt repo.
 - [ ] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
+- [ ] add wails considerations skill in flexigpt repo.
 
 ## M-3
 

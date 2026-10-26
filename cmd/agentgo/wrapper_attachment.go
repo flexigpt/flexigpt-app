@@ -353,7 +353,8 @@ func (a *App) promptOpenPaths(
 		CanChooseFiles(!chooseDirectories).
 		CanChooseDirectories(chooseDirectories).
 		CanCreateDirectories(true).
-		ShowHiddenFiles(showHiddenFiles)
+		ShowHiddenFiles(showHiddenFiles).
+		AllowsOtherFileTypes(true)
 	for _, filter := range filters {
 		dialog.AddFilter(filter.DisplayName, filter.Pattern())
 	}

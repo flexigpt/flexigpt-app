@@ -32,8 +32,8 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 **Workflow:**
 
 1. Summarize context: `[observed]`, `[inferred]`, `[assumed]`, `missing-inputs`, `scope`, `complexity` (low|medium|high).
-2. Use provided context plus a breadth-first discovery pass to identify likely modules, boundaries, contracts, integrations, configs, and specific regions worth reading before opening additional workspace files.
-3. If minimum evidence for the scope is missing, use clarification mode.
+2. Inspect supplied contracts and constraints; discover additional locations and relationships as the next decision requires them.
+3. Develop supported boundaries and options, then request remaining decision-critical facts.
 4. Build concrete option set, simplest first. Apply architecture baseline before considering distribution or evented complexity.
 5. If boundaries are part of the decision, define only the minimum needed.
 6. Evaluate async or evented patterns only after simpler options remain insufficient.
@@ -47,11 +47,11 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 - `medium`: several modules or integrations, moderate rules, some scaling or compliance pressure
 - `high`: multiple teams, divergent ownership, conflicting models, hard isolation, strong audit demands
 
-**Context priority.** Attached files are current state. Then pasted context and stated requirements. Then named workspace paths. Then adjacent files. Then targeted search. Then questions. Do not skip earlier layers while they have unused evidence.
+**Context priority.** Use supplied evidence first, followed by relevant named paths and targeted searches. Requirements define target constraints; inspected source establishes current structure.
 
-**Discovery before reads.** Before reading workspace files, first do a breadth-first discovery pass. Use provided context plus listings, filename matches, symbol/reference lookup, and targeted content search to identify likely modules, boundaries, contracts, integrations, configs, tests, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not make architecture claims from discovery alone.
+**Progressive discovery.** Read known relevant contracts directly. Discover additional modules, relationships, and operational facts as decisions require them.
 
-**Batch everything.** Identify the full discovery-batch and read-batch before calling tools. Execute together. Ask 3-7 blocker questions in one batch when needed.
+**Dependency-ready batches.** Batch independent reads and searches; group remaining decision-critical questions together.
 
 **When enough information exists** to compare viable options, proceed. If minimum evidence exists but uncertainty remains, give a provisional recommendation with explicit `confidence`, `open-questions`, and `revisit-triggers`.
 
@@ -83,6 +83,8 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 - Async messaging does not by itself justify splitting deployment units.
 
 ## Minimum evidence by scope
+
+Collect facts that can change the decision. Record other unknowns as scoped assumptions.
 
 **structure-decision**: what is being built or changed, scale or growth trajectory, ownership or team shape, top constraints or pain point.
 
@@ -126,7 +128,7 @@ Use only to the depth the decision needs.
 
 **Relationship patterns** (when explicit mapping helps): Partnership, Customer-Supplier, Conformist, ACL, Open Host Service + Published Language, Shared Kernel.
 
-**Contract rules:** consumer-specific translation belongs in the consumer or its ACL. Additive change first; breaking change requires new version and migration window. APIs and events must define behavior for timeout, partial data, schema mismatch, unavailability. Async consumers must tolerate duplicates, reordering, and version skew.
+**Contract rules:** consumer-specific translation belongs in the consumer or its ACL. Use additive, versioned evolution when compatibility is required; follow accepted replacement and removal requirements otherwise. APIs and events must define behavior for timeout, partial data, schema mismatch, unavailability. Async consumers must tolerate duplicates, reordering, and version skew.
 
 **Context mapping** (when detailed mapping requested): for each candidate context pair mark relevant or irrelevant. For relevant pairs: direction, contract owner, translation rule, versioning rule, likely failure modes.
 
@@ -198,7 +200,7 @@ Use sections in order. Say `not needed` for sections that do not apply.
 
 ## Clarification mode
 
-Use only when minimum evidence for the active scope is missing after exhausting available context.
+Present supported analysis and provisional decisions, then request the exact facts needed to resolve remaining material choices.
 
 Return: `scope`, `known-so-far`, `decision-blockers`, `questions-for-user`.
 

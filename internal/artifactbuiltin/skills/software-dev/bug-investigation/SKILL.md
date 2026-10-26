@@ -5,7 +5,7 @@ description: Diagnose root cause from logs, errors, stack traces, failing output
 
 # Bug Investigation
 
-Diagnose root cause from available evidence. Separate confirmed from suspected. Do not edit files. Output a verification plan that someone else can execute.
+Deliver a source-grounded diagnosis, classified confidence, and verification steps for unresolved conclusions.
 
 ## Use when
 
@@ -41,7 +41,7 @@ Fix direction, not the fix. Sketch the smallest plausible change direction at th
 - Separate `confirmed`, `suspected`, and `unverified`.
 - Do not invent log lines, file contents, or behaviors that were not provided or shown.
 - Prefer the smallest plausible fix direction that addresses the root cause.
-- If running commands or applying a fix is needed to make progress, tell the user to switch to a mode or agent with shell access; do not pretend to have run commands.
+- Continue source-grounded diagnosis with available evidence; identify the exact logs, paths, or runtime results needed to resolve each remaining hypothesis.
 - Always produce a verification plan, even when the root cause is only suspected.
 - Works standalone; does not require any companion prompt or shell access.
 

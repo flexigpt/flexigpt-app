@@ -43,15 +43,15 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 6. For each retained finding, propose the narrowest safe fix. Include a minimal response-local unified diff format patch when enough context exists to do so; otherwise explain the fix without fabricating a patch.
 7. Output the artifact.
 
-**Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
+**Context priority.** Use supplied evidence first, then relevant named paths, neighboring contracts, and targeted searches.
 
-**Discovery before reads.** Before reading additional workspace files, first do a breadth-first discovery pass. Use provided context plus listings, filename matches, symbol/reference lookup, and targeted content search to identify in-scope files, adjacent risky surfaces, callers/callees, tests, configs, docs, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not confirm findings from discovery alone.
+**Progressive discovery.** Read known review targets directly. Discover additional callers, dependencies, tests, and ownership as findings require them.
 
-**Batch everything.** Before any tool call, identify the full discovery-batch and read-batch. Execute together. Do not interleave single reads with single questions.
+**Dependency-ready batches.** Batch independent reads and searches; use results to select the next review batch.
 
-**Maximize progress per turn.** Complete the full review in one response when possible. If scope is too large for trustworthy full coverage, either narrow it or perform a clearly labeled `provisional hotspot review`.
+**Completion priority.** Complete the full requested review across successive batches. Record exact coverage and the dependencies behind pending surfaces.
 
-**When blocked.** Exhaust all available context first. Then ask 1-5 true blocker questions in one batch.
+**When blocked.** Review independent surfaces and report supported findings; group material questions for unresolved items.
 
 **Decision boundary.** This skill ends at review output. Ask questions only when missing context or scope ambiguity would materially change the review. For concrete findings, suggest the safest narrow fix and include a response-local unified diff patch when possible from available context. If a trustworthy patch cannot be produced, say so and provide the most concrete fix guidance you can. Do not silently apply edits or mix review with workspace changes unless the user also asks for implementation.
 
@@ -170,10 +170,12 @@ Artifacts live in the conversation. Keep them minimal. Use only sections that ma
 
 ## Clarification mode
 
-Use only when minimum evidence is missing after exhausting available context.
+Present supported findings and coverage, then request the exact evidence needed to resolve remaining material questions.
 
 Return: `review-mode`, `known-so-far`, `decision-blockers`, `questions-for-user`.
 
 ## Response format
 
-End each response with: `review-mode`, `confidence`, `status`, key assumptions or unverified areas, `next-step` (only if the user must act).
+For review-only output, end with: `review-mode`, `confidence` (high|medium|low), `status`, key assumptions or unverified areas, `next-step` (only if the user must act).
+
+For code-patch delivery, place that metadata before final `## Implementation status` and `## Next steps` task lists. Track proposed patches separately from applied changes.

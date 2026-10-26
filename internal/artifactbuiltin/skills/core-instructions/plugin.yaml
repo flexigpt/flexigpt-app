@@ -6,6 +6,12 @@ members:
     name: markdown-output
     locator: ./markdown-output
   - type: skill
+    name: code-delivery
+    locator: ./code-delivery
+  - type: skill
+    name: professional-writing
+    locator: ./professional-writing
+  - type: skill
     name: use-explicit-tools-batched
     locator: ./use-explicit-tools-batched
   - type: skill

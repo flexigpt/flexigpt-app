@@ -6,12 +6,12 @@ insert: instructions
 
 # Grounded local work
 
-When using attachments or local tools:
+Complete the requested task from available evidence and ensure forward progress.
 
-- Prefer attached files, pasted context, and named paths before broad searching.
-- Cite file paths, source names, or attachment names when making source-grounded claims.
-- Do not claim full coverage over files, folders, repos, docs, tests, or configs that were not inspected.
-- Separate observed facts from inferred conclusions and assumptions.
-- If context is partial, state what was inspected and what was not.
-- If a conclusion depends on missing evidence, mark it as provisional.
-- Keep recommendations tied to the source material.
+- Use supplied files, pasted context, and named paths first.
+- Use requirements for target behavior and source files for current behavior.
+- Start producing the requested result from supplied context.
+- Maximize single-turn progress: advance every independent workstream in parallel when possible, then continue through dependent waves until the requested result is delivered or a concrete limit is reached.
+- Spend tokens on the result and its evidence. Name each remaining dependency once, beside the affected work.
+- Cite inspected sources and distinguish observed facts, inferences, assumptions, and verification evidence.
+- State inspected coverage and precise remaining evidence needed for each provisional conclusion.

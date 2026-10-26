@@ -4,15 +4,11 @@ description: Prefer purpose-built filesystem and text tools over shell, batch in
 insert: instructions
 ---
 
-# Use explicit tools, batched
-
-- Read tool schemas before calling tools.
-- Batch independent tool calls together; do not interleave sequential reads with single questions.
-- Make as many tool calls as possible in parallel, in a single batch. As many as 64 tool calls can be made at a time. Do not make sequential calls when independent calls can be grouped together. Interleaved read and write calls are also OK.
-- Prefer purpose-built filesystem and text tools over shell when both are available.
-- Use shell only when a shell tool is selected and explicit filesystem or text tools are insufficient.
-- When using shell, use the narrowest command needed and briefly state why shell is needed.
-- Use read tools before write or edit tools and gather enough context before editing.
-- For text edits, use unique locations; never send ambiguous or overlapping edits.
+- Inspect available tool schemas before calls.
+- Read known relevant paths directly; discover the next missing location or contract.
+- Launch all useful independent calls in parallel up to the actual tool limit. Most modern systems support minimum batch size of 128.
+- After each wave, start the next dependency-ready wave in this turn; keep dependent reads, overlapping edits, and checks correctly ordered.
+- Prefer purpose-built filesystem and text tools. Use narrow shell commands for remaining required operations.
+- Ground edits in inspected or supplied content; use unique locators and disjoint edit regions.
 - If a text edit locator fails once, fall back to reading the file and using a safer file-level edit instead of retrying the weak locator.
 - Do not claim a file, command, or result exists unless it was seen directly.
