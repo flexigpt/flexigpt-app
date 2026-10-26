@@ -1,4 +1,4 @@
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import { ReasoningLevel } from '@/spec/inference';
 import { getReasoningLevelDisplayName } from '@/spec/inference_labels';
@@ -6,8 +6,8 @@ import { getReasoningLevelDisplayName } from '@/spec/inference_labels';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
-	actionTriggerMenuCompactClasses,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
@@ -36,7 +36,7 @@ export function SingleReasoningDropdown({
 	setReasoningLevel,
 }: SingleReasoningDropdownProps) {
 	const options = levelOptions && levelOptions.length > 0 ? levelOptions : COMPOSER_DEFAULT_REASONING_LEVELS;
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
 	const availableLevels = options.filter(level => level !== reasoningLevel);
@@ -64,14 +64,7 @@ export function SingleReasoningDropdown({
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={actionTriggerMenuCompactClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<div className={actionTriggerMenuHeaderRowClasses}>
 							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Reasoning level</div>
@@ -109,13 +102,13 @@ export function SingleReasoningDropdown({
 					<ComposerCurrentSettingPanel
 						label="Current reasoning"
 						value={getReasoningLevelDisplayName(reasoningLevel)}
-						help="Use Default to defer to the model or provider. Higher reasoning levels may require more latency and token budget."
+						help="Use Default to defer to the model or provider."
 						isDefault={reasoningLevel === undefined}
 						onUseDefault={() => {
 							setReasoningLevel(undefined);
 						}}
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

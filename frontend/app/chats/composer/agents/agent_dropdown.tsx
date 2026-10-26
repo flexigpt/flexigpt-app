@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FiCheck, FiEye, FiLayers, FiRefreshCw } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
 
@@ -10,12 +10,12 @@ import type { AgentCatalogOption } from '@/apis/agent_management';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
@@ -106,7 +106,7 @@ function SelectedAgentSummary({ option, onView }: { option: AgentCatalogOption; 
 
 export function AgentDropdown({ manager }: AgentDropdownProps) {
 	const menu = useMenuStore({
-		placement: 'top',
+		placement: 'top-start',
 		focusLoop: true,
 	});
 	const open = useStoreState(menu, 'open');
@@ -238,14 +238,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 			</HoverTip>
 
 			{open ? (
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					className={actionTriggerMenuWideClasses}
-					autoFocusOnShow={false}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						{manager.agentOptions.length > 0 ? (
 							<SearchableMenuInput
@@ -375,7 +368,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							</div>
 						) : null}
 					</ComposerDropdownSelectedPanel>
-				</Menu>
+				</ActionTriggerMenu>
 			) : null}
 
 			<AgentDetailsModal

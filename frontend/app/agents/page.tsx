@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-	FiChevronDown,
-	FiChevronUp,
-	FiDownload,
-	FiEdit2,
-	FiEye,
-	FiPlus,
-	FiRefreshCw,
-	FiTrash2,
-	FiUpload,
-} from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiPlus, FiRefreshCw, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentView } from '@/spec/agent';
 import type { PluginListItem, PluginView } from '@/spec/plugin';
@@ -33,7 +23,7 @@ import {
 	isBuiltInAgentPlugin,
 	pluginDisplayName,
 } from '@/apis/agent_management';
-import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
+import { agentManagementAPI } from '@/apis/baseapi';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -63,7 +53,7 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
-import { formatDateish, textToBase64 } from '@/agents/agent_management_utils';
+import { formatDateish } from '@/agents/agent_management_utils';
 
 const AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -159,7 +149,6 @@ interface AgentPluginCardProps {
 	onImportAgent: (destination: AgentImportDestination) => void;
 	onTogglePluginEnabled: (plugin: PluginListItem, enabled: boolean) => Promise<void>;
 	onViewAgent: (agent: AgentView) => void;
-	onExportAgent: (agent: AgentView) => Promise<void>;
 	onDeleteAgent: (agent: AgentView) => void;
 	onToggleAgentEnabled: (agent: AgentView, enabled: boolean) => Promise<void>;
 	onActionError: (message: string) => void;
@@ -174,7 +163,6 @@ function AgentPluginCard({
 	onImportAgent,
 	onTogglePluginEnabled,
 	onViewAgent,
-	onExportAgent,
 	onDeleteAgent,
 	onToggleAgentEnabled,
 	onActionError,
@@ -363,7 +351,6 @@ function AgentPluginCard({
 						? data.agents.map(agent => {
 								const agentAvailable = agent.state === ArtifactState.Available;
 								const toggleKey = `agent:${agent.ref.rootID}:${agent.ref.artifactID}:toggle`;
-								const exportKey = `agent:${agent.ref.rootID}:${agent.ref.artifactID}:export`;
 
 								return (
 									<ManagementItemCard
@@ -418,20 +405,6 @@ function AgentPluginCard({
 												<FiEye size={15} />
 												<span>View</span>
 											</button>
-
-											{agentAvailable ? (
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-xl"
-													disabled={isPending(exportKey)}
-													onClick={() => {
-														run(exportKey, () => onExportAgent(agent), 'Failed to export Agent YAML.');
-													}}
-												>
-													<FiDownload size={15} />
-													<span>{isPending(exportKey) ? 'Exporting...' : 'Export'}</span>
-												</button>
-											) : null}
 
 											{agent.managed && !agent.builtIn ? (
 												<button
@@ -997,17 +970,6 @@ export default function AgentsPage() {
 		}
 	}, [pluginToDelete, isDeletingPlugin, pageData.plugins, refreshPage, showAlert]);
 
-	const exportAgent = useCallback(async (agent: AgentView) => {
-		const exported = await agentManagementAPI.exportAgent(agentArtifactRef(agent));
-
-		await backendAPI.saveFile(exported.suggestedFileName, textToBase64(exported.content), [
-			{
-				DisplayName: 'YAML',
-				Extensions: ['yaml', 'yml'],
-			},
-		]);
-	}, []);
-
 	const importCommitted = useCallback(
 		async (result: AgentImportCommitResult) => {
 			await refreshPage();
@@ -1030,7 +992,7 @@ export default function AgentsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Agent Plugins"
-					description="Import immutable Agent recipes, inspect their resolved capabilities, configure MCP dependencies, and apply them as Composer starters."
+					description="Import immutable Agent recipes, inspect their grouped declarations, configure MCP dependencies, and apply them as Composer starters."
 					actions={
 						<>
 							{pluginCreationRoots.length > 1 ? (
@@ -1114,7 +1076,6 @@ export default function AgentsPage() {
 							}}
 							onTogglePluginEnabled={togglePluginEnabled}
 							onViewAgent={setAgentToView}
-							onExportAgent={exportAgent}
 							onDeleteAgent={setAgentToDelete}
 							onToggleAgentEnabled={toggleAgentEnabled}
 							onActionError={showAlert}

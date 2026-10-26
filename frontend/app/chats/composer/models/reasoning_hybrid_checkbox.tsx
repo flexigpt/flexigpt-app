@@ -1,11 +1,11 @@
 import { FiCheck } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerMenuCompactClasses,
+	ActionTriggerMenu,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerCurrentSettingPanel } from '@/components/composer_dropdown_selected_panel';
@@ -20,7 +20,7 @@ export function HybridReasoningCheckbox({
 	preference?: boolean;
 	setIsReasoningEnabled: (enabled?: boolean) => void;
 }) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 
 	return (
@@ -45,14 +45,7 @@ export function HybridReasoningCheckbox({
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={`${actionTriggerMenuCompactClasses} text-xs`}
-				>
+				<ActionTriggerMenu store={menu}>
 					{preference !== undefined ? (
 						<MenuItem
 							className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -94,7 +87,7 @@ export function HybridReasoningCheckbox({
 							setIsReasoningEnabled(undefined);
 						}}
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

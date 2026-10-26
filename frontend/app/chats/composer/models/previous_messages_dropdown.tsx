@@ -1,15 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { IncludePreviousMessages } from '@/spec/model';
 
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
-	actionTriggerMenuCompactClasses,
 	actionTriggerMenuFieldCardClasses,
 	actionTriggerMenuFieldInputClasses,
 	ActionTriggerMenuHeader,
@@ -52,7 +52,7 @@ function displayOptionLabel(value: IncludePreviousMessages): string {
 }
 
 export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDropdownProps) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
 	const availableOptions = OPTIONS.filter(option => option !== value);
@@ -109,14 +109,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={actionTriggerMenuCompactClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<div className={actionTriggerMenuHeaderRowClasses}>
 							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Previous user turns</div>
@@ -124,7 +117,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 						</div>
 					</ActionTriggerMenuHeader>
 
-					<ActionTriggerMenuBody className="space-y-2">
+					<ActionTriggerMenuBody className="min-h-0 flex-1 space-y-2 overflow-y-auto">
 						<div className="space-y-1">
 							{availableOptions.map(option => {
 								const key = valueToKey(option);
@@ -147,7 +140,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 							<label htmlFor="include-previous-messages" className="block text-xs font-semibold">
 								Custom number of turns
 							</label>
-							<div className="text-base-content/60 mt-1 mb-2 text-[11px]">
+							<div className="text-base-content/60 p-1 text-[11px]">
 								Enter 0 or a whole number of previous pure user turns.
 							</div>
 							<input
@@ -186,7 +179,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 								}}
 							/>
 							{customError ? (
-								<div id="previous-messages-error" role="alert" className="text-error mt-1 text-[11px]">
+								<div id="previous-messages-error" role="alert" className="text-error p-1 text-[11px]">
 									{customError}
 								</div>
 							) : null}
@@ -196,15 +189,15 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					<ComposerCurrentSettingPanel
 						label="Current history"
 						value={displayOptionLabel(value)}
-						help="This controls how many earlier pure user turns are sent with the current message. Turns containing tool output are not included."
+						help="This controls how many earlier pure user turns are sent with the current message. Turns containing tool output are not pure user turns."
 						isDefault={value === 0}
 						onUseDefault={() => {
 							setCustomError(null);
 							setValue(0);
 						}}
-						useDefaultLabel="Current turn only"
+						useDefaultLabel="Use current turn only"
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

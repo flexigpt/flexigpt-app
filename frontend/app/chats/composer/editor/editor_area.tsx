@@ -211,12 +211,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isActive,
 	});
 
-	const templateMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const toolMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const attachmentMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const skillsMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const mcpMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const workspaceMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const templateMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const toolMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const attachmentMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const skillsMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const mcpMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const workspaceMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
 	const mcp = useComposerMCP(mcpMenuOpen);
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);

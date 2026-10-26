@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiDownload, FiFileText, FiServer } from 'react-icons/fi';
+import { FiAlertCircle, FiChevronDown, FiDownload } from 'react-icons/fi';
 
-import type {
-	AgentCapabilityOccurrence,
-	AgentExportResult,
-	AgentMCPSetupDescriptor,
-	AgentResolution,
-	AgentView,
-} from '@/spec/agent';
-import { CapabilityResolutionStatus } from '@/spec/artifact';
+import type { AgentExportResult, AgentMCPSetupDescriptor, AgentResolution, AgentView } from '@/spec/agent';
+import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
@@ -23,14 +17,11 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/agent_management_utils';
+import type { AgentCapabilityControls } from '@/agents/agent_declarations';
+import { AgentDeclarations } from '@/agents/agent_declarations';
+import { textToBase64 } from '@/agents/agent_management_utils';
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
-
-interface AgentCapabilityControls {
-	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
-	onToggle: (occurrence: AgentCapabilityOccurrence) => void;
-}
 
 interface AgentDetailsModalProps {
 	isOpen: boolean;
@@ -56,46 +47,37 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 
 	const agentRef = useMemo(() => agentArtifactRef(agent), [agent]);
 	const displayName = agentDisplayName(agent);
-	const secondaryName = displayName === agent.name ? undefined : agent.name;
 
 	useEffect(() => {
 		let cancelled = false;
 
-		const resolveFallback = async () => {
-			if (cancelled) {
-				return;
-			}
-			try {
-				const value = await agentManagementAPI.resolveAgent(agentRef);
+		void agentManagementAPI
+			.resolveAgent(agentRef)
+			.then(value => {
 				if (!cancelled) {
 					setResolution(value);
 					setResolutionError('');
 				}
-			} catch (error) {
+			})
+			.catch((error: unknown) => {
 				if (!cancelled) {
 					setResolutionError(getErrorMessage(error, 'Agent declarations could not be resolved.'));
 				}
-			}
-		};
+			});
 
-		void (async () => {
-			try {
-				const value = await agentManagementAPI.exportAgent(agentRef);
+		void agentManagementAPI
+			.exportAgent(agentRef)
+			.then(value => {
 				if (!cancelled) {
 					setExportResult(value);
+					setExportError('');
 				}
-				if (cancelled) {
-					return;
-				}
-
-				await resolveFallback();
-			} catch (error) {
+			})
+			.catch((error: unknown) => {
 				if (!cancelled) {
 					setExportError(getErrorMessage(error, 'Managed Agent YAML could not be loaded.'));
 				}
-				await resolveFallback();
-			}
-		})();
+			});
 
 		return () => {
 			cancelled = true;
@@ -124,19 +106,10 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 		}
 	};
 
-	const occurrences = resolution?.capabilities?.occurrences ?? [];
-	const setupDescriptors = occurrences
-		.filter(occurrence => occurrence.type === 'mcp')
-		.map(occurrence => ({
-			occurrencePath: occurrence.path,
-			name: occurrence.name || 'MCP server',
-			artifact: occurrence.target?.artifact,
-		}));
-
 	return (
 		<>
 			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
-				<ModalHeader title={displayName} description={secondaryName} onClose={onClose} />
+				<ModalHeader title={displayName} onClose={onClose} />
 
 				<div className="app-scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:p-6">
 					<div className="space-y-5 pb-1">
@@ -157,10 +130,43 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 						</ModalSection>
 
 						<ModalSection
-							title="Composer starter recipe"
-							description="This frontend projection resolves mapped Models and Tools, Skill modes, and MCP runtime identities."
+							title="Agent contributions"
+							description="Declarations grouped by purpose, with their current resolution status. Final Run preparation resolves them again."
 						>
-							<AgentRecipePreview resolution={resolution} />
+							{resolutionError ? (
+								<div className="alert alert-warning rounded-2xl text-sm" role="alert">
+									<FiAlertCircle size={16} />
+									<span>{resolutionError}</span>
+								</div>
+							) : null}
+							{!resolution && !resolutionError ? (
+								<div className="text-base-content/70 text-sm">Resolving Agent declarations...</div>
+							) : null}
+							{resolution ? (
+								<div className="space-y-4">
+									<AgentRecipePreview resolution={resolution} />
+									<p className="text-base-content/70 text-xs">
+										{resolution.capabilities.complete
+											? 'All required declarations currently resolve.'
+											: 'Some declarations are unavailable or ambiguous.'}
+									</p>
+									<AgentDeclarations
+										occurrences={resolution.capabilities.occurrences}
+										capabilityControls={capabilityControls}
+										onSetup={occurrence => {
+											setSetupDescriptor({
+												occurrencePath: occurrence.path,
+												name: occurrence.name || 'MCP server',
+												artifact:
+													occurrence.status === CapabilityResolutionStatus.Available &&
+													occurrence.target?.form === CapabilityTargetForm.Artifact
+														? occurrence.target.artifact
+														: undefined,
+											});
+										}}
+									/>
+								</div>
+							) : null}
 						</ModalSection>
 
 						<ModalSection
@@ -204,144 +210,21 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 							) : null}
 
 							{exportResult ? (
-								<pre className="app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 text-xs leading-5 whitespace-pre-wrap">
-									{exportResult.content}
-								</pre>
-							) : null}
-						</ModalSection>
-
-						<ModalSection
-							title="Capabilities"
-							description="Resolved Agent declarations and their current availability."
-						>
-							{resolutionError ? (
-								<div className="alert alert-warning rounded-2xl text-sm">
-									<FiAlertCircle size={16} />
-									<span>{resolutionError}</span>
-								</div>
-							) : null}
-
-							{!resolution && !resolutionError ? (
-								<div className="text-base-content/70 text-sm">Resolving Agent declarations...</div>
-							) : null}
-
-							{resolution ? (
-								<div className="space-y-3">
-									<div className="text-base-content/70 text-xs">
-										{resolution.capabilities.complete
-											? 'All required Agent declarations currently resolve.'
-											: 'Some Agent declarations are unavailable or ambiguous.'}
+								<details className="border-base-content/10 group overflow-hidden rounded-xl border">
+									<summary className="bg-base-100/40 flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+										<span>Source YAML</span>
+										<FiChevronDown
+											size={16}
+											className="shrink-0 transition-transform group-open:rotate-180"
+											aria-hidden="true"
+										/>
+									</summary>
+									<div className="border-base-content/10 border-t p-3">
+										<pre className="app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 text-xs/5 wrap-break-word whitespace-pre-wrap">
+											{exportResult.content}
+										</pre>
 									</div>
-
-									{occurrences.map(occurrence => {
-										const canToggleCapability =
-											Boolean(capabilityControls) &&
-											occurrence.status === CapabilityResolutionStatus.Available &&
-											['tool', 'skill', 'text', 'mcp'].includes(occurrence.type);
-										const isExcluded = canToggleCapability && Boolean(capabilityControls?.isExcluded(occurrence));
-
-										return (
-											<div key={occurrence.path} className="border-base-content/10 rounded-xl border p-3">
-												<div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-													<div className="min-w-0">
-														<div className="flex flex-wrap items-center gap-2">
-															<span className="badge badge-ghost badge-sm shrink-0 capitalize">{occurrence.type}</span>
-															<span className="min-w-0 font-medium break-words">
-																{occurrence.name || `Unnamed ${occurrence.type}`}
-															</span>
-														</div>
-
-														{occurrence.message ? (
-															<div className="text-warning mt-2 text-xs leading-5">{occurrence.message}</div>
-														) : null}
-													</div>
-
-													<div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-														<span
-															className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
-														>
-															{occurrence.status}
-														</span>
-														{occurrence.required ? (
-															<span className="badge badge-outline badge-sm">Required</span>
-														) : null}
-														{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
-
-														{canToggleCapability ? (
-															<button
-																type="button"
-																className="btn btn-ghost btn-xs inline-flex items-center justify-center rounded-lg"
-																title={
-																	isExcluded
-																		? 'Restore this inherited Agent contribution for the next Run.'
-																		: 'Exclude this inherited Agent contribution for the next Run.'
-																}
-																onClick={() => {
-																	capabilityControls?.onToggle(occurrence);
-																}}
-															>
-																{isExcluded ? 'Include' : 'Exclude'}
-															</button>
-														) : null}
-													</div>
-												</div>
-
-												{occurrence.message ? (
-													<div className="text-warning mt-3 text-xs leading-5">{occurrence.message}</div>
-												) : null}
-											</div>
-										);
-									})}
-
-									{occurrences.length === 0 ? (
-										<div className="text-base-content/70 text-sm">This Agent has no declared capabilities.</div>
-									) : null}
-								</div>
-							) : null}
-						</ModalSection>
-
-						<ModalSection title="MCP setup">
-							{!resolution && !resolutionError ? (
-								<div className="text-base-content/70 text-sm">Loading MCP setup descriptors...</div>
-							) : null}
-
-							{resolutionError ? (
-								<div className="text-base-content/70 text-sm">
-									MCP setup is unavailable until this Agents declarations can be resolved.
-								</div>
-							) : null}
-
-							{resolution && setupDescriptors.length === 0 ? (
-								<div className="text-base-content/70 text-sm">This Agent does not declare any MCP servers.</div>
-							) : null}
-
-							{resolution && setupDescriptors.length > 0 ? (
-								<div className="space-y-2">
-									{setupDescriptors.map(descriptor => (
-										<div
-											key={descriptor.occurrencePath}
-											className="border-base-content/10 bg-base-100/40 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
-										>
-											<div className="min-w-0">
-												<div className="flex items-center gap-2 font-medium">
-													<FiServer size={15} className="shrink-0" />
-													<span className="truncate">{descriptor.name}</span>
-												</div>
-											</div>
-
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost inline-flex shrink-0 items-center justify-center gap-2 rounded-xl"
-												onClick={() => {
-													setSetupDescriptor(descriptor);
-												}}
-											>
-												<FiFileText size={15} className="shrink-0" />
-												<span>{descriptor.artifact ? 'Configure' : 'View setup status'}</span>
-											</button>
-										</div>
-									))}
-								</div>
+								</details>
 							) : null}
 						</ModalSection>
 					</div>

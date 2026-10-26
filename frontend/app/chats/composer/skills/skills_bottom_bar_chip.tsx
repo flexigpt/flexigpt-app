@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiZap } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { PluginListItem } from '@/spec/plugin';
 import type { SkillRef } from '@/spec/skill';
@@ -21,12 +21,12 @@ import {
 	ActionTriggerChipContent,
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { Dropdown } from '@/components/dropdown';
@@ -633,14 +633,7 @@ export function SkillsBottomBarChip({
 					</div>
 				</HoverTip>
 
-				<Menu
-					store={store}
-					gutter={8}
-					overflowPadding={8}
-					className={actionTriggerMenuWideClasses}
-					autoFocusOnShow={false}
-					portal
-				>
+				<ActionTriggerMenu store={store}>
 					<ActionTriggerMenuHeader>
 						<SearchableMenuInput
 							open={open}
@@ -995,7 +988,7 @@ export function SkillsBottomBarChip({
 					>
 						{selectedSkillsPanel}
 					</ComposerDropdownSelectedPanel>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 
 			<ComposerSkillDestinationModal

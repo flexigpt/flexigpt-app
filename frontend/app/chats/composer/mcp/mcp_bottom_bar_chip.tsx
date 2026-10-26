@@ -13,7 +13,7 @@ import {
 } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
 import type {
@@ -52,11 +52,11 @@ import {
 	ActionTriggerChipContent,
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
@@ -963,7 +963,7 @@ export function MCPBottomBarChip({
 	appContextUpdateCount?: number;
 	onClearAppContextUpdates?: () => void;
 }) {
-	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const internalMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
@@ -1145,14 +1145,7 @@ export function MCPBottomBarChip({
 							/>
 						</MenuButton>
 
-						<Menu
-							store={menu}
-							gutter={8}
-							overflowPadding={8}
-							portal
-							className={actionTriggerMenuWideClasses}
-							autoFocusOnShow={false}
-						>
+						<ActionTriggerMenu store={menu}>
 							<ActionTriggerMenuHeader>
 								<SearchableMenuInput
 									open={open}
@@ -1344,7 +1337,7 @@ export function MCPBottomBarChip({
 									</div>
 								) : null}
 							</ComposerDropdownSelectedPanel>
-						</Menu>
+						</ActionTriggerMenu>
 					</div>
 				</HoverTip>
 			</div>

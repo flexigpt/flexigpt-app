@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSettings, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { SkillRef } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
@@ -12,12 +12,12 @@ import {
 	ActionTriggerChipContent,
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
@@ -209,14 +209,7 @@ function WorkspaceBottomBarChipContent({
 				</div>
 			</HoverTip>
 
-			<Menu
-				store={store}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				autoFocusOnShow={false}
-				className={actionTriggerMenuWideClasses}
-			>
+			<ActionTriggerMenu store={store}>
 				<ActionTriggerMenuHeader>
 					<SearchableMenuInput
 						open={open}
@@ -399,7 +392,7 @@ function WorkspaceBottomBarChipContent({
 				>
 					{selectedWorkspacePanel}
 				</ComposerDropdownSelectedPanel>
-			</Menu>
+			</ActionTriggerMenu>
 
 			<WorkspaceDirectoryRegistrationModal
 				isOpen={isDirectoryRegistrationOpen}

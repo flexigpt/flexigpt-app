@@ -1,4 +1,4 @@
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import { OutputVerbosity } from '@/spec/inference';
 import { getOutputVerbosityDisplayName } from '@/spec/inference_labels';
@@ -7,8 +7,8 @@ import { ProviderSDKType } from '@/spec/provider_sdk';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
-	actionTriggerMenuCompactClasses,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
@@ -36,7 +36,7 @@ export function OutputVerbosityDropdown({
 	disabled = false,
 	setVerbosity,
 }: OutputVerbosityDropdownProps) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
 	const availableOptions = VERBOSITY_OPTIONS.filter(option => option !== verbosity);
@@ -71,14 +71,7 @@ export function OutputVerbosityDropdown({
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={actionTriggerMenuCompactClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<div className={actionTriggerMenuHeaderRowClasses}>
 							<div className="min-w-0 flex-1 truncate text-xs font-semibold">{settingName}</div>
@@ -105,13 +98,13 @@ export function OutputVerbosityDropdown({
 					<ComposerCurrentSettingPanel
 						label={`Current ${settingName.toLocaleLowerCase()}`}
 						value={displayVerbosity(verbosity)}
-						help={`Use Default to leave ${settingName.toLocaleLowerCase()} to the selected model or provider. An explicit value applies to the next response.`}
+						help={`Use Default to leave ${settingName.toLocaleLowerCase()} to the selected model or provider.`}
 						isDefault={verbosity === undefined}
 						onUseDefault={() => {
 							setVerbosity(undefined);
 						}}
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

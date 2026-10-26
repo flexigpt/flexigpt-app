@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiRefreshCw, FiTool, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
@@ -17,12 +17,12 @@ import {
 	ActionTriggerChipContent,
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
@@ -570,15 +570,7 @@ export function ToolsBottomBarChip({
 				</div>
 			</HoverTip>
 
-			<Menu
-				store={store}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				className={actionTriggerMenuWideClasses}
-				data-menu-kind="tools"
-				autoFocusOnShow={false}
-			>
+			<ActionTriggerMenu store={store} data-menu-kind="tools">
 				{open ? (
 					<>
 						<ActionTriggerMenuHeader>
@@ -724,7 +716,7 @@ export function ToolsBottomBarChip({
 						</ComposerDropdownSelectedPanel>
 					</>
 				) : null}
-			</Menu>
+			</ActionTriggerMenu>
 		</div>
 	);
 }

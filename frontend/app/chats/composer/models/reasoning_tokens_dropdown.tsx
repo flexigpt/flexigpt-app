@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import { DEFAULT_REASONING_TOKENS } from '@/spec/model';
 
@@ -9,8 +9,8 @@ import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
-	actionTriggerMenuCompactClasses,
 	actionTriggerMenuFieldCardClasses,
 	actionTriggerMenuFieldInputClasses,
 	ActionTriggerMenuHeader,
@@ -33,7 +33,7 @@ interface ReasoningTokensDropdownProps {
 }
 
 export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDropdownProps) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
 	const availableTokenOptions = defaultTokenOptions.filter(value => value !== tokens);
@@ -83,14 +83,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={actionTriggerMenuCompactClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<div className={actionTriggerMenuHeaderRowClasses}>
 							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Effort tokens</div>
@@ -173,7 +166,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 							setTokens(undefined);
 						}}
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

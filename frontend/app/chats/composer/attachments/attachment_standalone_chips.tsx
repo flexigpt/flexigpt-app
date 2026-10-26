@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiPaperclip, FiPlus, FiX } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 
@@ -10,11 +10,11 @@ import {
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipRemoveButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
@@ -53,7 +53,7 @@ export function StandaloneAttachmentsChip({
 	const attachedCount = attachments.length;
 	const removedCount = removedAttachments.length;
 	const totalCount = attachedCount + removedCount;
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 	const [query, setQuery] = useSearchableMenuState(open);
 	const [removedOpen, setRemovedOpen] = useState(false);
@@ -128,14 +128,7 @@ export function StandaloneAttachmentsChip({
 				</button>
 			</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				className={actionTriggerMenuWideClasses}
-				autoFocusOnShow={false}
-			>
+			<ActionTriggerMenu store={menu}>
 				<ActionTriggerMenuHeader>
 					<SearchableMenuInput
 						open={open}
@@ -261,7 +254,7 @@ export function StandaloneAttachmentsChip({
 						</MenuItem>
 					))}
 				</ComposerDropdownSelectedPanel>
-			</Menu>
+			</ActionTriggerMenu>
 		</div>
 	);
 }

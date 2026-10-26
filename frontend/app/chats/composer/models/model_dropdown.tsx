@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useMemo } from 'react';
 import { FiCheck } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
@@ -10,12 +10,12 @@ import type { UIModelOption } from '@/spec/model';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
@@ -97,7 +97,7 @@ export function ModelDropdown({
 	agentModelRef,
 }: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const providerGroups = useMemo(() => groupModelOptionsByProvider(allOptions), [allOptions]);
 	const agentOwnsModel = modelSelectionSource === 'agent';
 	const isAgentOwnedModel = (model: UIModelOption) =>
@@ -193,14 +193,7 @@ export function ModelDropdown({
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow={false}
-					className={actionTriggerMenuWideClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<SearchableMenuInput
 							open={open}
@@ -263,8 +256,8 @@ export function ModelDropdown({
 						ariaLabel="Current model"
 						help={
 							agentOwnsModel
-								? 'Choosing a Model above replaces Agent Model ownership with an explicit Session Model override.'
-								: 'The current Session Model is used for the next message unless another selector changes it.'
+								? 'Choosing a model above replaces the agents selected model with an explicit override.'
+								: ''
 						}
 						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session source'}</span>}
 					>
@@ -272,7 +265,7 @@ export function ModelDropdown({
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>
 						</div>
 					</ComposerDropdownSelectedPanel>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

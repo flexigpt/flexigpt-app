@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { buildShortcutDisplay } from '@/lib/keyboard_shortcuts';
@@ -8,12 +8,12 @@ import { buildShortcutDisplay } from '@/lib/keyboard_shortcuts';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
@@ -41,14 +41,7 @@ export function KeyboardShortcutsMenu({ shortcutConfig }: KeyboardShortcutsMenuP
 				</MenuButton>
 			</HoverTip>
 
-			<Menu
-				store={shortcutsMenu}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				className={actionTriggerMenuWideClasses}
-				autoFocusOnShow
-			>
+			<ActionTriggerMenu store={shortcutsMenu}>
 				<ActionTriggerMenuHeader>
 					<div className={actionTriggerMenuHeaderRowClasses}>
 						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Keyboard shortcuts</div>
@@ -90,7 +83,7 @@ export function KeyboardShortcutsMenu({ shortcutConfig }: KeyboardShortcutsMenuP
 						</>
 					)}
 				</ActionTriggerMenuBody>
-			</Menu>
+			</ActionTriggerMenu>
 		</div>
 	);
 }

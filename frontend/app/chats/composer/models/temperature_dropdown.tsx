@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
-	actionTriggerMenuCompactClasses,
 	actionTriggerMenuFieldCardClasses,
 	actionTriggerMenuFieldInputClasses,
 	ActionTriggerMenuHeader,
@@ -29,7 +29,7 @@ interface TemperatureDropdownProps {
 }
 
 export function TemperatureDropdown({ temperature, setTemperature }: TemperatureDropdownProps) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 	const availableTemperatureOptions = defaultTemperatureOptions.filter(value => value !== temperature);
 	const [customError, setCustomError] = useState<string | null>(null);
@@ -80,14 +80,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 					</MenuButton>
 				</HoverTip>
 
-				<Menu
-					store={menu}
-					portal
-					gutter={8}
-					overflowPadding={8}
-					autoFocusOnShow
-					className={actionTriggerMenuCompactClasses}
-				>
+				<ActionTriggerMenu store={menu}>
 					<ActionTriggerMenuHeader>
 						<div className={actionTriggerMenuHeaderRowClasses}>
 							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Temperature</div>
@@ -169,7 +162,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 							setTemperature(undefined);
 						}}
 					/>
-				</Menu>
+				</ActionTriggerMenu>
 			</div>
 		</div>
 	);

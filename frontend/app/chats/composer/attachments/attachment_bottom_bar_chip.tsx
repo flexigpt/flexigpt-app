@@ -3,19 +3,19 @@ import { useEffect, useState } from 'react';
 import { FiFolder, FiLink, FiPaperclip, FiUpload } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
-import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { UIAttachment } from '@/spec/attachment';
 
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuMetaClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { HoverTip } from '@/components/hover_tip';
@@ -131,15 +131,7 @@ function AttachmentBottomBarChipInner({
 				</MenuButton>
 			</HoverTip>
 
-			<Menu
-				store={store}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				className={actionTriggerMenuWideClasses}
-				data-menu-kind="attachments"
-				autoFocusOnShow
-			>
+			<ActionTriggerMenu store={store} data-menu-kind="attachments">
 				<ActionTriggerMenuHeader>
 					<div className={actionTriggerMenuHeaderRowClasses}>
 						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Attachments</div>
@@ -181,7 +173,7 @@ function AttachmentBottomBarChipInner({
 				>
 					{null}
 				</ComposerDropdownSelectedPanel>
-			</Menu>
+			</ActionTriggerMenu>
 
 			<UrlAttachmentModal
 				isOpen={isUrlModalOpen && !isInputLocked}

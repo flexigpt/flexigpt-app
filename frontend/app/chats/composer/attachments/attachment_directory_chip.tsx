@@ -10,7 +10,7 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode } from '@/spec/attachment';
@@ -20,10 +20,10 @@ import {
 	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipRemoveButtonClasses,
 	actionTriggerChipSurfaceClasses,
+	ActionTriggerMenu,
 	ActionTriggerMenuBody,
 	ActionTriggerMenuHeader,
 	actionTriggerMenuHeaderRowClasses,
-	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { useSearchableMenuState } from '@/components/searchmenu/searchable_menu_utils';
@@ -157,7 +157,7 @@ export function DirectoryChip({
 	onRemoveDirectoryGroup,
 	onRemoveOverflowDir,
 }: DirectoryChipProps) {
-	const directoryMenu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const directoryMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const menuOpen = useStoreState(directoryMenu, 'open');
 
 	const [query, setQuery] = useSearchableMenuState(menuOpen);
@@ -290,14 +290,7 @@ export function DirectoryChip({
 				</button>
 			</div>
 
-			<Menu
-				store={directoryMenu}
-				gutter={8}
-				overflowPadding={8}
-				portal
-				className={actionTriggerMenuWideClasses}
-				autoFocusOnShow={false}
-			>
+			<ActionTriggerMenu store={directoryMenu}>
 				<ActionTriggerMenuHeader>
 					<label className="relative block">
 						<FiSearch
@@ -553,7 +546,7 @@ export function DirectoryChip({
 						</div>
 					) : null}
 				</ComposerDropdownSelectedPanel>
-			</Menu>
+			</ActionTriggerMenu>
 		</div>
 	);
 }

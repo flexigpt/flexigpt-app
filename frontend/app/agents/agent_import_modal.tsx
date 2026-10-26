@@ -145,6 +145,10 @@ function AgentImportModalContent({
 	};
 
 	const previewImport = async () => {
+		if (isPickingFile || isPreviewing || isCommitting) {
+			return;
+		}
+
 		if (!selectedDestination) {
 			setError('Select an Agent Plugin destination.');
 			return;
@@ -205,16 +209,16 @@ function AgentImportModalContent({
 	};
 
 	return (
-		<ModalDialog isOpen={true} onClose={onClose} blockCancel={isPreviewing || isCommitting}>
-			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
-				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-					<ModalHeader
-						title="Import Managed Agent"
-						description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Plugin."
-						onClose={onClose}
-						closeDisabled={isPreviewing || isCommitting}
-					/>
+		<ModalDialog isOpen={true} onClose={onClose} blockCancel={isPickingFile || isPreviewing || isCommitting}>
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
+				<ModalHeader
+					title="Import Managed Agent"
+					description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Plugin."
+					onClose={onClose}
+					closeDisabled={isPickingFile || isPreviewing || isCommitting}
+				/>
 
+				<div className="app-scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
 					<div className="space-y-5">
 						{error ? (
 							<div className="alert alert-error rounded-2xl text-sm">
@@ -280,7 +284,7 @@ function AgentImportModalContent({
 							<button
 								type="button"
 								className="btn btn-primary rounded-xl"
-								disabled={!selectedDestination || !path.trim() || isPreviewing || isCommitting}
+								disabled={!selectedDestination || !path.trim() || isPickingFile || isPreviewing || isCommitting}
 								onClick={() => {
 									void previewImport();
 								}}
@@ -427,36 +431,36 @@ function AgentImportModalContent({
 								) : null}
 							</>
 						) : null}
-
-						<ModalActions>
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								disabled={isPreviewing || isCommitting}
-								onClick={onClose}
-							>
-								Cancel
-							</button>
-							<button
-								type="button"
-								className="btn btn-primary rounded-xl"
-								disabled={
-									!preview?.canImport ||
-									!preview.prepared ||
-									!preview.preparedFingerprint ||
-									!allConfirmationsAccepted ||
-									isCommitting
-								}
-								onClick={() => {
-									void commitImport();
-								}}
-							>
-								<FiCheck size={15} />
-								<span>{isCommitting ? 'Importing...' : 'Import Agent'}</span>
-							</button>
-						</ModalActions>
 					</div>
 				</div>
+
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						disabled={isPickingFile || isPreviewing || isCommitting}
+						onClick={onClose}
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="btn btn-primary rounded-xl"
+						disabled={
+							!preview?.canImport ||
+							!preview.prepared ||
+							!preview.preparedFingerprint ||
+							!allConfirmationsAccepted ||
+							isCommitting
+						}
+						onClick={() => {
+							void commitImport();
+						}}
+					>
+						<FiCheck size={15} />
+						<span>{isCommitting ? 'Importing...' : 'Import Agent'}</span>
+					</button>
+				</ModalActions>
 			</div>
 		</ModalDialog>
 	);
