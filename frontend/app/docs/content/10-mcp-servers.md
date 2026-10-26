@@ -8,7 +8,10 @@ Use this page to understand what the MCP Servers page owns and how it fits into 
 
 - [What MCP servers are](#what-mcp-servers-are)
 - [What the page owns](#what-the-page-owns)
+- [Define a server](#define-a-server)
+- [Installation values and credentials](#installation-values-and-credentials)
 - [Connecting and discovery](#connecting-and-discovery)
+- [Policies and MCP Apps](#policies-and-mcp-apps)
 - [What Chats can use](#what-chats-can-use)
 - [Safety and trust](#safety-and-trust)
 
@@ -25,6 +28,7 @@ Important points:
 - the backend keeps the plugin, server, auth, setup, and runtime metadata on your machine
 - the server itself may still be a local or remote endpoint
 - discovery is separate from the composer selection you make for one chat turn
+- configuring a server does not automatically make it connected, authorized, or selected for a chat
 
 ## What the page owns
 
@@ -33,17 +37,55 @@ Important points:
 | Plugin  | Group servers together and control the plugin enabled state.                                             |
 | Server  | Transport, trust level, auth mode, setup inputs, default policy, apps policy, and tool policy overrides. |
 | Runtime | Connect, disconnect, refresh, auth health, and discovery snapshots.                                      |
-| Secrets | Store auth values and setup secrets through the normal MCP secret flow.                                  |
+| Secrets | Store write-only auth values and installation secrets separately from the server definition.             |
 
 Common page actions:
 
 - add a plugin
 - add or edit a server
-- copy an existing server as a starting point
 - configure setup inputs
 - connect, disconnect, or refresh a server
 - inspect runtime details and discovery counts
 - manage OAuth settings when a server needs a loopback callback
+
+## Define a server
+
+Custom MCP servers support two transports:
+
+| Transport           | Use it for                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Stdio**           | A local command that FlexiGPT starts with configured arguments and environment values.                                   |
+| **Streamable HTTP** | A local or remote MCP endpoint. Remote endpoints require HTTPS; plain HTTP is limited to loopback development endpoints. |
+
+For HTTP servers, choose the authentication mode that matches the endpoint:
+
+- none
+- API key
+- OAuth
+- client credentials
+
+The server definition contains non-secret settings. API keys, OAuth client
+credentials, and declared secret environment/header values are stored through
+the MCP setup flow and are not displayed after saving.
+
+## Installation values and credentials
+
+An MCP server can declare local installation inputs such as:
+
+- text values
+- paths
+- secrets
+- OAuth client credentials
+
+Use **Setup** to provide or replace those values. Saving setup values does not
+replace a separate OAuth authorization flow, connection step, or tool policy.
+
+When OAuth is required:
+
+1. save the server and any installation inputs
+2. choose **Connect**
+3. complete browser authorization while FlexiGPT remains open
+4. wait for the server to finish connecting and discovering capabilities
 
 ## Connecting and discovery
 
@@ -54,6 +96,27 @@ The page keeps connection state and discovery state separate.
 - open Details to inspect server info, capabilities, config, and discovery counts
 - watch the auth health badge for OAuth or other authorization states
 - if a server needs browser authorization, complete the callback while FlexiGPT stays open
+- reconnect or refresh after changing a server definition, credential, setup value, or server-side capabilities
+
+## Policies and MCP Apps
+
+Each server has a policy that controls how discovered tools and MCP Apps behave.
+
+The server editor can configure:
+
+- trust level
+- default approval rule
+- manual or automatic execution mode
+- additional approval requirements for unknown-risk, write, or destructive tools
+- per-tool policy overrides
+- whether MCP Apps are advertised and rendered
+- whether an App may request tool calls
+- whether opening links or staging model context needs approval
+
+An MCP App can appear inline after a compatible MCP tool result. It is still
+scoped to the Run that created it. App requests for a user draft, model-context
+update, external link, or app-initiated tool call remain subject to the active
+policy and Runtime approval flow.
 
 ## What Chats can use
 
@@ -73,9 +136,9 @@ Practical rules:
 - app-only tools stay in the UI, but are not exposed to the model
 - required arguments block send until they are filled
 - keep instructions on only when they help the task
-- refresh discovery on the server page when the server contents change
+- refresh discovery after the server's capabilities change
 - an Agent can select a connected service as part of its starting setup
-- if an Agent shows **Configure**, finish the local setup before using that service
+- if an Agent or Workspace shows **Configure**, finish installation setup before using that service
 
 Agent setup never shares secret values through the Agent file.
 

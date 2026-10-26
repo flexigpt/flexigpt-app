@@ -1,8 +1,10 @@
 # Reusable Catalogs
 
-The pages outside **Chats** maintain reusable building blocks: Agents, built-in tools, Skills, MCP server catalogs, models, and title-bar settings.
+The pages outside **Chats** maintain reusable building blocks: Agents, tools, Skills, MCP server catalogs, Workspaces, providers, and models.
 
-Use Chats to load an Agent and apply reusable setup to a conversation. Use the appropriate pages to inspect, enable, disable, or manage the reusable definitions they own.
+This page is an ownership map, not a second setup guide. Use it to find the
+right management page, then follow that page's dedicated guide for the actual
+workflow.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -28,94 +30,46 @@ Use Chats to load an Agent and apply reusable setup to a conversation. Use the a
 
 ## Agents
 
-Agents are reusable starting points for a type of work. An Agent can prepare a model choice, instructions, opening text, tools, Skills, and connected services without locking the chat.
+Use an Agent when you want a reusable Chat starting point. Agent details show
+its currently resolved model, tools, Skills, Text, and MCP declarations.
 
-Use **Chats -> Agent** to load an Agent. Use [Agents](/docs?doc=agents) to manage Plugins, import or export Agent files, inspect setup, and enable or disable Agents.
-
-After loading an Agent, you can still change the model, draft, instructions, Skills, tools, connected services, attachments, Workspaces, and previous user turns. See [What an Agent can set up](/docs?doc=agents#what-an-agent-can-set-up) and [Manage Agents](/docs?doc=agents#manage-agents) for details.
+Use **Chats -> Agent** to apply one. Use [Agents](/docs?doc=agents) for imports,
+exports, Plugin management, availability, and immutable managed declarations.
 
 ## Tools
 
-The **Tools** page lists the built-in Go tool capabilities available in FlexiGPT. Runtime execution happens in Chats.
+The **Tools** page is the catalog for native FlexiGPT tools and
+provider-compatible tools. It is not a tool authoring page.
 
-From a user perspective:
-
-- the Tools page shows the built-in capabilities that can be selected
-- the Chats composer decides which tools are available to a conversation or message
-- the model can then request tool calls
-- tool calls can be run manually or auto-executed if configured
-
-Safety expectations:
-
-- start with manual review
-- inspect tool arguments before running
-- keep auto-execute off for risky tools
-- inspect outputs before sending them back
-- remove tools not needed for the current workflow
-
-The available tools are built-in Go implementations or provider-bound capabilities. FlexiGPT does not support user-created HTTP tools or arbitrary custom tool definitions. Use the Tools page as the source of truth for available tools and their arguments.
+Use **Chats -> Tools** to select tools for a Run. Use **MCP** in the composer
+for tools discovered from an MCP server. FlexiGPT does not offer user-created
+HTTP or arbitrary custom tool definitions.
 
 ## Skills
 
-The **Skills** page manages skill plugins and skills.
+The **Skills** page manages Skill Plugins and source-backed or managed Skills.
+You can register a directory, attach an existing Skill or path to a Plugin,
+create a managed Skill, inspect its document and resources, and enable or
+disable it.
 
-Important behavior:
-
-- built-in embedded skills are generally read-only
-- user-created skills are filesystem skills
-- skill names must be unique within a plugin
-- skill refs include a skill ID to avoid stale identity confusion
-- skills can be enabled or disabled
-- skills can show presence status such as present, missing, error, or unknown
-
-In Chats, a template-style skill renders into plain composer text and does not remain selected after insertion. An instruction-only skill can be selected as a system instruction source independently of any template text. Selected sources are combined with the enabled model default rather than replacing one another.
-
-Use skills when you want a reusable workflow mode, a template-style draft starter, or instruction-only behavior that shapes the request context. See [Composer Context](/docs?doc=composer-context#templates-and-instruction-sources) for the per-message flow.
-
-Use Agents to preload Skills for common workflows.
+Use [Composer Context](/docs?doc=composer-context#skills) for the distinction
+between user-message templates, enabled Skills, active Skills, and explicit
+instruction sources.
 
 ## Models
 
-The **Models** page owns provider, model, and provider-auth setup.
+The **Models** page owns provider compatibility, endpoint settings,
+write-only credentials, model records, enablement, and defaults.
 
-It controls:
-
-- default provider and provider auth keys
-- provider enablement
-- model enablement
-- provider SDK/API compatibility type
-- provider origin and path
-- API key header name
-- default headers
-- model parameters and capability overrides
-- default model per provider
-
-Use **Models** when changing how requests run or managing a provider key. Use Agents when changing the kind of workflow you want to start from.
-
-For local and self-hosted LLMs, the recommended customization order is:
-
-1. copy/fork an existing provider
-2. adjust provider-level settings
-3. then copy, add, or edit models under that provider
-
-Do provider first because the provider owns the shared endpoint contract:
-
-- SDK/API compatibility type
-- origin URL
-- chat path
-- API-key header name
-- default headers
-- provider-wide capability assumptions
-
-Built-in local providers such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM are useful defaults, but local server ports, paths, headers, model names, and feature support vary. In **Models**, copy the closest built-in provider, adjust its endpoint and compatibility settings, then add or copy a model under that provider.
-
-See [Local LLM Setup](/docs?doc=local-llm-setup) for a full local runtime setup flow.
+Use [Providers and Models](/docs?doc=providers-and-models) for the canonical
+provider and model setup flow. Use [Local LLM Setup](/docs?doc=local-llm-setup)
+only when the endpoint is local or self-hosted.
 
 ## Title-bar Settings
 
 The title-bar **Settings** menu controls theme and logging/debug options. It does not contain provider auth keys.
 
-Configure provider auth keys in **Models**, alongside the applicable provider/model setup. Provider secrets are stored through the OS keyring and are not shown as raw values.
+Configure provider auth keys in **Models**, alongside the applicable provider/model setup. Credential values are write-only in the UI and are never shown again after saving.
 
 Be careful with debug options. Raw request/response logging can include prompts, attachments, tool outputs, and sensitive provider responses.
 
@@ -125,18 +79,16 @@ Models, Skills, and Agents can include built-in and custom content:
 
 - built-in content ships with the app
 - custom content is stored locally
-- built-in definitions are generally read-only
+- built-in definitions are generally read-only, but may be enabled or disabled
 - built-in items can usually be enabled or disabled
 - custom entries can usually be edited/deleted according to that page’s rules
 
-Tools are different: FlexiGPT exposes only built-in Go tools. They can be selected in Chats, but cannot be created, imported, or edited as custom tool definitions.
+Tools are different: native tools and provider-compatible tools are selected
+from the available catalog, but cannot be created, imported, or edited as
+custom tool definitions.
 
-For content that supports customization, a practical workflow is:
-
-1. start from built-in content
-2. inspect what it does
-3. create custom versions when you need durable changes
-4. keep built-ins enabled only if useful
+When an item is unavailable, inspect its page for its Artifact state, enabled
+state, Plugin state, source diagnostics, setup requirements, or dependencies.
 
 ## Choosing the right page
 

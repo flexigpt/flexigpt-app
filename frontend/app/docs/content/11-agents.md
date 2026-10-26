@@ -1,8 +1,11 @@
 # Agents
 
-Agents are reusable starting points for Chats.
+Agents are reusable starting points for Chats. They are declarations of desired
+contributions, not a separate autonomous execution engine.
 
-An Agent can prepare a useful combination of model choice, instructions, tools, Skills, connected services, and opening text. Loading an Agent does not lock the chat. It only gives you a starting point.
+An Agent can prepare a model choice, instruction Text, user-message starter
+Text, tools, Skills, and MCP server references. FlexiGPT resolves those
+contributions again when it prepares the Run.
 
 After an Agent loads, you can still change the draft, model, instructions, tools, Skills, connected services, attachments, Workspaces, and history setting.
 
@@ -53,12 +56,16 @@ Depending on its contents, an Agent can provide:
 | Agent part              | What you see in Chats                                                            |
 | ----------------------- | -------------------------------------------------------------------------------- |
 | Model                   | A model selection for the next request.                                          |
-| Instructions            | Guidance added to the system instructions for the chat.                          |
-| Opening text            | An editable draft when the composer is empty.                                    |
+| Instruction Text        | Guidance resolved into the Run's instruction context.                            |
+| User-message Text       | An editable draft when the composer is empty.                                    |
 | Tools                   | Tools available to the model.                                                    |
-| Skills                  | Skills enabled for the chat, with some ready to use immediately.                 |
+| Skills                  | Session Skills, active Skills, or rendered instruction sources.                  |
 | Connected services      | MCP servers selected for the chat.                                               |
 | Connected service setup | A prompt to finish local setup when a service needs credentials or other values. |
+
+The Agent details view groups these contributions and shows whether each is
+available, unavailable, or ambiguous. A starter preview is useful for planning,
+but final Run preparation resolves the declarations again.
 
 An Agent may leave any of these areas unchanged.
 
@@ -78,11 +85,15 @@ After loading one, you can:
 - change connected service selections
 - change the amount of previous chat history included
 
+When viewing the currently selected Agent, available tool, Skill, Text, and MCP
+contributions can be excluded from the next Run. The model contribution is not
+an exclusion control.
+
 ## Manage Agents
 
 Open **Agents** from the sidebar to manage reusable Agent files.
 
-Agents are grouped into Plugins.
+Agents are grouped into Agent Plugins.
 
 On this page you can:
 
@@ -95,27 +106,23 @@ On this page you can:
 - remove a managed Agent
 - review connected service setup needs
 
-You cannot edit an imported Agent one field at a time in the app.
+Managed imported Agent declarations are immutable in the app. You cannot edit
+one field at a time in the Agent page.
 
-To change one:
+To change one, export it, edit it externally, then either:
 
 1. export it
 2. edit the file in your editor
 3. import it under a new name
 
-Or:
-
-1. export it
-2. remove the current managed Agent
-3. edit the file
-4. import it again with the same name
+or remove the managed copy first and import the edited declaration again.
 
 ## Import an Agent file
 
 1. Open **Agents**.
 2. Create or choose a Plugin.
 3. Select **Import Agent**.
-4. Choose an Agent `.yaml` or `.yml` file.
+4. Choose an Agent `.json`, `.yaml`, or `.yml` file.
 5. Review the preview.
 6. Read any warnings and confirmation requests.
 7. Confirm the import.
@@ -128,15 +135,14 @@ An Agent may still import when an optional dependency is not currently available
 
 Use **Export** from an Agent row or open the Agent details.
 
-Export is available for:
+Export produces the Agent YAML shown in Agent details. It is useful for
+reviewing a managed or built-in declaration before creating your own version.
 
-- built-in Agents
-- imported Agents
-- Agents discovered from your files
+Do not assume the export is a live editor. The app may show canonical or
+normalized YAML depending on the declaration source.
 
-The exported file keeps its original structure. Inline instructions and inline connected-service details stay inside the exported Agent file.
-
-Exporting a built-in Agent does not make the built-in copy editable. Import the exported file into one of your Plugins when you want your own version.
+Exporting a built-in Agent does not make the built-in copy editable. Import the
+export into an editable Agent Plugin when you want your own managed version.
 
 ## Connected service setup
 
@@ -152,9 +158,12 @@ After importing or opening an Agent, its details can show setup needs such as:
 
 Use **Configure** when setup is needed.
 
-Connected service values are stored locally. Secret values are not written back into the Agent file and are not shown again after saving.
+Connected service values are stored locally. Secret values are not written back
+into the Agent file and are not shown again after saving.
 
-For server-wide setup, connection, discovery, and troubleshooting, use **MCP Servers**.
+Configure only supplies declared installation inputs. Connection, OAuth
+authorization, policy approval, and discovery still happen through
+**MCP Servers** and during Run preparation.
 
 ## Built-in and your own Agents
 
@@ -162,7 +171,8 @@ Built-in Agents ship with FlexiGPT.
 
 You can inspect and export them, but you cannot edit their original definitions.
 
-Your own Agents live in your local Plugins. You can enable, disable, export, remove, and re-import them.
+Managed non-built-in Agents can be enabled, disabled, exported, removed, and
+re-imported through their Agent Plugin.
 
 A Plugin can still show an unavailable entry after an Agent is removed. That records the original choice and becomes available again if you restore a matching Agent later.
 

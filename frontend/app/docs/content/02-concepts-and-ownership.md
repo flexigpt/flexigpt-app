@@ -17,35 +17,34 @@ This page gives the vocabulary and explains which page owns each part. Detailed 
 
 ## Mental model
 
-A chat turn is assembled in layers:
+A chat has three useful layers:
 
-1. **Provider**
-   - The API family or endpoint that receives the request.
-2. **Model**
-   - The provider/model choice and request defaults.
-3. **Agent setup**
-   - Optional starter workflow: model, instructions, opening text, tools, Skills, and connected services.
-4. **Conversation history**
-   - Earlier turns included by **Previous user turns**.
-5. **Current message**
-   - Draft text, attachments, tool outputs, and active composer context.
+1. **Reusable catalog**
+   - Providers, models, Agents, Plugins, Skills, MCP servers, and Workspaces are maintained outside Chats.
+2. **Chat configuration**
+   - The composer records the model, Agent, Workspace, instructions, enabled Skills, tools, MCP selections, and history intended for a Run.
+3. **Run preparation**
+   - Before work begins, FlexiGPT resolves the selected reusable items again against their current state and policy.
 
-When a result changes, compare these layers one at a time.
+That final preparation step is important: an item can be selectable when you configure a chat but become unavailable, changed, ambiguous, disconnected, or blocked before the next Run.
 
 ## Main terms
 
-| Term                         | Meaning                                                                                                                                                                                            |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint.       |
-| **Model**                    | A saved provider/model configuration with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.          |
-| **Agent**                    | A reusable starting setup that can apply a model choice, instructions, opening text, tools, Skills, and connected services.                                                                        |
-| **Instruction context**      | Durable system instruction context built from the selected model default and instruction-only skill sources. The model default comes first; selected sources are then combined in selection order. |
-| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                      |
-| **Tool**                     | A built-in Go capability the model can request during a conversation.                                                                                                                              |
-| **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                      |
-| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a plugin, including transport, auth, trust, setup, discovery, and runtime state.                                                       |
-| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                               |
-| **Previous user turns**      | The history window for the next request.                                                                                                                                                           |
+| Term                         | Meaning                                                                                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Artifact**                 | A backend-managed reusable item, such as a model, Agent, Skill, MCP server, or Workspace contribution. Its state and enabled setting affect whether it can be used.                          |
+| **Plugin**                   | A named grouping of reusable items or declarations. Agent, Skill, MCP, and Tool pages use Plugins for organization and availability.                                                         |
+| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint. |
+| **Model**                    | A saved provider/model configuration with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.    |
+| **Agent**                    | A reusable starting setup that can apply a model choice, instructions, opening text, tools, Skills, and connected services.                                                                  |
+| **Workspace**                | Reusable repository or folder context. A Workspace can contribute instruction files, reference files, instruction Skills, and MCP server references.                                         |
+| **Instruction source**       | System-style instruction content. The enabled model default is first, followed by selected instruction sources in their selected order.                                                      |
+| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                |
+| **Tool**                     | A native FlexiGPT capability or provider-compatible capability selected for a Run. MCP-discovered tools are selected separately through MCP context.                                         |
+| **Skill**                    | A reusable `instructions` Skill or `user-message` template. A Skill can participate in a Session or render into the draft or instruction context, depending on how it is used.               |
+| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a plugin, including transport, auth, trust, setup, discovery, and runtime state.                                                 |
+| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                         |
+| **Previous user turns**      | The history window for the next request.                                                                                                                                                     |
 
 ## Agent versus model
 
@@ -65,15 +64,16 @@ The detailed rules for Agent contents, importing, exporting, inspection, and man
 
 Use the right mechanism for the job:
 
-| Need                                             | Use                            |
-| ------------------------------------------------ | ------------------------------ |
-| Exact source material                            | Attachment                     |
-| Durable behavior rules                           | Instruction-only skill         |
-| Repeatable current-message structure             | Template-style skill           |
-| Let the model ask the app to run something       | Tool                           |
-| Use context from a model context protocol server | MCP                            |
-| Keep a workflow mode active across turns         | Skill                          |
-| Recent web information                           | Provider-compatible web search |
+| Need                                                  | Use                                 |
+| ----------------------------------------------------- | ----------------------------------- |
+| Exact source material                                 | Attachment                          |
+| Durable system-style guidance                         | Model default or instruction source |
+| Repeatable current-message structure                  | User-message template               |
+| Let the model request a native or provider capability | Tool                                |
+| Use server-discovered tools, resources, or prompts    | MCP                                 |
+| Reuse repository context                              | Workspace                           |
+| Keep an instruction Skill available or active         | Skill                               |
+| Recent web information                                | Provider-compatible web search      |
 
 See [Composer Context](/docs?doc=composer-context) for how these are used while composing a message.
 
@@ -106,28 +106,27 @@ FlexiGPT ships with built-in:
 Built-in content is generally read-only. You can usually enable or disable it, but not edit its definition directly.
 For local LLM providers, treat built-ins as starting points: copy/fork the provider first, adjust the endpoint and compatibility settings, then copy or add models under that provider.
 
-Your local content is stored locally and can be created, edited, deleted, and versioned depending on the page.
+Your local content can be created, edited, enabled, disabled, or removed according to the rules of the page that owns it.
 
-To customize an Agent, export it, edit the file in your editor, and import it under a new name, or replace the managed copy.
-See [Agents](/docs?doc=agents#manage-agents) for the management flow.
+Imported managed Agent declarations are intentionally immutable in the app. Export and re-import them when you need a durable variation.
 
 ## Page ownership map
 
-| Goal                                                                   | Page                            |
-| ---------------------------------------------------------------------- | ------------------------------- |
-| Do active work with a model                                            | **Chats**                       |
-| Attach files, folders, URLs, tools, skills, or web search to a message | **Chats -> Composer**           |
-| Select MCP server context for a turn                                   | **Chats -> MCP**                |
-| Start from a reusable Agent workflow                                   | **Chats -> Agent menu**         |
-| Import, export, enable, or manage Agents                               | **Agents**                      |
-| Browse available built-in Go tools                                     | **Tools**                       |
-| Enable a tool for a conversation                                       | **Chats -> Tools** or an Agent  |
-| Create or maintain skill definitions                                   | **Skills**                      |
-| Enable skills for a conversation                                       | **Chats -> Skills** or an Agent |
-| Create or maintain MCP server catalogs                                 | **MCP Servers**                 |
-| Configure providers, models, and auth keys                             | **Models**                      |
-| Change theme or logging/debug options                                  | Title-bar **Settings** menu     |
-| Search and reopen old conversations                                    | **Chats**                       |
+| Goal                                                                  | Page                            |
+| --------------------------------------------------------------------- | ------------------------------- |
+| Do active work with a model                                           | **Chats**                       |
+| Attach files, folders, URLs, Workspaces, tools, Skills, or web search | **Chats -> Composer**           |
+| Select MCP server context for a turn                                  | **Chats -> MCP**                |
+| Start from a reusable Agent workflow                                  | **Chats -> Agent menu**         |
+| Import, export, enable, or manage Agents                              | **Agents**                      |
+| Browse native and provider-compatible tools                           | **Tools**                       |
+| Enable a tool for a conversation                                      | **Chats -> Tools** or an Agent  |
+| Create or maintain skill definitions                                  | **Skills**                      |
+| Enable skills for a conversation                                      | **Chats -> Skills** or an Agent |
+| Create or maintain MCP server catalogs                                | **MCP Servers**                 |
+| Configure providers, models, and auth keys                            | **Models**                      |
+| Change theme or logging/debug options                                 | Title-bar **Settings** menu     |
+| Search and reopen old conversations                                   | **Chats**                       |
 
 ## Decision guide
 

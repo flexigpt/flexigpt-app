@@ -55,11 +55,13 @@ When you send a chat request to a remote provider, the provider may receive:
 
 - the current user message
 - selected prior turns based on **Previous user turns**
-- instruction-only skill content or template-style skill output
+- selected model defaults and instruction-source content
+- enabled Skill context or user-message template output
 - attachments included in the request
 - selected tool definitions or tool outputs
+- selected Workspace context
+- selected MCP server tools, resources, prompts, server instructions, or staged MCP App context
 - web-search configuration when supported by the provider
-- skill-session context when skills are enabled
 - model preset parameters and provider-specific request options
 
 Local-first does not mean every inference request is local. If you choose a remote model provider, the assembled request is sent to that provider.
@@ -106,7 +108,7 @@ The app also stores local data for:
 
 - settings metadata
 - providers and models
-- built-in tool availability and related local configuration
+- tool, Skill, Agent, MCP server, and Workspace configuration
 - Agent Plugins and Agent files
 - Workspace setup
 - skill plugins and skills
@@ -119,37 +121,28 @@ Built-in providers, models, tools, Skills, Agents, and docs ship with the app. Y
 
 ## Storage locations
 
-FlexiGPT stores local data under the app's XDG data-home location, using a `flexigpt` app-data folder. These folders are created at first launch.
+The exact app-data location depends on the platform and packaging method.
+Use the platform's application-data facilities or package documentation when
+you need to locate local data.
 
-Current packaged builds typically use:
+Do not treat UI-only state, such as restored tabs or scroll positions, as a
+backup format for durable conversation or catalog data.
 
-- macOS: `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application Support/flexigpt/`
-- Linux Flatpak: `~/.var/app/io.github.flexigpt.client/data/flexigpt/`
-- Windows: `%LOCALAPPDATA%\flexigpt\`, usually `C:\Users\<username>\AppData\Local\flexigpt\`
-
-On Windows, if `AppData` is not visible:
-
-- Open **File Explorer**.
-- Go to `C:\Users\<username>\`.
-- Enable hidden folders through **View -> Show -> Hidden items**.
-- Open `AppData\Local\flexigpt`.
-
-Or open PowerShell and run:
-
-    $env:LOCALAPPDATA
+For installation-specific package notes, use the release documentation that
+matches your platform.
 
 ## Backup, restore, export, and reset
 
 Local data control surfaces include:
 
 - conversation export from the chat workspace
-- model export from **Models**
+- Agent YAML export from **Agents**
 - manual backup by copying the `flexigpt` app-data folder while the app is closed
-- full reset by closing FlexiGPT and removing the local `flexigpt` app-data folder
+- local source-file backup for Skills and Workspaces that you manage outside the app
 
-The app-data folder contains local conversations, catalogs, settings metadata, indexes, overlays, and logs.
-
-Provider secrets stored in the OS keyring may need separate OS-level backup, restore, or removal.
+Close FlexiGPT before taking a file-level backup or following support guidance
+for a reset. Provider credentials may need separate OS-level backup, restore,
+or removal.
 
 ## Attachments, URLs, tools, and skills
 
@@ -166,11 +159,13 @@ URL attachments can cause content to be fetched and included in the model reques
 
 Tools and skills can add execution capability or runtime context.
 
-FlexiGPT exposes only built-in Go tools. It does not support user-defined HTTP tools.
+FlexiGPT can expose native tools and provider-compatible tools. MCP server
+tools are selected independently through MCP context. It does not support
+user-defined HTTP or arbitrary custom tool definitions.
 
 Safety points:
 
-- inspect each built-in tool's description, arguments, and expected side effects before enabling it
+- inspect each selected tool's description, arguments, and expected side effects
 - use manual review for tools that can modify local data or perform external actions
 - skill-aware workflows can add skill session context and skill tool choices to the request
 - auto-execute should only be used for trusted tools and low-risk workflows

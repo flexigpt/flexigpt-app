@@ -46,6 +46,30 @@ function isTerminalSessionRun(run: SessionRun | undefined): boolean {
 	);
 }
 
+function sessionRunTimestampMilliseconds(value: string | undefined): number {
+	const parsed = Date.parse(value ?? '');
+	return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+// Go serializes time.Time as RFC3339Nano, where the fractional part is
+// optional. A lexical comparison can therefore rank "...:01Z" after
+// "...:01.100Z", even though the latter is newer.
+function compareSessionRunsNewestFirst(left: SessionRun, right: SessionRun): number {
+	const leftUpdatedAt = sessionRunTimestampMilliseconds(left.updatedAt);
+	const rightUpdatedAt = sessionRunTimestampMilliseconds(right.updatedAt);
+	if (leftUpdatedAt !== rightUpdatedAt) {
+		return rightUpdatedAt > leftUpdatedAt ? 1 : -1;
+	}
+
+	const leftCreatedAt = sessionRunTimestampMilliseconds(left.createdAt);
+	const rightCreatedAt = sessionRunTimestampMilliseconds(right.createdAt);
+	if (leftCreatedAt !== rightCreatedAt) {
+		return rightCreatedAt > leftCreatedAt ? 1 : -1;
+	}
+
+	return right.id.localeCompare(left.id);
+}
+
 export function selectedSessionRun(snapshot: SessionSnapshot, preferredRunID?: string): SessionRun | undefined {
 	if (preferredRunID) {
 		const preferred = snapshot.runs.find(run => run.id === preferredRunID);
@@ -56,6 +80,6 @@ export function selectedSessionRun(snapshot: SessionSnapshot, preferredRunID?: s
 
 	return (
 		snapshot.runs.find(run => !isTerminalSessionRun(run)) ??
-		[...snapshot.runs].toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]
+		[...snapshot.runs].toSorted(compareSessionRunsNewestFirst)[0]
 	);
 }

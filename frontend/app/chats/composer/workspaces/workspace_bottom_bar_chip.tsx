@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSettings, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiEye, FiFolderPlus, FiRefreshCw, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -49,11 +49,12 @@ function workspaceDisplayName(candidate: ComposerWorkspaceCandidate): string {
 }
 
 function workspaceSubtitle(candidate: ComposerWorkspaceCandidate): string {
-	if (candidate.workspace.origin === WorkspaceDirectoryOrigin.Default) {
-		return `${candidate.directory.root.displayName} · Automatic setup`;
-	}
+	const source = candidate.directory.root.displayName || 'Repository';
 
-	return candidate.workspace.manifestLocator ?? candidate.workspace.workspace.artifact.binding.locator;
+	if (candidate.workspace.origin === WorkspaceDirectoryOrigin.Default) {
+		return `${source} · Automatic setup`;
+	}
+	return `${source} · Repository workspace`;
 }
 
 function workspaceIsAvailable(candidate: ComposerWorkspaceCandidate): boolean {
@@ -349,13 +350,14 @@ function WorkspaceBottomBarChipContent({
 								<button
 									type="button"
 									className="btn btn-ghost btn-xs rounded-lg"
+									aria-label="View Workspace contents"
 									onClick={() => {
 										store.hide();
 										setIsSelectionOpen(true);
 									}}
-									title="Edit Workspace selection"
+									title="View Workspace contents"
 								>
-									<FiSettings size={12} />
+									<FiEye size={12} />
 								</button>
 								<button
 									type="button"

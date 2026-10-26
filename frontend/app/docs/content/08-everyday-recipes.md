@@ -36,22 +36,19 @@ Use this when you want FlexiGPT to inspect a repo, scope a bounded change, edit 
 Suggested setup:
 
 - Home starter: **Develop a Feature**
-- Agent: **Spec Driven Development**
 - Context: repo path, changed files, issue text, requirements, screenshots, failing tests, or design notes
-- Tools: relevant built-in Go tools, with any side-effecting calls reviewed manually
+- Tools: only the native, provider-compatible, or MCP capabilities that the task needs
 - Previous user turns: usually `0` or `1`
 
 Steps:
 
 1. Open the home screen.
 2. Choose **Develop a Feature**.
-3. Replace the prefilled placeholder with a repo path and the feature request.
+3. Replace any prefilled draft with a concrete repo path and feature request.
 4. Add any issue text, acceptance criteria, screenshots, or relevant files.
 5. Send the draft.
-6. Review the proposed spec or scope if the assistant asks for confirmation.
-7. Let it implement the confirmed scope.
-8. Review write and shell tool calls before running them.
-9. Inspect verification results and remaining gaps.
+6. Review the proposed scope, tool calls, and requested approvals before allowing side effects.
+7. Inspect verification results and remaining gaps.
 
 Equivalent prompt if starting from blank:
 
@@ -66,7 +63,7 @@ Use this when you want to understand an unfamiliar file.
 
 Suggested setup:
 
-- Agent: **Local Reader** or a similar reader Agent
+- Agent: choose an available reader-oriented Agent, or start from a blank chat
 - Context: one file first
 - Previous user turns: usually `0` or `1`
 
@@ -90,9 +87,9 @@ Use this for correctness, maintainability, security, reliability, and test-risk 
 
 Suggested setup:
 
-- Agent: **Reviewing Code**
+- Home starter: **Review Code**
 - Context: changed files, diff, PR description, tests, logs
-- Tools: read-only built-in tools if useful
+- Tools: read-oriented capabilities only, unless a side effect is explicitly required
 - Previous user turns: small and intentional
 
 Equivalent prompt if starting from blank:
@@ -117,7 +114,7 @@ Use this when you have logs, stack traces, failing tests, or confusing behavior.
 
 Suggested setup:
 
-- Agent: **Bug Investigator** or **Spec Driven Development**
+- Home starter: **Investigate a Bug**
 - Context: stack trace, logs, failing command, relevant code, recent diff
 - Tools: manual first
 
@@ -133,7 +130,7 @@ Use this for system boundaries, coupling, ownership, or design risk.
 
 Suggested setup:
 
-- Agent: **Designing System Architecture**
+- Agent: choose an available architecture-oriented Agent, or start from a blank chat
 - Context: README, architecture docs, code map, API contracts, constraints
 
 Equivalent prompt if starting from blank:
@@ -148,7 +145,7 @@ Use this for README text, usage docs, API docs, or internal guides.
 
 Suggested setup:
 
-- Agent: **Docs Writer** or **Local Reader**
+- Agent: choose an available writing-oriented Agent, or start from a blank chat
 - Context: source files, existing docs, examples, screenshots, command output
 
 Equivalent prompt if starting from blank:
@@ -163,7 +160,7 @@ Use this for notes, URLs, PDFs, or copied source material.
 
 Suggested setup:
 
-- Agent: **Research Brief Writer**
+- Agent: choose an available research-oriented Agent, or start from a blank chat
 - Optional: provider-supported web search if current information matters
 
 Equivalent prompt if starting from blank:
@@ -240,9 +237,10 @@ Before enabling tools broadly:
 
 - prefer manual review for new tools
 - inspect tool arguments
+- resolve MCP setup and policy requirements before selecting MCP tools
 - inspect tool outputs
 - keep auto-execute off for tools that write files or have other external side effects
 - do not enable tools that are not needed
-- retry or discard failed tool calls before sending
+- retry, skip, or deliberately submit failed tool calls as error results
 - treat tool error outputs as data you must choose to send deliberately
 - use auto-execute only for trusted, low-risk workflows

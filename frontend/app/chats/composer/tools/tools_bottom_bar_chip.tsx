@@ -6,7 +6,7 @@ import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/provider_sdk';
-import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import type { ToolListItem } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
@@ -84,12 +84,6 @@ function stop(event: SyntheticEvent | MouseEvent) {
 
 function itemKey(item: ToolListItem): string {
 	return toolIdentityKey(item.target);
-}
-
-function choiceLabel(choice: Omit<ToolStoreChoice, 'choiceID'>): string {
-	return `${choice.pluginName ? `${choice.pluginName}/` : ''}${choice.target.name}${
-		choice.toolVersion ? `@${choice.toolVersion}` : ''
-	}`;
 }
 
 function itemLabel(item: ToolListItem): string {
@@ -321,7 +315,8 @@ export function ToolsBottomBarChip({
 				store={store}
 				disabled={isInputLocked}
 				display={toolDisplayName(item.toolDefinition)}
-				slug={itemLabel(item)}
+				slug={item.toolDefinition.description?.trim() || 'Available tool'}
+				sourceBadge={item.pluginName}
 				supportsAutoExecute={item.toolDefinition.implementation.kind === ToolImplType.Go}
 				autoExecute={autoExecuteFor(item)}
 				onAutoExecuteChange={value => {
@@ -347,7 +342,8 @@ export function ToolsBottomBarChip({
 				dataAttachmentChip="bottom-bar-attached-tool"
 				dataSelectionId={entry.selectionID}
 				display={entry.displayName || entry.target.name}
-				slug={choiceLabel(entry)}
+				slug={entry.description?.trim() || 'Available for this message'}
+				sourceBadge="Message"
 				isSelected
 				supportsAutoExecute={entry.implementationKind === ToolImplType.Go}
 				autoExecute={entry.autoExecute}
@@ -397,7 +393,7 @@ export function ToolsBottomBarChip({
 				dataAttachmentChip="bottom-bar-conversation-tool"
 				title={entry.toolLoadError || (!entry.toolDefinition ? 'Tool definition is being resolved.' : undefined)}
 				display={choice.displayName || choice.target.name}
-				slug={choiceLabel(choice)}
+				slug={choice.description?.trim() || 'Available for this conversation'}
 				sourceBadge="Conversation"
 				isSelected={entry.enabled}
 				selectedTitle={entry.enabled ? 'Enabled for next send' : 'Disabled'}
@@ -459,7 +455,9 @@ export function ToolsBottomBarChip({
 					<FiGlobe size={14} />
 					<div className="min-w-0 flex-1">
 						<div className="truncate text-xs font-medium">{toolDisplayName(item.toolDefinition)}</div>
-						<div className="text-base-content/70 truncate text-xs">{itemLabel(item)}</div>
+						<div className="text-base-content/70 truncate text-xs">
+							{item.toolDefinition.description?.trim() || 'Provider web search'}
+						</div>
 					</div>
 					{selected ? <FiCheck size={14} className="text-primary" /> : null}
 					{selected && webSearchStatus?.hasSchema ? (

@@ -1,6 +1,6 @@
 # Composer Context
 
-The composer is where you decide what the next message includes. This page covers templates, instruction sources, attachments, tools, skills, and web search while composing a chat message.
+The composer is where you decide what the next Run includes. This page covers instruction sources, templates, attachments, Workspaces, tools, Skills, MCP context, and provider-compatible web search.
 
 This page is about using context in Chats. To create or maintain reusable definitions, see [Reusable Catalogs](/docs?doc=reusable-catalogs).
 
@@ -10,24 +10,28 @@ This page is about using context in Chats. To create or maintain reusable defini
 - [Templates and instruction sources](#templates-and-instruction-sources)
 - [Attachments](#attachments)
 - [Tools](#tools)
-  - [Tool scope and persistence](#tool-scope-and-persistence)
+  - [Reviewing tool calls](#reviewing-tool-calls)
   - [Error results](#error-results)
 - [Web search](#web-search)
 - [Skills](#skills)
 - [MCP servers](#mcp-servers)
+- [Workspaces](#workspaces)
+- [MCP servers](#mcp-servers-1)
 - [Active chips bar](#active-chips-bar)
 - [Recommended pattern](#recommended-pattern)
 
 ## Quick chooser
 
-| Need                                            | Use                                                  |
-| ----------------------------------------------- | ---------------------------------------------------- |
-| Bring exact source material into a request      | Attachment                                           |
-| Reuse current-message structure                 | Template-style skill                                 |
-| Let the model ask FlexiGPT to run something     | Tool                                                 |
-| Use server-discovered context                   | MCP                                                  |
-| Need recent web information                     | Web search, if compatible with the selected provider |
-| Use a reusable workflow mode or instruction set | Skill                                                |
+| Need                                                  | Use                                                  |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| Bring exact source material into a request            | Attachment                                           |
+| Reuse current-message structure                       | User-message template                                |
+| Add reusable system-style guidance                    | Model default or selected instruction source         |
+| Let the model request a native or provider capability | Tool                                                 |
+| Use server-discovered context                         | MCP                                                  |
+| Reuse repository context                              | Workspace                                            |
+| Need recent web information                           | Web search, if compatible with the selected provider |
+| Enable reusable instruction Skill state               | Skill                                                |
 
 ## Templates and instruction sources
 
@@ -35,7 +39,8 @@ Template-style skills and instruction sources solve different parts of a request
 
 - A template-style skill renders reusable text into the current draft. Templates with arguments or resources ask for configuration first.
 - After insertion, the rendered content is ordinary plain composer text. There is no active template to keep selected or collapse later.
-- Edit or remove inserted template text as you would manually written text. Doing so does not change selected instruction sources, attachments, or tools.
+- When a template has verified resource files, you can choose which of those files to attach with the rendered text.
+- Edit or remove inserted template text as you would manually written text. Doing so does not change selected instruction sources, attachments, Workspaces, or tools.
 
 Instruction sources shape the system instructions sent with the request. They are independent of template text:
 
@@ -69,6 +74,8 @@ The composer can add:
 
 Attachment behavior:
 
+- files and folders can be dropped into the active Chat composer
+- a drop made outside Chats is queued while FlexiGPT opens Chats
 - attachments added to the current draft are available to the model when that message is sent
 - after sending, an attachment remains with that user message in conversation history
 - an older attachment is available again only when its older user turn is included by **Previous user turns**
@@ -76,7 +83,7 @@ Attachment behavior:
 - folder chips are UI grouping; restored messages may show flat attachment chips
 - files and URLs are deduplicated by identity
 - a single local attachment over `16 MiB` becomes not-readable/error context
-- folder selection is limited to `128` files per directory selection
+- folder selection keeps a bounded set of files actively attached and shows additional candidates as not added
 
 Attachment modes can include:
 
@@ -95,9 +102,17 @@ Before sending sensitive or large context, check attachment modes.
 
 ## Tools
 
-Tools let the model ask FlexiGPT to run a built-in capability.
+Tools let the model request a capability during a Run.
 
-FlexiGPT exposes only built-in Go tools. It does not support user-created HTTP tools.
+The Tools picker can show:
+
+- native FlexiGPT tools implemented by the app
+- provider-compatible SDK tools, including provider web search where supported
+
+MCP-discovered tools are not ordinary catalog tools. Select them through the
+separate **MCP** picker.
+
+FlexiGPT does not provide a user-created HTTP or arbitrary custom-tool definition flow.
 
 Keep these states separate:
 
@@ -115,20 +130,20 @@ Tools can be made available by:
 - skills
 - provider-compatible web search
 
-### Tool scope and persistence
+### Reviewing tool calls
 
-Use the **Tools** bottom bar chip area to add a tool for the next send, or configure a conversation tool when it should remain available. After a successful send, the tool choices used for that request are retained as conversation tools and included in later turns until you remove, disable, or change them.
+Use the **Tools** picker to configure native and provider-compatible tools before sending. The selections used by a Run are shown with that message so you can inspect the history later.
 
-Review the configured conversation tools before sending a new task. Remove tools that are no longer needed instead of relying on an earlier task's narrow scope.
+Review selected tools before every important Run. Remove a tool that no longer belongs in the task instead of relying on an earlier task's narrow scope.
 
 Manual tool flow:
 
 1. choose or attach tools
 2. send a message
 3. inspect any proposed tool call
-4. run or discard the call
+4. run, retry, skip, or submit the failure as an error result
 5. inspect the output
-6. send the output back if useful
+6. continue the Run when the output is useful
 
 Use manual review first for an unfamiliar built-in tool or any tool whose arguments or side effects you have not verified.
 
@@ -158,26 +173,37 @@ Use web search when freshness matters. Do not enable it by default for private o
 
 ## Skills
 
-Skills are reusable workflow modes. They are not just saved text.
+Skills have two user-facing insert behaviors:
 
-FlexiGPT uses skills for three closely related things:
-
-- **Template-style skills** render reusable draft structure or starter text into plain composer text. They do not remain selected after insertion.
-- **Instruction-only skills** behave like durable system-style instructions without needing a separate prompt-template.
-- **Normal skills** carry workflow behavior, session state, and any runtime context the workflow needs.
+- **User-message templates** render text into the draft. They do not remain selected after insertion.
+- **Instruction Skills** can be enabled for the Session. A simple instruction Skill without arguments or resources can also be rendered as an explicit instruction source.
 
 The composer tracks:
 
 | State              | Meaning                                               |
 | ------------------ | ----------------------------------------------------- |
 | **Enabled skills** | Skills allowed in this conversation/session.          |
-| **Active skills**  | Skills currently active in the skill runtime session. |
+| **Active skills**  | Enabled instruction Skills preloaded as active state. |
 
-When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context, draft structure, or instruction-only behavior in the request.
+An Agent or Workspace can contribute Skill selections. Inspect the selected Skills panel after loading either one.
 
 Selected instruction-only sources are independent of template text and are assembled with the selected model default as described in [Templates and instruction sources](#templates-and-instruction-sources).
 
 Agents can enable Skills and mark some ready to use immediately.
+
+## MCP servers
+
+## Workspaces
+
+Use a Workspace when repository or folder context should be reusable.
+
+The Workspace picker allows one Workspace at a time. It resolves the current
+Workspace plan before sending, then lets you choose its available instruction
+files, reference files, instruction Skills, and MCP server references.
+
+If a saved Workspace item changed or became unavailable, resolve that warning
+in the Workspace picker before sending. Manage directory discovery and
+repository-wide enablement on [Workspaces](/docs?doc=workspaces).
 
 ## MCP servers
 
@@ -199,6 +225,7 @@ A few practical notes:
 - app-only tools stay visible, but are not exposed to the model
 - required arguments block send until they are filled
 - if the server produces app context updates, clear them when you no longer need them
+- an MCP App result does not become model context until you explicitly approve and stage an update
 - refresh discovery on the server page when the server contents change
 
 ## Active chips bar
@@ -212,6 +239,8 @@ The active chips bar shows live draft context such as:
 - pending tool calls
 - running tool calls
 - failed tool calls
+- selected Workspace content
+- staged MCP App context
 - tool outputs
 
 Use it to inspect and remove context before sending.

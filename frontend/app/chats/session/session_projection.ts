@@ -957,6 +957,17 @@ function projectActiveOperation(run: SessionRun): ConversationMessage | undefine
 	};
 }
 
+function latestTranscriptUserMessageID(transcript: SessionTranscriptMessage[]): string | undefined {
+	for (let index = transcript.length - 1; index >= 0; index -= 1) {
+		const message = transcript[index];
+		if (message.role === SessionMessageRole.User) {
+			return message.id;
+		}
+	}
+
+	return undefined;
+}
+
 function projectTerminalRunOutcome(
 	run: SessionRun,
 	transcript: SessionTranscriptMessage[]
@@ -965,28 +976,33 @@ function projectTerminalRunOutcome(
 		return undefined;
 	}
 
-	const operationIDs = new Set((run.modelOperations ?? []).map(operation => operation.id));
+	const latestOperation = run.modelOperations?.at(-1);
+	const latestUserMessageID = latestTranscriptUserMessageID(transcript);
+
+	// EditAndResend removes the replaced transcript branch but retains its Run.
+	// A fallback has no historical insertion point, so emit it only for the
+	// current visible user turn.
+	if (
+		!latestOperation ||
+		!latestOperation.request.current.id ||
+		latestOperation.request.current.id !== latestUserMessageID
+	) {
+		return undefined;
+	}
+
 	const alreadyRepresented = transcript.some(message => {
-		if (message.role !== SessionMessageRole.Assistant || !message.operationID) {
-			return false;
-		}
-		if (!operationIDs.has(message.operationID)) {
+		if (message.role !== SessionMessageRole.Assistant || message.operationID !== latestOperation.id) {
 			return false;
 		}
 
-		return (
-			Boolean(message.error) ||
-			message.status === 'failed' ||
-			message.status === 'cancelled' ||
-			message.status === 'interrupted'
-		);
+		const status = messageStatus(message, latestOperation);
+		return status === Status.Cancelled || status === Status.Failed || status === Status.Incomplete;
 	});
 
 	if (alreadyRepresented) {
 		return undefined;
 	}
 
-	const latestOperation = run.modelOperations?.at(-1);
 	const cancelled = run.state === SessionRunState.Cancelled;
 	const outcomeMessage =
 		run.outcome?.message?.trim() ||

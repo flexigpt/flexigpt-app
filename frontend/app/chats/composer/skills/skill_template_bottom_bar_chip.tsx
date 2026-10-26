@@ -1,6 +1,6 @@
 import type { RefObject, SubmitEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiEye, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -8,8 +8,6 @@ import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 import type { PathAttachmentsResult } from '@/spec/attachment';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
-
-import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -40,6 +38,9 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import { SkillDetailsModal, skillDetailsSubjectFromComposerSkill } from '@/skills/skill_details_modal';
+import { getSkillDisplayName, getSkillSecondaryLabel, getSkillSourceLabel } from '@/skills/skill_presentation';
+
 interface SkillTemplateDropdownProps {
 	store: MenuStore;
 	open: boolean;
@@ -48,7 +49,15 @@ interface SkillTemplateDropdownProps {
 	loadError?: string | null;
 	actionError?: string | null;
 	onRetry?: () => void;
+	onView: (item: ComposerSkillCatalogItem) => void;
 	onPick: (item: ComposerSkillCatalogItem) => void;
+}
+
+interface SkillTemplateMenuItemProps {
+	store: MenuStore;
+	item: ComposerSkillCatalogItem;
+	onPick: (item: ComposerSkillCatalogItem) => void;
+	onView: (item: ComposerSkillCatalogItem) => void;
 }
 
 interface SkillTemplateInsertOutcome {
@@ -100,24 +109,29 @@ const skillTemplateCollator = new Intl.Collator(undefined, {
 });
 
 function getSkillTemplateLabel(item: ComposerSkillCatalogItem): string {
-	return getPrimaryUserFacingLabel(item.displayName, item.name);
+	return getSkillDisplayName(item);
 }
 
 function skillTemplateKey(item: ComposerSkillCatalogItem): string {
 	return `${item.ref.rootID}:${item.ref.artifactID}`;
 }
 
-function compareSkillTemplateListItems(a: ComposerSkillCatalogItem, b: ComposerSkillCatalogItem): number {
-	const labelCompare = skillTemplateCollator.compare(getSkillTemplateLabel(a), getSkillTemplateLabel(b));
+function compareSkillTemplateListItems(left: ComposerSkillCatalogItem, right: ComposerSkillCatalogItem): number {
+	const labelCompare = skillTemplateCollator.compare(getSkillTemplateLabel(left), getSkillTemplateLabel(right));
 	if (labelCompare !== 0) {
 		return labelCompare;
 	}
 
-	return skillTemplateCollator.compare(skillTemplateKey(a), skillTemplateKey(b));
+	return skillTemplateCollator.compare(skillTemplateKey(left), skillTemplateKey(right));
 }
 
 function templateIsSelectable(item: ComposerSkillCatalogItem): boolean {
-	return item.runtimeResolved && item.enabled && item.state === ArtifactState.Available;
+	return (
+		item.insert === SkillInsert.UserMessage &&
+		item.runtimeResolved &&
+		item.enabled &&
+		item.state === ArtifactState.Available
+	);
 }
 
 function approvedTemplateResourcePaths(item: ComposerSkillCatalogItem | null | undefined): string[] {
@@ -125,8 +139,6 @@ function approvedTemplateResourcePaths(item: ComposerSkillCatalogItem | null | u
 	const seen = new Set<string>();
 
 	for (const location of item?.resources?.locations ?? []) {
-		// Preserve the exact backend-approved path. The non-blank check only
-		// rejects malformed transport values and does not rewrite filenames.
 		if (location.trim().length === 0 || seen.has(location)) {
 			continue;
 		}
@@ -143,21 +155,46 @@ function selectedApprovedTemplateResourcePaths(
 	selectedPaths: readonly string[]
 ): string[] {
 	const selected = new Set(selectedPaths);
+
 	return approvedPaths.filter(path => selected.has(path));
 }
 
-function resourceWarningsFromAttachmentResult(result: PathAttachmentsResult): string[] {
-	const unique = [...new Set((result.errors ?? []).map(error => error.trim()).filter(Boolean))];
+function templateResourceFileName(path: string): string {
+	const parts = path.replaceAll('\\', '/').split('/').filter(Boolean);
 
-	const maximumVisibleWarnings = 8;
-	if (unique.length <= maximumVisibleWarnings) {
-		return unique;
+	return parts.at(-1) || 'Resource file';
+}
+
+function templateResourceLabels(paths: readonly string[]): Map<string, string> {
+	const occurrences = new Map<string, number>();
+	const totals = new Map<string, number>();
+
+	for (const path of paths) {
+		const name = templateResourceFileName(path);
+		totals.set(name, (totals.get(name) ?? 0) + 1);
 	}
 
-	return [
-		...unique.slice(0, maximumVisibleWarnings),
-		`${unique.length - maximumVisibleWarnings} additional resource attachment errors were omitted.`,
-	];
+	const labels = new Map<string, string>();
+
+	for (const path of paths) {
+		const name = templateResourceFileName(path);
+		const occurrence = (occurrences.get(name) ?? 0) + 1;
+		occurrences.set(name, occurrence);
+
+		labels.set(path, (totals.get(name) ?? 0) > 1 ? `${name} (${occurrence})` : name);
+	}
+
+	return labels;
+}
+
+function resourceWarningsFromAttachmentResult(result: PathAttachmentsResult): string[] {
+	const errorCount = new Set((result.errors ?? []).map(error => error.trim()).filter(Boolean)).size;
+
+	if (errorCount === 0) {
+		return [];
+	}
+
+	return [`${errorCount} selected template resource${errorCount === 1 ? '' : 's'} could not be attached.`];
 }
 
 function parseTemplateArguments(raw: string): Record<string, string> {
@@ -178,61 +215,106 @@ function parseTemplateArguments(raw: string): Record<string, string> {
 	}
 
 	const result: Record<string, string> = {};
+
 	for (const [key, argument] of Object.entries(value)) {
 		if (!key.trim()) {
 			throw new Error('Template argument names must not be empty.');
 		}
+
 		if (typeof argument === 'string') {
 			result[key] = argument;
 			continue;
 		}
+
 		if (typeof argument === 'number' || typeof argument === 'boolean') {
 			result[key] = String(argument);
 			continue;
 		}
+
 		if (argument === null) {
 			result[key] = '';
 			continue;
 		}
+
 		throw new Error(`Template argument "${key}" must be a string, number, boolean, or null.`);
 	}
 
 	return result;
 }
 
-function renderSkillTemplateMenuItem(item: ComposerSkillCatalogItem, onPick: (item: ComposerSkillCatalogItem) => void) {
-	const disabled = !templateIsSelectable(item);
-	const secondaryName = getDistinctUserFacingLabel(getSkillTemplateLabel(item), item.name);
+function templateGroupLabel(item: ComposerSkillCatalogItem): string {
+	if (item.builtIn) {
+		return 'Built-in templates';
+	}
+
+	const source = getSkillSourceLabel(item);
+
+	if (source === 'Managed') {
+		return 'Managed templates';
+	}
+
+	if (source === 'External') {
+		return 'Other templates';
+	}
+
+	return source;
+}
+
+function SkillTemplateMenuItem({ store, item, onPick, onView }: SkillTemplateMenuItemProps) {
+	const unavailable = !templateIsSelectable(item);
+	const secondaryName = getSkillSecondaryLabel(item);
+	const sourceLabel = getSkillSourceLabel(item);
 
 	return (
-		<MenuItem
-			key={skillTemplateKey(item)}
-			data-searchable-menu-item="true"
-			hideOnClick={false}
-			disabled={disabled}
-			onClick={() => {
-				if (disabled) {
-					return;
-				}
-				onPick(item);
-			}}
-			className={`${actionTriggerMenuItemClasses} items-start`}
-			title={item.description}
-		>
-			<FiFilePlus size={14} className="text-warning mt-0.5 shrink-0" />
+		<div className="border-base-300 hover:bg-base-200 flex items-start gap-2 rounded-xl border p-2 transition-colors">
+			<MenuItem
+				store={store}
+				data-searchable-menu-item="true"
+				hideOnClick={false}
+				disabled={unavailable}
+				className={`data-active-item:bg-base-200 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left outline-none ${
+					unavailable ? 'cursor-not-allowed opacity-60' : ''
+				}`}
+				title={item.description}
+				onClick={() => {
+					if (!unavailable) {
+						onPick(item);
+					}
+				}}
+			>
+				<FiFilePlus size={14} className="text-warning mt-0.5 shrink-0" />
 
-			<div className="min-w-0 flex-1">
-				<div className="truncate text-xs font-medium">{getSkillTemplateLabel(item)}</div>
-				{secondaryName ? <div className="mt-1 truncate text-[10px] opacity-70">{secondaryName}</div> : null}
-			</div>
+				<div className="min-w-0 flex-1">
+					<div className="truncate text-xs font-medium">{getSkillTemplateLabel(item)}</div>
+					{secondaryName ? <div className="mt-1 truncate text-[10px] opacity-70">{secondaryName}</div> : null}
+					{item.description ? <div className="mt-1 line-clamp-2 text-xs opacity-75">{item.description}</div> : null}
+				</div>
 
-			<div className="ml-auto flex shrink-0 items-center gap-1">
-				{item.hasArguments ? <span className="badge badge-warning badge-xs">Args</span> : null}
-				{item.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
-				{item.builtIn ? <span className="badge badge-ghost badge-xs">Built-in</span> : null}
-				{!templateIsSelectable(item) ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
-			</div>
-		</MenuItem>
+				<div className="ml-auto flex shrink-0 flex-wrap justify-end gap-1">
+					{item.hasArguments ? <span className="badge badge-warning badge-xs">Args</span> : null}
+					{item.hasResources ? <span className="badge badge-info badge-xs">Resources</span> : null}
+					<span className="badge badge-ghost badge-xs max-w-24 truncate" title={sourceLabel}>
+						{sourceLabel}
+					</span>
+					{unavailable ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
+				</div>
+			</MenuItem>
+
+			<HoverTip content="View Skill details" placement="top" wrapperElement="div" wrapperClassName="inline-flex">
+				<button
+					type="button"
+					className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+					aria-label={`View details for ${getSkillTemplateLabel(item)}`}
+					onClick={event => {
+						event.preventDefault();
+						event.stopPropagation();
+						onView(item);
+					}}
+				>
+					<FiEye size={14} />
+				</button>
+			</HoverTip>
+		</div>
 	);
 }
 
@@ -244,6 +326,7 @@ function SkillTemplateDropdown({
 	loadError,
 	actionError,
 	onRetry,
+	onView,
 	onPick,
 }: SkillTemplateDropdownProps) {
 	const menuContentElement = useStoreState(store, 'contentElement');
@@ -259,17 +342,12 @@ function SkillTemplateDropdown({
 			getKey: skillTemplateKey,
 			getFields: item => [
 				{ value: getSkillTemplateLabel(item), weight: 7 },
-				{ value: item.name, weight: 6 },
-				{ value: item.description, weight: 3 },
-				{ value: item.ref.rootID, weight: 2 },
-				{ value: item.ref.artifactID, weight: 2 },
-				{ value: item.sourceID, weight: 2 },
-				{ value: item.location, weight: 2 },
+				{ value: item.name, weight: 5 },
+				{ value: item.description, weight: 4 },
 				...item.plugins.flatMap(plugin => [
-					{ value: plugin.name, weight: 3 },
 					{ value: plugin.displayName, weight: 3 },
+					{ value: plugin.name, weight: 2 },
 				]),
-				...(item.runtimeWarnings ?? []).map(warning => ({ value: warning, weight: 1 })),
 				...(item.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
 				...(item.arguments ?? []).flatMap(argument => [
 					{ value: argument.name, weight: 2 },
@@ -282,102 +360,118 @@ function SkillTemplateDropdown({
 	}, [items, searchQuery]);
 
 	const firstTemplate =
-		displayedItems.find(t => {
-			return templateIsSelectable(t);
+		displayedItems.find(item => {
+			return templateIsSelectable(item);
 		}) ?? null;
+
 	const templateHeaderMeta = isSearchQueryActive(searchQuery)
 		? `${displayedItems.length} match${displayedItems.length === 1 ? '' : 'es'}`
 		: `${items.length} available`;
 
+	const groupedItems = useMemo(
+		() =>
+			[...Map.groupBy(displayedItems, templateGroupLabel)].toSorted(([left], [right]) =>
+				skillTemplateCollator.compare(left, right)
+			),
+		[displayedItems]
+	);
+
 	return (
 		<ActionTriggerMenu store={store} data-menu-kind="templates">
-			{!open ? null : (
-				<ActionTriggerMenuHeader>
-					<SearchableMenuInput
-						open={open}
-						query={searchQuery}
-						onQueryChange={setSearchQuery}
-						placeholder="Search templates…"
-						disabled={loading || items.length === 0}
-						onFocusFirstItem={() => {
-							focusFirstSearchableMenuItem(menuContentElement);
-						}}
-						onEnterFirstResult={() => {
-							if (firstTemplate) {
-								onPick(firstTemplate);
-							}
-						}}
-						onEscape={() => {
-							store.hide();
-						}}
-					/>
+			{open ? (
+				<>
+					<ActionTriggerMenuHeader>
+						<SearchableMenuInput
+							open={open}
+							query={searchQuery}
+							onQueryChange={setSearchQuery}
+							placeholder="Search templates…"
+							disabled={loading || items.length === 0}
+							onFocusFirstItem={() => {
+								focusFirstSearchableMenuItem(menuContentElement);
+							}}
+							onEnterFirstResult={() => {
+								if (firstTemplate) {
+									onPick(firstTemplate);
+								}
+							}}
+							onEscape={() => {
+								store.hide();
+							}}
+						/>
 
-					<div className={actionTriggerMenuHeaderRowClasses}>
-						<div className="min-w-0 flex-1 truncate text-xs font-semibold">Templates</div>
-						<span className={actionTriggerMenuMetaClasses}>{templateHeaderMeta}</span>
-					</div>
+						<div className={actionTriggerMenuHeaderRowClasses}>
+							<div className="min-w-0 flex-1 truncate text-xs font-semibold">Templates</div>
+							<span className={actionTriggerMenuMetaClasses}>{templateHeaderMeta}</span>
+						</div>
 
-					{loadError ? (
-						<div className="alert alert-warning rounded-xl text-xs">
-							<FiAlertCircle size={14} className="shrink-0" />
-							<div className="grow">
-								<div className="font-semibold">Templates could not be refreshed</div>
-								<div>{loadError}</div>
+						{loadError ? (
+							<div className="alert alert-warning rounded-xl text-xs">
+								<FiAlertCircle size={14} className="shrink-0" />
+								<div className="min-w-0 flex-1">
+									<div className="font-semibold">Templates could not be refreshed</div>
+									<div>{loadError}</div>
+								</div>
+								{onRetry ? (
+									<button type="button" className="btn btn-xs rounded-lg" onClick={onRetry}>
+										Retry
+									</button>
+								) : null}
 							</div>
-							{onRetry ? (
-								<button type="button" className="btn btn-xs rounded-lg" onClick={onRetry}>
-									Retry
-								</button>
-							) : null}
-						</div>
-					) : null}
-					{actionError ? (
-						<div className="alert alert-error rounded-xl text-xs">
-							<FiAlertCircle size={14} className="shrink-0" />
-							<div className="grow">{actionError}</div>
-						</div>
-					) : null}
-				</ActionTriggerMenuHeader>
-			)}
+						) : null}
 
-			{!open ? null : (
-				<ActionTriggerMenuBody>
-					{loading ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-							Loading templates…
-						</div>
-					) : items.length === 0 ? (
-						<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-							No user-message skill templates available
-						</div>
-					) : displayedItems.length === 0 ? (
-						<div className={searchableMenuEmptyStateClasses}>No templates match your search.</div>
-					) : (
-						[
-							...Map.groupBy(
-								displayedItems,
-								item =>
-									item.plugins[0]?.displayName ??
-									(item.builtIn ? 'Built-in Skills' : item.sourceID || 'Unattached Skills')
-							),
-						].map(([group, templates]) => (
-							<GroupedMenuSection key={group} title={group} ariaLabel={`${group} templates`}>
-								{templates.map(item => renderSkillTemplateMenuItem(item, onPick))}
-							</GroupedMenuSection>
-						))
-					)}
-				</ActionTriggerMenuBody>
-			)}
+						{actionError ? (
+							<div className="alert alert-error rounded-xl text-xs">
+								<FiAlertCircle size={14} className="shrink-0" />
+								<span>{actionError}</span>
+							</div>
+						) : null}
+					</ActionTriggerMenuHeader>
 
-			{!open ? null : (
-				<ComposerDropdownSelectedPanel
-					label="Template insertion"
-					ariaLabel="Template insertion"
-					isEmpty
-					emptyLabel="Choose a template above to render it into the composer."
-					help="Templates render into ordinary draft text. They do not remain selected or join a Skill session after insertion."
-				/>
-			)}
+					<ActionTriggerMenuBody>
+						{loading ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								Loading templates…
+							</div>
+						) : items.length === 0 ? (
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								No user-message templates are available.
+							</div>
+						) : displayedItems.length === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>No templates match your search.</div>
+						) : (
+							<div className="space-y-2">
+								{groupedItems.map(([group, templates], index) => (
+									<GroupedMenuSection
+										key={group}
+										title={group}
+										ariaLabel={`${group} templates`}
+										separatorBefore={index > 0}
+									>
+										{templates.map(item => (
+											<SkillTemplateMenuItem
+												key={skillTemplateKey(item)}
+												store={store}
+												item={item}
+												onPick={onPick}
+												onView={onView}
+											/>
+										))}
+									</GroupedMenuSection>
+								))}
+							</div>
+						)}
+					</ActionTriggerMenuBody>
+
+					<ComposerDropdownSelectedPanel
+						label="Template insertion"
+						ariaLabel="Template insertion"
+						isEmpty
+						emptyLabel="Choose a template above to render it into the composer."
+						help="Templates render into ordinary draft text. They do not remain selected or join a Skill session after insertion."
+					/>
+				</>
+			) : null}
 		</ActionTriggerMenu>
 	);
 }
@@ -391,9 +485,8 @@ function SkillTemplateRenderModalContent({
 		Object.fromEntries((item?.arguments ?? []).map(argument => [argument.name, argument.default ?? '']))
 	);
 	const approvedResourcePaths = useMemo(() => approvedTemplateResourcePaths(item), [item]);
-	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>(() => {
-		return approvedResourcePaths;
-	});
+	const resourceLabels = useMemo(() => templateResourceLabels(approvedResourcePaths), [approvedResourcePaths]);
+	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>(() => approvedResourcePaths);
 	const [submitError, setSubmitError] = useState('');
 	const [resourceAttachmentWarnings, setResourceAttachmentWarnings] = useState<string[]>([]);
 	const [inserted, setInserted] = useState(false);
@@ -424,6 +517,7 @@ function SkillTemplateRenderModalContent({
 					item.arguments !== undefined ? argumentValues : parseTemplateArguments(argumentsJSON),
 					selectedApprovedResources
 				);
+
 				if (unmountingRef.current) {
 					return;
 				}
@@ -455,10 +549,10 @@ function SkillTemplateRenderModalContent({
 
 	return (
 		<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
-			<div className="max-h-[80vh] overflow-y-auto p-6">
+			<div className="app-scrollbar-thin max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 				<ModalHeader
 					title="Use Template"
-					description={`${getSkillTemplateLabel(item)} is rendered by the Session Runtime before insertion.`}
+					description={`${getSkillTemplateLabel(item)} will be rendered before insertion.`}
 					onClose={() => {
 						requestClose();
 					}}
@@ -481,10 +575,8 @@ function SkillTemplateRenderModalContent({
 									Template text was inserted, but some selected resources were not attached.
 								</div>
 								<ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
-									{resourceAttachmentWarnings.map((warning, index) => (
-										<li key={`${index}:${warning}`} className="wrap-break-word">
-											{warning}
-										</li>
+									{resourceAttachmentWarnings.map(warning => (
+										<li key={warning}>{warning}</li>
 									))}
 								</ul>
 							</div>
@@ -506,12 +598,15 @@ function SkillTemplateRenderModalContent({
 										disabled={formLocked}
 										onChange={event => {
 											const value = event.currentTarget.value;
-											setArgumentValues(previous => ({ ...previous, [argument.name]: value }));
+											setArgumentValues(previous => ({
+												...previous,
+												[argument.name]: value,
+											}));
 										}}
 									/>
 									{argument.default !== undefined ? (
 										<span className="text-base-content/60 mt-1 block text-xs">
-											Default: {argument.default || '(empty string)'}
+											Default: {argument.default || '(empty value)'}
 										</span>
 									) : null}
 								</label>
@@ -520,8 +615,8 @@ function SkillTemplateRenderModalContent({
 					) : item.hasArguments ? (
 						<div>
 							<p className="text-warning mb-2 text-xs">
-								Argument definitions are not exposed for this source by the current management read API. Known argument
-								names can still be supplied as JSON.
+								This template accepts arguments, but its argument definitions are unavailable. Known values can still be
+								supplied as JSON.
 							</p>
 							<label htmlFor="user-message-skill-arguments" className="label py-1">
 								<span className="text-sm">Arguments JSON</span>
@@ -536,12 +631,13 @@ function SkillTemplateRenderModalContent({
 								}}
 								disabled={formLocked}
 								placeholder={'{\n  "argument": "value"\n}'}
-								spellCheck="false"
+								spellCheck={false}
 							/>
 						</div>
 					) : (
 						<div className="text-base-content/70 text-sm">This template has no declared arguments.</div>
 					)}
+
 					{hasResourceSelection ? (
 						<section className="border-base-300 rounded-xl border p-3" aria-label="Template resource attachments">
 							<div className="flex flex-wrap items-start justify-between gap-2">
@@ -551,10 +647,10 @@ function SkillTemplateRenderModalContent({
 										Template resources
 									</div>
 									<p className="text-base-content/70 mt-1 text-xs">
-										Select verified resource files to attach alongside the rendered template text. Their attachment
-										modes can be changed after insertion.
+										Select resource files to attach alongside the rendered template text.
 									</p>
 								</div>
+
 								{approvedResourcePaths.length > 0 ? (
 									<span className="badge badge-ghost badge-sm">
 										{selectedApprovedResources.length}/{approvedResourcePaths.length} selected
@@ -573,7 +669,7 @@ function SkillTemplateRenderModalContent({
 												setSelectedResourcePaths(approvedResourcePaths);
 											}}
 										>
-											Select all listed
+											Select all
 										</button>
 										<button
 											type="button"
@@ -589,13 +685,13 @@ function SkillTemplateRenderModalContent({
 
 									<div className="border-base-300 mt-3 max-h-52 space-y-1 overflow-y-auto rounded-xl border p-2">
 										{approvedResourcePaths.map(resourcePath => {
+											const resourceLabel = resourceLabels.get(resourcePath) ?? 'Resource file';
 											const selected = selectedResourcePaths.includes(resourcePath);
 
 											return (
 												<label
 													key={resourcePath}
 													className="hover:bg-base-100 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
-													title={resourcePath}
 												>
 													<input
 														type="checkbox"
@@ -609,9 +705,9 @@ function SkillTemplateRenderModalContent({
 																	: [...previous, resourcePath]
 															);
 														}}
-														aria-label={`Attach resource ${resourcePath}`}
+														aria-label={`Attach template resource ${resourceLabel}`}
 													/>
-													<span className="min-w-0 flex-1 truncate font-mono text-xs">{resourcePath}</span>
+													<span className="min-w-0 flex-1 truncate text-xs">{resourceLabel}</span>
 												</label>
 											);
 										})}
@@ -619,21 +715,19 @@ function SkillTemplateRenderModalContent({
 								</>
 							) : (
 								<div className="alert alert-warning mt-3 rounded-xl text-xs">
-									The runtime reports resource files for this template, but no verified local paths are available for
-									this revision. The template text can still be inserted.
+									No verified resource files are currently available. The template text can still be inserted.
 								</div>
 							)}
 
 							{item.resources?.moreLocations ? (
 								<div className="alert alert-info mt-3 rounded-xl text-xs">
-									Only the verified resource paths listed above can be attached here. Additional indexed resource paths
-									were omitted from the bounded Skill details response.
+									Some additional resource files are available but cannot be attached from this menu.
 								</div>
 							) : null}
 						</section>
 					) : null}
 
-					<ModalActions className="-mx-6 mt-6 -mb-6">
+					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
 						{inserted ? (
 							<button
 								type="button"
@@ -701,7 +795,8 @@ function SkillTemplatePicker({
 	isInputLocked,
 	onInsertRendered,
 }: SkillTemplatePickerProps) {
-	const [modalItem, setModalItem] = useState<ComposerSkillCatalogItem | null>(null);
+	const [templateItem, setTemplateItem] = useState<ComposerSkillCatalogItem | null>(null);
+	const [viewedItem, setViewedItem] = useState<ComposerSkillCatalogItem | null>(null);
 	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
 
 	const handlePick = useCallback(
@@ -715,7 +810,7 @@ function SkillTemplatePicker({
 
 			if (item.hasArguments || item.hasResources || approvedTemplateResourcePaths(item).length > 0) {
 				store.hide();
-				setModalItem(item);
+				setTemplateItem(item);
 				return;
 			}
 
@@ -727,8 +822,6 @@ function SkillTemplatePicker({
 		},
 		[isInputLocked, onInsertRendered, store]
 	);
-
-	const modalIsOpen = modalItem !== null && !isInputLocked;
 
 	return (
 		<>
@@ -746,22 +839,35 @@ function SkillTemplatePicker({
 							}
 						: undefined
 				}
+				onView={item => {
+					store.hide();
+					setViewedItem(item);
+				}}
 				onPick={item => {
 					void handlePick(item);
 				}}
 			/>
 
 			<SkillTemplateRenderModal
-				isOpen={modalIsOpen}
-				item={modalItem}
+				isOpen={templateItem !== null && !isInputLocked}
+				item={templateItem}
 				onClose={() => {
-					setModalItem(null);
+					setTemplateItem(null);
 				}}
 				onInsert={(args, resourcePaths) => {
-					if (modalItem) {
-						return onInsertRendered(modalItem, args, resourcePaths);
+					if (!templateItem) {
+						return Promise.resolve({});
 					}
-					return Promise.resolve({});
+
+					return onInsertRendered(templateItem, args, resourcePaths);
+				}}
+			/>
+
+			<SkillDetailsModal
+				isOpen={viewedItem !== null}
+				skill={viewedItem ? skillDetailsSubjectFromComposerSkill(viewedItem) : null}
+				onClose={() => {
+					setViewedItem(null);
 				}}
 			/>
 		</>
@@ -839,6 +945,7 @@ function SkillTemplateBottomBarChipInner({
 					'Template prepared, but the Composer became locked before insertion. Try again when it is available.'
 				);
 			}
+
 			await onInsertTemplateText(rendered.text);
 			onTemplateRendered(item.ref);
 
@@ -854,6 +961,7 @@ function SkillTemplateBottomBarChipInner({
 						requestedResourcePaths,
 						() => !inputLockedRef.current
 					);
+
 					if (!attachmentResult) {
 						resourceAttachmentWarnings = ['Selected template resources could not be prepared for attachment.'];
 					} else {
@@ -862,10 +970,8 @@ function SkillTemplateBottomBarChipInner({
 							resourceAttachmentWarnings = warnings;
 						}
 					}
-				} catch (error) {
-					resourceAttachmentWarnings = [
-						error instanceof Error ? error.message : 'Selected template resources could not be attached.',
-					];
+				} catch {
+					resourceAttachmentWarnings = ['Selected template resources could not be attached.'];
 				}
 			}
 
@@ -880,7 +986,7 @@ function SkillTemplateBottomBarChipInner({
 
 			return { resourceAttachmentWarnings };
 		},
-		[onAttachApprovedTemplateResourcePaths, onInsertTemplateText, store, onTemplateRendered]
+		[onAttachApprovedTemplateResourcePaths, onInsertTemplateText, onTemplateRendered, store]
 	);
 
 	return (

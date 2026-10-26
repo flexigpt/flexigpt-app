@@ -83,17 +83,10 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 					<ManagementInfoRow label="Logical name" mono>
 						{plugin.name}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Root" mono>
-						{plugin.ref.rootID}
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Source" mono>
-						{plugin.sourceID}
-					</ManagementInfoRow>
 					<ManagementInfoRow label="State">{plugin.state}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{plugin.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Built-in">{plugin.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Revision">{plugin.revision}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">{plugin.description || '—'}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
@@ -142,8 +135,6 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 								<span className="font-mono">{member.type}</span>
 								{member.name ? ` / ${member.name}` : ''}
 								{member.scope ? ` / scope: ${member.scope}` : ''}
-								{member.locator?.path ? ` / path: ${member.locator.path}` : ''}
-								{member.locator?.url ? ` / URL: ${member.locator.url}` : ''}
 								{canManageSkillPlugin(plugin) ? (
 									<button
 										type="button"

@@ -33,7 +33,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { PageFrame } from '@/components/page_frame';
 
 import type { SkillManagementFilter } from '@/skills/skill_management_utils';
-import { SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
+import { SkillDetailsModal, skillDetailsSubjectFromStoreSkill } from '@/skills/skill_details_modal';
 import { SkillManagementInsertFilter, skillMatchesManagementFilter } from '@/skills/skill_management_utils';
 import { SkillPluginCard } from '@/skills/skill_plugin_card';
 
@@ -758,8 +758,8 @@ export default function SkillsPage() {
 							aria-label="Skill tag filter"
 						/>
 						<div className="text-base-content/60 text-xs sm:col-span-3">
-							{matchingSkills.length} matching Artifact{matchingSkills.length === 1 ? '' : 's'}. Tag and argument
-							metadata is searchable for verified Skill documents. Unavailable interpretation is shown in Skill Details.
+							{matchingSkills.length} matching Skill{matchingSkills.length === 1 ? '' : 's'}. Tags and arguments are
+							searchable for verified Skill documents. Availability details are shown in Skill Details.
 						</div>
 					</div>
 					{error ? (
@@ -776,8 +776,8 @@ export default function SkillsPage() {
 					) : null}
 
 					<div className="text-base-content/70 border-base-content/10 bg-base-100 rounded-2xl border p-3 text-sm">
-						{data.allSkills.length} discovered Skill Artifact{data.allSkills.length === 1 ? '' : 's'} are available
-						across all Roots. Use “Attach Existing” to place a discovered Artifact into a Plugin without recreating it.
+						{data.allSkills.length} discovered Skill{data.allSkills.length === 1 ? '' : 's'} are available across your
+						configured sources. Use “Attach Existing” to add an existing Skill to a Plugin.
 					</div>
 
 					{data.plugins.map(row => (
@@ -817,7 +817,8 @@ export default function SkillsPage() {
 							>
 								<div className="font-medium">{skill.displayName || skill.name}</div>
 								<div className="text-base-content/60 mt-1 text-xs">
-									{skill.ref.rootID}/{skill.ref.artifactID} · {skill.state}
+									{skill.builtIn ? 'Built-in Skill' : skill.managed ? 'Managed Skill' : 'Imported Skill'} ·{' '}
+									{skill.state}
 								</div>
 								<div className="mt-3 flex flex-wrap gap-2">
 									<button
@@ -878,9 +879,10 @@ export default function SkillsPage() {
 					failureMessage="Skill Plugin could not be created."
 				/>
 
-				<SkillArtifactDetailsModal
+				<SkillDetailsModal
 					isOpen={skillToView !== null}
-					skill={skillToView}
+					skill={skillToView ? skillDetailsSubjectFromStoreSkill(skillToView) : null}
+					showPreview
 					onClose={() => {
 						setSkillToView(null);
 					}}

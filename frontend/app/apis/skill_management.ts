@@ -188,6 +188,7 @@ export interface ComposerSkillCatalogItem {
 
 export interface PreparedInstructionSkillSource {
 	skillRef: ArtifactRef;
+	displayName: string;
 	text: string;
 }
 
@@ -686,10 +687,13 @@ export class SkillManagementAPI {
 					throwIfAborted(signal);
 				}
 
-				const rendered = await this.previewInstructionSkill({
-					skill: skillRef,
-					arguments: {},
-				});
+				const [rendered, artifact] = await Promise.all([
+					this.previewInstructionSkill({
+						skill: skillRef,
+						arguments: {},
+					}),
+					this.store.getSkill(skillRef).catch(() => undefined),
+				]);
 
 				if (signal) {
 					throwIfAborted(signal);
@@ -701,6 +705,7 @@ export class SkillManagementAPI {
 
 				return {
 					skillRef: rendered.skill,
+					displayName: artifact?.displayName.trim() || artifact?.logicalName.trim() || 'Instruction Skill',
 					text: rendered.text,
 				};
 			},

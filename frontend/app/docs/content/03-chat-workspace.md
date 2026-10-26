@@ -1,6 +1,6 @@
 # Chat Workspace
 
-The **Chats** page is the main place where FlexiGPT turns reusable setup into work. It brings together tabs, local conversation search, the message timeline, model controls, Agents, the composer, streaming responses, and edit/resend flows.
+The **Chats** page is where reusable setup becomes an active Session and Run. It brings together tabs, saved conversation search, the timeline, model controls, Agents, Workspaces, the composer, runtime waits, and edit/resend flows.
 
 This page is about working in the chat workspace. For the details of attachments, tools, skills, and web search inside the composer, see [Composer Context](/docs?doc=composer-context).
 
@@ -13,6 +13,7 @@ This page is about working in the chat workspace. For the details of attachments
 - [Composer context entry points](#composer-context-entry-points)
 - [Sending and stopping](#sending-and-stopping)
 - [Reading results](#reading-results)
+- [MCP App results](#mcp-app-results)
 - [Editing and branching](#editing-and-branching)
 - [Search, tabs, and continuity](#search-tabs-and-continuity)
 - [When to leave Chats](#when-to-leave-chats)
@@ -24,7 +25,7 @@ This page is about working in the chat workspace. For the details of attachments
 3. Confirm the model and provider.
 4. Set **Previous user turns** intentionally.
 5. Add only the context the task needs.
-6. Send.
+6. Send and review any preparation warning, approval request, or runtime wait.
 7. Inspect the response, citations, token usage, message details, and tool calls.
 8. Adjust one layer at a time.
 
@@ -54,8 +55,8 @@ The request control bar sits above the editor and controls how the next turn run
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **Agent**                    | Loads a starter setup for model, instructions, opening text, tools, Skills, and connected services.               |
 | **Model**                    | Chooses the provider/model configuration.                                                                         |
-| **Temperature or reasoning** | Controls model style or reasoning behavior where supported.                                                       |
-| **Effort/verbosity**         | Controls output verbosity where supported.                                                                        |
+| **Temperature or reasoning** | Controls sampling or reasoning behavior where supported by the selected model.                                    |
+| **Verbosity or effort**      | Controls output behavior where supported by the selected provider/model.                                          |
 | **Previous user turns**      | Controls how much earlier user context is resent.                                                                 |
 | **Advanced parameters**      | Streaming, token limits, timeout, cache control, output format, stop sequences, and provider-specific parameters. |
 
@@ -89,12 +90,14 @@ The composer bottom bar is where you add message context:
 
 - **Attachments**
   - files, folders, images, PDFs, URLs
+- **Workspace**
+  - one repository or folder setup and the specific content selected from it
 - **Tools**
-  - tool choices for the draft or conversation
+  - native FlexiGPT tools and provider-compatible tools for the Run
 - **MCP**
-  - Model context protocol servers and their discovered tools, resources, prompts, and server instructions for the next message
+  - connected MCP servers and their discovered tools, resources, prompts, and server instructions
 - **Skills**
-  - workflow modes for the current session, including template-style skills and instruction-only skills
+  - instruction Skills, active Skill state, and user-message templates
 - **Web search**
   - provider-compatible web search selection
 - **Keyboard shortcuts**
@@ -106,16 +109,18 @@ The active chips bar shows what is currently attached or pending. Review chips b
 
 Common actions:
 
-| Action                 | Meaning                                                                           |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| **Send**               | Send the current message and selected context.                                    |
-| **Run tools only**     | Execute pending runnable tool calls without sending a new model request.          |
-| **Run tools and send** | Execute pending calls, then send the outputs back to the model.                   |
-| **Stop**               | Abort an in-flight generation. Partial output already received stays in the chat. |
+| Action                     | Meaning                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **Send**                   | Send the current message and selected context.                                    |
+| **Run tools only**         | Execute pending runnable tool calls without sending a new model request.          |
+| **Run tools and continue** | Execute pending calls, then continue the active Run with its results.             |
+| **Stop**                   | Abort an in-flight generation. Partial output already received stays in the chat. |
 
 The composer can block send when:
 
 - tool or web-search options are incomplete
+- a selected MCP prompt or resource template needs an argument
+- a selected Workspace is still resolving or is no longer available
 - pending runnable tool calls must be run or discarded
 - failed runnable calls must be retried or discarded
 - current request has no usable content
@@ -137,6 +142,17 @@ The timeline can show:
 - recognized unified diff blocks with in-line apply controls for local file changes
 
 Use message details when debugging why a response changed.
+
+## MCP App results
+
+Some MCP tool results can include an inline MCP App view.
+
+- An App result is not automatically added as model context.
+- The App can request a draft message, a staged model-context update, an external link, or an app-initiated tool call.
+- FlexiGPT applies the server App policy and asks for approval where required.
+- Staged App context is shown in the composer and can be removed before the next continuation or send.
+
+Use the MCP server policy and discovery details to decide whether an App is appropriate for the workflow.
 
 ## Editing and branching
 
@@ -166,15 +182,10 @@ Tabs are UI workspace state. Conversation content is stored by the backend.
 
 ## When to leave Chats
 
-Stay in Chats for active work.
+Stay in Chats for active work and per-Run choices.
 
-Leave Chats when maintaining reusable building blocks:
-
-| Goal                                       | Page                    |
-| ------------------------------------------ | ----------------------- |
-| Import, export, enable, or manage an Agent | Agents                  |
-| Browse available built-in Go tools         | Tools                   |
-| Add or maintain skills                     | Skills                  |
-| Change providers or models                 | Models                  |
-| Add provider auth keys                     | Models                  |
-| Change theme or logging/debug options      | Title-bar Settings menu |
+Leave Chats when changing reusable definitions. The short ownership map is in
+[Manage Reusable Setup](/docs?doc=reusable-catalogs); the detailed pages are
+[Agents](/docs?doc=agents), [Workspaces](/docs?doc=workspaces),
+[MCP Servers](/docs?doc=mcp-servers), [Skills](/docs?doc=reusable-catalogs#skills),
+and [Providers and Models](/docs?doc=providers-and-models).

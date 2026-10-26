@@ -1,6 +1,16 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiZap } from 'react-icons/fi';
+import {
+	FiAlertCircle,
+	FiCheck,
+	FiEye,
+	FiFilePlus,
+	FiGitBranch,
+	FiPlus,
+	FiRefreshCw,
+	FiX,
+	FiZap,
+} from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -10,7 +20,7 @@ import type { SkillRef } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
-import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
+import { getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
@@ -45,7 +55,9 @@ import {
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
 import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
+import { SkillDetailsModal, skillDetailsSubjectFromComposerSkill } from '@/skills/skill_details_modal';
 import { makeUniqueSkillName } from '@/skills/skill_management_utils';
+import { getSkillDisplayName, getSkillSecondaryLabel, getSkillSourceLabel } from '@/skills/skill_presentation';
 
 function stopSkillRowAction(event: SyntheticEvent) {
 	event.stopPropagation();
@@ -104,7 +116,7 @@ function skillKey(item: ComposerSkillCatalogItem): string {
 }
 
 function skillLabel(item: ComposerSkillCatalogItem): string {
-	return item.displayName || item.name;
+	return getSkillDisplayName(item);
 }
 
 function compareSkills(left: ComposerSkillCatalogItem, right: ComposerSkillCatalogItem): number {
@@ -240,6 +252,7 @@ export function SkillsBottomBarChip({
 		action: PendingManagedSkillAction;
 		existingNames: string[];
 	} | null>(null);
+	const [viewedSkill, setViewedSkill] = useState<ComposerSkillCatalogItem | null>(null);
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -554,7 +567,8 @@ export function SkillsBottomBarChip({
 						const key = skillRefKey(ref);
 						const active = activeKeys.has(key);
 						const label = skill ? skillLabel(skill) : 'Unavailable saved Skill';
-						const secondaryName = skill ? getDistinctUserFacingLabel(label, skill.name) : undefined;
+						const secondaryName = skill ? getSkillSecondaryLabel(skill) : undefined;
+						const sourceLabel = skill ? getSkillSourceLabel(skill) : undefined;
 						const canMoveToInstructions = skill && selectable(skill) && !skill.hasArguments && !skill.hasResources;
 
 						return (
@@ -566,8 +580,27 @@ export function SkillsBottomBarChip({
 										<div className="text-base-content/60 truncate text-[10px]">{secondaryName}</div>
 									) : null}
 								</div>
+								{sourceLabel ? (
+									<span className="badge badge-ghost badge-xs max-w-28 shrink-0 truncate" title={sourceLabel}>
+										{sourceLabel}
+									</span>
+								) : null}
 								{active ? <span className="badge badge-success badge-xs">Active</span> : null}
 								{!skill ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
+								{skill ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+										title="View Skill details"
+										aria-label={`View details for ${label}`}
+										onClick={() => {
+											store.hide();
+											setViewedSkill(skill);
+										}}
+									>
+										<FiEye size={13} />
+									</button>
+								) : null}
 								{skill ? (
 									<button
 										type="button"
@@ -594,14 +627,16 @@ export function SkillsBottomBarChip({
 								) : null}
 								<button
 									type="button"
-									className="btn btn-ghost btn-xs text-error rounded-lg"
+									className="btn btn-ghost btn-xs btn-square text-error shrink-0 rounded-lg"
 									disabled={isInputLocked}
+									title="Remove Skill"
+									aria-label={`Remove ${label}`}
 									onClick={() => {
 										setEnabledSkillRefs(previous => removeSkillRef(previous, ref));
 										setActiveSkillRefs(previous => removeSkillRef(previous, ref));
 									}}
 								>
-									Disable
+									<FiX size={13} />
 								</button>
 							</div>
 						);
@@ -802,7 +837,8 @@ export function SkillsBottomBarChip({
 									const enabled = enabledKeys.has(key);
 									const active = activeKeys.has(key);
 									const activationAllowed = canActivate(skill);
-									const secondaryName = getDistinctUserFacingLabel(skillLabel(skill), skill.name);
+									const secondaryName = getSkillSecondaryLabel(skill);
+									const sourceLabel = getSkillSourceLabel(skill);
 
 									return (
 										<MenuItem
@@ -832,6 +868,9 @@ export function SkillsBottomBarChip({
 														<div className="text-base-content/70 mt-1 line-clamp-2 text-xs">{skill.description}</div>
 													) : null}
 												</div>
+												<span className="badge badge-ghost badge-xs max-w-28 shrink-0 truncate" title={sourceLabel}>
+													{sourceLabel}
+												</span>
 												{enabled ? <FiCheck size={14} className="text-secondary shrink-0" /> : null}
 											</div>
 											<div className="mt-2 ml-6 flex flex-wrap items-center gap-1">
@@ -854,6 +893,18 @@ export function SkillsBottomBarChip({
 												onClick={stopSkillRowAction}
 												onPointerDown={stopSkillRowAction}
 											>
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs btn-square rounded-lg"
+													title="View Skill details"
+													aria-label={`View details for ${skillLabel(skill)}`}
+													onClick={() => {
+														store.hide();
+														setViewedSkill(skill);
+													}}
+												>
+													<FiEye size={13} />
+												</button>
 												{enabled ? (
 													<>
 														<button
@@ -1080,6 +1131,14 @@ export function SkillsBottomBarChip({
 						);
 						store.show();
 					}
+				}}
+			/>
+
+			<SkillDetailsModal
+				isOpen={viewedSkill !== null}
+				skill={viewedSkill ? skillDetailsSubjectFromComposerSkill(viewedSkill) : null}
+				onClose={() => {
+					setViewedSkill(null);
 				}}
 			/>
 		</>

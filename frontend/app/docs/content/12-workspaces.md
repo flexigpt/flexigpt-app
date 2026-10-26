@@ -2,7 +2,9 @@
 
 Workspaces help you work with the same repository or folder repeatedly.
 
-An Agent gives you a starting way of working. A Workspace gives you project-aware context. You can use both in the same chat.
+An Agent gives you a starting way of working. A Workspace gives you
+project-aware context. You can use both in the same chat, but the composer
+selects one Workspace at a time.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -28,6 +30,9 @@ Use a Workspace when you often work with:
 
 A Workspace can help you bring the right local material into Chats without attaching the same files every time.
 
+It does not edit the repository. It resolves repository-backed content and lets
+you decide what that content contributes to the next Run.
+
 ## Add a repository folder
 
 1. Open **Workspaces**.
@@ -43,37 +48,29 @@ If the folder has no Workspace file yet, FlexiGPT provides a sensible starting s
 1. Open **Chats**.
 2. Open the **Workspace** picker in the composer.
 3. Choose the repository setup you want.
-4. Review the selected context.
-5. Add or remove files, Skills, tools, or connected services as needed.
+4. Review its instruction files, reference files, instruction Skills, and MCP server references.
+5. Add or remove the available context, instruction Skills, and MCP server references as needed.
 6. Send your request.
 
-A Workspace is still editable in the composer. It does not prevent you from adding other context.
+A Workspace remains editable in the composer. It does not prevent you from
+adding ordinary attachments, tools, Skills, or MCP context separately.
 
 ## Workspace and Agent together
 
 A useful pattern is:
 
 1. choose a Workspace for the repository or folder
-2. choose an Agent for the type of work
+2. choose an available Agent for the type of work
 3. review the draft and selected context
 4. remove anything that is not needed
 5. send a focused request
-
-Examples:
-
-| Goal                       | Workspace                          | Agent                   |
-| -------------------------- | ---------------------------------- | ----------------------- |
-| Build a feature            | Project repository                 | Spec Driven Development |
-| Review a change            | Project repository                 | Reviewing Code          |
-| Investigate a failing test | Project repository                 | Bug Investigator        |
-| Update a guide             | Documentation folder               | Docs Writer             |
-| Prepare release notes      | Repository or release notes folder | Release Notes Writer    |
 
 ## Customize a Workspace
 
 You can keep using the default setup, or add a Workspace file to the repository when you need a repeatable custom setup.
 
-A Workspace file can describe the local material and available built-in tools that are useful for that project.
+A Workspace file can describe the local material, Skills, and MCP server
+references that are useful for that project.
 
 Use the **Workspaces** page to:
 
@@ -82,6 +79,8 @@ Use the **Workspaces** page to:
 - enable or disable discovered items
 - remove a folder from FlexiGPT without deleting the folder from disk
 - view the default setup when no custom Workspace file exists
+
+The management page can also show source diagnostics and items excluded from the current Workspace setup.
 
 ## Troubleshooting
 
@@ -94,10 +93,16 @@ Check:
 - refresh completed successfully
 - any Workspace file in the repository is valid
 
+If the Workspace picker reports an item as changed or unavailable, refresh the
+Workspace and either accept the current contents or remove the unavailable
+saved selection.
+
 ### Too much context appears
 
-Remove unneeded selections in the composer before sending. A Workspace is a starting point, not a requirement to send every available file.
+Remove unneeded selections in the composer before sending. A Workspace is a
+starting point, not a requirement to send every available file.
 
 ### The wrong project context is selected
 
-Open the Workspace picker and choose the intended repository setup. If needed, remove the old Workspace directory from **Workspaces**.
+Open the Workspace picker and choose the intended repository setup. If needed,
+detach it from the Chat or remove the old Workspace directory from **Workspaces**.

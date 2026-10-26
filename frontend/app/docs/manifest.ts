@@ -31,24 +31,25 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'start-here',
 		title: 'Start Here',
-		summary: 'Learn the main workflow and get a useful first response before adding more context or setup.',
+		summary: 'Set up a runnable model, understand the chat workflow, and send a focused first request.',
 		sections: [
 			{
 				id: 'getting-started',
 				title: 'Getting Started',
-				summary: 'Connect a provider, choose a model or Agent, add useful context, and send a first request.',
+				summary: 'Configure a provider and model, open Chats, add focused context, and send a first request.',
 				body: gettingStartedBody,
 			},
 			{
 				id: 'concepts-and-ownership',
 				title: 'How FlexiGPT Fits Together',
-				summary: 'Learn the main terms and where to go when you want to change part of your setup.',
+				summary: 'Learn the main terms, resolution states, and which page owns each part of a workflow.',
 				body: conceptsAndOwnershipBody,
 			},
 			{
 				id: 'chat-workspace',
 				title: 'Chat Workspace',
-				summary: 'Use tabs, search, the conversation timeline, Agent starters, model controls, and send or edit flows.',
+				summary:
+					'Use tabs, saved conversations, Agent starters, runtime controls, message review, and edit/resend flows.',
 				body: chatWorkspaceBody,
 			},
 		],
@@ -57,38 +58,38 @@ export const docsCategories: DocsCategory[] = [
 		id: 'context-and-setup',
 		title: 'Context and Reusable Setup',
 		summary:
-			'Use context in Chats, then maintain reusable Agents, Workspaces, connected services, built-in tools, Skills, and models.',
+			'Choose context for the next Run, then maintain the reusable Agents, Workspaces, Skills, tools, and MCP servers it uses.',
 		sections: [
 			{
 				id: 'composer-context',
 				title: 'Composer Context',
-				summary: 'Attach files, folders, URLs, Workspaces, tools, Skills, connected services, and web search.',
+				summary: 'Choose attachments, Workspaces, tools, Skills, MCP context, and provider-compatible web search.',
 				body: composerContextBody,
 			},
 			{
 				id: 'agents',
 				title: 'Agents',
 				summary:
-					'Use reusable Agent files as editable starting points for development, review, writing, research, and planning.',
+					'Apply reusable Agent recipes, inspect their resolved contributions, and manage imported Agent declarations.',
 				body: agentsBody,
 			},
 			{
 				id: 'workspaces',
 				title: 'Workspaces',
-				summary: 'Use repository and folder setup to bring useful local project context into Chats.',
+				summary: 'Use repository and folder setup to select reusable project context, Skills, and MCP servers.',
 				body: workspacesBody,
 			},
 			{
 				id: 'mcp-servers',
 				title: 'MCP Servers',
-				summary: 'Set up connected services, authorization, local values, discovery, and safe use in Chats.',
+				summary: 'Configure MCP transports, installation values, authorization, policies, discovery, and MCP Apps.',
 				body: mcpServersBody,
 			},
 			{
 				id: 'reusable-catalogs',
-				title: 'Reusable Setup',
+				title: 'Manage Reusable Setup',
 				summary:
-					'Choose the right page for Agents, Workspaces, built-in tools, Skills, connected services, models, and title-bar settings.',
+					'Use this page as a short ownership map for catalog management pages without repeating their detailed guides.',
 				body: reusableCatalogsBody,
 			},
 		],
@@ -96,24 +97,25 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'providers-and-safety',
 		title: 'Providers, Safety, and Help',
-		summary: 'Configure providers and local endpoints, understand privacy choices, and troubleshoot common problems.',
+		summary:
+			'Configure provider endpoints and models, use local runtimes, understand request boundaries, and troubleshoot.',
 		sections: [
 			{
 				id: 'providers-and-models',
 				title: 'Providers and Models',
-				summary: 'Set up hosted providers, compatible endpoints, and local or self-hosted model servers.',
+				summary: 'Configure provider compatibility, credentials, models, defaults, and custom compatible endpoints.',
 				body: providersAndModelsBody,
 			},
 			{
 				id: 'privacy-data-and-troubleshooting',
 				title: 'Privacy, Data, and Troubleshooting',
-				summary: 'Review local storage, provider request boundaries, logs, backup, reset, and common checks.',
+				summary: 'Understand local data, outbound request context, secrets, logs, exports, and common checks.',
 				body: privacyDataTroubleshootingBody,
 			},
 			{
 				id: 'local-llm-setup',
 				title: 'Local LLM Setup',
-				summary: 'Set up local model servers, provider forks, models, and local-only working habits.',
+				summary: 'Connect a local or self-hosted endpoint by copying or adding a provider, then configuring a model.',
 				body: localLLMSetupBody,
 			},
 		],
@@ -122,24 +124,24 @@ export const docsCategories: DocsCategory[] = [
 		id: 'recipes',
 		title: 'Everyday Tasks',
 		summary:
-			'Use practical starting points for development, review, investigation, research, writing, and safe local changes.',
+			'Use focused starting points for development, review, investigation, writing, research, and reviewed local changes.',
 		sections: [
 			{
 				id: 'everyday-recipes',
 				title: 'Everyday Recipes',
-				summary: 'Develop features, review code, investigate bugs, write docs, research topics, and compare models.',
+				summary: 'Use outcome-focused prompts while keeping model, context, and execution choices intentional.',
 				body: everydayRecipesBody,
 			},
 			{
 				id: 'unified-diff-apply',
 				title: 'Apply a Suggested Change',
-				summary: 'Review a suggested patch, test it first, and apply approved local file changes safely.',
+				summary: 'Dry-run a suggested patch, resolve target paths or conflicts, and apply reviewed local changes.',
 				body: unifiedDiffApplyBody,
 			},
 			{
 				id: 'setup-recipes',
 				title: 'Setup Recipes',
-				summary: 'Set up providers, local models, Agents, Skills, Workspaces, tools, and connected services.',
+				summary: 'Use short checklists for common setup tasks, with links to the page that owns the full procedure.',
 				body: setupRecipesBody,
 			},
 		],

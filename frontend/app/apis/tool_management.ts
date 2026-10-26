@@ -124,7 +124,7 @@ export function toolStoreChoiceFromSelection(selection: ToolSelection, resolved:
 		artifactRevision: tool.artifact.revision,
 		definitionDigest: tool.definitionDigest,
 		pluginRef: toolPluginRef(resolved.plugin),
-		pluginName: resolved.plugin.name,
+		pluginName: resolved.plugin.displayName || resolved.plugin.name,
 	};
 }
 
@@ -301,7 +301,7 @@ export class ToolManagementAPI {
 				return {
 					target,
 					pluginRef: toolPluginRef(plugin),
-					pluginName: plugin.name,
+					pluginName: toolPluginDisplayName(plugin),
 					toolDefinition: tool,
 				};
 			},

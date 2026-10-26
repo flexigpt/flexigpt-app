@@ -2,6 +2,8 @@
 
 These recipes are app and workflow setup flows. They help you configure providers, local endpoints, Agents, Workspaces, tools, Skills, and connected services.
 
+Each recipe is intentionally short. Follow the linked page when you need field-by-field setup, safety, or troubleshooting detail.
+
 For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 
 ## Table of contents <!-- omit from toc -->
@@ -18,41 +20,17 @@ For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 
 Use OpenRouter when you want one provider endpoint that can access many hosted models.
 
-Prerequisites:
-
-- OpenRouter account
-- OpenRouter API key
-- OpenRouter provider/model enabled in FlexiGPT
-
 Steps:
 
 1. Create an API key in OpenRouter.
 2. Open **Models**.
-3. Add or update the key for OpenRouter alongside its provider/model setup.
-4. Stay in **Models**.
-5. Confirm the OpenRouter provider is enabled.
-6. Confirm the model you want is enabled.
-7. Open **Chats**.
-8. Select an OpenRouter model.
-9. Send a small test prompt.
+3. Configure the OpenRouter provider credential, then enable a model under it.
+4. Open **Chats**, select that model, and send a tiny text-only test.
+5. Add attachments, tools, or web search only after the basic request succeeds.
 
-Test prompt:
-
-    Reply with one sentence confirming the provider and model you are using.
-
-Expectations:
-
-- OpenRouter is still a remote hosted provider path.
-- Request content goes to OpenRouter and then through the selected model provider path according to OpenRouter behavior.
-- Features vary by model: tools, web search, reasoning controls, output format, context length, and multimodal support.
-
-Troubleshooting:
-
-- check OpenRouter provider is enabled
-- check the model preset is enabled
-- check auth key exists and is non-empty
-- check the model preset is compatible with the selected provider SDK setup
-- try a tiny prompt before testing attachments or tools
+OpenRouter is a remote provider path. Model capabilities can differ by model,
+so inspect the current model controls after switching models. For the complete
+provider flow, see [Providers and Models](/docs?doc=providers-and-models#openrouter).
 
 ## Use FlexiGPT with local models
 
@@ -66,53 +44,18 @@ Prerequisites:
 
 Built-in local and self-hosted provider presets include:
 
-- LocalAI
-- LM Studio
-- `llama.cpp`
-- Ollama
-- SGLang
-- vLLM
-
-These built-ins are good starting points. Because local servers vary in URL, path, headers, API compatibility, model names, and capabilities, the safest durable setup is usually to fork/copy the provider first and then add or adjust models.
+- LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM, when included in your installed catalog
 
 Steps:
 
 1. Start your local model server.
 2. Open **Models**.
-3. Create a provider by copying the closest built-in local provider.
-4. Give the forked provider a stable ID and display name.
-5. Adjust the provider origin, chat path, SDK/API compatibility type, API-key header, and default headers for your server.
-6. Save and enable the provider.
-7. Add a placeholder auth key in **Models** if the provider requires a non-empty key.
-8. Under the forked provider, add a model or copy a close built-in model.
-9. Set the model name to the exact name or tag expected by your local server.
-10. Enable the model and optionally set it as default for that provider.
-11. Open **Chats**.
-12. Select the local model.
-13. Send a tiny test prompt.
+3. Add a provider by copying the closest preset, or configure a compatible endpoint from scratch.
+4. Set the actual origin, path, compatibility type, key-header behavior, and model name expected by the server.
+5. Enable provider and model, then send a tiny text-only test in **Chats**.
 
-Test prompt:
-
-    Reply with "local model test ok" and no extra text.
-
-Expectations:
-
-- smaller context window than hosted frontier models
-- slower output depending on hardware
-- limited or no tool support
-- limited or no file/image support
-- different output formatting
-- weaker instruction following
-- no provider-side web search
-
-Safety check:
-
-- local-first only means local inference when the selected provider origin is actually local
-- provider IDs should stay stable after Chats or Agents use them
-- use harmless placeholder keys for dummy local auth instead of real production API keys
-- confirm the local server is not proxying to a remote service
-- test with harmless content first
-- for the full provider-first flow, see [Local LLM Setup](/docs?doc=local-llm-setup)
+For local-only checks, runtime caveats, and troubleshooting, see
+[Local LLM Setup](/docs?doc=local-llm-setup).
 
 ## Import your first Agent
 
@@ -127,7 +70,7 @@ Steps:
 1. Open **Agents**.
 2. Create or choose a Plugin.
 3. Select **Import Agent**.
-4. Choose an Agent `.yaml` or `.yml` file.
+4. Choose an Agent `.json`, `.yaml`, or `.yml` file.
 5. Review the preview.
 6. Read any warnings and confirmation requests.
 7. Confirm the import.
@@ -162,8 +105,8 @@ Or remove the managed copy first, then import the edited file again with the sam
 3. Review the discovered Workspace.
 4. Open **Chats**.
 5. Open the composer **Workspace** picker.
-6. Select the repository setup.
-7. Add or remove context before sending.
+6. Select one repository setup and choose the context, instruction Skills, and MCP references needed for the task.
+7. Resolve any changed or unavailable Workspace warning before sending.
 
 Use a Workspace for project context and an Agent for a starting way of working.
 
@@ -180,7 +123,7 @@ Steps:
 1. Open **Chats**.
 2. Choose an Agent if a starting setup would help.
 3. Open the **Tools** picker in the composer bottom bar.
-4. Select an available read-oriented or low-risk built-in Go tool.
+4. Select an available read-oriented or low-risk native or provider-compatible tool.
 5. Keep auto-execute off for the first run.
 6. Ask the model to use the tool only if needed.
 7. When a tool call appears, inspect it.
@@ -221,8 +164,8 @@ Skills can fill three roles:
 Steps:
 
 1. Open **Skills**.
-2. Confirm the skill plugin and skill are enabled.
-3. If creating a custom skill, use a custom plugin and filesystem skill location.
+2. Confirm the Skill Plugin and Skill are enabled.
+3. Create a managed Skill, register a Skill directory, attach a Skill path, or attach an existing Skill Artifact.
 4. Open **Chats**.
 5. Open the **Skills** menu in the composer bottom bar.
 6. Enable one relevant skill.
@@ -256,7 +199,7 @@ Steps:
 
 1. Open **MCP Servers**.
 2. Create or choose a plugin.
-3. Add one server, or copy an existing server if it is a close fit.
+3. Add one server and choose its transport, trust level, and authentication mode.
 4. Set transport, trust level, auth mode, and any required setup inputs.
 5. Connect the server and confirm that discovery is loaded.
 6. Open **Chats**.
@@ -279,7 +222,7 @@ Expected result:
 Troubleshooting:
 
 - check plugin enabled
-- check server enabled
+- check server and required installation inputs
 - check auth health
 - refresh discovery after changing server config
 - fill or remove incomplete arguments if send is blocked

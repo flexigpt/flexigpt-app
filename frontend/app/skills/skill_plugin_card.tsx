@@ -46,7 +46,8 @@ import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { ManagedSkillEditorMode, ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
 import type { SkillManagementFilter } from '@/skills/skill_management_utils';
-import { ManagedSkillEditorModal, SkillArtifactDetailsModal } from '@/skills/skill_add_edit_modal';
+import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
+import { SkillDetailsModal, skillDetailsSubjectFromStoreSkill } from '@/skills/skill_details_modal';
 import { skillMatchesManagementFilter } from '@/skills/skill_management_utils';
 import { SkillPluginDetailsModal } from '@/skills/skill_plugin_details_modal';
 import { SkillPluginEditModal } from '@/skills/skill_plugin_edit_modal';
@@ -581,7 +582,6 @@ export function SkillPluginCard({
 									}
 									metadata={
 										<>
-											<MetadataPill label="Revision">{skill.revision}</MetadataPill>
 											{presentations[skillArtifactKey(skill.ref)]?.summary ? (
 												<>
 													<MetadataPill label="Insert">
@@ -604,7 +604,6 @@ export function SkillPluginCard({
 													{tag}
 												</MetadataPill>
 											))}
-											{skill.definitionDigest ? <MetadataPill label="Definition">Pinned</MetadataPill> : null}
 										</>
 									}
 								>
@@ -773,9 +772,16 @@ export function SkillPluginCard({
 				}}
 			/>
 
-			<SkillArtifactDetailsModal
+			<SkillDetailsModal
 				isOpen={skillToView !== null}
-				skill={skillToView}
+				skill={
+					skillToView
+						? skillDetailsSubjectFromStoreSkill(skillToView, {
+								sourceLabel: plugin.displayName || plugin.name,
+							})
+						: null
+				}
+				showPreview
 				onClose={() => {
 					setSkillToView(null);
 				}}

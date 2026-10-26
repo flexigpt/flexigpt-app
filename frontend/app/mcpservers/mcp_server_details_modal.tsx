@@ -199,10 +199,9 @@ function MCPServerDetailsModalContent({
 			<ModalSection title="Server overview">
 				<ManagementInfoGrid>
 					<Field label="Display Name">{server.displayName}</Field>
-					<Field label="Name">{server.logicalName}</Field>
 					<Field label="Plugin">{plugin.displayName}</Field>
-					<Field label="Description">{server.document?.description || 'No description'}</Field>
 					<Field label="Transport">{transport}</Field>
+					<Field label="Description">{server.document?.description || 'No description'}</Field>
 					<Field label="Authentication">{getMCPHTTPAuthModeLabel(getAuthMode(server))}</Field>
 					<Field label="Built-in">{server.builtIn ? 'Yes' : 'No'}</Field>
 					<Field label="Enabled">{server.enabled ? 'Yes' : 'No'}</Field>

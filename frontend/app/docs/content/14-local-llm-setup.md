@@ -25,7 +25,7 @@ Use this page when you want inference to run on a machine or endpoint you contro
 
 ## Recommended mental model
 
-Local LLM setup has two layers:
+Local LLM setup has two reusable layers:
 
 1. **Provider configuration**
    - endpoint and API contract
@@ -43,20 +43,15 @@ For local models, configure the provider first, then models.
 
 ## Built-in local providers
 
-FlexiGPT ships with built-in local and self-hosted provider configurations so you can start quickly.
+FlexiGPT may ship local or self-hosted provider presets so you can start quickly.
+The exact presets available in your installation are shown in **Models**.
 
-| Built-in provider | Default origin           | Configured compatibility style     | Good starting point for                              |
-| ----------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------- |
-| LocalAI           | `http://127.0.0.1:8080`  | OpenAI Responses-compatible        | LocalAI or compatible local server                   |
-| LM Studio         | `http://127.0.0.1:1234`  | OpenAI Responses-compatible        | LM Studio local server                               |
-| `llama.cpp`       | `http://127.0.0.1:8080`  | OpenAI Chat Completions-compatible | `llama-server` compatible route                      |
-| Ollama            | `http://127.0.0.1:11434` | Anthropic-compatible               | Ollama-compatible route matching the built-in preset |
-| SGLang            | `http://127.0.0.1:30000` | OpenAI Responses-compatible        | Self-hosted SGLang                                   |
-| vLLM              | `http://127.0.0.1:8000`  | OpenAI Responses-compatible        | Self-hosted vLLM                                     |
+Common local-runtime starting points include LocalAI, LM Studio, `llama.cpp`,
+Ollama, SGLang, and vLLM. Their actual API route, port, model name, headers,
+and supported features are runtime-specific.
 
-These are useful defaults, not fixed requirements.
-
-Use a built-in directly only when your local server matches its origin, path, headers, compatibility type, and model names closely enough.
+Use a preset directly only when its displayed origin, path, headers,
+compatibility type, and model configuration match your server closely enough.
 
 ## Why fork providers before models
 
@@ -79,21 +74,15 @@ Do this before model edits because every model under that provider inherits the 
 1. Start your local runtime.
 2. Open **Models**.
 3. Create a provider by copying the closest built-in local provider.
-4. Give the fork a stable provider ID.
-   - Example: `my-lmstudio`
-   - Example: `workstation-vllm`
-   - Example: `ollama-laptop`
-5. Give it a clear display name.
-6. Adjust provider fields:
+4. Give it a clear display name.
+5. Adjust provider fields:
    - **SDK Type**
    - **Origin**
    - **Chat Path**
-   - **API-Key Header Key**
+   - **API-Key Header**
    - **Default Headers**
-7. Save and enable the provider.
-8. Add a matching auth key in **Models** if needed.
-
-Keep the provider ID stable after you use it. Chats, Agents, and saved model choices may point to it.
+6. Save and enable the provider.
+7. Add a matching credential in **Models** if the endpoint needs one.
 
 ## Model setup
 
@@ -101,18 +90,17 @@ After the provider is correct:
 
 1. Expand your forked provider in **Models**.
 2. Add a model.
-3. Copy an existing model if a built-in model is close to your local model.
-4. Set **Model ID** to a stable local ID.
-5. Set **Model Name** to the exact model name or tag expected by your local server.
-6. Set a friendly model label.
-7. Keep **Streaming** on if your server supports streaming.
-8. Start with conservative values:
+3. Use **Copy an Existing Model** if an existing model is a close starting point.
+4. Set the model's display name and provider-facing **Model** value.
+5. Use the exact model name or tag expected by the local server.
+6. Keep **Streaming** enabled only if your server supports it.
+7. Start with conservative values:
    - lower prompt token limit
    - lower output token limit
    - longer timeout for slow local hardware
    - temperature only, unless the local model and runtime support reasoning controls
-9. Save and enable the model.
-10. Optionally set it as the default model for the forked provider.
+8. Save and enable the model.
+9. Optionally set it as the provider's default model.
 
 If a model behaves strangely, first reduce complexity before changing many settings:
 
@@ -208,19 +196,13 @@ If a feature is not reliable, create a separate model with simpler settings inst
 
 ## Local-only safety checklist
 
-Before sending sensitive material to a local model:
+Before sending sensitive material to a local model, confirm the selected
+provider origin, server routing, selected model, history window, attachments,
+MCP selections, tools, web search, and debug settings.
 
-- confirm the selected provider is your local or self-hosted provider
-- confirm the origin is local, such as `http://127.0.0.1` or a trusted self-hosted address
-- confirm the runtime is not proxying to a remote model provider
-- use a harmless placeholder key for dummy local auth
-- keep **Previous user turns** small
-- remove stale attachments
-- turn off web search
-- avoid built-in tools with external side effects unless you need them
-- keep raw debug logging off unless actively diagnosing an issue
-
-Local-first app storage does not automatically make every inference request local. The selected provider endpoint decides where inference happens.
+The selected provider endpoint decides where inference happens. See
+[Privacy, Data, and Troubleshooting](/docs?doc=privacy-data-and-troubleshooting#sensitive-work-checklist)
+for the complete safety checklist.
 
 ## Troubleshooting
 

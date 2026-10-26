@@ -4,7 +4,7 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable LLM workflows with model choices, Agents, Workspaces, MCP servers, tools, Skills, and private local history across multiple providers.
+FlexiGPT is a local-first BYOK AI workspace for repeatable LLM workflows with model choices, Agents, Workspaces, MCP servers, native and provider-compatible tools, Skills, and private local history across multiple providers.
 
 ## Who FlexiGPT is for
 
@@ -17,9 +17,9 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
 
 ## What are you doing?
 
-- Writing the whole LLM setup down as plain, versionable files: models, prompts, Agents, MCP servers, Skills, files, and Workspace context along with built-in Go tools.
+- Keeping reusable LLM setup in local catalogs and source-backed files where supported: models, prompts, Agents, MCP servers, Skills, and Workspace context.
 - Assembling every request from that setup, with its exact input inspectable before it is sent. Nothing gets injected behind your back.
-- Controlling every action: you declare what runs automatically, what asks first, and what is never allowed. Pause automatic execution mid task, change input, resume as needed. Per tool, per Agent, per Workspace.
+- Controlling execution through tool policy, approval, manual execution, automatic execution where allowed, and Run controls.
 - Keeping a record of each run - input, output, and what it changed - so it can be reviewed, diffed, and repeated.
 - Exposing all of it through one uniform interface, so any application can drive the same setup.
 - Building use-case UIs on top of that interface, starting with chat.
@@ -45,7 +45,7 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
    - [Hugging Face](https://huggingface.co/settings/tokens)
 2. Open **Models** and add the key alongside the matching provider/model setup.
    - For local endpoints that require a non-empty key, add a harmless placeholder key for the local provider.
-3. In **Models**, enable a built-in provider/model or fork a provider for your endpoint.
+3. In **Models**, enable a provider/model or use **Add Provider** to copy the closest provider setup for your endpoint.
 4. Open **Chats**.
 5. Choose a built-in Agent for a reusable starting setup, or choose a model directly.
 6. Attach files, folders, notes, PDFs, URLs, or code when the model needs source material.
@@ -102,8 +102,9 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Agents can prepare a model choice, instructions, opening text, tools, Skills, and connected services without locking the chat.
 - Workspaces provide reusable repository or folder context without reattaching the same project material.
 - MCP servers can contribute selected tools, resources, resource templates, prompts, and instructions from configured local or remote services.
+- MCP tool results can render policy-controlled MCP Apps inside the chat.
 - Tools can be attached per conversation or per message and configured for manual review or auto-execution.
-- Tool implementations are built-in Go tools. Custom HTTP tools are not supported.
+- Native FlexiGPT tools are built-in Go implementations. Provider-compatible tools can also appear for the selected provider. Custom HTTP tool definitions are not supported.
 - When an eligible auto-execute tool is called, FlexiGPT can run it and submit the result back to the model.
 - Keep tools manual when you want tighter control over execution.
 
@@ -132,10 +133,11 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Refactor code, design tests, implement tests, explore codebases, and review architecture with built-in software Agents.
 - Use read-only Agents for review/investigation and manually review any built-in tool with write or other external side effects.
 
-### Built-in product, research, and technical-writing workflows
+### Built-in workflow starters
 
-- Built-in Agents cover PRD/MRD writing, decision records, user feedback analysis, roadmap prioritization, delivery risk review, and stakeholder status updates.
-- Technical-writing Agents cover docs audits, docs authoring, API reference, release notes, and troubleshooting guides.
+- Start from the home screen's Develop a Feature, Review Code, or Investigate a Bug workflow card when available.
+- Inspect the loaded Agent and revise its draft, model, context, tools, Skills, and MCP selections before sending.
+- Export and re-import an Agent when you need a durable variation.
 
 ## Documentation
 
@@ -145,31 +147,15 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ### Bundled in-app docs
 
-Start here:
-
 - [Getting Started](./frontend/app/docs/content/01-getting-started.md)
-- [Concepts and Ownership](./frontend/app/docs/content/02-concepts-and-ownership.md)
 - [Chat Workspace](./frontend/app/docs/content/03-chat-workspace.md)
-
-Context and reusable setup:
-
 - [Composer Context](./frontend/app/docs/content/04-composer-context.md)
 - [Agents](./frontend/app/docs/content/11-agents.md)
 - [Workspaces](./frontend/app/docs/content/12-workspaces.md)
 - [MCP Servers](./frontend/app/docs/content/10-mcp-servers.md)
-- [Reusable Catalogs](./frontend/app/docs/content/05-reusable-catalogs.md)
-
-Setup, safety, and help:
-
 - [Providers and Models](./frontend/app/docs/content/06-providers-and-models.md)
 - [Privacy, Data, and Troubleshooting](./frontend/app/docs/content/07-privacy-data-and-troubleshooting.md)
-- [Local LLM Setup](./frontend/app/docs/content/14-local-llm-setup.md)
-
-Recipes:
-
 - [Everyday Recipes](./frontend/app/docs/content/08-everyday-recipes.md)
-- [Unified Diff Apply](./frontend/app/docs/content/13-unified-diff-apply.md)
-- [Setup Recipes](./frontend/app/docs/content/09-setup-recipes.md)
 
 ## Built with
 

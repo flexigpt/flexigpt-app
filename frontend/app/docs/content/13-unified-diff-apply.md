@@ -39,14 +39,17 @@ If the block is not recognized as a diff, it stays a normal code block and only 
 
 Start with a dry run before you apply anything.
 
-Use the `Files` button in the code block header to open the details view, then:
+Open the patch or file details control in the code block header, then:
 
 - inspect the parsed file list
 - review the status badges
 - read the patch and file diagnostics
-- check whether the patch is `applicable`, `needs info`, `blocked`, `already applied`, or `applied`
+- check whether the patch is `applicable`, `needs info`, `conflict`, `error`, `already applied`, or `applied`
 
-If the dry run is clean, you can move on to apply.
+`already applied` means the target may already contain the intended hunk. It is
+not a signal to apply it again.
+
+If the dry run is applicable and the file targets are correct, you can move on to apply.
 
 ## Fix target paths
 
@@ -55,10 +58,9 @@ If a file target is missing or ambiguous, set the local target path in the detai
 Helpful patterns:
 
 - use the candidate paths if one matches your repo layout
-- keep strict matching on when you want fewer fuzzy matches
 - prefer one file at a time when a patch touches several unrelated paths
 
-If the target path is wrong, correct it and run the dry run again.
+If a target path is missing, ambiguous, or wrong, correct it and run the dry run again.
 
 ## Apply safely
 
@@ -67,11 +69,12 @@ When the dry run looks good:
 - use `Apply` for one file or `Apply all` for the whole patch
 - let the app run the validation step before writing files
 - reopen the edited files after the apply completes
-- treat a partially applied patch as a sign to re-check the paths and diagnostics
+- run the focused test, formatter, or build check that is appropriate for the changed files
+- treat a partially applied patch as a reason to re-check paths and diagnostics
 
 ## If it does not apply cleanly
 
-Do not force a patch through conflicts.
+Do not force a patch through a conflict or error.
 
 Instead:
 

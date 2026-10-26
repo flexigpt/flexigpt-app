@@ -5,6 +5,7 @@ import {
 	FiChevronDown,
 	FiChevronRight,
 	FiExternalLink,
+	FiEye,
 	FiRefreshCw,
 	FiServer,
 	FiWifi,
@@ -82,6 +83,7 @@ import {
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
+import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
 
 function stop(e: MouseEvent) {
 	e.preventDefault();
@@ -760,12 +762,14 @@ function ServerRow({
 	isInputLocked,
 	onAuthorize,
 	onToggleSelected,
+	onView,
 }: {
 	option: MCPComposerServerOption;
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
 	onAuthorize: () => void;
 	onToggleSelected: () => void;
+	onView: () => void;
 }) {
 	const key = mcpServerKey(option.runtimeServerID);
 	const selected = Boolean(state.selectedByServerKey[key]);
@@ -831,6 +835,9 @@ function ServerRow({
 						<span className={`badge badge-xs rounded-lg ${getMCPStatusBadgeClass(status)}`}>
 							{getMCPStatusLabel(status)}
 						</span>
+						<span className="badge badge-ghost badge-xs max-w-28 truncate" title={option.plugin.displayName}>
+							{option.plugin.displayName}
+						</span>
 						<span
 							className={`badge badge-xs rounded-lg ${getMCPServerAuthHealthBadgeClass(option.server, option.authHealth)}`}
 							title={option.authHealth?.lastError || getMCPServerAuthHealthLabel(option.server, option.authHealth)}
@@ -839,9 +846,7 @@ function ServerRow({
 						</span>
 					</div>
 
-					<div className="text-base-content/60 truncate text-xs">
-						{option.plugin.displayName || 'MCP Plugin'} / {getMCPTransportLabel(option.transport)}
-					</div>
+					<div className="text-base-content/60 truncate text-xs">{getMCPTransportLabel(option.transport)}</div>
 
 					{option.runtime?.lastError ? <div className="text-error mt-1 text-xs">{option.runtime.lastError}</div> : null}
 					{option.authHealth?.lastError ? (
@@ -850,6 +855,35 @@ function ServerRow({
 				</div>
 
 				<div className="flex shrink-0 items-center gap-1">
+					<button
+						type="button"
+						className="btn btn-ghost btn-xs btn-square rounded-lg"
+						title="View MCP server details"
+						aria-label={`View details for ${option.server.displayName}`}
+						onClick={event => {
+							stop(event);
+							onView();
+						}}
+					>
+						<FiEye size={13} />
+					</button>
+
+					{selected ? (
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs btn-square text-error rounded-lg"
+							title="Remove MCP server"
+							aria-label={`Remove ${option.server.displayName}`}
+							disabled={isInputLocked}
+							onClick={event => {
+								stop(event);
+								onToggleSelected();
+							}}
+						>
+							<FiX size={13} />
+						</button>
+					) : null}
+
 					{authActionable ? (
 						<button
 							type="button"
@@ -969,6 +1003,7 @@ export function MCPBottomBarChip({
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 	const [manualOAuthModalKey, setManualOAuthModalKey] = useState<string | null>(null);
 	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
+	const [viewedServer, setViewedServer] = useState<MCPComposerServerOption | null>(null);
 
 	const refreshRuntimeStates = state.refreshRuntimeStates;
 	useEffect(() => {
@@ -1220,6 +1255,10 @@ export function MCPBottomBarChip({
 										onToggleSelected={() => {
 											toggleServerOption(option);
 										}}
+										onView={() => {
+											menu.hide();
+											setViewedServer(option);
+										}}
 									/>
 								))}
 							</>
@@ -1325,6 +1364,10 @@ export function MCPBottomBarChip({
 								onToggleSelected={() => {
 									toggleServerOption(option);
 								}}
+								onView={() => {
+									menu.hide();
+									setViewedServer(option);
+								}}
 							/>
 						))}
 
@@ -1336,6 +1379,18 @@ export function MCPBottomBarChip({
 					</ComposerDropdownSelectedPanel>
 				</ActionTriggerMenu>
 			</div>
+
+			<MCPServerDetailsModal
+				isOpen={viewedServer !== null}
+				plugin={viewedServer?.plugin ?? null}
+				server={viewedServer?.server ?? null}
+				runtime={viewedServer?.runtime}
+				authHealth={viewedServer?.authHealth}
+				onClose={() => {
+					setViewedServer(null);
+				}}
+			/>
+
 			<MCPOAuthAuthorizationModal
 				isOpen={oauthModalOption !== null}
 				onClose={dismissOAuthModal}

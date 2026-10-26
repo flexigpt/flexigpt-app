@@ -2,22 +2,21 @@
 
 FlexiGPT is BYOK: bring your own provider key, custom compatible endpoint, or local model server.
 
-This page covers hosted providers, custom endpoints, and local model setup.
+This page owns the reusable provider and model setup. It does not describe
+every one-turn composer override; use the Chat controls for temporary request
+preferences.
 
 ## Table of contents <!-- omit from toc -->
 
 - [Usual setup path](#usual-setup-path)
 - [Built-in hosted providers](#built-in-hosted-providers)
 - [OpenRouter](#openrouter)
-- [Built-in local and self-hosted runtimes](#built-in-local-and-self-hosted-runtimes)
-- [Fork a local provider before editing models](#fork-a-local-provider-before-editing-models)
+- [Local and self-hosted endpoints](#local-and-self-hosted-endpoints)
+- [Copy a provider before adapting a local endpoint](#copy-a-provider-before-adapting-a-local-endpoint)
 - [Custom compatible endpoints](#custom-compatible-endpoints)
+- [Model defaults and availability](#model-defaults-and-availability)
 - [Local OpenAI-compatible servers](#local-openai-compatible-servers)
 - [Runtime-specific local notes](#runtime-specific-local-notes)
-  - [LM Studio](#lm-studio)
-  - [`llama.cpp`](#llamacpp)
-  - [Ollama](#ollama)
-  - [LocalAI, SGLang, and vLLM](#localai-sglang-and-vllm)
 - [Capability expectations](#capability-expectations)
 - [Troubleshooting provider setup](#troubleshooting-provider-setup)
 - [Local-first reminder](#local-first-reminder)
@@ -25,13 +24,15 @@ This page covers hosted providers, custom endpoints, and local model setup.
 ## Usual setup path
 
 1. Open **Models**.
-2. Enable or create a provider.
-3. Enable or add at least one model under that provider.
-4. Add the matching key in **Models**, alongside that provider/model setup.
-5. Set default provider/model if desired.
-6. Open **Chats**.
-7. Select the model.
-8. Send a tiny test prompt before using attachments or tools.
+2. Enable a provider preset, or choose **Add Provider** for a custom endpoint.
+3. Select the API compatibility style, origin, path, key header, and non-secret default headers that match the endpoint.
+4. Save a provider API key if the endpoint requires one.
+5. Add or enable at least one model under that provider.
+6. Set a default provider and provider default model if useful.
+7. Confirm both provider and model are enabled.
+8. Open **Chats**.
+9. Select the model.
+10. Send a tiny test prompt before using attachments or tools.
 
 Test prompt:
 
@@ -104,30 +105,20 @@ Capabilities can vary by model:
 
 When comparing OpenRouter models, keep everything constant except the model preset.
 
-## Built-in local and self-hosted runtimes
+## Local and self-hosted endpoints
 
-FlexiGPT includes built-in providers and models for common local or self-hosted runtimes:
+The **Models** page may include presets for common local or self-hosted runtimes.
+Treat every preset as a starting point, not a guarantee of a server's port,
+path, authentication behavior, model name, or capability support.
 
-| Built-in provider | Default origin           | Configured compatibility style     | Typical use                                               |
-| ----------------- | ------------------------ | ---------------------------------- | --------------------------------------------------------- |
-| LocalAI           | `http://127.0.0.1:8080`  | OpenAI Responses-compatible        | LocalAI or compatible local server                        |
-| LM Studio         | `http://127.0.0.1:1234`  | OpenAI Responses-compatible        | LM Studio local server                                    |
-| `llama.cpp`       | `http://127.0.0.1:8080`  | OpenAI Chat Completions-compatible | `llama-server` with compatible routes                     |
-| Ollama            | `http://127.0.0.1:11434` | Anthropic-compatible               | Ollama-compatible local route matching the built-in setup |
-| SGLang            | `http://127.0.0.1:30000` | OpenAI Responses-compatible        | Self-hosted SGLang endpoint                               |
-| vLLM              | `http://127.0.0.1:8000`  | OpenAI Responses-compatible        | Self-hosted vLLM endpoint                                 |
+Use [Local LLM Setup](/docs?doc=local-llm-setup) for the local endpoint
+workflow and runtime-specific checks.
 
-These configurations are defaults, not guarantees. Local runtime behavior varies by server version, launched model, command-line flags, routing layer, and hardware.
-
-Use a built-in provider directly when your server matches the default origin, path, headers, and model names. Otherwise, copy/fork the provider first and edit the fork.
-
-For a guided local setup, see [Local LLM Setup](/docs?doc=local-llm-setup).
-
-## Fork a local provider before editing models
+## Copy a provider before adapting a local endpoint
 
 For local LLMs, prefer this order:
 
-1. fork/copy the provider
+1. add a provider by copying the closest existing provider
 2. edit provider settings
 3. then add or copy models under that provider
 
@@ -143,16 +134,15 @@ Provider settings come first because they control the shared API contract:
 Recommended flow:
 
 1. Open **Models**.
-2. Create a provider by copying the closest built-in provider.
-3. Choose the closest built-in local provider.
-4. Give the new provider a stable provider ID, such as `my-lmstudio` or `workstation-vllm`.
-5. Adjust origin, path, SDK type, headers, and API-key header for your server.
-6. Save and enable the provider.
-7. Add a placeholder auth key in **Models** if the server requires one.
-8. Add, copy, or edit models under the forked provider.
-9. Select the forked model in **Chats** and send a tiny test prompt.
+2. Choose **Add Provider** and, when useful, use **Copy an Existing Provider**.
+3. Give the provider a clear display name.
+4. Adjust origin, path, SDK type, headers, and API-key header for your server.
+5. Save and enable the provider.
+6. Add a placeholder credential only if the local server requires a non-empty value.
+7. Add, copy, or edit models under that provider.
+8. Select the model in **Chats** and send a tiny test prompt.
 
-Keep provider IDs stable after use. Chats, Agents, and saved model choices may depend on them.
+Copying a provider deliberately does not copy its credential.
 
 ## Custom compatible endpoints
 
@@ -173,7 +163,24 @@ When adding or forking a custom provider, check:
 - default headers are valid JSON if provided
 - at least one model exists under the provider
 
-Keep provider IDs stable because chats, Agents, and saved model choices may depend on them.
+## Model defaults and availability
+
+A model record stores the provider-facing model name and model-specific defaults.
+The available fields depend on the selected provider and model capabilities, but can include:
+
+- streaming
+- temperature or reasoning settings
+- request timeout and token limits
+- cache control
+- system prompt and stop sequences
+- output verbosity or JSON Schema output
+
+A model is runnable in Chats only when its provider is available and enabled,
+the provider has a credential when required, and the model itself is available
+and enabled.
+
+Use the provider card to choose its default model. A default provider or model
+must be changed before it can be disabled or deleted.
 
 ## Local OpenAI-compatible servers
 
@@ -210,34 +217,15 @@ Local endpoints may not support every hosted-model feature. Start without tools,
 
 ## Runtime-specific local notes
 
-Use these notes after reading the provider-first flow above.
+Keep runtime-specific launch instructions and endpoint details with the local
+runtime itself. In FlexiGPT, verify the runtime against the values you entered
+in **Models**:
 
-### LM Studio
-
-- Start the LM Studio local server.
-- If the default port is still `1234`, try the built-in LM Studio provider directly.
-- If you changed the port, base URL, or route style, copy/fork LM Studio first and edit the fork.
-- Model names often need to match the repository/model identifier exposed by LM Studio.
-
-### `llama.cpp`
-
-- Start `llama-server` with the host, port, context, and model file you want.
-- The built-in `llama.cpp` provider uses an OpenAI Chat Completions-compatible setup on `http://127.0.0.1:8080`.
-- If your launch command uses another port or path, fork the provider and update the origin/path.
-- Context length and multimodal support depend on the model file and server flags.
-
-### Ollama
-
-- The built-in Ollama provider uses the compatibility style configured in its preset.
-- If your Ollama setup exposes a different route, such as an OpenAI-compatible route, fork the provider and adjust SDK type and path to match your server.
-- Use the local model tag that your Ollama instance expects.
-
-### LocalAI, SGLang, and vLLM
-
-- Start the server with the model and route style you intend to use.
-- If the built-in default port matches, enable the built-in provider and test.
-- If the server uses a different port, proxy path, auth header, or feature set, fork the provider first.
-- For self-hosted deployments, confirm whether the endpoint is still local-only or reachable on your network.
+- server origin and port
+- API compatibility style and path
+- API-key header behavior
+- model name or tag
+- supported features such as streaming, tool calls, files, images, and JSON output
 
 ## Capability expectations
 

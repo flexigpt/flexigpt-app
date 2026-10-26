@@ -9,10 +9,12 @@
   - [ ] test workspace
   - [ ] test all management pages again properly
 
-- [x] add as code in md, output format skill too
-- [x] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
 - [ ] add wails considerations skill in flexigpt repo.
 
+- [x] add as code in md, output format skill too
+- [x] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
+- [x] docs clean
+- [x] after a cancellation backend keeps the run, but frontend projects it twice even if there is a new run.
 - [ ] tools dont seem to be loaded from agent. template doesnt go into composer it seems.
 - [ ] skill selection shows some arbitrary thing rather than skill name. same checks needed for mcps etc. need skill view dropdown type things also. may be better to do a details modal views like agents in the dropdowns.
 
