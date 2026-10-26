@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiDownload, FiFileText, FiServer } from 'react-icons/fi';
 
-import type { AgentExportResult, AgentMCPSetupDescriptor, AgentResolution, AgentView } from '@/spec/agent';
+import type {
+	AgentCapabilityOccurrence,
+	AgentExportResult,
+	AgentMCPSetupDescriptor,
+	AgentResolution,
+	AgentView,
+} from '@/spec/agent';
+import { CapabilityResolutionStatus } from '@/spec/artifact';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
@@ -19,18 +26,25 @@ import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/agent_man
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
 
+export interface AgentCapabilityControls {
+	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
+	onToggle: (occurrence: AgentCapabilityOccurrence) => void;
+}
+
 interface AgentDetailsModalProps {
 	isOpen: boolean;
 	agent: AgentView | null;
 	onClose: () => void;
+	capabilityControls?: AgentCapabilityControls;
 }
 
 interface AgentDetailsModalContentProps {
 	agent: AgentView;
 	onClose: () => void;
+	capabilityControls?: AgentCapabilityControls;
 }
 
-function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentProps) {
+function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentDetailsModalContentProps) {
 	const [resolution, setResolution] = useState<AgentResolution | null>(null);
 	const [resolutionError, setResolutionError] = useState('');
 	const [exportResult, setExportResult] = useState<AgentExportResult | null>(null);
@@ -120,7 +134,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 
 	return (
 		<>
-			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 fixed top-1/2 left-1/2 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl -translate-1/2 overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader title={displayName} description={secondaryName} onClose={onClose} />
 
@@ -196,7 +210,10 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 							) : null}
 						</ModalSection>
 
-						<ModalSection title="Resolved declarations">
+						<ModalSection
+							title="Capabilities"
+							description="Resolved Agent declarations and their current availability."
+						>
 							{resolutionError ? (
 								<div className="alert alert-warning rounded-2xl text-sm">
 									<FiAlertCircle size={16} />
@@ -216,26 +233,51 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 											: 'Some Agent declarations are unavailable or ambiguous.'}
 									</div>
 
-									{occurrences.map(occurrence => (
-										<div key={occurrence.path} className="border-base-content/10 rounded-2xl border p-3">
-											<div className="flex flex-wrap items-center gap-2">
-												<span className="font-medium">
-													{occurrence.type}
-													{occurrence.name ? `: ${occurrence.name}` : ''}
-												</span>
-												<span
-													className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
-												>
-													{occurrence.status}
-												</span>
-												{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
-											</div>
+									{occurrences.map(occurrence => {
+										const canToggleCapability =
+											Boolean(capabilityControls) &&
+											occurrence.status === CapabilityResolutionStatus.Available &&
+											['tool', 'skill', 'text', 'mcp'].includes(occurrence.type);
+										const isExcluded = canToggleCapability && Boolean(capabilityControls?.isExcluded(occurrence));
 
-											{occurrence.message ? (
-												<div className="text-warning mt-2 text-xs">{occurrence.message}</div>
-											) : null}
-										</div>
-									))}
+										return (
+											<div key={occurrence.path} className="border-base-content/10 rounded-2xl border p-3">
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="font-medium">
+														{occurrence.type}
+														{occurrence.name ? `: ${occurrence.name}` : ''}
+													</span>
+													<span
+														className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
+													>
+														{occurrence.status}
+													</span>
+													{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
+													{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
+												</div>
+
+												<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+													{occurrence.message ? (
+														<div className="text-warning text-xs">{occurrence.message}</div>
+													) : (
+														<span />
+													)}
+
+													{canToggleCapability ? (
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs rounded-lg"
+															onClick={() => {
+																capabilityControls?.onToggle(occurrence);
+															}}
+														>
+															{isExcluded ? 'Include' : 'Exclude'}
+														</button>
+													) : null}
+												</div>
+											</div>
+										);
+									})}
 
 									{occurrences.length === 0 ? (
 										<div className="text-base-content/70 text-sm">This Agent has no declared capabilities.</div>
@@ -301,7 +343,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 	);
 }
 
-export function AgentDetailsModal({ isOpen, agent, onClose }: AgentDetailsModalProps) {
+export function AgentDetailsModal({ isOpen, agent, onClose, capabilityControls }: AgentDetailsModalProps) {
 	if (!isOpen || !agent) {
 		return null;
 	}
@@ -312,6 +354,7 @@ export function AgentDetailsModal({ isOpen, agent, onClose }: AgentDetailsModalP
 				key={`${agent.ref.rootID}:${agent.ref.artifactID}:${agent.revision}`}
 				agent={agent}
 				onClose={onClose}
+				capabilityControls={capabilityControls}
 			/>
 		</ModalDialog>
 	);

@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react';
-import { FiCheck, FiEye, FiLayers, FiRefreshCcw, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { FiCheck, FiEye, FiLayers, FiRefreshCw } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
-
-import type { AgentCapabilityOccurrence } from '@/spec/agent';
-import { isAgentSkillUseAsInstructions } from '@/spec/agent';
-import { CapabilityResolutionStatus } from '@/spec/artifact';
 
 import { getDistinctUserFacingLabel, getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
 
@@ -33,7 +29,7 @@ import {
 } from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
-import { AgentViewModal } from '@/chats/composer/agents/agent_view_modal';
+import { AgentDetailsModal } from '@/agents/agent_details_modal';
 
 interface AgentDropdownProps {
 	manager: AgentManagerState;
@@ -62,125 +58,48 @@ function compareAgentOptions(left: AgentCatalogOption, right: AgentCatalogOption
 	return agentCollator.compare(left.key, right.key);
 }
 
-const AGENT_CAPABILITY_SECTIONS = [
-	{ type: 'model', label: 'Model' },
-	{ type: 'tool', label: 'Tools' },
-	{ type: 'skill', label: 'Skills' },
-	{ type: 'mcp', label: 'MCP' },
-	{ type: 'text', label: 'Instructions' },
-] as const;
-
-function getCapabilityDisplayName(occurrence: AgentCapabilityOccurrence): string {
-	const target = occurrence.target;
-	return getPrimaryUserFacingLabel(occurrence.name, target?.name, occurrence.type);
-}
-
-function AgentSelectionSummary({ manager }: AgentDropdownProps) {
-	const selectedAgent = manager.selectedAgent;
-	const resolution = manager.selectedAgentResolution;
-
-	if (!selectedAgent) {
-		return null;
-	}
-
-	const occurrences = resolution?.capabilities.occurrences ?? [];
-	const availableOccurrences = occurrences.filter(
-		occurrence => occurrence.status === CapabilityResolutionStatus.Available
-	);
-	const unavailableOccurrences = occurrences.filter(
-		occurrence => occurrence.status !== CapabilityResolutionStatus.Available
-	);
-	const excludedCount = manager.capabilityExclusions.length;
-	const sections = AGENT_CAPABILITY_SECTIONS.map(section => ({
-		...section,
-		count: availableOccurrences.filter(occurrence => occurrence.type === section.type).length,
-	})).filter(section => section.count > 0);
+function AgentOptionSummary({ option }: { option: AgentCatalogOption }) {
+	const logicalName = getDistinctUserFacingLabel(option.displayName, option.agent.name);
 
 	return (
-		<div className="border-secondary/30 bg-secondary/10 rounded-xl border p-2 text-xs">
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="font-semibold">Capability preview</span>
-				{excludedCount > 0 ? <span className="badge badge-warning badge-xs">Excluded {excludedCount}</span> : null}
+		<>
+			<div className="truncate text-xs font-medium">{option.displayName}</div>
+			<div className="mt-1 text-[10px] opacity-70">
+				{[logicalName, option.agent.builtIn ? 'Built-in' : undefined, option.agent.managed ? 'Managed' : undefined]
+					.filter(Boolean)
+					.join(' · ')}
 			</div>
 
-			{resolution ? (
-				<>
-					{sections.length > 0 ? (
-						<div className="mt-2 flex flex-wrap gap-1">
-							{sections.map(section => (
-								<span key={section.type} className="badge badge-ghost badge-xs">
-									{section.label} {section.count}
-								</span>
-							))}
-						</div>
-					) : null}
+			{option.description ? <div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div> : null}
 
-					<details className="border-secondary/20 bg-base-100/60 mt-2 rounded-lg border">
-						<summary className="cursor-pointer px-2 py-1 font-medium">
-							Agent-provided selections
-							{unavailableOccurrences.length > 0 ? (
-								<span className="badge badge-warning badge-xs ml-2">{unavailableOccurrences.length} attention</span>
-							) : null}
-						</summary>
+			{!option.isSelectable ? (
+				<div className="text-warning mt-1 text-xs">
+					{option.availabilityReason ?? 'This Agent is not currently available.'}
+				</div>
+			) : null}
+		</>
+	);
+}
 
-						<div className="border-secondary/20 max-h-44 space-y-1 overflow-y-auto border-t p-2">
-							{occurrences.length > 0 ? (
-								occurrences.map(occurrence => {
-									const available = occurrence.status === CapabilityResolutionStatus.Available;
-									const isSystemInstructionSkill =
-										occurrence.type === 'skill' && isAgentSkillUseAsInstructions(occurrence.skillUseMode);
-									const exclusion = manager.getCapabilityExclusion(occurrence);
-									const canExclude =
-										available &&
-										(occurrence.type === 'tool' ||
-											occurrence.type === 'skill' ||
-											occurrence.type === 'text' ||
-											occurrence.type === 'mcp');
+function SelectedAgentSummary({ option, onView }: { option: AgentCatalogOption; onView: () => void }) {
+	return (
+		<div className="border-base-300 bg-base-200 flex w-full items-start gap-2 rounded-lg border p-2 text-left">
+			<div className="min-w-0 flex-1">
+				<div className="flex flex-wrap items-center gap-2">
+					<AgentOptionSummary option={option} />
+				</div>
+			</div>
 
-									return (
-										<div
-											key={`${occurrence.path}:${occurrence.type}:${occurrence.name ?? ''}`}
-											className="bg-base-100 flex min-w-0 items-center gap-2 rounded-lg px-2 py-1"
-										>
-											<span className="badge badge-ghost badge-xs shrink-0">{occurrence.type}</span>
-											<span className="min-w-0 flex-1 truncate" title={getCapabilityDisplayName(occurrence)}>
-												{getCapabilityDisplayName(occurrence)}
-											</span>
-											{isSystemInstructionSkill ? (
-												<span className="badge badge-secondary badge-xs shrink-0">System</span>
-											) : null}
-											<span className={`badge badge-xs shrink-0 ${available ? 'badge-success' : 'badge-warning'}`}>
-												{occurrence.status}
-											</span>
-											{exclusion ? <span className="badge badge-warning badge-xs shrink-0">Excluded</span> : null}
-											{canExclude ? (
-												<button
-													type="button"
-													className="btn btn-ghost btn-xs shrink-0 rounded-lg"
-													onClick={() => {
-														manager.toggleCapabilityExclusion(occurrence);
-													}}
-													title={
-														exclusion
-															? 'Restore this inherited Agent contribution for the next Run.'
-															: 'Exclude this inherited Agent contribution for the next Run.'
-													}
-												>
-													{exclusion ? 'Include' : 'Exclude'}
-												</button>
-											) : null}
-										</div>
-									);
-								})
-							) : (
-								<div className="text-base-content/60">This Agent currently exposes no capability records.</div>
-							)}
-						</div>
-					</details>
-				</>
-			) : (
-				<div className="text-base-content/60 mt-2">Loading Agent capability preview…</div>
-			)}
+			<HoverTip content="View Agent details" placement="top" wrapperElement="div" wrapperClassName="inline-flex">
+				<button
+					type="button"
+					aria-label={`View details for ${option.displayName}`}
+					className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+					onClick={onView}
+				>
+					<FiEye size={14} />
+				</button>
+			</HoverTip>
 		</div>
 	);
 }
@@ -228,36 +147,25 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 
 	const selectedAgentOption = sortedAgentOptions.find(option => option.key === manager.selectedAgentKey) ?? null;
 	const hasUnavailableSelectedAgent = Boolean(manager.selectedAgentKey && !selectedAgentOption);
-	const unselectedAgentOptions = displayedAgentOptions.filter(option => option.key !== selectedAgentOption?.key);
-	const selectableAgents = unselectedAgentOptions.filter(option => option.isSelectable);
-	const unavailableAgents = unselectedAgentOptions.filter(option => !option.isSelectable);
+	const topListAgentOptions = displayedAgentOptions.filter(option => option.key !== manager.selectedAgentKey);
+	const selectableAgents = topListAgentOptions.filter(option => option.isSelectable);
+	const unavailableAgents = topListAgentOptions.filter(option => !option.isSelectable);
 	const firstSelectableAgent = selectableAgents[0] ?? null;
 	const agentHeaderMeta = isSearchQueryActive(searchQuery)
 		? `${selectableAgents.length} match${selectableAgents.length === 1 ? '' : 'es'}`
 		: `${selectableAgents.length} available`;
-	const resetTargetsBase = manager.baseAgentKey !== null && manager.baseAgentKey === manager.defaultAgentKey;
-	const resetLabel = resetTargetsBase ? 'Clear to base' : 'Reset to default';
+	const openAgentDetails = (option: AgentCatalogOption) => {
+		menu.hide();
+		setViewedAgent(option);
+	};
 
 	const renderAgentOption = (option: AgentCatalogOption) => {
-		const selected = option.key === manager.selectedAgentKey;
-		const isBase = option.key === manager.baseAgentKey;
-		const isDefault = option.key === manager.defaultAgentKey;
 		const disabled = manager.loading || manager.isApplying || !option.isSelectable;
-		const statusTip = manager.isTrackingOnly
-			? 'Tracked from restored Session state.'
-			: 'Applied when the next Run is prepared.';
-		const resetTip = isDefault
-			? 'The default Agent is already selected.'
-			: resetTargetsBase
-				? 'Use the Base Agent.'
-				: 'Use the available default Agent.';
 
 		return (
 			<div
 				key={option.key}
-				className={`border-base-300 flex w-full flex-col rounded-lg border p-2 text-left transition-colors ${
-					selected ? 'bg-base-200' : 'hover:bg-base-200'
-				}`}
+				className="border-base-300 hover:bg-base-200 flex w-full flex-col rounded-lg border p-2 text-left transition-colors"
 			>
 				<div className="flex w-full items-start gap-2">
 					<MenuItem
@@ -279,27 +187,8 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							});
 						}}
 					>
-						<div className="pt-0.5">{selected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
-
 						<div className="min-w-0 flex-1">
-							<div className="truncate text-xs font-medium">{option.displayName}</div>
-							<div className="mt-1 text-[10px] opacity-70">
-								{[
-									getDistinctUserFacingLabel(option.displayName, option.agent.name),
-									option.agent.builtIn ? 'Built-in' : undefined,
-									option.agent.managed ? 'Managed' : undefined,
-								]
-									.filter(Boolean)
-									.join(' · ')}
-							</div>
-							{option.description ? (
-								<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
-							) : null}
-							{!option.isSelectable ? (
-								<div className="text-warning mt-1 text-xs">
-									{option.availabilityReason ?? 'This Agent is not currently available.'}
-								</div>
-							) : null}
+							<AgentOptionSummary option={option} />
 						</div>
 					</MenuItem>
 
@@ -310,7 +199,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 								aria-label={`View details for ${option.displayName}`}
 								className="btn btn-ghost btn-xs btn-square rounded-lg"
 								onClick={() => {
-									setViewedAgent(option);
+									openAgentDetails(option);
 								}}
 							>
 								<FiEye size={14} />
@@ -320,64 +209,6 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						{!option.isSelectable ? <span className="badge badge-warning badge-xs shrink-0">Unavailable</span> : null}
 					</div>
 				</div>
-
-				{selected ? (
-					<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center justify-between gap-1 border-t pt-1">
-						<div className="flex items-center gap-1">
-							<HoverTip content={statusTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex">
-								<span className="badge badge-secondary badge-xs">Agent selected</span>
-							</HoverTip>
-							{manager.isTrackingOnly ? <span className="badge badge-outline badge-xs">Restored</span> : null}
-							{isBase ? <span className="badge badge-ghost badge-xs">Base</span> : null}
-							{!isBase && isDefault ? <span className="badge badge-ghost badge-xs">Default</span> : null}
-						</div>
-
-						<div className="flex items-center gap-1">
-							<HoverTip
-								content="Apply this Agent starter recipe again"
-								placement="top"
-								wrapperElement="div"
-								wrapperClassName="inline-flex"
-							>
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									disabled={manager.loading || manager.isApplying || !option.isSelectable}
-									onClick={() => {
-										void manager.reapplySelectedAgent().then(applied => {
-											if (applied) {
-												menu.hide();
-											}
-										});
-									}}
-								>
-									<FiRefreshCcw size={14} className="mr-1" />
-									Reapply
-								</button>
-							</HoverTip>
-
-							<HoverTip content={resetTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex">
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs rounded-lg"
-									disabled={
-										manager.loading || manager.isApplying || !manager.defaultAgentKey || manager.isDefaultAgentSelected
-									}
-									onClick={() => {
-										void manager.resetToDefaultAgent().then(applied => {
-											if (applied) {
-												menu.hide();
-											}
-										});
-									}}
-								>
-									<FiTrash2 size={14} className="mr-1" />
-									{resetLabel}
-								</button>
-							</HoverTip>
-						</div>
-					</div>
-				) : null}
 			</div>
 		);
 	};
@@ -489,7 +320,7 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 								No Agents are available.
 							</div>
-						) : unselectedAgentOptions.length === 0 ? (
+						) : topListAgentOptions.length === 0 ? (
 							<div className={searchableMenuEmptyStateClasses}>No Agents match your search.</div>
 						) : (
 							<div className="space-y-2">
@@ -532,10 +363,12 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 						help="Applying an Agent saves Session intent. The runtime resolves its effective Model, Tools, Skills, MCP, and instructions for the next Run."
 					>
 						{selectedAgentOption ? (
-							<>
-								{renderAgentOption(selectedAgentOption)}
-								<AgentSelectionSummary manager={manager} />
-							</>
+							<SelectedAgentSummary
+								option={selectedAgentOption}
+								onView={() => {
+									openAgentDetails(selectedAgentOption);
+								}}
+							/>
 						) : hasUnavailableSelectedAgent ? (
 							<div className="alert alert-warning rounded-xl p-2 text-xs">
 								The saved Agent selection is not currently available. Choose an available Agent above to replace it.
@@ -545,12 +378,22 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 				</Menu>
 			) : null}
 
-			<AgentViewModal
+			<AgentDetailsModal
 				isOpen={viewedAgent !== null}
-				agent={viewedAgent}
+				agent={viewedAgent?.agent ?? null}
 				onClose={() => {
 					setViewedAgent(null);
 				}}
+				capabilityControls={
+					viewedAgent?.key === manager.selectedAgentKey
+						? {
+								isExcluded: occurrence => Boolean(manager.getCapabilityExclusion(occurrence)),
+								onToggle: occurrence => {
+									manager.toggleCapabilityExclusion(occurrence);
+								},
+							}
+						: undefined
+				}
 			/>
 		</div>
 	);
