@@ -9,8 +9,9 @@
   - [ ] test workspace
   - [ ] test all management pages again properly
 
-- [ ] add as code in md output format skill too
-- [ ] add wails considerations etc skill in my repo.
+- [ ] add as code in md, output format skill too
+- [ ] add wails considerations skill in flexigpt repo.
+- [ ] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
 
 ## M-3
 

@@ -321,10 +321,10 @@ function WorkspaceBottomBarChipContent({
 						</div>
 					)}
 
-					<div className="border-base-300 border-t pt-2">
+					<div className="border-base-300 flex justify-end border-t pt-2">
 						<button
 							type="button"
-							className="btn btn-ghost btn-sm w-full justify-start rounded-xl"
+							className="btn btn-ghost btn-sm rounded-xl"
 							disabled={isInputLocked}
 							onClick={() => {
 								store.hide();
