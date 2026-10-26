@@ -157,7 +157,9 @@ export function validatePinnedVersions(vars) {
 	const frontendPackage = JSON.parse(
 		fs.readFileSync(path.join(root, "frontend/package.json"), "utf8"),
 	);
-	const runtimeVersion = frontendPackage.dependencies?.["@wailsio/runtime"];
+	const runtimeVersion = frontendPackage.dependencies?.[
+		"@wailsio/runtime"
+	].replace(/^\^/, "");
 	const expectedRuntimeVersion = pinned("WAILS_VERSION").replace(/^v/, "");
 	if (runtimeVersion !== expectedRuntimeVersion) {
 		throw new Error(
