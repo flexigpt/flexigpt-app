@@ -73,7 +73,7 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 					throwIfAborted(signal);
 					return {
 						title: 'Skill document',
-						body: JSON.stringify(details.document, null, 2) || '(Empty document)',
+						body: details.document.markdownBody || '(Empty document)',
 						isDocument: true,
 						note: `Rendered instructions unavailable: ${getErrorMessage(error, 'Preview failed.')}`,
 					};
@@ -86,7 +86,7 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 			throwIfAborted(signal);
 			return {
 				title: 'Skill document',
-				body: JSON.stringify(details.document, null, 2) || '(Empty document)',
+				body: details.document.markdownBody || '(Empty document)',
 				isDocument: true,
 				note: 'This document may reference resources or render differently during Run preparation.',
 			};

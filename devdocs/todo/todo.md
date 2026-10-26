@@ -18,7 +18,9 @@
 - [x] after a cancellation backend keeps the run, but frontend projects it twice even if there is a new run.
 - [x] skill selection shows some arbitrary thing rather than skill name. same checks needed for mcps etc. need skill view dropdown type things also. may be better to do a details modal views like agents in the dropdowns.
 - [x] tools dont seem to be loaded from agent. template doesnt go into composer it seems.
-- [ ] verify tool and template population and override
+- [x] verify tool and template population and override
+- [ ] the source of skill in agent doesnt show the body, it should the whole json. as of now in agent declarations we show the md body, but it shoudl ideally show the actual md source i.e frontmatter and everything
+- [ ] template args are nto rendered for some reason now.
 
 ## M-3
 
