@@ -135,6 +135,7 @@ catalog_generated.next.json
 
 # Build
 
+# Some tests erroneously create a hyphen dir.
 -
 
 /e2e/test-results/
@@ -144,7 +145,7 @@ catalog_generated.next.json
 /out/
 /.task/
 /dist
-
+**/bindings
 
 /bin/
 /build/bin/
@@ -165,3 +166,4 @@ catalog_generated.next.json
 
 /frontend/dist/
 /frontend/tsconfig.tsbuildinfo
+
