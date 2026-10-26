@@ -26,7 +26,7 @@ import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/agent_man
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
 
-export interface AgentCapabilityControls {
+interface AgentCapabilityControls {
 	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
 	onToggle: (occurrence: AgentCapabilityOccurrence) => void;
 }
