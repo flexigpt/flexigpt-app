@@ -260,10 +260,12 @@ export function ModelDropdown({
 						ariaLabel="Current model"
 						help={
 							agentOwnsModel
-								? 'Choosing a model above replaces the agents selected model with an explicit override.'
-								: ''
+								? 'This model is inherited from the selected Agent.'
+								: agentModelRef
+									? 'Choosing a model above creates a Session model override.'
+									: 'This model is selected by the Session.'
 						}
-						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session source'}</span>}
+						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session override'}</span>}
 						actions={
 							!agentOwnsModel && agentModelRef && onUseAgentModel ? (
 								<button

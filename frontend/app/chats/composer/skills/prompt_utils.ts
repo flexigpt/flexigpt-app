@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { SessionInstructionOverride } from '@/spec/session';
 import type { SkillRef } from '@/spec/skill';
 
@@ -16,6 +17,8 @@ export interface SystemInstructionSource {
 	isBuiltIn: boolean;
 	skillRef?: SkillRef;
 	sessionOverride?: SessionInstructionOverride;
+	agentOccurrencePath?: string;
+	agentArtifact?: ArtifactRef;
 }
 
 function normalizePromptPart(value: string): string {

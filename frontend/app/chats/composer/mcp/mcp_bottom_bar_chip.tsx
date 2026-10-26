@@ -17,7 +17,6 @@ import type { MenuStore } from '@ariakit/react';
 import { MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
-import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import type {
 	MCPAuthHealth,
 	MCPPromptRef,
@@ -28,7 +27,6 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type { MCPPromptSelection, MCPResourceTemplateSelection } from '@/spec/session_mcp';
-import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
@@ -77,6 +75,7 @@ import type {
 	UseComposerMCPResult,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import {
+	agentBaselineMCPSelection,
 	mcpPromptKey,
 	mcpResourceKey,
 	mcpResourceTemplateKey,
@@ -463,7 +462,7 @@ function ToolExposureControls({
 							disabled={isInputLocked}
 							onClick={e => {
 								stop(e);
-								state.setToolExposure(option.runtimeServerID, choice.value);
+								state.setToolExposure(option.runtimeServerID, choice.value, selection);
 
 								if (choice.value !== MCPToolExposure.None) {
 									void state.ensureDiscoveryLoaded(option.runtimeServerID);
@@ -483,13 +482,15 @@ function ServerDiscoverySection({
 	option,
 	state,
 	isInputLocked,
+	effectiveSelection,
 }: {
 	option: MCPComposerServerOption;
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
+	effectiveSelection?: MCPComposerServerSelection;
 }) {
 	const key = mcpServerKey(option.runtimeServerID);
-	const selection = state.selectedByServerKey[key];
+	const selection = effectiveSelection ?? state.selectedByServerKey[key];
 	if (!selection) {
 		return null;
 	}
@@ -531,7 +532,7 @@ function ServerDiscoverySection({
 						checked={Boolean(selection.includeServerInstructions)}
 						disabled={isInputLocked}
 						onChange={e => {
-							state.setIncludeServerInstructions(option.runtimeServerID, e.currentTarget.checked);
+							state.setIncludeServerInstructions(option.runtimeServerID, e.currentTarget.checked, selection);
 						}}
 					/>
 					<span>Include instructions</span>
@@ -552,13 +553,13 @@ function ServerDiscoverySection({
 					onSelectAll={() => {
 						option.tools.forEach(tool => {
 							if (tool.enabled && isMCPToolVisibleToModel(tool)) {
-								state.toggleTool(tool, true);
+								state.toggleTool(tool, true, selection);
 							}
 						});
 					}}
 					onUnselectAll={() => {
 						option.tools.forEach(tool => {
-							state.toggleTool(tool, false);
+							state.toggleTool(tool, false, selection);
 						});
 					}}
 				>
@@ -588,7 +589,7 @@ function ServerDiscoverySection({
 												</div>
 											}
 											onChange={next => {
-												state.toggleTool(tool, next);
+												state.toggleTool(tool, next, selection);
 											}}
 										/>
 									);
@@ -612,18 +613,18 @@ function ServerDiscoverySection({
 					unselectAllDisabled={isInputLocked || selectedResourceCount === 0}
 					onSelectAll={() => {
 						option.resources.forEach(resource => {
-							state.toggleResource(resource, true);
+							state.toggleResource(resource, true, selection);
 						});
 						option.resourceTemplates.forEach(template => {
-							state.toggleResourceTemplate(template, true);
+							state.toggleResourceTemplate(template, true, selection);
 						});
 					}}
 					onUnselectAll={() => {
 						option.resources.forEach(resource => {
-							state.toggleResource(resource, false);
+							state.toggleResource(resource, false, selection);
 						});
 						option.resourceTemplates.forEach(template => {
-							state.toggleResourceTemplate(template, false);
+							state.toggleResourceTemplate(template, false, selection);
 						});
 					}}
 				>
@@ -644,7 +645,7 @@ function ServerDiscoverySection({
 										</div>
 									}
 									onChange={next => {
-										state.toggleResource(resource, next);
+										state.toggleResource(resource, next, selection);
 									}}
 								/>
 							))}
@@ -668,7 +669,7 @@ function ServerDiscoverySection({
 												</div>
 											}
 											onChange={next => {
-												state.toggleResourceTemplate(template, next);
+												state.toggleResourceTemplate(template, next, selection);
 											}}
 										/>
 										{selectedTemplate ? (
@@ -683,7 +684,8 @@ function ServerDiscoverySection({
 														template.server,
 														template.uriTemplate,
 														argumentName,
-														value
+														value,
+														selection
 													);
 												}}
 											/>
@@ -703,12 +705,12 @@ function ServerDiscoverySection({
 					unselectAllDisabled={isInputLocked || selectedPromptCount === 0}
 					onSelectAll={() => {
 						option.prompts.forEach(prompt => {
-							state.togglePrompt(prompt, true);
+							state.togglePrompt(prompt, true, selection);
 						});
 					}}
 					onUnselectAll={() => {
 						option.prompts.forEach(prompt => {
-							state.togglePrompt(prompt, false);
+							state.togglePrompt(prompt, false, selection);
 						});
 					}}
 				>
@@ -733,7 +735,7 @@ function ServerDiscoverySection({
 												</div>
 											}
 											onChange={next => {
-												state.togglePrompt(prompt, next);
+												state.togglePrompt(prompt, next, selection);
 											}}
 										/>
 										{selectedPrompt ? (
@@ -744,7 +746,13 @@ function ServerDiscoverySection({
 												item={selectedPrompt}
 												disabled={isInputLocked}
 												onValueChange={(argumentName, value) => {
-													state.setPromptArgumentValue(prompt.server, prompt.promptName, argumentName, value);
+													state.setPromptArgumentValue(
+														prompt.server,
+														prompt.promptName,
+														argumentName,
+														value,
+														selection
+													);
 												}}
 											/>
 										) : null}
@@ -765,6 +773,10 @@ function ServerRow({
 	isInputLocked,
 	onAuthorize,
 	onToggleSelected,
+	sourceBadge,
+	selectedOverride,
+	effectiveSelection,
+	onSetSelected,
 	onView,
 }: {
 	option: MCPComposerServerOption;
@@ -772,10 +784,14 @@ function ServerRow({
 	isInputLocked: boolean;
 	onAuthorize: () => void;
 	onToggleSelected: () => void;
+	sourceBadge?: 'Agent' | 'Session';
+	selectedOverride?: boolean;
+	effectiveSelection?: MCPComposerServerSelection;
+	onSetSelected?: (selected: boolean) => void;
 	onView: () => void;
 }) {
 	const key = mcpServerKey(option.runtimeServerID);
-	const selected = Boolean(state.selectedByServerKey[key]);
+	const selected = selectedOverride ?? Boolean(state.selectedByServerKey[key]);
 	const status = isEnabledMCPOption(option)
 		? getEffectiveMCPServerStatus(option.server, option.runtime?.status)
 		: MCPServerStatus.Disabled;
@@ -786,6 +802,15 @@ function ServerRow({
 	const authState = getServerAuthHealthState(option.server, option.authHealth);
 	const authActionable = isMCPAuthActionable(option.server, option.authHealth);
 	const authPending = authState === MCPAuthHealthState.AuthorizationPending;
+
+	const setSelected = (next: boolean) => {
+		if (onSetSelected) {
+			onSetSelected(next);
+			return;
+		}
+
+		state.setServerSelected(option, next);
+	};
 
 	return (
 		<div
@@ -819,7 +844,7 @@ function ServerRow({
 							return;
 						}
 
-						state.setServerSelected(option, e.currentTarget.checked);
+						setSelected(e.currentTarget.checked);
 						if (e.currentTarget.checked) {
 							const operation = isReady
 								? state.ensureDiscoveryLoaded(option.runtimeServerID)
@@ -838,6 +863,7 @@ function ServerRow({
 						<span className={`badge badge-xs rounded-lg ${getMCPStatusBadgeClass(status)}`}>
 							{getMCPStatusLabel(status)}
 						</span>
+						{sourceBadge ? <span className="badge badge-secondary badge-xs">{sourceBadge}</span> : null}
 						<span className="badge badge-ghost badge-xs max-w-28 truncate" title={option.plugin.displayName}>
 							{option.plugin.displayName}
 						</span>
@@ -958,7 +984,14 @@ function ServerRow({
 				</div>
 			</div>
 
-			{selected ? <ServerDiscoverySection option={option} state={state} isInputLocked={isInputLocked} /> : null}
+			{selected ? (
+				<ServerDiscoverySection
+					option={option}
+					state={state}
+					isInputLocked={isInputLocked}
+					effectiveSelection={effectiveSelection}
+				/>
+			) : null}
 		</div>
 	);
 }
@@ -1017,12 +1050,8 @@ export function MCPBottomBarChip({
 		}
 	}, [open, refreshRuntimeStates]);
 
-	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
 	const hasBlockingArgs = state.argumentsBlocked;
-	const selectedInstructionServerCount = Object.values(state.selectedByServerKey).filter(
-		selection => selection.includeServerInstructions
-	).length;
 	const enabledOperationalOptions = useMemo(() => state.options.filter(isEnabledMCPOption), [state.options]);
 	const visibleOptions = useMemo(
 		() =>
@@ -1031,11 +1060,30 @@ export function MCPBottomBarChip({
 			}),
 		[enabledOperationalOptions]
 	);
-	const agentMCPOccurrences = useMemo(
-		() => agentManager?.selectedAgentResolution?.capabilities.occurrences.filter(o => o.type === 'mcp') ?? [],
-		[agentManager?.selectedAgentResolution]
+	const selectedServerKeys = useMemo(
+		() => new Set(Object.keys(state.selectedByServerKey)),
+		[state.selectedByServerKey]
 	);
-	const hasAgentMCP = agentMCPOccurrences.length > 0;
+	const agentMCPRows = useMemo(
+		() =>
+			(agentManager?.agentMCPProjections ?? []).flatMap(projection => {
+				if (agentManager?.getCapabilityExclusion(projection.occurrence)) {
+					return [];
+				}
+
+				const option = state.options.find(
+					candidate =>
+						candidate.server.ref.rootID === projection.ref.rootID &&
+						candidate.server.ref.artifactID === projection.ref.artifactID
+				);
+				if (!option || selectedServerKeys.has(mcpServerKey(option.runtimeServerID))) {
+					return [];
+				}
+
+				return [{ projection, option, selection: agentBaselineMCPSelection(option) }];
+			}),
+		[agentManager, selectedServerKeys, state.options]
+	);
 	const configurationPendingServerCount = enabledOperationalOptions.length - visibleOptions.length;
 	const hiddenDisabledServerCount = state.options.filter(
 		option => !option.plugin.enabled || !option.server.enabled
@@ -1062,18 +1110,20 @@ export function MCPBottomBarChip({
 		});
 	}, [searchQuery, visibleOptions]);
 
-	const selectedServerKeys = useMemo(
-		() => new Set(Object.keys(state.selectedByServerKey)),
-		[state.selectedByServerKey]
-	);
+	const selectedOptions = state.options.filter(option => selectedServerKeys.has(mcpServerKey(option.runtimeServerID)));
 	const availableOptions = displayedVisibleOptions.filter(
 		option => !selectedServerKeys.has(mcpServerKey(option.runtimeServerID))
 	);
-	const selectedOptions = visibleOptions.filter(option => selectedServerKeys.has(mcpServerKey(option.runtimeServerID)));
-	const unavailableSelectedCount = [...selectedServerKeys].filter(
-		key => !selectedOptions.some(option => mcpServerKey(option.runtimeServerID) === key)
-	).length;
-	const hasSelectedMCPContext = selectedServerKeys.size > 0 || hasAppContextUpdates;
+	const unavailableSelectedCount =
+		[...selectedServerKeys].filter(key => !selectedOptions.some(option => mcpServerKey(option.runtimeServerID) === key))
+			.length +
+		(agentManager?.agentMCPProjections.length ?? 0) -
+		agentMCPRows.length;
+	const enabledCount = selectedServerKeys.size + agentMCPRows.length;
+	const selectedInstructionServerCount =
+		Object.values(state.selectedByServerKey).filter(selection => selection.includeServerInstructions).length +
+		agentMCPRows.filter(row => row.selection.includeServerInstructions).length;
+	const hasSelectedMCPContext = enabledCount > 0 || hasAppContextUpdates;
 	const firstVisibleOption = availableOptions[0] ?? null;
 	const mcpHeaderMeta = isSearchQueryActive(searchQuery)
 		? `${availableOptions.length} match${availableOptions.length === 1 ? '' : 'es'}`
@@ -1326,83 +1376,47 @@ export function MCPBottomBarChip({
 							) : undefined
 						}
 						actions={
-							hasSelectedMCPContext ? (
+							enabledCount > 0 ? (
 								<button
 									type="button"
 									className="btn btn-ghost btn-xs text-error rounded-lg"
 									disabled={isInputLocked}
 									onClick={() => {
 										state.clear();
-										onClearAppContextUpdates?.();
+										agentManager?.clearCapabilityExclusions(['mcp']);
 									}}
 								>
-									Clear all
+									Clear Session overrides
 								</button>
 							) : undefined
 						}
 					>
-						{hasAgentMCP ? (
-							<div className="border-base-300/70 mb-2 rounded-lg border p-2">
-								<div className="mb-1 text-xs font-semibold">Agent MCP servers</div>
-								<div className="text-base-content/60 mb-2 text-[11px]">
-									Backend owned. Override selects the server in Session, Exclude emits Remove.
-								</div>
-								{agentMCPOccurrences.map((occurrence: AgentCapabilityOccurrence) => {
-									const target = occurrence.target;
-									const ref =
-										occurrence.status === CapabilityResolutionStatus.Available &&
-										target?.form === CapabilityTargetForm.Artifact &&
-										target.artifact
-											? target.artifact
-											: undefined;
-									const excluded = !!agentManager?.getCapabilityExclusion(occurrence);
-									const option = ref
-										? state.options.find(
-												o => o.server.ref.rootID === ref.rootID && o.server.ref.artifactID === ref.artifactID
-											)
-										: undefined;
-									const runtimeKey = option ? mcpServerKey(option.runtimeServerID) : undefined;
-									const overridden = runtimeKey ? !!state.selectedByServerKey[runtimeKey] : false;
-									return (
-										<div
-											key={occurrence.path}
-											className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2"
-										>
-											<FiServer size={13} />
-											<span className="min-w-0 flex-1 truncate text-xs">
-												{occurrence.name || ref?.artifactID || 'Agent MCP'}
-											</span>
-											<span className="badge badge-secondary badge-xs">Agent</span>
-											{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
-											{overridden && !excluded ? <span className="badge badge-info badge-xs">Overridden</span> : null}
-											{!option ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
-											{ref && !excluded && option ? (
-												<button
-													type="button"
-													className="btn btn-ghost btn-xs rounded-lg"
-													disabled={isInputLocked}
-													onClick={() => {
-														void state.adoptAgentServer(ref).catch(console.error);
-													}}
-												>
-													Override
-												</button>
-											) : null}
-											<button
-												type="button"
-												className="btn btn-ghost btn-xs text-error rounded-lg"
-												disabled={isInputLocked || !ref}
-												onClick={() => {
-													agentManager?.toggleCapabilityExclusion(occurrence);
-												}}
-											>
-												{excluded ? 'Include' : 'Exclude'}
-											</button>
-										</div>
-									);
-								})}
-							</div>
-						) : null}
+						{agentMCPRows.map(row => (
+							<ServerRow
+								key={`agent:${row.projection.key}`}
+								option={row.option}
+								state={state}
+								isInputLocked={isInputLocked}
+								sourceBadge="Agent"
+								selectedOverride={true}
+								effectiveSelection={row.selection}
+								onSetSelected={selected => {
+									if (!selected) {
+										agentManager?.toggleCapabilityExclusion(row.projection.occurrence);
+									}
+								}}
+								onAuthorize={() => {
+									setManualOAuthModalKey(optionKey(row.option));
+								}}
+								onToggleSelected={() => {
+									agentManager?.toggleCapabilityExclusion(row.projection.occurrence);
+								}}
+								onView={() => {
+									menu.hide();
+									setViewedServer(row.option);
+								}}
+							/>
+						))}
 						{hasAppContextUpdates ? (
 							<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
 								<div className="flex items-center justify-between gap-2">
@@ -1430,6 +1444,7 @@ export function MCPBottomBarChip({
 								option={option}
 								state={state}
 								isInputLocked={isInputLocked}
+								sourceBadge="Session"
 								onAuthorize={() => {
 									setManualOAuthModalKey(optionKey(option));
 								}}

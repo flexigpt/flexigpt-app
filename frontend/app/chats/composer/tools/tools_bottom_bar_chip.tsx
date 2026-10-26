@@ -5,10 +5,8 @@ import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiRefreshCw, FiTool, FiX } 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
-import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
-import type { ToolListItem } from '@/spec/tool';
-import { CapabilityResolutionStatus } from '@/spec/artifact';
+import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
@@ -44,6 +42,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { AgentToolProjection } from '@/chats/composer/agents/agent_projection';
 import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
@@ -87,6 +86,8 @@ interface ToolPluginGroup {
 	available: ToolListItem[];
 }
 
+const EMPTY_AGENT_TOOL_PROJECTIONS: readonly AgentToolProjection[] = [];
+
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 function stop(event: SyntheticEvent | MouseEvent) {
@@ -117,6 +118,39 @@ function itemSearchFields(item: ToolListItem) {
 	];
 }
 
+function agentToolProjectionKey(projection: AgentToolProjection): string {
+	return toolIdentityKey(projection.target);
+}
+
+function AgentToolFallbackRow({
+	projection,
+	isInputLocked,
+	onRemove,
+}: {
+	projection: AgentToolProjection;
+	isInputLocked: boolean;
+	onRemove: () => void;
+}) {
+	return (
+		<div className="border-base-300 bg-base-100 mb-1 flex min-w-0 items-center gap-2 rounded-xl border p-2">
+			<FiTool size={13} className="shrink-0" />
+			<div className="min-w-0 flex-1">
+				<div className="truncate text-xs font-medium">{projection.occurrence.name || projection.target.name}</div>
+				<div className="text-base-content/60 truncate text-[10px]">Resolving Agent Tool details…</div>
+			</div>
+			<span className="badge badge-secondary badge-xs">Agent</span>
+			<button
+				type="button"
+				className="btn btn-ghost btn-xs text-error rounded-lg"
+				disabled={isInputLocked}
+				onClick={onRemove}
+			>
+				Remove
+			</button>
+		</div>
+	);
+}
+
 export function ToolsBottomBarChip({
 	store,
 	buttonRef,
@@ -130,7 +164,7 @@ export function ToolsBottomBarChip({
 
 	onSetAttachedToolAutoExecute,
 	onRemoveAttachedTool,
-	onRemoveAllAttachedTools,
+	onRemoveAllAttachedTools: _onRemoveAllAttachedTools,
 	onEditAttachedToolOptions,
 	onOpenAttachedToolDetails,
 	onOpenConversationToolDetails,
@@ -169,11 +203,68 @@ export function ToolsBottomBarChip({
 		() => new Map(attached.map(entry => [toolIdentityKey(entry.target), entry])),
 		[attached]
 	);
-	const agentToolOccurrences = useMemo(
-		() => agentManager?.selectedAgentResolution?.capabilities.occurrences.filter(o => o.type === 'tool') ?? [],
-		[agentManager?.selectedAgentResolution]
+	const agentToolProjections = agentManager?.agentToolProjections ?? EMPTY_AGENT_TOOL_PROJECTIONS;
+	const [agentToolChoices, setAgentToolChoices] = useState<Map<string, ToolStoreChoice>>(() => new Map());
+	const agentToolProjectionSignature = agentToolProjections
+		.map(projection => `${agentToolProjectionKey(projection)}:${projection.autoExecute ? '1' : '0'}`)
+		.join('|');
+
+	useEffect(() => {
+		let cancelled = false;
+		const missing = agentToolProjections.filter(
+			projection => !agentToolChoices.has(agentToolProjectionKey(projection))
+		);
+		if (missing.length === 0) {
+			return () => {
+				cancelled = true;
+			};
+		}
+
+		void Promise.all(
+			missing.map(async projection => {
+				const resolved = await toolManagementAPI.resolveToolTarget(projection.target);
+				const choice = toolStoreChoiceFromSelection(
+					{
+						choiceID: getUUIDv7(),
+						target: projection.target,
+						autoExecute: projection.autoExecute,
+					},
+					resolved
+				);
+				return [agentToolProjectionKey(projection), choice] as const;
+			})
+		)
+			.then(entries => {
+				if (cancelled) {
+					return;
+				}
+				setAgentToolChoices(previous => {
+					const next = new Map(previous);
+					for (const [key, choice] of entries) {
+						next.set(key, choice);
+					}
+					return next;
+				});
+			})
+			.catch(() => undefined);
+
+		return () => {
+			cancelled = true;
+		};
+	}, [agentToolChoices, agentToolProjectionSignature, agentToolProjections]);
+
+	const agentToolRows = useMemo(
+		() =>
+			agentToolProjections.filter(projection => {
+				const key = agentToolProjectionKey(projection);
+				return (
+					!agentManager?.getCapabilityExclusion(projection.occurrence) &&
+					!attachedByKey.has(key) &&
+					!conversationToolsState.some(entry => entry.enabled && entry.key === key)
+				);
+			}),
+		[agentManager, agentToolProjections, attachedByKey, conversationToolsState]
 	);
-	const hasAgentTools = agentToolOccurrences.length > 0;
 
 	const {
 		eligible: eligibleWebSearch,
@@ -234,9 +325,12 @@ export function ToolsBottomBarChip({
 		() =>
 			new Set([
 				...attached.map(entry => toolIdentityKey(entry.target)),
-				...conversationToolsState.map(entry => toolIdentityKey(entry.toolStoreChoice.target)),
+				...conversationToolsState
+					.filter(entry => entry.enabled)
+					.map(entry => toolIdentityKey(entry.toolStoreChoice.target)),
+				...agentToolRows.map(projection => agentToolProjectionKey(projection)),
 			]),
-		[attached, conversationToolsState]
+		[agentToolRows, attached, conversationToolsState]
 	);
 	const visibleAvailableToAdd = useMemo(
 		() => visibleAvailable.filter(item => !configuredToolKeys.has(itemKey(item))),
@@ -286,7 +380,11 @@ export function ToolsBottomBarChip({
 		}).length +
 		(webSearchBlocked ? 1 : 0);
 
-	const configuredCount = attached.length + conversationToolsState.length + webSearchTemplates.length;
+	const visibleConversationTools = conversationToolsState.filter(
+		entry => entry.enabled && !attachedByKey.has(entry.key)
+	);
+	const configuredCount =
+		attached.length + visibleConversationTools.length + agentToolRows.length + webSearchTemplates.length;
 	const resultCount = visibleAvailableToAdd.length + visibleWebSearchToAdd.length;
 	const toolsHeaderMeta = isSearchQueryActive(query)
 		? `${resultCount} match${resultCount === 1 ? '' : 'es'}`
@@ -313,6 +411,39 @@ export function ToolsBottomBarChip({
 		update: (entry: ConversationToolStateEntry) => ConversationToolStateEntry
 	) => {
 		setConversationToolsState(previous => previous.map(entry => (entry.key === key ? update(entry) : entry)));
+	};
+
+	const promoteAgentTool = async (
+		projection: AgentToolProjection,
+		patch: Partial<Pick<ToolStoreChoice, 'autoExecute' | 'userArgSchemaInstance'>>
+	): Promise<ToolStoreChoice> => {
+		const key = agentToolProjectionKey(projection);
+		const existingChoice = agentToolChoices.get(key);
+		const choice =
+			existingChoice ??
+			toolStoreChoiceFromSelection(
+				{
+					choiceID: getUUIDv7(),
+					target: projection.target,
+					autoExecute: projection.autoExecute,
+				},
+				await toolManagementAPI.resolveToolTarget(projection.target)
+			);
+
+		if (!existingChoice) {
+			setAgentToolChoices(previous => new Map([...previous, [key, choice]]));
+		}
+
+		const nextChoice = {
+			...choice,
+			...patch,
+			autoExecute: choice.implementationKind === ToolImplType.Go ? (patch.autoExecute ?? choice.autoExecute) : false,
+		};
+		setConversationToolsState(previous => [
+			...previous.filter(entry => entry.key !== key),
+			{ key, toolStoreChoice: nextChoice, enabled: true },
+		]);
+		return nextChoice;
 	};
 
 	const refresh = () => {
@@ -411,7 +542,7 @@ export function ToolsBottomBarChip({
 				title={entry.toolLoadError || (!entry.toolDefinition ? 'Tool definition is being resolved.' : undefined)}
 				display={choice.displayName || choice.target.name}
 				slug={choice.description?.trim() || 'Available for this conversation'}
-				sourceBadge="Conversation"
+				sourceBadge="Session"
 				isSelected={entry.enabled}
 				selectedTitle={entry.enabled ? 'Enabled for next send' : 'Disabled'}
 				supportsAutoExecute={choice.implementationKind === ToolImplType.Go}
@@ -446,6 +577,57 @@ export function ToolsBottomBarChip({
 						setConversationToolsState(previous => previous.filter(value => value.key !== entry.key));
 					},
 					title: 'Remove conversation tool',
+					disabled: isInputLocked,
+				}}
+			/>
+		);
+	};
+
+	const renderAgentTool = (projection: AgentToolProjection) => {
+		const key = agentToolProjectionKey(projection);
+		const choice = agentToolChoices.get(key);
+
+		if (!choice) {
+			return (
+				<AgentToolFallbackRow
+					key={`agent:${key}`}
+					projection={projection}
+					isInputLocked={isInputLocked}
+					onRemove={() => {
+						agentManager?.toggleCapabilityExclusion(projection.occurrence);
+					}}
+				/>
+			);
+		}
+
+		return (
+			<ToolMenuRow
+				key={`agent:${key}`}
+				store={store}
+				disabled={isInputLocked}
+				dataAttachmentChip="bottom-bar-agent-tool"
+				display={choice.displayName || choice.target.name}
+				slug={choice.description?.trim() || 'Inherited from the selected Agent'}
+				sourceBadge="Agent"
+				isSelected
+				supportsAutoExecute={choice.implementationKind === ToolImplType.Go}
+				autoExecute={choice.autoExecute}
+				onAutoExecuteChange={value => {
+					void promoteAgentTool(projection, { autoExecute: value });
+				}}
+				onEditOptions={() => {
+					void promoteAgentTool(projection, {}).then(() => {
+						window.setTimeout(() => {
+							dispatchOpenToolArgs({ kind: 'conversation', key }, toolArgsEventTarget);
+						}, 0);
+					});
+				}}
+				primaryAction={{
+					kind: 'remove',
+					onClick: () => {
+						agentManager?.toggleCapabilityExclusion(projection.occurrence);
+					},
+					title: 'Remove inherited Agent Tool',
 					disabled: isInputLocked,
 				}}
 			/>
@@ -520,82 +702,6 @@ export function ToolsBottomBarChip({
 	const selectedToolsPanel =
 		configuredCount > 0 ? (
 			<>
-				{hasAgentTools ? (
-					<div className="border-base-300/70 rounded-lg border p-2">
-						<div className="mb-1 text-xs font-semibold">Agent tools</div>
-						<div className="text-base-content/60 mb-2 text-[11px]">
-							Backend owned. Override copies into Session, Exclude emits Remove.
-						</div>
-						{agentToolOccurrences.map((occurrence: AgentCapabilityOccurrence) => {
-							const target = occurrence.target;
-							const ava = occurrence.status === CapabilityResolutionStatus.Available && target;
-							const excluded = !!agentManager?.getCapabilityExclusion(occurrence);
-							const overridden = target
-								? attachedByKey.has(toolIdentityKey(target)) ||
-									conversationToolsState.some(
-										e => toolIdentityKey(e.toolStoreChoice.target) === toolIdentityKey(target)
-									)
-								: false;
-							return (
-								<div
-									key={occurrence.path}
-									className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2"
-								>
-									<FiTool size={13} />
-									<span className="min-w-0 flex-1 truncate text-xs">{occurrence.name || 'Agent tool'}</span>
-									<span className="badge badge-secondary badge-xs">Agent</span>
-									{occurrence.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
-									{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
-									{overridden && !excluded ? <span className="badge badge-info badge-xs">Overridden</span> : null}
-									{!ava ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
-									{available && !excluded ? (
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs rounded-lg"
-											disabled={isInputLocked}
-											onClick={() => {
-												if (!target) {
-													return;
-												}
-												void toolManagementAPI
-													.resolveToolTarget(target)
-													.then(resolved => {
-														const choice = toolStoreChoiceFromSelection(
-															{ choiceID: getUUIDv7(), target, autoExecute: occurrence.autoExecute === true },
-															resolved
-														);
-														setConversationToolsState(prev => {
-															const key = toolIdentityKey(choice.target);
-															const existing = prev.find(e => e.key === key);
-															if (!existing) {
-																return [...prev, { key, toolStoreChoice: choice, enabled: true }];
-															}
-															return prev.map(e =>
-																e.key === key ? { ...e, toolStoreChoice: choice, enabled: true } : e
-															);
-														});
-													})
-													.catch(console.error);
-											}}
-										>
-											Override
-										</button>
-									) : null}
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs text-error rounded-lg"
-										disabled={isInputLocked || !available}
-										onClick={() => {
-											agentManager?.toggleCapabilityExclusion(occurrence);
-										}}
-									>
-										{excluded ? 'Include' : 'Exclude'}
-									</button>
-								</div>
-							);
-						})}
-					</div>
-				) : null}
 				{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
 				{activeWebSearch && !activeWebSearchItem ? (
 					<div className="alert alert-warning rounded-xl p-2 text-xs">
@@ -619,9 +725,10 @@ export function ToolsBottomBarChip({
 				{attached.map(a => {
 					return renderAttached(a);
 				})}
-				{conversationToolsState.map(a => {
+				{visibleConversationTools.map(a => {
 					return renderConversation(a);
 				})}
+				{agentToolRows.map(projection => renderAgentTool(projection))}
 			</>
 		) : undefined;
 
@@ -788,12 +895,12 @@ export function ToolsBottomBarChip({
 										className="btn btn-ghost btn-xs text-error rounded-lg"
 										disabled={isInputLocked}
 										onClick={() => {
-											onRemoveAllAttachedTools(attached);
 											setConversationToolsState([]);
 											setWebSearchTemplates([]);
+											agentManager?.clearCapabilityExclusions(['tool']);
 										}}
 									>
-										Clear all
+										Clear Session overrides
 									</button>
 								) : undefined
 							}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPPromptRef,
 	MCPResourceRef,
@@ -791,8 +790,44 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		}
 	}, []);
 
+	const selectionForMutation = useCallback(
+		(
+			previous: Record<string, MCPComposerServerSelection>,
+			key: string,
+			fallbackSelection?: MCPComposerServerSelection
+		): MCPComposerServerSelection | undefined => {
+			if (previous[key]) {
+				return previous[key];
+			}
+			if (!fallbackSelection) {
+				return undefined;
+			}
+
+			const option = optionsRef.current.find(candidate => optionKey(candidate) === key);
+			const selectedTools =
+				fallbackSelection.toolExposure === MCPToolExposure.All &&
+				fallbackSelection.selectedTools.length === 0 &&
+				option?.discoveryLoaded
+					? modelSelectableTools(option.tools).map(t => {
+							return toolToSelection(t);
+						})
+					: fallbackSelection.selectedTools.map(tool => ({ ...tool }));
+
+			return {
+				...fallbackSelection,
+				server: option?.runtimeServerID ?? fallbackSelection.server,
+				snapshotDigest: fallbackSelection.snapshotDigest ?? option?.runtime?.snapshotDigest,
+				selectedTools,
+				selectedResources: fallbackSelection.selectedResources.map(resource => ({ ...resource })),
+				selectedResourceTemplates: fallbackSelection.selectedResourceTemplates.map(template => ({ ...template })),
+				selectedPrompts: fallbackSelection.selectedPrompts.map(prompt => ({ ...prompt })),
+			};
+		},
+		[]
+	);
+
 	const setServerSelected = useCallback(
-		(option: MCPComposerServerOption, selected: boolean) => {
+		(option: MCPComposerServerOption, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = optionKey(option);
 
 			commitSelectedByServerKey(previous => {
@@ -802,6 +837,14 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 
 				if (previous[key]) {
 					return previous;
+				}
+
+				const fallback = selectionForMutation(previous, key, fallbackSelection);
+				if (fallback) {
+					return {
+						...previous,
+						[key]: fallback,
+					};
 				}
 
 				return {
@@ -824,7 +867,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const ensureServerSelected = useCallback(
@@ -864,52 +907,12 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		[commitSelectedByServerKey, loadDeclarationCatalog]
 	);
 
-	const adoptAgentServer = useCallback(
-		async (artifact: ArtifactRef): Promise<boolean> => {
-			await loadDeclarationCatalog();
-
-			const option = optionsRef.current.find(
-				value => value.server.ref.rootID === artifact.rootID && value.server.ref.artifactID === artifact.artifactID
-			);
-
-			if (!option || !option.plugin.enabled || !option.server.enabled || !isServerOperational(option.server)) {
-				return false;
-			}
-
-			const key = mcpServerKey(option.runtimeServerID);
-
-			commitSelectedByServerKey(previous => {
-				if (previous[key]) {
-					return previous;
-				}
-
-				return {
-					...previous,
-					[key]: {
-						server: option.runtimeServerID,
-						snapshotDigest: option.runtime?.snapshotDigest,
-						toolExposure: MCPToolExposure.All,
-						selectedTools: [],
-						selectedResources: [],
-						selectedResourceTemplates: [],
-						selectedPrompts: [],
-						includeServerInstructions: true,
-					},
-				};
-			});
-
-			void ensureDiscoveryLoaded(option.runtimeServerID);
-			return true;
-		},
-		[commitSelectedByServerKey, ensureDiscoveryLoaded, loadDeclarationCatalog]
-	);
-
 	const setToolExposure = useCallback(
-		(server: MCPRuntimeServerID, exposure: MCPToolExposure) => {
+		(server: MCPRuntimeServerID, exposure: MCPToolExposure, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = mcpServerKey(server);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -933,15 +936,15 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const setIncludeServerInstructions = useCallback(
-		(server: MCPRuntimeServerID, include: boolean) => {
+		(server: MCPRuntimeServerID, include: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = mcpServerKey(server);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -955,11 +958,11 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const toggleTool = useCallback(
-		(tool: MCPToolCapability, selected: boolean) => {
+		(tool: MCPToolCapability, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			if (selected && !isMCPToolVisibleToModel(tool)) {
 				return;
 			}
@@ -968,7 +971,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 			const selection = toolToSelection(tool);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -984,15 +987,15 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const toggleResource = useCallback(
-		(resource: MCPResourceRef, selected: boolean) => {
+		(resource: MCPResourceRef, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = mcpServerKey(resource.server);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -1008,11 +1011,11 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const toggleResourceTemplate = useCallback(
-		(template: MCPResourceTemplateRef, selected: boolean) => {
+		(template: MCPResourceTemplateRef, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = mcpServerKey(template.server);
 			const selection: MCPResourceTemplateSelection = {
 				...template,
@@ -1020,7 +1023,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 			};
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -1036,11 +1039,11 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const togglePrompt = useCallback(
-		(prompt: MCPPromptRef, selected: boolean) => {
+		(prompt: MCPPromptRef, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => {
 			const key = mcpServerKey(prompt.server);
 			const selection: MCPPromptSelection = {
 				...prompt,
@@ -1048,7 +1051,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 			};
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -1064,15 +1067,21 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const setResourceTemplateArgumentValue = useCallback(
-		(server: MCPRuntimeServerID, uriTemplate: string, argumentName: string, value: string) => {
+		(
+			server: MCPRuntimeServerID,
+			uriTemplate: string,
+			argumentName: string,
+			value: string,
+			fallbackSelection?: MCPComposerServerSelection
+		) => {
 			const key = mcpServerKey(server);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -1088,15 +1097,21 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const setPromptArgumentValue = useCallback(
-		(server: MCPRuntimeServerID, promptName: string, argumentName: string, value: string) => {
+		(
+			server: MCPRuntimeServerID,
+			promptName: string,
+			argumentName: string,
+			value: string,
+			fallbackSelection?: MCPComposerServerSelection
+		) => {
 			const key = mcpServerKey(server);
 
 			commitSelectedByServerKey(previous => {
-				const current = previous[key];
+				const current = selectionForMutation(previous, key, fallbackSelection);
 				if (!current) {
 					return previous;
 				}
@@ -1112,7 +1127,7 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 				};
 			});
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, selectionForMutation]
 	);
 
 	const clear = useCallback(() => {
@@ -1236,7 +1251,6 @@ export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult 
 		openAuthURL,
 		setServerSelected,
 		ensureServerSelected,
-		adoptAgentServer,
 		setToolExposure,
 		setIncludeServerInstructions,
 		toggleTool,

@@ -1,4 +1,3 @@
-import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
@@ -49,6 +48,29 @@ export interface MCPComposerServerSelection {
 	includeServerInstructions?: boolean;
 }
 
+/**
+ * This mirrors the Session Runtime Agent MCP baseline:
+ *
+ * - all model-visible server tools are exposed;
+ * - no explicit resource or prompt selection is added;
+ * - server instructions are included.
+ *
+ * The Composer uses this only as an inherited projection. It is never sent as
+ * a Session `Add` unless the user edits the inherited row.
+ */
+export function agentBaselineMCPSelection(option: MCPComposerServerOption): MCPComposerServerSelection {
+	return {
+		server: option.runtimeServerID,
+		snapshotDigest: option.runtime?.snapshotDigest,
+		toolExposure: MCPToolExposure.All,
+		selectedTools: [],
+		selectedResources: [],
+		selectedResourceTemplates: [],
+		selectedPrompts: [],
+		includeServerInstructions: true,
+	};
+}
+
 export interface UseComposerMCPResult {
 	options: MCPComposerServerOption[];
 	loading: boolean;
@@ -73,22 +95,44 @@ export interface UseComposerMCPResult {
 	cancelOAuth: (server: MCPRuntimeServerID) => Promise<void>;
 	openAuthURL: (url: string) => void;
 
-	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
+	setServerSelected: (
+		option: MCPComposerServerOption,
+		selected: boolean,
+		fallbackSelection?: MCPComposerServerSelection
+	) => void;
 	ensureServerSelected: (server: MCPRuntimeServerID) => Promise<boolean>;
-	adoptAgentServer: (server: ArtifactRef) => Promise<boolean>;
-	setToolExposure: (server: MCPRuntimeServerID, exposure: MCPToolExposure) => void;
-	setIncludeServerInstructions: (server: MCPRuntimeServerID, include: boolean) => void;
-	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;
-	toggleResource: (resource: MCPResourceRef, selected: boolean) => void;
-	toggleResourceTemplate: (template: MCPResourceTemplateRef, selected: boolean) => void;
-	togglePrompt: (prompt: MCPPromptRef, selected: boolean) => void;
+	setToolExposure: (
+		server: MCPRuntimeServerID,
+		exposure: MCPToolExposure,
+		fallbackSelection?: MCPComposerServerSelection
+	) => void;
+	setIncludeServerInstructions: (
+		server: MCPRuntimeServerID,
+		include: boolean,
+		fallbackSelection?: MCPComposerServerSelection
+	) => void;
+	toggleTool: (tool: MCPToolCapability, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => void;
+	toggleResource: (resource: MCPResourceRef, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => void;
+	toggleResourceTemplate: (
+		template: MCPResourceTemplateRef,
+		selected: boolean,
+		fallbackSelection?: MCPComposerServerSelection
+	) => void;
+	togglePrompt: (prompt: MCPPromptRef, selected: boolean, fallbackSelection?: MCPComposerServerSelection) => void;
 	setResourceTemplateArgumentValue: (
 		server: MCPRuntimeServerID,
 		uriTemplate: string,
 		argumentName: string,
-		value: string
+		value: string,
+		fallbackSelection?: MCPComposerServerSelection
 	) => void;
-	setPromptArgumentValue: (server: MCPRuntimeServerID, promptName: string, argumentName: string, value: string) => void;
+	setPromptArgumentValue: (
+		server: MCPRuntimeServerID,
+		promptName: string,
+		argumentName: string,
+		value: string,
+		fallbackSelection?: MCPComposerServerSelection
+	) => void;
 	clear: () => void;
 	restoreContext: (context?: MCPConversationContext) => void;
 }

@@ -101,7 +101,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 				modelSelectionSource={context.modelSelectionSource}
 				agentModelRef={agent.agentModelRef}
 				onUseAgentModel={() => {
-					void agent.reapplySelectedAgent();
+					void agent.resetModelToAgent();
 				}}
 			/>
 

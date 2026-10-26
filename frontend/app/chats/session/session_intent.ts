@@ -27,6 +27,7 @@ import { mcpManagementAPI } from '@/apis/baseapi';
 import { toolIdentityKey } from '@/apis/tool_management';
 
 import type { AgentCapabilityExclusion, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import { sessionCapabilityKey } from '@/chats/session/session_capability_key';
 
 export interface SessionSubmissionIntent {
 	configuration: SessionConfiguration;
@@ -349,6 +350,7 @@ function mergeSessionConfiguration(
 	payload: EditorSubmitPayload
 ): SessionConfiguration {
 	const releasedRemoveKeys = new Set(payload.agentCapabilityInclusionKeys);
+	const releasedAgentSkillActivityOverrideKeys = new Set(payload.agentSkillActivityInclusionKeys);
 	const unresolvedToolKeys = new Set(
 		(payload.unresolvedToolSelections ?? []).map(issue => sessionCapabilityKey(issue.selection.target))
 	);
@@ -386,7 +388,11 @@ function mergeSessionConfiguration(
 			(previous, current) => preserveArtifactSelectionPins(previous, current),
 			releasedRemoveKeys
 		),
-		activeSkills: mergeActiveSkillOverrides(baseline.activeSkills, generated.activeSkills, releasedRemoveKeys),
+		activeSkills: mergeActiveSkillOverrides(
+			baseline.activeSkills,
+			generated.activeSkills,
+			releasedAgentSkillActivityOverrideKeys
+		),
 		mcp: mergeCollectionOverrides(baseline.mcp, generated.mcp, mergeMCPServerSelection, releasedRemoveKeys),
 		history: cloneConfigurationValue(generated.history),
 	};
@@ -410,14 +416,6 @@ function nonSessionSkillRemovalOverrides(keys: ReadonlySet<string>): SessionArti
 		key,
 		mode: SessionCollectionOverrideMode.Remove,
 	}));
-}
-
-function sessionCapabilityKey(target: CapabilityTarget): string {
-	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
-		return artifactRefKey(target.artifact);
-	}
-
-	return ['direct', target.providerIdentity ?? '', target.providerLocalID ?? '', target.type, target.name].join(':');
 }
 
 function sessionCapabilitySelection(target: CapabilityTarget) {

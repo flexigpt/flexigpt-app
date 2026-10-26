@@ -377,16 +377,6 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 				onClose={() => {
 					setViewedAgent(null);
 				}}
-				capabilityControls={
-					viewedAgent?.key === manager.selectedAgentKey
-						? {
-								isExcluded: occurrence => Boolean(manager.getCapabilityExclusion(occurrence)),
-								onToggle: occurrence => {
-									manager.toggleCapabilityExclusion(occurrence);
-								},
-							}
-						: undefined
-				}
 			/>
 		</div>
 	);

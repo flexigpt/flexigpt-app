@@ -80,6 +80,7 @@ export interface AgentStarterPreview {
 	enabledSkillRefs: ArtifactRef[];
 	activeSkillRefs: ArtifactRef[];
 	instructionSkillRefs: ArtifactRef[];
+	instructionTextArtifacts: ArtifactRef[];
 	userMessageStarterText?: string;
 	textArtifacts: ArtifactRef[];
 	issues: Array<{
@@ -381,6 +382,7 @@ export class AgentManagementAPI {
 		const activeSkillRefs: ArtifactRef[] = [];
 		const instructionSkillRefs: ArtifactRef[] = [];
 		const textArtifacts: ArtifactRef[] = [];
+		const instructionTextArtifacts: ArtifactRef[] = [];
 		const userMessageStarterTextParts: string[] = [];
 		const mcpCandidates: ArtifactRef[] = [];
 		let modelRef: ArtifactRef | undefined;
@@ -490,9 +492,10 @@ export class AgentManagementAPI {
 
 						switch (materialized.insert) {
 							case TextInsert.Instructions:
-								// Instruction Text is resolved and composed by
-								// backend runtime setup. Do not duplicate it into
-								// frontend-authored session instructions.
+								// Keep declaration identity for read-only Composer
+								// provenance. Session Runtime still materializes and
+								// composes this source at operation preparation time.
+								instructionTextArtifacts.push(target.artifact);
 								break;
 
 							case TextInsert.UserMessage:
@@ -543,6 +546,7 @@ export class AgentManagementAPI {
 			enabledSkillRefs: uniqueRefs(enabledSkillRefs),
 			activeSkillRefs: uniqueRefs(activeSkillRefs),
 			instructionSkillRefs: uniqueRefs(instructionSkillRefs),
+			instructionTextArtifacts: uniqueRefs(instructionTextArtifacts),
 			userMessageStarterText: userMessageStarterTextParts.join('\n\n') || undefined,
 			textArtifacts: uniqueRefs(textArtifacts),
 			issues,

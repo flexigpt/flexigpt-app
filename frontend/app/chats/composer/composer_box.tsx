@@ -1,6 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { UIModelOption } from '@/spec/model';
@@ -12,18 +11,19 @@ import { SkillSessionSyncMode } from '@/spec/skill';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import { skillManagementAPI } from '@/apis/baseapi';
 import { normalizeSkillRefs } from '@/apis/skill_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type { AgentInstructionSourceDeclaration } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { ContextBar } from '@/chats/composer/editor/editor_context_bar';
 import { useComposerContextState } from '@/chats/composer/editor/use_editor_context_state';
+import { RestoreRequestGuard } from '@/chats/composer/restore_request_guard';
 import { useAgentSystemPrompt } from '@/chats/composer/skills/use_agent_system_prompt';
 
 export interface ComposerBoxHandle {
@@ -116,6 +116,7 @@ export const ComposerBox = memo(
 		const editorAreaRef = useRef<EditorAreaHandle>(null);
 		const sessionConfigurationBaselineRef = useRef<SessionConfiguration | undefined>(undefined);
 		const preEditConfigurationRef = useRef<SessionConfiguration | undefined>(undefined);
+		const restoreGuardRef = useRef(new RestoreRequestGuard());
 		const composerContext = useComposerContextState();
 		const systemPrompt = useAgentSystemPrompt({
 			modelDefaultPrompt: composerContext.selectedModel.systemPrompt,
@@ -133,60 +134,39 @@ export const ComposerBox = memo(
 			return editorAreaRef.current?.setDraftTextIfEmpty(text) ?? false;
 		}, []);
 
-		const applyAgentInstructionSkills = useCallback(
-			async (skillRefs: ArtifactRef[], signal: AbortSignal) => {
-				const sources = await skillManagementAPI.prepareInstructionSkillSources(skillRefs, signal);
-
-				if (signal.aborted) {
-					return;
-				}
-
-				systemPrompt.replaceAgentInstructionSkillSources(
-					sources.map((source, index) => {
-						const displayNameCandidate = (source as { displayName?: unknown; name?: unknown }).displayName;
-						const logicalNameCandidate = (source as { name?: unknown }).name;
-						const displayName =
-							typeof displayNameCandidate === 'string' && displayNameCandidate.trim()
-								? displayNameCandidate.trim()
-								: typeof logicalNameCandidate === 'string' && logicalNameCandidate.trim()
-									? logicalNameCandidate.trim()
-									: `Agent instruction ${index + 1}`;
-
-						return {
-							displayName,
-							prompt: source.text,
-							skillRef: source.skillRef,
-						};
-					})
-				);
+		const replaceAgentInstructionSources = useCallback(
+			(sources: AgentInstructionSourceDeclaration[]) => {
+				systemPrompt.replaceAgentInstructionSources(sources);
 			},
 			[systemPrompt]
 		);
 
-		const clearAgentInstructionSkills = useCallback(() => {
-			systemPrompt.clearAgentInstructionSkillSources();
+		const clearAgentInstructionSources = useCallback(() => {
+			systemPrompt.clearAgentInstructionSources();
 		}, [systemPrompt]);
 
-		const setAgentInstructionSkillSelected = useCallback(
-			(skillRef: ArtifactRef, selected: boolean) => {
-				systemPrompt.setAgentInstructionSkillSelected(skillRef, selected);
+		const setAgentInstructionSourceSelected = useCallback(
+			(occurrencePath: string, selected: boolean) => {
+				systemPrompt.setAgentInstructionSourceSelected(occurrencePath, selected);
 			},
 			[systemPrompt]
 		);
 
 		const agent = useAgentManager(composerContext, {
 			applyUserMessageStarter: applyAgentUserMessageStarter,
-			applyAgentInstructionSkills,
-			clearAgentInstructionSkills,
-			setAgentInstructionSkillSelected,
+			replaceAgentInstructionSources,
+			clearAgentInstructionSources,
+			setAgentInstructionSourceSelected,
 		});
 
 		const restoreComposerConfiguration = useCallback(
 			async (configuration: SessionConfiguration) => {
+				const restoreGeneration = restoreGuardRef.current.begin();
 				composerContext.restoreSessionConfiguration(configuration);
 				systemPrompt.restoreSessionConfiguration(configuration);
 
 				await agent.restoreSelectedAgent(configuration.agent, configuration.model ? 'session' : 'agent', configuration);
+				return restoreGuardRef.current.isCurrent(restoreGeneration);
 			},
 			[agent, composerContext, systemPrompt]
 		);
@@ -225,6 +205,8 @@ export const ComposerBox = memo(
 
 		const resetComposerState = useCallback(() => {
 			setAbortConfirmationRequested(false);
+			restoreGuardRef.current.invalidate();
+			preEditConfigurationRef.current = undefined;
 			agent.clearAgentTracking();
 			sessionConfigurationBaselineRef.current = undefined;
 
@@ -256,10 +238,7 @@ export const ComposerBox = memo(
 					throw new Error('Select an available model before sending.');
 				}
 
-				const nonSessionSkillRefs = normalizeSkillRefs([
-					...(payload.nonSessionSkillRefs ?? []),
-					...agent.instructionOnlySkillRefs,
-				]);
+				const nonSessionSkillRefs = normalizeSkillRefs([...(payload.nonSessionSkillRefs ?? [])]);
 
 				const acceptedConfiguration = await onSend(
 					{
@@ -292,6 +271,16 @@ export const ComposerBox = memo(
 						...(agent.releasedCapabilityExclusionKeys.length > 0
 							? {
 									agentCapabilityInclusionKeys: agent.releasedCapabilityExclusionKeys,
+								}
+							: {}),
+						...(agent.agentSkillActivityOverrides.length > 0
+							? {
+									agentSkillActivityOverrides: agent.agentSkillActivityOverrides,
+								}
+							: {}),
+						...(agent.releasedAgentSkillActivityOverrideKeys.length > 0
+							? {
+									agentSkillActivityInclusionKeys: agent.releasedAgentSkillActivityOverrideKeys,
 								}
 							: {}),
 						modelSelectionSource:
@@ -361,6 +350,8 @@ export const ComposerBox = memo(
 				restoreConversationContext: context => {
 					setAbortConfirmationRequested(false);
 					agent.clearAgentTracking();
+					restoreGuardRef.current.invalidate();
+					preEditConfigurationRef.current = undefined;
 
 					const model = composerContext.restoreConversationContext(context);
 					systemPrompt.restoreConversationContext(model?.systemPrompt ?? '', context.modelParam);
@@ -387,7 +378,10 @@ export const ComposerBox = memo(
 					sessionConfigurationBaselineRef.current = structuredClone(configuration);
 					preEditConfigurationRef.current = undefined;
 
-					await restoreComposerConfiguration(configuration);
+					const restored = await restoreComposerConfiguration(configuration);
+					if (!restored) {
+						return;
+					}
 					await editorAreaRef.current?.restoreSessionConfiguration(configuration);
 				},
 			}),

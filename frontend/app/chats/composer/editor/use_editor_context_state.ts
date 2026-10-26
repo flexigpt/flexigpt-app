@@ -296,14 +296,32 @@ export function useComposerContextState(): ComposerContextController {
 	const setAgentModelPreview = useCallback(
 		(model: UIModelOption | undefined, agentOwnsModel: boolean) => {
 			if (model) {
-				applySelectedModel(model, { syncHybridReasoning: true });
+				// Model identity is Agent-owned, while sparse request preferences
+				// remain Session-owned. Returning to the Agent model must not
+				// silently clear advanced model overrides.
+				const sessionRequestPatch = selectedModelRef.current.requestPatch;
+				applySelectedModel(
+					{
+						...model,
+						...(sessionRequestPatch ? { requestPatch: structuredClone(sessionRequestPatch) } : {}),
+					},
+					{ syncHybridReasoning: true }
+				);
 			} else if (!agentOwnsModel && modelSelectionSourceRef.current === 'agent') {
 				// Moving from an Agent-owned Model to an Agent with no Model must
 				// not leave the previous Agent's model looking like the fallback.
 				// Preserve an explicit user/session choice, but otherwise return
 				// to the catalog default.
 				const fallback = defaultModelRef.current ?? allOptionsRef.current[0] ?? selectedModelRef.current;
-				applySelectedModel(fallback, { syncHybridReasoning: true });
+				applySelectedModel(
+					{
+						...fallback,
+						...(selectedModelRef.current.requestPatch
+							? { requestPatch: structuredClone(selectedModelRef.current.requestPatch) }
+							: {}),
+					},
+					{ syncHybridReasoning: true }
+				);
 			}
 
 			setModelSelectionSource(agentOwnsModel ? 'agent' : 'session');

@@ -16,7 +16,6 @@ import {
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
@@ -113,9 +112,6 @@ export interface EditorAreaHandle {
 	setInstalledSkillStateFromAgent: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
 	restoreSessionConfiguration: (configuration: SessionConfiguration) => Promise<void>;
-	adoptAgentTool: (choice: ToolStoreChoice) => void;
-	adoptAgentSkill: (ref: SkillRef, active: boolean) => void;
-	adoptAgentMCPServer: (ref: ArtifactRef) => Promise<boolean>;
 }
 
 interface EditorAreaProps {
@@ -196,6 +192,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const [externalMessageRestorePending, setExternalMessageRestorePending] = useState(false);
 	const [externalMessageRestoreFailed, setExternalMessageRestoreFailed] = useState(false);
 	const externalMessageRestoreVersionRef = useRef(0);
+	const sessionConfigurationRestoreVersionRef = useRef(0);
 	const isInputLocked = inputLocked || externalMessageRestorePending;
 	const hasContinuationToSend = submissionMode === 'continuation' && canContinueWithoutDraft && !editingMessageId;
 
@@ -867,6 +864,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const clearComposerTransientState = useCallback(() => {
 		externalMessageRestoreVersionRef.current += 1;
+		sessionConfigurationRestoreVersionRef.current += 1;
 		setExternalMessageRestorePending(false);
 		setExternalMessageRestoreFailed(false);
 		closeAllMenus();
@@ -1240,6 +1238,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const restoreSessionConfiguration = useCallback(
 		async (configuration: SessionConfiguration) => {
+			const restoreVersion = sessionConfigurationRestoreVersionRef.current + 1;
+			sessionConfigurationRestoreVersionRef.current = restoreVersion;
+
+			const isCurrentRestore = () => sessionConfigurationRestoreVersionRef.current === restoreVersion;
+
 			// Invalidate an older edit hydration before restoring a Session.
 			externalMessageRestoreVersionRef.current += 1;
 			setExternalMessageRestorePending(false);
@@ -1265,6 +1268,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					}`
 				);
 			}
+			if (!isCurrentRestore()) {
+				return;
+			}
 
 			try {
 				await applyInstalledSkillSelectionState([], [], {
@@ -1278,11 +1284,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					}`
 				);
 			}
+			if (!isCurrentRestore()) {
+				return;
+			}
 
 			const [toolStateResult, mcpContextResult] = await Promise.allSettled([
 				hydrateSessionToolOverrides(configuration.tools),
 				hydrateSessionMCPOverrides(configuration.mcp),
 			]);
+
+			if (!isCurrentRestore()) {
+				return;
+			}
 
 			if (toolStateResult.status === 'fulfilled') {
 				applyConversationToolsFromChoices(toolStateResult.value.choices);
@@ -1309,6 +1322,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					}`
 				);
 			}
+			if (!isCurrentRestore()) {
+				return;
+			}
 
 			try {
 				await workspace.restoreSessionIntent(configuration.workspace, false);
@@ -1318,6 +1334,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						error instanceof Error ? error.message : 'saved Workspace selections are unavailable'
 					}`
 				);
+			}
+			if (!isCurrentRestore()) {
+				return;
 			}
 
 			try {
@@ -1346,6 +1365,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				);
 			}
 
+			if (!isCurrentRestore()) {
+				return;
+			}
+
 			if (restoreErrors.length > 0) {
 				setSubmitError(`Some saved Composer settings could not be restored:\n${restoreErrors.join('\n')}`);
 			}
@@ -1359,68 +1382,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			mcp,
 			workspace,
 		]
-	);
-
-	const adoptAgentTool = useCallback(
-		(choice: ToolStoreChoice) => {
-			const key = toolIdentityKey(choice.target);
-
-			setConversationToolsState(previous => {
-				const existing = previous.find(entry => entry.key === key);
-
-				if (!existing) {
-					return [
-						...previous,
-						{
-							key,
-							toolStoreChoice: { ...choice },
-							enabled: true,
-						},
-					];
-				}
-
-				return previous.map(entry =>
-					entry.key === key
-						? {
-								...entry,
-								toolStoreChoice: { ...choice },
-								enabled: true,
-							}
-						: entry
-				);
-			});
-		},
-		[setConversationToolsState]
-	);
-
-	const adoptAgentSkill = useCallback(
-		(sRef: SkillRef, active: boolean) => {
-			const enabled = normalizeSkillRefs([...getCurrentInstalledEnabledSkillRefs(), sRef]);
-			const nextActive = active
-				? normalizeSkillRefs([...getCurrentInstalledActiveSkillRefs(), sRef])
-				: getCurrentInstalledActiveSkillRefs();
-
-			void applyInstalledSkillSelectionState(enabled, nextActive, {
-				syncSession: SkillSessionSyncMode.None,
-			});
-		},
-		[applyInstalledSkillSelectionState, getCurrentInstalledActiveSkillRefs, getCurrentInstalledEnabledSkillRefs]
-	);
-
-	const adoptAgentMCPServer = useCallback(
-		async (aRef: ArtifactRef): Promise<boolean> => {
-			try {
-				const adopted = await mcp.adoptAgentServer(aRef);
-				if (!adopted) {
-					setSubmitError('The Agent MCP server is unavailable in the current Composer catalog.');
-				}
-				return adopted;
-			} catch (error) {
-				setSubmitError(error instanceof Error ? error.message : 'The Agent MCP server could not be adopted.');
-				return false;
-			}
-		},
-		[mcp]
 	);
 
 	useImperativeHandle(
@@ -1475,19 +1436,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setMCPAppContextUpdates(updates ?? []);
 			},
 			appendMCPAppContextUpdate: update => {
-				void mcp
-					.ensureServerSelected(update.server)
-					.then(selected => {
+				void (async () => {
+					try {
+						const selected = await mcp.ensureServerSelected(update.server);
 						if (!selected) {
 							setSubmitError('The MCP App context could not be added because its server is unavailable or disabled.');
 							return;
 						}
 
 						setMCPAppContextUpdates(previous => [...previous, update]);
-					})
-					.catch(() => {
+					} catch {
 						setSubmitError('The MCP server catalog could not be loaded.');
-					});
+					}
+				})();
 			},
 			clearMCPContext: () => {
 				mcp.clear();
@@ -1505,14 +1466,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				void workspace.restoreSelection(selection, syncSkills);
 			},
 			restoreSessionConfiguration,
-			adoptAgentTool,
-			adoptAgentSkill,
-			adoptAgentMCPServer,
 		}),
 		[
-			adoptAgentMCPServer,
-			adoptAgentSkill,
-			adoptAgentTool,
 			applyConversationToolsFromChoices,
 			applyAttachmentsDrop,
 			applyInstalledSkillSelectionState,

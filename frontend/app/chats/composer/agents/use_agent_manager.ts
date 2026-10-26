@@ -4,18 +4,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentCapabilityOccurrence, AgentResolution } from '@/spec/agent';
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { UIModelOption } from '@/spec/model';
-import type { SessionConfiguration } from '@/spec/session';
-import type { SkillRef } from '@/spec/skill';
-import { isAgentSkillUseAsInstructions } from '@/spec/agent';
+import type { SessionActiveSkillOverride, SessionConfiguration } from '@/spec/session';
 import { artifactRefKey, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
-import { SessionCollectionOverrideMode } from '@/spec/session_base';
+import { SessionActivityOverrideMode, SessionCollectionOverrideMode } from '@/spec/session_base';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
 import type { AgentCatalogOption, AgentStarterPreview } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
+import type {
+	AgentInstructionSourceDeclaration,
+	AgentMCPProjection,
+	AgentSkillProjection,
+	AgentToolProjection,
+} from '@/chats/composer/agents/agent_projection';
 import type { AgentCapabilityExclusion } from '@/chats/composer/editor/editor_types';
+import {
+	agentSkillActivityChange,
+	effectiveAgentSkillActive,
+	projectAgentInstructionSources,
+	projectAgentMCPCapabilities,
+	projectAgentSkillCapabilities,
+	projectAgentToolCapabilities,
+	sameAgentDefinition,
+} from '@/chats/composer/agents/agent_projection';
+import { sessionCapabilityKey } from '@/chats/session/session_capability_key';
 
 interface AgentComposerContext {
 	selectedModel: UIModelOption;
@@ -29,15 +43,16 @@ interface AgentComposerContext {
 
 interface AgentManagerOptions {
 	applyUserMessageStarter?: (text: string) => boolean;
-	applyAgentInstructionSkills?: (skillRefs: ArtifactRef[], signal: AbortSignal) => Promise<void>;
-	clearAgentInstructionSkills?: () => void;
-	setAgentInstructionSkillSelected?: (skillRef: ArtifactRef, selected: boolean) => void;
+	replaceAgentInstructionSources?: (sources: AgentInstructionSourceDeclaration[]) => void;
+	clearAgentInstructionSources?: () => void;
+	setAgentInstructionSourceSelected?: (occurrencePath: string, selected: boolean) => void;
 }
 
 interface PendingRestoredAgent {
 	agent: ArtifactRef;
 	modelSelectionSource: 'session' | 'agent';
 	exclusionKeys: string[];
+	configuration?: SessionConfiguration;
 }
 
 type PendingDefaultAction = 'ensure' | 'reset' | 'track';
@@ -46,32 +61,36 @@ const BASE_AGENT_NAME = 'base';
 const NO_SELECTABLE_AGENT_ERROR = 'No selectable Agent is available.';
 
 export interface AgentManagerState {
-	agentOptions: AgentCatalogOption[];
-	loading: boolean;
-	error: string | null;
-	actionError: string | null;
-	isApplying: boolean;
-
-	baseAgentKey: string | null;
-	defaultAgentKey: string | null;
-	isDefaultAgentSelected: boolean;
-
 	selectedAgentKey: string | null;
 	selectedAgent: AgentCatalogOption | null;
 	selectedAgentResolution: AgentResolution | null;
 	preparedStarter: AgentStarterPreview | null;
 	agentModelRef?: ArtifactRef;
 	isTrackingOnly: boolean;
-	instructionOnlySkillRefs: SkillRef[];
 	capabilityExclusions: AgentCapabilityExclusion[];
 	releasedCapabilityExclusionKeys: string[];
+	agentSkillActivityOverrides: SessionActiveSkillOverride[];
+	releasedAgentSkillActivityOverrideKeys: string[];
 	agentSelectionPinRefreshRequested: boolean;
+	agentToolProjections: AgentToolProjection[];
+	agentSkillProjections: AgentSkillProjection[];
+	agentMCPProjections: AgentMCPProjection[];
+
+	agentOptions: AgentCatalogOption[];
+	loading: boolean;
+	error: string | null;
+	actionError: string | null;
+	isApplying: boolean;
+	baseAgentKey: string | null;
+	defaultAgentKey: string | null;
+	isDefaultAgentSelected: boolean;
 
 	refreshAgents(): Promise<void>;
 	selectAgent(agentRef: ArtifactRef): Promise<boolean>;
 	ensureDefaultAgent(): Promise<boolean>;
 	resetToDefaultAgent(): Promise<boolean>;
 	reapplySelectedAgent(): Promise<boolean>;
+	resetModelToAgent(): Promise<boolean>;
 	acknowledgeAgentSelectionPinRefresh(): void;
 	trackDefaultAgentWithoutApplying(): Promise<boolean>;
 	clearAgentTracking(): void;
@@ -82,14 +101,15 @@ export interface AgentManagerState {
 	): Promise<boolean>;
 	getCapabilityExclusion(occurrence: AgentCapabilityOccurrence): AgentCapabilityExclusion | undefined;
 	toggleCapabilityExclusion(occurrence: AgentCapabilityOccurrence): void;
+	toggleCapabilityExclusionByPath(path: string): void;
+	clearCapabilityExclusions(kinds?: AgentCapabilityExclusion['kind'][]): void;
+	isAgentSkillActive(projection: AgentSkillProjection): boolean;
+	setAgentSkillActive(projection: AgentSkillProjection, active: boolean): void;
+	clearAgentSkillActivityOverrides(): void;
 }
 
 function capabilityTargetKey(target: CapabilityTarget): string {
-	if (target.form === CapabilityTargetForm.Artifact && target.artifact) {
-		return `artifact:${target.artifact.rootID}:${target.artifact.artifactID}`;
-	}
-
-	return ['direct', target.providerIdentity ?? '', target.providerLocalID ?? '', target.type, target.name].join(':');
+	return sessionCapabilityKey(target);
 }
 
 function cloneCapabilityTarget(target: CapabilityTarget): CapabilityTarget {
@@ -212,46 +232,46 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const [preparedStarter, setPreparedStarter] = useState<AgentStarterPreview | null>(null);
 	const [selectedAgentResolution, setSelectedAgentResolution] = useState<AgentResolution | null>(null);
 	const [agentSelectionPinRefreshRequested, setAgentSelectionPinRefreshRequested] = useState(false);
+	const [agentSkillActivityOverrides, setAgentSkillActivityOverrides] = useState<SessionActiveSkillOverride[]>([]);
+	const [releasedAgentSkillActivityOverrideKeys, setReleasedAgentSkillActivityOverrideKeys] = useState<string[]>([]);
 
 	const selectedAgentKeyRef = useRef<string | null>(null);
 	const isApplyingRef = useRef(false);
 	const starterApplierRef = useRef<AgentManagerOptions['applyUserMessageStarter']>(options.applyUserMessageStarter);
-	const agentInstructionSkillsApplierRef = useRef<AgentManagerOptions['applyAgentInstructionSkills']>(
-		options.applyAgentInstructionSkills
+	const agentInstructionSourcesReplacerRef = useRef<AgentManagerOptions['replaceAgentInstructionSources']>(
+		options.replaceAgentInstructionSources
 	);
-	const agentInstructionSkillsClearerRef = useRef<AgentManagerOptions['clearAgentInstructionSkills']>(
-		options.clearAgentInstructionSkills
+	const agentInstructionSourcesClearerRef = useRef<AgentManagerOptions['clearAgentInstructionSources']>(
+		options.clearAgentInstructionSources
 	);
-	const agentInstructionSkillSelectionRef = useRef<AgentManagerOptions['setAgentInstructionSkillSelected']>(
-		options.setAgentInstructionSkillSelected
+	const agentInstructionSourceSelectionRef = useRef<AgentManagerOptions['setAgentInstructionSourceSelected']>(
+		options.setAgentInstructionSourceSelected
 	);
 	const activeAgentRequestAbortControllerRef = useRef<AbortController | null>(null);
 	const applyRequestSeqRef = useRef(0);
+	const restoreRequestSeqRef = useRef(0);
+	const modelResetRequestSeqRef = useRef(0);
 	const catalogRequestSeqRef = useRef(0);
 	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
 	const initialDefaultRequestRef = useRef(false);
 	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
 	const pendingRestoredAgentRef = useRef<PendingRestoredAgent | null>(null);
+	const excludedCapabilityKeysRef = useRef<string[]>([]);
 
 	useEffect(() => {
 		starterApplierRef.current = options.applyUserMessageStarter;
-		agentInstructionSkillsApplierRef.current = options.applyAgentInstructionSkills;
-		agentInstructionSkillsClearerRef.current = options.clearAgentInstructionSkills;
-		agentInstructionSkillSelectionRef.current = options.setAgentInstructionSkillSelected;
+		agentInstructionSourcesReplacerRef.current = options.replaceAgentInstructionSources;
+		agentInstructionSourcesClearerRef.current = options.clearAgentInstructionSources;
+		agentInstructionSourceSelectionRef.current = options.setAgentInstructionSourceSelected;
 	}, [
-		options.applyAgentInstructionSkills,
 		options.applyUserMessageStarter,
-		options.clearAgentInstructionSkills,
-		options.setAgentInstructionSkillSelected,
+		options.clearAgentInstructionSources,
+		options.replaceAgentInstructionSources,
+		options.setAgentInstructionSourceSelected,
 	]);
 
 	const applyPreparedStarter = useCallback(
 		async (starter: AgentStarterPreview, signal: AbortSignal): Promise<boolean> => {
-			if (signal.aborted) {
-				return false;
-			}
-
-			await agentInstructionSkillsApplierRef.current?.(starter.instructionSkillRefs, signal);
 			if (signal.aborted) {
 				return false;
 			}
@@ -269,32 +289,37 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		[]
 	);
 
-	const projectAgentInstructionSkills = useCallback(
-		async (resolution: AgentResolution, signal: AbortSignal, excludedKeys: ReadonlySet<string>) => {
-			const refs = resolution.capabilities.occurrences.flatMap(occurrence => {
-				if (
-					occurrence.type !== 'skill' ||
-					!isAgentSkillUseAsInstructions(occurrence.skillUseMode) ||
-					occurrence.target?.form !== CapabilityTargetForm.Artifact ||
-					!occurrence.target.artifact
-				) {
-					return [];
-				}
+	const publishAgentInstructionSources = useCallback((resolution: AgentResolution, starter?: AgentStarterPreview) => {
+		const declarations = projectAgentInstructionSources(resolution, starter?.instructionTextArtifacts ?? []);
+		agentInstructionSourcesReplacerRef.current?.(declarations);
 
-				return [occurrence.target.artifact];
-			});
+		const excluded = new Set(excludedCapabilityKeysRef.current);
+		for (const declaration of declarations) {
+			const occurrence = resolution.capabilities.occurrences.find(
+				candidate => candidate.path === declaration.occurrencePath
+			);
 
-			await agentInstructionSkillsApplierRef.current?.(refs, signal);
-
-			for (const ref of refs) {
-				const key = `artifact:${ref.rootID}:${ref.artifactID}`;
-				if (excludedKeys.has(key)) {
-					agentInstructionSkillSelectionRef.current?.(ref, false);
-				}
+			if (!occurrence?.target) {
+				continue;
 			}
-		},
-		[]
-	);
+
+			if (excluded.has(capabilityTargetKey(occurrence.target))) {
+				agentInstructionSourceSelectionRef.current?.(declaration.occurrencePath, false);
+			}
+		}
+	}, []);
+
+	const replaceExcludedCapabilityKeys = useCallback((keys: readonly string[]) => {
+		const next = [
+			...new Set(
+				keys.filter(key => {
+					return key.trim().length > 0;
+				})
+			),
+		];
+		excludedCapabilityKeysRef.current = next;
+		setExcludedCapabilityKeys(next);
+	}, []);
 
 	const setTrackedAgent = useCallback(
 		(aKey: string | null, trackingOnly = false, resolution: AgentResolution | null = null) => {
@@ -305,16 +330,6 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		},
 		[]
 	);
-
-	const replaceExcludedCapabilityKeys = useCallback((keys: readonly string[]) => {
-		setExcludedCapabilityKeys([
-			...new Set(
-				keys.filter(key => {
-					return key.trim().length > 0;
-				})
-			),
-		]);
-	}, []);
 
 	const cancelActiveAgentRequest = useCallback(() => {
 		applyRequestSeqRef.current += 1;
@@ -377,8 +392,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const currentSelectedAgentResolution =
 		selectedAgent !== null &&
 		selectedAgentResolution !== null &&
-		artifactRefKey(selectedAgentResolution.agent.ref) === selectedAgent.key &&
-		selectedAgentResolution.agent.revision === selectedAgent.agent.revision
+		sameAgentDefinition(selectedAgentResolution.agent, selectedAgent.agent)
 			? selectedAgentResolution
 			: null;
 
@@ -399,36 +413,18 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		[currentSelectedAgentResolution]
 	);
 
-	/*
-	 * Agent Skills declared as "use as instructions" are rendered into the
-	 * inline system instruction channel. They must never be sent as effective
-	 * Skill-session participants, even when an Agent baseline would otherwise
-	 * resolve them as Skills.
-	 */
-	const instructionOnlySkillRefs = useMemo(() => {
-		const refs: SkillRef[] = [];
-		const seen = new Set<string>();
-
-		for (const occurrence of currentSelectedAgentResolution?.capabilities.occurrences ?? []) {
-			if (
-				occurrence.type !== 'skill' ||
-				!isAgentSkillUseAsInstructions(occurrence.skillUseMode) ||
-				occurrence.target?.form !== CapabilityTargetForm.Artifact ||
-				!occurrence.target.artifact
-			) {
-				continue;
-			}
-
-			const ref = occurrence.target.artifact;
-			const key = artifactRefKey(ref);
-			if (!seen.has(key)) {
-				seen.add(key);
-				refs.push({ rootID: ref.rootID, artifactID: ref.artifactID });
-			}
-		}
-
-		return refs;
-	}, [currentSelectedAgentResolution]);
+	const agentToolProjections = useMemo(
+		() => projectAgentToolCapabilities(currentSelectedAgentResolution),
+		[currentSelectedAgentResolution]
+	);
+	const agentSkillProjections = useMemo(
+		() => projectAgentSkillCapabilities(currentSelectedAgentResolution),
+		[currentSelectedAgentResolution]
+	);
+	const agentMCPProjections = useMemo(
+		() => projectAgentMCPCapabilities(currentSelectedAgentResolution),
+		[currentSelectedAgentResolution]
+	);
 
 	const resolveAgentModelOption = useCallback(
 		(resolution: AgentResolution): UIModelOption | undefined => {
@@ -458,53 +454,71 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		return output;
 	}, [currentSelectedAgentResolution, excludedCapabilityKeys]);
 
+	const restoreAgentSkillActivityOverrides = useCallback(
+		(resolution: AgentResolution, configuration?: SessionConfiguration) => {
+			const knownKeys = new Set(projectAgentSkillCapabilities(resolution).map(projection => projection.key));
+			const restored = (configuration?.activeSkills ?? []).filter(
+				override =>
+					knownKeys.has(override.key) &&
+					(override.mode === SessionActivityOverrideMode.Activate ||
+						override.mode === SessionActivityOverrideMode.Deactivate)
+			);
+			setAgentSkillActivityOverrides(restored.map(override => structuredClone(override)));
+			setReleasedAgentSkillActivityOverrideKeys([]);
+		},
+		[]
+	);
+
 	useEffect(() => {
 		if (!selectedAgent || currentSelectedAgentResolution) {
 			return;
 		}
 
 		let cancelled = false;
+		const controller = new AbortController();
 
-		void agentManagementAPI
-			.resolveAgent(selectedAgent.ref)
-			.then(async resolution => {
-				if (!cancelled) {
-					await projectAgentInstructionSkills(
-						resolution,
-						new AbortController().signal,
-						new Set(excludedCapabilityKeys)
-					);
+		const refreshSelectedAgentResolution = async () => {
+			try {
+				const resolution = await agentManagementAPI.resolveAgent(selectedAgent.ref);
 
-					if (cancelled) {
-						return;
-					}
-
-					if (context.modelSelectionSource === 'agent') {
-						context.setAgentModelPreview(
-							resolveAgentModelOption(resolution),
-							resolvedAgentModelRef(resolution) !== undefined
-						);
-					}
-					setSelectedAgentResolution(resolution);
+				if (cancelled || controller.signal.aborted) {
+					return;
 				}
-			})
-			.catch(() => {
+
+				let starter: AgentStarterPreview | undefined;
+				try {
+					starter = await agentManagementAPI.prepareAgentStarterFromResolution(resolution);
+				} catch {
+					starter = undefined;
+				}
+
+				if (cancelled || controller.signal.aborted) {
+					return;
+				}
+
+				publishAgentInstructionSources(resolution, starter);
+				if (context.modelSelectionSource === 'agent') {
+					context.setAgentModelPreview(
+						resolveAgentModelOption(resolution),
+						resolvedAgentModelRef(resolution) !== undefined
+					);
+				}
+				setPreparedStarter(starter ?? null);
+				setSelectedAgentResolution(resolution);
+			} catch {
 				if (!cancelled) {
 					setSelectedAgentResolution(null);
 				}
-			});
+			}
+		};
+
+		void refreshSelectedAgentResolution();
 
 		return () => {
 			cancelled = true;
+			controller.abort();
 		};
-	}, [
-		context,
-		currentSelectedAgentResolution,
-		excludedCapabilityKeys,
-		projectAgentInstructionSkills,
-		resolveAgentModelOption,
-		selectedAgent,
-	]);
+	}, [context, currentSelectedAgentResolution, publishAgentInstructionSources, resolveAgentModelOption, selectedAgent]);
 
 	const hasTrackedAgent = useCallback(() => {
 		const trackedKey = selectedAgentKeyRef.current;
@@ -529,6 +543,14 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			if (!context.modelOptionsLoaded) {
 				setActionError('Model options are still loading. Try again in a moment.');
 				return false;
+			}
+
+			restoreRequestSeqRef.current += 1;
+			pendingRestoredAgentRef.current = null;
+
+			if (selectedAgentKeyRef.current !== option.key) {
+				setSelectedAgentResolution(null);
+				agentInstructionSourcesClearerRef.current?.();
 			}
 
 			const requestSequence = applyRequestSeqRef.current + 1;
@@ -572,21 +594,15 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 					return false;
 				}
 
-				await projectAgentInstructionSkills(
-					resolution,
-					requestAbortController.signal,
-					isReapplyingCurrentAgent ? new Set(excludedCapabilityKeys) : new Set()
-				);
-				if (!isCurrentRequest()) {
-					return false;
-				}
-
 				const localAgentModelRef = resolvedAgentModelRef(resolution);
 				context.setAgentModelPreview(resolveAgentModelOption(resolution), localAgentModelRef !== undefined);
 				if (!isReapplyingCurrentAgent) {
 					replaceExcludedCapabilityKeys([]);
 					setReleasedCapabilityExclusionKeys([]);
+					setAgentSkillActivityOverrides([]);
+					setReleasedAgentSkillActivityOverrideKeys([]);
 				}
+				publishAgentInstructionSources(resolution, starter);
 				setTrackedAgent(option.key, false, resolution);
 				return true;
 			} catch (e: unknown) {
@@ -608,8 +624,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			agentOptions,
 			applyPreparedStarter,
 			context,
-			excludedCapabilityKeys,
-			projectAgentInstructionSkills,
+			publishAgentInstructionSources,
 			replaceExcludedCapabilityKeys,
 			resolveAgentModelOption,
 			setTrackedAgent,
@@ -622,19 +637,22 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			modelSelectionSource: 'session' | 'agent' = 'agent',
 			configuration?: SessionConfiguration
 		): Promise<boolean> => {
+			const restoreRequest = restoreRequestSeqRef.current + 1;
+			restoreRequestSeqRef.current = restoreRequest;
 			cancelActiveAgentRequest();
 			const exclusionKeys = agentRemovalKeys(configuration);
-			agentInstructionSkillsClearerRef.current?.();
+			agentInstructionSourcesClearerRef.current?.();
 			setReleasedCapabilityExclusionKeys([]);
+			setReleasedAgentSkillActivityOverrideKeys([]);
 
 			// Do not claim Agent ownership until its resolved capability plan proves it.
 			context.setModelSelectionSource('session');
 
 			if (!agent) {
 				pendingRestoredAgentRef.current = null;
-				context.setModelSelectionSource('session');
 				setPreparedStarter(null);
 				replaceExcludedCapabilityKeys([]);
+				setAgentSkillActivityOverrides([]);
 				setTrackedAgent(null);
 				setActionError(null);
 				setAgentSelectionPinRefreshRequested(false);
@@ -646,6 +664,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 					agent,
 					modelSelectionSource,
 					exclusionKeys,
+					configuration: configuration ? structuredClone(configuration) : undefined,
 				};
 				return false;
 			}
@@ -655,26 +674,46 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 				pendingRestoredAgentRef.current = null;
 				replaceExcludedCapabilityKeys([]);
 				setPreparedStarter(null);
+				setAgentSkillActivityOverrides([]);
 				setTrackedAgent(null);
 				setActionError('The Session-selected Agent is no longer available in the current catalog.');
 				return false;
 			}
 
 			pendingRestoredAgentRef.current = null;
-			replaceExcludedCapabilityKeys(exclusionKeys);
 			try {
 				const resolution = await agentManagementAPI.resolveAgent(agent);
-				await projectAgentInstructionSkills(resolution, new AbortController().signal, new Set(exclusionKeys));
+				if (restoreRequestSeqRef.current !== restoreRequest) {
+					return false;
+				}
+
+				const starter = await agentManagementAPI.prepareAgentStarterFromResolution(resolution).catch(() => undefined);
+				if (restoreRequestSeqRef.current !== restoreRequest) {
+					return false;
+				}
+
+				replaceExcludedCapabilityKeys(exclusionKeys);
+				restoreAgentSkillActivityOverrides(resolution, configuration);
+				publishAgentInstructionSources(resolution, starter);
 				if (modelSelectionSource === 'agent') {
 					const localAgentModelRef = resolvedAgentModelRef(resolution);
 					context.setAgentModelPreview(resolveAgentModelOption(resolution), localAgentModelRef !== undefined);
 				}
 				setTrackedAgent(option.key, true, resolution);
 			} catch {
+				if (restoreRequestSeqRef.current !== restoreRequest) {
+					return false;
+				}
+
 				// A stale/missing Agent must not leave the Model control falsely
 				// marked as Agent-owned.
 				context.setModelSelectionSource('session');
+				replaceExcludedCapabilityKeys(exclusionKeys);
+				setAgentSkillActivityOverrides([]);
 				setTrackedAgent(option.key, true);
+			}
+			if (restoreRequestSeqRef.current !== restoreRequest) {
+				return false;
 			}
 			setActionError(null);
 			setAgentSelectionPinRefreshRequested(false);
@@ -685,9 +724,10 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			cancelActiveAgentRequest,
 			context,
 			loading,
-			projectAgentInstructionSkills,
+			publishAgentInstructionSources,
 			replaceExcludedCapabilityKeys,
 			resolveAgentModelOption,
+			restoreAgentSkillActivityOverrides,
 			setTrackedAgent,
 		]
 	);
@@ -739,6 +779,42 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		setAgentSelectionPinRefreshRequested(false);
 	}, []);
 
+	const resetModelToAgent = useCallback(async (): Promise<boolean> => {
+		const option = selectedAgentKeyRef.current
+			? agentOptions.find(candidate => candidate.key === selectedAgentKeyRef.current)
+			: undefined;
+		if (!option) {
+			setActionError('No active Agent model is available.');
+			return false;
+		}
+
+		const request = modelResetRequestSeqRef.current + 1;
+		modelResetRequestSeqRef.current = request;
+
+		try {
+			const resolution = await agentManagementAPI.resolveAgent(option.ref);
+			if (modelResetRequestSeqRef.current !== request || selectedAgentKeyRef.current !== option.key) {
+				return false;
+			}
+
+			context.setAgentModelPreview(
+				resolveAgentModelOption(resolution),
+				resolvedAgentModelRef(resolution) !== undefined
+			);
+
+			if (!sameAgentDefinition(currentSelectedAgentResolution?.agent, resolution.agent)) {
+				setAgentSelectionPinRefreshRequested(true);
+			}
+
+			setSelectedAgentResolution(resolution);
+			setActionError(null);
+			return true;
+		} catch (cause) {
+			setActionError(getErrorMessage(cause, 'The Agent model could not be restored.'));
+			return false;
+		}
+	}, [agentOptions, context, currentSelectedAgentResolution, resolveAgentModelOption]);
+
 	const trackDefaultAgentWithoutApplying = useCallback(async (): Promise<boolean> => {
 		if (hasTrackedAgent()) {
 			pendingDefaultActionRef.current = null;
@@ -748,7 +824,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		// A restore must invalidate a still-running initial default application,
 		// otherwise it can overwrite restored Composer state when it resolves.
 		cancelActiveAgentRequest();
-		agentInstructionSkillsClearerRef.current?.();
+		agentInstructionSourcesClearerRef.current?.();
 
 		if (loading) {
 			pendingDefaultActionRef.current = 'track';
@@ -769,13 +845,18 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 
 	const clearAgentTracking = useCallback(() => {
 		cancelActiveAgentRequest();
+		restoreRequestSeqRef.current += 1;
+		modelResetRequestSeqRef.current += 1;
 		pendingDefaultActionRef.current = null;
-		agentInstructionSkillsClearerRef.current?.();
+		pendingRestoredAgentRef.current = null;
+		agentInstructionSourcesClearerRef.current?.();
 		autoEnsureCatalogKeyRef.current = null;
 		context.setModelSelectionSource('session');
 		replaceExcludedCapabilityKeys([]);
 		setPreparedStarter(null);
 		setReleasedCapabilityExclusionKeys([]);
+		setAgentSkillActivityOverrides([]);
+		setReleasedAgentSkillActivityOverrideKeys([]);
 		setAgentSelectionPinRefreshRequested(false);
 		setTrackedAgent(null);
 		setActionError(null);
@@ -806,24 +887,118 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			if (
 				exclusion.kind === 'skill' &&
 				exclusion.target.form === CapabilityTargetForm.Artifact &&
-				exclusion.target.artifact &&
-				isAgentSkillUseAsInstructions(occurrence.skillUseMode)
+				exclusion.target.artifact
 			) {
-				// Do not leave an explicit Composer instruction source behind after
-				// the matching Agent Skill is excluded.
-				agentInstructionSkillSelectionRef.current?.(exclusion.target.artifact, wasExcluded);
+				agentInstructionSourceSelectionRef.current?.(occurrence.path, wasExcluded);
+			}
+			if (exclusion.kind === 'instruction') {
+				agentInstructionSourceSelectionRef.current?.(occurrence.path, wasExcluded);
 			}
 
 			setReleasedCapabilityExclusionKeys(previous =>
 				wasExcluded ? [...new Set([...previous, exclusion.key])] : previous.filter(key => key !== exclusion.key)
 			);
 
-			setExcludedCapabilityKeys(previous =>
-				previous.includes(exclusion.key) ? previous.filter(key => key !== exclusion.key) : [...previous, exclusion.key]
-			);
+			setExcludedCapabilityKeys(previous => {
+				const next = previous.includes(exclusion.key)
+					? previous.filter(key => key !== exclusion.key)
+					: [...previous, exclusion.key];
+				excludedCapabilityKeysRef.current = next;
+				return next;
+			});
 		},
 		[excludedCapabilityKeys]
 	);
+
+	const toggleCapabilityExclusionByPath = useCallback(
+		(path: string) => {
+			const occurrence = currentSelectedAgentResolution?.capabilities.occurrences.find(
+				candidate => candidate.path === path
+			);
+			if (occurrence) {
+				toggleCapabilityExclusion(occurrence);
+			}
+		},
+		[currentSelectedAgentResolution, toggleCapabilityExclusion]
+	);
+
+	const clearCapabilityExclusions = useCallback(
+		(kinds?: AgentCapabilityExclusion['kind'][]) => {
+			const allowedKinds = kinds ? new Set(kinds) : undefined;
+			const releasable = new Set<string>();
+
+			for (const occurrence of currentSelectedAgentResolution?.capabilities.occurrences ?? []) {
+				const exclusion = capabilityExclusionForOccurrence(occurrence);
+				if (
+					!exclusion ||
+					!excludedCapabilityKeysRef.current.includes(exclusion.key) ||
+					(allowedKinds && !allowedKinds.has(exclusion.kind))
+				) {
+					continue;
+				}
+
+				releasable.add(exclusion.key);
+				if (exclusion.kind === 'instruction') {
+					agentInstructionSourceSelectionRef.current?.(occurrence.path, true);
+				}
+			}
+
+			if (releasable.size === 0) {
+				return;
+			}
+
+			setReleasedCapabilityExclusionKeys(previous => [...new Set([...previous, ...releasable])]);
+			setExcludedCapabilityKeys(previous => {
+				const next = previous.filter(key => !releasable.has(key));
+				excludedCapabilityKeysRef.current = next;
+				return next;
+			});
+		},
+		[currentSelectedAgentResolution]
+	);
+
+	const isAgentSkillActive = useCallback(
+		(projection: AgentSkillProjection) =>
+			effectiveAgentSkillActive(
+				projection,
+				agentSkillActivityOverrides.find(override => override.key === projection.key)
+			),
+		[agentSkillActivityOverrides]
+	);
+
+	const setAgentSkillActive = useCallback((projection: AgentSkillProjection, active: boolean) => {
+		const change = agentSkillActivityChange(projection, active);
+		const releasedOverrideKey = change.releasedOverrideKey;
+		if (releasedOverrideKey) {
+			setReleasedAgentSkillActivityOverrideKeys(previous => [...new Set([...previous, releasedOverrideKey])]);
+			setAgentSkillActivityOverrides(previous =>
+				previous.filter(override => override.key !== change.releasedOverrideKey)
+			);
+			return;
+		}
+		const nextOverride = change.override;
+		if (!nextOverride) {
+			return;
+		}
+
+		setReleasedAgentSkillActivityOverrideKeys(previous => previous.filter(key => key !== nextOverride?.key));
+		setAgentSkillActivityOverrides(previous => [
+			...previous.filter(override => override.key !== nextOverride.key),
+			nextOverride,
+		]);
+	}, []);
+
+	const clearAgentSkillActivityOverrides = useCallback(() => {
+		setAgentSkillActivityOverrides(previous => {
+			if (previous.length === 0) {
+				return previous;
+			}
+			setReleasedAgentSkillActivityOverrideKeys(released => [
+				...new Set([...released, ...previous.map(override => override.key)]),
+			]);
+			return [];
+		});
+	}, []);
 
 	const catalogIdentity = useMemo(
 		() => agentOptions.map(option => `${option.key}:${option.isSelectable ? '1' : '0'}`).join('|'),
@@ -844,15 +1019,11 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		if (pendingRestoredAgent && !loading) {
 			pendingRestoredAgentRef.current = null;
 			void Promise.resolve().then(() =>
-				restoreSelectedAgent(pendingRestoredAgent.agent, pendingRestoredAgent.modelSelectionSource, {
-					agent: pendingRestoredAgent.agent,
-					modelOverrides: {},
-					history: {},
-					tools: pendingRestoredAgent.exclusionKeys.map(key => ({
-						key,
-						mode: SessionCollectionOverrideMode.Remove,
-					})),
-				})
+				restoreSelectedAgent(
+					pendingRestoredAgent.agent,
+					pendingRestoredAgent.modelSelectionSource,
+					pendingRestoredAgent.configuration
+				)
 			);
 			return;
 		}
@@ -932,20 +1103,30 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		preparedStarter,
 		agentModelRef,
 		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
-		instructionOnlySkillRefs,
 		capabilityExclusions,
 		releasedCapabilityExclusionKeys,
+		agentSkillActivityOverrides,
+		releasedAgentSkillActivityOverrideKeys,
 		agentSelectionPinRefreshRequested,
+		agentToolProjections,
+		agentSkillProjections,
+		agentMCPProjections,
 		refreshAgents,
 		selectAgent,
 		ensureDefaultAgent,
 		resetToDefaultAgent,
 		reapplySelectedAgent,
+		resetModelToAgent,
 		acknowledgeAgentSelectionPinRefresh,
 		trackDefaultAgentWithoutApplying,
 		clearAgentTracking,
 		restoreSelectedAgent,
 		getCapabilityExclusion,
 		toggleCapabilityExclusion,
+		toggleCapabilityExclusionByPath,
+		clearCapabilityExclusions,
+		isAgentSkillActive,
+		setAgentSkillActive,
+		clearAgentSkillActivityOverrides,
 	};
 }

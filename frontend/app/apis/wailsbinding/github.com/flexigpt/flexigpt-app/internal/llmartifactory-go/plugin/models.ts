@@ -6,10 +6,10 @@
 import * as model$0 from "../../artifactory-go/store/artifact/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$2 from "../../artifactory-go/store/root/model/models.js";
+import * as model$1 from "../../artifactory-go/store/root/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$1 from "../../artifactory-go/store/source/model/models.js";
+import * as model$2 from "../../artifactory-go/store/source/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as spec$0 from "../../artifactory-go/store/spec/models.js";
@@ -54,8 +54,8 @@ export interface ArtifactMembershipView {
 }
 
 export interface CreateRequest {
-    "rootID": model$2.RootID;
-    "sourceID"?: model$1.SourceID;
+    "rootID": model$1.RootID;
+    "sourceID"?: model$2.SourceID;
     "name": spec$0.LogicalName;
     "displayName"?: string;
     "description"?: string;
@@ -84,7 +84,7 @@ export interface DirectMember {
 
 /**
  * DirectMembership is the resolved immediate membership of one Plugin.
- *
+ * 
  * It intentionally does not recursively expand a selected Agent, Skill, MCP,
  * Tool, Team, Loop, Workflow, or nested Plugin capability graph. Recursive
  * expansion remains ResolveCapabilities.
@@ -109,14 +109,14 @@ export interface DirectSelectorMatch {
 
 /**
  * ListItem is a lightweight Plugin projection.
- *
+ * 
  * Members are not returned in ordinary listings. The member count is enough
  * for management pages to determine whether deletion can be offered. Read
  * returns PluginView when a caller explicitly selects one Plugin.
  */
 export interface ListItem {
     "ref": model$0.ArtifactRef;
-    "sourceID": model$1.SourceID;
+    "sourceID": model$2.SourceID;
     "name": spec$0.LogicalName;
     "displayName": string;
     "description"?: string;
