@@ -14,8 +14,8 @@ import type { ToolCatalogState } from '@/hooks/use_tool';
 import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_management';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
@@ -551,7 +551,7 @@ export function ToolsBottomBarChip({
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className={actionTriggerChipMenuButtonClasses}
+						className={actionTriggerChipButtonClasses}
 						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 					>
 						<ActionTriggerChipContent

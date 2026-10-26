@@ -16,8 +16,8 @@ import type { UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode } from '@/spec/attachment';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipRemoveButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
@@ -263,7 +263,7 @@ export function DirectoryChip({
 			>
 				<MenuButton
 					store={directoryMenu}
-					className={actionTriggerChipMenuButtonClasses}
+					className={actionTriggerChipButtonClasses}
 					aria-label={`Show files in folder ${group.dirPath || group.label}`}
 					title={title}
 				>

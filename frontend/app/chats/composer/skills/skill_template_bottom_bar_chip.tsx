@@ -17,8 +17,8 @@ import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 import { skillManagementAPI } from '@/apis/baseapi';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
@@ -901,7 +901,7 @@ function SkillTemplateBottomBarChipInner({
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className={actionTriggerChipMenuButtonClasses}
+						className={actionTriggerChipButtonClasses}
 						aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
 					>
 						<ActionTriggerChipContent icon={<FiFile size={14} />} label="Templates" open={open} />

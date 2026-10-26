@@ -6,8 +6,8 @@ import { MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/reac
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipRemoveButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
@@ -99,11 +99,7 @@ export function StandaloneAttachmentsChip({
 					open ? 'border-base-300 bg-base-300/60' : 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
 				}`}
 			>
-				<MenuButton
-					store={menu}
-					className={actionTriggerChipMenuButtonClasses}
-					aria-label="Show attached files and links"
-				>
+				<MenuButton store={menu} className={actionTriggerChipButtonClasses} aria-label="Show attached files and links">
 					<ActionTriggerChipContent
 						className="text-base-content"
 						icon={<FiPaperclip size={14} />}

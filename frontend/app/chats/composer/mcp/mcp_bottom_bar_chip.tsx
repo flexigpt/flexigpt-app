@@ -49,8 +49,8 @@ import {
 } from '@/apis/mcp_management';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
@@ -1126,7 +1126,7 @@ export function MCPBottomBarChip({
 					<div className={`${actionTriggerChipSurfaceClasses} ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}>
 						<MenuButton
 							store={menu}
-							className={actionTriggerChipMenuButtonClasses}
+							className={actionTriggerChipButtonClasses}
 							aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
 							disabled={isInputLocked}
 						>

@@ -18,8 +18,8 @@ import { canWriteSkillPlugin, skillRefKey } from '@/apis/skill_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
@@ -619,7 +619,7 @@ export function SkillsBottomBarChip({
 					<div className={`${actionTriggerChipSurfaceClasses} ${chipTone} ${isInputLocked ? 'opacity-60' : ''}`}>
 						<MenuButton
 							store={store}
-							className={actionTriggerChipMenuButtonClasses}
+							className={actionTriggerChipButtonClasses}
 							aria-label={shortcut ? `Manage instruction Skills (${shortcut})` : 'Manage instruction Skills'}
 							disabled={isInputLocked}
 						>

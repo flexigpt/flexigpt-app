@@ -9,8 +9,8 @@ import { ArtifactState } from '@/spec/artifact';
 import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import {
+	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
-	actionTriggerChipMenuButtonClasses,
 	actionTriggerChipSurfaceClasses,
 	ActionTriggerMenu,
 	ActionTriggerMenuBody,
@@ -188,7 +188,7 @@ function WorkspaceBottomBarChipContent({
 					<MenuButton
 						store={store}
 						disabled={isInputLocked}
-						className={actionTriggerChipMenuButtonClasses}
+						className={actionTriggerChipButtonClasses}
 						aria-label="Select Workspace"
 					>
 						<ActionTriggerChipContent
