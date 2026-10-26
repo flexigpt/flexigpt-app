@@ -5,13 +5,23 @@ import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiRefreshCw, FiTool, FiX } 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
+import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import type { ProviderSDKType } from '@/spec/provider_sdk';
 import type { ToolListItem } from '@/spec/tool';
+import { CapabilityResolutionStatus } from '@/spec/artifact';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
+
+import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { ToolCatalogState } from '@/hooks/use_tool';
 
-import { toolArtifactKey, toolDisplayName, toolIdentityKey } from '@/apis/tool_management';
+import { toolManagementAPI } from '@/apis/baseapi';
+import {
+	toolArtifactKey,
+	toolDisplayName,
+	toolIdentityKey,
+	toolStoreChoiceFromSelection,
+} from '@/apis/tool_management';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -34,6 +44,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conversation_tool_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
@@ -49,6 +60,7 @@ import {
 interface ToolsBottomBarChipProps {
 	store: MenuStore;
 	buttonRef: RefObject<HTMLButtonElement | null>;
+	agentManager?: AgentManagerState;
 	shortcut?: string;
 	currentProviderSDKType: ProviderSDKType;
 	attachedToolEntries: AttachedToolEntry[];
@@ -108,6 +120,7 @@ function itemSearchFields(item: ToolListItem) {
 export function ToolsBottomBarChip({
 	store,
 	buttonRef,
+	agentManager,
 	shortcut,
 	currentProviderSDKType,
 	attachedToolEntries,
@@ -156,6 +169,11 @@ export function ToolsBottomBarChip({
 		() => new Map(attached.map(entry => [toolIdentityKey(entry.target), entry])),
 		[attached]
 	);
+	const agentToolOccurrences = useMemo(
+		() => agentManager?.selectedAgentResolution?.capabilities.occurrences.filter(o => o.type === 'tool') ?? [],
+		[agentManager?.selectedAgentResolution]
+	);
+	const hasAgentTools = agentToolOccurrences.length > 0;
 
 	const {
 		eligible: eligibleWebSearch,
@@ -502,6 +520,82 @@ export function ToolsBottomBarChip({
 	const selectedToolsPanel =
 		configuredCount > 0 ? (
 			<>
+				{hasAgentTools ? (
+					<div className="border-base-300/70 rounded-lg border p-2">
+						<div className="mb-1 text-xs font-semibold">Agent tools</div>
+						<div className="text-base-content/60 mb-2 text-[11px]">
+							Backend owned. Override copies into Session, Exclude emits Remove.
+						</div>
+						{agentToolOccurrences.map((occurrence: AgentCapabilityOccurrence) => {
+							const target = occurrence.target;
+							const ava = occurrence.status === CapabilityResolutionStatus.Available && target;
+							const excluded = !!agentManager?.getCapabilityExclusion(occurrence);
+							const overridden = target
+								? attachedByKey.has(toolIdentityKey(target)) ||
+									conversationToolsState.some(
+										e => toolIdentityKey(e.toolStoreChoice.target) === toolIdentityKey(target)
+									)
+								: false;
+							return (
+								<div
+									key={occurrence.path}
+									className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2"
+								>
+									<FiTool size={13} />
+									<span className="min-w-0 flex-1 truncate text-xs">{occurrence.name || 'Agent tool'}</span>
+									<span className="badge badge-secondary badge-xs">Agent</span>
+									{occurrence.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
+									{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
+									{overridden && !excluded ? <span className="badge badge-info badge-xs">Overridden</span> : null}
+									{!ava ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
+									{available && !excluded ? (
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs rounded-lg"
+											disabled={isInputLocked}
+											onClick={() => {
+												if (!target) {
+													return;
+												}
+												void toolManagementAPI
+													.resolveToolTarget(target)
+													.then(resolved => {
+														const choice = toolStoreChoiceFromSelection(
+															{ choiceID: getUUIDv7(), target, autoExecute: occurrence.autoExecute === true },
+															resolved
+														);
+														setConversationToolsState(prev => {
+															const key = toolIdentityKey(choice.target);
+															const existing = prev.find(e => e.key === key);
+															if (!existing) {
+																return [...prev, { key, toolStoreChoice: choice, enabled: true }];
+															}
+															return prev.map(e =>
+																e.key === key ? { ...e, toolStoreChoice: choice, enabled: true } : e
+															);
+														});
+													})
+													.catch(console.error);
+											}}
+										>
+											Override
+										</button>
+									) : null}
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs text-error rounded-lg"
+										disabled={isInputLocked || !available}
+										onClick={() => {
+											agentManager?.toggleCapabilityExclusion(occurrence);
+										}}
+									>
+										{excluded ? 'Include' : 'Exclude'}
+									</button>
+								</div>
+							);
+						})}
+					</div>
+				) : null}
 				{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
 				{activeWebSearch && !activeWebSearchItem ? (
 					<div className="alert alert-warning rounded-xl p-2 text-xs">

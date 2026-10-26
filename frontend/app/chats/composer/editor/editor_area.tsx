@@ -39,6 +39,7 @@ import { toolIdentityKey } from '@/apis/tool_management';
 
 import { HoverTip } from '@/components/hover_tip';
 
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
@@ -120,6 +121,7 @@ export interface EditorAreaHandle {
 interface EditorAreaProps {
 	isGenerating: boolean;
 	isActive: boolean;
+	agentManager?: AgentManagerState;
 	isInputLocked: boolean;
 	isRunActive: boolean;
 	submissionMode?: 'message' | 'continuation';
@@ -163,6 +165,7 @@ function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined)
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
 	{
 		isGenerating,
+		agentManager,
 		isInputLocked: inputLocked,
 		isActive,
 		isRunActive,
@@ -1818,6 +1821,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					<EditorBottomBar
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}
+						agentManager={agentManager}
 						onAttachURL={handleAttachURL}
 						onOpenAttachmentUrlModal={() => {
 							suppressNextAttachmentMenuFocusRestoreRef.current = true;

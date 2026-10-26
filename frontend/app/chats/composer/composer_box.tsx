@@ -20,7 +20,6 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
-import { AgentBaselinePanel } from '@/chats/composer/agents/agent_baseline_panel';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { ContextBar } from '@/chats/composer/editor/editor_context_bar';
@@ -407,20 +406,6 @@ export const ComposerBox = memo(
 			<div className="bg-base-200 flex w-full min-w-0 flex-col overflow-hidden">
 				<div className="shrink-0">
 					<ContextBar context={composerContext} agent={agent} />
-					<AgentBaselinePanel
-						manager={agent}
-						modelSelectionSource={composerContext.modelSelectionSource}
-						onAdoptTool={choice => {
-							editorAreaRef.current?.adoptAgentTool(choice);
-						}}
-						onAdoptSkill={(sRef, active) => {
-							editorAreaRef.current?.adoptAgentSkill(sRef, active);
-						}}
-						onAdoptMCP={mRef => editorAreaRef.current?.adoptAgentMCPServer(mRef) ?? Promise.resolve(false)}
-						onOpenSkills={() => {
-							editorAreaRef.current?.openSkillsMenu();
-						}}
-					/>
 				</div>
 
 				<DeleteConfirmationModal
@@ -442,6 +427,7 @@ export const ComposerBox = memo(
 					isGenerating={isGenerating}
 					isActive={isActive}
 					isRunActive={isBusy}
+					agentManager={agent}
 					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
 					isInputLocked={(isBusy && !allowContinuationInput) || isHydrating || !composerContext.hasRunnableModel}
 					currentProviderSDKType={composerContext.modelOptions.providerSDKType}

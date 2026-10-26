@@ -15,6 +15,7 @@ import type { ToolCatalogState } from '@/hooks/use_tool';
 
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
 
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
@@ -33,6 +34,7 @@ import { WorkspaceBottomBarChip } from '@/chats/composer/workspaces/workspace_bo
 interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;
 	onAttachDirectory: () => Promise<void> | void;
+	agentManager?: AgentManagerState;
 	onAttachURL: (url: string) => Promise<void> | void;
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
@@ -101,6 +103,7 @@ interface EditorBottomBarProps {
 export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
+	agentManager,
 	onAttachURL,
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
@@ -199,6 +202,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<SkillsBottomBarChip
 						store={skillsMenuState}
 						shortcut={shortcutLabels.skills}
+						agentManager={agentManager}
 						allSkills={allSkills}
 						loading={skillsLoading}
 						loadError={skillsLoadError}
@@ -230,6 +234,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<MCPBottomBarChip
 						store={mcpMenuState}
 						shortcut={shortcutLabels.mcp}
+						agentManager={agentManager}
 						state={mcpState}
 						isInputLocked={isInputLocked}
 						appContextUpdateCount={mcpAppContextUpdateCount}
@@ -239,6 +244,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<ToolsBottomBarChip
 						store={toolMenuState}
 						buttonRef={toolButtonRef}
+						agentManager={agentManager}
 						shortcut={shortcutLabels.tools}
 						currentProviderSDKType={currentProviderSDKType}
 						attachedToolEntries={attachedToolEntries}

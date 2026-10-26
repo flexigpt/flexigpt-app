@@ -17,7 +17,8 @@ import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { PluginListItem } from '@/spec/plugin';
 import type { SkillRef } from '@/spec/skill';
-import { ArtifactState } from '@/spec/artifact';
+import { AgentSkillUseMode, isAgentSkillUseAsInstructions } from '@/spec/agent';
+import { ArtifactState, CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
 import { getPrimaryUserFacingLabel } from '@/lib/user_facing_presentation';
@@ -52,6 +53,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { InstructionSourceDetails } from '@/skills/instruction_source_details_modal';
@@ -109,6 +111,7 @@ function removeSkillRef(refs: SkillRef[], ref: SkillRef): SkillRef[] {
 interface SkillsBottomBarChipProps {
 	store: MenuStore;
 	shortcut: string;
+	agentManager?: AgentManagerState;
 	allSkills: ComposerSkillCatalogItem[];
 	loading: boolean;
 	loadError?: string | null;
@@ -251,6 +254,7 @@ function ComposerSkillDestinationModal({
 export function SkillsBottomBarChip({
 	store,
 	shortcut,
+	agentManager,
 	allSkills,
 	loading,
 	loadError,
@@ -330,6 +334,23 @@ export function SkillsBottomBarChip({
 			),
 		[enabledSkillRefs]
 	);
+	const agentOccurrences = useMemo(
+		() =>
+			agentManager?.selectedAgentResolution?.capabilities.occurrences.filter(
+				o => o.type === 'skill' || o.type === 'text'
+			) ?? [],
+		[agentManager?.selectedAgentResolution]
+	);
+	const agentSkillOccurrences = useMemo(() => agentOccurrences.filter(o => o.type === 'skill'), [agentOccurrences]);
+	const agentTextOccurrences = useMemo(() => agentOccurrences.filter(o => o.type === 'text'), [agentOccurrences]);
+	const findAgentOccurrenceForSkillRef = (ref: SkillRef) =>
+		agentSkillOccurrences.find(
+			o =>
+				o.status === CapabilityResolutionStatus.Available &&
+				o.target?.form === CapabilityTargetForm.Artifact &&
+				o.target.artifact?.rootID === ref.rootID &&
+				o.target.artifact?.artifactID === ref.artifactID
+		);
 	const activeKeys = useMemo(
 		() =>
 			new Set(
@@ -562,6 +583,18 @@ export function SkillsBottomBarChip({
 		}
 	};
 
+	const removeInstructionSource = (identityKey: string) => {
+		const source = systemPrompt.instructionSources.find(s => s.identityKey === identityKey);
+		if (source?.sourceKind === 'agent' && source.skillRef && agentManager) {
+			const occurrence = findAgentOccurrenceForSkillRef(source.skillRef);
+			if (occurrence) {
+				agentManager.toggleCapabilityExclusion(occurrence);
+				return;
+			}
+		}
+		systemPrompt.toggleInstructionSource(identityKey);
+	};
+
 	const chipTone =
 		configuredCount > 0
 			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
@@ -632,7 +665,7 @@ export function SkillsBottomBarChip({
 								className="btn btn-ghost btn-xs text-error rounded-lg"
 								disabled={isInputLocked}
 								onClick={() => {
-									systemPrompt.toggleInstructionSource(source.identityKey);
+									removeInstructionSource(source.identityKey);
 								}}
 							>
 								Remove
@@ -856,7 +889,12 @@ export function SkillsBottomBarChip({
 									className="hover:bg-base-200 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-left"
 									disabled={isInputLocked}
 									onClick={() => {
-										systemPrompt.toggleInstructionSource(source.identityKey);
+										const agentOcc = source.skillRef ? findAgentOccurrenceForSkillRef(source.skillRef) : undefined;
+										if (source.sourceKind === 'agent' && agentOcc && agentManager) {
+											agentManager.toggleCapabilityExclusion(agentOcc);
+										} else {
+											systemPrompt.toggleInstructionSource(source.identityKey);
+										}
 									}}
 								>
 									<span className="min-w-0 text-xs">
@@ -1114,6 +1152,83 @@ export function SkillsBottomBarChip({
 							) : undefined
 						}
 					>
+						{agentSkillOccurrences.length > 0 ? (
+							<div className="border-base-300/70 mb-2 rounded-lg border p-2">
+								<div className="mb-1 text-xs font-semibold">Agent skills</div>
+								{agentSkillOccurrences.map(o => {
+									const ref =
+										o.status === CapabilityResolutionStatus.Available &&
+										o.target?.form === CapabilityTargetForm.Artifact &&
+										o.target.artifact
+											? { rootID: o.target.artifact.rootID, artifactID: o.target.artifact.artifactID }
+											: undefined;
+									const excluded = !!agentManager?.getCapabilityExclusion(o);
+									const overridden = ref ? enabledKeys.has(skillRefKey(ref)) : false;
+									const instructionOnly = isAgentSkillUseAsInstructions(o.skillUseMode);
+									const isActive = o.skillUseMode === AgentSkillUseMode.Active;
+									return (
+										<div key={o.path} className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2">
+											<FiZap size={13} />
+											<span className="min-w-0 flex-1 truncate text-xs">
+												{o.name || ref?.artifactID || 'Agent skill'}
+											</span>
+											<span className="badge badge-secondary badge-xs">Agent</span>
+											{instructionOnly ? <span className="badge badge-info badge-xs">Instructions</span> : null}
+											{isActive ? <span className="badge badge-success badge-xs">Active</span> : null}
+											{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
+											{overridden && !excluded ? <span className="badge badge-info badge-xs">Overridden</span> : null}
+											{ref && !excluded && !instructionOnly ? (
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isInputLocked}
+													onClick={() => {
+														setEnabledSkillRefs(prev => addSkillRef(prev, ref));
+														if (isActive) {
+															setActiveSkillRefs(prev => addSkillRef(prev, ref));
+														}
+													}}
+												>
+													Override
+												</button>
+											) : null}
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs text-error rounded-lg"
+												disabled={isInputLocked || !ref}
+												onClick={() => agentManager?.toggleCapabilityExclusion(o)}
+											>
+												{excluded ? 'Include' : 'Exclude'}
+											</button>
+										</div>
+									);
+								})}
+							</div>
+						) : null}
+						{agentTextOccurrences.length > 0 ? (
+							<div className="border-base-300/70 mb-2 rounded-lg border p-2">
+								<div className="mb-1 text-xs font-semibold">Agent text</div>
+								{agentTextOccurrences.map(o => {
+									const excluded = !!agentManager?.getCapabilityExclusion(o);
+									return (
+										<div key={o.path} className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2">
+											<FiFilePlus size={13} />
+											<span className="min-w-0 flex-1 truncate text-xs">{o.name || 'Agent text'}</span>
+											<span className="badge badge-secondary badge-xs">Agent</span>
+											{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs text-error rounded-lg"
+												disabled={isInputLocked}
+												onClick={() => agentManager?.toggleCapabilityExclusion(o)}
+											>
+												{excluded ? 'Include' : 'Exclude'}
+											</button>
+										</div>
+									);
+								})}
+							</div>
+						) : null}
 						{selectedSkillsPanel}
 					</ComposerDropdownSelectedPanel>
 				</ActionTriggerMenu>

@@ -107,6 +107,8 @@ export function ModelDropdown({
 		agentModelRef?.rootID === model.model?.rootID &&
 		agentModelRef?.artifactID === model.model?.artifactID;
 	const agentPreviewMatchesSelected = isAgentOwnedModel(selectedModel);
+	const agentModelMissingFromCatalog =
+		agentOwnsModel && !!agentModelRef && !agentPreviewMatchesSelected && allOptions.length > 0;
 	const triggerLabel =
 		agentOwnsModel && !agentPreviewMatchesSelected && agentModelRef ? 'Agent model' : selectedModel.modelDisplayName;
 
@@ -277,6 +279,12 @@ export function ModelDropdown({
 							) : undefined
 						}
 					>
+						{agentModelMissingFromCatalog ? (
+							<div className="alert alert-warning rounded-xl p-2 text-xs">
+								The agent selected model is not in the runnable catalog. A fallback model is previewed. Choose a session
+								model to override or reapply the agent when its model returns.
+							</div>
+						) : null}
 						<div className="bg-base-200 flex min-w-0 items-center gap-2 rounded-xl px-2 py-1">
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedModel.modelDisplayName}</span>
 						</div>

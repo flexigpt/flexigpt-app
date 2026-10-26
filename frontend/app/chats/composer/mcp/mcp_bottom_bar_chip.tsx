@@ -17,6 +17,7 @@ import type { MenuStore } from '@ariakit/react';
 import { MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
+import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import type {
 	MCPAuthHealth,
 	MCPPromptRef,
@@ -27,6 +28,7 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type { MCPPromptSelection, MCPResourceTemplateSelection } from '@/spec/session_mcp';
+import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
@@ -68,6 +70,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
 import type {
 	MCPComposerServerOption,
 	MCPComposerServerSelection,
@@ -984,6 +987,7 @@ function getMCPOptionSearchFields(option: MCPComposerServerOption) {
 export function MCPBottomBarChip({
 	store,
 	shortcut,
+	agentManager,
 	state,
 	isInputLocked = false,
 	appContextUpdateCount = 0,
@@ -991,6 +995,7 @@ export function MCPBottomBarChip({
 }: {
 	store: MenuStore;
 	shortcut: string;
+	agentManager?: AgentManagerState;
 	state: UseComposerMCPResult;
 	isInputLocked?: boolean;
 	appContextUpdateCount?: number;
@@ -1026,6 +1031,11 @@ export function MCPBottomBarChip({
 			}),
 		[enabledOperationalOptions]
 	);
+	const agentMCPOccurrences = useMemo(
+		() => agentManager?.selectedAgentResolution?.capabilities.occurrences.filter(o => o.type === 'mcp') ?? [],
+		[agentManager?.selectedAgentResolution]
+	);
+	const hasAgentMCP = agentMCPOccurrences.length > 0;
 	const configurationPendingServerCount = enabledOperationalOptions.length - visibleOptions.length;
 	const hiddenDisabledServerCount = state.options.filter(
 		option => !option.plugin.enabled || !option.server.enabled
@@ -1331,6 +1341,68 @@ export function MCPBottomBarChip({
 							) : undefined
 						}
 					>
+						{hasAgentMCP ? (
+							<div className="border-base-300/70 mb-2 rounded-lg border p-2">
+								<div className="mb-1 text-xs font-semibold">Agent MCP servers</div>
+								<div className="text-base-content/60 mb-2 text-[11px]">
+									Backend owned. Override selects the server in Session, Exclude emits Remove.
+								</div>
+								{agentMCPOccurrences.map((occurrence: AgentCapabilityOccurrence) => {
+									const target = occurrence.target;
+									const ref =
+										occurrence.status === CapabilityResolutionStatus.Available &&
+										target?.form === CapabilityTargetForm.Artifact &&
+										target.artifact
+											? target.artifact
+											: undefined;
+									const excluded = !!agentManager?.getCapabilityExclusion(occurrence);
+									const option = ref
+										? state.options.find(
+												o => o.server.ref.rootID === ref.rootID && o.server.ref.artifactID === ref.artifactID
+											)
+										: undefined;
+									const runtimeKey = option ? mcpServerKey(option.runtimeServerID) : undefined;
+									const overridden = runtimeKey ? !!state.selectedByServerKey[runtimeKey] : false;
+									return (
+										<div
+											key={occurrence.path}
+											className="bg-base-100 mb-1 flex flex-wrap items-center gap-2 rounded-lg p-2"
+										>
+											<FiServer size={13} />
+											<span className="min-w-0 flex-1 truncate text-xs">
+												{occurrence.name || ref?.artifactID || 'Agent MCP'}
+											</span>
+											<span className="badge badge-secondary badge-xs">Agent</span>
+											{excluded ? <span className="badge badge-warning badge-xs">Excluded</span> : null}
+											{overridden && !excluded ? <span className="badge badge-info badge-xs">Overridden</span> : null}
+											{!option ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
+											{ref && !excluded && option ? (
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isInputLocked}
+													onClick={() => {
+														void state.adoptAgentServer(ref).catch(console.error);
+													}}
+												>
+													Override
+												</button>
+											) : null}
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs text-error rounded-lg"
+												disabled={isInputLocked || !ref}
+												onClick={() => {
+													agentManager?.toggleCapabilityExclusion(occurrence);
+												}}
+											>
+												{excluded ? 'Include' : 'Exclude'}
+											</button>
+										</div>
+									);
+								})}
+							</div>
+						) : null}
 						{hasAppContextUpdates ? (
 							<div className="border-info/30 bg-info/10 rounded-xl border p-2 text-xs">
 								<div className="flex items-center justify-between gap-2">
