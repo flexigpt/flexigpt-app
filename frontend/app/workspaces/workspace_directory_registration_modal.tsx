@@ -65,7 +65,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-2xl rounded-2xl p-0">
+		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-3xl rounded-2xl p-0">
 			<ModalHeader title={title} description={description} onClose={onClose} closeDisabled={isSubmitting} />
 
 			<form className="space-y-4 p-4 sm:p-6" onSubmit={submit} aria-busy={isSubmitting}>

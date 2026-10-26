@@ -643,6 +643,7 @@ export async function runAction(project, action) {
 				],
 				{
 					timeoutMs: 0,
+					devListenerPort: Number(project.env.WAILS_VITE_PORT ?? "5173"),
 				},
 			);
 			break;

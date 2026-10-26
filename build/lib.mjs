@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import { createServer } from "node:net";
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -19,11 +20,31 @@ import { parseEnv } from "node:util";
  *   sensitive?: boolean,
  *   timeoutMs?: number,
  *   allowedExitCodes?: number[]
+ *   devListenerPort?: number
  * }} RunOptions
  */
 
 export const root = fileURLToPath(new URL("../", import.meta.url));
 const placeholder = path.join(root, "frontend", "dist", "client", "a.tmp");
+
+/** @param {number} port */
+async function listenerFree(port) {
+	return await new Promise((resolve, reject) => {
+		const server = createServer();
+		server.once("error", (/** @type {NodeJS.ErrnoException} */ error) => {
+			if (/** @type {NodeJS.ErrnoException} */ (error).code === "EADDRINUSE") {
+				resolve(false);
+			} else {
+				reject(error);
+			}
+		});
+		server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+			server.close((/** @type {any} */ error) =>
+				error ? reject(error) : resolve(true),
+			);
+		});
+	});
+}
 
 /** @param {string} version */
 export function validateVersion(version) {
@@ -385,13 +406,32 @@ export class Project {
 		const echoStdout = options.echo ?? !options.capture;
 		const echoStderr = options.echoStderr ?? true;
 
+		const devPort = options.devListenerPort;
+		if (devPort !== undefined) {
+			if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
+				throw new Error("WAILS_VITE_PORT must be an integer from 1 to 65535");
+			}
+			if (!(await listenerFree(devPort))) {
+				throw new Error(
+					`127.0.0.1:${devPort} is already in use; not killing its owner`,
+				);
+			}
+		}
+		const environment = { ...this.env, ...options.env };
+		const ownsGroup = !windows && !environment.FLEXIGPT_DEV_PROCESS_GROUP;
+
 		return await new Promise((resolve, reject) => {
 			const child = spawn(command, args, {
 				cwd: options.cwd ?? root,
-				env: { ...this.env, ...options.env },
+				env: {
+					...environment,
+					...(devPort !== undefined && !windows
+						? { FLEXIGPT_DEV_PROCESS_GROUP: "1" }
+						: {}),
+				},
 				stdio: ["pipe", "pipe", "pipe"],
 				shell: false,
-				detached: !windows,
+				detached: ownsGroup,
 				windowsHide: true,
 			});
 
@@ -435,7 +475,8 @@ export class Project {
 				}
 
 				try {
-					process.kill(-child.pid, "SIGTERM");
+					if (ownsGroup) process.kill(-child.pid, "SIGTERM");
+					else child.kill("SIGTERM");
 				} catch {
 					child.kill("SIGTERM");
 				}
@@ -446,7 +487,8 @@ export class Project {
 					}
 
 					try {
-						process.kill(-child.pid, "SIGKILL");
+						if (ownsGroup) process.kill(-child.pid, "SIGKILL");
+						else child.kill("SIGKILL");
 					} catch {
 						child.kill("SIGKILL");
 					}
@@ -515,6 +557,82 @@ export class Project {
 				this.log("DEBUG", `COMMAND ${number} STDERR: ${safe}`);
 			});
 
+			/** @type {Promise<void> | undefined} */
+			let devCleanup;
+
+			const groupAlive = () => {
+				if (!ownsGroup || !child.pid) return false;
+				try {
+					process.kill(-child.pid, 0);
+					return true;
+				} catch (error) {
+					if (/** @type {NodeJS.ErrnoException} */ (error).code === "ESRCH") {
+						return false;
+					}
+					throw error;
+				}
+			};
+
+			const waitForRelease = async () => {
+				for (let attempt = 0; attempt < 20; attempt++) {
+					if (
+						(await listenerFree(/** @type {number} */ (devPort))) &&
+						!groupAlive()
+					) {
+						return true;
+					}
+					await new Promise((resolve) => setTimeout(resolve, 100));
+				}
+				return false;
+			};
+
+			const finishDev = async () => {
+				// Give Wails and Vite two seconds to exit normally.
+				if (!(await waitForRelease()) && groupAlive()) {
+					this.log("WARN", "Wails dev processes remain; sending SIGTERM");
+					try {
+						process.kill(-(/** @type {number} */ (child.pid)), "SIGTERM");
+					} catch (error) {
+						if (/** @type {NodeJS.ErrnoException} */ (error).code !== "ESRCH")
+							throw error;
+					}
+				}
+
+				if (!(await waitForRelease()) && groupAlive()) {
+					this.log("WARN", "Wails dev processes remain; sending SIGKILL");
+					try {
+						process.kill(-(/** @type {number} */ (child.pid)), "SIGKILL");
+					} catch (error) {
+						if (/** @type {NodeJS.ErrnoException} */ (error).code !== "ESRCH")
+							throw error;
+					}
+				}
+
+				if (!(await waitForRelease())) {
+					throw new Error(
+						`Dev cleanup failed: 127.0.0.1:${devPort} is still occupied ` +
+							"or Wails dev processes remain; no unrelated port owner was killed",
+					);
+				}
+				this.log("INFO", `Dev cleanup verified: 127.0.0.1:${devPort} is free`);
+			};
+
+			// Start on exit, not close: an orphan can keep stdout/stderr open.
+			child.once("exit", () => {
+				if (devPort === undefined) return;
+				devCleanup = finishDev();
+				void devCleanup.then(
+					() => {
+						child.stdout?.destroy();
+						child.stderr?.destroy();
+					},
+					() => {
+						child.stdout?.destroy();
+						child.stderr?.destroy();
+					},
+				);
+			});
+
 			child.stdin.on("error", () => {
 				// A tool may exit before consuming optional standard input.
 			});
@@ -536,12 +654,19 @@ export class Project {
 				);
 			});
 
-			child.on("close", (code, signal) => {
+			child.on("close", async (code, signal) => {
 				if (settled) {
 					return;
 				}
 
 				settled = true;
+				try {
+					await devCleanup;
+				} catch (error) {
+					cleanup();
+					reject(error);
+					return;
+				}
 				cleanup();
 
 				const duration = ((Date.now() - started) / 1000).toFixed(1);

@@ -179,7 +179,7 @@ function WorkspacePathList({ locators }: { locators: string[] }) {
 	}
 
 	return (
-		<div className="mt-1 max-h-48 space-y-1 overflow-y-auto">
+		<div className="mt-1 max-h-96 space-y-1 overflow-y-auto">
 			{locators.map((locator, index) => {
 				const path = workspacePathParts(locator);
 
@@ -270,7 +270,7 @@ function WorkspaceContentCard({
 			</div>
 
 			{leadingActions || normalActions ? (
-				<div className="mt-4 flex flex-wrap items-center justify-end gap-2 p-0">
+				<div className="mt-2 flex flex-wrap items-center justify-end gap-2 p-0">
 					{leadingActions ? <div className="flex flex-wrap items-center gap-2">{leadingActions}</div> : null}
 					{normalActions ? <div className="ml-auto flex flex-wrap items-center gap-2">{normalActions}</div> : null}
 				</div>
@@ -392,12 +392,12 @@ export function WorkspaceContents({
 				}}
 				leadingActions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
 			>
-				<WorkspacePathList locators={locators} />
 				{context.truncated ? (
-					<div className="text-warning mt-2 text-xs">
+					<div className="text-warning py-1 text-xs">
 						Only part of this content fits within the Workspace prompt limit.
 					</div>
 				) : null}
+				<WorkspacePathList locators={locators} />
 			</WorkspaceContentCard>
 		);
 	};
