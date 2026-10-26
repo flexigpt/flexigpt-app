@@ -1,19 +1,16 @@
 // oxlint-disable react/only-export-components
-import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiFileText, FiPlay, FiRefreshCw } from 'react-icons/fi';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FiAlertCircle, FiDownload, FiFileText, FiPlay, FiRefreshCw } from 'react-icons/fi';
 
-import type { ArtifactRef, ArtifactState } from '@/spec/artifact';
-import type {
-	ArtifactSkillDetails,
-	SkillArgument,
-	SkillDocumentInput,
-	SkillResourceInfo,
-	StoreSkillListItem,
-} from '@/spec/skill';
+import type { ArtifactRef } from '@/spec/artifact';
+import type { ArtifactSkillDetails, SkillArgument, SkillDocumentInput, StoreSkillListItem } from '@/spec/skill';
+import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
+import { utf8TextToBase64 } from '@/lib/base64_utils';
+
 import type { ComposerSkillCatalogItem } from '@/apis/skill_management';
-import { skillManagementAPI } from '@/apis/baseapi';
+import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -21,34 +18,40 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
+import { encodeSkillDocument } from '@/skills/skill_management_utils';
 import { getSkillDisplayName, getSkillSourceLabel } from '@/skills/skill_presentation';
 
 export interface SkillDetailsSubject {
 	ref: ArtifactRef;
-	revision: number;
-	displayName: string;
-	name: string;
+	revision?: number;
+	displayName?: string;
+	name?: string;
 	description?: string;
 	state?: ArtifactState;
-	enabled: boolean;
-	builtIn: boolean;
-	managed: boolean;
+	enabled?: boolean;
+	builtIn?: boolean;
+	managed?: boolean;
 	runtimeResolved?: boolean;
 	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	document?: SkillDocumentInput;
-	resources?: SkillResourceInfo;
+	hasArguments?: boolean;
+	hasResources?: boolean;
 	sourceLabel?: string;
 }
 
 interface StoreSkillDetailsOptions {
 	sourceLabel?: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	document?: SkillDocumentInput;
-	resources?: SkillResourceInfo;
+}
+
+interface SkillDetailsReferenceOptions {
+	displayName?: string;
+	name?: string;
+	description?: string;
+	enabled?: boolean;
+	state?: ArtifactState;
+	builtIn?: boolean;
+	managed?: boolean;
+	runtimeResolved?: boolean;
+	sourceLabel?: string;
 }
 
 interface SkillDetailsModalProps {
@@ -58,6 +61,11 @@ interface SkillDetailsModalProps {
 	showPreview?: boolean;
 }
 
+interface LoadedSkillSource {
+	details: ArtifactSkillDetails;
+	revision: number;
+}
+
 function resourceFileName(location: string): string {
 	const parts = location.replaceAll('\\', '/').split('/').filter(Boolean);
 
@@ -65,7 +73,7 @@ function resourceFileName(location: string): string {
 }
 
 function skillAvailabilityLabel(skill: SkillDetailsSubject): string {
-	if (!skill.enabled) {
+	if (skill.enabled === false) {
 		return 'Disabled';
 	}
 
@@ -73,11 +81,28 @@ function skillAvailabilityLabel(skill: SkillDetailsSubject): string {
 		return 'Needs attention';
 	}
 
-	if (skill.state && skill.state.toString() !== 'available') {
+	if (skill.state && skill.state !== ArtifactState.Available) {
 		return 'Unavailable';
 	}
 
 	return 'Available';
+}
+
+function skillBehaviorLabel(insert?: SkillInsert): string {
+	switch (insert) {
+		case SkillInsert.UserMessage:
+			return 'User-message template';
+
+		case SkillInsert.Instructions:
+			return 'Instruction Skill';
+
+		default:
+			return 'Skill';
+	}
+}
+
+function canonicalSkillSource(document: SkillDocumentInput): string {
+	return new TextDecoder().decode(new Uint8Array(encodeSkillDocument(document)));
 }
 
 function parsePreviewArguments(raw: string): Record<string, string> {
@@ -97,7 +122,7 @@ function parsePreviewArguments(raw: string): Record<string, string> {
 		throw new Error('Arguments must be a JSON object.');
 	}
 
-	const values: Record<string, string> = {};
+	const output: Record<string, string> = {};
 
 	for (const [key, value] of Object.entries(parsed)) {
 		if (!key.trim()) {
@@ -105,24 +130,24 @@ function parsePreviewArguments(raw: string): Record<string, string> {
 		}
 
 		if (typeof value === 'string') {
-			values[key] = value;
+			output[key] = value;
 			continue;
 		}
 
 		if (typeof value === 'number' || typeof value === 'boolean') {
-			values[key] = String(value);
+			output[key] = String(value);
 			continue;
 		}
 
 		if (value === null) {
-			values[key] = '';
+			output[key] = '';
 			continue;
 		}
 
 		throw new Error(`Argument "${key}" must be a string, number, boolean, or null.`);
 	}
 
-	return values;
+	return output;
 }
 
 function previewArgumentsFromDocument(document: SkillDocumentInput): string {
@@ -131,6 +156,25 @@ function previewArgumentsFromDocument(document: SkillDocumentInput): string {
 		null,
 		2
 	);
+}
+
+async function loadSkillSource(skill: SkillDetailsSubject): Promise<LoadedSkillSource> {
+	const loadAtRevision = async (revision: number): Promise<LoadedSkillSource> => ({
+		details: await skillManagementAPI.getArtifactSkillDetails(skill.ref, revision),
+		revision,
+	});
+
+	if (skill.revision !== undefined) {
+		try {
+			return await loadAtRevision(skill.revision);
+		} catch {
+			// A restored selection can be stale. Resolve current metadata only
+			// after the user explicitly asks to inspect the source.
+		}
+	}
+
+	const artifact = await skillManagementAPI.getSkill(skill.ref);
+	return loadAtRevision(artifact.revision);
 }
 
 function SkillArgumentList({ argumentsList }: { argumentsList: SkillArgument[] }) {
@@ -155,8 +199,105 @@ function SkillArgumentList({ argumentsList }: { argumentsList: SkillArgument[] }
 	);
 }
 
-function SkillPreviewSection({ skill, document }: { skill: SkillDetailsSubject; document: SkillDocumentInput }) {
-	const [argumentsJSON, setArgumentsJSON] = useState(() => previewArgumentsFromDocument(document));
+function SkillSourceDisclosure({
+	source,
+	loading,
+	loadError,
+	saving,
+	saveError,
+	onEnsureSource,
+	onSaveSource,
+}: {
+	source: LoadedSkillSource | null;
+	loading: boolean;
+	loadError: string;
+	saving: boolean;
+	saveError: string;
+	onEnsureSource: () => Promise<LoadedSkillSource | null>;
+	onSaveSource: () => Promise<void>;
+}) {
+	const sourceText = useMemo(() => (source ? canonicalSkillSource(source.details.document) : ''), [source]);
+
+	return (
+		<div className="space-y-3">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div className="text-sm font-medium">SKILL.md source</div>
+
+				<button
+					type="button"
+					className="btn btn-ghost btn-sm rounded-xl"
+					disabled={saving}
+					onClick={() => {
+						void onSaveSource();
+					}}
+				>
+					<FiDownload size={14} />
+					<span>{saving ? 'Saving...' : loading ? 'Loading...' : 'Export SKILL.md'}</span>
+				</button>
+			</div>
+
+			{saveError ? (
+				<div className="alert alert-error rounded-xl text-sm">
+					<FiAlertCircle size={14} />
+					<span>{saveError}</span>
+				</div>
+			) : null}
+
+			<details
+				className="border-base-300 bg-base-100 rounded-xl border"
+				onToggle={event => {
+					if (event.currentTarget.open) {
+						void onEnsureSource();
+					}
+				}}
+			>
+				<summary className="hover:bg-base-200 flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium">
+					<FiFileText size={14} />
+					View SKILL.md source
+				</summary>
+
+				<div className="border-base-300 space-y-3 border-t p-3">
+					{loading ? <div className="text-base-content/60 text-sm">Loading SKILL.md source...</div> : null}
+
+					{loadError ? (
+						<div className="alert alert-warning rounded-xl text-sm">
+							<FiAlertCircle size={14} />
+							<div className="min-w-0 flex-1">
+								<div>{loadError}</div>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs mt-2 rounded-lg"
+									disabled={loading}
+									onClick={() => {
+										void onEnsureSource();
+									}}
+								>
+									Retry
+								</button>
+							</div>
+						</div>
+					) : null}
+
+					{source ? (
+						<>
+							<p className="text-base-content/60 text-xs">
+								Canonical SKILL.md reconstructed from the verified Skill document. Original formatting and comments are
+								not available through the current API.
+							</p>
+
+							<pre className="app-scrollbar-thin bg-base-300 max-h-96 overflow-auto rounded-xl p-3 text-xs/5 wrap-break-word whitespace-pre-wrap">
+								{sourceText}
+							</pre>
+						</>
+					) : null}
+				</div>
+			</details>
+		</div>
+	);
+}
+
+function SkillPreviewSection({ skill, source }: { skill: SkillDetailsSubject; source: LoadedSkillSource }) {
+	const [argumentsJSON, setArgumentsJSON] = useState(() => previewArgumentsFromDocument(source.details.document));
 	const [preview, setPreview] = useState<string | null>(null);
 	const [previewError, setPreviewError] = useState(false);
 	const [previewLoading, setPreviewLoading] = useState(false);
@@ -175,11 +316,11 @@ function SkillPreviewSection({ skill, document }: { skill: SkillDetailsSubject; 
 				const selection = {
 					rootID: skill.ref.rootID,
 					artifactID: skill.ref.artifactID,
-					expectedRevision: skill.revision,
+					expectedRevision: source.revision,
 				};
 
 				const result =
-					document.insert === SkillInsert.UserMessage
+					source.details.document.insert === SkillInsert.UserMessage
 						? await skillManagementAPI.prepareUserMessageSkillTemplate({
 								skill: selection,
 								arguments: argumentsValue,
@@ -202,8 +343,8 @@ function SkillPreviewSection({ skill, document }: { skill: SkillDetailsSubject; 
 
 	return (
 		<ModalSection
-			title={document.insert === SkillInsert.UserMessage ? 'Template preview' : 'Instruction preview'}
-			description="This preview is read-only and does not change the current conversation."
+			title={source.details.document.insert === SkillInsert.UserMessage ? 'Template preview' : 'Instruction preview'}
+			description="Preview is available only after SKILL.md source was explicitly loaded."
 		>
 			<label className="block">
 				<span className="mb-1 block text-sm">Arguments JSON</span>
@@ -231,7 +372,7 @@ function SkillPreviewSection({ skill, document }: { skill: SkillDetailsSubject; 
 			</div>
 
 			{previewError ? (
-				<div className="alert alert-warning mt-3 rounded-2xl text-sm">
+				<div className="alert alert-warning mt-3 rounded-xl text-sm">
 					<FiAlertCircle size={14} />
 					<span>The Skill preview could not be rendered. Check the arguments and Skill availability.</span>
 				</div>
@@ -240,7 +381,7 @@ function SkillPreviewSection({ skill, document }: { skill: SkillDetailsSubject; 
 			{preview !== null ? (
 				<div className="mt-3">
 					<MessageContentCard
-						messageID={`skill-preview:${skill.ref.rootID}:${skill.ref.artifactID}:${skill.revision}`}
+						messageID={`skill-preview:${skill.ref.rootID}:${skill.ref.artifactID}:${source.revision}`}
 						content={preview}
 						isBusy={false}
 						align="items-start text-left"
@@ -259,56 +400,97 @@ function SkillDetailsModalContent({
 }: Omit<SkillDetailsModalProps, 'isOpen'> & {
 	skill: SkillDetailsSubject;
 }) {
-	const [details, setDetails] = useState<ArtifactSkillDetails | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [loadFailed, setLoadFailed] = useState(false);
+	const [source, setSource] = useState<LoadedSkillSource | null>(null);
+	const [sourceLoading, setSourceLoading] = useState(false);
+	const [sourceError, setSourceError] = useState('');
+	const [sourceSaving, setSourceSaving] = useState(false);
+	const [sourceSaveError, setSourceSaveError] = useState('');
+	const sourcePromiseRef = useRef<Promise<LoadedSkillSource | null> | null>(null);
 
-	useEffect(() => {
-		let cancelled = false;
+	const ensureSource = useCallback(async (): Promise<LoadedSkillSource | null> => {
+		if (source) {
+			return source;
+		}
 
-		void skillManagementAPI
-			.getArtifactSkillDetails(skill.ref, skill.revision)
-			.then(value => {
-				if (!cancelled) {
-					setDetails(value);
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setLoadFailed(true);
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			});
+		if (sourcePromiseRef.current) {
+			return sourcePromiseRef.current;
+		}
 
-		return () => {
-			cancelled = true;
-		};
-	}, [skill.ref, skill.revision]);
+		setSourceLoading(true);
+		setSourceError('');
 
-	const skillDocument = details?.document ?? skill.document;
-	const argumentsList = skillDocument?.arguments ?? skill.arguments ?? [];
-	const tags = skillDocument?.tags ?? skill.tags ?? [];
-	const resources = details?.resources ?? skill.resources;
+		const request = (async () => {
+			try {
+				const loaded = await loadSkillSource(skill);
+				setSource(loaded);
+				return loaded;
+			} catch {
+				setSourceError('SKILL.md source could not be loaded.');
+				return null;
+			} finally {
+				setSourceLoading(false);
+			}
+		})();
+
+		sourcePromiseRef.current = request;
+
+		void request.finally(() => {
+			if (sourcePromiseRef.current === request) {
+				sourcePromiseRef.current = null;
+			}
+		});
+
+		return request;
+	}, [skill, source]);
+
+	const saveSource = useCallback(async () => {
+		if (sourceSaving) {
+			return;
+		}
+
+		const loaded = await ensureSource();
+		if (!loaded) {
+			return;
+		}
+
+		setSourceSaving(true);
+		setSourceSaveError('');
+
+		try {
+			await backendAPI.saveFile('SKILL.md', utf8TextToBase64(canonicalSkillSource(loaded.details.document)), [
+				{
+					DisplayName: 'Skill Markdown',
+					Extensions: ['md'],
+				},
+			]);
+		} catch {
+			setSourceSaveError('SKILL.md could not be exported.');
+		} finally {
+			setSourceSaving(false);
+		}
+	}, [ensureSource, sourceSaving]);
+
 	const sourceLabel = skill.sourceLabel ?? getSkillSourceLabel(skill);
-	const insert = skillDocument?.insert ?? skill.insert;
-	const behavior = insert === SkillInsert.UserMessage ? 'User-message template' : 'Instruction Skill';
+	const sourceDetails = source?.details;
+	const behavior = skillBehaviorLabel(sourceDetails?.document.insert ?? skill.insert);
+	const sourceTags = sourceDetails?.document.tags ?? [];
+	const hasArguments = sourceDetails
+		? (sourceDetails.document.arguments?.length ?? 0) > 0
+		: skill.hasArguments === true;
+	const hasResources = sourceDetails ? sourceDetails.resources.hasResources : skill.hasResources === true;
 	const resourceNames = useMemo(
 		() => [
 			...new Set(
-				(resources?.locations ?? [])
+				(sourceDetails?.resources.locations ?? [])
 					.map(r => {
 						return resourceFileName(r);
 					})
 					.filter(Boolean)
 			),
 		],
-		[resources?.locations]
+		[sourceDetails?.resources.locations]
 	);
-	const diagnosticCount = details?.artifact.diagnostics?.length ?? 0;
+	const diagnosticCount = sourceDetails?.artifact.diagnostics?.length ?? 0;
 
 	return (
 		<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
@@ -324,24 +506,6 @@ function SkillDetailsModalContent({
 			/>
 
 			<div className="app-scrollbar-thin min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
-				{loading ? <div className="text-base-content/60 text-sm">Loading Skill details...</div> : null}
-
-				{loadFailed ? (
-					<div className="alert alert-warning rounded-2xl text-sm">
-						<FiAlertCircle size={15} />
-						<span>Some current Skill details could not be loaded. Available catalog information is shown below.</span>
-					</div>
-				) : null}
-
-				{diagnosticCount > 0 ? (
-					<div className="alert alert-warning rounded-2xl text-sm">
-						<FiAlertCircle size={15} />
-						<span>
-							This Skill has {diagnosticCount} source diagnostic{diagnosticCount === 1 ? '' : 's'} that need attention.
-						</span>
-					</div>
-				) : null}
-
 				<ModalSection title="About">
 					<div className="border-base-300 bg-base-100 grid gap-3 rounded-2xl border p-3 text-sm sm:grid-cols-3">
 						<div>
@@ -358,9 +522,9 @@ function SkillDetailsModalContent({
 						</div>
 					</div>
 
-					{tags.length > 0 ? (
+					{sourceTags.length > 0 ? (
 						<div className="mt-3 flex flex-wrap gap-1">
-							{tags.map(tag => (
+							{sourceTags.map(tag => (
 								<span key={tag} className="badge badge-ghost badge-sm">
 									{tag}
 								</span>
@@ -370,48 +534,71 @@ function SkillDetailsModalContent({
 				</ModalSection>
 
 				<ModalSection title="Arguments">
-					<SkillArgumentList argumentsList={argumentsList} />
-				</ModalSection>
-
-				{resources?.hasResources ? (
-					<ModalSection title={`Resources (${resources.totalCount})`}>
-						{resourceNames.length > 0 ? (
-							<div className="flex flex-wrap gap-1">
-								{resourceNames.map(name => (
-									<span key={name} className="badge badge-ghost badge-sm">
-										{name}
-									</span>
-								))}
-							</div>
-						) : (
-							<div className="text-base-content/60 text-sm">This Skill includes resource files.</div>
-						)}
-
-						{resources.moreLocations ? (
-							<div className="text-base-content/60 mt-2 text-xs">Additional resource files are available.</div>
-						) : null}
-					</ModalSection>
-				) : null}
-
-				<ModalSection title="Skill instructions">
-					{skillDocument?.markdownBody.trim() ? (
-						<MessageContentCard
-							messageID={`skill-document:${skill.ref.rootID}:${skill.ref.artifactID}:${skill.revision}`}
-							content={skillDocument.markdownBody}
-							isBusy={false}
-							align="items-start text-left"
-							renderAsMarkdown={true}
-						/>
+					{sourceDetails ? (
+						<SkillArgumentList argumentsList={sourceDetails.document.arguments ?? []} />
+					) : hasArguments ? (
+						<div className="text-base-content/60 text-sm">
+							This Skill declares arguments. Open SKILL.md source to inspect them.
+						</div>
 					) : (
-						<div className="text-base-content/60 text-sm">No readable Skill instructions are available.</div>
+						<div className="text-base-content/60 text-sm">No declared arguments are currently known.</div>
 					)}
 				</ModalSection>
 
-				{showPreview && skillDocument ? (
+				<ModalSection title="Resources">
+					{sourceDetails && hasResources ? (
+						<>
+							{resourceNames.length > 0 ? (
+								<div className="flex flex-wrap gap-1">
+									{resourceNames.map(name => (
+										<span key={name} className="badge badge-ghost badge-sm">
+											{name}
+										</span>
+									))}
+								</div>
+							) : (
+								<div className="text-base-content/60 text-sm">This Skill includes resource files.</div>
+							)}
+
+							{sourceDetails.resources.moreLocations ? (
+								<div className="text-base-content/60 mt-2 text-xs">Additional resource files are available.</div>
+							) : null}
+						</>
+					) : hasResources ? (
+						<div className="text-base-content/60 text-sm">
+							This Skill includes resource files. Open SKILL.md source to inspect available details.
+						</div>
+					) : (
+						<div className="text-base-content/60 text-sm">No resources are currently known.</div>
+					)}
+				</ModalSection>
+
+				<ModalSection title="Source">
+					<SkillSourceDisclosure
+						source={source}
+						loading={sourceLoading}
+						loadError={sourceError}
+						saving={sourceSaving}
+						saveError={sourceSaveError}
+						onEnsureSource={ensureSource}
+						onSaveSource={saveSource}
+					/>
+				</ModalSection>
+
+				{diagnosticCount > 0 ? (
+					<div className="alert alert-warning rounded-xl text-sm">
+						<FiAlertCircle size={14} />
+						<span>
+							This Skill has {diagnosticCount} source diagnostic{diagnosticCount === 1 ? '' : 's'} that need attention.
+						</span>
+					</div>
+				) : null}
+
+				{showPreview && source ? (
 					<SkillPreviewSection
-						key={`${skill.ref.rootID}:${skill.ref.artifactID}:${skill.revision}:${skillDocument.insert}`}
+						key={`${skill.ref.rootID}:${skill.ref.artifactID}:${source.revision}`}
 						skill={skill}
-						document={skillDocument}
+						source={source}
 					/>
 				) : null}
 			</div>
@@ -441,10 +628,8 @@ export function skillDetailsSubjectFromComposerSkill(skill: ComposerSkillCatalog
 		managed: skill.managed,
 		runtimeResolved: skill.runtimeResolved,
 		insert: skill.insert,
-		arguments: skill.arguments,
-		tags: skill.tags,
-		document: skill.document,
-		resources: skill.resources,
+		hasArguments: skill.hasArguments,
+		hasResources: skill.hasResources,
 		sourceLabel: getSkillSourceLabel(skill),
 	};
 }
@@ -466,12 +651,28 @@ export function skillDetailsSubjectFromStoreSkill(
 		enabled: skill.enabled,
 		builtIn: skill.builtIn,
 		managed: skill.managed,
-		insert: options.insert,
-		arguments: options.arguments,
-		tags: options.tags,
-		document: options.document,
-		resources: options.resources,
 		sourceLabel: options.sourceLabel ?? getSkillSourceLabel(skill),
+	};
+}
+
+export function skillDetailsSubjectFromReference(
+	ref: ArtifactRef,
+	options: SkillDetailsReferenceOptions = {}
+): SkillDetailsSubject {
+	return {
+		ref: {
+			rootID: ref.rootID,
+			artifactID: ref.artifactID,
+		},
+		displayName: options.displayName,
+		name: options.name,
+		description: options.description,
+		state: options.state,
+		enabled: options.enabled,
+		builtIn: options.builtIn,
+		managed: options.managed,
+		runtimeResolved: options.runtimeResolved,
+		sourceLabel: options.sourceLabel,
 	};
 }
 
@@ -483,7 +684,9 @@ export function SkillDetailsModal({ isOpen, skill, onClose, showPreview = false 
 	return (
 		<ModalDialog isOpen={isOpen} onClose={onClose}>
 			<SkillDetailsModalContent
-				key={`${skill.ref.rootID}:${skill.ref.artifactID}:${skill.revision}:${showPreview ? 'preview' : 'readonly'}`}
+				key={`${skill.ref.rootID}:${skill.ref.artifactID}:${skill.revision ?? 'current'}:${
+					showPreview ? 'preview' : 'readonly'
+				}`}
 				skill={skill}
 				onClose={onClose}
 				showPreview={showPreview}

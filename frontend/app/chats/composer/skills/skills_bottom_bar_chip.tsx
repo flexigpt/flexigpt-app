@@ -52,15 +52,39 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
+import type { InstructionSourceDetails } from '@/skills/instruction_source_details_modal';
 import type { ManagedSkillEditorSeed } from '@/skills/skill_add_edit_modal';
+import type { SkillDetailsSubject } from '@/skills/skill_details_modal';
+import { InstructionSourceDetailsModal } from '@/skills/instruction_source_details_modal';
 import { ManagedSkillEditorModal } from '@/skills/skill_add_edit_modal';
-import { SkillDetailsModal, skillDetailsSubjectFromComposerSkill } from '@/skills/skill_details_modal';
+import {
+	SkillDetailsModal,
+	skillDetailsSubjectFromComposerSkill,
+	skillDetailsSubjectFromReference,
+} from '@/skills/skill_details_modal';
 import { makeUniqueSkillName } from '@/skills/skill_management_utils';
 import { getSkillDisplayName, getSkillSecondaryLabel, getSkillSourceLabel } from '@/skills/skill_presentation';
 
 function stopSkillRowAction(event: SyntheticEvent) {
 	event.stopPropagation();
+}
+
+function instructionSourceLabel(source: SystemInstructionSource): string {
+	switch (source.sourceKind) {
+		case 'agent':
+			return 'Agent';
+
+		case 'session':
+			return 'Session';
+
+		case 'restored-conversation':
+			return 'Previous conversation';
+
+		default:
+			return source.pluginDisplayName || 'Skill';
+	}
 }
 
 function selectable(item: ComposerSkillCatalogItem): boolean {
@@ -252,7 +276,8 @@ export function SkillsBottomBarChip({
 		action: PendingManagedSkillAction;
 		existingNames: string[];
 	} | null>(null);
-	const [viewedSkill, setViewedSkill] = useState<ComposerSkillCatalogItem | null>(null);
+	const [viewedSkillSubject, setViewedSkillSubject] = useState<SkillDetailsSubject | null>(null);
+	const [viewedInstructionSource, setViewedInstructionSource] = useState<InstructionSourceDetails | null>(null);
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -353,6 +378,37 @@ export function SkillsBottomBarChip({
 			})),
 		[enabledSkillRefs, instructionSkillByKey]
 	);
+
+	const openSkillDetails = (ref: SkillRef, fallbackLabel: string, sourceLabel: string) => {
+		const knownSkill = instructionSkillByKey.get(skillRefKey(ref));
+
+		setViewedSkillSubject(null);
+		setViewedSkillSubject(
+			knownSkill
+				? skillDetailsSubjectFromComposerSkill(knownSkill)
+				: skillDetailsSubjectFromReference(ref, {
+						displayName: fallbackLabel,
+						enabled: false,
+						runtimeResolved: false,
+						sourceLabel,
+					})
+		);
+		store.hide();
+	};
+
+	const openInstructionSourceDetails = (source: SystemInstructionSource) => {
+		if (source.skillRef) {
+			openSkillDetails(source.skillRef, source.displayName, instructionSourceLabel(source));
+			return;
+		}
+
+		setViewedInstructionSource({
+			displayName: source.displayName,
+			sourceLabel: instructionSourceLabel(source),
+			text: source.text,
+		});
+		store.hide();
+	};
 
 	const enabledCount = enabledKeys.size;
 	const activeCount = activeKeys.size;
@@ -526,6 +582,22 @@ export function SkillsBottomBarChip({
 							<span className="min-w-0 flex-1 truncate">Model default instructions</span>
 							<button
 								type="button"
+								className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+								title="View model default instructions"
+								aria-label="View model default instructions"
+								onClick={() => {
+									setViewedInstructionSource({
+										displayName: 'Model default instructions',
+										sourceLabel: 'Model',
+										text: systemPrompt.modelDefaultPrompt,
+									});
+									store.hide();
+								}}
+							>
+								<FiEye size={13} />
+							</button>
+							<button
+								type="button"
 								className="btn btn-ghost btn-xs text-error rounded-lg"
 								disabled={isInputLocked}
 								onClick={() => {
@@ -544,6 +616,17 @@ export function SkillsBottomBarChip({
 						>
 							<span className="min-w-0 flex-1 truncate text-xs">{source.displayName}</span>
 							{source.sourceKind === 'agent' ? <span className="badge badge-secondary badge-xs">Agent</span> : null}
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+								title={`View ${source.displayName}`}
+								aria-label={`View ${source.displayName}`}
+								onClick={() => {
+									openInstructionSourceDetails(source);
+								}}
+							>
+								<FiEye size={13} />
+							</button>
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs text-error rounded-lg"
@@ -587,20 +670,17 @@ export function SkillsBottomBarChip({
 								) : null}
 								{active ? <span className="badge badge-success badge-xs">Active</span> : null}
 								{!skill ? <span className="badge badge-warning badge-xs">Unavailable</span> : null}
-								{skill ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
-										title="View Skill details"
-										aria-label={`View details for ${label}`}
-										onClick={() => {
-											store.hide();
-											setViewedSkill(skill);
-										}}
-									>
-										<FiEye size={13} />
-									</button>
-								) : null}
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs btn-square shrink-0 rounded-lg"
+									title="View Skill details"
+									aria-label={`View details for ${label}`}
+									onClick={() => {
+										openSkillDetails(ref, label, sourceLabel ?? 'Saved selection');
+									}}
+								>
+									<FiEye size={13} />
+								</button>
 								{skill ? (
 									<button
 										type="button"
@@ -900,7 +980,7 @@ export function SkillsBottomBarChip({
 													aria-label={`View details for ${skillLabel(skill)}`}
 													onClick={() => {
 														store.hide();
-														setViewedSkill(skill);
+														setViewedSkillSubject(skillDetailsSubjectFromComposerSkill(skill));
 													}}
 												>
 													<FiEye size={13} />
@@ -1135,10 +1215,18 @@ export function SkillsBottomBarChip({
 			/>
 
 			<SkillDetailsModal
-				isOpen={viewedSkill !== null}
-				skill={viewedSkill ? skillDetailsSubjectFromComposerSkill(viewedSkill) : null}
+				isOpen={viewedSkillSubject !== null}
+				skill={viewedSkillSubject}
 				onClose={() => {
-					setViewedSkill(null);
+					setViewedSkillSubject(null);
+				}}
+			/>
+
+			<InstructionSourceDetailsModal
+				isOpen={viewedInstructionSource !== null}
+				source={viewedInstructionSource}
+				onClose={() => {
+					setViewedInstructionSource(null);
 				}}
 			/>
 		</>

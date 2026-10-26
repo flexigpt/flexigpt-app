@@ -316,7 +316,6 @@ export function ToolsBottomBarChip({
 				disabled={isInputLocked}
 				display={toolDisplayName(item.toolDefinition)}
 				slug={item.toolDefinition.description?.trim() || 'Available tool'}
-				sourceBadge={item.pluginName}
 				supportsAutoExecute={item.toolDefinition.implementation.kind === ToolImplType.Go}
 				autoExecute={autoExecuteFor(item)}
 				onAutoExecuteChange={value => {

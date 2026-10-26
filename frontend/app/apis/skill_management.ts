@@ -192,6 +192,11 @@ export interface PreparedInstructionSkillSource {
 	text: string;
 }
 
+interface ComposerSkillSummaryLoad {
+	summary?: ArtifactSkillSummary;
+	error?: string;
+}
+
 export interface SkillManagementPageData {
 	plugins: PluginListItem[];
 	skills: StoreSkillListItem[];
@@ -215,80 +220,9 @@ export class SkillManagementAPI {
 
 	private readonly presentationLoads = new Map<string, Promise<SkillManagementPresentation>>();
 
-	private readonly composerSkillCatalog = createSharedAsyncCatalog<ComposerSkillCatalogItem[]>(async () => {
-		const { skills, plugins, presentations } = await this.loadManagementPageData();
-		const enabledPlans = await mapWithConcurrency(
-			plugins.filter(plugin => plugin.enabled && plugin.state === ArtifactState.Available),
-			8,
-			plugin => this.store.resolveSkillPlugin(plugin.ref)
-		);
-		const eligible = new Set<string>();
-		for (const plan of enabledPlans) {
-			for (const occurrence of plan.occurrences) {
-				if (
-					occurrence.type === 'skill' &&
-					occurrence.status === CapabilityResolutionStatus.Available &&
-					occurrence.target?.form === CapabilityTargetForm.Artifact &&
-					occurrence.target.artifact
-				) {
-					eligible.add(skillArtifactKey(occurrence.target.artifact));
-				}
-			}
-		}
-
-		const values = await mapWithConcurrency(skills, 8, async skill => {
-			const presentation = presentations[skillArtifactKey(skill.ref)];
-			const summary = presentation?.summary;
-			const document = presentation?.document;
-			const pluginMemberships = presentation?.memberships ?? [];
-			const sources = plugins
-				.filter(plugin => pluginMemberships.some(membership => sameSkillArtifact(membership.plugin, plugin.ref)))
-				.map(plugin => ({
-					ref: plugin.ref,
-					name: plugin.name,
-					displayName: plugin.displayName || plugin.name,
-				}));
-			return {
-				ref: skill.ref,
-				name: skill.name,
-				displayName: skill.displayName || skill.name,
-				description: skill.description,
-				state: skill.state,
-				enabled: skill.enabled && Boolean(summary?.IsEnabled) && eligible.has(skillArtifactKey(skill.ref)),
-				builtIn: skill.builtIn,
-				managed: skill.managed,
-				revision: skill.revision,
-				definitionDigest: skill.definitionDigest,
-				insert: summary?.Insert ?? document?.insert,
-				hasArguments: summary?.HasArguments ?? Boolean(document?.arguments?.length),
-				hasResources: summary?.HasResources ?? false,
-				runtimeResolved: Boolean(summary),
-				runtimeError: !summary
-					? presentation?.errors.join('\n') || 'Skill interpretation is unavailable.'
-					: !eligible.has(skillArtifactKey(skill.ref))
-						? 'No enabled Plugin currently resolves this Skill.'
-						: undefined,
-				arguments: document?.arguments,
-				tags: document?.tags,
-				document,
-				location: presentation?.location,
-				resources: presentation?.resources,
-				sourceID: presentation?.details?.artifact.binding.sourceID,
-				plugins: sources,
-				runtimeWarnings: presentation?.runtimeWarnings,
-				metadataError: presentation?.errors.length ? presentation.errors.join('\n') : undefined,
-			} satisfies ComposerSkillCatalogItem;
-		});
-
-		return values.toSorted((left, right) => {
-			const display = left.displayName.localeCompare(right.displayName, undefined, {
-				numeric: true,
-				sensitivity: 'base',
-			});
-
-			return display !== 0 ? display : left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-		});
-	});
+	private readonly composerSkillCatalog = createSharedAsyncCatalog<ComposerSkillCatalogItem[]>(() =>
+		this.loadComposerSkillCatalog()
+	);
 
 	invalidateComposerSkillsCatalog(): void {
 		this.composerSkillCatalog.invalidate();
@@ -297,6 +231,135 @@ export class SkillManagementAPI {
 
 	listComposerSkillCatalog(force = false): Promise<ComposerSkillCatalogItem[]> {
 		return this.composerSkillCatalog.load(force);
+	}
+
+	private async loadComposerSkillCatalog(): Promise<ComposerSkillCatalogItem[]> {
+		const [plugins, skills] = await Promise.all([
+			this.store.listSkillPluginsForManagement(),
+			this.store.listSkillsForManagement(),
+		]);
+		const pluginPlans = await mapWithConcurrency(plugins, 8, async plugin => {
+			try {
+				return {
+					plugin,
+					plan: await this.store.resolveSkillPlugin(plugin.ref),
+				};
+			} catch {
+				return {
+					plugin,
+					plan: undefined,
+				};
+			}
+		});
+
+		const eligibleSkillKeys = new Set<string>();
+		const sourcePluginsBySkillKey = new Map<
+			string,
+			Array<{
+				ref: ArtifactRef;
+				name: string;
+				displayName: string;
+			}>
+		>();
+
+		for (const { plugin, plan } of pluginPlans) {
+			for (const occurrence of plan?.occurrences ?? []) {
+				if (
+					occurrence.type !== 'skill' ||
+					occurrence.target?.form !== CapabilityTargetForm.Artifact ||
+					!occurrence.target.artifact
+				) {
+					continue;
+				}
+
+				const skillRef = occurrence.target.artifact;
+				const key = skillArtifactKey(skillRef);
+				const existingSources = sourcePluginsBySkillKey.get(key) ?? [];
+
+				if (!existingSources.some(source => sameSkillArtifact(source.ref, plugin.ref))) {
+					sourcePluginsBySkillKey.set(key, [
+						...existingSources,
+						{
+							ref: plugin.ref,
+							name: plugin.name,
+							displayName: plugin.displayName || plugin.name,
+						},
+					]);
+				}
+
+				if (
+					plugin.enabled &&
+					plugin.state === ArtifactState.Available &&
+					occurrence.status === CapabilityResolutionStatus.Available
+				) {
+					eligibleSkillKeys.add(key);
+				}
+			}
+		}
+
+		const summaryEntries = await mapWithConcurrency(skills, 8, async skill => {
+			const key = skillArtifactKey(skill.ref);
+			let value: ComposerSkillSummaryLoad;
+
+			try {
+				value = {
+					summary: await this.aggregate.describeArtifactSkill(skill.ref),
+				};
+			} catch (error) {
+				value = {
+					error: errorText(error, 'Skill interpretation is unavailable.'),
+				};
+			}
+
+			return [key, value] as const;
+		});
+		const summariesBySkillKey = new Map<string, ComposerSkillSummaryLoad>(summaryEntries);
+
+		return skills
+			.map(skill => {
+				const key = skillArtifactKey(skill.ref);
+				const load = summariesBySkillKey.get(key);
+				const summary = load?.summary;
+				const eligible = eligibleSkillKeys.has(key);
+
+				return {
+					ref: skill.ref,
+					name: skill.name,
+					displayName: skill.displayName || skill.name,
+					description: skill.description,
+					state: skill.state,
+					enabled: skill.enabled && summary?.IsEnabled === true && eligible,
+					builtIn: skill.builtIn,
+					managed: skill.managed,
+					revision: skill.revision,
+					definitionDigest: skill.definitionDigest,
+					insert: summary?.Insert,
+					hasArguments: summary?.HasArguments ?? false,
+					hasResources: summary?.HasResources ?? false,
+					runtimeResolved: summary !== undefined,
+					runtimeError:
+						load?.error ??
+						(!summary
+							? 'Skill interpretation is unavailable.'
+							: !eligible
+								? 'No enabled Plugin currently resolves this Skill.'
+								: undefined),
+					plugins: (sourcePluginsBySkillKey.get(key) ?? []).toSorted((left, right) =>
+						left.displayName.localeCompare(right.displayName, undefined, {
+							numeric: true,
+							sensitivity: 'base',
+						})
+					),
+				} satisfies ComposerSkillCatalogItem;
+			})
+			.toSorted((left, right) => {
+				const display = left.displayName.localeCompare(right.displayName, undefined, {
+					numeric: true,
+					sensitivity: 'base',
+				});
+
+				return display !== 0 ? display : left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+			});
 	}
 
 	private async mutate<T>(operation: () => Promise<T>): Promise<T> {

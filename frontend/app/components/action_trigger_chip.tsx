@@ -4,7 +4,7 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { Menu } from '@ariakit/react';
 
 const actionTriggerMenuClasses =
-	'rounded-box bg-base-100 text-base-content border-base-300 z-50 flex min-h-0 min-w-60 max-w-lg flex-col overflow-hidden border p-2 text-xs shadow-xl outline-none';
+	'rounded-box bg-base-100 text-base-content border-base-300 z-50 flex min-h-0 min-w-60 max-w-xl flex-col overflow-hidden border p-2 text-xs shadow-xl outline-none';
 
 export const actionTriggerMenuItemClasses =
 	'flex min-h-7 items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300';
