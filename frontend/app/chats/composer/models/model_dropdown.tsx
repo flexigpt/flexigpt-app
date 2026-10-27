@@ -263,7 +263,7 @@ export function ModelDropdown({
 								? 'This model is inherited from the selected Agent.'
 								: agentModelRef
 									? 'Choosing a model above creates a Session model override.'
-									: 'This model is selected by the Session.'
+									: ''
 						}
 						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session override'}</span>}
 						actions={
