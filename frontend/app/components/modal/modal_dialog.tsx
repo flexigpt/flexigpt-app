@@ -8,6 +8,7 @@ import { ModalDialogControllerContext, useDialogController } from '@/hooks/use_d
 type ModalDialogRender = (controller: ModalDialogController) => ReactNode;
 type ModalDialogChildren = ReactNode | ModalDialogRender;
 type NativeCancelHandler = NonNullable<DialogHTMLAttributes<HTMLDialogElement>['onCancel']>;
+type NativeCloseHandler = NonNullable<DialogHTMLAttributes<HTMLDialogElement>['onClose']>;
 
 interface ModalDialogChildrenRendererProps {
 	controller: ModalDialogController;
@@ -78,12 +79,31 @@ export function ModalDialog({
 		[dialogRef, requestClose, unmountingRef]
 	);
 
+	const handleNativeClose: NativeCloseHandler = event => {
+		// React event propagation crosses portal boundaries. Without this guard,
+		// closing a nested dialog also reaches the outer dialog's onClose.
+		if (event.target !== event.currentTarget) {
+			event.stopPropagation();
+			return;
+		}
+
+		event.stopPropagation();
+		handleClose();
+	};
+
 	const portalTarget = typeof document === 'undefined' ? null : document.body;
 	if (!isOpen || !portalTarget) {
 		return null;
 	}
 
 	const handleNativeCancel: NativeCancelHandler = event => {
+		// Escape from a nested portal dialog must only affect that dialog.
+		if (event.target !== event.currentTarget) {
+			event.stopPropagation();
+			return;
+		}
+
+		event.stopPropagation();
 		handleCancel(event);
 		if (!event.defaultPrevented) {
 			onCancel?.(event);
@@ -104,7 +124,7 @@ export function ModalDialog({
 				{...dialogProps}
 				ref={dialogRef}
 				className={dialogClassName}
-				onClose={handleClose}
+				onClose={handleNativeClose}
 				onCancel={handleNativeCancel}
 			>
 				{content}
