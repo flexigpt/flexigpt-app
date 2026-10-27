@@ -1,16 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { FiChevronDown, FiEye, FiFileText } from 'react-icons/fi';
 
 import type { AgentCapabilityOccurrence } from '@/spec/agent';
-import { isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 
-import { throwIfAborted } from '@/lib/async_utils';
-import { getErrorMessage } from '@/lib/error_utils';
-
-import { useAsyncResource } from '@/hooks/use_async_resource';
-
-import { skillManagementAPI, textStoreAPI } from '@/apis/baseapi';
+import { textStoreAPI } from '@/apis/baseapi';
 
 import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 
@@ -21,62 +15,6 @@ import { loadSkillArtifactSource } from '@/skills/skill_artifact_source';
 export interface AgentCapabilityControls {
 	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
 	onToggle: (occurrence: AgentCapabilityOccurrence) => void;
-}
-
-interface ContributionPreview {
-	title: string;
-	body: string;
-	note?: string;
-}
-
-function RenderedInstructionPreview({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
-	const load = useCallback(
-		async (signal: AbortSignal): Promise<ContributionPreview> => {
-			const ref = occurrence.target?.artifact;
-			if (!ref || occurrence.target?.form !== CapabilityTargetForm.Artifact) {
-				throw new Error('This declaration has no Artifact content to preview.');
-			}
-
-			const result = await skillManagementAPI.previewInstructionSkill({
-				skill: ref,
-				arguments: {},
-			});
-			throwIfAborted(signal);
-			if (!result.text.trim()) {
-				throw new Error('This Skill rendered no instruction text.');
-			}
-			return {
-				title: 'Rendered instructions (empty arguments)',
-				body: result.text,
-				note: 'Run preparation may render this Skill with different arguments.',
-			};
-		},
-		[occurrence]
-	);
-	const { data, error } = useAsyncResource(load, {
-		initialData: null as ContributionPreview | null,
-	});
-
-	if (error) {
-		return (
-			<p className="text-error text-xs" role="alert">
-				{getErrorMessage(error, 'Content could not be loaded.')}
-			</p>
-		);
-	}
-	if (!data) {
-		return <p className="text-base-content/70 text-xs">Loading content...</p>;
-	}
-
-	return (
-		<div className="space-y-2">
-			<div className="text-base-content/70 text-xs font-medium">{data.title}</div>
-			<pre className="app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 text-sm wrap-break-word whitespace-pre-wrap">
-				{data.body}
-			</pre>
-			{data.note ? <p className="text-base-content/70 text-xs">{data.note}</p> : null}
-		</div>
-	);
 }
 
 function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
@@ -112,9 +50,6 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 				load={() => loadSkillArtifactSource(ref)}
 				note="Canonical SKILL.md is reconstructed from the verified document, including frontmatter. Original comments and formatting are not available through this API."
 			/>
-			{isAgentSkillUseAsInstructions(occurrence.skillUseMode) ? (
-				<RenderedInstructionPreview occurrence={occurrence} />
-			) : null}
 		</div>
 	);
 }

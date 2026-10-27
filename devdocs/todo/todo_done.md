@@ -1137,3 +1137,11 @@
 - [x] skill selection shows some arbitrary thing rather than skill name. same checks needed for mcps etc. need skill view dropdown type things also. may be better to do a details modal views like agents in the dropdowns.
 - [x] tools dont seem to be loaded from agent. template doesnt go into composer it seems.
 - [x] verify tool and template population and override
+- [x] as of now in agent declarations we show the md body of skill, but it should ideally show the actual md source i.e frontmatter and everything.
+- [x] all skills and other artifacts should always have a copy/export button across the board. this reinforces our artifact driven operation model celanly. the artifacts should be rendered uniformly across the board as a copy/export text which is lazy loaded when someone clicks show or export or copy. may be each artifact domains minimal renderer can be inside that folder and then used everwher as needed. liek skill inlien renders can be in app/skills and then used in skill, composer, agent, workspace etc. focus shoudl be to create proper common components in proper palces and then use it uniformly.
+- [x] management ui should be uniform with minimal overrides and ideally consumers shoudl be uniformized to use simialr things rather than doing their own things.
+- [x] template args are not rendered for some reason now in template modal. also the modal doesnt show the actual template with placeholders etc.
+- [x] code delivery skill should enforce ownership cost sensitivity and max parallelism properly.
+- [x] when streaming diff apply paths are not populated.
+- [x] add a default agent selection preference and a default workspace one
+- [x] verify new management ui in all pages
