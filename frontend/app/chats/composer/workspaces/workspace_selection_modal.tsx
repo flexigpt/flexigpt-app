@@ -25,6 +25,7 @@ import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceMCPSetupModal } from '@/workspaces/workspace_mcp_setup_modal';
+import { WorkspaceSource } from '@/workspaces/workspace_source';
 
 interface WorkspaceSelectionModalProps {
 	isOpen: boolean;
@@ -199,6 +200,16 @@ function WorkspaceDirectorySelectionModalContent({
 								conversation selected them. Use Current Contents to accept the latest versions.
 							</span>
 						</div>
+					) : null}
+
+					{state.workspace ? (
+						<WorkspaceSource
+							directory={state.workspace.directory.ref}
+							workspace={{
+								rootID: state.workspace.workspace.workspace.artifact.rootID,
+								artifactID: state.workspace.workspace.workspace.artifact.id,
+							}}
+						/>
 					) : null}
 
 					{state.plan ? (

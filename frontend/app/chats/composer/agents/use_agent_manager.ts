@@ -227,6 +227,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	const [isApplying, setIsApplying] = useState(false);
 	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
+	const [configuredDefaultAgentRef, setConfiguredDefaultAgentRef] = useState<ArtifactRef | null>(null);
 	const [excludedCapabilityKeys, setExcludedCapabilityKeys] = useState<string[]>([]);
 	const [releasedCapabilityExclusionKeys, setReleasedCapabilityExclusionKeys] = useState<string[]>([]);
 	const [preparedStarter, setPreparedStarter] = useState<AgentStarterPreview | null>(null);
@@ -341,12 +342,16 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 
 	const fetchAgentOptions = useCallback(async (force: boolean, requestSeq: number) => {
 		try {
-			const nextOptions = await agentManagementAPI.listAgentCatalogOptions(force);
+			const [nextOptions, defaultAgent] = await Promise.all([
+				agentManagementAPI.listAgentCatalogOptions(force),
+				agentManagementAPI.getDefaultAgent().catch(() => null),
+			]);
 			if (catalogRequestSeqRef.current !== requestSeq) {
 				return;
 			}
 
 			setAgentOptions(nextOptions);
+			setConfiguredDefaultAgentRef(defaultAgent);
 		} catch (loadError) {
 			if (catalogRequestSeqRef.current !== requestSeq) {
 				return;
@@ -354,6 +359,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 
 			setAgentOptions([]);
 			setError(getErrorMessage(loadError, 'Failed to load Agents.'));
+			setConfiguredDefaultAgentRef(null);
 		} finally {
 			if (catalogRequestSeqRef.current === requestSeq) {
 				setLoading(false);
@@ -402,9 +408,20 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 			null,
 		[agentOptions]
 	);
+	const configuredDefaultAgent = useMemo(
+		() =>
+			configuredDefaultAgentRef
+				? (agentOptions.find(
+						option => option.isSelectable && artifactRefKey(option.ref) === artifactRefKey(configuredDefaultAgentRef)
+					) ?? null)
+				: null,
+		[agentOptions, configuredDefaultAgentRef]
+	);
 	const defaultAgent = useMemo(
-		() => (baseAgent?.isSelectable ? baseAgent : (agentOptions.find(option => option.isSelectable) ?? null)),
-		[agentOptions, baseAgent]
+		() =>
+			configuredDefaultAgent ??
+			(baseAgent?.isSelectable ? baseAgent : (agentOptions.find(option => option.isSelectable) ?? null)),
+		[agentOptions, baseAgent, configuredDefaultAgent]
 	);
 	const isDefaultAgentSelected = selectedAgent !== null && selectedAgent.key === defaultAgent?.key;
 
@@ -1001,8 +1018,12 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 	}, []);
 
 	const catalogIdentity = useMemo(
-		() => agentOptions.map(option => `${option.key}:${option.isSelectable ? '1' : '0'}`).join('|'),
-		[agentOptions]
+		() =>
+			[
+				...agentOptions.map(option => `${option.key}:${option.isSelectable ? '1' : '0'}`),
+				configuredDefaultAgentRef ? artifactRefKey(configuredDefaultAgentRef) : 'automatic',
+			].join('|'),
+		[agentOptions, configuredDefaultAgentRef]
 	);
 
 	useEffect(() => {

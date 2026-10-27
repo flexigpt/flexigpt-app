@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef, CapabilityOccurrence } from '@/spec/artifact';
 import type { SessionArtifactOverride, SessionWorkspaceSelectionIntent } from '@/spec/session';
@@ -307,26 +307,44 @@ function isCandidateAvailable(candidate: ComposerWorkspaceCandidate): boolean {
 	return candidate.directory.enabled && artifact.enabled && artifact.state === ArtifactState.Available;
 }
 
+interface ComposerWorkspaceCatalog {
+	directories: WorkspaceDirectoryView[];
+	defaultWorkspace: ArtifactRef | null;
+}
+
 export function useComposerWorkspace({
 	applyWorkspaceSkillSelectionState,
 	getCurrentActiveSkillRefs,
 }: UseComposerWorkspaceArgs): ComposerWorkspaceController {
 	const loadDirectories = useCallback(async (signal: AbortSignal) => {
-		const directories = await workspaceManagementAPI.listComposerWorkspaceDirectories();
+		const [directories, defaultWorkspace] = await Promise.all([
+			workspaceManagementAPI.listComposerWorkspaceDirectories(),
+			workspaceManagementAPI.getDefaultWorkspace().catch(() => null),
+		]);
 		throwIfAborted(signal);
-		return directories;
+
+		return {
+			directories,
+			defaultWorkspace,
+		} satisfies ComposerWorkspaceCatalog;
 	}, []);
 
 	const {
-		data: directories,
+		data: workspaceCatalog,
 		error: directoriesError,
 		isLoading: initialDirectoriesLoading,
 		isRefreshing: directoriesRefreshing,
+		hasResolved,
 		reloadOrThrow,
 		setData: setDirectories,
 	} = useAsyncResource(loadDirectories, {
-		initialData: [] as WorkspaceDirectoryView[],
+		initialData: {
+			directories: [],
+			defaultWorkspace: null,
+		} satisfies ComposerWorkspaceCatalog,
 	});
+	const directories = workspaceCatalog.directories;
+	const defaultWorkspace = workspaceCatalog.defaultWorkspace;
 
 	const [selection, setSelection] = useState<WorkspaceConversationSelection>();
 	const [workspace, setWorkspace] = useState<ComposerWorkspaceCandidate>();
@@ -336,6 +354,7 @@ export function useComposerWorkspace({
 
 	const requestVersion = useRef(0);
 	const selectionRef = useRef<WorkspaceConversationSelection | undefined>(undefined);
+	const initialDefaultHandledRef = useRef(false);
 
 	const workspaces = useMemo(() => candidatesFor(directories), [directories]);
 
@@ -436,6 +455,7 @@ export function useComposerWorkspace({
 
 	const attachWorkspace = useCallback(
 		async (candidate: ComposerWorkspaceCandidate) => {
+			initialDefaultHandledRef.current = true;
 			if (!isCandidateAvailable(candidate)) {
 				throw new Error('This Workspace is not currently enabled and available.');
 			}
@@ -447,6 +467,7 @@ export function useComposerWorkspace({
 	const detachWorkspace = useCallback(
 		async (syncSkills = true) => {
 			requestVersion.current += 1;
+			initialDefaultHandledRef.current = true;
 			replaceSelection(undefined);
 			setWorkspace(undefined);
 			setPlan(undefined);
@@ -466,13 +487,14 @@ export function useComposerWorkspace({
 				await detachWorkspace(syncSkills);
 				return;
 			}
+			initialDefaultHandledRef.current = true;
 
 			let nextDirectories = directories;
 			let candidate = candidateForRef(candidatesFor(nextDirectories), nextSelection.workspace);
 
 			if (!candidate) {
 				nextDirectories = await workspaceManagementAPI.listComposerWorkspaceDirectories();
-				setDirectories(nextDirectories);
+				setDirectories(previous => ({ ...previous, directories: nextDirectories }));
 				candidate = candidateForRef(candidatesFor(nextDirectories), nextSelection.workspace);
 			}
 
@@ -504,6 +526,7 @@ export function useComposerWorkspace({
 				await detachWorkspace(syncSkills);
 				return;
 			}
+			initialDefaultHandledRef.current = true;
 
 			let nextDirectories = directories;
 			let candidate = candidateForRef(candidatesFor(nextDirectories), {
@@ -513,7 +536,7 @@ export function useComposerWorkspace({
 
 			if (!candidate) {
 				nextDirectories = await workspaceManagementAPI.listComposerWorkspaceDirectories(true);
-				setDirectories(nextDirectories);
+				setDirectories(previous => ({ ...previous, directories: nextDirectories }));
 				candidate = candidateForRef(candidatesFor(nextDirectories), {
 					rootID: intent.workspace.rootID,
 					artifactID: intent.workspace.artifactID,
@@ -728,9 +751,12 @@ export function useComposerWorkspace({
 		}
 
 		const refreshed = await workspaceManagementAPI.refreshWorkspaceDirectory(current.directory.ref);
-		setDirectories(previous =>
-			previous.map(directory => (directory.ref.rootID === refreshed.ref.rootID ? refreshed : directory))
-		);
+		setDirectories(previous => ({
+			...previous,
+			directories: previous.directories.map(directory =>
+				directory.ref.rootID === refreshed.ref.rootID ? refreshed : directory
+			),
+		}));
 
 		const candidate = candidateForRef(
 			candidatesFor([...directories.filter(directory => directory.ref.rootID !== refreshed.ref.rootID), refreshed]),
@@ -751,8 +777,8 @@ export function useComposerWorkspace({
 		async (path: string) => {
 			const directory = await workspaceManagementAPI.registerWorkspaceDirectory(path);
 			setDirectories(previous => {
-				const withoutCurrent = previous.filter(value => value.ref.rootID !== directory.ref.rootID);
-				return [...withoutCurrent, directory];
+				const withoutCurrent = previous.directories.filter(value => value.ref.rootID !== directory.ref.rootID);
+				return { ...previous, directories: [...withoutCurrent, directory] };
 			});
 
 			const candidate = candidatesFor([directory])[0];
@@ -766,6 +792,27 @@ export function useComposerWorkspace({
 		},
 		[attachWorkspace, setDirectories]
 	);
+
+	useEffect(() => {
+		if (!hasResolved || initialDefaultHandledRef.current || selectionRef.current || selectionLoading) {
+			return;
+		}
+
+		initialDefaultHandledRef.current = true;
+
+		if (!defaultWorkspace) {
+			return;
+		}
+
+		const candidate = candidateForRef(workspaces, defaultWorkspace);
+
+		if (!candidate || !isCandidateAvailable(candidate)) {
+			return;
+		}
+
+		// oxlint-disable-next-line react/set-state-in-effect
+		void resolveCandidate(candidate).catch(() => undefined);
+	}, [defaultWorkspace, hasResolved, resolveCandidate, selectionLoading, workspaces]);
 
 	const selectedContextIDs = useMemo(
 		() => new Set((selection?.contextRefs ?? []).map(ref => artifactRefKey(ref.artifact))),

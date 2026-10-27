@@ -48,11 +48,15 @@ export interface AgentPluginData {
 export interface AgentManagementPageData {
 	plugins: AgentPluginData[];
 	importDestinations: AgentImportDestination[];
+	defaultAgent: ArtifactRef | null;
+	agentOptions: AgentCatalogOption[];
 }
 
 export const EMPTY_AGENT_MANAGEMENT_PAGE_DATA: AgentManagementPageData = {
 	plugins: [],
 	importDestinations: [],
+	defaultAgent: null,
+	agentOptions: [],
 };
 
 export interface AgentCatalogOption {
@@ -201,9 +205,11 @@ export class AgentManagementAPI {
 	}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
-		const [pluginResult, destinationResult] = await Promise.all([
+		const [pluginResult, destinationResult, defaultAgent, agentOptions] = await Promise.all([
 			this.agents.listAgentPluginsForManagement(),
 			this.agents.listAgentImportDestinations(),
+			this.getDefaultAgent().catch(() => null),
+			this.listAgentCatalogOptions(),
 		]);
 		throwIfAborted(signal);
 
@@ -281,6 +287,8 @@ export class AgentManagementAPI {
 					sensitivity: 'base',
 				});
 			}),
+			defaultAgent,
+			agentOptions,
 		};
 	}
 
@@ -626,16 +634,18 @@ export class AgentManagementAPI {
 		return this.mutate(() => this.agents.deleteManagedAgent(agent, expectedRevision));
 	}
 
-	clearDefaultAgent(): Promise<void> {
-		return this.agents.clearDefaultAgent();
+	async clearDefaultAgent(): Promise<void> {
+		await this.agents.clearDefaultAgent();
+		this.invalidateAgentCatalog();
 	}
 
 	getDefaultAgent(): Promise<ArtifactRef | null> {
 		return this.agents.getDefaultAgent();
 	}
 
-	setDefaultAgent(ref: ArtifactRef): Promise<void> {
-		return this.agents.setDefaultAgent(ref);
+	async setDefaultAgent(ref: ArtifactRef): Promise<void> {
+		await this.agents.setDefaultAgent(ref);
+		this.invalidateAgentCatalog();
 	}
 
 	private projectAgentCatalogOptions(agents: AgentView[]): AgentCatalogOption[] {

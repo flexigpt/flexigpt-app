@@ -546,7 +546,10 @@ export class ModelManagementAPI {
 	}
 
 	private async loadCatalog(): Promise<ModelCatalog> {
-		const snapshot = await this.loadSnapshot();
+		const [snapshot, configuredDefaultModel] = await Promise.all([
+			this.loadSnapshot(),
+			this.getDefaultModel().catch(() => undefined),
+		]);
 		const options = snapshot.models
 			.filter(isModelRunnable)
 			.map(m => {
@@ -587,10 +590,17 @@ export class ModelManagementAPI {
 		const selectedOption = selectedModel
 			? options.find(option => modelRefEqual(option.model, selectedModel.list.ref))
 			: undefined;
+		const configuredDefaultOption = configuredDefaultModel
+			? options.find(
+					option =>
+						modelRefEqual(option.model, configuredDefaultModel.model) &&
+						modelRefEqual(option.provider, configuredDefaultModel.provider)
+				)
+			: undefined;
 
 		return {
 			options,
-			defaultOption: selectedOption ?? fallback,
+			defaultOption: configuredDefaultOption ?? selectedOption ?? fallback,
 		};
 	}
 }

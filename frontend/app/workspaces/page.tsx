@@ -1,18 +1,22 @@
 import { useCallback, useMemo, useState } from 'react';
 import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { WorkspaceDirectoryListItem, WorkspaceDirectoryView } from '@/spec/workspace';
+import { ArtifactState } from '@/spec/artifact';
 import { workspaceDirectoryListItemFromView } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { Loader } from '@/components/loader';
+import { DefaultArtifactControl } from '@/components/managementui/default_artifact_control';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
@@ -35,6 +39,22 @@ interface WorkspaceDirectoryRemovalTarget {
 	ref: WorkspaceDirectoryListItem['ref'];
 	displayName: string;
 	expectedRevision: number;
+}
+
+interface DefaultWorkspaceOption {
+	ref: ArtifactRef;
+	displayName: string;
+	isSelectable: boolean;
+	availabilityReason?: string;
+}
+
+interface WorkspaceDefaultsData {
+	defaultWorkspace: ArtifactRef | null;
+	directories: WorkspaceDirectoryView[];
+}
+
+function refsEqual(left: ArtifactRef | null | undefined, right: ArtifactRef | null | undefined): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<WorkspaceDirectoryListItem[]> {
@@ -84,6 +104,27 @@ export default function WorkspaceDirectoryManagement() {
 		initialData: [] as WorkspaceDirectoryListItem[],
 	});
 
+	const loadWorkspaceDefaults = useCallback(async (signal: AbortSignal): Promise<WorkspaceDefaultsData> => {
+		const [defaultWorkspace, fullDirectories] = await Promise.all([
+			workspaceManagementAPI.getDefaultWorkspace().catch(() => null),
+			workspaceManagementAPI.listComposerWorkspaceDirectories(true),
+		]);
+		throwIfAborted(signal);
+
+		return {
+			defaultWorkspace,
+			directories: fullDirectories,
+		};
+	}, []);
+	const {
+		data: workspaceDefaults,
+		error: workspaceDefaultsError,
+		isRefreshing: isRefreshingWorkspaceDefaults,
+		reloadOrThrow: reloadWorkspaceDefaultsOrThrow,
+	} = useAsyncResource(loadWorkspaceDefaults, {
+		initialData: { defaultWorkspace: null, directories: [] } satisfies WorkspaceDefaultsData,
+	});
+
 	const [search, setSearch] = useState('');
 	const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 	const [managedDirectoryKey, setManagedDirectoryKey] = useState<string | null>(null);
@@ -92,6 +133,7 @@ export default function WorkspaceDirectoryManagement() {
 	const [detailsByDirectoryKey, setDetailsByDirectoryKey] = useState<Record<string, WorkspaceDirectoryView>>({});
 	const [loadingDirectoryKeys, setLoadingDirectoryKeys] = useState<Set<string>>(new Set());
 	const [directoryErrors, setDirectoryErrors] = useState<Record<string, string>>({});
+	const { isPending: isDefaultWorkspacePending, runAction: runDefaultWorkspaceAction } = usePendingActions();
 
 	const visibleDirectories = useMemo(() => {
 		const query = search.trim().toLowerCase();
@@ -103,6 +145,51 @@ export default function WorkspaceDirectoryManagement() {
 	}, [directories, search]);
 
 	const managedDirectory = managedDirectoryKey ? detailsByDirectoryKey[managedDirectoryKey] : undefined;
+
+	const defaultWorkspaceOptions = useMemo<DefaultWorkspaceOption[]>(
+		() =>
+			workspaceDefaults.directories
+				.flatMap(directory =>
+					directory.workspaces.map(workspace => {
+						const artifact = workspace.workspace.artifact;
+						const ref = {
+							rootID: artifact.rootID,
+							artifactID: artifact.id,
+						};
+						const isSelectable = directory.enabled && artifact.enabled && artifact.state === ArtifactState.Available;
+
+						return {
+							ref,
+							displayName: artifact.displayName || artifact.logicalName || 'Workspace',
+							isSelectable,
+							availabilityReason: isSelectable
+								? undefined
+								: 'Enable an available Workspace directory and Workspace before setting it as default.',
+						};
+					})
+				)
+				.toSorted((left, right) =>
+					left.displayName.localeCompare(right.displayName, undefined, { sensitivity: 'base' })
+				),
+		[workspaceDefaults.directories]
+	);
+
+	const defaultWorkspaceDirectoryKeys = useMemo(
+		() =>
+			new Set(
+				workspaceDefaults.directories.flatMap(directory =>
+					directory.workspaces.some(workspace =>
+						refsEqual(workspaceDefaults.defaultWorkspace, {
+							rootID: workspace.workspace.artifact.rootID,
+							artifactID: workspace.workspace.artifact.id,
+						})
+					)
+						? [directory.ref.rootID]
+						: []
+				)
+			),
+		[workspaceDefaults.defaultWorkspace, workspaceDefaults.directories]
+	);
 
 	const replaceDirectory = useCallback(
 		(next: WorkspaceDirectoryView) => {
@@ -122,6 +209,27 @@ export default function WorkspaceDirectoryManagement() {
 			}));
 		},
 		[setDirectories]
+	);
+
+	const changeDefaultWorkspace = useCallback(
+		async (workspace?: ArtifactRef) => {
+			if (workspace) {
+				await workspaceManagementAPI.setDefaultWorkspace(workspace);
+			} else {
+				await workspaceManagementAPI.clearDefaultWorkspace();
+			}
+
+			await reloadWorkspaceDefaultsOrThrow();
+		},
+		[reloadWorkspaceDefaultsOrThrow]
+	);
+
+	const handleDirectoryChanged = useCallback(
+		(next: WorkspaceDirectoryView) => {
+			replaceDirectory(next);
+			void reloadWorkspaceDefaultsOrThrow().catch(() => undefined);
+		},
+		[reloadWorkspaceDefaultsOrThrow, replaceDirectory]
 	);
 
 	const loadDirectoryDetails = useCallback(
@@ -178,6 +286,7 @@ export default function WorkspaceDirectoryManagement() {
 			...previous,
 			[directoryKey(summary)]: directory,
 		}));
+		await reloadWorkspaceDefaultsOrThrow().catch(() => undefined);
 	};
 
 	const removeDirectory = async () => {
@@ -191,6 +300,7 @@ export default function WorkspaceDirectoryManagement() {
 			setDetailsByDirectoryKey(previous => omitManyKeys(previous, [directoryToRemove.ref.rootID]));
 			setManagedDirectoryKey(previous => (previous === directoryToRemove.ref.rootID ? null : previous));
 			setDirectoryToRemove(null);
+			await reloadWorkspaceDefaultsOrThrow().catch(() => undefined);
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Workspace directory removal failed.');
 		}
@@ -228,6 +338,32 @@ export default function WorkspaceDirectoryManagement() {
 							error={error}
 							isRetrying={isRefreshing}
 							onRetry={reloadOrThrow}
+						/>
+					) : null}
+
+					<DefaultArtifactControl
+						label="Default Workspace"
+						automaticLabel="Use no default Workspace"
+						options={defaultWorkspaceOptions}
+						defaultRef={workspaceDefaults.defaultWorkspace}
+						pending={isDefaultWorkspacePending('default-workspace')}
+						onChange={ref => {
+							void runDefaultWorkspaceAction('default-workspace', () => changeDefaultWorkspace(ref)).catch(
+								(cause: unknown) => {
+									setActionError(
+										cause instanceof Error ? cause.message : 'The default Workspace could not be changed.'
+									);
+								}
+							);
+						}}
+					/>
+
+					{workspaceDefaultsError ? (
+						<ManagementResourceError
+							title="Workspace defaults could not be loaded"
+							error={workspaceDefaultsError}
+							isRetrying={isRefreshingWorkspaceDefaults}
+							onRetry={reloadWorkspaceDefaultsOrThrow}
 						/>
 					) : null}
 
@@ -286,6 +422,7 @@ export default function WorkspaceDirectoryManagement() {
 									directory={directory}
 									isLoading={loadingDirectoryKeys.has(key)}
 									error={directoryErrors[key]}
+									isDefaultWorkspace={defaultWorkspaceDirectoryKeys.has(directory.ref.rootID)}
 									onManage={() => {
 										void loadDirectoryDetails(directory);
 									}}
@@ -328,7 +465,7 @@ export default function WorkspaceDirectoryManagement() {
 					onClose={() => {
 						setManagedDirectoryKey(null);
 					}}
-					onChanged={replaceDirectory}
+					onChanged={handleDirectoryChanged}
 					onRequestRemove={value => {
 						setManagedDirectoryKey(null);
 						setDirectoryToRemove({

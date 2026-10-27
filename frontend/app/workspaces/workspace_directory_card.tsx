@@ -9,6 +9,7 @@ interface WorkspaceDirectoryCardProps {
 	directory: WorkspaceDirectoryListItem;
 	isLoading: boolean;
 	error?: string;
+	isDefaultWorkspace?: boolean;
 	onManage: () => void;
 	onRequestRemove: () => void;
 }
@@ -17,6 +18,7 @@ export function WorkspaceDirectoryCard({
 	directory,
 	isLoading,
 	error,
+	isDefaultWorkspace = false,
 	onManage,
 	onRequestRemove,
 }: WorkspaceDirectoryCardProps) {
@@ -30,6 +32,7 @@ export function WorkspaceDirectoryCard({
 						{directory.enabled ? 'Enabled' : 'Paused'}
 					</StatusBadge>
 					<StatusBadge>Repository</StatusBadge>
+					{isDefaultWorkspace ? <StatusBadge tone="info">Default Workspace</StatusBadge> : null}
 				</>
 			}
 			actions={

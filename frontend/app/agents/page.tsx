@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiPlus, FiRefreshCw, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentView } from '@/spec/agent';
+import type { ArtifactRef } from '@/spec/artifact';
 import type { PluginListItem, PluginView } from '@/spec/plugin';
 import { ArtifactState } from '@/spec/artifact';
 import { pluginListItemFromPluginView } from '@/spec/plugin';
@@ -25,10 +26,8 @@ import {
 } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
-import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
-import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
 import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
@@ -57,6 +56,7 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
+import { DefaultAgentControl } from '@/agents/default_agent_control';
 
 const AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -99,6 +99,10 @@ function agentRefKey(agent: AgentView): string {
 
 function pluginRefKey(plugin: PluginListItem): string {
 	return `${plugin.ref.rootID}:${plugin.ref.artifactID}`;
+}
+
+function artifactRefsEqual(left: ArtifactRef | null | undefined, right: ArtifactRef | null | undefined): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
@@ -155,6 +159,7 @@ interface AgentPluginCardProps {
 	onDeleteAgent: (agent: AgentView) => void;
 	onToggleAgentEnabled: (agent: AgentView, enabled: boolean) => Promise<void>;
 	onActionError: (message: string) => void;
+	defaultAgent: ArtifactRef | null;
 }
 
 function AgentPluginCard({
@@ -169,6 +174,7 @@ function AgentPluginCard({
 	onDeleteAgent,
 	onToggleAgentEnabled,
 	onActionError,
+	defaultAgent,
 }: AgentPluginCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const { isPending, runAction } = usePendingActions();
@@ -352,6 +358,7 @@ function AgentPluginCard({
 						? data.agents.map(agent => {
 								const agentAvailable = agent.state === ArtifactState.Available;
 								const toggleKey = `agent:${agent.ref.rootID}:${agent.ref.artifactID}:toggle`;
+								const isDefaultAgent = artifactRefsEqual(defaultAgent, agent.ref);
 
 								return (
 									<ManagementItemCard
@@ -366,6 +373,7 @@ function AgentPluginCard({
 													<StatusBadge tone="warning">{agent.state}</StatusBadge>
 												) : null}
 												{agent.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+												{isDefaultAgent ? <StatusBadge tone="info">Default Agent</StatusBadge> : null}
 												{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
 											</>
 										}
@@ -376,9 +384,15 @@ function AgentPluginCard({
 												<EnabledControl
 													id={`agent-${agent.ref.rootID}-${agent.ref.artifactID}`}
 													checked={agent.enabled}
-													disabled={!agentAvailable || isPending(toggleKey)}
+													disabled={!agentAvailable || (isDefaultAgent && agent.enabled) || isPending(toggleKey)}
 													busy={isPending(toggleKey)}
-													title={!agentAvailable ? 'This Agent Artifact is unavailable.' : undefined}
+													title={
+														isDefaultAgent && agent.enabled
+															? 'Choose another default Agent or use automatic selection before disabling this Agent.'
+															: !agentAvailable
+																? 'This Agent is unavailable.'
+																: undefined
+													}
 													onChange={enabled => {
 														run(
 															toggleKey,
@@ -404,6 +418,12 @@ function AgentPluginCard({
 												<button
 													type="button"
 													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={isDefaultAgent}
+													title={
+														isDefaultAgent
+															? 'Choose another default Agent or use automatic selection before deleting this Agent.'
+															: undefined
+													}
 													onClick={() => {
 														onDeleteAgent(agent);
 													}}
@@ -627,45 +647,19 @@ export default function AgentsPage() {
 	const [isDeletingAgent, setIsDeletingAgent] = useState(false);
 	const [isDeletingPlugin, setIsDeletingPlugin] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
-	const [pluginCreationRootID, setPluginCreationRootID] = useState('');
+	const { isPending: isDefaultAgentPending, runAction: runDefaultAgentAction } = usePendingActions();
 
 	const mountedRef = useRef(false);
 	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
 	const agentLoadEpochRef = useRef(0);
 	const pluginDetailsRequestIDRef = useRef(0);
 
-	const pluginCreationRoots = useMemo(
+	const defaultPluginCreationRootID = useMemo(
 		() =>
-			[
-				...new Map(
-					pageData.plugins
-						.map(value => value.plugin)
-						.filter(plugin => plugin.baseline && !isBuiltInAgentPlugin(plugin))
-						.map(
-							plugin =>
-								[
-									plugin.ref.rootID,
-									{
-										rootID: plugin.ref.rootID,
-										label: pluginDisplayName(plugin),
-									},
-								] as const
-						)
-				).values(),
-			].toSorted((left, right) => left.label.localeCompare(right.label)),
-		[pageData.plugins]
-	);
-
-	const effectivePluginCreationRootID = pluginCreationRoots.some(value => value.rootID === pluginCreationRootID)
-		? pluginCreationRootID
-		: (pluginCreationRoots[0]?.rootID ?? '');
-	const pluginCreationRootDropdownItems = useMemo(
-		() =>
-			Object.fromEntries(pluginCreationRoots.map(root => [root.rootID, { isEnabled: true }])) as Record<
-				string,
-				DropdownItem
-			>,
-		[pluginCreationRoots]
+			pageData.importDestinations[0]?.rootID ??
+			pageData.plugins.find(data => data.plugin.baseline && !isBuiltInAgentPlugin(data.plugin))?.plugin.ref.rootID ??
+			'',
+		[pageData.importDestinations, pageData.plugins]
 	);
 
 	const showAlert = useCallback((message: string) => {
@@ -845,6 +839,10 @@ export default function AgentsPage() {
 
 	const toggleAgentEnabled = useCallback(
 		async (agent: AgentView, enabled: boolean) => {
+			if (!enabled && artifactRefsEqual(pageData.defaultAgent, agent.ref)) {
+				throw new Error('Choose another default Agent or use automatic selection before disabling this Agent.');
+			}
+
 			const updated = await agentManagementAPI.setAgentEnabled(agentArtifactRef(agent), agent.revision, enabled);
 			const key = agentRefKey(updated);
 
@@ -859,13 +857,13 @@ export default function AgentsPage() {
 			setAgentToView(previous => (previous && agentRefKey(previous) === key ? updated : previous));
 			agentManagementAPI.invalidateAgentCatalog();
 		},
-		[setPageData]
+		[pageData.defaultAgent, setPageData]
 	);
 
 	const createPlugin = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
 			await agentManagementAPI.createAgentPlugin({
-				rootID: effectivePluginCreationRootID,
+				rootID: defaultPluginCreationRootID,
 				name: slug,
 				displayName,
 				description,
@@ -873,7 +871,20 @@ export default function AgentsPage() {
 
 			await refreshPage();
 		},
-		[effectivePluginCreationRootID, refreshPage]
+		[defaultPluginCreationRootID, refreshPage]
+	);
+
+	const changeDefaultAgent = useCallback(
+		async (agent?: ArtifactRef) => {
+			if (agent) {
+				await agentManagementAPI.setDefaultAgent(agent);
+			} else {
+				await agentManagementAPI.clearDefaultAgent();
+			}
+
+			await refreshPage();
+		},
+		[refreshPage]
 	);
 
 	const updatePlugin = useCallback(
@@ -895,6 +906,11 @@ export default function AgentsPage() {
 		if (!agentToDelete || isDeletingAgent) {
 			return;
 		}
+		if (artifactRefsEqual(pageData.defaultAgent, agentToDelete.ref)) {
+			showAlert('Choose another default Agent or use automatic selection before deleting this Agent.');
+			setAgentToDelete(null);
+			return;
+		}
 
 		setIsDeletingAgent(true);
 
@@ -909,7 +925,7 @@ export default function AgentsPage() {
 				setIsDeletingAgent(false);
 			}
 		}
-	}, [agentToDelete, isDeletingAgent, refreshPage, showAlert]);
+	}, [agentToDelete, isDeletingAgent, pageData.defaultAgent, refreshPage, showAlert]);
 
 	const deletePlugin = useCallback(async () => {
 		if (!pluginToDelete || isDeletingPlugin) {
@@ -975,22 +991,6 @@ export default function AgentsPage() {
 					description="Import immutable Agent recipes, inspect their grouped declarations, configure MCP dependencies, and apply them as Composer starters."
 					actions={
 						<>
-							{pluginCreationRoots.length > 1 ? (
-								<div className="w-56 max-w-72">
-									<Dropdown<string>
-										dropdownItems={pluginCreationRootDropdownItems}
-										orderedKeys={pluginCreationRoots.map(root => root.rootID)}
-										selectedKey={effectivePluginCreationRootID}
-										onChange={setPluginCreationRootID}
-										filterDisabled={false}
-										title="Agent Plugin Root"
-										getDisplayName={rootID =>
-											pluginCreationRoots.find(root => root.rootID === rootID)?.label ?? 'Unavailable destination'
-										}
-									/>
-								</div>
-							) : null}
-
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
@@ -1040,6 +1040,17 @@ export default function AgentsPage() {
 						/>
 					) : null}
 
+					<DefaultAgentControl
+						agents={pageData.agentOptions}
+						defaultAgent={pageData.defaultAgent}
+						pending={isDefaultAgentPending('default-agent')}
+						onChange={ref => {
+							void runDefaultAgentAction('default-agent', () => changeDefaultAgent(ref)).catch((error: unknown) => {
+								showAlert(getErrorMessage(error, 'The default Agent could not be changed.'));
+							});
+						}}
+					/>
+
 					{pageData.plugins.length === 0 && !pageLoadError ? (
 						<p className="mt-8 text-center text-sm">No Agent Plugins are currently available.</p>
 					) : null}
@@ -1061,6 +1072,7 @@ export default function AgentsPage() {
 							onDeleteAgent={setAgentToDelete}
 							onToggleAgentEnabled={toggleAgentEnabled}
 							onActionError={showAlert}
+							defaultAgent={pageData.defaultAgent}
 						/>
 					))}
 				</ManagementPageContent>
@@ -1074,10 +1086,10 @@ export default function AgentsPage() {
 					}}
 					onSubmit={createPlugin}
 					existingSlugs={pageData.plugins
-						.filter(data => data.plugin.ref.rootID === effectivePluginCreationRootID)
+						.filter(data => !defaultPluginCreationRootID || data.plugin.ref.rootID === defaultPluginCreationRootID)
 						.map(data => data.plugin.name)}
 					existingDisplayNames={pageData.plugins
-						.filter(data => data.plugin.ref.rootID === effectivePluginCreationRootID)
+						.filter(data => !defaultPluginCreationRootID || data.plugin.ref.rootID === defaultPluginCreationRootID)
 						.map(data => pluginDisplayName(data.plugin))}
 					failureMessage="Failed to create Agent Plugin."
 				/>

@@ -32,7 +32,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
-import { WorkspaceDefaultPolicyDisclosure } from '@/workspaces/workspace_default_policy_disclosure';
+import { WorkspaceSource } from '@/workspaces/workspace_source';
 
 interface WorkspaceDirectoryManagementModalProps {
 	isOpen: boolean;
@@ -47,6 +47,13 @@ type EffectiveWorkspace = WorkspaceDirectoryView['workspaces'][number];
 function effectiveWorkspaceKey(entry: EffectiveWorkspace): string {
 	const artifact = entry.workspace.artifact;
 	return `${artifact.rootID}:${artifact.id}`;
+}
+
+function effectiveWorkspaceRef(entry: EffectiveWorkspace) {
+	return {
+		rootID: entry.workspace.artifact.rootID,
+		artifactID: entry.workspace.artifact.id,
+	};
 }
 
 function effectiveWorkspaceTitle(entry: EffectiveWorkspace): string {
@@ -403,7 +410,6 @@ function WorkspaceDirectoryManagementModalContent({
 							<span>{actionError}</span>
 						</div>
 					) : null}
-
 					{artifactLoadError ? (
 						<ManagementResourceError
 							title="Workspace item controls could not be loaded"
@@ -412,7 +418,6 @@ function WorkspaceDirectoryManagementModalContent({
 							onRetry={reloadArtifactsOrThrow}
 						/>
 					) : null}
-
 					<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center">
 						<div className="min-w-0 grow">
 							<div className="flex flex-wrap items-center gap-2">
@@ -441,7 +446,6 @@ function WorkspaceDirectoryManagementModalContent({
 							</div>
 						)}
 					</div>
-
 					{directory.workspaces.length > 0 ? (
 						<section className="space-y-2">
 							<div>
@@ -485,11 +489,13 @@ function WorkspaceDirectoryManagementModalContent({
 													{entry.origin === WorkspaceDirectoryOrigin.Default ? 'Automatic' : 'Repository'}
 												</StatusBadge>
 											</div>
-
-											{entry.origin === WorkspaceDirectoryOrigin.Default ? <WorkspaceDefaultPolicyDisclosure /> : null}
 										</div>
 									);
 								})}
+
+								{selectedWorkspace ? (
+									<WorkspaceSource directory={directory.ref} workspace={effectiveWorkspaceRef(selectedWorkspace)} />
+								) : null}
 							</div>
 						</section>
 					) : (
@@ -500,8 +506,7 @@ function WorkspaceDirectoryManagementModalContent({
 								refresh.
 							</span>
 						</div>
-					)}
-
+					)}{' '}
 					{selectedWorkspace && directory.enabled ? (
 						<WorkspaceRuntimeContents
 							key={`${effectiveWorkspaceKey(selectedWorkspace)}:${selectedWorkspace.workspace.artifact.revision}:${runtimePlanVersion}`}
@@ -535,7 +540,6 @@ function WorkspaceDirectoryManagementModalContent({
 							}}
 						/>
 					) : null}
-
 					{directory.diagnostics?.length ? (
 						<section className="space-y-2">
 							<div>
@@ -559,7 +563,6 @@ function WorkspaceDirectoryManagementModalContent({
 							))}
 						</section>
 					) : null}
-
 					{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (
 						<section className="space-y-2">
 							<div>
