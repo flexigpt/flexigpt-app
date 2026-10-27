@@ -11,16 +11,10 @@
 
 - [ ] add wails considerations skill in flexigpt repo.
 
-- [ ] anthropic released sdk v2
-- [x] add as code in md, output format skill too
-- [x] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
-- [x] docs clean
-- [x] after a cancellation backend keeps the run, but frontend projects it twice even if there is a new run.
-- [x] skill selection shows some arbitrary thing rather than skill name. same checks needed for mcps etc. need skill view dropdown type things also. may be better to do a details modal views like agents in the dropdowns.
-- [x] tools dont seem to be loaded from agent. template doesnt go into composer it seems.
-- [x] verify tool and template population and override
-- [ ] the source of skill in agent doesnt show the body, it should the whole json. as of now in agent declarations we show the md body, but it shoudl ideally show the actual md source i.e frontmatter and everything
-- [ ] template args are nto rendered for some reason now.
+- [ ] the source of skill in agent doesn't show the body, it should the whole json. as of now in agent declarations we show the md body, but it should ideally show the actual md source i.e frontmatter and everything
+- [ ] template args are not rendered for some reason now.
+
+- [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 
 ## M-3
 

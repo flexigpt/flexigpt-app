@@ -1130,3 +1130,10 @@
 - [x] title rename is not working in ui i.e if i press edit button on title and rename then i do not get any change anyhwere. there is no backend error
 - [x] plate doc has weird behavior with cursor. sometimes it goes up and sometimes it doesn't, this is when we use arrows etc and there is already a multi line input. this looks like happening during streaming in other tab most probably. may be normally too, but streaming is confirmed issue.
 - [x] if i say cancel a request i.e from stop button, it comes as context cancelled now and not actual error like before. also text or thinking that was streamed is not retained in ui and it shows full assistant replaced with context cancelled. we need to show actual error as appended text with italics and some color error to the bottom of any already streamed thinking or content. that shoudl not go away until user actually closes it. in the backend the streamed one should be retained until either user edits a previous message and sends so we start a new chain or let the partial response be there as empty on error.
+- [x] add as code in md, output format skill too
+- [x] need a skill that says dont use the dont do this do that, and advise with mouthful of words language without solution.
+- [x] docs clean
+- [x] after a cancellation backend keeps the run, but frontend projects it twice even if there is a new run.
+- [x] skill selection shows some arbitrary thing rather than skill name. same checks needed for mcps etc. need skill view dropdown type things also. may be better to do a details modal views like agents in the dropdowns.
+- [x] tools dont seem to be loaded from agent. template doesnt go into composer it seems.
+- [x] verify tool and template population and override
