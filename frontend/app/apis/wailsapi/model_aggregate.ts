@@ -1,5 +1,6 @@
 import type { ArtifactRef, StoreArtifact } from '@/spec/artifact';
 import type {
+	DefaultModelSelection,
 	ManagedProviderCreateRequest,
 	ManagedProviderReplaceRequest,
 	ManagedProviderResult,
@@ -20,6 +21,7 @@ import {
 	ClearProviderAPIKey,
 	CreateProvider,
 	DeleteProvider,
+	GetDefaultModel,
 	GetDefaultProvider,
 	ResetProviderSettings,
 	SaveProviderSettings,
@@ -32,6 +34,10 @@ import {
 export class WailsModelAggregateAPI implements IModelAggregateAPI {
 	async getDefaultProvider(): Promise<ArtifactRef | undefined> {
 		return optionalWailsBody<ArtifactRef>(await GetDefaultProvider(), 'GetDefaultProvider');
+	}
+
+	async getDefaultModel(): Promise<DefaultModelSelection> {
+		return requiredObject<DefaultModelSelection>(await GetDefaultModel(), 'GetDefaultModel');
 	}
 
 	async setDefaultProvider(provider: ArtifactRef): Promise<void> {

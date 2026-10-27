@@ -12,6 +12,30 @@ import * as model$0 from "../../internal/artifactory-go/store/artifact/model/mod
 // @ts-ignore: Unused imports
 import * as workspace$0 from "../../internal/llmartifactory-go/workspace/models.js";
 
+/**
+ * ClearDefaultWorkspace creates the explicit no-default state. It does not
+ * alter the selected Workspace Artifact or its directory Sources.
+ */
+export function ClearDefaultWorkspace(): $CancellablePromise<void> {
+    return $Call.ByName("main.WorkspaceStoreWrapper.ClearDefaultWorkspace");
+}
+
+/**
+ * ExportWorkspaceSource returns the verified portable YAML or JSON source for
+ * one Workspace manifest owned by directory.
+ */
+export function ExportWorkspaceSource(directory: workspace$0.WorkspaceDirectoryRef, workspace: model$0.ArtifactRef): $CancellablePromise<workspace$0.WorkspaceSourceExport> {
+    return $Call.ByName("main.WorkspaceStoreWrapper.ExportWorkspaceSource", directory, workspace);
+}
+
+/**
+ * GetDefaultWorkspace returns nil when no default Workspace is configured.
+ * It does not choose a fallback Workspace.
+ */
+export function GetDefaultWorkspace(): $CancellablePromise<model$0.ArtifactRef | null> {
+    return $Call.ByName("main.WorkspaceStoreWrapper.GetDefaultWorkspace");
+}
+
 export function GetWorkspaceDefaultPolicy(): $CancellablePromise<workspace$0.WorkspaceDefaultPolicyView> {
     return $Call.ByName("main.WorkspaceStoreWrapper.GetWorkspaceDefaultPolicy");
 }
@@ -38,6 +62,10 @@ export function RegisterWorkspaceDirectory(path: string): $CancellablePromise<wo
 
 export function RemoveWorkspaceDirectory(ref: workspace$0.WorkspaceDirectoryRef, expectedRevision: number): $CancellablePromise<void> {
     return $Call.ByName("main.WorkspaceStoreWrapper.RemoveWorkspaceDirectory", ref, expectedRevision);
+}
+
+export function SetDefaultWorkspace(ref: model$0.ArtifactRef): $CancellablePromise<void> {
+    return $Call.ByName("main.WorkspaceStoreWrapper.SetDefaultWorkspace", ref);
 }
 
 export function SetWorkspaceDirectoryArtifactEnabled(directory: workspace$0.WorkspaceDirectoryRef, ref: model$0.ArtifactRef, expectedRevision: number, enabled: boolean): $CancellablePromise<workspace$0.WorkspaceArtifactView> {

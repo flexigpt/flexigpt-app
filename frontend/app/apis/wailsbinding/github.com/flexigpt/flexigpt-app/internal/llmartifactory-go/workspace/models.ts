@@ -197,3 +197,23 @@ export interface WorkspaceSkillLoadPlan {
     "workspace": model$0.ArtifactRef;
     "skills": WorkspaceSkill[] | null;
 }
+
+export interface WorkspaceSourceExport {
+    "content": string;
+    "suggestedFileName": string;
+    "format": WorkspaceSourceFormat;
+}
+
+/**
+ * WorkspaceSourceFormat identifies the portable source syntax returned by
+ * Workspace source export.
+ */
+export enum WorkspaceSourceFormat {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkspaceSourceFormatYAML = "yaml",
+    WorkspaceSourceFormatJSON = "json",
+};

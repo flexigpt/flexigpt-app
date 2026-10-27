@@ -626,6 +626,18 @@ export class AgentManagementAPI {
 		return this.mutate(() => this.agents.deleteManagedAgent(agent, expectedRevision));
 	}
 
+	clearDefaultAgent(): Promise<void> {
+		return this.agents.clearDefaultAgent();
+	}
+
+	getDefaultAgent(): Promise<ArtifactRef | null> {
+		return this.agents.getDefaultAgent();
+	}
+
+	setDefaultAgent(ref: ArtifactRef): Promise<void> {
+		return this.agents.setDefaultAgent(ref);
+	}
+
 	private projectAgentCatalogOptions(agents: AgentView[]): AgentCatalogOption[] {
 		return agents
 			.map(agent => {

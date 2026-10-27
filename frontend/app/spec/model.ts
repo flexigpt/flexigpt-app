@@ -78,6 +78,19 @@ export enum ModelToolChoiceParameterStyle {
 	RequiredNamed = 'requiredNamed',
 }
 
+export enum DefaultModelSource {
+	DefaultModelSourceMutableArtifactData = 'mutableArtifactData',
+	DefaultModelSourceProtectedOverlay = 'protectedOverlay',
+	DefaultModelSourceProviderDeclaration = 'providerDeclaration',
+	DefaultModelSourceFirstEnabledModel = 'firstEnabledLinkedModel',
+}
+
+export interface DefaultModelSelection {
+	provider: ArtifactRef;
+	model: ArtifactRef;
+	source: DefaultModelSource;
+}
+
 export type ModelReasoningLevel = ReasoningLevel | '';
 
 export type ModelJSONSchema = Record<string, unknown> | boolean;

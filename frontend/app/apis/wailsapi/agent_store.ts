@@ -46,6 +46,7 @@ import {
 import {
 	AddAgentPluginArtifactMember,
 	AddAgentPluginMember,
+	ClearDefaultAgent,
 	CommitAgentImport,
 	CreateAgentPlugin,
 	DeleteAgentPlugin,
@@ -53,6 +54,7 @@ import {
 	ExportAgent,
 	GetAgent,
 	GetAgentPlugin,
+	GetDefaultAgent,
 	ListAgentImportDestinations,
 	ListAgentPluginMembers,
 	ListAgentPlugins,
@@ -66,6 +68,7 @@ import {
 	ResolveAgentPluginCapabilities,
 	SetAgentEnabled,
 	SetAgentPluginEnabled,
+	SetDefaultAgent,
 	UpdateAgentPlugin,
 } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/agentstorewrapper';
 
@@ -280,5 +283,17 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 			agent,
 			expectedRevision,
 		} as Parameters<typeof DeleteManagedAgent>[0]);
+	}
+
+	async clearDefaultAgent(): Promise<void> {
+		await ClearDefaultAgent();
+	}
+
+	async getDefaultAgent(): Promise<ArtifactRef | null> {
+		return requiredObject<ArtifactRef>(await GetDefaultAgent(), 'GetDefaultAgent');
+	}
+
+	async setDefaultAgent(ref: ArtifactRef): Promise<void> {
+		await SetDefaultAgent(ref as Parameters<typeof SetDefaultAgent>[0]);
 	}
 }

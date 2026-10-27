@@ -52,6 +52,18 @@ export enum WorkspaceConversationSkillUsageStatus {
 	Unavailable = 'unavailable',
 }
 
+/** @public */
+export enum WorkspaceSourceFormat {
+	WorkspaceSourceFormatYAML = 'yaml',
+	WorkspaceSourceFormatJSON = 'json',
+}
+
+export interface WorkspaceSourceExport {
+	content: string;
+	suggestedFileName: string;
+	format: WorkspaceSourceFormat;
+}
+
 export interface WorkspaceDirectoryRef {
 	rootID: ArtifactRootID;
 }

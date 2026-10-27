@@ -21,6 +21,9 @@ import * as model$0 from "../../internal/artifactory-go/store/artifact/model/mod
 import * as mcp$0 from "../../internal/llmartifactory-go/mcp/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as model$1 from "../../internal/llmartifactory-go/model/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as mcppolicy$0 from "../../internal/mcppolicy/models.js";
 
 export interface ArtifactSkillFilter {
@@ -39,6 +42,17 @@ export interface ArtifactSkillSummary {
     "Insert": document$0.SkillInsert;
     "HasArguments": boolean;
     "HasResources": boolean;
+}
+
+/**
+ * DefaultModelSelection is the consumer-safe effective Model selection for
+ * the required effective Provider. It contains no credentials, local overlay
+ * payload, or runtime configuration.
+ */
+export interface DefaultModelSelection {
+    "provider": model$0.ArtifactRef;
+    "model": model$0.ArtifactRef;
+    "source": model$1.DefaultModelSource;
 }
 
 export interface MCPServerDetails {

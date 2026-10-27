@@ -17,6 +17,18 @@ import * as cryptoutil$0 from "../../cryptoutil/models.js";
 // @ts-ignore: Unused imports
 import * as domain$0 from "./domain/models.js";
 
+export enum DefaultModelSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    DefaultModelSourceMutableArtifactData = "mutableArtifactData",
+    DefaultModelSourceProtectedOverlay = "protectedOverlay",
+    DefaultModelSourceProviderDeclaration = "providerDeclaration",
+    DefaultModelSourceFirstEnabledModel = "firstEnabledLinkedModel",
+};
+
 export interface ManagedModelCreateRequest {
     "rootID": model$0.RootID;
     "document": domain$0.ModelDocument;

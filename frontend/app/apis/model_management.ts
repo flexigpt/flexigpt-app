@@ -2,6 +2,7 @@
 import type { ArtifactRef, CapabilityTarget } from '@/spec/artifact';
 import type { CacheControl, ModelParam, OutputParam, ReasoningParam } from '@/spec/inference';
 import type {
+	DefaultModelSelection,
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
 	ManagedModelResult,
@@ -380,6 +381,10 @@ export class ModelManagementAPI {
 
 	getDefaultProvider(): Promise<ArtifactRef | undefined> {
 		return this.aggregate.getDefaultProvider();
+	}
+
+	getDefaultModel(): Promise<DefaultModelSelection> {
+		return this.aggregate.getDefaultModel();
 	}
 
 	async saveProviderSettings(request: SaveProviderSettingsRequest): Promise<ModelProviderView> {

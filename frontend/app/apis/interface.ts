@@ -51,6 +51,7 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
+	DefaultModelSelection,
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
 	ManagedModelResult,
@@ -161,6 +162,7 @@ import type {
 	WorkspaceRuntimePlan,
 	WorkspaceRuntimeSelection,
 	WorkspaceSkillLoadPlan,
+	WorkspaceSourceExport,
 } from '@/spec/workspace';
 
 export interface ILogger {
@@ -286,6 +288,7 @@ export interface IModelStoreAPI {
 
 export interface IModelAggregateAPI {
 	getDefaultProvider(): Promise<ArtifactRef | undefined>;
+	getDefaultModel(): Promise<DefaultModelSelection>;
 
 	setDefaultProvider(provider: ArtifactRef): Promise<void>;
 
@@ -380,6 +383,10 @@ export interface IAgentStoreAPI {
 	exportAgent(agent: ArtifactRef): Promise<AgentExportResult>;
 
 	deleteManagedAgent(agent: ArtifactRef, expectedRevision: number): Promise<void>;
+
+	clearDefaultAgent(): Promise<void>;
+	getDefaultAgent(): Promise<ArtifactRef | null>;
+	setDefaultAgent(ref: ArtifactRef): Promise<void>;
 }
 
 export interface ITextStoreAPI {
@@ -456,6 +463,11 @@ export interface IWorkspaceStoreAPI {
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<WorkspaceDirectoryView>;
+
+	clearDefaultWorkspace(): Promise<void>;
+	exportWorkspaceSource(directory: WorkspaceDirectoryRef, workspace: ArtifactRef): Promise<WorkspaceSourceExport>;
+	getDefaultWorkspace(): Promise<ArtifactRef | null>;
+	setDefaultWorkspace(ref: ArtifactRef): Promise<void>;
 }
 
 export interface IWorkspaceRuntimeAPI {

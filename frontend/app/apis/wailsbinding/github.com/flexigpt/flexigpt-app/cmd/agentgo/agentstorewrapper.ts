@@ -26,6 +26,14 @@ export function AddAgentPluginMember(request: plugin$0.AddMemberRequest): $Cance
     return $Call.ByName("main.AgentStoreWrapper.AddAgentPluginMember", request);
 }
 
+/**
+ * ClearDefaultAgent removes the explicit override. The effective default then
+ * returns to the protected built-in base Agent selection.
+ */
+export function ClearDefaultAgent(): $CancellablePromise<void> {
+    return $Call.ByName("main.AgentStoreWrapper.ClearDefaultAgent");
+}
+
 export function CommitAgentImport(request: agent$0.AgentImportCommitRequest): $CancellablePromise<agent$0.AgentImportCommitResult> {
     return $Call.ByName("main.AgentStoreWrapper.CommitAgentImport", request);
 }
@@ -52,6 +60,14 @@ export function GetAgent(ref: model$0.ArtifactRef): $CancellablePromise<agent$0.
 
 export function GetAgentPlugin(ref: model$0.ArtifactRef): $CancellablePromise<plugin$0.PluginView> {
     return $Call.ByName("main.AgentStoreWrapper.GetAgentPlugin", ref);
+}
+
+/**
+ * GetDefaultAgent always returns an effective Agent or an error. It first
+ * considers the saved explicit preference, then the built-in base Agent.
+ */
+export function GetDefaultAgent(): $CancellablePromise<model$0.ArtifactRef | null> {
+    return $Call.ByName("main.AgentStoreWrapper.GetDefaultAgent");
 }
 
 export function ListAgentImportDestinations(): $CancellablePromise<agent$0.AgentImportDestination[] | null> {
@@ -109,6 +125,10 @@ export function SetAgentEnabled(ref: model$0.ArtifactRef, expectedRevision: numb
 
 export function SetAgentPluginEnabled(ref: model$0.ArtifactRef, expectedRevision: number, enabled: boolean): $CancellablePromise<plugin$0.PluginView> {
     return $Call.ByName("main.AgentStoreWrapper.SetAgentPluginEnabled", ref, expectedRevision, enabled);
+}
+
+export function SetDefaultAgent(ref: model$0.ArtifactRef): $CancellablePromise<void> {
+    return $Call.ByName("main.AgentStoreWrapper.SetDefaultAgent", ref);
 }
 
 export function UpdateAgentPlugin(request: plugin$0.UpdateRequest): $CancellablePromise<plugin$0.PluginView> {

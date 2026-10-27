@@ -13,6 +13,7 @@ import type {
 	WorkspaceRuntimePlan,
 	WorkspaceRuntimeSelection,
 	WorkspaceSkillLoadPlan,
+	WorkspaceSourceExport,
 } from '@/spec/workspace';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
@@ -171,5 +172,21 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 
 	resolveMappedModelTarget(target: CapabilityTarget): Promise<ModelManagementItem> {
 		return this.models.resolveMappedModelTarget(target);
+	}
+
+	clearDefaultWorkspace(): Promise<void> {
+		return this.store.clearDefaultWorkspace();
+	}
+
+	exportWorkspaceSource(directory: WorkspaceDirectoryRef, workspace: ArtifactRef): Promise<WorkspaceSourceExport> {
+		return this.store.exportWorkspaceSource(directory, workspace);
+	}
+
+	getDefaultWorkspace(): Promise<ArtifactRef | null> {
+		return this.store.getDefaultWorkspace();
+	}
+
+	setDefaultWorkspace(ref: ArtifactRef): Promise<void> {
+		return this.store.setDefaultWorkspace(ref);
 	}
 }

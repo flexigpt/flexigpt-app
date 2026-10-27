@@ -2,6 +2,8 @@ module github.com/flexigpt/flexigpt-app
 
 go 1.27
 
+ignore build
+
 // Tools are installed via the taskfile. Check the associated task.
 
 require (

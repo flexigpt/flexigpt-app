@@ -8,6 +8,7 @@ import type {
 	WorkspaceDirectoryWorkspace,
 	WorkspacePage,
 	WorkspacePageRequest,
+	WorkspaceSourceExport,
 } from '@/spec/workspace';
 import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
@@ -15,6 +16,9 @@ import type { IWorkspaceStoreAPI } from '@/apis/interface';
 import { workspaceDirectoryListItemFromWails } from '@/apis/wailsapi/list_item_projection';
 import { enumFromWails, optionalWailsString, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
+	ClearDefaultWorkspace,
+	ExportWorkspaceSource,
+	GetDefaultWorkspace,
 	GetWorkspaceDefaultPolicy,
 	GetWorkspaceDirectory,
 	ListWorkspaceDirectories,
@@ -22,6 +26,7 @@ import {
 	RefreshWorkspaceDirectory,
 	RegisterWorkspaceDirectory,
 	RemoveWorkspaceDirectory,
+	SetDefaultWorkspace,
 	SetWorkspaceDirectoryArtifactEnabled,
 	SetWorkspaceDirectoryEnabled,
 } from '@/apis/wailsbinding/github.com/flexigpt/flexigpt-app/cmd/agentgo/workspacestorewrapper';
@@ -123,5 +128,29 @@ export class WailsWorkspaceStoreAPI implements IWorkspaceStoreAPI {
 			),
 			'SetWorkspaceDirectoryEnabled'
 		);
+	}
+
+	async clearDefaultWorkspace(): Promise<void> {
+		await ClearDefaultWorkspace();
+	}
+
+	async exportWorkspaceSource(
+		directory: WorkspaceDirectoryRef,
+		workspace: ArtifactRef
+	): Promise<WorkspaceSourceExport> {
+		return requiredObject<WorkspaceSourceExport>(
+			await ExportWorkspaceSource(
+				directory as Parameters<typeof ExportWorkspaceSource>[0],
+				workspace as Parameters<typeof ExportWorkspaceSource>[1]
+			),
+			'ExportWorkspaceSource'
+		);
+	}
+	async getDefaultWorkspace(): Promise<ArtifactRef | null> {
+		return requiredObject<ArtifactRef>(await GetDefaultWorkspace(), 'GetDefaultWorkspace');
+	}
+
+	async setDefaultWorkspace(ref: ArtifactRef): Promise<void> {
+		await SetDefaultWorkspace(ref as Parameters<typeof SetDefaultWorkspace>[0]);
 	}
 }

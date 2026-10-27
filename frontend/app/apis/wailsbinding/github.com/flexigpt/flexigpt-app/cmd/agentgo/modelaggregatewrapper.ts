@@ -18,6 +18,10 @@ import * as model$0 from "../../internal/artifactory-go/store/artifact/model/mod
 // @ts-ignore: Unused imports
 import * as model$1 from "../../internal/llmartifactory-go/model/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 export function ClearDefaultProvider(): $CancellablePromise<void> {
     return $Call.ByName("main.ModelAggregateWrapper.ClearDefaultProvider");
 }
@@ -32,6 +36,14 @@ export function CreateProvider(request: model$1.ManagedProviderCreateRequest): $
 
 export function DeleteProvider(ref: model$0.ArtifactRef, expectedProviderRevision: number): $CancellablePromise<void> {
     return $Call.ByName("main.ModelAggregateWrapper.DeleteProvider", ref, expectedProviderRevision);
+}
+
+/**
+ * GetDefaultModel resolves the existing per-Provider defaultModel selection
+ * for the effective required Provider.
+ */
+export function GetDefaultModel(): $CancellablePromise<$models.DefaultModelSelection> {
+    return $Call.ByName("main.ModelAggregateWrapper.GetDefaultModel");
 }
 
 export function GetDefaultProvider(): $CancellablePromise<model$0.ArtifactRef | null> {
