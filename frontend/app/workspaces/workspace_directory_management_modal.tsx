@@ -12,12 +12,18 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { Loader } from '@/components/loader';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
+import { ModalSection } from '@/components/modal/modal_section';
 
+import { WorkspaceArtifactRecordSource, WorkspaceDirectoryRecordSource } from '@/workspaces/workspace_artifact_source';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceDefaultPolicyDisclosure } from '@/workspaces/workspace_default_policy_disclosure';
 
@@ -341,7 +347,7 @@ function WorkspaceDirectoryManagementModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 flex max-h-[90vh] w-[calc(100%-1rem)] max-w-6xl flex-col overflow-hidden rounded-2xl p-0">
+		<ManagementModalPanel width="wide">
 			<ModalHeader
 				title={`Manage ${directory.root.displayName}`}
 				description="Review the files, Skills, and integrations this repository adds. Advanced discovery controls remain available below."
@@ -349,7 +355,7 @@ function WorkspaceDirectoryManagementModalContent({
 				closeDisabled={Boolean(busy)}
 			/>
 
-			<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+			<ManagementModalBody>
 				{actionError ? (
 					<div className="alert alert-error rounded-2xl text-sm" role="alert">
 						<FiAlertCircle size={15} />
@@ -394,6 +400,9 @@ function WorkspaceDirectoryManagementModalContent({
 						</div>
 					)}
 				</div>
+				<ModalSection title="Workspace directory Artifact">
+					<WorkspaceDirectoryRecordSource directory={directory.ref} />
+				</ModalSection>
 
 				{directory.workspaces.length > 0 ? (
 					<section className="space-y-2">
@@ -489,6 +498,29 @@ function WorkspaceDirectoryManagementModalContent({
 					</section>
 				) : null}
 
+				{artifacts ? (
+					<ModalSection
+						title="Workspace Artifact records"
+						description="Copy or export the current metadata projection for any discovered repository Artifact."
+					>
+						<details className="border-base-content/10 bg-base-100 rounded-xl border">
+							<summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+								Show Artifact records ({artifacts.length})
+							</summary>
+							<div className="border-base-content/10 space-y-3 border-t p-3">
+								{artifacts.map(artifact => (
+									<div key={artifactRefKey(artifact.artifact)} className="border-base-content/10 rounded-xl border p-3">
+										<div className="mb-2 text-sm font-medium">
+											{artifact.displayName || artifact.logicalName || artifact.artifact.artifactID}
+										</div>
+										<WorkspaceArtifactRecordSource directory={directory.ref} artifact={artifact} />
+									</div>
+								))}
+							</div>
+						</details>
+					</ModalSection>
+				) : null}
+
 				{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (
 					<section className="space-y-2">
 						<div>
@@ -537,14 +569,13 @@ function WorkspaceDirectoryManagementModalContent({
 							})}
 					</section>
 				) : null}
-			</div>
+			</ManagementModalBody>
 
 			<ModalActions
-				className="flex justify-between gap-2"
 				leading={
 					<button
 						type="button"
-						className="btn btn-error rounded-xl"
+						className="btn btn-ghost text-error rounded-xl"
 						disabled={Boolean(busy)}
 						onClick={() => {
 							onRequestRemove(directory);
@@ -555,36 +586,34 @@ function WorkspaceDirectoryManagementModalContent({
 					</button>
 				}
 			>
-				<div className="ml-auto flex items-center justify-end gap-2">
-					<button
-						type="button"
-						className="btn btn-ghost rounded-xl"
-						disabled={Boolean(busy)}
-						onClick={() => {
-							void refreshDirectory();
-						}}
-					>
-						<FiRefreshCw size={14} />
-						{busy === 'refresh' ? 'Refreshing...' : 'Refresh repository'}
-					</button>
+				<button
+					type="button"
+					className="btn btn-ghost rounded-xl"
+					disabled={Boolean(busy)}
+					onClick={() => {
+						void refreshDirectory();
+					}}
+				>
+					<FiRefreshCw size={14} />
+					{busy === 'refresh' ? 'Refreshing...' : 'Refresh repository'}
+				</button>
 
-					<button
-						type="button"
-						className="btn btn-ghost rounded-xl"
-						disabled={Boolean(busy)}
-						onClick={() => {
-							void setDirectoryEnabled();
-						}}
-					>
-						{busy === 'enabled' ? 'Saving...' : directory.enabled ? 'Pause repository' : 'Enable repository'}
-					</button>
+				<button
+					type="button"
+					className="btn btn-ghost rounded-xl"
+					disabled={Boolean(busy)}
+					onClick={() => {
+						void setDirectoryEnabled();
+					}}
+				>
+					{busy === 'enabled' ? 'Saving...' : directory.enabled ? 'Pause repository' : 'Enable repository'}
+				</button>
 
-					<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
-						Done
-					</button>
-				</div>
+				<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
+					Done
+				</button>
 			</ModalActions>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -594,7 +623,7 @@ export function WorkspaceDirectoryManagementModal(props: WorkspaceDirectoryManag
 	}
 
 	return (
-		<ModalDialog isOpen onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen onClose={props.onClose} blockCancel>
 			<WorkspaceDirectoryManagementModalContent
 				key={props.directory.ref.rootID}
 				directory={props.directory}
@@ -602,6 +631,6 @@ export function WorkspaceDirectoryManagementModal(props: WorkspaceDirectoryManag
 				onChanged={props.onChanged}
 				onRequestRemove={props.onRequestRemove}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

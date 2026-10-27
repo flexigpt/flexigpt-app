@@ -11,6 +11,7 @@ import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalSection } from '@/components/modal/modal_section';
 
@@ -89,6 +90,14 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 					<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">{plugin.description || '—'}</ManagementInfoRow>
 				</ManagementInfoGrid>
+			</ModalSection>
+
+			<ModalSection title="Plugin Artifact">
+				<ManagementJSONSource
+					label="Skill Plugin document JSON"
+					fileName={`${plugin.name}.json`}
+					load={() => skillManagementAPI.getSkillPlugin(plugin.ref)}
+				/>
 			</ModalSection>
 
 			<ModalSection title="Resolved Skills">

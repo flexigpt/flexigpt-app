@@ -25,9 +25,12 @@ import { serverDraftFromView } from '@/apis/mcp_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -608,694 +611,689 @@ function AddEditMCPServerModalContent({
 	const allValid = Object.keys(validate(form)).length === 0;
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
-				<ModalHeader
-					title={isEdit ? 'Edit MCP Server' : 'Add MCP Server'}
-					description={
-						isEdit
-							? 'Update the server definition and its locally stored credentials.'
-							: `Add a server to ${plugin.displayName}. Secrets are stored locally and separately from the server definition.`
-					}
-					onClose={() => {
-						requestClose();
-					}}
-					closeDisabled={isSubmitting}
-				/>
+		<ManagementModalPanel width="form">
+			<ModalHeader
+				title={isEdit ? 'Edit MCP Server' : 'Add MCP Server'}
+				description={
+					isEdit
+						? 'Update the server definition and its locally stored credentials.'
+						: `Add a server to ${plugin.displayName}. Secrets are stored locally and separately from the server definition.`
+				}
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={isSubmitting}
+			/>
 
-				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-					<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
-						{submitError ? (
-							<div className="alert alert-error rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>{submitError}</span>
-							</div>
-						) : null}
+			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+				<ManagementModalBody>
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
 
-						<ModalSection title="Identity and availability">
-							<ModalField label="Display Name" htmlFor="mcp-display-name" required error={errors.displayName}>
+					<ModalSection title="Identity and availability">
+						<ModalField label="Display Name" htmlFor="mcp-display-name" required error={errors.displayName}>
+							<input
+								id="mcp-display-name"
+								type="text"
+								name="displayName"
+								value={form.displayName}
+								disabled={isSubmitting}
+								autoComplete="off"
+								spellCheck="false"
+								className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+								onChange={handleInput}
+							/>
+						</ModalField>
+
+						<ModalField
+							label="Name"
+							htmlFor="mcp-logical-name"
+							required
+							hint="Stable name inside this MCP Plugin. It cannot be changed after creation."
+							error={errors.logicalName}
+						>
+							<input
+								id="mcp-logical-name"
+								ref={logicalNameInputRef}
+								type="text"
+								name="logicalName"
+								value={form.logicalName}
+								readOnly={isEdit}
+								disabled={isSubmitting}
+								autoComplete="off"
+								spellCheck="false"
+								className={`input w-full rounded-xl ${errors.logicalName ? 'input-error' : ''}`}
+								onChange={handleInput}
+							/>
+						</ModalField>
+
+						<ModalField label="Enabled" htmlFor="mcp-server-enabled">
+							<input
+								id="mcp-server-enabled"
+								type="checkbox"
+								name="enabled"
+								checked={form.enabled}
+								disabled={isSubmitting}
+								className="toggle toggle-accent"
+								onChange={handleInput}
+							/>
+						</ModalField>
+					</ModalSection>
+
+					<ModalSection title="Transport and trust">
+						<ModalField label="Transport">
+							<Dropdown
+								dropdownItems={TRANSPORT_ITEMS}
+								selectedKey={form.transport}
+								onChange={transport => {
+									setFormAndValidate({
+										...form,
+										transport,
+									});
+								}}
+								getDisplayName={getMCPTransportLabel}
+								disabled={isSubmitting}
+								title="Transport"
+								inlineMenu={true}
+							/>
+						</ModalField>
+
+						<ModalField label="Trust">
+							<Dropdown
+								dropdownItems={TRUST_ITEMS}
+								selectedKey={form.trustLevel}
+								onChange={trustLevel => {
+									setFormAndValidate({
+										...form,
+										trustLevel,
+									});
+								}}
+								getDisplayName={getMCPTrustLevelLabel}
+								disabled={isSubmitting}
+								title="Trust level"
+								inlineMenu={true}
+							/>
+						</ModalField>
+					</ModalSection>
+
+					{form.transport === MCPTransportType.Stdio ? (
+						<ModalSection
+							title="Stdio runtime"
+							description="Secret values are materialized only into declared process environment variables."
+						>
+							<ModalField label="Command" htmlFor="mcp-stdio-command" required error={errors.stdioCommand}>
 								<input
-									id="mcp-display-name"
+									id="mcp-stdio-command"
 									type="text"
-									name="displayName"
-									value={form.displayName}
+									name="stdioCommand"
+									value={form.stdioCommand}
 									disabled={isSubmitting}
 									autoComplete="off"
 									spellCheck="false"
-									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.stdioCommand ? 'input-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
+
+							<ModalField label="Arguments" htmlFor="mcp-stdio-args" hint="One argument per line." align="start">
+								<textarea
+									id="mcp-stdio-args"
+									name="stdioArgsText"
+									value={form.stdioArgsText}
+									disabled={isSubmitting}
+									spellCheck="false"
+									className="textarea h-28 w-full rounded-xl"
 									onChange={handleInput}
 								/>
 							</ModalField>
 
 							<ModalField
-								label="Name"
-								htmlFor="mcp-logical-name"
-								required
-								hint="Stable name inside this MCP Plugin. It cannot be changed after creation."
-								error={errors.logicalName}
+								label="Environment JSON"
+								htmlFor="mcp-stdio-environment"
+								hint="Plain non-secret environment values."
+								error={errors.stdioEnvironment}
+								align="start"
+							>
+								<textarea
+									id="mcp-stdio-environment"
+									name="stdioEnvironmentJSON"
+									value={form.stdioEnvironmentJSON}
+									disabled={isSubmitting}
+									spellCheck="false"
+									placeholder='{"NODE_ENV":"production"}'
+									className={`textarea h-28 w-full rounded-xl ${errors.stdioEnvironment ? 'textarea-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
+
+							<ModalField
+								label="Startup Timeout"
+								htmlFor="mcp-stdio-timeout"
+								hint="Optional positive timeout in milliseconds."
+								error={errors.stdioTimeout}
 							>
 								<input
-									id="mcp-logical-name"
-									ref={logicalNameInputRef}
+									id="mcp-stdio-timeout"
+									type="number"
+									name="stdioTimeoutMS"
+									value={form.stdioTimeoutMS}
+									min={1}
+									disabled={isSubmitting}
+									className={`input w-full rounded-xl ${errors.stdioTimeout ? 'input-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
+
+							<ModalSection
+								title="Secret environment variables"
+								description="Existing secrets are represented only as configured bindings."
+								className="bg-base-100/40"
+								actions={
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										disabled={isSubmitting}
+										onClick={addSecretRow}
+									>
+										<FiPlus size={14} />
+										<span className="ml-1">Add Secret</span>
+									</button>
+								}
+							>
+								{errors.stdioSecrets ? (
+									<div className="alert alert-error rounded-2xl text-sm">
+										<FiAlertCircle size={12} />
+										<span>{errors.stdioSecrets}</span>
+									</div>
+								) : null}
+
+								<div className="space-y-3">
+									{form.stdioSecrets.map((row, index) => (
+										<div
+											key={`${row.inputName ?? 'new'}:${index}`}
+											className="border-base-content/10 bg-base-100 rounded-2xl border p-3"
+										>
+											<div className="mb-3 flex items-center justify-between gap-3">
+												<div>
+													<div className="font-semibold">{row.envName || 'New secret variable'}</div>
+													<div className="text-base-content/60 text-xs">
+														Secret values are never displayed after saving.
+													</div>
+												</div>
+												<button
+													type="button"
+													className="btn btn-ghost btn-sm rounded-xl"
+													disabled={isSubmitting}
+													title="Remove secret environment variable"
+													onClick={() => {
+														removeSecretRow(index);
+													}}
+												>
+													<FiTrash2 size={14} />
+												</button>
+											</div>
+
+											<div className="space-y-3">
+												<ModalField label="Environment Variable">
+													<input
+														type="text"
+														value={row.envName}
+														disabled={isSubmitting}
+														autoComplete="off"
+														spellCheck="false"
+														className="input w-full rounded-xl"
+														onChange={event => {
+															updateSecretRow(index, {
+																envName: event.target.value,
+															});
+														}}
+													/>
+												</ModalField>
+
+												<ModalField label={row.existingSecretConfigured ? 'Replace Secret Value' : 'Secret Value'}>
+													<input
+														type="password"
+														value={row.secretValue}
+														disabled={isSubmitting}
+														autoComplete="new-password"
+														className="input w-full rounded-xl"
+														onChange={event => {
+															updateSecretRow(index, {
+																secretValue: event.target.value,
+															});
+														}}
+													/>
+													{row.existingSecretConfigured ? (
+														<p className="text-base-content/60 mt-1 text-xs">
+															Configured. Leave blank to keep the existing secret.
+														</p>
+													) : null}
+												</ModalField>
+
+												{row.existingSecretConfigured ? (
+													<label className="label cursor-pointer justify-start gap-3">
+														<input
+															type="checkbox"
+															className="checkbox checkbox-sm"
+															checked={row.deleteExisting}
+															disabled={isSubmitting}
+															onChange={event => {
+																updateSecretRow(index, {
+																	deleteExisting: event.target.checked,
+																});
+															}}
+														/>
+														<span className="text-sm">Delete existing stored secret</span>
+													</label>
+												) : null}
+											</div>
+										</div>
+									))}
+
+									{form.stdioSecrets.length === 0 ? (
+										<div className="text-base-content/60 text-center text-sm">No secret environment variables.</div>
+									) : null}
+								</div>
+							</ModalSection>
+						</ModalSection>
+					) : null}
+
+					{form.transport === MCPTransportType.StreamableHTTP ? (
+						<ModalSection
+							title="Streamable HTTP runtime"
+							description="Remote endpoints must use HTTPS. Plain HTTP is only accepted for loopback development endpoints."
+						>
+							<ModalField label="URL" htmlFor="mcp-http-url" required error={errors.httpURL}>
+								<input
+									id="mcp-http-url"
 									type="text"
-									name="logicalName"
-									value={form.logicalName}
-									readOnly={isEdit}
+									name="httpURL"
+									value={form.httpURL}
 									disabled={isSubmitting}
 									autoComplete="off"
 									spellCheck="false"
-									className={`input w-full rounded-xl ${errors.logicalName ? 'input-error' : ''}`}
+									placeholder="https://example.com/mcp"
+									className={`input w-full rounded-xl ${errors.httpURL ? 'input-error' : ''}`}
 									onChange={handleInput}
 								/>
 							</ModalField>
 
-							<ModalField label="Enabled" htmlFor="mcp-server-enabled">
-								<input
-									id="mcp-server-enabled"
-									type="checkbox"
-									name="enabled"
-									checked={form.enabled}
-									disabled={isSubmitting}
-									className="toggle toggle-accent"
-									onChange={handleInput}
-								/>
-							</ModalField>
-						</ModalSection>
-
-						<ModalSection title="Transport and trust">
-							<ModalField label="Transport">
-								<Dropdown
-									dropdownItems={TRANSPORT_ITEMS}
-									selectedKey={form.transport}
-									onChange={transport => {
-										setFormAndValidate({
-											...form,
-											transport,
-										});
-									}}
-									getDisplayName={getMCPTransportLabel}
-									disabled={isSubmitting}
-									title="Transport"
-									inlineMenu={true}
-								/>
-							</ModalField>
-
-							<ModalField label="Trust">
-								<Dropdown
-									dropdownItems={TRUST_ITEMS}
-									selectedKey={form.trustLevel}
-									onChange={trustLevel => {
-										setFormAndValidate({
-											...form,
-											trustLevel,
-										});
-									}}
-									getDisplayName={getMCPTrustLevelLabel}
-									disabled={isSubmitting}
-									title="Trust level"
-									inlineMenu={true}
-								/>
-							</ModalField>
-						</ModalSection>
-
-						{form.transport === MCPTransportType.Stdio ? (
-							<ModalSection
-								title="Stdio runtime"
-								description="Secret values are materialized only into declared process environment variables."
+							<ModalField
+								label="Headers JSON"
+								htmlFor="mcp-http-headers"
+								hint="Plain non-secret headers. API-key secrets are configured below."
+								error={errors.httpHeaders}
+								align="start"
 							>
-								<ModalField label="Command" htmlFor="mcp-stdio-command" required error={errors.stdioCommand}>
-									<input
-										id="mcp-stdio-command"
-										type="text"
-										name="stdioCommand"
-										value={form.stdioCommand}
-										disabled={isSubmitting}
-										autoComplete="off"
-										spellCheck="false"
-										className={`input w-full rounded-xl ${errors.stdioCommand ? 'input-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
+								<textarea
+									id="mcp-http-headers"
+									name="httpHeadersJSON"
+									value={form.httpHeadersJSON}
+									disabled={isSubmitting}
+									spellCheck="false"
+									placeholder='{"Accept":"application/json"}'
+									className={`textarea h-28 w-full rounded-xl ${errors.httpHeaders ? 'textarea-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
 
-								<ModalField label="Arguments" htmlFor="mcp-stdio-args" hint="One argument per line." align="start">
-									<textarea
-										id="mcp-stdio-args"
-										name="stdioArgsText"
-										value={form.stdioArgsText}
-										disabled={isSubmitting}
-										spellCheck="false"
-										className="textarea h-28 w-full rounded-xl"
-										onChange={handleInput}
-									/>
-								</ModalField>
+							<ModalField
+								label="Timeout"
+								htmlFor="mcp-http-timeout"
+								hint="Optional positive timeout in milliseconds."
+								error={errors.httpTimeout}
+							>
+								<input
+									id="mcp-http-timeout"
+									type="number"
+									name="httpTimeoutMS"
+									value={form.httpTimeoutMS}
+									min={1}
+									disabled={isSubmitting}
+									className={`input w-full rounded-xl ${errors.httpTimeout ? 'input-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
 
-								<ModalField
-									label="Environment JSON"
-									htmlFor="mcp-stdio-environment"
-									hint="Plain non-secret environment values."
-									error={errors.stdioEnvironment}
-									align="start"
-								>
-									<textarea
-										id="mcp-stdio-environment"
-										name="stdioEnvironmentJSON"
-										value={form.stdioEnvironmentJSON}
-										disabled={isSubmitting}
-										spellCheck="false"
-										placeholder='{"NODE_ENV":"production"}'
-										className={`textarea h-28 w-full rounded-xl ${errors.stdioEnvironment ? 'textarea-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
+							<ModalField label="Auth Mode">
+								<Dropdown
+									dropdownItems={AUTH_ITEMS}
+									selectedKey={form.httpAuthMode}
+									onChange={httpAuthMode => {
+										setFormAndValidate({
+											...form,
+											httpAuthMode,
+										});
+									}}
+									getDisplayName={getMCPHTTPAuthModeLabel}
+									disabled={isSubmitting}
+									title="Auth mode"
+									inlineMenu={true}
+								/>
+							</ModalField>
 
-								<ModalField
-									label="Startup Timeout"
-									htmlFor="mcp-stdio-timeout"
-									hint="Optional positive timeout in milliseconds."
-									error={errors.stdioTimeout}
-								>
-									<input
-										id="mcp-stdio-timeout"
-										type="number"
-										name="stdioTimeoutMS"
-										value={form.stdioTimeoutMS}
-										min={1}
-										disabled={isSubmitting}
-										className={`input w-full rounded-xl ${errors.stdioTimeout ? 'input-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
-
+							{form.httpAuthMode === MCPHTTPAuthMode.APIKey ? (
 								<ModalSection
-									title="Secret environment variables"
-									description="Existing secrets are represented only as configured bindings."
+									title="API key secret"
+									description="The secret value is stored separately and substituted only into this declared header."
 									className="bg-base-100/40"
-									actions={
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											disabled={isSubmitting}
-											onClick={addSecretRow}
-										>
-											<FiPlus size={14} />
-											<span className="ml-1">Add Secret</span>
-										</button>
-									}
 								>
-									{errors.stdioSecrets ? (
-										<div className="alert alert-error rounded-2xl text-sm">
-											<FiAlertCircle size={12} />
-											<span>{errors.stdioSecrets}</span>
-										</div>
+									<ModalField label="Header Name" error={errors.httpAPIKey}>
+										<input
+											type="text"
+											name="httpAPIKeyHeaderName"
+											value={form.httpAPIKeyHeaderName}
+											disabled={isSubmitting}
+											autoComplete="off"
+											spellCheck="false"
+											className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
+											onChange={handleInput}
+										/>
+									</ModalField>
+
+									<ModalField label="Value Prefix" hint='For example, "Bearer ".'>
+										<input
+											type="text"
+											name="httpAPIKeyPrefix"
+											value={form.httpAPIKeyPrefix}
+											disabled={isSubmitting}
+											autoComplete="off"
+											className="input w-full rounded-xl"
+											onChange={handleInput}
+										/>
+									</ModalField>
+
+									<ModalField label="Value Suffix">
+										<input
+											type="text"
+											name="httpAPIKeySuffix"
+											value={form.httpAPIKeySuffix}
+											disabled={isSubmitting}
+											autoComplete="off"
+											className="input w-full rounded-xl"
+											onChange={handleInput}
+										/>
+									</ModalField>
+
+									<ModalField label="API Key" error={errors.httpAPIKey}>
+										<input
+											type="password"
+											name="httpAPIKeyValue"
+											value={form.httpAPIKeyValue}
+											disabled={isSubmitting}
+											autoComplete="new-password"
+											className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
+											onChange={handleInput}
+										/>
+										{initialDraft.httpAPIKey?.existingSecretConfigured ? (
+											<p className="text-base-content/60 mt-1 text-xs">
+												Configured. Leave blank to keep the existing key.
+											</p>
+										) : null}
+									</ModalField>
+
+									{initialDraft.httpAPIKey?.existingSecretConfigured ? (
+										<label className="label cursor-pointer justify-start gap-3">
+											<input
+												type="checkbox"
+												name="httpAPIKeyDeleteExisting"
+												checked={form.httpAPIKeyDeleteExisting}
+												disabled={isSubmitting}
+												className="checkbox checkbox-sm"
+												onChange={handleInput}
+											/>
+											<span className="text-sm">Delete existing API key</span>
+										</label>
+									) : null}
+								</ModalSection>
+							) : null}
+
+							{form.httpAuthMode === MCPHTTPAuthMode.OAuth ||
+							form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials ? (
+								<ModalSection
+									title="OAuth client credentials"
+									description="OAuth client credentials are local secret values. Authorization-code OAuth can omit them when dynamic registration is supported."
+									className="bg-base-100/40"
+								>
+									{form.httpAuthMode === MCPHTTPAuthMode.OAuth ? (
+										<label className="label cursor-pointer justify-start gap-3">
+											<input
+												type="checkbox"
+												name="httpUseOAuthClientCredentials"
+												checked={form.httpUseOAuthClientCredentials}
+												disabled={isSubmitting}
+												className="checkbox checkbox-sm"
+												onChange={handleInput}
+											/>
+											<span className="text-sm">Use pre-registered OAuth client credentials</span>
+										</label>
 									) : null}
 
-									<div className="space-y-3">
-										{form.stdioSecrets.map((row, index) => (
-											<div
-												key={`${row.inputName ?? 'new'}:${index}`}
-												className="border-base-content/10 bg-base-100 rounded-2xl border p-3"
-											>
-												<div className="mb-3 flex items-center justify-between gap-3">
-													<div>
-														<div className="font-semibold">{row.envName || 'New secret variable'}</div>
-														<div className="text-base-content/60 text-xs">
-															Secret values are never displayed after saving.
-														</div>
-													</div>
-													<button
-														type="button"
-														className="btn btn-ghost btn-sm rounded-xl"
-														disabled={isSubmitting}
-														title="Remove secret environment variable"
-														onClick={() => {
-															removeSecretRow(index);
-														}}
-													>
-														<FiTrash2 size={14} />
-													</button>
-												</div>
-
-												<div className="space-y-3">
-													<ModalField label="Environment Variable">
-														<input
-															type="text"
-															value={row.envName}
-															disabled={isSubmitting}
-															autoComplete="off"
-															spellCheck="false"
-															className="input w-full rounded-xl"
-															onChange={event => {
-																updateSecretRow(index, {
-																	envName: event.target.value,
-																});
-															}}
-														/>
-													</ModalField>
-
-													<ModalField label={row.existingSecretConfigured ? 'Replace Secret Value' : 'Secret Value'}>
-														<input
-															type="password"
-															value={row.secretValue}
-															disabled={isSubmitting}
-															autoComplete="new-password"
-															className="input w-full rounded-xl"
-															onChange={event => {
-																updateSecretRow(index, {
-																	secretValue: event.target.value,
-																});
-															}}
-														/>
-														{row.existingSecretConfigured ? (
-															<p className="text-base-content/60 mt-1 text-xs">
-																Configured. Leave blank to keep the existing secret.
-															</p>
-														) : null}
-													</ModalField>
-
-													{row.existingSecretConfigured ? (
-														<label className="label cursor-pointer justify-start gap-3">
-															<input
-																type="checkbox"
-																className="checkbox checkbox-sm"
-																checked={row.deleteExisting}
-																disabled={isSubmitting}
-																onChange={event => {
-																	updateSecretRow(index, {
-																		deleteExisting: event.target.checked,
-																	});
-																}}
-															/>
-															<span className="text-sm">Delete existing stored secret</span>
-														</label>
-													) : null}
-												</div>
-											</div>
-										))}
-
-										{form.stdioSecrets.length === 0 ? (
-											<div className="text-base-content/60 text-center text-sm">No secret environment variables.</div>
-										) : null}
-									</div>
-								</ModalSection>
-							</ModalSection>
-						) : null}
-
-						{form.transport === MCPTransportType.StreamableHTTP ? (
-							<ModalSection
-								title="Streamable HTTP runtime"
-								description="Remote endpoints must use HTTPS. Plain HTTP is only accepted for loopback development endpoints."
-							>
-								<ModalField label="URL" htmlFor="mcp-http-url" required error={errors.httpURL}>
-									<input
-										id="mcp-http-url"
-										type="text"
-										name="httpURL"
-										value={form.httpURL}
-										disabled={isSubmitting}
-										autoComplete="off"
-										spellCheck="false"
-										placeholder="https://example.com/mcp"
-										className={`input w-full rounded-xl ${errors.httpURL ? 'input-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
-
-								<ModalField
-									label="Headers JSON"
-									htmlFor="mcp-http-headers"
-									hint="Plain non-secret headers. API-key secrets are configured below."
-									error={errors.httpHeaders}
-									align="start"
-								>
-									<textarea
-										id="mcp-http-headers"
-										name="httpHeadersJSON"
-										value={form.httpHeadersJSON}
-										disabled={isSubmitting}
-										spellCheck="false"
-										placeholder='{"Accept":"application/json"}'
-										className={`textarea h-28 w-full rounded-xl ${errors.httpHeaders ? 'textarea-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
-
-								<ModalField
-									label="Timeout"
-									htmlFor="mcp-http-timeout"
-									hint="Optional positive timeout in milliseconds."
-									error={errors.httpTimeout}
-								>
-									<input
-										id="mcp-http-timeout"
-										type="number"
-										name="httpTimeoutMS"
-										value={form.httpTimeoutMS}
-										min={1}
-										disabled={isSubmitting}
-										className={`input w-full rounded-xl ${errors.httpTimeout ? 'input-error' : ''}`}
-										onChange={handleInput}
-									/>
-								</ModalField>
-
-								<ModalField label="Auth Mode">
-									<Dropdown
-										dropdownItems={AUTH_ITEMS}
-										selectedKey={form.httpAuthMode}
-										onChange={httpAuthMode => {
-											setFormAndValidate({
-												...form,
-												httpAuthMode,
-											});
-										}}
-										getDisplayName={getMCPHTTPAuthModeLabel}
-										disabled={isSubmitting}
-										title="Auth mode"
-										inlineMenu={true}
-									/>
-								</ModalField>
-
-								{form.httpAuthMode === MCPHTTPAuthMode.APIKey ? (
-									<ModalSection
-										title="API key secret"
-										description="The secret value is stored separately and substituted only into this declared header."
-										className="bg-base-100/40"
-									>
-										<ModalField label="Header Name" error={errors.httpAPIKey}>
-											<input
-												type="text"
-												name="httpAPIKeyHeaderName"
-												value={form.httpAPIKeyHeaderName}
+									{form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials || form.httpUseOAuthClientCredentials ? (
+										<ModalField
+											label="Client Credentials JSON"
+											hint='{"clientID":"...","clientSecret":"..."}'
+											error={errors.httpCredentials}
+											align="start"
+										>
+											<textarea
+												name="httpOAuthCredentialsJSON"
+												value={form.httpOAuthCredentialsJSON}
 												disabled={isSubmitting}
-												autoComplete="off"
 												spellCheck="false"
-												className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
+												placeholder='{"clientID":"...","clientSecret":"..."}'
+												className={`textarea h-28 w-full rounded-xl ${errors.httpCredentials ? 'textarea-error' : ''}`}
 												onChange={handleInput}
 											/>
-										</ModalField>
-
-										<ModalField label="Value Prefix" hint='For example, "Bearer ".'>
-											<input
-												type="text"
-												name="httpAPIKeyPrefix"
-												value={form.httpAPIKeyPrefix}
-												disabled={isSubmitting}
-												autoComplete="off"
-												className="input w-full rounded-xl"
-												onChange={handleInput}
-											/>
-										</ModalField>
-
-										<ModalField label="Value Suffix">
-											<input
-												type="text"
-												name="httpAPIKeySuffix"
-												value={form.httpAPIKeySuffix}
-												disabled={isSubmitting}
-												autoComplete="off"
-												className="input w-full rounded-xl"
-												onChange={handleInput}
-											/>
-										</ModalField>
-
-										<ModalField label="API Key" error={errors.httpAPIKey}>
-											<input
-												type="password"
-												name="httpAPIKeyValue"
-												value={form.httpAPIKeyValue}
-												disabled={isSubmitting}
-												autoComplete="new-password"
-												className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
-												onChange={handleInput}
-											/>
-											{initialDraft.httpAPIKey?.existingSecretConfigured ? (
+											{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
 												<p className="text-base-content/60 mt-1 text-xs">
-													Configured. Leave blank to keep the existing key.
+													Configured. Leave blank to keep the existing credentials.
 												</p>
 											) : null}
 										</ModalField>
+									) : null}
 
-										{initialDraft.httpAPIKey?.existingSecretConfigured ? (
-											<label className="label cursor-pointer justify-start gap-3">
-												<input
-													type="checkbox"
-													name="httpAPIKeyDeleteExisting"
-													checked={form.httpAPIKeyDeleteExisting}
-													disabled={isSubmitting}
-													className="checkbox checkbox-sm"
-													onChange={handleInput}
-												/>
-												<span className="text-sm">Delete existing API key</span>
-											</label>
-										) : null}
-									</ModalSection>
-								) : null}
+									{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
+										<label className="label cursor-pointer justify-start gap-3">
+											<input
+												type="checkbox"
+												name="httpOAuthDeleteExisting"
+												checked={form.httpOAuthDeleteExisting}
+												disabled={isSubmitting}
+												className="checkbox checkbox-sm"
+												onChange={handleInput}
+											/>
+											<span className="text-sm">Delete existing OAuth client credentials</span>
+										</label>
+									) : null}
 
-								{form.httpAuthMode === MCPHTTPAuthMode.OAuth ||
-								form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials ? (
-									<ModalSection
-										title="OAuth client credentials"
-										description="OAuth client credentials are local secret values. Authorization-code OAuth can omit them when dynamic registration is supported."
-										className="bg-base-100/40"
-									>
-										{form.httpAuthMode === MCPHTTPAuthMode.OAuth ? (
-											<label className="label cursor-pointer justify-start gap-3">
-												<input
-													type="checkbox"
-													name="httpUseOAuthClientCredentials"
-													checked={form.httpUseOAuthClientCredentials}
-													disabled={isSubmitting}
-													className="checkbox checkbox-sm"
-													onChange={handleInput}
-												/>
-												<span className="text-sm">Use pre-registered OAuth client credentials</span>
-											</label>
-										) : null}
-
-										{form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials || form.httpUseOAuthClientCredentials ? (
-											<ModalField
-												label="Client Credentials JSON"
-												hint='{"clientID":"...","clientSecret":"..."}'
-												error={errors.httpCredentials}
-												align="start"
-											>
-												<textarea
-													name="httpOAuthCredentialsJSON"
-													value={form.httpOAuthCredentialsJSON}
-													disabled={isSubmitting}
-													spellCheck="false"
-													placeholder='{"clientID":"...","clientSecret":"..."}'
-													className={`textarea h-28 w-full rounded-xl ${
-														errors.httpCredentials ? 'textarea-error' : ''
-													}`}
-													onChange={handleInput}
-												/>
-												{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
-													<p className="text-base-content/60 mt-1 text-xs">
-														Configured. Leave blank to keep the existing credentials.
-													</p>
-												) : null}
-											</ModalField>
-										) : null}
-
-										{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
-											<label className="label cursor-pointer justify-start gap-3">
-												<input
-													type="checkbox"
-													name="httpOAuthDeleteExisting"
-													checked={form.httpOAuthDeleteExisting}
-													disabled={isSubmitting}
-													className="checkbox checkbox-sm"
-													onChange={handleInput}
-												/>
-												<span className="text-sm">Delete existing OAuth client credentials</span>
-											</label>
-										) : null}
-
-										{form.httpAuthMode === MCPHTTPAuthMode.OAuth ? (
-											<ModalField label="Client ID Metadata URL" error={errors.httpMetadataURL}>
-												<input
-													type="text"
-													name="httpClientIDMetadataDocumentURL"
-													value={form.httpClientIDMetadataDocumentURL}
-													disabled={isSubmitting}
-													autoComplete="off"
-													spellCheck="false"
-													placeholder="https://client.example.com/flexigpt-mcp-client.json"
-													className={`input w-full rounded-xl ${errors.httpMetadataURL ? 'input-error' : ''}`}
-													onChange={handleInput}
-												/>
-											</ModalField>
-										) : null}
-									</ModalSection>
-								) : null}
-							</ModalSection>
-						) : null}
-
-						<ModalSection
-							title="Default tool policy"
-							description="This policy controls the default behavior of tools exposed by this server."
-						>
-							<ModalField label="Execution">
-								<Dropdown
-									dropdownItems={EXECUTION_ITEMS}
-									selectedKey={form.defaultExecutionMode}
-									onChange={defaultExecutionMode => {
-										setFormAndValidate({
-											...form,
-											defaultExecutionMode,
-										});
-									}}
-									getDisplayName={getMCPExecutionModeLabel}
-									disabled={isSubmitting}
-									title="Default execution"
-									inlineMenu={true}
-								/>
-							</ModalField>
-
-							<ModalField label="Approval">
-								<Dropdown
-									dropdownItems={APPROVAL_ITEMS}
-									selectedKey={form.defaultApprovalRule}
-									onChange={defaultApprovalRule => {
-										setFormAndValidate({
-											...form,
-											defaultApprovalRule,
-										});
-									}}
-									getDisplayName={getMCPApprovalRuleLabel}
-									disabled={isSubmitting}
-									title="Default approval"
-									inlineMenu={true}
-								/>
-							</ModalField>
-
-							<ModalField label="Require approval for" align="start">
-								<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="requireApprovalForUnknownRisk"
-											checked={form.requireApprovalForUnknownRisk}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Unknown risk</span>
-									</label>
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="requireApprovalForWrite"
-											checked={form.requireApprovalForWrite}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Write</span>
-									</label>
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="requireApprovalForDestructive"
-											checked={form.requireApprovalForDestructive}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Destructive</span>
-									</label>
-								</div>
-							</ModalField>
+									{form.httpAuthMode === MCPHTTPAuthMode.OAuth ? (
+										<ModalField label="Client ID Metadata URL" error={errors.httpMetadataURL}>
+											<input
+												type="text"
+												name="httpClientIDMetadataDocumentURL"
+												value={form.httpClientIDMetadataDocumentURL}
+												disabled={isSubmitting}
+												autoComplete="off"
+												spellCheck="false"
+												placeholder="https://client.example.com/flexigpt-mcp-client.json"
+												className={`input w-full rounded-xl ${errors.httpMetadataURL ? 'input-error' : ''}`}
+												onChange={handleInput}
+											/>
+										</ModalField>
+									) : null}
+								</ModalSection>
+							) : null}
 						</ModalSection>
+					) : null}
 
-						<ModalSection title="MCP Apps policy">
-							<ModalField label="App behavior" align="start">
-								<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="appsEnabled"
-											checked={form.appsEnabled}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Advertise and render MCP Apps</span>
-									</label>
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="appsAllowToolCalls"
-											checked={form.appsAllowToolCalls}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Allow app-initiated tool calls</span>
-									</label>
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="appsRequireOpenLinkApproval"
-											checked={form.appsRequireOpenLinkApproval}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Approve open-link actions</span>
-									</label>
-									<label className="label cursor-pointer justify-start gap-3">
-										<input
-											type="checkbox"
-											name="appsRequireContextUpdateApproval"
-											checked={form.appsRequireContextUpdateApproval}
-											disabled={isSubmitting}
-											className="checkbox checkbox-sm"
-											onChange={handleInput}
-										/>
-										<span className="text-sm">Approve context updates</span>
-									</label>
-								</div>
-							</ModalField>
-						</ModalSection>
+					<ModalSection
+						title="Default tool policy"
+						description="This policy controls the default behavior of tools exposed by this server."
+					>
+						<ModalField label="Execution">
+							<Dropdown
+								dropdownItems={EXECUTION_ITEMS}
+								selectedKey={form.defaultExecutionMode}
+								onChange={defaultExecutionMode => {
+									setFormAndValidate({
+										...form,
+										defaultExecutionMode,
+									});
+								}}
+								getDisplayName={getMCPExecutionModeLabel}
+								disabled={isSubmitting}
+								title="Default execution"
+								inlineMenu={true}
+							/>
+						</ModalField>
 
-						<ModalSection
-							title="Per-tool policy overrides"
-							description="Optional object keyed by discovered MCP tool name."
-						>
-							<ModalField label="Tool Policies JSON" error={errors.toolPolicies} align="start">
-								<textarea
-									name="toolPoliciesJSON"
-									value={form.toolPoliciesJSON}
-									disabled={isSubmitting}
-									spellCheck="false"
-									placeholder='{"tool_name":{"toolName":"tool_name","approvalRule":"ask"}}'
-									className={`textarea h-36 w-full rounded-xl ${errors.toolPolicies ? 'textarea-error' : ''}`}
-									onChange={handleInput}
-								/>
-							</ModalField>
-						</ModalSection>
-					</div>
+						<ModalField label="Approval">
+							<Dropdown
+								dropdownItems={APPROVAL_ITEMS}
+								selectedKey={form.defaultApprovalRule}
+								onChange={defaultApprovalRule => {
+									setFormAndValidate({
+										...form,
+										defaultApprovalRule,
+									});
+								}}
+								getDisplayName={getMCPApprovalRuleLabel}
+								disabled={isSubmitting}
+								title="Default approval"
+								inlineMenu={true}
+							/>
+						</ModalField>
 
-					<ModalActions>
-						<button
-							type="button"
-							className="btn bg-base-300 rounded-xl"
-							disabled={isSubmitting}
-							onClick={() => {
-								requestClose();
-							}}
-						>
-							Cancel
-						</button>
-						<button type="submit" className="btn btn-primary rounded-xl" disabled={!allValid || isSubmitting}>
-							{isSubmitting ? 'Saving...' : 'Save'}
-						</button>
-					</ModalActions>
-				</form>
-			</div>
-			<ModalBackdrop enabled={false} />
-		</>
+						<ModalField label="Require approval for" align="start">
+							<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="requireApprovalForUnknownRisk"
+										checked={form.requireApprovalForUnknownRisk}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Unknown risk</span>
+								</label>
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="requireApprovalForWrite"
+										checked={form.requireApprovalForWrite}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Write</span>
+								</label>
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="requireApprovalForDestructive"
+										checked={form.requireApprovalForDestructive}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Destructive</span>
+								</label>
+							</div>
+						</ModalField>
+					</ModalSection>
+
+					<ModalSection title="MCP Apps policy">
+						<ModalField label="App behavior" align="start">
+							<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="appsEnabled"
+										checked={form.appsEnabled}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Advertise and render MCP Apps</span>
+								</label>
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="appsAllowToolCalls"
+										checked={form.appsAllowToolCalls}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Allow app-initiated tool calls</span>
+								</label>
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="appsRequireOpenLinkApproval"
+										checked={form.appsRequireOpenLinkApproval}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Approve open-link actions</span>
+								</label>
+								<label className="label cursor-pointer justify-start gap-3">
+									<input
+										type="checkbox"
+										name="appsRequireContextUpdateApproval"
+										checked={form.appsRequireContextUpdateApproval}
+										disabled={isSubmitting}
+										className="checkbox checkbox-sm"
+										onChange={handleInput}
+									/>
+									<span className="text-sm">Approve context updates</span>
+								</label>
+							</div>
+						</ModalField>
+					</ModalSection>
+
+					<ModalSection
+						title="Per-tool policy overrides"
+						description="Optional object keyed by discovered MCP tool name."
+					>
+						<ModalField label="Tool Policies JSON" error={errors.toolPolicies} align="start">
+							<textarea
+								name="toolPoliciesJSON"
+								value={form.toolPoliciesJSON}
+								disabled={isSubmitting}
+								spellCheck="false"
+								placeholder='{"tool_name":{"toolName":"tool_name","approvalRule":"ask"}}'
+								className={`textarea h-36 w-full rounded-xl ${errors.toolPolicies ? 'textarea-error' : ''}`}
+								onChange={handleInput}
+							/>
+						</ModalField>
+					</ModalSection>
+				</ManagementModalBody>
+
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						disabled={isSubmitting}
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={!allValid || isSubmitting}>
+						{isSubmitting ? 'Saving...' : 'Save'}
+					</button>
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -1309,8 +1307,8 @@ export function AddEditMCPServerModal(props: AddEditMCPServerModalProps) {
 		: 'new';
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<AddEditMCPServerModalContent key={modalKey} {...props} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

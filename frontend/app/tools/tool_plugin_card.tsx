@@ -6,12 +6,14 @@ import type { ToolStoreListItem } from '@/spec/tool';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
+import { toolManagementAPI } from '@/apis/baseapi';
 import { toolDisplayName, toolPluginDisplayName } from '@/apis/tool_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { EnabledControl } from '@/components/managementui/enabled_control';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
@@ -164,6 +166,13 @@ export function ToolPluginCard({
 										</>
 									}
 								>
+									<div className="mt-3">
+										<ManagementJSONSource
+											label="tool definition JSON"
+											fileName={`${tool.name}.json`}
+											load={() => toolManagementAPI.getTool(tool.ref)}
+										/>
+									</div>
 									<div className="mt-4 flex flex-wrap items-center gap-3">
 										<EnabledControl
 											id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}

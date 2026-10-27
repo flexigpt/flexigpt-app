@@ -12,11 +12,17 @@ import { mergeModelCapabilities } from '@/lib/model_capability_helpers';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { ModelManagementItem, ModelProviderManagementItem } from '@/apis/model_management';
+import { modelManagementAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -298,7 +304,7 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 	};
 
 	return (
-		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+		<ManagementModalPanel width="form">
 			<ModalHeader
 				title={title}
 				description={`Provider: ${provider.list.displayName || 'Provider'}`}
@@ -309,7 +315,7 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 			/>
 
 			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
-				<div className={`app-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${MANAGEMENT_MODAL_FORM_CLASS}`}>
+				<ManagementModalBody className={MANAGEMENT_MODAL_FORM_CLASS}>
 					{submitError ? (
 						<div className="alert alert-error rounded-xl text-sm" role="alert">
 							<div className="flex items-center gap-2">
@@ -403,6 +409,17 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 						</ModalField>
 					</ModalSection>
 
+					{model ? (
+						<ModalSection title="Saved Model Artifact">
+							<ManagementJSONSource
+								label="model document JSON"
+								fileName={`${model.view.document.name}.json`}
+								load={async () => (await modelManagementAPI.getModel(model.list.ref)).document}
+								note="Exports the saved Artifact document. Unsaved editor changes are not exported."
+							/>
+						</ModalSection>
+					) : null}
+
 					<ModelRuntimeDefaultsFields
 						value={form.runtime}
 						errors={errors.runtime}
@@ -427,7 +444,7 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 							});
 						}}
 					/>
-				</div>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button
@@ -452,29 +469,29 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 					) : null}
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
 function MissingProviderModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose}>
-			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-lg rounded-2xl p-0">
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose}>
+			<ManagementModalPanel width="compact">
 				<ModalHeader
 					title="Model Unavailable"
 					description="The provider for this model is no longer available."
 					onClose={onClose}
 				/>
-				<div className="p-6 text-sm">
+				<ManagementModalBody className="text-sm">
 					Choose an available provider before adding a model, or reload the page if this model was changed elsewhere.
-				</div>
+				</ManagementModalBody>
 				<ModalActions>
 					<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
 						Close
 					</button>
 				</ModalActions>
-			</div>
-		</ModalDialog>
+			</ManagementModalPanel>
+		</ManagementModalDialog>
 	);
 }
 
@@ -505,7 +522,7 @@ export function ModelAddEditModal({
 				}:${model?.list.revision ?? 0}`;
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel={mode !== ModelModalMode.View}>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} blockCancel={mode !== ModelModalMode.View}>
 			<ModelAddEditModalContent
 				key={key}
 				mode={mode}
@@ -514,6 +531,6 @@ export function ModelAddEditModal({
 				allModels={allModels}
 				onSubmit={onSubmit}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

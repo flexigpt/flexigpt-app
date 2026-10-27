@@ -8,9 +8,12 @@ import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { getMCPServerAuthHealthBadgeClass, getMCPServerAuthHealthLabel } from '@/apis/mcp_management';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface MCPOAuthAuthorizationModalProps {
@@ -78,136 +81,133 @@ function MCPOAuthAuthorizationModalContent({
 	};
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl p-0">
-				<div className="app-scrollbar-thin p-4 sm:p-6">
-					<ModalHeader
-						title={isAuthorized ? 'OAuth authorization completed' : 'Connect with OAuth'}
-						description={
-							isAuthorized
-								? `${server.displayName} is completing MCP discovery.`
-								: `${server.displayName} needs browser authorization before FlexiGPT can connect.`
-						}
-						onClose={() => {
-							requestClose();
-						}}
-						closeDisabled={isCancelling}
-					/>
+		<ManagementModalPanel width="compact">
+			<ModalHeader
+				title={isAuthorized ? 'OAuth authorization completed' : 'Connect with OAuth'}
+				description={
+					isAuthorized
+						? `${server.displayName} is completing MCP discovery.`
+						: `${server.displayName} needs browser authorization before FlexiGPT can connect.`
+				}
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={isCancelling}
+			/>
 
-					<div className="mb-4 flex flex-wrap items-center gap-2">
-						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}>
-							{getMCPServerAuthHealthLabel(server, authHealth)}
-						</span>
-						{authHealth?.authorizationExpiresAt ? (
-							<span className="text-base-content/60 text-xs">Expires at {authHealth.authorizationExpiresAt}</span>
+			<ManagementModalBody>
+				<div className="mb-4 flex flex-wrap items-center gap-2">
+					<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}>
+						{getMCPServerAuthHealthLabel(server, authHealth)}
+					</span>
+					{authHealth?.authorizationExpiresAt ? (
+						<span className="text-base-content/60 text-xs">Expires at {authHealth.authorizationExpiresAt}</span>
+					) : null}
+				</div>
+
+				{isAuthorized ? (
+					<div className="alert alert-success rounded-2xl text-sm">
+						{isReady
+							? 'Authorization and MCP connection completed.'
+							: isConnecting
+								? 'Authorization completed. FlexiGPT is loading MCP capabilities.'
+								: 'Authorization completed.'}
+					</div>
+				) : (
+					<div className="space-y-4">
+						<div className="bg-base-100 rounded-2xl p-4 text-sm">
+							<ol className="list-decimal space-y-2 pl-5">
+								<li>Open the authorization page.</li>
+								<li>Complete login and consent in your browser.</li>
+								<li>Keep FlexiGPT open while the browser returns to its loopback callback.</li>
+								<li>FlexiGPT finishes the authorization flow automatically.</li>
+							</ol>
+						</div>
+
+						{authorizationURL ? (
+							<div className="alert alert-info rounded-2xl text-sm">
+								<FiExternalLink size={14} />
+								<span>The authorization page is ready to open.</span>
+							</div>
+						) : isPreparing ? (
+							<div className="alert alert-info rounded-2xl text-sm">
+								<FiRefreshCw className="animate-spin" size={14} />
+								<span>
+									Preparing a secure authorization request. The browser will open automatically when it is ready.
+								</span>
+							</div>
+						) : loopbackUnavailable ? (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>
+									{authHealth?.oauthLoopbackError ||
+										'The local OAuth callback listener is unavailable. Check OAuth settings and restart FlexiGPT.'}
+								</span>
+							</div>
+						) : (
+							<div className="alert alert-warning rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>No OAuth authorization request is active. Close this dialog and retry Connect.</span>
+							</div>
+						)}
+
+						{lastError && !loopbackUnavailable ? (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>{lastError}</span>
+							</div>
+						) : null}
+
+						{cancelError ? (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>{cancelError}</span>
+							</div>
 						) : null}
 					</div>
+				)}
+			</ManagementModalBody>
 
-					{isAuthorized ? (
-						<div className="alert alert-success rounded-2xl text-sm">
-							{isReady
-								? 'Authorization and MCP connection completed.'
-								: isConnecting
-									? 'Authorization completed. FlexiGPT is loading MCP capabilities.'
-									: 'Authorization completed.'}
-						</div>
-					) : (
-						<div className="space-y-4">
-							<div className="bg-base-100 rounded-2xl p-4 text-sm">
-								<ol className="list-decimal space-y-2 pl-5">
-									<li>Open the authorization page.</li>
-									<li>Complete login and consent in your browser.</li>
-									<li>Keep FlexiGPT open while the browser returns to its loopback callback.</li>
-									<li>FlexiGPT finishes the authorization flow automatically.</li>
-								</ol>
-							</div>
+			<ModalActions>
+				{(isPending || isConnecting) && onCancel ? (
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						disabled={isCancelling}
+						onClick={() => {
+							void handleCancel();
+						}}
+					>
+						{isPending ? 'Cancel authorization' : 'Cancel connection'}
+					</button>
+				) : null}
 
-							{authorizationURL ? (
-								<div className="alert alert-info rounded-2xl text-sm">
-									<FiExternalLink size={14} />
-									<span>The authorization page is ready to open.</span>
-								</div>
-							) : isPreparing ? (
-								<div className="alert alert-info rounded-2xl text-sm">
-									<FiRefreshCw className="animate-spin" size={14} />
-									<span>
-										Preparing a secure authorization request. The browser will open automatically when it is ready.
-									</span>
-								</div>
-							) : loopbackUnavailable ? (
-								<div className="alert alert-error rounded-2xl text-sm">
-									<FiAlertCircle size={14} />
-									<span>
-										{authHealth?.oauthLoopbackError ||
-											'The local OAuth callback listener is unavailable. Check OAuth settings and restart FlexiGPT.'}
-									</span>
-								</div>
-							) : (
-								<div className="alert alert-warning rounded-2xl text-sm">
-									<FiAlertCircle size={14} />
-									<span>No OAuth authorization request is active. Close this dialog and retry Connect.</span>
-								</div>
-							)}
+				<button
+					type="button"
+					className="btn btn-primary rounded-xl"
+					disabled={!authorizationURL || isAuthorized}
+					onClick={() => {
+						if (authorizationURL) {
+							onOpenURL(authorizationURL);
+						}
+					}}
+				>
+					<FiExternalLink size={14} />
+					<span>Open authorization page</span>
+				</button>
 
-							{lastError && !loopbackUnavailable ? (
-								<div className="alert alert-error rounded-2xl text-sm">
-									<FiAlertCircle size={14} />
-									<span>{lastError}</span>
-								</div>
-							) : null}
-
-							{cancelError ? (
-								<div className="alert alert-error rounded-2xl text-sm">
-									<FiAlertCircle size={14} />
-									<span>{cancelError}</span>
-								</div>
-							) : null}
-						</div>
-					)}
-
-					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
-						{(isPending || isConnecting) && onCancel ? (
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								disabled={isCancelling}
-								onClick={() => {
-									void handleCancel();
-								}}
-							>
-								{isPending ? 'Cancel authorization' : 'Cancel connection'}
-							</button>
-						) : null}
-
-						<button
-							type="button"
-							className="btn btn-primary rounded-xl"
-							disabled={!authorizationURL || isAuthorized}
-							onClick={() => {
-								if (authorizationURL) {
-									onOpenURL(authorizationURL);
-								}
-							}}
-						>
-							<FiExternalLink size={14} />
-							<span className="ml-1">Open authorization page</span>
-						</button>
-
-						<button
-							type="button"
-							className="btn bg-base-300 rounded-xl"
-							disabled={isCancelling}
-							onClick={() => {
-								requestClose();
-							}}
-						>
-							Close
-						</button>
-					</ModalActions>
-				</div>
-			</div>
-			<ModalBackdrop enabled={!isCancelling} />
-		</>
+				<button
+					type="button"
+					className="btn bg-base-300 rounded-xl"
+					disabled={isCancelling}
+					onClick={() => {
+						requestClose();
+					}}
+				>
+					Close
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 
@@ -215,9 +215,9 @@ function MCPOAuthAuthorizationModalSession(props: MCPOAuthAuthorizationModalProp
 	const [isCancelling, setIsCancelling] = useState(false);
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isCancelling}>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isCancelling}>
 			<MCPOAuthAuthorizationModalContent {...props} isCancelling={isCancelling} setIsCancelling={setIsCancelling} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }
 

@@ -7,8 +7,12 @@ import { validateSlug } from '@/lib/text_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 
@@ -174,7 +178,7 @@ function ManagementPluginCreateModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
+		<ManagementModalPanel>
 			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
 				<ModalHeader
 					title={<span id={`${displayNameID}-modal-title`}>{title}</span>}
@@ -185,7 +189,7 @@ function ManagementPluginCreateModalContent({
 					closeDisabled={isSubmitting}
 				/>
 
-				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
+				<ManagementModalBody>
 					{submitError ? (
 						<div className="alert alert-error rounded-2xl text-sm" role="alert">
 							<FiAlertCircle className="shrink-0" size={14} />
@@ -252,7 +256,7 @@ function ManagementPluginCreateModalContent({
 							disabled={isSubmitting}
 						/>
 					</ModalField>
-				</div>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button
@@ -274,7 +278,7 @@ function ManagementPluginCreateModalContent({
 					</button>
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -284,8 +288,8 @@ export function ManagementPluginCreateModal(props: ManagementPluginCreateModalPr
 	}
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<ManagementPluginCreateModalContent key={`${props.entityLabel}:create-plugin`} {...props} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

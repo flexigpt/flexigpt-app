@@ -40,10 +40,10 @@ export function ManagementPluginCard({
 	const effectiveIdentity = identity ?? subtitle;
 
 	return (
-		<section className={`bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm ${className}`}>
+		<section className={`bg-base-100 border-base-content/10 rounded-2xl border p-4 shadow-sm ${className}`}>
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0">
-					<div className="text-sm font-semibold wrap-break-word">{title}</div>
+					<div className="text-base font-semibold wrap-break-word">{title}</div>
 
 					{effectiveIdentity ? (
 						<div className="text-base-content/60 mt-1 text-xs wrap-break-word">{effectiveIdentity}</div>

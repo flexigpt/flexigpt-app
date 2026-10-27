@@ -4,9 +4,12 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface MCPSettingsModalProps {
@@ -139,107 +142,103 @@ function MCPSettingsModalContent({
 	};
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 max-w-2xl rounded-2xl p-0">
-				<div className="p-6">
-					<ModalHeader
-						title="MCP OAuth Settings"
-						onClose={() => {
-							requestClose();
-						}}
-						closeDisabled={isSubmitting}
-					/>
+		<ManagementModalPanel width="compact">
+			<ModalHeader
+				title="MCP OAuth Settings"
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={isSubmitting}
+			/>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-8" aria-busy={isSubmitting}>
-						{submitError ? (
-							<div className="alert alert-error rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>{submitError}</span>
-							</div>
-						) : null}
+			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
+				<ManagementModalBody className="space-y-8">
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
 
-						{oauthLoopbackReady === false ? (
-							<div className="alert alert-error rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>
-									{oauthLoopbackError ||
-										'The active OAuth callback listener is unavailable. Restart FlexiGPT before authorizing.'}
-								</span>
-							</div>
-						) : null}
+					{oauthLoopbackReady === false ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>
+								{oauthLoopbackError ||
+									'The active OAuth callback listener is unavailable. Restart FlexiGPT before authorizing.'}
+							</span>
+						</div>
+					) : null}
 
-						{oauthRestartRequired ? (
-							<div className="alert alert-warning rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>
-									The saved listen address is not active yet. Restart FlexiGPT before using the new callback URL.
-								</span>
-							</div>
-						) : null}
+					{oauthRestartRequired ? (
+						<div className="alert alert-warning rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>
+								The saved listen address is not active yet. Restart FlexiGPT before using the new callback URL.
+							</span>
+						</div>
+					) : null}
 
-						{oauthRedirectURL ? (
-							<div>
-								<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">OAuth Redirect URL</div>
-								<div className="bg-base-300 rounded-2xl p-3 text-xs break-all">{oauthRedirectURL}</div>
-								<p className="text-base-content/60 mt-2 text-xs">
-									Register this URL with providers that require a fixed loopback redirect URI.
-								</p>
-							</div>
-						) : null}
-
+					{oauthRedirectURL ? (
 						<div>
-							<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">
-								OAuth Loopback Listen Address
-							</div>
-							<input
-								type="text"
-								className={`input w-full rounded-xl ${validationError ? 'input-error' : ''}`}
-								value={listenAddress}
-								placeholder="127.0.0.1:37645, or leave blank for a random port"
-								spellCheck="false"
-								autoComplete="off"
-								disabled={isSubmitting}
-								onChange={event => {
-									setListenAddress(event.target.value);
-									setValidationError(validateListenAddress(event.target.value));
-								}}
-							/>
-							{validationError ? (
-								<div className="label">
-									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} />
-										{validationError}
-									</span>
-								</div>
-							) : null}
-							{activeListenAddr ? (
-								<p className="text-base-content/60 mt-2 text-xs">Currently active: {activeListenAddr}</p>
-							) : null}
+							<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">OAuth Redirect URL</div>
+							<div className="bg-base-300 rounded-2xl p-3 text-xs break-all">{oauthRedirectURL}</div>
 							<p className="text-base-content/60 mt-2 text-xs">
-								Changing this address takes effect after restarting FlexiGPT.
+								Register this URL with providers that require a fixed loopback redirect URI.
 							</p>
 						</div>
+					) : null}
 
-						<ModalActions className="-mx-6 mt-6 -mb-6">
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								disabled={isSubmitting}
-								onClick={() => {
-									requestClose();
-								}}
-							>
-								Cancel
-							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
-								{isSubmitting ? 'Saving...' : 'Save'}
-							</button>
-						</ModalActions>
-					</form>
-				</div>
-			</div>
-			<ModalBackdrop enabled={false} />
-		</>
+					<div>
+						<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">
+							OAuth Loopback Listen Address
+						</div>
+						<input
+							type="text"
+							className={`input w-full rounded-xl ${validationError ? 'input-error' : ''}`}
+							value={listenAddress}
+							placeholder="127.0.0.1:37645, or leave blank for a random port"
+							spellCheck="false"
+							autoComplete="off"
+							disabled={isSubmitting}
+							onChange={event => {
+								setListenAddress(event.target.value);
+								setValidationError(validateListenAddress(event.target.value));
+							}}
+						/>
+						{validationError ? (
+							<div className="label">
+								<span className="text-error flex items-center gap-1">
+									<FiAlertCircle size={12} />
+									{validationError}
+								</span>
+							</div>
+						) : null}
+						{activeListenAddr ? (
+							<p className="text-base-content/60 mt-2 text-xs">Currently active: {activeListenAddr}</p>
+						) : null}
+						<p className="text-base-content/60 mt-2 text-xs">
+							Changing this address takes effect after restarting FlexiGPT.
+						</p>
+					</div>
+				</ManagementModalBody>
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						disabled={isSubmitting}
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
+						{isSubmitting ? 'Saving...' : 'Save'}
+					</button>
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -249,8 +248,8 @@ export function MCPSettingsModal(props: MCPSettingsModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<MCPSettingsModalContent key="mcp-settings-modal" {...props} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

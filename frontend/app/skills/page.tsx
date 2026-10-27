@@ -22,12 +22,16 @@ import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
 import { ManagementPluginCreateModal } from '@/components/managementui/management_plugin_create_modal';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { PageFrame } from '@/components/page_frame';
@@ -215,88 +219,90 @@ function SkillDirectoryRegistrationModal({
 	};
 
 	return (
-		<ModalDialog isOpen onClose={onClose} blockCancel={saving}>
-			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+		<ManagementModalDialog isOpen onClose={onClose} blockCancel>
+			<ManagementModalPanel width="compact">
 				<ModalHeader title="Register Skill Directory" onClose={onClose} closeDisabled={saving} />
-				<form className="space-y-4 p-4 sm:p-6" onSubmit={submit}>
-					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
+				<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+					<ManagementModalBody>
+						{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-					<ModalField label="Artifact Root" required>
-						<Dropdown<string>
-							dropdownItems={rootDropdownItems}
-							orderedKeys={roots.map(root => root.rootID)}
-							selectedKey={effectiveRootID}
-							onChange={value => {
-								setRootID(value);
-								setDestinationKey('unattached');
-							}}
-							filterDisabled={false}
-							title="Select Artifact Root"
-							placeholderLabel="No Artifact Roots available"
-							getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? value}
-							disabled={saving || roots.length === 0}
-							inlineMenu
-							maxMenuHeight={240}
-						/>
-					</ModalField>
+						<ModalField label="Artifact Root" required>
+							<Dropdown<string>
+								dropdownItems={rootDropdownItems}
+								orderedKeys={roots.map(root => root.rootID)}
+								selectedKey={effectiveRootID}
+								onChange={value => {
+									setRootID(value);
+									setDestinationKey('unattached');
+								}}
+								filterDisabled={false}
+								title="Select Artifact Root"
+								placeholderLabel="No Artifact Roots available"
+								getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? value}
+								disabled={saving || roots.length === 0}
+								inlineMenu
+								maxMenuHeight={240}
+							/>
+						</ModalField>
 
-					<ModalField label="Directory" htmlFor="skill-directory-path" required>
-						<div className="flex gap-2">
+						<ModalField label="Directory" htmlFor="skill-directory-path" required>
+							<div className="flex gap-2">
+								<input
+									id="skill-directory-path"
+									className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
+									value={path}
+									disabled={saving}
+									onChange={event => {
+										setPath(event.currentTarget.value);
+									}}
+									placeholder="/path/to/skills"
+								/>
+								<button type="button" className="btn btn-ghost rounded-xl" disabled={saving} onClick={chooseDirectory}>
+									Choose
+								</button>
+							</div>
+						</ModalField>
+
+						<ModalField label="Source display name" htmlFor="skill-directory-source-name" required>
 							<input
-								id="skill-directory-path"
-								className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
-								value={path}
+								id="skill-directory-source-name"
+								className="input w-full rounded-xl"
+								value={sourceDisplayName}
 								disabled={saving}
 								onChange={event => {
-									setPath(event.currentTarget.value);
+									setSourceDisplayName(event.currentTarget.value);
 								}}
-								placeholder="/path/to/skills"
+								placeholder="Repository Skills"
 							/>
-							<button type="button" className="btn btn-ghost rounded-xl" disabled={saving} onClick={chooseDirectory}>
-								Choose
-							</button>
+						</ModalField>
+
+						<ModalField label="Destination Plugin">
+							<Dropdown<string>
+								dropdownItems={destinationDropdownItems}
+								orderedKeys={[
+									'unattached',
+									...destinations.map(d => {
+										return pluginKey(d);
+									}),
+								]}
+								selectedKey={destinationValue}
+								onChange={value => {
+									setDestinationKey(value);
+								}}
+								filterDisabled={false}
+								title="Select Destination Plugin"
+								placeholderLabel="Register without attaching"
+								getDisplayName={destinationLabel}
+								disabled={saving}
+								inlineMenu
+								maxMenuHeight={240}
+							/>
+						</ModalField>
+						<div className="alert alert-info rounded-2xl text-sm">
+							Every discovered Skill from this Source is attached to the selected Plugin. Registration without a
+							destination leaves the Skills under Unattached Skills.
 						</div>
-					</ModalField>
-
-					<ModalField label="Source display name" htmlFor="skill-directory-source-name" required>
-						<input
-							id="skill-directory-source-name"
-							className="input w-full rounded-xl"
-							value={sourceDisplayName}
-							disabled={saving}
-							onChange={event => {
-								setSourceDisplayName(event.currentTarget.value);
-							}}
-							placeholder="Repository Skills"
-						/>
-					</ModalField>
-
-					<ModalField label="Destination Plugin">
-						<Dropdown<string>
-							dropdownItems={destinationDropdownItems}
-							orderedKeys={[
-								'unattached',
-								...destinations.map(d => {
-									return pluginKey(d);
-								}),
-							]}
-							selectedKey={destinationValue}
-							onChange={value => {
-								setDestinationKey(value);
-							}}
-							filterDisabled={false}
-							title="Select Destination Plugin"
-							placeholderLabel="Register without attaching"
-							getDisplayName={destinationLabel}
-							disabled={saving}
-							inlineMenu
-							maxMenuHeight={240}
-						/>
-					</ModalField>
-					<div className="alert alert-info rounded-2xl text-sm">
-						Every discovered Skill from this Source is attached to the selected Plugin. Registration without a
-						destination leaves the Skills under Unattached Skills.
-					</div>
+					</ManagementModalBody>
 
 					<ModalActions>
 						<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
@@ -307,8 +313,8 @@ function SkillDirectoryRegistrationModal({
 						</button>
 					</ModalActions>
 				</form>
-			</div>
-		</ModalDialog>
+			</ManagementModalPanel>
+		</ManagementModalDialog>
 	);
 }
 

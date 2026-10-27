@@ -32,22 +32,22 @@ export function WorkspaceDirectoryCard({
 					<StatusBadge>Repository</StatusBadge>
 				</>
 			}
-			actionLeading={
-				<button
-					type="button"
-					className="btn btn-sm btn-error rounded-xl"
-					disabled={isLoading}
-					onClick={onRequestRemove}
-				>
-					<FiTrash2 size={15} />
-					<span>Remove</span>
-				</button>
-			}
 			actions={
-				<button type="button" className="btn btn-sm btn-primary rounded-xl" disabled={isLoading} onClick={onManage}>
-					<FiEye size={15} />
-					<span>{isLoading ? 'Opening...' : 'Manage'}</span>
-				</button>
+				<>
+					<button type="button" className="btn btn-sm btn-primary rounded-xl" disabled={isLoading} onClick={onManage}>
+						<FiEye size={15} />
+						<span>{isLoading ? 'Opening...' : 'Manage'}</span>
+					</button>
+					<button
+						type="button"
+						className="btn btn-sm btn-ghost text-error rounded-xl"
+						disabled={isLoading}
+						onClick={onRequestRemove}
+					>
+						<FiTrash2 size={15} />
+						<span>Remove</span>
+					</button>
+				</>
 			}
 		>
 			<div className="text-base-content/60 mt-2 text-xs">

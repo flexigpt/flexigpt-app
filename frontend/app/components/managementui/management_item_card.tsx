@@ -25,11 +25,11 @@ export function ManagementItemCard({
 }: ManagementItemCardProps) {
 	return (
 		<article
-			className={`border-base-content/10 hover:border-base-content/20 min-w-0 rounded-2xl border p-4 transition-colors ${className}`}
+			className={`bg-base-100 border-base-content/10 hover:border-base-content/20 min-w-0 rounded-2xl border p-4 transition-colors ${className}`}
 		>
 			<div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0">
-					<div className="font-medium wrap-break-word">{title}</div>
+					<div className="text-sm font-semibold wrap-break-word">{title}</div>
 
 					{subtitle ? <div className="text-base-content/60 mt-1 text-xs wrap-break-word">{subtitle}</div> : null}
 

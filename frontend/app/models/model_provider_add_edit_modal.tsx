@@ -18,11 +18,17 @@ import { formatJSON } from '@/lib/jsonschema_utils';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { ModelProviderManagementItem } from '@/apis/model_management';
+import { modelManagementAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -390,7 +396,7 @@ function ModelProviderAddEditModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+		<ManagementModalPanel width="form">
 			<ModalHeader
 				title={title}
 				description={
@@ -405,7 +411,7 @@ function ModelProviderAddEditModalContent({
 			/>
 
 			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
-				<div className={`app-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${MANAGEMENT_MODAL_FORM_CLASS}`}>
+				<ManagementModalBody className={MANAGEMENT_MODAL_FORM_CLASS}>
 					{submitError ? (
 						<div className="alert alert-error rounded-xl text-sm" role="alert">
 							<div className="flex items-center gap-2">
@@ -614,6 +620,17 @@ function ModelProviderAddEditModalContent({
 						</ModalField>
 					</ModalSection>
 
+					{provider ? (
+						<ModalSection title="Saved Provider Artifact">
+							<ManagementJSONSource
+								label="provider document JSON"
+								fileName={`${provider.view.document.name}.json`}
+								load={async () => (await modelManagementAPI.getProvider(provider.list.ref)).document}
+								note="Exports the saved Artifact document. Credentials and unsaved editor changes are never exported."
+							/>
+						</ModalSection>
+					) : null}
+
 					<ModalSection
 						title="Security and Availability"
 						description="Credentials are write-only. Leaving an existing credential blank preserves it."
@@ -666,7 +683,7 @@ function ModelProviderAddEditModalContent({
 							)}
 						</ModalField>
 					</ModalSection>
-				</div>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button
@@ -691,7 +708,7 @@ function ModelProviderAddEditModalContent({
 					) : null}
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -715,7 +732,7 @@ export function ModelProviderAddEditModal({
 				}:${provider?.list.revision ?? 0}`;
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel={mode !== ModelProviderModalMode.View}>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} blockCancel={mode !== ModelProviderModalMode.View}>
 			<ModelProviderAddEditModalContent
 				key={key}
 				mode={mode}
@@ -723,6 +740,6 @@ export function ModelProviderAddEditModal({
 				allProviders={allProviders}
 				onSubmit={onSubmit}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

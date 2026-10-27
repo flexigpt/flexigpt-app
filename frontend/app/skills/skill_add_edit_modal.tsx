@@ -18,12 +18,17 @@ import { skillManagementAPI } from '@/apis/baseapi';
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import { canonicalSkillSource } from '@/skills/skill_artifact_source';
 import {
 	encodeSkillDocument,
 	formatSkillArguments,
@@ -251,7 +256,7 @@ function ManagedSkillEditorModalContent({
 
 		try {
 			const document = documentFromForm(form, parsedArguments.values);
-			const markdown = new TextDecoder().decode(new Uint8Array(encodeSkillDocument(document)));
+			const markdown = canonicalSkillSource(document);
 			await navigator.clipboard.writeText(markdown);
 		} catch (cause) {
 			setError(cause instanceof Error ? cause.message : 'Generated SKILL.md could not be copied.');
@@ -337,11 +342,11 @@ function ManagedSkillEditorModalContent({
 		mode === 'edit' ? 'Edit Managed Skill' : mode === 'fork' ? 'Fork into Managed Skill' : 'Create Managed Skill';
 
 	return (
-		<div className="modal-box bg-base-200 max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
-			<div className="app-scrollbar-thin max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-				<ModalHeader title={title} onClose={onClose} closeDisabled={saving} />
+		<ManagementModalPanel>
+			<ModalHeader title={title} onClose={onClose} closeDisabled={saving} />
 
-				<form className="space-y-4" onSubmit={submit}>
+			<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+				<ManagementModalBody>
 					{error ? (
 						<div className="alert alert-error rounded-2xl text-sm">
 							<FiAlertCircle size={15} />
@@ -530,23 +535,23 @@ function ManagedSkillEditorModalContent({
 							</ModalSection>
 						</>
 					)}
+				</ManagementModalBody>
 
-					<ModalActions>
-						<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							className="btn btn-primary rounded-xl"
-							disabled={saving || loadingDocument || documentLoadFailed}
-						>
-							<FiFileText size={14} />
-							<span>{saving ? 'Saving...' : 'Save Skill'}</span>
-						</button>
-					</ModalActions>
-				</form>
-			</div>
-		</div>
+				<ModalActions>
+					<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						className="btn btn-primary rounded-xl"
+						disabled={saving || loadingDocument || documentLoadFailed}
+					>
+						<FiFileText size={14} />
+						<span>{saving ? 'Saving...' : 'Save Skill'}</span>
+					</button>
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -556,13 +561,13 @@ export function ManagedSkillEditorModal(props: ManagedSkillEditorModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen onClose={props.onClose} blockCancel>
 			<ManagedSkillEditorModalContent
 				key={`${props.plugin.ref.rootID}:${props.plugin.ref.artifactID}:${props.skill?.ref.artifactID ?? 'new'}:${
 					props.skill?.revision ?? props.plugin.revision
 				}:${props.mode ?? 'create'}`}
 				{...props}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

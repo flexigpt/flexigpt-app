@@ -30,8 +30,12 @@ import { parseOptionalPositiveInteger } from '@/lib/number_utils';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import {
@@ -562,7 +566,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 	};
 
 	return (
-		<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl p-0">
+		<ManagementModalPanel>
 			<ModalHeader
 				title="Advanced Model Parameters"
 				onClose={() => {
@@ -570,380 +574,382 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				}}
 			/>
 
-			<form onSubmit={handleSubmit} className="space-y-4 p-6">
-				<div className="grid grid-cols-12 items-center gap-2">
-					<div className="label col-span-4">
-						<span className="text-sm">Streaming</span>
-						<HelpHint content="Default leaves streaming to the model/runtime configuration." />
-					</div>
-					<div className="col-span-8">
-						<Dropdown<StreamChoice>
-							dropdownItems={streamChoiceItems}
-							selectedKey={streamChoice}
-							onChange={setStreamChoice}
-							filterDisabled={false}
-							title="Select streaming preference"
-							getDisplayName={choice => streamChoiceItems[choice].displayName}
-						/>
-					</div>
-				</div>
-
-				<div className="grid grid-cols-12 items-center gap-2">
-					<label htmlFor="advanced-max-prompt-length" className="label col-span-4">
-						<span className="text-sm">Max Prompt Tokens</span>
-						<HelpHint content="Blank leaves this value to the model/runtime configuration." />
-					</label>
-					<div className="col-span-8">
-						<input
-							id="advanced-max-prompt-length"
-							ref={maxPromptLengthInputRef}
-							type="text"
-							value={maxPromptLength}
-							onChange={event => {
-								updateField('maxPromptLength', event.target.value, setMaxPromptLength);
-							}}
-							className={`input w-full rounded-xl ${errors.maxPromptLength ? 'input-error' : ''}`}
-							placeholder="Default: model / SDK"
-							spellCheck="false"
-						/>
-						{errors.maxPromptLength && (
-							<div className="label">
-								<span className="text-error flex items-center gap-1">
-									<FiAlertCircle size={12} /> {errors.maxPromptLength}
-								</span>
-							</div>
-						)}
-					</div>
-				</div>
-
-				<div className="grid grid-cols-12 items-center gap-2">
-					<label htmlFor="advanced-max-output-length" className="label col-span-4">
-						<span className="text-sm">Max Output Tokens</span>
-						<HelpHint content="Blank leaves this value to the model/runtime configuration." />
-					</label>
-					<div className="col-span-8">
-						<input
-							id="advanced-max-output-length"
-							type="text"
-							value={maxOutputLength}
-							onChange={event => {
-								updateField('maxOutputLength', event.target.value, setMaxOutputLength);
-							}}
-							className={`input w-full rounded-xl ${errors.maxOutputLength ? 'input-error' : ''}`}
-							placeholder="Default: model / SDK"
-							spellCheck="false"
-						/>
-						{errors.maxOutputLength && (
-							<div className="label">
-								<span className="text-error flex items-center gap-1">
-									<FiAlertCircle size={12} /> {errors.maxOutputLength}
-								</span>
-							</div>
-						)}
-					</div>
-				</div>
-
-				<div className="grid grid-cols-12 items-center gap-2">
-					<label htmlFor="advanced-timeout" className="label col-span-4">
-						<span className="text-sm">Timeout (s)</span>
-						<HelpHint content="Blank leaves timeout selection to the model/runtime configuration." />
-					</label>
-					<div className="col-span-8">
-						<input
-							id="advanced-timeout"
-							type="text"
-							value={timeoutSec}
-							onChange={event => {
-								updateField('timeout', event.target.value, setTimeoutSec);
-							}}
-							className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
-							placeholder="Default: model / SDK"
-							spellCheck="false"
-						/>
-						{errors.timeout && (
-							<div className="label">
-								<span className="text-error flex items-center gap-1">
-									<FiAlertCircle size={12} /> {errors.timeout}
-								</span>
-							</div>
-						)}
-					</div>
-				</div>
-
-				<div className="grid grid-cols-12 items-center gap-2">
-					<div className="label col-span-4">
-						<span className="text-sm">Reasoning Summary</span>
-						<HelpHint
-							content={
-								reasoningEnabled
-									? 'Default leaves reasoning summary style to source configuration and the SDK.'
-									: 'Reasoning is not currently active for this model selection.'
-							}
-						/>
-					</div>
-					<div className="col-span-8">
-						<Dropdown<SummaryStyleChoice>
-							dropdownItems={reasoningSummaryStyleItems}
-							selectedKey={reasoningSummaryStyle}
-							onChange={setReasoningSummaryStyle}
-							filterDisabled={false}
-							title="Select reasoning summary style"
-							getDisplayName={key => reasoningSummaryStyleItems[key].displayName}
-						/>
-					</div>
-				</div>
-
-				<div className="grid grid-cols-12 items-center gap-2">
-					<div className="label col-span-4">
-						<span className="text-sm">Output Format</span>
-						<HelpHint content="Default leaves output format to source configuration and the SDK." />
-					</div>
-					<div className="col-span-8">
-						<Dropdown<OutputFormatChoice>
-							dropdownItems={outputFormatItems}
-							selectedKey={outputFormatChoice}
-							onChange={handleOutputFormatChange}
-							filterDisabled={false}
-							title="Select output format"
-							getDisplayName={key => outputFormatItems[key].displayName}
-						/>
-					</div>
-				</div>
-
-				{outputFormatChoice === 'jsonSchema' && (
-					<>
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label htmlFor="advanced-json-schema-name" className="label col-span-4">
-								<span className="text-sm">Schema Name</span>
-							</label>
-							<div className="col-span-8">
-								<input
-									id="advanced-json-schema-name"
-									type="text"
-									className={`input w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
-									value={jsonSchemaName}
-									onChange={event => {
-										handleJsonSchemaNameChange(event.target.value);
-									}}
-									placeholder="e.g. my_response"
-									spellCheck="false"
-								/>
-								{errors.jsonSchemaName && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.jsonSchemaName}
-										</span>
-									</div>
-								)}
-							</div>
+			<form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+				<ManagementModalBody>
+					<div className="grid grid-cols-12 items-center gap-2">
+						<div className="label col-span-4">
+							<span className="text-sm">Streaming</span>
+							<HelpHint content="Default leaves streaming to the model/runtime configuration." />
 						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label htmlFor="advanced-json-schema-description" className="label col-span-4">
-								<span className="text-sm">Description</span>
-							</label>
-							<div className="col-span-8">
-								<input
-									id="advanced-json-schema-description"
-									type="text"
-									className="input w-full rounded-xl"
-									value={jsonSchemaDescription}
-									onChange={event => {
-										setJsonSchemaDescription(event.target.value);
-									}}
-									placeholder="Optional"
-									spellCheck="false"
-								/>
-							</div>
+						<div className="col-span-8">
+							<Dropdown<StreamChoice>
+								dropdownItems={streamChoiceItems}
+								selectedKey={streamChoice}
+								onChange={setStreamChoice}
+								filterDisabled={false}
+								title="Select streaming preference"
+								getDisplayName={choice => streamChoiceItems[choice].displayName}
+							/>
 						</div>
+					</div>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<div className="label col-span-4">
-								<span className="text-sm">Strict</span>
-							</div>
-							<div className="col-span-8">
-								<Dropdown<StrictChoice>
-									dropdownItems={strictChoiceItems}
-									selectedKey={jsonSchemaStrict}
-									onChange={setJsonSchemaStrict}
-									filterDisabled={false}
-									title="Select JSON Schema strictness"
-									getDisplayName={choice => strictChoiceItems[choice].displayName}
-								/>
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label htmlFor="advanced-json-schema" className="label col-span-4">
-								<span className="text-sm">Schema JSON</span>
-							</label>
-							<div className="col-span-8">
-								<textarea
-									id="advanced-json-schema"
-									className={`textarea w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
-									rows={8}
-									value={jsonSchemaText}
-									onChange={event => {
-										handleJsonSchemaTextChange(event.target.value);
-									}}
-									placeholder={`{\n  "type": "object",\n  "properties": {\n    "answer": { "type": "string" }\n  },\n  "required": ["answer"]\n}`}
-									spellCheck="false"
-								/>
-								{errors.jsonSchema && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.jsonSchema}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-					</>
-				)}
-
-				{(supportsManualCacheControl || supportsAutomaticProviderCaching) && (
-					<>
-						<div className="grid grid-cols-12 items-center gap-2">
-							<div className="label col-span-4">
-								<span className="text-sm">Cache Control</span>
-								<HelpHint content="Default leaves cache behavior to source configuration and the provider." />
-							</div>
-							<div className="col-span-8">
-								{supportsManualCacheControl ? (
-									<Dropdown<CacheControlMode>
-										dropdownItems={cacheControlModeItems}
-										selectedKey={cacheControlMode}
-										onChange={mode => {
-											setCacheControlMode(mode);
-											if (mode === 'enabled' && !cacheControlKind) {
-												setCacheControlKind(supportedCacheKinds[0] ?? '');
-											}
-										}}
-										filterDisabled={false}
-										title="Select cache-control preference"
-										getDisplayName={mode => cacheControlModeItems[mode].displayName}
-									/>
-								) : (
-									<span className="text-sm opacity-70">Manual top-level cache control is not available.</span>
-								)}
-							</div>
-							{supportsAutomaticProviderCaching && (
+					<div className="grid grid-cols-12 items-center gap-2">
+						<label htmlFor="advanced-max-prompt-length" className="label col-span-4">
+							<span className="text-sm">Max Prompt Tokens</span>
+							<HelpHint content="Blank leaves this value to the model/runtime configuration." />
+						</label>
+						<div className="col-span-8">
+							<input
+								id="advanced-max-prompt-length"
+								ref={maxPromptLengthInputRef}
+								type="text"
+								value={maxPromptLength}
+								onChange={event => {
+									updateField('maxPromptLength', event.target.value, setMaxPromptLength);
+								}}
+								className={`input w-full rounded-xl ${errors.maxPromptLength ? 'input-error' : ''}`}
+								placeholder="Default: model / SDK"
+								spellCheck="false"
+							/>
+							{errors.maxPromptLength && (
 								<div className="label">
-									<span className="text-xs opacity-70">
-										This provider SDK also supports automatic caching behavior.
+									<span className="text-error flex items-center gap-1">
+										<FiAlertCircle size={12} /> {errors.maxPromptLength}
 									</span>
 								</div>
 							)}
 						</div>
+					</div>
 
-						{supportsManualCacheControl && cacheControlMode === 'enabled' && (
-							<>
-								<div className="grid grid-cols-12 items-center gap-2">
-									<div className="label col-span-4">
-										<span className="text-sm">Cache Kind</span>
-									</div>
-									<div className="col-span-8">
-										<Dropdown<CacheControlKind>
-											dropdownItems={cacheControlKindItems}
-											selectedKey={(cacheControlKind || supportedCacheKinds[0]) as CacheControlKind}
-											onChange={setCacheControlKind}
-											filterDisabled={false}
-											title="Select cache kind"
-											getDisplayName={key => cacheControlKindItems[key].displayName}
-										/>
-									</div>
+					<div className="grid grid-cols-12 items-center gap-2">
+						<label htmlFor="advanced-max-output-length" className="label col-span-4">
+							<span className="text-sm">Max Output Tokens</span>
+							<HelpHint content="Blank leaves this value to the model/runtime configuration." />
+						</label>
+						<div className="col-span-8">
+							<input
+								id="advanced-max-output-length"
+								type="text"
+								value={maxOutputLength}
+								onChange={event => {
+									updateField('maxOutputLength', event.target.value, setMaxOutputLength);
+								}}
+								className={`input w-full rounded-xl ${errors.maxOutputLength ? 'input-error' : ''}`}
+								placeholder="Default: model / SDK"
+								spellCheck="false"
+							/>
+							{errors.maxOutputLength && (
+								<div className="label">
+									<span className="text-error flex items-center gap-1">
+										<FiAlertCircle size={12} /> {errors.maxOutputLength}
+									</span>
 								</div>
+							)}
+						</div>
+					</div>
 
-								<div className="grid grid-cols-12 items-center gap-2">
-									<div className="label col-span-4">
-										<span className="text-sm">Cache TTL</span>
-									</div>
-									<div className="col-span-8">
-										<Dropdown<CacheControlTTLSelection>
-											dropdownItems={cacheControlTTLItems}
-											selectedKey={cacheControlTTL}
-											onChange={setCacheControlTTL}
-											filterDisabled={false}
-											title="Select cache TTL"
-											getDisplayName={key => cacheControlTTLItems[key].displayName}
-										/>
-									</div>
+					<div className="grid grid-cols-12 items-center gap-2">
+						<label htmlFor="advanced-timeout" className="label col-span-4">
+							<span className="text-sm">Timeout (s)</span>
+							<HelpHint content="Blank leaves timeout selection to the model/runtime configuration." />
+						</label>
+						<div className="col-span-8">
+							<input
+								id="advanced-timeout"
+								type="text"
+								value={timeoutSec}
+								onChange={event => {
+									updateField('timeout', event.target.value, setTimeoutSec);
+								}}
+								className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
+								placeholder="Default: model / SDK"
+								spellCheck="false"
+							/>
+							{errors.timeout && (
+								<div className="label">
+									<span className="text-error flex items-center gap-1">
+										<FiAlertCircle size={12} /> {errors.timeout}
+									</span>
 								</div>
+							)}
+						</div>
+					</div>
 
-								{supportsCacheKey && (
+					<div className="grid grid-cols-12 items-center gap-2">
+						<div className="label col-span-4">
+							<span className="text-sm">Reasoning Summary</span>
+							<HelpHint
+								content={
+									reasoningEnabled
+										? 'Default leaves reasoning summary style to source configuration and the SDK.'
+										: 'Reasoning is not currently active for this model selection.'
+								}
+							/>
+						</div>
+						<div className="col-span-8">
+							<Dropdown<SummaryStyleChoice>
+								dropdownItems={reasoningSummaryStyleItems}
+								selectedKey={reasoningSummaryStyle}
+								onChange={setReasoningSummaryStyle}
+								filterDisabled={false}
+								title="Select reasoning summary style"
+								getDisplayName={key => reasoningSummaryStyleItems[key].displayName}
+							/>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-12 items-center gap-2">
+						<div className="label col-span-4">
+							<span className="text-sm">Output Format</span>
+							<HelpHint content="Default leaves output format to source configuration and the SDK." />
+						</div>
+						<div className="col-span-8">
+							<Dropdown<OutputFormatChoice>
+								dropdownItems={outputFormatItems}
+								selectedKey={outputFormatChoice}
+								onChange={handleOutputFormatChange}
+								filterDisabled={false}
+								title="Select output format"
+								getDisplayName={key => outputFormatItems[key].displayName}
+							/>
+						</div>
+					</div>
+
+					{outputFormatChoice === 'jsonSchema' && (
+						<>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label htmlFor="advanced-json-schema-name" className="label col-span-4">
+									<span className="text-sm">Schema Name</span>
+								</label>
+								<div className="col-span-8">
+									<input
+										id="advanced-json-schema-name"
+										type="text"
+										className={`input w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
+										value={jsonSchemaName}
+										onChange={event => {
+											handleJsonSchemaNameChange(event.target.value);
+										}}
+										placeholder="e.g. my_response"
+										spellCheck="false"
+									/>
+									{errors.jsonSchemaName && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.jsonSchemaName}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label htmlFor="advanced-json-schema-description" className="label col-span-4">
+									<span className="text-sm">Description</span>
+								</label>
+								<div className="col-span-8">
+									<input
+										id="advanced-json-schema-description"
+										type="text"
+										className="input w-full rounded-xl"
+										value={jsonSchemaDescription}
+										onChange={event => {
+											setJsonSchemaDescription(event.target.value);
+										}}
+										placeholder="Optional"
+										spellCheck="false"
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-center gap-2">
+								<div className="label col-span-4">
+									<span className="text-sm">Strict</span>
+								</div>
+								<div className="col-span-8">
+									<Dropdown<StrictChoice>
+										dropdownItems={strictChoiceItems}
+										selectedKey={jsonSchemaStrict}
+										onChange={setJsonSchemaStrict}
+										filterDisabled={false}
+										title="Select JSON Schema strictness"
+										getDisplayName={choice => strictChoiceItems[choice].displayName}
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label htmlFor="advanced-json-schema" className="label col-span-4">
+									<span className="text-sm">Schema JSON</span>
+								</label>
+								<div className="col-span-8">
+									<textarea
+										id="advanced-json-schema"
+										className={`textarea w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
+										rows={8}
+										value={jsonSchemaText}
+										onChange={event => {
+											handleJsonSchemaTextChange(event.target.value);
+										}}
+										placeholder={`{\n  "type": "object",\n  "properties": {\n    "answer": { "type": "string" }\n  },\n  "required": ["answer"]\n}`}
+										spellCheck="false"
+									/>
+									{errors.jsonSchema && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.jsonSchema}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+						</>
+					)}
+
+					{(supportsManualCacheControl || supportsAutomaticProviderCaching) && (
+						<>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<div className="label col-span-4">
+									<span className="text-sm">Cache Control</span>
+									<HelpHint content="Default leaves cache behavior to source configuration and the provider." />
+								</div>
+								<div className="col-span-8">
+									{supportsManualCacheControl ? (
+										<Dropdown<CacheControlMode>
+											dropdownItems={cacheControlModeItems}
+											selectedKey={cacheControlMode}
+											onChange={mode => {
+												setCacheControlMode(mode);
+												if (mode === 'enabled' && !cacheControlKind) {
+													setCacheControlKind(supportedCacheKinds[0] ?? '');
+												}
+											}}
+											filterDisabled={false}
+											title="Select cache-control preference"
+											getDisplayName={mode => cacheControlModeItems[mode].displayName}
+										/>
+									) : (
+										<span className="text-sm opacity-70">Manual top-level cache control is not available.</span>
+									)}
+								</div>
+								{supportsAutomaticProviderCaching && (
+									<div className="label">
+										<span className="text-xs opacity-70">
+											This provider SDK also supports automatic caching behavior.
+										</span>
+									</div>
+								)}
+							</div>
+
+							{supportsManualCacheControl && cacheControlMode === 'enabled' && (
+								<>
 									<div className="grid grid-cols-12 items-center gap-2">
-										<label htmlFor="advanced-cache-key" className="label col-span-4">
-											<span className="text-sm">Cache Key</span>
-										</label>
+										<div className="label col-span-4">
+											<span className="text-sm">Cache Kind</span>
+										</div>
 										<div className="col-span-8">
-											<input
-												id="advanced-cache-key"
-												type="text"
-												value={cacheControlKey}
-												onChange={event => {
-													setCacheControlKey(event.target.value);
-												}}
-												className="input w-full rounded-xl"
-												placeholder="Optional request cache key"
-												spellCheck="false"
+											<Dropdown<CacheControlKind>
+												dropdownItems={cacheControlKindItems}
+												selectedKey={(cacheControlKind || supportedCacheKinds[0]) as CacheControlKind}
+												onChange={setCacheControlKind}
+												filterDisabled={false}
+												title="Select cache kind"
+												getDisplayName={key => cacheControlKindItems[key].displayName}
 											/>
 										</div>
 									</div>
+
+									<div className="grid grid-cols-12 items-center gap-2">
+										<div className="label col-span-4">
+											<span className="text-sm">Cache TTL</span>
+										</div>
+										<div className="col-span-8">
+											<Dropdown<CacheControlTTLSelection>
+												dropdownItems={cacheControlTTLItems}
+												selectedKey={cacheControlTTL}
+												onChange={setCacheControlTTL}
+												filterDisabled={false}
+												title="Select cache TTL"
+												getDisplayName={key => cacheControlTTLItems[key].displayName}
+											/>
+										</div>
+									</div>
+
+									{supportsCacheKey && (
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label htmlFor="advanced-cache-key" className="label col-span-4">
+												<span className="text-sm">Cache Key</span>
+											</label>
+											<div className="col-span-8">
+												<input
+													id="advanced-cache-key"
+													type="text"
+													value={cacheControlKey}
+													onChange={event => {
+														setCacheControlKey(event.target.value);
+													}}
+													className="input w-full rounded-xl"
+													placeholder="Optional request cache key"
+													spellCheck="false"
+												/>
+											</div>
+										</div>
+									)}
+								</>
+							)}
+						</>
+					)}
+
+					{stopPolicy.isSupported && (
+						<div className="grid grid-cols-12 items-start gap-2">
+							<label htmlFor="advanced-stop-sequences" className="label col-span-4">
+								<span className="text-sm">Stop Sequences</span>
+								<HelpHint
+									content={
+										stopSequencesDisabledBecauseReasoning
+											? 'Stop sequences are disabled while reasoning is active for this model/provider.'
+											: `One per line. Blank uses model / SDK defaults. Max ${stopPolicy.maxSequences}.`
+									}
+								/>
+							</label>
+							<div className="col-span-8">
+								<textarea
+									id="advanced-stop-sequences"
+									disabled={stopSequencesDisabledBecauseReasoning}
+									className={`textarea w-full rounded-xl ${
+										errors.stopSequences ? 'textarea-error' : ''
+									} ${stopSequencesDisabledBecauseReasoning ? 'cursor-not-allowed opacity-50' : ''}`}
+									rows={4}
+									value={stopSequencesText}
+									onChange={event => {
+										const value = event.target.value;
+										setStopSequencesText(value);
+										setErrors(previous => ({
+											...previous,
+											stopSequences: validateStopSequences(value),
+										}));
+									}}
+									placeholder={'e.g.\n\nEND\n</final>'}
+									spellCheck="false"
+								/>
+								{stopSequencesDisabledBecauseReasoning && (
+									<div className="label">
+										<span className="opacity-70">Disabled because reasoning is enabled for this model/provider.</span>
+									</div>
 								)}
-							</>
-						)}
-					</>
-				)}
-
-				{stopPolicy.isSupported && (
-					<div className="grid grid-cols-12 items-start gap-2">
-						<label htmlFor="advanced-stop-sequences" className="label col-span-4">
-							<span className="text-sm">Stop Sequences</span>
-							<HelpHint
-								content={
-									stopSequencesDisabledBecauseReasoning
-										? 'Stop sequences are disabled while reasoning is active for this model/provider.'
-										: `One per line. Blank uses model / SDK defaults. Max ${stopPolicy.maxSequences}.`
-								}
-							/>
-						</label>
-						<div className="col-span-8">
-							<textarea
-								id="advanced-stop-sequences"
-								disabled={stopSequencesDisabledBecauseReasoning}
-								className={`textarea w-full rounded-xl ${
-									errors.stopSequences ? 'textarea-error' : ''
-								} ${stopSequencesDisabledBecauseReasoning ? 'cursor-not-allowed opacity-50' : ''}`}
-								rows={4}
-								value={stopSequencesText}
-								onChange={event => {
-									const value = event.target.value;
-									setStopSequencesText(value);
-									setErrors(previous => ({
-										...previous,
-										stopSequences: validateStopSequences(value),
-									}));
-								}}
-								placeholder={'e.g.\n\nEND\n</final>'}
-								spellCheck="false"
-							/>
-							{stopSequencesDisabledBecauseReasoning && (
-								<div className="label">
-									<span className="opacity-70">Disabled because reasoning is enabled for this model/provider.</span>
-								</div>
-							)}
-							{errors.stopSequences && (
-								<div className="label">
-									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {errors.stopSequences}
-									</span>
-								</div>
-							)}
+								{errors.stopSequences && (
+									<div className="label">
+										<span className="text-error flex items-center gap-1">
+											<FiAlertCircle size={12} /> {errors.stopSequences}
+										</span>
+									</div>
+								)}
+							</div>
 						</div>
-					</div>
-				)}
+					)}
+				</ManagementModalBody>
 
-				<ModalActions className="-mx-6 mt-6 -mb-6">
+				<ModalActions>
 					<button
 						type="button"
 						className="btn bg-base-300 rounded-xl"
@@ -958,7 +964,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 					</button>
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -978,13 +984,13 @@ export function AdvancedParamsModal({
 		: `${currentModel.providerName}::${currentModel.logicalName}`;
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose}>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
 			<AdvancedParamsModalInner
 				key={modelIdentity}
 				currentModel={currentModel}
 				effectiveReasoningEnabled={effectiveReasoningEnabled}
 				onSave={onSave}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

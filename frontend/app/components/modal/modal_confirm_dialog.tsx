@@ -4,9 +4,12 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 type ConfirmButtonTone = 'primary' | 'error' | 'warning';
@@ -111,13 +114,14 @@ function ModalConfirmDialogContent({
 	const displayError = error ?? confirmError;
 
 	return (
-		<ModalDialog
+		<ManagementModalDialog
 			{...dialogProps}
 			isOpen={isOpen}
 			onClose={onClose}
 			blockCancel={blockCancel || effectiveBusy}
 			isBusy={effectiveBusy}
 			onCancel={onCancel}
+			allowBackdropClose={allowBackdropClose}
 		>
 			{({ requestClose, unmountingRef }) => {
 				const handleConfirm = () => {
@@ -168,58 +172,52 @@ function ModalConfirmDialogContent({
 				};
 
 				return (
-					<>
-						<div
-							className={`modal-box bg-base-200 flex max-h-[80vh] w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-2xl p-0 ${modalBoxClassName}`}
-						>
-							<ModalHeader
-								title={headerTitle}
-								description={description}
-								onClose={requestClose}
-								closeDisabled={effectiveBusy}
-							/>
+					<ManagementModalPanel width="confirmation" className={modalBoxClassName}>
+						<ModalHeader
+							title={headerTitle}
+							description={description}
+							onClose={requestClose}
+							closeDisabled={effectiveBusy}
+						/>
 
-							<div className={`min-h-0 flex-1 overflow-y-auto p-4 sm:px-6 ${bodyClassName}`}>
-								{displayError ? (
-									<div className="alert alert-error rounded-2xl text-sm" role="alert">
-										<FiAlertCircle className="shrink-0" size={14} />
-										<span className="wrap-break-word">{displayError}</span>
-									</div>
-								) : null}
-								{message ? <div className={displayError ? 'mt-4' : ''}>{message}</div> : null}
-								{children ? <div className={displayError || message ? 'mt-4' : ''}>{children}</div> : null}
-							</div>
+						<ManagementModalBody className={bodyClassName}>
+							{displayError ? (
+								<div className="alert alert-error rounded-2xl text-sm" role="alert">
+									<FiAlertCircle className="shrink-0" size={14} />
+									<span className="wrap-break-word">{displayError}</span>
+								</div>
+							) : null}
+							{message ? <div className={displayError ? 'mt-4' : ''}>{message}</div> : null}
+							{children ? <div className={displayError || message ? 'mt-4' : ''}>{children}</div> : null}
+						</ManagementModalBody>
 
-							<ModalActions className={actionsClassName}>
-								{showCancel ? (
-									<button
-										type="button"
-										className={`btn bg-base-300 rounded-xl ${cancelButtonClassName}`}
-										onClick={() => {
-											requestClose();
-										}}
-										disabled={effectiveBusy || cancelDisabled}
-									>
-										{cancelLabel}
-									</button>
-								) : null}
+						<ModalActions className={actionsClassName}>
+							{showCancel ? (
 								<button
 									type="button"
-									className={`${getConfirmButtonClassName(confirmTone)} ${confirmButtonClassName}`}
-									onClick={handleConfirm}
-									disabled={effectiveBusy || confirmDisabled}
+									className={`btn bg-base-300 rounded-xl ${cancelButtonClassName}`}
+									onClick={() => {
+										requestClose();
+									}}
+									disabled={effectiveBusy || cancelDisabled}
 								>
-									{effectiveBusy ? <span className="loading loading-spinner loading-xs" /> : null}
-									{effectiveBusy ? busyLabel : resolvedConfirmLabel}
+									{cancelLabel}
 								</button>
-							</ModalActions>
-						</div>
-
-						<ModalBackdrop enabled={allowBackdropClose && !blockCancel && !effectiveBusy} />
-					</>
+							) : null}
+							<button
+								type="button"
+								className={`${getConfirmButtonClassName(confirmTone)} ${confirmButtonClassName}`}
+								onClick={handleConfirm}
+								disabled={effectiveBusy || confirmDisabled}
+							>
+								{effectiveBusy ? <span className="loading loading-spinner loading-xs" /> : null}
+								{effectiveBusy ? busyLabel : resolvedConfirmLabel}
+							</button>
+						</ModalActions>
+					</ManagementModalPanel>
 				);
 			}}
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }
 

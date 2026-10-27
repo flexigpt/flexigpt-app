@@ -6,8 +6,12 @@ import type { PluginListItem } from '@/spec/plugin';
 
 import { skillManagementAPI } from '@/apis/baseapi';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -60,47 +64,49 @@ function SkillPluginEditModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+		<ManagementModalPanel width="compact">
 			<ModalHeader title="Edit Skill Plugin" onClose={onClose} closeDisabled={saving} />
 
-			<form className="space-y-4 p-4 sm:p-6" onSubmit={submit}>
-				{error ? (
-					<div className="alert alert-error rounded-2xl text-sm">
-						<FiAlertCircle size={14} />
-						<span>{error}</span>
-					</div>
-				) : null}
+			<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+				<ManagementModalBody>
+					{error ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{error}</span>
+						</div>
+					) : null}
 
-				<ModalSection title="Plugin details">
-					<ModalField label="Logical name">
-						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.name}</div>
-					</ModalField>
+					<ModalSection title="Plugin details">
+						<ModalField label="Logical name">
+							<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.name}</div>
+						</ModalField>
 
-					<ModalField label="Display name" htmlFor="skill-plugin-display-name" required>
-						<input
-							id="skill-plugin-display-name"
-							className="input w-full rounded-xl"
-							value={displayName}
-							disabled={saving}
-							onChange={event => {
-								setDisplayName(event.currentTarget.value);
-								setError('');
-							}}
-						/>
-					</ModalField>
+						<ModalField label="Display name" htmlFor="skill-plugin-display-name" required>
+							<input
+								id="skill-plugin-display-name"
+								className="input w-full rounded-xl"
+								value={displayName}
+								disabled={saving}
+								onChange={event => {
+									setDisplayName(event.currentTarget.value);
+									setError('');
+								}}
+							/>
+						</ModalField>
 
-					<ModalField label="Description" htmlFor="skill-plugin-description">
-						<textarea
-							id="skill-plugin-description"
-							className="textarea min-h-24 w-full rounded-xl"
-							value={description}
-							disabled={saving}
-							onChange={event => {
-								setDescription(event.currentTarget.value);
-							}}
-						/>
-					</ModalField>
-				</ModalSection>
+						<ModalField label="Description" htmlFor="skill-plugin-description">
+							<textarea
+								id="skill-plugin-description"
+								className="textarea min-h-24 w-full rounded-xl"
+								value={description}
+								disabled={saving}
+								onChange={event => {
+									setDescription(event.currentTarget.value);
+								}}
+							/>
+						</ModalField>
+					</ModalSection>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button type="button" className="btn bg-base-300 rounded-xl" disabled={saving} onClick={onClose}>
@@ -111,7 +117,7 @@ function SkillPluginEditModalContent({
 					</button>
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -121,13 +127,13 @@ export function SkillPluginEditModal(props: SkillPluginEditModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen onClose={props.onClose} blockCancel>
 			<SkillPluginEditModalContent
 				key={`${props.plugin.ref.rootID}:${props.plugin.ref.artifactID}:${props.plugin.revision}`}
 				plugin={props.plugin}
 				onClose={props.onClose}
 				onSaved={props.onSaved}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

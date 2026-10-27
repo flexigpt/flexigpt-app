@@ -16,15 +16,17 @@ export function ModalHeader({ title, description, onClose, closeDisabled = false
 				{description ? <div className="text-base-content/70 mt-1 text-sm">{description}</div> : null}
 			</div>
 
-			<button
-				type="button"
-				className="btn btn-sm btn-circle bg-base-300 shrink-0"
-				onClick={onClose}
-				disabled={closeDisabled}
-				aria-label="Close"
-			>
-				<FiX size={14} />
-			</button>
+			{onClose ? (
+				<button
+					type="button"
+					className="btn btn-sm btn-circle bg-base-300 shrink-0"
+					onClick={onClose}
+					disabled={closeDisabled}
+					aria-label="Close"
+				>
+					<FiX size={14} />
+				</button>
+			) : null}
 		</header>
 	);
 }

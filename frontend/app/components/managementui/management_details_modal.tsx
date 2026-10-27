@@ -2,9 +2,12 @@ import type { ReactNode } from 'react';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface ManagementDetailsModalProps {
@@ -27,43 +30,33 @@ function ManagementDetailsModalContent({
 	width = 'standard',
 	height = 'standard',
 	closeLabel = 'Close',
-	allowBackdropClose = true,
-}: Omit<ManagementDetailsModalProps, 'isOpen' | 'modalKey' | 'onClose'>) {
+}: Omit<ManagementDetailsModalProps, 'isOpen' | 'modalKey' | 'onClose' | 'allowBackdropClose'>) {
 	const { requestClose } = useModalDialogController();
 
-	const widthClassName = width === 'wide' ? 'max-w-6xl' : 'max-w-3xl';
-	const heightClassName = height === 'tall' ? 'max-h-[85vh]' : 'max-h-[80vh]';
-
 	return (
-		<>
-			<div
-				className={`modal-box bg-base-200 flex ${heightClassName} w-[calc(100%-1rem)] ${widthClassName} flex-col overflow-hidden rounded-2xl p-0`}
-			>
-				<ModalHeader
-					title={title}
-					description={description}
-					onClose={() => {
+		<ManagementModalPanel width={width} className={height === 'tall' ? 'max-h-[calc(100dvh-1rem)]' : ''}>
+			<ModalHeader
+				title={title}
+				description={description}
+				onClose={() => {
+					requestClose();
+				}}
+			/>
+
+			<ManagementModalBody>{children}</ManagementModalBody>
+
+			<ModalActions>
+				<button
+					type="button"
+					className="btn bg-base-300 rounded-xl"
+					onClick={() => {
 						requestClose();
 					}}
-				/>
-
-				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">{children}</div>
-
-				<ModalActions>
-					<button
-						type="button"
-						className="btn bg-base-300 rounded-xl"
-						onClick={() => {
-							requestClose();
-						}}
-					>
-						{closeLabel}
-					</button>
-				</ModalActions>
-			</div>
-
-			<ModalBackdrop enabled={allowBackdropClose} />
-		</>
+				>
+					{closeLabel}
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 
@@ -84,7 +77,7 @@ export function ManagementDetailsModal({
 	}
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose}>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} allowBackdropClose={allowBackdropClose}>
 			<ManagementDetailsModalContent
 				key={modalKey}
 				title={title}
@@ -92,10 +85,9 @@ export function ManagementDetailsModal({
 				width={width}
 				height={height}
 				closeLabel={closeLabel}
-				allowBackdropClose={allowBackdropClose}
 			>
 				{children}
 			</ManagementDetailsModalContent>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

@@ -8,8 +8,12 @@ import type { ModelProviderManagementItem } from '@/apis/model_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Dropdown } from '@/components/dropdown';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 
@@ -82,7 +86,7 @@ function ProviderCredentialModalContent({
 
 	return (
 		<>
-			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+			<ManagementModalPanel width="compact">
 				<ModalHeader
 					title={`API Key for ${provider.list.displayName}`}
 					description="API keys are write-only and are never shown after saving."
@@ -92,53 +96,55 @@ function ProviderCredentialModalContent({
 					closeDisabled={saving}
 				/>
 
-				<form noValidate onSubmit={handleSubmit} className="space-y-4 p-6" aria-busy={saving}>
-					{error ? (
-						<div className="alert alert-error rounded-xl text-sm" role="alert">
-							<div className="flex items-center gap-2">
-								<FiAlertCircle size={15} />
-								<span>{error}</span>
+				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={saving}>
+					<ManagementModalBody>
+						{error ? (
+							<div className="alert alert-error rounded-xl text-sm" role="alert">
+								<div className="flex items-center gap-2">
+									<FiAlertCircle size={15} />
+									<span>{error}</span>
+								</div>
 							</div>
-						</div>
-					) : null}
+						) : null}
 
-					{provider.apiKey.configured ? (
-						<ModalField label="Action">
-							<Dropdown<CredentialAction>
-								dropdownItems={actionItems}
-								selectedKey={action}
-								onChange={setAction}
-								filterDisabled={false}
-								title="Select credential action"
-								getDisplayName={key => actionItems[key].displayName}
-								disabled={saving}
-							/>
-						</ModalField>
-					) : null}
+						{provider.apiKey.configured ? (
+							<ModalField label="Action">
+								<Dropdown<CredentialAction>
+									dropdownItems={actionItems}
+									selectedKey={action}
+									onChange={setAction}
+									filterDisabled={false}
+									title="Select credential action"
+									getDisplayName={key => actionItems[key].displayName}
+									disabled={saving}
+								/>
+							</ModalField>
+						) : null}
 
-					{action === 'replace' ? (
-						<ModalField label="Credential" htmlFor="provider-credential" required>
-							<input
-								id="provider-credential"
-								type="password"
-								autoComplete="new-password"
-								className="input w-full rounded-xl"
-								value={credential}
-								onChange={event => {
-									setCredential(event.target.value);
-									setError('');
-								}}
-								disabled={saving}
-								autoFocus
-							/>
-						</ModalField>
-					) : (
-						<div className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
-							Requests using this provider will fail until a replacement credential is configured.
-						</div>
-					)}
+						{action === 'replace' ? (
+							<ModalField label="Credential" htmlFor="provider-credential" required>
+								<input
+									id="provider-credential"
+									type="password"
+									autoComplete="new-password"
+									className="input w-full rounded-xl"
+									value={credential}
+									onChange={event => {
+										setCredential(event.target.value);
+										setError('');
+									}}
+									disabled={saving}
+									autoFocus
+								/>
+							</ModalField>
+						) : (
+							<div className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
+								Requests using this provider will fail until a replacement credential is configured.
+							</div>
+						)}
+					</ManagementModalBody>
 
-					<ModalActions className="-mx-6 mt-6 -mb-6">
+					<ModalActions>
 						<button
 							type="button"
 							className="btn bg-base-300 rounded-xl"
@@ -154,7 +160,7 @@ function ProviderCredentialModalContent({
 						</button>
 					</ModalActions>
 				</form>
-			</div>
+			</ManagementModalPanel>
 
 			<DeleteConfirmationModal
 				isOpen={confirmRemoval}
@@ -181,8 +187,8 @@ export function ProviderCredentialModal({ isOpen, provider, onClose, onSave }: P
 	const key = `${provider.list.ref.rootID}:${provider.list.ref.artifactID}:${provider.apiKey.apiKeyRevision}`;
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
 			<ProviderCredentialModalContent key={key} provider={provider} onSave={onSave} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

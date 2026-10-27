@@ -9,9 +9,12 @@ import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { serverSetupInputs } from '@/apis/mcp_management';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface MCPServerSetupModalProps {
@@ -172,160 +175,154 @@ function MCPServerSetupModalContent({
 	};
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-					<ModalHeader
-						title={`Configure ${server.displayName}`}
-						description="Values are stored locally for this server. Stored secret values are never displayed."
-						onClose={() => {
-							requestClose();
-						}}
-						closeDisabled={isSubmitting}
-					/>
+		<ManagementModalPanel>
+			<ModalHeader
+				title={`Configure ${server.displayName}`}
+				description="Values are stored locally for this server. Stored secret values are never displayed."
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={isSubmitting}
+			/>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
-						{server.document?.configuration.install.note ? (
-							<div className="bg-base-100 rounded-2xl p-3 text-sm">{server.document.configuration.install.note}</div>
-						) : null}
+			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
+				<ManagementModalBody>
+					{server.document?.configuration.install.note ? (
+						<div className="bg-base-100 rounded-2xl p-3 text-sm">{server.document.configuration.install.note}</div>
+					) : null}
 
-						{submitError ? (
-							<div className="alert alert-error rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>{submitError}</span>
-							</div>
-						) : null}
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
 
-						{reset ? (
-							<div className="alert alert-warning rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>Reset removes existing installation bindings that are not supplied in this save.</span>
-							</div>
-						) : null}
+					{reset ? (
+						<div className="alert alert-warning rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>Reset removes existing installation bindings that are not supplied in this save.</span>
+						</div>
+					) : null}
 
-						{inputs.map(input => {
-							const row = rows[input.name] ?? emptyRow();
-							const label = input.declaration.label || input.name;
-							const isOAuth = input.declaration.kind === MCPInputKind.OAuthClientCredentials;
-							const isSecret = isOAuth || input.declaration.kind === MCPInputKind.Secret;
+					{inputs.map(input => {
+						const row = rows[input.name] ?? emptyRow();
+						const label = input.declaration.label || input.name;
+						const isOAuth = input.declaration.kind === MCPInputKind.OAuthClientCredentials;
+						const isSecret = isOAuth || input.declaration.kind === MCPInputKind.Secret;
 
-							return (
-								<div key={input.name} className="bg-base-100 rounded-2xl p-4">
-									<div className="mb-2 flex items-center justify-between gap-3">
-										<div className="min-w-0">
-											<div className="truncate font-semibold">
-												{label}
-												{input.declaration.required ? ' *' : ''}
-											</div>
-											{input.declaration.label ? null : (
-												<div className="text-base-content/60 text-xs">{input.name}</div>
-											)}
+						return (
+							<div key={input.name} className="bg-base-100 rounded-2xl p-4">
+								<div className="mb-2 flex items-center justify-between gap-3">
+									<div className="min-w-0">
+										<div className="truncate font-semibold">
+											{label}
+											{input.declaration.required ? ' *' : ''}
 										</div>
-										<span className="badge badge-xs rounded-xl">{inputKindLabel(input.declaration.kind)}</span>
+										{input.declaration.label ? null : <div className="text-base-content/60 text-xs">{input.name}</div>}
 									</div>
+									<span className="badge badge-xs rounded-xl">{inputKindLabel(input.declaration.kind)}</span>
+								</div>
 
-									{input.declaration.description ? (
-										<p className="text-base-content/70 mb-3 text-xs">{input.declaration.description}</p>
-									) : null}
+								{input.declaration.description ? (
+									<p className="text-base-content/70 mb-3 text-xs">{input.declaration.description}</p>
+								) : null}
 
-									{isOAuth ? (
-										<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-											<input
-												type="text"
-												className="input w-full rounded-xl"
-												placeholder="Client ID"
-												value={row.clientID}
-												autoComplete="off"
-												spellCheck="false"
-												disabled={isSubmitting}
-												onChange={event => {
-													updateRow(input.name, {
-														clientID: event.target.value,
-													});
-												}}
-											/>
-											<input
-												type="password"
-												className="input w-full rounded-xl"
-												placeholder={
-													input.declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'
-												}
-												value={row.clientSecret}
-												autoComplete="new-password"
-												disabled={isSubmitting}
-												onChange={event => {
-													updateRow(input.name, {
-														clientSecret: event.target.value,
-													});
-												}}
-											/>
-										</div>
-									) : (
+								{isOAuth ? (
+									<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
 										<input
-											type={isSecret ? 'password' : 'text'}
+											type="text"
 											className="input w-full rounded-xl"
-											placeholder={input.declaration.placeholder}
-											value={row.value}
-											autoComplete={isSecret ? 'new-password' : 'off'}
+											placeholder="Client ID"
+											value={row.clientID}
+											autoComplete="off"
 											spellCheck="false"
 											disabled={isSubmitting}
 											onChange={event => {
 												updateRow(input.name, {
-													value: event.target.value,
+													clientID: event.target.value,
 												});
 											}}
 										/>
-									)}
-
-									<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-										{input.declaration.note ? (
-											<span className="text-base-content/60 text-xs">{input.declaration.note}</span>
-										) : (
-											<span />
-										)}
-										{input.secretConfigured || input.boundValue ? (
-											<span className="text-base-content/60 text-xs">Configured. Leave blank to keep it.</span>
-										) : null}
+										<input
+											type="password"
+											className="input w-full rounded-xl"
+											placeholder={
+												input.declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'
+											}
+											value={row.clientSecret}
+											autoComplete="new-password"
+											disabled={isSubmitting}
+											onChange={event => {
+												updateRow(input.name, {
+													clientSecret: event.target.value,
+												});
+											}}
+										/>
 									</div>
+								) : (
+									<input
+										type={isSecret ? 'password' : 'text'}
+										className="input w-full rounded-xl"
+										placeholder={input.declaration.placeholder}
+										value={row.value}
+										autoComplete={isSecret ? 'new-password' : 'off'}
+										spellCheck="false"
+										disabled={isSubmitting}
+										onChange={event => {
+											updateRow(input.name, {
+												value: event.target.value,
+											});
+										}}
+									/>
+								)}
+
+								<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+									{input.declaration.note ? (
+										<span className="text-base-content/60 text-xs">{input.declaration.note}</span>
+									) : (
+										<span />
+									)}
+									{input.secretConfigured || input.boundValue ? (
+										<span className="text-base-content/60 text-xs">Configured. Leave blank to keep it.</span>
+									) : null}
 								</div>
-							);
-						})}
+							</div>
+						);
+					})}
 
-						{server.builtIn ? (
-							<label className="label cursor-pointer justify-start gap-3">
-								<input
-									type="checkbox"
-									className="checkbox checkbox-sm"
-									checked={reset}
-									disabled={isSubmitting}
-									onChange={event => {
-										setReset(event.target.checked);
-									}}
-								/>
-								<span className="text-sm">Reset saved values that are not supplied here</span>
-							</label>
-						) : null}
-
-						<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
+					{server.builtIn ? (
+						<label className="label cursor-pointer justify-start gap-3">
+							<input
+								type="checkbox"
+								className="checkbox checkbox-sm"
+								checked={reset}
 								disabled={isSubmitting}
-								onClick={() => {
-									requestClose();
+								onChange={event => {
+									setReset(event.target.checked);
 								}}
-							>
-								Cancel
-							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
-								{isSubmitting ? 'Saving...' : 'Save'}
-							</button>
-						</ModalActions>
-					</form>
-				</div>
-			</div>
-			<ModalBackdrop enabled={false} />
-		</>
+							/>
+							<span className="text-sm">Reset saved values that are not supplied here</span>
+						</label>
+					) : null}
+				</ManagementModalBody>
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						disabled={isSubmitting}
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
+						{isSubmitting ? 'Saving...' : 'Save'}
+					</button>
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -335,12 +332,12 @@ export function MCPServerSetupModal(props: MCPServerSetupModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<MCPServerSetupModalContent
 				key={`${props.server.ref.rootID}:${props.server.ref.artifactID}:${props.server.artifact.revision}`}
 				{...props}
 				server={props.server}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

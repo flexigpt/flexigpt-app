@@ -14,9 +14,13 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 import { mcpManagementAPI } from '@/apis/baseapi';
 
 import { Loader } from '@/components/loader';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -62,10 +66,10 @@ function UnresolvedMCPSetupContent({
 	onClose: () => void;
 }) {
 	return (
-		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+		<ManagementModalPanel width="compact">
 			<ModalHeader title={`MCP Setup: ${descriptor.name}`} onClose={onClose} />
 
-			<div className="space-y-4 p-4 sm:p-6">
+			<ManagementModalBody>
 				<div className="alert alert-warning rounded-2xl text-sm">
 					<FiAlertCircle size={16} />
 					<span>
@@ -73,14 +77,14 @@ function UnresolvedMCPSetupContent({
 						before configuring it.
 					</span>
 				</div>
+			</ManagementModalBody>
 
-				<ModalActions>
-					<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
-						Close
-					</button>
-				</ModalActions>
-			</div>
-		</div>
+			<ModalActions>
+				<button type="button" className="btn bg-base-300 rounded-xl" onClick={onClose}>
+					Close
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 
@@ -184,145 +188,140 @@ function AgentMCPSetupForm({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-hidden rounded-2xl p-0">
-			<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-				<ModalHeader
-					title={`MCP Setup: ${descriptor.name}`}
-					description={setup.displayName !== descriptor.name ? setup.displayName : undefined}
-					onClose={onClose}
-					closeDisabled={isSaving}
-				/>
+		<ManagementModalPanel width="compact">
+			<ModalHeader
+				title={`MCP Setup: ${descriptor.name}`}
+				description={setup.displayName !== descriptor.name ? setup.displayName : undefined}
+				onClose={onClose}
+				closeDisabled={isSaving}
+			/>
 
-				<div className="space-y-5">
-					{saveError ? (
-						<div className="alert alert-error rounded-2xl text-sm">
-							<FiAlertCircle size={16} />
-							<span>{saveError}</span>
-						</div>
-					) : null}
+			<ManagementModalBody className="space-y-5">
+				{saveError ? (
+					<div className="alert alert-error rounded-2xl text-sm">
+						<FiAlertCircle size={16} />
+						<span>{saveError}</span>
+					</div>
+				) : null}
 
-					<ModalSection title="Installation inputs">
-						{setup.note ? <div className="bg-base-100 mb-4 rounded-2xl p-3 text-sm">{setup.note}</div> : null}
+				<ModalSection title="Installation inputs">
+					{setup.note ? <div className="bg-base-100 mb-4 rounded-2xl p-3 text-sm">{setup.note}</div> : null}
 
-						{setup.inputs.length === 0 ? (
-							<div className="text-base-content/70 text-sm">This MCP server does not declare installation inputs.</div>
-						) : (
-							<div className="space-y-4">
-								{setup.inputs.map(input => {
-									const row = rows[input.name] ?? emptyRow();
-									const isOAuth = input.declaration.kind === MCPInputKind.OAuthClientCredentials;
-									const isSecret = isOAuth || input.declaration.kind === MCPInputKind.Secret;
+					{setup.inputs.length === 0 ? (
+						<div className="text-base-content/70 text-sm">This MCP server does not declare installation inputs.</div>
+					) : (
+						<div className="space-y-4">
+							{setup.inputs.map(input => {
+								const row = rows[input.name] ?? emptyRow();
+								const isOAuth = input.declaration.kind === MCPInputKind.OAuthClientCredentials;
+								const isSecret = isOAuth || input.declaration.kind === MCPInputKind.Secret;
 
-									return (
-										<div key={input.name} className="border-base-content/10 rounded-2xl border p-3">
-											<div className="mb-3 flex items-center gap-2">
-												{isSecret ? <FiKey size={14} /> : <FiServer size={14} />}
-												<div>
-													<div className="font-medium">{input.declaration.label || input.name}</div>
-													<div className="text-base-content/70 text-xs">
-														{[
-															inputKindLabel(input.declaration.kind),
-															input.declaration.required ? 'Required' : 'Optional',
-															input.secretConfigured || input.boundValue ? 'Configured' : undefined,
-														]
-															.filter(Boolean)
-															.join(' · ')}
-													</div>
+								return (
+									<div key={input.name} className="border-base-content/10 rounded-2xl border p-3">
+										<div className="mb-3 flex items-center gap-2">
+											{isSecret ? <FiKey size={14} /> : <FiServer size={14} />}
+											<div>
+												<div className="font-medium">{input.declaration.label || input.name}</div>
+												<div className="text-base-content/70 text-xs">
+													{[
+														inputKindLabel(input.declaration.kind),
+														input.declaration.required ? 'Required' : 'Optional',
+														input.secretConfigured || input.boundValue ? 'Configured' : undefined,
+													]
+														.filter(Boolean)
+														.join(' · ')}
 												</div>
 											</div>
-
-											{input.declaration.description ? (
-												<div className="text-base-content/70 mb-3 text-xs">{input.declaration.description}</div>
-											) : null}
-
-											{isOAuth ? (
-												<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-													<input
-														type="text"
-														className="input w-full rounded-xl"
-														value={row.clientID}
-														disabled={isSaving}
-														autoComplete="off"
-														placeholder="Client ID"
-														onChange={event => {
-															updateRow(input.name, {
-																clientID: event.currentTarget.value,
-															});
-														}}
-													/>
-													<input
-														type="password"
-														className="input w-full rounded-xl"
-														value={row.clientSecret}
-														disabled={isSaving}
-														autoComplete="new-password"
-														placeholder={
-															input.declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'
-														}
-														onChange={event => {
-															updateRow(input.name, {
-																clientSecret: event.currentTarget.value,
-															});
-														}}
-													/>
-												</div>
-											) : (
-												<ModalField
-													label={isSecret ? 'Secret value' : 'Value'}
-													htmlFor={`agent-mcp-input-${input.name}`}
-												>
-													<input
-														id={`agent-mcp-input-${input.name}`}
-														type={isSecret ? 'password' : 'text'}
-														className="input w-full rounded-xl"
-														value={row.value}
-														disabled={isSaving}
-														autoComplete={isSecret ? 'new-password' : 'off'}
-														placeholder={input.declaration.placeholder || input.declaration.default}
-														onChange={event => {
-															updateRow(input.name, {
-																value: event.currentTarget.value,
-															});
-														}}
-													/>
-												</ModalField>
-											)}
-
-											{input.declaration.note ? (
-												<div className="text-base-content/60 mt-2 text-xs">{input.declaration.note}</div>
-											) : null}
 										</div>
-									);
-								})}
-							</div>
-						)}
-					</ModalSection>
 
-					{descriptor.authMode === MCPHTTPAuthMode.OAuth ? (
-						<div className="alert alert-info rounded-2xl text-sm">
-							<FiServer size={16} />
-							<span>OAuth authorization is initiated from MCP management after setup is saved.</span>
+										{input.declaration.description ? (
+											<div className="text-base-content/70 mb-3 text-xs">{input.declaration.description}</div>
+										) : null}
+
+										{isOAuth ? (
+											<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+												<input
+													type="text"
+													className="input w-full rounded-xl"
+													value={row.clientID}
+													disabled={isSaving}
+													autoComplete="off"
+													placeholder="Client ID"
+													onChange={event => {
+														updateRow(input.name, {
+															clientID: event.currentTarget.value,
+														});
+													}}
+												/>
+												<input
+													type="password"
+													className="input w-full rounded-xl"
+													value={row.clientSecret}
+													disabled={isSaving}
+													autoComplete="new-password"
+													placeholder={
+														input.declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'
+													}
+													onChange={event => {
+														updateRow(input.name, {
+															clientSecret: event.currentTarget.value,
+														});
+													}}
+												/>
+											</div>
+										) : (
+											<ModalField label={isSecret ? 'Secret value' : 'Value'} htmlFor={`agent-mcp-input-${input.name}`}>
+												<input
+													id={`agent-mcp-input-${input.name}`}
+													type={isSecret ? 'password' : 'text'}
+													className="input w-full rounded-xl"
+													value={row.value}
+													disabled={isSaving}
+													autoComplete={isSecret ? 'new-password' : 'off'}
+													placeholder={input.declaration.placeholder || input.declaration.default}
+													onChange={event => {
+														updateRow(input.name, {
+															value: event.currentTarget.value,
+														});
+													}}
+												/>
+											</ModalField>
+										)}
+
+										{input.declaration.note ? (
+											<div className="text-base-content/60 mt-2 text-xs">{input.declaration.note}</div>
+										) : null}
+									</div>
+								);
+							})}
 						</div>
-					) : null}
+					)}
+				</ModalSection>
 
-					<ModalActions>
-						<button type="button" className="btn bg-base-300 rounded-xl" disabled={isSaving} onClick={onClose}>
-							Close
-						</button>
-						<button
-							type="button"
-							className="btn btn-primary rounded-xl"
-							disabled={isSaving}
-							onClick={() => {
-								void submit();
-							}}
-						>
-							{isSaving ? 'Saving...' : 'Save MCP Setup'}
-						</button>
-					</ModalActions>
-				</div>
-			</div>
-		</div>
+				{descriptor.authMode === MCPHTTPAuthMode.OAuth ? (
+					<div className="alert alert-info rounded-2xl text-sm">
+						<FiServer size={16} />
+						<span>OAuth authorization is initiated from MCP management after setup is saved.</span>
+					</div>
+				) : null}
+			</ManagementModalBody>
+
+			<ModalActions>
+				<button type="button" className="btn bg-base-300 rounded-xl" disabled={isSaving} onClick={onClose}>
+					Close
+				</button>
+				<button
+					type="button"
+					className="btn btn-primary rounded-xl"
+					disabled={isSaving}
+					onClick={() => {
+						void submit();
+					}}
+				>
+					{isSaving ? 'Saving...' : 'Save MCP Setup'}
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 
@@ -356,25 +355,28 @@ function AgentMCPSetupContent({
 
 	if (error) {
 		return (
-			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-2xl rounded-2xl p-0">
+			<ManagementModalPanel width="compact">
 				<ModalHeader title={`MCP Setup: ${descriptor.name}`} onClose={onClose} />
-				<div className="p-4 sm:p-6">
+				<ManagementModalBody>
 					<ManagementResourceError
 						title="MCP setup could not be loaded"
 						error={error}
 						isRetrying={isRefreshing}
 						onRetry={reloadOrThrow}
 					/>
-				</div>
-			</div>
+				</ManagementModalBody>
+			</ManagementModalPanel>
 		);
 	}
 
 	if (isLoading || !setup) {
 		return (
-			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-2xl rounded-2xl p-6">
-				<Loader text="Loading MCP installation inputs..." />
-			</div>
+			<ManagementModalPanel width="compact">
+				<ModalHeader title={`MCP Setup: ${descriptor.name}`} onClose={onClose} />
+				<ManagementModalBody>
+					<Loader text="Loading MCP installation inputs..." />
+				</ManagementModalBody>
+			</ManagementModalPanel>
 		);
 	}
 
@@ -395,20 +397,20 @@ export function AgentMCPSetupModal({ isOpen, descriptor, onClose }: AgentMCPSetu
 
 	if (!descriptor.artifact) {
 		return (
-			<ModalDialog isOpen={isOpen} onClose={onClose}>
+			<ManagementModalDialog isOpen={isOpen} onClose={onClose}>
 				<UnresolvedMCPSetupContent descriptor={descriptor} onClose={onClose} />
-			</ModalDialog>
+			</ManagementModalDialog>
 		);
 	}
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose}>
+		<ManagementModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
 			<AgentMCPSetupContent
 				key={`${descriptor.artifact.rootID}:${descriptor.artifact.artifactID}`}
 				descriptor={descriptor}
 				artifact={descriptor.artifact}
 				onClose={onClose}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

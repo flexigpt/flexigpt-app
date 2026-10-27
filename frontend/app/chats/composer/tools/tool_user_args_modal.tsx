@@ -15,9 +15,12 @@ import {
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { computeToolUserArgsStatus } from '@/chats/composer/tools/lib/tool_userargs_utils';
@@ -182,167 +185,163 @@ function ToolUserArgsModalContent({
 	};
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-[80vw] min-w-0 overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<ModalHeader
-						title={
-							<span className="flex items-center gap-2">
-								<FiTool size={16} />
-								<span>Tool options</span>
-								<span className="badge badge-neutral">{toolLabel}</span>
-							</span>
-						}
-						onClose={requestClose}
-					/>
+		<ManagementModalPanel width="form">
+			<ModalHeader
+				title={
+					<span className="flex items-center gap-2">
+						<FiTool size={16} />
+						<span>Tool options</span>
+						<span className="badge badge-neutral">{toolLabel}</span>
+					</span>
+				}
+				onClose={requestClose}
+			/>
 
-					{/* stacked content */}
-					<form
-						noValidate
-						onSubmit={handleSubmit}
-						className="flex flex-col gap-4"
-						onKeyDownCapture={e => {
-							e.stopPropagation();
-						}}
-						onKeyUpCapture={e => {
-							e.stopPropagation();
-						}}
-					>
-						{/* small summary (optional but useful) */}
-						<div className="space-y-1 text-xs">
-							{schemaObj ? (
-								<>
-									{requiredKeys.length > 0 ? (
-										<div>
-											<span className="font-semibold">Required keys:</span> {requiredKeys.join(', ')}
-										</div>
-									) : (
-										<div>There are no required keys for this tool.</div>
-									)}
-									{optionalKeys.length > 0 && (
-										<div>
-											<span className="font-semibold">Optional keys:</span> {optionalKeys.join(', ')}
-										</div>
-									)}
-								</>
-							) : (
-								<div>
-									{schema === false
-										? 'This tool does not accept any user configuration.'
-										: 'There are no required configuration keys for this tool.'}
-								</div>
-							)}
-						</div>
+			{/* stacked content */}
+			<form
+				noValidate
+				onSubmit={handleSubmit}
+				className="flex min-h-0 flex-1 flex-col"
+				onKeyDownCapture={e => {
+					e.stopPropagation();
+				}}
+				onKeyUpCapture={e => {
+					e.stopPropagation();
+				}}
+			>
+				<ManagementModalBody>
+					{/* small summary (optional but useful) */}
+					<div className="space-y-1 text-xs">
+						{schemaObj ? (
+							<>
+								{requiredKeys.length > 0 ? (
+									<div>
+										<span className="font-semibold">Required keys:</span> {requiredKeys.join(', ')}
+									</div>
+								) : (
+									<div>There are no required keys for this tool.</div>
+								)}
+								{optionalKeys.length > 0 && (
+									<div>
+										<span className="font-semibold">Optional keys:</span> {optionalKeys.join(', ')}
+									</div>
+								)}
+							</>
+						) : (
+							<div>
+								{schema === false
+									? 'This tool does not accept any user configuration.'
+									: 'There are no required configuration keys for this tool.'}
+							</div>
+						)}
+					</div>
 
-						{/* Editor */}
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<label htmlFor="tool-user-args-json" className="label p-1">
-									<span className="text-sm">Options (JSON)</span>
-								</label>
+					{/* Editor */}
+					<div className="space-y-2">
+						<div className="flex items-center justify-between">
+							<label htmlFor="tool-user-args-json" className="label p-1">
+								<span className="text-sm">Options (JSON)</span>
+							</label>
 
-								<div className="flex items-center gap-2">
+							<div className="flex items-center gap-2">
+								<button
+									type="button"
+									className="btn btn-xs bg-base-300 rounded-lg"
+									onClick={handleFormat}
+									title="Format JSON"
+								>
+									<FiRefreshCcw size={12} />
+									<span className="ml-1">Format</span>
+								</button>
+
+								{schemaObj && (
 									<button
 										type="button"
 										className="btn btn-xs bg-base-300 rounded-lg"
-										onClick={handleFormat}
-										title="Format JSON"
+										onClick={handleUseExample}
+										title="Replace editor contents with the full schema-derived example"
 									>
-										<FiRefreshCcw size={12} />
-										<span className="ml-1">Format</span>
+										Use example
 									</button>
-
-									{schemaObj && (
-										<button
-											type="button"
-											className="btn btn-xs bg-base-300 rounded-lg"
-											onClick={handleUseExample}
-											title="Replace editor contents with the full schema-derived example"
-										>
-											Use example
-										</button>
-									)}
-								</div>
-							</div>
-
-							<textarea
-								ref={textareaRef}
-								id="tool-user-args-json"
-								className={`textarea w-full rounded-xl font-mono text-xs ${error ? 'textarea-error' : ''}`}
-								rows={12}
-								value={formData.rawJson}
-								onChange={e => {
-									setFormData({ rawJson: e.target.value });
-									if (error) {
-										setError(null);
-									}
-								}}
-								spellCheck={false}
-								placeholder={schemaObj ? '{\n  "key": "value"\n}' : 'JSON object; structure depends on this tool.'}
-							/>
-
-							<div className="min-h-6 text-xs">
-								{isLoading ? <span>Loading tool definition...</span> : null}
-								{(loadError || error) && (
-									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {loadError || error}
-									</span>
 								)}
 							</div>
 						</div>
 
-						{/* Example block (full) */}
-						<div className="bg-base-300 rounded-xl p-3">
-							<div className="mb-2 text-sm font-semibold">Example options (all keys)</div>
+						<textarea
+							ref={textareaRef}
+							id="tool-user-args-json"
+							className={`textarea w-full rounded-xl font-mono text-xs ${error ? 'textarea-error' : ''}`}
+							rows={12}
+							value={formData.rawJson}
+							onChange={e => {
+								setFormData({ rawJson: e.target.value });
+								if (error) {
+									setError(null);
+								}
+							}}
+							spellCheck={false}
+							placeholder={schemaObj ? '{\n  "key": "value"\n}' : 'JSON object; structure depends on this tool.'}
+						/>
+
+						<div className="min-h-6 text-xs">
+							{isLoading ? <span>Loading tool definition...</span> : null}
+							{(loadError || error) && (
+								<span className="text-error flex items-center gap-1">
+									<FiAlertCircle size={12} /> {loadError || error}
+								</span>
+							)}
+						</div>
+					</div>
+
+					{/* Example block (full) */}
+					<div className="bg-base-300 rounded-xl p-3">
+						<div className="mb-2 text-sm font-semibold">Example options (all keys)</div>
+						<MessageContentCard
+							messageID={`tool-args:example:${toolLabel}`}
+							content={exampleMarkdown}
+							isBusy={false}
+							align="items-start text-left"
+							renderAsMarkdown={true}
+						/>
+						<div className="mt-2 text-xs opacity-80">
+							Full example includes all schema properties. Defaults/enums are respected when present.
+						</div>
+					</div>
+
+					{/* JSON Schema block */}
+					<div className="bg-base-300 rounded-xl p-3">
+						<div className="mb-2 text-sm font-semibold">JSON Schema</div>
+						{schemaMarkdown ? (
 							<MessageContentCard
-								messageID={`tool-args:example:${toolLabel}`}
-								content={exampleMarkdown}
+								messageID={`tool-args:schema:${toolLabel}`}
+								content={schemaMarkdown}
 								isBusy={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}
 							/>
-							<div className="mt-2 text-xs opacity-80">
-								Full example includes all schema properties. Defaults/enums are respected when present.
-							</div>
-						</div>
+						) : (
+							<div className="text-xs opacity-80">No schema provided for this tool.</div>
+						)}
+					</div>
+				</ManagementModalBody>
 
-						{/* JSON Schema block */}
-						<div className="bg-base-300 rounded-xl p-3">
-							<div className="mb-2 text-sm font-semibold">JSON Schema</div>
-							{schemaMarkdown ? (
-								<MessageContentCard
-									messageID={`tool-args:schema:${toolLabel}`}
-									content={schemaMarkdown}
-									isBusy={false}
-									align="items-start text-left"
-									renderAsMarkdown={true}
-								/>
-							) : (
-								<div className="text-xs opacity-80">No schema provided for this tool.</div>
-							)}
-						</div>
-
-						{/* footer */}
-						<ModalActions className="-mx-6 mt-6 -mb-6">
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								onClick={() => {
-									requestClose();
-								}}
-							>
-								Cancel
-							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={isLoading || Boolean(loadError)}>
-								Save
-							</button>
-						</ModalActions>
-					</form>
-				</div>
-			</div>
-
-			<ModalBackdrop enabled={true} />
-		</>
+				{/* footer */}
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={isLoading || Boolean(loadError)}>
+						Save
+					</button>
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -357,8 +356,8 @@ export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
 	});
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose}>
+		<ManagementModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<ToolUserArgsModalContent key={remountKey} {...props} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

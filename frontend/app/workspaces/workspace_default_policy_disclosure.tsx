@@ -10,6 +10,7 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { Loader } from '@/components/loader';
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 
 function WorkspaceDefaultPolicyDisclosureContent() {
@@ -43,9 +44,24 @@ function WorkspaceDefaultPolicyDisclosureContent() {
 			{isLoading && !policy ? <Loader text="Loading automatic Workspace setup..." /> : null}
 
 			{policy ? (
-				<pre className="bg-base-200 max-h-72 overflow-auto rounded-xl p-3 text-xs whitespace-pre-wrap">
-					{policy.yaml}
-				</pre>
+				<ManagementArtifactSource
+					label="automatic Workspace setup YAML"
+					prefetched={{
+						data: policy,
+						text: policy.yaml,
+						fileName: 'workspace-default.yaml',
+						extension: 'yaml',
+					}}
+					load={async () => {
+						const current = await workspaceManagementAPI.getWorkspaceDefaultPolicy();
+						return {
+							data: current,
+							text: current.yaml,
+							fileName: 'workspace-default.yaml',
+							extension: 'yaml',
+						};
+					}}
+				/>
 			) : null}
 		</div>
 	);

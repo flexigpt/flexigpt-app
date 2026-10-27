@@ -37,6 +37,12 @@ import { ManagementEmptyState } from '@/components/managementui/management_empty
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
 import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
@@ -45,7 +51,6 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -469,7 +474,7 @@ function AgentPluginEditModalContent({
 	};
 
 	return (
-		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
+		<ManagementModalPanel width="compact">
 			<ModalHeader
 				title="Edit Agent Plugin"
 				description="The logical Plugin name remains stable. Imported Agents remain immutable."
@@ -478,45 +483,52 @@ function AgentPluginEditModalContent({
 			/>
 
 			<form
-				className="space-y-4 p-4 sm:p-6"
+				className="flex min-h-0 flex-1 flex-col"
 				onSubmit={event => {
 					event.preventDefault();
 					void submit();
 				}}
 			>
-				{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
+				<ManagementModalBody>
+					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-				<ModalSection title="Plugin details">
-					<ModalField label="Plugin name" htmlFor="agent-plugin-name">
-						<input id="agent-plugin-name" className="input w-full rounded-xl font-mono" value={plugin.name} readOnly />
-					</ModalField>
+					<ModalSection title="Plugin details">
+						<ModalField label="Plugin name" htmlFor="agent-plugin-name">
+							<input
+								id="agent-plugin-name"
+								className="input w-full rounded-xl font-mono"
+								value={plugin.name}
+								readOnly
+							/>
+						</ModalField>
 
-					<ModalField label="Display name" htmlFor="agent-plugin-display-name" required>
-						<input
-							id="agent-plugin-display-name"
-							className="input w-full rounded-xl"
-							value={displayName}
-							onChange={event => {
-								setDisplayName(event.currentTarget.value);
-							}}
-							disabled={isSubmitting}
-							maxLength={256}
-						/>
-					</ModalField>
+						<ModalField label="Display name" htmlFor="agent-plugin-display-name" required>
+							<input
+								id="agent-plugin-display-name"
+								className="input w-full rounded-xl"
+								value={displayName}
+								onChange={event => {
+									setDisplayName(event.currentTarget.value);
+								}}
+								disabled={isSubmitting}
+								maxLength={256}
+							/>
+						</ModalField>
 
-					<ModalField label="Description" htmlFor="agent-plugin-description">
-						<textarea
-							id="agent-plugin-description"
-							className="textarea min-h-24 w-full rounded-xl"
-							value={description}
-							onChange={event => {
-								setDescription(event.currentTarget.value);
-							}}
-							disabled={isSubmitting}
-							maxLength={2000}
-						/>
-					</ModalField>
-				</ModalSection>
+						<ModalField label="Description" htmlFor="agent-plugin-description">
+							<textarea
+								id="agent-plugin-description"
+								className="textarea min-h-24 w-full rounded-xl"
+								value={description}
+								onChange={event => {
+									setDescription(event.currentTarget.value);
+								}}
+								disabled={isSubmitting}
+								maxLength={2000}
+							/>
+						</ModalField>
+					</ModalSection>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button type="button" className="btn bg-base-300 rounded-xl" disabled={isSubmitting} onClick={onClose}>
@@ -527,7 +539,7 @@ function AgentPluginEditModalContent({
 					</button>
 				</ModalActions>
 			</form>
-		</div>
+		</ManagementModalPanel>
 	);
 }
 
@@ -545,14 +557,14 @@ function AgentPluginEditModal({
 	}
 
 	return (
-		<ModalDialog isOpen={true} onClose={onClose} blockCancel>
+		<ManagementModalDialog isOpen onClose={onClose} blockCancel>
 			<AgentPluginEditModalContent
 				key={`${plugin.ref.rootID}:${plugin.ref.artifactID}:${plugin.revision}`}
 				plugin={plugin}
 				onClose={onClose}
 				onSubmit={(displayName, description) => onSubmit(plugin, displayName, description)}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }
 
@@ -617,6 +629,11 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 					<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
+			<ManagementJSONSource
+				label="Agent Plugin document JSON"
+				fileName={`${plugin.name}.json`}
+				load={() => agentManagementAPI.getAgentPlugin(state.plugin.ref)}
+			/>
 		</ManagementDetailsModal>
 	);
 }

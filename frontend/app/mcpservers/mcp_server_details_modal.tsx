@@ -40,6 +40,7 @@ import { ManagementDetailsModal } from '@/components/managementui/management_det
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -256,6 +257,21 @@ function MCPServerDetailsModalContent({
 					</ManagementInfoGrid>
 				</ModalSection>
 			) : null}
+
+			<ModalSection title="Artifact documents">
+				<ManagementJSONSource
+					label="MCP server document JSON"
+					fileName={`${server.logicalName}.json`}
+					load={async () => {
+						const current = await mcpManagementAPI.getMCPServer(server.ref, plugin.ref);
+						if (!current.document) {
+							throw new Error('The MCP server document is unavailable.');
+						}
+						return current.document;
+					}}
+					note="This is the server declaration, not installation secrets or OAuth tokens."
+				/>
+			</ModalSection>
 
 			<ModalSection title="Discovery" description="Tools, resources, templates, and prompts currently available.">
 				{isLoading ? <div className="text-center text-sm">Loading discovery cache…</div> : null}

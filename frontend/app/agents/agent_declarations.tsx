@@ -4,7 +4,6 @@ import { FiChevronDown, FiFileText } from 'react-icons/fi';
 import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import { isAgentSkillUseAsInstructions } from '@/spec/agent';
 import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
-import { TextInsert } from '@/spec/text';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
@@ -13,7 +12,10 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { skillManagementAPI, textStoreAPI } from '@/apis/baseapi';
 
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
+
 import { getAgentRelationshipBadgeClass } from '@/agents/agent_management_utils';
+import { loadSkillArtifactSource } from '@/skills/skill_artifact_source';
 
 export interface AgentCapabilityControls {
 	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
@@ -23,11 +25,10 @@ export interface AgentCapabilityControls {
 interface ContributionPreview {
 	title: string;
 	body: string;
-	isDocument?: boolean;
 	note?: string;
 }
 
-function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
+function RenderedInstructionPreview({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
 	const load = useCallback(
 		async (signal: AbortSignal): Promise<ContributionPreview> => {
 			const ref = occurrence.target?.artifact;
@@ -35,60 +36,18 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 				throw new Error('This declaration has no Artifact content to preview.');
 			}
 
-			if (occurrence.type === 'text') {
-				const text = await textStoreAPI.materializeText(ref);
-				throwIfAborted(signal);
-				return {
-					title:
-						text.insert === TextInsert.Instructions
-							? 'Instruction text'
-							: text.insert === TextInsert.UserMessage
-								? 'User-message text'
-								: 'Text content',
-					body: text.content || '(Empty text)',
-					note: `Materialized from ${text.name}; Run preparation resolves it again.`,
-				};
-			}
-
-			if (isAgentSkillUseAsInstructions(occurrence.skillUseMode)) {
-				try {
-					const result = await skillManagementAPI.previewInstructionSkill({
-						skill: ref,
-						arguments: {},
-					});
-					throwIfAborted(signal);
-					if (!result.text.trim()) {
-						throw new Error('This Skill rendered no instruction text.');
-					}
-					return {
-						title: 'Rendered instructions (empty arguments)',
-						body: result.text,
-						note: 'Run preparation may render this Skill with different arguments.',
-					};
-				} catch (error) {
-					throwIfAborted(signal);
-					const skill = await skillManagementAPI.getSkill(ref);
-					throwIfAborted(signal);
-					const details = await skillManagementAPI.getArtifactSkillDetails(ref, skill.revision);
-					throwIfAborted(signal);
-					return {
-						title: 'Skill document',
-						body: details.document.markdownBody || '(Empty document)',
-						isDocument: true,
-						note: `Rendered instructions unavailable: ${getErrorMessage(error, 'Preview failed.')}`,
-					};
-				}
-			}
-
-			const skill = await skillManagementAPI.getSkill(ref);
+			const result = await skillManagementAPI.previewInstructionSkill({
+				skill: ref,
+				arguments: {},
+			});
 			throwIfAborted(signal);
-			const details = await skillManagementAPI.getArtifactSkillDetails(ref, skill.revision);
-			throwIfAborted(signal);
+			if (!result.text.trim()) {
+				throw new Error('This Skill rendered no instruction text.');
+			}
 			return {
-				title: 'Skill document',
-				body: details.document.markdownBody || '(Empty document)',
-				isDocument: true,
-				note: 'This document may reference resources or render differently during Run preparation.',
+				title: 'Rendered instructions (empty arguments)',
+				body: result.text,
+				note: 'Run preparation may render this Skill with different arguments.',
 			};
 		},
 		[occurrence]
@@ -111,14 +70,50 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 	return (
 		<div className="space-y-2">
 			<div className="text-base-content/70 text-xs font-medium">{data.title}</div>
-			<pre
-				className={`app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 wrap-break-word whitespace-pre-wrap ${
-					data.isDocument ? 'font-mono text-xs' : 'font-sans text-sm'
-				}`}
-			>
+			<pre className="app-scrollbar-thin bg-base-300 max-h-80 overflow-auto rounded-xl p-3 text-sm wrap-break-word whitespace-pre-wrap">
 				{data.body}
 			</pre>
 			{data.note ? <p className="text-base-content/70 text-xs">{data.note}</p> : null}
+		</div>
+	);
+}
+
+function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
+	const ref = occurrence.target?.form === CapabilityTargetForm.Artifact ? occurrence.target.artifact : undefined;
+	if (!ref) {
+		return <p className="text-base-content/70 text-xs">This declaration has no source Artifact.</p>;
+	}
+
+	if (occurrence.type === 'text') {
+		return (
+			<ManagementArtifactSource
+				key={`${ref.rootID}:${ref.artifactID}`}
+				label="materialized text"
+				load={async () => {
+					const text = await textStoreAPI.materializeText(ref);
+					return {
+						data: text,
+						text: text.content,
+						fileName: `${text.name || 'text'}.txt`,
+						extension: 'txt',
+					};
+				}}
+				note="This is materialized text. Run preparation resolves the Artifact again."
+			/>
+		);
+	}
+
+	return (
+		<div className="space-y-3">
+			<ManagementArtifactSource
+				key={`${ref.rootID}:${ref.artifactID}`}
+				label="SKILL.md source"
+				load={() => loadSkillArtifactSource(ref)}
+				note="Canonical SKILL.md is reconstructed from the verified document, including frontmatter. Original comments and formatting are not available through this API."
+			/>
+			{isAgentSkillUseAsInstructions(occurrence.skillUseMode) ? (
+				<RenderedInstructionPreview occurrence={occurrence} />
+			) : null}
 		</div>
 	);
 }

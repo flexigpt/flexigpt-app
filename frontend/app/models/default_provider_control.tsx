@@ -73,9 +73,9 @@ export function DefaultProviderControl({
 	const setupLabel = providers.length === 0 ? 'Add a provider' : 'Configure provider API keys';
 
 	return (
-		<div className="bg-base-100 mb-6 rounded-2xl px-4 py-3 shadow-lg">
+		<section className="bg-base-100 border-base-content/10 rounded-2xl border p-4">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-				<div className="text-sm font-medium sm:w-48">Default Provider</div>
+				<div className="text-sm font-semibold sm:w-48">Default Provider</div>
 
 				<div className="min-w-0 grow">
 					<Dropdown<string>
@@ -116,6 +116,6 @@ export function DefaultProviderControl({
 					The backend default is shown above, but it is not currently enabled and ready to send requests.
 				</div>
 			) : null}
-		</div>
+		</section>
 	);
 }

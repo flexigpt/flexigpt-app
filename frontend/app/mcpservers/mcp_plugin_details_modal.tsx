@@ -1,8 +1,11 @@
 import type { MCPPluginView } from '@/spec/mcp';
 
+import { mcpManagementAPI } from '@/apis/baseapi';
+
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 
 interface MCPPluginDetailsModalProps {
 	isOpen: boolean;
@@ -48,6 +51,11 @@ export function MCPPluginDetailsModal({
 					<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
+			<ManagementJSONSource
+				label="MCP Plugin document JSON"
+				fileName={`${plugin.logicalName}.json`}
+				load={() => mcpManagementAPI.getMCPPlugin(plugin.ref)}
+			/>
 		</ManagementDetailsModal>
 	);
 }

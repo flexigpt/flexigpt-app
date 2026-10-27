@@ -16,9 +16,12 @@ import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { getPrettyToolName } from '@/apis/tool_management';
 
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -272,68 +275,64 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	}
 
 	return (
-		<>
-			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
-				<ModalHeader
-					title={
-						<span className="flex items-center gap-2">
-							<FiTool size={16} />
-							<span>{title}</span>
-						</span>
-					}
-					onClose={() => {
-						requestClose();
-					}}
-				/>
-				<div className="min-h-0 flex-1 overflow-y-auto p-6">
-					{/* Primary, human-friendly view (semantics first) */}
-					{primaryContent.trim().length > 0 && (
-						<div className="mb-4">
-							<MessageContentCard
-								messageID={`${baseMessageId}:primary`}
-								content={primaryContent}
-								isBusy={false}
-								align="items-start text-left"
-								renderAsMarkdown={true}
-								defaultCodeBlockExpanded={false}
-							/>
-						</div>
-					)}
-
-					{outputMedia.length > 0 ? (
-						<div className="border-base-300 bg-base-100 mb-4 rounded-xl border p-3">
-							<div className="mb-2 text-sm font-semibold">Generated images and files</div>
-							<MessageMediaContent items={outputMedia} />
-						</div>
-					) : null}
-
-					{/* Raw payload for full inspection */}
-					<div>
+		<ManagementModalPanel width="wide">
+			<ModalHeader
+				title={
+					<span className="flex items-center gap-2">
+						<FiTool size={16} />
+						<span>{title}</span>
+					</span>
+				}
+				onClose={() => {
+					requestClose();
+				}}
+			/>
+			<ManagementModalBody>
+				{/* Primary, human-friendly view (semantics first) */}
+				{primaryContent.trim().length > 0 && (
+					<div className="mb-4">
 						<MessageContentCard
-							messageID={`${baseMessageId}:raw`}
-							content={rawPayloadMarkdown}
+							messageID={`${baseMessageId}:primary`}
+							content={primaryContent}
 							isBusy={false}
 							align="items-start text-left"
 							renderAsMarkdown={true}
 							defaultCodeBlockExpanded={false}
 						/>
 					</div>
-				</div>
-				<ModalActions>
-					<button
-						type="button"
-						className="btn bg-base-300 rounded-xl"
-						onClick={() => {
-							requestClose();
-						}}
-					>
-						Close
-					</button>
-				</ModalActions>
-			</div>
+				)}
 
-			<ModalBackdrop enabled={true} />
-		</>
+				{outputMedia.length > 0 ? (
+					<div className="border-base-300 bg-base-100 mb-4 rounded-xl border p-3">
+						<div className="mb-2 text-sm font-semibold">Generated images and files</div>
+						<MessageMediaContent items={outputMedia} />
+					</div>
+				) : null}
+
+				{/* Raw payload for full inspection */}
+				<div>
+					<MessageContentCard
+						messageID={`${baseMessageId}:raw`}
+						content={rawPayloadMarkdown}
+						isBusy={false}
+						align="items-start text-left"
+						renderAsMarkdown={true}
+						defaultCodeBlockExpanded={false}
+					/>
+				</div>
+			</ManagementModalBody>
+			<ModalActions>
+				<button
+					type="button"
+					className="btn bg-base-300 rounded-xl"
+					onClick={() => {
+						requestClose();
+					}}
+				>
+					Close
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 
@@ -343,8 +342,8 @@ export function ToolDetailsModal(props: ToolDetailsModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen={true} onClose={props.onClose}>
+		<ManagementModalDialog isOpen onClose={props.onClose}>
 			<ToolDetailsModalContent {...props} />
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }

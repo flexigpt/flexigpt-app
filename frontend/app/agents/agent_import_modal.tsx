@@ -10,8 +10,12 @@ import { getErrorMessage } from '@/lib/error_utils';
 import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -209,8 +213,8 @@ function AgentImportModalContent({
 	};
 
 	return (
-		<ModalDialog isOpen={true} onClose={onClose} blockCancel={isPickingFile || isPreviewing || isCommitting}>
-			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
+		<ManagementModalDialog isOpen onClose={onClose} blockCancel>
+			<ManagementModalPanel width="wide">
 				<ModalHeader
 					title="Import Managed Agent"
 					description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Plugin."
@@ -218,7 +222,7 @@ function AgentImportModalContent({
 					closeDisabled={isPickingFile || isPreviewing || isCommitting}
 				/>
 
-				<div className="app-scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
+				<ManagementModalBody>
 					<div className="space-y-5">
 						{error ? (
 							<div className="alert alert-error rounded-2xl text-sm">
@@ -432,7 +436,7 @@ function AgentImportModalContent({
 							</>
 						) : null}
 					</div>
-				</div>
+				</ManagementModalBody>
 
 				<ModalActions>
 					<button
@@ -461,8 +465,8 @@ function AgentImportModalContent({
 						<span>{isCommitting ? 'Importing...' : 'Import Agent'}</span>
 					</button>
 				</ModalActions>
-			</div>
-		</ModalDialog>
+			</ManagementModalPanel>
+		</ManagementModalDialog>
 	);
 }
 

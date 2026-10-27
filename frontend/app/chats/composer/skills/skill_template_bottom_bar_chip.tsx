@@ -6,6 +6,7 @@ import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { PathAttachmentsResult } from '@/spec/attachment';
+import type { SkillArgument } from '@/spec/skill';
 import { ArtifactState } from '@/spec/artifact';
 import { SkillInsert } from '@/spec/skill';
 
@@ -27,8 +28,13 @@ import {
 import { ComposerDropdownSelectedPanel } from '@/components/composer_dropdown_selected_panel';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip } from '@/components/hover_tip';
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
+import {
+	ManagementModalBody,
+	ManagementModalDialog,
+	ManagementModalPanel,
+} from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
-import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -38,8 +44,11 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { LoadedSkillSource } from '@/skills/skill_artifact_source';
+import { loadSkillArtifactSource } from '@/skills/skill_artifact_source';
 import { SkillDetailsModal, skillDetailsSubjectFromComposerSkill } from '@/skills/skill_details_modal';
 import { getSkillDisplayName, getSkillSecondaryLabel, getSkillSourceLabel } from '@/skills/skill_presentation';
+import { selectVerifiedTemplateResourcePaths, uniqueTemplateResourcePaths } from '@/skills/template_resource_selection';
 
 interface SkillTemplateDropdownProps {
 	store: MenuStore;
@@ -64,11 +73,19 @@ interface SkillTemplateInsertOutcome {
 	resourceAttachmentWarnings?: string[];
 }
 
+interface SkillTemplateInsertRequest {
+	arguments: Record<string, string>;
+	resources: {
+		allowedPaths: string[];
+		selectedPaths: string[];
+	};
+}
+
 interface SkillTemplateRenderModalProps {
 	isOpen: boolean;
 	item: ComposerSkillCatalogItem | null;
 	onClose: () => void;
-	onInsert: (args: Record<string, string>, resourcePaths: string[]) => Promise<SkillTemplateInsertOutcome>;
+	onInsert: (request: SkillTemplateInsertRequest) => Promise<SkillTemplateInsertOutcome>;
 }
 
 interface SkillTemplatePickerProps {
@@ -81,8 +98,7 @@ interface SkillTemplatePickerProps {
 	isInputLocked: boolean;
 	onInsertRendered: (
 		item: ComposerSkillCatalogItem,
-		args: Record<string, string>,
-		resourcePaths: string[]
+		request: SkillTemplateInsertRequest
 	) => Promise<SkillTemplateInsertOutcome>;
 }
 
@@ -135,28 +151,7 @@ function templateIsSelectable(item: ComposerSkillCatalogItem): boolean {
 }
 
 function approvedTemplateResourcePaths(item: ComposerSkillCatalogItem | null | undefined): string[] {
-	const paths: string[] = [];
-	const seen = new Set<string>();
-
-	for (const location of item?.resources?.locations ?? []) {
-		if (location.trim().length === 0 || seen.has(location)) {
-			continue;
-		}
-
-		seen.add(location);
-		paths.push(location);
-	}
-
-	return paths;
-}
-
-function selectedApprovedTemplateResourcePaths(
-	approvedPaths: readonly string[],
-	selectedPaths: readonly string[]
-): string[] {
-	const selected = new Set(selectedPaths);
-
-	return approvedPaths.filter(path => selected.has(path));
+	return uniqueTemplateResourcePaths(item?.resources?.locations);
 }
 
 function templateResourceFileName(path: string): string {
@@ -481,22 +476,41 @@ function SkillTemplateRenderModalContent({
 	onInsert,
 }: Omit<SkillTemplateRenderModalProps, 'isOpen' | 'onClose'>) {
 	const [argumentsJSON, setArgumentsJSON] = useState('{}');
+	const [verifiedSource, setVerifiedSource] = useState<LoadedSkillSource | null>(null);
 	const [argumentValues, setArgumentValues] = useState<Record<string, string>>(() =>
 		Object.fromEntries((item?.arguments ?? []).map(argument => [argument.name, argument.default ?? '']))
 	);
-	const approvedResourcePaths = useMemo(() => approvedTemplateResourcePaths(item), [item]);
+	const resourceSelectionTouchedRef = useRef(false);
+	const declaredArguments: SkillArgument[] | undefined = verifiedSource?.details.document.arguments ?? item?.arguments;
+	const sourceHasDeclaredArguments = verifiedSource !== null || item?.arguments !== undefined;
+	const templateHasArguments =
+		verifiedSource !== null
+			? (verifiedSource.details.document.arguments?.length ?? 0) > 0
+			: item?.hasArguments === true;
+	const approvedResourcePaths = useMemo(
+		() =>
+			verifiedSource
+				? uniqueTemplateResourcePaths(verifiedSource.details.resources.locations)
+				: approvedTemplateResourcePaths(item),
+		[item, verifiedSource]
+	);
 	const resourceLabels = useMemo(() => templateResourceLabels(approvedResourcePaths), [approvedResourcePaths]);
-	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>(() => approvedResourcePaths);
+	const [selectedResourcePaths, setSelectedResourcePaths] = useState<string[]>(() =>
+		approvedTemplateResourcePaths(item)
+	);
 	const [submitError, setSubmitError] = useState('');
 	const [resourceAttachmentWarnings, setResourceAttachmentWarnings] = useState<string[]>([]);
 	const [inserted, setInserted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const { requestClose, unmountingRef } = useModalDialogController();
 
-	const selectedApprovedResources = selectedApprovedTemplateResourcePaths(approvedResourcePaths, selectedResourcePaths);
+	const selectedApprovedResources = selectVerifiedTemplateResourcePaths(approvedResourcePaths, selectedResourcePaths);
 	const allApprovedResourcesSelected =
 		approvedResourcePaths.length > 0 && selectedApprovedResources.length === approvedResourcePaths.length;
-	const hasResourceSelection = Boolean(item?.hasResources) || approvedResourcePaths.length > 0;
+	const hasResourceSelection =
+		verifiedSource !== null
+			? verifiedSource.details.resources.hasResources || approvedResourcePaths.length > 0
+			: Boolean(item?.hasResources) || approvedResourcePaths.length > 0;
 	const formLocked = submitting || inserted;
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
@@ -513,10 +527,13 @@ function SkillTemplateRenderModalContent({
 
 		void Promise.resolve()
 			.then(async () => {
-				const outcome = await onInsert(
-					item.arguments !== undefined ? argumentValues : parseTemplateArguments(argumentsJSON),
-					selectedApprovedResources
-				);
+				const outcome = await onInsert({
+					arguments: declaredArguments !== undefined ? argumentValues : parseTemplateArguments(argumentsJSON),
+					resources: {
+						allowedPaths: approvedResourcePaths,
+						selectedPaths: selectedResourcePaths,
+					},
+				});
 
 				if (unmountingRef.current) {
 					return;
@@ -548,18 +565,18 @@ function SkillTemplateRenderModalContent({
 	}
 
 	return (
-		<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
-			<div className="app-scrollbar-thin max-h-[80vh] overflow-y-auto p-4 sm:p-6">
-				<ModalHeader
-					title="Use Template"
-					description={`${getSkillTemplateLabel(item)} will be rendered before insertion.`}
-					onClose={() => {
-						requestClose();
-					}}
-					closeDisabled={submitting}
-				/>
+		<ManagementModalPanel>
+			<ModalHeader
+				title="Use Template"
+				description={`${getSkillTemplateLabel(item)} will be rendered before insertion.`}
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={submitting}
+			/>
 
-				<form className="space-y-4" onSubmit={handleSubmit}>
+			<form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+				<ManagementModalBody>
 					{submitError ? (
 						<div className="alert alert-error rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
@@ -583,9 +600,25 @@ function SkillTemplateRenderModalContent({
 						</div>
 					) : null}
 
-					{item.hasArguments && item.arguments !== undefined ? (
+					<ManagementArtifactSource
+						label="template SKILL.md source"
+						defaultOpen
+						load={() => loadSkillArtifactSource(item.ref, item.revision)}
+						onLoaded={loaded => {
+							setVerifiedSource(loaded);
+							setArgumentValues(
+								Object.fromEntries(
+									(loaded.details.document.arguments ?? []).map(argument => [argument.name, argument.default ?? ''])
+								)
+							);
+							setSelectedResourcePaths([...new Set(loaded.details.resources.locations)]);
+						}}
+						note="The complete verified template includes frontmatter and unrendered placeholders. Copy and Export use this same source."
+					/>
+
+					{declaredArguments !== undefined && declaredArguments.length > 0 ? (
 						<div className="space-y-3">
-							{item.arguments.map(argument => (
+							{declaredArguments.map(argument => (
 								<label key={argument.name} className="block">
 									<span className="mb-1 block text-sm font-medium">{argument.name}</span>
 									{argument.description ? (
@@ -612,7 +645,7 @@ function SkillTemplateRenderModalContent({
 								</label>
 							))}
 						</div>
-					) : item.hasArguments ? (
+					) : templateHasArguments && !sourceHasDeclaredArguments ? (
 						<div>
 							<p className="text-warning mb-2 text-xs">
 								This template accepts arguments, but its argument definitions are unavailable. Known values can still be
@@ -666,6 +699,7 @@ function SkillTemplateRenderModalContent({
 											className="btn btn-ghost btn-xs rounded-lg"
 											disabled={formLocked || allApprovedResourcesSelected}
 											onClick={() => {
+												resourceSelectionTouchedRef.current = true;
 												setSelectedResourcePaths(approvedResourcePaths);
 											}}
 										>
@@ -676,6 +710,7 @@ function SkillTemplateRenderModalContent({
 											className="btn btn-ghost btn-xs rounded-lg"
 											disabled={formLocked || selectedApprovedResources.length === 0}
 											onClick={() => {
+												resourceSelectionTouchedRef.current = true;
 												setSelectedResourcePaths([]);
 											}}
 										>
@@ -699,6 +734,7 @@ function SkillTemplateRenderModalContent({
 														checked={selected}
 														disabled={formLocked}
 														onChange={() => {
+															resourceSelectionTouchedRef.current = true;
 															setSelectedResourcePaths(previous =>
 																previous.includes(resourcePath)
 																	? previous.filter(path => path !== resourcePath)
@@ -719,51 +755,50 @@ function SkillTemplateRenderModalContent({
 								</div>
 							)}
 
-							{item.resources?.moreLocations ? (
+							{(verifiedSource?.details.resources.moreLocations ?? item.resources?.moreLocations) ? (
 								<div className="alert alert-info mt-3 rounded-xl text-xs">
 									Some additional resource files are available but cannot be attached from this menu.
 								</div>
 							) : null}
 						</section>
 					) : null}
-
-					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
-						{inserted ? (
+				</ManagementModalBody>
+				<ModalActions>
+					{inserted ? (
+						<button
+							type="button"
+							className="btn btn-primary rounded-xl"
+							onClick={() => {
+								requestClose(true);
+							}}
+						>
+							<FiCheck size={14} />
+							Done
+						</button>
+					) : (
+						<>
 							<button
 								type="button"
-								className="btn btn-primary rounded-xl"
+								className="btn bg-base-300 rounded-xl"
 								onClick={() => {
-									requestClose(true);
+									requestClose();
 								}}
+								disabled={submitting}
 							>
-								<FiCheck size={14} />
-								Done
+								Cancel
 							</button>
-						) : (
-							<>
-								<button
-									type="button"
-									className="btn bg-base-300 rounded-xl"
-									onClick={() => {
-										requestClose();
-									}}
-									disabled={submitting}
-								>
-									Cancel
-								</button>
-								<button type="submit" className="btn btn-primary rounded-xl" disabled={formLocked}>
-									{submitting
-										? 'Preparing…'
-										: selectedApprovedResources.length > 0
-											? `Insert + attach (${selectedApprovedResources.length})`
-											: 'Insert'}
-								</button>
-							</>
-						)}
-					</ModalActions>
-				</form>
-			</div>
-		</div>
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={formLocked}>
+								{submitting
+									? 'Preparing…'
+									: selectedApprovedResources.length > 0
+										? `Insert + attach (${selectedApprovedResources.length})`
+										: 'Insert'}
+							</button>
+						</>
+					)}
+				</ModalActions>
+			</form>
+		</ManagementModalPanel>
 	);
 }
 
@@ -775,13 +810,13 @@ function SkillTemplateRenderModal(props: SkillTemplateRenderModalProps) {
 	}
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={props.onClose} blockCancel>
+		<ManagementModalDialog isOpen={isOpen} onClose={props.onClose} blockCancel>
 			<SkillTemplateRenderModalContent
 				key={`${skillTemplateKey(item)}:${item.revision}`}
 				item={item}
 				onInsert={props.onInsert}
 			/>
-		</ModalDialog>
+		</ManagementModalDialog>
 	);
 }
 
@@ -808,19 +843,10 @@ function SkillTemplatePicker({
 				return;
 			}
 
-			if (item.hasArguments || item.hasResources || approvedTemplateResourcePaths(item).length > 0) {
-				store.hide();
-				setTemplateItem(item);
-				return;
-			}
-
-			try {
-				await onInsertRendered(item, {}, []);
-			} catch (error) {
-				setTemplateActionError(error instanceof Error ? error.message : 'Template rendering was rejected.');
-			}
+			store.hide();
+			setTemplateItem(item);
 		},
-		[isInputLocked, onInsertRendered, store]
+		[isInputLocked, store]
 	);
 
 	return (
@@ -854,12 +880,12 @@ function SkillTemplatePicker({
 				onClose={() => {
 					setTemplateItem(null);
 				}}
-				onInsert={(args, resourcePaths) => {
+				onInsert={request => {
 					if (!templateItem) {
 						return Promise.resolve({});
 					}
 
-					return onInsertRendered(templateItem, args, resourcePaths);
+					return onInsertRendered(templateItem, request);
 				}}
 			/>
 
@@ -923,8 +949,7 @@ function SkillTemplateBottomBarChipInner({
 	const handleInsertRendered = useCallback(
 		async (
 			item: ComposerSkillCatalogItem,
-			args: Record<string, string>,
-			selectedResourcePaths: string[]
+			request: SkillTemplateInsertRequest
 		): Promise<SkillTemplateInsertOutcome> => {
 			if (inputLockedRef.current) {
 				throw new Error('Composer input is locked.');
@@ -937,7 +962,7 @@ function SkillTemplateBottomBarChipInner({
 					expectedRevision: item.revision,
 					...(item.definitionDigest ? { expectedDigest: item.definitionDigest } : {}),
 				},
-				arguments: args,
+				arguments: request.arguments,
 			});
 
 			if (inputLockedRef.current) {
@@ -949,9 +974,9 @@ function SkillTemplateBottomBarChipInner({
 			await onInsertTemplateText(rendered.text);
 			onTemplateRendered(item.ref);
 
-			const requestedResourcePaths = selectedApprovedTemplateResourcePaths(
-				approvedTemplateResourcePaths(item),
-				selectedResourcePaths
+			const requestedResourcePaths = selectVerifiedTemplateResourcePaths(
+				request.resources.allowedPaths,
+				request.resources.selectedPaths
 			);
 			let resourceAttachmentWarnings: string[] | undefined;
 

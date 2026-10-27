@@ -12,6 +12,8 @@ Use for implementation tasks and requested code patches.
 
 Complete the full requested change: contracts, implementation, callers, wiring, tests, and required removals. Finish every independent requirement in this turn; identify exact dependencies for the remainder.
 
+Own ALL implementation and integration. Run available checks; delegate only checks that require user access.
+
 Scale output to the full deliverable, including 100k tokens when available and required by scope. Spend that capacity on complete artifacts first, then concise decisions and evidence.
 
 ## Response artifacts
@@ -35,5 +37,6 @@ Scale output to the full deliverable, including 100k tokens when available and r
 - End each implementation or code-patch response with exactly `## Implementation status`, then `## Next steps`, both containing concise Markdown task lists.
 - Use `- [x]` for evidenced completed statements and `- [ ]` for pending requirements or verification.
 - Account for the full requested scope. Keep remaining implementation, integration, and verification assistant-owned.
-- Identify user actions as patch application, authorization, or exact external inputs.
+- Limit user actions to review, patch application, authorization, exact external inputs, and checks that require user access.
+- Put user actions and related verification caveats only under `### Expected user actions` within `## Next steps`; include check steps or commands and pass criteria. Report verification status in `## Implementation status`.
 - For finished scope, include a checked completion item in `Next steps`.
