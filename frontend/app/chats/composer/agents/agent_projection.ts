@@ -100,7 +100,7 @@ export function projectAgentSkillCapabilities(resolution: AgentResolution | null
 			occurrence,
 			ref,
 			key: sessionArtifactKey(ref),
-			displayName: occurrenceDisplayName(occurrence, ref.artifactID),
+			displayName: occurrenceDisplayName(occurrence, 'Skill'),
 			active: occurrence.skillUseMode === AgentSkillUseMode.Active,
 		});
 	}
@@ -125,7 +125,7 @@ export function projectAgentMCPCapabilities(resolution: AgentResolution | null):
 			occurrence,
 			ref,
 			key: sessionArtifactKey(ref),
-			displayName: occurrenceDisplayName(occurrence, ref.artifactID),
+			displayName: occurrenceDisplayName(occurrence, 'MCP server'),
 		});
 	}
 
@@ -154,7 +154,7 @@ export function projectAgentInstructionSources(
 				occurrencePath: occurrence.path,
 				kind: 'skill',
 				artifact: ref,
-				displayName: occurrenceDisplayName(occurrence, ref.artifactID),
+				displayName: occurrenceDisplayName(occurrence, 'Skill'),
 			});
 			continue;
 		}
@@ -164,7 +164,7 @@ export function projectAgentInstructionSources(
 				occurrencePath: occurrence.path,
 				kind: 'text',
 				artifact: ref,
-				displayName: occurrenceDisplayName(occurrence, ref.artifactID),
+				displayName: occurrenceDisplayName(occurrence, 'Text'),
 			});
 		}
 	}

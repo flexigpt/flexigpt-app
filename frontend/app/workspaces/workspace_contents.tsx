@@ -1,6 +1,6 @@
 // oxlint-disable react/only-export-components
 import type { ReactNode } from 'react';
-import { FiBookOpen, FiFileText, FiServer, FiZap } from 'react-icons/fi';
+import { FiBookOpen, FiEye, FiFileText, FiServer, FiZap } from 'react-icons/fi';
 
 import type {
 	WorkspaceArtifactView,
@@ -33,6 +33,9 @@ interface WorkspaceContentsProps {
 	onToggleMCP?: (server: WorkspaceMCPServer, selected: boolean) => void;
 	onSetArtifactEnabled?: (artifact: WorkspaceArtifactView, enabled: boolean) => void | Promise<void>;
 	renderMCPAction?: (server: WorkspaceMCPServer) => ReactNode;
+	onViewContext?: (context: WorkspacePromptContribution) => void;
+	onViewSkill?: (skill: WorkspaceSkill) => void;
+	onViewMCP?: (server: WorkspaceMCPServer) => void;
 }
 
 export interface WorkspaceContentCounts {
@@ -304,6 +307,15 @@ function WorkspaceContentSection({
 	);
 }
 
+function WorkspaceViewButton({ label, onClick }: { label: string; onClick: () => void }) {
+	return (
+		<button type="button" className="btn btn-sm btn-ghost rounded-xl" title={`View ${label}`} onClick={onClick}>
+			<FiEye size={14} />
+			View
+		</button>
+	);
+}
+
 export function WorkspaceContents({
 	plan,
 	selection,
@@ -315,6 +327,9 @@ export function WorkspaceContents({
 	onToggleMCP,
 	onSetArtifactEnabled,
 	renderMCPAction,
+	onViewContext,
+	onViewSkill,
+	onViewMCP,
 }: WorkspaceContentsProps) {
 	const renderArtifactControl = (artifactRef: WorkspaceArtifactView['artifact'], label: string): ReactNode => {
 		const artifact = artifactViews?.get(artifactRefKey(artifactRef));
@@ -391,6 +406,16 @@ export function WorkspaceContents({
 					onToggleContext?.(context, next);
 				}}
 				leadingActions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
+				normalActions={
+					onViewContext ? (
+						<WorkspaceViewButton
+							label={instruction ? 'repository instructions' : 'repository reference files'}
+							onClick={() => {
+								onViewContext(context);
+							}}
+						/>
+					) : undefined
+				}
 			>
 				{context.truncated ? (
 					<div className="text-warning py-1 text-xs">
@@ -424,6 +449,21 @@ export function WorkspaceContents({
 					/>
 				</label>
 			) : undefined;
+		const viewControl = onViewSkill ? (
+			<WorkspaceViewButton
+				label="Skill"
+				onClick={() => {
+					onViewSkill(skill);
+				}}
+			/>
+		) : undefined;
+		const normalActions =
+			viewControl || activeControl ? (
+				<>
+					{viewControl}
+					{activeControl}
+				</>
+			) : undefined;
 
 		return (
 			<WorkspaceContentCard
@@ -445,7 +485,7 @@ export function WorkspaceContents({
 					onToggleSkill?.(skill, next);
 				}}
 				leadingActions={artifactControl}
-				normalActions={activeControl}
+				normalActions={normalActions}
 			>
 				<WorkspacePathList locators={path ? [path] : []} />
 			</WorkspaceContentCard>
@@ -459,6 +499,21 @@ export function WorkspaceContents({
 		const entry = server.subresourceLocator?.trim();
 		const artifactControl = renderArtifactControl(server.artifact, 'MCP server');
 		const mcpAction = renderMCPAction?.(server);
+		const viewControl = onViewMCP ? (
+			<WorkspaceViewButton
+				label="MCP server"
+				onClick={() => {
+					onViewMCP(server);
+				}}
+			/>
+		) : undefined;
+		const normalActions =
+			viewControl || mcpAction ? (
+				<>
+					{viewControl}
+					{mcpAction}
+				</>
+			) : undefined;
 
 		return (
 			<WorkspaceContentCard
@@ -481,7 +536,7 @@ export function WorkspaceContents({
 					onToggleMCP?.(server, next);
 				}}
 				leadingActions={artifactControl}
-				normalActions={mcpAction}
+				normalActions={normalActions}
 			>
 				<WorkspacePathList locators={locator ? [locator] : []} />
 			</WorkspaceContentCard>

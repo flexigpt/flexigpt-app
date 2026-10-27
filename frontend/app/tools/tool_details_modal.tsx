@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { ToolStoreListItem, ToolView } from '@/spec/tool';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -17,10 +18,29 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import type { ToolSchemaKind } from '@/tools/tool_schema_source';
 import { getToolSchema, toolSchemaFileName } from '@/tools/tool_schema_source';
 
+export interface ToolDetailsSubject {
+	ref: ArtifactRef;
+	revision?: number;
+	displayName?: string;
+	name?: string;
+	description?: string;
+}
+
 interface ToolDetailsModalProps {
 	isOpen: boolean;
-	tool: ToolStoreListItem | null;
+	subject: ToolDetailsSubject | null;
 	onClose: () => void;
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function toolDetailsSubjectFromListItem(tool: ToolStoreListItem): ToolDetailsSubject {
+	return {
+		ref: tool.ref,
+		revision: tool.revision,
+		displayName: tool.displayName,
+		name: tool.name,
+		description: tool.description,
+	};
 }
 
 function ToolSchemaSection({ tool, kind }: { tool: ToolView; kind: ToolSchemaKind }) {
@@ -44,14 +64,14 @@ function ToolSchemaSection({ tool, kind }: { tool: ToolView; kind: ToolSchemaKin
 	);
 }
 
-function ToolDetailsModalContent({ listedTool, onClose }: { listedTool: ToolStoreListItem; onClose: () => void }) {
+function ToolDetailsModalContent({ subject, onClose }: { subject: ToolDetailsSubject; onClose: () => void }) {
 	const loadTool = useCallback(
 		async (signal: AbortSignal): Promise<ToolView> => {
-			const value = await toolManagementAPI.getTool(listedTool.ref);
+			const value = await toolManagementAPI.getTool(subject.ref);
 			throwIfAborted(signal);
 			return value;
 		},
-		[listedTool]
+		[subject]
 	);
 
 	const {
@@ -68,9 +88,9 @@ function ToolDetailsModalContent({ listedTool, onClose }: { listedTool: ToolStor
 		<ManagementDetailsModal
 			isOpen={true}
 			onClose={onClose}
-			title={listedTool.displayName || listedTool.name}
-			description={listedTool.description}
-			modalKey={`tool:${listedTool.ref.rootID}:${listedTool.ref.artifactID}:${listedTool.revision}`}
+			title={tool?.displayName || subject.displayName || subject.name || 'Tool'}
+			description={tool?.description || subject.description}
+			modalKey={`tool:${subject.ref.rootID}:${subject.ref.artifactID}:${subject.revision ?? 'current'}`}
 		>
 			{error ? (
 				<ManagementResourceError
@@ -98,15 +118,15 @@ function ToolDetailsModalContent({ listedTool, onClose }: { listedTool: ToolStor
 	);
 }
 
-export function ToolDetailsModal({ isOpen, tool, onClose }: ToolDetailsModalProps) {
-	if (!isOpen || !tool) {
+export function ToolDetailsModal({ isOpen, subject, onClose }: ToolDetailsModalProps) {
+	if (!isOpen || !subject) {
 		return null;
 	}
 
 	return (
 		<ToolDetailsModalContent
-			key={`${tool.ref.rootID}:${tool.ref.artifactID}:${tool.revision}`}
-			listedTool={tool}
+			key={`${subject.ref.rootID}:${subject.ref.artifactID}:${subject.revision ?? 'current'}`}
+			subject={subject}
 			onClose={onClose}
 		/>
 	);

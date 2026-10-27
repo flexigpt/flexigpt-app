@@ -1,34 +1,33 @@
 import { useEffect, useState } from 'react';
+import { FiEye } from 'react-icons/fi';
 
-import type { PluginListItem, PluginView } from '@/spec/plugin';
+import type { PluginListItem } from '@/spec/plugin';
 import type { StoreSkillListItem } from '@/spec/skill';
 
 import { skillManagementAPI } from '@/apis/baseapi';
-import { canManageSkillPlugin } from '@/apis/skill_management';
 
-import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { ManagementPluginSource } from '@/components/managementui/management_plugin_source';
-import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
+
+import { SkillDetailsModal, skillDetailsSubjectFromStoreSkill } from '@/skills/skill_details_modal';
 
 interface SkillPluginDetailsModalProps {
 	isOpen: boolean;
 	plugin: PluginListItem | null;
 	onClose: () => void;
-	onChanged?: () => Promise<void>;
 }
 
-export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: SkillPluginDetailsModalProps) {
-	const [view, setView] = useState<PluginView | null>(null);
+export function SkillPluginDetailsModal({ isOpen, plugin, onClose }: SkillPluginDetailsModalProps) {
 	const [error, setError] = useState('');
 	const [resolvedSkills, setResolvedSkills] = useState<StoreSkillListItem[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [memberToRemove, setMemberToRemove] = useState<{ index: number; revision: number; label: string } | null>(null);
-	const [removing, setRemoving] = useState(false);
+	const [skillToView, setSkillToView] = useState<StoreSkillListItem | null>(null);
 
 	useEffect(() => {
 		if (!isOpen || !plugin) {
@@ -36,16 +35,19 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 		}
 
 		let cancelled = false;
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setLoading(true);
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setError('');
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setResolvedSkills([]);
 
 		void skillManagementAPI
 			.getSkillPluginSkills(plugin.ref)
 			.then(next => {
 				if (!cancelled) {
-					setView(next.plugin);
 					setResolvedSkills(next.skills);
-					if (next.diagnostics.length > 0) {
-						setError(next.diagnostics.join('\n'));
-					}
+					setError(next.diagnostics.join('\n'));
 				}
 			})
 			.catch((cause: unknown) => {
@@ -95,24 +97,39 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 				load={() => skillManagementAPI.getSkillPlugin(plugin.ref)}
 			/>
 
-			<ModalSection title="Resolved Skills">
+			<ModalSection title="Skills">
 				<div className="mb-3 text-sm">
-					{resolvedSkills.length} Skill{resolvedSkills.length === 1 ? '' : 's'} loaded for this Plugin.
+					{resolvedSkills.length} Skill{resolvedSkills.length === 1 ? '' : 's'} available through this Plugin.
 				</div>
 
 				<div className="space-y-2">
 					{resolvedSkills.map(skill => (
-						<div
+						<ManagementItemCard
 							key={`${skill.ref.rootID}:${skill.ref.artifactID}`}
-							className="border-base-content/10 rounded-2xl border p-3"
-						>
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="font-medium">{skill.displayName || skill.name}</span>
-								<MetadataPill label="State">{skill.state}</MetadataPill>
-								{skill.managed ? <MetadataPill>Managed</MetadataPill> : null}
-								{skill.builtIn ? <MetadataPill>Built-in</MetadataPill> : null}
-							</div>
-						</div>
+							title={skill.displayName || skill.name}
+							description={skill.description}
+							status={
+								<>
+									<StatusBadge tone={skill.enabled ? 'success' : 'neutral'}>
+										{skill.enabled ? 'Enabled' : 'Disabled'}
+									</StatusBadge>
+									{skill.managed ? <StatusBadge>Managed</StatusBadge> : null}
+									{skill.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+								</>
+							}
+							actions={
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={() => {
+										setSkillToView(skill);
+									}}
+								>
+									<FiEye size={15} />
+									View
+								</button>
+							}
+						/>
 					))}
 
 					{!loading && !error && resolvedSkills.length === 0 ? (
@@ -123,82 +140,19 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 				</div>
 			</ModalSection>
 
-			{view ? (
-				<ModalSection title="Declared membership">
-					<div className="text-base-content/70 mb-2 text-sm">
-						{view.members.length} declared member{view.members.length === 1 ? '' : 's'}.
-					</div>
-
-					<div className="space-y-1">
-						{view.members.map((member, index) => (
-							<div key={`${member.type}:${member.name}:${index}`} className="bg-base-100 rounded-xl px-3 py-2 text-xs">
-								<span className="font-mono">{member.type}</span>
-								{member.name ? ` / ${member.name}` : ''}
-								{member.scope ? ` / scope: ${member.scope}` : ''}
-								{canManageSkillPlugin(plugin) ? (
-									<button
-										type="button"
-										className="btn btn-xs btn-ghost ml-2 rounded-lg"
-										disabled={removing}
-										onClick={() => {
-											setMemberToRemove({
-												index,
-												revision: view.artifact.revision,
-												label: `${member.type}/${member.name || '(unnamed declaration)'}`,
-											});
-										}}
-									>
-										Remove declaration
-									</button>
-								) : null}
-							</div>
-						))}
-
-						{view.members.length === 0 ? (
-							<div className="text-base-content/60 px-1 text-sm">No declared members.</div>
-						) : null}
-					</div>
-				</ModalSection>
-			) : null}
-			<DeleteConfirmationModal
-				isOpen={memberToRemove !== null}
+			<SkillDetailsModal
+				isOpen={skillToView !== null}
+				skill={
+					skillToView
+						? skillDetailsSubjectFromStoreSkill(skillToView, {
+								sourceLabel: plugin.displayName || plugin.name,
+							})
+						: null
+				}
 				onClose={() => {
-					if (!removing) {
-						setMemberToRemove(null);
-					}
+					setSkillToView(null);
 				}}
-				onConfirm={async () => {
-					if (!memberToRemove || removing) {
-						return;
-					}
-					setRemoving(true);
-					try {
-						await skillManagementAPI.removeSkillPluginMember({
-							plugin: plugin.ref,
-							expectedRevision: memberToRemove.revision,
-							index: memberToRemove.index,
-						});
-						setMemberToRemove(null);
-						try {
-							const fresh = await skillManagementAPI.getSkillPluginSkills(plugin.ref);
-							setView(fresh.plugin);
-							setResolvedSkills(fresh.skills);
-							setError(fresh.diagnostics.join('\n'));
-							await onChanged?.();
-						} catch (cause) {
-							setError(
-								`Declaration removed, but refresh failed: ${cause instanceof Error ? cause.message : 'unknown error'}`
-							);
-						}
-					} catch (cause) {
-						setError(cause instanceof Error ? cause.message : 'Declaration could not be removed.');
-					} finally {
-						setRemoving(false);
-					}
-				}}
-				title="Remove Plugin Declaration"
-				message={`Remove "${memberToRemove?.label || ''}"? A selector declaration can affect several resolved Skills. Artifacts and source files are retained.`}
-				confirmButtonText="Remove"
+				showPreview
 			/>
 		</ManagementDetailsModal>
 	);

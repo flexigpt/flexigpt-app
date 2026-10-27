@@ -155,12 +155,12 @@ export function ManagementArtifactSource<T>({
 
 	return (
 		<div className="border-base-content/10 bg-base-100 overflow-hidden rounded-xl border">
-			<div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+			<div className="flex min-h-8 items-center justify-between gap-2 px-2 py-0.5">
 				<span className="min-w-0 truncate text-sm font-medium">View {label}</span>
 
 				<div className="flex shrink-0 items-center gap-0.5">
 					<CopyButton
-						className="btn btn-ghost btn-xs shrink-0 rounded-lg p-1"
+						className="btn btn-ghost btn-xs h-7 min-h-7 shrink-0 rounded-lg p-1"
 						valueFetcher={getCopyValue}
 						size={14}
 						label="Copy"
@@ -174,7 +174,7 @@ export function ManagementArtifactSource<T>({
 					/>
 
 					<DownloadButton
-						className="btn btn-ghost btn-xs shrink-0 rounded-lg p-1"
+						className="btn btn-ghost btn-xs h-7 min-h-7 shrink-0 rounded-lg p-1"
 						valueFetcher={getExportValue}
 						size={14}
 						label="Export"
@@ -188,7 +188,7 @@ export function ManagementArtifactSource<T>({
 
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs shrink-0 rounded-lg p-1"
+						className="btn btn-ghost btn-xs h-7 min-h-7 shrink-0 rounded-lg p-1"
 						aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
 						title={expanded ? `Collapse ${label}` : `Expand ${label}`}
 						aria-expanded={expanded}

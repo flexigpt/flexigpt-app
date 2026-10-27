@@ -137,8 +137,6 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 				{ value: option.displayName, weight: 6 },
 				{ value: option.agent.name, weight: 5 },
 				{ value: option.description, weight: 3 },
-				{ value: option.ref.rootID, weight: 2 },
-				{ value: option.ref.artifactID, weight: 2 },
 				{ value: option.availabilityReason, weight: 1 },
 			],
 			fallbackCompare: compareAgentOptions,

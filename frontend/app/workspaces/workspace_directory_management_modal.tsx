@@ -1,9 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheckCircle, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { FiAlertCircle, FiCheckCircle, FiEye, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
-import type { WorkspaceArtifactView, WorkspaceDirectoryView, WorkspaceRuntimePlan } from '@/spec/workspace';
+import type {
+	WorkspaceArtifactView,
+	WorkspaceDirectoryView,
+	WorkspaceMCPServer,
+	WorkspacePromptContribution,
+	WorkspaceRuntimePlan,
+	WorkspaceSkill,
+} from '@/spec/workspace';
 import { artifactRefKey, ArtifactState } from '@/spec/artifact';
-import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
+import { WorkspaceDirectoryOrigin, WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
 
@@ -22,7 +29,9 @@ import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalHeader } from '@/components/modal/modal_header';
 
+import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
+import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceDefaultPolicyDisclosure } from '@/workspaces/workspace_default_policy_disclosure';
 
 interface WorkspaceDirectoryManagementModalProps {
@@ -97,6 +106,29 @@ function artifactTitle(artifact: WorkspaceArtifactView): string {
 	return path.name || artifact.logicalName || artifactKindLabel(artifact.kind);
 }
 
+function sourceSubjectForWorkspaceArtifact(artifact: WorkspaceArtifactView): WorkspaceContributionSourceSubject {
+	const kind =
+		artifact.kind === 'text'
+			? 'text'
+			: artifact.kind === 'skill'
+				? 'skill'
+				: artifact.kind === 'mcp'
+					? 'mcp'
+					: artifact.kind === 'tool'
+						? 'tool'
+						: artifact.kind === 'model'
+							? 'model'
+							: artifact.kind === 'agent'
+								? 'agent'
+								: 'unsupported';
+
+	return {
+		kind,
+		artifact: artifact.artifact,
+		title: artifactTitle(artifact),
+	};
+}
+
 function diagnosticTone(severity: string): 'error' | 'warning' | 'info' | 'neutral' {
 	switch (severity) {
 		case 'error':
@@ -134,11 +166,17 @@ function WorkspaceRuntimeContents({
 	artifactViews,
 	onSetArtifactEnabled,
 	disabled,
+	onViewContext,
+	onViewSkill,
+	onViewMCP,
 }: {
 	workspace: EffectiveWorkspace;
 	artifactViews: ReadonlyMap<string, WorkspaceArtifactView>;
 	onSetArtifactEnabled: (artifact: WorkspaceArtifactView, enabled: boolean) => void | Promise<void>;
 	disabled: boolean;
+	onViewContext: (context: WorkspacePromptContribution) => void;
+	onViewSkill: (skill: WorkspaceSkill) => void;
+	onViewMCP: (server: WorkspaceMCPServer) => void;
 }) {
 	const workspaceRootID = workspace.workspace.artifact.rootID;
 	const workspaceArtifactID = workspace.workspace.artifact.id;
@@ -200,6 +238,9 @@ function WorkspaceRuntimeContents({
 						artifactViews={artifactViews}
 						onSetArtifactEnabled={onSetArtifactEnabled}
 						disabled={disabled}
+						onViewContext={onViewContext}
+						onViewSkill={onViewSkill}
+						onViewMCP={onViewMCP}
 					/>
 				) : null}
 			</section>
@@ -239,6 +280,7 @@ function WorkspaceDirectoryManagementModalContent({
 	const [runtimePlanVersion, setRuntimePlanVersion] = useState(0);
 	const [busy, setBusy] = useState('');
 	const [actionError, setActionError] = useState('');
+	const [viewedContribution, setViewedContribution] = useState<WorkspaceContributionSourceSubject | null>(null);
 
 	const selectedWorkspace = useMemo(
 		() =>
@@ -345,247 +387,294 @@ function WorkspaceDirectoryManagementModalContent({
 	};
 
 	return (
-		<ManagementModalPanel width="wide">
-			<ModalHeader
-				title={`Manage ${directory.root.displayName}`}
-				description="Review the files, Skills, and integrations this repository adds. Advanced discovery controls remain available below."
-				onClose={onClose}
-				closeDisabled={Boolean(busy)}
-			/>
+		<>
+			<ManagementModalPanel width="wide">
+				<ModalHeader
+					title={`Manage ${directory.root.displayName}`}
+					description="Review the files, Skills, and integrations this repository adds. Advanced discovery controls remain available below."
+					onClose={onClose}
+					closeDisabled={Boolean(busy)}
+				/>
 
-			<ManagementModalBody>
-				{actionError ? (
-					<div className="alert alert-error rounded-2xl text-sm" role="alert">
-						<FiAlertCircle size={15} />
-						<span>{actionError}</span>
+				<ManagementModalBody>
+					{actionError ? (
+						<div className="alert alert-error rounded-2xl text-sm" role="alert">
+							<FiAlertCircle size={15} />
+							<span>{actionError}</span>
+						</div>
+					) : null}
+
+					{artifactLoadError ? (
+						<ManagementResourceError
+							title="Workspace item controls could not be loaded"
+							error={artifactLoadError}
+							isRetrying={isRefreshingArtifacts}
+							onRetry={reloadArtifactsOrThrow}
+						/>
+					) : null}
+
+					<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center">
+						<div className="min-w-0 grow">
+							<div className="flex flex-wrap items-center gap-2">
+								<div className="font-semibold">{directory.root.displayName}</div>
+								<StatusBadge tone={directory.enabled ? 'success' : 'warning'}>
+									{directory.enabled ? 'Enabled' : 'Paused'}
+								</StatusBadge>
+								<StatusBadge>
+									{directory.workspaces.length} Workspace
+									{directory.workspaces.length === 1 ? '' : 's'}
+								</StatusBadge>
+							</div>
+							<div className="text-base-content/60 mt-1 text-xs">
+								Repository paths shown below are relative to this directory.
+							</div>
+						</div>
+
+						{directory.enabled ? (
+							<div className="text-success flex items-center gap-2 text-xs">
+								<FiCheckCircle size={14} />
+								Repository content is available to conversations
+							</div>
+						) : (
+							<div className="text-warning text-xs">
+								Enable this repository to resolve and use its Workspace contents.
+							</div>
+						)}
 					</div>
-				) : null}
 
-				{artifactLoadError ? (
-					<ManagementResourceError
-						title="Workspace item controls could not be loaded"
-						error={artifactLoadError}
-						isRetrying={isRefreshingArtifacts}
-						onRetry={reloadArtifactsOrThrow}
-					/>
-				) : null}
+					{directory.workspaces.length > 0 ? (
+						<section className="space-y-2">
+							<div>
+								<div className="text-sm font-semibold">Workspace setup</div>
+								<div className="text-base-content/60 mt-0.5 text-xs">
+									Choose a setup to inspect when this repository exposes more than one.
+								</div>
+							</div>
 
-				<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center">
-					<div className="min-w-0 grow">
-						<div className="flex flex-wrap items-center gap-2">
-							<div className="font-semibold">{directory.root.displayName}</div>
-							<StatusBadge tone={directory.enabled ? 'success' : 'warning'}>
-								{directory.enabled ? 'Enabled' : 'Paused'}
-							</StatusBadge>
-							<StatusBadge>
-								{directory.workspaces.length} Workspace
-								{directory.workspaces.length === 1 ? '' : 's'}
-							</StatusBadge>
-						</div>
-						<div className="text-base-content/60 mt-1 text-xs">
-							Repository paths shown below are relative to this directory.
-						</div>
-					</div>
+							<div>
+								{directory.workspaces.map(entry => {
+									const key = effectiveWorkspaceKey(entry);
+									const selected = key === effectiveWorkspaceKey(selectedWorkspace ?? entry);
+									const locator = effectiveWorkspaceLocator(entry);
+									const path = workspacePathParts(locator);
 
-					{directory.enabled ? (
-						<div className="text-success flex items-center gap-2 text-xs">
-							<FiCheckCircle size={14} />
-							Repository content is available to conversations
-						</div>
+									return (
+										<div
+											key={key}
+											className={`border-base-content/10 bg-base-100 flex min-w-0 flex-col gap-2 rounded-2xl border p-2 ${
+												selected ? 'border-secondary/50 bg-secondary/10' : ''
+											}`}
+										>
+											<div className="flex min-w-0 items-center gap-2">
+												<button
+													type="button"
+													className="min-w-0 grow rounded-xl p-2 text-left"
+													onClick={() => {
+														setSelectedWorkspaceKey(key);
+													}}
+												>
+													<div className="truncate text-sm font-medium">{effectiveWorkspaceTitle(entry)}</div>
+													<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
+														{entry.origin === WorkspaceDirectoryOrigin.Default
+															? 'Automatic repository setup'
+															: path.path || 'Repository workspace file'}
+													</div>
+												</button>
+
+												<StatusBadge tone={entry.origin === WorkspaceDirectoryOrigin.Default ? 'info' : 'success'}>
+													{entry.origin === WorkspaceDirectoryOrigin.Default ? 'Automatic' : 'Repository'}
+												</StatusBadge>
+											</div>
+
+											{entry.origin === WorkspaceDirectoryOrigin.Default ? <WorkspaceDefaultPolicyDisclosure /> : null}
+										</div>
+									);
+								})}
+							</div>
+						</section>
 					) : (
-						<div className="text-warning text-xs">
-							Enable this repository to resolve and use its Workspace contents.
+						<div className="alert alert-warning rounded-2xl text-sm">
+							<FiAlertCircle size={15} />
+							<span>
+								No usable Workspace setup is available. Review the repository files that need attention below, then
+								refresh.
+							</span>
 						</div>
 					)}
-				</div>
 
-				{directory.workspaces.length > 0 ? (
-					<section className="space-y-2">
-						<div>
-							<div className="text-sm font-semibold">Workspace setup</div>
-							<div className="text-base-content/60 mt-0.5 text-xs">
-								Choose a setup to inspect when this repository exposes more than one.
+					{selectedWorkspace && directory.enabled ? (
+						<WorkspaceRuntimeContents
+							key={`${effectiveWorkspaceKey(selectedWorkspace)}:${selectedWorkspace.workspace.artifact.revision}:${runtimePlanVersion}`}
+							workspace={selectedWorkspace}
+							artifactViews={artifactsByKey}
+							onSetArtifactEnabled={setArtifactEnabled}
+							disabled={Boolean(busy)}
+							onViewContext={context => {
+								setViewedContribution({
+									kind: 'text',
+									artifact: context.artifact,
+									title:
+										context.insert === WorkspaceInsertTarget.Instructions
+											? 'Repository instructions'
+											: 'Repository reference files',
+								});
+							}}
+							onViewSkill={skill => {
+								setViewedContribution({
+									kind: 'skill',
+									artifact: skill.artifact,
+									title: skill.displayName || skill.name,
+								});
+							}}
+							onViewMCP={server => {
+								setViewedContribution({
+									kind: 'mcp',
+									artifact: server.artifact,
+									title: server.displayName || server.name,
+								});
+							}}
+						/>
+					) : null}
+
+					{directory.diagnostics?.length ? (
+						<section className="space-y-2">
+							<div>
+								<div className="text-sm font-semibold">Repository files that need attention</div>
+								<div className="text-base-content/60 mt-0.5 text-xs">Fix these files and refresh the repository.</div>
 							</div>
-						</div>
 
-						<div>
-							{directory.workspaces.map(entry => {
-								const key = effectiveWorkspaceKey(entry);
-								const selected = key === effectiveWorkspaceKey(selectedWorkspace ?? entry);
-								const locator = effectiveWorkspaceLocator(entry);
-								const path = workspacePathParts(locator);
-
-								return (
-									<div
-										key={key}
-										className={`border-base-content/10 bg-base-100 flex min-w-0 flex-col gap-2 rounded-2xl border p-2 ${
-											selected ? 'border-secondary/50 bg-secondary/10' : ''
-										}`}
-									>
-										<div className="flex min-w-0 items-center gap-2">
-											<button
-												type="button"
-												className="min-w-0 grow rounded-xl p-2 text-left"
-												onClick={() => {
-													setSelectedWorkspaceKey(key);
-												}}
-											>
-												<div className="truncate text-sm font-medium">{effectiveWorkspaceTitle(entry)}</div>
-												<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
-													{entry.origin === WorkspaceDirectoryOrigin.Default
-														? 'Automatic repository setup'
-														: path.path || 'Repository workspace file'}
-												</div>
-											</button>
-
-											<StatusBadge tone={entry.origin === WorkspaceDirectoryOrigin.Default ? 'info' : 'success'}>
-												{entry.origin === WorkspaceDirectoryOrigin.Default ? 'Automatic' : 'Repository'}
-											</StatusBadge>
-										</div>
-
-										{entry.origin === WorkspaceDirectoryOrigin.Default ? <WorkspaceDefaultPolicyDisclosure /> : null}
+							{directory.diagnostics.map((diagnostic, index) => (
+								<div
+									key={`${diagnostic.code}:${diagnostic.message}:${index}`}
+									className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-sm"
+								>
+									<div className="flex flex-wrap items-center gap-2">
+										<StatusBadge tone={diagnosticTone(diagnostic.severity)}>{diagnostic.severity}</StatusBadge>
+										<div>{diagnostic.message}</div>
 									</div>
-								);
-							})}
-						</div>
-					</section>
-				) : (
-					<div className="alert alert-warning rounded-2xl text-sm">
-						<FiAlertCircle size={15} />
-						<span>
-							No usable Workspace setup is available. Review the repository files that need attention below, then
-							refresh.
-						</span>
-					</div>
-				)}
-
-				{selectedWorkspace && directory.enabled ? (
-					<WorkspaceRuntimeContents
-						key={`${effectiveWorkspaceKey(selectedWorkspace)}:${selectedWorkspace.workspace.artifact.revision}:${runtimePlanVersion}`}
-						workspace={selectedWorkspace}
-						artifactViews={artifactsByKey}
-						onSetArtifactEnabled={setArtifactEnabled}
-						disabled={Boolean(busy)}
-					/>
-				) : null}
-
-				{directory.diagnostics?.length ? (
-					<section className="space-y-2">
-						<div>
-							<div className="text-sm font-semibold">Repository files that need attention</div>
-							<div className="text-base-content/60 mt-0.5 text-xs">Fix these files and refresh the repository.</div>
-						</div>
-
-						{directory.diagnostics.map((diagnostic, index) => (
-							<div
-								key={`${diagnostic.code}:${diagnostic.message}:${index}`}
-								className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-sm"
-							>
-								<div className="flex flex-wrap items-center gap-2">
-									<StatusBadge tone={diagnosticTone(diagnostic.severity)}>{diagnostic.severity}</StatusBadge>
-									<div>{diagnostic.message}</div>
+									{diagnostic.location?.locator ? (
+										<div className="text-base-content/60 mt-2 font-mono text-xs">{diagnostic.location.locator}</div>
+									) : null}
 								</div>
-								{diagnostic.location?.locator ? (
-									<div className="text-base-content/60 mt-2 font-mono text-xs">{diagnostic.location.locator}</div>
-								) : null}
+							))}
+						</section>
+					) : null}
+
+					{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (
+						<section className="space-y-2">
+							<div>
+								<div className="text-sm font-semibold">Excluded items</div>
+								<div className="text-base-content/60 mt-0.5 text-xs">
+									These repository items are available but are not currently added by this Workspace.
+								</div>
 							</div>
-						))}
-					</section>
-				) : null}
 
-				{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (
-					<section className="space-y-2">
-						<div>
-							<div className="text-sm font-semibold">Excluded items</div>
-							<div className="text-base-content/60 mt-0.5 text-xs">
-								These repository items are available but are not currently added by this Workspace.
-							</div>
-						</div>
+							{artifacts
+								.filter(artifact => artifact.state === ArtifactState.Available && !artifact.enabled)
+								.map(artifact => {
+									const isText = artifact.kind === 'text';
+									const sourceSubject = sourceSubjectForWorkspaceArtifact(artifact);
+									const path = artifactPath(artifact);
 
-						{artifacts
-							.filter(artifact => artifact.state === ArtifactState.Available && !artifact.enabled)
-							.map(artifact => {
-								const isText = artifact.kind === 'text';
-								const path = artifactPath(artifact);
-
-								return (
-									<div
-										key={artifact.artifact.artifactID}
-										className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
-									>
-										<div className="min-w-0 grow">
-											<div className="flex flex-wrap items-center gap-2">
-												<div className="truncate text-sm font-medium">
-													{isText ? 'Repository file group' : artifactTitle(artifact)}
+									return (
+										<div
+											key={artifact.artifact.artifactID}
+											className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
+										>
+											<div className="min-w-0 grow">
+												<div className="flex flex-wrap items-center gap-2">
+													<div className="truncate text-sm font-medium">
+														{isText ? 'Repository file group' : artifactTitle(artifact)}
+													</div>
+													<StatusBadge tone="warning">Excluded</StatusBadge>
+													<StatusBadge>{artifactKindLabel(artifact.kind)}</StatusBadge>
 												</div>
-												<StatusBadge tone="warning">Excluded</StatusBadge>
-												<StatusBadge>{artifactKindLabel(artifact.kind)}</StatusBadge>
+												<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
+													{isText ? 'Source files selected by this Workspace' : path || 'Repository Workspace setup'}
+												</div>
 											</div>
-											<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
-												{isText ? 'Source files selected by this Workspace' : path || 'Repository Workspace setup'}
+
+											<div className="flex flex-wrap items-center gap-2">
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														setViewedContribution(sourceSubject);
+													}}
+												>
+													<FiEye size={14} />
+													View
+												</button>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={Boolean(busy)}
+													onClick={() => {
+														void setArtifactEnabled(artifact, true);
+													}}
+												>
+													Include
+												</button>
 											</div>
 										</div>
+									);
+								})}
+						</section>
+					) : null}
+				</ManagementModalBody>
 
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											disabled={Boolean(busy)}
-											onClick={() => {
-												void setArtifactEnabled(artifact, true);
-											}}
-										>
-											Include
-										</button>
-									</div>
-								);
-							})}
-					</section>
-				) : null}
-			</ManagementModalBody>
-
-			<ModalActions
-				leading={
+				<ModalActions
+					leading={
+						<button
+							type="button"
+							className="btn btn-ghost text-error rounded-xl"
+							disabled={Boolean(busy)}
+							onClick={() => {
+								onRequestRemove(directory);
+							}}
+						>
+							<FiTrash2 size={14} />
+							Remove
+						</button>
+					}
+				>
 					<button
 						type="button"
-						className="btn btn-ghost text-error rounded-xl"
+						className="btn btn-ghost rounded-xl"
 						disabled={Boolean(busy)}
 						onClick={() => {
-							onRequestRemove(directory);
+							void refreshDirectory();
 						}}
 					>
-						<FiTrash2 size={14} />
-						Remove
+						<FiRefreshCw size={14} />
+						{busy === 'refresh' ? 'Refreshing...' : 'Refresh repository'}
 					</button>
-				}
-			>
-				<button
-					type="button"
-					className="btn btn-ghost rounded-xl"
-					disabled={Boolean(busy)}
-					onClick={() => {
-						void refreshDirectory();
-					}}
-				>
-					<FiRefreshCw size={14} />
-					{busy === 'refresh' ? 'Refreshing...' : 'Refresh repository'}
-				</button>
 
-				<button
-					type="button"
-					className="btn btn-ghost rounded-xl"
-					disabled={Boolean(busy)}
-					onClick={() => {
-						void setDirectoryEnabled();
-					}}
-				>
-					{busy === 'enabled' ? 'Saving...' : directory.enabled ? 'Pause repository' : 'Enable repository'}
-				</button>
+					<button
+						type="button"
+						className="btn btn-ghost rounded-xl"
+						disabled={Boolean(busy)}
+						onClick={() => {
+							void setDirectoryEnabled();
+						}}
+					>
+						{busy === 'enabled' ? 'Saving...' : directory.enabled ? 'Pause repository' : 'Enable repository'}
+					</button>
 
-				<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
-					Done
-				</button>
-			</ModalActions>
-		</ManagementModalPanel>
+					<button type="button" className="btn btn-primary rounded-xl" disabled={Boolean(busy)} onClick={onClose}>
+						Done
+					</button>
+				</ModalActions>
+			</ManagementModalPanel>
+
+			<WorkspaceContributionDetailsModal
+				isOpen={viewedContribution !== null}
+				subject={viewedContribution}
+				onClose={() => {
+					setViewedContribution(null);
+				}}
+			/>
+		</>
 	);
 }
 

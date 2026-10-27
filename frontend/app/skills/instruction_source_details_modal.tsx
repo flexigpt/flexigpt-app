@@ -6,7 +6,6 @@ import {
 } from '@/components/managementui/management_modal_layout';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalHeader } from '@/components/modal/modal_header';
-import { ModalSection } from '@/components/modal/modal_section';
 
 export interface InstructionSourceDetails {
 	displayName: string;
@@ -31,23 +30,21 @@ export function InstructionSourceDetailsModal({ isOpen, source, onClose }: Instr
 				<ModalHeader title={source.displayName} description={source.sourceLabel} onClose={onClose} />
 
 				<ManagementModalBody>
-					<ModalSection title="Source">
-						<ManagementArtifactSource
-							label="applied instruction text"
-							prefetched={{
-								data: source,
-								text: source.text || '(The selected source is empty.)',
-								fileName: 'instructions.md',
-								extension: 'md',
-							}}
-							load={async () => ({
-								data: source,
-								text: source.text || '(The selected source is empty.)',
-								fileName: 'instructions.md',
-								extension: 'md',
-							})}
-						/>
-					</ModalSection>
+					<ManagementArtifactSource
+						label="instruction text"
+						prefetched={{
+							data: source,
+							text: source.text || '(The selected source is empty.)',
+							fileName: 'instructions.md',
+							extension: 'md',
+						}}
+						load={async () => ({
+							data: source,
+							text: source.text || '(The selected source is empty.)',
+							fileName: 'instructions.md',
+							extension: 'md',
+						})}
+					/>
 				</ManagementModalBody>
 
 				<ModalActions>

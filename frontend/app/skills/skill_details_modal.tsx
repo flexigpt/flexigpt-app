@@ -301,6 +301,7 @@ function SkillDetailsModalContent({
 		[sourceDetails?.resources.locations]
 	);
 	const diagnosticCount = sourceDetails?.artifact.diagnostics?.length ?? 0;
+	const canRenderPreview = showPreview && (sourceDetails?.document.arguments?.length ?? 0) > 0;
 
 	return (
 		<ManagementModalPanel>
@@ -397,7 +398,7 @@ function SkillDetailsModalContent({
 					</div>
 				) : null}
 
-				{showPreview && source ? (
+				{canRenderPreview && source ? (
 					<SkillPreviewSection
 						key={`${skill.ref.rootID}:${skill.ref.artifactID}:${source.revision}`}
 						skill={skill}

@@ -511,29 +511,27 @@ function ManagedSkillEditorModalContent({
 								</ModalField>
 							</ModalSection>
 
-							<ModalSection title="Generated SKILL.md">
-								{generatedSkillSource ? (
-									<ManagementArtifactSource
-										key={generatedSkillSource}
-										label="SKILL.md"
-										prefetched={{
-											data: generatedSkillSource,
-											text: generatedSkillSource,
-											fileName: 'SKILL.md',
-											extension: 'md',
-										}}
-										load={async () => ({
-											data: generatedSkillSource,
-											text: generatedSkillSource,
-											fileName: 'SKILL.md',
-											extension: 'md',
-										})}
-										note="This is the complete source that will be saved, including frontmatter."
-									/>
-								) : (
-									<p className="text-base-content/60 text-sm">Fix the arguments before generating SKILL.md.</p>
-								)}
-							</ModalSection>
+							{generatedSkillSource ? (
+								<ManagementArtifactSource
+									key={generatedSkillSource}
+									label="generated SKILL.md"
+									prefetched={{
+										data: generatedSkillSource,
+										text: generatedSkillSource,
+										fileName: 'SKILL.md',
+										extension: 'md',
+									}}
+									load={async () => ({
+										data: generatedSkillSource,
+										text: generatedSkillSource,
+										fileName: 'SKILL.md',
+										extension: 'md',
+									})}
+									note="This is the complete source that will be saved, including frontmatter."
+								/>
+							) : (
+								<p className="text-base-content/60 text-sm">Fix the arguments before generating SKILL.md.</p>
+							)}
 						</>
 					)}
 				</ManagementModalBody>

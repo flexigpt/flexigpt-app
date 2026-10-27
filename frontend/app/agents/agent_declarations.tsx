@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { FiChevronDown, FiFileText } from 'react-icons/fi';
+import { FiChevronDown, FiEye, FiFileText } from 'react-icons/fi';
 
 import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import { isAgentSkillUseAsInstructions } from '@/spec/agent';
@@ -14,6 +14,7 @@ import { skillManagementAPI, textStoreAPI } from '@/apis/baseapi';
 
 import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 
+import { AgentContributionDetailsModal } from '@/agents/agent_contribution_details_modal';
 import { getAgentRelationshipBadgeClass } from '@/agents/agent_management_utils';
 import { loadSkillArtifactSource } from '@/skills/skill_artifact_source';
 
@@ -122,12 +123,27 @@ function ContributionRow({
 	occurrence,
 	capabilityControls,
 	onSetup,
+	onView,
 }: {
 	occurrence: AgentCapabilityOccurrence;
 	capabilityControls?: AgentCapabilityControls;
 	onSetup: (occurrence: AgentCapabilityOccurrence) => void;
+	onView: (occurrence: AgentCapabilityOccurrence) => void;
 }) {
 	const [expanded, setExpanded] = useState(false);
+	const sourceArtifact =
+		occurrence.status === CapabilityResolutionStatus.Available &&
+		occurrence.target?.form === CapabilityTargetForm.Artifact
+			? occurrence.target.artifact
+			: undefined;
+	const canView =
+		Boolean(sourceArtifact) &&
+		(occurrence.type === 'tool' ||
+			occurrence.type === 'skill' ||
+			occurrence.type === 'text' ||
+			occurrence.type === 'mcp' ||
+			occurrence.type === 'model' ||
+			occurrence.type === 'agent');
 	const canToggle =
 		Boolean(capabilityControls) &&
 		occurrence.status === CapabilityResolutionStatus.Available &&
@@ -140,6 +156,7 @@ function ContributionRow({
 		occurrence.type === 'skill' ||
 		occurrence.type === 'text' ||
 		occurrence.type === 'mcp' ||
+		canView ||
 		canToggle ||
 		(occurrence.type === 'model' && occurrence.includeSystemPrompt !== undefined);
 	const heading = (
@@ -193,6 +210,18 @@ function ContributionRow({
 						) : null}
 						{occurrence.type === 'mcp' || canToggle ? (
 							<div className="flex flex-wrap items-center gap-2">
+								{canView ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-sm rounded-xl"
+										onClick={() => {
+											onView(occurrence);
+										}}
+									>
+										<FiEye size={15} />
+										View
+									</button>
+								) : null}
 								{occurrence.type === 'mcp' ? (
 									<button
 										type="button"
@@ -249,6 +278,8 @@ export function AgentDeclarations({
 	capabilityControls?: AgentCapabilityControls;
 	onSetup: (occurrence: AgentCapabilityOccurrence) => void;
 }) {
+	const [viewedOccurrence, setViewedOccurrence] = useState<AgentCapabilityOccurrence | null>(null);
+
 	if (occurrences.length === 0) {
 		return <p className="text-base-content/70 text-sm">This Agent has no declared contributions.</p>;
 	}
@@ -265,20 +296,31 @@ export function AgentDeclarations({
 	].filter(group => group.entries.length > 0);
 
 	return (
-		<div className="space-y-5">
-			{groups.map(group => (
-				<div key={group.title} className="space-y-2">
-					<h5 className="text-sm font-semibold">{group.title}</h5>
-					{group.entries.map(occurrence => (
-						<ContributionRow
-							key={occurrence.path}
-							occurrence={occurrence}
-							capabilityControls={capabilityControls}
-							onSetup={onSetup}
-						/>
-					))}
-				</div>
-			))}
-		</div>
+		<>
+			<div className="space-y-5">
+				{groups.map(group => (
+					<div key={group.title} className="space-y-2">
+						<h5 className="text-sm font-semibold">{group.title}</h5>
+						{group.entries.map(occurrence => (
+							<ContributionRow
+								key={occurrence.path}
+								occurrence={occurrence}
+								capabilityControls={capabilityControls}
+								onSetup={onSetup}
+								onView={setViewedOccurrence}
+							/>
+						))}
+					</div>
+				))}
+			</div>
+
+			<AgentContributionDetailsModal
+				isOpen={viewedOccurrence !== null}
+				occurrence={viewedOccurrence}
+				onClose={() => {
+					setViewedOccurrence(null);
+				}}
+			/>
+		</>
 	);
 }

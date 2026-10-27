@@ -46,6 +46,8 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import { MCPResourceSource } from '@/mcpservers/mcp_resource_source';
+
 interface MCPServerDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -358,43 +360,42 @@ function MCPServerDetailsModalContent({
 						<h4 className="mb-2 text-sm font-semibold">Tools ({data.tools.length})</h4>
 						<div className="space-y-3">
 							{data.tools.map(tool => (
-								<>
-									<ManagementItemCard
-										key={`${tool.server}:${tool.toolName}:${tool.digest}`}
-										title={tool.displayName || tool.title || tool.toolName}
-										subtitle={tool.toolName}
-										description={tool.description}
-										status={
-											<>
-												<StatusBadge tone={tool.enabled ? 'success' : 'neutral'}>
-													{tool.enabled ? 'Enabled' : 'Disabled'}
-												</StatusBadge>
-												<StatusBadge
-													tone={
-														tool.inferredRisk === MCPToolRisk.Read
-															? 'success'
-															: tool.inferredRisk === MCPToolRisk.Write
-																? 'warning'
-																: 'error'
-													}
-												>
-													{getMCPToolRiskLabel(tool.inferredRisk)}
-												</StatusBadge>
-											</>
-										}
-										metadata={
-											<>
-												<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
-												<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
-												{tool.app?.resourceUri ? <MetadataPill label="App">Configured</MetadataPill> : null}
-											</>
-										}
-									/>
+								<ManagementItemCard
+									key={`${tool.server}:${tool.toolName}:${tool.digest}`}
+									title={tool.displayName || tool.title || tool.toolName}
+									subtitle={tool.toolName}
+									description={tool.description}
+									status={
+										<>
+											<StatusBadge tone={tool.enabled ? 'success' : 'neutral'}>
+												{tool.enabled ? 'Enabled' : 'Disabled'}
+											</StatusBadge>
+											<StatusBadge
+												tone={
+													tool.inferredRisk === MCPToolRisk.Read
+														? 'success'
+														: tool.inferredRisk === MCPToolRisk.Write
+															? 'warning'
+															: 'error'
+												}
+											>
+												{getMCPToolRiskLabel(tool.inferredRisk)}
+											</StatusBadge>
+										</>
+									}
+									metadata={
+										<>
+											<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
+											<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
+											{tool.app?.resourceUri ? <MetadataPill label="App">Configured</MetadataPill> : null}
+										</>
+									}
+								>
 									<div className="mt-3 grid gap-3 xl:grid-cols-2">
 										<MCPToolSchemaSource tool={tool} kind="input" />
 										<MCPToolSchemaSource tool={tool} kind="output" />
 									</div>
-								</>
+								</ManagementItemCard>
 							))}
 							{data.tools.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
@@ -408,18 +409,21 @@ function MCPServerDetailsModalContent({
 						<h4 className="mb-2 text-sm font-semibold">Resources ({data.resources.length})</h4>
 						<div className="space-y-3">
 							{data.resources.map(resource => (
-								<ManagementItemCard
-									key={`${resource.server}:${resource.uri}:${resource.digest ?? ''}`}
-									title={resource.displayName || resource.name || resource.uri}
-									subtitle={resource.uri}
-									description={resource.description}
-									metadata={
-										<>
-											<MetadataPill label="MIME">{resource.mimeType || 'Unknown'}</MetadataPill>
-											{resource.size !== undefined ? <MetadataPill label="Size">{resource.size}</MetadataPill> : null}
-										</>
-									}
-								/>
+								<>
+									<ManagementItemCard
+										key={`${resource.server}:${resource.uri}:${resource.digest ?? ''}`}
+										title={resource.displayName || resource.name || resource.uri}
+										subtitle={resource.uri}
+										description={resource.description}
+										metadata={
+											<>
+												<MetadataPill label="MIME">{resource.mimeType || 'Unknown'}</MetadataPill>
+												{resource.size !== undefined ? <MetadataPill label="Size">{resource.size}</MetadataPill> : null}
+											</>
+										}
+									/>
+									<MCPResourceSource server={server.runtimeServerID} resource={resource} />
+								</>
 							))}
 							{data.resources.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">

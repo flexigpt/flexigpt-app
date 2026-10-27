@@ -6,9 +6,12 @@ import type { SkillRef } from '@/spec/skill';
 import type {
 	WorkspaceConversationResourceSelectionRef,
 	WorkspaceMCPServer,
+	WorkspacePromptContribution,
 	WorkspaceRuntimePlan,
+	WorkspaceSkill,
 } from '@/spec/workspace';
 import { artifactRefKey } from '@/spec/artifact';
+import { WorkspaceInsertTarget } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -18,7 +21,9 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
+import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
+import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceMCPSetupModal } from '@/workspaces/workspace_mcp_setup_modal';
 
 interface WorkspaceSelectionModalProps {
@@ -66,7 +71,7 @@ function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSe
 		const loaded = loadedByArtifact.get(key);
 		targets.set(key, {
 			artifact: occurrence.target.artifact,
-			displayName: loaded?.displayName || loaded?.name || occurrence.name || occurrence.target.artifact.artifactID,
+			displayName: loaded?.displayName || loaded?.name || occurrence.name || 'MCP server',
 			status: occurrence.status,
 			runtimeLoaded: loaded !== undefined,
 		});
@@ -115,6 +120,7 @@ function WorkspaceDirectorySelectionModalContent({
 	const { requestClose } = useModalDialogController();
 	const [setupTarget, setSetupTarget] = useState<WorkspaceMCPSetupTarget | null>(null);
 	const [actionError, setActionError] = useState('');
+	const [viewedContribution, setViewedContribution] = useState<WorkspaceContributionSourceSubject | null>(null);
 
 	const activeSkillIDs = useMemo(() => new Set(activeSkillRefs.map(value => artifactRefKey(value))), [activeSkillRefs]);
 	const workspaceName =
@@ -166,7 +172,7 @@ function WorkspaceDirectorySelectionModalContent({
 			<div className="modal-box bg-base-200 flex max-h-[88vh] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title="Workspace contents"
-					description={`Choose what ${workspaceName} adds to this conversation. Repository-relative paths are shown instead of internal declaration names.`}
+					description={`Choose what ${workspaceName} adds to this conversation. Repository-relative paths are shown below.`}
 					onClose={requestClose}
 				/>
 
@@ -219,6 +225,30 @@ function WorkspaceDirectorySelectionModalContent({
 							}}
 							onToggleMCP={(server, selected) => {
 								state.toggleMCP(server, selected);
+							}}
+							onViewContext={(context: WorkspacePromptContribution) => {
+								setViewedContribution({
+									kind: 'text',
+									artifact: context.artifact,
+									title:
+										context.insert === WorkspaceInsertTarget.Instructions
+											? 'Repository instructions'
+											: 'Repository reference files',
+								});
+							}}
+							onViewSkill={(skill: WorkspaceSkill) => {
+								setViewedContribution({
+									kind: 'skill',
+									artifact: skill.artifact,
+									title: skill.displayName || skill.name,
+								});
+							}}
+							onViewMCP={server => {
+								setViewedContribution({
+									kind: 'mcp',
+									artifact: server.artifact,
+									title: server.displayName || server.name,
+								});
 							}}
 							renderMCPAction={server => {
 								const target = mcpTargetsByArtifact.get(artifactRefKey(server.artifact));
@@ -402,6 +432,14 @@ function WorkspaceDirectorySelectionModalContent({
 					</button>
 				</ModalActions>
 			</div>
+
+			<WorkspaceContributionDetailsModal
+				isOpen={viewedContribution !== null}
+				subject={viewedContribution}
+				onClose={() => {
+					setViewedContribution(null);
+				}}
+			/>
 
 			<WorkspaceMCPSetupModal
 				isOpen={setupTarget !== null}

@@ -791,7 +791,6 @@ export function SkillPluginCard({
 				}`}
 				isOpen={isDetailsOpen}
 				plugin={plugin}
-				onChanged={onReload}
 				onClose={() => {
 					setIsDetailsOpen(false);
 				}}

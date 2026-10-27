@@ -315,8 +315,6 @@ export function SkillsBottomBarChip({
 				{ value: skillLabel(skill), weight: 7 },
 				{ value: skill.name, weight: 6 },
 				{ value: skill.description, weight: 3 },
-				{ value: skill.ref.rootID, weight: 2 },
-				{ value: skill.ref.artifactID, weight: 2 },
 				{ value: skill.runtimeError, weight: 1 },
 				{ value: skill.location, weight: 2 },
 				...(skill.tags ?? []).map(tag => ({ value: tag, weight: 2 })),

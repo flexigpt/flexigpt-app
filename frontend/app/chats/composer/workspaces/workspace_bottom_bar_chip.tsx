@@ -77,7 +77,6 @@ function candidateMatchesSearch(candidate: ComposerWorkspaceCandidate, rawQuery:
 		candidate.workspace.workspace.description,
 		workspaceSubtitle(candidate),
 		candidate.directory.root.displayName,
-		candidate.directory.root.id,
 		artifact.logicalName,
 		artifact.binding.locator,
 		candidate.workspace.origin,

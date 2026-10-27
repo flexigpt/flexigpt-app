@@ -16,7 +16,7 @@ import { ManagementPluginCard } from '@/components/managementui/management_plugi
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
-import { ToolDetailsModal } from '@/tools/tool_details_modal';
+import { ToolDetailsModal, toolDetailsSubjectFromListItem } from '@/tools/tool_details_modal';
 import { ToolPluginDetailsModal } from '@/tools/tool_plugin_details_modal';
 
 interface ToolPluginCardProps {
@@ -199,7 +199,7 @@ export function ToolPluginCard({
 											}}
 										>
 											<FiEye size={15} />
-											<span>View schemas</span>
+											<span>View</span>
 										</button>
 									</div>
 								</ManagementItemCard>
@@ -223,7 +223,7 @@ export function ToolPluginCard({
 
 			<ToolDetailsModal
 				isOpen={toolToView !== null}
-				tool={toolToView}
+				subject={toolToView ? toolDetailsSubjectFromListItem(toolToView) : null}
 				onClose={() => {
 					setToolToView(null);
 				}}

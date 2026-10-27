@@ -30,7 +30,7 @@ export function WorkspaceDefaultPolicyDisclosure() {
 	});
 
 	return (
-		<div className="border-base-content/10 max-h-96 overflow-y-auto border-t p-3">
+		<div className="space-y-2">
 			{error ? (
 				<ManagementResourceError
 					title="Automatic Workspace setup could not be loaded"
@@ -44,7 +44,7 @@ export function WorkspaceDefaultPolicyDisclosure() {
 
 			{policy ? (
 				<ManagementArtifactSource
-					label="workspace YAML"
+					label="automatic workspace YAML"
 					prefetched={{
 						data: policy,
 						text: policy.yaml,
