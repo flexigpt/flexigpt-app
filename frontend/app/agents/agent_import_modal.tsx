@@ -384,25 +384,23 @@ function AgentImportModalContent({
 								) : null}
 
 								{preview.normalizedYAML ? (
-									<ModalSection title="Agent YAML source">
-										<ManagementArtifactSource
-											key={preview.preparedFingerprint ?? preview.normalizedYAML}
-											label="Agent YAML"
-											prefetched={{
-												data: preview,
-												text: preview.normalizedYAML,
-												fileName: 'agent.yaml',
-												extension: 'yaml',
-											}}
-											load={async () => ({
-												data: preview,
-												text: preview.normalizedYAML ?? '',
-												fileName: 'agent.yaml',
-												extension: 'yaml',
-											})}
-											note="This is the normalized portable Agent source that will be imported."
-										/>
-									</ModalSection>
+									<ManagementArtifactSource
+										key={preview.preparedFingerprint ?? preview.normalizedYAML}
+										label="agent YAML"
+										prefetched={{
+											data: preview,
+											text: preview.normalizedYAML,
+											fileName: 'agent.yaml',
+											extension: 'yaml',
+										}}
+										load={async () => ({
+											data: preview,
+											text: preview.normalizedYAML ?? '',
+											fileName: 'agent.yaml',
+											extension: 'yaml',
+										})}
+										note="This is the normalized portable Agent source that will be imported."
+									/>
 								) : null}
 
 								{preview.mcpSetupDescriptors?.length ? (

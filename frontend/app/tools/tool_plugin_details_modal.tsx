@@ -35,7 +35,7 @@ export function ToolPluginDetailsModal({ isOpen, plugin, onClose }: ToolPluginDe
 			</ManagementInfoGrid>
 
 			<ManagementPluginSource
-				label="Tool Plugin YAML"
+				label="tool plugin YAML"
 				pluginName={plugin.name}
 				load={() => toolManagementAPI.getToolPlugin(plugin.ref)}
 			/>

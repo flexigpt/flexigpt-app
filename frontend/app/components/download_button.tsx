@@ -1,6 +1,6 @@
 // DownloadButton.tsx
 import type { ButtonHTMLAttributes } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FiDownload } from 'react-icons/fi';
 
 import type { FileFilter } from '@/spec/attachment';
@@ -10,12 +10,38 @@ import { MimeTypeMap, ProgrammingLanguages } from '@/lib/extension_utils';
 
 import { backendAPI } from '@/apis/baseapi';
 
+export interface DownloadButtonValue {
+	content: string | Blob;
+	fileName?: string;
+	extension?: string;
+	filterDisplayName?: string;
+}
+
+type DownloadButtonContent = string | Blob | DownloadButtonValue | null | undefined;
+
 interface DownloadButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	language?: string;
-	valueFetcher: () => Promise<string | Blob>;
+	valueFetcher: () => Promise<DownloadButtonContent>;
 	size: number;
 	fileprefix?: string;
-	isBinary?: boolean; // Indicates if content is binary (e.g., images)
+	isBinary?: boolean;
+	label?: string;
+	downloadingLabel?: string;
+	onDownloaded?: () => void;
+	onDownloadError?: (error: unknown) => void;
+}
+
+function normalizeExtension(extension?: string) {
+	return extension?.replace(/^\./, '') ?? '';
+}
+
+function getFileNameExtension(fileName?: string) {
+	const match = fileName?.match(/\.([^.]+)$/);
+	return match?.[1] ?? '';
+}
+
+function isDownloadButtonValue(value: string | Blob | DownloadButtonValue): value is DownloadButtonValue {
+	return typeof value === 'object' && value !== null && 'content' in value;
 }
 
 export function DownloadButton({
@@ -24,32 +50,70 @@ export function DownloadButton({
 	size,
 	fileprefix = 'file',
 	isBinary = false,
+	label,
+	downloadingLabel = 'Downloading',
+	onDownloaded,
+	onDownloadError,
+	children,
+	disabled = false,
+	onClick,
+	'aria-label': ariaLabel,
+	title,
 	...buttonProps
 }: DownloadButtonProps) {
 	const [downloading, setDownloading] = useState(false);
+	const mountedRef = useRef(false);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+		};
+	}, []);
 
 	const downloadAsFile = async () => {
+		if (disabled || downloading) {
+			return;
+		}
+
 		setDownloading(true);
 		try {
-			const value = await valueFetcher();
+			const fetchedValue = await valueFetcher();
+			if (fetchedValue === null || fetchedValue === undefined) {
+				return;
+			}
+
+			const download = isDownloadButtonValue(fetchedValue) ? fetchedValue : { content: fetchedValue };
+			const content = download.content;
 			let contentBase64: string;
 			let fileExtension: string;
-			let mimeType: string;
+			fileExtension = normalizeExtension(download.extension) || getFileNameExtension(download.fileName);
 
-			if (isBinary && value instanceof Blob) {
-				mimeType = value.type || 'application/octet-stream';
+			if (isBinary && content instanceof Blob) {
+				const mimeType = content.type || 'application/octet-stream';
 				contentBase64 = await new Promise<string>((resolve, reject) => {
 					const reader = new FileReader();
 					reader.onloadend = () => {
-						const dataUrl = reader.result as string;
+						const dataUrl = reader.result;
+						if (typeof dataUrl !== 'string') {
+							reject(new TypeError('Binary content could not be encoded.'));
+							return;
+						}
+
 						const base64Data = dataUrl.split(',')[1];
+						if (base64Data === null || base64Data === undefined) {
+							reject(new TypeError('Binary content could not be encoded.'));
+							return;
+						}
 						resolve(base64Data);
 					};
 					reader.onerror = reject;
-					reader.readAsDataURL(value);
+					reader.readAsDataURL(content);
 				});
-				fileExtension = MimeTypeMap[mimeType] || '';
-			} else if (typeof value === 'string') {
+				if (!fileExtension) {
+					fileExtension = normalizeExtension(MimeTypeMap[mimeType]);
+				}
+			} else if (typeof content === 'string') {
 				const languageKey = language.toLowerCase();
 				const langInfo =
 					languageKey in ProgrammingLanguages
@@ -58,39 +122,63 @@ export function DownloadButton({
 								extension: '.txt',
 								mimeType: 'text/plain',
 							};
-				fileExtension = langInfo.extension;
-				mimeType = langInfo.mimeType;
-				contentBase64 = Base64EncodeUTF8(value);
+				if (!fileExtension) {
+					fileExtension = normalizeExtension(langInfo.extension);
+				}
+				contentBase64 = Base64EncodeUTF8(content);
 			} else {
 				throw new TypeError('Unsupported content type for download');
 			}
 
-			const suggestedFileName = `${fileprefix}-${GenerateRandomString(3, true)}${fileExtension}`;
-			const additionalFilters: FileFilter[] = [
-				{
-					DisplayName: `Files (*${fileExtension})`,
-					Extensions: [fileExtension],
-				},
-			];
+			const extensionSuffix = fileExtension ? `.${fileExtension}` : '';
+			const suggestedFileName = download.fileName || `${fileprefix}-${GenerateRandomString(3, true)}${extensionSuffix}`;
+			const additionalFilters: FileFilter[] = fileExtension
+				? [
+						{
+							DisplayName: `${download.filterDisplayName ?? 'Files'} (*.${fileExtension})`,
+							Extensions: [fileExtension],
+						},
+					]
+				: [];
 
 			await backendAPI.saveFile(suggestedFileName, contentBase64, additionalFilters);
-		} catch (err: any) {
-			console.error('Download failed:', err, JSON.stringify(err));
+			if (mountedRef.current) {
+				onDownloaded?.();
+			}
+		} catch (error: unknown) {
+			console.error('Download failed:', error);
+			if (mountedRef.current) {
+				onDownloadError?.(error);
+			}
 		} finally {
-			setDownloading(false);
+			if (mountedRef.current) {
+				setDownloading(false);
+			}
 		}
 	};
 
+	const buttonLabel = downloading ? downloadingLabel : label;
+
 	return (
 		<button
-			type="button"
-			aria-label="Download"
-			title="Download"
-			onClick={downloadAsFile}
-			disabled={downloading}
 			{...buttonProps}
+			type="button"
+			aria-label={ariaLabel ?? buttonLabel ?? 'Download'}
+			title={title ?? buttonLabel ?? 'Download'}
+			disabled={disabled || downloading}
+			onClick={event => {
+				onClick?.(event);
+				if (!event.defaultPrevented) {
+					void downloadAsFile();
+				}
+			}}
 		>
-			<FiDownload size={size} />
+			{downloading ? (
+				<span className="loading loading-spinner loading-xs" aria-hidden="true" />
+			) : (
+				<FiDownload size={size} aria-hidden="true" />
+			)}
+			{children ?? (label ? <span>{buttonLabel}</span> : null)}
 		</button>
 	);
 }

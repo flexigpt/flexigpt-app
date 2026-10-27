@@ -342,7 +342,12 @@ function SkillDetailsModalContent({
 						</div>
 					) : null}
 				</ModalSection>
-
+				<ManagementArtifactSource
+					label="SKILL.md"
+					load={() => loadSkillArtifactSource(skill.ref, skill.revision, true)}
+					onLoaded={setSource}
+					note="Canonical SKILL.md is reconstructed from the verified document. Original formatting and comments are not available through this API."
+				/>
 				<ModalSection title="Arguments">
 					{sourceDetails ? (
 						<SkillArgumentList argumentsList={sourceDetails.document.arguments ?? []} />
@@ -381,15 +386,6 @@ function SkillDetailsModalContent({
 					) : (
 						<div className="text-base-content/60 text-sm">No resources are currently known.</div>
 					)}
-				</ModalSection>
-
-				<ModalSection title="Source">
-					<ManagementArtifactSource
-						label="SKILL.md source"
-						load={() => loadSkillArtifactSource(skill.ref, skill.revision, true)}
-						onLoaded={setSource}
-						note="Canonical SKILL.md is reconstructed from the verified document. Original formatting and comments are not available through this API."
-					/>
 				</ModalSection>
 
 				{diagnosticCount > 0 ? (

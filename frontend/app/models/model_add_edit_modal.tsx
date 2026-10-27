@@ -361,6 +361,15 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 						</ModalSection>
 					) : null}
 
+					{model ? (
+						<ManagementJSONSource
+							label="model JSON"
+							fileName={`${model.view.document.name}.json`}
+							load={async () => (await modelManagementAPI.getModel(model.list.ref)).document}
+							note="This is the shareable saved Model source. Unsaved editor changes are not exported."
+						/>
+					) : null}
+
 					<ModalSection title="Identity" description="Set the display label and the provider-facing model name.">
 						<ModalField label="Display Name" htmlFor="model-display-name" required error={errors.displayName}>
 							{readOnly ? (
@@ -408,17 +417,6 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 							)}
 						</ModalField>
 					</ModalSection>
-
-					{model ? (
-						<ModalSection title="Saved Model source">
-							<ManagementJSONSource
-								label="Model JSON"
-								fileName={`${model.view.document.name}.json`}
-								load={async () => (await modelManagementAPI.getModel(model.list.ref)).document}
-								note="This is the shareable saved Model source. Unsaved editor changes are not exported."
-							/>
-						</ModalSection>
-					) : null}
 
 					<ModelRuntimeDefaultsFields
 						value={form.runtime}

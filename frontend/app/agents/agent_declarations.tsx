@@ -107,7 +107,7 @@ function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurr
 		<div className="space-y-3">
 			<ManagementArtifactSource
 				key={`${ref.rootID}:${ref.artifactID}`}
-				label="SKILL.md source"
+				label="SKILL.md"
 				load={() => loadSkillArtifactSource(ref)}
 				note="Canonical SKILL.md is reconstructed from the verified document, including frontmatter. Original comments and formatting are not available through this API."
 			/>

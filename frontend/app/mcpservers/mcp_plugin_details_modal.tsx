@@ -48,7 +48,7 @@ export function MCPPluginDetailsModal({
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
 			<ManagementArtifactSource
-				label="MCP Plugin YAML"
+				label="MCP plugin YAML"
 				load={() => mcpManagementAPI.exportMCPPluginSource(plugin.ref)}
 				note="This portable Plugin declaration excludes local state, source metadata, revisions, and resolved targets."
 			/>

@@ -129,7 +129,7 @@ function mcpToolSchemaFileName(toolName: string, kind: MCPToolSchemaKind): strin
 
 function MCPToolSchemaSource({ tool, kind }: { tool: MCPToolCapability; kind: MCPToolSchemaKind }) {
 	const schema = getMCPToolSchema(tool, kind);
-	const label = kind === 'input' ? 'Input schema JSON' : 'Output schema JSON';
+	const label = kind === 'input' ? 'input schema JSON' : 'output schema JSON';
 
 	return schema === undefined ? (
 		<p className="text-base-content/60 text-xs">No {kind} schema is declared.</p>
@@ -337,13 +337,11 @@ function MCPServerDetailsModalContent({
 				</ModalSection>
 			) : null}
 
-			<ModalSection title="MCP server source">
-				<ManagementArtifactSource
-					label="MCP server YAML"
-					load={() => mcpManagementAPI.exportMCPServerSource(server.ref)}
-					note="This portable server declaration excludes installation secrets and OAuth tokens."
-				/>
-			</ModalSection>
+			<ManagementArtifactSource
+				label="MCP server YAML"
+				load={() => mcpManagementAPI.exportMCPServerSource(server.ref)}
+				note="This portable server declaration excludes installation secrets and OAuth tokens."
+			/>
 
 			<ModalSection title="Discovery" description="Tools, resources, templates, and prompts currently available.">
 				{isLoading ? <div className="text-center text-sm">Loading discovery cache…</div> : null}

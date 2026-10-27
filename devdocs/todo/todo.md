@@ -23,6 +23,8 @@
 
 - [ ] add a default agent selection preference and a default workspace one
 
+- [ ] add outputschema to llmtools go and then plug it end to end.
+
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 
 ## M-3

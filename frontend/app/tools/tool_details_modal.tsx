@@ -13,7 +13,6 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
-import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ToolSchemaKind } from '@/tools/tool_schema_source';
 import { getToolSchema, toolSchemaFileName } from '@/tools/tool_schema_source';
@@ -26,24 +25,22 @@ interface ToolDetailsModalProps {
 
 function ToolSchemaSection({ tool, kind }: { tool: ToolView; kind: ToolSchemaKind }) {
 	const schema = getToolSchema(tool, kind);
-	const title = kind === 'input' ? 'Input schema' : 'Output schema';
-	const label = kind === 'input' ? 'Input schema JSON' : 'Output schema JSON';
+	const label = kind === 'input' ? 'input schema JSON' : 'output schema JSON';
 
+	if (schema === undefined) {
+		return (
+			<p className="text-base-content/60 text-sm">
+				This tool does not declare an {kind === 'input' ? 'input' : 'output'} schema.
+			</p>
+		);
+	}
 	return (
-		<ModalSection title={title}>
-			{schema === undefined ? (
-				<p className="text-base-content/60 text-sm">
-					This tool does not declare an {kind === 'input' ? 'input' : 'output'} schema.
-				</p>
-			) : (
-				<ManagementJSONSource
-					label={label}
-					fileName={toolSchemaFileName(tool, kind)}
-					load={async () => schema}
-					note={`This is the shareable ${kind} schema. Runtime and management metadata are not included.`}
-				/>
-			)}
-		</ModalSection>
+		<ManagementJSONSource
+			label={label}
+			fileName={toolSchemaFileName(tool, kind)}
+			load={async () => schema}
+			note={`This is the shareable ${kind} schema. Runtime and management metadata are not included.`}
+		/>
 	);
 }
 

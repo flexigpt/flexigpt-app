@@ -480,6 +480,17 @@ function ModelProviderAddEditModalContent({
 						</ModalSection>
 					) : null}
 
+					{provider ? (
+						<ManagementJSONSource
+							label="provider JSON"
+							fileName={`${provider.view.document.name}.json`}
+							load={async () =>
+								shareableProviderDocument((await modelManagementAPI.getProvider(provider.list.ref)).document)
+							}
+							note="This is the shareable saved Provider source. API keys, sensitive headers, and unsaved editor changes are not exported."
+						/>
+					) : null}
+
 					<ModalSection
 						title="Identity and Compatibility"
 						description="Choose the compatible API before configuring the endpoint."
@@ -642,19 +653,6 @@ function ModelProviderAddEditModalContent({
 							)}
 						</ModalField>
 					</ModalSection>
-
-					{provider ? (
-						<ModalSection title="Saved Provider source">
-							<ManagementJSONSource
-								label="Provider JSON"
-								fileName={`${provider.view.document.name}.json`}
-								load={async () =>
-									shareableProviderDocument((await modelManagementAPI.getProvider(provider.list.ref)).document)
-								}
-								note="This is the shareable saved Provider source. API keys, sensitive headers, and unsaved editor changes are not exported."
-							/>
-						</ModalSection>
-					) : null}
 
 					<ModalSection
 						title="Security and Availability"

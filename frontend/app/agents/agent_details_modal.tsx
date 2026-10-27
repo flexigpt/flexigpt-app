@@ -40,22 +40,13 @@ interface AgentDetailsModalContentProps {
 	capabilityControls?: AgentCapabilityControls;
 }
 
-function AgentSourceDisclosure({ agentRef, managed }: { agentRef: AgentView['ref']; managed: boolean }) {
+function AgentSourceDisclosure({ agentRef }: { agentRef: AgentView['ref'] }) {
 	return (
-		<ModalSection
-			title="Agent source"
-			description={
-				managed
-					? 'Managed Agent declarations are immutable. Export, edit externally, then import a replacement.'
-					: 'The portable Agent source is available for inspection.'
-			}
-		>
-			<ManagementArtifactSource
-				label="Agent source"
-				load={() => loadAgentArtifactSource(agentRef)}
-				note="The extension follows the Agent source format supplied by the exporter."
-			/>
-		</ModalSection>
+		<ManagementArtifactSource
+			label="agent source"
+			load={() => loadAgentArtifactSource(agentRef)}
+			note="The extension follows the Agent source format supplied by the exporter."
+		/>
 	);
 }
 
@@ -107,7 +98,7 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 								</ManagementInfoRow>
 							</ManagementInfoGrid>
 						</ModalSection>
-
+						<AgentSourceDisclosure agentRef={agentRef} />
 						<ModalSection
 							title="Agent contributions"
 							description="Declarations grouped by purpose, with their current resolution status. Final Run preparation resolves them again."
@@ -150,8 +141,6 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 								</div>
 							) : null}
 						</ModalSection>
-
-						<AgentSourceDisclosure agentRef={agentRef} managed={agent.managed} />
 					</div>
 				</ManagementModalBody>
 

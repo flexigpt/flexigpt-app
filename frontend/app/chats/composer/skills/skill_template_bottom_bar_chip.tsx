@@ -601,7 +601,7 @@ function SkillTemplateRenderModalContent({
 					) : null}
 
 					<ManagementArtifactSource
-						label="template SKILL.md source"
+						label="template SKILL.md"
 						defaultOpen
 						load={() => loadSkillArtifactSource(item.ref, item.revision)}
 						onLoaded={loaded => {

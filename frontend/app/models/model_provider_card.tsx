@@ -234,7 +234,7 @@ export function ModelProviderCard({
 							</ManagementInfoRow>
 						</ManagementInfoGrid>
 
-						<div className="divider my-0">Models</div>
+						<div className="border-base-content/10 border-t" />
 
 						{models.length > 0 ? (
 							<div className="space-y-3">

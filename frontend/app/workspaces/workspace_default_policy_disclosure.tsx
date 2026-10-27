@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { FiFileText } from 'react-icons/fi';
 
 import type { WorkspaceDefaultPolicyView } from '@/spec/workspace';
 
@@ -13,7 +12,7 @@ import { Loader } from '@/components/loader';
 import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 
-function WorkspaceDefaultPolicyDisclosureContent() {
+export function WorkspaceDefaultPolicyDisclosure() {
 	const loadPolicy = useCallback(async (signal: AbortSignal): Promise<WorkspaceDefaultPolicyView> => {
 		const policy = await workspaceManagementAPI.getWorkspaceDefaultPolicy();
 		throwIfAborted(signal);
@@ -45,7 +44,7 @@ function WorkspaceDefaultPolicyDisclosureContent() {
 
 			{policy ? (
 				<ManagementArtifactSource
-					label="automatic Workspace setup YAML"
+					label="workspace YAML"
 					prefetched={{
 						data: policy,
 						text: policy.yaml,
@@ -64,17 +63,5 @@ function WorkspaceDefaultPolicyDisclosureContent() {
 				/>
 			) : null}
 		</div>
-	);
-}
-
-export function WorkspaceDefaultPolicyDisclosure() {
-	return (
-		<details className="border-base-content/10 bg-base-200/50 w-full rounded-xl border">
-			<summary className="btn btn-ghost btn-sm w-full list-none justify-start rounded-xl">
-				<FiFileText size={14} />
-				View automatic setup
-			</summary>
-			<WorkspaceDefaultPolicyDisclosureContent />
-		</details>
 	);
 }

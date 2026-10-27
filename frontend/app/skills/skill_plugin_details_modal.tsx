@@ -89,13 +89,11 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 				</ManagementInfoGrid>
 			</ModalSection>
 
-			<ModalSection title="Plugin source">
-				<ManagementPluginSource
-					label="Skill Plugin YAML"
-					pluginName={plugin.name}
-					load={() => skillManagementAPI.getSkillPlugin(plugin.ref)}
-				/>
-			</ModalSection>
+			<ManagementPluginSource
+				label="skill plugin YAML"
+				pluginName={plugin.name}
+				load={() => skillManagementAPI.getSkillPlugin(plugin.ref)}
+			/>
 
 			<ModalSection title="Resolved Skills">
 				<div className="mb-3 text-sm">

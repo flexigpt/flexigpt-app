@@ -593,7 +593,7 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
 			<ManagementPluginSource
-				label="Agent Plugin YAML"
+				label="agent plugin YAML"
 				pluginName={plugin.name}
 				load={() => agentManagementAPI.getAgentPlugin(state.plugin.ref)}
 			/>
