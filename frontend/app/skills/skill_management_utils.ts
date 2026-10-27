@@ -201,7 +201,6 @@ export function skillMatchesManagementFilter(
 		insert,
 		presentation?.location,
 		presentation?.details?.artifact.binding.locator,
-		presentation?.details?.artifact.binding.sourceID,
 		...(presentation?.resources?.locations ?? []),
 		...(presentation?.runtimeWarnings ?? []),
 		...(presentation?.diagnostics ?? []).flatMap(diagnostic => [

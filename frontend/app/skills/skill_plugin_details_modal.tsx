@@ -11,7 +11,7 @@ import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
-import { ManagementJSONSource } from '@/components/managementui/management_json_source';
+import { ManagementPluginSource } from '@/components/managementui/management_plugin_source';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalSection } from '@/components/modal/modal_section';
 
@@ -81,9 +81,6 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 			<ModalSection title="Plugin">
 				<ManagementInfoGrid>
 					<ManagementInfoRow label="Display name">{plugin.displayName || plugin.name}</ManagementInfoRow>
-					<ManagementInfoRow label="Logical name" mono>
-						{plugin.name}
-					</ManagementInfoRow>
 					<ManagementInfoRow label="State">{plugin.state}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{plugin.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Built-in">{plugin.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
@@ -92,17 +89,17 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 				</ManagementInfoGrid>
 			</ModalSection>
 
-			<ModalSection title="Plugin Artifact">
-				<ManagementJSONSource
-					label="Skill Plugin document JSON"
-					fileName={`${plugin.name}.json`}
+			<ModalSection title="Plugin source">
+				<ManagementPluginSource
+					label="Skill Plugin YAML"
+					pluginName={plugin.name}
 					load={() => skillManagementAPI.getSkillPlugin(plugin.ref)}
 				/>
 			</ModalSection>
 
 			<ModalSection title="Resolved Skills">
 				<div className="mb-3 text-sm">
-					{resolvedSkills.length} Skill Artifact{resolvedSkills.length === 1 ? '' : 's'} loaded for this Plugin.
+					{resolvedSkills.length} Skill{resolvedSkills.length === 1 ? '' : 's'} loaded for this Plugin.
 				</div>
 
 				<div className="space-y-2">
@@ -114,19 +111,15 @@ export function SkillPluginDetailsModal({ isOpen, plugin, onClose, onChanged }: 
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="font-medium">{skill.displayName || skill.name}</span>
 								<MetadataPill label="State">{skill.state}</MetadataPill>
-								<MetadataPill label="Revision">{skill.revision}</MetadataPill>
 								{skill.managed ? <MetadataPill>Managed</MetadataPill> : null}
 								{skill.builtIn ? <MetadataPill>Built-in</MetadataPill> : null}
-							</div>
-							<div className="text-base-content/60 mt-1 font-mono text-xs">
-								{skill.ref.rootID}/{skill.ref.artifactID}
 							</div>
 						</div>
 					))}
 
 					{!loading && !error && resolvedSkills.length === 0 ? (
 						<div className="text-base-content/60 rounded-2xl border border-dashed p-3 text-sm">
-							No Skill Artifact currently resolves through this Plugin.
+							No Skill currently resolves through this Plugin.
 						</div>
 					) : null}
 				</div>

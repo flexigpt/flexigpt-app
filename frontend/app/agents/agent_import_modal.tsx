@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/lib/error_utils';
 import { agentManagementAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import {
 	ManagementModalBody,
 	ManagementModalDialog,
@@ -383,10 +384,24 @@ function AgentImportModalContent({
 								) : null}
 
 								{preview.normalizedYAML ? (
-									<ModalSection title="Normalized Agent YAML">
-										<pre className="bg-base-300 max-h-96 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-											{preview.normalizedYAML}
-										</pre>
+									<ModalSection title="Agent YAML source">
+										<ManagementArtifactSource
+											key={preview.preparedFingerprint ?? preview.normalizedYAML}
+											label="Agent YAML"
+											prefetched={{
+												data: preview,
+												text: preview.normalizedYAML,
+												fileName: 'agent.yaml',
+												extension: 'yaml',
+											}}
+											load={async () => ({
+												data: preview,
+												text: preview.normalizedYAML ?? '',
+												fileName: 'agent.yaml',
+												extension: 'yaml',
+											})}
+											note="This is the normalized portable Agent source that will be imported."
+										/>
 									</ModalSection>
 								) : null}
 

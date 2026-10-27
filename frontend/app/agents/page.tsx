@@ -37,7 +37,6 @@ import { ManagementEmptyState } from '@/components/managementui/management_empty
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
-import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import {
 	ManagementModalBody,
 	ManagementModalDialog,
@@ -47,8 +46,8 @@ import { ManagementPageContent } from '@/components/managementui/management_page
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
 import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { ManagementPluginCreateModal } from '@/components/managementui/management_plugin_create_modal';
+import { ManagementPluginSource } from '@/components/managementui/management_plugin_source';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
-import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalField } from '@/components/modal/modal_field';
@@ -58,7 +57,6 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
-import { formatDateish } from '@/agents/agent_management_utils';
 
 const AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -178,7 +176,6 @@ function AgentPluginCard({
 	const plugin = data.plugin;
 	const builtIn = isBuiltInAgentPlugin(plugin);
 	const displayName = pluginDisplayName(plugin);
-	const secondaryName = displayName === plugin.name ? undefined : plugin.name;
 	const pluginAvailable = plugin.state === ArtifactState.Available;
 
 	const run = (key: string, action: () => Promise<void>, fallback: string) => {
@@ -209,7 +206,6 @@ function AgentPluginCard({
 	return (
 		<ManagementPluginCard
 			title={displayName}
-			identity={secondaryName ? <span className="font-mono">{secondaryName}</span> : null}
 			description={plugin.description}
 			status={
 				<>
@@ -361,8 +357,6 @@ function AgentPluginCard({
 									<ManagementItemCard
 										key={agentRefKey(agent)}
 										title={agentDisplayName(agent)}
-										subtitle={agent.name === agentDisplayName(agent) ? undefined : agent.name}
-										description={agent.description}
 										status={
 											<>
 												<StatusBadge tone={agent.enabled ? 'success' : 'neutral'}>
@@ -375,12 +369,7 @@ function AgentPluginCard({
 												{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
 											</>
 										}
-										metadata={
-											<>
-												<MetadataPill label="Revision">{agent.revision}</MetadataPill>
-												{agent.definitionDigest ? <MetadataPill label="Definition">Available</MetadataPill> : null}
-											</>
-										}
+										description={agent.description}
 									>
 										<ActionRow
 											leading={
@@ -477,7 +466,7 @@ function AgentPluginEditModalContent({
 		<ManagementModalPanel width="compact">
 			<ModalHeader
 				title="Edit Agent Plugin"
-				description="The logical Plugin name remains stable. Imported Agents remain immutable."
+				description="Imported Agents remain immutable."
 				onClose={onClose}
 				closeDisabled={isSubmitting}
 			/>
@@ -493,15 +482,6 @@ function AgentPluginEditModalContent({
 					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
 					<ModalSection title="Plugin details">
-						<ModalField label="Plugin name" htmlFor="agent-plugin-name">
-							<input
-								id="agent-plugin-name"
-								className="input w-full rounded-xl font-mono"
-								value={plugin.name}
-								readOnly
-							/>
-						</ModalField>
-
 						<ModalField label="Display name" htmlFor="agent-plugin-display-name" required>
 							<input
 								id="agent-plugin-display-name"
@@ -595,9 +575,6 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{pluginDisplayName(plugin)}</ManagementInfoRow>
-				<ManagementInfoRow label="Name" mono>
-					{plugin.name}
-				</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">
@@ -606,32 +583,18 @@ function AgentPluginDetailsModal({ state, onClose }: { state: PluginDetailsState
 				<ManagementInfoRow label="State">
 					{'artifact' in plugin ? plugin.artifact.state : plugin.state}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Revision">
-					{'artifact' in plugin ? plugin.artifact.revision : plugin.revision}
-				</ManagementInfoRow>
 				{'artifact' in plugin ? (
-					<>
-						<ManagementInfoRow label="Source" mono>
-							{plugin.artifact.binding.sourceID}
-						</ManagementInfoRow>
-						<ManagementInfoRow label="Created">{formatDateish(plugin.artifact.createdAt)}</ManagementInfoRow>
-						<ManagementInfoRow label="Modified">{formatDateish(plugin.artifact.modifiedAt)}</ManagementInfoRow>
-					</>
+					<ManagementInfoRow label="Declared members">{plugin.members.length}</ManagementInfoRow>
 				) : (
-					<>
-						<ManagementInfoRow label="Source" mono>
-							{plugin.sourceID}
-						</ManagementInfoRow>
-						<ManagementInfoRow label="Declared members">{plugin.memberCount}</ManagementInfoRow>
-					</>
+					<ManagementInfoRow label="Declared members">{plugin.memberCount}</ManagementInfoRow>
 				)}
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
-			<ManagementJSONSource
-				label="Agent Plugin document JSON"
-				fileName={`${plugin.name}.json`}
+			<ManagementPluginSource
+				label="Agent Plugin YAML"
+				pluginName={plugin.name}
 				load={() => agentManagementAPI.getAgentPlugin(state.plugin.ref)}
 			/>
 		</ManagementDetailsModal>
@@ -1021,7 +984,9 @@ export default function AgentsPage() {
 										onChange={setPluginCreationRootID}
 										filterDisabled={false}
 										title="Agent Plugin Root"
-										getDisplayName={rootID => pluginCreationRoots.find(root => root.rootID === rootID)?.label ?? rootID}
+										getDisplayName={rootID =>
+											pluginCreationRoots.find(root => root.rootID === rootID)?.label ?? 'Unavailable destination'
+										}
 									/>
 								</div>
 							) : null}

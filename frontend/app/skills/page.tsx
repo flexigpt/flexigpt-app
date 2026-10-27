@@ -226,7 +226,7 @@ function SkillDirectoryRegistrationModal({
 					<ManagementModalBody>
 						{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-						<ModalField label="Artifact Root" required>
+						<ModalField label="Destination" required>
 							<Dropdown<string>
 								dropdownItems={rootDropdownItems}
 								orderedKeys={roots.map(root => root.rootID)}
@@ -236,9 +236,9 @@ function SkillDirectoryRegistrationModal({
 									setDestinationKey('unattached');
 								}}
 								filterDisabled={false}
-								title="Select Artifact Root"
-								placeholderLabel="No Artifact Roots available"
-								getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? value}
+								title="Select destination"
+								placeholderLabel="No destinations available"
+								getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? 'Unavailable destination'}
 								disabled={saving || roots.length === 0}
 								inlineMenu
 								maxMenuHeight={240}
@@ -628,7 +628,7 @@ export default function SkillsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Skills and Templates"
-					description="Manage Artifact-backed Skill Plugins, managed SKILL.md files, filesystem Skill paths, and user-message templates."
+					description="Manage Skill Plugins, managed SKILL.md files, filesystem Skill paths, and user-message templates."
 					actions={
 						<>
 							{roots.length > 1 ? (
@@ -640,7 +640,9 @@ export default function SkillsPage() {
 										onChange={setCreationRootID}
 										filterDisabled={false}
 										title="Skill Plugin Root"
-										getDisplayName={rootID => roots.find(root => root.rootID === rootID)?.label ?? rootID}
+										getDisplayName={rootID =>
+											roots.find(root => root.rootID === rootID)?.label ?? 'Unavailable destination'
+										}
 									/>
 								</div>
 							) : null}
@@ -855,12 +857,12 @@ export default function SkillsPage() {
 												setSkillToPurge(skill);
 											}}
 										>
-											Delete Artifact
+											Delete Skill
 										</button>
 									) : null}
 								</div>
 								<p className="text-base-content/60 mt-2 text-xs">
-									Use Attach Existing on a Plugin to attach this Artifact. External source files are not deleted by
+									Use Attach Existing on a Plugin to attach this Skill. External source files are not deleted by
 									detachment.
 								</p>
 							</div>
@@ -904,7 +906,7 @@ export default function SkillsPage() {
 					onConfirm={confirmPurgeUnattachedSkill}
 					title="Delete Unattached Managed Skill"
 					message={`Permanently delete "${skillToPurge?.displayName || skillToPurge?.name || ''}"? Memberships are checked again before deletion.`}
-					confirmButtonText="Delete"
+					confirmButtonText={purging ? 'Deleting...' : 'Delete'}
 				/>
 
 				<SkillDirectoryRegistrationModal

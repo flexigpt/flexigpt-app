@@ -410,12 +410,12 @@ function ModelAddEditModalContent({ mode, model, provider, allModels, onSubmit }
 					</ModalSection>
 
 					{model ? (
-						<ModalSection title="Saved Model Artifact">
+						<ModalSection title="Saved Model source">
 							<ManagementJSONSource
-								label="model document JSON"
+								label="Model JSON"
 								fileName={`${model.view.document.name}.json`}
 								load={async () => (await modelManagementAPI.getModel(model.list.ref)).document}
-								note="Exports the saved Artifact document. Unsaved editor changes are not exported."
+								note="This is the shareable saved Model source. Unsaved editor changes are not exported."
 							/>
 						</ModalSection>
 					) : null}

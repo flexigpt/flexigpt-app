@@ -135,7 +135,6 @@ export function MCPPluginCard({
 	const clearAlert = () => {
 		setAlertMessage('');
 	};
-	const pluginIdentity = plugin.displayName === plugin.logicalName ? undefined : plugin.logicalName;
 
 	const refresh = () => {
 		void runAction('plugin:refresh', onRefreshServers).catch((error: unknown) => {
@@ -164,7 +163,6 @@ export function MCPPluginCard({
 		<>
 			<ManagementPluginCard
 				title={plugin.displayName}
-				identity={pluginIdentity ? <span className="font-mono">{pluginIdentity}</span> : null}
 				description={plugin.description}
 				status={
 					<>
@@ -304,13 +302,11 @@ export function MCPPluginCard({
 								const operational = isServerOperational(server);
 								const authPending = authHealth?.state === MCPAuthHealthState.AuthorizationPending;
 								const title = serverDisplayName(server);
-								const subtitle = title === server.logicalName ? undefined : server.logicalName;
 
 								return (
 									<ManagementItemCard
 										key={`${server.ref.rootID}:${artifactID}`}
 										title={title}
-										subtitle={subtitle}
 										status={
 											<>
 												<StatusBadge className={getMCPStatusBadgeClass(status)}>

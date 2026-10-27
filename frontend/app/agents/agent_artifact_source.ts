@@ -7,8 +7,13 @@ import type { ManagementArtifactSourceValue } from '@/components/managementui/ma
 
 function agentSourceExtension(result: AgentExportResult): string {
 	const matched = /\.([A-Za-z0-9]+)$/.exec(result.suggestedFileName);
+	const extension = matched?.[1]?.toLowerCase();
 
-	if (matched?.[1]?.toLowerCase() === 'yml') {
+	if (extension === 'json') {
+		return 'json';
+	}
+
+	if (extension === 'yml') {
 		return 'yml';
 	}
 
@@ -17,7 +22,8 @@ function agentSourceExtension(result: AgentExportResult): string {
 
 /**
  * Canonical Agent export used by Management and Composer detail surfaces.
- * The backend owns YAML normalization and filename selection.
+ * The backend owns source normalization and filename selection. A backend
+ * export may preserve JSON when the Agent source was supplied as JSON.
  */
 export async function loadAgentArtifactSource(
 	agent: ArtifactRef

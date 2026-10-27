@@ -40,17 +40,21 @@ interface AgentDetailsModalContentProps {
 	capabilityControls?: AgentCapabilityControls;
 }
 
-function AgentYAMLDisclosure({ agentRef, managed }: { agentRef: AgentView['ref']; managed: boolean }) {
+function AgentSourceDisclosure({ agentRef, managed }: { agentRef: AgentView['ref']; managed: boolean }) {
 	return (
 		<ModalSection
-			title="Agent YAML"
+			title="Agent source"
 			description={
 				managed
 					? 'Managed Agent declarations are immutable. Export, edit externally, then import a replacement.'
-					: 'Canonical Agent YAML is available for inspection.'
+					: 'The portable Agent source is available for inspection.'
 			}
 		>
-			<ManagementArtifactSource label="Agent YAML" load={() => loadAgentArtifactSource(agentRef)} />
+			<ManagementArtifactSource
+				label="Agent source"
+				load={() => loadAgentArtifactSource(agentRef)}
+				note="The extension follows the Agent source format supplied by the exporter."
+			/>
 		</ModalSection>
 	);
 }
@@ -94,14 +98,10 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 					<div className="space-y-5 pb-1">
 						<ModalSection title="Agent metadata">
 							<ManagementInfoGrid>
-								<ManagementInfoRow label="Name" mono>
-									{agent.name}
-								</ManagementInfoRow>
 								<ManagementInfoRow label="Managed">{agent.managed ? 'Yes' : 'No'}</ManagementInfoRow>
 								<ManagementInfoRow label="Built-in">{agent.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 								<ManagementInfoRow label="Enabled">{agent.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 								<ManagementInfoRow label="State">{agent.state}</ManagementInfoRow>
-								<ManagementInfoRow label="Revision">{agent.revision}</ManagementInfoRow>
 								<ManagementInfoRow label="Description">
 									<span className="whitespace-pre-wrap">{agent.description || '—'}</span>
 								</ManagementInfoRow>
@@ -151,7 +151,7 @@ function AgentDetailsModalContent({ agent, onClose, capabilityControls }: AgentD
 							) : null}
 						</ModalSection>
 
-						<AgentYAMLDisclosure agentRef={agentRef} managed={agent.managed} />
+						<AgentSourceDisclosure agentRef={agentRef} managed={agent.managed} />
 					</div>
 				</ManagementModalBody>
 

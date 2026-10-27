@@ -52,6 +52,10 @@ export function ManagementArtifactSource<T>({
 		};
 	}, []);
 
+	useEffect(() => {
+		onLoadedRef.current = onLoaded;
+	}, [onLoaded]);
+
 	const ensureSource = useCallback(async (): Promise<ManagementArtifactSourceValue<T> | null> => {
 		if (valueRef.current) {
 			return valueRef.current;
@@ -152,28 +156,42 @@ export function ManagementArtifactSource<T>({
 
 	return (
 		<div className="border-base-content/10 bg-base-100 overflow-hidden rounded-xl border">
-			<div className="flex flex-wrap items-center justify-end gap-1 p-2">
+			<div className="flex min-h-8 items-center justify-end gap-0.5 px-1 py-0.5">
 				<button
 					type="button"
-					className="btn btn-ghost btn-sm rounded-xl"
+					className="btn btn-ghost btn-xs size-7 min-h-7 rounded-lg p-0"
 					disabled={Boolean(working)}
+					aria-label={working === 'copy' ? `Copying ${label}` : copied ? `${label} copied` : `Copy ${label}`}
+					title={working === 'copy' ? `Copying ${label}` : copied ? `${label} copied` : `Copy ${label}`}
 					onClick={() => {
 						void copy();
 					}}
 				>
-					{copied ? <FiCheck size={14} /> : <FiCopy size={14} />}
-					{working === 'copy' ? 'Copying...' : copied ? 'Copied' : 'Copy'}
+					{working === 'copy' ? (
+						<span className="loading loading-spinner loading-xs" aria-hidden="true" />
+					) : copied ? (
+						<FiCheck size={14} aria-hidden="true" />
+					) : (
+						<FiCopy size={14} aria-hidden="true" />
+					)}
+					<span className="sr-only">{working === 'copy' ? 'Copying' : copied ? 'Copied' : 'Copy'}</span>
 				</button>
 				<button
 					type="button"
-					className="btn btn-ghost btn-sm rounded-xl"
+					className="btn btn-ghost btn-xs size-7 min-h-7 rounded-lg p-0"
 					disabled={Boolean(working)}
+					aria-label={working === 'export' ? `Exporting ${label}` : `Export ${label}`}
+					title={working === 'export' ? `Exporting ${label}` : `Export ${label}`}
 					onClick={() => {
 						void exportSource();
 					}}
 				>
-					<FiDownload size={14} />
-					{working === 'export' ? 'Exporting...' : 'Export'}
+					{working === 'export' ? (
+						<span className="loading loading-spinner loading-xs" aria-hidden="true" />
+					) : (
+						<FiDownload size={14} aria-hidden="true" />
+					)}
+					<span className="sr-only">{working === 'export' ? 'Exporting' : 'Export'}</span>
 				</button>
 			</div>
 

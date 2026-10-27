@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { FiChevronDown, FiChevronUp, FiRefreshCw } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 import type { PluginListItem } from '@/spec/plugin';
 import type { ToolStoreListItem } from '@/spec/tool';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
-import { toolManagementAPI } from '@/apis/baseapi';
 import { toolDisplayName, toolPluginDisplayName } from '@/apis/tool_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { EnabledControl } from '@/components/managementui/enabled_control';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
-import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 import { ManagementPluginCard } from '@/components/managementui/management_plugin_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
+
+import { ToolDetailsModal } from '@/tools/tool_details_modal';
+import { ToolPluginDetailsModal } from '@/tools/tool_plugin_details_modal';
 
 interface ToolPluginCardProps {
 	plugin: PluginListItem;
@@ -43,6 +44,8 @@ export function ToolPluginCard({
 }: ToolPluginCardProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
+	const [isPluginDetailsOpen, setIsPluginDetailsOpen] = useState(false);
+	const [toolToView, setToolToView] = useState<ToolStoreListItem | null>(null);
 	const { isPending, runAction } = usePendingActions();
 
 	const run = async (key: string, action: () => Promise<void>) => {
@@ -65,7 +68,6 @@ export function ToolPluginCard({
 		<>
 			<ManagementPluginCard
 				title={toolPluginDisplayName(plugin)}
-				identity={<span className="font-mono">{plugin.name}</span>}
 				description={plugin.description}
 				status={
 					<>
@@ -101,17 +103,29 @@ export function ToolPluginCard({
 					/>
 				}
 				actions={
-					<button
-						type="button"
-						className="btn btn-sm btn-ghost rounded-xl"
-						disabled={isPending('plugin:refresh')}
-						onClick={() => {
-							void run('plugin:refresh', onRefreshTools);
-						}}
-					>
-						<FiRefreshCw className={isPending('plugin:refresh') ? 'animate-spin' : undefined} size={15} />
-						<span>Refresh</span>
-					</button>
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								setIsPluginDetailsOpen(true);
+							}}
+						>
+							<FiEye size={15} />
+							<span>Details</span>
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={isPending('plugin:refresh')}
+							onClick={() => {
+								void run('plugin:refresh', onRefreshTools);
+							}}
+						>
+							<FiRefreshCw className={isPending('plugin:refresh') ? 'animate-spin' : undefined} size={15} />
+							<span>Refresh</span>
+						</button>
+					</>
 				}
 			>
 				{toolLoadError ? (
@@ -149,7 +163,6 @@ export function ToolPluginCard({
 								<ManagementItemCard
 									key={`${tool.ref.rootID}:${tool.ref.artifactID}`}
 									title={toolDisplayName(tool)}
-									subtitle={tool.name}
 									description={tool.description}
 									status={
 										<>
@@ -166,13 +179,6 @@ export function ToolPluginCard({
 										</>
 									}
 								>
-									<div className="mt-3">
-										<ManagementJSONSource
-											label="tool definition JSON"
-											fileName={`${tool.name}.json`}
-											load={() => toolManagementAPI.getTool(tool.ref)}
-										/>
-									</div>
 									<div className="mt-4 flex flex-wrap items-center gap-3">
 										<EnabledControl
 											id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}
@@ -185,6 +191,16 @@ export function ToolPluginCard({
 											title="Change built-in tool availability"
 										/>
 										<span className="text-base-content/70 text-xs">Built-in tool definitions are read-only.</span>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												setToolToView(tool);
+											}}
+										>
+											<FiEye size={15} />
+											<span>View schemas</span>
+										</button>
 									</div>
 								</ManagementItemCard>
 							);
@@ -196,6 +212,22 @@ export function ToolPluginCard({
 					</div>
 				) : null}
 			</ManagementPluginCard>
+
+			<ToolPluginDetailsModal
+				isOpen={isPluginDetailsOpen}
+				plugin={plugin}
+				onClose={() => {
+					setIsPluginDetailsOpen(false);
+				}}
+			/>
+
+			<ToolDetailsModal
+				isOpen={toolToView !== null}
+				tool={toolToView}
+				onClose={() => {
+					setToolToView(null);
+				}}
+			/>
 
 			<ActionDeniedAlertModal
 				isOpen={Boolean(alertMessage)}

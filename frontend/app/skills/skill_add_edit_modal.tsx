@@ -1,6 +1,6 @@
 import type { SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCopy, FiFileText } from 'react-icons/fi';
+import { FiAlertCircle, FiFileText } from 'react-icons/fi';
 
 import type { ArtifactRef, StoreArtifact } from '@/spec/artifact';
 import type { PluginListItem } from '@/spec/plugin';
@@ -18,6 +18,7 @@ import { skillManagementAPI } from '@/apis/baseapi';
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import {
 	ManagementModalBody,
 	ManagementModalDialog,
@@ -201,6 +202,13 @@ function ManagedSkillEditorModalContent({
 	}, [mode, skill]);
 
 	const parsedArguments = useMemo(() => parseSkillArguments(form.argumentsText), [form.argumentsText]);
+	const generatedSkillSource = useMemo(() => {
+		if (parsedArguments.error) {
+			return undefined;
+		}
+
+		return canonicalSkillSource(documentFromForm(form, parsedArguments.values));
+	}, [form, parsedArguments]);
 	const existingNameKeys = useMemo(() => {
 		const keys = new Set<string>();
 		for (const existingName of existingNames) {
@@ -242,25 +250,6 @@ function ManagedSkillEditorModalContent({
 			return formFromDocument(nextDocument, previous.enabled);
 		});
 		setError('');
-	};
-
-	const copyGeneratedDocument = async () => {
-		if (parsedArguments.error) {
-			setError(parsedArguments.error);
-			return;
-		}
-		if (typeof navigator === 'undefined' || !navigator.clipboard) {
-			setError('Clipboard access is unavailable.');
-			return;
-		}
-
-		try {
-			const document = documentFromForm(form, parsedArguments.values);
-			const markdown = canonicalSkillSource(document);
-			await navigator.clipboard.writeText(markdown);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : 'Generated SKILL.md could not be copied.');
-		}
 	};
 
 	const submit: SubmitEventHandler<HTMLFormElement> = async event => {
@@ -523,15 +512,27 @@ function ManagedSkillEditorModalContent({
 							</ModalSection>
 
 							<ModalSection title="Generated SKILL.md">
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={saving || Boolean(parsedArguments.error)}
-									onClick={copyGeneratedDocument}
-								>
-									<FiCopy size={14} />
-									Copy complete document
-								</button>
+								{generatedSkillSource ? (
+									<ManagementArtifactSource
+										key={generatedSkillSource}
+										label="SKILL.md"
+										prefetched={{
+											data: generatedSkillSource,
+											text: generatedSkillSource,
+											fileName: 'SKILL.md',
+											extension: 'md',
+										}}
+										load={async () => ({
+											data: generatedSkillSource,
+											text: generatedSkillSource,
+											fileName: 'SKILL.md',
+											extension: 'md',
+										})}
+										note="This is the complete source that will be saved, including frontmatter."
+									/>
+								) : (
+									<p className="text-base-content/60 text-sm">Fix the arguments before generating SKILL.md.</p>
+								)}
 							</ModalSection>
 						</>
 					)}

@@ -210,11 +210,11 @@ function ExistingSkillAttachModal({
 	return (
 		<ModalDialog isOpen onClose={onClose} blockCancel={submitting}>
 			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
-				<ModalHeader title="Attach Existing Skill Artifact" onClose={onClose} closeDisabled={submitting} />
+				<ModalHeader title="Attach Existing Skill" onClose={onClose} closeDisabled={submitting} />
 				<div className="space-y-4 p-4 sm:p-6">
 					{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
 
-					<ModalField label="Skill Artifact" required>
+					<ModalField label="Skill" required>
 						<Dropdown<string>
 							dropdownItems={candidateDropdownItems}
 							orderedKeys={candidates.map(c => {
@@ -223,11 +223,11 @@ function ExistingSkillAttachModal({
 							selectedKey={selected ? selectedKey : ''}
 							onChange={setSelectedKey}
 							filterDisabled={false}
-							title="Select a Skill Artifact"
-							placeholderLabel="Select a Skill Artifact"
+							title="Select a Skill"
+							placeholderLabel="Select a Skill"
 							getDisplayName={key => {
 								const skill = candidates.find(candidate => refKey(candidate) === key);
-								return skill ? `${skill.displayName || skill.name} · ${skill.ref.rootID}` : key;
+								return skill ? skill.displayName || skill.name : key;
 							}}
 							disabled={submitting || candidates.length === 0}
 							inlineMenu
@@ -384,7 +384,6 @@ export function SkillPluginCard({
 		<>
 			<ManagementPluginCard
 				title={plugin.displayName || plugin.name}
-				identity={plugin.displayName !== plugin.name ? <span className="font-mono">{plugin.name}</span> : null}
 				description={plugin.description}
 				status={
 					<>
@@ -566,7 +565,6 @@ export function SkillPluginCard({
 								<ManagementItemCard
 									key={refKey(skill)}
 									title={skill.displayName || skill.name}
-									subtitle={skill.displayName !== skill.name ? skill.name : undefined}
 									description={skill.description}
 									status={
 										<>
@@ -712,7 +710,7 @@ export function SkillPluginCard({
 						})}
 
 						{skillsLoaded && skills.length === 0 ? (
-							<ManagementEmptyState>No Skill Artifact currently resolves through this Plugin.</ManagementEmptyState>
+							<ManagementEmptyState>No Skill currently resolves through this Plugin.</ManagementEmptyState>
 						) : null}
 						{skillsLoaded && skills.length > 0 && visibleSkills.length === 0 ? (
 							<ManagementEmptyState>No Skills match the current filters.</ManagementEmptyState>

@@ -8,8 +8,8 @@ interface ManagementJSONSourceProps<T> {
 }
 
 /**
- * Exports a structured API document, not original source-file bytes.
- * Callers must pass only a safe, non-secret document or projection.
+ * Displays caller-supplied portable JSON source. Callers must pass a real
+ * source document or schema, never a management API view or store record.
  */
 export function ManagementJSONSource<T>({ label, fileName, load, note }: ManagementJSONSourceProps<T>) {
 	return (
@@ -24,7 +24,7 @@ export function ManagementJSONSource<T>({ label, fileName, load, note }: Managem
 					extension: 'json',
 				};
 			}}
-			note={note ?? 'This JSON is reconstructed from the API document. It is not the original source file.'}
+			note={note}
 		/>
 	);
 }

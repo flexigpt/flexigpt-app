@@ -91,6 +91,29 @@ function safeHeadersJSON(headers: Record<string, string>): string {
 	}
 }
 
+function shareableProviderDocument(document: ModelProviderDocument): ModelProviderDocument {
+	const connection = document.connection;
+	const headers = connection?.headers;
+
+	if (!headers?.set) {
+		return document;
+	}
+
+	const { set: _sensitiveHeaders, ...headerPatch } = headers;
+	const safeHeaders = omitSensitiveHTTPHeaders(headers.set) ?? {};
+
+	return {
+		...document,
+		connection: {
+			...connection,
+			headers: {
+				...headerPatch,
+				...(Object.keys(safeHeaders).length > 0 ? { set: safeHeaders } : {}),
+			},
+		},
+	};
+}
+
 function initialFormState(
 	provider: ModelProviderManagementItem | undefined,
 	existingLogicalNames: string[]
@@ -621,12 +644,14 @@ function ModelProviderAddEditModalContent({
 					</ModalSection>
 
 					{provider ? (
-						<ModalSection title="Saved Provider Artifact">
+						<ModalSection title="Saved Provider source">
 							<ManagementJSONSource
-								label="provider document JSON"
+								label="Provider JSON"
 								fileName={`${provider.view.document.name}.json`}
-								load={async () => (await modelManagementAPI.getProvider(provider.list.ref)).document}
-								note="Exports the saved Artifact document. Credentials and unsaved editor changes are never exported."
+								load={async () =>
+									shareableProviderDocument((await modelManagementAPI.getProvider(provider.list.ref)).document)
+								}
+								note="This is the shareable saved Provider source. API keys, sensitive headers, and unsaved editor changes are not exported."
 							/>
 						</ModalSection>
 					) : null}

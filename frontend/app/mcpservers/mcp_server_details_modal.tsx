@@ -36,6 +36,7 @@ import {
 } from '@/apis/mcp_management';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
@@ -63,6 +64,84 @@ interface DiscoveryData {
 }
 
 const DISCOVERY_PAGE_SIZE = 100;
+
+type MCPToolSchemaKind = 'input' | 'output';
+
+function asSchemaRecord(value: unknown): Record<string, unknown> | undefined {
+	return value !== null && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: undefined;
+}
+
+function readSchemaPath(source: unknown, path: readonly string[]): unknown {
+	let current = source;
+
+	for (const segment of path) {
+		const record = asSchemaRecord(current);
+
+		if (!record) {
+			return undefined;
+		}
+
+		current = record[segment];
+	}
+
+	return current;
+}
+
+// oxlint-disable-next-line typescript/no-redundant-type-constituents
+function getMCPToolSchema(tool: MCPToolCapability, kind: MCPToolSchemaKind): unknown | undefined {
+	const paths =
+		kind === 'input'
+			? [['inputSchema'], ['input_schema'], ['parameters'], ['schema', 'input'], ['schema', 'inputSchema']]
+			: [['outputSchema'], ['output_schema'], ['resultSchema'], ['schema', 'output'], ['schema', 'outputSchema']];
+
+	for (const path of paths) {
+		const value = readSchemaPath(tool, path);
+
+		if (typeof value === 'string') {
+			try {
+				return JSON.parse(value) as unknown;
+			} catch {
+				continue;
+			}
+		}
+
+		if (typeof value === 'boolean' || (value !== null && typeof value === 'object')) {
+			return value;
+		}
+	}
+
+	return undefined;
+}
+
+function mcpToolSchemaFileName(toolName: string, kind: MCPToolSchemaKind): string {
+	const stem =
+		toolName
+			.trim()
+			.toLowerCase()
+			.replaceAll(/[^a-z0-9._-]+/g, '-')
+			.replaceAll(/^-+|-+$/g, '')
+			.slice(0, 96) || 'tool';
+
+	return `${stem}.${kind}.schema.json`;
+}
+
+function MCPToolSchemaSource({ tool, kind }: { tool: MCPToolCapability; kind: MCPToolSchemaKind }) {
+	const schema = getMCPToolSchema(tool, kind);
+	const label = kind === 'input' ? 'Input schema JSON' : 'Output schema JSON';
+
+	return schema === undefined ? (
+		<p className="text-base-content/60 text-xs">No {kind} schema is declared.</p>
+	) : (
+		<ManagementJSONSource
+			label={label}
+			fileName={mcpToolSchemaFileName(tool.toolName, kind)}
+			load={async () => schema}
+			note={`This is the shareable ${kind} schema reported by the MCP server.`}
+		/>
+	);
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
 	return <ManagementInfoRow label={label}>{children}</ManagementInfoRow>;
@@ -258,18 +337,11 @@ function MCPServerDetailsModalContent({
 				</ModalSection>
 			) : null}
 
-			<ModalSection title="Artifact documents">
-				<ManagementJSONSource
-					label="MCP server document JSON"
-					fileName={`${server.logicalName}.json`}
-					load={async () => {
-						const current = await mcpManagementAPI.getMCPServer(server.ref, plugin.ref);
-						if (!current.document) {
-							throw new Error('The MCP server document is unavailable.');
-						}
-						return current.document;
-					}}
-					note="This is the server declaration, not installation secrets or OAuth tokens."
+			<ModalSection title="MCP server source">
+				<ManagementArtifactSource
+					label="MCP server YAML"
+					load={() => mcpManagementAPI.exportMCPServerSource(server.ref)}
+					note="This portable server declaration excludes installation secrets and OAuth tokens."
 				/>
 			</ModalSection>
 
@@ -288,37 +360,43 @@ function MCPServerDetailsModalContent({
 						<h4 className="mb-2 text-sm font-semibold">Tools ({data.tools.length})</h4>
 						<div className="space-y-3">
 							{data.tools.map(tool => (
-								<ManagementItemCard
-									key={`${tool.server}:${tool.toolName}:${tool.digest}`}
-									title={tool.displayName || tool.title || tool.toolName}
-									subtitle={tool.toolName}
-									description={tool.description}
-									status={
-										<>
-											<StatusBadge tone={tool.enabled ? 'success' : 'neutral'}>
-												{tool.enabled ? 'Enabled' : 'Disabled'}
-											</StatusBadge>
-											<StatusBadge
-												tone={
-													tool.inferredRisk === MCPToolRisk.Read
-														? 'success'
-														: tool.inferredRisk === MCPToolRisk.Write
-															? 'warning'
-															: 'error'
-												}
-											>
-												{getMCPToolRiskLabel(tool.inferredRisk)}
-											</StatusBadge>
-										</>
-									}
-									metadata={
-										<>
-											<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
-											<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
-											{tool.app?.resourceUri ? <MetadataPill label="App">Configured</MetadataPill> : null}
-										</>
-									}
-								/>
+								<>
+									<ManagementItemCard
+										key={`${tool.server}:${tool.toolName}:${tool.digest}`}
+										title={tool.displayName || tool.title || tool.toolName}
+										subtitle={tool.toolName}
+										description={tool.description}
+										status={
+											<>
+												<StatusBadge tone={tool.enabled ? 'success' : 'neutral'}>
+													{tool.enabled ? 'Enabled' : 'Disabled'}
+												</StatusBadge>
+												<StatusBadge
+													tone={
+														tool.inferredRisk === MCPToolRisk.Read
+															? 'success'
+															: tool.inferredRisk === MCPToolRisk.Write
+																? 'warning'
+																: 'error'
+													}
+												>
+													{getMCPToolRiskLabel(tool.inferredRisk)}
+												</StatusBadge>
+											</>
+										}
+										metadata={
+											<>
+												<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
+												<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
+												{tool.app?.resourceUri ? <MetadataPill label="App">Configured</MetadataPill> : null}
+											</>
+										}
+									/>
+									<div className="mt-3 grid gap-3 xl:grid-cols-2">
+										<MCPToolSchemaSource tool={tool} kind="input" />
+										<MCPToolSchemaSource tool={tool} kind="output" />
+									</div>
+								</>
 							))}
 							{data.tools.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">

@@ -2,10 +2,10 @@ import type { MCPPluginView } from '@/spec/mcp';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
 
+import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
-import { ManagementJSONSource } from '@/components/managementui/management_json_source';
 
 interface MCPPluginDetailsModalProps {
 	isOpen: boolean;
@@ -38,23 +38,19 @@ export function MCPPluginDetailsModal({
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{plugin.displayName}</ManagementInfoRow>
-				<ManagementInfoRow label="Logical Name" mono>
-					{plugin.logicalName}
-				</ManagementInfoRow>
 				<ManagementInfoRow label="Baseline">{plugin.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{plugin.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">{plugin.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="State">{plugin.plugin.state}</ManagementInfoRow>
-				<ManagementInfoRow label="Revision">{plugin.plugin.revision}</ManagementInfoRow>
 				<ManagementInfoRow label="Servers">{serversLoaded ? serverCount : 'Not loaded'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{plugin.description || '—'}</span>
 				</ManagementInfoRow>
 			</ManagementInfoGrid>
-			<ManagementJSONSource
-				label="MCP Plugin document JSON"
-				fileName={`${plugin.logicalName}.json`}
-				load={() => mcpManagementAPI.getMCPPlugin(plugin.ref)}
+			<ManagementArtifactSource
+				label="MCP Plugin YAML"
+				load={() => mcpManagementAPI.exportMCPPluginSource(plugin.ref)}
+				note="This portable Plugin declaration excludes local state, source metadata, revisions, and resolved targets."
 			/>
 		</ManagementDetailsModal>
 	);

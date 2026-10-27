@@ -21,9 +21,7 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalHeader } from '@/components/modal/modal_header';
-import { ModalSection } from '@/components/modal/modal_section';
 
-import { WorkspaceArtifactRecordSource, WorkspaceDirectoryRecordSource } from '@/workspaces/workspace_artifact_source';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceDefaultPolicyDisclosure } from '@/workspaces/workspace_default_policy_disclosure';
 
@@ -400,9 +398,6 @@ function WorkspaceDirectoryManagementModalContent({
 						</div>
 					)}
 				</div>
-				<ModalSection title="Workspace directory Artifact">
-					<WorkspaceDirectoryRecordSource directory={directory.ref} />
-				</ModalSection>
 
 				{directory.workspaces.length > 0 ? (
 					<section className="space-y-2">
@@ -496,29 +491,6 @@ function WorkspaceDirectoryManagementModalContent({
 							</div>
 						))}
 					</section>
-				) : null}
-
-				{artifacts ? (
-					<ModalSection
-						title="Workspace Artifact records"
-						description="Copy or export the current metadata projection for any discovered repository Artifact."
-					>
-						<details className="border-base-content/10 bg-base-100 rounded-xl border">
-							<summary className="cursor-pointer px-3 py-2 text-sm font-medium">
-								Show Artifact records ({artifacts.length})
-							</summary>
-							<div className="border-base-content/10 space-y-3 border-t p-3">
-								{artifacts.map(artifact => (
-									<div key={artifactRefKey(artifact.artifact)} className="border-base-content/10 rounded-xl border p-3">
-										<div className="mb-2 text-sm font-medium">
-											{artifact.displayName || artifact.logicalName || artifact.artifact.artifactID}
-										</div>
-										<WorkspaceArtifactRecordSource directory={directory.ref} artifact={artifact} />
-									</div>
-								))}
-							</div>
-						</details>
-					</ModalSection>
 				) : null}
 
 				{artifacts?.some(artifact => artifact.state === ArtifactState.Available && !artifact.enabled) ? (

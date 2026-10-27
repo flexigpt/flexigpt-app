@@ -77,10 +77,6 @@ function SkillPluginEditModalContent({
 					) : null}
 
 					<ModalSection title="Plugin details">
-						<ModalField label="Logical name">
-							<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{plugin.name}</div>
-						</ModalField>
-
 						<ModalField label="Display name" htmlFor="skill-plugin-display-name" required>
 							<input
 								id="skill-plugin-display-name"

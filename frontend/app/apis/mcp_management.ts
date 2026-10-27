@@ -66,8 +66,14 @@ import {
 } from '@/spec/mcp';
 import { pluginListItemFromPluginView } from '@/spec/plugin';
 
+import type { PortableSource } from '@/lib/shareable_source';
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
+import {
+	createPortableYAMLSource,
+	pluginShareableSourceDocument,
+	portableSourceFileName,
+} from '@/lib/shareable_source';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { IMCPAggregateAPI, IMCPRuntimeAPI, IMCPStoreAPI, IToolTargetResolver } from '@/apis/interface';
@@ -751,6 +757,13 @@ export class MCPManagementAPI {
 		return this.toPluginView(pluginListItemFromPluginView(s, false));
 	}
 
+	async exportMCPPluginSource(plugin: ArtifactRef): Promise<PortableSource<Record<string, unknown>>> {
+		const view = await this.store.getMCPPlugin(plugin);
+		const source = pluginShareableSourceDocument(view);
+
+		return createPortableYAMLSource(source, portableSourceFileName(view.name, 'yaml', 'mcp-plugin'));
+	}
+
 	getMCPPolicy(policy: ArtifactRef) {
 		return this.store.getMCPPolicy(policy);
 	}
@@ -785,6 +798,16 @@ export class MCPManagementAPI {
 
 	async getMCPServer(server: ArtifactRef, plugin: ArtifactRef): Promise<MCPServerView> {
 		return this.toServerView(await this.aggregate.getMCPServer(server), plugin);
+	}
+
+	async exportMCPServerSource(server: ArtifactRef): Promise<PortableSource<MCPServerDocument>> {
+		const details = await this.aggregate.getMCPServer(server);
+		const source = details.settings.document;
+
+		return createPortableYAMLSource(
+			source,
+			portableSourceFileName(source.displayName ?? source.logicalName, 'yaml', 'mcp-server')
+		);
 	}
 
 	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerView> {
