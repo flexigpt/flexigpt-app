@@ -32,6 +32,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
+import { workspaceDisplayName, workspaceRef } from '@/workspaces/workspace_presentation';
 import { WorkspaceSource } from '@/workspaces/workspace_source';
 
 interface WorkspaceDirectoryManagementModalProps {
@@ -47,17 +48,6 @@ type EffectiveWorkspace = WorkspaceDirectoryView['workspaces'][number];
 function effectiveWorkspaceKey(entry: EffectiveWorkspace): string {
 	const artifact = entry.workspace.artifact;
 	return `${artifact.rootID}:${artifact.id}`;
-}
-
-function effectiveWorkspaceRef(entry: EffectiveWorkspace) {
-	return {
-		rootID: entry.workspace.artifact.rootID,
-		artifactID: entry.workspace.artifact.id,
-	};
-}
-
-function effectiveWorkspaceTitle(entry: EffectiveWorkspace): string {
-	return entry.workspace.artifact.displayName || entry.workspace.artifact.logicalName;
 }
 
 function effectiveWorkspaceLocator(entry: EffectiveWorkspace): string {
@@ -477,7 +467,7 @@ function WorkspaceDirectoryManagementModalContent({
 														setSelectedWorkspaceKey(key);
 													}}
 												>
-													<div className="truncate text-sm font-medium">{effectiveWorkspaceTitle(entry)}</div>
+													<div className="truncate text-sm font-medium">{workspaceDisplayName(directory, entry)}</div>
 													<div className="text-base-content/60 mt-1 truncate font-mono text-xs">
 														{entry.origin === WorkspaceDirectoryOrigin.Default
 															? 'Automatic repository setup'
@@ -494,7 +484,7 @@ function WorkspaceDirectoryManagementModalContent({
 								})}
 
 								{selectedWorkspace ? (
-									<WorkspaceSource directory={directory.ref} workspace={effectiveWorkspaceRef(selectedWorkspace)} />
+									<WorkspaceSource directory={directory.ref} workspace={workspaceRef(selectedWorkspace)} />
 								) : null}
 							</div>
 						</section>

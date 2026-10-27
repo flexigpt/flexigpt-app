@@ -27,6 +27,7 @@ import { PageFrame } from '@/components/page_frame';
 import { WorkspaceDirectoryCard } from '@/workspaces/workspace_directory_card';
 import { WorkspaceDirectoryManagementModal } from '@/workspaces/workspace_directory_management_modal';
 import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
+import { workspaceDisplayName } from '@/workspaces/workspace_presentation';
 
 const DIRECTORY_PAGE_SIZE = 100;
 const MAX_DIRECTORY_PAGE_HOPS = 10_000;
@@ -160,7 +161,7 @@ export default function WorkspaceDirectoryManagement() {
 
 						return {
 							ref,
-							displayName: artifact.displayName || artifact.logicalName || 'Workspace',
+							displayName: workspaceDisplayName(directory, workspace),
 							isSelectable,
 							availabilityReason: isSelectable
 								? undefined

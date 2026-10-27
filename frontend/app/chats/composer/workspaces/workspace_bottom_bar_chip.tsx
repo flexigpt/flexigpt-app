@@ -30,6 +30,7 @@ import type {
 import { WorkspaceDirectorySelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
 import { getWorkspaceContentCounts } from '@/workspaces/workspace_contents';
 import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
+import { workspaceDisplayName as formatWorkspaceDisplayName } from '@/workspaces/workspace_presentation';
 
 interface WorkspaceBottomBarChipProps {
 	store: MenuStore;
@@ -44,17 +45,14 @@ function workspaceKey(candidate: ComposerWorkspaceCandidate): string {
 }
 
 function workspaceDisplayName(candidate: ComposerWorkspaceCandidate): string {
-	const artifact = candidate.workspace.workspace.artifact;
-	return artifact.displayName || artifact.logicalName;
+	return formatWorkspaceDisplayName(candidate.directory, candidate.workspace);
 }
 
 function workspaceSubtitle(candidate: ComposerWorkspaceCandidate): string {
-	const source = candidate.directory.root.displayName || 'Repository';
-
 	if (candidate.workspace.origin === WorkspaceDirectoryOrigin.Default) {
-		return `${source} · Automatic setup`;
+		return 'Automatic setup';
 	}
-	return `${source} · Repository workspace`;
+	return 'Repository workspace';
 }
 
 function workspaceIsAvailable(candidate: ComposerWorkspaceCandidate): boolean {

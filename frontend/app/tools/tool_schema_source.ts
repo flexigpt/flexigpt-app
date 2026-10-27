@@ -52,12 +52,15 @@ export function getToolSchema(tool: ToolView, kind: ToolSchemaKind): unknown | u
 		kind === 'input'
 			? [
 					['inputSchema'],
+					['userArgSchema'],
 					['input_schema'],
 					['parameters'],
 					['schema', 'input'],
 					['schema', 'inputSchema'],
 					['definition', 'inputSchema'],
+					['definition', 'userArgSchema'],
 					['toolDefinition', 'inputSchema'],
+					['toolDefinition', 'userArgSchema'],
 				]
 			: [
 					['outputSchema'],

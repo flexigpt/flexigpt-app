@@ -134,30 +134,26 @@ function SkillDirectoryRegistrationModal({
 	const [sourceDisplayName, setSourceDisplayName] = useState('');
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
-	const [destinationKey, setDestinationKey] = useState('unattached');
+	const [destinationKey, setDestinationKey] = useState('');
 	const effectiveRootID = roots.some(root => root.rootID === rootID) ? rootID : (roots[0]?.rootID ?? '');
 	const destinations = plugins.filter(plugin => plugin.ref.rootID === effectiveRootID && canWriteSkillPlugin(plugin));
 	const destination = destinations.find(plugin => pluginKey(plugin) === destinationKey);
-	const destinationValue = destination ? destinationKey : 'unattached';
+	const destinationValue = destination ? destinationKey : '';
 	const rootDropdownItems = useMemo(
 		() => Object.fromEntries(roots.map(root => [root.rootID, { isEnabled: true }])) as Record<string, DropdownItem>,
 		[roots]
 	);
 	const destinationDropdownItems = useMemo(
 		() =>
-			({
-				unattached: { isEnabled: true },
-				...Object.fromEntries(destinations.map(plugin => [pluginKey(plugin), { isEnabled: true }])),
-			}) as Record<string, DropdownItem>,
+			Object.fromEntries(destinations.map(plugin => [pluginKey(plugin), { isEnabled: true }])) as Record<
+				string,
+				DropdownItem
+			>,
 		[destinations]
 	);
 	const destinationLabel = (key: string) => {
-		if (key === 'unattached') {
-			return 'Register without attaching';
-		}
-
 		const plugin = destinations.find(candidate => pluginKey(candidate) === key);
-		return plugin?.displayName || plugin?.name || key;
+		return plugin?.displayName || plugin?.name || 'Select a Skill Plugin';
 	};
 
 	if (!isOpen) {
@@ -179,8 +175,8 @@ function SkillDirectoryRegistrationModal({
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (!effectiveRootID || !path.trim() || !sourceDisplayName.trim()) {
-			setError('Root, directory, and source display name are required.');
+		if (!effectiveRootID || !path.trim() || !sourceDisplayName.trim() || !destination) {
+			setError('Root, directory, source display name, and destination Plugin are required.');
 			return;
 		}
 
@@ -221,7 +217,12 @@ function SkillDirectoryRegistrationModal({
 	return (
 		<ManagementModalDialog isOpen onClose={onClose} blockCancel>
 			<ManagementModalPanel width="compact">
-				<ModalHeader title="Register Skill Directory" onClose={onClose} closeDisabled={saving} />
+				<ModalHeader
+					title="Import Skills"
+					description="Choose the source directory and the Skill Plugin that will receive the discovered Skills."
+					onClose={onClose}
+					closeDisabled={saving}
+				/>
 				<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
 					<ManagementModalBody>
 						{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
@@ -233,7 +234,7 @@ function SkillDirectoryRegistrationModal({
 								selectedKey={effectiveRootID}
 								onChange={value => {
 									setRootID(value);
-									setDestinationKey('unattached');
+									setDestinationKey('');
 								}}
 								filterDisabled={false}
 								title="Select destination"
@@ -291,16 +292,15 @@ function SkillDirectoryRegistrationModal({
 								}}
 								filterDisabled={false}
 								title="Select Destination Plugin"
-								placeholderLabel="Register without attaching"
+								placeholderLabel="Select a Skill Plugin"
 								getDisplayName={destinationLabel}
-								disabled={saving}
+								disabled={saving || destinations.length === 0}
 								inlineMenu
 								maxMenuHeight={240}
 							/>
 						</ModalField>
 						<div className="alert alert-info rounded-2xl text-sm">
-							Every discovered Skill from this Source is attached to the selected Plugin. Registration without a
-							destination leaves the Skills under Unattached Skills.
+							Every discovered Skill from this Source is attached to the selected Plugin.
 						</div>
 					</ManagementModalBody>
 
@@ -309,7 +309,7 @@ function SkillDirectoryRegistrationModal({
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={saving}>
-							{saving ? 'Registering...' : 'Register Directory'}
+							{saving ? 'Importing...' : 'Import Skills'}
 						</button>
 					</ModalActions>
 				</form>
@@ -334,7 +334,6 @@ export default function SkillsPage() {
 
 	const [isCreatePluginOpen, setIsCreatePluginOpen] = useState(false);
 	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
-	const [creationRootID, setCreationRootID] = useState('');
 	const [alert, setAlert] = useState('');
 	const [filter, setFilter] = useState<SkillManagementFilter>({
 		query: '',
@@ -424,14 +423,7 @@ export default function SkillsPage() {
 		[data.plugins]
 	);
 
-	const effectiveCreationRootID = roots.some(root => root.rootID === creationRootID)
-		? creationRootID
-		: (roots[0]?.rootID ?? '');
-	const creationRootDropdownItems = useMemo(
-		() => Object.fromEntries(roots.map(root => [root.rootID, { isEnabled: true }])) as Record<string, DropdownItem>,
-		[roots]
-	);
-
+	const defaultCreationRootID = roots[0]?.rootID ?? '';
 	const updatePluginRow = useCallback(
 		(plugin: PluginListItem, update: (row: PluginRow) => PluginRow) => {
 			setData(previous => ({
@@ -592,14 +584,14 @@ export default function SkillsPage() {
 	const createPlugin = useCallback(
 		async (name: string, displayName: string, description?: string) => {
 			await skillManagementAPI.createSkillPlugin({
-				rootID: effectiveCreationRootID,
+				rootID: defaultCreationRootID,
 				name,
 				displayName,
 				description,
 			});
 			await reloadAfterMutation('Plugin creation');
 		},
-		[effectiveCreationRootID, reloadAfterMutation]
+		[defaultCreationRootID, reloadAfterMutation]
 	);
 
 	const matchingSkills = data.allSkills.filter(skill =>
@@ -631,22 +623,6 @@ export default function SkillsPage() {
 					description="Manage Skill Plugins, managed SKILL.md files, filesystem Skill paths, and user-message templates."
 					actions={
 						<>
-							{roots.length > 1 ? (
-								<div className="w-56 max-w-72">
-									<Dropdown<string>
-										dropdownItems={creationRootDropdownItems}
-										orderedKeys={roots.map(root => root.rootID)}
-										selectedKey={effectiveCreationRootID}
-										onChange={setCreationRootID}
-										filterDisabled={false}
-										title="Skill Plugin Root"
-										getDisplayName={rootID =>
-											roots.find(root => root.rootID === rootID)?.label ?? 'Unavailable destination'
-										}
-									/>
-								</div>
-							) : null}
-
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
@@ -666,7 +642,7 @@ export default function SkillsPage() {
 								}}
 							>
 								<FiFolderPlus size={17} />
-								Register Directory
+								Import Skills
 							</button>
 
 							<button
@@ -879,10 +855,10 @@ export default function SkillsPage() {
 					}}
 					onSubmit={createPlugin}
 					existingSlugs={data.plugins
-						.filter(row => row.plugin.ref.rootID === effectiveCreationRootID)
+						.filter(row => !defaultCreationRootID || row.plugin.ref.rootID === defaultCreationRootID)
 						.map(row => row.plugin.name)}
 					existingDisplayNames={data.plugins
-						.filter(row => row.plugin.ref.rootID === effectiveCreationRootID)
+						.filter(row => !defaultCreationRootID || row.plugin.ref.rootID === defaultCreationRootID)
 						.map(row => row.plugin.displayName || row.plugin.name)}
 					failureMessage="Skill Plugin could not be created."
 				/>

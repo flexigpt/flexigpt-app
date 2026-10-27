@@ -25,6 +25,8 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { workspaceManagementAPI } from '@/apis/baseapi';
 
+import { workspaceDisplayName } from '@/workspaces/workspace_presentation';
+
 interface SkillSelectionApplyOptions {
 	syncSession?: SkillSessionSyncMode;
 	forceResetSession?: boolean;
@@ -149,7 +151,7 @@ function selectionFromPlan(
 ): WorkspaceConversationSelection {
 	return {
 		workspace: workspaceRefOf(candidate),
-		displayName: candidate.workspace.workspace.artifact.displayName,
+		displayName: workspaceDisplayName(candidate.directory, candidate.workspace),
 		workspaceRevision: candidate.workspace.workspace.artifact.revision,
 		contextRefs: plan.prompt.contributions.map(contextRefOf),
 		skillRefs: plan.skills.skills

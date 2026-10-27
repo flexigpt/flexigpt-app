@@ -9,6 +9,7 @@ import { usePendingActions } from '@/hooks/use_pending_actions';
 import { toolDisplayName, toolPluginDisplayName } from '@/apis/tool_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
+import { ActionRow } from '@/components/managementui/action_row';
 import { EnabledControl } from '@/components/managementui/enabled_control';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
@@ -179,18 +180,23 @@ export function ToolPluginCard({
 										</>
 									}
 								>
-									<div className="mt-4 flex flex-wrap items-center gap-3">
-										<EnabledControl
-											id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}
-											checked={tool.enabled}
-											onChange={enabled => {
-												void run(toggleKey, () => onToggleToolEnable(plugin, tool, enabled));
-											}}
-											disabled={isPending(toggleKey)}
-											busy={isPending(toggleKey)}
-											title="Change built-in tool availability"
-										/>
-										<span className="text-base-content/70 text-xs">Built-in tool definitions are read-only.</span>
+									<ActionRow
+										leading={
+											<div className="flex flex-wrap items-center gap-3">
+												<EnabledControl
+													id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}
+													checked={tool.enabled}
+													onChange={enabled => {
+														void run(toggleKey, () => onToggleToolEnable(plugin, tool, enabled));
+													}}
+													disabled={isPending(toggleKey)}
+													busy={isPending(toggleKey)}
+													title="Change built-in tool availability"
+												/>
+												<span className="text-base-content/70 text-xs">Built-in tool definitions are read-only.</span>
+											</div>
+										}
+									>
 										<button
 											type="button"
 											className="btn btn-sm btn-ghost rounded-xl"
@@ -201,7 +207,7 @@ export function ToolPluginCard({
 											<FiEye size={15} />
 											<span>View</span>
 										</button>
-									</div>
+									</ActionRow>
 								</ManagementItemCard>
 							);
 						})}

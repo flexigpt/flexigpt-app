@@ -143,7 +143,7 @@ function ContributionRow({
 								Setup configures installation inputs. Connection and policy approval are still required at Run time.
 							</p>
 						) : null}
-						{occurrence.type === 'mcp' || canToggle ? (
+						{canView || occurrence.type === 'mcp' || canToggle ? (
 							<div className="flex flex-wrap items-center gap-2">
 								{canView ? (
 									<button

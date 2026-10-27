@@ -25,6 +25,7 @@ import type { WorkspaceContributionSourceSubject } from '@/workspaces/workspace_
 import { WorkspaceContents, workspacePathParts } from '@/workspaces/workspace_contents';
 import { WorkspaceContributionDetailsModal } from '@/workspaces/workspace_contribution_details_modal';
 import { WorkspaceMCPSetupModal } from '@/workspaces/workspace_mcp_setup_modal';
+import { workspaceDisplayName } from '@/workspaces/workspace_presentation';
 import { WorkspaceSource } from '@/workspaces/workspace_source';
 
 interface WorkspaceSelectionModalProps {
@@ -125,8 +126,7 @@ function WorkspaceDirectorySelectionModalContent({
 
 	const activeSkillIDs = useMemo(() => new Set(activeSkillRefs.map(value => artifactRefKey(value))), [activeSkillRefs]);
 	const workspaceName =
-		state.workspace?.workspace.workspace.artifact.displayName ||
-		state.workspace?.workspace.workspace.artifact.logicalName ||
+		(state.workspace ? workspaceDisplayName(state.workspace.directory, state.workspace.workspace) : undefined) ||
 		state.selection?.displayName ||
 		'Unavailable Workspace';
 	const mcpTargets = useMemo(() => mcpSetupTargets(state.plan), [state.plan]);

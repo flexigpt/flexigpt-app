@@ -60,20 +60,6 @@ function normalizeWorkspacePath(locator: string | undefined): string {
 	return normalized === '.' ? '' : normalized;
 }
 
-function isWorkspaceManifestPath(locator: string): boolean {
-	const segments = locator.split('/');
-	const filename = (segments.at(-1) ?? '').toLowerCase();
-
-	return (
-		filename === 'workspace.yaml' ||
-		filename === 'workspace.yml' ||
-		filename === 'workspace.json' ||
-		filename.endsWith('.workspace.yaml') ||
-		filename.endsWith('.workspace.yml') ||
-		filename.endsWith('.workspace.json')
-	);
-}
-
 export function workspacePathParts(locator: string | undefined): WorkspacePathParts {
 	const normalized = normalizeWorkspacePath(locator);
 	if (!normalized) {
@@ -107,9 +93,13 @@ function contributionSourceLocators(context: WorkspacePromptContribution): strin
 
 	if (unique.size === 0) {
 		const fallback = normalizeWorkspacePath(context.locator);
-		if (fallback && !isWorkspaceManifestPath(fallback)) {
+		if (fallback) {
 			unique.add(fallback);
 		}
+	}
+
+	if (unique.size === 0 && context.name.trim()) {
+		unique.add(context.name.trim());
 	}
 
 	return [...unique];
@@ -125,7 +115,7 @@ function includedContextCount(context: WorkspacePromptContribution): number {
 }
 
 function hasVisibleContext(context: WorkspacePromptContribution): boolean {
-	return contributionSourceLocators(context).length > 0 || context.includedBytes > 0;
+	return contributionSourceLocators(context).length > 0 || context.originalBytes > 0 || context.includedBytes > 0;
 }
 
 export function getWorkspaceContentCounts(
@@ -376,14 +366,7 @@ export function WorkspaceContents({
 		const key = artifactRefKey(context.artifact);
 		const selected = selection ? selection.selectedContextIDs.has(key) : true;
 		const locators = contributionSourceLocators(context);
-		const title =
-			locators.length > 0
-				? instruction
-					? 'Repository instruction files'
-					: 'Repository reference files'
-				: instruction
-					? 'Repository instruction files'
-					: 'Repository reference files';
+		const title = instruction ? 'Repository instruction files' : context.name.trim() || 'Repository reference files';
 		const description =
 			locators.length > 0
 				? `${locators.length} ${locators.length === 1 ? 'file is' : 'files are'} added together.`
@@ -407,9 +390,9 @@ export function WorkspaceContents({
 				}}
 				leadingActions={renderArtifactControl(context.artifact, locators.length === 1 ? 'file' : 'files')}
 				normalActions={
-					onViewContext ? (
+					instruction && onViewContext ? (
 						<WorkspaceViewButton
-							label={instruction ? 'repository instructions' : 'repository reference files'}
+							label="repository instructions"
 							onClick={() => {
 								onViewContext(context);
 							}}

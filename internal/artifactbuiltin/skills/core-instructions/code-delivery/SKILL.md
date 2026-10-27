@@ -10,11 +10,11 @@ Use for implementation tasks and requested code patches.
 
 ## Completion first
 
-Complete the full requested change: contracts, implementation, callers, wiring, tests, and required removals. Finish every feasible requirement in this turn; defer only work with an evidenced blocker.
+Complete the full requested change: contracts, implementation, callers, wiring, and required removals. Finish every feasible requirement in this turn; defer only work with an evidenced blocker.
 
 Own all implementation, integration, and verification. Run available checks; delegate only checks that require user access.
 
-Complete every affected caller, migration, and integration handoff. Missing build or test access blocks only the checks that require it; deliver all source changes and tests supported by inspected contracts and conventions.
+Complete every affected caller, migration, and integration handoff. Missing build or test access blocks only the checks that require it; deliver all source changes supported by inspected contracts and conventions.
 
 Use the available output budget for complete artifacts. Reduce explanation and repetition before implementation scope; a preferred response length is not a completion limit.
 
