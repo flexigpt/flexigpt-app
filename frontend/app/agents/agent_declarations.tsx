@@ -1,57 +1,15 @@
 import { useState } from 'react';
-import { FiChevronDown, FiEye, FiFileText } from 'react-icons/fi';
+import { FiEye, FiFileText } from 'react-icons/fi';
 
 import type { AgentCapabilityOccurrence } from '@/spec/agent';
 import { CapabilityResolutionStatus, CapabilityTargetForm } from '@/spec/artifact';
 
-import { textStoreAPI } from '@/apis/baseapi';
-
-import { ManagementArtifactSource } from '@/components/managementui/management_artifact_source';
-
 import { AgentContributionDetailsModal } from '@/agents/agent_contribution_details_modal';
 import { getAgentRelationshipBadgeClass } from '@/agents/agent_management_utils';
-import { loadSkillArtifactSource } from '@/skills/skill_artifact_source';
 
 export interface AgentCapabilityControls {
 	isExcluded: (occurrence: AgentCapabilityOccurrence) => boolean;
 	onToggle: (occurrence: AgentCapabilityOccurrence) => void;
-}
-
-function ContributionContent({ occurrence }: { occurrence: AgentCapabilityOccurrence }) {
-	const ref = occurrence.target?.form === CapabilityTargetForm.Artifact ? occurrence.target.artifact : undefined;
-	if (!ref) {
-		return <p className="text-base-content/70 text-xs">This declaration has no source Artifact.</p>;
-	}
-
-	if (occurrence.type === 'text') {
-		return (
-			<ManagementArtifactSource
-				key={`${ref.rootID}:${ref.artifactID}`}
-				label="materialized text"
-				load={async () => {
-					const text = await textStoreAPI.materializeText(ref);
-					return {
-						data: text,
-						text: text.content,
-						fileName: `${text.name || 'text'}.txt`,
-						extension: 'txt',
-					};
-				}}
-				note="This is materialized text. Run preparation resolves the Artifact again."
-			/>
-		);
-	}
-
-	return (
-		<div className="space-y-3">
-			<ManagementArtifactSource
-				key={`${ref.rootID}:${ref.artifactID}`}
-				label="SKILL.md"
-				load={() => loadSkillArtifactSource(ref)}
-				note="Canonical SKILL.md is reconstructed from the verified document, including frontmatter. Original comments and formatting are not available through this API."
-			/>
-		</div>
-	);
 }
 
 function ContributionRow({
@@ -65,7 +23,6 @@ function ContributionRow({
 	onSetup: (occurrence: AgentCapabilityOccurrence) => void;
 	onView: (occurrence: AgentCapabilityOccurrence) => void;
 }) {
-	const [expanded, setExpanded] = useState(false);
 	const sourceArtifact =
 		occurrence.status === CapabilityResolutionStatus.Available &&
 		occurrence.target?.form === CapabilityTargetForm.Artifact
@@ -87,111 +44,83 @@ function ContributionRow({
 			occurrence.type === 'text' ||
 			occurrence.type === 'mcp');
 	const isExcluded = canToggle && Boolean(capabilityControls?.isExcluded(occurrence));
-	const hasDetails =
-		occurrence.type === 'skill' ||
-		occurrence.type === 'text' ||
-		occurrence.type === 'mcp' ||
-		canView ||
-		canToggle ||
-		(occurrence.type === 'model' && occurrence.includeSystemPrompt !== undefined);
-	const heading = (
-		<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-			<span className="min-w-0 text-sm font-semibold wrap-break-word">
-				{occurrence.name || `Unnamed ${occurrence.type}`}
-			</span>
-			<span className="flex shrink-0 flex-wrap items-center gap-2">
-				<span className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}>
-					{occurrence.status}
-				</span>
-				{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
-				{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
-			</span>
-		</div>
-	);
+	const detailSummary =
+		occurrence.type === 'model' && occurrence.includeSystemPrompt !== undefined
+			? `System prompt: ${occurrence.includeSystemPrompt ? 'included' : 'not included'}`
+			: occurrence.type === 'skill' && occurrence.skillUseMode
+				? `Use mode: ${occurrence.skillUseMode}`
+				: occurrence.type === 'mcp'
+					? 'Setup, connection, and policy approval are required before Run use.'
+					: undefined;
+
+	const actions =
+		canView || occurrence.type === 'mcp' || canToggle ? (
+			<div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+				{canView ? (
+					<button
+						type="button"
+						className="btn btn-ghost btn-sm rounded-xl"
+						onClick={() => {
+							onView(occurrence);
+						}}
+					>
+						<FiEye size={15} />
+						View
+					</button>
+				) : null}
+
+				{occurrence.type === 'mcp' ? (
+					<button
+						type="button"
+						className="btn btn-ghost btn-sm rounded-xl"
+						onClick={() => {
+							onSetup(occurrence);
+						}}
+					>
+						<FiFileText size={15} />
+						{occurrence.status === CapabilityResolutionStatus.Available && sourceArtifact
+							? 'Configure MCP'
+							: 'View setup status'}
+					</button>
+				) : null}
+
+				{canToggle ? (
+					<button
+						type="button"
+						className="btn btn-ghost btn-sm rounded-xl"
+						onClick={() => {
+							capabilityControls?.onToggle(occurrence);
+						}}
+					>
+						{isExcluded ? 'Include for next Run' : 'Exclude for next Run'}
+					</button>
+				) : null}
+			</div>
+		) : null;
 
 	return (
-		<div className="border-base-content/10 rounded-xl border">
-			{hasDetails ? (
-				<details
-					className="group"
-					onToggle={event => {
-						setExpanded(event.currentTarget.open);
-					}}
-				>
-					<summary className="flex cursor-pointer list-none items-start gap-2 p-2 [&::-webkit-details-marker]:hidden">
-						{heading}
-						<FiChevronDown size={16} className="mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
-					</summary>
-					<div className="border-base-content/10 space-y-2 border-t p-2">
-						{occurrence.type === 'model' && occurrence.includeSystemPrompt !== undefined ? (
-							<p className="text-base-content/70 text-xs">
-								Include model system prompt: {occurrence.includeSystemPrompt ? 'Yes' : 'No'}
-							</p>
-						) : null}
-						{occurrence.type === 'skill' && occurrence.skillUseMode ? (
-							<p className="text-base-content/70 text-xs">Use mode: {occurrence.skillUseMode}</p>
-						) : null}
-						{expanded && (occurrence.type === 'skill' || occurrence.type === 'text') ? (
-							occurrence.status === CapabilityResolutionStatus.Available ? (
-								<ContributionContent occurrence={occurrence} />
-							) : (
-								<p className="text-base-content/70 text-xs">Content is unavailable until this declaration resolves.</p>
-							)
-						) : null}
-						{occurrence.type === 'mcp' ? (
-							<p className="text-base-content/70 text-xs">
-								Setup configures installation inputs. Connection and policy approval are still required at Run time.
-							</p>
-						) : null}
-						{canView || occurrence.type === 'mcp' || canToggle ? (
-							<div className="flex flex-wrap items-center gap-2">
-								{canView ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-sm rounded-xl"
-										onClick={() => {
-											onView(occurrence);
-										}}
-									>
-										<FiEye size={15} />
-										View
-									</button>
-								) : null}
-								{occurrence.type === 'mcp' ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-sm rounded-xl"
-										onClick={() => {
-											onSetup(occurrence);
-										}}
-									>
-										<FiFileText size={15} />
-										{occurrence.status === CapabilityResolutionStatus.Available &&
-										occurrence.target?.form === CapabilityTargetForm.Artifact &&
-										occurrence.target.artifact
-											? 'Configure MCP'
-											: 'View setup status'}
-									</button>
-								) : null}
-								{canToggle ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-sm rounded-xl"
-										onClick={() => {
-											capabilityControls?.onToggle(occurrence);
-										}}
-									>
-										{isExcluded ? 'Include for next Run' : 'Exclude for next Run'}
-									</button>
-								) : null}
-							</div>
-						) : null}
+		<div className="border-base-content/10 rounded-xl border p-3">
+			<div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div className="min-w-0">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="min-w-0 text-sm font-semibold wrap-break-word">
+							{occurrence.name || `Unnamed ${occurrence.type}`}
+						</span>
+						<span className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}>
+							{occurrence.status}
+						</span>
+						{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
+						{isExcluded ? <span className="badge badge-warning badge-sm">Excluded</span> : null}
 					</div>
-				</details>
-			) : (
-				<div className="p-3">{heading}</div>
-			)}
-			{occurrence.message ? <p className="text-warning px-3 pb-3 text-xs/5">{occurrence.message}</p> : null}
+
+					{detailSummary ? <p className="text-base-content/60 mt-1 text-xs">{detailSummary}</p> : null}
+					{occurrence.message ? (
+						<p className="text-warning mt-2 text-xs/5 wrap-break-word">{occurrence.message}</p>
+					) : null}
+				</div>
+
+				{actions}
+			</div>
 		</div>
 	);
 }

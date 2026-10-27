@@ -10,6 +10,7 @@
   - [ ] test all management pages again properly
 
 - [ ] verify diff applicability in streaming
+- [x] diff styling needs a bit of red in blocked things. collapsed target picker.
 
 - [ ] add outputschema to llmtools go and then plug it end to end.
 

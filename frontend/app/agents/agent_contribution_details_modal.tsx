@@ -49,6 +49,7 @@ function SourceDetails({
 				skill={skillDetailsSubjectFromReference(artifact, {
 					displayName: title,
 					sourceLabel: 'Agent',
+					description: occurrence.message,
 				})}
 				showPreview
 				onClose={onClose}
@@ -63,6 +64,7 @@ function SourceDetails({
 				subject={{
 					ref: artifact,
 					displayName: title,
+					description: occurrence.message,
 				}}
 				onClose={onClose}
 			/>
@@ -70,7 +72,7 @@ function SourceDetails({
 	}
 
 	return (
-		<ManagementDetailsModal isOpen onClose={onClose} title={title} modalKey={modalKey}>
+		<ManagementDetailsModal isOpen onClose={onClose} title={title} description={occurrence.message} modalKey={modalKey}>
 			{occurrence.type === 'text' ? (
 				<ManagementArtifactSource
 					label="text source"

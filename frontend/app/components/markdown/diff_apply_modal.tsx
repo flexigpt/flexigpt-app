@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -29,12 +29,13 @@ interface LazyPanelProps {
 	className?: string;
 	renderContent: () => ReactNode;
 	defaultOpen?: boolean;
+	onOpen?: () => void;
 }
 
 const DISPLAY_CANDIDATE_LIMIT = 24;
 const DISPLAY_HUNK_PAGE_SIZE = 32;
 
-function LazyPanel({ summary, className = '', renderContent, defaultOpen = false }: LazyPanelProps) {
+function LazyPanel({ summary, className = '', renderContent, defaultOpen = false, onOpen }: LazyPanelProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const contentID = useId();
 
@@ -46,6 +47,9 @@ function LazyPanel({ summary, className = '', renderContent, defaultOpen = false
 				aria-expanded={isOpen}
 				aria-controls={contentID}
 				onClick={() => {
+					if (!isOpen) {
+						onOpen?.();
+					}
 					setIsOpen(previous => !previous);
 				}}
 			>
@@ -211,9 +215,10 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 						const index = page * DISPLAY_HUNK_PAGE_SIZE + pageIndex;
 						const outcome = view.hunkOutcomes[hunk.id];
 						const canSelect = !!view.targetPath || outcome?.status === 'ready';
+						const hunkCardClassName = outcome?.status === 'blocked' ? 'border-error/30 bg-error/10' : 'border-base-300';
 
 						return (
-							<div key={hunk.id} className="border-base-300 rounded-lg border p-3">
+							<div key={hunk.id} className={`rounded-lg border p-3 ${hunkCardClassName}`}>
 								{/* oxlint-disable-next-line jsx-a11y/label-has-associated-control */}
 								<label htmlFor={`${inputPrefix}-${index}`} className="flex items-start gap-2 text-xs">
 									<input
@@ -269,16 +274,10 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 	);
 }
 
-function FileCard({
-	view,
-	controller,
-	defaultTargetPickerOpen,
-}: {
-	view: DiffApplyFileView;
-	controller: DiffApplyController;
-	defaultTargetPickerOpen: boolean;
-}) {
+function FileCard({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
 	const { file } = view;
+	const autoHunkReviewFingerprintRef = useRef<string | null>(null);
+	const [targetPickerVersion, setTargetPickerVersion] = useState(0);
 	const inputID = useId();
 	const displayPath =
 		view.targetPath ||
@@ -306,6 +305,23 @@ function FileCard({
 			: 'Enter a target path manually';
 
 	const showHunks = file.hunks.length > 0;
+
+	const shouldStartInitialHunkReview =
+		view.canTryHunks &&
+		file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES &&
+		Object.keys(view.hunkOutcomes).length === 0 &&
+		view.status !== 'applied' &&
+		view.status !== 'already-applied' &&
+		!controller.busy;
+
+	const handleFirstHunkInspection = (): void => {
+		if (autoHunkReviewFingerprintRef.current === view.fingerprint || !shouldStartInitialHunkReview) {
+			return;
+		}
+
+		autoHunkReviewFingerprintRef.current = view.fingerprint;
+		void controller.reviewHunks(file.id);
+	};
 
 	return (
 		<section className="border-base-300 bg-base-100 rounded-xl border p-4 shadow-sm" aria-busy={isActive}>
@@ -375,7 +391,8 @@ function FileCard({
 			{showHunks ? (
 				<LazyPanel
 					className="mt-3"
-					summary="Inspect hunk source / select hunks"
+					summary="Inspect and review hunks"
+					onOpen={handleFirstHunkInspection}
 					renderContent={() => <HunkPanel view={view} controller={controller} />}
 				/>
 			) : null}
@@ -395,9 +412,11 @@ function FileCard({
 				</div>
 
 				<Dropdown<string>
+					key={`${file.id}\u0000${targetPickerVersion}`}
 					dropdownItems={candidateDropdownItems}
 					selectedKey={selectedCandidate}
 					onChange={candidate => {
+						setTargetPickerVersion(version => version + 1);
 						controller.setTargetPath(file.id, candidate);
 					}}
 					filterDisabled={false}
@@ -407,7 +426,7 @@ function FileCard({
 					}
 					orderedKeys={candidates}
 					inlineMenu
-					defaultOpen={defaultTargetPickerOpen}
+					defaultOpen={false}
 					maxMenuHeight={220}
 					disabled={!!controller.busy}
 				/>
@@ -518,12 +537,6 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 			? 'Stopping after in-flight requests finish. Already submitted writes cannot be undone.'
 			: `${controller.busy.kind.replaceAll('-', ' ')}: ${controller.busy.completed}/${controller.busy.total}`
 		: '';
-	const unresolvedFiles = controller.files.filter(view => !view.targetPath);
-	const initiallyOpenTargetFileID =
-		unresolvedFiles.find(view => view.file.kind === 'add' && view.candidates.length > 0)?.file.id ??
-		unresolvedFiles.find(view => view.candidates.length > 0)?.file.id ??
-		unresolvedFiles.find(view => view.file.kind === 'add')?.file.id ??
-		unresolvedFiles[0]?.file.id;
 
 	return (
 		<>
@@ -643,12 +656,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					) : null}
 
 					{controller.files.map(view => (
-						<FileCard
-							key={view.file.id}
-							view={view}
-							controller={controller}
-							defaultTargetPickerOpen={view.file.id === initiallyOpenTargetFileID}
-						/>
+						<FileCard key={view.file.id} view={view} controller={controller} />
 					))}
 
 					{renderDiagnosticsPanel({

@@ -1,6 +1,6 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FiFolderPlus, FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi';
+import { FiFolder, FiFolderPlus, FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi';
 
 import type { PluginListItem } from '@/spec/plugin';
 import type { StoreSkillListItem } from '@/spec/skill';
@@ -129,7 +129,7 @@ function SkillDirectoryRegistrationModal({
 	onRegistered: () => Promise<void>;
 	onWarning: (message: string) => void;
 }) {
-	const [rootID, setRootID] = useState(roots[0]?.rootID ?? '');
+	const [rootID, _setRootID] = useState(roots[0]?.rootID ?? '');
 	const [path, setPath] = useState('');
 	const [sourceDisplayName, setSourceDisplayName] = useState('');
 	const [error, setError] = useState('');
@@ -139,10 +139,6 @@ function SkillDirectoryRegistrationModal({
 	const destinations = plugins.filter(plugin => plugin.ref.rootID === effectiveRootID && canWriteSkillPlugin(plugin));
 	const destination = destinations.find(plugin => pluginKey(plugin) === destinationKey);
 	const destinationValue = destination ? destinationKey : '';
-	const rootDropdownItems = useMemo(
-		() => Object.fromEntries(roots.map(root => [root.rootID, { isEnabled: true }])) as Record<string, DropdownItem>,
-		[roots]
-	);
 	const destinationDropdownItems = useMemo(
 		() =>
 			Object.fromEntries(destinations.map(plugin => [pluginKey(plugin), { isEnabled: true }])) as Record<
@@ -216,7 +212,7 @@ function SkillDirectoryRegistrationModal({
 
 	return (
 		<ManagementModalDialog isOpen onClose={onClose} blockCancel>
-			<ManagementModalPanel width="compact">
+			<ManagementModalPanel>
 				<ModalHeader
 					title="Import Skills"
 					description="Choose the source directory and the Skill Plugin that will receive the discovered Skills."
@@ -226,58 +222,7 @@ function SkillDirectoryRegistrationModal({
 				<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
 					<ManagementModalBody>
 						{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
-
-						<ModalField label="Destination" required>
-							<Dropdown<string>
-								dropdownItems={rootDropdownItems}
-								orderedKeys={roots.map(root => root.rootID)}
-								selectedKey={effectiveRootID}
-								onChange={value => {
-									setRootID(value);
-									setDestinationKey('');
-								}}
-								filterDisabled={false}
-								title="Select destination"
-								placeholderLabel="No destinations available"
-								getDisplayName={value => roots.find(root => root.rootID === value)?.label ?? 'Unavailable destination'}
-								disabled={saving || roots.length === 0}
-								inlineMenu
-								maxMenuHeight={240}
-							/>
-						</ModalField>
-
-						<ModalField label="Directory" htmlFor="skill-directory-path" required>
-							<div className="flex gap-2">
-								<input
-									id="skill-directory-path"
-									className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
-									value={path}
-									disabled={saving}
-									onChange={event => {
-										setPath(event.currentTarget.value);
-									}}
-									placeholder="/path/to/skills"
-								/>
-								<button type="button" className="btn btn-ghost rounded-xl" disabled={saving} onClick={chooseDirectory}>
-									Choose
-								</button>
-							</div>
-						</ModalField>
-
-						<ModalField label="Source display name" htmlFor="skill-directory-source-name" required>
-							<input
-								id="skill-directory-source-name"
-								className="input w-full rounded-xl"
-								value={sourceDisplayName}
-								disabled={saving}
-								onChange={event => {
-									setSourceDisplayName(event.currentTarget.value);
-								}}
-								placeholder="Repository Skills"
-							/>
-						</ModalField>
-
-						<ModalField label="Destination Plugin">
+						<ModalField label="Destination Plugin*">
 							<Dropdown<string>
 								dropdownItems={destinationDropdownItems}
 								orderedKeys={[
@@ -299,6 +244,39 @@ function SkillDirectoryRegistrationModal({
 								maxMenuHeight={240}
 							/>
 						</ModalField>
+
+						<ModalField label="Directory" htmlFor="skill-directory-path" required>
+							<div className="flex gap-2">
+								<input
+									id="skill-directory-path"
+									className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
+									value={path}
+									disabled={saving}
+									onChange={event => {
+										setPath(event.currentTarget.value);
+									}}
+									placeholder="/path/to/skills"
+								/>
+								<button type="button" className="btn btn-ghost rounded-xl" disabled={saving} onClick={chooseDirectory}>
+									<FiFolder />
+									Choose
+								</button>
+							</div>
+						</ModalField>
+
+						<ModalField label="Source display name" htmlFor="skill-directory-source-name" required>
+							<input
+								id="skill-directory-source-name"
+								className="input w-full rounded-xl"
+								value={sourceDisplayName}
+								disabled={saving}
+								onChange={event => {
+									setSourceDisplayName(event.currentTarget.value);
+								}}
+								placeholder="Repository Skills"
+							/>
+						</ModalField>
+
 						<div className="alert alert-info rounded-2xl text-sm">
 							Every discovered Skill from this Source is attached to the selected Plugin.
 						</div>
