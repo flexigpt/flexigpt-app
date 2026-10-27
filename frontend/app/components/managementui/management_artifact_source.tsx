@@ -209,9 +209,13 @@ export function ManagementArtifactSource<T>({
 					{loading && !value ? <output className="text-base-content/60 text-sm">Loading {label}...</output> : null}
 
 					{value ? (
-						<pre className="app-scrollbar-thin bg-base-300 max-h-96 overflow-auto rounded-xl p-3 font-mono text-xs/5 wrap-break-word whitespace-pre-wrap">
-							{value.text}
-						</pre>
+						value.text.trim() ? (
+							<pre className="app-scrollbar-thin bg-base-300 max-h-96 overflow-auto rounded-xl p-3 font-mono text-xs/5 wrap-break-word whitespace-pre-wrap">
+								{value.text}
+							</pre>
+						) : (
+							<p className="text-base-content/60 text-sm">This source is empty.</p>
+						)
 					) : null}
 
 					{note ? <p className="text-base-content/60 text-xs">{note}</p> : null}

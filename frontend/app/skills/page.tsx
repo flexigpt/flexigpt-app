@@ -129,14 +129,14 @@ function SkillDirectoryRegistrationModal({
 	onRegistered: () => Promise<void>;
 	onWarning: (message: string) => void;
 }) {
-	const [rootID, _setRootID] = useState(roots[0]?.rootID ?? '');
 	const [path, setPath] = useState('');
 	const [sourceDisplayName, setSourceDisplayName] = useState('');
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [destinationKey, setDestinationKey] = useState('');
-	const effectiveRootID = roots.some(root => root.rootID === rootID) ? rootID : (roots[0]?.rootID ?? '');
-	const destinations = plugins.filter(plugin => plugin.ref.rootID === effectiveRootID && canWriteSkillPlugin(plugin));
+	const destinations = plugins.filter(p => {
+		return canWriteSkillPlugin(p);
+	});
 	const destination = destinations.find(plugin => pluginKey(plugin) === destinationKey);
 	const destinationValue = destination ? destinationKey : '';
 	const destinationDropdownItems = useMemo(
@@ -149,7 +149,14 @@ function SkillDirectoryRegistrationModal({
 	);
 	const destinationLabel = (key: string) => {
 		const plugin = destinations.find(candidate => pluginKey(candidate) === key);
-		return plugin?.displayName || plugin?.name || 'Select a Skill Plugin';
+		if (!plugin) {
+			return 'Select a Skill Plugin';
+		}
+
+		const pluginLabel = plugin.displayName || plugin.name;
+		const rootLabel = roots.find(root => root.rootID === plugin.ref.rootID)?.label;
+
+		return rootLabel && rootLabel !== pluginLabel ? `${rootLabel} / ${pluginLabel}` : pluginLabel;
 	};
 
 	if (!isOpen) {
@@ -171,8 +178,8 @@ function SkillDirectoryRegistrationModal({
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (!effectiveRootID || !path.trim() || !sourceDisplayName.trim() || !destination) {
-			setError('Root, directory, source display name, and destination Plugin are required.');
+		if (!path.trim() || !sourceDisplayName.trim() || !destination) {
+			setError('Directory, source display name, and destination Plugin are required.');
 			return;
 		}
 
@@ -182,7 +189,7 @@ function SkillDirectoryRegistrationModal({
 		try {
 			const result = await skillManagementAPI.registerSkillDirectoryAndAttach(
 				{
-					rootID: effectiveRootID,
+					rootID: destination.ref.rootID,
 					rootPath: path.trim(),
 					sourceDisplayName: sourceDisplayName.trim(),
 				},
@@ -222,15 +229,12 @@ function SkillDirectoryRegistrationModal({
 				<form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
 					<ManagementModalBody>
 						{error ? <div className="alert alert-error rounded-2xl text-sm">{error}</div> : null}
-						<ModalField label="Destination Plugin*">
+						<ModalField label="Destination Plugin" required>
 							<Dropdown<string>
 								dropdownItems={destinationDropdownItems}
-								orderedKeys={[
-									'unattached',
-									...destinations.map(d => {
-										return pluginKey(d);
-									}),
-								]}
+								orderedKeys={destinations.map(plugin => {
+									return pluginKey(plugin);
+								})}
 								selectedKey={destinationValue}
 								onChange={value => {
 									setDestinationKey(value);
