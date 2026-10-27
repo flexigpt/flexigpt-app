@@ -57,11 +57,27 @@ function normalizeWorkspacePath(locator: string | undefined): string {
 	}
 
 	const normalized = locator.replaceAll('\\', '/').replace(/^\.\/+/, '');
+
 	return normalized === '.' ? '' : normalized;
+}
+
+function isWorkspaceManifestPath(locator: string): boolean {
+	// oxlint-disable-next-line unicorn/prefer-array-find
+	const filename = locator.replaceAll('\\', '/').split('/').filter(Boolean).at(-1)?.toLowerCase() ?? '';
+
+	return (
+		filename === 'workspace.yaml' ||
+		filename === 'workspace.yml' ||
+		filename === 'workspace.json' ||
+		filename.endsWith('.workspace.yaml') ||
+		filename.endsWith('.workspace.yml') ||
+		filename.endsWith('.workspace.json')
+	);
 }
 
 export function workspacePathParts(locator: string | undefined): WorkspacePathParts {
 	const normalized = normalizeWorkspacePath(locator);
+
 	if (!normalized) {
 		return {
 			name: '',
@@ -81,11 +97,11 @@ export function workspacePathParts(locator: string | undefined): WorkspacePathPa
 }
 
 function contributionSourceLocators(context: WorkspacePromptContribution): string[] {
-	const values = context.sourceLocators ?? [];
 	const unique = new Set<string>();
 
-	for (const value of values) {
+	for (const value of context.sourceLocators ?? []) {
 		const normalized = normalizeWorkspacePath(value);
+
 		if (normalized) {
 			unique.add(normalized);
 		}
@@ -93,13 +109,10 @@ function contributionSourceLocators(context: WorkspacePromptContribution): strin
 
 	if (unique.size === 0) {
 		const fallback = normalizeWorkspacePath(context.locator);
-		if (fallback) {
+
+		if (fallback && !isWorkspaceManifestPath(fallback)) {
 			unique.add(fallback);
 		}
-	}
-
-	if (unique.size === 0 && context.name.trim()) {
-		unique.add(context.name.trim());
 	}
 
 	return [...unique];
@@ -107,6 +120,7 @@ function contributionSourceLocators(context: WorkspacePromptContribution): strin
 
 function includedContextCount(context: WorkspacePromptContribution): number {
 	const locators = contributionSourceLocators(context);
+
 	if (locators.length > 0) {
 		return locators.length;
 	}
@@ -115,7 +129,7 @@ function includedContextCount(context: WorkspacePromptContribution): number {
 }
 
 function hasVisibleContext(context: WorkspacePromptContribution): boolean {
-	return contributionSourceLocators(context).length > 0 || context.originalBytes > 0 || context.includedBytes > 0;
+	return contributionSourceLocators(context).length > 0 || context.includedBytes > 0;
 }
 
 export function getWorkspaceContentCounts(
@@ -172,7 +186,7 @@ function WorkspacePathList({ locators }: { locators: string[] }) {
 	}
 
 	return (
-		<div className="mt-1 max-h-96 space-y-1 overflow-y-auto">
+		<div className="mt-2 max-h-96 space-y-1 overflow-y-auto">
 			{locators.map((locator, index) => {
 				const path = workspacePathParts(locator);
 
@@ -183,6 +197,7 @@ function WorkspacePathList({ locators }: { locators: string[] }) {
 						title={path.path}
 					>
 						<FiFileText size={14} className="text-base-content/60 shrink-0" />
+
 						<div className="min-w-0">
 							<div className="truncate text-xs font-medium">{path.name || locator}</div>
 							<div className="text-base-content/60 truncate font-mono text-[11px]">
@@ -257,13 +272,12 @@ function WorkspaceContentCard({
 					</div>
 
 					{description ? <div className="text-base-content/65 mt-1 text-xs">{description}</div> : null}
-
 					{children}
 				</div>
 			</div>
 
 			{leadingActions || normalActions ? (
-				<div className="mt-2 flex flex-wrap items-center justify-end gap-2 p-0">
+				<div className="mt-2 flex flex-wrap items-center justify-end gap-2">
 					{leadingActions ? <div className="flex flex-wrap items-center gap-2">{leadingActions}</div> : null}
 					{normalActions ? <div className="ml-auto flex flex-wrap items-center gap-2">{normalActions}</div> : null}
 				</div>
@@ -290,8 +304,10 @@ function WorkspaceContentSection({
 					<div className="text-sm font-semibold">{title}</div>
 					<div className="text-base-content/60 mt-0.5 text-xs">{description}</div>
 				</div>
+
 				<div className="text-base-content/50 shrink-0 text-xs">{count}</div>
 			</div>
+
 			<div className="space-y-2">{children}</div>
 		</section>
 	);
@@ -323,6 +339,7 @@ export function WorkspaceContents({
 }: WorkspaceContentsProps) {
 	const renderArtifactControl = (artifactRef: WorkspaceArtifactView['artifact'], label: string): ReactNode => {
 		const artifact = artifactViews?.get(artifactRefKey(artifactRef));
+
 		if (!artifact || !onSetArtifactEnabled) {
 			return undefined;
 		}
@@ -362,17 +379,19 @@ export function WorkspaceContents({
 		);
 	}
 
-	const renderContext = (context: WorkspacePromptContribution, instruction: boolean) => {
-		const key = artifactRefKey(context.artifact);
-		const selected = selection ? selection.selectedContextIDs.has(key) : true;
+	const renderContext = (context: WorkspacePromptContribution, instruction: boolean, index: number) => {
 		const locators = contributionSourceLocators(context);
-		const title = instruction ? 'Repository instruction files' : context.name.trim() || 'Repository reference files';
+		const selected = selection ? selection.selectedContextIDs.has(artifactRefKey(context.artifact)) : true;
+		const title = instruction ? 'Repository instruction files' : 'Repository reference files';
 		const description =
 			locators.length > 0
-				? `${locators.length} ${locators.length === 1 ? 'file is' : 'files are'} added together.`
-				: context.locator
-					? 'No matching repository files are currently available.'
-					: 'Inline content supplied by this Workspace.';
+				? `${locators.length} ${locators.length === 1 ? 'file is' : 'files are'} included together.`
+				: context.includedBytes > 0
+					? 'Workspace content is included without individual file locations.'
+					: undefined;
+		const key = [artifactRefKey(context.artifact), context.insert, context.name, locators.join('\u0000'), index].join(
+			':'
+		);
 
 		return (
 			<WorkspaceContentCard
@@ -401,10 +420,11 @@ export function WorkspaceContents({
 				}
 			>
 				{context.truncated ? (
-					<div className="text-warning py-1 text-xs">
+					<div className="text-warning mt-2 text-xs">
 						Only part of this content fits within the Workspace prompt limit.
 					</div>
 				) : null}
+
 				<WorkspacePathList locators={locators} />
 			</WorkspaceContentCard>
 		);
@@ -532,9 +552,9 @@ export function WorkspaceContents({
 				<WorkspaceContentSection
 					title="Instructions"
 					description="Guidance automatically supplied to the model."
-					count={instructionContexts.reduce((total, value) => total + includedContextCount(value), 0)}
+					count={instructionContexts.reduce((total, context) => total + includedContextCount(context), 0)}
 				>
-					{instructionContexts.map(context => renderContext(context, true))}
+					{instructionContexts.map((context, index) => renderContext(context, true, index))}
 				</WorkspaceContentSection>
 			) : null}
 
@@ -542,9 +562,9 @@ export function WorkspaceContents({
 				<WorkspaceContentSection
 					title="Reference files"
 					description="README, documentation, and other repository context."
-					count={referenceContexts.reduce((total, value) => total + includedContextCount(value), 0)}
+					count={referenceContexts.reduce((total, context) => total + includedContextCount(context), 0)}
 				>
-					{referenceContexts.map(context => renderContext(context, false))}
+					{referenceContexts.map((context, index) => renderContext(context, false, index))}
 				</WorkspaceContentSection>
 			) : null}
 

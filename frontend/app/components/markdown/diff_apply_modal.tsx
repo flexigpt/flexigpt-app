@@ -214,8 +214,26 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 					{visibleHunks.map((hunk, pageIndex) => {
 						const index = page * DISPLAY_HUNK_PAGE_SIZE + pageIndex;
 						const outcome = view.hunkOutcomes[hunk.id];
-						const canSelect = !!view.targetPath || outcome?.status === 'ready';
-						const hunkCardClassName = outcome?.status === 'blocked' ? 'border-error/30 bg-error/10' : 'border-base-300';
+						const hunkStatus = outcome?.status;
+						const canSelect = !!view.targetPath || hunkStatus === 'ready';
+						const hunkCardClassName =
+							hunkStatus === 'blocked'
+								? 'border-error/30 bg-error/10'
+								: hunkStatus === 'ready' || hunkStatus === 'applied'
+									? 'border-success/30 bg-success/10'
+									: hunkStatus === 'already-applied'
+										? 'border-info/30 bg-info/10'
+										: 'border-base-300';
+						const hunkStatusTextClassName =
+							hunkStatus === 'blocked'
+								? 'text-error'
+								: hunkStatus === 'ready' || hunkStatus === 'applied'
+									? 'text-success'
+									: hunkStatus === 'already-applied'
+										? 'text-info'
+										: hunkStatus === 'needs-info'
+											? 'text-warning'
+											: 'text-base-content/60';
 
 						return (
 							<div key={hunk.id} className={`rounded-lg border p-3 ${hunkCardClassName}`}>
@@ -234,7 +252,7 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 
 									<span className="min-w-0">
 										<span className="font-semibold">Hunk {index + 1}</span>
-										<span className="text-base-content/60 ml-2">{outcome?.status ?? 'not reviewed'}</span>
+										<span className={`ml-2 ${hunkStatusTextClassName}`}>{hunkStatus ?? 'not reviewed'}</span>
 										<code className="mt-1 block break-all">{hunk.header}</code>
 									</span>
 								</label>
@@ -279,12 +297,11 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 	const autoHunkReviewFingerprintRef = useRef<string | null>(null);
 	const [targetPickerVersion, setTargetPickerVersion] = useState(0);
 	const inputID = useId();
-	const displayPath =
-		view.targetPath ||
-		view.applyOutcome?.resolvedTargetPath ||
-		view.reviewOutcome?.resolvedTargetPath ||
-		getInteractiveDiffTargetPath(file) ||
-		'Target path unresolved';
+	const backendResolvedTargetPath =
+		view.applyOutcome?.resolvedTargetPath || view.reviewOutcome?.resolvedTargetPath || '';
+	const currentTargetPath = backendResolvedTargetPath || view.targetPath;
+	const displayPath = currentTargetPath || getInteractiveDiffTargetPath(file) || 'Target path unresolved';
+
 	const isActive = controller.busy?.activeFileIDs.includes(file.id) ?? false;
 	const candidates = view.candidates.slice(0, DISPLAY_CANDIDATE_LIMIT);
 	const diagnostics = uniqueDiagnostics([
@@ -348,12 +365,6 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 						</div>
 					) : null}
 
-					{view.reviewOutcome?.resolvedTargetPath ? (
-						<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-							Backend target: {view.reviewOutcome.resolvedTargetPath}
-						</div>
-					) : null}
-
 					{isActive ? (
 						<output className="text-info mt-3 flex items-center gap-2 text-xs">
 							<span className="loading loading-spinner loading-xs" />
@@ -406,6 +417,13 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 			) : null}
 
 			<div className="mt-4 space-y-2">
+				{currentTargetPath ? (
+					<div className="border-base-300 bg-base-200/40 rounded-lg border px-3 py-2">
+						<div className="text-base-content/60 text-xs font-semibold">Current target path</div>
+						<code className="text-base-content mt-1 block font-mono text-xs break-all">{currentTargetPath}</code>
+					</div>
+				) : null}
+
 				<div className="flex items-center justify-between gap-2">
 					<span className="text-xs font-semibold">Suggested target paths</span>
 					<span className="text-base-content/50 text-[11px]">Ranked</span>
@@ -519,7 +537,7 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 			{diagnostics.length > 0 ? (
 				<div className="mt-3">
 					{renderDiagnosticsPanel({
-						title: 'File details',
+						title: 'Additional diagnostic details',
 						description: 'Parser notes and backend diagnostics for this file section.',
 						diagnostics,
 					})}

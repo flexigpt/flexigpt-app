@@ -1402,7 +1402,12 @@ function backendMessage(output: ApplyUnifiedDiffOut, fileMessage: string | undef
 function responseTargetPath(output: ApplyUnifiedDiffOut): string {
 	const file = output.files?.length === 1 ? output.files[0] : undefined;
 
-	return file?.targetPath || file?.resolvedPath || '';
+	/*
+	 * The backend-selected resolved path is canonical. `targetPath` can echo
+	 * a relative patch path or requested input, so it is only a fallback when
+	 * the backend did not resolve a concrete target.
+	 */
+	return file?.resolvedPath || file?.targetPath || '';
 }
 
 /**

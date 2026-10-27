@@ -10,10 +10,7 @@
   - [ ] test all management pages again properly
 
 - [ ] verify diff applicability in streaming
-- [x] diff styling needs a bit of red in blocked things. collapsed target picker.
-
 - [ ] add outputschema to llmtools go and then plug it end to end.
-
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 - [ ] add wails considerations skill in flexigpt repo.
 

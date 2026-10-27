@@ -1145,3 +1145,4 @@
 - [x] when streaming diff apply paths are not populated.
 - [x] add a default agent selection preference and a default workspace one
 - [x] verify new management ui in all pages
+- [x] diff styling needs a bit of red in blocked things. collapsed target picker.
