@@ -55,6 +55,16 @@ func (a *Service) ResolveWorkspace(
 	return value.View(), nil
 }
 
+// RequireSettableDefaultWorkspace verifies that ref currently identifies an
+// enabled effective Workspace. It does not persist any application preference.
+func (a *Service) RequireSettableDefaultWorkspace(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) error {
+	_, err := a.resolveWorkspace(ctx, ref)
+	return err
+}
+
 // ResolveWorkspace is the runtime read boundary. It accepts only a currently
 // effective and enabled Workspace. Management projections use workspaceForRef.
 func (a *Service) resolveWorkspace(

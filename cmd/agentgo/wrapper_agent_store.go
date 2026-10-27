@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/agentcatalog"
@@ -27,9 +28,22 @@ import (
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
 )
 
+type agentDefaultPreferenceStore interface {
+	GetDefaultAgent(
+		ctx context.Context,
+	) (*artifactModel.ArtifactRef, error)
+
+	SetDefaultAgent(
+		ctx context.Context,
+		ref *artifactModel.ArtifactRef,
+	) error
+}
+
 type AgentStoreWrapper struct {
-	api   *agentAPI.Service
-	roots root.API
+	api         *agentAPI.Service
+	roots       root.API
+	preferences agentDefaultPreferenceStore
+	fallback    storeSpec.LogicalName
 }
 
 func NewAgentBuiltInInstaller(
@@ -61,6 +75,7 @@ func InitAgentStoreWrapper(
 	definitions definition.API,
 	resolver *composition.Resolver,
 	interpretations *coreinterpretation.Registry,
+	preferences agentDefaultPreferenceStore,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -71,7 +86,8 @@ func InitAgentStoreWrapper(
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
-		interpretations == nil {
+		interpretations == nil ||
+		preferences == nil {
 		return errors.New("agent store wrapper dependencies are incomplete")
 	}
 
@@ -101,6 +117,8 @@ func InitAgentStoreWrapper(
 
 	wrapper.api = api
 	wrapper.roots = roots
+	wrapper.preferences = preferences
+	wrapper.fallback = llmsupport.DefaultAgentName
 	return nil
 }
 
@@ -254,6 +272,85 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 			)
 		},
 	)
+}
+
+// GetDefaultAgent always returns an effective Agent or an error. It first
+// considers the saved explicit preference, then the built-in base Agent.
+func (w *AgentStoreWrapper) GetDefaultAgent() (
+	*artifactModel.ArtifactRef,
+	error,
+) {
+	return withAgentStore(
+		w,
+		func(api *agentAPI.Service) (
+			*artifactModel.ArtifactRef,
+			error,
+		) {
+			if w.preferences == nil {
+				return nil, storeSpec.ErrClosed
+			}
+
+			ctx := context.Background()
+			preference, err := w.preferences.GetDefaultAgent(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			selected, err := api.SelectDefaultAgent(
+				ctx,
+				preference,
+				w.fallback,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if selected == nil {
+				return nil, fmt.Errorf(
+					"%w: no enabled default Agent is available",
+					storeSpec.ErrReferenceUnresolved,
+				)
+			}
+			return selected, nil
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) SetDefaultAgent(
+	ref artifactModel.ArtifactRef,
+) error {
+	_, err := withAgentStore(
+		w,
+		func(api *agentAPI.Service) (struct{}, error) {
+			if w.preferences == nil {
+				return struct{}{}, storeSpec.ErrClosed
+			}
+
+			ctx := context.Background()
+			if err := api.RequireSettableDefaultAgent(ctx, ref); err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, w.preferences.SetDefaultAgent(ctx, &ref)
+		},
+	)
+	return err
+}
+
+// ClearDefaultAgent removes the explicit override. The effective default then
+// returns to the protected built-in base Agent selection.
+func (w *AgentStoreWrapper) ClearDefaultAgent() error {
+	_, err := withAgentStore(
+		w,
+		func(_ *agentAPI.Service) (struct{}, error) {
+			if w.preferences == nil {
+				return struct{}{}, storeSpec.ErrClosed
+			}
+			return struct{}{}, w.preferences.SetDefaultAgent(
+				context.Background(),
+				nil,
+			)
+		},
+	)
+	return err
 }
 
 func (w *AgentStoreWrapper) CreateAgentPlugin(
@@ -536,4 +633,6 @@ func (w *AgentStoreWrapper) close() {
 	}
 	w.api = nil
 	w.roots = nil
+	w.preferences = nil
+	w.fallback = ""
 }

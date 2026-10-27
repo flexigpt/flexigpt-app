@@ -18,8 +18,20 @@ import (
 	workspacemcp "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/adapter/mcp"
 )
 
+type workspaceDefaultPreferenceStore interface {
+	GetDefaultWorkspace(
+		ctx context.Context,
+	) (*artifactModel.ArtifactRef, error)
+
+	SetDefaultWorkspace(
+		ctx context.Context,
+		ref *artifactModel.ArtifactRef,
+	) error
+}
+
 type WorkspaceStoreWrapper struct {
 	api                     *workspaceAPI.Service
+	preferences             workspaceDefaultPreferenceStore
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error
 }
 
@@ -36,13 +48,16 @@ func InitWorkspaceWrappers(
 	resolver *composition.Resolver,
 	workspaceConfig workspaceAPI.Config,
 	mcpServers workspacemcp.ServerResolver,
+	preferences workspaceDefaultPreferenceStore,
 	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		roots == nil ||
 		mcpServers == nil ||
-		ensureArtifactBaselines == nil || nativeResources == nil {
+		preferences == nil ||
+		ensureArtifactBaselines == nil ||
+		nativeResources == nil {
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
@@ -62,6 +77,7 @@ func InitWorkspaceWrappers(
 		return err
 	}
 	storeWrapper.api = api
+	storeWrapper.preferences = preferences
 	storeWrapper.ensureArtifactBaselines = ensureArtifactBaselines
 	runtimeWrapper.api = api
 	return nil
@@ -128,6 +144,69 @@ func (w *WorkspaceStoreWrapper) GetWorkspaceDirectory(
 	)
 }
 
+// GetDefaultWorkspace returns nil when no default Workspace is configured.
+// It does not choose a fallback Workspace.
+func (w *WorkspaceStoreWrapper) GetDefaultWorkspace() (
+	*artifactModel.ArtifactRef,
+	error,
+) {
+	return withWorkspaceStore(
+		w,
+		func(_ *workspaceAPI.Service) (
+			*artifactModel.ArtifactRef,
+			error,
+		) {
+			if w.preferences == nil {
+				return nil, storeSpec.ErrClosed
+			}
+			return w.preferences.GetDefaultWorkspace(
+				context.Background(),
+			)
+		},
+	)
+}
+
+func (w *WorkspaceStoreWrapper) SetDefaultWorkspace(
+	ref artifactModel.ArtifactRef,
+) error {
+	_, err := withWorkspaceStore(
+		w,
+		func(api *workspaceAPI.Service) (struct{}, error) {
+			if w.preferences == nil {
+				return struct{}{}, storeSpec.ErrClosed
+			}
+
+			ctx := context.Background()
+			if err := api.RequireSettableDefaultWorkspace(ctx, ref); err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, w.preferences.SetDefaultWorkspace(
+				ctx,
+				&ref,
+			)
+		},
+	)
+	return err
+}
+
+// ClearDefaultWorkspace creates the explicit no-default state. It does not
+// alter the selected Workspace Artifact or its directory Sources.
+func (w *WorkspaceStoreWrapper) ClearDefaultWorkspace() error {
+	_, err := withWorkspaceStore(
+		w,
+		func(_ *workspaceAPI.Service) (struct{}, error) {
+			if w.preferences == nil {
+				return struct{}{}, storeSpec.ErrClosed
+			}
+			return struct{}{}, w.preferences.SetDefaultWorkspace(
+				context.Background(),
+				nil,
+			)
+		},
+	)
+	return err
+}
+
 func (w *WorkspaceStoreWrapper) RefreshWorkspaceDirectory(
 	ref workspaceAPI.WorkspaceDirectoryRef,
 ) (workspaceAPI.WorkspaceDirectoryView, error) {
@@ -184,6 +263,27 @@ func (w *WorkspaceStoreWrapper) GetWorkspaceDefaultPolicy() (
 	)
 }
 
+// ExportWorkspaceSource returns the verified portable YAML or JSON source for
+// one Workspace manifest owned by directory.
+func (w *WorkspaceStoreWrapper) ExportWorkspaceSource(
+	directory workspaceAPI.WorkspaceDirectoryRef,
+	workspace artifactModel.ArtifactRef,
+) (workspaceAPI.WorkspaceSourceExport, error) {
+	return withWorkspaceStore(
+		w,
+		func(api *workspaceAPI.Service) (
+			workspaceAPI.WorkspaceSourceExport,
+			error,
+		) {
+			return api.ExportWorkspaceSource(
+				context.Background(),
+				directory,
+				workspace,
+			)
+		},
+	)
+}
+
 func (w *WorkspaceStoreWrapper) ListWorkspaceDirectoryArtifacts(
 	ref workspaceAPI.WorkspaceDirectoryRef,
 ) ([]workspaceAPI.WorkspaceArtifactView, error) {
@@ -229,5 +329,6 @@ func (w *WorkspaceStoreWrapper) close() {
 		return
 	}
 	w.api = nil
+	w.preferences = nil
 	w.ensureArtifactBaselines = nil
 }

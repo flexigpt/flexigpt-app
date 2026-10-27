@@ -38,6 +38,10 @@ const (
 	agentBaselinePluginName = "agent-baseline"
 	skillBaselinePluginName = "skill-baseline"
 	mcpBaselinePluginName   = "mcp-baseline"
+
+	// DefaultAgentName identifies the protected built-in fallback Agent used
+	// when the application has no usable explicit Agent preference.
+	DefaultAgentName storeSpec.LogicalName = "base"
 )
 
 func document(

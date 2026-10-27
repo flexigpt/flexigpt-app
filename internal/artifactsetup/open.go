@@ -11,9 +11,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/agentpreferences"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspacepreferences"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
@@ -101,6 +103,14 @@ func OpenArtifactStore(
 	storeNamespaces := append(
 		modelOverlay.StoreNamespaces(),
 		mcpOverlay.StoreNamespaces()...,
+	)
+	storeNamespaces = append(
+		storeNamespaces,
+		agentpreferences.StoreNamespaces()...,
+	)
+	storeNamespaces = append(
+		storeNamespaces,
+		workspacepreferences.StoreNamespaces()...,
 	)
 
 	store, err := local.Open(ctx, local.Config{

@@ -78,6 +78,21 @@ type WorkspaceDefaultPolicyView struct {
 	YAML    string            `json:"yaml"`
 }
 
+// WorkspaceSourceFormat identifies the portable source syntax returned by
+// Workspace source export.
+type WorkspaceSourceFormat string
+
+const (
+	WorkspaceSourceFormatYAML WorkspaceSourceFormat = "yaml"
+	WorkspaceSourceFormatJSON WorkspaceSourceFormat = "json"
+)
+
+type WorkspaceSourceExport struct {
+	Content           string                `json:"content"`
+	SuggestedFileName string                `json:"suggestedFileName"`
+	Format            WorkspaceSourceFormat `json:"format"`
+}
+
 type WorkspaceRuntimeSelection struct {
 	PromptArtifacts []artifactModel.ArtifactRef `json:"promptArtifacts,omitempty"`
 	SkillArtifacts  []artifactModel.ArtifactRef `json:"skillArtifacts,omitempty"`

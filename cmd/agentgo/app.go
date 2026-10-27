@@ -11,8 +11,10 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/agentpreferences"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspacepreferences"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/adrg/xdg"
@@ -267,6 +269,24 @@ func (a *App) initManagers() {
 
 	artifactCompositionResolver := artifactSetup.LLM.Composition()
 	artifactInterpretations := artifactSetup.LLM.Interpretations()
+	agentPreferences, err := agentpreferences.New(
+		artifactComposition.StoreOverlays,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Agent preference store initialization failed\n" +
+				err.Error(),
+		)
+	}
+	workspacePreferences, err := workspacepreferences.New(
+		artifactComposition.StoreOverlays,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Workspace preference store initialization failed\n" +
+				err.Error(),
+		)
+	}
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
 	err = InitTextStoreWrapper(
@@ -455,6 +475,7 @@ func (a *App) initManagers() {
 		artifactComposition.Definitions,
 		artifactCompositionResolver,
 		artifactInterpretations,
+		agentPreferences,
 	)
 	if err != nil {
 		slog.Error(
@@ -560,6 +581,7 @@ func (a *App) initManagers() {
 		artifactCompositionResolver,
 		workspaceConfig,
 		a.mcpStoreAPI.api,
+		workspacePreferences,
 		func(ctx context.Context, rootID rootModel.RootID) error {
 			return artifactsetup.EnsureRootBaselines(
 				ctx,

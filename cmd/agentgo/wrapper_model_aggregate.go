@@ -17,6 +17,15 @@ import (
 
 const providerRuntimeCleanupTimeout = 5 * time.Second
 
+// DefaultModelSelection is the consumer-safe effective Model selection for
+// the required effective Provider. It contains no credentials, local overlay
+// payload, or runtime configuration.
+type DefaultModelSelection struct {
+	Provider artifactModel.ArtifactRef   `json:"provider"`
+	Model    artifactModel.ArtifactRef   `json:"model"`
+	Source   modelAPI.DefaultModelSource `json:"source"`
+}
+
 type modelDefaultProviderPreferences interface {
 	GetDefaultProvider(ctx context.Context) (*artifactModel.ArtifactRef, error)
 	SetDefaultProvider(ctx context.Context, ref *artifactModel.ArtifactRef) error
@@ -61,15 +70,39 @@ func (w *ModelAggregateWrapper) GetDefaultProvider() (
 	defer w.mu.Unlock()
 
 	ctx := context.Background()
-	preference, err := w.preferences.GetDefaultProvider(ctx)
-	if err != nil {
-		return nil, err
+	return w.defaultProvider(ctx)
+}
+
+// GetDefaultModel resolves the existing per-Provider defaultModel selection
+// for the effective required Provider.
+func (w *ModelAggregateWrapper) GetDefaultModel() (
+	DefaultModelSelection,
+	error,
+) {
+	if err := w.lock(); err != nil {
+		return DefaultModelSelection{}, err
 	}
-	return w.store.SelectDefaultProvider(
+	defer w.mu.Unlock()
+
+	ctx := context.Background()
+	provider, err := w.defaultProvider(ctx)
+	if err != nil {
+		return DefaultModelSelection{}, err
+	}
+
+	resolution, err := w.store.ResolveProviderDefaultModel(
 		ctx,
-		preference,
-		w.fallbackProvider,
+		*provider,
 	)
+	if err != nil {
+		return DefaultModelSelection{}, err
+	}
+
+	return DefaultModelSelection{
+		Provider: *provider,
+		Model:    resolution.Resolved.Model.Artifact.Ref(),
+		Source:   resolution.Source,
+	}, nil
 }
 
 func (w *ModelAggregateWrapper) SetDefaultProvider(
@@ -274,6 +307,32 @@ func (w *ModelAggregateWrapper) SetProviderEnabled(
 			return value, value, err
 		},
 	)
+}
+
+func (w *ModelAggregateWrapper) defaultProvider(
+	ctx context.Context,
+) (*artifactModel.ArtifactRef, error) {
+	preference, err := w.preferences.GetDefaultProvider(ctx)
+	if err != nil {
+		return nil, err
+	}
+	selected, err := w.store.SelectDefaultProvider(
+		ctx,
+		preference,
+		w.fallbackProvider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if selected == nil {
+		return nil, fmt.Errorf(
+			"%w: no enabled default Model Provider is available",
+			storeSpec.ErrReferenceUnresolved,
+		)
+	}
+
+	output := *selected
+	return &output, nil
 }
 
 // mutateModelProvider serializes API-owned provider lifecycle changes:
