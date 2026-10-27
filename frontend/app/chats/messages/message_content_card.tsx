@@ -57,6 +57,7 @@ interface MessageContentCardProps {
 	renderAsMarkdown?: boolean;
 	deferRichRendering?: boolean;
 	diffCandidatePaths?: string[];
+	diffCandidatePathsReady?: boolean;
 	streamingText?: string;
 	defaultCodeBlockExpanded?: boolean;
 }
@@ -81,6 +82,7 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
 		prev.deferRichRendering === next.deferRichRendering &&
 		stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths) &&
+		prev.diffCandidatePathsReady === next.diffCandidatePathsReady &&
 		prev.streamingText === next.streamingText &&
 		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);
@@ -94,6 +96,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	renderAsMarkdown = true,
 	deferRichRendering = false,
 	diffCandidatePaths,
+	diffCandidatePathsReady = true,
 	streamingText,
 	defaultCodeBlockExpanded = true,
 }: MessageContentCardProps) {
@@ -135,6 +138,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 				isBusy={isBusy}
 				diffCandidatePaths={diffCandidatePaths}
 				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
+				diffCandidatePathsReady={diffCandidatePathsReady}
 			/>
 		</div>
 	);

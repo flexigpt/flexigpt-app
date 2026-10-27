@@ -74,6 +74,7 @@ interface EnhancedMarkdownProps {
 	hideH1Title?: boolean;
 	diffCandidatePaths?: string[];
 	diffWorkspaceRoots?: string[];
+	diffCandidatePathsReady?: boolean;
 	defaultCodeBlockExpanded?: boolean;
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
@@ -242,14 +243,22 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	hideH1Title = false,
 	diffCandidatePaths,
 	diffWorkspaceRoots,
+	diffCandidatePathsReady = true,
 	defaultCodeBlockExpanded = true,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => (isBusy ? text : sanitizeLaTeXOutsideFences(text)), [isBusy, text]);
 	const presentation = useMemo(() => ({ align, hideH1Title, onLinkClick }), [align, hideH1Title, onLinkClick]);
 	const codeRendererSettings = useMemo(
-		() => ({ isBusy, hideMermaidCode, diffCandidatePaths, diffWorkspaceRoots, defaultCodeBlockExpanded }),
-		[defaultCodeBlockExpanded, diffCandidatePaths, diffWorkspaceRoots, hideMermaidCode, isBusy]
+		() => ({
+			isBusy,
+			hideMermaidCode,
+			diffCandidatePaths,
+			diffWorkspaceRoots,
+			diffCandidatePathsReady,
+			defaultCodeBlockExpanded,
+		}),
+		[defaultCodeBlockExpanded, diffCandidatePaths, diffCandidatePathsReady, diffWorkspaceRoots, hideMermaidCode, isBusy]
 	);
 
 	return (

@@ -85,6 +85,7 @@ export function MarkdownPreRenderer({ node: _node, children, ...props }: HTMLAtt
 			hideMermaidCode={settings.hideMermaidCode}
 			diffCandidatePaths={settings.diffCandidatePaths}
 			diffWorkspaceRoots={settings.diffWorkspaceRoots}
+			diffCandidatePathsReady={settings.diffCandidatePathsReady}
 			defaultExpanded={settings.defaultCodeBlockExpanded}
 			disableControls={settings.isBusy}
 		/>

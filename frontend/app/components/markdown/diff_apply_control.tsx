@@ -11,6 +11,7 @@ interface DiffApplyControlProps {
 	diffText: string;
 	isBusy: boolean;
 	candidatePaths?: string[];
+	candidatePathsReady?: boolean;
 	workspaceRoots?: string[];
 }
 
@@ -147,6 +148,7 @@ export function DiffApplyControl({
 	diffText,
 	isBusy,
 	candidatePaths,
+	candidatePathsReady = true,
 	workspaceRoots,
 }: DiffApplyControlProps) {
 	const [session, setSession] = useState<{
@@ -172,8 +174,13 @@ export function DiffApplyControl({
 		return (
 			<button
 				type="button"
+				disabled={!candidatePathsReady}
 				className={getButtonClassName()}
-				title="Parse this patch and run a backend dry-run review. No files are changed."
+				title={
+					candidatePathsReady
+						? 'Parse this patch and run a backend dry-run review. No files are changed.'
+						: 'Preparing trusted target path suggestions for this patch.'
+				}
 				onClick={() => {
 					const parsed = parseInteractiveDiff(diffText, language);
 					pendingInitialReviewRef.current = parsed;
@@ -184,8 +191,8 @@ export function DiffApplyControl({
 					});
 				}}
 			>
-				<FiGitPullRequest size={12} />
-				Review
+				{candidatePathsReady ? <FiGitPullRequest size={12} /> : <FiLoader size={12} className="animate-spin" />}
+				{candidatePathsReady ? 'Review' : 'Preparing targets'}
 			</button>
 		);
 	}

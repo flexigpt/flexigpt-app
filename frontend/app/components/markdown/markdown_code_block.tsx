@@ -18,6 +18,7 @@ interface CodeProps {
 	hideMermaidCode: boolean;
 	diffCandidatePaths?: string[];
 	diffWorkspaceRoots?: string[];
+	diffCandidatePathsReady?: boolean;
 	defaultExpanded?: boolean;
 	disableControls?: boolean;
 }
@@ -132,6 +133,7 @@ export const CodeBlock = memo(function CodeBlock({
 	hideMermaidCode,
 	diffCandidatePaths,
 	diffWorkspaceRoots,
+	diffCandidatePathsReady = true,
 	defaultExpanded = true,
 	disableControls = false,
 }: CodeProps) {
@@ -240,6 +242,7 @@ export const CodeBlock = memo(function CodeBlock({
 								isBusy={diffControlsDisabled}
 								candidatePaths={diffCandidatePaths}
 								workspaceRoots={diffWorkspaceRoots}
+								candidatePathsReady={diffCandidatePathsReady}
 							/>
 						) : null}
 					</div>

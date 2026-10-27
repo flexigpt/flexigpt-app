@@ -56,7 +56,7 @@ const RICH_RENDER_BATCH_SIZE = 1;
 const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
 
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
-	/```(?:diff|patch|udiff)\b|^diff --git\s|^\*\*\*\s+Begin\s+Patch\s*$|^---\s+.+\n\+\+\+\s+/m;
+	/```(?:diff|patch|udiff)\b|^diff --git\s|^Index:\s+|^@@|^\*\*\*\s+(?:Begin Patch|(?:Add|Update|Delete)\s+File:)\s*$|^---\s+.+\n\+\+\+\s+/im;
 
 function textContainsDiffPayload(text: string | undefined): boolean {
 	return !!text && DIFF_MARKDOWN_SIGNAL_PATTERN.test(text);
@@ -466,9 +466,11 @@ function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Ma
 		}
 
 		cumulative = next;
-		if (textContainsDiffPayload(message.uiContent)) {
-			byID.set(message.id, cumulative);
-		}
+		// Keep an entry for every message, not only messages that already
+		// contain a diff. A streamed assistant placeholder can gain a diff
+		// fence after this work has completed, and it must receive the
+		// cumulative path evidence that existed before that message.
+		byID.set(message.id, cumulative);
 	}
 
 	return byID;
@@ -518,6 +520,7 @@ type MessageItemRenderer = (
 	index: number,
 	message: ConversationMessage,
 	diffCandidatePaths: string[] | undefined,
+	diffCandidatePathsReady: boolean,
 	deferRichRendering: boolean
 ) => ReactNode;
 
@@ -598,40 +601,77 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 		});
 	}, [richReadyCount, richRenderTargetCount]);
 
-	const [diffCandidateState, setDiffCandidateState] = useState<{
-		messages: ConversationMessage[];
-		paths: Map<string, string[]>;
-	} | null>(null);
+	const [diffCandidatePathsState, setDiffCandidatePathsState] = useState<Map<string, string[]> | null>(null);
+	const messagesRef = useRef(messages);
+	const canBuildDiffCandidatePaths = !deferRichWork;
+	const canBuildDiffCandidatePathsRef = useRef(canBuildDiffCandidatePaths);
+	const diffCandidatePathBuildCancelRef = useRef<(() => void) | null>(null);
+	const diffCandidatePathBuildMountedRef = useRef(true);
 
-	const canBuildDiffCandidatePaths = !deferRichWork && !isBusy;
+	useLayoutEffect(() => {
+		messagesRef.current = messages;
+		canBuildDiffCandidatePathsRef.current = canBuildDiffCandidatePaths;
+	}, [canBuildDiffCandidatePaths, messages]);
 
-	useEffect(() => {
-		if (!canBuildDiffCandidatePaths) {
+	const scheduleDiffCandidatePathBuild = useCallback(() => {
+		if (diffCandidatePathBuildCancelRef.current) {
 			return;
 		}
 
-		let cancelled = false;
-		const cancelWork = scheduleDeferredUIWork(() => {
-			if (cancelled || !conversationMayContainApplicableDiff(messages)) {
+		diffCandidatePathBuildCancelRef.current = scheduleDeferredUIWork(() => {
+			diffCandidatePathBuildCancelRef.current = null;
+
+			if (!diffCandidatePathBuildMountedRef.current || !canBuildDiffCandidatePathsRef.current) {
 				return;
 			}
 
-			const paths = buildDiffCandidatePathsByMessageID(messages);
+			// Do not capture a streamed snapshot in the scheduled callback.
+			// The next idle slot must process the newest available messages.
+			const latestMessages = messagesRef.current;
+			const nextPaths = conversationMayContainApplicableDiff(latestMessages)
+				? buildDiffCandidatePathsByMessageID(latestMessages)
+				: null;
+
 			startTransition(() => {
-				if (!cancelled) {
-					setDiffCandidateState({ messages, paths });
+				if (diffCandidatePathBuildMountedRef.current && canBuildDiffCandidatePathsRef.current) {
+					setDiffCandidatePathsState(nextPaths);
 				}
 			});
 		});
+	}, []);
+
+	useEffect(() => {
+		diffCandidatePathBuildMountedRef.current = true;
 
 		return () => {
-			cancelled = true;
-			cancelWork();
+			diffCandidatePathBuildMountedRef.current = false;
+			diffCandidatePathBuildCancelRef.current?.();
+			diffCandidatePathBuildCancelRef.current = null;
 		};
-	}, [canBuildDiffCandidatePaths, messages]);
+	}, []);
 
-	const diffCandidatePathsByMessageID =
-		diffCandidateState?.messages === messages ? diffCandidateState.paths : EMPTY_DIFF_CANDIDATE_PATHS;
+	useEffect(() => {
+		if (!canBuildDiffCandidatePaths) {
+			diffCandidatePathBuildCancelRef.current?.();
+			diffCandidatePathBuildCancelRef.current = null;
+			// oxlint-disable-next-line react/set-state-in-effect
+			setDiffCandidatePathsState(null);
+			return;
+		}
+
+		if (!conversationMayContainApplicableDiff(messages)) {
+			diffCandidatePathBuildCancelRef.current?.();
+			diffCandidatePathBuildCancelRef.current = null;
+			setDiffCandidatePathsState(null);
+			return;
+		}
+
+		// A stream can replace messages many times before an idle callback
+		// executes. Keep one scheduled build alive and let it read messagesRef.
+		scheduleDiffCandidatePathBuild();
+	}, [canBuildDiffCandidatePaths, messages, scheduleDiffCandidatePathBuild]);
+
+	const diffCandidatePathsByMessageID = diffCandidatePathsState ?? EMPTY_DIFF_CANDIDATE_PATHS;
 
 	return messages.map((message, index) => (
 		<div key={message.id} data-chat-message-index={index}>
@@ -639,6 +679,7 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 				index,
 				message,
 				diffCandidatePathsByMessageID.get(message.id),
+				diffCandidatePathsState?.has(message.id) ?? false,
 				deferRichWork || index >= richReadyCount || (isBusy && index === messages.length - 1)
 			)}
 		</div>
@@ -1240,6 +1281,7 @@ function ConversationAreaInner(
 			index: number,
 			message: ConversationMessage,
 			diffCandidatePaths: string[] | undefined,
+			diffCandidatePathsReady: boolean,
 			deferRichRendering: boolean
 		) => {
 			const isLast = index === messageCount - 1;
@@ -1257,6 +1299,7 @@ function ConversationAreaInner(
 						tabId={activeTabId}
 						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
+						diffCandidatePathsReady={diffCandidatePathsReady}
 						responseTiming={responseTiming}
 					/>
 				);
@@ -1271,6 +1314,7 @@ function ConversationAreaInner(
 					tabId={activeTabId}
 					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
+					diffCandidatePathsReady={diffCandidatePathsReady}
 					responseTiming={responseTiming}
 				/>
 			);

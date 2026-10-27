@@ -29,6 +29,7 @@ interface ChatMessageProps {
 	isEditing: boolean;
 	deferRichRendering: boolean;
 	diffCandidatePaths?: string[];
+	diffCandidatePathsReady?: boolean;
 	onEdit: () => void;
 	streamSource?: MessageStreamSource;
 	responseTiming?: AssistantResponseTiming;
@@ -120,6 +121,9 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 
 	// Equivalent freshly-created arrays must not rebuild the markdown and
 	// Mermaid subtree.
+	if (prev.diffCandidatePathsReady !== next.diffCandidatePathsReady) {
+		return false;
+	}
 	if (!stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths)) {
 		return false;
 	}
@@ -162,6 +166,7 @@ export const ChatMessage = memo(function ChatMessage({
 	isEditing,
 	deferRichRendering,
 	diffCandidatePaths,
+	diffCandidatePathsReady,
 	onEdit,
 	streamSource,
 	responseTiming,
@@ -308,6 +313,7 @@ export const ChatMessage = memo(function ChatMessage({
 								deferRichRendering={deferRichRendering}
 								diffCandidatePaths={diffCandidatePaths}
 								streamingText={isBusy ? streamSnapshot.text : undefined}
+								diffCandidatePathsReady={diffCandidatePathsReady}
 							/>
 							<MessageMediaContent items={outputMedia} />
 							{!hasAnyContent && hasError && !terminalState && !isBusy ? (

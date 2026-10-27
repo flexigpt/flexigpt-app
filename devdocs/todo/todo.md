@@ -15,10 +15,13 @@
 - [x] all skills and other artifacts should always have a copy/export button across the board. this reinforces our artifact driven operation model celanly. the artifacts should be rendered uniformly across the board as a copy/export text which is lazy loaded when someone clicks show or export or copy. may be each artifact domains minimal renderer can be inside that folder and then used everwher as needed. liek skill inlien renders can be in app/skills and then used in skill, composer, agent, workspace etc. focus shoudl be to create proper common components in proper palces and then use it uniformly.
 - [x] management ui should be uniform with minimal overrides and ideally consumers shoudl be uniformized to use simialr things rather than doing their own things.
 - [x] template args are not rendered for some reason now in template modal. also the modal doesnt show the actual template with placeholders etc.
+- [x] code delivery skill should enforce ownership cost sensitivity and max parallelism properly.
+- [x] when streaming diff apply paths are not populated.
 
-- [ ] when streaming diff apply paths are not populated.
 - [ ] verify new management ui in all pages
-- [ ] code delivery skill shoudl enforce ownership cost sensitivity and max parallellism properly.
+- [ ] verify diff applicability in streaming
+
+- [ ] add a default agent selection preference and a default workspace one
 
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 
