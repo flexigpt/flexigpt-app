@@ -258,6 +258,8 @@ export function ModelDropdown({
 					<ComposerDropdownSelectedPanel
 						label="Current model"
 						ariaLabel="Current model"
+						// Do NOT show anything for standalone session things. It is understood that normally model is for session.
+						// Only agent overrides need proper mention and help.
 						help={
 							agentOwnsModel
 								? 'This model is inherited from the selected Agent.'
@@ -265,7 +267,7 @@ export function ModelDropdown({
 									? 'Choosing a model above creates a Session model override.'
 									: ''
 						}
-						summary={<span>{agentOwnsModel ? 'Agent source' : 'Session override'}</span>}
+						summary={<span>{agentOwnsModel ? 'Agent source' : ''}</span>}
 						actions={
 							!agentOwnsModel && agentModelRef && onUseAgentModel ? (
 								<button
