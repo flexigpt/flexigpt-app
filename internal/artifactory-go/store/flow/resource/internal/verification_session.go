@@ -247,10 +247,12 @@ func (s *verificationSession) Close(ctx context.Context) error {
 			)
 		}
 
+		// Do not Confirm whole source tree here. Confirm re fingerprints all
+		// files and fails closed batches on unrelated concurrent writes.
+		// Reads already verified their own digests at read time.
 		output = errors.Join(
 			output,
 			currentErr,
-			value.snapshot.Confirm(ctx),
 			value.snapshot.Close(),
 		)
 	}
@@ -357,19 +359,9 @@ func (s *verificationSession) ensureRefreshCurrentLocked(
 		return refreshModel.Inspection{}, err
 	}
 
-	// IsCurrent includes declaration-admission metadata such as Source
-	// revision, discovery configuration, and decoder fingerprints. Resource
-	// verification needs only the generation that proves source bytes still
-	// match the refreshed Artifact evidence.
-	if current.snapshot.Generation() !=
-		inspection.State.SourceGeneration {
-		return refreshModel.Inspection{}, fmt.Errorf(
-			"%w: Artifact Source %q changed during batch setup",
-			storeSpec.ErrRefreshRequired,
-			current.source.ID,
-		)
-	}
-
+	// Content generation drift for unrelated files must not fail setup.
+	// Real staleness is decided per artifact by SourceContentDigest and
+	// Definition digest in resolveArtifactInSession and read helpers.
 	copyValue := inspection.Clone()
 	current.inspection = &copyValue
 	return copyValue, nil

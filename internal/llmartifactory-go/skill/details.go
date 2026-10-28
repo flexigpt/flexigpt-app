@@ -114,9 +114,8 @@ func (a *Service) GetArtifactSkillDetails(
 			if err != nil {
 				return ArtifactSkillDetails{}, err
 			}
-			if entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
-				return ArtifactSkillDetails{}, storeSpec.ErrRefreshRequired
-			}
+			// Generation alone does not prove this Skill changed.
+			// The digest comparison below is the per artifact gate.
 			if materialized.Locator == value.Binding.Locator &&
 				(value.SourceContentDigest == nil ||
 					entry.Digest != *value.SourceContentDigest) {

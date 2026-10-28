@@ -219,9 +219,11 @@ func (a *RuntimeAdapter) ResolveSkills(
 			return ResolvedSkills{}, err
 		}
 		if err := a.syncRoot(ctx, rootID); err != nil {
+			// Preserve ErrRefreshRequired for genuine own file change.
+			// Callers use errors.Is, so do not mask it behind only
+			// ErrReferenceUnresolved and root context.
 			return ResolvedSkills{}, fmt.Errorf(
-				"%w: synchronize Skill Root %q: %w",
-				storeSpec.ErrReferenceUnresolved,
+				"synchronize Skill Root %q: %w",
 				rootID,
 				err,
 			)

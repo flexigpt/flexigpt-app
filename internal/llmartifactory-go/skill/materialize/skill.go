@@ -184,12 +184,9 @@ func resolve(
 	if err != nil {
 		return ResolvedSkill{}, err
 	}
-	if sourceEntry.SourceGeneration != resolved.RefreshState.SourceGeneration {
-		return ResolvedSkill{}, fmt.Errorf(
-			"%w: Skill Source changed during materialization",
-			storeSpec.ErrRefreshRequired,
-		)
-	}
+	// Do not fail on source wide generation drift.
+	// Unrelated files in the same source can move generation while this
+	// Skill entry digest still matches refresh time evidence.
 	if documentLocator == resolved.Artifact.Binding.Locator &&
 		sourceEntry.Digest != *resolved.Artifact.SourceContentDigest {
 		return ResolvedSkill{}, fmt.Errorf(

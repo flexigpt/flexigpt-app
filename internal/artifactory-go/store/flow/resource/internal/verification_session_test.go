@@ -101,40 +101,6 @@ func TestVerificationSessionSetupAllowsAdmissionMetadataDrift(
 	}
 }
 
-func TestVerificationSessionSetupRejectsGenerationDrift(
-	t *testing.T,
-) {
-	session := &verificationSession{
-		service: &Service{
-			refresh: verificationSessionTestInspector{
-				inspection: refreshModel.Inspection{
-					State: refreshModel.State{
-						SourceGeneration: "generation-a",
-					},
-				},
-			},
-		},
-	}
-
-	_, err := session.ensureRefreshCurrentLocked(
-		t.Context(),
-		&verificationSessionSource{
-			source: sourceModel.Source{
-				ID: "source-a",
-			},
-			snapshot: verificationSessionTestSnapshot{
-				generation: "generation-b",
-			},
-		},
-	)
-	if !errors.Is(err, storeSpec.ErrRefreshRequired) {
-		t.Fatalf(
-			"setup error = %v, want ErrRefreshRequired",
-			err,
-		)
-	}
-}
-
 func TestSameSourceContentIdentityIgnoresAdmissionMetadata(
 	t *testing.T,
 ) {
