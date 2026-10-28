@@ -9,7 +9,7 @@ ignore build
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.21.7
-	github.com/flexigpt/inference-go v0.28.5
+	github.com/flexigpt/inference-go v0.28.6
 	github.com/flexigpt/llmtools-go v0.24.6
 	github.com/flexigpt/mapstore-go v0.4.5
 	github.com/glebarez/go-sqlite v1.23.0

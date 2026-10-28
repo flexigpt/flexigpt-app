@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiCheck, FiEye, FiFolderPlus, FiRefreshCw, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiEdit, FiFolderPlus, FiRefreshCw, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -347,14 +347,14 @@ function WorkspaceBottomBarChipContent({
 								<button
 									type="button"
 									className="btn btn-ghost btn-xs rounded-lg"
-									aria-label="View Workspace contents"
+									aria-label="View and edit workspace usage"
 									onClick={() => {
 										store.hide();
 										setIsSelectionOpen(true);
 									}}
-									title="View Workspace contents"
+									title="View and edit workspace usage"
 								>
-									<FiEye size={12} />
+									<FiEdit size={12} />
 								</button>
 								<button
 									type="button"
