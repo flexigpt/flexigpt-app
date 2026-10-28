@@ -214,7 +214,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	return (
 		<div className={bodyPresent ? 'grow' : ''}>
 			<div
-				className={`flex items-center gap-3 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
+				className={`flex items-center gap-3 overflow-x-auto ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
 			>
 				<div className="flex min-w-0 items-center gap-3">
 					{isBusy ? (

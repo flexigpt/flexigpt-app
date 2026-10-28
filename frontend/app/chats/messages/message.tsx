@@ -33,6 +33,12 @@ interface ChatMessageProps {
 	onEdit: () => void;
 	streamSource?: MessageStreamSource;
 	responseTiming?: AssistantResponseTiming;
+	/**
+	 * The following message in this turn, when available. For a user message,
+	 * its assistant response can supply recorded selections. For an assistant
+	 * message, the following user message can hold its tool results.
+	 */
+	turnContextMessage?: ConversationMessage;
 }
 
 function stringArraysEqual(left?: string[], right?: string[]): boolean {
@@ -60,6 +66,9 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 	if (prev.streamSource !== next.streamSource) {
+		return false;
+	}
+	if (prev.turnContextMessage !== next.turnContextMessage) {
 		return false;
 	}
 	if (
@@ -171,6 +180,7 @@ export const ChatMessage = memo(function ChatMessage({
 	onEdit,
 	streamSource,
 	responseTiming,
+	turnContextMessage,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const streamSnapshot = useMessageStreamSnapshot(streamSource, isBusy);
@@ -221,17 +231,66 @@ export const ChatMessage = memo(function ChatMessage({
 		}) ?? false;
 
 	const hasCitations = !isUser && !isBusy && (message.uiCitations?.length ?? 0) > 0;
-	const hasMCPContext = (message.operationResolution?.mcp?.length ?? 0) > 0;
-	const hasWorkspaceContext = Boolean(message.operationResolution?.workspace);
-	const hasSkillContext = (message.operationResolution?.skills?.length ?? 0) > 0;
-	const hasAppContext = (message.appContextUpdates?.length ?? 0) > 0;
+
+	// Some recorded send-time selections are stored on the response. Display
+	// them with the user's request, never with the assistant's activity.
+	const selectionSource = isUser && turnContextMessage?.role === RoleEnum.Assistant ? turnContextMessage : undefined;
+	const toolChoices = isUser
+		? message.uiToolChoices?.length
+			? message.uiToolChoices
+			: selectionSource?.uiToolChoices
+		: undefined;
+	const toolSelectionIssues = isUser
+		? message.uiToolSelectionIssues?.length
+			? message.uiToolSelectionIssues
+			: selectionSource?.uiToolSelectionIssues
+		: undefined;
+	const operationResolution = isUser
+		? (message.operationResolution ?? selectionSource?.operationResolution)
+		: undefined;
+	const appContextUpdates = isUser
+		? message.appContextUpdates?.length
+			? message.appContextUpdates
+			: selectionSource?.appContextUpdates
+		: undefined;
+
+	// Tool results can be persisted on the following user message. Only
+	// results that match this assistant's calls belong under this response.
+	const toolOutputs = useMemo(() => {
+		if (isUser) {
+			return undefined;
+		}
+		if (message.uiToolOutputs?.length) {
+			return message.uiToolOutputs;
+		}
+		const followingOutputs = turnContextMessage?.role === RoleEnum.User ? turnContextMessage.uiToolOutputs : undefined;
+		if (!followingOutputs?.length) {
+			return message.uiToolOutputs;
+		}
+		const callIDs = new Set<string>();
+		for (const call of message.uiToolCalls ?? []) {
+			if (call.id) {
+				callIDs.add(call.id);
+			}
+			if (call.callID) {
+				callIDs.add(call.callID);
+			}
+		}
+		return followingOutputs.filter(output => callIDs.has(output.callID));
+	}, [isUser, message.uiToolCalls, message.uiToolOutputs, turnContextMessage]);
+
+	const hasMCPContext = (operationResolution?.mcp?.length ?? 0) > 0;
+	const hasWorkspaceContext = Boolean(operationResolution?.workspace);
+	const hasSkillContext = (operationResolution?.skills?.length ?? 0) > 0;
+	const hasAppContext = (appContextUpdates?.length ?? 0) > 0;
 
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
-		(message.toolSelections?.length ?? 0) > 0 ||
+		(toolChoices?.length ?? 0) > 0 ||
+		(toolSelectionIssues?.length ?? 0) > 0 ||
 		hasAppContext ||
-		(message.uiToolCalls?.length ?? 0) > 0 ||
-		(message.uiToolOutputs?.length ?? 0) > 0 ||
+		(!isUser && (message.uiToolCalls?.length ?? 0) > 0) ||
+		(toolOutputs?.length ?? 0) > 0 ||
 		hasMCPContext ||
 		hasWorkspaceContext ||
 		hasSkillContext;
@@ -242,7 +301,7 @@ export const ChatMessage = memo(function ChatMessage({
 			return [];
 		}
 
-		const outputs = message.uiToolOutputs ?? [];
+		const outputs = toolOutputs ?? [];
 		const callsById = new Map<string, UIToolCall>();
 		for (const call of message.uiToolCalls ?? []) {
 			if (call.id) {
@@ -262,7 +321,7 @@ export const ChatMessage = memo(function ChatMessage({
 				return { instance, call, output: out } as const;
 			})
 			.filter((v): v is NonNullable<typeof v> => v !== null);
-	}, [deferRichRendering, isBusy, message.uiToolCalls, message.uiToolOutputs]);
+	}, [deferRichRendering, isBusy, message.uiToolCalls, toolOutputs]);
 
 	const hasMCPAppsView = mcpAppViews.length > 0;
 
@@ -384,19 +443,20 @@ export const ChatMessage = memo(function ChatMessage({
 			</div>
 			<div className="col-span-10 min-w-0 lg:col-span-9">
 				<div
-					className={`flex min-w-0 items-center gap-2 px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+					className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 				>
 					{hasAttachmentsBar && (
 						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
 							<MessageAttachmentsBar
+								isUser={isUser}
 								attachments={message.attachments}
-								toolChoices={message.uiToolChoices}
-								toolSelectionIssues={message.uiToolSelectionIssues}
+								toolChoices={toolChoices}
+								toolSelectionIssues={toolSelectionIssues}
 								onToolSelectionIssueDetails={handleToolSelectionIssueDetails}
-								operationResolution={message.operationResolution}
-								appContextUpdates={message.appContextUpdates}
+								operationResolution={operationResolution}
+								appContextUpdates={appContextUpdates}
 								toolCalls={message.uiToolCalls}
-								toolOutputs={message.uiToolOutputs}
+								toolOutputs={toolOutputs}
 								onToolChoiceDetails={handleToolChoiceDetails}
 								onToolCallDetails={handleToolCallDetails}
 								onToolOutputDetails={handleToolOutputDetails}

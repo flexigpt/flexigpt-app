@@ -6,10 +6,10 @@
 import * as model$0 from "../../artifactory-go/store/artifact/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$1 from "../../artifactory-go/store/root/model/models.js";
+import * as model$2 from "../../artifactory-go/store/root/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$2 from "../../artifactory-go/store/source/model/models.js";
+import * as model$1 from "../../artifactory-go/store/source/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as spec$0 from "../../artifactory-go/store/spec/models.js";
@@ -91,9 +91,9 @@ export interface AgentImportConflict {
 }
 
 export interface AgentImportDestination {
-    "rootID": model$1.RootID;
+    "rootID": model$2.RootID;
     "rootDisplayName"?: string;
-    "sourceID": model$2.SourceID;
+    "sourceID": model$1.SourceID;
     "plugin": model$0.ArtifactRef;
     "pluginRevision": number;
     "pluginName": spec$0.LogicalName;
@@ -241,7 +241,7 @@ export interface AgentView {
 }
 
 export interface ListAgentsRequest {
-    "rootID": model$1.RootID;
+    "rootID": model$2.RootID;
     "logicalNames"?: spec$0.LogicalName[] | null;
 
     /**

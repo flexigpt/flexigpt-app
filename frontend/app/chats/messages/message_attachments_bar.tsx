@@ -338,9 +338,8 @@ interface MessageToolOutputChipProps {
 }
 
 /**
- * Read‑only chip for a tool output that was attached to this user turn.
- * History chips are not interactive; the full output was already used
- * when the turn was sent.
+ * Read-only chip for a tool result shown with the assistant's tool activity.
+ * The details action opens the recorded output.
  */
 function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageToolOutputChipProps) {
 	const displayName = output.displayName?.trim() || 'Tool';
@@ -622,6 +621,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 }
 
 interface MessageAttachmentsBarProps {
+	isUser: boolean;
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
 	toolSelectionIssues?: ToolSelectionIssue[];
@@ -637,13 +637,14 @@ interface MessageAttachmentsBarProps {
 
 /**
  * Read‑only toolbar under a message bubble:
- * - For user messages: files, tool choices, and tool outputs.
- * - For assistant messages: files and suggested tool calls.
+ * - User messages show attachments and recorded send-time selections.
+ * - Assistant messages show attachments, tool calls, and tool results.
  *
  * Uses compact dropdown chips similar to the composer, but without
  * any remove / edit actions.
  */
 export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
+	isUser,
 	attachments,
 	toolChoices,
 	toolSelectionIssues,
@@ -656,10 +657,10 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 	onToolCallDetails,
 	onToolOutputDetails,
 }: MessageAttachmentsBarProps) {
-	const choices = toolChoices ?? [];
-	const calls = toolCalls ?? [];
-	const outputs = toolOutputs ?? [];
-	const unavailableSelections = toolSelectionIssues ?? [];
+	const choices = isUser ? (toolChoices ?? []) : [];
+	const calls = isUser ? [] : (toolCalls ?? []);
+	const outputs = isUser ? [] : (toolOutputs ?? []);
+	const unavailableSelections = isUser ? (toolSelectionIssues ?? []) : [];
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
@@ -670,10 +671,10 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 
 	const hasAttachments = !!attachments && attachments.length > 0;
 	const hasTools = normalToolChoices.length > 0;
-	const hasMCP = (operationResolution?.mcp?.length ?? 0) > 0;
-	const hasMCPAppContext = (appContextUpdates?.length ?? 0) > 0;
-	const hasSkillContext = (operationResolution?.skills?.length ?? 0) > 0;
-	const hasWorkspace = Boolean(operationResolution?.workspace);
+	const hasMCP = isUser && (operationResolution?.mcp?.length ?? 0) > 0;
+	const hasMCPAppContext = isUser && (appContextUpdates?.length ?? 0) > 0;
+	const hasSkillContext = isUser && (operationResolution?.skills?.length ?? 0) > 0;
+	const hasWorkspace = isUser && Boolean(operationResolution?.workspace);
 
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
