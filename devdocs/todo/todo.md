@@ -12,7 +12,8 @@
 - [ ] verify diff applicability in streaming
 - [x] add outputschema to llmtools go and then plug it end to end.
 - [x] there is a session refresh error even if content did not change.
-- [ ] skill tools should mention that resource and scripts only from fodler will be run using that tool.
+- [x] skill tools should mention that resource and scripts only from fodler will be run using that tool.
+- [ ] message chips are still backend concept heavy. need cleaning.
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 - [ ] add wails considerations skill in flexigpt repo.
 
