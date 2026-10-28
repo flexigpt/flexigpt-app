@@ -750,15 +750,3 @@ export function getMCPServerAuthHealthStateBadgeClass(state: MCPAuthHealthState 
 			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 	}
 }
-
-export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
-	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
-}
-
-export function isMCPExecutionMode(value: unknown): value is MCPExecutionMode {
-	return typeof value === 'string' && Object.values(MCPExecutionMode).includes(value as MCPExecutionMode);
-}
-
-export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
-	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
-}

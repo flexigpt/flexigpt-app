@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { FiEye, FiTool } from 'react-icons/fi';
+import { FiTool } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice } from '@/spec/tool';
-import { CapabilityTargetForm } from '@/spec/artifact';
 import { ToolOutputKind } from '@/spec/tool';
 
 import {
@@ -16,8 +14,6 @@ import { redactInternalPresentationFields } from '@/lib/user_facing_presentation
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { getPrettyToolName } from '@/apis/tool_management';
-
 import {
 	ManagementModalBody,
 	ManagementModalDialog,
@@ -26,10 +22,8 @@ import {
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { ToolDetailsSubject } from '@/tools/tool_details_modal';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { mediaItemsFromToolOutputItems, MessageMediaContent } from '@/chats/messages/message_media_content';
-import { ToolDetailsModal as ToolSourceDetailsModal } from '@/tools/tool_details_modal';
 
 function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string {
 	switch (item.kind) {
@@ -100,35 +94,11 @@ function getChoiceDisplayInfo(c: ToolStoreChoice) {
 }
 
 function getToolCallDisplayName(call: UIToolCall): string {
-	return call.mcpToolSelection?.toolName || getPrettyToolName(call.name);
+	return call.displayName?.trim() || 'Tool';
 }
 
-function formatToolOutputSummary(n: string): string {
-	const pretty = getPrettyToolName(n);
-	return `Result: ${pretty}`;
-}
-
-function sourceSubjectForState(state: Exclude<ToolDetailsState, null>): ToolDetailsSubject | undefined {
-	const target =
-		state.kind === 'choice' ? state.choice.target : state.kind === 'selection' ? state.selection.target : undefined;
-
-	if (target?.form !== CapabilityTargetForm.Artifact || !target.artifact) {
-		return undefined;
-	}
-
-	if (state.kind === 'choice') {
-		return {
-			ref: target.artifact,
-			displayName: state.choice.displayName || state.choice.target.name,
-		};
-	}
-	if (state.kind === 'selection') {
-		return {
-			ref: target.artifact,
-			displayName: state.selection.target.name,
-		};
-	}
-	return undefined;
+function getToolOutputDisplayName(output: UIToolOutput): string {
+	return output.displayName?.trim() || 'Tool';
 }
 
 function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; payload: unknown } {
@@ -149,19 +119,19 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		}
 		case 'call': {
 			const call = state.call;
+			const { mcpToolSelection: _mcpToolSelection, ...safeCall } = call;
 			return {
 				title: `Tool call • ${getToolCallDisplayName(call)}`,
-				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(call)),
+				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(safeCall)),
 			};
 		}
 		case 'output': {
 			const out = state.output;
+			const { mcpApp: _mcpApp, mcpToolSelection: _mcpToolSelection, sessionApp: _sessionApp, ...safeOutput } = out;
 
 			return {
-				title: `Tool output • ${
-					out.summary && out.summary.length > 0 ? out.summary : formatToolOutputSummary(out.name)
-				}`,
-				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(out)),
+				title: `Tool output • ${out.summary || `Result: ${getToolOutputDisplayName(out)}`}`,
+				payload: redactInternalPresentationFields(normalizeStructuredJSONStringDeep(safeOutput)),
 			};
 		}
 	}
@@ -199,7 +169,7 @@ function buildCallPrimaryContent(call: UIToolCall): string {
 
 	lines.push('');
 
-	const argumentsBlock = buildJSONOrTextCodeBlock(call.arguments);
+	const argumentsBlock = buildJSONOrTextCodeBlock(redactInternalPresentationFields(call.arguments));
 	if (argumentsBlock) {
 		lines.push('### Arguments', '', argumentsBlock);
 	} else {
@@ -217,20 +187,21 @@ function buildCallPrimaryContent(call: UIToolCall): string {
 function buildOutputPrimaryContent(output: UIToolOutput): string {
 	const lines: string[] = [];
 
-	const titleText = output.summary && output.summary.length > 0 ? output.summary : formatToolOutputSummary(output.name);
+	const titleText =
+		output.summary && output.summary.length > 0 ? output.summary : `Result: ${getToolOutputDisplayName(output)}`;
 
-	lines.push(`### Summary: ${titleText}`, `### Tool: ${getPrettyToolName(output.name)}`);
+	lines.push(`### Summary: ${titleText}`, `### Tool: ${getToolOutputDisplayName(output)}`);
 
 	if (output.isSkipped) {
 		lines.push('### Status: `skipped`');
 	} else if (typeof output.isError === 'boolean') {
 		lines.push(`### Status: \`${output.isError ? 'error' : 'ok'}\``);
 	}
-	const argumentsBlock = buildJSONOrTextCodeBlock(output.arguments);
+	const argumentsBlock = buildJSONOrTextCodeBlock(redactInternalPresentationFields(output.arguments));
 	if (argumentsBlock) {
 		lines.push('', '### Arguments', '', argumentsBlock);
 	}
-	const errorBlock = buildJSONOrTextCodeBlock(output.errorMessage);
+	const errorBlock = buildJSONOrTextCodeBlock(redactInternalPresentationFields(output.errorMessage));
 	if (errorBlock) {
 		lines.push('', '### Error details', '', errorBlock);
 	}
@@ -255,14 +226,12 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	const { requestClose } = useModalDialogController();
-	const [sourceOpen, setSourceOpen] = useState(false);
 
 	if (!state) {
 		return null;
 	}
 
 	const { title, payload } = buildPayload(state);
-	const sourceSubject = sourceSubjectForState(state);
 
 	// Raw payload, preferring JSON display with a safe text fallback.
 	const rawPayloadMarkdown = `### Additional details\n\n${buildJSONOrTextCodeBlock(payload) ?? '_No additional details available._'}`;
@@ -306,87 +275,64 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	}
 
 	return (
-		<>
-			<ManagementModalPanel width="wide">
-				<ModalHeader
-					title={
-						<span className="flex items-center gap-2">
-							<FiTool size={16} />
-							<span>{title}</span>
-						</span>
-					}
-					onClose={() => {
-						requestClose();
-					}}
-				/>
-				<ManagementModalBody>
-					{/* Primary, human-friendly view (semantics first) */}
-					{primaryContent.trim().length > 0 && (
-						<div className="mb-4">
-							{sourceSubject ? (
-								<div className="mb-3">
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											setSourceOpen(true);
-										}}
-									>
-										<FiEye size={14} />
-										View source
-									</button>
-								</div>
-							) : null}
-							<MessageContentCard
-								messageID={`${baseMessageId}:primary`}
-								content={primaryContent}
-								isBusy={false}
-								align="items-start text-left"
-								renderAsMarkdown={true}
-								defaultCodeBlockExpanded={false}
-							/>
-						</div>
-					)}
-
-					{outputMedia.length > 0 ? (
-						<div className="border-base-300 bg-base-100 mb-4 rounded-xl border p-3">
-							<div className="mb-2 text-sm font-semibold">Generated images and files</div>
-							<MessageMediaContent items={outputMedia} />
-						</div>
-					) : null}
-
-					{/* Raw payload for full inspection */}
-					<div>
+		<ManagementModalPanel width="wide">
+			<ModalHeader
+				title={
+					<span className="flex items-center gap-2">
+						<FiTool size={16} />
+						<span>{title}</span>
+					</span>
+				}
+				onClose={() => {
+					requestClose();
+				}}
+			/>
+			<ManagementModalBody>
+				{/* Primary, human-friendly view (semantics first) */}
+				{primaryContent.trim().length > 0 && (
+					<div className="mb-4">
 						<MessageContentCard
-							messageID={`${baseMessageId}:raw`}
-							content={rawPayloadMarkdown}
+							messageID={`${baseMessageId}:primary`}
+							content={primaryContent}
 							isBusy={false}
 							align="items-start text-left"
 							renderAsMarkdown={true}
 							defaultCodeBlockExpanded={false}
 						/>
 					</div>
-				</ManagementModalBody>
-				<ModalActions>
-					<button
-						type="button"
-						className="btn bg-base-300 rounded-xl"
-						onClick={() => {
-							requestClose();
-						}}
-					>
-						Close
-					</button>
-				</ModalActions>
-			</ManagementModalPanel>
-			<ToolSourceDetailsModal
-				isOpen={sourceOpen}
-				subject={sourceSubject ?? null}
-				onClose={() => {
-					setSourceOpen(false);
-				}}
-			/>
-		</>
+				)}
+
+				{outputMedia.length > 0 ? (
+					<div className="border-base-300 bg-base-100 mb-4 rounded-xl border p-3">
+						<div className="mb-2 text-sm font-semibold">Generated images and files</div>
+						<MessageMediaContent items={outputMedia} />
+					</div>
+				) : null}
+
+				{/* Raw payload for full inspection */}
+				<div>
+					<MessageContentCard
+						messageID={`${baseMessageId}:raw`}
+						content={rawPayloadMarkdown}
+						isBusy={false}
+						align="items-start text-left"
+						renderAsMarkdown={true}
+						defaultCodeBlockExpanded={false}
+					/>
+				</div>
+			</ManagementModalBody>
+			<ModalActions>
+				<button
+					type="button"
+					className="btn bg-base-300 rounded-xl"
+					onClick={() => {
+						requestClose();
+					}}
+				>
+					Close
+				</button>
+			</ModalActions>
+		</ManagementModalPanel>
 	);
 }
 

@@ -108,19 +108,36 @@ func (c *coordinator) prepareSkills(
 				nil,
 			)
 		}
-		used := resolvedArtifact(
+		used := resolvedArtifactWithDetails(
 			value.Artifact,
 			value.Revision,
 			cryptoutil.Digest(value.DefinitionDigest),
+			firstNonEmpty(
+				value.DisplayName,
+				value.Definition.Name,
+				"Skill",
+			),
+			value.Description,
+			firstNonEmpty(
+				value.SourceLocation,
+				value.Definition.Location,
+			),
+			nil,
 		)
 		item := contribution.item
 		key := artifactKey(value.Artifact)
 		activeSelection, activeSelected := activeSelections[key]
+		_, activeNow := active[key]
+		item.Used = used
+		item.Skill = &sessionRuntime.SkillResolutionState{
+			Enabled:          value.Enabled,
+			Active:           activeNow,
+			SessionAvailable: false,
+		}
 
 		if contribution.owner == sessionRuntime.ConfigurationOwnerSession {
 			if err := requireSelectionPin(contribution.selection, used); err != nil {
 				item.State = sessionRuntime.ResolutionStateStale
-				item.Used = used
 				item.Reason = err.Error()
 				summary.Skills = append(summary.Skills, item)
 
@@ -156,7 +173,6 @@ func (c *coordinator) prepareSkills(
 
 		if !value.Enabled {
 			item.State = sessionRuntime.ResolutionStateUnavailable
-			item.Used = used
 			item.Reason = "Skill is disabled"
 			summary.Skills = append(summary.Skills, item)
 			severity := sessionRuntime.DiagnosticSeverityWarning
@@ -234,7 +250,7 @@ func (c *coordinator) prepareSkills(
 		effective = append(effective, reference)
 
 		item.State = sessionRuntime.ResolutionStateIncluded
-		item.Used = used
+		item.Skill.SessionAvailable = true
 		summary.Skills = append(summary.Skills, item)
 
 		if _, enabled := active[key]; enabled {
@@ -711,10 +727,12 @@ func skillToolChoices(
 			Arguments:   schema,
 		}
 		proposal := sessionRuntime.ToolCallProposal{
-			Name:     choice.Name,
-			ChoiceID: choice.ID,
-			Type:     choice.Type,
-			Required: true,
+			Name:        choice.Name,
+			ChoiceID:    choice.ID,
+			Type:        choice.Type,
+			Required:    true,
+			DisplayName: skillToolDisplayName(definition.name),
+			Description: strings.TrimSpace(definition.tool.Description),
 			Automatic: definition.name == skillToolLoadName ||
 				definition.name == skillToolUnloadName ||
 				definition.name == skillToolReadResourceName,
@@ -729,6 +747,21 @@ func skillToolChoices(
 	}
 
 	return choices, bindings, nil
+}
+
+func skillToolDisplayName(name string) string {
+	switch name {
+	case skillToolLoadName:
+		return "Load Skill"
+	case skillToolUnloadName:
+		return "Unload Skill"
+	case skillToolReadResourceName:
+		return "Read Skill resource"
+	case skillToolRunScriptName:
+		return "Run Skill script"
+	default:
+		return "Skill Tool"
+	}
 }
 
 func skillRulesPrompt(

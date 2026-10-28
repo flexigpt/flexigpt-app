@@ -15,4 +15,7 @@ export interface ResolvedArtifactSkill {
     "Revision": number;
     "DefinitionDigest": string;
     "Enabled": boolean;
+    "DisplayName": string;
+    "Description": string;
+    "SourceLocation": string;
 }

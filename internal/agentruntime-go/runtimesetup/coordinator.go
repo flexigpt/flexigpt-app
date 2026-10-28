@@ -1211,6 +1211,43 @@ func resolvedArtifact(
 	}
 }
 
+func resolvedArtifactWithDetails(
+	value artifactModel.ArtifactRef,
+	revision uint64,
+	digest cryptoutil.Digest,
+	displayName string,
+	description string,
+	sourceLocation string,
+	sourceLocations []string,
+) *sessionRuntime.ResolvedArtifact {
+	output := resolvedArtifact(value, revision, digest)
+	output.DisplayName = strings.TrimSpace(displayName)
+	output.Description = strings.TrimSpace(description)
+	output.SourceLocation = strings.TrimSpace(sourceLocation)
+
+	for _, location := range sourceLocations {
+		if location = strings.TrimSpace(location); location != "" {
+			output.SourceLocations = append(output.SourceLocations, location)
+		}
+	}
+	if len(output.SourceLocations) == 0 && output.SourceLocation != "" {
+		output.SourceLocations = []string{output.SourceLocation}
+	}
+	return output
+}
+
+func withResolvedArtifactDisplay(
+	value *sessionRuntime.ResolvedArtifact,
+	displayName string,
+) *sessionRuntime.ResolvedArtifact {
+	if value == nil || strings.TrimSpace(value.DisplayName) != "" {
+		return value
+	}
+	copyValue := *value
+	copyValue.DisplayName = strings.TrimSpace(displayName)
+	return &copyValue
+}
+
 func requireSelectionPin(
 	selection sessionRuntime.ArtifactSelection,
 	used *sessionRuntime.ResolvedArtifact,

@@ -21,7 +21,6 @@ interface MessageFooterAreaProps {
 	isUser: boolean;
 	cardCopyContent: string;
 	onEdit: () => void;
-	messageDetails: string;
 	reasoningContents?: ReasoningContent[];
 	isBusy: boolean;
 	bodyPresent: boolean;
@@ -146,7 +145,6 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	isUser,
 	cardCopyContent,
 	onEdit,
-	messageDetails,
 	reasoningContents,
 	isBusy,
 	bodyPresent,
@@ -164,8 +162,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 
 	const copyContent = useMemo(() => (isBusy ? '' : stripCustomMDFences(cardCopyContent)), [cardCopyContent, isBusy]);
 	const hasDebugDetailsError = typeof debugDetailsError === 'string' && /\S/.test(debugDetailsError);
-	const hasDebugDetails =
-		/\S/.test(messageDetails) || debugDetails !== undefined || hasDebugDetailsError || errorDetails !== undefined;
+	const hasDebugDetails = debugDetails !== undefined || hasDebugDetailsError || errorDetails !== undefined;
 	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
@@ -179,20 +176,8 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	);
 
 	const renderedMessageDetails = useMemo(() => {
-		if (!isDetailsOpen) {
-			return messageDetails;
-		}
-
-		const generatedDetails = getDebugDetailsMarkdown(debugDetails, errorDetails, debugDetailsError) ?? '';
-
-		if (!/\S/.test(messageDetails)) {
-			return generatedDetails;
-		}
-		if (!/\S/.test(generatedDetails)) {
-			return messageDetails;
-		}
-		return `${messageDetails}\n\n${generatedDetails}`;
-	}, [debugDetails, debugDetailsError, errorDetails, isDetailsOpen, messageDetails]);
+		return isDetailsOpen ? (getDebugDetailsMarkdown(debugDetails, errorDetails, debugDetailsError) ?? '') : '';
+	}, [debugDetails, debugDetailsError, errorDetails, isDetailsOpen]);
 
 	const toggleDetailsModal = useCallback(() => {
 		if (!hasDetails || isBusy) {

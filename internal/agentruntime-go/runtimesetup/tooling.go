@@ -76,11 +76,6 @@ func (e *goToolExecutor) ExecuteTool(
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
-	if binding.Used != *toolResolvedArtifact(resolved) {
-		return sessionRuntime.ToolExecutionResult{}, errors.New(
-			"prepared Go Tool binding is stale",
-		)
-	}
 
 	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
 		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
@@ -287,6 +282,12 @@ func toolChoiceAndBinding(
 		Name:     choice.Name,
 		ChoiceID: choice.ID,
 		Required: true,
+		DisplayName: firstNonEmpty(
+			resolved.Tool.DisplayName,
+			string(resolved.Tool.Name),
+			"Tool",
+		),
+		Description: strings.TrimSpace(resolved.Tool.Description),
 	}
 
 	if contribution.autoExecute != nil {

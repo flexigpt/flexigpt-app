@@ -2,22 +2,50 @@ import { FiChevronRight, FiServer } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { MCPConversationContext } from '@/spec/session_mcp';
+import type { SessionOperationResolutionSummary } from '@/spec/session_base';
+import { SessionResolutionState } from '@/spec/session_base';
 
-import { toolExposureLabel } from '@/chats/messages/mcp_message_context_utils';
 import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
 
-export function MCPMessageContextChip({ context }: { context?: MCPConversationContext }) {
-	const count = context?.servers?.length ?? 0;
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-
-	if (!context || count === 0) {
+function namedItems(
+	items:
+		| Array<{
+				displayName: string;
+				description?: string;
+				availability: 'available' | 'unavailable';
+		  }>
+		| undefined
+) {
+	if (!items?.length) {
 		return null;
 	}
 
-	const resourceCount = (context.resources?.length ?? 0) + (context.resourceTemplates?.length ?? 0);
-	const promptCount = context.prompts?.length ?? 0;
+	return (
+		<div className="mt-1 space-y-1">
+			{items.map((item, index) => (
+				<div key={`${item.displayName}:${index}`} className="bg-base-100 flex items-start gap-2 rounded-lg px-2 py-1">
+					<div className="min-w-0 flex-1">
+						<div className="truncate text-[11px]">{item.displayName}</div>
+						{item.description ? <div className="text-base-content/60 text-[10px]">{item.description}</div> : null}
+					</div>
+					<span className={`badge badge-xs ${item.availability === 'available' ? 'badge-info' : 'badge-warning'}`}>
+						{item.availability === 'available' ? 'Available' : 'Unavailable'}
+					</span>
+				</div>
+			))}
+		</div>
+	);
+}
+
+export function MCPMessageContextChip({ resolution }: { resolution?: SessionOperationResolutionSummary }) {
+	const servers = resolution?.mcp ?? [];
+	const count = servers.length;
+	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const open = useStoreState(menu, 'open');
+
+	if (count === 0) {
+		return null;
+	}
 
 	return (
 		<div className="shrink-0">
@@ -49,22 +77,44 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 				>
 					<div className="text-base-content/70 mb-2 text-xs font-semibold">MCP context</div>
 
-					{context.servers.map((server, index) => (
-						<div key={server.server} className="bg-base-200 mb-1 rounded-xl px-2 py-1">
-							<div className="text-xs font-medium">MCP server {index + 1}</div>
+					{servers.map((server, index) => (
+						<div
+							key={`${server.used?.displayName || 'Unavailable MCP server'}:${index}`}
+							className="bg-base-200 mb-2 rounded-xl p-2 last:mb-0"
+						>
+							<div className="text-xs font-medium">{server.used?.displayName || 'Unavailable MCP server'}</div>
 							<div className="mt-1 flex flex-wrap gap-1">
-								<span className="badge badge-ghost badge-xs">{toolExposureLabel(server)}</span>
-								{server.includeServerInstructions ? (
-									<span className="badge badge-ghost badge-xs">instructions</span>
-								) : null}
+								<span
+									className={`badge badge-xs ${server.state === SessionResolutionState.Included ? 'badge-info' : 'badge-warning'}`}
+								>
+									{server.state === SessionResolutionState.Included ? 'Available' : 'Unavailable'}
+								</span>
+								<span className="badge badge-ghost badge-xs">
+									{server.mcp?.instructionsIncluded ? 'Instructions included' : 'Instructions not included'}
+								</span>
 							</div>
+
+							{server.mcp?.tools?.length ? (
+								<div className="text-base-content/70 mt-2 text-[10px]">Selected Tools</div>
+							) : null}
+							{namedItems(server.mcp?.tools)}
+
+							{server.mcp?.resources?.length ? (
+								<div className="text-base-content/70 mt-2 text-[10px]">Selected Resources</div>
+							) : null}
+							{namedItems(server.mcp?.resources)}
+
+							{server.mcp?.resourceTemplates?.length ? (
+								<div className="text-base-content/70 mt-2 text-[10px]">Selected Resource templates</div>
+							) : null}
+							{namedItems(server.mcp?.resourceTemplates)}
+
+							{server.mcp?.prompts?.length ? (
+								<div className="text-base-content/70 mt-2 text-[10px]">Selected Prompts</div>
+							) : null}
+							{namedItems(server.mcp?.prompts)}
 						</div>
 					))}
-
-					{resourceCount > 0 ? (
-						<div className="text-base-content/70 mt-2 text-xs">Resources: {resourceCount}</div>
-					) : null}
-					{promptCount > 0 ? <div className="text-base-content/70 text-xs">Prompts: {promptCount}</div> : null}
 				</Menu>
 			) : null}
 		</div>

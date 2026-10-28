@@ -103,6 +103,7 @@ func unresolvedCompletionToolCall(
 		ProviderCallID: firstNonEmpty(call.CallID, call.ID),
 		Name:           call.Name,
 		ChoiceID:       call.ChoiceID,
+		DisplayName:    "Unresolved Tool",
 		Type:           call.Type,
 		Arguments:      append(json.RawMessage(nil), arguments...),
 		Required:       true,

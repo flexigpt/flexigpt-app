@@ -2939,6 +2939,18 @@ func (r *Runtime) startModelOperationLocked(
 	if operationID == "" {
 		operationID = OperationID(r.newID())
 	}
+
+	// The transcript keeps one durable association to the operation that
+	// prepared it. Resolution data remains canonical on ModelOperation and is
+	// not copied into TranscriptMessage.
+	current.OperationID = operationID
+	for index := range sessionValue.Transcript {
+		if sessionValue.Transcript[index].ID == currentMessageID {
+			sessionValue.Transcript[index].OperationID = operationID
+			break
+		}
+	}
+
 	operation := ModelOperation{
 		ID:        operationID,
 		State:     OperationStateQueued,

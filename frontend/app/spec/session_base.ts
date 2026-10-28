@@ -228,6 +228,66 @@ export interface SessionCommandMeta {
 interface SessionResolvedArtifact extends ArtifactRef {
 	revision?: SessionRevision;
 	digest?: string;
+	displayName?: string;
+	description?: string;
+	sourceLocation?: string;
+	sourceLocations?: string[];
+}
+
+export enum SessionWorkspaceContextOutcome {
+	Included = 'included',
+	PartiallyIncluded = 'partiallyIncluded',
+	NotIncluded = 'notIncluded',
+	NotAllowed = 'notAllowed',
+	Unavailable = 'unavailable',
+}
+
+interface SessionSkillResolutionState {
+	enabled: boolean;
+	active: boolean;
+	sessionAvailable: boolean;
+}
+
+interface SessionWorkspaceContextResolution {
+	outcome: SessionWorkspaceContextOutcome;
+	diagnosticSummary?: string;
+}
+
+enum SessionMCPSelectionAvailability {
+	Available = 'available',
+	Unavailable = 'unavailable',
+}
+
+interface SessionMCPToolResolution {
+	displayName: string;
+	description?: string;
+	availability: SessionMCPSelectionAvailability;
+}
+
+interface SessionMCPResourceResolution {
+	displayName: string;
+	description?: string;
+	availability: SessionMCPSelectionAvailability;
+}
+
+interface SessionMCPResourceTemplateResolution {
+	displayName: string;
+	description?: string;
+	availability: SessionMCPSelectionAvailability;
+}
+
+interface SessionMCPPromptResolution {
+	displayName: string;
+	description?: string;
+	availability: SessionMCPSelectionAvailability;
+}
+
+interface SessionMCPResolutionDetails {
+	instructionsIncluded: boolean;
+	tools?: SessionMCPToolResolution[];
+	resources?: SessionMCPResourceResolution[];
+	resourceTemplates?: SessionMCPResourceTemplateResolution[];
+	prompts?: SessionMCPPromptResolution[];
 }
 
 export interface SessionResolutionItem {
@@ -238,6 +298,9 @@ export interface SessionResolutionItem {
 	selected?: SessionArtifactSelection;
 	used?: SessionResolvedArtifact;
 	reason?: string;
+	skill?: SessionSkillResolutionState;
+	workspaceContext?: SessionWorkspaceContextResolution;
+	mcp?: SessionMCPResolutionDetails;
 }
 
 interface SessionResolutionDiagnostic {
@@ -247,7 +310,7 @@ interface SessionResolutionDiagnostic {
 	key?: string;
 }
 
-interface SessionOperationResolutionSummary {
+export interface SessionOperationResolutionSummary {
 	version: number;
 	agent?: SessionResolutionItem;
 	workspace?: SessionResolutionItem;

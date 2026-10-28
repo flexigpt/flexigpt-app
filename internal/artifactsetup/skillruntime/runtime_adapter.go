@@ -37,6 +37,9 @@ type ResolvedArtifactSkill struct {
 	Revision         uint64
 	DefinitionDigest string
 	Enabled          bool
+	DisplayName      string
+	Description      string
+	SourceLocation   string
 }
 
 // ResolvedSkills is a request-owned, verified selection. Values preserve the
@@ -413,6 +416,9 @@ func (a *RuntimeAdapter) materializeRecords(
 			Revision:         record.Revision,
 			DefinitionDigest: definitionDigest,
 			Enabled:          true,
+			DisplayName:      record.DisplayName,
+			Description:      material.Document.Description,
+			SourceLocation:   string(record.Binding.Locator),
 		})
 	}
 	return output, nil

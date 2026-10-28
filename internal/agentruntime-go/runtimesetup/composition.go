@@ -11,6 +11,7 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
@@ -431,10 +432,14 @@ func (c *coordinator) resolveWorkspace(
 		)
 	}
 
-	usedWorkspace := resolvedArtifact(
+	usedWorkspace := resolvedArtifactWithDetails(
 		runtimePlan.Workspace.Artifact.Ref(),
 		runtimePlan.Workspace.Artifact.Revision,
 		digestFromArtifact(runtimePlan.Workspace.Artifact),
+		runtimePlan.Workspace.Artifact.DisplayName,
+		runtimePlan.Workspace.Description,
+		string(runtimePlan.Workspace.Artifact.Binding.Locator),
+		nil,
 	)
 	if err := requireSelectionPin(
 		selection.Workspace,
@@ -511,10 +516,22 @@ func (c *coordinator) resolveWorkspace(
 			continue
 		}
 
-		used := resolvedArtifact(
+		sourceLocations := make(
+			[]string,
+			0,
+			len(contribution.SourceLocators),
+		)
+		for _, locator := range contribution.SourceLocators {
+			sourceLocations = append(sourceLocations, string(locator))
+		}
+		used := resolvedArtifactWithDetails(
 			contribution.Artifact,
 			contribution.ArtifactRevision,
 			contribution.DefinitionDigest,
+			contribution.Name,
+			"",
+			string(contribution.Locator),
+			sourceLocations,
 		)
 		if err := requireSelectionPin(selected, used); err != nil {
 			selectedCopy := selected
@@ -528,6 +545,11 @@ func (c *coordinator) resolveWorkspace(
 					Selected: &selectedCopy,
 					Used:     used,
 					Reason:   err.Error(),
+					WorkspaceContext: workspaceContextResolution(
+						runtimePlan.Prompt.Decisions,
+						contribution.Artifact,
+						sessionRuntime.WorkspaceContextOutcomeUnavailable,
+					),
 				},
 			)
 			return operationPreparationError(
@@ -547,6 +569,11 @@ func (c *coordinator) resolveWorkspace(
 				State:    sessionRuntime.ResolutionStateIncluded,
 				Selected: &selected,
 				Used:     used,
+				WorkspaceContext: workspaceContextResolution(
+					runtimePlan.Prompt.Decisions,
+					contribution.Artifact,
+					sessionRuntime.WorkspaceContextOutcomeIncluded,
+				),
 			},
 		)
 		includedWorkspaceContexts[key] = struct{}{}
@@ -568,6 +595,14 @@ func (c *coordinator) resolveWorkspace(
 				State:    sessionRuntime.ResolutionStateExcluded,
 				Selected: &selectedCopy,
 				Reason:   "Workspace Context was not included in the resolved runtime plan",
+				WorkspaceContext: workspaceContextResolution(
+					runtimePlan.Prompt.Decisions,
+					artifactModel.ArtifactRef{
+						RootID:     rootModel.RootID(selected.RootID),
+						ArtifactID: artifactModel.ArtifactID(selected.ArtifactID),
+					},
+					sessionRuntime.WorkspaceContextOutcomeNotIncluded,
+				),
 			},
 		)
 		plan.summary.Diagnostics = append(
@@ -597,10 +632,14 @@ func (c *coordinator) resolveWorkspace(
 			continue
 		}
 
-		used := resolvedArtifact(
+		used := resolvedArtifactWithDetails(
 			skill.Artifact,
 			skill.ArtifactRevision,
 			skill.DefinitionDigest,
+			firstNonEmpty(skill.DisplayName, skill.Name, "Workspace Skill"),
+			"",
+			string(skill.Locator),
+			nil,
 		)
 		if err := requireSelectionPin(selected, used); err != nil {
 			selectedCopy := selected
@@ -703,10 +742,14 @@ func (c *coordinator) resolveWorkspace(
 			continue
 		}
 
-		used := resolvedArtifact(
+		used := resolvedArtifactWithDetails(
 			server.Artifact,
 			server.ArtifactRevision,
 			server.DefinitionDigest,
+			firstNonEmpty(server.DisplayName, string(server.Name), "MCP server"),
+			"",
+			string(server.Locator),
+			nil,
 		)
 		if err := requireSelectionPin(selected.Server, used); err != nil {
 			selectedServer := selected.Server
@@ -720,6 +763,7 @@ func (c *coordinator) resolveWorkspace(
 					Selected: &selectedServer,
 					Used:     used,
 					Reason:   err.Error(),
+					MCP:      &sessionRuntime.MCPResolutionDetails{},
 				},
 			)
 			return operationPreparationError(
@@ -752,6 +796,7 @@ func (c *coordinator) resolveWorkspace(
 				State:    sessionRuntime.ResolutionStateExcluded,
 				Selected: &selectedServer,
 				Reason:   "Workspace MCP server was not included in the resolved runtime plan",
+				MCP:      &sessionRuntime.MCPResolutionDetails{},
 			},
 		)
 		plan.summary.Diagnostics = append(
@@ -1887,6 +1932,46 @@ func (c *coordinator) toolTargetFromIntent(
 	return composition.CapabilityTarget{}, errors.New(
 		"tool capability selection is required",
 	)
+}
+
+func workspaceContextResolution(
+	decisions []workspaceAPI.WorkspacePromptDecision,
+	ref artifactModel.ArtifactRef,
+	fallback sessionRuntime.WorkspaceContextOutcome,
+) *sessionRuntime.WorkspaceContextResolution {
+	outcome := fallback
+	for _, decision := range decisions {
+		if decision.Artifact != ref {
+			continue
+		}
+		switch string(decision.Status) {
+		case "included":
+			outcome = sessionRuntime.WorkspaceContextOutcomeIncluded
+		case "truncated":
+			outcome = sessionRuntime.WorkspaceContextOutcomePartiallyIncluded
+		case "excluded":
+			outcome = sessionRuntime.WorkspaceContextOutcomeNotIncluded
+		case "denied":
+			outcome = sessionRuntime.WorkspaceContextOutcomeNotAllowed
+		case "unavailable":
+			outcome = sessionRuntime.WorkspaceContextOutcomeUnavailable
+		}
+		break
+	}
+
+	value := &sessionRuntime.WorkspaceContextResolution{
+		Outcome: outcome,
+	}
+	switch outcome {
+	case sessionRuntime.WorkspaceContextOutcomeNotIncluded:
+		value.DiagnosticSummary = "Selected Context was not included."
+	case sessionRuntime.WorkspaceContextOutcomeNotAllowed:
+		value.DiagnosticSummary = "Selected Context was not allowed."
+	case sessionRuntime.WorkspaceContextOutcomeUnavailable:
+		value.DiagnosticSummary = "Selected Context was unavailable."
+	default:
+	}
+	return value
 }
 
 func agentOccurrenceDiagnostic(

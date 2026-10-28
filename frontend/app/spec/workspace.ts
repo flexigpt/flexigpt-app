@@ -33,13 +33,13 @@ export enum WorkspacePromptCompositionStatus {
 	Unavailable = 'unavailable',
 }
 
-export enum WorkspaceConversationSelectionStatus {
+enum WorkspaceConversationSelectionStatus {
 	Ready = 'ready',
 	Partial = 'partial',
 	Unavailable = 'unavailable',
 }
 
-export enum WorkspaceConversationContextUsageStatus {
+enum WorkspaceConversationContextUsageStatus {
 	Included = 'included',
 	Truncated = 'truncated',
 	Excluded = 'excluded',
@@ -47,7 +47,7 @@ export enum WorkspaceConversationContextUsageStatus {
 	Unavailable = 'unavailable',
 }
 
-export enum WorkspaceConversationSkillUsageStatus {
+enum WorkspaceConversationSkillUsageStatus {
 	Available = 'available',
 	Unavailable = 'unavailable',
 }
@@ -252,7 +252,7 @@ export interface WorkspaceConversationSelection {
 	mcpRefs?: WorkspaceConversationResourceSelectionRef[];
 }
 
-export interface WorkspaceConversationContextUsage {
+interface WorkspaceConversationContextUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	locator?: ArtifactLocator;
@@ -267,7 +267,7 @@ export interface WorkspaceConversationContextUsage {
 	diagnostics?: ArtifactDiagnostic[];
 }
 
-export interface WorkspaceConversationSkillUsage {
+interface WorkspaceConversationSkillUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	displayName?: string;

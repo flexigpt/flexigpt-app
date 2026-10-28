@@ -311,6 +311,10 @@ type AppContextContent struct {
 	Description string `json:"description,omitempty"`
 	MIMEType    string `json:"mimeType,omitempty"`
 	Data        []byte `json:"data,omitempty"`
+
+	// DisplayName is populated only by the validated Session App staging
+	// path. It is the label normal chat UI may render for this content item.
+	DisplayName string `json:"displayName,omitempty"`
 }
 
 type AppContextUpdate struct {
@@ -321,6 +325,11 @@ type AppContextUpdate struct {
 	Content           []AppContextContent `json:"content,omitempty"`
 	StructuredContent json.RawMessage     `json:"structuredContent,omitempty"`
 	UpdatedAt         time.Time           `json:"updatedAt"`
+
+	ServerDisplayName      string `json:"serverDisplayName,omitempty"`
+	AppDisplayName         string `json:"appDisplayName,omitempty"`
+	ContextLabel           string `json:"contextLabel,omitempty"`
+	StructuredContentLabel string `json:"structuredContentLabel,omitempty"`
 }
 
 type ResolutionDiagnostic struct {
@@ -335,6 +344,11 @@ type ResolvedArtifact struct {
 	ArtifactID string   `json:"artifactID"`
 	Revision   Revision `json:"revision,omitempty"`
 	Digest     string   `json:"digest,omitempty"`
+
+	DisplayName     string   `json:"displayName,omitempty"`
+	Description     string   `json:"description,omitempty"`
+	SourceLocation  string   `json:"sourceLocation,omitempty"`
+	SourceLocations []string `json:"sourceLocations,omitempty"`
 }
 
 type ResolutionItem struct {
@@ -345,6 +359,10 @@ type ResolutionItem struct {
 	Selected *ArtifactSelection `json:"selected,omitempty"`
 	Used     *ResolvedArtifact  `json:"used,omitempty"`
 	Reason   string             `json:"reason,omitempty"`
+
+	Skill            *SkillResolutionState       `json:"skill,omitempty"`
+	WorkspaceContext *WorkspaceContextResolution `json:"workspaceContext,omitempty"`
+	MCP              *MCPResolutionDetails       `json:"mcp,omitempty"`
 }
 
 type OperationResolutionSummary struct {

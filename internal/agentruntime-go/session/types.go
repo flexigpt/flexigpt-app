@@ -350,6 +350,8 @@ type ToolCall struct {
 	ProviderCallID        string            `json:"providerCallID,omitempty"`
 	Name                  string            `json:"name"`
 	ChoiceID              string            `json:"choiceID,omitempty"`
+	DisplayName           string            `json:"displayName,omitempty"`
+	Description           string            `json:"description,omitempty"`
 	Type                  InferenceToolType `json:"type,omitempty"`
 	Arguments             json.RawMessage   `json:"arguments,omitempty"`
 	Binding               ToolBinding       `json:"binding"`
@@ -376,6 +378,8 @@ type ToolCallProposal struct {
 	ProviderCallID  string            `json:"providerCallID,omitempty"`
 	Name            string            `json:"name"`
 	ChoiceID        string            `json:"choiceID,omitempty"`
+	DisplayName     string            `json:"displayName,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Type            InferenceToolType `json:"type,omitempty"`
 	Arguments       json.RawMessage   `json:"arguments,omitempty"`
 	Binding         ToolBinding       `json:"binding"`

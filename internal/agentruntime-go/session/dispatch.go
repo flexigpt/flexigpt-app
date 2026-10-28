@@ -867,6 +867,8 @@ func (r *Runtime) registerToolCallLocked(
 		ProviderCallID:    proposal.ProviderCallID,
 		Name:              proposal.Name,
 		ChoiceID:          proposal.ChoiceID,
+		DisplayName:       proposal.DisplayName,
+		Description:       proposal.Description,
 		Type:              proposal.Type,
 		Arguments:         cloneRaw(proposal.Arguments),
 		Binding:           cloneJSON(proposal.Binding),

@@ -244,7 +244,7 @@ export interface MCPServerOverride {
  * are converted to durable MCPServerOverride records only at Session-command
  * admission.
  */
-export interface MCPRuntimeServerSelection {
+interface MCPRuntimeServerSelection {
 	server: MCPRuntimeServerID;
 	snapshotDigest?: string;
 	toolExposure: MCPToolExposure;
@@ -267,6 +267,7 @@ interface MCPAppContextContent {
 	description?: string;
 	mimeType?: string;
 	data?: number[];
+	displayName?: string;
 }
 
 /**
@@ -280,6 +281,10 @@ export interface MCPAppContextUpdate {
 	content?: MCPAppContextContent[];
 	structuredContent?: SessionOpaqueJSON;
 	updatedAt?: string;
+	serverDisplayName?: string;
+	appDisplayName?: string;
+	contextLabel?: string;
+	structuredContentLabel?: string;
 }
 
 /**

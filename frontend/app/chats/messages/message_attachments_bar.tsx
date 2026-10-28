@@ -5,34 +5,24 @@ import {
 	FiChevronRight,
 	FiCode,
 	FiFileText,
-	FiFolderPlus,
 	FiGlobe,
 	FiImage,
 	FiLink,
 	FiPaperclip,
-	FiServer,
 	FiTerminal,
 	FiTool,
-	FiZap,
 } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/session_mcp';
-import type { SkillRef } from '@/spec/skill';
+import type { SessionOperationResolutionSummary } from '@/spec/session_base';
+import type { MCPAppContextUpdate } from '@/spec/session_mcp';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
-import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
-import { artifactRefKey } from '@/spec/artifact';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { ToolStoreChoiceType } from '@/spec/tool';
-import {
-	WorkspaceConversationContextUsageStatus,
-	WorkspaceConversationSelectionStatus,
-	WorkspaceConversationSkillUsageStatus,
-} from '@/spec/workspace';
 
 import { getPrettyToolName } from '@/apis/tool_management';
 
@@ -44,6 +34,11 @@ import {
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
+import {
+	MCPAppContextResolutionChip,
+	MessageSkillsResolutionChip,
+	MessageWorkspaceResolutionChip,
+} from '@/chats/messages/message_resolution_chips';
 
 /**
  * Get a path/URL for tooltip display, similar to getUIAttachmentPath
@@ -308,21 +303,7 @@ interface MessageToolCallChipProps {
  * Read‑only chip for an assistant-suggested tool call under the assistant bubble.
  */
 function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCallChipProps) {
-	const tmpCall: UIToolCall = {
-		id: call.id || call.callID,
-		callID: call.callID,
-		name: call.name,
-		arguments: call.arguments,
-		webSearchToolCallItems: call.webSearchToolCallItems,
-		type: call.type,
-		choiceID: call.choiceID,
-		status: call.status,
-		toolStoreChoice: call.toolStoreChoice,
-		mcpToolSelection: call.mcpToolSelection,
-		errorMessage: call.errorMessage,
-	};
-
-	const label = call.mcpToolSelection?.toolName ? call.mcpToolSelection.toolName : getPrettyToolName(tmpCall.name);
+	const label = call.displayName?.trim() || 'Tool';
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
 	const isAutoExecute =
@@ -330,8 +311,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		Boolean(call.toolStoreChoice?.autoExecute) ||
 		call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
-	const mcpLabel = call.mcpToolSelection ? `\nMCP tool: ${call.mcpToolSelection.toolName}` : '';
-	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
+	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}`;
 
 	return (
 		<MessageBarChip
@@ -363,13 +343,9 @@ interface MessageToolOutputChipProps {
  * when the turn was sent.
  */
 function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageToolOutputChipProps) {
-	const prettyName = getPrettyToolName(output.name);
-	const label = output.summary || `Result: ${prettyName}`;
-	const titleLines = [label, `Tool: ${prettyName}`];
-
-	if (output.mcpToolSelection) {
-		titleLines.push(`MCP tool: ${output.mcpToolSelection.toolName}`);
-	}
+	const displayName = output.displayName?.trim() || 'Tool';
+	const label = output.summary || `Result: ${displayName}`;
+	const titleLines = [label, `Tool: ${displayName}`];
 
 	const title = titleLines.join('\n');
 
@@ -457,265 +433,6 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 			onClick={onClick}
 			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
 		/>
-	);
-}
-
-function formatSkillRefForChip(ref: SkillRef): string {
-	return `${ref.rootID}/${ref.artifactID}`;
-}
-
-function MessageSkillsContextChip({
-	enabledSkillRefs,
-	activeSkillRefs,
-}: {
-	enabledSkillRefs: SkillRef[];
-	activeSkillRefs: SkillRef[];
-}) {
-	const enabledCount = enabledSkillRefs.length;
-	const activeCount = activeSkillRefs.length;
-
-	if (enabledCount === 0 && activeCount === 0) {
-		return null;
-	}
-
-	const activeKeys = new Set(
-		activeSkillRefs.map(s => {
-			return formatSkillRefForChip(s);
-		})
-	);
-	const titleLines = [
-		'Instruction skills for this turn',
-		`${enabledCount} enabled skill${enabledCount === 1 ? '' : 's'}`,
-		`${activeCount} active skill${activeCount === 1 ? '' : 's'}`,
-		...enabledSkillRefs.map(ref => {
-			const label = formatSkillRefForChip(ref);
-			return activeKeys.has(label) ? `${label} (active)` : label;
-		}),
-	];
-
-	return (
-		<MessageBarChip
-			icon={<FiZap size={14} />}
-			label="Skills"
-			title={titleLines.join('\n')}
-			dataMessageChip="skills-context"
-			tone="secondary"
-			maxLabelWidthClass="max-w-24"
-			trailing={
-				<>
-					<span className="text-base-content/60 whitespace-nowrap">{enabledCount}</span>
-					{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
-				</>
-			}
-		/>
-	);
-}
-
-function MessageWorkspaceContextChip({
-	selection,
-	usage,
-}: {
-	selection?: WorkspaceConversationSelection;
-	usage?: WorkspaceConversationUsage;
-}) {
-	const menu = useMenuStore({
-		placement: 'bottom-start',
-		focusLoop: true,
-	});
-	const open = useStoreState(menu, 'open');
-
-	if (!selection && !usage) {
-		return null;
-	}
-
-	const displayName = usage?.displayName || selection?.displayName || 'Workspace';
-	const requestedContexts = selection?.contextRefs ?? [];
-	const requestedSkills = selection?.skillRefs ?? [];
-	const hasRecordedUsage = usage !== undefined;
-	const contexts = usage?.contexts ?? [];
-	const skills = usage?.skills ?? [];
-	const includedContextCount = contexts.filter(
-		item =>
-			item.status === WorkspaceConversationContextUsageStatus.Included ||
-			item.status === WorkspaceConversationContextUsageStatus.Truncated
-	).length;
-	const availableSkillCount = skills.filter(item => item.sessionAvailable).length;
-	const activeSkillCount = skills.filter(item => item.active).length;
-	const contextBadgeCount = hasRecordedUsage ? includedContextCount : requestedContexts.length;
-	const skillBadgeCount = hasRecordedUsage ? availableSkillCount : requestedSkills.length;
-	const workspaceUsageNeedsAttention =
-		usage?.status === WorkspaceConversationSelectionStatus.Partial ||
-		usage?.status === WorkspaceConversationSelectionStatus.Unavailable;
-	const warningCount =
-		contexts.filter(
-			item =>
-				item.status !== WorkspaceConversationContextUsageStatus.Included &&
-				item.status !== WorkspaceConversationContextUsageStatus.Truncated
-		).length +
-		skills.filter(item => item.status !== WorkspaceConversationSkillUsageStatus.Available).length +
-		(usage?.diagnostics?.length ?? 0) +
-		(workspaceUsageNeedsAttention ? 1 : 0);
-
-	return (
-		<div className="shrink-0">
-			<MenuButton
-				store={menu}
-				className={getMessageBarChipClassName(warningCount > 0 ? 'secondary' : 'info', false, true)}
-				title={`${displayName}\nWorkspace state recorded for this turn`}
-				data-message-chip="workspace-context"
-			>
-				<FiFolderPlus size={14} />
-				<span className="max-w-32 truncate">{displayName}</span>
-				{contextBadgeCount > 0 ? (
-					<span className="badge badge-secondary badge-xs">
-						{hasRecordedUsage ? 'Context' : 'Selected'} {contextBadgeCount}
-					</span>
-				) : null}
-				{skillBadgeCount > 0 ? (
-					<span className="badge badge-info badge-xs">
-						{hasRecordedUsage ? 'Skills' : 'Selected'} {skillBadgeCount}
-					</span>
-				) : null}
-				{activeSkillCount > 0 ? <span className="badge badge-success badge-xs">Active {activeSkillCount}</span> : null}
-				{warningCount > 0 ? <span className="badge badge-warning badge-xs">{warningCount}</span> : null}
-				<FiChevronRight size={14} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
-			</MenuButton>
-
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-96 w-lg max-w-[calc(100vw-1rem)] overflow-y-auto border p-3 shadow-xl"
-					autoFocusOnShow
-				>
-					<div className="text-sm font-semibold">{displayName}</div>
-					<div className="text-base-content/60 mt-1 text-xs">
-						{usage
-							? 'Recorded at send time.'
-							: 'The Workspace selection was recorded, but an exact backend usage result is unavailable.'}
-					</div>
-					{usage ? (
-						<div className="mt-2">
-							<span className={`badge badge-xs ${workspaceUsageNeedsAttention ? 'badge-warning' : 'badge-success'}`}>
-								{usage.status}
-							</span>
-						</div>
-					) : null}
-
-					{selection ? (
-						<>
-							<div className="mt-3 text-xs font-semibold">Requested selection</div>
-							<div className="mt-1 space-y-1">
-								{requestedContexts.map(item => (
-									<div
-										key={`requested-context:${artifactRefKey(item.artifact)}`}
-										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
-									>
-										<FiFileText size={13} className="mt-0.5" />
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || 'Context item'}</div>
-											{item.locator ? (
-												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
-											) : null}
-										</div>
-										<span className="badge badge-secondary badge-xs">Context</span>
-									</div>
-								))}
-
-								{requestedSkills.map(item => (
-									<div
-										key={`requested-skill:${artifactRefKey(item.artifact)}`}
-										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
-									>
-										<FiZap size={13} className="mt-0.5" />
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || 'Skill'}</div>
-											{item.locator ? (
-												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
-											) : null}
-										</div>
-										<span className="badge badge-info badge-xs">Skill</span>
-									</div>
-								))}
-
-								{requestedContexts.length === 0 && requestedSkills.length === 0 ? (
-									<div className="text-base-content/60 px-1 text-xs">No Context or Skill records were selected.</div>
-								) : null}
-							</div>
-						</>
-					) : null}
-
-					{!usage ? (
-						<div className="border-base-content/10 text-base-content/60 mt-3 rounded-xl border p-2 text-xs">
-							Exact Workspace send-time usage was not recorded for this older message.
-						</div>
-					) : null}
-
-					{usage ? (
-						<>
-							<div className="mt-3 text-xs font-semibold">Send-time Context outcome</div>
-							<div className="mt-1 space-y-1">
-								{contexts.map(item => (
-									<div
-										key={artifactRefKey(item.artifact)}
-										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
-									>
-										<FiFileText size={13} className="mt-0.5" />
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || 'Context item'}</div>
-											{item.locator ? (
-												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
-											) : null}
-										</div>
-										<span className="badge badge-ghost badge-xs">{item.status}</span>
-									</div>
-								))}
-							</div>
-
-							<div className="mt-3 text-xs font-semibold">Send-time Workspace Skill outcome</div>
-							<div className="mt-1 space-y-1">
-								{skills.map(item => (
-									<div
-										key={artifactRefKey(item.artifact)}
-										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
-									>
-										<FiZap size={13} className="mt-0.5" />
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.displayName || item.name || 'Skill'}</div>
-											{item.locator ? (
-												<div className="text-base-content/60 truncate text-[10px]">{item.locator}</div>
-											) : null}
-										</div>
-										{item.sessionAvailable ? <span className="badge badge-info badge-xs">Available</span> : null}
-										{item.active ? <span className="badge badge-success badge-xs">Active</span> : null}
-										{item.status !== WorkspaceConversationSkillUsageStatus.Available ? (
-											<span className="badge badge-warning badge-xs">{item.status}</span>
-										) : null}
-									</div>
-								))}
-							</div>
-
-							{usage.diagnostics?.length ? (
-								<div className="mt-3">
-									<div className="text-xs font-semibold">Diagnostics</div>
-									<div className="mt-1 space-y-1">
-										{usage.diagnostics.map((diagnostic, index) => (
-											<div
-												key={`${diagnostic.code}:${index}`}
-												className="bg-base-100 text-base-content/70 rounded-xl p-2 text-[10px]"
-											>
-												{diagnostic.message}
-											</div>
-										))}
-									</div>
-								</div>
-							) : null}
-						</>
-					) : null}
-				</Menu>
-			) : null}
-		</div>
 	);
 }
 
@@ -909,12 +626,8 @@ interface MessageAttachmentsBarProps {
 	toolChoices?: ToolStoreChoice[];
 	toolSelectionIssues?: ToolSelectionIssue[];
 	onToolSelectionIssueDetails?: (issue: ToolSelectionIssue) => void;
-	mcpContext?: MCPConversationContext;
-	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
-	enabledSkillRefs?: SkillRef[];
-	activeSkillRefs?: SkillRef[];
-	workspaceSelection?: WorkspaceConversationSelection;
-	workspaceUsage?: WorkspaceConversationUsage;
+	operationResolution?: SessionOperationResolutionSummary;
+	appContextUpdates?: MCPAppContextUpdate[];
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -935,12 +648,8 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 	toolChoices,
 	toolSelectionIssues,
 	onToolSelectionIssueDetails,
-	mcpContext,
-	mcpAppContextUpdates,
-	enabledSkillRefs,
-	activeSkillRefs,
-	workspaceSelection,
-	workspaceUsage,
+	operationResolution,
+	appContextUpdates,
 	toolCalls,
 	toolOutputs,
 	onToolChoiceDetails,
@@ -950,30 +659,21 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 	const choices = toolChoices ?? [];
 	const calls = toolCalls ?? [];
 	const outputs = toolOutputs ?? [];
-	const enabledSkills = enabledSkillRefs ?? [];
-	const activeSkills = activeSkillRefs ?? [];
 	const unavailableSelections = toolSelectionIssues ?? [];
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
-
 	const normalToolCalls = calls.filter(c => c.type !== ToolStoreChoiceType.WebSearch);
 	const webSearchCalls = calls.filter(c => c.type === ToolStoreChoiceType.WebSearch);
-
 	const normalToolOutputs = outputs.filter(o => o.type !== ToolStoreChoiceType.WebSearch);
 	const webSearchOutputs = outputs.filter(o => o.type === ToolStoreChoiceType.WebSearch);
 
 	const hasAttachments = !!attachments && attachments.length > 0;
 	const hasTools = normalToolChoices.length > 0;
-	const hasMCP =
-		(mcpContext?.servers?.length ?? 0) +
-			(mcpContext?.resources?.length ?? 0) +
-			(mcpContext?.resourceTemplates?.length ?? 0) +
-			(mcpContext?.prompts?.length ?? 0) >
-		0;
-	const hasMCPAppContext = (mcpAppContextUpdates?.length ?? 0) > 0;
-	const hasSkillContext = enabledSkills.length > 0 || activeSkills.length > 0;
-	const hasWorkspace = Boolean(workspaceSelection || workspaceUsage);
+	const hasMCP = (operationResolution?.mcp?.length ?? 0) > 0;
+	const hasMCPAppContext = (appContextUpdates?.length ?? 0) > 0;
+	const hasSkillContext = (operationResolution?.skills?.length ?? 0) > 0;
+	const hasWorkspace = Boolean(operationResolution?.workspace);
 
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
@@ -1003,9 +703,13 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 			className="flex min-h-8 max-w-full min-w-0 items-center gap-1 overflow-x-auto text-xs"
 			style={{ scrollbarGutter: 'stable' }}
 		>
-			{hasWorkspace ? <MessageWorkspaceContextChip selection={workspaceSelection} usage={workspaceUsage} /> : null}
+			{hasWorkspace ? <MessageWorkspaceResolutionChip resolution={operationResolution} /> : null}
 
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
+
+			{hasMCP && <MCPMessageContextChip resolution={operationResolution} />}
+			{hasMCPAppContext && <MCPAppContextResolutionChip updates={appContextUpdates ?? []} />}
+			{hasSkillContext && <MessageSkillsResolutionChip resolution={operationResolution} />}
 
 			{unavailableSelections.map(issue => (
 				<MessageBarChip
@@ -1028,22 +732,6 @@ export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 
 			{/* Regular tools for this turn */}
 			{hasTools && <ToolChoicesGroupChip tools={normalToolChoices} onToolChoiceDetails={onToolChoiceDetails} />}
-
-			{hasMCP && <MCPMessageContextChip context={mcpContext} />}
-			{hasMCPAppContext && (
-				<MessageBarChip
-					icon={<FiServer size={14} />}
-					label="App context"
-					title={`MCP App model context\n${mcpAppContextUpdates?.length ?? 0} update${
-						(mcpAppContextUpdates?.length ?? 0) === 1 ? '' : 's'
-					}`}
-					dataMessageChip="mcp-app-context"
-					tone="secondary"
-					maxLabelWidthClass="max-w-28"
-					trailing={<span className="text-base-content/60 whitespace-nowrap">{mcpAppContextUpdates?.length ?? 0}</span>}
-				/>
-			)}
-			{hasSkillContext && <MessageSkillsContextChip enabledSkillRefs={enabledSkills} activeSkillRefs={activeSkills} />}
 
 			{/* Web‑search config for this turn */}
 			{hasWebSearchTools && (

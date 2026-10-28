@@ -19,6 +19,15 @@ const INTERNAL_PRESENTATION_FIELDS = new Set([
 	'sessionid',
 	'runid',
 	'operationid',
+	'originoperationid',
+	'selectedresultid',
+	'attemptid',
+	'waitid',
+	'consumedbyoperationid',
+	'resourceuri',
+	'appresourceuri',
+	'sessionapp',
+	'structuredcontent',
 ]);
 
 function normalizedLabel(value: string): string {

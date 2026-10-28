@@ -458,6 +458,8 @@ export interface UIToolCall {
 	id: string;
 	callID: string;
 	name: string;
+	displayName?: string;
+	description?: string;
 	arguments?: string;
 	webSearchToolCallItems?: WebSearchToolCallItemUnion[];
 	type: ToolStoreChoiceType;
@@ -500,6 +502,8 @@ export interface UIToolOutput {
 	id: string;
 	callID: string;
 	name: string;
+	displayName?: string;
+	description?: string;
 
 	type: ToolStoreChoiceType;
 	choiceID: string;

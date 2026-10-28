@@ -69,11 +69,6 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 
-	if (prev.message.uiDebugDetails !== next.message.uiDebugDetails) {
-		// Callers must replace changed message objects. A comparator cannot
-		// detect mutation when both props reference the same object.
-		return false;
-	}
 	if (prev.message.debugDetails !== next.message.debugDetails) {
 		return false;
 	}
@@ -116,6 +111,12 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 	if (prev.message.workspaceUsage !== next.message.workspaceUsage) {
+		return false;
+	}
+	if (prev.message.operationResolution !== next.message.operationResolution) {
+		return false;
+	}
+	if (prev.message.appContextUpdates !== next.message.appContextUpdates) {
 		return false;
 	}
 
@@ -220,19 +221,15 @@ export const ChatMessage = memo(function ChatMessage({
 		}) ?? false;
 
 	const hasCitations = !isUser && !isBusy && (message.uiCitations?.length ?? 0) > 0;
-	const mcpContextItemCount =
-		(message.mcpContext?.servers?.length ?? 0) +
-		(message.mcpContext?.resources?.length ?? 0) +
-		(message.mcpContext?.resourceTemplates?.length ?? 0) +
-		(message.mcpContext?.prompts?.length ?? 0);
-	const hasMCPContext = mcpContextItemCount > 0;
-	const hasWorkspaceContext = Boolean(message.workspaceSelection || message.workspaceUsage);
-	const hasSkillContext = (message.enabledSkillRefs?.length ?? 0) > 0 || (message.activeSkillRefs?.length ?? 0) > 0;
+	const hasMCPContext = (message.operationResolution?.mcp?.length ?? 0) > 0;
+	const hasWorkspaceContext = Boolean(message.operationResolution?.workspace);
+	const hasSkillContext = (message.operationResolution?.skills?.length ?? 0) > 0;
+	const hasAppContext = (message.appContextUpdates?.length ?? 0) > 0;
 
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
 		(message.toolSelections?.length ?? 0) > 0 ||
-		(message.mcpAppContextUpdates?.length ?? 0) > 0 ||
+		hasAppContext ||
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0 ||
 		hasMCPContext ||
@@ -396,12 +393,8 @@ export const ChatMessage = memo(function ChatMessage({
 								toolChoices={message.uiToolChoices}
 								toolSelectionIssues={message.uiToolSelectionIssues}
 								onToolSelectionIssueDetails={handleToolSelectionIssueDetails}
-								mcpContext={message.mcpContext}
-								mcpAppContextUpdates={message.mcpAppContextUpdates}
-								enabledSkillRefs={message.enabledSkillRefs}
-								activeSkillRefs={message.activeSkillRefs}
-								workspaceSelection={message.workspaceSelection}
-								workspaceUsage={message.workspaceUsage}
+								operationResolution={message.operationResolution}
+								appContextUpdates={message.appContextUpdates}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
 								onToolChoiceDetails={handleToolChoiceDetails}
@@ -419,7 +412,6 @@ export const ChatMessage = memo(function ChatMessage({
 							isUser={isUser}
 							cardCopyContent={message.uiContent}
 							onEdit={onEdit}
-							messageDetails={message.uiDebugDetails ?? ''}
 							reasoningContents={message.uiReasoningContents}
 							isBusy={isBusy}
 							bodyPresent={showBodyWithMedia}

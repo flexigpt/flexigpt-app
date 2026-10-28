@@ -30,6 +30,7 @@ import type {
 	SessionOpaqueJSON,
 	SessionOperationError,
 	SessionOperationPreparation,
+	SessionOperationResolutionSummary,
 	SessionOperationState,
 	SessionRevision,
 	SessionRunOutcomeKind,
@@ -327,6 +328,8 @@ export interface SessionToolCall {
 	providerCallID?: string;
 	name: string;
 	choiceID?: string;
+	displayName?: string;
+	description?: string;
 	type?: string;
 	arguments?: SessionOpaqueJSON;
 	binding: SessionToolBinding;
@@ -675,6 +678,8 @@ export interface ConversationMessage {
 	mcpToolMappings?: MCPProviderToolMapping[];
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	attachments?: Attachment[];
+	operationResolution?: SessionOperationResolutionSummary;
+	appContextUpdates?: MCPAppContextUpdate[];
 	enabledSkillRefs?: ArtifactRef[];
 	activeSkillRefs?: ArtifactRef[];
 	workspaceSelection?: WorkspaceConversationSelection;
@@ -687,11 +692,9 @@ export interface ConversationMessage {
 
 	// This is not a model/provider failure. It means the backend received
 	// debugger output but could not safely serialize it for Session transport.
-	// It must remain visible in the existing message-details modal.
 	debugDetailsError?: string;
 
 	uiContent: string;
-	uiDebugDetails?: string;
 	uiReasoningContents?: ReasoningContent[];
 	uiToolCalls?: UIToolCall[];
 	uiToolOutputs?: UIToolOutput[];

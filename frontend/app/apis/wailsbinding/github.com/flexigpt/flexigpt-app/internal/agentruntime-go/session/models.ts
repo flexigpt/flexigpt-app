@@ -33,6 +33,12 @@ export interface AppContextContent {
     "description"?: string;
     "mimeType"?: string;
     "data"?: string | null;
+
+    /**
+     * DisplayName is populated only by the validated Session App staging
+     * path. It is the label normal chat UI may render for this content item.
+     */
+    "displayName"?: string;
 }
 
 export interface AppContextUpdate {
@@ -43,6 +49,10 @@ export interface AppContextUpdate {
     "content"?: AppContextContent[] | null;
     "structuredContent"?: json$0.RawMessage;
     "updatedAt": string;
+    "serverDisplayName"?: string;
+    "appDisplayName"?: string;
+    "contextLabel"?: string;
+    "structuredContentLabel"?: string;
 }
 
 export interface AppInstance {
@@ -375,10 +385,33 @@ export interface LocalAttachmentReference {
     "format"?: string;
 }
 
+export interface MCPPromptResolution {
+    "displayName": string;
+    "description"?: string;
+    "availability": MCPSelectionAvailability;
+}
+
 export interface MCPPromptSelection {
     "promptName": string;
     "expectedDigest"?: string;
     "arguments"?: { [_ in string]?: string } | null;
+}
+
+/**
+ * MCPResolutionDetails belongs only to an MCP server resolution item.
+ */
+export interface MCPResolutionDetails {
+    "instructionsIncluded": boolean;
+    "tools"?: MCPToolResolution[] | null;
+    "resources"?: MCPResourceResolution[] | null;
+    "resourceTemplates"?: MCPResourceTemplateResolution[] | null;
+    "prompts"?: MCPPromptResolution[] | null;
+}
+
+export interface MCPResourceResolution {
+    "displayName": string;
+    "description"?: string;
+    "availability": MCPSelectionAvailability;
 }
 
 export interface MCPResourceSelection {
@@ -386,11 +419,31 @@ export interface MCPResourceSelection {
     "expectedDigest"?: string;
 }
 
+export interface MCPResourceTemplateResolution {
+    "displayName": string;
+    "description"?: string;
+    "availability": MCPSelectionAvailability;
+}
+
 export interface MCPResourceTemplateSelection {
     "uriTemplate": string;
     "expectedDigest"?: string;
     "arguments"?: { [_ in string]?: string } | null;
 }
+
+/**
+ * MCPSelectionAvailability records whether one selected MCP capability was
+ * actually available at operation preparation time.
+ */
+export enum MCPSelectionAvailability {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MCPSelectionAvailabilityAvailable = "available",
+    MCPSelectionAvailabilityUnavailable = "unavailable",
+};
 
 export interface MCPServerOverride {
     "key": string;
@@ -419,6 +472,12 @@ export enum MCPToolExposure {
     MCPToolExposureAll = "all",
     MCPToolExposureSelected = "selected",
 };
+
+export interface MCPToolResolution {
+    "displayName": string;
+    "description"?: string;
+    "availability": MCPSelectionAvailability;
+}
 
 export interface MCPToolSelection {
     "toolName": string;
@@ -655,6 +714,9 @@ export interface ResolutionItem {
     "selected"?: ArtifactSelection | null;
     "used"?: ResolvedArtifact | null;
     "reason"?: string;
+    "skill"?: SkillResolutionState | null;
+    "workspaceContext"?: WorkspaceContextResolution | null;
+    "mcp"?: MCPResolutionDetails | null;
 }
 
 export enum ResolutionState {
@@ -685,6 +747,10 @@ export interface ResolvedArtifact {
     "artifactID": string;
     "revision"?: Revision;
     "digest"?: string;
+    "displayName"?: string;
+    "description"?: string;
+    "sourceLocation"?: string;
+    "sourceLocations"?: string[] | null;
 }
 
 export interface ResumeRunCommand {
@@ -832,6 +898,16 @@ export interface SetAutomationHoldCommand {
     "scope"?: AutomationHoldScope;
 }
 
+/**
+ * SkillResolutionState belongs to a Skill resolution item for one operation.
+ * It must not be inferred from current Skill catalog state.
+ */
+export interface SkillResolutionState {
+    "enabled": boolean;
+    "active": boolean;
+    "sessionAvailable": boolean;
+}
+
 export interface SkillSessionState {
     "id"?: string;
     "generation": Revision;
@@ -916,6 +992,8 @@ export interface ToolCall {
     "providerCallID"?: string;
     "name": string;
     "choiceID"?: string;
+    "displayName"?: string;
+    "description"?: string;
     "type"?: InferenceToolType;
     "arguments"?: json$0.RawMessage;
     "binding": ToolBinding;
@@ -1145,6 +1223,33 @@ export interface WaitingRequest {
     "updatedAt": string;
     "expiresAt"?: string | null;
     "error"?: string;
+}
+
+/**
+ * WorkspaceContextOutcome records the exact send-time outcome of one selected
+ * Workspace Context item. It is a domain result, not a frontend-derived label.
+ */
+export enum WorkspaceContextOutcome {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkspaceContextOutcomeIncluded = "included",
+    WorkspaceContextOutcomePartiallyIncluded = "partiallyIncluded",
+    WorkspaceContextOutcomeNotIncluded = "notIncluded",
+    WorkspaceContextOutcomeNotAllowed = "notAllowed",
+    WorkspaceContextOutcomeUnavailable = "unavailable",
+};
+
+/**
+ * WorkspaceContextResolution belongs only to a workspaceContext resolution
+ * item. DiagnosticSummary is deliberately user-safe and never mirrors the
+ * internal Reason field.
+ */
+export interface WorkspaceContextResolution {
+    "outcome": WorkspaceContextOutcome;
+    "diagnosticSummary"?: string;
 }
 
 export interface WorkspaceSelectionIntent {
