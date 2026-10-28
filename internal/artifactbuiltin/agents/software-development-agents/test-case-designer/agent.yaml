@@ -45,6 +45,7 @@ members:
         <Attach a spec/bug report/code path or replace this line with the relevant repo/file path and behavior to test.>
 
         Design a traceable test plan using the available repository evidence.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

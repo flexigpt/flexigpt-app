@@ -42,9 +42,9 @@ members:
     parameters:
       mediaType: text/markdown
       content: |-
-        <Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>
+        <Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`. Describe the task.>
 
-        Inspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.
+        Use the referenced material. Follow the attached instructions.
 
   - type: tool
     name: readfile

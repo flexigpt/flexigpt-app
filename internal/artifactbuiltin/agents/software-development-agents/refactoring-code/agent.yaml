@@ -51,6 +51,7 @@ members:
         <Replace this line with the repo/file path and the refactoring goal. Example: `/absolute/path/to/repo/pkg/foo`>
 
         Refactor the requested scope end to end while preserving behavior; update affected callers and tests, then verify with available tools.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: readfile

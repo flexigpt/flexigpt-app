@@ -45,6 +45,7 @@ members:
         <Replace this line with the local path(s) and the exact edit you want. Example: `/absolute/path/to/repo-or-docs`>
 
         Inspect relevant files first, prefer unified diffs for normal edits, use direct text insert/replace/delete only when they are the safest precise operation, and verify with focused shell commands when useful. Keep changes scoped.
+        Use the referenced material. Follow the attached instructions.
 
   - type: tool
     name: readfile

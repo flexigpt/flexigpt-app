@@ -45,6 +45,7 @@ members:
         <Attach research/notes or describe the product goal, target users, constraints, and desired document type: PRD, MRD, or product requirements brief.>
 
         Create a source-grounded requirements artifact with problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

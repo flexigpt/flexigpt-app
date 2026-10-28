@@ -45,6 +45,7 @@ members:
         <Attach or paste errors, logs, bug reports, support notes, or confirmed fixes. Include the intended audience and product/version if known.>
 
         Write a troubleshooting/KB article with symptom, confirmed vs possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

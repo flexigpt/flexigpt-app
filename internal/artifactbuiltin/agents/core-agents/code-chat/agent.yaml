@@ -38,4 +38,4 @@ members:
       content: |-
         <Attach the specification and relevant source files with repository-relative paths. Describe the requested implementation.>
 
-        Implement the change from the supplied material. Deliver complete new or replacement files and exact-path diffs for modified files. Complete every supported part in this response and identify precise verification limits.
+        Implement the change from the supplied material. Follow the attached instructions.

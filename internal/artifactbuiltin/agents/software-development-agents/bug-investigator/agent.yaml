@@ -45,6 +45,7 @@ members:
         <Paste the error, stack trace, failing test output, bug report, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`.>
 
         Investigate this bug using the available repository evidence.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

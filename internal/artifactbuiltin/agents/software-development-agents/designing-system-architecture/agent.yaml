@@ -45,6 +45,7 @@ members:
         <Describe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.>
 
         Recommend the simplest viable architecture using the available source material.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: readfile

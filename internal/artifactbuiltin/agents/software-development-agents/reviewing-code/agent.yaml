@@ -45,6 +45,7 @@ members:
         <Attach changed files, paste a diff, or replace this line with repo path plus commit/branch/PR context: `/absolute/path/to/repo`.>
 
         Review the code or diff using the available repository evidence.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: readfile

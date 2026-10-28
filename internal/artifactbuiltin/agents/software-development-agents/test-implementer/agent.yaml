@@ -51,6 +51,7 @@ members:
         <Replace this line with the repo path and behavior/bug/requirement to cover with tests. Example: `/absolute/path/to/repo`>
 
         Inspect existing tests to match style, plan the focused cases, write or update tests only, and verify them with focused shell commands.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

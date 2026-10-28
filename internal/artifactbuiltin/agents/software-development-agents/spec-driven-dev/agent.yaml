@@ -51,6 +51,7 @@ members:
         <Replace this line with the repo path and feature/change request. Example: `/absolute/path/to/repo`>
 
         Develop this change end to end using the available repository evidence.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: readfile

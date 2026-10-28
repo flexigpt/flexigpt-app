@@ -45,6 +45,7 @@ members:
         <Describe the decision to make, options considered, constraints, evidence, stakeholders, and any deadline. Attach supporting notes if available.>
 
         Write a decision record with a clear recommendation, rationale, trade-offs accepted, risks, next steps, and concrete revisit triggers.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

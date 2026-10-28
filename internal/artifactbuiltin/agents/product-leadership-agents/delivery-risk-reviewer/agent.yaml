@@ -44,7 +44,7 @@ members:
       content: |-
         <Attach or paste the plan, milestone list, issue summary, status notes, or delivery commitment to review.>
 
-        Review delivery risk using the supplied source material.
+        Review delivery risk using the supplied source material. Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

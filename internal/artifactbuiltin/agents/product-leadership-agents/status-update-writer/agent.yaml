@@ -45,6 +45,7 @@ members:
         <Attach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.>
 
         Turn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

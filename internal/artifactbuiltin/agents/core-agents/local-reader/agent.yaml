@@ -36,9 +36,9 @@ members:
     parameters:
       mediaType: text/markdown
       content: |-
-        <Attach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`>
+        <Attach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`. Describe the task.>
 
-        Analyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next.
+        Analyze the referenced material. Follow the attached instructions.
 
   - type: tool
     name: readfile

@@ -45,6 +45,7 @@ members:
         <Attach or paste diffs, PR summaries, commit notes, issue lists, or version notes for the release. Include the version if known.>
 
         Create release notes from this source material. Separate added, changed, fixed, breaking changes, migration notes, known issues, and internal-only changes. Mark gaps as draft.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

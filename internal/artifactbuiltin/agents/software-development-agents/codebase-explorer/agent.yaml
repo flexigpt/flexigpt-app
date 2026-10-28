@@ -45,6 +45,7 @@ members:
         <Replace this line with the repo/module path and what you want to understand. Example: `/absolute/path/to/repo/internal/search`>
 
         Explore this codebase area using the available repository evidence.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

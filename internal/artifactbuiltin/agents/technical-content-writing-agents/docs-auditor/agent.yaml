@@ -45,6 +45,7 @@ members:
         <Attach docs or replace this line with docs/README paths to audit, for example `/absolute/path/to/repo/docs`. Include intended audience if known.>
 
         Audit these docs read-only for audience fit, structure, missing content, stale or unsupported claims, duplication, navigation issues, severity, and a recommended rewrite plan. Do not rewrite files.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath

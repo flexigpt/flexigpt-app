@@ -45,6 +45,7 @@ members:
         <Attach source material or replace this line with repo/docs paths plus the doc you want created or updated, for example `/absolute/path/to/repo/docs`. Include audience and desired doc type.>
 
         Create or update documentation grounded in the provided source. Include a clear outline, steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.
+        Use the needed skills and tools. Follow the attached instructions.
 
   - type: tool
     name: statpath
