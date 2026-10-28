@@ -9,14 +9,15 @@ import (
 )
 
 type GoToolDescriptor struct {
-	Function    string
-	Name        storeSpec.LogicalName
-	Version     storeSpec.LogicalVersion
-	DisplayName string
-	Description string
-	Tags        []string
-	AutoExecute bool
-	InputSchema json.RawMessage
+	Function     string
+	Name         storeSpec.LogicalName
+	Version      storeSpec.LogicalVersion
+	DisplayName  string
+	Description  string
+	Tags         []string
+	AutoExecute  bool
+	InputSchema  json.RawMessage
+	OutputSchema json.RawMessage
 }
 
 func (d GoToolDescriptor) Validate() error {

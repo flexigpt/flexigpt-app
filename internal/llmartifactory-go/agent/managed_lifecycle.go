@@ -217,7 +217,7 @@ func (a *Service) loadManagedAgent(
 		if err != nil {
 			return editableManagedAgent{}, err
 		}
-		if !inspection.IsCurrent() {
+		if !inspection.IsContentCurrent() {
 			return editableManagedAgent{}, fmt.Errorf(
 				"%w: managed Agent Source requires refresh",
 				storeSpec.ErrRefreshRequired,

@@ -717,7 +717,7 @@ func (a *Service) currentManagedSourceGeneration(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (string, error) {
-	if err := refreshFlow.EnsureSourceCurrent(
+	if err := refreshFlow.EnsureSourceContentCurrent(
 		ctx,
 		a.discovery,
 		rootID,
@@ -734,7 +734,7 @@ func (a *Service) currentManagedSourceGeneration(
 	if err != nil {
 		return "", err
 	}
-	if !inspection.IsCurrent() {
+	if !inspection.IsContentCurrent() {
 		return "", fmt.Errorf(
 			"%w: managed Model Source requires refresh",
 			storeSpec.ErrRefreshRequired,

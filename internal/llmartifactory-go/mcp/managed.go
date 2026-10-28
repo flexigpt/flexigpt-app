@@ -304,7 +304,7 @@ func (a *Service) UpdateMCPServer(
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if !inspection.IsCurrent() {
+	if !inspection.IsContentCurrent() {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: managed MCP Source requires refresh",
 			storeSpec.ErrRefreshRequired,

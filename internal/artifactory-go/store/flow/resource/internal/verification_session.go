@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -234,7 +235,11 @@ func (s *verificationSession) Close(ctx context.Context) error {
 		)
 		if currentErr == nil &&
 			(!current.Enabled ||
-				current.Revision != value.source.Revision) {
+				current.RetiredAt != nil ||
+				!sameSourceContentIdentity(
+					value.source,
+					current,
+				)) {
 			currentErr = fmt.Errorf(
 				"%w: Artifact Source %q changed during batch",
 				storeSpec.ErrRefreshRequired,
@@ -259,6 +264,21 @@ func verificationSessionFromContext(
 		verificationSessionContextKey{},
 	).(*verificationSession)
 	return value
+}
+
+// sameSourceContentIdentity compares Source fields that select the physical
+// backing source. It deliberately excludes display metadata, discovery,
+// revision, and timestamps because those can change without changing bytes.
+func sameSourceContentIdentity(
+	left sourceModel.Source,
+	right sourceModel.Source,
+) bool {
+	return left.RootID == right.RootID &&
+		left.ID == right.ID &&
+		left.RootStorageKey == right.RootStorageKey &&
+		left.StorageKey == right.StorageKey &&
+		left.Kind == right.Kind &&
+		bytes.Equal(left.Config, right.Config)
 }
 
 func (s *verificationSession) withSource(
@@ -336,8 +356,13 @@ func (s *verificationSession) ensureRefreshCurrentLocked(
 	if err != nil {
 		return refreshModel.Inspection{}, err
 	}
-	if !inspection.IsCurrent() ||
-		current.snapshot.Generation() != inspection.State.SourceGeneration {
+
+	// IsCurrent includes declaration-admission metadata such as Source
+	// revision, discovery configuration, and decoder fingerprints. Resource
+	// verification needs only the generation that proves source bytes still
+	// match the refreshed Artifact evidence.
+	if current.snapshot.Generation() !=
+		inspection.State.SourceGeneration {
 		return refreshModel.Inspection{}, fmt.Errorf(
 			"%w: Artifact Source %q changed during batch setup",
 			storeSpec.ErrRefreshRequired,
@@ -527,10 +552,11 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 			sourceID: resolved.Source.ID,
 		},
 		func(current *verificationSessionSource) error {
-			if current.source.Revision !=
-				resolved.RefreshState.SourceRevision ||
-				current.snapshot.Generation() !=
-					resolved.RefreshState.SourceGeneration {
+			// Source revision can advance for metadata-only operations. The
+			// source generation is the physical witness associated with the
+			// resolved Artifact.
+			if current.snapshot.Generation() !=
+				resolved.RefreshState.SourceGeneration {
 				return fmt.Errorf(
 					"%w: Source changed after Artifact resolution",
 					storeSpec.ErrRefreshRequired,

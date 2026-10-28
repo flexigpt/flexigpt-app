@@ -256,9 +256,10 @@ func (s *Service) InspectSource(
 	if err != nil {
 		return refreshModel.Inspection{}, err
 	}
-	if result.SourceRevisionChanged || result.DiscoveryChanged || result.DecoderChanged {
-		return result.Clone(), nil
-	}
+
+	// Content callers must still observe a physical generation change when
+	// admission metadata is stale. IsCurrent remains false for that metadata
+	// drift, while IsContentCurrent can safely report byte freshness.
 	return s.inspectSourceGeneration(ctx, value, result)
 }
 

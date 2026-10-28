@@ -988,7 +988,7 @@ func (a *API) loadEditablePlugin(
 	if err != nil {
 		return editablePlugin{}, err
 	}
-	if !inspection.IsCurrent() {
+	if !inspection.IsContentCurrent() {
 		return editablePlugin{}, fmt.Errorf(
 			"%w: managed Plugin Source requires refresh",
 			storeSpec.ErrRefreshRequired,

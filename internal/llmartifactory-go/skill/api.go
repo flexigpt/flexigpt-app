@@ -536,7 +536,7 @@ func (a *Service) ReplaceManagedSkill(
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if !inspection.IsCurrent() {
+	if !inspection.IsContentCurrent() {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: managed Skill Source requires refresh",
 			storeSpec.ErrRefreshRequired,
@@ -779,8 +779,6 @@ func (a *Service) getManagedSkillDocument(
 	}
 	if value.SourceContentDigest == nil ||
 		entry.Digest != *value.SourceContentDigest ||
-		entry.SourceRevision !=
-			resolved.RefreshState.SourceRevision ||
 		entry.SourceGeneration !=
 			resolved.RefreshState.SourceGeneration {
 		return skillSource.ManagedSkillDocument{}, fmt.Errorf(

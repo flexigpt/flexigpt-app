@@ -68,12 +68,9 @@ func (r ResolvedArtifact) Validate() error {
 			storeSpec.ErrInvalid,
 		)
 	}
-	if r.Source.Revision != r.RefreshState.SourceRevision {
-		return fmt.Errorf(
-			"%w: resolved Source revision does not match refresh state",
-			storeSpec.ErrRefreshRequired,
-		)
-	}
+	// Source revision can advance for discovery, decoder, and display
+	// metadata changes. Resource resolution verifies source generation and
+	// exact content through its verification session instead.
 	if r.Definition.Kind != r.Artifact.Kind ||
 		r.Definition.Digest != *r.Artifact.ResolvedDefinition ||
 		r.Definition.LogicalName != r.Artifact.LogicalName ||

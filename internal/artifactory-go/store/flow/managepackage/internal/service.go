@@ -163,7 +163,7 @@ func (s *Service) Publish(
 			request.RootID,
 			request.Binding.SourceID,
 		)
-		if inspectErr == nil && inspection.IsCurrent() {
+		if inspectErr == nil && inspection.IsContentCurrent() {
 			resolved, findErr := s.dependencies.Artifacts.FindByOrigin(
 				ctx,
 				request.RootID,

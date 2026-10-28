@@ -114,8 +114,7 @@ func (a *Service) GetArtifactSkillDetails(
 			if err != nil {
 				return ArtifactSkillDetails{}, err
 			}
-			if entry.SourceRevision != resolved.RefreshState.SourceRevision ||
-				entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+			if entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
 				return ArtifactSkillDetails{}, storeSpec.ErrRefreshRequired
 			}
 			if materialized.Locator == value.Binding.Locator &&

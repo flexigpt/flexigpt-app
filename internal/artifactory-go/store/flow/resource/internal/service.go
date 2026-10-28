@@ -654,8 +654,13 @@ func (s *Service) confirmSourceCurrent(
 	if err != nil {
 		return err
 	}
+
+	// Source revisions also represent discovery and decoder metadata changes.
+	// A confirmed snapshot plus an unchanged physical source identity is the
+	// resource-read consistency boundary.
 	if !current.Enabled ||
-		current.Revision != observed.Revision {
+		current.RetiredAt != nil ||
+		!sameSourceContentIdentity(observed, current) {
 		return fmt.Errorf(
 			"%w: Source %q changed during verified read",
 			storeSpec.ErrRefreshRequired,

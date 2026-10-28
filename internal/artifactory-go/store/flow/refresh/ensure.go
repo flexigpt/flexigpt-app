@@ -30,6 +30,28 @@ func EnsureSourceCurrent(
 	return err
 }
 
+// EnsureSourceContentCurrent refreshes only when the physical Source
+// generation is stale. Discovery, decoder, schema, and other admission
+// metadata drift does not require a content refresh.
+func EnsureSourceContentCurrent(
+	ctx context.Context,
+	refreshes API,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) error {
+	inspection, err := refreshes.InspectSource(ctx, rootID, sourceID)
+	if err == nil && inspection.IsContentCurrent() {
+		return nil
+	}
+	if err != nil &&
+		!errors.Is(err, storeSpec.ErrRefreshStateNotFound) {
+		return err
+	}
+
+	_, err = refreshes.RefreshSource(ctx, rootID, sourceID)
+	return err
+}
+
 type DiscoveryReconciler func(
 	current sourceModel.DiscoverySpec,
 	desired sourceModel.DiscoverySpec,

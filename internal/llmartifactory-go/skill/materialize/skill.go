@@ -184,9 +184,7 @@ func resolve(
 	if err != nil {
 		return ResolvedSkill{}, err
 	}
-	if sourceEntry.SourceRevision != resolved.RefreshState.SourceRevision ||
-		sourceEntry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
+	if sourceEntry.SourceGeneration != resolved.RefreshState.SourceGeneration {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Source changed during materialization",
 			storeSpec.ErrRefreshRequired,

@@ -727,7 +727,7 @@ func (a *Service) agentImportDestination(
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}
-	if !inspection.IsCurrent() {
+	if !inspection.IsContentCurrent() {
 		return agentImportDestinationState{}, fmt.Errorf(
 			"%w: selected managed Agent Source requires refresh",
 			storeSpec.ErrRefreshRequired,

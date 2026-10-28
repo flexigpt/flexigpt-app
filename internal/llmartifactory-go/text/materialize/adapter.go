@@ -222,14 +222,12 @@ func (a *Adapter) contentForDocument(
 	return materializeSourceEntries(
 		entries,
 		&sourceEntriesExpectation{
-			revision:   resolved.RefreshState.SourceRevision,
 			generation: resolved.RefreshState.SourceGeneration,
 		},
 	)
 }
 
 type sourceEntriesExpectation struct {
-	revision   uint64
 	generation string
 }
 
@@ -240,25 +238,21 @@ func materializeSourceEntries(
 	var output strings.Builder
 	locators := make([]storeSpec.Locator, 0, len(entries))
 	var generation string
-	var revision uint64
 
 	for index, entry := range entries {
 		switch {
 		case expected != nil &&
-			(entry.SourceRevision != expected.revision ||
-				entry.SourceGeneration != expected.generation):
+			entry.SourceGeneration != expected.generation:
 			return "", nil, fmt.Errorf(
 				"%w: Text Source changed during materialization",
 				storeSpec.ErrRefreshRequired,
 			)
 
 		case expected == nil && index == 0:
-			revision = entry.SourceRevision
 			generation = entry.SourceGeneration
 
 		case expected == nil &&
-			(entry.SourceRevision != revision ||
-				entry.SourceGeneration != generation):
+			entry.SourceGeneration != generation:
 			return "", nil, fmt.Errorf(
 				"%w: Text Source changed during materialization",
 				storeSpec.ErrRefreshRequired,

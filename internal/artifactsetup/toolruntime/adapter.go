@@ -166,14 +166,15 @@ func descriptorFor(
 	_, manual := nonAutoGoFunctions[function]
 
 	descriptor := toolDomain.GoToolDescriptor{
-		Function:    function,
-		Name:        storeSpec.LogicalName(value.Slug),
-		Version:     storeSpec.LogicalVersion(value.Version),
-		DisplayName: value.DisplayName,
-		Description: value.Description,
-		Tags:        append([]string(nil), value.Tags...),
-		AutoExecute: !manual,
-		InputSchema: append(json.RawMessage(nil), value.ArgSchema...),
+		Function:     function,
+		Name:         storeSpec.LogicalName(value.Slug),
+		Version:      storeSpec.LogicalVersion(value.Version),
+		DisplayName:  value.DisplayName,
+		Description:  value.Description,
+		Tags:         append([]string(nil), value.Tags...),
+		AutoExecute:  !manual,
+		InputSchema:  append(json.RawMessage(nil), value.ArgSchema...),
+		OutputSchema: append(json.RawMessage(nil), value.OutputSchema...),
 	}
 	if err := descriptor.Validate(); err != nil {
 		return toolDomain.GoToolDescriptor{}, err
@@ -189,6 +190,10 @@ func cloneDescriptor(
 	output.InputSchema = append(
 		json.RawMessage(nil),
 		value.InputSchema...,
+	)
+	output.OutputSchema = append(
+		json.RawMessage(nil),
+		value.OutputSchema...,
 	)
 	return output
 }
