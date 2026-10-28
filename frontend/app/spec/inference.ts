@@ -505,6 +505,14 @@ export interface UIToolOutput {
 	displayName?: string;
 	description?: string;
 
+	/**
+	 * Runtime-only MCP App protocol tool name.
+	 *
+	 * This field is not user-facing. Normal chat UI must use `displayName`
+	 * and must never render this value.
+	 */
+	appToolName?: string;
+
 	type: ToolStoreChoiceType;
 	choiceID: string;
 

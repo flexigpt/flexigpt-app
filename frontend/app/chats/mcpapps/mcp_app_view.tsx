@@ -11,7 +11,7 @@ import { MCPContentType } from '@/spec/session_mcp';
 import { isJSONObject } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { backendAPI, mcpManagementAPI, sessionManagementAPI } from '@/apis/baseapi';
+import { backendAPI, sessionManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -59,11 +59,6 @@ interface PendingAppToolResult {
 interface BlockedExternalLink {
 	url: string;
 	reason: 'unsafe' | 'open-failed';
-}
-
-interface ResolvedServerLabel {
-	runtimeID: string;
-	label: string;
 }
 
 function isAppMime(mime?: string): boolean {
@@ -166,20 +161,16 @@ function truncateForDisplay(value: string, maximumLength = MAX_APPROVAL_PREVIEW_
 	return `${value.slice(0, maximumLength)}\n[Preview truncated]`;
 }
 
-function formatApprovalPreview(value: unknown): string {
-	try {
-		const serialized = typeof value === 'string' ? value : (JSON.stringify(value, null, 2) ?? String(value));
-		return truncateForDisplay(serialized);
-	} catch {
-		return '[Preview unavailable]';
-	}
-}
-
 function formatModelContextUpdatePreview(update: MCPAppModelContextUpdatePayload): string {
-	return formatApprovalPreview({
-		...(update.content === undefined ? {} : { content: update.content }),
-		...(update.structuredContent === undefined ? {} : { structuredContent: update.structuredContent }),
-	});
+	const contentCount = Array.isArray(update.content) ? update.content.length : 0;
+	const lines = ['The MCP App requested a model context update.'];
+	if (contentCount > 0) {
+		lines.push(`${contentCount} context item${contentCount === 1 ? '' : 's'} will be added.`);
+	}
+	if (update.structuredContent !== undefined) {
+		lines.push('Structured context will be added.');
+	}
+	return lines.join('\n');
 }
 
 function disposeMCPAppBridge(bridge: MCPAppPostMessageBridge, resourceUri: string, reason: string): void {
@@ -269,14 +260,6 @@ function buildToolInputNotificationParams(
 	return params;
 }
 
-function stringifyOpaqueValue(value: unknown): string {
-	try {
-		return JSON.stringify(value, null, 2) ?? '';
-	} catch {
-		return '';
-	}
-}
-
 function sessionToolResultToAppToolCallResult(result: SessionToolResult): MCPAppToolCallResult {
 	const appPayload = decodeSessionOpaqueJSON<{
 		content?: MCPContent[];
@@ -284,11 +267,7 @@ function sessionToolResultToAppToolCallResult(result: SessionToolResult): MCPApp
 		isError?: boolean;
 	}>(result.app);
 	const structuredContent = appPayload?.structuredContent ?? decodeSessionOpaqueJSON(result.structured);
-	const fallbackText =
-		result.text ||
-		result.error ||
-		(structuredContent === undefined ? '' : stringifyOpaqueValue(structuredContent)) ||
-		'Tool completed without textual output.';
+	const fallbackText = result.text || result.error || 'Tool completed without textual output.';
 
 	return {
 		content: Array.isArray(appPayload?.content)
@@ -320,8 +299,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const [appRequestedHeight, setAppRequestedHeight] = useState<number | null>(null);
 	const [sessionError, setSessionError] = useState<string | null>(null);
 	const [viewID] = useState(() => `mcp-app-view-${getUUIDv7()}`);
-	const [resolvedServerLabel, setResolvedServerLabel] = useState<ResolvedServerLabel | null>(null);
-	const serverLabel = resolvedServerLabel?.runtimeID === instance.server ? resolvedServerLabel.label : 'MCP server';
+	const appLabel = instance.displayName?.trim() || 'MCP App';
 	const revisionsRef = useRef({
 		sessionRevision: instance.session.sessionRevision,
 		runRevision: instance.session.runRevision,
@@ -349,32 +327,6 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	const pendingAppToolResultsRef = useRef(new Map<string, PendingAppToolResult>());
 	const completedAppToolResultsRef = useRef(new Map<string, MCPAppToolCallResult>());
 	const frameHeight = appRequestedHeight ?? clampAppHeight(height);
-
-	useEffect(() => {
-		let cancelled = false;
-		const runtimeID = instance.server;
-
-		void mcpManagementAPI
-			.findComposerServerByRuntimeID(runtimeID)
-			.then(server => {
-				if (cancelled || !server) {
-					return;
-				}
-
-				setResolvedServerLabel({
-					runtimeID,
-					label: server.displayName.trim() || server.logicalName.trim() || 'MCP server',
-				});
-			})
-			.catch(() => {
-				// The runtime ID remains a useful fallback when the management
-				// catalog no longer contains the server.
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [instance.server]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -882,16 +834,11 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 	return (
 		<>
 			<div className="border-base-content/10 bg-base-200 rounded-2xl border p-2">
-				<div className="mb-2 flex items-center justify-between gap-2 text-xs">
-					<span className="truncate font-semibold">{instance.displayName ?? instance.toolName}</span>
-					<span className="text-base-content/60 truncate" title={serverLabel}>
-						{serverLabel}
-					</span>
-				</div>
+				<div className="mb-2 truncate text-xs font-semibold">{appLabel}</div>
 				<MCPAppSandbox
 					html={loadedResource.html}
 					csp={sandboxConfiguration.csp}
-					title={`MCP App ${instance.toolName}`}
+					title={appLabel}
 					onIframeReady={handleIframeReady}
 					height={frameHeight}
 					allow={sandboxConfiguration.allow}
@@ -901,7 +848,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			<DeleteConfirmationModal
 				isOpen={pendingURL !== null}
 				title="Open external link?"
-				message={`The MCP App for ${serverLabel} wants to open:\n${truncateForDisplay(pendingURL ?? '')}`}
+				message={`${appLabel} wants to open:\n${truncateForDisplay(pendingURL ?? '')}`}
 				confirmButtonText="Open"
 				onConfirm={() => {
 					const url = pendingURL;
@@ -933,7 +880,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			<DeleteConfirmationModal
 				isOpen={pendingUIMessage !== null}
 				title="Add message from MCP App?"
-				message={`The MCP App for ${serverLabel} wants to add this draft message:\n\n${truncateForDisplay(pendingUIMessage?.text ?? '')}`}
+				message={`${appLabel} wants to add this draft message:\n\n${truncateForDisplay(pendingUIMessage?.text ?? '')}`}
 				confirmButtonText="Add draft"
 				onConfirm={() => {
 					const resolver = approvalResolverRef.current;
@@ -952,7 +899,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 			<DeleteConfirmationModal
 				isOpen={pendingContextUpdate !== null}
 				title="Allow MCP App model context?"
-				message={`The MCP App for ${serverLabel} wants to add this context to the next model request:\n\n${
+				message={`${appLabel} wants to add context to the next model request:\n\n${
 					pendingContextUpdate ? formatModelContextUpdatePreview(pendingContextUpdate) : ''
 				}`}
 				confirmButtonText="Allow"

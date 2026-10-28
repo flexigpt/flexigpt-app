@@ -372,6 +372,7 @@ function toolOutputFromResult(
 		name: displayName,
 		displayName,
 		description: call?.description,
+		appToolName: call?.name,
 		choiceID: result.choiceID ?? call?.choiceID ?? '',
 		type: toolChoiceType(result.type || call?.type),
 		summary: result.kind === SessionToolResultKind.Success ? `Result: ${displayName}` : `Tool error: ${displayName}`,

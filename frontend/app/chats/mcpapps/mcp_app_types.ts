@@ -1,5 +1,5 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPAppRenderTarget, MCPToolSelection } from '@/spec/session_mcp';
+import type { MCPAppRenderTarget } from '@/spec/session_mcp';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
@@ -105,25 +105,22 @@ export function isJSONRPCNotification(value: unknown): value is JSONRPCNotificat
 /** Build an instance from a tool output that has app render info. */
 export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInstance | undefined {
 	const app = output.mcpApp;
-	const sel: MCPToolSelection | undefined = output.mcpToolSelection;
 	const session = output.sessionApp;
 
-	if (!app?.resourceUri || !sel?.server || !session) {
+	if (!app?.resourceUri || !session || !output.appToolName) {
 		return undefined;
 	}
-
-	const resourceUri = app.resourceUri;
 
 	return {
 		instanceID: session.appInstanceID,
 		session,
-		server: sel.server,
-		resourceUri,
+		server: session.serverID,
+		resourceUri: app.resourceUri,
 		mimeType: app.mimeType,
-		toolName: sel.toolName || output.name,
+		toolName: output.appToolName,
 		toolUseID: output.callID || output.id,
 		callID: output.callID || output.id,
-		displayName: output.name,
+		displayName: output.displayName?.trim() || 'MCP App',
 		allowToolCalls: app.allowAppInitiatedToolCalls,
 		requireOpenLinkApproval: app.requireApprovalForOpenLink,
 		requireContextUpdateApproval: app.requireApprovalForContextUpdates,
