@@ -48,10 +48,20 @@ func (d GoToolDescriptor) Validate() error {
 	); err != nil {
 		return err
 	}
-	return declaration.ValidateJSONSchemaValue(
+
+	if err := declaration.ValidateJSONSchemaValue(
 		"Go Tool inputSchema",
 		d.InputSchema,
-	)
+	); err != nil {
+		return err
+	}
+	if len(d.OutputSchema) != 0 {
+		return declaration.ValidateJSONSchemaValue(
+			"Go Tool outputSchema",
+			d.OutputSchema,
+		)
+	}
+	return nil
 }
 
 // GoToolLocator is the runtime-neutral Go Tool validation port required by

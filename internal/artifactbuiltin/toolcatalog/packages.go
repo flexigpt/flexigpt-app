@@ -2,6 +2,7 @@ package toolcatalog
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"sort"
@@ -353,6 +354,10 @@ func readStaticSDKTools(
 func toolDocumentFromGoDescriptor(
 	value toolDomain.GoToolDescriptor,
 ) toolv1.ToolDocument {
+	var outSchema json.RawMessage = append(
+		[]byte(nil),
+		value.OutputSchema...,
+	)
 	return toolv1.ToolDocument{
 		Type:        toolv1.ToolType,
 		Name:        string(value.Name),
@@ -366,6 +371,7 @@ func toolDocumentFromGoDescriptor(
 			[]byte(nil),
 			value.InputSchema...,
 		),
+		OutputSchema: &outSchema,
 		Implementation: toolv1.ToolImplementation{
 			Kind:     toolv1.ImplementationKindGo,
 			Function: value.Function,

@@ -91,12 +91,12 @@ github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeORc=
 github.com/felixge/httpsnoop v1.1.0/go.mod h1:Zqxgdd+1Rkcz8euOqdr7lqgCRJztwr5hp9vDSi5UZCE=
-github.com/flexigpt/agentskills-go v0.21.7 h1:6EPuyJWTGWcwHN/+759dIvDXY4rra5hMSU224xIoJNc=
-github.com/flexigpt/agentskills-go v0.21.7/go.mod h1:KugmNxS3g8jR7YY3IOVRJdmx5SdOmgL/sVSyPK2InoY=
+github.com/flexigpt/agentskills-go v0.22.0 h1:zeMuMpcqfp8mwNprr4mGuLhRdwZlN3m/mopCX0lBmMw=
+github.com/flexigpt/agentskills-go v0.22.0/go.mod h1:K1LE/I9mksfIwskIzRlibo3vnuzeKPfmJP/sB63LCRM=
 github.com/flexigpt/inference-go v0.28.6 h1:dFIwyPus+oOpHSVMNmEREYtiIi0qvr07K06izRjsviQ=
 github.com/flexigpt/inference-go v0.28.6/go.mod h1:+HMJW0nzmk8GbTNnI0qqToOLj1JKXjNlzOuct+YOYf4=
-github.com/flexigpt/llmtools-go v0.24.6 h1:PWrUI2nkPIEILV86Q/+svGzm5H7O4zSIxbe2ewfHa1U=
-github.com/flexigpt/llmtools-go v0.24.6/go.mod h1:F9BkJ0fB/jqb9BEP0b7mxT/PHF0GDTdD07ymLcRHrcs=
+github.com/flexigpt/llmtools-go v0.25.0 h1:SeBluTC2Zy0LLCbFd27xBfiC5dZfZbEB0aSt4rAO/d4=
+github.com/flexigpt/llmtools-go v0.25.0/go.mod h1:F9BkJ0fB/jqb9BEP0b7mxT/PHF0GDTdD07ymLcRHrcs=
 github.com/flexigpt/mapstore-go v0.4.5 h1:QPLyjZiGCvr/HyoZpfhClThTS/T19QNHIvtImE1E2OQ=
 github.com/flexigpt/mapstore-go v0.4.5/go.mod h1:kVDoFW4UEDfBMcjliv/GAUBce9eWevAjAUkVD1eZlCk=
 github.com/forPelevin/gomoji v1.3.0 h1:WPIOLWB1bvRYlKZnSSEevLt3IfKlLs+tK+YA9fFYlkE=
