@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -28,6 +29,26 @@ func (a *Service) ExportWorkspaceSource(
 		return WorkspaceSourceExport{}, err
 	}
 
+	export, err := resourceFlow.WithVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (WorkspaceSourceExport, error) {
+			return a.exportWorkspaceSource(
+				sessionCtx,
+				directory,
+				ref,
+			)
+		},
+	)
+	if err == nil || !errors.Is(err, storeSpec.ErrRefreshRequired) {
+		return export, err
+	}
+	if a == nil || a.refresher == nil {
+		return export, err
+	}
+	if refreshErr := a.refresher.Refresh(ctx, ref); refreshErr != nil {
+		return WorkspaceSourceExport{}, err
+	}
 	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,

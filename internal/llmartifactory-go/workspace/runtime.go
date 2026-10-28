@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -19,7 +20,7 @@ func (a *Service) ComposeWorkspacePrompt(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
-	return resourceFlow.WithVerificationSession(
+	plan, err := resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspacePromptPlan, error) {
@@ -34,6 +35,24 @@ func (a *Service) ComposeWorkspacePrompt(
 			return projectWorkspacePromptPlan(value), nil
 		},
 	)
+	if a.refreshStaleWorkspace(ctx, workspace, err) {
+		return resourceFlow.WithVerificationSession(
+			ctx,
+			a.resources,
+			func(sessionCtx context.Context) (WorkspacePromptPlan, error) {
+				value, err := a.composeWorkspacePrompt(
+					sessionCtx,
+					workspace,
+					artifacts,
+				)
+				if err != nil {
+					return WorkspacePromptPlan{}, err
+				}
+				return projectWorkspacePromptPlan(value), nil
+			},
+		)
+	}
+	return plan, err
 }
 
 func (a *Service) composeWorkspacePrompt(
@@ -70,7 +89,8 @@ func (a *Service) LoadWorkspaceSkills(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
-	return resourceFlow.WithVerificationSession(
+	plan, err := resourceFlow.WithVerificationSession(
+
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceSkillLoadPlan, error) {
@@ -85,6 +105,24 @@ func (a *Service) LoadWorkspaceSkills(
 			return projectWorkspaceSkillLoadPlan(value), nil
 		},
 	)
+	if a.refreshStaleWorkspace(ctx, workspace, err) {
+		return resourceFlow.WithVerificationSession(
+			ctx,
+			a.resources,
+			func(sessionCtx context.Context) (WorkspaceSkillLoadPlan, error) {
+				value, err := a.loadWorkspaceSkills(
+					sessionCtx,
+					workspace,
+					artifacts,
+				)
+				if err != nil {
+					return WorkspaceSkillLoadPlan{}, err
+				}
+				return projectWorkspaceSkillLoadPlan(value), nil
+			},
+		)
+	}
+	return plan, err
 }
 
 func (a *Service) loadWorkspaceSkills(
@@ -121,7 +159,7 @@ func (a *Service) LoadWorkspaceMCPServers(
 	workspace artifactModel.ArtifactRef,
 	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceMCPServerLoadPlan, error) {
-	return resourceFlow.WithVerificationSession(
+	plan, err := resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceMCPServerLoadPlan, error) {
@@ -136,6 +174,24 @@ func (a *Service) LoadWorkspaceMCPServers(
 			return projectWorkspaceMCPServerLoadPlan(value), nil
 		},
 	)
+	if a.refreshStaleWorkspace(ctx, workspace, err) {
+		return resourceFlow.WithVerificationSession(
+			ctx,
+			a.resources,
+			func(sessionCtx context.Context) (WorkspaceMCPServerLoadPlan, error) {
+				value, err := a.loadWorkspaceMCPServersForRuntime(
+					sessionCtx,
+					workspace,
+					artifacts,
+				)
+				if err != nil {
+					return WorkspaceMCPServerLoadPlan{}, err
+				}
+				return projectWorkspaceMCPServerLoadPlan(value), nil
+			},
+		)
+	}
+	return plan, err
 }
 
 func (a *Service) loadWorkspaceMCPServersForRuntime(
@@ -172,7 +228,7 @@ func (a *Service) ResolveWorkspaceRuntimePlan(
 	workspace artifactModel.ArtifactRef,
 	selection WorkspaceRuntimeSelection,
 ) (WorkspaceRuntimePlan, error) {
-	return resourceFlow.WithVerificationSession(
+	plan, err := resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceRuntimePlan, error) {
@@ -183,6 +239,20 @@ func (a *Service) ResolveWorkspaceRuntimePlan(
 			)
 		},
 	)
+	if a.refreshStaleWorkspace(ctx, workspace, err) {
+		return resourceFlow.WithVerificationSession(
+			ctx,
+			a.resources,
+			func(sessionCtx context.Context) (WorkspaceRuntimePlan, error) {
+				return a.resolveWorkspaceRuntimePlan(
+					sessionCtx,
+					workspace,
+					selection,
+				)
+			},
+		)
+	}
+	return plan, err
 }
 
 func (a *Service) resolveWorkspaceRuntimePlan(
@@ -290,6 +360,19 @@ func (a *Service) loadWorkspaceMCPServers(
 		)
 	}
 	return a.mcpAdapter.Load(ctx, workspace, refs)
+}
+
+func (a *Service) refreshStaleWorkspace(ctx context.Context, workspace artifactModel.ArtifactRef, err error) bool {
+	if err == nil || !errors.Is(err, storeSpec.ErrRefreshRequired) {
+		return false
+	}
+	if a == nil || a.refresher == nil {
+		return false
+	}
+	if refreshErr := a.refresher.Refresh(ctx, workspace); refreshErr != nil {
+		return false
+	}
+	return true
 }
 
 func selectedWorkspaceArtifacts(

@@ -2,9 +2,11 @@ package workspace
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/domain"
@@ -15,6 +17,16 @@ func (a *Service) ResolveWorkspaceCapabilities(
 	ref artifactModel.ArtifactRef,
 ) (composition.CapabilityPlan, error) {
 	_, plan, err := a.resolveWorkspaceCapabilities(ctx, ref)
+	if err == nil || !errors.Is(err, storeSpec.ErrRefreshRequired) {
+		return plan, err
+	}
+	if a == nil || a.refresher == nil {
+		return plan, err
+	}
+	if refreshErr := a.refresher.Refresh(ctx, ref); refreshErr != nil {
+		return composition.CapabilityPlan{}, err
+	}
+	_, plan, err = a.resolveWorkspaceCapabilities(ctx, ref)
 	return plan, err
 }
 

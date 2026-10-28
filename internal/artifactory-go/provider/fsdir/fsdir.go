@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -206,9 +205,7 @@ func validateFilesystemRoot(root string) error {
 func fingerprint(ctx context.Context, root string, policy normalizedTraversalPolicy) (string, error) {
 	type entry struct {
 		relative string
-		mode     os.FileMode
 		size     int64
-		modified time.Time
 	}
 
 	values := make([]entry, 0)
@@ -255,14 +252,15 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 					policy.isGitSubmoduleDirectory(location)) {
 				return nil
 			}
-			if !info.IsDir() && !info.Mode().IsRegular() {
+			// Only regular files affect declaration refresh. Directories,
+			// symlinks, and other special files affect traversal but not
+			// source bytes consumed by refresh.
+			if !info.Mode().IsRegular() {
 				return nil
 			}
 			values = append(values, entry{
 				relative: filepath.ToSlash(relative),
-				mode:     info.Mode(),
 				size:     info.Size(),
-				modified: info.ModTime().UTC(),
 			})
 		}
 
@@ -309,15 +307,10 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 	for _, value := range values {
 		_, _ = fmt.Fprintf(
 			hash,
-			"%s\x00%d\x00%d\x00%s\x00",
+			"%s\x00%d\x00",
 			value.relative,
-			value.mode,
 			value.size,
-			value.modified.Format(time.RFC3339Nano),
 		)
-		if !value.mode.IsRegular() {
-			continue
-		}
 		if value.size < 0 ||
 			value.size > storeSpec.MaxScanBytes-totalBytes {
 			return "", fmt.Errorf(
