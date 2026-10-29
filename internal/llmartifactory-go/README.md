@@ -83,7 +83,7 @@ LLM Artifactory Go is not:
 - A generic package manager or dependency solver.
 - A global built-in content registry.
 - A generic plugin execution engine.
-- An inference, Tool, MCP, Skill, Team, Loop, or Workflow runtime.
+- An inference, Tool, MCP, Skill, or Workflow runtime.
 - A Wails or transport package.
 - An authorization service or sandbox.
 - A plaintext secret service for ordinary family APIs.
@@ -156,8 +156,6 @@ mcp
 mcp.policy
 plugin
 agent
-team
-loop
 workflow
 workspace
 ```
@@ -362,7 +360,7 @@ template. A family has only the subpackages justified by its behavior.
 | **Model**                   | Operational Model and Provider APIs, managed Model/Provider package behavior, settings, Provider credentials, default selection, and resolution inputs.                  |
 | **Model Provider contract** | `modelprovider/contract/v1` owns the portable `model.provider` declaration contract. The current operational API remains in `model`.                                     |
 | **MCP and MCP Policy**      | MCP declaration/source-format behavior, installation-local state, logical secret selectors, policy composition, managed packages, and runtime-neutral server resolution. |
-| **Team, Loop, Workflow**    | Their declaration contracts and runtime-neutral planning projections. They do not execute a team, loop, or workflow.                                                     |
+| **Workflow**                | Declaration contracts and runtime-neutral planning projections. They do not execute a workflow.                                                                          |
 | **Workspace**               | Workspace declaration behavior, directory/default-policy selection, effective Workspace checks, and runtime-neutral prompt/Skill/MCP planning.                           |
 
 ### Plugin
