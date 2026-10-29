@@ -48,8 +48,6 @@ export enum Type {
     TypeMCPPolicy = "mcp.policy",
     TypePlugin = "plugin",
     TypeAgent = "agent",
-    TypeTeam = "team",
-    TypeLoop = "loop",
     TypeWorkflow = "workflow",
     TypeWorkspace = "workspace",
 };

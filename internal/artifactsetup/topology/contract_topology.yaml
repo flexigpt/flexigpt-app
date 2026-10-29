@@ -102,46 +102,6 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
-  teams:
-    - locator: "team.yaml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - locator: "team.yml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - locator: "team.json"
-      format: "json"
-      decoderID: "artifact-declaration-json"
-    - pattern: "*.team.yaml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - pattern: "*.team.yml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - pattern: "*.team.json"
-      format: "json"
-      decoderID: "artifact-declaration-json"
-
-  loops:
-    - locator: "loop.yaml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - locator: "loop.yml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - locator: "loop.json"
-      format: "json"
-      decoderID: "artifact-declaration-json"
-    - pattern: "*.loop.yaml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - pattern: "*.loop.yml"
-      format: "yaml"
-      decoderID: "artifact-declaration-yaml"
-    - pattern: "*.loop.json"
-      format: "json"
-      decoderID: "artifact-declaration-json"
-
   workflows:
     - locator: "workflow.yaml"
       format: "yaml"
@@ -306,18 +266,6 @@ documentUses:
     documentSets:
       - "plugins"
     defaultLocator: "plugin.yaml"
-
-  teamPackage:
-    documentSets:
-      - "teams"
-    defaultLocator: "team.yaml"
-    decoderID: "artifact-declaration-yaml"
-
-  loopPackage:
-    documentSets:
-      - "loops"
-    defaultLocator: "loop.yaml"
-    decoderID: "artifact-declaration-yaml"
 
   workflowPackage:
     documentSets:
@@ -515,12 +463,7 @@ workspaceDiscovery:
       documentUses:
         - "modelPackage"
         - "modelProviderPackage"
-    team:
-      documentUses:
-        - "teamPackage"
-    loop:
-      documentUses:
-        - "loopPackage"
+
     workflow:
       documentUses:
         - "workflowPackage"

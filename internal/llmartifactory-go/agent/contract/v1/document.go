@@ -35,7 +35,6 @@ type AgentDocument struct {
 	declaration.Header
 
 	Members  []declaration.Entry `json:"members,omitempty"`
-	Loop     *declaration.Entry  `json:"loop,omitempty"`
 	Workflow *declaration.Entry  `json:"workflow,omitempty"`
 }
 
@@ -137,10 +136,6 @@ func (v AgentDocument) Clone() (AgentDocument, error) {
 	output := v
 	output.Header = v.Header.Clone()
 	output.Members = declaration.CloneEntries(v.Members)
-	if v.Loop != nil {
-		value := v.Loop.Clone()
-		output.Loop = &value
-	}
 	if v.Workflow != nil {
 		value := v.Workflow.Clone()
 		output.Workflow = &value
@@ -195,7 +190,6 @@ func (v AgentDocument) validateFields() error {
 		"Agent",
 		v.Locator,
 		v.Members != nil ||
-			v.Loop != nil ||
 			v.Workflow != nil,
 	); err != nil {
 		return err
@@ -220,17 +214,6 @@ func (v AgentDocument) validateFields() error {
 		}
 	}
 
-	if v.Loop != nil && v.Workflow != nil {
-		return fmt.Errorf(
-			"%w: Agent cannot contain both loop and workflow",
-			storeSpec.ErrInvalid,
-		)
-	}
-	if v.Loop != nil {
-		if err := validateProgramMember("Agent loop", *v.Loop, declaration.TypeLoop); err != nil {
-			return err
-		}
-	}
 	if v.Workflow != nil {
 		if err := validateProgramMember(
 			"Agent workflow",

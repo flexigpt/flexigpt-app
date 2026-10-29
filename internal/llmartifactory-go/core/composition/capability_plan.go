@@ -83,28 +83,6 @@ func (r *Resolver) ResolveAgentCapabilities(
 	return capabilityPlanFor(value)
 }
 
-func (r *Resolver) ResolveTeamCapabilities(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (CapabilityPlan, error) {
-	value, err := r.ResolveTeam(ctx, ref)
-	if err != nil {
-		return CapabilityPlan{}, err
-	}
-	return capabilityPlanFor(value)
-}
-
-func (r *Resolver) ResolveLoopCapabilities(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (CapabilityPlan, error) {
-	value, err := r.ResolveLoop(ctx, ref)
-	if err != nil {
-		return CapabilityPlan{}, err
-	}
-	return capabilityPlanFor(value)
-}
-
 func (r *Resolver) ResolveWorkflowCapabilities(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,

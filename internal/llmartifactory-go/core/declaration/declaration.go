@@ -23,8 +23,6 @@ const (
 	TypeMCPPolicy     Type = "mcp.policy"
 	TypePlugin        Type = "plugin"
 	TypeAgent         Type = "agent"
-	TypeTeam          Type = "team"
-	TypeLoop          Type = "loop"
 	TypeWorkflow      Type = "workflow"
 	TypeWorkspace     Type = "workspace"
 )
@@ -60,8 +58,6 @@ func Types() []Type {
 		TypeMCPPolicy,
 		TypePlugin,
 		TypeAgent,
-		TypeTeam,
-		TypeLoop,
 		TypeWorkflow,
 		TypeWorkspace,
 	}
@@ -78,8 +74,6 @@ func (t Type) Validate() error {
 		TypeMCPPolicy,
 		TypePlugin,
 		TypeAgent,
-		TypeTeam,
-		TypeLoop,
 		TypeWorkflow,
 		TypeWorkspace:
 		return nil

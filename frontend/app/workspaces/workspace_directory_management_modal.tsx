@@ -76,10 +76,6 @@ function artifactKindLabel(kind: string): string {
 			return 'Plugin';
 		case 'model':
 			return 'Model';
-		case 'team':
-			return 'Team';
-		case 'loop':
-			return 'Loop';
 		case 'workflow':
 			return 'Workflow';
 		default:

@@ -288,8 +288,6 @@ func (c *coordinator) resolveAgent(
 			declaration.TypeMCPPolicy,
 			declaration.TypePlugin,
 			declaration.TypeAgent,
-			declaration.TypeTeam,
-			declaration.TypeLoop,
 			declaration.TypeWorkflow,
 			declaration.TypeWorkspace:
 			// These declaration families do not contribute executable Agent

@@ -16,14 +16,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
-	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
 	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
 	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
-	teamv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/team/contract/v1"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -222,8 +220,6 @@ func schemasByType(t *testing.T) map[declaration.Type][]byte {
 		mcppolicyv1.MCPPolicyType:         mcppolicyv1.MCPPolicyJSONSchema(),
 		pluginv1.PluginType:               pluginv1.PluginJSONSchema(),
 		agentv1.AgentType:                 agentv1.AgentJSONSchema(),
-		teamv1.TeamType:                   teamv1.TeamJSONSchema(),
-		loopv1.LoopType:                   loopv1.LoopJSONSchema(),
 		workflowv1.WorkflowType:           workflowv1.WorkflowJSONSchema(),
 		workspacev1.WorkspaceType:         workspacev1.WorkspaceJSONSchema(),
 	}
@@ -246,8 +242,6 @@ func declarationTestRegistry(t *testing.T) *coreinterpretation.Registry {
 		mcppolicyv1.Interpretation(),
 		pluginv1.Interpretation(),
 		agentv1.Interpretation(),
-		teamv1.Interpretation(),
-		loopv1.Interpretation(),
 		workflowv1.Interpretation(),
 		workspacev1.Interpretation(),
 	)
@@ -329,20 +323,6 @@ func canonicalConcreteDocument(
 
 	case declaration.TypeAgent:
 		value, err := agentv1.DecodeAgentEntry(entry)
-		if err != nil {
-			return nil, err
-		}
-		return value.CanonicalJSON()
-
-	case declaration.TypeTeam:
-		value, err := teamv1.DecodeTeamEntry(entry)
-		if err != nil {
-			return nil, err
-		}
-		return value.CanonicalJSON()
-
-	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopEntry(entry)
 		if err != nil {
 			return nil, err
 		}

@@ -11,11 +11,15 @@
 
 - [ ] verify diff applicability in streaming
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
+- [ ] tools seem to be attached even if i have removed them in session. also remove session overrides does nothing for agent tools.
+- [ ] even if all files are attached larger models tnd to just call tools if they are present for arbitrary shit without actually seeing if analysis is to be done with current already present context or not. this is even with that skill we have related to use context. see if the skill needs more better wording.
+- [ ] add text when a tool call or output is pending doesnt seem to work
 
 ## M-n
 
 - [ ] agent to agent and workflow support backend + ui.
   - [ ] mostly loop and team as a artifact doesn't really make sense as it is not saying anything concrete.
+  - [ ] see if plugin and workflow are exactly same as now. not domain same but behavior needed and flows etc.
   - [ ] maybe agents and agent to agent communication and a stronger workflow schema that can express a team based workflow (where each agent is a team member anycase), and loop semantics inbuilt supported is better.
 
 - [ ] artifactory, llm artifacts and then agentruntime repo. much tighter api surface.

@@ -18,7 +18,6 @@ import (
 	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
-	loopv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/loop/contract/v1"
 	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
 	mcpconfig "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/sourceformat/config"
@@ -29,7 +28,6 @@ import (
 	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
 	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
 	skillmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/sourceformat/markdown"
-	teamv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/team/contract/v1"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 	textmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/sourceformat/markdown"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
@@ -173,12 +171,7 @@ func allLLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
 	if err := add(agentv1.Interpretation(), agentv1.AgentJSONSchema()); err != nil {
 		return nil, fmt.Errorf("create Agent schema codec: %w", err)
 	}
-	if err := add(teamv1.Interpretation(), teamv1.TeamJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Team schema codec: %w", err)
-	}
-	if err := add(loopv1.Interpretation(), loopv1.LoopJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Loop schema codec: %w", err)
-	}
+
 	if err := add(
 		workflowv1.Interpretation(),
 		workflowv1.WorkflowJSONSchema(),
@@ -362,8 +355,7 @@ func llmFamilyRegistrations(skillDocuments support.Documents) []coreinterpretati
 		mcppolicyv1.Interpretation(),
 		pluginv1.Interpretation(),
 		agentv1.Interpretation(),
-		teamv1.Interpretation(),
-		loopv1.Interpretation(),
+
 		workflowv1.Interpretation(),
 		workspacev1.Interpretation(),
 	}

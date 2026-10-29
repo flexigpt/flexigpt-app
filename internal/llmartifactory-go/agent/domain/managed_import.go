@@ -284,13 +284,6 @@ func ValidateManagedAgentImport(
 			"managed Agent import cannot use a top-level locator",
 		)
 	}
-	if document.Loop != nil || document.Workflow != nil {
-		output.addError(
-			"agent.import.program",
-			"",
-			"managed Agent import cannot declare loop or workflow",
-		)
-	}
 
 	for _, member := range document.Members {
 		if err := validateManagedAgentMember(

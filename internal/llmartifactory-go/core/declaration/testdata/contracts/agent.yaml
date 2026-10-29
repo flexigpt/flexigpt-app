@@ -45,8 +45,3 @@ members:
     name: github
     locator: ./.mcp.json
     server: github
-
-loop:
-  type: loop
-  name: reviewer-loop
-  locator: ./loops/reviewer-loop.yaml

@@ -699,29 +699,6 @@ func workflowDependencyDocument(
 			name,
 		), nil
 
-	case declaration.TypeTeam:
-		return fmt.Appendf(nil,
-			"type: %s\nname: %s\n",
-			workflowYAMLQuote(string(declaration.TypeTeam)),
-			name,
-		), nil
-
-	case declaration.TypeLoop:
-		bodyName, err := declaration.DeriveNestedLogicalName(
-			dependency.Name,
-			"body",
-		)
-		if err != nil {
-			return nil, err
-		}
-		return fmt.Appendf(nil,
-			"type: %s\nname: %s\nbody:\n  type: %s\n  name: %s\n  parameters: {}\n",
-			workflowYAMLQuote(string(declaration.TypeLoop)),
-			name,
-			workflowYAMLQuote(string(declaration.TypeAgent)),
-			workflowYAMLQuote(string(bodyName)),
-		), nil
-
 	case declaration.TypeWorkflow:
 		return fmt.Appendf(nil,
 			"type: %s\nname: %s\n",

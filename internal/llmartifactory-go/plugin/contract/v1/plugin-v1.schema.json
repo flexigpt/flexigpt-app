@@ -191,8 +191,6 @@
 								"mcp.policy",
 								"plugin",
 								"agent",
-								"team",
-								"loop",
 								"workflow"
 							]
 						},
@@ -233,8 +231,6 @@
 								"mcp.policy",
 								"plugin",
 								"agent",
-								"team",
-								"loop",
 								"workflow"
 							]
 						},
@@ -265,8 +261,6 @@
 								"mcp.policy",
 								"plugin",
 								"agent",
-								"team",
-								"loop",
 								"workflow"
 							]
 						},

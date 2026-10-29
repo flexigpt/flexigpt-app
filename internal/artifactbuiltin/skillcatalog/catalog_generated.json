@@ -244,7 +244,7 @@
           "size": 1156
         }
       ],
-      "fingerprint": "sha256:b011711e5c3f70ebe536cd68fd8ad091a943cbd24f84198444903e0262681a27"
+      "fingerprint": "sha256:cc3fcd28f6043a52c1deb67d83c6fc870380fc3695936a620f444857dc770e07"
     },
     {
       "address": {
@@ -521,7 +521,7 @@
           "size": 3019
         }
       ],
-      "fingerprint": "sha256:09ef2cc6f4f1b4208143f57c94ab15be85e603d18fd2699f84a92e986f889432"
+      "fingerprint": "sha256:f09e38d1e3ea4765950d5a6600828597ccf15f2e3e0e1d44ca23e3814e63907f"
     },
     {
       "address": {
@@ -603,7 +603,7 @@
           "size": 3001
         }
       ],
-      "fingerprint": "sha256:5970bc52dcc2cfd4bcfb349a0300d862ded5939f742ac9bfcca4eb464f223b64"
+      "fingerprint": "sha256:38a7f3605f0131662453338238f32e0a2baad97c68fd046dc56f65b9288befc6"
     },
     {
       "address": {
@@ -763,7 +763,7 @@
           "size": 335
         }
       ],
-      "fingerprint": "sha256:a890df2e61547a7d538b36bbccfc77bb1f4014ac75222416fba772809d90bccd"
+      "fingerprint": "sha256:0f86346b2f8dd0c3e9f6690ff27e750c839e7404ca4085e050dd59b61168867e"
     },
     {
       "address": {
@@ -1130,7 +1130,7 @@
           "size": 1841
         }
       ],
-      "fingerprint": "sha256:6fe5f835640b90b456f4006d1aff07e9816a31335e375a55d88c28b18d315f96"
+      "fingerprint": "sha256:3c9827db8e9be79865980960e59c45026dfe2ddaccf9f8b4ad1afd22cdcc9c3f"
     },
     {
       "address": {
@@ -1368,7 +1368,7 @@
           "size": 2955
         }
       ],
-      "fingerprint": "sha256:b2931616cd5098901918a526ff0fd996325efe696c8395854591efe691bcab7a"
+      "fingerprint": "sha256:b1539a14bdae3060b61fbe8032d6b67bf2deb0a1d56cb62c9a5ad38b3ee54a60"
     }
   ]
 }

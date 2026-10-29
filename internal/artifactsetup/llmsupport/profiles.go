@@ -498,8 +498,6 @@ func workspaceSelectorPatterns() (
 		declaration.TypeMCP,
 		declaration.TypeMCPPolicy,
 		declaration.TypeModel,
-		declaration.TypeTeam,
-		declaration.TypeLoop,
 		declaration.TypeWorkflow,
 	}
 

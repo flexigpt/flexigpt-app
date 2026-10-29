@@ -14,7 +14,7 @@ import (
 // DirectMembership is the resolved immediate membership of one Plugin.
 //
 // It intentionally does not recursively expand a selected Agent, Skill, MCP,
-// Tool, Team, Loop, Workflow, or nested Plugin capability graph. Recursive
+// Tool, Workflow, or nested Plugin capability graph. Recursive
 // expansion remains ResolveCapabilities.
 type DirectMembership struct {
 	Plugin   PluginView     `json:"plugin"`

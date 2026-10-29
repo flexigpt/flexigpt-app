@@ -108,20 +108,6 @@ func (r *Resolver) ResolveAgent(
 	return r.resolveTyped(ctx, ref, declaration.TypeAgent)
 }
 
-func (r *Resolver) ResolveTeam(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (*ResolvedEntry, error) {
-	return r.resolveTyped(ctx, ref, declaration.TypeTeam)
-}
-
-func (r *Resolver) ResolveLoop(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (*ResolvedEntry, error) {
-	return r.resolveTyped(ctx, ref, declaration.TypeLoop)
-}
-
 func (r *Resolver) ResolveWorkflow(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,

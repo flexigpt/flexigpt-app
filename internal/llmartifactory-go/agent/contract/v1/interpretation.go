@@ -41,19 +41,7 @@ func agentRelationships(
 	if err != nil {
 		return nil, err
 	}
-	if document.Loop != nil {
-		value, err := coreinterpretation.NewMemberRelationship(
-			[]string{"loop"},
-			*document.Loop,
-			coreinterpretation.MemberOptions{
-				DirectPosition: true,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("loop: %w", err)
-		}
-		output = append(output, value)
-	}
+
 	if document.Workflow != nil {
 		value, err := coreinterpretation.NewMemberRelationship(
 			[]string{"workflow"},

@@ -212,8 +212,6 @@
 						"mcp.policy",
 						"plugin",
 						"agent",
-						"team",
-						"loop",
 						"workflow"
 					]
 				},

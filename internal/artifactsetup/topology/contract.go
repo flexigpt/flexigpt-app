@@ -1573,8 +1573,6 @@ func validateRequiredContractBindings(value contractTopology) error {
 		"mcp",
 		"mcp.policy",
 		"model",
-		"team",
-		"loop",
 		"workflow",
 	} {
 		if _, found := value.workspaceSelectorPatterns[declarationType]; !found {

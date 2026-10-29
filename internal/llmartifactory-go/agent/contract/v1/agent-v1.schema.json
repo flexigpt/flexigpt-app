@@ -18,16 +18,6 @@
 			"maxItems": 4096,
 			"items": { "$ref": "#/$defs/agentMember" }
 		},
-		"loop": {
-			"allOf": [
-				{ "$ref": "#/$defs/singleMember" },
-				{
-					"properties": {
-						"type": { "const": "loop" }
-					}
-				}
-			]
-		},
 		"workflow": {
 			"allOf": [
 				{ "$ref": "#/$defs/singleMember" },
@@ -39,7 +29,7 @@
 			]
 		}
 	},
-	"not": { "required": ["loop", "workflow"] },
+	"not": { "required": ["workflow"] },
 	"$defs": {
 		"name": {
 			"type": "string",
@@ -447,7 +437,7 @@
 					"additionalProperties": false,
 					"required": ["type", "name"],
 					"properties": {
-						"type": { "enum": ["loop", "workflow"] },
+						"type": { "enum": ["workflow"] },
 						"name": { "$ref": "#/$defs/name" },
 						"locator": { "$ref": "#/$defs/locator" },
 						"scope": { "const": "builtin" }
@@ -459,7 +449,7 @@
 					"additionalProperties": false,
 					"required": ["type", "name", "parameters"],
 					"properties": {
-						"type": { "enum": ["loop", "workflow"] },
+						"type": { "enum": ["workflow"] },
 						"name": { "$ref": "#/$defs/name" },
 						"locator": { "$ref": "#/$defs/locator" },
 						"parameters": { "$ref": "#/$defs/parameters" }
