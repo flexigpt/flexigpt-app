@@ -1146,3 +1146,7 @@
 - [x] add a default agent selection preference and a default workspace one
 - [x] verify new management ui in all pages
 - [x] diff styling needs a bit of red in blocked things. collapsed target picker.
+- [x] add outputschema to llmtools go and then plug it end to end.
+- [x] there is a session refresh error even if content did not change.
+- [x] skill tools should mention that resource and scripts only from fodler will be run using that tool.
+- [x] message chips are still backend concept heavy. need cleaning. verify now.
