@@ -11,11 +11,26 @@
 
 - [ ] verify diff applicability in streaming
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
-- [ ] add wails considerations skill in flexigpt repo.
 
-## M-3
+- [ ] FlexiGPT repos automation using workspaces
+  - [ ] add wails considerations skill in flexigpt repo.
+  - [ ] add workspaces of frontend wails bridge and backend work in flexigpt
+  - [x] add skills in inference. and a workspace config too.
 
-- [ ] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
+## M-near
+
+- [ ] agent to agent and workflow support backend + ui.
+  - [ ] mostly loop and team as a artifact doesnt really make sense as it is not saying anything concrete.
+  - [ ] maybe agents and agent to agent communication and a stronger workflow schema that can express a team based workflow (where each agent is a team member anycase), and loop semantics inbuilt supported is better.
+
+- [ ] artifactory, llm artifacts and then agentruntime repo. much tighter api surface.
+
+- [ ] App SDK
+  - [ ] An ai intro tutorial app builtin will be good.
+  - [ ] An learn chess app will also be nice
+  - [ ] Start with the noted apps support
+
+## M-4
 
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - [x] setup steps for local or custom models
@@ -49,47 +64,3 @@
     - [ ] disabled provider
     - [ ] incompatible web search
     - [ ] missing skill
-
-## M-Future
-
-- [ ] i18n
-
-- [ ] aggregate tokens and may be integration with usage pais will be good
-
-- [ ] Better Text support: extracted other docs input, sheets and docx mainly.
-  - [ ] llmtools: may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
-
-- [ ] Image output: See inference-go notes.
-- [ ] audio in/out
-- [ ] check the reference calculator tool in claude docs
-- [ ] App SDK, etc
-- [ ] MCP options in remote server apis connections and hooks.
-  - [ ] This app should focus on local first with stateless api behavior rather than stateful, vendor specific server side operations.
-
-- [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
-  - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
-  - [ ] May need to check when there are actually a lot of tools.
-  - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
-
-- [ ] conversation level tokens would be nice to have.
-- [ ] An ai intro tutorial builtin will be good.
-- [ ] Tool calls: Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
-- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
-
-- Multi Model parallel comparison and evals
-  - [ ] send same prompt to multiple models
-  - [ ] compare responses side-by-side
-  - [ ] show token usage
-  - [ ] show latency
-  - [ ] show estimated cost
-  - [ ] save comparison result
-  - [ ] reusable evaluation prompts
-
-- Usage and cost dashboard: Because users bring their own keys, help them understand usage.
-  - [ ] per-message token usage
-  - [ ] per-conversation token usage
-  - [ ] per-provider usage
-  - [ ] estimated cost
-  - [ ] latency
-  - [ ] model comparison cost
-  - [ ] export usage CSV
