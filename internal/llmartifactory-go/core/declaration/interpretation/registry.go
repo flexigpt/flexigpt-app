@@ -23,6 +23,10 @@ type Registration struct {
 	DeclarationType declaration.Type
 	SchemaKey       schemaModel.Key
 
+	// RequireAPIVersion applies to standalone source documents. Canonical
+	// Definition bodies and contained declarations omit dispatch metadata.
+	RequireAPIVersion bool
+
 	ValidateEntry func(declaration.Entry) error
 
 	// ValidateAdmittedEntry validates family semantics of an Entry whose
@@ -305,6 +309,23 @@ func (r *Registry) LocatorCandidates(
 	return values[0].LocatorCandidates(target)
 }
 
+// PrepareSourceDocument normalizes source syntax only after dispatch has
+// selected a complete registered schema key.
+func (r *Registry) PrepareSourceDocument(
+	key schemaModel.Key,
+	raw []byte,
+) ([]byte, error) {
+	registration, err := r.registrationForSchema(key)
+	if err != nil {
+		return nil, err
+	}
+	return declaration.PrepareSourceDocument(
+		key,
+		raw,
+		registration.RequireAPIVersion,
+	)
+}
+
 func (r *Registry) Relationships(
 	entry declaration.Entry,
 ) ([]Relationship, error) {
@@ -328,10 +349,20 @@ func (r *Registry) AdmittedRelationships(
 	if err != nil {
 		return nil, err
 	}
-	if err := registration.ValidateAdmittedEntry(entry); err != nil {
+	return r.admittedRelationships(registration, entry)
+}
+
+// AdmittedRelationshipsForSchema uses the exact schema selected during
+// admission. It supports declaration types with more than one schema version.
+func (r *Registry) AdmittedRelationshipsForSchema(
+	key schemaModel.Key,
+	entry declaration.Entry,
+) ([]Relationship, error) {
+	registration, err := r.registrationForSchema(key)
+	if err != nil {
 		return nil, err
 	}
-	return r.relationshipsForValidatedEntry(registration, entry)
+	return r.admittedRelationships(registration, entry)
 }
 
 func (r *Registry) ValidateTree(
@@ -384,7 +415,23 @@ func (r *Registry) DefinitionForEntry(
 	)
 }
 
-func (r *Registry) DefinitionsForDocument(
+// DefinitionsForSourceDocument prepares standalone source before full family
+// and contained-declaration validation.
+func (r *Registry) DefinitionsForSourceDocument(
+	key schemaModel.Key,
+	raw []byte,
+) ([]AdmittedEntry, error) {
+	canonical, err := r.PrepareSourceDocument(key, raw)
+	if err != nil {
+		return nil, err
+	}
+	return r.definitionsForDocument(key, canonical, false)
+}
+
+// DefinitionsForCanonicalDocument validates an already prepared canonical
+// declaration body and its contained declarations. It is not an admitted
+// Definition read and does not accept dispatch-only apiVersion.
+func (r *Registry) DefinitionsForCanonicalDocument(
 	key schemaModel.Key,
 	raw []byte,
 ) ([]AdmittedEntry, error) {
@@ -449,6 +496,22 @@ func (r *Registry) EntryFromDefinition(
 	return entry, nil
 }
 
+func (r *Registry) admittedRelationships(
+	registration Registration,
+	entry declaration.Entry,
+) ([]Relationship, error) {
+	if err := declaration.ValidateEntryType(
+		entry,
+		registration.DeclarationType,
+	); err != nil {
+		return nil, err
+	}
+	if err := registration.ValidateAdmittedEntry(entry); err != nil {
+		return nil, err
+	}
+	return r.relationshipsForValidatedEntry(registration, entry)
+}
+
 func (r *Registry) definitionForValidatedSchema(
 	registration Registration,
 	key schemaModel.Key,
@@ -499,11 +562,12 @@ func (r *Registry) definitionForValidatedSchema(
 func (r *Registry) walkNamedEntries(
 	root declaration.Entry,
 ) ([]NamedEntry, error) {
-	return r.walkNamedEntriesWithRootValidation(root, false)
+	return r.walkNamedEntriesWithRootValidation(root, nil, false)
 }
 
 func (r *Registry) walkNamedEntriesWithRootValidation(
 	root declaration.Entry,
+	rootRegistration *Registration,
 	rootSchemaValidated bool,
 ) ([]NamedEntry, error) {
 	if err := root.Validate(); err != nil {
@@ -539,9 +603,21 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 			)
 		}
 
-		registration, err := r.registrationForEntry(entry)
-		if err != nil {
-			return err
+		var registration Registration
+		if depth == 0 && rootRegistration != nil {
+			registration = *rootRegistration
+			if err := declaration.ValidateEntryType(
+				entry,
+				registration.DeclarationType,
+			); err != nil {
+				return err
+			}
+		} else {
+			var err error
+			registration, err = r.registrationForEntry(entry)
+			if err != nil {
+				return err
+			}
 		}
 		if schemaValidated {
 			if err := registration.ValidateAdmittedEntry(entry); err != nil {
@@ -585,9 +661,13 @@ func (r *Registry) walkNamedEntriesWithRootValidation(
 			if err != nil {
 				return err
 			}
+			// ContainedPath is relative to this entry. Preserve the complete
+			// parent path so nested occurrences match composition lookup.
+			childPath := append([]string(nil), path...)
+			childPath = append(childPath, relationship.ContainedPath...)
 			if err := walk(
 				target,
-				append([]string(nil), relationship.ContainedPath...),
+				childPath,
 				depth+1,
 				false,
 			); err != nil {
@@ -665,6 +745,7 @@ func (r *Registry) definitionsForDocument(
 
 	entries, err := r.walkNamedEntriesWithRootValidation(
 		root,
+		&registration,
 		rootSchemaValidated,
 	)
 	if err != nil {

@@ -85,8 +85,10 @@ func ToolJSONSchema() []byte {
 
 func DecodeToolJSON(raw []byte) (ToolDocument, error) {
 	var value ToolDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		ToolSchemaKey,
+		false,
 		compiledToolSchema,
 		&value,
 	); err != nil {

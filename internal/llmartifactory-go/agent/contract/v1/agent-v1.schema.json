@@ -17,19 +17,8 @@
 			"type": "array",
 			"maxItems": 4096,
 			"items": { "$ref": "#/$defs/agentMember" }
-		},
-		"workflow": {
-			"allOf": [
-				{ "$ref": "#/$defs/singleMember" },
-				{
-					"properties": {
-						"type": { "const": "workflow" }
-					}
-				}
-			]
 		}
 	},
-	"not": { "required": ["workflow"] },
 	"$defs": {
 		"name": {
 			"type": "string",
@@ -427,33 +416,6 @@
 							}
 						}
 					]
-				}
-			]
-		},
-		"singleMember": {
-			"oneOf": [
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["type", "name"],
-					"properties": {
-						"type": { "enum": ["workflow"] },
-						"name": { "$ref": "#/$defs/name" },
-						"locator": { "$ref": "#/$defs/locator" },
-						"scope": { "const": "builtin" }
-					},
-					"not": { "required": ["scope", "locator"] }
-				},
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["type", "name", "parameters"],
-					"properties": {
-						"type": { "enum": ["workflow"] },
-						"name": { "$ref": "#/$defs/name" },
-						"locator": { "$ref": "#/$defs/locator" },
-						"parameters": { "$ref": "#/$defs/parameters" }
-					}
 				}
 			]
 		}

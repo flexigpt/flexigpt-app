@@ -174,7 +174,7 @@ func allLLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
 
 	if err := add(
 		workflowv1.Interpretation(),
-		workflowv1.WorkflowJSONSchema(),
+		workflowv1.WorkflowDefinitionJSONSchema(),
 	); err != nil {
 		return nil, fmt.Errorf("create Workflow schema codec: %w", err)
 	}

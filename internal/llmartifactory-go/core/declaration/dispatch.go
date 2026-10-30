@@ -210,14 +210,20 @@ func readDispatchHeader(raw []byte) (dispatchHeader, error) {
 	}, nil
 }
 
-// CanonicalDocumentForSchema removes the declaration-language dispatch-only
-// apiVersion header after Dispatcher.Resolve has selected the expected schema
-// key. The family schema therefore validates the portable declaration body,
-// while apiVersion remains grammar metadata rather than Definition content.
+// PrepareSourceDocument validates a standalone source header against its
+// selected schema key, then removes dispatch-only apiVersion metadata.
 //
-// This preserves canonical bytes and Definition digests for existing omitted
-// v1 declarations and makes explicit apiVersion: v1 canonicalize identically.
-func CanonicalDocumentForSchema(raw []byte) ([]byte, error) {
+// "requireAPIVersion" is owned by the declaration contract. Canonical Definition
+// bodies and contained entries are not standalone source documents and must
+// not be passed through this function merely to reconstruct admitted data.
+func PrepareSourceDocument(
+	expected schemaModel.Key,
+	raw []byte,
+	requireAPIVersion bool,
+) ([]byte, error) {
+	if err := expected.Validate(); err != nil {
+		return nil, err
+	}
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
 		storeSpec.MaxDefinitionBytes,
@@ -229,6 +235,17 @@ func CanonicalDocumentForSchema(raw []byte) ([]byte, error) {
 	header, err := readDispatchHeader(canonical)
 	if err != nil {
 		return nil, err
+	}
+	if err := ValidateSchemaHeader(expected, canonical); err != nil {
+		return nil, err
+	}
+	if requireAPIVersion && !header.versionSpecified {
+		return nil, fmt.Errorf(
+			"%w: declaration type %q requires apiVersion %q",
+			storeSpec.ErrInvalid,
+			expected.Kind,
+			expected.SchemaVersion,
+		)
 	}
 	if !header.versionSpecified {
 		return canonical, nil

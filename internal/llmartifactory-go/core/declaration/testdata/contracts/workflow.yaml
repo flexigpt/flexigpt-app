@@ -1,3 +1,4 @@
+apiVersion: v1
 type: workflow
 name: change-workflow
 displayName: Change Workflow
@@ -7,55 +8,108 @@ labels:
   owner: platform
 metadata:
   acme.example/owner: platform
-start:
-  - plan
-nodes:
-  - id: plan
-    type: agent
-    name: planner
+
+inputSchema:
+  type: object
+  required: [request]
+  properties:
+    request:
+      type: string
+  additionalProperties: false
+
+outputSchema:
+  type: object
+  required: [patch, validation]
+  properties:
+    patch:
+      type: string
+    validation: true
+  additionalProperties: false
+
+targets:
+  planner:
+    kind: agent
+    ref: planner
     locator: ./agents/planner.agent.yaml
-
-  - id: implement
-    join: any
-    type: agent
-    name: implementer
+  implementer:
+    kind: agent
+    ref: implementer
     locator: ./agents/implementer.agent.yaml
-
-  - id: review
-    type: agent
-    name: reviewer
+  reviewer:
+    kind: agent
+    ref: reviewer
     locator: ./agents/reviewer.agent.yaml
+  validate-change:
+    kind: tool
+    ref: validate-change
+
+steps:
+  - id: plan
+    call:
+      target: planner
+      input:
+        request:
+          $expr: input.request
+
+  - id: refine
+    repeat:
+      state:
+        schema:
+          type: object
+          required: [approved, patch, feedback]
+          properties:
+            approved:
+              type: boolean
+            patch:
+              type: string
+            feedback:
+              type: string
+          additionalProperties: false
+        initial:
+          approved: false
+          patch: ""
+          feedback: ""
+      until:
+        $expr: state.approved
+      maxIterations: 3
+      onExhausted: fail
+      do:
+        steps:
+          - id: implement
+            call:
+              target: implementer
+              input:
+                plan:
+                  $expr: steps.plan.output
+                feedback:
+                  $expr: state.feedback
+
+          - id: review
+            call:
+              target: reviewer
+              input:
+                patch:
+                  $expr: steps.implement.output.patch
+
+          - id: record
+            set:
+              values:
+                approved:
+                  $expr: steps.review.output.approved
+                patch:
+                  $expr: steps.implement.output.patch
+                feedback:
+                  $expr: steps.review.output.feedback
 
   - id: final-check
-    type: tool
-    name: validate-change
-    parameters:
-      displayName: Validate Change
-      description: Validates the final repository state.
-      version: v1.0.0
-      autoExecute: false
-      inputSchema:
-        type: object
-      implementation:
-        kind: go
-        function: github.com/flexigpt/flexigpt/tools.ValidateChange
-edges:
-  - from: plan
-    to: implement
+    call:
+      target: validate-change
+      input:
+        patch:
+          $expr: steps.refine.output.state.patch
 
-  - from: implement
-    to: review
-
-  - from: review
-    to: implement
-    match:
-      pointer: /decision
-      schema:
-        const: changes-requested
-
-  - from: review
-    to: final-check
-    match:
-      pointer: /decision
-      schema:
-        const: approved
+output:
+  patch:
+    $expr: steps.refine.output.state.patch
+  validation:
+    $expr: "steps['final-check'].output"

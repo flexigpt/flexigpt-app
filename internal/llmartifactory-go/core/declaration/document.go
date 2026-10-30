@@ -4,22 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// DecodeDocumentInto validates the original canonical document before
-// decoding it. Validating the original bytes preserves field presence, so
-// values hidden by omitempty cannot bypass their schema constraints.
-func DecodeDocumentInto(
+// DecodeSourceDocumentInto prepares a standalone JSON declaration and
+// validates its canonical body before decoding. Validation uses the prepared
+// bytes, not a re-marshalled Go value, so field presence is preserved.
+func DecodeSourceDocumentInto(
 	raw []byte,
+	expected schemaModel.Key,
+	requireAPIVersion bool,
 	compiled jsonutil.JSONSchema,
 	target any,
 ) error {
-	canonical, err := jsonutil.CanonicalizeObject(
+	canonical, err := PrepareSourceDocument(
+		expected,
 		raw,
-		storeSpec.MaxDefinitionBytes,
+		requireAPIVersion,
 	)
 	if err != nil {
 		return err

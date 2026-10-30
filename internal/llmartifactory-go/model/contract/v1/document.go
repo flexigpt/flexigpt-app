@@ -55,8 +55,10 @@ func ModelJSONSchema() []byte {
 
 func DecodeModelJSON(raw []byte) (ModelDocument, error) {
 	var value ModelDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		ModelSchemaKey,
+		false,
 		compiledModelSchema,
 		&value,
 	); err != nil {

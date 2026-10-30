@@ -23,7 +23,7 @@ type MemberOptions struct {
 	Optional      bool
 
 	// DirectPosition omits the target type from contained relationship paths.
-	// Workflow slots use this because their position already determines the required family type.
+	// It is for positions that already determine the target family.
 	DirectPosition bool
 }
 

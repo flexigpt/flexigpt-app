@@ -410,6 +410,8 @@ linters:
             - "github.com/flexigpt/agentskills-go"
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+            - "cel.dev/cel-go/cel"
+            - "cel.dev/cel-go/common/ast"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.

@@ -92,8 +92,10 @@ func decodeSkill(
 	raw []byte,
 ) (SkillDocument, error) {
 	var value SkillDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		SkillSchemaKey,
+		false,
 		compiledSkillSchema,
 		&value,
 	); err != nil {

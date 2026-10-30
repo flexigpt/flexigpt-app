@@ -46,8 +46,10 @@ func TextJSONSchema() []byte {
 
 func DecodeTextJSON(raw []byte) (TextDocument, error) {
 	var value TextDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		TextSchemaKey,
+		false,
 		compiledTextSchema,
 		&value,
 	); err != nil {

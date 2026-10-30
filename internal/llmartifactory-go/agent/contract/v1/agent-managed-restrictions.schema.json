@@ -8,7 +8,6 @@
 			"const": "agent"
 		},
 		"locator": false,
-		"workflow": false,
 		"members": {
 			"type": "array",
 			"items": {

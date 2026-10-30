@@ -1,3 +1,6 @@
+// Package workflow exposes read-only Workflow declaration planning.
+//
+// It does not create invocations or execute control flow.
 package workflow
 
 import (
@@ -7,6 +10,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -16,39 +20,44 @@ type Service struct {
 	resolver *composition.Resolver
 }
 
+// BindingRequirement identifies one declared callable or capability
+// requirement that needs binding preparation before use.
+//
+// UsesComposition reports whether the declaration also has a relationship in
+// Capabilities. That relationship can resolve to an Artifact or an explicitly
+// supplied direct capability. It does not establish runtime binding readiness.
+type BindingRequirement struct {
+	Path            string            `json:"path"`
+	Target          workflowv1.Target `json:"target"`
+	UsesComposition bool              `json:"usesComposition"`
+}
+
 type Plan struct {
-	Workflow     artifactModel.ArtifactRef  `json:"workflow"`
-	Name         storeSpec.LogicalName      `json:"name"`
-	Start        []string                   `json:"start,omitempty"`
-	Nodes        []Node                     `json:"nodes"`
-	Edges        []Edge                     `json:"edges"`
+	Workflow artifactModel.ArtifactRef `json:"workflow"`
+
+	// Document is the canonical declaration. Dispatch-only apiVersion is not
+	// included in an admitted Definition.
+	Document workflowv1.WorkflowDocument `json:"document"`
+
+	// Capabilities contains recursively resolved declaration relationships.
 	Capabilities composition.CapabilityPlan `json:"capabilities"`
-	Complete     bool                       `json:"complete"`
-}
 
-type Node struct {
-	ID     string                        `json:"id"`
-	Join   workflowv1.Join               `json:"join,omitempty"`
-	Type   declaration.Type              `json:"type"`
-	Name   storeSpec.LogicalName         `json:"name"`
-	Form   declaration.MemberForm        `json:"form"`
-	Status composition.ResolutionStatus  `json:"status"`
-	Target *composition.CapabilityTarget `json:"target,omitempty"`
+	// BindingRequirements inventories all declared targets and requirements,
+	// including service and activity bindings and MCP Tool operation bindings.
+	// Inclusion does not mean that a binding is unavailable.
+	BindingRequirements []BindingRequirement `json:"bindingRequirements"`
 
-	Code    string `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-type Edge struct {
-	From  string                   `json:"from"`
-	To    string                   `json:"to"`
-	Match *declaration.OutputMatch `json:"match,omitempty"`
+	// CompositionComplete covers only relationships represented in
+	// Capabilities. Direct capabilities count as available composition
+	// results. This field does not establish binding readiness, authorization,
+	// dynamic target availability, or runtime support.
+	CompositionComplete bool `json:"compositionComplete"`
 }
 
 func NewService(resolver *composition.Resolver) (*Service, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf(
-			"%w: Workflow plan resolver is required",
+			"%w: Workflow composition resolver is required",
 			storeSpec.ErrInvalid,
 		)
 	}
@@ -59,6 +68,9 @@ func (s *Service) ResolvePlan(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (Plan, error) {
+	if s == nil || s.resolver == nil {
+		return Plan{}, storeSpec.ErrClosed
+	}
 	if err := ref.Validate(); err != nil {
 		return Plan{}, err
 	}
@@ -67,7 +79,8 @@ func (s *Service) ResolvePlan(
 	if err != nil {
 		return Plan{}, err
 	}
-	if resolved == nil || resolved.Type != declaration.TypeWorkflow ||
+	if resolved == nil ||
+		resolved.Type != declaration.TypeWorkflow ||
 		resolved.Definition == nil {
 		return Plan{}, fmt.Errorf(
 			"%w: Artifact did not resolve as a Workflow",
@@ -78,13 +91,12 @@ func (s *Service) ResolvePlan(
 	workflowRef, found := resolved.ArtifactRef()
 	if !found {
 		return Plan{}, fmt.Errorf(
-			"%w: Workflow plan root has no Artifact",
+			"%w: Workflow plan has no source-backed root",
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
-	document, err := workflowv1.DecodeAdmittedWorkflowJSON(
-		resolved.Definition.Body,
-	)
+
+	document, err := workflowv1.FromDefinition(*resolved.Definition)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -92,89 +104,79 @@ func (s *Service) ResolvePlan(
 	if err != nil {
 		return Plan{}, err
 	}
-
-	nodes := append([]workflowv1.Node(nil), document.Nodes...)
-	sort.Slice(nodes, func(left, right int) bool {
-		return nodes[left].ID < nodes[right].ID
-	})
-
-	output := Plan{
-		Workflow:     workflowRef,
-		Name:         storeSpec.LogicalName(document.Name),
-		Start:        append([]string(nil), document.Start...),
-		Nodes:        make([]Node, 0, len(nodes)),
-		Edges:        make([]Edge, 0, len(document.Edges)),
-		Capabilities: capabilities,
-		Complete:     capabilities.Complete,
+	bindings, err := bindingRequirements(document)
+	if err != nil {
+		return Plan{}, err
 	}
-	for _, value := range nodes {
-		relationship, found, err := workflowNodeRelationship(
-			resolved.Relationships,
-			value.ID,
-		)
-		if err != nil {
-			return Plan{}, err
-		}
-		if !found {
-			return Plan{}, fmt.Errorf(
-				"%w: Workflow node %q has no resolved relationship",
-				storeSpec.ErrInvalid,
-				value.ID,
-			)
-		}
 
-		form, err := value.Member.MemberForm()
-		if err != nil {
-			return Plan{}, err
-		}
-		header := value.Member.Header()
-		node := Node{
-			ID:     value.ID,
-			Join:   value.Join,
-			Type:   header.Type,
-			Name:   storeSpec.LogicalName(header.Name),
-			Form:   form,
-			Status: relationship.Status,
-		}
-		if relationship.Issue != nil {
-			node.Code = relationship.Issue.Code
-			node.Message = relationship.Issue.Message
-		}
-		if relationship.Resolved != nil && relationship.Resolved.Target != nil {
-			target := relationship.Resolved.Target.Clone()
-			node.Target = &target
-		}
-		output.Nodes = append(output.Nodes, node)
-	}
-	for _, value := range document.Edges {
-		edge := Edge{
-			From: value.From,
-			To:   value.To,
-		}
-		if value.Match != nil {
-			match := value.Match.Clone()
-			edge.Match = &match
-		}
-		output.Edges = append(output.Edges, edge)
-	}
-	return output, nil
+	return Plan{
+		Workflow:            workflowRef,
+		Document:            document,
+		Capabilities:        capabilities,
+		BindingRequirements: bindings,
+		CompositionComplete: capabilities.Complete,
+	}, nil
 }
 
-func workflowNodeRelationship(
-	values []composition.ResolvedRelationship,
-	nodeID string,
-) (composition.ResolvedRelationship, bool, error) {
-	segment, err := workflowv1.NodeRelationshipSegment(nodeID)
-	if err != nil {
-		return composition.ResolvedRelationship{}, false, err
+func bindingRequirements(
+	document workflowv1.WorkflowDocument,
+) ([]BindingRequirement, error) {
+	groups := []struct {
+		path   string
+		values map[string]workflowv1.Target
+	}{
+		{
+			path:   "targets",
+			values: document.Targets,
+		},
+		{
+			path:   "requirements",
+			values: document.Requirements,
+		},
 	}
-	for _, value := range values {
-		if len(value.Path) < 2 ||
-			value.Path[0] != "nodes" ||
-			value.Path[1] != segment {
-			continue
+
+	output := make(
+		[]BindingRequirement,
+		0,
+		len(document.Targets)+len(document.Requirements),
+	)
+	for _, group := range groups {
+		names := make([]string, 0, len(group.values))
+		for name := range group.values {
+			names = append(names, name)
 		}
-		return value, true, nil
+		sort.Strings(names)
+
+		for _, name := range names {
+			target := group.values[name]
+			_, usesComposition, err := target.DeclarationMember()
+			if err != nil {
+				return nil, fmt.Errorf(
+					"workflow %s/%s: %w",
+					group.path,
+					name,
+					err,
+				)
+			}
+
+			// The plan's dependency inventory and document must not share
+			// mutable pointers or slices with one another.
+			owned, err := jsonutil.CloneJSON(target)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"clone Workflow %s/%s: %w",
+					group.path,
+					name,
+					err,
+				)
+			}
+
+			output = append(output, BindingRequirement{
+				Path:            group.path + "/" + name,
+				Target:          owned,
+				UsesComposition: usesComposition,
+			})
+		}
 	}
-	return composition.ResolvedRelationship{}, false, nil
+	return output, nil
 }

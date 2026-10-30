@@ -217,8 +217,10 @@ func decodeMCP(
 	raw []byte,
 ) (MCPDocument, error) {
 	var value MCPDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		MCPSchemaKey,
+		false,
 		compiledMCPSchema,
 		&value,
 	); err != nil {

@@ -137,7 +137,7 @@ func (a *Service) ListProviders(
 			item.Description = entry.Definition.Description
 		}
 		if entry.Document != nil {
-			document, err := modelproviderv1.DecodeModelProviderJSON(
+			document, err := modelproviderv1.DecodeAdmittedModelProviderJSON(
 				entry.Document.Body,
 			)
 			if err != nil {
@@ -195,7 +195,7 @@ func (a *Service) ListModels(
 			item.Description = entry.Definition.Description
 		}
 		if entry.Document != nil {
-			document, err := modelv1.DecodeModelJSON(entry.Document.Body)
+			document, err := modelv1.DecodeAdmittedModelJSON(entry.Document.Body)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"decode listed Model %q: %w",

@@ -1,11 +1,17 @@
+// Package workflowv1 owns the Workflow v1 declaration language.
+//
+// This package validates declarations. It does not evaluate expressions,
+// invoke targets, schedule work, persist invocations, or execute workflows.
 package workflowv1
 
 import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -14,118 +20,138 @@ import (
 )
 
 const (
-	WorkflowType          declaration.Type = "workflow"
+	WorkflowType          declaration.Type = declaration.TypeWorkflow
 	WorkflowSchemaID                       = "artifact.workflow.v1"
 	WorkflowSchemaVersion                  = declaration.SchemaVersionV1
-)
 
-type Join string
-
-const (
-	JoinAll Join = "all"
-	JoinAny Join = "any"
+	WorkflowSourceVersionRequired = true
 )
 
 //go:embed workflow-v1.schema.json
 var schemaJSON []byte
 
-var compiledWorkflowSchema = jsonutil.MustCompileJSONSchema(schemaJSON)
+var (
+	definitionSchemaJSON   = makeDefinitionSchema()
+	compiledWorkflowSchema = jsonutil.MustCompileJSONSchema(definitionSchemaJSON)
 
-var WorkflowSchemaKey = schemaModel.ArtifactKey(
-	artifactModel.ArtifactKind(WorkflowType),
-	schemaModel.SchemaID(WorkflowSchemaID),
-	WorkflowSchemaVersion,
+	WorkflowSchemaKey = schemaModel.ArtifactKey(
+		artifactModel.ArtifactKind(WorkflowType),
+		schemaModel.SchemaID(WorkflowSchemaID),
+		WorkflowSchemaVersion,
+	)
 )
 
-type Node struct {
-	ID     string            `json:"-"`
-	Join   Join              `json:"-"`
-	Member declaration.Entry `json:"-"`
+// Value is a portable value-construction expression or JSON literal.
+//
+// A single-key {"$expr":"..."} object is CEL. A single-key {"$literal":...}
+// object suppresses directive interpretation for its entire value.
+type Value json.RawMessage
+
+func (v Value) MarshalJSON() ([]byte, error) {
+	return marshalRaw(v)
 }
 
-func (n Node) MarshalJSON() ([]byte, error) {
-	raw, err := n.Member.CanonicalJSON()
-	if err != nil {
-		return nil, err
+func (v *Value) UnmarshalJSON(raw []byte) error {
+	if v == nil {
+		return fmt.Errorf("%w: nil Workflow value target", storeSpec.ErrInvalid)
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return nil, err
-	}
-	fields["id"], _ = json.Marshal(n.ID)
-	if n.Join != "" {
-		fields["join"], _ = json.Marshal(n.Join)
-	}
-	return jsonutil.MarshalCanonicalObject(
-		fields,
-		storeSpec.MaxDefinitionBodyBytes,
-	)
-}
-
-func (n *Node) UnmarshalJSON(raw []byte) error {
-	if n == nil {
-		return fmt.Errorf("%w: Workflow node target is nil", storeSpec.ErrInvalid)
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		storeSpec.MaxDefinitionBodyBytes,
-	)
+	canonical, err := boundedJSON(raw)
 	if err != nil {
 		return err
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(canonical, &fields); err != nil {
-		return err
+	*v = Value(canonical)
+	return nil
+}
+
+// Schema is a JSON Schema Draft 2020-12 object or boolean.
+type Schema json.RawMessage
+
+func (s Schema) MarshalJSON() ([]byte, error) {
+	return marshalRaw(s)
+}
+
+func (s *Schema) UnmarshalJSON(raw []byte) error {
+	if s == nil {
+		return fmt.Errorf("%w: nil Workflow schema target", storeSpec.ErrInvalid)
 	}
-	if err := json.Unmarshal(fields["id"], &n.ID); err != nil {
-		return err
-	}
-	if joinRaw, found := fields["join"]; found {
-		if err := json.Unmarshal(joinRaw, &n.Join); err != nil {
-			return err
-		}
-	}
-	delete(fields, "id")
-	delete(fields, "join")
-	memberRaw, err := jsonutil.MarshalCanonicalObject(
-		fields,
-		storeSpec.MaxDefinitionBodyBytes,
-	)
+	canonical, err := boundedJSON(raw)
 	if err != nil {
 		return err
 	}
-	n.Member, err = declaration.DecodeCanonicalEntryJSON(memberRaw)
-	return err
+	*s = Schema(canonical)
+	return nil
 }
 
-type Edge struct {
-	From  string                   `json:"from"`
-	To    string                   `json:"to"`
-	Match *declaration.OutputMatch `json:"match,omitempty"`
+func marshalRaw(raw []byte) ([]byte, error) {
+	if len(raw) == 0 {
+		return []byte("null"), nil
+	}
+	return boundedJSON(raw)
 }
 
+func boundedJSON(raw []byte) ([]byte, error) {
+	if len(raw) > storeSpec.MaxDefinitionBodyBytes {
+		return nil, fmt.Errorf("%w: Workflow JSON value exceeds its size limit", storeSpec.ErrInvalid)
+	}
+	return jsonutil.Canonicalize(raw)
+}
+
+// WorkflowDocument is the canonical Definition representation.
+//
+// "apiVersion" is mandatory in standalone source documents. It is dispatch
+// metadata and is not stored in Definition.Body. Contained declarations inherit
+// the enclosing v1 admission context and use this canonical representation.
 type WorkflowDocument struct {
 	declaration.Header
+	Block
 
-	Start []string `json:"start,omitempty"`
-	Nodes []Node   `json:"nodes,omitempty"`
-	Edges []Edge   `json:"edges,omitempty"`
+	InputSchema  Schema `json:"inputSchema"`
+	OutputSchema Schema `json:"outputSchema"`
+
+	Schemas      map[string]Schema        `json:"schemas,omitempty"`
+	Targets      map[string]Target        `json:"targets,omitempty"`
+	TargetSets   map[string]TargetSet     `json:"targetSets,omitempty"`
+	Events       map[string]EventContract `json:"events,omitempty"`
+	Channels     map[string]Channel       `json:"channels,omitempty"`
+	Ports        map[string]PortBinding   `json:"ports,omitempty"`
+	Triggers     map[string]Trigger       `json:"triggers,omitempty"`
+	Requirements map[string]Target        `json:"requirements,omitempty"`
+	Resources    map[string]Resource      `json:"resources,omitempty"`
+	Limits       *Limits                  `json:"limits,omitempty"`
 }
 
+// WorkflowJSONSchema returns the complete standalone source schema.
+// Standalone source requires apiVersion: v1.
 func WorkflowJSONSchema() []byte {
 	return append([]byte(nil), schemaJSON...)
 }
 
-func DecodeWorkflowJSON(raw []byte) (WorkflowDocument, error) {
-	return decodeWorkflow(raw)
+// WorkflowDefinitionJSONSchema returns the same grammar for canonical
+// Definition bodies, after dispatch-only apiVersion removal.
+func WorkflowDefinitionJSONSchema() []byte {
+	return append([]byte(nil), definitionSchemaJSON...)
 }
 
-func DecodeWorkflowEntry(
-	entry declaration.Entry,
-) (WorkflowDocument, error) {
+func makeDefinitionSchema() []byte {
+	var value map[string]json.RawMessage
+	if err := json.Unmarshal(schemaJSON, &value); err != nil {
+		panic(err)
+	}
+	delete(value, "properties")
+	delete(value, "required")
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return raw
+}
+
+func DecodeWorkflowJSON(raw []byte) (WorkflowDocument, error) {
 	var value WorkflowDocument
-	if err := declaration.DecodeEntryDocumentInto(
-		entry,
+	if err := declaration.DecodeSourceDocumentInto(
+		raw,
+		WorkflowSchemaKey,
+		WorkflowSourceVersionRequired,
 		compiledWorkflowSchema,
 		&value,
 	); err != nil {
@@ -137,9 +163,18 @@ func DecodeWorkflowEntry(
 	return value, nil
 }
 
-func DecodeAdmittedWorkflowJSON(
-	raw []byte,
-) (WorkflowDocument, error) {
+func DecodeWorkflowEntry(entry declaration.Entry) (WorkflowDocument, error) {
+	var value WorkflowDocument
+	if err := declaration.DecodeEntryDocumentInto(entry, compiledWorkflowSchema, &value); err != nil {
+		return WorkflowDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return value, nil
+}
+
+func DecodeAdmittedWorkflowJSON(raw []byte) (WorkflowDocument, error) {
 	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
 	if err != nil {
 		return WorkflowDocument{}, err
@@ -147,14 +182,9 @@ func DecodeAdmittedWorkflowJSON(
 	return DecodeAdmittedWorkflowEntry(entry)
 }
 
-func DecodeAdmittedWorkflowEntry(
-	entry declaration.Entry,
-) (WorkflowDocument, error) {
+func DecodeAdmittedWorkflowEntry(entry declaration.Entry) (WorkflowDocument, error) {
 	var value WorkflowDocument
-	if err := declaration.DecodeAdmittedEntryInto(
-		entry,
-		&value,
-	); err != nil {
+	if err := declaration.DecodeAdmittedEntryInto(entry, &value); err != nil {
 		return WorkflowDocument{}, err
 	}
 	if err := value.validateFields(); err != nil {
@@ -163,31 +193,22 @@ func DecodeAdmittedWorkflowEntry(
 	return value, nil
 }
 
-func decodeWorkflow(
-	raw []byte,
-) (WorkflowDocument, error) {
-	var value WorkflowDocument
-	if err := declaration.DecodeDocumentInto(
-		raw,
-		compiledWorkflowSchema,
-		&value,
-	); err != nil {
-		return WorkflowDocument{}, err
+func (v WorkflowDocument) Validate() error {
+	if err := declaration.ValidateDocument(compiledWorkflowSchema, v); err != nil {
+		return fmt.Errorf("workflow schema: %w", err)
 	}
-	if err := value.validateFields(); err != nil {
-		return WorkflowDocument{}, err
-	}
-	return value, nil
+	return v.validateFields()
+}
+
+func (v WorkflowDocument) ValidateEntry() error {
+	return v.Validate()
 }
 
 func (v WorkflowDocument) Clone() (WorkflowDocument, error) {
 	return jsonutil.CloneJSON(v)
 }
 
-func (v WorkflowDocument) Canonicalize() (
-	WorkflowDocument,
-	error,
-) {
+func (v WorkflowDocument) Canonicalize() (WorkflowDocument, error) {
 	return v.Clone()
 }
 
@@ -198,166 +219,81 @@ func (v WorkflowDocument) CanonicalJSON() ([]byte, error) {
 	return declaration.CanonicalDocumentJSON(v)
 }
 
-func (v WorkflowDocument) CalculatedDigest() (
-	cryptoutil.Digest,
-	error,
-) {
-	return declaration.DocumentDigest(v)
+// SourceJSON returns a standalone declaration, including mandatory apiVersion.
+func (v WorkflowDocument) SourceJSON() ([]byte, error) {
+	raw, err := v.CanonicalJSON()
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	version, err := json.Marshal(WorkflowSchemaVersion)
+	if err != nil {
+		return nil, err
+	}
+	fields["apiVersion"] = version
+	return jsonutil.MarshalCanonicalObject(fields, storeSpec.MaxDefinitionBytes)
 }
 
-func (v WorkflowDocument) Validate() error {
-	return v.validate()
+func (v WorkflowDocument) CalculatedDigest() (cryptoutil.Digest, error) {
+	raw, err := v.CanonicalJSON()
+	if err != nil {
+		return "", err
+	}
+	return cryptoutil.DigestBytes(raw), nil
 }
 
-func (v WorkflowDocument) ValidateEntry() error {
-	return v.validate()
+func DefinitionForDocument(document WorkflowDocument) (definitionModel.Definition, error) {
+	body, err := document.CanonicalJSON()
+	if err != nil {
+		return definitionModel.Definition{}, err
+	}
+	displayName := document.DisplayName
+	if displayName == "" {
+		displayName = document.Name
+	}
+	return definitionModel.Canonicalize(definitionModel.Definition{
+		Kind:          artifactModel.ArtifactKind(WorkflowType),
+		SchemaID:      WorkflowSchemaKey.SchemaID,
+		SchemaVersion: WorkflowSchemaKey.SchemaVersion,
+		LogicalName:   storeSpec.LogicalName(document.Name),
+		DisplayName:   displayName,
+		Description:   document.Description,
+		Labels:        declaration.CloneStringMap(document.Labels),
+		Body:          body,
+	})
 }
 
-func (v WorkflowDocument) validate() error {
-	if err := declaration.ValidateDocument(
-		compiledWorkflowSchema,
-		v,
-	); err != nil {
-		return fmt.Errorf("workflow schema: %w", err)
+// FromDefinition reconstructs admitted meaning without executing the family
+// admission schema or recalculating the immutable Definition digest.
+func FromDefinition(value definitionModel.Definition) (WorkflowDocument, error) {
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
+		return WorkflowDocument{}, err
 	}
-	return v.validateFields()
-}
-
-func (v WorkflowDocument) validateFields() error {
-	if err := v.Header.Validate(declaration.HeaderValidation{
-		ExpectedType: WorkflowType,
-		RequireName:  true,
-	}); err != nil {
-		return err
+	if value.Kind != artifactModel.ArtifactKind(WorkflowType) ||
+		value.SchemaID != WorkflowSchemaKey.SchemaID ||
+		value.SchemaVersion != WorkflowSchemaKey.SchemaVersion ||
+		value.LogicalVersion != "" {
+		return WorkflowDocument{}, fmt.Errorf("%w: unsupported Workflow Definition", storeSpec.ErrUnsupported)
 	}
-	if err := declaration.ValidateDeclarationLocatorExclusivity(
-		"Workflow",
-		v.Locator,
-		v.Start != nil ||
-			v.Nodes != nil ||
-			v.Edges != nil,
-	); err != nil {
-		return err
+	document, err := DecodeAdmittedWorkflowJSON(value.Body)
+	if err != nil {
+		return WorkflowDocument{}, err
 	}
-
-	nodes := make(map[string]struct{}, len(v.Nodes))
-	for index, node := range v.Nodes {
-		if err := declaration.ValidateWorkflowID(
-			"Workflow node ID",
-			node.ID,
-		); err != nil {
-			return fmt.Errorf("workflow nodes[%d]: %w", index, err)
-		}
-		if _, duplicate := nodes[node.ID]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate Workflow node ID %q",
-				storeSpec.ErrInvalid,
-				node.ID,
-			)
-		}
-		nodes[node.ID] = struct{}{}
-		form, err := node.Member.MemberForm()
-		if err != nil {
-			return fmt.Errorf(
-				"workflow nodes[%d] member: %w",
-				index,
-				err,
-			)
-		}
-		if form == declaration.MemberSelector {
-			return fmt.Errorf(
-				"%w: Workflow node %q cannot contain a member selector",
-				storeSpec.ErrInvalid,
-				node.ID,
-			)
-		}
-		if err := declaration.ValidateNoRelationshipBehavior(
-			"Workflow node",
-			node.Member,
-		); err != nil {
-			return fmt.Errorf("workflow nodes[%d]: %w", index, err)
-		}
-		switch node.Join {
-		case "", JoinAll, JoinAny:
-		default:
-			return fmt.Errorf(
-				"%w: workflow node %q has invalid join %q",
-				storeSpec.ErrInvalid,
-				node.ID,
-				node.Join,
-			)
-		}
+	displayName := document.DisplayName
+	if displayName == "" {
+		displayName = document.Name
 	}
-
-	starts := make(map[string]int, len(v.Start))
-	for index, start := range v.Start {
-		if previous, duplicate := starts[start]; duplicate {
-			return fmt.Errorf(
-				"%w: Workflow start[%d] duplicates start[%d]",
-				storeSpec.ErrIdentityConflict,
-				index,
-				previous,
-			)
-		}
-		starts[start] = index
-		if _, found := nodes[start]; !found {
-			return fmt.Errorf(
-				"%w: workflow start[%d] identifies unknown node %q",
-				storeSpec.ErrInvalid,
-				index,
-				start,
-			)
-		}
+	if document.Name != string(value.LogicalName) ||
+		document.Description != value.Description ||
+		displayName != value.DisplayName ||
+		!maps.Equal(document.Labels, value.Labels) {
+		return WorkflowDocument{}, fmt.Errorf(
+			"%w: Workflow body differs from Definition metadata",
+			storeSpec.ErrDigestMismatch,
+		)
 	}
-
-	edges := make(map[string]int, len(v.Edges))
-	for index, edge := range v.Edges {
-		match := ""
-		if edge.Match != nil {
-			raw, err := declaration.CanonicalDocumentJSON(edge.Match)
-			if err != nil {
-				return err
-			}
-			match = string(raw)
-		}
-		key := edge.From + "\x00" + edge.To + "\x00" + match
-		if previous, duplicate := edges[key]; duplicate {
-			return fmt.Errorf(
-				"%w: Workflow edges[%d] duplicates edges[%d]",
-				storeSpec.ErrIdentityConflict,
-				index,
-				previous,
-			)
-		}
-		edges[key] = index
-		if _, found := nodes[edge.From]; !found {
-			return fmt.Errorf(
-				"%w: workflow edges[%d].from identifies unknown node %q",
-				storeSpec.ErrInvalid,
-				index,
-				edge.From,
-			)
-		}
-		if _, found := nodes[edge.To]; !found {
-			return fmt.Errorf(
-				"%w: workflow edges[%d].to identifies unknown node %q",
-				storeSpec.ErrInvalid,
-				index,
-				edge.To,
-			)
-		}
-		if edge.Match != nil {
-			if err := declaration.ValidateOutputMatch(
-				"Workflow edge match",
-				*edge.Match,
-			); err != nil {
-				return fmt.Errorf(
-					"workflow edges[%d]: %w",
-					index,
-					err,
-				)
-			}
-		}
-	}
-	return nil
+	return document, nil
 }

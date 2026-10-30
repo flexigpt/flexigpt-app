@@ -107,7 +107,7 @@ func (d *canonicalDecoder) Decode(
 		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
 
-	document, err := declaration.CanonicalDocumentForSchema(raw)
+	document, err := d.interpretations.PrepareSourceDocument(key, raw)
 	if err != nil {
 		return nil, decodeDiagnostic(
 			candidate,

@@ -127,7 +127,7 @@ func (d *AgentMarkdownDecoder) Decode(
 			fmt.Errorf("%w: Agent Markdown interpretation registry is unavailable", storeSpec.ErrClosed),
 		)
 	}
-	admitted, err := d.interpretations.DefinitionsForDocument(
+	admitted, err := d.interpretations.DefinitionsForCanonicalDocument(
 		agentv1.AgentSchemaKey,
 		raw,
 	)
@@ -198,11 +198,7 @@ func decodeAgentMarkdown(
 	if err != nil {
 		return agentv1.AgentDocument{}, "", err
 	}
-	entry, err := declaration.DecodeCanonicalEntryJSON(raw)
-	if err != nil {
-		return agentv1.AgentDocument{}, "", err
-	}
-	document, err := agentv1.DecodeAgentEntry(entry)
+	document, err := agentv1.DecodeAgentJSON(raw)
 	if err != nil {
 		return agentv1.AgentDocument{}, "", err
 	}

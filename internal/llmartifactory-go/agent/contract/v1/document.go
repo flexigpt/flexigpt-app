@@ -31,11 +31,13 @@ var AgentSchemaKey = schemaModel.ArtifactKey(
 	AgentSchemaVersion,
 )
 
+// AgentDocument declares reusable Agent configuration. It does not own a
+// Workflow. A Workflow refers to an Agent through a typed callable target;
+// Plugins and Workspaces can reference Workflow declarations separately.
 type AgentDocument struct {
 	declaration.Header
 
-	Members  []declaration.Entry `json:"members,omitempty"`
-	Workflow *declaration.Entry  `json:"workflow,omitempty"`
+	Members []declaration.Entry `json:"members,omitempty"`
 }
 
 func AgentJSONSchema() []byte {
@@ -119,8 +121,10 @@ func decodeAgent(
 	raw []byte,
 ) (AgentDocument, error) {
 	var value AgentDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		AgentSchemaKey,
+		false,
 		compiledAgentSchema,
 		&value,
 	); err != nil {
@@ -136,10 +140,6 @@ func (v AgentDocument) Clone() (AgentDocument, error) {
 	output := v
 	output.Header = v.Header.Clone()
 	output.Members = declaration.CloneEntries(v.Members)
-	if v.Workflow != nil {
-		value := v.Workflow.Clone()
-		output.Workflow = &value
-	}
 	return output, nil
 }
 
@@ -189,8 +189,7 @@ func (v AgentDocument) validateFields() error {
 	if err := declaration.ValidateDeclarationLocatorExclusivity(
 		"Agent",
 		v.Locator,
-		v.Members != nil ||
-			v.Workflow != nil,
+		v.Members != nil,
 	); err != nil {
 		return err
 	}
@@ -214,40 +213,7 @@ func (v AgentDocument) validateFields() error {
 		}
 	}
 
-	if v.Workflow != nil {
-		if err := validateProgramMember(
-			"Agent workflow",
-			*v.Workflow,
-			declaration.TypeWorkflow,
-		); err != nil {
-			return err
-		}
-	}
 	return nil
-}
-
-func validateProgramMember(
-	label string,
-	value declaration.Entry,
-	expected declaration.Type,
-) error {
-	form, err := value.MemberForm()
-	if err != nil {
-		return fmt.Errorf("%s: %w", label, err)
-	}
-	if form == declaration.MemberSelector ||
-		value.Header().Type != expected {
-		return fmt.Errorf(
-			"%w: %s must be one named or contained %q member",
-			storeSpec.ErrInvalid,
-			label,
-			expected,
-		)
-	}
-	return declaration.ValidateNoRelationshipBehavior(
-		label,
-		value,
-	)
 }
 
 func validateMemberRelationship(member declaration.Entry) error {

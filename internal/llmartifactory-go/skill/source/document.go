@@ -136,7 +136,7 @@ func SkillDeclarationFromDefinition(
 	if err := ValidateDefinition(value); err != nil {
 		return skillv1.SkillDocument{}, err
 	}
-	return skillv1.DecodeSkillJSON(value.Body)
+	return skillv1.DecodeAdmittedSkillJSON(value.Body)
 }
 
 // ValidateDefinition verifies the generic Definition projection without

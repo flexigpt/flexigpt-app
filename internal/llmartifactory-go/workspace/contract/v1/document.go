@@ -89,8 +89,10 @@ func decodeWorkspace(
 	raw []byte,
 ) (WorkspaceDocument, error) {
 	var value WorkspaceDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		WorkspaceSchemaKey,
+		false,
 		compiledWorkspaceSchema,
 		&value,
 	); err != nil {

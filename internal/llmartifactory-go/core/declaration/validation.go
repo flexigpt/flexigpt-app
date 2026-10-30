@@ -264,17 +264,3 @@ func ValidateRawMessageMap(
 	}
 	return nil
 }
-
-func ValidateWorkflowID(
-	label string,
-	value string,
-) error {
-	if err := storeSpec.ValidateRequiredText(
-		label,
-		value,
-		storeSpec.MaxLogicalNameBytes,
-	); err != nil {
-		return err
-	}
-	return nil
-}

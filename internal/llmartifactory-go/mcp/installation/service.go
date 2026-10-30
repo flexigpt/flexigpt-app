@@ -139,15 +139,14 @@ func (s *Service) Save(
 	expectedRevision uint64,
 	data serverMCPDomain.ServerData,
 ) (artifactModel.Artifact, error) {
-	if expectedRevision == 0 {
-		return artifactModel.Artifact{}, fmt.Errorf(
-			"%w: expected MCP installation revision is required",
-			storeSpec.ErrInvalid,
-		)
-	}
-
 	material, err := s.Resolve(ctx, ref)
 	if err != nil {
+		return artifactModel.Artifact{}, err
+	}
+	if err := validateInstallationWriteRevision(
+		material.BuiltIn,
+		expectedRevision,
+	); err != nil {
 		return artifactModel.Artifact{}, err
 	}
 	if err := data.ValidateFor(
@@ -161,6 +160,17 @@ func (s *Service) Save(
 		return s.saveProtected(ctx, material, expectedRevision, data)
 	}
 	return s.saveMutable(ctx, material, expectedRevision, data)
+}
+
+func validateInstallationWriteRevision(builtIn bool, expectedRevision uint64) error {
+	if !builtIn && expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected mutable MCP installation revision is required",
+			storeSpec.ErrInvalid,
+		)
+	}
+	// A protected server has overlay revision zero before its first write.
+	return nil
 }
 
 func (s *Service) SecretInputs(
@@ -221,18 +231,18 @@ func (s *Service) saveMutable(
 	if err != nil {
 		return artifactModel.Artifact{}, err
 	}
-	if jsonutil.Equal(record.Data, encoded) {
-		return record.Clone(), nil
-	}
 
-	updated, err := s.artifacts.UpdateData(
-		ctx,
-		record.Ref(),
-		expectedRevision,
-		encoded,
-	)
-	if err != nil {
-		return artifactModel.Artifact{}, err
+	updated := record.Clone()
+	if !jsonutil.Equal(record.Data, encoded) {
+		updated, err = s.artifacts.UpdateData(
+			ctx,
+			record.Ref(),
+			expectedRevision,
+			encoded,
+		)
+		if err != nil {
+			return artifactModel.Artifact{}, err
+		}
 	}
 	if err := serverMCPDomain.CleanupUnboundServerSecrets(
 		ctx,

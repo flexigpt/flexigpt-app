@@ -56,8 +56,10 @@ func ModelProviderJSONSchema() []byte {
 
 func DecodeModelProviderJSON(raw []byte) (ProviderDocument, error) {
 	var value ProviderDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		ModelProviderSchemaKey,
+		false,
 		compiledModelProviderSchema,
 		&value,
 	); err != nil {

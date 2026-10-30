@@ -1177,7 +1177,7 @@ func (a *Service) preflightNamedManagedDependency(
 		}
 
 		if header.Type == declaration.TypeMCP {
-			document, err := mcpv1.DecodeMCPJSON(definitionValue.Body)
+			document, err := mcpv1.DecodeAdmittedMCPJSON(definitionValue.Body)
 			if err != nil {
 				return AgentImportRelationship{},
 					nil,

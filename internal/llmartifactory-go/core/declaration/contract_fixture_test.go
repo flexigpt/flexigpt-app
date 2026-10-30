@@ -9,6 +9,7 @@ import (
 	"sort"
 	"testing"
 
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
@@ -45,8 +46,12 @@ var fixturePackageLayout = support.PackageLayout{
 }
 
 func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
-	schemas := schemasByType(t)
+	schemas := schemasByKey(t)
 	registry := declarationTestRegistry(t)
+	dispatcher, err := declaration.NewDispatcher(registry.SchemaKeys())
+	if err != nil {
+		t.Fatalf("create declaration dispatcher: %v", err)
+	}
 	entries, err := fs.ReadDir(contractFixtures, contractFixtureDirectory)
 	if err != nil {
 		t.Fatalf("read contract fixtures err: %v", err)
@@ -87,7 +92,15 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 				t.Fatalf("canonicalize YAML: %v", err)
 			}
 
-			entry, err := declaration.DecodeCanonicalEntryJSON(raw)
+			schemaKey, err := dispatcher.Resolve(raw)
+			if err != nil {
+				t.Fatalf("dispatch declaration source: %v", err)
+			}
+			canonical, err := registry.PrepareSourceDocument(schemaKey, raw)
+			if err != nil {
+				t.Fatalf("prepare declaration source: %v", err)
+			}
+			entry, err := declaration.DecodeCanonicalEntryJSON(canonical)
 			if err != nil {
 				t.Fatalf("decode generic Entry: %v", err)
 			}
@@ -100,11 +113,11 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			}
 			seenTypes[entry.Header().Type] = name
 
-			schemaJSON, found := schemas[entry.Header().Type]
+			schemaJSON, found := schemas[schemaKey]
 			if !found {
 				t.Fatalf(
-					"no codec schema for declaration type %q",
-					entry.Header().Type,
+					"no codec schema for declaration key %v",
+					schemaKey,
 				)
 			}
 			compiled, err := jsonutil.CompileJSONSchema(schemaJSON)
@@ -113,10 +126,29 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			}
 			if err := jsonutil.ValidateJSONSchema(
 				compiled,
-				json.RawMessage(raw),
+				json.RawMessage(canonical),
 				storeSpec.MaxDefinitionBytes,
 			); err != nil {
-				t.Fatalf("validate fixture JSON Schema: %v", err)
+				t.Fatalf("validate canonical fixture JSON Schema: %v", err)
+			}
+
+			if entry.Header().Type == declaration.TypeWorkflow {
+				sourceSchema, err := jsonutil.CompileJSONSchema(
+					workflowv1.WorkflowJSONSchema(),
+				)
+				if err != nil {
+					t.Fatalf("compile Workflow source schema: %v", err)
+				}
+				if err := jsonutil.ValidateJSONSchema(
+					sourceSchema,
+					json.RawMessage(raw),
+					storeSpec.MaxDefinitionBytes,
+				); err != nil {
+					t.Fatalf("validate Workflow source schema: %v", err)
+				}
+				if _, err := workflowv1.DecodeWorkflowJSON(raw); err != nil {
+					t.Fatalf("decode Workflow source: %v", err)
+				}
 			}
 
 			canonicalDocument, err := canonicalConcreteDocument(entry)
@@ -149,7 +181,29 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 				t.Fatal("walk named declarations returned no root declaration")
 			}
 
+			admitted, err := registry.DefinitionsForSchemaValidatedDocument(
+				schemaKey,
+				canonical,
+			)
+			if err != nil {
+				t.Fatalf("admit schema-validated declaration: %v", err)
+			}
+			if len(admitted) != len(named) {
+				t.Fatalf(
+					"admitted Definition count = %d, want %d",
+					len(admitted),
+					len(named),
+				)
+			}
+
 			for index, value := range named {
+				if admitted[index].SubresourceLocator != value.SubresourceLocator {
+					t.Fatalf(
+						"admitted subresource %q, want %q",
+						admitted[index].SubresourceLocator,
+						value.SubresourceLocator,
+					)
+				}
 				if _, err := canonicalConcreteDocument(value.Entry); err != nil {
 					t.Fatalf(
 						"decode contained declaration %q: %v",
@@ -165,6 +219,9 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 					}
 					if err := definitionValue.Validate(); err != nil {
 						t.Fatalf("validate root Definition: %v", err)
+					}
+					if admitted[index].Definition.Digest != definitionValue.Digest {
+						t.Fatal("schema-validated root Definition differs from reconstructed Definition")
 					}
 					continue
 				}
@@ -183,6 +240,9 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 						value.SubresourceLocator,
 						err,
 					)
+				}
+				if admitted[index].Definition.Digest != definitionValue.Digest {
+					t.Fatalf("contained Definition %q differs after admission", value.SubresourceLocator)
 				}
 			}
 		})
@@ -207,21 +267,21 @@ func TestMCPRejectsRetiredSSETransport(t *testing.T) {
 	}
 }
 
-func schemasByType(t *testing.T) map[declaration.Type][]byte {
+func schemasByKey(t *testing.T) map[schemaModel.Key][]byte {
 	t.Helper()
 
-	output := map[declaration.Type][]byte{
-		textv1.TextType:                   textv1.TextJSONSchema(),
-		modelv1.ModelType:                 modelv1.ModelJSONSchema(),
-		modelproviderv1.ModelProviderType: modelproviderv1.ModelProviderJSONSchema(),
-		toolv1.ToolType:                   toolv1.ToolJSONSchema(),
-		skillv1.SkillType:                 skillv1.SkillJSONSchema(),
-		mcpv1.MCPType:                     mcpv1.MCPJSONSchema(),
-		mcppolicyv1.MCPPolicyType:         mcppolicyv1.MCPPolicyJSONSchema(),
-		pluginv1.PluginType:               pluginv1.PluginJSONSchema(),
-		agentv1.AgentType:                 agentv1.AgentJSONSchema(),
-		workflowv1.WorkflowType:           workflowv1.WorkflowJSONSchema(),
-		workspacev1.WorkspaceType:         workspacev1.WorkspaceJSONSchema(),
+	output := map[schemaModel.Key][]byte{
+		textv1.TextSchemaKey:                   textv1.TextJSONSchema(),
+		modelv1.ModelSchemaKey:                 modelv1.ModelJSONSchema(),
+		modelproviderv1.ModelProviderSchemaKey: modelproviderv1.ModelProviderJSONSchema(),
+		toolv1.ToolSchemaKey:                   toolv1.ToolJSONSchema(),
+		skillv1.SkillSchemaKey:                 skillv1.SkillJSONSchema(),
+		mcpv1.MCPSchemaKey:                     mcpv1.MCPJSONSchema(),
+		mcppolicyv1.MCPPolicySchemaKey:         mcppolicyv1.MCPPolicyJSONSchema(),
+		pluginv1.PluginSchemaKey:               pluginv1.PluginJSONSchema(),
+		agentv1.AgentSchemaKey:                 agentv1.AgentJSONSchema(),
+		workflowv1.WorkflowSchemaKey:           workflowv1.WorkflowDefinitionJSONSchema(),
+		workspacev1.WorkspaceSchemaKey:         workspacev1.WorkspaceJSONSchema(),
 	}
 	return output
 }

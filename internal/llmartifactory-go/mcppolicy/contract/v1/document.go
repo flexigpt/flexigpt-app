@@ -115,8 +115,10 @@ func decodeMCPPolicy(
 	raw []byte,
 ) (MCPPolicyDocument, error) {
 	var value MCPPolicyDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		MCPPolicySchemaKey,
+		false,
 		compiledMCPPolicySchema,
 		&value,
 	); err != nil {

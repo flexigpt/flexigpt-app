@@ -41,8 +41,10 @@ func PluginJSONSchema() []byte {
 
 func DecodePluginJSON(raw []byte) (PluginDocument, error) {
 	var value PluginDocument
-	if err := declaration.DecodeDocumentInto(
+	if err := declaration.DecodeSourceDocumentInto(
 		raw,
+		PluginSchemaKey,
+		false,
 		compiledPluginSchema,
 		&value,
 	); err != nil {

@@ -465,7 +465,7 @@ A call can start work and return a handle:
   wait:
     for: completion
     handle:
-      $expr: steps.start-analysis.output.handle
+      $expr: steps['start-analysis'].output.handle
 ```
 
 `lifetime` is:
@@ -855,7 +855,7 @@ This makes request-and-callback processes safe when a callback arrives before th
           subscription: confirmation
 
     output:
-      $expr: steps.receive-confirmation.output.data
+      $expr: steps['receive-confirmation'].output.data
 ```
 
 Matching events remain available within subscription retention until consumed.
@@ -1441,3 +1441,25 @@ The example distinguishes three different decisions:
 | Protocol-neutral target bindings                    | Local-only control-flow semantics                    | Remote integrations can use the same language without a separate workflow model.            |
 
 The result is one process language for pipelines, dynamic Agent work, human decisions, asynchronous integrations, and event-driven business lifecycles. Practical breadth comes from these composable contracts, with typed callable work as the extension point.
+
+## 12. Declaration implementation boundary
+
+- Standalone Workflow source requires `apiVersion: v1`.
+- Canonical Definition bodies omit dispatch-only `apiVersion`.
+- Contained Workflow declarations inherit the enclosing v1 admission context.
+- The previous `start`, `nodes`, `edges`, and `join` format is removed.
+- Workflow documents are concrete declarations, not locator aliases.
+- Target references can use registered portable locator handlers.
+- MCP Tool targets use `kind: tool`, an MCP `server` reference, and the
+  operation name in `ref`.
+- Service and activity targets remain explicit binding requirements. They do
+  not create synthetic Artifacts.
+- Reusable schemas are available under `#/$defs/<name>`.
+- Calendar schedules use five-field numeric cron syntax and an IANA time zone.
+- Hyphenated step IDs use CEL bracket access, such as
+  `steps['request-payment'].output`.
+- Declaration admission compiles expressions and validates static facts. It
+  does not evaluate expressions or execute any Workflow operation.
+- Full callable binding preparation, data-dependent boundary validation,
+  invocation persistence, scheduling, execution, and recovery belong to the
+  separate runtime implementation.

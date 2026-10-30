@@ -1,8 +1,6 @@
 package agentv1
 
 import (
-	"fmt"
-
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 )
@@ -32,28 +30,9 @@ func agentRelationships(
 	if err != nil {
 		return nil, err
 	}
-
-	output, err := coreinterpretation.MemberRelationships(
+	return coreinterpretation.MemberRelationships(
 		[]string{"members"},
 		document.Members,
 		coreinterpretation.MemberOptions{AllowSelector: true},
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	if document.Workflow != nil {
-		value, err := coreinterpretation.NewMemberRelationship(
-			[]string{"workflow"},
-			*document.Workflow,
-			coreinterpretation.MemberOptions{
-				DirectPosition: true,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("workflow: %w", err)
-		}
-		output = append(output, value)
-	}
-	return output, nil
 }

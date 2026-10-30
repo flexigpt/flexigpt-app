@@ -7,6 +7,8 @@ import (
 
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -27,14 +29,16 @@ func canonicalManagedAgentImportDocument(
 	format ImportFormat,
 	raw []byte,
 ) ([]byte, error) {
+	var canonical []byte
+	var err error
 	switch format {
 	case ImportFormatJSON:
-		return jsonutil.CanonicalizeObject(
+		canonical, err = jsonutil.CanonicalizeObject(
 			raw,
 			storeSpec.MaxDefinitionBytes,
 		)
 	case ImportFormatYAML:
-		return yamlutil.CanonicalObjectJSON(
+		canonical, err = yamlutil.CanonicalObjectJSON(
 			raw,
 			storeSpec.MaxDefinitionBytes,
 		)
@@ -45,6 +49,14 @@ func canonicalManagedAgentImportDocument(
 			format,
 		)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return declaration.PrepareSourceDocument(
+		agentv1.AgentSchemaKey,
+		canonical,
+		false,
+	)
 }
 
 func (format ImportFormat) invalidDocumentIssueCode() string {
