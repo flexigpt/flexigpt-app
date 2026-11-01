@@ -68,7 +68,7 @@
 	},
 	"devDependencies": {
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-		"@react-router/dev": "^8.5.0",
+		"@react-router/dev": "^8.5.1",
 		"@tailwindcss/node": "^4.3.3",
 		"@tailwindcss/vite": "^4.3.3",
 		"@testing-library/jest-dom": "^7.0.1",
@@ -89,7 +89,7 @@
 		"jiti": "^2.7.0",
 		"jsdom": "^30.1.3",
 		"knip": "^6.43.0",
-		"oxlint": "^1.89.0",
+		"oxlint": "^1.90.0",
 		"oxlint-tsgolint": "^7.0.2005",
 		"prettier": "^3.9.10",
 		"prettier-plugin-tailwindcss": "^0.8.1",
