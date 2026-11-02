@@ -128,10 +128,6 @@ export function CopyButton({
 		if (copyOperationRef.current !== operationID) {
 			return;
 		}
-		if (!mountedRef.current) {
-			copyInFlightRef.current = false;
-			return;
-		}
 		if (text === null || text === undefined) {
 			finishCopyFailure(operationID, new Error('No text is available to copy.'));
 			return;
@@ -157,7 +153,9 @@ export function CopyButton({
 	};
 
 	const copy = () => {
-		if (disabled || copyInFlightRef.current) {
+		// Click-only entry. A new click supersedes a pending write.
+		// Do not gate on copying state, otherwise rapid retries are lost.
+		if (disabled) {
 			return;
 		}
 
@@ -209,7 +207,7 @@ export function CopyButton({
 			type="button"
 			aria-label={copyState === 'failed' ? failedLabel : (ariaLabel ?? buttonLabel ?? 'Copy To Clipboard')}
 			title={copyState === 'failed' ? failedLabel : (title ?? buttonLabel ?? 'Copy To Clipboard')}
-			disabled={disabled || copying}
+			disabled={disabled}
 			aria-busy={copying || undefined}
 			onClick={event => {
 				onClick?.(event);
