@@ -245,6 +245,16 @@ func (v WorkflowDocument) CalculatedDigest() (cryptoutil.Digest, error) {
 	return cryptoutil.DigestBytes(raw), nil
 }
 
+// CompileValueSchema compiles an instance boundary using the same local
+// schema dependencies and reference policy as Workflow declaration admission.
+//
+// It does not evaluate a Workflow value or execute an operation.
+func (v WorkflowDocument) CompileValueSchema(
+	schema Schema,
+) (jsonutil.JSONSchema, error) {
+	return v.compileSchema(schema)
+}
+
 func DefinitionForDocument(document WorkflowDocument) (definitionModel.Definition, error) {
 	body, err := document.CanonicalJSON()
 	if err != nil {

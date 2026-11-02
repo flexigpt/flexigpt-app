@@ -10,6 +10,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
@@ -34,6 +35,8 @@ type BindingRequirement struct {
 
 type Plan struct {
 	Workflow artifactModel.ArtifactRef `json:"workflow"`
+	Revision uint64                    `json:"revision"`
+	Digest   cryptoutil.Digest         `json:"digest"`
 
 	// Document is the canonical declaration. Dispatch-only apiVersion is not
 	// included in an admitted Definition.
@@ -95,6 +98,12 @@ func (s *Service) ResolvePlan(
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
+	if resolved.Artifact == nil || !resolved.Artifact.Enabled {
+		return Plan{}, fmt.Errorf(
+			"%w: selected Workflow is disabled",
+			storeSpec.ErrReferenceUnresolved,
+		)
+	}
 
 	document, err := workflowv1.FromDefinition(*resolved.Definition)
 	if err != nil {
@@ -111,6 +120,8 @@ func (s *Service) ResolvePlan(
 
 	return Plan{
 		Workflow:            workflowRef,
+		Revision:            resolved.Artifact.Revision,
+		Digest:              resolved.Definition.Digest,
 		Document:            document,
 		Capabilities:        capabilities,
 		BindingRequirements: bindings,
