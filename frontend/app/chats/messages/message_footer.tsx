@@ -166,6 +166,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
+	const hasCopyContent = /\S/.test(copyContent);
 	const hasUsage = Boolean(
 		usage &&
 		(usage.inputTokensTotal > 0 ||
@@ -275,7 +276,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 						</HoverTip>
 					)}
 
-					{cardCopyContent !== '' && !isBusy && (
+					{hasCopyContent && !isBusy && (
 						<HoverTip content="Copy message text" placement="top">
 							<CopyButton
 								value={copyContent}
