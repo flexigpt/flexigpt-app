@@ -215,6 +215,7 @@ const tsRules: DummyRuleMap = {
 
 	// Suspicious. Default on.
 	'typescript/no-unsafe-type-assertion': 'off',
+	'typescript/no-unsafe-enum-assignment': 'off',
 	'typescript/no-unnecessary-type-assertion': 'off',
 	'typescript/consistent-return': 'off',
 

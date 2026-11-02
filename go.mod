@@ -7,7 +7,7 @@ ignore build
 // Tools are installed via the taskfile. Check the associated task.
 
 require (
-	cel.dev/cel-go v0.33.1
+	cel.dev/cel-go v0.33.2
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.22.0
 	github.com/flexigpt/inference-go v0.28.6
@@ -16,8 +16,8 @@ require (
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/wailsapp/wails/v3 v3.0.0
-	go.yaml.in/yaml/v4 v4.0.0-rc.6
+	github.com/wailsapp/wails/v3 v3.1.0
+	go.yaml.in/yaml/v4 v4.0.0-rc.7
 	golang.org/x/oauth2 v0.37.0
 )
 
@@ -42,6 +42,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/forPelevin/gomoji v1.3.0 // indirect
@@ -108,6 +109,7 @@ require (
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.278.0 // indirect
