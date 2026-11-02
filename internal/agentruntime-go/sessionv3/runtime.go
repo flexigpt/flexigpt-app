@@ -1172,11 +1172,27 @@ func (r *Runtime) advanceFrameLocked(
 		}
 		execution.WorkItems = append(execution.WorkItems, item)
 		frame.WorkItemIDs = append(frame.WorkItemIDs, item.ID)
-		if item.Type == WorkItemTypeTool && frame.Program.InterpreterID == BuiltinAgentLoopInterpreterID {
-			var as agentLoopProgramState
-			if json.Unmarshal(frame.State.Data, &as) == nil {
-				as.PendingToolIDs = append(as.PendingToolIDs, item.ID)
-				frame.State = encodeAgentLoopState(as)
+		if frame.Program.InterpreterID == BuiltinAgentLoopInterpreterID {
+			if item.Type == WorkItemTypeTool {
+				var as agentLoopProgramState
+				if json.Unmarshal(frame.State.Data, &as) == nil {
+					as.PendingToolIDs = append(as.PendingToolIDs, item.ID)
+					frame.State = encodeAgentLoopState(as)
+				}
+			}
+			if item.Type == WorkItemTypeLLM {
+				var as agentLoopProgramState
+				if json.Unmarshal(frame.State.Data, &as) == nil {
+					as.LastLLMWorkItemID = item.ID
+					frame.State = encodeAgentLoopState(as)
+				}
+			}
+		}
+		if item.Type == WorkItemTypeLLM && frame.Program.InterpreterID == BuiltinSingleModelInterpreterID {
+			var ss singleModelProgramState
+			if json.Unmarshal(frame.State.Data, &ss) == nil {
+				ss.WorkItemID = item.ID
+				frame.State = encodeSingleModelState(ss)
 			}
 		}
 	}

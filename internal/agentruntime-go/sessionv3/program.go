@@ -219,9 +219,13 @@ func (agentLoopInterpreter) Advance(
 			return startAgentLLM(state, payload.Defaults)
 		}
 	case ProgramEventWorkSettled:
-		if event.WorkItemID == state.LastLLMWorkItemID {
-			item := executionWorkItem(execution, event.WorkItemID)
-			if item == nil || item.Output == nil || item.Output.LLM == nil {
+		item := executionWorkItem(execution, event.WorkItemID)
+		if item == nil {
+			return ProgramTransition{State: encodeAgentLoopState(state)}, nil
+		}
+		if item.Type == WorkItemTypeLLM && item.FrameID == frame.ID {
+			state.LastLLMWorkItemID = item.ID
+			if item.Output == nil || item.Output.LLM == nil {
 				return failedAgentTransition(state, "llm_output_missing", "LLM WorkItem completed without LLM output")
 			}
 			assistant := Activity{
@@ -230,19 +234,23 @@ func (agentLoopInterpreter) Advance(
 				WorkItemID: item.ID,
 				Message:    &MessageActivity{Role: MessageRoleAssistant, Text: item.Output.LLM.Text},
 			}
-			if len(item.Output.LLM.ToolCalls) == 0 {
+			executable, observed := splitExecutableCalls(item.Output.LLM.ToolCalls)
+			activities := make([]Activity, 0, 1+len(observed))
+			activities = append(activities, assistant)
+			activities = append(activities, observed...)
+			if len(executable) == 0 {
 				status := ProgramFrameStateCompleted
 				return ProgramTransition{
 					State:      encodeAgentLoopState(state),
 					Status:     &status,
 					Output:     MustCanonicalValue(item.Output.LLM),
-					Activities: []Activity{assistant},
+					Activities: activities,
 				}, nil
 			}
 			state.PendingToolIDs = nil
 			state.AwaitingContinue = true
-			work := make([]WorkItemIntent, 0, len(item.Output.LLM.ToolCalls))
-			for _, call := range item.Output.LLM.ToolCalls {
+			work := make([]WorkItemIntent, 0, len(executable))
+			for _, call := range executable {
 				work = append(
 					work,
 					WorkItemIntent{
@@ -258,7 +266,7 @@ func (agentLoopInterpreter) Advance(
 			return ProgramTransition{
 				State:      encodeAgentLoopState(state),
 				Status:     &status,
-				Activities: []Activity{assistant},
+				Activities: activities,
 				WorkItems:  work,
 			}, nil
 		}
@@ -328,6 +336,29 @@ func encodeAgentLoopState(value agentLoopProgramState) ProgramState {
 		Version: BuiltinInterpreterVersion,
 		Data:    MustCanonicalValue(value),
 	}
+}
+
+func splitExecutableCalls(calls []ToolCall) ([]ToolCall, []Activity) {
+	executable := make([]ToolCall, 0, len(calls))
+	observed := make([]Activity, 0)
+	for _, call := range calls {
+		if call.Binding.Kind == ToolBindingKindProvider {
+			observed = append(observed, Activity{
+				Kind:       ActivityKindAction,
+				Visibility: ActivityVisibilityBoth,
+				WorkItemID: WorkItemID(call.ID),
+				Action: &ActionActivity{
+					Title:      firstNonEmpty(call.DisplayName, call.Name),
+					Summary:    "Provider managed tool observed.",
+					ActionKind: "tool",
+					Outcome:    string(ToolOutputKindSuccess),
+				},
+			})
+			continue
+		}
+		executable = append(executable, call)
+	}
+	return executable, observed
 }
 
 type singleModelInterpreter struct{}
@@ -445,6 +476,15 @@ func encodeSingleModelState(value singleModelProgramState) ProgramState {
 		Version: BuiltinInterpreterVersion,
 		Data:    MustCanonicalValue(value),
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func executionWorkItem(execution Execution, id WorkItemID) *WorkItem {

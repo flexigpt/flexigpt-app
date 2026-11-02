@@ -35,12 +35,41 @@ type Session struct {
 }
 
 type SessionDefaults struct {
-	Model              *ArtifactSelection `json:"model,omitempty"`
-	Agent              *ArtifactSelection `json:"agent,omitempty"`
-	Workspace          *ArtifactSelection `json:"workspace,omitempty"`
-	SystemInstructions []Instruction      `json:"systemInstructions,omitempty"`
-	Temperature        *float64           `json:"temperature,omitempty"`
-	Metadata           CanonicalValue     `json:"metadata,omitempty"`
+	Model              *ArtifactSelection   `json:"model,omitempty"`
+	Agent              *ArtifactSelection   `json:"agent,omitempty"`
+	Workspace          *ArtifactSelection   `json:"workspace,omitempty"`
+	SystemInstructions []Instruction        `json:"systemInstructions,omitempty"`
+	Temperature        *float64             `json:"temperature,omitempty"`
+	Metadata           CanonicalValue       `json:"metadata,omitempty"`
+	History            HistorySelection     `json:"history"`
+	Tools              []ArtifactSelection  `json:"tools,omitempty"`
+	Skills             []ArtifactSelection  `json:"skills,omitempty"`
+	ActiveSkills       []ArtifactSelection  `json:"activeSkills,omitempty"`
+	MCP                []MCPServerSelection `json:"mcp,omitempty"`
+}
+
+type HistorySelection struct {
+	All                      bool `json:"all,omitempty"`
+	IncludePreviousUserTurns int  `json:"includePreviousUserTurns,omitempty"`
+}
+
+type MCPToolExposure string
+
+const (
+	MCPToolExposureNone MCPToolExposure = "none"
+	MCPToolExposureAll  MCPToolExposure = "all"
+)
+
+type MCPToolSelection struct {
+	ToolName       string `json:"toolName"`
+	ExpectedDigest string `json:"expectedDigest,omitempty"`
+}
+
+type MCPServerSelection struct {
+	Server                    ArtifactSelection  `json:"server"`
+	IncludeServerInstructions bool               `json:"includeServerInstructions,omitempty"`
+	ToolExposure              MCPToolExposure    `json:"toolExposure"`
+	SelectedTools             []MCPToolSelection `json:"selectedTools,omitempty"`
 }
 
 type Instruction struct {

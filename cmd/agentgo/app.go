@@ -55,13 +55,15 @@ type App struct {
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 	sessionRuntimeAPI     *SessionRuntimeWrapper
+	sessionV3RuntimeAPI   *SessionV3Wrapper
 
 	artifactStoreSetup *artifactsetup.Handle
 
 	dataBasePath string
 
-	settingsDirPath      string
-	sessionsDirPath      string
+	settingsDirPath string
+	sessionsDirPath string
+
 	artifactStoreDirPath string
 
 	artifactInitializationError error
@@ -711,6 +713,9 @@ func (a *App) closeManagers() {
 	}
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
+	if a.sessionV3RuntimeAPI != nil {
+		a.sessionV3RuntimeAPI.close()
+	}
 	if a.sessionRuntimeAPI != nil {
 		a.sessionRuntimeAPI.close()
 	}

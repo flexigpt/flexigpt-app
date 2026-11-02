@@ -67,13 +67,3 @@ type sessionIndexRecord struct {
 	SchemaVersion string          `json:"schemaVersion"`
 	Item          SessionListItem `json:"item"`
 }
-
-type sessionFTSRecord struct {
-	SchemaVersion string              `json:"schemaVersion"`
-	SessionID     sessionv3.SessionID `json:"sessionID"`
-	Revision      sessionv3.Revision  `json:"revision"`
-	UpdatedAt     time.Time           `json:"updatedAt"`
-	Title         string              `json:"title"`
-	Text          string              `json:"text"`
-	Terms         []string            `json:"terms"`
-}
