@@ -1,520 +1,762 @@
-# Workflow Runtime
+# Workflow Runtime HLD
+
+> A Session is a durable timeline of related activities plus the execution state needed to continue those activities safely.
 
-## 1. Decision
+A Session is not only a timeline. A timeline explains what happened. Execution state explains what is still running, waiting, retryable, cancelled, or uncertain.
 
-A Workflow declaration describes a reusable process.
+A chat turn, an Agent Tool loop, and a Workflow invocation differ in orchestration only. They use the same Session, execution records, LLM calls, Tool calls, waits, outcomes, and persistence boundary.
 
-A Workflow invocation is one durable execution of that process.
+## 1. Core model
+
+The Session is the only durable activity root.
+
+```text
+Session
+├── Timeline
+│   ├── user message activities
+│   ├── assistant message activities
+│   ├── action summaries
+│   ├── approval and wait activities
+│   └── workflow progress activities
+│
+├── Executions
+│   ├── orchestration frames
+│   ├── work items
+│   ├── attempts
+│   ├── waits
+│   ├── outputs
+│   └── recovery state
+│
+└── Session defaults and presentation metadata
+```
 
-A Session is a conversation and execution container for interactive reasoning.
+The Session answers two different questions:
 
-A Session Run is one accepted reasoning interaction, including its Model
-operations, Tool calls, approvals, and continuation.
+| Question                                              | Owned data      |
+| ----------------------------------------------------- | --------------- |
+| What happened in this coherent activity?              | Timeline        |
+| What is still active, and how can it safely continue? | Execution state |
 
-These are separate identities:
+A timeline item is an activity record. It can be a message, action summary, wait, workflow phase, or system outcome.
 
-- Workflow Artifact: reusable process definition.
-- Workflow invocation: process execution.
-- Session: conversation.
-- Session Run: reasoning execution.
-- Workflow operation: one logical operation within an invocation.
-- Operation attempt: one dispatch attempt for that operation.
+An execution work item is not necessarily visible in the timeline. For example, a retry backoff calculation, a branch guard evaluation, or a provider binding resolution is execution state but is usually not user-facing activity.
+
+## 2. Activity versus work item
+
+These are different concepts.
+
+### 2.1 Activity
 
-A Workflow invocation is not a provider completion.
-
-An Agent call from a Workflow uses the existing Session runtime. The Workflow
-runtime does not implement another Agent Tool loop.
-
-## 2. Ownership
-
-### Declaration layer
-
-`internal/llmartifactory-go/workflow` owns read-only declaration planning.
-
-It owns:
-
-- Workflow Artifact selection.
-- Canonical Workflow document reconstruction.
-- Composition results.
-- Binding requirement inventory.
-- Definition revision and digest evidence.
-
-It does not own:
-
-- Invocation state.
-- CEL evaluation.
-- Target execution.
-- Timers.
-- Human decisions.
-- Invocation persistence.
-- Runtime recovery.
-
-`CompositionComplete` is not runtime readiness.
-
-### Workflow runtime
-
-`internal/agentruntime-go/workflow` owns:
-
-- Invocation admission.
-- Immutable invocation definition snapshots.
-- Runtime capability admission.
-- Operation identities.
-- Prepared binding values.
-- Execution and retry state.
-- Durable waits.
-- Invocation controls.
-- Typed operational errors.
-- Recovery barriers.
-- Invocation snapshots.
-
-The runtime consumes narrow Source, Executor, Repository, and HumanAuthorizer
-ports. It does not receive an Artifact Store aggregate.
-
-### Runtime setup
-
-`internal/agentruntime-go/runtimesetup` joins:
-
-- Workflow declaration planning.
-- Artifact revision and digest checks.
-- Model runtime preparation.
-- Session runtime Agent execution.
-- Application-registered service and activity bindings.
-
-Credentials remain in the existing inference and Model runtime boundaries.
-They are not written into Workflow records.
-
-### Transport
-
-The Wails wrapper exposes explicit invocation commands and read-only
-snapshots. It does not accept prepared bindings, credentials, actor roles, or
-arbitrary Workflow documents from the frontend.
-
-## 3. Invocation API
-
-An explicit invocation supplies:
-
-- Command ID.
-- Workflow Artifact selection.
-- Expected Artifact revision or Definition digest when selected by the UI.
-- JSON input.
-- Optional JSON context.
-- Optional Session association for presentation.
-
-Example:
-
-    InvokeWorkflow({
-      commandID: "...",
-      workflow: {
-        rootID: "...",
-        artifactID: "...",
-        expectedRevision: 7,
-        expectedDigest: "sha256:..."
-      },
-      input: {
-        requestId: "...",
-        release: "..."
-      },
-      sessionID: "..."
-    })
-
-`sessionID` is an association only. It does not transfer conversation history,
-Model selection, Tool authority, attachments, or instructions.
-
-The response contains an invocation ID.
-
-The UI attaches through `GetWorkflowInvocation`. It can poll while an
-invocation is active. Existing Session APIs remain authoritative for Agent
-child Runs and their Tool approvals.
-
-Commands are:
-
-- Invoke.
-- Pause.
-- Resume.
-- Cancel.
-- Respond to a human wait.
-- Resolve recovery review for an uncertain call.
-
-Command IDs are idempotency identities. Reuse with another payload is an
-error.
-
-## 4. Admission
-
-Admission completes before business work starts.
-
-The runtime:
-
-1. Resolves the selected Workflow plan.
-2. Checks selection pins.
-3. Captures the canonical document and Definition evidence.
-4. Requires complete declared composition.
-5. Prepares every target and requirement binding.
-6. Checks the local execution profile.
-7. Validates invocation input.
-8. Writes the accepted invocation.
-9. Starts runtime-owned execution.
-
-An unavailable required binding rejects invocation admission.
-
-A declaration that uses an unsupported execution capability also rejects
-admission. The runtime must not discover an unsupported operation after
-earlier business work has executed.
-
-A later target availability change is an operational failure. It does not
-change the captured Workflow definition.
-
-## 5. Durable Execution Model
-
-The local runtime uses a persisted operation journal.
-
-An operation key includes:
-
-- Declared step path.
-- Composite attempt path.
-- Loop iteration or collection index.
-
-A retry keeps the logical step identity. Its attempt counter changes.
-
-Each step captures its entry environment once. This includes completed
-enclosing outcomes, state, input, context, and logical evaluation time.
-
-Replay reconstructs control flow from that captured environment and terminal
-journal entries.
-
-Replay does not repeat a confirmed successful call.
-
-For an external call, the write order is:
-
-1. Capture selected binding and mapped values.
-2. Persist prepared call data.
-3. Persist dispatching state.
-4. Execute the external call.
-5. Persist returned output or asynchronous receipt.
-6. Continue.
-
-A persistence failure before dispatch prevents dispatch.
-
-A crash after dispatching state but before a confirmed result creates an
-uncertainty barrier. It does not cause automatic redispatch.
-
-This is not an exactly-once guarantee for external systems.
-
-## 6. Definition and Binding Consistency
-
-The invocation stores an immutable Workflow document and prepared binding
-descriptors.
-
-Artifact-backed binding descriptors contain identities and expected
-revision/digest evidence, not provider credentials.
-
-Service and activity bindings contain application registration identities
-and revisions. They do not create synthetic Artifacts.
-
-Before use, an application registration must still have the captured
-revision.
-
-A target's authored interface constrains the binding. It cannot grant
-capabilities that the binding does not support.
-
-The binding's effect contract is authoritative for retry safety.
-
-## 7. Values and State
-
-CEL evaluation uses the standard pure CEL environment.
-
-Runtime evaluation has a cost limit and observes context cancellation.
-
-JSON values are copied at binding boundaries.
-
-Integral JSON numbers outside the interoperable exact-integer range are
-rejected instead of silently changing value during persistence or CEL
-adaptation.
-
-A single-key `$literal` object suppresses directive interpretation for its
-complete value.
-
-All fields of one constructed value use the same environment snapshot.
-
-A `set` operation:
-
-1. Evaluates every assignment against the previous state.
-2. Applies shallow assignments and removals.
-3. Validates the complete candidate state.
-4. Publishes the new state atomically.
-
-Parallel branches and Foreach items receive independent state copies.
-Their state is not implicitly merged into the parent.
-
-Step outcomes expose status, output, error, and metadata. Skipped steps do
-not expose output.
-
-## 8. Calls
-
-### Agent
-
-An Agent call creates a dedicated child Session and Run.
-
-Only mapped input and mapped context enter that Session.
-
-The child Session configuration selects the captured Agent. It does not
-inherit the active chat configuration.
-
-Agent execution uses the existing Session runtime for:
-
-- Model preparation.
-- Tool execution.
-- MCP approvals.
-- Skill sessions.
-- Streaming.
-- Cancellation.
-- Recovery.
-
-The Workflow call retains the child Session and Run IDs as its receipt.
-
-A waiting child Run keeps the Workflow call waiting. The UI uses existing
-Session commands to resolve child Tool approvals or request continuation.
-
-Agent output is parsed as JSON when possible. Otherwise it is a string.
-Declared output schemas determine whether that result is acceptable.
-
-### Model
-
-A Model call performs one prepared Model operation.
-
-It uses the existing runtime setup and inference boundary.
-
-It does not start an Agent Tool loop.
-
-Unexpected local Tool-call proposals are an execution error.
-
-### Service and activity
-
-These calls require explicit application registrations.
-
-A registration supplies:
-
-- Stable binding identity.
-- Registration revision.
-- Callable interface.
+An Activity is a durable timeline record.
+
+It is append-only from the consumer perspective and has:
+
+- Activity ID.
+- Timestamp.
+- Visibility.
+- Session association.
+- Optional execution association.
+- Optional parent activity.
+- Typed payload.
+- Human-readable summary.
+- Optional structured data safe for consumers.
+
+Activity kinds include:
+
+| Activity kind | Example                                       |
+| ------------- | --------------------------------------------- |
+| `message`     | User asks a question.                         |
+| `message`     | Assistant returns an answer.                  |
+| `action`      | Tool changed a file.                          |
+| `action`      | MCP Tool returned a result.                   |
+| `workflow`    | Review branch completed.                      |
+| `wait`        | Approval is required.                         |
+| `wait`        | Approval was granted.                         |
+| `state`       | Workflow reached a meaningful milestone.      |
+| `outcome`     | Activity completed, failed, or was cancelled. |
+
+A normal chat transcript becomes a filtered view of message Activities.
+
+A Workflow UI becomes a filtered view of workflow, action, wait, and outcome Activities.
+
+A CLI or VS Code extension can consume the same Activity timeline without Wails-specific behavior.
+
+### 2.2 Work item
+
+A WorkItem is a durable execution node.
+
+It has:
+
+- Work item ID.
+- Parent frame ID.
+- Program path.
+- Dependency IDs.
+- Logical operation key.
+- Work type.
+- State.
+- Attempt history.
+- Semantic input.
+- Semantic output.
+- Sanitized error.
+- Safe external receipt, when available.
+- Visibility policy.
+
+Work types include:
+
+| Work type      | Meaning                                                             |
+| -------------- | ------------------------------------------------------------------- |
+| `llm`          | One provider-neutral LLM request.                                   |
+| `tool`         | Go Tool, MCP Tool, Skill Tool, or provider-managed Tool action.     |
+| `service`      | Trusted application service call.                                   |
+| `activity`     | Trusted local or remote activity call.                              |
+| `transform`    | Deterministic value construction.                                   |
+| `condition`    | Durable branch selection.                                           |
+| `stateUpdate`  | Atomic scope-state update.                                          |
+| `fork`         | Start parallel child scopes.                                        |
+| `join`         | Evaluate child completion policy.                                   |
+| `wait`         | Timer, approval, event, child completion, recovery, or human input. |
+| `emit`         | Local channel append or external event publication.                 |
+| `compensation` | Declared compensating action.                                       |
+
+A WorkItem is the unit that the scheduler can dispatch or resume.
+
+A WorkItem can emit zero, one, or many Activities.
+
+An Activity can be associated with zero, one, or many WorkItems.
+
+## 3. Timeline and execution relation
+
+The new Session model does not replace the current persistence model with an unrelated event store.
+
+It evolves the current shape.
+
+Current conceptual shape:
+
+```text
+Session
+├── TranscriptMessage[]
+├── Run[]
+│   ├── ModelOperation[]
+│   ├── ToolCall[]
+│   ├── ToolAttempt[]
+│   ├── ToolResult[]
+│   └── WaitingRequest[]
+└── Session configuration
+```
+
+New conceptual shape:
+
+```text
+Session
+├── Activity[]
+├── Execution[]
+│   ├── ProgramFrame[]
+│   ├── WorkItem[]
+│   ├── Attempt[]
+│   ├── Wait[]
+│   └── Outcome[]
+└── Session defaults and presentation metadata
+```
+
+The important preservation is:
+
+| Current persisted concept   | New persisted concept                     |
+| --------------------------- | ----------------------------------------- |
+| `TranscriptMessage`         | `Activity` with `kind=message`            |
+| `Run`                       | `Execution`                               |
+| `ModelOperation`            | `WorkItem` with `type=llm`                |
+| `ToolCall`                  | `WorkItem` with `type=tool`               |
+| `ToolAttempt`               | Work item attempt                         |
+| `ToolResult`                | Work item outcome                         |
+| `WaitingRequest`            | `WorkItem` with `type=wait`               |
+| `Run.Driver`                | Program frame interpreter state           |
+| `ContinuationInput`         | Session input Activity plus program event |
+| Assistant transcript output | Message Activity plus LLM outcome         |
+
+This is a breaking structural migration, but it preserves the meaning of existing records.
+
+## 4. What a Session saves
+
+A Session saves durable semantic facts.
+
+### 4.1 Persisted Session facts
+
+The Session persists:
+
+- Activity timeline.
+- Program snapshots.
+- Program frame state.
+- Work item graph.
+- Branch selections.
+- Loop iteration state.
+- Scope state.
+- LLM semantic requests.
+- Tool semantic requests.
+- Selected Artifact references.
+- Selected Artifact revisions and definition digests.
+- Service and activity registration identities and revisions.
+- Inputs and outputs.
+- Wait requests and resolutions.
+- Absolute logical deadlines.
+- Retry attempt history.
+- Idempotency keys.
+- Safe external receipts.
+- Sanitized errors.
+- Cancellation and recovery state.
+- Visible and audit-safe summaries.
+
+These are required to answer:
+
+- What happened?
+- What is still active?
+- What may safely run next?
+- What must not run again?
+- What needs user or operator review?
+
+### 4.2 Not persisted
+
+The Session must not persist process-local runtime binding data.
+
+It must not persist:
+
+- API keys.
+- OAuth tokens.
+- MCP approval tokens.
+- Provider headers containing secrets.
+- Provider client objects.
+- MCP client objects.
+- Go function pointers.
+- Service client instances.
+- Open streams.
+- HTTP request contexts.
+- Cancellation functions.
+- Stream callbacks.
+- Debug configuration.
+- Logging configuration.
+- Worker pool state.
+- Native paths.
+- Compiled CEL programs.
+- Cached provider capability resolver instances.
+- Browser or Wails state.
+
+These values are runtime bindings. They are recreated when a durable WorkItem becomes eligible for dispatch.
+
+## 5. Caller-time input versus semantic input
+
+Not every caller-supplied value has the same persistence rule.
+
+| Value                                          | Persist? | Reason                             |
+| ---------------------------------------------- | -------: | ---------------------------------- |
+| User prompt                                    |      Yes | It is Session activity input.      |
+| Selected Agent                                 |      Yes | It changes semantic execution.     |
+| Selected Model                                 |      Yes | It changes semantic execution.     |
+| Temperature override accepted for one LLM call |      Yes | It changes output semantics.       |
+| Tool policy override                           |      Yes | It changes safety semantics.       |
+| Workflow input                                 |      Yes | It changes execution semantics.    |
+| Branch selection                               |      Yes | It changes continuation semantics. |
+| Approval decision                              |      Yes | It changes execution semantics.    |
+| Provider request timeout                       |       No | Transport policy only.             |
+| Stream flush settings                          |       No | Transport policy only.             |
+| Wails event subscription                       |       No | Consumer transport only.           |
+| Debug logging                                  |       No | Diagnostic behavior only.          |
+| API key                                        |       No | Credential.                        |
+| Open MCP connection                            |       No | Process-local resource.            |
+
+The rule is:
+
+> If a value changes what the Session means or what it may safely do next, persist it. If it only changes how the current process dispatches, streams, observes, or transports work, do not persist it.
+
+## 6. Program frames
+
+A ProgramFrame is a durable scope that interprets orchestration.
+
+It has:
+
+- Frame ID.
+- Parent frame ID.
+- Program snapshot.
+- Local state.
+- Visible scope path.
+- Current continuation state.
+- Child frame references.
+- Child work-item references.
+- Completion status.
+- Error and output.
+
+There is no `Session.Kind`.
+
+There is no `Run.Kind = chat|workflow`.
+
+There is only a ProgramFrame whose program source may be:
+
+| Program source                   | Meaning                        |
+| -------------------------------- | ------------------------------ |
+| Built-in conversation program    | Normal chat behavior.          |
+| Built-in Agent-loop program      | LLM, Tool, continuation loop.  |
+| Built-in single-model program    | One direct Model request.      |
+| Workflow Artifact program        | Authored Workflow declaration. |
+| Nested Workflow Artifact program | Child Workflow frame.          |
+
+A simple chat has a ProgramFrame. It is just small.
+
+An Agent loop has a ProgramFrame. It loops over LLM and Tool work items.
+
+A Workflow has a ProgramFrame. It can create scopes, loops, branches, waits, and child frames.
+
+## 7. Simple chat under the unified model
+
+A simple user message creates a message Activity.
+
+The built-in conversation program receives that Activity and creates an LLM WorkItem.
+
+```text
+User message Activity
+  -> conversation program frame
+  -> LLM WorkItem
+  -> assistant message Activity
+```
+
+If the LLM returns no local Tool calls, the frame reaches a stable waiting state for another user message.
+
+This preserves the current chat behavior.
+
+`FetchCompletion` remains unchanged:
+
+```text
+Session scheduler
+  -> ready LLM WorkItem
+  -> runtime setup prepares provider request
+  -> inference.FetchCompletion
+  -> durable LLM WorkItem outcome
+  -> Activity projection
+```
+
+The provider layer does not need to know whether the LLM WorkItem came from chat, an Agent loop, or a Workflow.
+
+## 8. Agent loop under the unified model
+
+An Agent is a reusable LLM interaction configuration.
+
+An Agent execution is not a different Session type.
+
+The built-in Agent-loop program does this:
+
+```text
+LLM WorkItem
+  -> model output
+  -> zero or more Tool WorkItems
+  -> optional approval Wait WorkItems
+  -> continuation LLM WorkItem
+  -> final output
+```
+
+The existing Tool, MCP, Skill, approval, App, and continuation behavior becomes reusable orchestration behavior.
+
+A Workflow calling an Agent creates a child Agent-loop frame inside the same Session execution graph.
+
+It does not create:
+
+- A second Session.
+- A separate Workflow persistence record.
+- A hidden unrelated execution root.
+- A separate Tool approval mechanism.
+
+## 9. Workflow under the unified model
+
+A Workflow Artifact is an authored orchestration program.
+
+At admission:
+
+1. Resolve the Workflow Artifact.
+2. Verify selection pins.
+3. Capture the canonical declaration or canonical semantic IR.
+4. Capture the definition digest and interpreter version.
+5. Resolve static capability requirements.
+6. Reject unsupported runtime capabilities before business work starts.
+7. Create a ProgramFrame in the Session execution graph.
+8. Create a visible Workflow-started Activity.
+
+The Workflow interpreter creates WorkItems and child frames.
+
+Examples:
+
+| Workflow declaration | Unified runtime behavior             |
+| -------------------- | ------------------------------------ |
+| `call: agent`        | Child Agent-loop frame               |
+| `call: model`        | Child single-model frame             |
+| `call: tool`         | Tool WorkItem                        |
+| `call: service`      | Service WorkItem                     |
+| `call: activity`     | Activity WorkItem                    |
+| `call: workflow`     | Child Workflow frame                 |
+| `parallel`           | Fork plus sibling scopes plus join   |
+| `foreach`            | Captured collection plus item scopes |
+| `repeat`             | Loop state and repeated child scope  |
+| `wait: human`        | Human Wait WorkItem                  |
+| `wait: timer`        | Timer Wait WorkItem                  |
+| `wait: event`        | Event Wait WorkItem                  |
+| `machine`            | State-machine ProgramFrame           |
+| `saga`               | Compensation scope and WorkItems     |
+
+Workflow execution does not bypass the Session scheduler.
+
+## 10. LLM WorkItems
+
+An LLM WorkItem persists provider-neutral semantic input.
+
+It contains:
+
+- Selected Agent or Model identity.
+- Selected revision and definition digest.
+- System instruction contributions.
+- Message and content input references or canonical values.
+- Tool-choice semantic identities.
+- Output schema.
+- Semantic Model overrides.
+- Explicit context transfer.
+- Declared logical deadline.
+- Stable operation key.
+
+It does not contain:
+
+- Provider endpoint.
+- API key.
+- HTTP headers.
+- Provider client state.
+- Debug configuration.
+- Stream callback.
+
+At dispatch, runtime setup resolves the current provider runtime configuration and verifies that it is compatible with the persisted semantic target.
+
+## 11. Tool and action WorkItems
+
+A Tool proposal from an LLM and a direct Workflow Tool call both become Tool WorkItems.
+
+The origin differs. The persistence model does not.
+
+| Origin                 | WorkItem source             |
+| ---------------------- | --------------------------- |
+| Model output           | LLM WorkItem outcome        |
+| Workflow direct call   | Workflow ProgramFrame       |
+| MCP App action         | Session input Activity      |
+| Skill lifecycle action | Program frame or LLM output |
+| Service call           | Workflow ProgramFrame       |
+| Activity call          | Workflow ProgramFrame       |
+
+A Tool WorkItem stores:
+
+- Semantic Tool binding identity.
+- Input arguments.
 - Effect contract.
-- Execute function.
+- Approval requirement.
+- Execution mode.
+- Attempt history.
+- Output or error.
+- Safe external receipt.
+- Optional App projection.
 
-The registry is application-owned. The frontend cannot register executable
-functions.
+MCP approval is a generic wait attached to a Tool WorkItem. MCP-specific tokens remain runtime-only.
 
-### Nested Workflow
+## 12. Parallelism
 
-Nested Workflow calls require a separately prepared child invocation and
-parent-child lifecycle integration. This is outside the initial local
-execution profile.
+Parallelism is a scheduler property inside one Session execution graph.
 
-They must not be simulated by recursively calling an unjournaled function.
+A `parallel` Workflow construct creates sibling scopes.
 
-## 9. Waiting
+Each sibling scope gets:
 
-Timer waits persist their absolute deadline. Replay does not reset a timer.
+- A local state snapshot.
+- Local WorkItems.
+- Local outputs.
+- Local failures.
+- Local waits.
 
-Human waits persist:
+The parent scope owns:
 
-- Prepared request.
-- Assignees.
-- Response schema.
-- Step identity.
-- Deadline inherited from the step.
+- Completion policy.
+- Join behavior.
+- Merge behavior.
+- Aggregate outcome.
 
-The frontend supplies response data only.
+Parallel branches do not write shared parent state directly.
 
-A backend HumanAuthorizer identifies and authorizes the responder.
-Caller-supplied roles are not accepted.
+A normal chat session usually has one active LLM WorkItem. A Workflow can have many ready LLM WorkItems. The LLM execution path remains the same.
 
-An invalid response leaves the existing wait pending.
+## 13. Waits, approvals, and events
 
-Session Tool approvals are not converted into Workflow human responses.
-They remain owned by the child Session Run.
+A wait is a generic WorkItem.
 
-## 10. Retry and Recovery
+Wait kinds include:
 
-Automatic call retry requires:
+- Approval.
+- Human response.
+- Timer.
+- Event.
+- Channel message.
+- Child completion.
+- Authentication.
+- Configuration.
+- Recovery review.
 
-- Remaining declared attempts.
-- A matching retry policy.
-- A binding-owned safe effect contract.
-- No unresolved uncertain effect.
+A wait persists:
 
-Read and idempotent bindings can be retried.
+- Semantic request.
+- Input schema.
+- Allowed resolutions.
+- Audience constraints.
+- Correlation facts.
+- Absolute expiry.
+- Final resolution.
 
-Keyed retry additionally requires a stable prepared key and binding support
-for keyed invocation.
+A wait does not persist:
 
-Unknown or non-idempotent effects do not receive automatic retry.
+- Approval token.
+- OAuth state.
+- Browser form state.
+- Wails window state.
+- Runtime client handle.
 
-On recovery, a call left in dispatching state becomes uncertain.
+A human response, CLI command, VS Code interaction, or Wails action all enter the backend as a Session input Activity. The active ProgramFrame validates whether that Activity resolves a pending wait.
 
-Recovery review can establish:
+## 14. Runtime binding
 
-- Applied, with validated output.
-- Not applied, allowing an explicit safe redispatch.
-- Cancel invocation.
+A persisted WorkItem is semantic intent. Runtime binding is current process work.
 
-The review command is recorded durably.
+```text
+Persisted WorkItem
+  -> bind current runtime dependencies
+  -> verify compatibility
+  -> construct ephemeral executor request
+  -> dispatch
+  -> persist outcome
+```
 
-The local profile does not automatically reconcile unknown effects or
-perform saga compensation.
+### 14.1 Ready WorkItem
 
-## 11. Controls and Shutdown
+For a ready WorkItem:
 
-Pause prevents new normal dispatch. It does not claim to undo active work.
+- Resolve current Artifact/runtime bindings.
+- Verify persisted Artifact revision and digest.
+- Verify service or activity registration version.
+- Resolve credentials only in trusted runtime code.
+- Create an ephemeral executor request.
+- Dispatch.
 
-Resume makes pending work eligible again.
+If binding compatibility fails, do not silently substitute another Model, Tool, Agent, or Workflow.
+
+The WorkItem becomes blocked, fails safely, or requires an explicit rebind policy.
+
+### 14.2 Dispatched WorkItem
+
+Before external work:
+
+1. Persist semantic input.
+2. Persist selected semantic target.
+3. Persist effect key when applicable.
+4. Persist `dispatched`.
+5. Execute external work.
+
+After external work:
+
+1. Persist output, error, or safe receipt.
+2. Transition WorkItem state.
+3. Advance the owning frame.
+
+### 14.3 Uncertain WorkItem
+
+If the process stops after dispatch and before a confirmed outcome:
+
+- Mark the WorkItem uncertain.
+- Do not automatically repeat non-idempotent work.
+- Create a recovery wait or reconciliation action.
+- Preserve the original semantic target and input.
+
+## 15. Session Store
+
+Session Store remains the only logical persistence model.
+
+The current `storedSession` envelope already persists one Session and associated execution records. Keep that ownership model.
+
+The new breaking schema should persist:
+
+```text
+StoredSession
+├── Session
+│   ├── metadata
+│   ├── Timeline[] Activity
+│   └── session defaults
+│
+└── Executions[] Execution
+    ├── ProgramFrames[]
+    ├── WorkItems[]
+    ├── Attempts[]
+    ├── Waits[]
+    ├── Controls
+    └── Outcomes
+```
+
+The implementation can keep a session document plus derived index and FTS files. That remains one Session Store model.
+
+The FTS index remains derived data.
+
+The execution graph is authoritative.
+
+### 15.1 Timeline projection
+
+A conversation projection returns only visible message Activities.
+
+A workflow projection returns relevant workflow, action, wait, and outcome Activities.
+
+An audit projection returns authorized technical history.
+
+The same Session supports all three consumers.
+
+### 15.2 Checkpoint behavior
+
+Checkpointing remains Session-owned.
+
+A checkpoint persists:
+
+- The current Session timeline.
+- The changed Execution.
+- Associated WorkItems and waits.
+- Session revision.
+- Execution revision.
+- Durable outcomes.
+
+No separate Workflow checkpoint sink exists.
+
+## 16. Cancellation and recovery
+
+Pause, resume, cancel, recovery, and deletion are Session execution controls.
+
+They are not chat-specific controls.
+
+### Pause
+
+Pause prevents new ready WorkItems from dispatching.
+
+It does not claim to stop already-running external work.
+
+### Resume
+
+Resume asks the scheduler to inspect ready WorkItems again.
+
+### Cancel
 
 Cancel:
 
-- Cancels the active runtime context.
-- Requests cancellation of an active Agent child Run.
-- Prevents new normal work.
-- Preserves uncertainty when external execution may have occurred.
+1. Marks the relevant execution scope cancelling.
+2. Prevents new ordinary WorkItems.
+3. Requests cancellation for attached child scopes.
+4. Cancels eligible waits.
+5. Runs supported finalization and compensation.
+6. Preserves uncertainty when external outcomes are unknown.
+7. Produces a durable outcome Activity.
 
-Shutdown cancels runtime-owned workers and waits for them.
+### Recovery
 
-Accepted work does not depend on the lifetime of a Wails request.
+On restart:
 
-## 12. Persistence
+1. Restore the Session document.
+2. Reconstruct program interpreters from ProgramSnapshots.
+3. Restore pending waits and deadlines.
+4. Mark in-flight unconfirmed work uncertain.
+5. Rebind runtime dependencies only when a WorkItem becomes ready.
+6. Continue deterministic orchestration from durable state.
 
-The local Repository stores complete invocation records.
+## 17. Breaking migration
 
-The supplied filesystem implementation uses:
+This is a breaking Session schema change.
 
-- Private directory permissions.
-- Bounded record reads and writes.
-- Temporary-file writes.
-- File synchronization.
-- Atomic rename.
-- Directory synchronization.
+Use explicit offline migration scripts.
 
-Workflow persistence is separate from Session persistence.
+Do not maintain a permanent dual runtime model.
 
-Agent child Sessions continue to use the existing Session checkpoint store.
+### 17.1 Migration mapping
 
-This avoids changing Session-store serialization without inspecting its
-implementation. A future shared deployment can implement Repository using
-another storage engine without changing the interpreter.
+| Existing state         | New state                                        |
+| ---------------------- | ------------------------------------------------ |
+| `TranscriptMessage`    | Message Activity                                 |
+| `Run`                  | Execution                                        |
+| `SequentialChatDriver` | Built-in conversation or Agent-loop ProgramFrame |
+| `ModelOperation`       | LLM WorkItem                                     |
+| `ToolCall`             | Tool WorkItem                                    |
+| `ToolAttempt`          | WorkItem attempt                                 |
+| `ToolResult`           | WorkItem outcome                                 |
+| `WaitingRequest`       | Wait WorkItem                                    |
+| `ContinuationInput`    | Session input Activity                           |
+| Assistant output       | Message Activity plus LLM outcome                |
 
-Public snapshots exclude:
+### 17.2 In-flight old state
 
-- Prepared binding data.
-- Captured operation environments.
-- Executor-private prepared call data.
+Migration must not guess that external work completed.
 
-Business input, output, human requests, and sanitized errors remain durable
-application data.
+It must:
 
-## 13. Initial Local Execution Profile
+- Preserve completed outcomes.
+- Convert safe queued work to ready WorkItems.
+- Convert in-flight Model or Tool operations to uncertain WorkItems.
+- Convert durable waits where enough data exists.
+- Create recovery review waits where information is insufficient.
+- Drop private authorization tokens and runtime handles.
+- Rebuild Session indexes and FTS.
 
-The initial implementation supports:
+## 18. Backend ownership
 
-- Explicit invocation.
-- Sequence.
-- Transform.
-- Set.
-- Scope.
-- Choose.
-- Parallel with all completion.
-- Foreach with all completion.
-- Counted, while, and until Repeat.
-- Block and Workflow return.
-- Fail.
-- Break and continue.
-- Timer waits.
-- Human waits.
-- Agent calls.
-- Model calls.
-- Registered service and activity calls.
-- Explicit-member dynamic target selection.
-- Call retry.
-- Pause, resume, cancellation, and recovery review.
+The runtime is backend-owned.
 
-The following declarations reject admission in this profile:
+Wails is one consumer.
 
-- Event and schedule triggers.
-- Event subscriptions.
-- Event and channel waits.
-- Emit.
-- Published ports and streaming ports.
-- State machines.
-- Sagas and compensation.
-- Reconciliation blocks.
-- Async start and completion handles.
-- Independent child lifetime.
-- Conversation handoff.
-- Cancel-by-handle.
-- Nested Workflow calls.
-- Resolver-produced target sets.
-- Resource claims and rate limits.
-- Token and monetary budgets.
-- Non-all parallel completion.
-- Composite retry.
+Other consumers can include:
 
-These are runtime capability exclusions, not changes to the portable v1
-declaration language.
+- CLI.
+- VS Code extension.
+- HTTP API.
+- Background service.
+- Test harness.
+- Automation client.
 
-Complete v1 support requires additional runtime implementation. An invocation
-using these capabilities must not be accepted by this implementation.
+Consumers do not:
 
-## 14. Verification Plan
+- Execute orchestration logic.
+- Create runtime bindings.
+- Resolve credentials.
+- Decide whether a WorkItem is safe to retry.
+- Mutate execution state directly.
+- Supply approval authority.
+- Interpret private runtime state.
 
-The implementation requires tests for:
+Consumers submit typed Session commands and read Session snapshots or projections.
 
-- Selection pin mismatch and incomplete composition.
-- Rejected unsupported capability before target execution.
-- Input, state, call-output, and human-response schema failures.
-- CEL lexical scope and literal directives.
-- Replay without repeated confirmed effects.
-- Persistence failure before dispatch.
-- Recovery from dispatching state.
-- Applied and not-applied recovery decisions.
-- Retry input, target, and key stability.
-- Isolated parallel and collection state.
-- Timer deadline preservation.
-- Child Session approval and continuation.
-- Cancellation while preparing, invoking, polling, and waiting.
-- Shutdown with active calls.
-- Command ID conflict and duplicate handling.
-- Filesystem record limits and atomic replacement.
+```text
+Wails / CLI / VS Code / HTTP
+           |
+           v
+       Session API
+           |
+           v
+ Session orchestration runtime
+           |
+           v
+ Runtime setup and executors
+           |
+           v
+ Inference / Tools / MCP / Skills / Services
+```
 
-No existing declaration, decoder, hydration, or module version changes are
-required by this local profile.
+## 19. Implementation order
 
-## Important review findings
-
-The artifacts above are not sufficient to label the requested complete Workflow runtime finished.
-
-In addition to the explicit profile exclusions, source review identifies these remaining correctness requirements:
-
-- A separate persisted retry key is needed. Reading it from executor-private prepared JSON is not a sound general Executor contract.
-- Applied recovery must validate the call-level and step-level output schemas, not only binding constraints.
-- Invalid human responses should reject the response command synchronously. The current implementation validates them on the next drive.
-- Paused-branch suspension must not be confused with invocation failure.
-- Child limits need subtree-owned counters. The current root counters do not fully implement inherited step budgets.
-- Root duration expiry and cancellation must preserve uncertainty and settle all active children before publishing a terminal invocation.
-- Parallel Workflow returns need a durable winner and cancellation of remaining attached work.
-- `finally` needs bounded cleanup execution and preserved original outcomes.
-- Agent binding admission must prepare the effective Agent configuration before accepting the invocation, not only validate its Artifact identity.
-- The filesystem implementation needs platform-specific atomic replacement and directory synchronization verification, particularly on Windows.
-- Restored records need structural journal validation before execution.
-- Registered callable failures need an explicit result/effect-state contract. An ordinary Go error cannot establish whether a side effect occurred.
-
-These are assistant-owned implementation gaps, not work that should be assigned to your tests or entry-point hooking. I have listed them explicitly rather than presenting an unverified partial implementation as complete end-to-end `v1` support.
-
-## Implementation status
-
-- [x] Authored the runtime HLD, invocation contracts, persistence adapter, local interpreter, binding adapter, and Wails wrapper.
-- [x] Supplied declaration-evidence changes against the attached `plan.go`.
-- [x] Kept declaration planning separate from runtime execution.
-
-## Next steps
-
-- [ ] Review the invocation ownership decision and the explicit distinction between the local profile and complete `v1` support. Patch application should wait until the pending correctness work is complete.
-- [ ] After completion, hook construction and shutdown in your application entry point: construct `workflow.Service`, a Repository, the trusted callable registry, and a backend human authorizer; initialize `WorkflowRuntimeWrapper`; close Workflow runtime before Session runtime.
-- [ ] Assistant-owned: resolve the listed correctness gaps before integration.
-- [ ] Assistant-owned: implement the remaining `v1` capabilities or obtain an explicit agreement to ship only the local profile.
-- [ ] Assistant-owned: compile and verify the complete patch when repository access is available.
+1. Preserve the current Session Store ownership model.
+2. Introduce Timeline Activities without losing current message data.
+3. Introduce generic Executions, ProgramFrames, WorkItems, Attempts, and Waits.
+4. Map the current sequential chat driver into a built-in conversation program.
+5. Map the current Agent Tool loop into a built-in agent-loop program.
+6. Keep `FetchCompletion` and provider execution unchanged.
+7. Add Workflow Artifact compilation into ProgramFrames.
+8. Add Workflow Agent and Model calls.
+9. Add direct Tool and MCP WorkItems.
+10. Add service and activity registry bindings.
+11. Add parallel, foreach, repeat, and scope-state handling.
+12. Add waits, timers, events, channels, and triggers.
+13. Add state machines, saga compensation, and reconciliation.
+14. Run the offline migration and rebuild derived indexes.
