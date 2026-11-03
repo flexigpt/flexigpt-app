@@ -112,8 +112,6 @@ type Admission struct {
 	workflows *workflowAPI.Service
 	pins      ArtifactPinResolver
 	bindings  *BindingRegistry
-	mu        sync.Mutex
-	active    map[artifactModel.ArtifactRef]struct{}
 }
 
 func NewAdmission(
@@ -128,7 +126,6 @@ func NewAdmission(
 		workflows: workflows,
 		pins:      pins,
 		bindings:  bindings,
-		active:    map[artifactModel.ArtifactRef]struct{}{},
 	}, nil
 }
 
@@ -161,7 +158,13 @@ func (a *Admission) AdmitWorkflow(
 		RootID:     rootModel.RootID(request.Workflow.RootID),
 		ArtifactID: artifactModel.ArtifactID(request.Workflow.ArtifactID),
 	}
-	return a.admit(ctx, ref, request.Workflow, request.Input)
+	return a.admit(
+		ctx,
+		ref,
+		request.Workflow,
+		request.Input,
+		make(map[artifactModel.ArtifactRef]struct{}),
+	)
 }
 
 func (a *Admission) admit(
@@ -169,15 +172,13 @@ func (a *Admission) admit(
 	ref artifactModel.ArtifactRef,
 	selection sessionv3.ArtifactSelection,
 	input sessionv3.CanonicalValue,
+	active map[artifactModel.ArtifactRef]struct{},
 ) (sessionv3.WorkflowAdmissionResult, error) {
-	a.mu.Lock()
-	if _, exists := a.active[ref]; exists {
-		a.mu.Unlock()
+	if _, exists := active[ref]; exists {
 		return sessionv3.WorkflowAdmissionResult{}, errors.New("nested Workflow cycle")
 	}
-	a.active[ref] = struct{}{}
-	a.mu.Unlock()
-	defer func() { a.mu.Lock(); delete(a.active, ref); a.mu.Unlock() }()
+	active[ref] = struct{}{}
+	defer delete(active, ref)
 	plan, err := a.workflows.ResolvePlan(ctx, ref)
 	if err != nil {
 		return sessionv3.WorkflowAdmissionResult{}, err
@@ -208,7 +209,7 @@ func (a *Admission) admit(
 		Input:    input.Clone(),
 		Targets:  map[string]TargetBinding{},
 	}
-	if err := a.bindTargets(ctx, plan, &program); err != nil {
+	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
 		return sessionv3.WorkflowAdmissionResult{}, err
 	}
 	if err := validateProgram(program); err != nil {
@@ -225,7 +226,12 @@ func (a *Admission) admit(
 	}, nil
 }
 
-func (a *Admission) bindTargets(ctx context.Context, plan workflowAPI.Plan, program *Program) error {
+func (a *Admission) bindTargets(
+	ctx context.Context,
+	plan workflowAPI.Plan,
+	program *Program,
+	active map[artifactModel.ArtifactRef]struct{},
+) error {
 	refs := map[string]artifactModel.ArtifactRef{}
 	for _, occurrence := range plan.Capabilities.Occurrences {
 		if occurrence.Status == composition.ResolutionAvailable && occurrence.Target != nil &&
@@ -234,14 +240,14 @@ func (a *Admission) bindTargets(ctx context.Context, plan workflowAPI.Plan, prog
 		}
 	}
 	for name, target := range plan.Document.Targets {
-		b, err := a.bindTarget(ctx, "targets/"+name, name, target, refs)
+		b, err := a.bindTarget(ctx, "targets/"+name, name, target, refs, active)
 		if err != nil {
 			return err
 		}
 		program.Targets[name] = b
 	}
 	for name, target := range plan.Document.Requirements {
-		b, err := a.bindTarget(ctx, "requirements/"+name, name, target, refs)
+		b, err := a.bindTarget(ctx, "requirements/"+name, name, target, refs, active)
 		if err != nil {
 			return err
 		}
@@ -255,6 +261,7 @@ func (a *Admission) bindTarget(
 	path, name string,
 	target workflowv1.Target,
 	refs map[string]artifactModel.ArtifactRef,
+	active map[artifactModel.ArtifactRef]struct{},
 ) (TargetBinding, error) {
 	out := TargetBinding{Name: name, Kind: target.Kind}
 	switch target.Kind {
@@ -293,6 +300,7 @@ func (a *Admission) bindTarget(
 					ExpectedDigest:   pin.Digest,
 				},
 				sessionv3.MustCanonicalValue(map[string]any{}),
+				active,
 			)
 			if err != nil {
 				return TargetBinding{}, err
@@ -334,6 +342,16 @@ func validateBlockTargets(block workflowv1.Block, targets map[string]TargetBindi
 			}
 		}
 	}
+	for _, handler := range block.Catch {
+		if err := validateBlockTargets(handler.Do, targets); err != nil {
+			return err
+		}
+	}
+	if block.Finally != nil {
+		if err := validateBlockTargets(*block.Finally, targets); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -370,6 +388,21 @@ func childBlocks(step workflowv1.Step) []workflowv1.Block {
 		}
 		if step.Effect.Compensate != nil {
 			out = append(out, *step.Effect.Compensate)
+		}
+	}
+	if step.Machine != nil {
+		for _, state := range step.Machine.States {
+			if state.Entry != nil {
+				out = append(out, *state.Entry)
+			}
+			if state.Exit != nil {
+				out = append(out, *state.Exit)
+			}
+			for _, transition := range state.Transitions {
+				if transition.Do != nil {
+					out = append(out, *transition.Do)
+				}
+			}
 		}
 	}
 	return out

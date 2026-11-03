@@ -134,7 +134,7 @@ func (r *Runtime) CreateSession(ctx context.Context, command CreateSessionComman
 		Title:      command.Title,
 		CreatedAt:  now,
 		UpdatedAt:  now,
-		Defaults:   command.Defaults,
+		Defaults:   cloneSessionDefaults(command.Defaults),
 		Metadata:   command.Metadata.Clone(),
 		Timeline:   []Activity{},
 		Executions: []Execution{},
@@ -191,7 +191,7 @@ func (r *Runtime) UpdateSessionDefaults(
 					Message:   err.Error(),
 				}, nil
 			}
-			session.Defaults = command.Defaults
+			session.Defaults = cloneSessionDefaults(command.Defaults)
 			r.touchSessionLocked(session)
 			return &CommandReceipt{
 				CommandID:       command.Meta.ID,
@@ -394,6 +394,15 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	if r.closed {
 		return nil, ErrRuntimeClosed
+	}
+
+	if err := ValidateWorkflowAdmissionResult(admission); err != nil {
+		return r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			err.Error(),
+		), nil
 	}
 	session = r.sessions[command.SessionID]
 	if session == nil {
@@ -1343,14 +1352,14 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		WorkItem:  *item,
 	}
 	r.mu.Unlock()
-	var bound BindResult
+	var (
+		bound   BindResult
+		bindErr error
+	)
 	if hasPrebound {
 		bound = BindResult{SemanticBinding: prebound.SemanticBinding, Private: prebound.Private}
 	} else {
-		bound, err = r.deps.Binder.BindWork(ctx, request)
-		if err != nil {
-			return
-		}
+		bound, bindErr = r.deps.Binder.BindWork(ctx, request)
 	}
 
 	r.mu.Lock()
@@ -1359,14 +1368,21 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		return
 	}
 	session, execution, err = r.executionLocked(sessionID, executionID)
+	if err != nil {
+		return
+	}
 	item = mutableWorkItem(execution, itemID)
 	if item == nil || item.State != WorkItemStateBinding {
 		return
 	}
-	if err != nil {
+	if bindErr != nil {
+		delete(r.privateBindings, item.ID)
 		now := r.now()
 		item.State = WorkItemStateBlocked
-		item.Error = &SanitizedError{Code: "runtime_binding_failed", Message: err.Error()}
+		item.Error = &SanitizedError{
+			Code:    "runtime_binding_failed",
+			Message: bindErr.Error(),
+		}
 		item.CompletedAt = &now
 		item.UpdatedAt = now
 		_ = r.advanceFrameLocked(
@@ -1385,6 +1401,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		return
 	}
 	if bound.ImmediateOutput != nil {
+		delete(r.privateBindings, item.ID)
 		r.finishWorkLocked(
 			session,
 			execution,
@@ -1484,7 +1501,7 @@ func (r *Runtime) executeOne(
 		cancel()
 		return
 	}
-	session, execution, err := r.executionLocked(sessionID, executionID)
+	_, execution, err := r.executionLocked(sessionID, executionID)
 	if err != nil {
 		r.mu.Unlock()
 		cancel()
@@ -1505,9 +1522,19 @@ func (r *Runtime) executeOne(
 	if err != nil && result.Error == nil {
 		result.Error = &SanitizedError{Code: "external_execution_failed", Message: err.Error()}
 	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
+		return
+	}
+
+	session, execution, err := r.executionLocked(sessionID, executionID)
+	if err != nil {
+		return
+	}
+	item = mutableWorkItem(execution, itemID)
+	if item == nil || item.State != WorkItemStateDispatched {
 		return
 	}
 
@@ -1882,15 +1909,19 @@ func (r *Runtime) interpreterLocked(snapshot ProgramSnapshot) ProgramInterpreter
 }
 
 func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Session) error {
-	if err := session.Validate(); err != nil {
-		return err
+	if session == nil {
+		return errors.New("cannot checkpoint a nil Session")
 	}
 
-	// EventSequence is durable state. Reserve the next sequence before the
-	// checkpoint so recovery cannot publish a duplicate sequence value.
-	session.EventSequence++
+	// Build and validate a durable candidate first. A failed checkpoint must
+	// not mutate the live sequence, otherwise a retry would publish a gap.
+	snapshot := cloneSession(*session)
+	snapshot.EventSequence++
 
-	for _, execution := range session.Executions {
+	if err := snapshot.Validate(); err != nil {
+		return err
+	}
+	for _, execution := range snapshot.Executions {
 		for _, frame := range execution.ProgramFrames {
 			interpreter := r.interpreterLocked(frame.Program)
 			if interpreter == nil {
@@ -1904,10 +1935,14 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 			}
 		}
 	}
-	return r.deps.Checkpoints.HandleCheckpoint(
+	if err := r.deps.Checkpoints.HandleCheckpoint(
 		context.WithoutCancel(ctx),
-		CheckpointView{Reason: reason, Session: cloneSession(*session), CreatedAt: r.now()},
-	)
+		CheckpointView{Reason: reason, Session: snapshot, CreatedAt: r.now()},
+	); err != nil {
+		return err
+	}
+	session.EventSequence = snapshot.EventSequence
+	return nil
 }
 
 func (r *Runtime) publishLocked(ctx context.Context, session *Session, executionID ExecutionID, kind RuntimeEventKind) {

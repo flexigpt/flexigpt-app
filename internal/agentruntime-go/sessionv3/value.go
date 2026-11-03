@@ -56,6 +56,10 @@ func cloneSession(value Session) Session {
 	return jsonutil.CloneJSONInValue(value)
 }
 
+func cloneSessionDefaults(value SessionDefaults) SessionDefaults {
+	return jsonutil.CloneJSONInValue(value)
+}
+
 func cloneExecution(value Execution) Execution {
 	return jsonutil.CloneJSONInValue(value)
 }

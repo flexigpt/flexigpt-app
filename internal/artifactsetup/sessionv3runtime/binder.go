@@ -1,4 +1,4 @@
-package binder
+package sessionv3runtime
 
 import (
 	"context"
@@ -35,8 +35,9 @@ type Dependencies struct {
 }
 
 type Binder struct {
-	deps   Dependencies
-	skills *skillSessions
+	deps          Dependencies
+	skills        *skillSessions
+	deterministic sessionv3.DeterministicExecutor
 }
 
 func New(deps Dependencies) (*Binder, error) {
@@ -56,13 +57,20 @@ func New(deps Dependencies) (*Binder, error) {
 }
 
 func (b *Binder) BindWork(ctx context.Context, req sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
+	if result, handled, err := b.deterministic.Bind(ctx, req); handled || err != nil {
+		return result, err
+	}
+
 	switch req.WorkItem.Type {
 	case sessionv3.WorkItemTypeLLM:
 		return b.bindLLM(ctx, req)
 	case sessionv3.WorkItemTypeTool:
 		return b.bindTool(ctx, req)
 	default:
-		return b.bindDeterministic(req)
+		return sessionv3.BindResult{}, fmt.Errorf(
+			"unsupported sessionv3 WorkItem type %q",
+			req.WorkItem.Type,
+		)
 	}
 }
 
@@ -71,14 +79,15 @@ func (b *Binder) ExecuteWork(
 	req sessionv3.WorkDispatchRequest,
 	bound sessionv3.BoundWork,
 ) (sessionv3.WorkExecutionResult, error) {
+	if result, handled, err := b.deterministic.Execute(ctx, req, bound); handled || err != nil {
+		return result, err
+	}
+
 	if v, ok := bound.Private.(privateLLM); ok {
 		return b.executeLLM(ctx, req, v)
 	}
 	if v, ok := bound.Private.(privateTool); ok {
 		return b.executeTool(ctx, req, bound, v)
-	}
-	if _, ok := bound.Private.(deterministicPrivate); ok {
-		return b.executeDeterministic(req)
 	}
 	return sessionv3.WorkExecutionResult{}, fmt.Errorf("unknown bound work type %T", bound.Private)
 }
@@ -87,19 +96,16 @@ func (b *Binder) ResolveWait(
 	ctx context.Context,
 	req sessionv3.WaitResolutionRequest,
 ) (sessionv3.WaitResolutionResult, error) {
+	if result, handled, err := b.deterministic.ResolveWait(ctx, req); handled || err != nil {
+		return result, err
+	}
+
 	if v, ok := req.Private.(privateToolWait); ok {
 		return b.resolveToolWait(ctx, req, v)
 	}
-	return sessionv3.WaitResolutionResult{
-		Resume: true,
-		Bound: &sessionv3.BoundWork{
-			SemanticBinding: sessionv3.SemanticBinding{
-				Version:           "v3-wait/v1",
-				TargetFingerprint: "wait",
-				BoundAt:           time.Now().UTC(),
-			},
-		},
-	}, nil
+	return sessionv3.WaitResolutionResult{}, errors.New(
+		"wait has no registered sessionv3 resolver",
+	)
 }
 
 func (b *Binder) CloseExecutionBinding(_ context.Context, _ sessionv3.ExecutionID) error {

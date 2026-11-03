@@ -124,16 +124,22 @@ func New(baseDir string) (*Store, error) {
 	maintenanceCtx, cancel := context.WithCancel(context.Background())
 	s.maintenanceCancel = cancel
 	backgroundutil.Launch(&s.maintenanceWG, "SessionStoreV3 FTS reconciliation", func() {
-		s.ftsMu.RLock()
-		defer s.ftsMu.RUnlock()
-		_, _ = ftsengine.SyncDirToFTS(
+		s.ftsMu.Lock()
+		defer s.ftsMu.Unlock()
+
+		if s.fts == nil {
+			return
+		}
+		if _, err := ftsengine.SyncDirToFTS(
 			maintenanceCtx,
 			s.fts,
 			filepath.Join(s.baseDir, documentDirectory),
 			"mtime",
 			1000,
 			s.syncDocumentToFTS,
-		)
+		); err != nil {
+			slog.Error("sessionstorev3 FTS reconciliation failed", "error", err)
+		}
 	}, nil)
 	return s, nil
 }
@@ -424,7 +430,16 @@ func (s *Store) SearchSessions(ctx context.Context, request SearchSessionsReques
 	if s.fts == nil {
 		return SessionPage{}, errors.New("FTS is disabled")
 	}
-	hits, next, err := s.fts.Search(ctx, request.Query, request.PageToken, normalizePageSize(request.PageSize))
+
+	s.ftsMu.RLock()
+	engine := s.fts
+	hits, next, err := engine.Search(
+		ctx,
+		request.Query,
+		request.PageToken,
+		normalizePageSize(request.PageSize),
+	)
+	s.ftsMu.RUnlock()
 	if err != nil {
 		return SessionPage{}, err
 	}

@@ -14,7 +14,7 @@ import (
 type Binder struct {
 	Base          sessionv3.WorkBinder
 	Bindings      *BindingRegistry
-	Deterministic DeterministicExecutor
+	Deterministic sessionv3.DeterministicExecutor
 }
 
 type boundService struct {

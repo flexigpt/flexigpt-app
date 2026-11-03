@@ -1,4 +1,4 @@
-package binder
+package sessionv3runtime
 
 import (
 	"context"
@@ -53,7 +53,12 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 		if err != nil {
 			return sessionv3.BindResult{}, err
 		}
-		if evaluation != nil && evaluation.Decision == mcpServer.MCPApprovalDecisionApprovalRequired &&
+		if evaluation == nil {
+			return sessionv3.BindResult{}, errors.New(
+				"MCP approval evaluation returned no result",
+			)
+		}
+		if evaluation.Decision == mcpServer.MCPApprovalDecisionApprovalRequired &&
 			evaluation.Summary != nil {
 			wait := sessionv3.WaitRequest{
 				Kind:    sessionv3.WaitKindApproval,
@@ -78,8 +83,7 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 				},
 			}, nil
 		}
-		if evaluation != nil &&
-			evaluation.Decision == mcpServer.MCPApprovalDecisionDenied {
+		if evaluation.Decision == mcpServer.MCPApprovalDecisionDenied {
 			return sessionv3.BindResult{
 				SemanticBinding: semantic,
 				ImmediateOutput: &sessionv3.WorkItemOutput{
@@ -161,13 +165,24 @@ func (b *Binder) mappedMCPRequest(
 	if err := mapping.Validate(); err != nil {
 		return invocation.MappedToolBinding{}, mcpServer.InvokeMCPToolRequestBody{}, err
 	}
+
+	arguments := payload.Call.Arguments
+	if len(arguments) == 0 {
+		arguments = sessionv3.MustCanonicalValue(map[string]any{})
+	}
+	if !arguments.Valid() {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			errors.New("MCP Tool arguments are not canonical JSON")
+	}
+
 	var args map[string]any
-	if len(payload.Call.Arguments) != 0 {
-		_ = json.Unmarshal([]byte(payload.Call.Arguments), &args)
+	if err := json.Unmarshal(arguments, &args); err != nil || args == nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			errors.New("MCP Tool arguments must be a JSON object")
 	}
-	if args == nil {
-		args = map[string]any{}
-	}
+
 	invokeReq := mcpServer.InvokeMCPToolRequestBody{
 		Source:           mcpServer.MCPInvocationSourceModel,
 		ToolName:         binding.ToolName,

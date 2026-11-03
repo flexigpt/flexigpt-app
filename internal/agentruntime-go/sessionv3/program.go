@@ -223,8 +223,18 @@ func (agentLoopInterpreter) Advance(
 		if item == nil {
 			return ProgramTransition{State: encodeAgentLoopState(state)}, nil
 		}
-		if item.Type == WorkItemTypeLLM && item.FrameID == frame.ID {
+		if item.FrameID != frame.ID {
+			return ProgramTransition{State: encodeAgentLoopState(state)}, nil
+		}
+		if item.Type == WorkItemTypeLLM {
 			state.LastLLMWorkItemID = item.ID
+			if item.State != WorkItemStateCompleted {
+				return failedAgentTransition(
+					state,
+					"llm_work_failed",
+					workItemFailureMessage(*item),
+				)
+			}
 			if item.Output == nil || item.Output.LLM == nil {
 				return failedAgentTransition(state, "llm_output_missing", "LLM WorkItem completed without LLM output")
 			}
@@ -328,6 +338,16 @@ func failedAgentTransition(state agentLoopProgramState, code, message string) (P
 		Status: &status,
 		Error:  &SanitizedError{Code: code, Message: message},
 	}, nil
+}
+
+func workItemFailureMessage(item WorkItem) string {
+	if item.Error != nil && strings.TrimSpace(item.Error.Message) != "" {
+		return item.Error.Message
+	}
+	if item.State == WorkItemStateCancelled {
+		return "LLM WorkItem was cancelled"
+	}
+	return "LLM WorkItem did not complete successfully"
 }
 
 func encodeAgentLoopState(value agentLoopProgramState) ProgramState {
@@ -436,7 +456,20 @@ func (singleModelInterpreter) Advance(
 		}
 	case ProgramEventWorkSettled:
 		item := executionWorkItem(execution, event.WorkItemID)
-		if item == nil || item.Output == nil || item.Output.LLM == nil {
+		if item == nil ||
+			item.FrameID != frame.ID ||
+			item.ID != state.WorkItemID {
+			return ProgramTransition{State: encodeSingleModelState(state)}, nil
+		}
+		if item.State != WorkItemStateCompleted {
+			status := ProgramFrameStateFailed
+			return ProgramTransition{
+				State:  encodeSingleModelState(state),
+				Status: &status,
+				Error:  &SanitizedError{Code: "model_work_failed", Message: workItemFailureMessage(*item)},
+			}, nil
+		}
+		if item.Output == nil || item.Output.LLM == nil {
 			status := ProgramFrameStateFailed
 			return ProgramTransition{
 				State:  encodeSingleModelState(state),

@@ -1,9 +1,9 @@
-package binder
+package sessionv3runtime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -99,6 +99,7 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 			Inputs:        inputs,
 			Choices:       choices,
 			Bindings:      bindings,
+			Fingerprint:   configuration.Fingerprint,
 		},
 	}, nil
 }
@@ -144,6 +145,14 @@ func (b *Binder) executeLLM(
 	}
 	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
 	confirmed := strings.TrimSpace(text) != "" || len(calls) != 0
+	if !confirmed {
+		return sessionv3.WorkExecutionResult{
+			Error: &sessionv3.SanitizedError{
+				Code:    "empty_completion",
+				Message: "provider returned no text or executable Tool call",
+			},
+		}, nil
+	}
 	return sessionv3.WorkExecutionResult{
 		Output: &sessionv3.WorkItemOutput{
 			LLM: &sessionv3.LLMOutput{Text: text, Thinking: thinking, ToolCalls: calls},
@@ -153,7 +162,7 @@ func (b *Binder) executeLLM(
 				ConfirmedAt: time.Now().UTC(),
 			},
 		},
-		Confirmed: confirmed || out != nil,
+		Confirmed: true,
 	}, nil
 }
 
@@ -199,42 +208,67 @@ func (b *Binder) decodeProviderOutputs(
 		if call == nil {
 			continue
 		}
-		raw := json.RawMessage(`{}`)
-		if strings.TrimSpace(call.Arguments) != "" && json.Valid([]byte(call.Arguments)) {
-			raw = json.RawMessage(append([]byte(nil), call.Arguments...))
+
+		callID := firstText(call.ID, call.CallID)
+		if callID == "" {
+			callID = fmt.Sprintf("provider-call-%d", len(calls)+1)
 		}
-		if bound, ok := bindings[call.ChoiceID]; ok {
-			next := bound
-			next.ID = firstText(call.ID, call.CallID)
-			next.ProviderCallID = firstText(call.CallID, call.ID)
-			next.Arguments = sessionv3.CanonicalValue(raw)
-			calls = append(calls, next)
+
+		arguments := sessionv3.MustCanonicalValue(map[string]any{})
+		if raw := strings.TrimSpace(call.Arguments); raw != "" {
+			value, err := sessionv3.CanonicalValueFrom([]byte(raw))
+			if err != nil {
+				calls = append(calls, unresolvedProviderToolCall(
+					call,
+					callID,
+					arguments,
+					"provider Tool call arguments are invalid JSON",
+				))
+				continue
+			}
+			arguments = value
+		}
+
+		bound, found := bindings[call.ChoiceID]
+		if !found && call.ChoiceID == "" {
+			bound, found = bindings[call.Name]
+		}
+		if !found || (call.Name != "" && call.Name != bound.Name) {
+			calls = append(calls, unresolvedProviderToolCall(
+				call,
+				callID,
+				arguments,
+				"provider Tool call does not match a prepared binding",
+			))
 			continue
 		}
-		if bound, ok := bindings[call.Name]; ok {
-			next := bound
-			next.ID = firstText(call.ID, call.CallID)
-			next.ProviderCallID = firstText(call.CallID, call.ID)
-			next.Arguments = sessionv3.CanonicalValue(raw)
-			calls = append(calls, next)
-			continue
-		}
-		calls = append(
-			calls,
-			sessionv3.ToolCall{
-				ID:             firstText(call.ID, call.CallID),
-				ProviderCallID: firstText(call.CallID, call.ID),
-				Name:           call.Name,
-				ChoiceID:       call.ChoiceID,
-				Arguments:      sessionv3.CanonicalValue(raw),
-				Binding: sessionv3.ToolBinding{
-					Kind:       sessionv3.ToolBindingKindUnresolved,
-					Unresolved: &sessionv3.UnresolvedToolBinding{Reason: "unresolved provider call"},
-				},
-			},
-		)
+
+		next := bound
+		next.ID = callID
+		next.ProviderCallID = firstText(call.CallID, call.ID)
+		next.Arguments = arguments
+		calls = append(calls, next)
 	}
 	return text.String(), thinking.String(), calls
+}
+
+func unresolvedProviderToolCall(
+	call *inferenceSpec.ToolCall,
+	callID string,
+	arguments sessionv3.CanonicalValue,
+	reason string,
+) sessionv3.ToolCall {
+	return sessionv3.ToolCall{
+		ID:             callID,
+		ProviderCallID: firstText(call.CallID, call.ID),
+		Name:           call.Name,
+		ChoiceID:       call.ChoiceID,
+		Arguments:      arguments,
+		Binding: sessionv3.ToolBinding{
+			Kind:       sessionv3.ToolBindingKindUnresolved,
+			Unresolved: &sessionv3.UnresolvedToolBinding{Reason: reason},
+		},
+	}
 }
 
 func firstText(values ...string) string {

@@ -76,23 +76,36 @@ func (s Session) Validate() error {
 	return nil
 }
 
-func validateDefaults(value SessionDefaults) error {
-	validateSelection := func(selection *ArtifactSelection) error {
-		if selection == nil {
-			return nil
-		}
-		if err := validateSelection(*selection); err != nil {
-			return err
-		}
+func validateArtifactSelection(value ArtifactSelection) error {
+	if err := validateID("Artifact Root ID", value.RootID); err != nil {
+		return err
+	}
+	if err := validateID("Artifact ID", value.ArtifactID); err != nil {
+		return err
+	}
+	if value.ExpectedDigest != "" &&
+		(strings.TrimSpace(value.ExpectedDigest) != value.ExpectedDigest ||
+			!utf8.ValidString(value.ExpectedDigest) ||
+			strings.ContainsRune(value.ExpectedDigest, 0)) {
+		return errors.New("artifact expected digest is invalid")
+	}
+	return nil
+}
+
+func validateOptionalArtifactSelection(value *ArtifactSelection) error {
+	if value == nil {
 		return nil
 	}
+	return validateArtifactSelection(*value)
+}
 
+func validateDefaults(value SessionDefaults) error {
 	for _, selection := range []*ArtifactSelection{
 		value.Model,
 		value.Agent,
 		value.Workspace,
 	} {
-		if err := validateSelection(selection); err != nil {
+		if err := validateOptionalArtifactSelection(selection); err != nil {
 			return err
 		}
 	}
@@ -129,7 +142,7 @@ func validateDefaults(value SessionDefaults) error {
 		seen := make(map[string]struct{}, len(selections))
 		for index := range selections {
 			selection := selections[index]
-			if err := validateSelection(&selection); err != nil {
+			if err := validateSelection(selection); err != nil {
 				return fmt.Errorf("%s %d: %w", label, index, err)
 			}
 			key := selection.RootID + "\x00" + selection.ArtifactID
@@ -152,7 +165,7 @@ func validateDefaults(value SessionDefaults) error {
 	}
 
 	for index, selection := range value.MCP {
-		if err := validateSelection(&selection.Server); err != nil {
+		if err := validateSelection(selection.Server); err != nil {
 			return fmt.Errorf("MCP selection %d: %w", index, err)
 		}
 		switch selection.ToolExposure {
@@ -525,18 +538,38 @@ func (b ToolBinding) Validate() error {
 	}
 	switch b.Kind {
 	case ToolBindingKindGo:
-		if b.Go == nil {
+		if b.Go == nil ||
+			strings.TrimSpace(b.Go.Function) == "" ||
+			b.Go.TimeoutMS < 0 {
 			return errors.New("go Tool binding is missing")
 		}
 		return validatePin(b.Go.Target)
+
 	case ToolBindingKindMCP:
-		if b.MCP == nil || b.MCP.ServerID == "" || b.MCP.ProviderToolName == "" || b.MCP.ToolName == "" ||
-			b.MCP.ToolDigest == "" {
+		if b.MCP == nil ||
+			strings.TrimSpace(b.MCP.ServerID) == "" ||
+			strings.TrimSpace(b.MCP.ProviderToolName) == "" ||
+			strings.TrimSpace(b.MCP.ChoiceID) == "" ||
+			strings.TrimSpace(b.MCP.ToolName) == "" ||
+			strings.TrimSpace(b.MCP.ToolDigest) == "" {
 			return errors.New("invalid MCP Tool binding")
 		}
 		if b.MCP.ServerArtifact != nil {
-			return validatePin(*b.MCP.ServerArtifact)
+			if err := validatePin(*b.MCP.ServerArtifact); err != nil {
+				return err
+			}
 		}
+		switch b.MCP.ApprovalRule {
+		case "allow", "ask", "deny":
+		default:
+			return errors.New("invalid MCP Tool approval rule")
+		}
+		switch b.MCP.ExecutionMode {
+		case "auto", "manual":
+		default:
+			return errors.New("invalid MCP Tool execution mode")
+		}
+
 	case ToolBindingKindSkill:
 		if b.Skill == nil || b.Skill.Name == "" {
 			return errors.New("invalid Skill Tool binding")

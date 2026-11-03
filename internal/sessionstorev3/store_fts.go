@@ -68,8 +68,8 @@ func (s *Store) ftsListener() mapstore.FileListener {
 			if !isSessionDocumentFile(event.File) {
 				return
 			}
-			s.ftsMu.RLock()
-			defer s.ftsMu.RUnlock()
+			s.ftsMu.Lock()
+			defer s.ftsMu.Unlock()
 			if s.fts == nil {
 				return
 			}
@@ -81,7 +81,9 @@ func (s *Store) ftsListener() mapstore.FileListener {
 					return
 				}
 				if doc.Kind == sessionDocumentKindDeleted {
-					_ = s.fts.Delete(context.Background(), event.File)
+					if err := s.fts.Delete(context.Background(), event.File); err != nil {
+						slog.Error("sessionstorev3 FTS deletion failed", "error", err)
+					}
 					return
 				}
 				if doc.Session == nil {
@@ -92,9 +94,17 @@ func (s *Store) ftsListener() mapstore.FileListener {
 					slog.Error("sessionstorev3 FTS file observation failed", "error", err)
 					return
 				}
-				_ = s.fts.Upsert(context.Background(), event.File, sessionFTSValues(*doc.Session, mtime))
+				if err := s.fts.Upsert(
+					context.Background(),
+					event.File,
+					sessionFTSValues(*doc.Session, mtime),
+				); err != nil {
+					slog.Error("sessionstorev3 FTS upsert failed", "error", err)
+				}
 			case mapstore.OpDeleteFile:
-				_ = s.fts.Delete(context.Background(), event.File)
+				if err := s.fts.Delete(context.Background(), event.File); err != nil {
+					slog.Error("sessionstorev3 FTS file removal failed", "error", err)
+				}
 			case mapstore.OpSetKey, mapstore.OpDeleteKey:
 			}
 		}, nil)

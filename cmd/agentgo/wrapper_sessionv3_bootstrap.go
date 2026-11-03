@@ -8,12 +8,12 @@ import (
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3/binder"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/sessionv3runtime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workflowruntime"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
@@ -66,8 +66,8 @@ func InitComposedSessionV3Runtime(
 	if wrapper == nil || store == nil {
 		return errSessionV3Deps
 	}
-	base, err := binder.New(
-		binder.Dependencies{
+	base, err := sessionv3runtime.New(
+		sessionv3runtime.Dependencies{
 			Providers:     params.Providers,
 			Models:        params.Models,
 			Agents:        params.Agents,

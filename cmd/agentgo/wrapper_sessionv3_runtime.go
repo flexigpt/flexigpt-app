@@ -71,6 +71,22 @@ func (w *SessionV3Wrapper) ContinueExecution(
 	})
 }
 
+func (w *SessionV3Wrapper) PauseExecution(
+	command sessionv3.PauseExecutionCommand,
+) (*sessionv3.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3.Runtime) (*sessionv3.CommandReceipt, error) {
+		return r.PauseExecution(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) ResumeExecution(
+	command sessionv3.ResumeExecutionCommand,
+) (*sessionv3.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3.Runtime) (*sessionv3.CommandReceipt, error) {
+		return r.ResumeExecution(context.Background(), command)
+	})
+}
+
 func (w *SessionV3Wrapper) CancelExecution(
 	command sessionv3.CancelExecutionCommand,
 ) (*sessionv3.CommandReceipt, error) {
@@ -113,6 +129,51 @@ func (w *SessionV3Wrapper) Conversation(id sessionv3.SessionID) (sessionv3.Conve
 		return sessionv3.ConversationProjection{}, errSessionV3Closed
 	}
 	return store.ReadConversation(id)
+}
+
+func (w *SessionV3Wrapper) Activities(
+	id sessionv3.SessionID,
+) (sessionv3.ActivityProjection, error) {
+	w.mu.RLock()
+	store := w.store
+	w.mu.RUnlock()
+	if store == nil {
+		return sessionv3.ActivityProjection{}, errSessionV3Closed
+	}
+	return store.ReadActivities(id)
+}
+
+func (w *SessionV3Wrapper) Workflow(
+	id sessionv3.SessionID,
+) (sessionv3.WorkflowProjection, error) {
+	w.mu.RLock()
+	store := w.store
+	w.mu.RUnlock()
+	if store == nil {
+		return sessionv3.WorkflowProjection{}, errSessionV3Closed
+	}
+	return store.ReadWorkflow(id)
+}
+
+func (w *SessionV3Wrapper) Execution(
+	sessionID sessionv3.SessionID,
+	executionID sessionv3.ExecutionID,
+) (sessionv3.Execution, error) {
+	w.mu.RLock()
+	store := w.store
+	w.mu.RUnlock()
+	if store == nil {
+		return sessionv3.Execution{}, errSessionV3Closed
+	}
+	return store.ReadExecution(sessionID, executionID)
+}
+
+func (w *SessionV3Wrapper) Session(
+	id sessionv3.SessionID,
+) (sessionv3.Session, error) {
+	return withSessionV3(w, func(r *sessionv3.Runtime) (sessionv3.Session, error) {
+		return r.GetSession(context.Background(), id)
+	})
 }
 
 func (w *SessionV3Wrapper) close() {

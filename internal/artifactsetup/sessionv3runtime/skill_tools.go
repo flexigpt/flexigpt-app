@@ -1,4 +1,4 @@
-package binder
+package sessionv3runtime
 
 import (
 	"encoding/json"

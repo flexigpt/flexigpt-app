@@ -233,7 +233,11 @@ func (i *Interpreter) call(
 		if target.NestedProgram == nil {
 			return failure(s, errors.New("nested workflow programFrame is unavailable"))
 		}
-		return childTransition(path, *target.NestedProgram, "", input, s)
+		nested, err := programWithInput(*target.NestedProgram, input)
+		if err != nil {
+			return failure(s, err)
+		}
+		return childTransition(path, nested, "", input, s)
 	case workflowv1.TargetTool:
 		if target.Artifact == nil {
 			return failure(s, errors.New("workflow tool target is not pinned"))
@@ -334,6 +338,28 @@ func childTransition(
 	}, nil
 }
 
+func programWithInput(
+	snapshot sessionv3.ProgramSnapshot,
+	input sessionv3.CanonicalValue,
+) (sessionv3.ProgramSnapshot, error) {
+	if !input.Valid() {
+		return sessionv3.ProgramSnapshot{}, errors.New(
+			"nested workflow input is not canonical JSON",
+		)
+	}
+
+	var program Program
+	if err := json.Unmarshal(snapshot.Payload, &program); err != nil {
+		return sessionv3.ProgramSnapshot{}, err
+	}
+	program.Input = input.Clone()
+	if err := validateProgram(program); err != nil {
+		return sessionv3.ProgramSnapshot{}, err
+	}
+	snapshot.Payload = sessionv3.MustCanonicalValue(program)
+	return snapshot, nil
+}
+
 type State struct {
 	Version   uint32                              `json:"version"`
 	Input     sessionv3.CanonicalValue            `json:"input"`
@@ -384,9 +410,12 @@ func (s *State) settleWork(e sessionv3.Execution, id sessionv3.WorkItemID) error
 	if s.Pending != "" && item.ProgramPath != s.Pending {
 		return nil
 	}
-	if item.State == sessionv3.WorkItemStateFailed || item.State == sessionv3.WorkItemStateUncertain ||
-		item.State == sessionv3.WorkItemStateBlocked {
-		return fmt.Errorf("workflow WorkItem %q failed", id)
+	if item.State != sessionv3.WorkItemStateCompleted {
+		return fmt.Errorf(
+			"workflow WorkItem %q did not complete successfully: %s",
+			id,
+			item.State,
+		)
 	}
 	if item.Output != nil {
 		s.Outputs[item.ProgramPath] = item.Output.Value.Clone()
