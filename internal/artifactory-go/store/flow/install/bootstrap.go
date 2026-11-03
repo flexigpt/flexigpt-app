@@ -230,11 +230,7 @@ func (b *Bootstrap) Ensure(ctx context.Context) error {
 				TopologyCurrent: plan.current,
 				Stale:           slices.Clone(plan.stale),
 			}
-			for _, value := range plan.packages {
-				if !plan.packageCurrent[value.Key] {
-					compiled.Changed = append(compiled.Changed, value.Key.Scope)
-				}
-			}
+			compiled.Changed = plan.changedPackageScopes()
 			compiledPlans = append(compiledPlans, compiled)
 			continue
 		}
@@ -455,6 +451,26 @@ func (p bootstrapPlan) needsPackageMutation() bool {
 		}
 	}
 	return false
+}
+
+// changedPackageScopes returns package scopes that must pass through the
+// compiled hydration path.
+//
+// When aggregate topology hydration is stale, every package owned by that
+// installer is included even when its individual package fingerprint is
+// current. ApplyPackageBatch avoids rewriting equivalent bytes, but the
+// compiled hydration path advances Source metadata and refreshes once. This
+// re-admits changed discovery/schema behavior without deleting Artifacts or
+// allocating replacement IDs.
+func (p bootstrapPlan) changedPackageScopes() []storeSpec.Locator {
+	output := make([]storeSpec.Locator, 0, len(p.packages))
+	for _, value := range p.packages {
+		if p.current && p.packageCurrent[value.Key] {
+			continue
+		}
+		output = append(output, value.Key.Scope)
+	}
+	return output
 }
 
 func normalizePackageScopes(values []storeSpec.Locator) ([]storeSpec.Locator, error) {

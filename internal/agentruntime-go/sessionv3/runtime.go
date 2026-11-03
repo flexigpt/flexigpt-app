@@ -719,6 +719,14 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		r.mu.Unlock()
 		return receipt, nil
 	}
+	if wait.Request.Kind == WaitKindRecovery {
+		receipt, resolveErr := r.resolveRecoveryWaitLocked(
+			ctx, session, execution, wait, command,
+		)
+		r.mu.Unlock()
+		return receipt, resolveErr
+	}
+
 	previous := cloneSession(*session)
 	wait.Status = WaitStatusResolving
 	wait.UpdatedAt = r.now()
@@ -729,6 +737,10 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		return nil, err
 	}
 	item := mutableWorkItem(execution, wait.WorkItemID)
+	if item == nil {
+		r.mu.Unlock()
+		return nil, errors.New("wait owner work item is unavailable")
+	}
 	private := r.privateWaits[wait.ID]
 	request := WaitResolutionRequest{
 		Session:    cloneSession(*session),
@@ -748,9 +760,12 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		return nil, err
 	}
 	wait = mutableWait(execution, command.WaitID)
-	item = mutableWorkItem(execution, wait.WorkItemID)
-	if wait == nil || item == nil || wait.Status != WaitStatusResolving {
+	if wait == nil || wait.Status != WaitStatusResolving {
 		return nil, errors.New("wait changed while resolution was in progress")
+	}
+	item = mutableWorkItem(execution, wait.WorkItemID)
+	if item == nil {
+		return nil, errors.New("wait owner work item is unavailable")
 	}
 	now := r.now()
 	if resolveErr != nil {
@@ -791,9 +806,10 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		)
 	case result.Resume && result.Bound != nil:
 		r.privateBindings[item.ID] = *result.Bound
-		if err := r.startDispatchedLocked(ctx, session, execution, item, *result.Bound); err != nil {
-			return nil, err
-		}
+		item.State = WorkItemStateReady
+		item.Requested = true
+		item.Binding = &result.Bound.SemanticBinding
+		item.UpdatedAt = now
 	default:
 		item.State = WorkItemStateFailed
 		item.Error = result.Error
@@ -900,6 +916,59 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 		Activities:      activities,
 		Executions:      executions,
 	}, nil
+}
+
+func (r *Runtime) resolveRecoveryWaitLocked(
+	ctx context.Context,
+	session *Session,
+	execution *Execution,
+	wait *Wait,
+	command ResolveWaitCommand,
+) (*CommandReceipt, error) {
+	if session == nil || execution == nil || wait == nil {
+		return nil, errors.New("recovery wait is unavailable")
+	}
+
+	previous := cloneSession(*session)
+	now := r.now()
+	wait.Status = WaitStatusResolved
+	wait.Resolution = command.Resolution
+	wait.Response = command.Response.Clone()
+	wait.UpdatedAt = now
+	delete(r.privateWaits, wait.ID)
+
+	outcome := ExecutionOutcome{
+		Kind:        ExecutionOutcomeFailed,
+		Code:        "recovery_outcome_uncertain",
+		Message:     "An external WorkItem outcome was uncertain after recovery and was not replayed.",
+		CompletedAt: now,
+	}
+	if command.Resolution == WaitResolutionCancel {
+		outcome = ExecutionOutcome{
+			Kind:        ExecutionOutcomeCancelled,
+			Code:        "recovery_cancelled",
+			Message:     "Execution was cancelled during recovery review.",
+			CompletedAt: now,
+		}
+	}
+	r.completeExecutionLocked(ctx, session, execution, outcome)
+
+	receipt := CommandReceipt{
+		CommandID:         command.Meta.ID,
+		Accepted:          true,
+		SessionID:         session.ID,
+		ExecutionID:       execution.ID,
+		SessionRevision:   session.Revision,
+		ExecutionRevision: execution.Revision,
+		WaitIDs:           []WaitID{wait.ID},
+	}
+	r.rememberCommandLocked(session, command.Meta, command, receipt)
+	if err := r.persistLocked(ctx, "recoveryWaitResolved", session); err != nil {
+		*session = previous
+		return nil, err
+	}
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
+	return &receipt, nil
 }
 
 func (r *Runtime) setPaused(
@@ -1081,7 +1150,20 @@ func (r *Runtime) advanceFrameLocked(
 	execution *Execution,
 	frameID ProgramFrameID,
 	event ProgramEvent,
-) error {
+) (err error) {
+	if session == nil || execution == nil {
+		return errors.New("ProgramFrame execution is unavailable")
+	}
+
+	previousExecution := cloneExecution(*execution)
+	previousTimelineLength := len(session.Timeline)
+	defer func() {
+		if err != nil {
+			*execution = previousExecution
+			session.Timeline = session.Timeline[:previousTimelineLength]
+		}
+	}()
+
 	frame := mutableFrame(execution, frameID)
 	if frame == nil || frame.Status.Terminal() {
 		return nil
@@ -1142,6 +1224,10 @@ func (r *Runtime) advanceFrameLocked(
 			UpdatedAt:     now,
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)
+		frame = mutableFrame(execution, frameID)
+		if frame == nil {
+			return errors.New("parent ProgramFrame disappeared while adding a child")
+		}
 		frame.ChildFrameIDs = append(frame.ChildFrameIDs, child.ID)
 		childIDs = append(childIDs, child.ID)
 		if frame.Program.InterpreterID == BuiltinConversationInterpreterID {
@@ -1171,6 +1257,10 @@ func (r *Runtime) advanceFrameLocked(
 			return err
 		}
 		execution.WorkItems = append(execution.WorkItems, item)
+		frame = mutableFrame(execution, frameID)
+		if frame == nil {
+			return errors.New("parent ProgramFrame disappeared while adding work")
+		}
 		frame.WorkItemIDs = append(frame.WorkItemIDs, item.ID)
 		if frame.Program.InterpreterID == BuiltinAgentLoopInterpreterID {
 			if item.Type == WorkItemTypeTool {
@@ -1258,12 +1348,16 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		bound = BindResult{SemanticBinding: prebound.SemanticBinding, Private: prebound.Private}
 	} else {
 		bound, err = r.deps.Binder.BindWork(ctx, request)
+		if err != nil {
+			return
+		}
 	}
-	if err != nil {
-		return
-	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
 	session, execution, err = r.executionLocked(sessionID, executionID)
 	item = mutableWorkItem(execution, itemID)
 	if item == nil || item.State != WorkItemStateBinding {
@@ -1275,8 +1369,19 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		item.Error = &SanitizedError{Code: "runtime_binding_failed", Message: err.Error()}
 		item.CompletedAt = &now
 		item.UpdatedAt = now
+		_ = r.advanceFrameLocked(
+			session,
+			execution,
+			item.FrameID,
+			ProgramEvent{
+				Kind:       ProgramEventWorkSettled,
+				WorkItemID: item.ID,
+			},
+		)
+		r.refreshExecutionStateLocked(execution)
 		r.touchExecutionLocked(session, execution)
 		_ = r.persistLocked(ctx, "workBlocked", session)
+		r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 		return
 	}
 	if bound.ImmediateOutput != nil {
@@ -1310,6 +1415,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.touchExecutionLocked(session, execution)
 		r.appendWaitActivityLocked(session, execution, wait)
 		_ = r.persistLocked(ctx, "waitRequested", session)
+		r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 		if wait.Request.Deadline != nil {
 			go r.expireAt(context.WithoutCancel(ctx), sessionID, executionID, wait.ID, *wait.Request.Deadline)
 		}
@@ -1325,6 +1431,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		*session = previous
 		return
 	}
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	go r.executeOne(
 		context.WithoutCancel(ctx),
 		sessionID,
@@ -1372,6 +1479,25 @@ func (r *Runtime) executeOne(
 ) {
 	executionCtx, cancel := context.WithCancel(ctx)
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		cancel()
+		return
+	}
+	session, execution, err := r.executionLocked(sessionID, executionID)
+	if err != nil {
+		r.mu.Unlock()
+		cancel()
+		return
+	}
+	item := mutableWorkItem(execution, itemID)
+	if item == nil || item.State != WorkItemStateDispatched ||
+		execution.Controls.CancellationRequested ||
+		execution.State.Terminal() {
+		r.mu.Unlock()
+		cancel()
+		return
+	}
 	r.cancels[itemID] = cancel
 	r.mu.Unlock()
 	result, err := r.deps.Binder.ExecuteWork(executionCtx, request, bound)
@@ -1381,18 +1507,28 @@ func (r *Runtime) executeOne(
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	session, execution, lookupErr := r.executionLocked(sessionID, executionID)
-	if lookupErr != nil {
+	if r.closed {
 		return
 	}
-	item := mutableWorkItem(execution, itemID)
-	if item == nil || item.State != WorkItemStateDispatched {
-		return
-	}
+
 	delete(r.cancels, itemID)
 	delete(r.privateBindings, itemID)
 	r.finishWorkLocked(session, execution, item, activeAttempt(execution, itemID), result)
+	if execution.Controls.CancellationRequested && !hasDispatched(*execution) {
+		r.completeExecutionLocked(
+			context.WithoutCancel(ctx),
+			session,
+			execution,
+			ExecutionOutcome{
+				Kind:        ExecutionOutcomeCancelled,
+				Code:        "cancelled",
+				Message:     "Execution was cancelled",
+				CompletedAt: r.now(),
+			},
+		)
+	}
 	_ = r.persistLocked(ctx, "workFinished", session)
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	go r.launchWork(context.WithoutCancel(ctx), sessionID, executionID, r.readyWorkLocked(*execution))
 }
 
@@ -1408,6 +1544,19 @@ func (r *Runtime) finishWorkLocked(
 	item.Error = result.Error
 	item.CompletedAt = &now
 	item.UpdatedAt = now
+
+	if execution.Controls.CancellationRequested {
+		item.State = WorkItemStateCancelled
+		if attempt != nil {
+			attempt.State = AttemptStateCancelled
+			attempt.FinishedAt = &now
+			attempt.Error = result.Error
+		}
+		r.refreshExecutionStateLocked(execution)
+		r.touchExecutionLocked(session, execution)
+		return
+	}
+
 	if attempt != nil {
 		attempt.FinishedAt = &now
 		attempt.Error = result.Error
@@ -1421,10 +1570,16 @@ func (r *Runtime) finishWorkLocked(
 		if attempt != nil {
 			attempt.State = AttemptStateConfirmed
 		}
-	case result.Confirmed:
+	case result.Confirmed || item.Effect.Kind == EffectKindRead:
 		item.State = WorkItemStateFailed
 		if attempt != nil {
 			attempt.State = AttemptStateFailed
+		}
+		if item.Error == nil {
+			item.Error = &SanitizedError{
+				Code:    "confirmed_work_failed",
+				Message: "a read-only WorkItem completed without a confirmed output",
+			}
 		}
 	default:
 		item.State = WorkItemStateUncertain
@@ -1518,7 +1673,7 @@ func (r *Runtime) expireAt(
 	waitID WaitID,
 	deadline time.Time,
 ) {
-	delay := time.Until(deadline)
+	delay := deadline.Sub(r.now())
 	if delay > 0 {
 		time.Sleep(delay)
 	}
@@ -1526,6 +1681,9 @@ func (r *Runtime) expireAt(
 	defer r.mu.Unlock()
 	session, execution, err := r.executionLocked(sessionID, executionID)
 	if err != nil {
+		return
+	}
+	if r.closed {
 		return
 	}
 	wait := mutableWait(execution, waitID)
@@ -1538,6 +1696,7 @@ func (r *Runtime) expireAt(
 	wait.Error = &SanitizedError{Code: "wait_expired", Message: "wait deadline elapsed"}
 	wait.UpdatedAt = now
 	item := mutableWorkItem(execution, wait.WorkItemID)
+	delete(r.privateWaits, wait.ID)
 	if item != nil && !item.State.Terminal() {
 		item.State = WorkItemStateFailed
 		item.Error = wait.Error
@@ -1552,6 +1711,7 @@ func (r *Runtime) expireAt(
 	}
 	r.touchExecutionLocked(session, execution)
 	_ = r.persistLocked(context.WithoutCancel(ctx), "waitExpired", session)
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 }
 
 func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
@@ -1575,9 +1735,23 @@ func (r *Runtime) launchWork(ctx context.Context, sessionID SessionID, execution
 }
 
 func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
-	if execution.State.Terminal() {
+	if execution == nil || execution.State.Terminal() {
 		return
 	}
+
+	if outcome := r.frameOutcomeLocked(execution); outcome != nil {
+		execution.Outcome = outcome
+		switch outcome.Kind {
+		case ExecutionOutcomeCancelled:
+			execution.State = ExecutionStateCancelled
+		case ExecutionOutcomeFailed:
+			execution.State = ExecutionStateFailed
+		default:
+			execution.State = ExecutionStateCompleted
+		}
+		return
+	}
+
 	if execution.Controls.CancellationRequested {
 		execution.State = ExecutionStateCancelling
 		return
@@ -1592,14 +1766,80 @@ func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
 			return
 		}
 	}
+
+	runnable := false
 	for _, item := range execution.WorkItems {
-		if item.State == WorkItemStateReady || item.State == WorkItemStateBinding ||
-			item.State == WorkItemStateDispatched {
+		switch item.State {
+		case WorkItemStateBinding, WorkItemStateDispatched:
 			execution.State = ExecutionStateRunning
 			return
+		case WorkItemStateReady:
+			if item.Automatic || item.Requested {
+				runnable = true
+			}
+		default:
 		}
 	}
+	if runnable {
+		execution.State = ExecutionStateRunning
+		return
+	}
 	execution.State = ExecutionStateWaiting
+}
+
+func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
+	if execution == nil {
+		return nil
+	}
+
+	rootCount := 0
+	allTerminal := true
+	failed := false
+	cancelled := false
+
+	for _, frame := range execution.ProgramFrames {
+		if frame.ParentFrameID != "" {
+			continue
+		}
+
+		// A conversation frame is intentionally long-lived. It waits for the
+		// next user Activity after every completed child Agent loop.
+		if frame.Program.InterpreterID == BuiltinConversationInterpreterID {
+			return nil
+		}
+
+		rootCount++
+		if !frame.Status.Terminal() {
+			allTerminal = false
+			continue
+		}
+		switch frame.Status {
+		case ProgramFrameStateFailed:
+			failed = true
+		case ProgramFrameStateCancelled:
+			cancelled = true
+		default:
+		}
+	}
+
+	if rootCount == 0 || !allTerminal {
+		return nil
+	}
+
+	outcome := &ExecutionOutcome{
+		Kind:        ExecutionOutcomeCompleted,
+		CompletedAt: r.now(),
+	}
+	if failed {
+		outcome.Kind = ExecutionOutcomeFailed
+		outcome.Code = "program_frame_failed"
+		outcome.Message = "a root ProgramFrame failed"
+	} else if cancelled {
+		outcome.Kind = ExecutionOutcomeCancelled
+		outcome.Code = "program_frame_cancelled"
+		outcome.Message = "a root ProgramFrame was cancelled"
+	}
+	return outcome
 }
 
 func (r *Runtime) completeExecutionLocked(
@@ -1645,6 +1885,11 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 	if err := session.Validate(); err != nil {
 		return err
 	}
+
+	// EventSequence is durable state. Reserve the next sequence before the
+	// checkpoint so recovery cannot publish a duplicate sequence value.
+	session.EventSequence++
+
 	for _, execution := range session.Executions {
 		for _, frame := range execution.ProgramFrames {
 			interpreter := r.interpreterLocked(frame.Program)
@@ -1669,7 +1914,6 @@ func (r *Runtime) publishLocked(ctx context.Context, session *Session, execution
 	if r.deps.Events == nil {
 		return
 	}
-	session.EventSequence++
 	event := RuntimeEvent{
 		SessionID:   session.ID,
 		ExecutionID: executionID,

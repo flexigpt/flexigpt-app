@@ -24,6 +24,11 @@ type goToolExecutor struct {
 	runtime *toolruntime.Adapter
 }
 
+// goToolBinding is durable semantic execution evidence for one Go Tool call.
+//
+// Used is an immutable Artifact Definition witness captured during operation
+// preparation. It is not an allocation request and must match the current Tool
+// Definition before execution can invoke a local Go function.
 type goToolBinding struct {
 	Target    composition.CapabilityTarget    `json:"target"`
 	Used      sessionRuntime.ResolvedArtifact `json:"used"`
@@ -77,6 +82,11 @@ func (e *goToolExecutor) ExecuteTool(
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
 
+	current := toolResolvedArtifact(resolved)
+	if err := validateGoToolBindingCurrent(binding, current); err != nil {
+		return sessionRuntime.ToolExecutionResult{}, err
+	}
+
 	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
 		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
 			"tool %q is not a Go Tool",
@@ -118,6 +128,60 @@ func (e *goToolExecutor) ExecuteTool(
 		result.Error = invokeErr.Error()
 	}
 	return result, nil
+}
+
+// validateGoToolBindingCurrent prevents a pending Tool call from silently
+// executing a changed Tool Definition.
+//
+// Revision is deliberately not compared. Local Artifact metadata can advance a
+// revision without changing the executable Tool declaration. ResolveToolTarget
+// separately checks current Artifact availability and enablement.
+func validateGoToolBindingCurrent(
+	binding goToolBinding,
+	current *sessionRuntime.ResolvedArtifact,
+) error {
+	if err := binding.Target.Validate(); err != nil {
+		return fmt.Errorf("invalid persisted Go Tool target: %w", err)
+	}
+
+	if binding.Target.Form != composition.TargetFormArtifact ||
+		binding.Target.Artifact == nil {
+		return errors.New(
+			"go Tool binding must retain an Artifact-backed Tool target",
+		)
+	}
+
+	if strings.TrimSpace(binding.Used.RootID) == "" ||
+		strings.TrimSpace(binding.Used.ArtifactID) == "" ||
+		strings.TrimSpace(binding.Used.Digest) == "" {
+		return errors.New(
+			"go Tool binding has no immutable Artifact Definition witness",
+		)
+	}
+
+	if string(binding.Target.Artifact.RootID) != binding.Used.RootID ||
+		string(binding.Target.Artifact.ArtifactID) != binding.Used.ArtifactID {
+		return errors.New(
+			"go Tool binding target and Artifact Definition witness differ",
+		)
+	}
+
+	if current == nil {
+		return errors.New("current Go Tool Artifact witness is unavailable")
+	}
+	if current.RootID != binding.Used.RootID ||
+		current.ArtifactID != binding.Used.ArtifactID {
+		return errors.New(
+			"go Tool Artifact identity changed since Tool call preparation",
+		)
+	}
+	if strings.TrimSpace(current.Digest) == "" ||
+		current.Digest != binding.Used.Digest {
+		return errors.New(
+			"go Tool Definition changed since Tool call preparation",
+		)
+	}
+	return nil
 }
 
 func (e *goToolExecutor) ResolveToolWait(

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -127,13 +126,17 @@ func (i *Interpreter) drive(
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return failure(s, err)
 	}
-	if when, ok := fields["when"]; ok && string(when) != "null" && string(when) != "true" {
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeCondition,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{Condition: &sessionv3.ConditionWork{Input: sessionv3.CanonicalValue(when)}},
+	if when, ok := fields["when"]; ok &&
+		string(when) != "null" &&
+		string(when) != "true" {
+		// The current interpreter has no persisted branch-decision state.
+		// Do not run the body after a condition as the old implementation did.
+		return failure(
 			s,
+			fmt.Errorf(
+				"workflow step %q uses conditional execution that is not implemented by workflow runtime v1",
+				step.ID,
+			),
 		)
 	}
 	if call, ok := fields["call"]; ok {
@@ -141,100 +144,20 @@ func (i *Interpreter) drive(
 	}
 	switch {
 	case fields["transform"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeTransform,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{
-				Transform: &sessionv3.TransformWork{Input: sessionv3.CanonicalValue(fields["transform"])},
-			},
-			s,
-		)
 	case fields["set"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeStateUpdate,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{StateUpdate: &sessionv3.StateUpdateWork{}},
-			s,
-		)
 	case fields["wait"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeWait,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{Wait: &sessionv3.WaitWork{Request: waitRequest(fields["wait"])}},
-			s,
-		)
 	case fields["emit"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeEmit,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindIdempotent},
-			sessionv3.WorkItemPayload{
-				Emit: &sessionv3.EmitWork{
-					Destination: sessionv3.EmitDestination{Event: "workflow.emit"},
-					Data:        sessionv3.CanonicalValue(fields["emit"]),
-				},
-			},
-			s,
-		)
 	case fields["parallel"] != nil || fields["foreach"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeFork,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{
-				Fork: &sessionv3.ForkWork{
-					ChildFrames: []sessionv3.ProgramFrameID{sessionv3.ProgramFrameID(string(frame.ID) + ":" + step.ID)},
-				},
-			},
-			s,
-		)
 	case fields["choose"] != nil || fields["repeat"] != nil || fields["machine"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeCondition,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{Condition: &sessionv3.ConditionWork{Input: sessionv3.CanonicalValue(raw)}},
-			s,
-		)
 	case fields["saga"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeCompensation,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindIdempotent},
-			sessionv3.WorkItemPayload{
-				Compensation: &sessionv3.CompensationWork{
-					OriginalWorkItemID: sessionv3.WorkItemID(string(frame.ID) + ":" + step.ID),
-					Input:              sessionv3.CanonicalValue(fields["saga"]),
-				},
-			},
-			s,
-		)
 	case fields["scope"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeTransform,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindRead},
-			sessionv3.WorkItemPayload{
-				Transform: &sessionv3.TransformWork{Input: sessionv3.CanonicalValue(fields["scope"])},
-			},
-			s,
-		)
 	case fields["cancel"] != nil:
-		return i.work(
-			path,
-			sessionv3.WorkItemTypeActivity,
-			sessionv3.EffectContract{Kind: sessionv3.EffectKindIdempotent},
-			sessionv3.WorkItemPayload{
-				Activity: &sessionv3.ActivityWork{
-					ActivityID:     "workflow.cancel",
-					BindingVersion: "v1",
-					Input:          sessionv3.CanonicalValue(fields["cancel"]),
-				},
-			},
+		return failure(
 			s,
+			fmt.Errorf(
+				"workflow step %q uses an operation that is represented by the contract but not executable by workflow runtime v1",
+				step.ID,
+			),
 		)
 	case fields["return"] != nil:
 		status := sessionv3.ProgramFrameStateCompleted
@@ -246,8 +169,9 @@ func (i *Interpreter) drive(
 	case fields["fail"] != nil:
 		return failure(s, errors.New("workflow fail step"))
 	default:
-		return failure(s, fmt.Errorf("unsupported Workflow step %q", step.ID))
+
 	}
+	return failure(s, fmt.Errorf("unsupported Workflow step %q", step.ID))
 }
 
 func (i *Interpreter) call(
@@ -307,10 +231,13 @@ func (i *Interpreter) call(
 		return childTransition(path, program, activityID, input, s)
 	case workflowv1.TargetWorkflow:
 		if target.NestedProgram == nil {
-			return failure(s, errors.New("nested Workflow ProgramFrame is unavailable"))
+			return failure(s, errors.New("nested workflow programFrame is unavailable"))
 		}
 		return childTransition(path, *target.NestedProgram, "", input, s)
 	case workflowv1.TargetTool:
+		if target.Artifact == nil {
+			return failure(s, errors.New("workflow tool target is not pinned"))
+		}
 		return i.work(
 			path,
 			sessionv3.WorkItemTypeTool,
@@ -326,6 +253,7 @@ func (i *Interpreter) call(
 							Unresolved: &sessionv3.UnresolvedToolBinding{Reason: "Workflow Tool Artifact binding"},
 						},
 					},
+					Target: target.Artifact,
 				},
 			},
 			s,
@@ -404,28 +332,6 @@ func childTransition(
 		Activities: activities,
 		Frames:     []sessionv3.ProgramFrameIntent{{Path: path, Program: program}},
 	}, nil
-}
-
-func waitRequest(raw json.RawMessage) sessionv3.WaitRequest {
-	var value map[string]json.RawMessage
-	_ = json.Unmarshal(raw, &value)
-	kind := sessionv3.WaitKindHuman
-	v := string(value["for"])
-	if strings.Contains(v, "timer") {
-		kind = sessionv3.WaitKindTimer
-	}
-	if strings.Contains(v, "event") {
-		kind = sessionv3.WaitKindEvent
-	}
-	return sessionv3.WaitRequest{
-		Kind:    kind,
-		Summary: sessionv3.CanonicalValue(raw),
-		AllowedResolutions: []sessionv3.WaitResolution{
-			sessionv3.WaitResolutionContinue,
-			sessionv3.WaitResolutionCancel,
-		},
-		RuntimeBound: false,
-	}
 }
 
 type State struct {

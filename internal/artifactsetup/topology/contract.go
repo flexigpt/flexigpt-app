@@ -41,6 +41,8 @@ const (
 	DiscoveryUseSkill                                  = "skill"
 	DiscoveryUseMCP                                    = "mcp"
 	DiscoveryUseWorkspace                              = "workspace"
+	DocumentUseWorkflow                                = "workflow"
+	DocumentUseWorkflowPackage                         = "workflowPackage"
 	MarkdownRuleAgent                                  = "agent"
 	MarkdownRuleText                                   = "text"
 	MarkdownRuleDefaultText                            = "defaultText"
@@ -1484,6 +1486,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseManagedMCP,
 		DocumentUseManagedMCPPolicy,
 		DocumentUseAgentMarkdown,
+		DocumentUseWorkflowPackage,
 		DocumentUseWorkspaceMarkdown,
 		DocumentUseWorkspaceInstructions,
 		DocumentUseWorkspaceManifest,
@@ -1509,6 +1512,7 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseManagedAgent,
 		DocumentUseManagedMCP,
 		DocumentUseManagedMCPPolicy,
+		DocumentUseWorkflowPackage,
 	} {
 		if _, err := value.defaultDocumentFile(use); err != nil {
 			return err

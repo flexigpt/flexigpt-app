@@ -201,14 +201,23 @@ func toolResultToInput(item sessionv3.WorkItem) inferenceSpec.InputUnion {
 	if strings.TrimSpace(text) == "" {
 		text = "Tool completed."
 	}
+	call := item.Input.Tool.Call
 	return inferenceSpec.InputUnion{
-		Kind: inferenceSpec.InputKindInputMessage,
-		InputMessage: &inferenceSpec.InputOutputContent{
-			ID:     "tool-" + string(item.ID),
-			Role:   inferenceSpec.RoleUser,
-			Status: inferenceSpec.StatusNone,
-			Contents: []inferenceSpec.InputOutputContentItemUnion{
-				{Kind: inferenceSpec.ContentItemKindText, TextItem: &inferenceSpec.ContentItemText{Text: text}},
+		Kind: inferenceSpec.InputKindFunctionToolOutput,
+		FunctionToolOutput: &inferenceSpec.ToolOutput{
+			Type:     inferenceSpec.ToolTypeFunction,
+			ID:       string(item.ID),
+			CallID:   firstText(call.ProviderCallID, call.ID),
+			ChoiceID: call.ChoiceID,
+			Name:     call.Name,
+			Role:     inferenceSpec.RoleTool,
+			Status:   inferenceSpec.StatusCompleted,
+			IsError:  item.Output.Tool.Kind != sessionv3.ToolOutputKindSuccess,
+			Contents: []inferenceSpec.ToolOutputItemUnion{
+				{
+					Kind:     inferenceSpec.ContentItemKindText,
+					TextItem: &inferenceSpec.ContentItemText{Text: text},
+				},
 			},
 		},
 	}
@@ -224,9 +233,14 @@ func (b *Binder) systemPromptText(_ context.Context, req sessionv3.WorkDispatchR
 			}
 		}
 	}
-	for _, inst := range req.Session.Defaults.SystemInstructions {
-		if strings.TrimSpace(inst.Content) != "" {
-			parts = append(parts, inst.Content)
+	// Built-in programs copy Session defaults into LLMWork. Falling back only
+	// when the work item has no explicit instructions prevents duplicated
+	// system prompts on every Agent-loop round.
+	if len(parts) == 0 {
+		for _, inst := range req.Session.Defaults.SystemInstructions {
+			if strings.TrimSpace(inst.Content) != "" {
+				parts = append(parts, inst.Content)
+			}
 		}
 	}
 	return strings.Join(parts, "\n\n")

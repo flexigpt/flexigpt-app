@@ -13,9 +13,6 @@ type CanonicalValue json.RawMessage
 
 func CanonicalValueFrom(raw []byte) (CanonicalValue, error) {
 	if len(raw) > maxCanonicalValueBytes {
-		return nil, nil
-	}
-	if len(raw) > maxCanonicalValueBytes {
 		return nil, fmt.Errorf("canonical value exceeds %d bytes", maxCanonicalValueBytes)
 	}
 	canonical, err := jsonutil.Canonicalize(raw)
@@ -56,37 +53,13 @@ func (v CanonicalValue) Valid() bool {
 }
 
 func cloneSession(value Session) Session {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	var output Session
-	if err := json.Unmarshal(raw, &output); err != nil {
-		panic(err)
-	}
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }
 
 func cloneExecution(value Execution) Execution {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	var output Execution
-	if err := json.Unmarshal(raw, &output); err != nil {
-		panic(err)
-	}
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }
 
 func cloneFrame(value ProgramFrame) ProgramFrame {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	var output ProgramFrame
-	if err := json.Unmarshal(raw, &output); err != nil {
-		panic(err)
-	}
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }

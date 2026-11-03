@@ -2,12 +2,15 @@ package sessionstorev3
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/ftsengine"
 )
@@ -67,6 +70,9 @@ func (s *Store) ftsListener() mapstore.FileListener {
 			}
 			s.ftsMu.RLock()
 			defer s.ftsMu.RUnlock()
+			if s.fts == nil {
+				return
+			}
 			switch event.Op {
 			case mapstore.OpSetFile, mapstore.OpResetFile:
 				doc, err := decodeStoreDocument(event.Data)
@@ -81,7 +87,11 @@ func (s *Store) ftsListener() mapstore.FileListener {
 				if doc.Session == nil {
 					return
 				}
-				mtime := doc.Session.UpdatedAt.UTC().Format(time.RFC3339Nano)
+				mtime, err := storeDocumentMTime(context.Background(), event.File)
+				if err != nil {
+					slog.Error("sessionstorev3 FTS file observation failed", "error", err)
+					return
+				}
 				_ = s.fts.Upsert(context.Background(), event.File, sessionFTSValues(*doc.Session, mtime))
 			case mapstore.OpDeleteFile:
 				_ = s.fts.Delete(context.Background(), event.File)
@@ -92,7 +102,7 @@ func (s *Store) ftsListener() mapstore.FileListener {
 }
 
 func (s *Store) syncDocumentToFTS(
-	_ context.Context,
+	ctx context.Context,
 	_, fullPath string,
 	getPreviousComparison ftsengine.GetPrevCmp,
 ) (ftsengine.SyncDecision, error) {
@@ -100,10 +110,53 @@ func (s *Store) syncDocumentToFTS(
 	if !isSessionDocumentFile(fullPath) {
 		return skip, nil
 	}
-	stat, err := s.documents.GetFileData(mapstore.FileKey{FileName: fullPath}, false)
+	comparison, err := storeDocumentMTime(ctx, fullPath)
 	if err != nil {
 		return skip, err
 	}
-	_ = stat
-	return skip, nil
+	if comparison == getPreviousComparison(fullPath) {
+		return ftsengine.SyncDecision{
+			ID:        fullPath,
+			Vals:      map[string]string{},
+			Unchanged: true,
+		}, nil
+	}
+
+	raw, err := llmtoolsutil.ReadPortableTextFile(
+		ctx,
+		fullPath,
+		maximumDocumentBytes,
+	)
+	if err != nil {
+		return skip, err
+	}
+	doc, err := decodeStoreDocumentJSON(raw)
+	if err != nil {
+		return skip, err
+	}
+	if doc.Kind == sessionDocumentKindDeleted {
+		if err := s.fts.Delete(ctx, fullPath); err != nil {
+			return skip, err
+		}
+		return skip, nil
+	}
+	if doc.Session == nil {
+		return skip, fmt.Errorf("%w: live FTS document has no Session", ErrInvalidDocument)
+	}
+	return ftsengine.SyncDecision{
+		ID:     fullPath,
+		CmpOut: comparison,
+		Vals:   sessionFTSValues(*doc.Session, comparison),
+	}, nil
+}
+
+func storeDocumentMTime(ctx context.Context, path string) (string, error) {
+	value, err := llmtoolsutil.StatPath(ctx, fstool.StatPathArgs{Path: path})
+	if err != nil {
+		return "", err
+	}
+	if value == nil || !value.Exists || value.IsDir || value.ModTime == nil {
+		return "", fmt.Errorf("%w: Session document is unavailable", ErrInvalidDocument)
+	}
+	return value.ModTime.UTC().Format(time.RFC3339Nano), nil
 }

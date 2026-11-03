@@ -13,8 +13,13 @@ import (
 )
 
 // PrepareTopologyHydrations reconciles all installer desired states before
-// any installer creates topology. It must operate as one batch because
-// multiple artifact families can share one protected Root.
+// any installer creates topology. It operates as one batch because multiple
+// artifact families can share one protected Root.
+//
+// A changed installer hydration fingerprint alone does not prove that the
+// physical topology changed. Package hydration and topology reconciliation can
+// safely update a stable Root/Source endpoint in place. A destructive reset is
+// reserved for an explicit Root or Source identity move.
 func (c *Service) PrepareTopologyHydrations(
 	ctx context.Context,
 	desiredValues []installModel.Hydration,
@@ -60,10 +65,18 @@ func (c *Service) PrepareTopologyHydrations(
 		}
 
 		currentByInstaller[desired.InstallerName] = false
-		resetInstallerByRoot[desired.RootID] = desired.InstallerName
-		if found {
-			resetInstallerByRoot[previous.RootID] = desired.InstallerName
+
+		// Hydration fingerprints can change when installer-owned evidence or
+		// topology metadata changes. Reconcile the same Root/Source endpoint
+		// in place so unchanged Artifacts retain their identity and local
+		// state. Package hydration will force a source refresh for this
+		// installer before its new marker is committed.
+		if !found || !topologyResetRequired(previous, desired) {
+			continue
 		}
+
+		resetInstallerByRoot[desired.RootID] = desired.InstallerName
+		resetInstallerByRoot[previous.RootID] = desired.InstallerName
 	}
 
 	// A reset invalidates every installer that uses the reset Root, including
@@ -151,6 +164,15 @@ func equalTopologyHydration(
 		left.Fingerprint == right.Fingerprint
 }
 
+// topologyResetRequired identifies a physical protected-topology migration.
+//
+// Changing Root or Source identity changes the source-backed Artifact origin.
+// A fingerprint-only change must instead use in-place reconciliation so
+// existing ArtifactRefs stay valid.
+func topologyResetRequired(left, right installModel.Hydration) bool {
+	return left.RootID != right.RootID || left.SourceID != right.SourceID
+}
+
 // ResetTopologyHydration removes all local state for a binary-owned topology.
 //
 // A reset is authorized only when rootID is the current protected Root or the
@@ -159,7 +181,9 @@ func equalTopologyHydration(
 //
 // The hydration record intentionally survives this method. It is replaced only
 // after the next complete installation succeeds, making interrupted upgrades
-// converge on the next application start.
+// converge on the next application start. Fingerprint-only hydration drift
+// does not call this method because it can be reconciled without deleting
+// stable Artifact identities.
 func (c *Service) ResetTopologyHydration(
 	ctx context.Context,
 	installerName string,

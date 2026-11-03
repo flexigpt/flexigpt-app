@@ -17,6 +17,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+// typedBinding is the stable source-backed Artifact identity used during
+// refresh reconciliation.
+//
+// Definition digest, source-content digest, logical metadata, diagnostics,
+// and Artifact revision are deliberately absent. A declaration content update
+// at the same physical origin must update the existing Artifact rather than
+// allocate another ArtifactID.
 type typedBinding struct {
 	Binding artifactModel.SourceBinding
 	Kind    artifactModel.ArtifactKind

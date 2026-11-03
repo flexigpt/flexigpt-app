@@ -45,6 +45,7 @@ builtin:
           - "agents"
           - "skillPackages"
           - "tools"
+          - "workflows"
 
   embeddedPackages:
     skills: "skills"

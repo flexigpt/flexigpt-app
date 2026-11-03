@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -76,23 +77,106 @@ func (s Session) Validate() error {
 }
 
 func validateDefaults(value SessionDefaults) error {
-	for _, selection := range []*ArtifactSelection{
-		value.Model, value.Agent, value.Workspace,
-	} {
+	validateSelection := func(selection *ArtifactSelection) error {
 		if selection == nil {
-			continue
+			return nil
 		}
 		if err := validateSelection(*selection); err != nil {
 			return err
 		}
+		return nil
 	}
-	for _, instruction := range value.SystemInstructions {
+
+	for _, selection := range []*ArtifactSelection{
+		value.Model,
+		value.Agent,
+		value.Workspace,
+	} {
+		if err := validateSelection(selection); err != nil {
+			return err
+		}
+	}
+
+	if value.History.IncludePreviousUserTurns < 0 {
+		return errors.New("history previous-user-turn count cannot be negative")
+	}
+	if value.Temperature != nil &&
+		(math.IsNaN(*value.Temperature) || math.IsInf(*value.Temperature, 0)) {
+		return errors.New("session temperature must be finite")
+	}
+
+	instructions := make(map[string]struct{}, len(value.SystemInstructions))
+	for index, instruction := range value.SystemInstructions {
+		if strings.TrimSpace(instruction.Content) == "" {
+			return fmt.Errorf("system instruction %d has no content", index)
+		}
+		if instruction.ID == "" {
+			continue
+		}
 		if err := validateID("instruction ID", instruction.ID); err != nil {
 			return err
 		}
-		if instruction.Content == "" {
-			return errors.New("instruction content is required")
+		if _, duplicate := instructions[instruction.ID]; duplicate {
+			return fmt.Errorf("duplicate system instruction %q", instruction.ID)
 		}
+		instructions[instruction.ID] = struct{}{}
+	}
+
+	validateSelections := func(
+		label string,
+		selections []ArtifactSelection,
+	) error {
+		seen := make(map[string]struct{}, len(selections))
+		for index := range selections {
+			selection := selections[index]
+			if err := validateSelection(&selection); err != nil {
+				return fmt.Errorf("%s %d: %w", label, index, err)
+			}
+			key := selection.RootID + "\x00" + selection.ArtifactID
+			if _, duplicate := seen[key]; duplicate {
+				return fmt.Errorf("duplicate %s selection %q", label, key)
+			}
+			seen[key] = struct{}{}
+		}
+		return nil
+	}
+
+	if err := validateSelections("Tool", value.Tools); err != nil {
+		return err
+	}
+	if err := validateSelections("Skill", value.Skills); err != nil {
+		return err
+	}
+	if err := validateSelections("active Skill", value.ActiveSkills); err != nil {
+		return err
+	}
+
+	for index, selection := range value.MCP {
+		if err := validateSelection(&selection.Server); err != nil {
+			return fmt.Errorf("MCP selection %d: %w", index, err)
+		}
+		switch selection.ToolExposure {
+		case MCPToolExposureNone:
+			if len(selection.SelectedTools) != 0 {
+				return fmt.Errorf(
+					"MCP selection %d disables tools but contains selected tools",
+					index,
+				)
+			}
+		case MCPToolExposureAll:
+			if len(selection.SelectedTools) != 0 {
+				return fmt.Errorf(
+					"MCP selection %d exposes all tools but contains selected tools",
+					index,
+				)
+			}
+		default:
+			return fmt.Errorf(
+				"unsupported MCP tool exposure %q",
+				selection.ToolExposure,
+			)
+		}
+
 	}
 	return nil
 }
@@ -103,6 +187,12 @@ func validateSelection(value ArtifactSelection) error {
 	}
 	if err := validateID("Artifact ID", value.ArtifactID); err != nil {
 		return err
+	}
+	if value.ExpectedDigest != "" &&
+		(strings.TrimSpace(value.ExpectedDigest) != value.ExpectedDigest ||
+			!utf8.ValidString(value.ExpectedDigest) ||
+			strings.ContainsRune(value.ExpectedDigest, 0)) {
+		return errors.New("artifact expected digest is invalid")
 	}
 	return nil
 }

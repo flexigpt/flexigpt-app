@@ -46,7 +46,7 @@ func (b *Binder) executeGoTool(
 					ConfirmedAt: time.Now().UTC(),
 				},
 			},
-			Error: &sessionv3.SanitizedError{Code: "go_tool_failed", Message: err.Error()},
+			Confirmed: true,
 		}, nil
 	}
 	text, structured := toolOutputsToV3(outputs)

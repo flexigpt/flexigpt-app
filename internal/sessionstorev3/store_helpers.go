@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
@@ -25,6 +27,10 @@ func (s *Store) lock() error {
 }
 
 func (s *Store) readDocument(id sessionv3.SessionID, _ bool) (sessionDocument, bool, error) {
+	if err := validateStoreSessionID(id); err != nil {
+		return sessionDocument{}, false, err
+	}
+
 	filename, err := stableSessionFilename(id, documentExtension)
 	if err != nil {
 		return sessionDocument{}, false, err
@@ -40,6 +46,12 @@ func (s *Store) readDocument(id sessionv3.SessionID, _ bool) (sessionDocument, b
 	doc, err := decodeStoreDocument(data)
 	if err != nil {
 		return sessionDocument{}, false, err
+	}
+	if doc.SessionID != id {
+		return sessionDocument{}, false, fmt.Errorf(
+			"%w: document identity differs from requested Session ID",
+			ErrInvalidDocument,
+		)
 	}
 	return doc, true, nil
 }
@@ -59,6 +71,13 @@ func (s *Store) writeRawDocument(id sessionv3.SessionID, doc sessionDocument) er
 	if err != nil {
 		return err
 	}
+	if doc.SessionID != id {
+		return fmt.Errorf("%w: document identity differs from filename identity", ErrInvalidDocument)
+	}
+	if err := validateStoreDocument(doc); err != nil {
+		return err
+	}
+
 	raw, err := json.Marshal(doc)
 	if err != nil {
 		return err
@@ -120,6 +139,10 @@ func (s *Store) readIndex(id sessionv3.SessionID) (sessionIndexRecord, bool, err
 	if err != nil {
 		return sessionIndexRecord{}, false, err
 	}
+	if err := validateStoreSessionID(id); err != nil {
+		return sessionIndexRecord{}, false, err
+	}
+
 	found, err := hasExactStoreFile(s.index, filename, string(id))
 	if err != nil || !found {
 		return sessionIndexRecord{}, false, err
@@ -141,6 +164,19 @@ func (s *Store) readIndexFile(filename string) (sessionIndexRecord, error) {
 	if err := json.Unmarshal(raw, &record); err != nil {
 		return sessionIndexRecord{}, err
 	}
+	if record.SchemaVersion != sessionv3.SchemaVersion {
+		return sessionIndexRecord{}, fmt.Errorf("%w: unsupported index schema", ErrInvalidDocument)
+	}
+	if err := validateStoreSessionID(record.Item.ID); err != nil {
+		return sessionIndexRecord{}, err
+	}
+	expected, err := stableSessionFilename(record.Item.ID, indexExtension)
+	if err != nil {
+		return sessionIndexRecord{}, err
+	}
+	if expected != filename {
+		return sessionIndexRecord{}, fmt.Errorf("%w: index identity mismatch", ErrInvalidDocument)
+	}
 	return record, nil
 }
 
@@ -159,23 +195,27 @@ func (s *Store) allDocuments() ([]sessionDocument, error) {
 		if err != nil {
 			return nil, err
 		}
+		expected, err := stableSessionFilename(doc.SessionID, documentExtension)
+		if err != nil {
+			return nil, err
+		}
+		if expected != filename {
+			return nil, fmt.Errorf(
+				"%w: document filename identity mismatch",
+				ErrInvalidDocument,
+			)
+		}
 		out = append(out, doc)
 	}
 	return out, nil
 }
 
 func cloneSession(v sessionv3.Session) sessionv3.Session {
-	raw, _ := json.Marshal(v)
-	var out sessionv3.Session
-	_ = json.Unmarshal(raw, &out)
-	return out
+	return jsonutil.CloneJSONInValue(v)
 }
 
 func cloneExecution(v sessionv3.Execution) sessionv3.Execution {
-	raw, _ := json.Marshal(v)
-	var out sessionv3.Execution
-	_ = json.Unmarshal(raw, &out)
-	return out
+	return jsonutil.CloneJSONInValue(v)
 }
 
 func cloneOutcome(v *sessionv3.ExecutionOutcome) *sessionv3.ExecutionOutcome {
@@ -201,6 +241,9 @@ func filepathBase(p string) string {
 }
 
 func stableSessionFilename(id sessionv3.SessionID, ext string) (string, error) {
+	if err := validateStoreSessionID(id); err != nil {
+		return "", err
+	}
 	info, err := uuidv7filename.Build(string(id), "Session", strings.TrimPrefix(ext, "."))
 	if err != nil {
 		return "", err
@@ -224,6 +267,8 @@ func hasExactStoreFile(store *mapstore.MapDirectoryStore, filename, prefix strin
 func listAllStoreFiles(store *mapstore.MapDirectoryStore, ext string) ([]string, error) {
 	out := []string{}
 	token := ""
+	seenTokens := map[string]struct{}{}
+	seenFiles := map[string]struct{}{}
 	for {
 		entries, next, err := store.ListFiles(
 			mapstore.ListingConfig{SortOrder: mapstore.SortOrderDescending, PageSize: maxPageSize},
@@ -235,12 +280,20 @@ func listAllStoreFiles(store *mapstore.MapDirectoryStore, ext string) ([]string,
 		for _, e := range entries {
 			filename := filepath.Base(e.BaseRelativePath)
 			if strings.HasSuffix(filename, ext) {
+				if _, duplicate := seenFiles[filename]; duplicate {
+					continue
+				}
+				seenFiles[filename] = struct{}{}
 				out = append(out, filename)
 			}
 		}
 		if next == "" {
 			return out, nil
 		}
+		if _, duplicate := seenTokens[next]; duplicate {
+			return nil, fmt.Errorf("%w: repeated listing cursor", ErrInvalidDocument)
+		}
+		seenTokens[next] = struct{}{}
 		token = next
 	}
 }
@@ -250,9 +303,55 @@ func decodeStoreDocument(data map[string]any) (sessionDocument, error) {
 	if err != nil {
 		return sessionDocument{}, err
 	}
+	return decodeStoreDocumentJSON(raw)
+}
+
+func decodeStoreDocumentJSON(raw []byte) (sessionDocument, error) {
+	if len(raw) > maximumDocumentBytes {
+		return sessionDocument{}, fmt.Errorf("%w: document exceeds size limit", ErrInvalidDocument)
+	}
 	var doc sessionDocument
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return sessionDocument{}, err
 	}
+	if err := validateStoreDocument(doc); err != nil {
+		return sessionDocument{}, err
+	}
 	return doc, nil
+}
+
+func validateStoreSessionID(id sessionv3.SessionID) error {
+	if err := uuidutil.ValidateUUIDv7(string(id)); err != nil {
+		return fmt.Errorf("%w: invalid Session ID: %w", ErrInvalidDocument, err)
+	}
+	return nil
+}
+
+func validateStoreDocument(doc sessionDocument) error {
+	if doc.SchemaVersion != sessionv3.SchemaVersion {
+		return fmt.Errorf("%w: unsupported schema version %q", ErrInvalidDocument, doc.SchemaVersion)
+	}
+	if err := validateStoreSessionID(doc.SessionID); err != nil {
+		return err
+	}
+
+	switch doc.Kind {
+	case sessionDocumentKindSession:
+		if doc.Session == nil || doc.DeletedAt != nil {
+			return fmt.Errorf("%w: malformed live Session document", ErrInvalidDocument)
+		}
+		if doc.Session.ID != doc.SessionID {
+			return fmt.Errorf("%w: Session document identity mismatch", ErrInvalidDocument)
+		}
+		if err := doc.Session.Validate(); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalidDocument, err)
+		}
+	case sessionDocumentKindDeleted:
+		if doc.Session != nil || doc.DeletedAt == nil || doc.DeletedAt.IsZero() {
+			return fmt.Errorf("%w: malformed Session tombstone", ErrInvalidDocument)
+		}
+	default:
+		return fmt.Errorf("%w: unsupported document kind %q", ErrInvalidDocument, doc.Kind)
+	}
+	return nil
 }

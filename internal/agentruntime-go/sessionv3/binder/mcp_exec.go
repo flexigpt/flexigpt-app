@@ -13,7 +13,10 @@ import (
 )
 
 type privateTool struct {
-	Kind sessionv3.ToolBindingKind
+	Kind             sessionv3.ToolBindingKind
+	Call             sessionv3.ToolCall
+	MCPApprovalID    string
+	MCPApprovalToken string
 }
 
 type privateToolWait struct {
@@ -21,6 +24,7 @@ type privateToolWait struct {
 	Summary    mcpServer.MCPApprovalSummary
 	Mapping    invocation.MappedToolBinding
 	Request    mcpServer.InvokeMCPToolRequestBody
+	Call       sessionv3.ToolCall
 }
 
 func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
@@ -28,16 +32,20 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 	if payload == nil {
 		return sessionv3.BindResult{}, errors.New("tool payload is missing")
 	}
-	if err := payload.Call.Validate(); err != nil {
+	call := payload.Call
+	if err := call.Validate(); err != nil {
 		return sessionv3.BindResult{}, err
 	}
+
 	semantic := sessionv3.SemanticBinding{
 		Version:           "v3-tool/v1",
-		TargetFingerprint: payload.Call.Name + ":" + payload.Call.ID,
+		TargetFingerprint: call.Name + ":" + call.ID,
 		BoundAt:           boundNow(),
 	}
-	if payload.Call.Binding.Kind == sessionv3.ToolBindingKindMCP {
-		mapping, invokeReq, err := b.mappedMCPRequest(payload)
+	if call.Binding.Kind == sessionv3.ToolBindingKindMCP {
+		effective := *payload
+		effective.Call = call
+		mapping, invokeReq, err := b.mappedMCPRequest(&effective)
 		if err != nil {
 			return sessionv3.BindResult{}, err
 		}
@@ -66,11 +74,33 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 					Summary:    *evaluation.Summary,
 					Mapping:    mapping,
 					Request:    invokeReq,
+					Call:       call,
+				},
+			}, nil
+		}
+		if evaluation != nil &&
+			evaluation.Decision == mcpServer.MCPApprovalDecisionDenied {
+			return sessionv3.BindResult{
+				SemanticBinding: semantic,
+				ImmediateOutput: &sessionv3.WorkItemOutput{
+					Tool: &sessionv3.ToolOutput{
+						Kind: sessionv3.ToolOutputKindError,
+						Text: firstText(
+							evaluation.Reason,
+							"MCP policy denied the Tool call.",
+						),
+					},
 				},
 			}, nil
 		}
 	}
-	return sessionv3.BindResult{SemanticBinding: semantic, Private: privateTool{Kind: payload.Call.Binding.Kind}}, nil
+	return sessionv3.BindResult{
+		SemanticBinding: semantic,
+		Private: privateTool{
+			Kind: call.Binding.Kind,
+			Call: call,
+		},
+	}, nil
 }
 
 func (b *Binder) executeTool(
@@ -80,13 +110,19 @@ func (b *Binder) executeTool(
 	private privateTool,
 ) (sessionv3.WorkExecutionResult, error) {
 	payload := req.WorkItem.Input.Tool
+	if payload == nil {
+		return sessionv3.WorkExecutionResult{}, errors.New("tool payload is missing")
+	}
+	effective := *payload
+	effective.Call = private.Call
+
 	switch private.Kind {
 	case sessionv3.ToolBindingKindGo:
-		return b.executeGoTool(ctx, payload)
+		return b.executeGoTool(ctx, &effective)
 	case sessionv3.ToolBindingKindMCP:
-		return b.executeMCPTool(ctx, payload)
+		return b.executeMCPTool(ctx, &effective, private)
 	case sessionv3.ToolBindingKindSkill:
-		return b.executeSkillTool(ctx, req, payload)
+		return b.executeSkillTool(ctx, req, &effective)
 	case sessionv3.ToolBindingKindProvider:
 		return sessionv3.WorkExecutionResult{
 			Output: &sessionv3.WorkItemOutput{
@@ -147,6 +183,7 @@ func (b *Binder) mappedMCPRequest(
 func (b *Binder) executeMCPTool(
 	ctx context.Context,
 	payload *sessionv3.ToolWork,
+	private privateTool,
 ) (sessionv3.WorkExecutionResult, error) {
 	mapping, invokeReq, err := b.mappedMCPRequest(payload)
 	if err != nil {
@@ -155,6 +192,8 @@ func (b *Binder) executeMCPTool(
 			Error: &sessionv3.SanitizedError{Code: "invalid_mcp_binding", Message: err.Error()},
 		}, nil
 	}
+	invokeReq.ApprovalID = private.MCPApprovalID
+	invokeReq.ApprovalToken = private.MCPApprovalToken
 	resp, err := b.deps.MCPBridge.InvokeMapped(ctx, mapping, invokeReq)
 	if err != nil {
 		//nolint:nilerr // Explicit return.
@@ -163,10 +202,14 @@ func (b *Binder) executeMCPTool(
 		}, nil
 	}
 	text := string(mustMarshal(resp.Content))
+	kind := sessionv3.ToolOutputKindSuccess
+	if resp.IsError {
+		kind = sessionv3.ToolOutputKindError
+	}
 	return sessionv3.WorkExecutionResult{
 		Output: &sessionv3.WorkItemOutput{
 			Tool: &sessionv3.ToolOutput{
-				Kind:       sessionv3.ToolOutputKindSuccess,
+				Kind:       kind,
 				Text:       text,
 				Structured: sessionv3.MustCanonicalValue(resp),
 			},
@@ -194,6 +237,7 @@ func (b *Binder) resolveToolWait(
 			Output: &sessionv3.WorkItemOutput{
 				Tool: &sessionv3.ToolOutput{Kind: sessionv3.ToolOutputKindError, Text: "MCP tool call was denied"},
 			},
+			Confirmed: true,
 		}, nil
 	}
 	return sessionv3.WaitResolutionResult{
@@ -204,7 +248,12 @@ func (b *Binder) resolveToolWait(
 				TargetFingerprint: private.Mapping.ToolName,
 				BoundAt:           boundNow(),
 			},
-			Private: privateTool{Kind: sessionv3.ToolBindingKindMCP},
+			Private: privateTool{
+				Kind:             sessionv3.ToolBindingKindMCP,
+				Call:             private.Call,
+				MCPApprovalID:    result.ApprovalID,
+				MCPApprovalToken: result.Token,
+			},
 		},
 	}, nil
 }

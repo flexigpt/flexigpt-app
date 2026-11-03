@@ -33,7 +33,7 @@ const (
 	maxPageSize            = 256
 	maximumDocumentBytes   = 64 << 20
 	sessionFTSDatabaseFile = "sessions-v3.fts.sqlite"
-	sessionFTSTable        = "sessions-v3"
+	sessionFTSTable        = "sessions_v3"
 )
 
 var (
@@ -190,10 +190,15 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3.CheckpointVie
 	if found && current.Kind == sessionDocumentKindDeleted {
 		return nil
 	}
+
 	incoming := cloneSession(view.Session)
-	if found && current.Session != nil && current.Session.Revision > incoming.Revision {
+	if found && current.Session != nil &&
+		(current.Session.Revision > incoming.Revision ||
+			(current.Session.Revision == incoming.Revision &&
+				!current.Session.UpdatedAt.Before(incoming.UpdatedAt))) {
 		incoming = cloneSession(*current.Session)
 	}
+
 	if err := s.writeDocument(incoming); err != nil {
 		return err
 	}
@@ -205,6 +210,9 @@ func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3.SessionID) 
 		return err
 	}
 	defer s.mu.Unlock()
+	if err := validateStoreSessionID(id); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 	doc := sessionDocument{
 		SchemaVersion: sessionv3.SchemaVersion,
@@ -395,7 +403,11 @@ func (s *Store) ListSessions(request ListSessionsRequest) (SessionPage, error) {
 	}
 	items := []SessionListItem{}
 	for _, entry := range entries {
-		record, err := s.readIndexFile(filepathBase(entry.BaseRelativePath))
+		filename := filepathBase(entry.BaseRelativePath)
+		if !strings.HasSuffix(filename, indexExtension) {
+			continue
+		}
+		record, err := s.readIndexFile(filename)
 		if err != nil {
 			return SessionPage{}, err
 		}
@@ -452,18 +464,49 @@ func (s *Store) RebuildDerived(ctx context.Context) error {
 		return err
 	}
 	defer s.mu.Unlock()
+
+	return s.rebuildDerivedLocked(ctx)
+}
+
+func (s *Store) rebuildDerivedLocked(ctx context.Context) error {
 	documents, err := s.allDocuments()
 	if err != nil {
 		return err
 	}
+
+	live := make(map[sessionv3.SessionID]struct{}, len(documents))
 	for _, doc := range documents {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		if doc.Kind == sessionDocumentKindSession && doc.Session != nil {
+			live[doc.Session.ID] = struct{}{}
 			if err := s.writeIndex(*doc.Session); err != nil {
 				return err
 			}
+			continue
+		}
+		if doc.Kind == sessionDocumentKindDeleted {
+			if err := s.deleteIndex(doc.SessionID); err != nil {
+				return err
+			}
+		}
+	}
+
+	indexFiles, err := listAllStoreFiles(s.index, indexExtension)
+	if err != nil {
+		return err
+	}
+	for _, filename := range indexFiles {
+		record, err := s.readIndexFile(filename)
+		if err != nil {
+			return err
+		}
+		if _, found := live[record.Item.ID]; found {
+			continue
+		}
+		if err := s.index.DeleteFile(mapstore.FileKey{FileName: filename}); err != nil {
+			return err
 		}
 	}
 	return nil

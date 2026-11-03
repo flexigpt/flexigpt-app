@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,12 +17,11 @@ import (
 )
 
 type privateLLM struct {
-	Provider    inferenceSpec.ProviderParam
-	Model       inferenceSpec.ModelParam
-	Inputs      []inferenceSpec.InputUnion
-	Choices     []inferenceSpec.ToolChoice
-	Bindings    map[string]sessionv3.ToolCall
-	Fingerprint string
+	Configuration inferenceRuntimeSpec.RuntimeConfiguration
+	Inputs        []inferenceSpec.InputUnion
+	Choices       []inferenceSpec.ToolChoice
+	Bindings      map[string]sessionv3.ToolCall
+	Fingerprint   string
 }
 
 func artifactRefForSelection(s sessionv3.ArtifactSelection) artifactModel.ArtifactRef {
@@ -42,11 +43,31 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 	if modelSel == nil {
 		return sessionv3.BindResult{}, errors.New("no effective model selection")
 	}
+
 	ref := artifactRefForSelection(*modelSel)
-	resolved, err := b.deps.Models.ResolveRuntimeModel(ctx, ref)
+	if err := ref.Validate(); err != nil {
+		return sessionv3.BindResult{}, err
+	}
+	resolved, modelUse, err := b.deps.Models.ResolveRuntimeModelWithRequestPatch(
+		ctx,
+		ref,
+		nil,
+	)
 	if err != nil {
 		return sessionv3.BindResult{}, err
 	}
+	if modelUse == nil {
+		return sessionv3.BindResult{}, errors.New("runtime model resolution returned no Artifact use")
+	}
+	if modelSel.ExpectedRevision != 0 &&
+		modelSel.ExpectedRevision != modelUse.Revision {
+		return sessionv3.BindResult{}, errors.New("selected Model revision changed")
+	}
+	if modelSel.ExpectedDigest != "" &&
+		modelSel.ExpectedDigest != modelUse.Digest {
+		return sessionv3.BindResult{}, errors.New("selected Model definition changed")
+	}
+
 	if prompt := b.systemPromptText(ctx, req); strings.TrimSpace(prompt) != "" {
 		resolved.ModelParam.SystemPrompt = appendPrompt(resolved.ModelParam.SystemPrompt, prompt)
 	}
@@ -58,6 +79,14 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 	if err != nil {
 		return sessionv3.BindResult{}, err
 	}
+
+	configuration := resolved
+	configuration.ProviderParam.DefaultHeaders = maps.Clone(
+		resolved.ProviderParam.DefaultHeaders,
+	)
+	configuration.CapabilityOverrides = slices.Clone(
+		resolved.CapabilityOverrides,
+	)
 	semantic := sessionv3.SemanticBinding{
 		Version:           "v3-llm/v1",
 		TargetFingerprint: resolved.Fingerprint,
@@ -66,12 +95,10 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 	return sessionv3.BindResult{
 		SemanticBinding: semantic,
 		Private: privateLLM{
-			Provider:    resolved.ProviderParam,
-			Model:       resolved.ModelParam,
-			Inputs:      inputs,
-			Choices:     choices,
-			Bindings:    bindings,
-			Fingerprint: resolved.Fingerprint,
+			Configuration: configuration,
+			Inputs:        inputs,
+			Choices:       choices,
+			Bindings:      bindings,
 		},
 	}, nil
 }
@@ -81,16 +108,19 @@ func (b *Binder) executeLLM(
 	req sessionv3.WorkDispatchRequest,
 	private privateLLM,
 ) (sessionv3.WorkExecutionResult, error) {
+	configuration := private.Configuration
+	configuration.ProviderParam.DefaultHeaders = maps.Clone(
+		private.Configuration.ProviderParam.DefaultHeaders,
+	)
+	configuration.CapabilityOverrides = slices.Clone(
+		private.Configuration.CapabilityOverrides,
+	)
 	resp, err := b.deps.Providers.FetchCompletion(
 		ctx,
 		&inferenceRuntimeSpec.CompletionRequest{
-			Configuration: inferenceRuntimeSpec.RuntimeConfiguration{
-				ProviderParam: private.Provider,
-				ModelParam:    private.Model,
-				Fingerprint:   private.Fingerprint,
-			},
-			Inputs:      private.Inputs,
-			ToolChoices: private.Choices,
+			Configuration: configuration,
+			Inputs:        private.Inputs,
+			ToolChoices:   private.Choices,
 		},
 	)
 	if err != nil {
@@ -107,8 +137,9 @@ func (b *Binder) executeLLM(
 	out := resp.Body.InferenceResponse
 	if out.Error != nil {
 		return sessionv3.WorkExecutionResult{
-			Output: &sessionv3.WorkItemOutput{LLM: &sessionv3.LLMOutput{Text: decodedProviderText(out.Outputs)}},
-			Error:  &sessionv3.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
+			Output:    &sessionv3.WorkItemOutput{LLM: &sessionv3.LLMOutput{Text: decodedProviderText(out.Outputs)}},
+			Error:     &sessionv3.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
+			Confirmed: true,
 		}, nil
 	}
 	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
@@ -122,7 +153,7 @@ func (b *Binder) executeLLM(
 				ConfirmedAt: time.Now().UTC(),
 			},
 		},
-		Confirmed: confirmed,
+		Confirmed: confirmed || out != nil,
 	}, nil
 }
 
