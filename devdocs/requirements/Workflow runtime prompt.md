@@ -1,202 +1,319 @@
-You are implementing a breaking Session Runtime v3 migration for FlexiGPT.
+Complete Session Runtime v3 Workflow support in the FlexiGPT repository.
 
-The architecture is non-negotiable:
+This is a backend/runtime task. Do not implement frontend adoption, v2-to-v3 migration tooling, or deletion of v2/legacy paths unless an existing source change requires a compatibility adapter. Preserve existing durable payload compatibility.
+Treat the source as authoritative.
 
-1. A Session is the single durable root for one coherent activity.
-2. Chat, Agent loops, and Workflow execution are orchestration programs inside
-   the same Session. They are not Session kinds and they are not separate
-   persistence roots.
-3. Do not introduce a standalone Workflow repository, filesystem store,
-   Workflow runtime persistence model, Workflow session type, or
-   Run.Kind=chat|workflow discriminator.
-4. Keep the existing Session Store as the only logical persistence owner.
-   Internal Store files, indexes, and FTS may remain implementation details.
-5. FetchCompletion and provider execution remain provider-facing execution
-   APIs. Do not redesign them merely because Workflows are added.
-6. The change is breaking. Use an explicit offline migration. Do not add a
-   permanent legacy dual-read or dual-runtime compatibility layer.
-7. Wails is one backend consumer only. CLI, VS Code, HTTP, and test clients
-   must use the same backend Session commands and projections.
+Primary goal:
 
-The target model is:
+Implement the complete Workflow Runtime v3 backend through a typed,
+runtime-neutral compiled Workflow program. Artifact declaration parsing and
+Artifact pinning must stay outside Session Runtime. Session Runtime must execute
+only a typed compiled IR and must not import Artifact or LLM Artifactory
+packages.
 
-Session
+Non-goals:
 
-- Timeline[] Activity
-- Executions[] Execution
-- Session defaults and metadata
+- No frontend v3 adoption.
+- No offline v2-to-v3 migration implementation.
+- No deletion of v2 Session Runtime, v2 Store, or legacy interpreter support.
+- No new Workflow persistence root, Workflow store, trigger store, or event
+  store outside the existing v3 Session document.
+- No broad compatibility rewrite of existing v2 Session behavior.
 
-Execution
+Read these sources first:
 
-- ProgramFrames[]
-- WorkItems[]
-- Attempts[]
-- Waits[]
-- Controls
-- Outcome
+Dependency and style constraints:
 
-Activity is user-facing durable history.
-WorkItem is resumable execution state.
-An Activity and WorkItem are related but are not the same object.
+- `.golangci.yml`
 
-A message is an Activity with kind=message.
-A Tool summary is an Activity with kind=action.
-A Workflow milestone is an Activity with kind=workflow.
-A wait or approval is an Activity with kind=wait.
-Not every WorkItem transition must become an Activity.
+Session v3 runtime and persistence:
 
-ProgramFrame is the universal orchestration scope.
-A built-in conversation program implements ordinary chat.
-A built-in agent-loop program implements the current LLM -> Tool -> LLM loop.
-A Workflow Artifact compiles to an Artifact-backed program.
-A nested Workflow is a child ProgramFrame.
-An Agent call from a Workflow is a child built-in agent-loop ProgramFrame.
-A Model call from a Workflow is a child single-model ProgramFrame.
+- `internal/agentruntime-go/sessionv3/`
+- `internal/sessionstorev3/`
 
-WorkItem types must be a closed typed union, not unvalidated arbitrary maps.
-At minimum support:
+Workflow Artifact declaration, planning, and validation:
 
-- llm
-- tool
-- service
-- activity
-- transform
-- condition
-- stateUpdate
-- fork
-- join
-- wait
-- emit
-- compensation
+- `internal/llmartifactory-go/workflow/`
+- `internal/llmartifactory-go/workflow/contract/v1/`
+- `internal/artifactsetup/registration/llm_declarations.go`
+- `internal/artifactsetup/topology/contract.go`
+- `internal/artifactsetup/topology/contract_topology.yaml`
 
-Persist semantic execution facts:
+Workflow setup boundary:
 
-- Program snapshot and interpreter version.
-- Artifact identities, revisions, and definition digests.
-- Canonical semantic inputs and outputs.
-- Branch decisions.
-- Loop and scope state.
-- WorkItem dependencies and state.
-- Retry history.
-- Idempotency keys.
-- Absolute deadlines.
-- Wait requests and resolutions.
-- Safe external receipts.
-- Sanitized errors and outcomes.
+- `internal/agentruntimesetup/workflowruntime/`
+- `internal/agentruntimesetup/sessionv3runtime/`
 
-Do not persist runtime bindings:
+Domain runtime adapters:
 
-- API keys.
-- OAuth tokens.
-- MCP approval tokens.
-- Provider headers with secrets.
-- HTTP clients.
-- MCP clients.
-- Go function pointers.
-- cancellation functions.
-- stream callbacks.
-- debug settings.
-- native paths.
-- compiled CEL programs.
-- browser or Wails state.
+- `internal/agentruntimesetup/modelruntime/`
+- `internal/agentruntimesetup/toolruntime/`
+- `internal/agentruntimesetup/mcpruntime/`
+- `internal/agentruntimesetup/skillruntime/`
+- `internal/agentruntimesetup/attachmentruntime/`
 
-Runtime binding occurs only when a ready WorkItem dispatches:
+Bootstrap and transport:
 
-1. Resolve current runtime dependencies.
-2. Verify compatibility with the persisted semantic target.
-3. Build ephemeral executor data.
-4. Dispatch.
-5. Persist the outcome.
+- `cmd/agentgo/app.go`
+- `cmd/agentgo/wrapper_sessionv3_bootstrap.go`
+- `cmd/agentgo/wrapper_sessionv3_runtime.go`
 
-A semantic value that affects resumable behavior must persist.
-A process-local transport or observation value must not persist.
+Behavioral reference only, not a dependency target:
 
-Examples:
+- `internal/agentruntime-go/session/`
+- `internal/agentruntimesetup/sessionruntime/`
 
-- Persist accepted model temperature override.
-- Persist approval decision.
-- Persist selected target.
-- Persist absolute deadline.
-- Do not persist provider HTTP timeout, debug setting, or API key.
+Required architecture:
 
-External-effect safety is mandatory:
+1. Dependency direction
 
-- Persist semantic intent before dispatch.
-- Persist dispatched state before external work.
-- Persist confirmed outcome after external work.
-- Treat crash-after-dispatch-before-outcome as uncertain.
-- Do not automatically repeat uncertain non-idempotent work.
-- Implement recovery review or reconciliation paths.
+   `internal/agentruntime-go/...` must not import:
+   - `internal/artifactory-go/...`
+   - `internal/llmartifactory-go/...`
+   - `internal/agentruntimesetup/...`
+   - `cmd/...`
 
-Keep the current Session persistence essence:
+   `internal/llmartifactory-go/...` must not import Agent Runtime.
 
-- One stored Session document remains the durable root.
-- Session Store checkpoint and restore remain the persistence path.
-- Existing index and FTS stay derived data.
-- Existing Session command idempotency, revision checks, events, checkpointing,
-  cancellation, and recovery behavior should be reused where valid.
+   The only layer allowed to depend on both Artifact-domain contracts and
+   Agent Runtime contracts is `internal/agentruntimesetup/...`.
 
-Breaking migration:
+   Keep this direction valid under the `depguard` rules in `.golangci.yml`.
 
-- Create explicit offline migration tooling.
-- Translate TranscriptMessage to Activity(kind=message).
-- Translate Run to Execution.
-- Translate ModelOperation to WorkItem(type=llm).
-- Translate ToolCall and ToolAttempt to WorkItem(type=tool) and Attempt.
-- Translate WaitingRequest to WorkItem(type=wait).
-- Translate current sequential chat driver state to a built-in conversation or
-  agent-loop ProgramFrame.
-- Convert in-flight external work to uncertain state unless a durable outcome
-  proves completion.
-- Drop private authorization tokens, process handles, and runtime-only data.
-- Rebuild Session indexes and FTS after migration.
-- Do not attempt live in-place migration while the old runtime is active.
+2. Typed compiler boundary
 
-Do not start implementation until you inspect the relevant current source.
+   Workflow source and Artifact concerns stay here:
+   - `internal/llmartifactory-go/workflow/contract/v1`
+   - `internal/llmartifactory-go/workflow`
+   - `internal/agentruntimesetup/workflowruntime`
 
-Required directories to inspect first:
+   Session execution stays here:
+   - `internal/agentruntime-go/sessionv3`
 
-- internal/agentruntime-go/session/
-- internal/agentruntime-go/runtimesetup/
-- internal/agentruntime-go/inference/
-- internal/sessionstore/
-- internal/llmartifactory-go/workflow/
-- internal/llmartifactory-go/core/composition/
-- internal/llmartifactory-go/core/declaration/
-- internal/artifactsetup/
-- cmd/agentgo/
+   `agentruntimesetup/workflowruntime` must compile an admitted
+   `workflowv1.WorkflowDocument` plus resolved Artifact pins into a typed,
+   runtime-neutral `sessionv3.WorkflowProgram` or equivalent typed IR.
 
-Implementation requirements:
+   Do not place `workflowv1.WorkflowDocument`, `workflowv1.Value`,
+   `workflowv1.Target`, Artifact refs, Artifact services, or declaration
+   locators in `internal/agentruntime-go/sessionv3`.
 
-1. Preserve FetchCompletion as the provider single call execution boundary.
-2. Replace hardcoded sequential-chat-only orchestration with a versioned ProgramFrame interpreter model.
-3. Do not encode program kind as Session kind or Run kind.
-4. Create a closed typed WorkItem model. Do not use arbitrary map-shaped execution state as the primary durable model.
-5. Keep opaque JSON only where a versioned program interpreter explicitly owns a bounded canonical payload. Validate it on persistence and restoration. The json also should be only transport with its type existing with the interpreter owning the type and common model usign narrow ports to supprot different such types. these should be minimal types.
-6. Preserve current user-visible conversation behavior through a conversation projection over Timeline Activities.
-7. Add Workflow and activity projections without making Wails authoritative.
-8. Ensure backend commands work without Wails.
-9. Migration will be done as a offline script. you need not give anything related to it. the code dirs related to session persistence will be moved to new version by the user so that nothing breaks.
-10. Test addition is done later via a separate implementor. You jsut need to mention in the next steps as someone needs to add tests for belwo and anything you think more:
-    - normal chat migration and replay;
-    - Agent Tool loop migration and replay;
-    - Workflow admission;
-    - parallel LLM WorkItems;
-    - Tool approval waits;
-    - pause, resume, and cancel;
-    - crash after dispatch;
-    - uncertain external effects;
-    - Session Store restore;
-    - stale Artifact binding;
-    - Wails-independent CLI-style command use;
-    - FTS rebuild after migration.
-11. Do not change dependency versions unless an actual missing dependency is demonstrated by inspected source.
-12. Do not leave a second Workflow persistence mechanism in the repository.
-13. Do not claim a Workflow declaration feature is supported until it has a complete ProgramFrame, WorkItem, binding, persistence, cancellation, and recovery mapping.
+   Do not place Session mutation, ProgramFrame advancement, WorkItem state,
+   retry state, Wait state, or CEL evaluation execution in
+   `agentruntimesetup/workflowruntime`.
 
-Deliver:
+3. Durable versioning
 
-- Updated HLD if any changes needed.
-- Full and proper implementation patch following the instructions attached.
-- Exact removed files with proper rm commands.
-- A concise final status that separates authored, applied, and verified work.
+   Workflow declaration language version and runtime interpreter version are
+   different things.
+   - `apiVersion: v1` remains the Workflow declaration language.
+   - Existing durable snapshots using `artifact.workflow.v1@1` must remain
+     readable while migration is not authorized.
+   - Do not change the meaning or payload shape of an existing interpreter
+     version in place.
+   - Introduce a new typed interpreter payload version, for example
+     `artifact.workflow.v1@2`, for the new compiler output.
+   - Keep legacy interpreter support as a compatibility path only.
+   - New Workflow admission must emit only the current typed interpreter
+     version after it is implemented.
+
+4. Typed values and schemas
+
+   Use proper typed runtime structures.
+   - Use typed `WorkflowProgram`, `WorkflowBlock`, `WorkflowStep`,
+     `WorkflowTarget`, `WorkflowValue`, `WorkflowState`, and typed WorkItem
+     payloads.
+   - `sessionv3.CanonicalValue` is allowed only at generic JSON boundaries:
+     user values, JSON Schema documents, expression literal values, generic
+     Tool payloads, generic external outputs, and persisted arbitrary values.
+   - Do not add `json.RawMessage` fields to new runtime models.
+   - Do not persist `map[string]any` as a semantic runtime model.
+   - Decode CanonicalValue to a concrete type at each typed boundary.
+   - Use `jsonutil` in one conversion helper per boundary. Do not scatter
+     direct JSON marshal/unmarshal calls through interpreter logic.
+   - Schema compilation belongs in runtime only after Artifact setup has
+     expanded declaration-local `$defs` into a runtime-neutral schema value.
+   - Do not persist compiled CEL programs, compiled JSON Schemas, clients,
+     callbacks, function pointers, cancellation functions, authorization
+     tokens, or native paths.
+
+5. Validation discipline
+
+   Do not add redundant validation layers.
+
+   Validation ownership is:
+   - Workflow contract package:
+     source syntax, declaration shape, static expression scope, static target
+     relationships, portable schema validity.
+   - Workflow compiler in setup:
+     conversion from declaration to typed IR, supported-operation check,
+     durable Artifact pins, Service/Activity binding availability, typed IR
+     integrity.
+   - Session v3 core:
+     ProgramSnapshot and ProgramState integrity, state/input/output boundary
+     schemas, command revision checks, WorkItem lifecycle invariants.
+   - Domain executors:
+     current executable pin, current MCP discovery identity, credentials,
+     policy, approval, and external invocation behavior.
+
+   Do not re-run full declaration validation before every WorkItem.
+   Do not add blanket string trimming, duplicate identity checks, arbitrary
+   caps, or generic validation helpers unless they protect a real boundary or
+   a durable invariant.
+
+   Unsupported Workflow operations must fail at Workflow admission with a
+   typed, explicit unsupported-operation error. Never accept an operation and
+   silently ignore it, convert it to a no-op, or fail only after external work
+   begins.
+
+6. Runtime binding and privacy
+
+   Follow this durable ordering:
+   1. Persist typed WorkItem intent.
+   2. Resolve current runtime dependencies.
+   3. Verify semantic Artifact or runtime pins.
+   4. Persist durable semantic binding facts.
+   5. Persist dispatched Attempt state.
+   6. Dispatch external work.
+   7. Persist confirmed output, failure, receipt, or uncertainty.
+
+   In-memory private state belongs only in BoundWork/private runtime maps:
+   - OAuth and MCP approval tokens.
+   - MCP approval IDs.
+   - clients and transports.
+   - Skill Runtime session IDs.
+   - function pointers.
+   - compiled CEL and schema objects.
+   - cancellation functions.
+
+   It must never enter ProgramSnapshot, ProgramState, WorkItem, Attempt,
+   Wait, SessionStore v3, events, or Wails projections.
+
+7. Domain executors
+
+   Keep runtime behavior in its domain runtime package.
+   - Model runtime owns provider configuration and credential resolution.
+   - Tool runtime owns Go Tool target binding and Tool output conversion.
+   - MCP runtime owns MCP Tool discovery, policy, approval, invocation,
+     resources, prompts, and Apps.
+   - Skill runtime owns Skill resolution, allow-lists, Skill sessions, and
+     Skill Tool invocation.
+   - Workflow runtime setup owns Artifact Workflow admission and typed IR
+     compilation.
+   - Session v3 owns only orchestration and durable state transitions.
+
+   Do not create interface-on-interface wrappers around concrete domain
+   runtimes. Existing `ProgramInterpreter`, `WorkBinder`, and external
+   Service/Activity binding interfaces are sufficient boundaries.
+
+8. Workflow target behavior
+
+   Complete target support in this order:
+   - Tool Artifact target:
+     compile an immutable Tool Artifact pin; bind it through Tool Runtime at
+     dispatch; verify current identity and definition digest.
+   - MCP Tool target:
+     compile an immutable MCP server Artifact pin plus declared operation
+     name; discover and bind the current provider Tool at dispatch; preserve
+     policy, digest, approval, and uncertainty behavior.
+   - Service and Activity:
+     use the existing BindingRegistry; bind stable binding ID and version at
+     admission; execute private binding state through workflowruntime.Binder.
+   - Nested Workflow:
+     admit a pinned child ProgramSnapshot; preserve cycle detection;
+     propagate typed input and child outcome.
+   - Model and Agent:
+     do not silently serialize arbitrary JSON into a chat message. Implement
+     them only after the typed Model and Agent execution-plan compiler exists.
+   - Dynamic target sets:
+     support only when the runtime has a typed resolver WorkItem and a
+     persisted selected target identity. Do not use strings alone as a
+     durable dynamic target binding.
+
+9. Workflow implementation order
+
+   Implement in dependency order.
+
+   A. Stabilize the typed compiler boundary.
+   - Preserve legacy interpreter compatibility.
+   - Add current typed interpreter version.
+   - Compile only the operations actually implemented.
+   - Verify no Artifact import enters Session Runtime.
+
+   B. Complete the sequential typed core.
+   - `when`
+   - `transform`
+   - `set`
+   - `call`
+   - `return`
+   - `fail`
+   - root input/output/state schema boundaries
+   - nested Workflow child settlement
+   - Tool, MCP Tool, Service, Activity target binding
+
+   C. Complete core WorkItem lifecycle before fan-out.
+   - deadline handling
+   - retry scheduling
+   - cancellation settlement
+   - panic recovery
+   - uncertain external effects
+   - recovery review waits
+   - typed output and receipt propagation
+
+   D. Add Agent, Model, Workspace, Skill, and MCP preparation plans.
+   - Agent contribution plan.
+   - Workspace contribution plan.
+   - Model request patch plan.
+   - instruction and text contribution plan.
+   - Tool/Skill/MCP merged plan.
+   - immutable source pins and operation fingerprint.
+   - no Session coordinator logic that reimplements domain resolution.
+
+   E. Add structured Workflow control flow.
+   - `scope`
+   - `choose`
+   - `repeat`
+   - `parallel`
+   - `foreach`
+   - `fork`
+   - `join`
+   - `break`
+   - `continue`
+   - child block output and scoped state semantics
+
+   F. Add durable coordination.
+   - human waits
+   - completion waits
+   - timers
+   - event subscriptions
+   - channel logs and cursors
+   - `emit`
+   - execution signals
+   - state machines
+   - trigger scheduling and overlap policy
+
+   G. Add effects and reliability.
+   - effect kinds
+   - stable idempotency keys
+   - reconciliation
+   - saga compensation
+   - resource claims
+   - budgets and limits
+   - cleanup allowance
+
+10. Runtime correctness rules
+
+- Do not use `time.Sleep` for durable timer waits.
+- All timers and goroutines must be cancelable by Runtime.Close.
+- Use the existing runtime lifecycle context and background panic boundary.
+- Do not create an unbounded global cache of compiled CEL or schemas.
+- If caching is necessary, scope it to runtime lifecycle or execution
+  lifecycle and explicitly evict it.
+- Preserve original external-effect uncertainty after restart.
+- Never replay a non-idempotent dispatched WorkItem automatically.
+- A WorkItem effect contract controls retry and recovery safety.
+- A Provider, MCP, Tool, Skill, or Service failure must not fabricate a
+  successful output.
+- A selected Tool result must be represented once and consumed once.
+- App and approval private references must be invalid after recovery unless
+  the runtime can reconstruct them safely.

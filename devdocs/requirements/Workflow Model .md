@@ -1463,3 +1463,75 @@ The result is one process language for pipelines, dynamic Agent work, human deci
 - Full callable binding preparation, data-dependent boundary validation,
   invocation persistence, scheduling, execution, and recovery belong to the
   separate runtime implementation.
+
+## 13. Runtime compiler and interpreter conformance
+
+The Workflow declaration language and the Workflow interpreter payload have
+independent versions.
+
+- `apiVersion: v1` identifies the declaration language.
+- An interpreter version identifies one durable compiled runtime payload.
+- A runtime payload version must never change meaning in place.
+- A new typed payload requires a new interpreter version, even when it is
+  compiled from the same `apiVersion: v1` declaration.
+
+### 13.1 Typed compiler boundary
+
+Workflow source is not a runtime ProgramFrame payload.
+
+```text
+Workflow declaration v1
+        |
+        v
+Artifact admission and pinning
+        |
+        v
+Typed runtime-neutral Workflow program
+        |
+        v
+Session v3 Workflow ProgramFrame interpreter
+```
+
+Artifact admission compiles a validated declaration and resolved target pins
+into a typed runtime-neutral program.
+
+The compiled program contains:
+
+- Typed blocks, steps, targets, state specifications, and value templates.
+- Artifact pins where a target is Artifact-backed.
+- Stable Service and Activity binding IDs and versions.
+- Generic canonical values only at JSON value and JSON Schema boundaries.
+
+The Session Runtime does not receive Workflow declaration package types,
+Artifact services, Artifact references, locators, or source documents.
+
+### 13.2 Runtime value representation
+
+Runtime code uses typed value templates:
+
+- Literal canonical values.
+- CEL expression source.
+- Typed object fields.
+- Typed array items.
+
+`CanonicalValue` is allowed only for generic JSON data boundaries. Runtime
+state must not use untyped `json.RawMessage` fields or persisted
+`map[string]any` semantic models.
+
+### 13.3 Admission conformance rule
+
+A declaration can be valid Workflow v1 source before every runtime feature is
+implemented. Workflow admission must compile only operations supported by the
+selected interpreter version.
+
+If an operation is not implemented, admission returns an explicit typed
+unsupported-operation error before it creates external work. Runtime must not
+silently ignore the operation, change its meaning, or defer failure until
+after an external effect starts.
+
+### 13.4 Runtime compatibility rule
+
+Existing durable interpreter payload versions remain readable until a separate
+migration and deletion decision is approved. New Workflow admission emits only
+the current typed interpreter version. Declaration language compatibility does
+not require compiled payload compatibility.
