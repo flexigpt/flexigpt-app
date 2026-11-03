@@ -3,9 +3,9 @@ package modelcatalog
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
@@ -21,10 +21,10 @@ func Compile(
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	return artifactsetup.CompileBuiltInPackageSet(
+	return artifactbuiltin.CompileBuiltInPackageSet(
 		ctx,
 		temporaryDirectory,
-		artifactsetup.CompileConfig{
+		artifactbuiltin.CompileConfig{
 			SetName:         generatedCatalogName,
 			SchemaVersion:   modelDomain.HydrationSchemaVersion,
 			InstallerName:   modelDomain.BuiltInInstallerName,

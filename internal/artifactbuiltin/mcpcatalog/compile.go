@@ -7,7 +7,6 @@ import (
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
@@ -37,7 +36,7 @@ func Compile(
 
 	// MCP package admission needs the standard MCP configuration adapter in
 	// addition to canonical declaration decoding.
-	return artifactsetup.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactsetup.CompileConfig{
+	return artifactbuiltin.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactbuiltin.CompileConfig{
 		SetName:         topology.BuiltinEmbeddedPackageMCPs,
 		SchemaVersion:   mcpDomain.HydrationSchemaVersion,
 		InstallerName:   mcpDomain.BuiltInInstallerName,

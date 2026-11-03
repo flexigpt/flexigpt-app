@@ -1,4 +1,4 @@
-package artifactsetup
+package artifactbuiltin
 
 import (
 	"context"
@@ -32,51 +32,6 @@ type CompileConfig struct {
 	AdditionalSchemaCodecs []schema.Codec
 	AdditionalDecoders     []ingest.Decoder
 	Packages               []installFlow.PackageInput
-}
-
-// schemaKeysForCompiledPackages derives the declaration admission keys from
-// the Artifacts the package compiler has already declared it will emit.
-//
-// This deliberately prevents a schema or canonical-decoder change for an
-// unrelated declaration family from changing another built-in package set's
-// hydration identity.
-func schemaKeysForCompiledPackages(
-	interpretations *coreinterpretation.Registry,
-	packages []installFlow.PackageInput,
-) ([]schemaModel.Key, error) {
-	if interpretations == nil {
-		return nil, fmt.Errorf(
-			"%w: built-in compilation interpretation registry is nil",
-			storeSpec.ErrInvalid,
-		)
-	}
-
-	kinds := make([]artifactModel.ArtifactKind, 0)
-	seen := make(map[artifactModel.ArtifactKind]struct{})
-	for packageIndex, packageValue := range packages {
-		for expectationIndex, expectation := range packageValue.Expectations {
-			if err := expectation.Kind.Validate(); err != nil {
-				return nil, fmt.Errorf(
-					"built-in package %d expectation %d kind: %w",
-					packageIndex,
-					expectationIndex,
-					err,
-				)
-			}
-			if _, found := seen[expectation.Kind]; found {
-				continue
-			}
-			seen[expectation.Kind] = struct{}{}
-			kinds = append(kinds, expectation.Kind)
-		}
-	}
-	if len(kinds) == 0 {
-		return nil, fmt.Errorf(
-			"%w: built-in package set has no expected Artifact kinds",
-			storeSpec.ErrInvalid,
-		)
-	}
-	return interpretations.SchemaKeysForArtifactKinds(kinds)
 }
 
 // CompileBuiltInPackageSet compiles application-owned embedded content through
@@ -180,4 +135,49 @@ func CompileBuiltInPackageSet(
 			Packages:      config.Packages,
 		},
 	)
+}
+
+// schemaKeysForCompiledPackages derives the declaration admission keys from
+// the Artifacts the package compiler has already declared it will emit.
+//
+// This deliberately prevents a schema or canonical-decoder change for an
+// unrelated declaration family from changing another built-in package set's
+// hydration identity.
+func schemaKeysForCompiledPackages(
+	interpretations *coreinterpretation.Registry,
+	packages []installFlow.PackageInput,
+) ([]schemaModel.Key, error) {
+	if interpretations == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in compilation interpretation registry is nil",
+			storeSpec.ErrInvalid,
+		)
+	}
+
+	kinds := make([]artifactModel.ArtifactKind, 0)
+	seen := make(map[artifactModel.ArtifactKind]struct{})
+	for packageIndex, packageValue := range packages {
+		for expectationIndex, expectation := range packageValue.Expectations {
+			if err := expectation.Kind.Validate(); err != nil {
+				return nil, fmt.Errorf(
+					"built-in package %d expectation %d kind: %w",
+					packageIndex,
+					expectationIndex,
+					err,
+				)
+			}
+			if _, found := seen[expectation.Kind]; found {
+				continue
+			}
+			seen[expectation.Kind] = struct{}{}
+			kinds = append(kinds, expectation.Kind)
+		}
+	}
+	if len(kinds) == 0 {
+		return nil, fmt.Errorf(
+			"%w: built-in package set has no expected Artifact kinds",
+			storeSpec.ErrInvalid,
+		)
+	}
+	return interpretations.SchemaKeysForArtifactKinds(kinds)
 }

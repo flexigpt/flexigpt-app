@@ -6,7 +6,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/domain"
@@ -38,7 +37,7 @@ func Compile(
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	return artifactsetup.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactsetup.CompileConfig{
+	return artifactbuiltin.CompileBuiltInPackageSet(ctx, temporaryDirectory, artifactbuiltin.CompileConfig{
 		SetName:         topology.BuiltinEmbeddedPackageAgents,
 		SchemaVersion:   agentDomain.HydrationSchemaVersion,
 		InstallerName:   agentDomain.BuiltInInstallerName,
