@@ -68,7 +68,7 @@ func InitComposedSessionRuntime(
 			Workspaces:        workspaces.api,
 			Texts:             texts.service,
 			Tools:             tools.api,
-			ToolRuntime:       tools.runtime,
+			ToolCaller:        tools.runtime,
 			SkillResolver:     skillResolver,
 			SkillRuntime:      skillRuntimeWrapper.service,
 			MCPRuntime:        mcpWrapper.runtime,

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -14,7 +13,7 @@ import (
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
-	goTools, err := toolruntime.NewAdapter()
+	goTools, err := NewAdapter()
 	if err != nil {
 		t.Fatal(err)
 	}

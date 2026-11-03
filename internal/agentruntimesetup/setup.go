@@ -13,7 +13,6 @@ import (
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
@@ -63,7 +62,7 @@ type Dependencies struct {
 	Texts      *textAPI.Service
 	Tools      *toolAPI.Service
 
-	ToolRuntime *toolruntime.Adapter
+	ToolCaller GoToolCaller
 
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
@@ -85,7 +84,7 @@ func New(
 
 	goExecutor, err := newGoToolExecutor(
 		dependencies.Tools,
-		dependencies.ToolRuntime,
+		dependencies.ToolCaller,
 	)
 	if err != nil {
 		return nil, err
@@ -168,8 +167,8 @@ func (d Dependencies) validate() error {
 		return errors.New("runtime setup requires a Text service")
 	case d.Tools == nil:
 		return errors.New("runtime setup requires a Tool service")
-	case d.ToolRuntime == nil:
-		return errors.New("runtime setup requires a Go Tool runtime")
+	case d.ToolCaller == nil:
+		return errors.New("runtime setup requires a Go Tool caller")
 	case d.SkillResolver == nil:
 		return errors.New(
 			"runtime setup requires an Artifact Skill resolver",

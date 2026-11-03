@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionv3runtime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
@@ -31,7 +31,7 @@ type SessionV3Params struct {
 	Workspaces    *workspaceAPI.Service
 	Texts         *textAPI.Service
 	Tools         *toolAPI.Service
-	ToolRuntime   *toolruntime.Adapter
+	ToolCaller    agentruntimesetup.GoToolCaller
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
@@ -102,7 +102,7 @@ func InitComposedSessionV3Runtime(
 			Workspaces:    params.Workspaces,
 			Texts:         params.Texts,
 			Tools:         params.Tools,
-			ToolRuntime:   params.ToolRuntime,
+			ToolCaller:    params.ToolCaller,
 			SkillResolver: params.SkillResolver,
 			SkillRuntime:  params.SkillRuntime,
 			MCPRuntime:    params.MCPRuntime,

@@ -11,9 +11,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
@@ -27,7 +27,7 @@ type Dependencies struct {
 	Workspaces    *workspaceAPI.Service
 	Texts         *textAPI.Service
 	Tools         *toolAPI.Service
-	ToolRuntime   *toolruntime.Adapter
+	ToolCaller    agentruntimesetup.GoToolCaller
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
@@ -44,7 +44,7 @@ func New(deps Dependencies) (*Binder, error) {
 	if deps.Providers == nil || deps.Models == nil {
 		return nil, errors.New("sessionv3 binder requires providers and models")
 	}
-	if deps.Tools == nil || deps.ToolRuntime == nil {
+	if deps.Tools == nil || deps.ToolCaller == nil {
 		return nil, errors.New("sessionv3 binder requires tool service and runtime")
 	}
 	if deps.SkillResolver == nil || deps.SkillRuntime == nil {

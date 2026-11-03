@@ -10,18 +10,27 @@ import (
 	"time"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
+type GoToolCaller interface {
+	CallGoTool(
+		ctx context.Context,
+		function string,
+		args json.RawMessage,
+		timeout time.Duration,
+	) ([]llmtoolsSpec.ToolOutputUnion, error)
+}
+
 type goToolExecutor struct {
-	tools   *toolAPI.Service
-	runtime *toolruntime.Adapter
+	tools  *toolAPI.Service
+	caller GoToolCaller
 }
 
 // goToolBinding is durable semantic execution evidence for one Go Tool call.
@@ -37,17 +46,17 @@ type goToolBinding struct {
 
 func newGoToolExecutor(
 	tools *toolAPI.Service,
-	runtime *toolruntime.Adapter,
+	caller GoToolCaller,
 ) (*goToolExecutor, error) {
-	if tools == nil || runtime == nil {
+	if tools == nil || caller == nil {
 		return nil, errors.New(
 			"go Tool executor dependencies are incomplete",
 		)
 	}
 
 	return &goToolExecutor{
-		tools:   tools,
-		runtime: runtime,
+		tools:  tools,
+		caller: caller,
 	}, nil
 }
 
@@ -104,7 +113,7 @@ func (e *goToolExecutor) ExecuteTool(
 		)
 	}
 
-	outputs, invokeErr := e.runtime.CallGoTool(
+	outputs, invokeErr := e.caller.CallGoTool(
 		ctx,
 		resolved.Tool.Implementation.Function,
 		args,

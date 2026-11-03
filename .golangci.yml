@@ -425,6 +425,29 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
             - "github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 
+        isolate_artifactbuiltin:
+          files:
+            - "**/internal/artifactbuiltin/**/*.go"
+          allow:
+            - "$gostd"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
+            - "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
+            - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+            - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
+            - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
+            - "github.com/flexigpt/flexigpt-app/internal/clockutil"
+            - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
+            - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+            - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+
+            - "github.com/flexigpt/inference-go$"
+            - "github.com/flexigpt/inference-go/"
+            - "github.com/flexigpt/llmtools-go$"
+            - "github.com/flexigpt/llmtools-go/"
+
         isolate_agentruntime:
           files:
             - "**/internal/agentruntime-go/**/*.go"

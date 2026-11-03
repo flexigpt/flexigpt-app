@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup"
@@ -38,7 +39,6 @@ type App struct {
 	modelStoreAPI         *ModelStoreWrapper
 	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
-	toolRuntimeAPI        *ToolRuntimeWrapper
 	toolBuiltInInstaller  installFlow.HydrationInstaller
 	modelBuiltInInstaller installFlow.HydrationInstaller
 	agentStoreAPI         *AgentStoreWrapper
@@ -152,7 +152,6 @@ func newApp() *App {
 	app.modelStoreAPI = &ModelStoreWrapper{}
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
-	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.agentStoreAPI = &AgentStoreWrapper{}
@@ -348,19 +347,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("provider runtime initialized")
 
-	err = InitToolRuntimeWrapper(a.toolRuntimeAPI)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize artifact-backed Tool runtime",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Tool runtime initialization failed\n" +
-				err.Error(),
-		)
-	}
-
 	toolBuiltinCatalog, err := ToolBuiltinCatalog()
 	if err != nil {
 		slog.Error(
@@ -373,9 +359,22 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
+	toolAdapter, err := toolcatalog.NewAdapter()
+	if err != nil {
+		slog.Error(
+			"couldn't load generated Tool built-in adapter",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool built-in catalog adapter initialization failed\n" +
+				err.Error(),
+		)
+	}
+
 	err = InitToolStoreWrapper(
 		a.toolStoreAPI,
-		a.toolRuntimeAPI.adapter,
+		toolAdapter,
 		artifactComposition.Sources,
 		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
@@ -748,7 +747,7 @@ func (a *App) initManagers() {
 			Workspaces:    a.workspaceStoreAPI.api,
 			Texts:         a.textStoreAPI.service,
 			Tools:         a.toolStoreAPI.api,
-			ToolRuntime:   a.toolRuntimeAPI.adapter,
+			ToolCaller:    toolAdapter,
 			SkillResolver: skillInference,
 			SkillRuntime:  a.skillRuntimeAPI.service,
 			MCPRuntime:    a.mcpRuntimeAPI.runtime,
@@ -827,9 +826,6 @@ func (a *App) closeManagers() {
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()
-	}
-	if a.toolRuntimeAPI != nil {
-		a.toolRuntimeAPI.close()
 	}
 	if a.modelAggregateAPI != nil {
 		a.modelAggregateAPI.close()

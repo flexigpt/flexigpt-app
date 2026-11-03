@@ -51,7 +51,7 @@ func (b *Binder) executeGoTool(
 	}
 
 	timeout := time.Duration(binding.TimeoutMS) * time.Millisecond
-	outputs, err := b.deps.ToolRuntime.CallGoTool(
+	outputs, err := b.deps.ToolCaller.CallGoTool(
 		ctx,
 		resolved.Tool.Implementation.Function,
 		json.RawMessage(args),

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/toolcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -22,12 +22,12 @@ import (
 
 type ToolStoreWrapper struct {
 	api     *toolAPI.Service
-	runtime *toolruntime.Adapter
+	runtime *toolcatalog.Adapter
 }
 
 func InitToolStoreWrapper(
 	wrapper *ToolStoreWrapper,
-	runtimeAdapter *toolruntime.Adapter,
+	runtimeAdapter *toolcatalog.Adapter,
 	sources source.API,
 	discovery refreshFlow.API,
 	artifacts artifact.API,

@@ -1,4 +1,4 @@
-package toolruntime
+package toolcatalog
 
 import (
 	"context"
@@ -159,6 +159,25 @@ func (a *Adapter) CallGoTool(
 	)
 }
 
+func (a *Adapter) GoTools() []toolDomain.GoToolDescriptor {
+	if a == nil {
+		return nil
+	}
+
+	output := make(
+		[]toolDomain.GoToolDescriptor,
+		0,
+		len(a.byFunction),
+	)
+	for _, value := range a.byFunction {
+		output = append(output, cloneDescriptor(value))
+	}
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Name < output[right].Name
+	})
+	return output
+}
+
 func descriptorFor(
 	value llmtoolsSpec.Tool,
 ) (toolDomain.GoToolDescriptor, error) {
@@ -195,24 +214,5 @@ func cloneDescriptor(
 		json.RawMessage(nil),
 		value.OutputSchema...,
 	)
-	return output
-}
-
-func (a *Adapter) GoTools() []toolDomain.GoToolDescriptor {
-	if a == nil {
-		return nil
-	}
-
-	output := make(
-		[]toolDomain.GoToolDescriptor,
-		0,
-		len(a.byFunction),
-	)
-	for _, value := range a.byFunction {
-		output = append(output, cloneDescriptor(value))
-	}
-	sort.Slice(output, func(left, right int) bool {
-		return output[left].Name < output[right].Name
-	})
 	return output
 }
