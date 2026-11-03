@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -25,37 +25,45 @@ const (
 var ErrBindingUnavailable = errors.New("workflow target binding is unavailable")
 
 type ArtifactPinResolver interface {
-	PinArtifact(ctx context.Context, ref artifactModel.ArtifactRef) (sessionv3.ArtifactPin, error)
+	PinArtifact(ctx context.Context, ref artifactModel.ArtifactRef) (sessionv3Runtime.ArtifactPin, error)
 }
 
 type ServiceBinding interface {
 	ID() string
 	Version() string
-	Effect() sessionv3.EffectContract
-	Bind(ctx context.Context, input sessionv3.CanonicalValue) (sessionv3.SemanticBinding, any, error)
-	Execute(ctx context.Context, input sessionv3.CanonicalValue, state any) (sessionv3.WorkExecutionResult, error)
+	Effect() sessionv3Runtime.EffectContract
+	Bind(ctx context.Context, input sessionv3Runtime.CanonicalValue) (sessionv3Runtime.SemanticBinding, any, error)
+	Execute(
+		ctx context.Context,
+		input sessionv3Runtime.CanonicalValue,
+		state any,
+	) (sessionv3Runtime.WorkExecutionResult, error)
 	ResolveWait(
 		ctx context.Context,
-		wait sessionv3.Wait,
-		resolution sessionv3.WaitResolution,
-		input sessionv3.CanonicalValue,
+		wait sessionv3Runtime.Wait,
+		resolution sessionv3Runtime.WaitResolution,
+		input sessionv3Runtime.CanonicalValue,
 		state any,
-	) (sessionv3.WaitResolutionResult, error)
+	) (sessionv3Runtime.WaitResolutionResult, error)
 }
 
 type ActivityBinding interface {
 	ID() string
 	Version() string
-	Effect() sessionv3.EffectContract
-	Bind(ctx context.Context, input sessionv3.CanonicalValue) (sessionv3.SemanticBinding, any, error)
-	Execute(ctx context.Context, input sessionv3.CanonicalValue, state any) (sessionv3.WorkExecutionResult, error)
+	Effect() sessionv3Runtime.EffectContract
+	Bind(ctx context.Context, input sessionv3Runtime.CanonicalValue) (sessionv3Runtime.SemanticBinding, any, error)
+	Execute(
+		ctx context.Context,
+		input sessionv3Runtime.CanonicalValue,
+		state any,
+	) (sessionv3Runtime.WorkExecutionResult, error)
 	ResolveWait(
 		ctx context.Context,
-		wait sessionv3.Wait,
-		resolution sessionv3.WaitResolution,
-		input sessionv3.CanonicalValue,
+		wait sessionv3Runtime.Wait,
+		resolution sessionv3Runtime.WaitResolution,
+		input sessionv3Runtime.CanonicalValue,
 		state any,
-	) (sessionv3.WaitResolutionResult, error)
+	) (sessionv3Runtime.WaitResolutionResult, error)
 }
 
 type BindingRegistry struct {
@@ -130,29 +138,29 @@ func NewAdmission(
 }
 
 type TargetBinding struct {
-	Name           string                     `json:"name"`
-	Kind           workflowv1.TargetKind      `json:"kind"`
-	Artifact       *sessionv3.ArtifactPin     `json:"artifact,omitempty"`
-	ServiceID      string                     `json:"serviceID,omitempty"`
-	ActivityID     string                     `json:"activityID,omitempty"`
-	BindingVersion string                     `json:"bindingVersion,omitempty"`
-	NestedProgram  *sessionv3.ProgramSnapshot `json:"nestedProgram,omitempty"`
+	Name           string                            `json:"name"`
+	Kind           workflowv1.TargetKind             `json:"kind"`
+	Artifact       *sessionv3Runtime.ArtifactPin     `json:"artifact,omitempty"`
+	ServiceID      string                            `json:"serviceID,omitempty"`
+	ActivityID     string                            `json:"activityID,omitempty"`
+	BindingVersion string                            `json:"bindingVersion,omitempty"`
+	NestedProgram  *sessionv3Runtime.ProgramSnapshot `json:"nestedProgram,omitempty"`
 }
 
 type Program struct {
-	Version  uint32                      `json:"version"`
-	Workflow sessionv3.ArtifactPin       `json:"workflow"`
-	Document workflowv1.WorkflowDocument `json:"document"`
-	Input    sessionv3.CanonicalValue    `json:"input"`
-	Targets  map[string]TargetBinding    `json:"targets"`
+	Version  uint32                          `json:"version"`
+	Workflow sessionv3Runtime.ArtifactPin    `json:"workflow"`
+	Document workflowv1.WorkflowDocument     `json:"document"`
+	Input    sessionv3Runtime.CanonicalValue `json:"input"`
+	Targets  map[string]TargetBinding        `json:"targets"`
 }
 
 func (a *Admission) AdmitWorkflow(
 	ctx context.Context,
-	request sessionv3.WorkflowAdmissionRequest,
-) (sessionv3.WorkflowAdmissionResult, error) {
+	request sessionv3Runtime.WorkflowAdmissionRequest,
+) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	if request.Workflow.RootID == "" || request.Workflow.ArtifactID == "" || !request.Input.Valid() {
-		return sessionv3.WorkflowAdmissionResult{}, errors.New("invalid Workflow admission request")
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("invalid Workflow admission request")
 	}
 	ref := artifactModel.ArtifactRef{
 		RootID:     rootModel.RootID(request.Workflow.RootID),
@@ -170,37 +178,37 @@ func (a *Admission) AdmitWorkflow(
 func (a *Admission) admit(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-	selection sessionv3.ArtifactSelection,
-	input sessionv3.CanonicalValue,
+	selection sessionv3Runtime.ArtifactSelection,
+	input sessionv3Runtime.CanonicalValue,
 	active map[artifactModel.ArtifactRef]struct{},
-) (sessionv3.WorkflowAdmissionResult, error) {
+) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	if _, exists := active[ref]; exists {
-		return sessionv3.WorkflowAdmissionResult{}, errors.New("nested Workflow cycle")
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("nested Workflow cycle")
 	}
 	active[ref] = struct{}{}
 	defer delete(active, ref)
 	plan, err := a.workflows.ResolvePlan(ctx, ref)
 	if err != nil {
-		return sessionv3.WorkflowAdmissionResult{}, err
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if !plan.CompositionComplete {
-		return sessionv3.WorkflowAdmissionResult{}, fmt.Errorf(
+		return sessionv3Runtime.WorkflowAdmissionResult{}, fmt.Errorf(
 			"%w: unresolved required Workflow capability",
 			ErrBindingUnavailable,
 		)
 	}
 	if selection.ExpectedRevision != 0 && selection.ExpectedRevision != plan.Revision {
-		return sessionv3.WorkflowAdmissionResult{}, errors.New("selected Workflow revision changed")
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("selected Workflow revision changed")
 	}
 	if selection.ExpectedDigest != "" && selection.ExpectedDigest != string(plan.Digest) {
-		return sessionv3.WorkflowAdmissionResult{}, errors.New("selected Workflow definition changed")
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("selected Workflow definition changed")
 	}
 	pin, err := a.pins.PinArtifact(ctx, plan.Workflow)
 	if err != nil {
-		return sessionv3.WorkflowAdmissionResult{}, err
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if pin.Revision != plan.Revision || pin.Digest != string(plan.Digest) {
-		return sessionv3.WorkflowAdmissionResult{}, errors.New("workflow Artifact changed during admission")
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("workflow Artifact changed during admission")
 	}
 	program := Program{
 		Version:  InterpreterVersion,
@@ -210,18 +218,18 @@ func (a *Admission) admit(
 		Targets:  map[string]TargetBinding{},
 	}
 	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
-		return sessionv3.WorkflowAdmissionResult{}, err
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := validateProgram(program); err != nil {
-		return sessionv3.WorkflowAdmissionResult{}, err
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	return sessionv3.WorkflowAdmissionResult{
-		Program: sessionv3.ProgramSnapshot{
+	return sessionv3Runtime.WorkflowAdmissionResult{
+		Program: sessionv3Runtime.ProgramSnapshot{
 			InterpreterID:      InterpreterID,
 			InterpreterVersion: InterpreterVersion,
 			Artifact:           &pin,
 			DefinitionDigest:   pin.Digest,
-			Payload:            sessionv3.MustCanonicalValue(program),
+			Payload:            sessionv3Runtime.MustCanonicalValue(program),
 		},
 	}, nil
 }
@@ -293,13 +301,13 @@ func (a *Admission) bindTarget(
 			nested, err := a.admit(
 				ctx,
 				ref,
-				sessionv3.ArtifactSelection{
+				sessionv3Runtime.ArtifactSelection{
 					RootID:           pin.RootID,
 					ArtifactID:       pin.ArtifactID,
 					ExpectedRevision: pin.Revision,
 					ExpectedDigest:   pin.Digest,
 				},
-				sessionv3.MustCanonicalValue(map[string]any{}),
+				sessionv3Runtime.MustCanonicalValue(map[string]any{}),
 				active,
 			)
 			if err != nil {

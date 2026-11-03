@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
@@ -181,7 +181,7 @@ func (s *Store) Close() error {
 	return result
 }
 
-func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3.CheckpointView) error {
+func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3Runtime.CheckpointView) error {
 	if err := view.Session.Validate(); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidDocument, err)
 	}
@@ -214,7 +214,7 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3.CheckpointVie
 	return s.writeIndex(incoming)
 }
 
-func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3.SessionID) error {
+func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3Runtime.SessionID) error {
 	if err := s.lock(); err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3.SessionID) 
 	}
 	now := time.Now().UTC()
 	doc := sessionDocument{
-		SchemaVersion: sessionv3.SchemaVersion,
+		SchemaVersion: sessionv3Runtime.SchemaVersion,
 		Kind:          sessionDocumentKindDeleted,
 		SessionID:     id,
 		DeletedAt:     &now,
@@ -235,7 +235,7 @@ func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3.SessionID) 
 	return s.deleteIndex(id)
 }
 
-func (s *Store) Restore(ctx context.Context, restorer sessionv3.RuntimeRestorer) error {
+func (s *Store) Restore(ctx context.Context, restorer sessionv3Runtime.RuntimeRestorer) error {
 	if restorer == nil {
 		return errors.New("session Runtime v3 restorer is required")
 	}
@@ -247,7 +247,7 @@ func (s *Store) Restore(ctx context.Context, restorer sessionv3.RuntimeRestorer)
 	if err != nil {
 		return err
 	}
-	if retired, ok := restorer.(sessionv3.RetiredSessionRestorer); ok {
+	if retired, ok := restorer.(sessionv3Runtime.RetiredSessionRestorer); ok {
 		for _, doc := range documents {
 			if doc.Kind == sessionDocumentKindDeleted {
 				if err := retired.RestoreRetiredSession(ctx, doc.SessionID); err != nil {
@@ -266,34 +266,34 @@ func (s *Store) Restore(ctx context.Context, restorer sessionv3.RuntimeRestorer)
 	return nil
 }
 
-func (s *Store) ReadSession(id sessionv3.SessionID) (sessionv3.Session, error) {
+func (s *Store) ReadSession(id sessionv3Runtime.SessionID) (sessionv3Runtime.Session, error) {
 	if err := s.lock(); err != nil {
-		return sessionv3.Session{}, err
+		return sessionv3Runtime.Session{}, err
 	}
 	defer s.mu.Unlock()
 	doc, found, err := s.readDocument(id, false)
 	if err != nil {
-		return sessionv3.Session{}, err
+		return sessionv3Runtime.Session{}, err
 	}
 	if !found || doc.Kind != sessionDocumentKindSession || doc.Session == nil {
-		return sessionv3.Session{}, ErrSessionNotFound
+		return sessionv3Runtime.Session{}, ErrSessionNotFound
 	}
 	return cloneSession(*doc.Session), nil
 }
 
-func (s *Store) ReadConversation(id sessionv3.SessionID) (sessionv3.ConversationProjection, error) {
+func (s *Store) ReadConversation(id sessionv3Runtime.SessionID) (sessionv3Runtime.ConversationProjection, error) {
 	session, err := s.ReadSession(id)
 	if err != nil {
-		return sessionv3.ConversationProjection{}, err
+		return sessionv3Runtime.ConversationProjection{}, err
 	}
-	messages := []sessionv3.Activity{}
+	messages := []sessionv3Runtime.Activity{}
 	for _, a := range session.Timeline {
-		if a.Kind == sessionv3.ActivityKindMessage && a.Visibility != sessionv3.ActivityVisibilityAudit {
+		if a.Kind == sessionv3Runtime.ActivityKindMessage && a.Visibility != sessionv3Runtime.ActivityVisibilityAudit {
 			messages = append(messages, a)
 		}
 	}
-	return sessionv3.ConversationProjection{
-		SchemaVersion:   sessionv3.SchemaVersion,
+	return sessionv3Runtime.ConversationProjection{
+		SchemaVersion:   sessionv3Runtime.SchemaVersion,
 		SessionID:       session.ID,
 		SessionRevision: session.Revision,
 		Title:           session.Title,
@@ -301,29 +301,29 @@ func (s *Store) ReadConversation(id sessionv3.SessionID) (sessionv3.Conversation
 	}, nil
 }
 
-func (s *Store) ReadActivities(id sessionv3.SessionID) (sessionv3.ActivityProjection, error) {
+func (s *Store) ReadActivities(id sessionv3Runtime.SessionID) (sessionv3Runtime.ActivityProjection, error) {
 	session, err := s.ReadSession(id)
 	if err != nil {
-		return sessionv3.ActivityProjection{}, err
+		return sessionv3Runtime.ActivityProjection{}, err
 	}
-	return sessionv3.ActivityProjection{
-		SchemaVersion:   sessionv3.SchemaVersion,
+	return sessionv3Runtime.ActivityProjection{
+		SchemaVersion:   sessionv3Runtime.SchemaVersion,
 		SessionID:       session.ID,
 		SessionRevision: session.Revision,
-		Activities:      append([]sessionv3.Activity(nil), session.Timeline...),
+		Activities:      append([]sessionv3Runtime.Activity(nil), session.Timeline...),
 	}, nil
 }
 
-func (s *Store) ReadWorkflow(id sessionv3.SessionID) (sessionv3.WorkflowProjection, error) {
+func (s *Store) ReadWorkflow(id sessionv3Runtime.SessionID) (sessionv3Runtime.WorkflowProjection, error) {
 	session, err := s.ReadSession(id)
 	if err != nil {
-		return sessionv3.WorkflowProjection{}, err
+		return sessionv3Runtime.WorkflowProjection{}, err
 	}
-	activities := []sessionv3.Activity{}
-	executions := []sessionv3.Execution{}
+	activities := []sessionv3Runtime.Activity{}
+	executions := []sessionv3Runtime.Execution{}
 	for _, a := range session.Timeline {
-		if a.Kind == sessionv3.ActivityKindWorkflow || a.Kind == sessionv3.ActivityKindAction ||
-			a.Kind == sessionv3.ActivityKindWait {
+		if a.Kind == sessionv3Runtime.ActivityKindWorkflow || a.Kind == sessionv3Runtime.ActivityKindAction ||
+			a.Kind == sessionv3Runtime.ActivityKindWait {
 			activities = append(activities, a)
 		}
 	}
@@ -335,8 +335,8 @@ func (s *Store) ReadWorkflow(id sessionv3.SessionID) (sessionv3.WorkflowProjecti
 			}
 		}
 	}
-	return sessionv3.WorkflowProjection{
-		SchemaVersion:   sessionv3.SchemaVersion,
+	return sessionv3Runtime.WorkflowProjection{
+		SchemaVersion:   sessionv3Runtime.SchemaVersion,
 		SessionID:       session.ID,
 		SessionRevision: session.Revision,
 		Activities:      activities,
@@ -345,19 +345,19 @@ func (s *Store) ReadWorkflow(id sessionv3.SessionID) (sessionv3.WorkflowProjecti
 }
 
 func (s *Store) ReadExecution(
-	sessionID sessionv3.SessionID,
-	executionID sessionv3.ExecutionID,
-) (sessionv3.Execution, error) {
+	sessionID sessionv3Runtime.SessionID,
+	executionID sessionv3Runtime.ExecutionID,
+) (sessionv3Runtime.Execution, error) {
 	session, err := s.ReadSession(sessionID)
 	if err != nil {
-		return sessionv3.Execution{}, err
+		return sessionv3Runtime.Execution{}, err
 	}
 	for _, e := range session.Executions {
 		if e.ID == executionID {
 			return cloneExecution(e), nil
 		}
 	}
-	return sessionv3.Execution{}, ErrExecutionNotFound
+	return sessionv3Runtime.Execution{}, ErrExecutionNotFound
 }
 
 func (s *Store) ListExecutions(request ListExecutionsRequest) ([]ExecutionListItem, error) {
@@ -372,7 +372,7 @@ func (s *Store) ListExecutions(request ListExecutionsRequest) ([]ExecutionListIt
 		}
 		waitCount := 0
 		for _, w := range e.Waits {
-			if w.Status == sessionv3.WaitStatusPending || w.Status == sessionv3.WaitStatusResolving {
+			if w.Status == sessionv3Runtime.WaitStatusPending || w.Status == sessionv3Runtime.WaitStatusResolving {
 				waitCount++
 			}
 		}
@@ -447,13 +447,13 @@ func (s *Store) SearchSessions(ctx context.Context, request SearchSessionsReques
 		return SessionPage{}, err
 	}
 	items := []SessionListItem{}
-	seen := map[sessionv3.SessionID]struct{}{}
+	seen := map[sessionv3Runtime.SessionID]struct{}{}
 	for _, hit := range hits {
 		info, err := uuidv7filename.Parse(filepathBase(hit.ID))
 		if err != nil {
 			return SessionPage{}, fmt.Errorf("%w: malformed FTS identity", ErrInvalidDocument)
 		}
-		id := sessionv3.SessionID(info.ID)
+		id := sessionv3Runtime.SessionID(info.ID)
 		if _, duplicate := seen[id]; duplicate {
 			continue
 		}
@@ -469,7 +469,7 @@ func (s *Store) SearchSessions(ctx context.Context, request SearchSessionsReques
 	return SessionPage{Items: items, NextPageToken: next}, nil
 }
 
-func (s *Store) ExportSession(id sessionv3.SessionID) ([]byte, error) {
+func (s *Store) ExportSession(id sessionv3Runtime.SessionID) ([]byte, error) {
 	session, err := s.ReadSession(id)
 	if err != nil {
 		return nil, err
@@ -492,7 +492,7 @@ func (s *Store) rebuildDerivedLocked(ctx context.Context) error {
 		return err
 	}
 
-	live := make(map[sessionv3.SessionID]struct{}, len(documents))
+	live := make(map[sessionv3Runtime.SessionID]struct{}, len(documents))
 	for _, doc := range documents {
 		if err := ctx.Err(); err != nil {
 			return err

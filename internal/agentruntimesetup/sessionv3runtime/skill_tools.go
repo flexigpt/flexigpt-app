@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -56,15 +56,15 @@ func (b *Binder) skillLifecycleChoices() ([]preparedChoice, error) {
 			Description: d.desc,
 			Arguments:   args,
 		}
-		call := sessionv3.ToolCall{
+		call := sessionv3Runtime.ToolCall{
 			Name:        d.name,
 			ChoiceID:    "builtin." + d.name,
 			DisplayName: d.name,
 			Description: d.desc,
 			Automatic:   true,
-			Binding: sessionv3.ToolBinding{
-				Kind:  sessionv3.ToolBindingKindSkill,
-				Skill: &sessionv3.SkillToolBinding{Name: d.name},
+			Binding: sessionv3Runtime.ToolBinding{
+				Kind:  sessionv3Runtime.ToolBindingKindSkill,
+				Skill: &sessionv3Runtime.SkillToolBinding{Name: d.name},
 			},
 		}
 		out = append(out, preparedChoice{Choice: choice, Call: call})

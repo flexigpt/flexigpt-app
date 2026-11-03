@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionruntime"
@@ -21,7 +21,7 @@ import (
 )
 
 type Dependencies struct {
-	Providers     *inference.ProviderSetAPI
+	Providers     *inferenceRuntime.ProviderSetAPI
 	Models        *modelruntime.RuntimeAdapter
 	Agents        *agentAPI.Service
 	Workspaces    *workspaceAPI.Service
@@ -37,7 +37,7 @@ type Dependencies struct {
 type Binder struct {
 	deps          Dependencies
 	skills        *skillSessions
-	deterministic sessionv3.DeterministicExecutor
+	deterministic sessionv3Runtime.DeterministicExecutor
 }
 
 func New(deps Dependencies) (*Binder, error) {
@@ -56,18 +56,21 @@ func New(deps Dependencies) (*Binder, error) {
 	return &Binder{deps: deps, skills: newSkillSessions()}, nil
 }
 
-func (b *Binder) BindWork(ctx context.Context, req sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
+func (b *Binder) BindWork(
+	ctx context.Context,
+	req sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, error) {
 	if result, handled, err := b.deterministic.Bind(ctx, req); handled || err != nil {
 		return result, err
 	}
 
 	switch req.WorkItem.Type {
-	case sessionv3.WorkItemTypeLLM:
+	case sessionv3Runtime.WorkItemTypeLLM:
 		return b.bindLLM(ctx, req)
-	case sessionv3.WorkItemTypeTool:
+	case sessionv3Runtime.WorkItemTypeTool:
 		return b.bindTool(ctx, req)
 	default:
-		return sessionv3.BindResult{}, fmt.Errorf(
+		return sessionv3Runtime.BindResult{}, fmt.Errorf(
 			"unsupported sessionv3 WorkItem type %q",
 			req.WorkItem.Type,
 		)
@@ -76,9 +79,9 @@ func (b *Binder) BindWork(ctx context.Context, req sessionv3.WorkDispatchRequest
 
 func (b *Binder) ExecuteWork(
 	ctx context.Context,
-	req sessionv3.WorkDispatchRequest,
-	bound sessionv3.BoundWork,
-) (sessionv3.WorkExecutionResult, error) {
+	req sessionv3Runtime.WorkDispatchRequest,
+	bound sessionv3Runtime.BoundWork,
+) (sessionv3Runtime.WorkExecutionResult, error) {
 	if result, handled, err := b.deterministic.Execute(ctx, req, bound); handled || err != nil {
 		return result, err
 	}
@@ -89,13 +92,13 @@ func (b *Binder) ExecuteWork(
 	if v, ok := bound.Private.(privateTool); ok {
 		return b.executeTool(ctx, req, bound, v)
 	}
-	return sessionv3.WorkExecutionResult{}, fmt.Errorf("unknown bound work type %T", bound.Private)
+	return sessionv3Runtime.WorkExecutionResult{}, fmt.Errorf("unknown bound work type %T", bound.Private)
 }
 
 func (b *Binder) ResolveWait(
 	ctx context.Context,
-	req sessionv3.WaitResolutionRequest,
-) (sessionv3.WaitResolutionResult, error) {
+	req sessionv3Runtime.WaitResolutionRequest,
+) (sessionv3Runtime.WaitResolutionResult, error) {
 	if result, handled, err := b.deterministic.ResolveWait(ctx, req); handled || err != nil {
 		return result, err
 	}
@@ -103,12 +106,12 @@ func (b *Binder) ResolveWait(
 	if v, ok := req.Private.(privateToolWait); ok {
 		return b.resolveToolWait(ctx, req, v)
 	}
-	return sessionv3.WaitResolutionResult{}, errors.New(
+	return sessionv3Runtime.WaitResolutionResult{}, errors.New(
 		"wait has no registered sessionv3 resolver",
 	)
 }
 
-func (b *Binder) CloseExecutionBinding(_ context.Context, _ sessionv3.ExecutionID) error {
+func (b *Binder) CloseExecutionBinding(_ context.Context, _ sessionv3Runtime.ExecutionID) error {
 	return nil
 }
 

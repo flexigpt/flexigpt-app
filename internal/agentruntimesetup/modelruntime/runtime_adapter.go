@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -143,9 +143,6 @@ func (d AdapterDefinition) Validate() error {
 	return nil
 }
 
-// RuntimeConfiguration is the inference consumer's runtime result contract.
-type RuntimeConfiguration = inferenceRuntimeSpec.RuntimeConfiguration
-
 type RuntimeAdapter struct {
 	credentials CredentialResolver
 	adapters    map[string]AdapterDefinition
@@ -266,7 +263,7 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 func (a *RuntimeAdapter) Resolve(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
-) (RuntimeConfiguration, error) {
+) (inferenceRuntime.RuntimeConfiguration, error) {
 	return a.resolveRuntime(
 		ctx,
 		resolved,
@@ -280,10 +277,10 @@ func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
 	requestPatch *RuntimeRequestPatch,
-) (RuntimeConfiguration, error) {
+) (inferenceRuntime.RuntimeConfiguration, error) {
 	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 	return a.resolveRuntime(ctx, resolved, prepared)
 }
@@ -308,9 +305,9 @@ func (a *RuntimeAdapter) resolveRuntime(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,
 	requestPatch preparedRuntimeRequestPatch,
-) (RuntimeConfiguration, error) {
+) (inferenceRuntime.RuntimeConfiguration, error) {
 	if err := cryptoutil.ValidateDigest(resolved.Fingerprint); err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	providerRuntime, err := a.resolveProviderRuntime(
@@ -324,7 +321,7 @@ func (a *RuntimeAdapter) resolveRuntime(
 		true,
 	)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	defaults, err := mergeDefaultLayers(
@@ -334,7 +331,7 @@ func (a *RuntimeAdapter) resolveRuntime(
 		resolved.ModelOverlay.Defaults,
 	)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	// Adapter parameters replace atomically by layer.
@@ -349,13 +346,13 @@ func (a *RuntimeAdapter) resolveRuntime(
 		}
 		value, err := decodeObjectMap(raw)
 		if err != nil {
-			return RuntimeConfiguration{}, err
+			return inferenceRuntime.RuntimeConfiguration{}, err
 		}
 		defaults["adapterParameters"] = value
 	}
 
 	if err := requestPatch.apply(defaults); err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	modelParam, err := modelParamFromDefaults(
@@ -363,7 +360,7 @@ func (a *RuntimeAdapter) resolveRuntime(
 		resolved.Model.Document.ProviderModelID,
 	)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	capabilityOverrides, err := collectCapabilityOverrides(
@@ -373,7 +370,7 @@ func (a *RuntimeAdapter) resolveRuntime(
 		resolved.ModelOverlay.Capabilities,
 	)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
 	fingerprint, err := cryptoutil.CanonicalDigest(struct {
@@ -388,10 +385,10 @@ func (a *RuntimeAdapter) resolveRuntime(
 		RequestPatch:        requestPatch.digest,
 	})
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 
-	return RuntimeConfiguration{
+	return inferenceRuntime.RuntimeConfiguration{
 		ProviderParam:       providerRuntime.param,
 		ModelParam:          modelParam,
 		CapabilityOverrides: capabilityOverrides,

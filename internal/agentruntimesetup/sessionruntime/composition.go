@@ -12,7 +12,7 @@ import (
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -1921,7 +1921,7 @@ func (c *coordinator) toolTargetFromIntent(
 		return composition.CapabilityTarget{
 			Form:             "direct",
 			Type:             declaration.Type(direct.Type),
-			Name:             spec.LogicalName(direct.Name),
+			Name:             storeSpec.LogicalName(direct.Name),
 			ProviderIdentity: direct.ProviderIdentity,
 			ProviderLocalID:  direct.ProviderLocalID,
 		}, nil

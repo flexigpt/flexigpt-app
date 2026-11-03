@@ -5,7 +5,7 @@ import (
 
 	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
 	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
 	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
 )
@@ -45,7 +45,7 @@ func TestNestedContainedPathsIncludeTheirParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registry, err := interpretation.NewRegistry(
+	registry, err := coreinterpretation.NewRegistry(
 		pluginv1.Interpretation(),
 		agentv1.Interpretation(),
 		textv1.Interpretation(),

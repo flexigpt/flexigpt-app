@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
 // Binder composes the existing provider and Tool binder with Workflow-local
 // deterministic execution plus registered Service and Activity bindings. All
 // private binding values stay in BoundWork and are never checkpointed.
 type Binder struct {
-	Base          sessionv3.WorkBinder
+	Base          sessionv3Runtime.WorkBinder
 	Bindings      *BindingRegistry
-	Deterministic sessionv3.DeterministicExecutor
+	Deterministic sessionv3Runtime.DeterministicExecutor
 }
 
 type boundService struct {
@@ -27,21 +27,24 @@ type boundActivity struct {
 	private any
 }
 
-func NewBinder(base sessionv3.WorkBinder, bindings *BindingRegistry) (*Binder, error) {
+func NewBinder(base sessionv3Runtime.WorkBinder, bindings *BindingRegistry) (*Binder, error) {
 	if base == nil || bindings == nil {
 		return nil, errors.New("workflow binder dependencies are incomplete")
 	}
 	return &Binder{Base: base, Bindings: bindings}, nil
 }
 
-func (b *Binder) BindWork(ctx context.Context, request sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
+func (b *Binder) BindWork(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, error) {
 	if result, handled, err := b.Deterministic.Bind(ctx, request); handled || err != nil {
 		return result, err
 	}
 	switch request.WorkItem.Type {
-	case sessionv3.WorkItemTypeService:
+	case sessionv3Runtime.WorkItemTypeService:
 		return b.bindService(ctx, request)
-	case sessionv3.WorkItemTypeActivity:
+	case sessionv3Runtime.WorkItemTypeActivity:
 		return b.bindActivity(ctx, request)
 	default:
 		return b.Base.BindWork(ctx, request)
@@ -50,9 +53,9 @@ func (b *Binder) BindWork(ctx context.Context, request sessionv3.WorkDispatchReq
 
 func (b *Binder) ExecuteWork(
 	ctx context.Context,
-	request sessionv3.WorkDispatchRequest,
-	bound sessionv3.BoundWork,
-) (sessionv3.WorkExecutionResult, error) {
+	request sessionv3Runtime.WorkDispatchRequest,
+	bound sessionv3Runtime.BoundWork,
+) (sessionv3Runtime.WorkExecutionResult, error) {
 	if result, handled, err := b.Deterministic.Execute(ctx, request, bound); handled || err != nil {
 		return result, err
 	}
@@ -68,8 +71,8 @@ func (b *Binder) ExecuteWork(
 
 func (b *Binder) ResolveWait(
 	ctx context.Context,
-	request sessionv3.WaitResolutionRequest,
-) (sessionv3.WaitResolutionResult, error) {
+	request sessionv3Runtime.WaitResolutionRequest,
+) (sessionv3Runtime.WaitResolutionResult, error) {
 	if result, handled, err := b.Deterministic.ResolveWait(ctx, request); handled || err != nil {
 		return result, err
 	}
@@ -83,21 +86,24 @@ func (b *Binder) ResolveWait(
 	}
 }
 
-func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv3.ExecutionID) error {
-	if closer, ok := b.Base.(sessionv3.ExecutionBindingCloser); ok {
+func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv3Runtime.ExecutionID) error {
+	if closer, ok := b.Base.(sessionv3Runtime.ExecutionBindingCloser); ok {
 		return closer.CloseExecutionBinding(ctx, executionID)
 	}
 	return nil
 }
 
-func (b *Binder) bindService(ctx context.Context, request sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
+func (b *Binder) bindService(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, error) {
 	payload := request.WorkItem.Input.Service
 	if payload == nil {
-		return sessionv3.BindResult{}, errors.New("Service WorkItem payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("Service WorkItem payload is missing")
 	}
 	binding, found := b.Bindings.Service(payload.ServiceID)
 	if !found || binding.Version() != payload.BindingVersion {
-		return sessionv3.BindResult{}, fmt.Errorf(
+		return sessionv3Runtime.BindResult{}, fmt.Errorf(
 			"%w: service %q version %q",
 			ErrBindingUnavailable,
 			payload.ServiceID,
@@ -106,9 +112,9 @@ func (b *Binder) bindService(ctx context.Context, request sessionv3.WorkDispatch
 	}
 	semantic, private, err := binding.Bind(ctx, payload.Input)
 	if err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
-	return sessionv3.BindResult{
+	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private:         boundService{binding: binding, private: private},
 	}, nil
@@ -116,15 +122,15 @@ func (b *Binder) bindService(ctx context.Context, request sessionv3.WorkDispatch
 
 func (b *Binder) bindActivity(
 	ctx context.Context,
-	request sessionv3.WorkDispatchRequest,
-) (sessionv3.BindResult, error) {
+	request sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, error) {
 	payload := request.WorkItem.Input.Activity
 	if payload == nil {
-		return sessionv3.BindResult{}, errors.New("activity WorkItem payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("activity WorkItem payload is missing")
 	}
 	binding, found := b.Bindings.Activity(payload.ActivityID)
 	if !found || binding.Version() != payload.BindingVersion {
-		return sessionv3.BindResult{}, fmt.Errorf(
+		return sessionv3Runtime.BindResult{}, fmt.Errorf(
 			"%w: activity %q version %q",
 			ErrBindingUnavailable,
 			payload.ActivityID,
@@ -133,9 +139,9 @@ func (b *Binder) bindActivity(
 	}
 	semantic, private, err := binding.Bind(ctx, payload.Input)
 	if err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
-	return sessionv3.BindResult{
+	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private:         boundActivity{binding: binding, private: private},
 	}, nil

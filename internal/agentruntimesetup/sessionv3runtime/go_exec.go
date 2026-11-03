@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
@@ -17,12 +17,12 @@ import (
 
 func (b *Binder) executeGoTool(
 	ctx context.Context,
-	payload *sessionv3.ToolWork,
-) (sessionv3.WorkExecutionResult, error) {
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.WorkExecutionResult, error) {
 	binding := payload.Call.Binding.Go
 	if binding == nil {
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "invalid_go_binding",
 				Message: "go binding is missing",
 			},
@@ -32,8 +32,8 @@ func (b *Binder) executeGoTool(
 	resolved, err := b.resolvePinnedGoTool(ctx, binding)
 	if err != nil {
 		//nolint:nilerr // Explicit.
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "go_binding_stale",
 				Message: err.Error(),
 			},
@@ -42,11 +42,11 @@ func (b *Binder) executeGoTool(
 
 	args := payload.Call.Arguments
 	if strings.TrimSpace(string(args)) == "" {
-		args = sessionv3.CanonicalValue(`{}`)
+		args = sessionv3Runtime.CanonicalValue(`{}`)
 	}
 	if !json.Valid([]byte(args)) {
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "invalid_arguments", Message: "tool arguments are not JSON"},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "invalid_arguments", Message: "tool arguments are not JSON"},
 		}, nil
 	}
 
@@ -62,20 +62,20 @@ func (b *Binder) executeGoTool(
 		if strings.TrimSpace(text) == "" {
 			text = err.Error()
 		}
-		return sessionv3.WorkExecutionResult{
-			Output: &sessionv3.WorkItemOutput{
-				Tool: &sessionv3.ToolOutput{
-					Kind:       sessionv3.ToolOutputKindError,
+		return sessionv3Runtime.WorkExecutionResult{
+			Output: &sessionv3Runtime.WorkItemOutput{
+				Tool: &sessionv3Runtime.ToolOutput{
+					Kind:       sessionv3Runtime.ToolOutputKindError,
 					Text:       text,
 					Structured: structured,
 				},
-				Receipt: &sessionv3.ExternalReceipt{
+				Receipt: &sessionv3Runtime.ExternalReceipt{
 					System:      "go-tool",
 					Reference:   resolved.Tool.Implementation.Function,
 					ConfirmedAt: time.Now().UTC(),
 				},
 			},
-			Error: &sessionv3.SanitizedError{
+			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "go_tool_failed",
 				Message: err.Error(),
 			},
@@ -83,10 +83,14 @@ func (b *Binder) executeGoTool(
 		}, nil
 	}
 	text, structured := toolOutputsToV3(outputs)
-	return sessionv3.WorkExecutionResult{
-		Output: &sessionv3.WorkItemOutput{
-			Tool: &sessionv3.ToolOutput{Kind: sessionv3.ToolOutputKindSuccess, Text: text, Structured: structured},
-			Receipt: &sessionv3.ExternalReceipt{
+	return sessionv3Runtime.WorkExecutionResult{
+		Output: &sessionv3Runtime.WorkItemOutput{
+			Tool: &sessionv3Runtime.ToolOutput{
+				Kind:       sessionv3Runtime.ToolOutputKindSuccess,
+				Text:       text,
+				Structured: structured,
+			},
+			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      "go-tool",
 				Reference:   resolved.Tool.Implementation.Function,
 				ConfirmedAt: time.Now().UTC(),
@@ -98,7 +102,7 @@ func (b *Binder) executeGoTool(
 
 func (b *Binder) resolvePinnedGoTool(
 	ctx context.Context,
-	binding *sessionv3.GoToolBinding,
+	binding *sessionv3Runtime.GoToolBinding,
 ) (toolAPI.ResolvedToolView, error) {
 	if binding == nil {
 		return toolAPI.ResolvedToolView{}, errors.New("go binding is missing")
@@ -142,7 +146,7 @@ func (b *Binder) resolvePinnedGoTool(
 	return resolved, nil
 }
 
-func toolOutputsToV3(outputs []llmtoolsSpec.ToolOutputUnion) (string, sessionv3.CanonicalValue) {
+func toolOutputsToV3(outputs []llmtoolsSpec.ToolOutputUnion) (string, sessionv3Runtime.CanonicalValue) {
 	parts := []string{}
 	for _, o := range outputs {
 		switch o.Kind {
@@ -158,7 +162,7 @@ func toolOutputsToV3(outputs []llmtoolsSpec.ToolOutputUnion) (string, sessionv3.
 			parts = append(parts, "[tool output omitted]")
 		}
 	}
-	return strings.Join(parts, "\n\n"), sessionv3.MustCanonicalValue(outputs)
+	return strings.Join(parts, "\n\n"), sessionv3Runtime.MustCanonicalValue(outputs)
 }
 
 func mustMarshal(v any) []byte {

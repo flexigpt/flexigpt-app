@@ -1,4 +1,4 @@
-package spec
+package inference
 
 import (
 	"encoding/hex"

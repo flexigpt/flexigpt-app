@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
@@ -15,34 +15,34 @@ import (
 	"github.com/flexigpt/mapstore-go/ftsengine"
 )
 
-func sessionFTSValues(session sessionv3.Session, mtime string) map[string]string {
+func sessionFTSValues(session sessionv3Runtime.Session, mtime string) map[string]string {
 	var user, assistant, action strings.Builder
 	for _, a := range session.Timeline {
 		switch a.Kind {
-		case sessionv3.ActivityKindMessage:
+		case sessionv3Runtime.ActivityKindMessage:
 			if a.Message == nil {
 				continue
 			}
-			if a.Message.Role == sessionv3.MessageRoleUser {
+			if a.Message.Role == sessionv3Runtime.MessageRoleUser {
 				user.WriteString(a.Message.Text)
 				user.WriteString("\n")
 			} else {
 				assistant.WriteString(a.Message.Text)
 				assistant.WriteString("\n")
 			}
-		case sessionv3.ActivityKindAction:
+		case sessionv3Runtime.ActivityKindAction:
 			if a.Action != nil {
 				action.WriteString(a.Action.Title)
 				action.WriteString("\n")
 				action.WriteString(a.Action.Summary)
 				action.WriteString("\n")
 			}
-		case sessionv3.ActivityKindWorkflow:
+		case sessionv3Runtime.ActivityKindWorkflow:
 			if a.Workflow != nil {
 				action.WriteString(a.Workflow.Summary)
 				action.WriteString("\n")
 			}
-		case sessionv3.ActivityKindWait:
+		case sessionv3Runtime.ActivityKindWait:
 			if a.Wait != nil {
 				action.WriteString(a.Wait.Summary)
 				action.WriteString("\n")

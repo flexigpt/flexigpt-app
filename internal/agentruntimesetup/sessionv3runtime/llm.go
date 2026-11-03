@@ -9,44 +9,47 @@ import (
 	"strings"
 	"time"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type privateLLM struct {
-	Configuration inferenceRuntimeSpec.RuntimeConfiguration
+	Configuration inferenceRuntime.RuntimeConfiguration
 	Inputs        []inferenceSpec.InputUnion
 	Choices       []inferenceSpec.ToolChoice
-	Bindings      map[string]sessionv3.ToolCall
+	Bindings      map[string]sessionv3Runtime.ToolCall
 	Fingerprint   string
 }
 
-func artifactRefForSelection(s sessionv3.ArtifactSelection) artifactModel.ArtifactRef {
+func artifactRefForSelection(s sessionv3Runtime.ArtifactSelection) artifactModel.ArtifactRef {
 	return artifactModel.ArtifactRef{
 		RootID:     rootModel.RootID(s.RootID),
 		ArtifactID: artifactModel.ArtifactID(s.ArtifactID),
 	}
 }
 
-func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest) (sessionv3.BindResult, error) {
+func (b *Binder) bindLLM(
+	ctx context.Context,
+	req sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
-		return sessionv3.BindResult{}, errors.New("LLM payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
 	}
 	modelSel := payload.Model
 	if modelSel == nil {
 		modelSel = req.Session.Defaults.Model
 	}
 	if modelSel == nil {
-		return sessionv3.BindResult{}, errors.New("no effective model selection")
+		return sessionv3Runtime.BindResult{}, errors.New("no effective model selection")
 	}
 
 	ref := artifactRefForSelection(*modelSel)
 	if err := ref.Validate(); err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
 	resolved, modelUse, err := b.deps.Models.ResolveRuntimeModelWithRequestPatch(
 		ctx,
@@ -54,18 +57,18 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 		nil,
 	)
 	if err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
 	if modelUse == nil {
-		return sessionv3.BindResult{}, errors.New("runtime model resolution returned no Artifact use")
+		return sessionv3Runtime.BindResult{}, errors.New("runtime model resolution returned no Artifact use")
 	}
 	if modelSel.ExpectedRevision != 0 &&
 		modelSel.ExpectedRevision != modelUse.Revision {
-		return sessionv3.BindResult{}, errors.New("selected Model revision changed")
+		return sessionv3Runtime.BindResult{}, errors.New("selected Model revision changed")
 	}
 	if modelSel.ExpectedDigest != "" &&
 		modelSel.ExpectedDigest != modelUse.Digest {
-		return sessionv3.BindResult{}, errors.New("selected Model definition changed")
+		return sessionv3Runtime.BindResult{}, errors.New("selected Model definition changed")
 	}
 
 	if prompt := b.systemPromptText(ctx, req); strings.TrimSpace(prompt) != "" {
@@ -73,11 +76,11 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 	}
 	inputs, err := b.buildInputs(req)
 	if err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
 	choices, bindings, err := b.toolChoices(ctx, req)
 	if err != nil {
-		return sessionv3.BindResult{}, err
+		return sessionv3Runtime.BindResult{}, err
 	}
 
 	configuration := resolved
@@ -87,12 +90,12 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 	configuration.CapabilityOverrides = slices.Clone(
 		resolved.CapabilityOverrides,
 	)
-	semantic := sessionv3.SemanticBinding{
+	semantic := sessionv3Runtime.SemanticBinding{
 		Version:           "v3-llm/v1",
 		TargetFingerprint: resolved.Fingerprint,
 		BoundAt:           time.Now().UTC(),
 	}
-	return sessionv3.BindResult{
+	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private: privateLLM{
 			Configuration: configuration,
@@ -106,9 +109,9 @@ func (b *Binder) bindLLM(ctx context.Context, req sessionv3.WorkDispatchRequest)
 
 func (b *Binder) executeLLM(
 	ctx context.Context,
-	req sessionv3.WorkDispatchRequest,
+	req sessionv3Runtime.WorkDispatchRequest,
 	private privateLLM,
-) (sessionv3.WorkExecutionResult, error) {
+) (sessionv3Runtime.WorkExecutionResult, error) {
 	configuration := private.Configuration
 	configuration.ProviderParam.DefaultHeaders = maps.Clone(
 		private.Configuration.ProviderParam.DefaultHeaders,
@@ -118,7 +121,7 @@ func (b *Binder) executeLLM(
 	)
 	resp, err := b.deps.Providers.FetchCompletion(
 		ctx,
-		&inferenceRuntimeSpec.CompletionRequest{
+		&inferenceRuntime.CompletionRequest{
 			Configuration: configuration,
 			Inputs:        private.Inputs,
 			ToolChoices:   private.Choices,
@@ -126,37 +129,39 @@ func (b *Binder) executeLLM(
 	)
 	if err != nil {
 		//nolint:nilerr // Explicit return.
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "completion_failed", Message: err.Error()},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "completion_failed", Message: err.Error()},
 		}, nil
 	}
 	if resp == nil || resp.Body == nil || resp.Body.InferenceResponse == nil {
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "empty_completion", Message: "empty provider response"},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "empty_completion", Message: "empty provider response"},
 		}, nil
 	}
 	out := resp.Body.InferenceResponse
 	if out.Error != nil {
-		return sessionv3.WorkExecutionResult{
-			Output:    &sessionv3.WorkItemOutput{LLM: &sessionv3.LLMOutput{Text: decodedProviderText(out.Outputs)}},
-			Error:     &sessionv3.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
+		return sessionv3Runtime.WorkExecutionResult{
+			Output: &sessionv3Runtime.WorkItemOutput{
+				LLM: &sessionv3Runtime.LLMOutput{Text: decodedProviderText(out.Outputs)},
+			},
+			Error:     &sessionv3Runtime.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
 			Confirmed: true,
 		}, nil
 	}
 	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
 	confirmed := strings.TrimSpace(text) != "" || len(calls) != 0
 	if !confirmed {
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "empty_completion",
 				Message: "provider returned no text or executable Tool call",
 			},
 		}, nil
 	}
-	return sessionv3.WorkExecutionResult{
-		Output: &sessionv3.WorkItemOutput{
-			LLM: &sessionv3.LLMOutput{Text: text, Thinking: thinking, ToolCalls: calls},
-			Receipt: &sessionv3.ExternalReceipt{
+	return sessionv3Runtime.WorkExecutionResult{
+		Output: &sessionv3Runtime.WorkItemOutput{
+			LLM: &sessionv3Runtime.LLMOutput{Text: text, Thinking: thinking, ToolCalls: calls},
+			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      "inference",
 				Reference:   private.Fingerprint,
 				ConfirmedAt: time.Now().UTC(),
@@ -182,11 +187,11 @@ func decodedProviderText(outputs []inferenceSpec.OutputUnion) string {
 
 func (b *Binder) decodeProviderOutputs(
 	outputs []inferenceSpec.OutputUnion,
-	bindings map[string]sessionv3.ToolCall,
-) (t, th string, c []sessionv3.ToolCall) {
+	bindings map[string]sessionv3Runtime.ToolCall,
+) (t, th string, c []sessionv3Runtime.ToolCall) {
 	var text strings.Builder
 	var thinking strings.Builder
-	calls := []sessionv3.ToolCall{}
+	calls := []sessionv3Runtime.ToolCall{}
 	for _, o := range outputs {
 		if o.OutputMessage != nil {
 			for _, c := range o.OutputMessage.Contents {
@@ -214,9 +219,9 @@ func (b *Binder) decodeProviderOutputs(
 			callID = fmt.Sprintf("provider-call-%d", len(calls)+1)
 		}
 
-		arguments := sessionv3.MustCanonicalValue(map[string]any{})
+		arguments := sessionv3Runtime.MustCanonicalValue(map[string]any{})
 		if raw := strings.TrimSpace(call.Arguments); raw != "" {
-			value, err := sessionv3.CanonicalValueFrom([]byte(raw))
+			value, err := sessionv3Runtime.CanonicalValueFrom([]byte(raw))
 			if err != nil {
 				calls = append(calls, unresolvedProviderToolCall(
 					call,
@@ -255,18 +260,18 @@ func (b *Binder) decodeProviderOutputs(
 func unresolvedProviderToolCall(
 	call *inferenceSpec.ToolCall,
 	callID string,
-	arguments sessionv3.CanonicalValue,
+	arguments sessionv3Runtime.CanonicalValue,
 	reason string,
-) sessionv3.ToolCall {
-	return sessionv3.ToolCall{
+) sessionv3Runtime.ToolCall {
+	return sessionv3Runtime.ToolCall{
 		ID:             callID,
 		ProviderCallID: firstText(call.CallID, call.ID),
 		Name:           call.Name,
 		ChoiceID:       call.ChoiceID,
 		Arguments:      arguments,
-		Binding: sessionv3.ToolBinding{
-			Kind:       sessionv3.ToolBindingKindUnresolved,
-			Unresolved: &sessionv3.UnresolvedToolBinding{Reason: reason},
+		Binding: sessionv3Runtime.ToolBinding{
+			Kind:       sessionv3Runtime.ToolBindingKindUnresolved,
+			Unresolved: &sessionv3Runtime.UnresolvedToolBinding{Reason: reason},
 		},
 	}
 }

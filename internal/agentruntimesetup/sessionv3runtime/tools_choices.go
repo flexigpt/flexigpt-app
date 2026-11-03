@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 func (b *Binder) toolChoices(
 	ctx context.Context,
-	req sessionv3.WorkDispatchRequest,
-) ([]inferenceSpec.ToolChoice, map[string]sessionv3.ToolCall, error) {
+	req sessionv3Runtime.WorkDispatchRequest,
+) ([]inferenceSpec.ToolChoice, map[string]sessionv3Runtime.ToolCall, error) {
 	choices := []inferenceSpec.ToolChoice{}
-	bindings := map[string]sessionv3.ToolCall{}
+	bindings := map[string]sessionv3Runtime.ToolCall{}
 
 	register := func(value preparedChoice) error {
 		if value.Choice.ID == "" || value.Choice.Name == "" {
@@ -67,5 +67,5 @@ func (b *Binder) toolChoices(
 
 type preparedChoice struct {
 	Choice inferenceSpec.ToolChoice
-	Call   sessionv3.ToolCall
+	Call   sessionv3Runtime.ToolCall
 }

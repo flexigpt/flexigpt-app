@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionruntime"
@@ -25,7 +25,7 @@ import (
 )
 
 type SessionV3Params struct {
-	Providers     *inference.ProviderSetAPI
+	Providers     *inferenceRuntime.ProviderSetAPI
 	Models        *modelruntime.RuntimeAdapter
 	Agents        *agentAPI.Service
 	Workspaces    *workspaceAPI.Service
@@ -36,8 +36,8 @@ type SessionV3Params struct {
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
 	MCPBridge     *invocation.ToolBridge
-	Events        sessionv3.EventPublisher
-	Workflow      sessionv3.WorkflowAdmission
+	Events        sessionv3Runtime.EventPublisher
+	Workflow      sessionv3Runtime.WorkflowAdmission
 }
 
 var (
@@ -46,7 +46,7 @@ var (
 	errSessionV3Closed      = errors.New("session v3 wrapper is closed")
 )
 
-func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3.Runtime) (T, error)) (T, error) {
+func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3Runtime.Runtime) (T, error)) (T, error) {
 	var zero T
 	if wrapper == nil {
 		return zero, errSessionV3Closed
@@ -63,7 +63,7 @@ func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3.Runtime)
 func newSessionV3WorkflowAdmission(
 	artifacts artifact.API,
 	resolver *composition.Resolver,
-) (sessionv3.WorkflowAdmission, error) {
+) (sessionv3Runtime.WorkflowAdmission, error) {
 	if artifacts == nil || resolver == nil {
 		return nil, errSessionV3Deps
 	}
@@ -117,15 +117,15 @@ func InitComposedSessionV3Runtime(
 	if err != nil {
 		return err
 	}
-	interpreters := sessionv3.NewBuiltinInterpreters()
+	interpreters := sessionv3Runtime.NewBuiltinInterpreters()
 	interpreters = append(interpreters, workflowruntime.NewInterpreter())
 
 	events := params.Events
 	if events == nil {
 		events = wrapper
 	}
-	runtime, err := sessionv3.NewRuntime(
-		sessionv3.RuntimeDependencies{
+	runtime, err := sessionv3Runtime.NewRuntime(
+		sessionv3Runtime.RuntimeDependencies{
 			Binder:       composed,
 			Checkpoints:  store,
 			Recovery:     store,

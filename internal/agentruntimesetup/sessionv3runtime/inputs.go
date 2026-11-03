@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-func (b *Binder) buildInputs(req sessionv3.WorkDispatchRequest) ([]inferenceSpec.InputUnion, error) {
+func (b *Binder) buildInputs(req sessionv3Runtime.WorkDispatchRequest) ([]inferenceSpec.InputUnion, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
 		return nil, errors.New("LLM payload is missing")
@@ -41,20 +41,20 @@ func (b *Binder) buildInputs(req sessionv3.WorkDispatchRequest) ([]inferenceSpec
 	return inputs, nil
 }
 
-func selectHistory(session sessionv3.Session, payload *sessionv3.LLMWork) []sessionv3.Activity {
+func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.LLMWork) []sessionv3Runtime.Activity {
 	_ = payload
-	out := []sessionv3.Activity{}
+	out := []sessionv3Runtime.Activity{}
 	countUser := 0
 	for _, a := range slices.Backward(session.Timeline) {
 
-		if a.Kind != sessionv3.ActivityKindMessage || a.Message == nil {
+		if a.Kind != sessionv3Runtime.ActivityKindMessage || a.Message == nil {
 			continue
 		}
 		if a.ID == payload.InputActivityID {
 			continue
 		}
-		out = append([]sessionv3.Activity{a}, out...)
-		if a.Message.Role == sessionv3.MessageRoleUser {
+		out = append([]sessionv3Runtime.Activity{a}, out...)
+		if a.Message.Role == sessionv3Runtime.MessageRoleUser {
 			countUser++
 		}
 		if !session.Defaults.History.All && countUser > session.Defaults.History.IncludePreviousUserTurns {
@@ -67,7 +67,7 @@ func selectHistory(session sessionv3.Session, payload *sessionv3.LLMWork) []sess
 	return out
 }
 
-func findActivity(session sessionv3.Session, id sessionv3.ActivityID) *sessionv3.Activity {
+func findActivity(session sessionv3Runtime.Session, id sessionv3Runtime.ActivityID) *sessionv3Runtime.Activity {
 	for i := range session.Timeline {
 		if session.Timeline[i].ID == id {
 			v := session.Timeline[i]
@@ -77,7 +77,7 @@ func findActivity(session sessionv3.Session, id sessionv3.ActivityID) *sessionv3
 	return nil
 }
 
-func findWorkItem(execution sessionv3.Execution, id sessionv3.WorkItemID) *sessionv3.WorkItem {
+func findWorkItem(execution sessionv3Runtime.Execution, id sessionv3Runtime.WorkItemID) *sessionv3Runtime.WorkItem {
 	for i := range execution.WorkItems {
 		if execution.WorkItems[i].ID == id {
 			v := execution.WorkItems[i]
@@ -87,7 +87,7 @@ func findWorkItem(execution sessionv3.Execution, id sessionv3.WorkItemID) *sessi
 	return nil
 }
 
-func activityToInput(a sessionv3.Activity) inferenceSpec.InputUnion {
+func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 	text := ""
 	if a.Message != nil {
 		text = a.Message.Text
@@ -110,7 +110,7 @@ func activityToInput(a sessionv3.Activity) inferenceSpec.InputUnion {
 		}
 	}
 	role := inferenceSpec.RoleUser
-	if a.Message != nil && a.Message.Role == sessionv3.MessageRoleAssistant {
+	if a.Message != nil && a.Message.Role == sessionv3Runtime.MessageRoleAssistant {
 		role = inferenceSpec.RoleAssistant
 	}
 	return inferenceSpec.InputUnion{
@@ -124,9 +124,9 @@ func activityToInput(a sessionv3.Activity) inferenceSpec.InputUnion {
 	}
 }
 
-func attachmentToContentItem(a sessionv3.Attachment) (inferenceSpec.InputOutputContentItemUnion, bool) {
+func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.InputOutputContentItemUnion, bool) {
 	switch a.Kind {
-	case sessionv3.AttachmentKindText:
+	case sessionv3Runtime.AttachmentKindText:
 		if strings.TrimSpace(a.Text) == "" {
 			return inferenceSpec.InputOutputContentItemUnion{}, false
 		}
@@ -134,7 +134,7 @@ func attachmentToContentItem(a sessionv3.Attachment) (inferenceSpec.InputOutputC
 			Kind:     inferenceSpec.ContentItemKindText,
 			TextItem: &inferenceSpec.ContentItemText{Text: a.Text},
 		}, true
-	case sessionv3.AttachmentKindImage:
+	case sessionv3Runtime.AttachmentKindImage:
 		image := &inferenceSpec.ContentItemImage{ImageMIME: "image/png"}
 		if a.MIMEType != "" {
 			image.ImageMIME = a.MIMEType
@@ -152,7 +152,7 @@ func attachmentToContentItem(a sessionv3.Attachment) (inferenceSpec.InputOutputC
 			Kind:      inferenceSpec.ContentItemKindImage,
 			ImageItem: image,
 		}, true
-	case sessionv3.AttachmentKindFile:
+	case sessionv3Runtime.AttachmentKindFile:
 		file := &inferenceSpec.ContentItemFile{FileMIME: "application/octet-stream"}
 		if a.MIMEType != "" {
 			file.FileMIME = a.MIMEType
@@ -176,7 +176,7 @@ func attachmentToContentItem(a sessionv3.Attachment) (inferenceSpec.InputOutputC
 			return inferenceSpec.InputOutputContentItemUnion{}, false
 		}
 		return inferenceSpec.InputOutputContentItemUnion{Kind: inferenceSpec.ContentItemKindFile, FileItem: file}, true
-	case sessionv3.AttachmentKindURL:
+	case sessionv3Runtime.AttachmentKindURL:
 		if strings.TrimSpace(a.URL) == "" && strings.TrimSpace(a.Text) == "" {
 			return inferenceSpec.InputOutputContentItemUnion{}, false
 		}
@@ -193,7 +193,7 @@ func attachmentToContentItem(a sessionv3.Attachment) (inferenceSpec.InputOutputC
 	}
 }
 
-func toolResultToInput(item sessionv3.WorkItem) inferenceSpec.InputUnion {
+func toolResultToInput(item sessionv3Runtime.WorkItem) inferenceSpec.InputUnion {
 	text := ""
 	if item.Output != nil && item.Output.Tool != nil {
 		text = item.Output.Tool.Text
@@ -212,7 +212,7 @@ func toolResultToInput(item sessionv3.WorkItem) inferenceSpec.InputUnion {
 			Name:     call.Name,
 			Role:     inferenceSpec.RoleTool,
 			Status:   inferenceSpec.StatusCompleted,
-			IsError:  item.Output.Tool.Kind != sessionv3.ToolOutputKindSuccess,
+			IsError:  item.Output.Tool.Kind != sessionv3Runtime.ToolOutputKindSuccess,
 			Contents: []inferenceSpec.ToolOutputItemUnion{
 				{
 					Kind:     inferenceSpec.ContentItemKindText,
@@ -223,7 +223,7 @@ func toolResultToInput(item sessionv3.WorkItem) inferenceSpec.InputUnion {
 	}
 }
 
-func (b *Binder) systemPromptText(_ context.Context, req sessionv3.WorkDispatchRequest) string {
+func (b *Binder) systemPromptText(_ context.Context, req sessionv3Runtime.WorkDispatchRequest) string {
 	parts := []string{}
 	payload := req.WorkItem.Input.LLM
 	if payload != nil {

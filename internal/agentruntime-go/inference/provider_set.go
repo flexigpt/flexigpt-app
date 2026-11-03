@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -109,8 +108,8 @@ func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
 
 func (ps *ProviderSetAPI) AddProvider(
 	ctx context.Context,
-	request *inferenceRuntimeSpec.AddProviderRequest,
-) (*inferenceRuntimeSpec.AddProviderResponse, error) {
+	request *AddProviderRequest,
+) (*AddProviderResponse, error) {
 	if request == nil || request.Body == nil ||
 		request.Provider == "" ||
 		strings.TrimSpace(request.Body.Origin) == "" {
@@ -131,26 +130,26 @@ func (ps *ProviderSetAPI) AddProvider(
 	if err != nil {
 		return nil, err
 	}
-	return &inferenceRuntimeSpec.AddProviderResponse{}, nil
+	return &AddProviderResponse{}, nil
 }
 
 func (ps *ProviderSetAPI) DeleteProvider(
 	ctx context.Context,
-	request *inferenceRuntimeSpec.DeleteProviderRequest,
-) (*inferenceRuntimeSpec.DeleteProviderResponse, error) {
+	request *DeleteProviderRequest,
+) (*DeleteProviderResponse, error) {
 	if request == nil || request.Provider == "" {
 		return nil, errors.New("invalid provider removal request")
 	}
 	if err := ps.inner.DeleteProvider(ctx, request.Provider); err != nil {
 		return nil, err
 	}
-	return &inferenceRuntimeSpec.DeleteProviderResponse{}, nil
+	return &DeleteProviderResponse{}, nil
 }
 
 func (ps *ProviderSetAPI) SetProviderAPIKey(
 	ctx context.Context,
-	request *inferenceRuntimeSpec.SetProviderAPIKeyRequest,
-) (*inferenceRuntimeSpec.SetProviderAPIKeyResponse, error) {
+	request *SetProviderAPIKeyRequest,
+) (*SetProviderAPIKeyResponse, error) {
 	if request == nil || request.Body == nil || request.Provider == "" {
 		return nil, errors.New("invalid provider credential request")
 	}
@@ -161,13 +160,13 @@ func (ps *ProviderSetAPI) SetProviderAPIKey(
 	); err != nil {
 		return nil, err
 	}
-	return &inferenceRuntimeSpec.SetProviderAPIKeyResponse{}, nil
+	return &SetProviderAPIKeyResponse{}, nil
 }
 
 func (ps *ProviderSetAPI) FetchCompletion(
 	ctx context.Context,
-	request *inferenceRuntimeSpec.CompletionRequest,
-) (*inferenceRuntimeSpec.CompletionResponse, error) {
+	request *CompletionRequest,
+) (*CompletionResponse, error) {
 	if request == nil {
 		return nil, errors.New("prepared completion request is required")
 	}
@@ -243,8 +242,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
-	return &inferenceRuntimeSpec.CompletionResponse{
-		Body: &inferenceRuntimeSpec.CompletionResponseBody{
+	return &CompletionResponse{
+		Body: &CompletionResponseBody{
 			InferenceResponse: response,
 		},
 	}, executeErr

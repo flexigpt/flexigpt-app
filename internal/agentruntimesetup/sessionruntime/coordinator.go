@@ -17,7 +17,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
+
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
@@ -134,7 +134,7 @@ type preparedSkillSession struct {
 }
 
 type preparedOperation struct {
-	configuration  inferenceRuntimeSpec.RuntimeConfiguration
+	configuration  inferenceRuntime.RuntimeConfiguration
 	inputs         []inferenceSpec.InputUnion
 	currentInputs  []inferenceSpec.InputUnion
 	currentContext []string
@@ -528,7 +528,7 @@ func (c *coordinator) ExecuteModel(
 
 	response, executeErr := c.providers.FetchCompletion(
 		ctx,
-		&inferenceRuntimeSpec.CompletionRequest{
+		&inferenceRuntime.CompletionRequest{
 			Configuration:    configuration,
 			Inputs:           inputs,
 			ToolChoices:      toolChoices,
@@ -1442,8 +1442,8 @@ func preparedOperationFingerprint(
 }
 
 func cloneRuntimeConfiguration(
-	value inferenceRuntimeSpec.RuntimeConfiguration,
-) inferenceRuntimeSpec.RuntimeConfiguration {
+	value inferenceRuntime.RuntimeConfiguration,
+) inferenceRuntime.RuntimeConfiguration {
 	output := value
 	output.ProviderParam.DefaultHeaders = maps.Clone(
 		value.ProviderParam.DefaultHeaders,

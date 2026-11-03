@@ -1,4 +1,4 @@
-package spec
+package inference
 
 import inferenceSpec "github.com/flexigpt/inference-go/spec"
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/mapstore-go"
@@ -26,7 +26,7 @@ func (s *Store) lock() error {
 	return nil
 }
 
-func (s *Store) readDocument(id sessionv3.SessionID, _ bool) (sessionDocument, bool, error) {
+func (s *Store) readDocument(id sessionv3Runtime.SessionID, _ bool) (sessionDocument, bool, error) {
 	if err := validateStoreSessionID(id); err != nil {
 		return sessionDocument{}, false, err
 	}
@@ -56,9 +56,9 @@ func (s *Store) readDocument(id sessionv3.SessionID, _ bool) (sessionDocument, b
 	return doc, true, nil
 }
 
-func (s *Store) writeDocument(session sessionv3.Session) error {
+func (s *Store) writeDocument(session sessionv3Runtime.Session) error {
 	doc := sessionDocument{
-		SchemaVersion: sessionv3.SchemaVersion,
+		SchemaVersion: sessionv3Runtime.SchemaVersion,
 		Kind:          sessionDocumentKindSession,
 		SessionID:     session.ID,
 		Session:       &session,
@@ -66,7 +66,7 @@ func (s *Store) writeDocument(session sessionv3.Session) error {
 	return s.writeRawDocument(session.ID, doc)
 }
 
-func (s *Store) writeRawDocument(id sessionv3.SessionID, doc sessionDocument) error {
+func (s *Store) writeRawDocument(id sessionv3Runtime.SessionID, doc sessionDocument) error {
 	filename, err := stableSessionFilename(id, documentExtension)
 	if err != nil {
 		return err
@@ -92,15 +92,15 @@ func (s *Store) writeRawDocument(id sessionv3.SessionID, doc sessionDocument) er
 	return s.documents.SetFileData(mapstore.FileKey{FileName: filename}, data)
 }
 
-func (s *Store) writeIndex(session sessionv3.Session) error {
-	active := []sessionv3.ExecutionID{}
+func (s *Store) writeIndex(session sessionv3Runtime.Session) error {
+	active := []sessionv3Runtime.ExecutionID{}
 	for _, e := range session.Executions {
 		if !e.State.Terminal() {
 			active = append(active, e.ID)
 		}
 	}
 	record := sessionIndexRecord{
-		SchemaVersion: sessionv3.SchemaVersion,
+		SchemaVersion: sessionv3Runtime.SchemaVersion,
 		Item: SessionListItem{
 			ID:                 session.ID,
 			Revision:           session.Revision,
@@ -122,7 +122,7 @@ func (s *Store) writeIndex(session sessionv3.Session) error {
 	return s.index.SetFileData(mapstore.FileKey{FileName: filename}, data)
 }
 
-func (s *Store) deleteIndex(id sessionv3.SessionID) error {
+func (s *Store) deleteIndex(id sessionv3Runtime.SessionID) error {
 	filename, err := stableSessionFilename(id, indexExtension)
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (s *Store) deleteIndex(id sessionv3.SessionID) error {
 	return s.index.DeleteFile(mapstore.FileKey{FileName: filename})
 }
 
-func (s *Store) readIndex(id sessionv3.SessionID) (sessionIndexRecord, bool, error) {
+func (s *Store) readIndex(id sessionv3Runtime.SessionID) (sessionIndexRecord, bool, error) {
 	filename, err := stableSessionFilename(id, indexExtension)
 	if err != nil {
 		return sessionIndexRecord{}, false, err
@@ -176,7 +176,7 @@ func (s *Store) readIndexFile(filename string) (sessionIndexRecord, error) {
 	); err != nil {
 		return sessionIndexRecord{}, err
 	}
-	if record.SchemaVersion != sessionv3.SchemaVersion {
+	if record.SchemaVersion != sessionv3Runtime.SchemaVersion {
 		return sessionIndexRecord{}, fmt.Errorf("%w: unsupported index schema", ErrInvalidDocument)
 	}
 	if err := validateStoreSessionID(record.Item.ID); err != nil {
@@ -222,15 +222,15 @@ func (s *Store) allDocuments() ([]sessionDocument, error) {
 	return out, nil
 }
 
-func cloneSession(v sessionv3.Session) sessionv3.Session {
+func cloneSession(v sessionv3Runtime.Session) sessionv3Runtime.Session {
 	return jsonutil.CloneJSONInValue(v)
 }
 
-func cloneExecution(v sessionv3.Execution) sessionv3.Execution {
+func cloneExecution(v sessionv3Runtime.Execution) sessionv3Runtime.Execution {
 	return jsonutil.CloneJSONInValue(v)
 }
 
-func cloneOutcome(v *sessionv3.ExecutionOutcome) *sessionv3.ExecutionOutcome {
+func cloneOutcome(v *sessionv3Runtime.ExecutionOutcome) *sessionv3Runtime.ExecutionOutcome {
 	if v == nil {
 		return nil
 	}
@@ -252,7 +252,7 @@ func filepathBase(p string) string {
 	return filepath.Base(p)
 }
 
-func stableSessionFilename(id sessionv3.SessionID, ext string) (string, error) {
+func stableSessionFilename(id sessionv3Runtime.SessionID, ext string) (string, error) {
 	if err := validateStoreSessionID(id); err != nil {
 		return "", err
 	}
@@ -344,7 +344,7 @@ func decodeStoreDocumentJSON(raw []byte) (sessionDocument, error) {
 	return doc, nil
 }
 
-func validateStoreSessionID(id sessionv3.SessionID) error {
+func validateStoreSessionID(id sessionv3Runtime.SessionID) error {
 	if err := uuidutil.ValidateUUIDv7(string(id)); err != nil {
 		return fmt.Errorf("%w: invalid Session ID: %w", ErrInvalidDocument, err)
 	}
@@ -352,7 +352,7 @@ func validateStoreSessionID(id sessionv3.SessionID) error {
 }
 
 func validateStoreDocument(doc sessionDocument) error {
-	if doc.SchemaVersion != sessionv3.SchemaVersion {
+	if doc.SchemaVersion != sessionv3Runtime.SchemaVersion {
 		return fmt.Errorf("%w: unsupported schema version %q", ErrInvalidDocument, doc.SchemaVersion)
 	}
 	if err := validateStoreSessionID(doc.SessionID); err != nil {

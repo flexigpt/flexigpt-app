@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -17,7 +17,10 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-func (b *Binder) goToolChoices(ctx context.Context, req sessionv3.WorkDispatchRequest) ([]preparedChoice, error) {
+func (b *Binder) goToolChoices(
+	ctx context.Context,
+	req sessionv3Runtime.WorkDispatchRequest,
+) ([]preparedChoice, error) {
 	out := []preparedChoice{}
 	if b.deps.Tools == nil {
 		return out, nil
@@ -68,7 +71,7 @@ func (b *Binder) goToolChoices(ctx context.Context, req sessionv3.WorkDispatchRe
 }
 
 func validateV3ToolSelection(
-	selection sessionv3.ArtifactSelection,
+	selection sessionv3Runtime.ArtifactSelection,
 	resolved toolAPI.ResolvedToolView,
 ) error {
 	artifact := resolved.Tool.Artifact
@@ -84,24 +87,26 @@ func validateV3ToolSelection(
 	return nil
 }
 
-func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.ToolChoice, sessionv3.ToolCall, bool) {
+func v3GoOrProviderChoice(
+	resolved toolAPI.ResolvedToolView,
+) (inferenceSpec.ToolChoice, sessionv3Runtime.ToolCall, bool) {
 	name := string(resolved.Tool.Name)
 	if strings.TrimSpace(name) == "" {
-		return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
+		return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 	}
 	args := getEmptySchema()
 	if len(resolved.Tool.InputSchema) != 0 {
 		var err error
 		args, err = jsonutil.DecodeJSONRaw[map[string]any](resolved.Tool.InputSchema)
 		if err != nil {
-			return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
+			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 		}
 	}
 	digest := ""
 	if resolved.Tool.Artifact.ResolvedDefinition != nil {
 		digest = string(*resolved.Tool.Artifact.ResolvedDefinition)
 	}
-	pin := sessionv3.ArtifactPin{
+	pin := sessionv3Runtime.ArtifactPin{
 		RootID:     string(resolved.Tool.Artifact.RootID),
 		ArtifactID: string(resolved.Tool.Artifact.ID),
 		Revision:   resolved.Tool.Artifact.Revision,
@@ -111,7 +116,7 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 	case toolv1.ImplementationKindGo:
 		function := strings.TrimSpace(resolved.Tool.Implementation.Function)
 		if function == "" {
-			return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
+			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 		}
 		id := stableV3ChoiceID(
 			"v3-go",
@@ -127,14 +132,14 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 			Description: resolved.Tool.Description,
 			Arguments:   args,
 		}
-		call := sessionv3.ToolCall{
+		call := sessionv3Runtime.ToolCall{
 			Name:        name,
 			ChoiceID:    id,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
-			Binding: sessionv3.ToolBinding{
-				Kind: sessionv3.ToolBindingKindGo,
-				Go: &sessionv3.GoToolBinding{
+			Binding: sessionv3Runtime.ToolBinding{
+				Kind: sessionv3Runtime.ToolBindingKindGo,
+				Go: &sessionv3Runtime.GoToolBinding{
 					Target:      pin,
 					LogicalName: name,
 					Function:    function,
@@ -145,7 +150,7 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 	case toolv1.ImplementationKindSDK:
 		sdkType := strings.TrimSpace(string(resolved.Tool.Implementation.SDKToolType))
 		if sdkType == "" {
-			return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
+			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 		}
 		id := stableV3ChoiceID(
 			"v3-sdk",
@@ -161,14 +166,14 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 			Description: resolved.Tool.Description,
 			Arguments:   args,
 		}
-		call := sessionv3.ToolCall{
+		call := sessionv3Runtime.ToolCall{
 			Name:        name,
 			ChoiceID:    id,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
-			Binding: sessionv3.ToolBinding{
-				Kind: sessionv3.ToolBindingKindProvider,
-				Provider: &sessionv3.ProviderToolBinding{
+			Binding: sessionv3Runtime.ToolBinding{
+				Kind: sessionv3Runtime.ToolBindingKindProvider,
+				Provider: &sessionv3Runtime.ProviderToolBinding{
 					Type: sdkType,
 					Name: name,
 				},
@@ -176,7 +181,7 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 		}
 		return choice, call, true
 	default:
-		return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
+		return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 	}
 }
 

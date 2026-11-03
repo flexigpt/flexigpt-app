@@ -5,29 +5,29 @@ import (
 	"sync"
 
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 )
 
 type skillSessions struct {
 	mu          sync.Mutex
-	byExecution map[sessionv3.ExecutionID]string
+	byExecution map[sessionv3Runtime.ExecutionID]string
 }
 
 func newSkillSessions() *skillSessions {
-	return &skillSessions{byExecution: map[sessionv3.ExecutionID]string{}}
+	return &skillSessions{byExecution: map[sessionv3Runtime.ExecutionID]string{}}
 }
 
 func (b *Binder) executeSkillTool(
 	ctx context.Context,
-	req sessionv3.WorkDispatchRequest,
-	payload *sessionv3.ToolWork,
-) (sessionv3.WorkExecutionResult, error) {
+	req sessionv3Runtime.WorkDispatchRequest,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.WorkExecutionResult, error) {
 	sessionID, err := b.ensureSkillSession(ctx, req)
 	if err != nil {
 		//nolint:nilerr // Explicit return.
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "skill_session_failed", Message: err.Error()},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "skill_session_failed", Message: err.Error()},
 		}, nil
 	}
 	resp, err := b.deps.SkillRuntime.InvokeSkillTool(
@@ -42,28 +42,28 @@ func (b *Binder) executeSkillTool(
 	)
 	if err != nil {
 		//nolint:nilerr // Explicit return.
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "skill_failed", Message: err.Error()},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "skill_failed", Message: err.Error()},
 		}, nil
 	}
 	if resp == nil || resp.Body == nil {
-		return sessionv3.WorkExecutionResult{
-			Error: &sessionv3.SanitizedError{Code: "skill_empty", Message: "skill returned no response"},
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{Code: "skill_empty", Message: "skill returned no response"},
 		}, nil
 	}
 	text := string(mustMarshal(resp.Body.Outputs))
-	kind := sessionv3.ToolOutputKindSuccess
-	var execErr *sessionv3.SanitizedError
+	kind := sessionv3Runtime.ToolOutputKindSuccess
+	var execErr *sessionv3Runtime.SanitizedError
 	if resp.Body.IsError {
-		kind = sessionv3.ToolOutputKindError
-		execErr = &sessionv3.SanitizedError{Code: "skill_tool_error", Message: resp.Body.ErrorMessage}
+		kind = sessionv3Runtime.ToolOutputKindError
+		execErr = &sessionv3Runtime.SanitizedError{Code: "skill_tool_error", Message: resp.Body.ErrorMessage}
 	}
-	return sessionv3.WorkExecutionResult{
-		Output: &sessionv3.WorkItemOutput{
-			Tool: &sessionv3.ToolOutput{
+	return sessionv3Runtime.WorkExecutionResult{
+		Output: &sessionv3Runtime.WorkItemOutput{
+			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,
-				Structured: sessionv3.MustCanonicalValue(resp.Body.Outputs),
+				Structured: sessionv3Runtime.MustCanonicalValue(resp.Body.Outputs),
 			},
 		},
 		Error:     execErr,
@@ -71,7 +71,7 @@ func (b *Binder) executeSkillTool(
 	}, nil
 }
 
-func (b *Binder) ensureSkillSession(ctx context.Context, req sessionv3.WorkDispatchRequest) (string, error) {
+func (b *Binder) ensureSkillSession(ctx context.Context, req sessionv3Runtime.WorkDispatchRequest) (string, error) {
 	b.skills.mu.Lock()
 	existing := b.skills.byExecution[req.Execution.ID]
 	b.skills.mu.Unlock()

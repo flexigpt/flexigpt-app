@@ -4,14 +4,17 @@ import (
 	"context"
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-func (b *Binder) mcpToolChoices(ctx context.Context, req sessionv3.WorkDispatchRequest) ([]preparedChoice, error) {
+func (b *Binder) mcpToolChoices(
+	ctx context.Context,
+	req sessionv3Runtime.WorkDispatchRequest,
+) ([]preparedChoice, error) {
 	out := []preparedChoice{}
 	if b.deps.MCPRuntime == nil {
 		return out, nil
@@ -20,7 +23,7 @@ func (b *Binder) mcpToolChoices(ctx context.Context, req sessionv3.WorkDispatchR
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if sel.ToolExposure == sessionv3.MCPToolExposureNone {
+		if sel.ToolExposure == sessionv3Runtime.MCPToolExposureNone {
 			continue
 		}
 		ref := artifactModel.ArtifactRef{
@@ -45,7 +48,7 @@ func (b *Binder) mcpToolChoices(ctx context.Context, req sessionv3.WorkDispatchR
 			if t.TaskSupport == mcpServer.MCPTaskSupportRequired {
 				continue
 			}
-			if sel.ToolExposure != sessionv3.MCPToolExposureAll && string(sel.ToolExposure) != "" {
+			if sel.ToolExposure != sessionv3Runtime.MCPToolExposureAll && string(sel.ToolExposure) != "" {
 				found := false
 				for _, s := range sel.SelectedTools {
 					if s.ToolName == t.ToolName {
@@ -68,14 +71,14 @@ func (b *Binder) mcpToolChoices(ctx context.Context, req sessionv3.WorkDispatchR
 				Description: t.Description,
 				Arguments:   args,
 			}
-			call := sessionv3.ToolCall{
+			call := sessionv3Runtime.ToolCall{
 				Name:        t.ProviderToolName,
 				ChoiceID:    t.ChoiceID,
 				DisplayName: t.DisplayName,
 				Description: t.Description,
-				Binding: sessionv3.ToolBinding{
-					Kind: sessionv3.ToolBindingKindMCP,
-					MCP: &sessionv3.MCPToolBinding{
+				Binding: sessionv3Runtime.ToolBinding{
+					Kind: sessionv3Runtime.ToolBindingKindMCP,
+					MCP: &sessionv3Runtime.MCPToolBinding{
 						ServerID:         string(t.Server),
 						ProviderToolName: t.ProviderToolName,
 						ChoiceID:         t.ChoiceID,

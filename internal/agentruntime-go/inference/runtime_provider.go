@@ -12,8 +12,6 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
-
-	inferenceRuntimeSpec "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference/spec"
 )
 
 const runtimeProviderCleanupTimeout = 5 * time.Second
@@ -73,7 +71,7 @@ func (ps *ProviderSetAPI) removeRuntimeProvider(
 
 func (ps *ProviderSetAPI) registerRuntimeProvider(
 	ctx context.Context,
-	config inferenceRuntimeSpec.RuntimeConfiguration,
+	config RuntimeConfiguration,
 	completionKey string,
 ) (inferenceSpec.ProviderName, func(), error) {
 	sum := sha256.Sum256([]byte(
@@ -102,7 +100,7 @@ func (ps *ProviderSetAPI) registerRuntimeProvider(
 func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	config inferenceRuntimeSpec.RuntimeConfiguration,
+	config RuntimeConfiguration,
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
 	if len(config.CapabilityOverrides) == 0 {

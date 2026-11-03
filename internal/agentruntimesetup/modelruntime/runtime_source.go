@@ -7,6 +7,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
+	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -40,7 +41,7 @@ func (a *RuntimeAdapter) BindModelStore(store *modelAPI.Service) error {
 func (a *RuntimeAdapter) ResolveRuntimeModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
-) (RuntimeConfiguration, error) {
+) (inferenceRuntime.RuntimeConfiguration, error) {
 	value, _, err := a.ResolveRuntimeModelWithRequestPatch(ctx, ref, nil)
 	return value, err
 }
@@ -49,22 +50,22 @@ func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	requestPatch *RuntimeRequestPatch,
-) (RuntimeConfiguration, *RuntimeModelUse, error) {
+) (inferenceRuntime.RuntimeConfiguration, *RuntimeModelUse, error) {
 	prepared, err := prepareRuntimeRequestPatch(requestPatch)
 	if err != nil {
-		return RuntimeConfiguration{}, nil, err
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
 	store, err := a.modelStore()
 	if err != nil {
-		return RuntimeConfiguration{}, nil, err
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
 	resolved, err := store.ResolveModel(ctx, ref)
 	if err != nil {
-		return RuntimeConfiguration{}, nil, err
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
 	value, err := a.resolveRuntime(ctx, resolved, prepared)
 	if err != nil {
-		return RuntimeConfiguration{}, nil, err
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
 	return value, &RuntimeModelUse{
 		RootID:     string(resolved.Model.Artifact.RootID),
@@ -79,19 +80,19 @@ func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 	ctx context.Context,
 	target composition.CapabilityTarget,
-) (RuntimeConfiguration, error) {
+) (inferenceRuntime.RuntimeConfiguration, error) {
 	if err := target.Validate(); err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 	if target.Type != declaration.TypeModel {
-		return RuntimeConfiguration{}, fmt.Errorf(
+		return inferenceRuntime.RuntimeConfiguration{}, fmt.Errorf(
 			"%w: capability target type is %q, expected model",
 			storeSpec.ErrUnsupported,
 			target.Type,
 		)
 	}
 	if target.Form != composition.TargetFormArtifact || target.Artifact == nil {
-		return RuntimeConfiguration{}, fmt.Errorf(
+		return inferenceRuntime.RuntimeConfiguration{}, fmt.Errorf(
 			"%w: direct Model capability targets require an application runtime adapter",
 			storeSpec.ErrUnsupported,
 		)
@@ -99,15 +100,15 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 
 	store, err := a.modelStore()
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 	resolved, err := store.ResolveModel(ctx, *target.Artifact)
 	if err != nil {
-		return RuntimeConfiguration{}, err
+		return inferenceRuntime.RuntimeConfiguration{}, err
 	}
 	if resolved.Model.Artifact.Ref() != *target.Artifact ||
 		resolved.Model.Artifact.LogicalName != target.Name {
-		return RuntimeConfiguration{}, fmt.Errorf(
+		return inferenceRuntime.RuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model capability target no longer matches current source-backed configuration",
 			storeSpec.ErrReferenceUnresolved,
 		)

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
 // TriggerManager is backend-only trigger ownership. It never creates another
@@ -15,13 +15,13 @@ type TriggerManager struct {
 	mu      sync.Mutex
 	closed  bool
 	cancels map[string]context.CancelFunc
-	start   func(context.Context, sessionv3.StartWorkflowCommand) (*sessionv3.CommandReceipt, error)
-	signal  func(context.Context, sessionv3.SignalExecutionCommand) (*sessionv3.CommandReceipt, error)
+	start   func(context.Context, sessionv3Runtime.StartWorkflowCommand) (*sessionv3Runtime.CommandReceipt, error)
+	signal  func(context.Context, sessionv3Runtime.SignalExecutionCommand) (*sessionv3Runtime.CommandReceipt, error)
 }
 
 func NewTriggerManager(
-	start func(context.Context, sessionv3.StartWorkflowCommand) (*sessionv3.CommandReceipt, error),
-	signal func(context.Context, sessionv3.SignalExecutionCommand) (*sessionv3.CommandReceipt, error),
+	start func(context.Context, sessionv3Runtime.StartWorkflowCommand) (*sessionv3Runtime.CommandReceipt, error),
+	signal func(context.Context, sessionv3Runtime.SignalExecutionCommand) (*sessionv3Runtime.CommandReceipt, error),
 ) *TriggerManager {
 	return &TriggerManager{cancels: map[string]context.CancelFunc{}, start: start, signal: signal}
 }
@@ -39,7 +39,7 @@ func (m *TriggerManager) Close() {
 	m.mu.Unlock()
 }
 
-func (m *TriggerManager) Schedule(key string, at time.Time, command sessionv3.StartWorkflowCommand) {
+func (m *TriggerManager) Schedule(key string, at time.Time, command sessionv3Runtime.StartWorkflowCommand) {
 	if m == nil || key == "" {
 		return
 	}
@@ -77,8 +77,8 @@ func (m *TriggerManager) Schedule(key string, at time.Time, command sessionv3.St
 
 func (m *TriggerManager) Signal(
 	ctx context.Context,
-	command sessionv3.SignalExecutionCommand,
-) (*sessionv3.CommandReceipt, error) {
+	command sessionv3Runtime.SignalExecutionCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
 	if m == nil || m.signal == nil {
 		return nil, context.Canceled
 	}
