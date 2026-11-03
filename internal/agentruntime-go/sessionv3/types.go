@@ -55,13 +55,16 @@ type HistorySelection struct {
 type MCPToolExposure string
 
 const (
-	MCPToolExposureNone MCPToolExposure = "none"
-	MCPToolExposureAll  MCPToolExposure = "all"
+	MCPToolExposureNone     MCPToolExposure = "none"
+	MCPToolExposureAll      MCPToolExposure = "all"
+	MCPToolExposureSelected MCPToolExposure = "selected"
 )
 
 type MCPToolSelection struct {
-	ToolName       string `json:"toolName"`
-	ExpectedDigest string `json:"expectedDigest,omitempty"`
+	ToolName       string  `json:"toolName"`
+	ExpectedDigest string  `json:"expectedDigest,omitempty"`
+	ApprovalRule   *string `json:"approvalRule,omitempty"`
+	ExecutionMode  *string `json:"executionMode,omitempty"`
 }
 
 type MCPServerSelection struct {

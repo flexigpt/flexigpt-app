@@ -58,9 +58,6 @@ func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.L
 		if !session.Defaults.History.All && countUser > session.Defaults.History.IncludePreviousUserTurns {
 			break
 		}
-		if len(reversed) >= 64 {
-			break
-		}
 	}
 
 	out := make([]sessionv3Runtime.Activity, len(reversed))
@@ -112,18 +109,29 @@ func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 			}
 		}
 	}
+
 	role := inferenceSpec.RoleUser
-	if a.Message != nil && a.Message.Role == sessionv3Runtime.MessageRoleAssistant {
-		role = inferenceSpec.RoleAssistant
+	if a.Message != nil && a.Message.Role != "" {
+		role = inferenceSpec.RoleEnum(a.Message.Role)
 	}
+	message := &inferenceSpec.InputOutputContent{
+		ID:       string(a.ID),
+		Role:     role,
+		Status:   inferenceSpec.StatusNone,
+		Contents: contents,
+	}
+
+	if role == inferenceSpec.RoleAssistant {
+		message.Status = inferenceSpec.StatusCompleted
+		return inferenceSpec.InputUnion{
+			Kind:          inferenceSpec.InputKindOutputMessage,
+			OutputMessage: message,
+		}
+	}
+
 	return inferenceSpec.InputUnion{
-		Kind: inferenceSpec.InputKindInputMessage,
-		InputMessage: &inferenceSpec.InputOutputContent{
-			ID:       string(a.ID),
-			Role:     role,
-			Status:   inferenceSpec.StatusNone,
-			Contents: contents,
-		},
+		Kind:         inferenceSpec.InputKindInputMessage,
+		InputMessage: message,
 	}
 }
 

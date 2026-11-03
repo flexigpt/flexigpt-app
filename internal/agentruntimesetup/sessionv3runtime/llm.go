@@ -11,8 +11,10 @@ import (
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -51,10 +53,12 @@ func (b *Binder) bindLLM(
 	if err := ref.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+
+	requestPatch := v3ModelRequestPatch(payload.Temperature)
 	resolved, modelUse, err := b.deps.Models.ResolveRuntimeModelWithRequestPatch(
 		ctx,
 		ref,
-		nil,
+		requestPatch,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
@@ -293,4 +297,19 @@ func appendPrompt(base, extra string) string {
 		return base
 	}
 	return base + "\n\n" + extra
+}
+
+func v3ModelRequestPatch(
+	temperature *float64,
+) *modelruntime.RuntimeRequestPatch {
+	if temperature == nil {
+		return nil
+	}
+
+	value := *temperature
+	return &modelruntime.RuntimeRequestPatch{
+		Defaults: &modelDomain.DefaultsPatch{
+			Temperature: &value,
+		},
+	}
 }

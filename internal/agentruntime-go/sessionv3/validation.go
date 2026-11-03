@@ -165,10 +165,38 @@ func validateDefaults(value SessionDefaults) error {
 		return err
 	}
 
+	enabledSkills := make(
+		map[string]struct{},
+		len(value.Skills),
+	)
+	for _, selection := range value.Skills {
+		enabledSkills[selection.RootID+"\x00"+selection.ArtifactID] = struct{}{}
+	}
+	for _, selection := range value.ActiveSkills {
+		key := selection.RootID + "\x00" + selection.ArtifactID
+		if _, found := enabledSkills[key]; !found {
+			return fmt.Errorf(
+				"active Skill %q is not part of enabled Skills",
+				key,
+			)
+		}
+	}
+
+	servers := make(map[string]struct{}, len(value.MCP))
 	for index, selection := range value.MCP {
 		if err := validateSelection(selection.Server); err != nil {
 			return fmt.Errorf("MCP selection %d: %w", index, err)
 		}
+		serverKey := selection.Server.RootID + "\x00" +
+			selection.Server.ArtifactID
+		if _, duplicate := servers[serverKey]; duplicate {
+			return fmt.Errorf(
+				"duplicate MCP server selection %q",
+				serverKey,
+			)
+		}
+		servers[serverKey] = struct{}{}
+
 		switch selection.ToolExposure {
 		case MCPToolExposureNone:
 			if len(selection.SelectedTools) != 0 {
@@ -177,20 +205,77 @@ func validateDefaults(value SessionDefaults) error {
 					index,
 				)
 			}
-		case MCPToolExposureAll:
+
+		case "", MCPToolExposureAll:
 			if len(selection.SelectedTools) != 0 {
 				return fmt.Errorf(
 					"MCP selection %d exposes all tools but contains selected tools",
 					index,
 				)
 			}
+
+		case MCPToolExposureSelected:
+			if len(selection.SelectedTools) == 0 {
+				return fmt.Errorf(
+					"MCP selection %d selects tools but contains none",
+					index,
+				)
+			}
+			tools := make(
+				map[string]struct{},
+				len(selection.SelectedTools),
+			)
+			for toolIndex, tool := range selection.SelectedTools {
+				if err := validateMCPToolSelection(tool); err != nil {
+					return fmt.Errorf(
+						"MCP selection %d tool %d: %w",
+						index,
+						toolIndex,
+						err,
+					)
+				}
+				if _, duplicate := tools[tool.ToolName]; duplicate {
+					return fmt.Errorf(
+						"duplicate selected MCP Tool %q",
+						tool.ToolName,
+					)
+				}
+				tools[tool.ToolName] = struct{}{}
+			}
+
 		default:
 			return fmt.Errorf(
 				"unsupported MCP tool exposure %q",
 				selection.ToolExposure,
 			)
 		}
+	}
+	return nil
+}
 
+func validateMCPToolSelection(value MCPToolSelection) error {
+	if err := validateID("MCP Tool name", value.ToolName); err != nil {
+		return err
+	}
+	if value.ExpectedDigest != "" {
+		if err := validateID("MCP Tool expected digest", value.ExpectedDigest); err != nil {
+			return err
+		}
+	}
+
+	if value.ApprovalRule != nil {
+		switch *value.ApprovalRule {
+		case "allow", "ask", "deny":
+		default:
+			return errors.New("invalid MCP Tool approval override")
+		}
+	}
+	if value.ExecutionMode != nil {
+		switch *value.ExecutionMode {
+		case "auto", "manual":
+		default:
+			return errors.New("invalid MCP Tool execution override")
+		}
 	}
 	return nil
 }

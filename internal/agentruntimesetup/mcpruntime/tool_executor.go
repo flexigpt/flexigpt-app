@@ -15,6 +15,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const toolCallDenied = "MCP Tool call was denied"
+
 // SessionToolExecutor owns MCP Tool evaluation, approvals, authorization
 // tokens, invocation, and response adaptation. Session owns only Tool-call
 // state transitions and durable wait records.
@@ -309,8 +311,8 @@ func (e *SessionToolExecutor) ResolveToolWait(
 			Result: &sessionRuntime.ToolExecutionResult{
 				HasResult: true,
 				Kind:      sessionRuntime.ToolResultKindError,
-				Text:      failureText("MCP Tool call was denied"),
-				Error:     "MCP Tool call was denied",
+				Text:      failureText(toolCallDenied),
+				Error:     toolCallDenied,
 			},
 		}, nil
 

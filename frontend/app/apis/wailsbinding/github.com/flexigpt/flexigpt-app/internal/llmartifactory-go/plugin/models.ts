@@ -6,10 +6,10 @@
 import * as model$0 from "../../artifactory-go/store/artifact/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$2 from "../../artifactory-go/store/root/model/models.js";
+import * as model$1 from "../../artifactory-go/store/root/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$1 from "../../artifactory-go/store/source/model/models.js";
+import * as model$2 from "../../artifactory-go/store/source/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as spec$0 from "../../artifactory-go/store/spec/models.js";
@@ -54,8 +54,8 @@ export interface ArtifactMembershipView {
 }
 
 export interface CreateRequest {
-    "rootID": model$2.RootID;
-    "sourceID"?: model$1.SourceID;
+    "rootID": model$1.RootID;
+    "sourceID"?: model$2.SourceID;
     "name": spec$0.LogicalName;
     "displayName"?: string;
     "description"?: string;
@@ -116,7 +116,7 @@ export interface DirectSelectorMatch {
  */
 export interface ListItem {
     "ref": model$0.ArtifactRef;
-    "sourceID": model$1.SourceID;
+    "sourceID": model$2.SourceID;
     "name": spec$0.LogicalName;
     "displayName": string;
     "description"?: string;

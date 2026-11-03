@@ -29,7 +29,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
@@ -1297,50 +1296,14 @@ func instructionOwnerOrder(owner sessionRuntime.ConfigurationOwner) int {
 func modelRequestPatch(
 	input sessionRuntime.ModelDefaultsOverride,
 ) (*modelruntime.RuntimeRequestPatch, error) {
-	raw, err := json.Marshal(input)
+	raw, err := jsonutil.MarshalCanonicalObject(
+		input,
+		storeSpec.MaxDefinitionBodyBytes,
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	var defaults modelDomain.DefaultsPatch
-	if err := json.Unmarshal(raw, &defaults); err != nil {
-		return nil, err
-	}
-
-	clearFields := make(
-		[]modelruntime.RuntimeDefaultField,
-		0,
-		len(input.Clear),
-	)
-	for _, field := range input.Clear {
-		clearFields = append(
-			clearFields,
-			modelruntime.RuntimeDefaultField(field),
-		)
-	}
-
-	if isZeroModelDefaults(input) && len(clearFields) == 0 {
-		//nolint:nilnil // A nil patch explicitly means no request-level override.
-		return nil, nil
-	}
-	return &modelruntime.RuntimeRequestPatch{
-		Defaults: &defaults,
-		Clear:    clearFields,
-	}, nil
-}
-
-func isZeroModelDefaults(value sessionRuntime.ModelDefaultsOverride) bool {
-	return value.Stream == nil &&
-		value.MaxPromptTokens == nil &&
-		value.MaxOutputTokens == nil &&
-		value.Temperature == nil &&
-		value.SystemPrompt == nil &&
-		value.TimeoutMS == nil &&
-		value.Reasoning == nil &&
-		value.CacheControl == nil &&
-		value.Output == nil &&
-		value.StopSequences == nil &&
-		len(value.AdapterParameters) == 0
+	return modelruntime.RuntimeRequestPatchFromJSON(raw)
 }
 
 func appendSystemPrompt(base string, values ...string) string {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -34,7 +35,15 @@ func (b *Binder) toolChoices(
 	}
 
 	if len(req.Session.Defaults.Skills) != 0 {
-		skillChoices, err := b.skillLifecycleChoices()
+		var (
+			skillChoices []preparedChoice
+			err          error
+		)
+		if b.skillTools != nil {
+			skillChoices, err = b.skillLifecycleChoicesFromDomain(ctx, req)
+		} else {
+			skillChoices, err = b.skillLifecycleChoices()
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -68,4 +77,25 @@ func (b *Binder) toolChoices(
 type preparedChoice struct {
 	Choice inferenceSpec.ToolChoice
 	Call   sessionv3Runtime.ToolCall
+}
+
+func (b *Binder) skillLifecycleChoicesFromDomain(
+	ctx context.Context,
+	req sessionv3Runtime.WorkDispatchRequest,
+) ([]preparedChoice, error) {
+	values, err := b.skillTools.Choices(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return preparedChoicesFromDomain(values), nil
+}
+
+func preparedChoicesFromDomain(
+	values []toolruntime.V3PreparedChoice,
+) []preparedChoice {
+	output := make([]preparedChoice, len(values))
+	for index := range values {
+		output[index] = preparedChoice(values[index])
+	}
+	return output
 }

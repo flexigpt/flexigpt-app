@@ -15,6 +15,11 @@ func (b *Binder) mcpToolChoices(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
 ) ([]preparedChoice, error) {
+	if b.mcpTools != nil {
+		values, err := b.mcpTools.Choices(ctx, req.Session.Defaults.MCP)
+		return preparedChoicesFromDomain(values), err
+	}
+
 	out := []preparedChoice{}
 	if b.deps.MCPRuntime == nil {
 		return out, nil

@@ -39,6 +39,13 @@ func (b *Binder) bindTool(
 	if err := call.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindMCP &&
+		b.mcpTools != nil {
+		result, handled, err := b.mcpTools.Bind(ctx, req)
+		if handled || err != nil {
+			return result, err
+		}
+	}
 
 	semantic := sessionv3Runtime.SemanticBinding{
 		Version:           "v3-tool/v1",
@@ -126,9 +133,16 @@ func (b *Binder) bindTool(
 func (b *Binder) executeTool(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
-	_ sessionv3Runtime.BoundWork,
+	bound sessionv3Runtime.BoundWork,
 	private privateTool,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
+	if b.mcpTools != nil {
+		result, handled, err := b.mcpTools.Execute(ctx, req, bound)
+		if handled || err != nil {
+			return result, err
+		}
+	}
+
 	payload := req.WorkItem.Input.Tool
 	if payload == nil {
 		return sessionv3Runtime.WorkExecutionResult{}, errors.New("tool payload is missing")
@@ -142,6 +156,16 @@ func (b *Binder) executeTool(
 	case sessionv3Runtime.ToolBindingKindMCP:
 		return b.executeMCPTool(ctx, &effective, private)
 	case sessionv3Runtime.ToolBindingKindSkill:
+		if b.skillTools != nil {
+			result, handled, err := b.skillTools.Execute(
+				ctx,
+				req,
+				&effective,
+			)
+			if handled || err != nil {
+				return result, err
+			}
+		}
 		return b.executeSkillTool(ctx, req, &effective)
 	case sessionv3Runtime.ToolBindingKindProvider:
 		return sessionv3Runtime.WorkExecutionResult{
@@ -268,6 +292,13 @@ func (b *Binder) resolveToolWait(
 	req sessionv3Runtime.WaitResolutionRequest,
 	private privateToolWait,
 ) (sessionv3Runtime.WaitResolutionResult, error) {
+	if b.mcpTools != nil {
+		result, handled, err := b.mcpTools.ResolveWait(ctx, req)
+		if handled || err != nil {
+			return result, err
+		}
+	}
+
 	resolution, err := mcpWaitResolution(req.Resolution)
 	if err != nil {
 		return sessionv3Runtime.WaitResolutionResult{}, err

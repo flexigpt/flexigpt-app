@@ -22,16 +22,17 @@ import (
 )
 
 type SessionV3Params struct {
-	Providers     *inferenceRuntime.ProviderSetAPI
-	Models        *modelruntime.SourceResolver
-	Tools         *toolAPI.Service
-	ToolCaller    toolruntime.GoToolCaller
-	SkillResolver *skillruntime.Resolver
-	SkillRuntime  *skillRuntime.Service
-	MCPRuntime    *mcpConnection.MCPRuntimeManager
-	MCPBridge     *invocation.ToolBridge
-	Events        sessionv3Runtime.EventPublisher
-	Workflow      sessionv3Runtime.WorkflowAdmission
+	Providers        *inferenceRuntime.ProviderSetAPI
+	Models           *modelruntime.SourceResolver
+	Tools            *toolAPI.Service
+	ToolCaller       toolruntime.GoToolCaller
+	SkillResolver    *skillruntime.Resolver
+	SkillRuntime     *skillRuntime.Service
+	MCPRuntime       *mcpConnection.MCPRuntimeManager
+	MCPBridge        *invocation.ToolBridge
+	Events           sessionv3Runtime.EventPublisher
+	Workflow         sessionv3Runtime.WorkflowAdmission
+	WorkflowBindings *workflowruntime.BindingRegistry
 }
 
 var (
@@ -57,21 +58,30 @@ func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3Runtime.R
 func newSessionV3WorkflowAdmission(
 	artifacts artifact.API,
 	resolver *composition.Resolver,
-) (sessionv3Runtime.WorkflowAdmission, error) {
+) (
+	sessionv3Runtime.WorkflowAdmission,
+	*workflowruntime.BindingRegistry,
+	error,
+) {
 	if artifacts == nil || resolver == nil {
-		return nil, errSessionV3Deps
+		return nil, nil, errSessionV3Deps
 	}
 
 	workflows, err := workflowAPI.NewService(resolver)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return workflowruntime.NewAdmission(
+	bindings := workflowruntime.NewBindingRegistry()
+	admission, err := workflowruntime.NewAdmission(
 		workflows,
 		artifacts,
-		workflowruntime.NewBindingRegistry(),
+		bindings,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return admission, bindings, nil
 }
 
 func InitComposedSessionV3Runtime(
@@ -81,7 +91,8 @@ func InitComposedSessionV3Runtime(
 	params SessionV3Params,
 ) error {
 	if wrapper == nil || store == nil ||
-		params.Workflow == nil {
+		params.Workflow == nil ||
+		params.WorkflowBindings == nil {
 		return errSessionV3Deps
 	}
 	base, err := sessionv3runtime.New(
@@ -99,8 +110,7 @@ func InitComposedSessionV3Runtime(
 	if err != nil {
 		return err
 	}
-	registry := workflowruntime.NewBindingRegistry()
-	composed, err := workflowruntime.NewBinder(base, registry)
+	composed, err := workflowruntime.NewBinder(base, params.WorkflowBindings)
 	if err != nil {
 		return err
 	}

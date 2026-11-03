@@ -30,7 +30,7 @@ func validateSessionID(id sessionRuntime.SessionID) error {
 	return nil
 }
 
-func validateCapabilityTarget(target sessionRuntime.CapabilityTarget) error {
+func validateCapabilityTarget(target CapabilityTarget) error {
 	if err := validateIdentity("capability name", target.Name); err != nil {
 		return err
 	}

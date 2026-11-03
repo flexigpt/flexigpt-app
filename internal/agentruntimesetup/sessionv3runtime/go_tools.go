@@ -19,6 +19,14 @@ func (b *Binder) goToolChoices(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
 ) ([]preparedChoice, error) {
+	if b.goTools != nil {
+		values, err := b.goTools.Choices(
+			ctx,
+			req.Session.Defaults.Tools,
+		)
+		return preparedChoicesFromDomain(values), err
+	}
+
 	out := []preparedChoice{}
 	if b.deps.Tools == nil {
 		return out, nil

@@ -717,7 +717,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("session runtime initialized")
 
-	workflowAdmission, err := newSessionV3WorkflowAdmission(
+	workflowAdmission, workflowBindings, err := newSessionV3WorkflowAdmission(
 		artifactComposition.Artifacts,
 		artifactCompositionResolver,
 	)
@@ -741,16 +741,17 @@ func (a *App) initManagers() {
 		a.sessionV3RuntimeAPI,
 		sessionV3Store,
 		SessionV3Params{
-			Providers:     providerPublisher,
-			Models:        modelRuntime,
-			Tools:         a.toolStoreAPI.api,
-			ToolCaller:    toolAdapter,
-			SkillResolver: skillInference,
-			SkillRuntime:  a.skillRuntimeAPI.service,
-			MCPRuntime:    a.mcpRuntimeAPI.runtime,
-			MCPBridge:     a.mcpRuntimeAPI.toolBridge,
-			Events:        a.sessionV3RuntimeAPI,
-			Workflow:      workflowAdmission,
+			Providers:        providerPublisher,
+			Models:           modelRuntime,
+			Tools:            a.toolStoreAPI.api,
+			ToolCaller:       toolAdapter,
+			SkillResolver:    skillInference,
+			SkillRuntime:     a.skillRuntimeAPI.service,
+			MCPRuntime:       a.mcpRuntimeAPI.runtime,
+			MCPBridge:        a.mcpRuntimeAPI.toolBridge,
+			Events:           a.sessionV3RuntimeAPI,
+			Workflow:         workflowAdmission,
+			WorkflowBindings: workflowBindings,
 		},
 	); err != nil {
 		closeErr := sessionV3Store.Close()

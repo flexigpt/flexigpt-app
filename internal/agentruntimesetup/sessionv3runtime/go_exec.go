@@ -20,6 +20,10 @@ func (b *Binder) executeGoTool(
 	ctx context.Context,
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
+	if b.goTools != nil {
+		return b.goTools.ExecuteGo(ctx, payload)
+	}
+
 	binding := payload.Call.Binding.Go
 	if binding == nil {
 		return sessionv3Runtime.WorkExecutionResult{

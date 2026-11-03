@@ -286,8 +286,19 @@ func canonicalJSONValue(input json.RawMessage) (json.RawMessage, error) {
 	return json.RawMessage(canonical), nil
 }
 
+type CapabilityTarget struct {
+	Form             string                            `json:"form"`
+	Type             string                            `json:"type"`
+	Name             string                            `json:"name"`
+	Provenance       string                            `json:"provenance"`
+	Artifact         *sessionRuntime.ArtifactReference `json:"artifact,omitempty"`
+	ProviderIdentity string                            `json:"providerIdentity,omitempty"`
+	ProviderLocalID  string                            `json:"providerLocalID,omitempty"`
+	Evidence         string                            `json:"evidence,omitempty"`
+}
+
 type semanticGoBinding struct {
-	Target    sessionRuntime.CapabilityTarget `json:"target"`
+	Target    CapabilityTarget                `json:"target"`
 	Used      sessionRuntime.ResolvedArtifact `json:"used"`
 	TimeoutMS int                             `json:"timeoutMS,omitempty"`
 }

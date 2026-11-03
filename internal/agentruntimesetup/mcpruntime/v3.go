@@ -1,0 +1,800 @@
+package mcpruntime
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+)
+
+// V3Executor owns MCP Tool discovery adaptation, policy evaluation, approval
+// waits, and invocation for Session Runtime v3. Session retains only durable
+// WorkItem state and generic wait orchestration.
+type V3Executor struct {
+	runtime *mcpConnection.MCPRuntimeManager
+	bridge  *invocation.ToolBridge
+}
+
+type v3MCPExecution struct {
+	Call              sessionv3Runtime.ToolCall
+	ApprovalID        string
+	ApprovalToken     string
+	TargetFingerprint string
+}
+
+type v3MCPWait struct {
+	Call              sessionv3Runtime.ToolCall
+	Mapping           invocation.MappedToolBinding
+	Request           mcpServer.InvokeMCPToolRequestBody
+	ApprovalID        string
+	TargetFingerprint string
+}
+
+func NewV3Executor(
+	runtime *mcpConnection.MCPRuntimeManager,
+	bridge *invocation.ToolBridge,
+) (*V3Executor, error) {
+	if runtime == nil || bridge == nil {
+		return nil, errors.New("session v3 MCP runtime dependencies are incomplete")
+	}
+	return &V3Executor{
+		runtime: runtime,
+		bridge:  bridge,
+	}, nil
+}
+
+// Choices adapts selected ready MCP servers into inference choices and durable
+// bindings. A disconnected server is an error rather than a silently omitted
+// capability.
+func (e *V3Executor) Choices(
+	ctx context.Context,
+	selections []sessionv3Runtime.MCPServerSelection,
+) ([]toolruntime.V3PreparedChoice, error) {
+	if len(selections) == 0 {
+		return nil, nil
+	}
+	if e == nil || e.runtime == nil {
+		return nil, errors.New("session v3 MCP runtime is unavailable")
+	}
+
+	output := make([]toolruntime.V3PreparedChoice, 0)
+	for index := range selections {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		selection := selections[index]
+		serverID, pin, err := v3MCPServerSelection(selection)
+		if err != nil {
+			return nil, fmt.Errorf("selected MCP server %d: %w", index, err)
+		}
+
+		status, err := e.runtime.Status(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		if status == nil || status.Status != mcpServer.MCPServerStatusReady {
+			return nil, fmt.Errorf("MCP server %q is not connected", serverID)
+		}
+
+		available, err := e.runtime.ListTools(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		selected, err := v3MCPSelectedTools(available, selection)
+		if err != nil {
+			return nil, err
+		}
+
+		sort.Slice(selected, func(left, right int) bool {
+			return selected[left].ProviderToolName <
+				selected[right].ProviderToolName
+		})
+
+		for _, tool := range selected {
+			schema := jsonutil.CloneJSONInValue(tool.InputSchema)
+			if len(schema) == 0 {
+				schema = map[string]any{"type": "object"}
+			}
+
+			choice := inferenceSpec.ToolChoice{
+				Type:        inferenceSpec.ToolTypeFunction,
+				ID:          tool.ChoiceID,
+				Name:        tool.ProviderToolName,
+				Description: v3MCPToolDescription(tool),
+				Arguments:   schema,
+			}
+			call := sessionv3Runtime.ToolCall{
+				Name:     choice.Name,
+				ChoiceID: choice.ID,
+				DisplayName: firstNonBlank(
+					tool.DisplayName,
+					tool.ToolName,
+					"MCP Tool",
+				),
+				Description: strings.TrimSpace(tool.Description),
+				Automatic: tool.ExecutionMode ==
+					mcppolicy.MCPExecutionModeAuto,
+				Binding: sessionv3Runtime.ToolBinding{
+					Kind: sessionv3Runtime.ToolBindingKindMCP,
+					MCP: &sessionv3Runtime.MCPToolBinding{
+						ServerArtifact:   pin,
+						ServerID:         string(serverID),
+						ProviderToolName: tool.ProviderToolName,
+						ChoiceID:         tool.ChoiceID,
+						ToolName:         tool.ToolName,
+						ToolDigest:       tool.Digest,
+						ApprovalRule:     string(tool.ApprovalRule),
+						ExecutionMode:    string(tool.ExecutionMode),
+					},
+				},
+			}
+			output = append(output, toolruntime.V3PreparedChoice{
+				Choice: choice,
+				Call:   call,
+			})
+		}
+	}
+	return output, nil
+}
+
+// Bind handles MCP Tool evaluation. The private values returned here remain in
+// Session Runtime memory and are never written to checkpoints.
+func (e *V3Executor) Bind(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+) (sessionv3Runtime.BindResult, bool, error) {
+	payload := request.WorkItem.Input.Tool
+	if payload == nil ||
+		payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindMCP {
+		return sessionv3Runtime.BindResult{}, false, nil
+	}
+
+	call := payload.Call
+	if err := call.Validate(); err != nil {
+		return sessionv3Runtime.BindResult{}, true, err
+	}
+
+	mapping, invokeRequest, err := v3MappedMCPRequest(payload)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, true, err
+	}
+	evaluation, err := e.bridge.EvaluateMapped(
+		ctx,
+		mapping,
+		invokeRequest,
+	)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, true, err
+	}
+	if evaluation == nil {
+		return sessionv3Runtime.BindResult{}, true, errors.New(
+			"MCP approval evaluation returned no result",
+		)
+	}
+
+	fingerprint := string(mcpServer.DigestBytes([]byte(
+		string(mapping.Server) + "\x00" +
+			mapping.ToolName + "\x00" +
+			mapping.ToolDigest + "\x00" +
+			call.ID,
+	)))
+	semantic := sessionv3Runtime.SemanticBinding{
+		Version:           "session-v3-mcp/v1",
+		TargetFingerprint: fingerprint,
+		BoundAt:           time.Now().UTC(),
+	}
+	if call.Binding.MCP.ServerArtifact != nil {
+		semantic.Artifacts = []sessionv3Runtime.ArtifactPin{
+			*call.Binding.MCP.ServerArtifact,
+		}
+	}
+
+	switch evaluation.Decision {
+	case mcpServer.MCPApprovalDecisionAllowed:
+		return sessionv3Runtime.BindResult{
+			SemanticBinding: semantic,
+			Private: v3MCPExecution{
+				Call:              call,
+				TargetFingerprint: fingerprint,
+			},
+		}, true, nil
+
+	case mcpServer.MCPApprovalDecisionDenied:
+		message := v3MCPFailureText(evaluation.Reason)
+		return sessionv3Runtime.BindResult{
+			SemanticBinding: semantic,
+			ImmediateOutput: &sessionv3Runtime.WorkItemOutput{
+				Tool: &sessionv3Runtime.ToolOutput{
+					Kind:  sessionv3Runtime.ToolOutputKindError,
+					Text:  message,
+					Error: message,
+				},
+			},
+		}, true, nil
+
+	case mcpServer.MCPApprovalDecisionApprovalRequired:
+		if evaluation.Summary == nil ||
+			strings.TrimSpace(evaluation.ApprovalID) == "" {
+			return sessionv3Runtime.BindResult{}, true, errors.New(
+				"MCP approval evaluation has no approval identity or summary",
+			)
+		}
+
+		summary, err := canonicalV3MCPValue(evaluation.Summary)
+		if err != nil {
+			return sessionv3Runtime.BindResult{}, true, err
+		}
+		deadline, err := parseV3MCPDeadline(evaluation.ExpiresAt)
+		if err != nil {
+			return sessionv3Runtime.BindResult{}, true, err
+		}
+
+		wait := &sessionv3Runtime.WaitRequest{
+			Kind:    sessionv3Runtime.WaitKindApproval,
+			Summary: summary,
+			AllowedResolutions: []sessionv3Runtime.WaitResolution{
+				sessionv3Runtime.WaitResolutionApproveOnce,
+				sessionv3Runtime.WaitResolutionApproveAlways,
+				sessionv3Runtime.WaitResolutionDenyOnce,
+				sessionv3Runtime.WaitResolutionDenyAlways,
+			},
+			Deadline:     deadline,
+			RuntimeBound: true,
+		}
+		return sessionv3Runtime.BindResult{
+			SemanticBinding: semantic,
+			Wait:            wait,
+			Private: v3MCPWait{
+				Call:              call,
+				Mapping:           mapping,
+				Request:           invokeRequest,
+				ApprovalID:        evaluation.ApprovalID,
+				TargetFingerprint: fingerprint,
+			},
+		}, true, nil
+
+	default:
+		return sessionv3Runtime.BindResult{}, true, fmt.Errorf(
+			"unsupported MCP approval decision %q",
+			evaluation.Decision,
+		)
+	}
+}
+
+// Execute handles a private binding returned by Bind.
+func (e *V3Executor) Execute(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+	bound sessionv3Runtime.BoundWork,
+) (sessionv3Runtime.WorkExecutionResult, bool, error) {
+	private, found := bound.Private.(v3MCPExecution)
+	if !found {
+		return sessionv3Runtime.WorkExecutionResult{}, false, nil
+	}
+
+	payload := request.WorkItem.Input.Tool
+	if payload == nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "invalid_mcp_binding",
+				Message: "MCP Tool payload is missing",
+			},
+		}, true, nil
+	}
+
+	effective := *payload
+	effective.Call = private.Call
+	mapping, invokeRequest, err := v3MappedMCPRequest(&effective)
+	if err != nil {
+		//nolint:nilerr // Ok.
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "invalid_mcp_binding",
+				Message: err.Error(),
+			},
+		}, true, nil
+	}
+	invokeRequest.ApprovalID = private.ApprovalID
+	invokeRequest.ApprovalToken = private.ApprovalToken
+
+	response, err := e.bridge.InvokeMapped(ctx, mapping, invokeRequest)
+	if err != nil {
+		//nolint:nilerr // Ok.
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "mcp_failed",
+				Message: err.Error(),
+			},
+		}, true, nil
+	}
+	if response == nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "mcp_empty",
+				Message: "MCP Tool returned no response",
+			},
+		}, true, nil
+	}
+
+	content, err := canonicalV3MCPValue(response.Content)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
+	structured, err := canonicalV3MCPValue(struct {
+		Content           []mcpServer.MCPContent          `json:"content"`
+		StructuredContent any                             `json:"structuredContent,omitempty"`
+		App               *mcpServer.MCPToolAppRenderInfo `json:"app,omitempty"`
+	}{
+		Content:           response.Content,
+		StructuredContent: response.StructuredContent,
+		App:               response.App,
+	})
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
+
+	text := v3MCPContentsText(response.Content)
+	if strings.TrimSpace(text) == "" {
+		text = string(content)
+	}
+	kind := sessionv3Runtime.ToolOutputKindSuccess
+	errorText := ""
+	if response.IsError {
+		kind = sessionv3Runtime.ToolOutputKindError
+		errorText = firstNonBlank(
+			text,
+			"MCP Tool returned an error result",
+		)
+	}
+
+	return sessionv3Runtime.WorkExecutionResult{
+		Output: &sessionv3Runtime.WorkItemOutput{
+			Tool: &sessionv3Runtime.ToolOutput{
+				Kind:       kind,
+				Text:       text,
+				Structured: structured,
+				Error:      errorText,
+			},
+			Receipt: &sessionv3Runtime.ExternalReceipt{
+				System:      "mcp",
+				Reference:   private.TargetFingerprint,
+				ConfirmedAt: time.Now().UTC(),
+			},
+		},
+		Confirmed: true,
+	}, true, nil
+}
+
+// ResolveWait translates a Session v3 approval resolution into the MCP
+// approval protocol and returns a resumed private execution binding.
+func (e *V3Executor) ResolveWait(
+	ctx context.Context,
+	request sessionv3Runtime.WaitResolutionRequest,
+) (sessionv3Runtime.WaitResolutionResult, bool, error) {
+	private, found := request.Private.(v3MCPWait)
+	if !found {
+		return sessionv3Runtime.WaitResolutionResult{}, false, nil
+	}
+
+	resolution, err := v3MCPWaitResolution(request.Resolution)
+	if err != nil {
+		return sessionv3Runtime.WaitResolutionResult{}, true, err
+	}
+	result, err := e.bridge.ResolveApproval(
+		ctx,
+		private.ApprovalID,
+		resolution,
+	)
+	if err != nil {
+		if errors.Is(err, mcpServer.ErrMCPInvalidRuntimeRequest) ||
+			errors.Is(err, mcpServer.ErrMCPApprovalNeeded) {
+			message := "MCP approval expired or is no longer valid"
+			return sessionv3Runtime.WaitResolutionResult{
+				Output: &sessionv3Runtime.WorkItemOutput{
+					Tool: &sessionv3Runtime.ToolOutput{
+						Kind:  sessionv3Runtime.ToolOutputKindError,
+						Text:  message,
+						Error: message,
+					},
+				},
+				Confirmed: true,
+			}, true, nil
+		}
+		return sessionv3Runtime.WaitResolutionResult{}, true, err
+	}
+
+	switch result.Decision {
+	case mcpServer.MCPApprovalDecisionDenied:
+		return sessionv3Runtime.WaitResolutionResult{
+			Output: &sessionv3Runtime.WorkItemOutput{
+				Tool: &sessionv3Runtime.ToolOutput{
+					Kind:  sessionv3Runtime.ToolOutputKindError,
+					Text:  toolCallDenied,
+					Error: toolCallDenied,
+				},
+			},
+			Confirmed: true,
+		}, true, nil
+
+	case mcpServer.MCPApprovalDecisionAllowed:
+		if request.Resolution ==
+			sessionv3Runtime.WaitResolutionApproveOnce &&
+			strings.TrimSpace(result.Token) == "" {
+			return sessionv3Runtime.WaitResolutionResult{}, true, errors.New(
+				"MCP one-time approval returned no approval token",
+			)
+		}
+
+		return sessionv3Runtime.WaitResolutionResult{
+			Resume: true,
+			Bound: &sessionv3Runtime.BoundWork{
+				SemanticBinding: sessionv3Runtime.SemanticBinding{
+					Version:           "session-v3-mcp-resume/v1",
+					TargetFingerprint: private.TargetFingerprint,
+					BoundAt:           time.Now().UTC(),
+				},
+				Private: v3MCPExecution{
+					Call:              private.Call,
+					ApprovalID:        result.ApprovalID,
+					ApprovalToken:     result.Token,
+					TargetFingerprint: private.TargetFingerprint,
+				},
+			},
+		}, true, nil
+
+	default:
+		return sessionv3Runtime.WaitResolutionResult{}, true, fmt.Errorf(
+			"unsupported MCP approval resolution decision %q",
+			result.Decision,
+		)
+	}
+}
+
+func v3MCPServerSelection(
+	selection sessionv3Runtime.MCPServerSelection,
+) (mcpServer.ServerID, *sessionv3Runtime.ArtifactPin, error) {
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(selection.Server.RootID),
+		ArtifactID: artifactModel.ArtifactID(selection.Server.ArtifactID),
+	}
+	if err := ref.Validate(); err != nil {
+		return "", nil, err
+	}
+
+	serverID, err := ServerIDForArtifact(ref)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if selection.Server.ExpectedRevision == 0 ||
+		strings.TrimSpace(selection.Server.ExpectedDigest) == "" {
+		return serverID, nil, nil
+	}
+
+	return serverID, &sessionv3Runtime.ArtifactPin{
+		RootID:     selection.Server.RootID,
+		ArtifactID: selection.Server.ArtifactID,
+		Revision:   selection.Server.ExpectedRevision,
+		Digest:     selection.Server.ExpectedDigest,
+	}, nil
+}
+
+func v3MCPSelectedTools(
+	available []mcpServer.MCPToolCapability,
+	selection sessionv3Runtime.MCPServerSelection,
+) ([]mcpServer.MCPToolCapability, error) {
+	exposure := selection.ToolExposure
+	if exposure == "" {
+		exposure = sessionv3Runtime.MCPToolExposureAll
+	}
+
+	switch exposure {
+	case sessionv3Runtime.MCPToolExposureNone:
+		return nil, nil
+
+	case sessionv3Runtime.MCPToolExposureAll:
+		output := make([]mcpServer.MCPToolCapability, 0, len(available))
+		for _, tool := range available {
+			if v3MCPToolAvailable(tool) {
+				output = append(output, tool)
+			}
+		}
+		return output, nil
+
+	case sessionv3Runtime.MCPToolExposureSelected:
+		byName := make(
+			map[string]mcpServer.MCPToolCapability,
+			len(available),
+		)
+		for _, tool := range available {
+			byName[tool.ToolName] = tool
+		}
+
+		output := make(
+			[]mcpServer.MCPToolCapability,
+			0,
+			len(selection.SelectedTools),
+		)
+		for _, requested := range selection.SelectedTools {
+			tool, found := byName[requested.ToolName]
+			if !found || !v3MCPToolAvailable(tool) {
+				return nil, fmt.Errorf(
+					"selected MCP Tool %q is unavailable",
+					requested.ToolName,
+				)
+			}
+			if requested.ExpectedDigest != "" &&
+				requested.ExpectedDigest != tool.Digest {
+				return nil, fmt.Errorf(
+					"selected MCP Tool %q changed since selection",
+					requested.ToolName,
+				)
+			}
+
+			constrained, err := v3ConstrainMCPTool(tool, requested)
+			if err != nil {
+				return nil, err
+			}
+			output = append(output, constrained)
+		}
+		return output, nil
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported MCP Tool exposure %q",
+			selection.ToolExposure,
+		)
+	}
+}
+
+func v3MCPToolAvailable(
+	tool mcpServer.MCPToolCapability,
+) bool {
+	return tool.Enabled &&
+		tool.TaskSupport != mcpServer.MCPTaskSupportRequired &&
+		mcpApps.ToolVisibleToModel(tool.App)
+}
+
+func v3ConstrainMCPTool(
+	tool mcpServer.MCPToolCapability,
+	selection sessionv3Runtime.MCPToolSelection,
+) (mcpServer.MCPToolCapability, error) {
+	output := tool
+
+	if selection.ApprovalRule != nil {
+		value, err := v3MCPApprovalRule(*selection.ApprovalRule)
+		if err != nil {
+			return mcpServer.MCPToolCapability{}, err
+		}
+		if mcppolicy.ApprovalRuleRank(value) <
+			mcppolicy.ApprovalRuleRank(
+				mcppolicy.NormalizedApprovalRule(tool.ApprovalRule),
+			) {
+			return mcpServer.MCPToolCapability{}, errors.New(
+				"MCP approval override weakens the effective server policy",
+			)
+		}
+		output.ApprovalRule = value
+	}
+
+	if selection.ExecutionMode != nil {
+		value, err := v3MCPExecutionMode(*selection.ExecutionMode)
+		if err != nil {
+			return mcpServer.MCPToolCapability{}, err
+		}
+		if mcppolicy.ExecutionModeRank(value) <
+			mcppolicy.ExecutionModeRank(
+				mcppolicy.NormalizedExecutionMode(tool.ExecutionMode),
+			) {
+			return mcpServer.MCPToolCapability{}, errors.New(
+				"MCP execution override weakens the effective server policy",
+			)
+		}
+		output.ExecutionMode = value
+	}
+	return output, nil
+}
+
+func v3MCPApprovalRule(
+	value string,
+) (mcppolicy.MCPApprovalRule, error) {
+	if strings.TrimSpace(value) != value {
+		return "", errors.New("MCP approval override is not normalized")
+	}
+
+	rule := mcppolicy.MCPApprovalRule(value)
+	switch rule {
+	case mcppolicy.MCPApprovalRuleAllow,
+		mcppolicy.MCPApprovalRuleAsk,
+		mcppolicy.MCPApprovalRuleDeny:
+		return rule, nil
+	default:
+		return "", errors.New("unsupported MCP approval override")
+	}
+}
+
+func v3MCPExecutionMode(
+	value string,
+) (mcppolicy.MCPExecutionMode, error) {
+	if strings.TrimSpace(value) != value {
+		return "", errors.New("MCP execution override is not normalized")
+	}
+
+	mode := mcppolicy.MCPExecutionMode(value)
+	switch mode {
+	case mcppolicy.MCPExecutionModeAuto,
+		mcppolicy.MCPExecutionModeManual:
+		return mode, nil
+	default:
+		return "", errors.New("unsupported MCP execution override")
+	}
+}
+
+func v3MappedMCPRequest(
+	payload *sessionv3Runtime.ToolWork,
+) (
+	invocation.MappedToolBinding,
+	mcpServer.InvokeMCPToolRequestBody,
+	error,
+) {
+	if payload == nil || payload.Call.Binding.MCP == nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			errors.New("MCP Tool binding is missing")
+	}
+
+	binding := payload.Call.Binding.MCP
+	mapping := invocation.MappedToolBinding{
+		Server:           mcpServer.ServerID(binding.ServerID),
+		ProviderToolName: binding.ProviderToolName,
+		ChoiceID:         binding.ChoiceID,
+		ToolName:         binding.ToolName,
+		ToolDigest:       binding.ToolDigest,
+		ApprovalRule:     mcppolicy.MCPApprovalRule(binding.ApprovalRule),
+		ExecutionMode:    mcppolicy.MCPExecutionMode(binding.ExecutionMode),
+	}
+	if err := mapping.Validate(); err != nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			err
+	}
+
+	arguments := payload.Call.Arguments.Clone()
+	if len(arguments) == 0 {
+		arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+	}
+	values, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+		arguments,
+	)
+	if err != nil || values == nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			errors.New("MCP Tool arguments must be a JSON object")
+	}
+
+	return mapping, mcpServer.InvokeMCPToolRequestBody{
+		Source:           mcpServer.MCPInvocationSourceModel,
+		ToolName:         binding.ToolName,
+		ProviderToolName: binding.ProviderToolName,
+		ChoiceID:         binding.ChoiceID,
+		ToolDigest:       binding.ToolDigest,
+		Arguments:        values,
+		ToolUseID: firstNonBlank(
+			payload.Call.ProviderCallID,
+			payload.Call.ID,
+		),
+	}, nil
+}
+
+func canonicalV3MCPValue(
+	value any,
+) (sessionv3Runtime.CanonicalValue, error) {
+	raw, err := jsonutil.EncodeToJSONRaw(value)
+	if err != nil {
+		return nil, err
+	}
+	return sessionv3Runtime.CanonicalValueFrom(raw)
+}
+
+func parseV3MCPDeadline(value string) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		//nolint:nilnil // Ok.
+		return nil, nil
+	}
+
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return nil, fmt.Errorf("decode MCP approval expiration: %w", err)
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
+}
+
+func v3MCPWaitResolution(
+	value sessionv3Runtime.WaitResolution,
+) (mcpServer.MCPApprovalResolution, error) {
+	switch value {
+	case sessionv3Runtime.WaitResolutionApproveOnce:
+		return mcpServer.MCPApprovalResolutionAllowOnce, nil
+	case sessionv3Runtime.WaitResolutionApproveAlways:
+		return mcpServer.MCPApprovalResolutionAllowAlways, nil
+	case sessionv3Runtime.WaitResolutionDenyOnce:
+		return mcpServer.MCPApprovalResolutionDenyOnce, nil
+	case sessionv3Runtime.WaitResolutionDenyAlways:
+		return mcpServer.MCPApprovalResolutionDenyAlways, nil
+	default:
+		return "", fmt.Errorf("unsupported MCP wait resolution %q", value)
+	}
+}
+
+func v3MCPToolDescription(
+	tool mcpServer.MCPToolCapability,
+) string {
+	return firstNonBlank(
+		strings.TrimSpace(tool.Description),
+		tool.DisplayName,
+		tool.ToolName,
+	)
+}
+
+func v3MCPFailureText(reason string) string {
+	return firstNonBlank(reason, "MCP policy denied the Tool call.")
+}
+
+func v3MCPContentsText(
+	contents []mcpServer.MCPContent,
+) string {
+	parts := make([]string, 0, len(contents))
+	for _, content := range contents {
+		switch content.Type {
+		case mcpServer.MCPContentTypeText:
+			if strings.TrimSpace(content.Text) != "" {
+				parts = append(parts, content.Text)
+			}
+
+		case mcpServer.MCPContentTypeResource:
+			if content.Resource == nil {
+				continue
+			}
+			if strings.TrimSpace(content.Resource.Text) != "" {
+				parts = append(parts, content.Resource.Text)
+			} else if strings.TrimSpace(content.Resource.URI) != "" {
+				parts = append(
+					parts,
+					"[MCP resource omitted: "+content.Resource.URI+"]",
+				)
+			}
+
+		case mcpServer.MCPContentTypeResourceLink:
+			if value := strings.TrimSpace(
+				content.Name + " " + content.URI,
+			); value != "" {
+				parts = append(parts, value)
+			}
+
+		case mcpServer.MCPContentTypeImage:
+			parts = append(parts, "[MCP image content omitted]")
+
+		case mcpServer.MCPContentTypeAudio:
+			parts = append(parts, "[MCP audio content omitted]")
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
