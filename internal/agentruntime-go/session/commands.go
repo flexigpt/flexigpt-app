@@ -12,10 +12,12 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
-	toolCallNotFound = "tool call was not found"
+	toolCallNotFound               = "tool call was not found"
+	maximumCommandFingerprintBytes = 32 << 20
 )
 
 func (r *Runtime) CreateSession(
@@ -2717,10 +2719,14 @@ func preparationFailureDetails(
 }
 
 func commandFingerprint(value any) (string, error) {
-	raw, err := json.Marshal(value)
+	raw, err := jsonutil.MarshalCanonicalObject(
+		value,
+		maximumCommandFingerprintBytes,
+	)
 	if err != nil {
-		return "", fmt.Errorf("encode command payload: %w", err)
+		return "", fmt.Errorf("canonicalize command payload: %w", err)
 	}
+
 	// Include the command type so different command kinds cannot share an ID
 	// merely because their JSON object shapes happen to be identical.
 	typed := append(fmt.Appendf(nil, "%T\x00", value), raw...)

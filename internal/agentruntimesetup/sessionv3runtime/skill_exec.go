@@ -51,7 +51,12 @@ func (b *Binder) executeSkillTool(
 			Error: &sessionv3Runtime.SanitizedError{Code: "skill_empty", Message: "skill returned no response"},
 		}, nil
 	}
-	text := string(mustMarshal(resp.Body.Outputs))
+	structured, err := canonicalValue(resp.Body.Outputs)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, err
+	}
+
+	text := string(structured)
 	kind := sessionv3Runtime.ToolOutputKindSuccess
 	var execErr *sessionv3Runtime.SanitizedError
 	if resp.Body.IsError {
@@ -63,7 +68,7 @@ func (b *Binder) executeSkillTool(
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,
-				Structured: sessionv3Runtime.MustCanonicalValue(resp.Body.Outputs),
+				Structured: structured,
 			},
 		},
 		Error:     execErr,

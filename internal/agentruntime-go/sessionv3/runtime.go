@@ -11,10 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
-const maxDurableCommandRecords = 1024
+const (
+	maxDurableCommandRecords       = 1024
+	maximumCommandFingerprintBytes = 32 << 20
+)
 
 type RuntimeDependencies struct {
 	Binder       WorkBinder
@@ -2054,7 +2058,10 @@ func (r *Runtime) rejectLocked(session *Session, meta CommandMeta, payload any, 
 }
 
 func fingerprintCommand(value any) (string, error) {
-	raw, err := json.Marshal(value)
+	raw, err := jsonutil.MarshalCanonicalObject(
+		value,
+		maximumCommandFingerprintBytes,
+	)
 	if err != nil {
 		return "", err
 	}

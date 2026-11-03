@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
@@ -58,7 +59,16 @@ func (b *Binder) executeGoTool(
 		timeout,
 	)
 	if err != nil {
-		text, structured := toolOutputsToV3(outputs)
+		text, structured, conversionErr := toolOutputsToV3(outputs)
+		if conversionErr != nil {
+			//nolint:nilerr // Explicit.
+			return sessionv3Runtime.WorkExecutionResult{
+				Error: &sessionv3Runtime.SanitizedError{
+					Code:    "go_tool_output_invalid",
+					Message: conversionErr.Error(),
+				},
+			}, nil
+		}
 		if strings.TrimSpace(text) == "" {
 			text = err.Error()
 		}
@@ -82,7 +92,16 @@ func (b *Binder) executeGoTool(
 			Confirmed: true,
 		}, nil
 	}
-	text, structured := toolOutputsToV3(outputs)
+	text, structured, conversionErr := toolOutputsToV3(outputs)
+	if conversionErr != nil {
+		//nolint:nilerr // Explicit.
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "go_tool_output_invalid",
+				Message: conversionErr.Error(),
+			},
+		}, nil
+	}
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
 			Tool: &sessionv3Runtime.ToolOutput{
@@ -146,29 +165,18 @@ func (b *Binder) resolvePinnedGoTool(
 	return resolved, nil
 }
 
-func toolOutputsToV3(outputs []llmtoolsSpec.ToolOutputUnion) (string, sessionv3Runtime.CanonicalValue) {
-	parts := []string{}
-	for _, o := range outputs {
-		switch o.Kind {
-		case llmtoolsSpec.ToolOutputKindText:
-			if o.TextItem != nil {
-				parts = append(parts, o.TextItem.Text)
-			}
-		case llmtoolsSpec.ToolOutputKindImage:
-			parts = append(parts, "[tool image omitted]")
-		case llmtoolsSpec.ToolOutputKindFile:
-			parts = append(parts, "[tool file omitted]")
-		default:
-			parts = append(parts, "[tool output omitted]")
-		}
-	}
-	return strings.Join(parts, "\n\n"), sessionv3Runtime.MustCanonicalValue(outputs)
-}
-
-func mustMarshal(v any) []byte {
-	raw, err := json.Marshal(v)
+func toolOutputsToV3(
+	outputs []llmtoolsSpec.ToolOutputUnion,
+) (string, sessionv3Runtime.CanonicalValue, error) {
+	raw, err := toolruntime.CanonicalToolOutputs(outputs)
 	if err != nil {
-		return []byte(`{}`)
+		return "", nil, err
 	}
-	return raw
+
+	value, err := sessionv3Runtime.CanonicalValueFrom(raw)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return toolruntime.ToolOutputsText(outputs), value, nil
 }

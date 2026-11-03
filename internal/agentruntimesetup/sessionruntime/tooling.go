@@ -7,200 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
-	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
-type GoToolCaller interface {
-	CallGoTool(
-		ctx context.Context,
-		function string,
-		args json.RawMessage,
-		timeout time.Duration,
-	) ([]llmtoolsSpec.ToolOutputUnion, error)
-}
-
-type goToolExecutor struct {
-	tools  *toolAPI.Service
-	caller GoToolCaller
-}
-
-// goToolBinding is durable semantic execution evidence for one Go Tool call.
-//
-// Used is an immutable Artifact Definition witness captured during operation
-// preparation. It is not an allocation request and must match the current Tool
-// Definition before execution can invoke a local Go function.
-type goToolBinding struct {
-	Target    composition.CapabilityTarget    `json:"target"`
-	Used      sessionRuntime.ResolvedArtifact `json:"used"`
-	TimeoutMS int                             `json:"timeoutMS,omitempty"`
-}
-
-func newGoToolExecutor(
-	tools *toolAPI.Service,
-	caller GoToolCaller,
-) (*goToolExecutor, error) {
-	if tools == nil || caller == nil {
-		return nil, errors.New(
-			"go Tool executor dependencies are incomplete",
-		)
-	}
-
-	return &goToolExecutor{
-		tools:  tools,
-		caller: caller,
-	}, nil
-}
-
-func (e *goToolExecutor) EvaluateTool(
-	_ context.Context,
-	_ sessionRuntime.ToolExecutionRequest,
-) (sessionRuntime.ToolEvaluation, error) {
-	return sessionRuntime.ToolEvaluation{
-		Decision: sessionRuntime.ToolEvaluationAllowed,
-	}, nil
-}
-
-func (e *goToolExecutor) ExecuteTool(
-	ctx context.Context,
-	request sessionRuntime.ToolExecutionRequest,
-) (sessionRuntime.ToolExecutionResult, error) {
-	var binding goToolBinding
-	if err := json.Unmarshal(request.ToolCall.Binding.Data, &binding); err != nil {
-		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
-			"decode Go Tool binding: %w",
-			err,
-		)
-	}
-	if binding.TimeoutMS < 0 {
-		return sessionRuntime.ToolExecutionResult{}, errors.New(
-			"go Tool timeout cannot be negative",
-		)
-	}
-
-	resolved, err := e.tools.ResolveToolTarget(ctx, binding.Target)
-	if err != nil {
-		return sessionRuntime.ToolExecutionResult{}, err
-	}
-
-	current := toolResolvedArtifact(resolved)
-	if err := validateGoToolBindingCurrent(binding, current); err != nil {
-		return sessionRuntime.ToolExecutionResult{}, err
-	}
-
-	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
-		return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
-			"tool %q is not a Go Tool",
-			resolved.Tool.Name,
-		)
-	}
-
-	args := request.ToolCall.Arguments
-	if len(bytes.TrimSpace(args)) == 0 {
-		args = json.RawMessage(`{}`)
-	}
-	if !json.Valid(args) {
-		return sessionRuntime.ToolExecutionResult{}, errors.New(
-			"go Tool arguments are invalid JSON",
-		)
-	}
-
-	outputs, invokeErr := e.caller.CallGoTool(
-		ctx,
-		resolved.Tool.Implementation.Function,
-		args,
-		durationMilliseconds(binding.TimeoutMS),
-	)
-
-	rawOutputs, err := json.Marshal(outputs)
-	if err != nil {
-		return sessionRuntime.ToolExecutionResult{}, err
-	}
-
-	result := sessionRuntime.ToolExecutionResult{
-		HasResult:  true,
-		Kind:       sessionRuntime.ToolResultKindSuccess,
-		Text:       string(rawOutputs),
-		Contents:   toolOutputItemsFromLLMToolOutputs(outputs),
-		Structured: rawOutputs,
-	}
-	if invokeErr != nil {
-		result.Kind = sessionRuntime.ToolResultKindError
-		result.Error = invokeErr.Error()
-	}
-	return result, nil
-}
-
-// validateGoToolBindingCurrent prevents a pending Tool call from silently
-// executing a changed Tool Definition.
-//
-// Revision is deliberately not compared. Local Artifact metadata can advance a
-// revision without changing the executable Tool declaration. ResolveToolTarget
-// separately checks current Artifact availability and enablement.
-func validateGoToolBindingCurrent(
-	binding goToolBinding,
-	current *sessionRuntime.ResolvedArtifact,
-) error {
-	if err := binding.Target.Validate(); err != nil {
-		return fmt.Errorf("invalid persisted Go Tool target: %w", err)
-	}
-
-	if binding.Target.Form != composition.TargetFormArtifact ||
-		binding.Target.Artifact == nil {
-		return errors.New(
-			"go Tool binding must retain an Artifact-backed Tool target",
-		)
-	}
-
-	if strings.TrimSpace(binding.Used.RootID) == "" ||
-		strings.TrimSpace(binding.Used.ArtifactID) == "" ||
-		strings.TrimSpace(binding.Used.Digest) == "" {
-		return errors.New(
-			"go Tool binding has no immutable Artifact Definition witness",
-		)
-	}
-
-	if string(binding.Target.Artifact.RootID) != binding.Used.RootID ||
-		string(binding.Target.Artifact.ArtifactID) != binding.Used.ArtifactID {
-		return errors.New(
-			"go Tool binding target and Artifact Definition witness differ",
-		)
-	}
-
-	if current == nil {
-		return errors.New("current Go Tool Artifact witness is unavailable")
-	}
-	if current.RootID != binding.Used.RootID ||
-		current.ArtifactID != binding.Used.ArtifactID {
-		return errors.New(
-			"go Tool Artifact identity changed since Tool call preparation",
-		)
-	}
-	if strings.TrimSpace(current.Digest) == "" ||
-		current.Digest != binding.Used.Digest {
-		return errors.New(
-			"go Tool Definition changed since Tool call preparation",
-		)
-	}
-	return nil
-}
-
-func (e *goToolExecutor) ResolveToolWait(
-	_ context.Context,
-	_ sessionRuntime.ToolWaitResolutionRequest,
-) (sessionRuntime.ToolWaitResolution, error) {
-	return sessionRuntime.ToolWaitResolution{}, errors.New(
-		"go tool execution does not expose an approval wait",
-	)
-}
+const maximumToolBindingBytes = 1 << 20
 
 func (c *coordinator) prepareTools(
 	ctx context.Context,
@@ -236,10 +55,8 @@ func (c *coordinator) prepareTools(
 			item := contribution.item
 			item.State = sessionRuntime.ResolutionStateUnavailable
 			item.Reason = err.Error()
-			summary.Tools = append(
-				summary.Tools,
-				item,
-			)
+			summary.Tools = append(summary.Tools, item)
+
 			severity := sessionRuntime.DiagnosticSeverityWarning
 			if contribution.required {
 				severity = sessionRuntime.DiagnosticSeverityError
@@ -369,10 +186,13 @@ func toolChoiceAndBinding(
 
 	switch resolved.Tool.Implementation.Kind {
 	case toolv1.ImplementationKindGo:
-		rawBinding, err := json.Marshal(goToolBinding{
-			Target: target,
-			Used:   *toolResolvedArtifact(resolved),
-		})
+		rawBinding, err := jsonutil.MarshalCanonicalObject(
+			toolruntime.GoBinding{
+				Target: target,
+				Used:   *toolResolvedArtifact(resolved),
+			},
+			maximumToolBindingBytes,
+		)
 		if err != nil {
 			return inferenceSpec.ToolChoice{},
 				sessionRuntime.ToolCallProposal{},
@@ -431,6 +251,7 @@ func toolChoiceAndBinding(
 					resolved.Tool.Implementation.SDKToolType,
 				)
 		}
+
 		return choice, proposal, nil
 
 	default:
@@ -555,6 +376,7 @@ func toolResolvedArtifact(
 	if value.Tool.Artifact.ResolvedDefinition != nil {
 		digest = string(*value.Tool.Artifact.ResolvedDefinition)
 	}
+
 	return &sessionRuntime.ResolvedArtifact{
 		RootID:     string(value.Tool.Artifact.RootID),
 		ArtifactID: string(value.Tool.Artifact.ID),
@@ -569,11 +391,4 @@ func stableChoiceID(prefix, key string) string {
 		cryptoutil.DigestSHA256Prefix,
 	)
 	return prefix + "-" + digest[:16]
-}
-
-func durationMilliseconds(value int) time.Duration {
-	if value <= 0 {
-		return 0
-	}
-	return time.Duration(value) * time.Millisecond
 }

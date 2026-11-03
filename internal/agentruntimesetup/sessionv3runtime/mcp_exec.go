@@ -237,7 +237,16 @@ func (b *Binder) executeMCPTool(
 			Error: &sessionv3Runtime.SanitizedError{Code: "mcp_empty", Message: "MCP returned no response"},
 		}, nil
 	}
-	text := string(mustMarshal(resp.Content))
+	content, err := canonicalValue(resp.Content)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, err
+	}
+	structured, err := canonicalValue(resp)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, err
+	}
+
+	text := string(content)
 	kind := sessionv3Runtime.ToolOutputKindSuccess
 	if resp.IsError {
 		kind = sessionv3Runtime.ToolOutputKindError
@@ -247,7 +256,7 @@ func (b *Binder) executeMCPTool(
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,
-				Structured: sessionv3Runtime.MustCanonicalValue(resp),
+				Structured: structured,
 			},
 		},
 		Confirmed: true,

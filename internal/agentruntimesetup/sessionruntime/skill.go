@@ -16,6 +16,7 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -375,7 +376,7 @@ func (c *coordinator) prepareSkills(
 	return output, effective, activeRefs, instructionOutput, nil
 }
 
-func (c *coordinator) ensureSkillSession(
+func (c *coordinator) EnsureSkillSession(
 	ctx context.Context,
 	request sessionRuntime.SkillSessionRequest,
 ) (sessionRuntime.SkillSessionResult, error) {
@@ -471,7 +472,7 @@ func (c *coordinator) ensureSkillSession(
 	}, nil
 }
 
-func (c *coordinator) closeSkillSession(
+func (c *coordinator) CloseSkillSession(
 	ctx context.Context,
 	sessionID string,
 ) error {
@@ -489,7 +490,7 @@ func (c *coordinator) closeSkillSession(
 	return nil
 }
 
-func (c *coordinator) invokeSkillTool(
+func (c *coordinator) InvokeSkillTool(
 	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolExecutionResult, error) {
@@ -529,7 +530,7 @@ func (c *coordinator) invokeSkillTool(
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
 		Text:       string(outputs),
-		Contents:   toolOutputItemsFromLLMToolOutputs(response.Body.Outputs),
+		Contents:   toolruntime.OutputItemsFromLLMToolOutputs(response.Body.Outputs),
 		Structured: outputs,
 	}
 	if response.Body.IsError {

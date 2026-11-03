@@ -1,78 +1,18 @@
-package sessionruntime
+package mcpruntime
 
 import (
 	"encoding/base64"
 	"strings"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
-	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 )
 
-// toolOutputItemsFromLLMToolOutputs adapts executor-originated llmtools
-// output to the canonical inference-go ToolOutput content representation.
-func toolOutputItemsFromLLMToolOutputs(
-	outputs []llmtoolsSpec.ToolOutputUnion,
-) []sessionRuntime.InferenceToolOutputItem {
-	result := make(
-		[]sessionRuntime.InferenceToolOutputItem,
-		0,
-		len(outputs),
-	)
-
-	for _, output := range outputs {
-		switch output.Kind {
-		case llmtoolsSpec.ToolOutputKindText:
-			if output.TextItem == nil {
-				continue
-			}
-			result = append(result, inferenceSpec.ToolOutputItemUnion{
-				Kind: inferenceSpec.ContentItemKindText,
-				TextItem: &inferenceSpec.ContentItemText{
-					Text: output.TextItem.Text,
-				},
-			})
-
-		case llmtoolsSpec.ToolOutputKindImage:
-			if output.ImageItem == nil {
-				continue
-			}
-			result = append(result, inferenceSpec.ToolOutputItemUnion{
-				Kind: inferenceSpec.ContentItemKindImage,
-				ImageItem: &inferenceSpec.ContentItemImage{
-					ImageName: output.ImageItem.ImageName,
-					ImageMIME: output.ImageItem.ImageMIME,
-					ImageData: output.ImageItem.ImageData,
-				},
-			})
-
-		case llmtoolsSpec.ToolOutputKindFile:
-			if output.FileItem == nil {
-				continue
-			}
-			result = append(result, inferenceSpec.ToolOutputItemUnion{
-				Kind: inferenceSpec.ContentItemKindFile,
-				FileItem: &inferenceSpec.ContentItemFile{
-					FileName: output.FileItem.FileName,
-					FileMIME: output.FileItem.FileMIME,
-					FileData: output.FileItem.FileData,
-				},
-			})
-		default:
-		}
-	}
-
-	if len(result) == 0 {
-		return nil
-	}
-	return result
-}
-
-// toolOutputItemsFromMCPContents keeps MCP-specific adaptation in runtime
-// setup, while exposing only inference-go content types to Session state.
-func toolOutputItemsFromMCPContents(
+// ToolOutputItemsFromMCPContents keeps MCP-specific content adaptation in the
+// MCP runtime boundary while exposing only inference-go content to Session.
+func ToolOutputItemsFromMCPContents(
 	contents []mcpServer.MCPContent,
 ) []sessionRuntime.InferenceToolOutputItem {
 	result := make(

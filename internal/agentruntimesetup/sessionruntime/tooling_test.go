@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -19,7 +20,7 @@ func TestValidateGoToolBindingCurrentAllowsRevisionOnlyChange(
 	current := binding.Used
 	current.Revision++
 
-	if err := validateGoToolBindingCurrent(binding, &current); err != nil {
+	if err := toolruntime.ValidateGoBindingCurrent(binding, &current); err != nil {
 		t.Fatalf(
 			"validate unchanged Go Tool Definition after local revision change: %v",
 			err,
@@ -34,7 +35,7 @@ func TestValidateGoToolBindingCurrentRejectsChangedDefinitionOrIdentity(
 
 	tests := []struct {
 		name          string
-		mutateBinding func(*goToolBinding)
+		mutateBinding func(*toolruntime.GoBinding)
 		mutateCurrent func(*sessionRuntime.ResolvedArtifact)
 	}{
 		{
@@ -53,13 +54,13 @@ func TestValidateGoToolBindingCurrentRejectsChangedDefinitionOrIdentity(
 		},
 		{
 			name: "missing persisted witness",
-			mutateBinding: func(value *goToolBinding) {
+			mutateBinding: func(value *toolruntime.GoBinding) {
 				value.Used.Digest = ""
 			},
 		},
 		{
 			name: "target and witness differ",
-			mutateBinding: func(value *goToolBinding) {
+			mutateBinding: func(value *toolruntime.GoBinding) {
 				value.Used.ArtifactID = "0192c4c0-0002-7000-8000-000000000002"
 			},
 		},
@@ -77,14 +78,14 @@ func TestValidateGoToolBindingCurrentRejectsChangedDefinitionOrIdentity(
 				test.mutateCurrent(&current)
 			}
 
-			if err := validateGoToolBindingCurrent(candidate, &current); err == nil {
+			if err := toolruntime.ValidateGoBindingCurrent(candidate, &current); err == nil {
 				t.Fatal("validateGoToolBindingCurrent succeeded for stale binding")
 			}
 		})
 	}
 }
 
-func goToolBindingForTest(t *testing.T) goToolBinding {
+func goToolBindingForTest(t *testing.T) toolruntime.GoBinding {
 	t.Helper()
 
 	ref := artifactModel.ArtifactRef{
@@ -98,7 +99,7 @@ func goToolBindingForTest(t *testing.T) goToolBinding {
 	targetRef := ref
 	digest := cryptoutil.DigestBytes([]byte("tool-definition"))
 
-	return goToolBinding{
+	return toolruntime.GoBinding{
 		Target: composition.CapabilityTarget{
 			Form:       composition.TargetFormArtifact,
 			Type:       declaration.TypeTool,

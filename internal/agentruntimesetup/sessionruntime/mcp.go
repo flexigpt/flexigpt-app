@@ -322,19 +322,7 @@ func (c *coordinator) prepareMCPTools(
 			Arguments:   schema,
 		}
 
-		bindingData, err := json.Marshal(
-			invocation.MappedToolBinding{
-				Server:           tool.Server,
-				ProviderToolName: tool.ProviderToolName,
-				ChoiceID:         tool.ChoiceID,
-				ToolName:         tool.ToolName,
-				ToolDigest:       tool.Digest,
-				ApprovalRule:     tool.ApprovalRule,
-				ExecutionMode:    tool.ExecutionMode,
-				AppResourceURI:   appResourceURI(tool.App),
-				Visibility:       appVisibility(tool.App),
-			},
-		)
+		bindingData, err := mcpruntime.ToolBindingData(tool)
 		if err != nil {
 			return nil, preparedBindings{}, diagnostics, err
 		}
@@ -349,6 +337,7 @@ func (c *coordinator) prepareMCPTools(
 				Kind: sessionRuntime.ToolBindingKindMCP,
 				Data: bindingData,
 			},
+			Source: sessionRuntime.ToolCallSourceModel,
 			DisplayName: firstNonEmpty(
 				tool.DisplayName,
 				"MCP Tool",

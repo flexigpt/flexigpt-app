@@ -1,6 +1,7 @@
-package sessionruntime
+package mcpruntime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,30 +12,53 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-type mcpToolExecutor struct {
+// SessionToolExecutor owns MCP Tool evaluation, approvals, authorization
+// tokens, invocation, and response adaptation. Session owns only Tool-call
+// state transitions and durable wait records.
+type SessionToolExecutor struct {
 	bridge *invocation.ToolBridge
 }
 
-func newMCPToolExecutor(
+func NewSessionToolExecutor(
 	bridge *invocation.ToolBridge,
-) (*mcpToolExecutor, error) {
+) (*SessionToolExecutor, error) {
 	if bridge == nil {
 		return nil, errors.New(
 			"session MCP Tool executor requires an invocation bridge",
 		)
 	}
-	return &mcpToolExecutor{bridge: bridge}, nil
+
+	return &SessionToolExecutor{bridge: bridge}, nil
 }
 
-func (e *mcpToolExecutor) EvaluateTool(
+// ToolBindingData creates canonical durable MCP semantic binding data.
+func ToolBindingData(
+	tool mcpServer.MCPToolCapability,
+) (json.RawMessage, error) {
+	return jsonutil.MarshalCanonicalObject(
+		invocation.MappedToolBinding{
+			Server:           tool.Server,
+			ProviderToolName: tool.ProviderToolName,
+			ChoiceID:         tool.ChoiceID,
+			ToolName:         tool.ToolName,
+			ToolDigest:       tool.Digest,
+			ApprovalRule:     tool.ApprovalRule,
+			ExecutionMode:    tool.ExecutionMode,
+			AppResourceURI:   appResourceURI(tool.App),
+			Visibility:       appVisibility(tool.App),
+		},
+		1<<20,
+	)
+}
+
+func (e *SessionToolExecutor) EvaluateTool(
 	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolEvaluation, error) {
 	if len(request.Authorization) != 0 {
-		// The invocation bridge verifies scope, freshness, and token
-		// consumption immediately before the external call.
 		return sessionRuntime.ToolEvaluation{
 			Decision: sessionRuntime.ToolEvaluationAllowed,
 			Authorization: append(
@@ -76,7 +100,7 @@ func (e *mcpToolExecutor) EvaluateTool(
 			Result: &sessionRuntime.ToolExecutionResult{
 				HasResult: true,
 				Kind:      sessionRuntime.ToolResultKindError,
-				Text:      mcpFailureText(evaluation.Reason),
+				Text:      failureText(evaluation.Reason),
 				Error:     evaluation.Reason,
 			},
 		}, nil
@@ -88,7 +112,7 @@ func (e *mcpToolExecutor) EvaluateTool(
 			)
 		}
 
-		summary, err := json.Marshal(evaluation.Summary)
+		summary, err := canonicalMCPJSON(evaluation.Summary)
 		if err != nil {
 			return sessionRuntime.ToolEvaluation{}, err
 		}
@@ -134,7 +158,7 @@ func (e *mcpToolExecutor) EvaluateTool(
 	}
 }
 
-func (e *mcpToolExecutor) ExecuteTool(
+func (e *SessionToolExecutor) ExecuteTool(
 	ctx context.Context,
 	request sessionRuntime.ToolExecutionRequest,
 ) (sessionRuntime.ToolExecutionResult, error) {
@@ -148,10 +172,11 @@ func (e *mcpToolExecutor) ExecuteTool(
 		Token      string `json:"token,omitempty"`
 	}
 	if len(request.Authorization) != 0 {
-		if err := json.Unmarshal(
-			request.Authorization,
-			&authorization,
-		); err != nil {
+		authorization, err = jsonutil.DecodeJSONRaw[struct {
+			ApprovalID string `json:"approvalID,omitempty"`
+			Token      string `json:"token,omitempty"`
+		}](request.Authorization)
+		if err != nil {
 			return sessionRuntime.ToolExecutionResult{}, fmt.Errorf(
 				"decode Session MCP authorization: %w",
 				err,
@@ -176,7 +201,7 @@ func (e *mcpToolExecutor) ExecuteTool(
 		)
 	}
 
-	structured, err := json.Marshal(struct {
+	structured, err := canonicalMCPJSON(struct {
 		Content           []mcpServer.MCPContent `json:"content"`
 		StructuredContent any                    `json:"structuredContent,omitempty"`
 	}{
@@ -187,7 +212,7 @@ func (e *mcpToolExecutor) ExecuteTool(
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
 
-	app, err := json.Marshal(response.App)
+	app, err := canonicalMCPJSON(response.App)
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
@@ -196,7 +221,7 @@ func (e *mcpToolExecutor) ExecuteTool(
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
 		Text:       string(structured),
-		Contents:   toolOutputItemsFromMCPContents(response.Content),
+		Contents:   ToolOutputItemsFromMCPContents(response.Content),
 		Structured: structured,
 		App:        app,
 	}
@@ -219,10 +244,11 @@ func (e *mcpToolExecutor) ExecuteTool(
 			"MCP Tool returned an error result",
 		)
 	}
+
 	return result, nil
 }
 
-func (e *mcpToolExecutor) ResolveToolWait(
+func (e *SessionToolExecutor) ResolveToolWait(
 	ctx context.Context,
 	request sessionRuntime.ToolWaitResolutionRequest,
 ) (sessionRuntime.ToolWaitResolution, error) {
@@ -232,7 +258,7 @@ func (e *mcpToolExecutor) ResolveToolWait(
 		)
 	}
 
-	resolution, err := mcpApprovalResolution(request.Resolution)
+	resolution, err := approvalResolution(request.Resolution)
 	if err != nil {
 		return sessionRuntime.ToolWaitResolution{}, err
 	}
@@ -251,7 +277,7 @@ func (e *mcpToolExecutor) ResolveToolWait(
 				Result: &sessionRuntime.ToolExecutionResult{
 					HasResult: true,
 					Kind:      sessionRuntime.ToolResultKindError,
-					Text:      mcpFailureText(message),
+					Text:      failureText(message),
 					Error:     message,
 				},
 			}, nil
@@ -261,7 +287,7 @@ func (e *mcpToolExecutor) ResolveToolWait(
 
 	switch result.Decision {
 	case mcpServer.MCPApprovalDecisionAllowed:
-		authorization, err := json.Marshal(struct {
+		authorization, err := canonicalMCPJSON(struct {
 			ApprovalID string `json:"approvalID"`
 			Token      string `json:"token"`
 		}{
@@ -283,7 +309,7 @@ func (e *mcpToolExecutor) ResolveToolWait(
 			Result: &sessionRuntime.ToolExecutionResult{
 				HasResult: true,
 				Kind:      sessionRuntime.ToolResultKindError,
-				Text:      mcpFailureText("MCP Tool call was denied"),
+				Text:      failureText("MCP Tool call was denied"),
 				Error:     "MCP Tool call was denied",
 			},
 		}, nil
@@ -303,8 +329,8 @@ func decodeMCPToolRequest(
 	mcpServer.InvokeMCPToolRequestBody,
 	error,
 ) {
-	var binding invocation.MappedToolBinding
-	if err := json.Unmarshal(request.ToolCall.Binding.Data, &binding); err != nil {
+	binding, err := jsonutil.DecodeJSONRaw[invocation.MappedToolBinding](request.ToolCall.Binding.Data)
+	if err != nil {
 		return invocation.MappedToolBinding{},
 			mcpServer.InvokeMCPToolRequestBody{},
 			fmt.Errorf("decode MCP Session binding: %w", err)
@@ -315,19 +341,24 @@ func decodeMCPToolRequest(
 			err
 	}
 
-	arguments := map[string]any{}
-	if len(request.ToolCall.Arguments) != 0 {
-		if err := json.Unmarshal(
-			request.ToolCall.Arguments,
-			&arguments,
-		); err != nil {
-			return invocation.MappedToolBinding{},
-				mcpServer.InvokeMCPToolRequestBody{},
-				fmt.Errorf("decode MCP Tool arguments: %w", err)
-		}
+	rawArguments := bytes.TrimSpace(request.ToolCall.Arguments)
+	if len(rawArguments) == 0 {
+		rawArguments = []byte(`{}`)
 	}
-	if arguments == nil {
-		arguments = map[string]any{}
+	canonicalArguments, err := jsonutil.Canonicalize(rawArguments)
+	if err != nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			fmt.Errorf("decode MCP Tool arguments: %w", err)
+	}
+
+	arguments, err := jsonutil.DecodeJSONRaw[map[string]any](
+		json.RawMessage(canonicalArguments),
+	)
+	if err != nil || arguments == nil {
+		return invocation.MappedToolBinding{},
+			mcpServer.InvokeMCPToolRequestBody{},
+			errors.New("MCP Tool arguments must be a JSON object")
 	}
 
 	source := mcpServer.MCPInvocationSourceModel
@@ -350,15 +381,7 @@ func decodeMCPToolRequest(
 	}, nil
 }
 
-func cloneSessionToolBinding(
-	value sessionRuntime.ToolBinding,
-) sessionRuntime.ToolBinding {
-	output := value
-	output.Data = append(json.RawMessage(nil), value.Data...)
-	return output
-}
-
-func mcpApprovalResolution(
+func approvalResolution(
 	resolution sessionRuntime.WaitResolution,
 ) (mcpServer.MCPApprovalResolution, error) {
 	switch resolution {
@@ -378,7 +401,52 @@ func mcpApprovalResolution(
 	}
 }
 
-func mcpFailureText(message string) string {
+func canonicalMCPJSON(value any) (json.RawMessage, error) {
+	raw, err := jsonutil.EncodeToJSONRaw(value)
+	if err != nil {
+		return nil, err
+	}
+
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(canonical), nil
+}
+
+func cloneSessionToolBinding(
+	value sessionRuntime.ToolBinding,
+) sessionRuntime.ToolBinding {
+	output := value
+	output.Data = append(json.RawMessage(nil), value.Data...)
+	return output
+}
+
+func appResourceURI(info *mcpServer.MCPToolAppInfo) string {
+	if info == nil {
+		return ""
+	}
+	return info.ResourceURI
+}
+
+func appVisibility(info *mcpServer.MCPToolAppInfo) []string {
+	if info == nil {
+		return nil
+	}
+	return append([]string(nil), info.Visibility...)
+}
+
+func firstNonBlank(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func failureText(message string) string {
 	message = strings.TrimSpace(message)
 	if message == "" {
 		message = "MCP policy denied this Tool call."
@@ -389,13 +457,4 @@ func mcpFailureText(message string) string {
 		"This result completes the requested Tool call.",
 		"The model may correct the request or retry the Tool.",
 	}, "\n\n")
-}
-
-func firstNonBlank(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

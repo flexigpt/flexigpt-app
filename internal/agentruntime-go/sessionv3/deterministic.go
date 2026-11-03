@@ -2,7 +2,6 @@ package sessionv3
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 )
@@ -141,15 +140,16 @@ func (DeterministicExecutor) ResolveWait(
 func normalizeDeterministicCondition(
 	value CanonicalValue,
 ) (CanonicalValue, error) {
-	var direct bool
-	if err := json.Unmarshal(value, &direct); err == nil {
+	direct, err := DecodeCanonicalValue[bool](value)
+	if err == nil {
 		return MustCanonicalValue(direct), nil
 	}
 
-	var wrapped struct {
+	type wrappedCondition struct {
 		Value *bool `json:"value"`
 	}
-	if err := json.Unmarshal(value, &wrapped); err == nil &&
+	wrapped, err := DecodeCanonicalValue[wrappedCondition](value)
+	if err == nil &&
 		wrapped.Value != nil {
 		return MustCanonicalValue(*wrapped.Value), nil
 	}

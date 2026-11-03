@@ -11,8 +11,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
@@ -62,7 +64,7 @@ type Dependencies struct {
 	Texts      *textAPI.Service
 	Tools      *toolAPI.Service
 
-	ToolCaller GoToolCaller
+	ToolCaller toolruntime.GoToolCaller
 
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
@@ -82,7 +84,7 @@ func New(
 	attachments := newReferenceMaterializer()
 	coordinator := newCoordinator(dependencies, attachments)
 
-	goExecutor, err := newGoToolExecutor(
+	goExecutor, err := toolruntime.NewGoToolExecutor(
 		dependencies.Tools,
 		dependencies.ToolCaller,
 	)
@@ -90,17 +92,21 @@ func New(
 		return nil, err
 	}
 
-	mcpExecutor, err := newMCPToolExecutor(dependencies.MCPBridge)
+	mcpExecutor, err := mcpruntime.NewSessionToolExecutor(
+		dependencies.MCPBridge,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	skillExecutor, err := newSkillToolExecutor(coordinator)
+	skillExecutor, err := skillruntime.NewSessionToolExecutor(
+		coordinator,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := sessionRuntime.NewToolRouter(
+	router, err := toolruntime.NewRouter(
 		map[sessionRuntime.ToolBindingKind]sessionRuntime.ToolExecutor{
 			sessionRuntime.ToolBindingKindGo:    goExecutor,
 			sessionRuntime.ToolBindingKindMCP:   mcpExecutor,

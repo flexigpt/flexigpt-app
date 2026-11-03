@@ -2,7 +2,6 @@ package sessionv3
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 )
 
@@ -1000,8 +999,3 @@ func (v *CanonicalValue) UnmarshalJSON(raw []byte) error {
 	*v = value
 	return nil
 }
-
-var (
-	_ json.Marshaler   = CanonicalValue{}
-	_ json.Unmarshaler = (*CanonicalValue)(nil)
-)

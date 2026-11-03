@@ -2,6 +2,7 @@ package sessionv3
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -23,7 +24,7 @@ func CanonicalValueFrom(raw []byte) (CanonicalValue, error) {
 }
 
 func MustCanonicalValue(value any) CanonicalValue {
-	raw, err := json.Marshal(value)
+	raw, err := jsonutil.EncodeToJSONRaw(value)
 	if err != nil {
 		panic(err)
 	}
@@ -50,6 +51,26 @@ func (v CanonicalValue) Valid() bool {
 		return false
 	}
 	return string(canonical) == string(v)
+}
+
+// DecodeCanonicalValue verifies canonical representation before decoding a
+// typed value. It is the only decoding helper for durable v3 JSON values.
+func DecodeCanonicalValue[T any](value CanonicalValue) (T, error) {
+	var zero T
+	if len(value) == 0 {
+		return zero, nil
+	}
+	if !value.Valid() {
+		return zero, errors.New("canonical value is not canonical JSON")
+	}
+
+	decoded, err := jsonutil.DecodeJSONRaw[T](
+		json.RawMessage(append([]byte(nil), value...)),
+	)
+	if err != nil {
+		return zero, err
+	}
+	return decoded, nil
 }
 
 func cloneSession(value Session) Session {

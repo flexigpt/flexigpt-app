@@ -19,8 +19,6 @@ type SessionV3Wrapper struct {
 	closed  bool
 }
 
-var _ sessionv3Runtime.EventPublisher = (*SessionV3Wrapper)(nil)
-
 func InitSessionV3Wrapper(
 	wrapper *SessionV3Wrapper,
 	runtime *sessionv3Runtime.Runtime,

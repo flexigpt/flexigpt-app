@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -297,14 +296,28 @@ func (m *ApprovalManager) purgeExpiredLocked(now time.Time) {
 }
 
 func approvalDecisionKeyFor(summary mcpServer.MCPApprovalSummary) string {
-	raw, _ := json.Marshal(approvalDecisionKey{
+	raw, err := jsonutil.MarshalCanonicalObject(approvalDecisionKey{
 		Server:     summary.Server,
 		ToolName:   summary.ToolName,
 		ToolDigest: summary.ToolDigest,
 		Risk:       summary.Risk,
 		Source:     summary.Source,
 		AppID:      summary.AppInstanceID,
-	})
+	}, 1<<20)
+	if err != nil {
+		// Summary identity is validated before a decision is stored. Preserve a
+		// deterministic fallback for callers that only inspect a stale or
+		// malformed summary.
+		raw = []byte(strings.Join([]string{
+			string(summary.Server),
+			summary.ToolName,
+			summary.ToolDigest,
+			string(summary.Risk),
+			string(summary.Source),
+			summary.AppInstanceID,
+			string(normalizeApprovalArguments(summary.Arguments)),
+		}, "\x00"))
+	}
 	return string(mcpServer.DigestBytes(raw))
 }
 

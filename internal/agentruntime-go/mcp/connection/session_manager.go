@@ -16,6 +16,7 @@ import (
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
@@ -1615,7 +1616,7 @@ func normalizeSnapshot(
 }
 
 func computeDiscoverySnapshotDigest(snap MCPDiscoverySnapshot) string {
-	raw, err := json.Marshal(discoverySnapshotDigestPayload{
+	raw, err := jsonutil.EncodeToJSONRaw(discoverySnapshotDigestPayload{
 		Server:                    snap.Server,
 		NegotiatedProtocolVersion: snap.NegotiatedProtocolVersion,
 		ServerInfo:                snap.ServerInfo,
@@ -1629,7 +1630,12 @@ func computeDiscoverySnapshotDigest(snap MCPDiscoverySnapshot) string {
 	if err != nil {
 		return ""
 	}
-	return string(mcpServer.DigestBytes(raw))
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return ""
+	}
+
+	return string(mcpServer.DigestBytes(canonical))
 }
 
 func toolByName(
