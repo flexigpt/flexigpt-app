@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -99,6 +100,10 @@ func TestFTSPagination(t *testing.T) {
 }
 
 func TestFTSDeletePurgesIndex(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("purge test skipped on Windows")
+	}
+
 	dir := t.TempDir()
 	cc := newCollection(t, dir, true)
 
