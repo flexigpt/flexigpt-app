@@ -1,4 +1,4 @@
-package runtimesetup
+package agentruntimesetup
 
 import (
 	"bytes"
