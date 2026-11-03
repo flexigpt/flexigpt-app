@@ -430,7 +430,6 @@ linters:
           allow:
             - "$gostd"
             - "github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-            - "github.com/flexigpt/flexigpt-app/internal/artifactsetup"
             - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
             - "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
             - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -441,6 +440,9 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+
+            # Only sub packages allowed.
+            - "github.com/flexigpt/flexigpt-app/internal/artifactsetup/"
 
             - "github.com/flexigpt/inference-go$"
             - "github.com/flexigpt/inference-go/"
