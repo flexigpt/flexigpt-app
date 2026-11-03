@@ -29,7 +29,9 @@ func (DeterministicExecutor) Bind(
 	}
 
 	switch item.Type {
-	case WorkItemTypeTransform, WorkItemTypeCondition:
+	case WorkItemTypeTransform,
+		WorkItemTypeCondition,
+		WorkItemTypeStateUpdate:
 		return BindResult{
 			SemanticBinding: binding,
 			Private:         deterministicBinding{},
@@ -93,6 +95,14 @@ func (DeterministicExecutor) Execute(
 			return WorkExecutionResult{}, true, err
 		}
 		value = normalized
+
+	case WorkItemTypeStateUpdate:
+		if item.Input.StateUpdate == nil {
+			return WorkExecutionResult{}, true, errors.New(
+				"deterministic StateUpdate WorkItem has no payload",
+			)
+		}
+		value = MustCanonicalValue(map[string]any{})
 
 	default:
 		return WorkExecutionResult{}, false, nil

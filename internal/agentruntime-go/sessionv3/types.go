@@ -412,8 +412,17 @@ type LLMWork struct {
 }
 
 type ToolWork struct {
-	Call   ToolCall     `json:"call"`
-	Target *ArtifactPin `json:"target,omitempty"`
+	Call   ToolCall       `json:"call"`
+	Target *ArtifactPin   `json:"target,omitempty"`
+	MCP    *MCPToolTarget `json:"mcp,omitempty"`
+}
+
+// MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
+// discovers the current provider Tool and creates the executable MCP binding
+// immediately before dispatch.
+type MCPToolTarget struct {
+	Server   ArtifactPin `json:"server"`
+	ToolName string      `json:"toolName"`
 }
 
 type ToolCall struct {

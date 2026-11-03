@@ -549,8 +549,33 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if p.LLM.InputActivityID == "" {
 			return errors.New("LLM WorkItem input activity is required")
 		}
+
 	case WorkItemTypeTool:
-		return p.Tool.Call.Validate()
+		if err := p.Tool.Call.Validate(); err != nil {
+			return err
+		}
+		if p.Tool.Target != nil && p.Tool.MCP != nil {
+			return errors.New(
+				"tool workItem cannot contain both Artifact and MCP targets",
+			)
+		}
+		if p.Tool.Target != nil {
+			if err := validatePin(*p.Tool.Target); err != nil {
+				return err
+			}
+		}
+		if p.Tool.MCP != nil {
+			if err := validatePin(p.Tool.MCP.Server); err != nil {
+				return err
+			}
+			if err := validateID(
+				"MCP Tool target name",
+				p.Tool.MCP.ToolName,
+			); err != nil {
+				return err
+			}
+		}
+
 	case WorkItemTypeService:
 		if p.Service.ServiceID == "" || p.Service.BindingVersion == "" || !p.Service.Input.Valid() {
 			return errors.New("invalid service WorkItem")

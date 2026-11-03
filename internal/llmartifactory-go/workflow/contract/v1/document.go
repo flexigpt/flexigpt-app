@@ -120,6 +120,16 @@ type WorkflowDocument struct {
 	Limits       *Limits                  `json:"limits,omitempty"`
 }
 
+func (v WorkflowDocument) CanonicalSchema(
+	schema Schema,
+) ([]byte, error) {
+	raw, err := v.schemaObject(schema)
+	if err != nil {
+		return nil, err
+	}
+	return jsonutil.Canonicalize(raw)
+}
+
 // WorkflowJSONSchema returns the complete standalone source schema.
 // Standalone source requires apiVersion: v1.
 func WorkflowJSONSchema() []byte {

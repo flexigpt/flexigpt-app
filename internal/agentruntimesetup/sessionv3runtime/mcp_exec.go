@@ -35,7 +35,25 @@ func (b *Binder) bindTool(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("tool payload is missing")
 	}
+
 	call := payload.Call
+	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindUnresolved {
+		switch {
+		case payload.MCP != nil:
+			value, err := b.bindMCPToolCall(ctx, payload)
+			if err != nil {
+				return sessionv3Runtime.BindResult{}, err
+			}
+			call = value
+
+		case payload.Target != nil:
+			value, err := b.bindArtifactToolCall(ctx, payload)
+			if err != nil {
+				return sessionv3Runtime.BindResult{}, err
+			}
+			call = value
+		}
+	}
 	if err := call.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
@@ -277,6 +295,7 @@ func (b *Binder) executeMCPTool(
 	}
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,

@@ -76,6 +76,59 @@ func (b *Binder) goToolChoices(
 	return out, nil
 }
 
+func (b *Binder) bindArtifactToolCall(
+	ctx context.Context,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.ToolCall, error) {
+	if payload == nil || payload.Target == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow Tool Artifact target is missing",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(payload.Target.RootID),
+		ArtifactID: artifactModel.ArtifactID(payload.Target.ArtifactID),
+	}
+	target, err := b.deps.Tools.MapToolTarget(ctx, ref)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	resolved, err := b.deps.Tools.ResolveToolTarget(ctx, target)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if resolved.Tool.Artifact.Ref() != ref ||
+		resolved.Tool.Artifact.Revision != payload.Target.Revision ||
+		resolved.Tool.Artifact.ResolvedDefinition == nil ||
+		string(*resolved.Tool.Artifact.ResolvedDefinition) != payload.Target.Digest {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow Tool Artifact changed since Workflow admission",
+		)
+	}
+
+	_, bound, supported := v3GoOrProviderChoice(resolved)
+	if !supported {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow Tool %s/%s has no supported v3 binding",
+			ref.RootID,
+			ref.ArtifactID,
+		)
+	}
+	if payload.Call.Name != "" &&
+		payload.Call.Name != bound.Name {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow Tool name changed since Workflow admission",
+		)
+	}
+
+	bound.ID = payload.Call.ID
+	bound.ProviderCallID = payload.Call.ProviderCallID
+	bound.Arguments = payload.Call.Arguments.Clone()
+	bound.Automatic = payload.Call.Automatic
+	return bound, nil
+}
+
 func validateV3ToolSelection(
 	selection sessionv3Runtime.ArtifactSelection,
 	resolved toolAPI.ResolvedToolView,

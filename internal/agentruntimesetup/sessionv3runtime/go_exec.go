@@ -81,6 +81,7 @@ func (b *Binder) executeGoTool(
 		}
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: &sessionv3Runtime.WorkItemOutput{
+				Value: structured,
 				Tool: &sessionv3Runtime.ToolOutput{
 					Kind:       sessionv3Runtime.ToolOutputKindError,
 					Text:       text,
@@ -111,6 +112,7 @@ func (b *Binder) executeGoTool(
 	}
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       sessionv3Runtime.ToolOutputKindSuccess,
 				Text:       text,

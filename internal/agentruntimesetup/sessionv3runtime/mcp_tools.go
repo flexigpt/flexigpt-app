@@ -2,7 +2,10 @@ package sessionv3runtime
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/apps"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
@@ -98,4 +101,77 @@ func (b *Binder) mcpToolChoices(
 		}
 	}
 	return out, nil
+}
+
+func (b *Binder) bindMCPToolCall(
+	ctx context.Context,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.ToolCall, error) {
+	if payload == nil || payload.MCP == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow MCP Tool target is missing",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(payload.MCP.Server.RootID),
+		ArtifactID: artifactModel.ArtifactID(payload.MCP.Server.ArtifactID),
+	}
+	serverID, err := mcpruntime.ServerIDForArtifact(ref)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	status, err := b.deps.MCPRuntime.Status(ctx, serverID)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if status == nil || status.Status != mcpServer.MCPServerStatusReady {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow MCP server %q is not connected",
+			serverID,
+		)
+	}
+
+	tools, err := b.deps.MCPRuntime.ListTools(ctx, serverID)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	var selected *mcpServer.MCPToolCapability
+	for index := range tools {
+		if tools[index].ToolName == payload.MCP.ToolName {
+			selected = &tools[index]
+			break
+		}
+	}
+	if selected == nil ||
+		!selected.Enabled ||
+		selected.TaskSupport == mcpServer.MCPTaskSupportRequired ||
+		!mcpApps.ToolVisibleToModel(selected.App) {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow MCP Tool %q is unavailable",
+			payload.MCP.ToolName,
+		)
+	}
+
+	call := payload.Call
+	call.Name = selected.ProviderToolName
+	call.ChoiceID = selected.ChoiceID
+	call.DisplayName = selected.DisplayName
+	call.Description = selected.Description
+	call.Binding = sessionv3Runtime.ToolBinding{
+		Kind: sessionv3Runtime.ToolBindingKindMCP,
+		MCP: &sessionv3Runtime.MCPToolBinding{
+			ServerArtifact:   &payload.MCP.Server,
+			ServerID:         string(serverID),
+			ProviderToolName: selected.ProviderToolName,
+			ChoiceID:         selected.ChoiceID,
+			ToolName:         selected.ToolName,
+			ToolDigest:       selected.Digest,
+			ApprovalRule:     string(selected.ApprovalRule),
+			ExecutionMode:    string(selected.ExecutionMode),
+		},
+	}
+	return call, nil
 }

@@ -8,6 +8,13 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
+// NewInterpreter returns the runtime-owned interpreter. Workflow Artifact
+// admission remains in this package, but execution semantics live in
+// agentruntime-go/sessionv3 and do not import Artifact contracts.
+func NewInterpreter() (*sessionv3Runtime.WorkflowInterpreter, error) {
+	return sessionv3Runtime.NewWorkflowInterpreter()
+}
+
 // Binder composes the existing provider and Tool binder with Workflow-local
 // deterministic execution plus registered Service and Activity bindings. All
 // private binding values stay in BoundWork and are never checkpointed.

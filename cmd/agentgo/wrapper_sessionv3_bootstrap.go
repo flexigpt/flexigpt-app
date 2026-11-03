@@ -114,8 +114,13 @@ func InitComposedSessionV3Runtime(
 	if err != nil {
 		return err
 	}
+
+	workflowInterpreter, err := workflowruntime.NewInterpreter()
+	if err != nil {
+		return err
+	}
 	interpreters := sessionv3Runtime.NewBuiltinInterpreters()
-	interpreters = append(interpreters, workflowruntime.NewInterpreter())
+	interpreters = append(interpreters, workflowInterpreter)
 
 	events := params.Events
 	if events == nil {

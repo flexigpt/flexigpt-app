@@ -76,6 +76,7 @@ func (b *Binder) executeSkillTool(
 	}
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,
