@@ -13,10 +13,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$0 from "../../internal/artifactory-go/store/artifact/model/models.js";
+import * as skillruntime$0 from "../../internal/agentruntimesetup/skillruntime/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as skillruntime$0 from "../../internal/artifactsetup/skillruntime/models.js";
+import * as model$0 from "../../internal/artifactory-go/store/artifact/model/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
