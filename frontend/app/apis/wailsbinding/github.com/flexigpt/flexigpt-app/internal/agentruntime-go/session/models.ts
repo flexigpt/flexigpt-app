@@ -6,6 +6,9 @@
 import * as json$0 from "../../../../../../encoding/json/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as attachment$0 from "../attachment/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as spec$0 from "../../../../inference-go/spec/models.js";
 
 export interface ActiveSkillOverride {
@@ -94,30 +97,7 @@ export interface ArtifactSelection {
     "expectedDigest"?: string;
 }
 
-export interface AttachmentReference {
-    "kind": AttachmentReferenceKind;
-    "label"?: string;
-    "mode"?: string;
-    "availableModes"?: string[] | null;
-    "file"?: LocalAttachmentReference | null;
-    "image"?: LocalAttachmentReference | null;
-    "url"?: URLAttachmentReference | null;
-    "generic"?: GenericAttachmentReference | null;
-    "directory"?: DirectoryAttachmentReference | null;
-}
-
-export enum AttachmentReferenceKind {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    AttachmentReferenceFile = "file",
-    AttachmentReferenceDirectory = "directory",
-    AttachmentReferenceImage = "image",
-    AttachmentReferenceURL = "url",
-    AttachmentReferenceGeneric = "generic",
-};
+export type AttachmentReference = attachment$0.AttachmentReference;
 
 export interface AutomationControls {
     "automaticTools": AutomationHold;
@@ -262,21 +242,6 @@ export interface DirectCapabilitySelection {
     "type": string;
 }
 
-export interface DirectoryAttachmentReference {
-    "path": string;
-    "originalPath"?: string;
-    "name"?: string;
-    "scannedFileCount"?: number;
-    "hasMore"?: boolean;
-
-    /**
-     * Expanded is populated exactly once during submission preparation.
-     * Historical replay uses these immutable child references rather than
-     * walking the current directory contents again.
-     */
-    "expanded"?: AttachmentReference[] | null;
-}
-
 export interface DriverState {
     "kind": string;
     "version": number;
@@ -310,11 +275,6 @@ export interface ExecuteCallsCommand {
     "runID": RunID;
     "callIDs"?: ToolCallID[] | null;
     "continue": boolean;
-}
-
-export interface GenericAttachmentReference {
-    "handle": string;
-    "originalHandle"?: string;
 }
 
 export interface HistorySelection {
@@ -367,22 +327,6 @@ export interface InstructionSkillPreviewRequest {
 export interface InstructionSkillPreviewResult {
     "skill": ArtifactReference;
     "text": string;
-}
-
-export interface LocalAttachmentReference {
-    "path"?: string;
-    "originalPath"?: string;
-    "name"?: string;
-    "exists": boolean;
-    "isDirectory"?: boolean;
-    "size"?: number;
-    "originalSize"?: number;
-    "modifiedAt"?: string;
-    "originalModifiedAt"?: string;
-    "mimeType"?: string;
-    "width"?: number;
-    "height"?: number;
-    "format"?: string;
 }
 
 export interface MCPPromptResolution {
@@ -1112,12 +1056,6 @@ export interface TranscriptMessage {
     "error"?: OperationError | null;
     "metadata"?: json$0.RawMessage;
     "runtimeMetadata"?: json$0.RawMessage;
-}
-
-export interface URLAttachmentReference {
-    "url": string;
-    "normalized"?: string;
-    "original"?: string;
 }
 
 export interface UpdateContinuationInputCommand {

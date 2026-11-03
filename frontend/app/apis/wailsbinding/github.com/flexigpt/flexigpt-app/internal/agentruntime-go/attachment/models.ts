@@ -106,6 +106,41 @@ export enum AttachmentKind {
 };
 
 /**
+ * AttachmentReference is the durable Attachment-domain value used by Session
+ * transcript and continuation state. It contains no open file, native handle,
+ * HTTP client, or fetched content.
+ */
+export interface AttachmentReference {
+    "kind": AttachmentReferenceKind;
+    "label"?: string;
+    "mode"?: string;
+    "availableModes"?: string[] | null;
+    "file"?: LocalAttachmentReference | null;
+    "image"?: LocalAttachmentReference | null;
+    "url"?: URLAttachmentReference | null;
+    "generic"?: GenericAttachmentReference | null;
+    "directory"?: DirectoryAttachmentReference | null;
+}
+
+/**
+ * AttachmentReferenceKind identifies a durable semantic Attachment reference.
+ * Session stores these values, but Attachment owns their meaning and
+ * materialization contract.
+ */
+export enum AttachmentReferenceKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AttachmentReferenceFile = "file",
+    AttachmentReferenceDirectory = "directory",
+    AttachmentReferenceImage = "image",
+    AttachmentReferenceURL = "url",
+    AttachmentReferenceGeneric = "generic",
+};
+
+/**
  * ContentBlock represents a provider-agnostic chunk of content derived from an Attachment.
  * Providers (OpenAI, Anthropic, etc.) adapt this into their own message/part formats.
  */
@@ -132,6 +167,20 @@ export interface ContentBlock {
      * URL is populated for URL-based attachments.
      */
     "url"?: string | null;
+}
+
+/**
+ * DirectoryAttachmentReference stores the materialized child references that
+ * were selected at submission time. Replay must not walk the current
+ * filesystem tree again.
+ */
+export interface DirectoryAttachmentReference {
+    "path": string;
+    "originalPath"?: string;
+    "name"?: string;
+    "scannedFileCount"?: number;
+    "hasMore"?: boolean;
+    "expanded"?: AttachmentReference[] | null;
 }
 
 export interface DirectoryAttachmentsResult {
@@ -291,6 +340,11 @@ export interface FileRef {
     "origModTime": string;
 }
 
+export interface GenericAttachmentReference {
+    "handle": string;
+    "originalHandle"?: string;
+}
+
 /**
  * GenericRef preserves legacy handle-style references (PRs, doc indexes, etc.).
  */
@@ -328,6 +382,27 @@ export interface ImageRef {
     "origPath": string;
     "origSize": number;
     "origModTime": string;
+}
+
+/**
+ * LocalAttachmentReference records a local-file snapshot. Original fields are
+ * captured during admission and protect historical replay from silently using
+ * changed local content.
+ */
+export interface LocalAttachmentReference {
+    "path"?: string;
+    "originalPath"?: string;
+    "name"?: string;
+    "exists": boolean;
+    "isDirectory"?: boolean;
+    "size"?: number;
+    "originalSize"?: number;
+    "modifiedAt"?: string;
+    "originalModifiedAt"?: string;
+    "mimeType"?: string;
+    "width"?: number;
+    "height"?: number;
+    "format"?: string;
 }
 
 export enum MIMEType {
@@ -368,6 +443,12 @@ export interface PathAttachmentsResult {
     "fileAttachments": Attachment[] | null;
     "dirAttachments": DirectoryAttachmentsResult[] | null;
     "errors"?: string[] | null;
+}
+
+export interface URLAttachmentReference {
+    "url": string;
+    "normalized"?: string;
+    "original"?: string;
 }
 
 /**

@@ -376,11 +376,24 @@ export enum MCPToolExposure {
 
     MCPToolExposureNone = "none",
     MCPToolExposureAll = "all",
+    MCPToolExposureSelected = "selected",
 };
 
 export interface MCPToolSelection {
     "toolName": string;
     "expectedDigest"?: string;
+    "approvalRule"?: string | null;
+    "executionMode"?: string | null;
+}
+
+/**
+ * MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
+ * discovers the current provider Tool and creates the executable MCP binding
+ * immediately before dispatch.
+ */
+export interface MCPToolTarget {
+    "server": ArtifactPin;
+    "toolName": string;
 }
 
 export interface MessageActivity {
@@ -657,6 +670,7 @@ export enum ToolOutputKind {
 export interface ToolWork {
     "call": ToolCall;
     "target"?: ArtifactPin | null;
+    "mcp"?: MCPToolTarget | null;
 }
 
 export interface TransformWork {
