@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelcredentials"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
@@ -74,7 +73,7 @@ func initModelWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	credentials, err := modelcredentials.New(secretRuntime)
+	credentials, err := modelruntime.NewModelCredentialsResolver(secretRuntime)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,42 +1,41 @@
-package modelcredentials
+package modelruntime
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// Resolver is the trusted application-side bridge from a Model Provider
+// ModelCredentialsResolver is the trusted application-side bridge from a Model Provider
 // credential binding to runtime-only inference credentials.
-type Resolver struct {
+type ModelCredentialsResolver struct {
 	secrets storeSecret.RuntimeAPI
 }
 
-func New(
+func NewModelCredentialsResolver(
 	secrets storeSecret.RuntimeAPI,
-) (*Resolver, error) {
+) (*ModelCredentialsResolver, error) {
 	if secrets == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store Model credential runtime is required",
 			storeSpec.ErrInvalid,
 		)
 	}
-	return &Resolver{secrets: secrets}, nil
+	return &ModelCredentialsResolver{secrets: secrets}, nil
 }
 
-func (r *Resolver) ResolveModelCredential(
+func (r *ModelCredentialsResolver) ResolveModelCredential(
 	ctx context.Context,
 	binding secretModel.Binding,
-) (modelruntime.Credential, error) {
+) (Credential, error) {
 	if err := binding.Validate(); err != nil {
-		return modelruntime.Credential{}, err
+		return Credential{}, err
 	}
 	if !binding.Active() {
-		return modelruntime.Credential{}, fmt.Errorf(
+		return Credential{}, fmt.Errorf(
 			"%w: Model Provider credential binding is not configured",
 			storeSpec.ErrReferenceUnresolved,
 		)
@@ -48,19 +47,19 @@ func (r *Resolver) ResolveModelCredential(
 		*binding.Ref,
 	)
 	if err != nil {
-		return modelruntime.Credential{}, err
+		return Credential{}, err
 	}
 	if current.Revision != binding.Revision ||
 		current.SHA256 != binding.SHA256 ||
 		!current.Active() ||
 		*current.Ref != *binding.Ref {
-		return modelruntime.Credential{}, fmt.Errorf(
+		return Credential{}, fmt.Errorf(
 			"%w: Model Provider credential changed during resolution",
 			storeSpec.ErrConflict,
 		)
 	}
 
-	return modelruntime.Credential{
+	return Credential{
 		APIKey:  value,
 		Version: binding.SHA256,
 	}, nil
