@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
@@ -22,27 +21,22 @@ type OAuthTokenStore interface {
 	DeleteSecret(ctx context.Context, ref string) error
 }
 
-// RuntimeAdapter is constructed with immutable resolution dependencies.
-// BindRuntime completes the runtime/inference side of assembly exactly once.
-//
-// The runtime may call ResolveServer before binding is complete because that
-// method uses only constructor dependencies. Inference must not receive the
-// adapter until BindRuntime succeeds.
-type RuntimeAdapter struct {
+// SourceAdapter translates MCP Artifact configuration into the opaque source
+// capability consumed by MCP Runtime Manager. It owns no runtime manager and
+// has no late binding phase.
+type SourceAdapter struct {
 	store       mcpAPI.ServerStore
 	secrets     serverMCPDomain.SecretResolver
 	oauthTokens OAuthTokenStore
 	environment serverMCPDomain.EnvironmentResolver
-
-	runtime *mcpConnection.MCPRuntimeManager
 }
 
-func NewRuntimeAdapter(
+func NewSourceAdapter(
 	store mcpAPI.ServerStore,
 	secrets serverMCPDomain.SecretResolver,
 	oauthTokens OAuthTokenStore,
 	environment serverMCPDomain.EnvironmentResolver,
-) (*RuntimeAdapter, error) {
+) (*SourceAdapter, error) {
 	if store == nil ||
 		secrets == nil ||
 		oauthTokens == nil {
@@ -52,7 +46,7 @@ func NewRuntimeAdapter(
 		)
 	}
 
-	return &RuntimeAdapter{
+	return &SourceAdapter{
 		store:       store,
 		secrets:     secrets,
 		oauthTokens: oauthTokens,
@@ -60,30 +54,9 @@ func NewRuntimeAdapter(
 	}, nil
 }
 
-// BindRuntime completes application assembly. The caller retains ownership
-// of runtime shutdown and must drain inference before closing the runtime.
-func (a *RuntimeAdapter) BindRuntime(
-	runtime *mcpConnection.MCPRuntimeManager,
-) error {
-	if runtime == nil {
-		return fmt.Errorf(
-			"%w: MCP runtime is required",
-			storeSpec.ErrInvalid,
-		)
-	}
-	if a.runtime != nil {
-		return fmt.Errorf(
-			"%w: MCP runtime adapter is already bound",
-			storeSpec.ErrConflict,
-		)
-	}
-	a.runtime = runtime
-	return nil
-}
-
 // ResolveServer implements the MCP runtime's source capability. Artifact
 // identities and family documents do not escape into the runtime manager.
-func (a *RuntimeAdapter) ResolveServer(
+func (a *SourceAdapter) ResolveServer(
 	ctx context.Context,
 	serverID mcpServer.ServerID,
 ) (mcpServer.ResolvedServer, error) {
@@ -123,7 +96,7 @@ func (a *RuntimeAdapter) ResolveServer(
 
 // InspectRuntimeConfig converts an already-resolved installation without
 // resolving its secret values. Management owns the resulting health view.
-func (a *RuntimeAdapter) InspectRuntimeConfig(
+func (a *SourceAdapter) InspectRuntimeConfig(
 	ctx context.Context,
 	resolved serverMCPDomain.Resolved,
 ) (mcpServer.RuntimeConfig, error) {
@@ -135,94 +108,4 @@ func (a *RuntimeAdapter) InspectRuntimeConfig(
 		return mcpServer.RuntimeConfig{}, err
 	}
 	return runtimeConfig(resolved, materialized)
-}
-
-func (a *RuntimeAdapter) Status(
-	ctx context.Context,
-	server mcpServer.ServerID,
-) (*mcpServer.MCPServerRuntimeSnapshot, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.Status(ctx, server)
-}
-
-func (a *RuntimeAdapter) ListTools(
-	ctx context.Context,
-	server mcpServer.ServerID,
-) ([]mcpServer.MCPToolCapability, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.ListTools(ctx, server)
-}
-
-func (a *RuntimeAdapter) ListResources(
-	ctx context.Context,
-	server mcpServer.ServerID,
-) ([]mcpServer.MCPResourceRef, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.ListResources(ctx, server)
-}
-
-func (a *RuntimeAdapter) ListResourceTemplates(
-	ctx context.Context,
-	server mcpServer.ServerID,
-) ([]mcpServer.MCPResourceTemplateRef, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.ListResourceTemplates(ctx, server)
-}
-
-func (a *RuntimeAdapter) ListPrompts(
-	ctx context.Context,
-	server mcpServer.ServerID,
-) ([]mcpServer.MCPPromptRef, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.ListPrompts(ctx, server)
-}
-
-func (a *RuntimeAdapter) ReadResource(
-	ctx context.Context,
-	server mcpServer.ServerID,
-	uri string,
-) (*mcpServer.MCPReadResourceResponseBody, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.ReadResource(ctx, server, uri)
-}
-
-func (a *RuntimeAdapter) GetPrompt(
-	ctx context.Context,
-	server mcpServer.ServerID,
-	name string,
-	arguments map[string]string,
-) (*mcpServer.MCPGetPromptResponseBody, error) {
-	runtime, err := a.runtimeManager()
-	if err != nil {
-		return nil, err
-	}
-	return runtime.GetPrompt(ctx, server, name, arguments)
-}
-
-func (a *RuntimeAdapter) runtimeManager() (
-	*mcpConnection.MCPRuntimeManager,
-	error,
-) {
-	if a.runtime == nil {
-		return nil, storeSpec.ErrClosed
-	}
-	return a.runtime, nil
 }

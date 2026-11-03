@@ -14,7 +14,7 @@ import (
 
 // LoadOAuthToken translates the opaque runtime identity before using the
 // application's Artifact-scoped secret persistence capability.
-func (a *RuntimeAdapter) LoadOAuthToken(
+func (a *SourceAdapter) LoadOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 ) (*oauth2.Token, error) {
@@ -37,7 +37,7 @@ func (a *RuntimeAdapter) LoadOAuthToken(
 	return &token, nil
 }
 
-func (a *RuntimeAdapter) SaveOAuthToken(
+func (a *SourceAdapter) SaveOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 	token *oauth2.Token,
@@ -59,7 +59,7 @@ func (a *RuntimeAdapter) SaveOAuthToken(
 	return err
 }
 
-func (a *RuntimeAdapter) DeleteOAuthToken(
+func (a *SourceAdapter) DeleteOAuthToken(
 	ctx context.Context,
 	status mcpAuth.MCPAuthStatus,
 ) error {

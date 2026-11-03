@@ -15,24 +15,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
-	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 )
 
 type SessionV3Params struct {
 	Providers     *inferenceRuntime.ProviderSetAPI
-	Models        *modelruntime.RuntimeAdapter
-	Agents        *agentAPI.Service
-	Workspaces    *workspaceAPI.Service
-	Texts         *textAPI.Service
+	Models        *modelruntime.SourceResolver
 	Tools         *toolAPI.Service
 	ToolCaller    toolruntime.GoToolCaller
-	SkillResolver *skillruntime.RuntimeAdapter
+	SkillResolver *skillruntime.Resolver
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
 	MCPBridge     *invocation.ToolBridge
@@ -72,14 +66,10 @@ func newSessionV3WorkflowAdmission(
 	if err != nil {
 		return nil, err
 	}
-	pins, err := workflowruntime.NewArtifactPinResolver(artifacts)
-	if err != nil {
-		return nil, err
-	}
 
 	return workflowruntime.NewAdmission(
 		workflows,
-		pins,
+		artifacts,
 		workflowruntime.NewBindingRegistry(),
 	)
 }
@@ -98,9 +88,6 @@ func InitComposedSessionV3Runtime(
 		sessionv3runtime.Dependencies{
 			Providers:     params.Providers,
 			Models:        params.Models,
-			Agents:        params.Agents,
-			Workspaces:    params.Workspaces,
-			Texts:         params.Texts,
 			Tools:         params.Tools,
 			ToolCaller:    params.ToolCaller,
 			SkillResolver: params.SkillResolver,

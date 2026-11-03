@@ -1,10 +1,10 @@
 package sessionv3runtime
 
 import (
-	"encoding/json"
-
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -42,12 +42,15 @@ func (b *Binder) skillLifecycleChoices() ([]preparedChoice, error) {
 	}
 	out := make([]preparedChoice, 0, len(defs))
 	for _, d := range defs {
-		args := getEmptySchema()
-		if d.schema != "" {
-			var decoded map[string]any
-			if err := json.Unmarshal([]byte(d.schema), &decoded); err == nil && len(decoded) != 0 {
-				args = decoded
-			}
+		raw, err := jsonutil.DecodeJSONStringRaw(
+			jsonutil.JSONRawString(d.schema),
+		)
+		if err != nil {
+			return nil, err
+		}
+		args, err := toolruntime.InputSchema(raw)
+		if err != nil {
+			return nil, err
 		}
 		choice := inferenceSpec.ToolChoice{
 			Type:        inferenceSpec.ToolTypeFunction,

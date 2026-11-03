@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/agentskills-go/provider/fs"
@@ -68,32 +67,23 @@ func (s ResolvedSkills) ArtifactRefs(
 	return output
 }
 
-// RuntimeAdapter projects source-backed Skills into the Artifact-unaware
-// runtime and implements completion hydration. It owns no closable resources.
-type RuntimeAdapter struct {
+// CatalogAdapter projects source-backed Skills into Skill Runtime's
+// Artifact-unaware CatalogSource contract.
+type CatalogAdapter struct {
 	artifacts       artifact.API
 	cat             catalog.API
 	resources       resourceFlow.API
 	nativeResources resourceFlow.NativePathAPI
 	documents       support.Documents
-	runtime         *skillRuntime.Service
-
-	syncMu  sync.Mutex
-	syncing map[rootModel.RootID]*rootCatalogSync
 }
 
-type rootCatalogSync struct {
-	done chan struct{}
-	err  error
-}
-
-func NewRuntimeAdapter(
+func NewCatalogAdapter(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	documents support.Documents,
-) (*RuntimeAdapter, error) {
+) (*CatalogAdapter, error) {
 	if artifacts == nil || cat == nil ||
 		resources == nil || nativeResources == nil {
 		return nil, fmt.Errorf(
@@ -105,36 +95,18 @@ func NewRuntimeAdapter(
 		return nil, err
 	}
 
-	return &RuntimeAdapter{
+	return &CatalogAdapter{
 		artifacts:       artifacts,
 		cat:             cat,
 		resources:       resources,
 		nativeResources: nativeResources,
 		documents:       documents.Clone(),
-		syncing:         make(map[rootModel.RootID]*rootCatalogSync),
 	}, nil
-}
-
-// BindRuntime completes assembly after the runtime has received this adapter
-// as its CatalogSource. Call once, before serving requests.
-func (a *RuntimeAdapter) BindRuntime(runtime *skillRuntime.Service) error {
-	if runtime == nil {
-		return fmt.Errorf("%w: Skill runtime is required", storeSpec.ErrInvalid)
-	}
-	if a.runtime != nil {
-		return fmt.Errorf("%w: Skill runtime is already bound", storeSpec.ErrConflict)
-	}
-	a.runtime = runtime
-	return nil
-}
-
-func (a *RuntimeAdapter) RunScriptsEnabled() bool {
-	return a != nil && a.runtime != nil && a.runtime.SupportsRunScript()
 }
 
 // Skills implements the runtime-owned CatalogSource contract. Plugin
 // membership does not determine runtime catalog ownership.
-func (a *RuntimeAdapter) Skills(
+func (a *CatalogAdapter) Skills(
 	ctx context.Context,
 	catalogID skillRuntime.CatalogID,
 ) ([]skillRuntime.SkillRegistration, error) {
@@ -197,122 +169,7 @@ func (a *RuntimeAdapter) Skills(
 	return output, nil
 }
 
-// ResolveSkills synchronizes each selected Root once, then verifies the
-// selected current revisions against the registrations actually installed.
-//
-// The second materialization is intentional: a selection changed during Root
-// synchronization must not be returned as though its new revision were loaded.
-func (a *RuntimeAdapter) ResolveSkills(
-	ctx context.Context,
-	refs []artifactModel.ArtifactRef,
-) (ResolvedSkills, error) {
-	if a == nil || a.runtime == nil {
-		return ResolvedSkills{}, storeSpec.ErrClosed
-	}
-
-	roots, err := selectionRoots(refs)
-	if err != nil {
-		return ResolvedSkills{}, err
-	}
-	for _, rootID := range roots {
-		if err := ctx.Err(); err != nil {
-			return ResolvedSkills{}, err
-		}
-		if err := a.syncRoot(ctx, rootID); err != nil {
-			// Preserve ErrRefreshRequired for genuine own file change.
-			// Callers use errors.Is, so do not mask it behind only
-			// ErrReferenceUnresolved and root context.
-			return ResolvedSkills{}, fmt.Errorf(
-				"synchronize Skill Root %q: %w",
-				rootID,
-				err,
-			)
-		}
-	}
-
-	records, err := a.readRecords(ctx, refs)
-	if err != nil {
-		return ResolvedSkills{}, fmt.Errorf(
-			"%w: read selected Skill Artifacts: %w",
-			storeSpec.ErrReferenceUnresolved,
-			err,
-		)
-	}
-	values, err := a.materializeRecords(ctx, records)
-	if err != nil {
-		return ResolvedSkills{}, err
-	}
-
-	for _, value := range values {
-		if !a.runtime.IsRegistered(skillRuntime.SkillRegistration{
-			Definition: value.Definition,
-			Revision:   value.Version,
-		}) {
-			return ResolvedSkills{}, fmt.Errorf(
-				"%w: Skill %s/%s revision %q is not registered",
-				storeSpec.ErrReferenceUnresolved,
-				value.Artifact.RootID,
-				value.Artifact.ArtifactID,
-				value.Version,
-			)
-		}
-	}
-	return selectionFromValues(values)
-}
-
-func (a *RuntimeAdapter) SyncRootCatalog(
-	ctx context.Context,
-	rootID rootModel.RootID,
-) error {
-	if a == nil || a.runtime == nil {
-		return storeSpec.ErrClosed
-	}
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
-	return a.syncRoot(ctx, rootID)
-}
-
-// syncRoot coalesces overlapping observations, but does not cache successful
-// observations across requests. Runtime still owns reconciliation generations.
-func (a *RuntimeAdapter) syncRoot(
-	ctx context.Context,
-	rootID rootModel.RootID,
-) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	a.syncMu.Lock()
-	if current, found := a.syncing[rootID]; found {
-		a.syncMu.Unlock()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-current.done:
-			return current.err
-		}
-	}
-
-	current := &rootCatalogSync{done: make(chan struct{})}
-	a.syncing[rootID] = current
-	a.syncMu.Unlock()
-
-	err := a.runtime.SyncCatalog(
-		ctx,
-		skillRuntime.CatalogID(artifactRootCatalogPrefix+string(rootID)),
-	)
-
-	a.syncMu.Lock()
-	current.err = err
-	delete(a.syncing, rootID)
-	close(current.done)
-	a.syncMu.Unlock()
-
-	return err
-}
-
-func (a *RuntimeAdapter) readRecords(
+func (a *CatalogAdapter) readRecords(
 	ctx context.Context,
 	refs []artifactModel.ArtifactRef,
 ) ([]artifactModel.Artifact, error) {
@@ -346,7 +203,7 @@ type materializeResources struct {
 	resourceFlow.NativePathAPI
 }
 
-func (a *RuntimeAdapter) materializeRecords(
+func (a *CatalogAdapter) materializeRecords(
 	ctx context.Context,
 	records []artifactModel.Artifact,
 ) ([]ResolvedArtifactSkill, error) {

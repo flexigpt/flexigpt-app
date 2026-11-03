@@ -54,7 +54,7 @@ func (c *coordinator) prepareMCP(
 			return nil, preparedBindings{}, nil, err
 		}
 
-		status, statusErr := c.mcpRuntime.runtime.Status(ctx, serverID)
+		status, statusErr := c.mcpRuntime.Status(ctx, serverID)
 		if statusErr != nil ||
 			status == nil ||
 			status.Status != mcpServer.MCPServerStatusReady {
@@ -204,7 +204,7 @@ func (c *coordinator) prepareMCPTools(
 		}, diagnostics, nil
 	}
 
-	tools, err := c.mcpRuntime.runtime.ListTools(ctx, serverID)
+	tools, err := c.mcpRuntime.ListTools(ctx, serverID)
 	if err != nil {
 		return nil, preparedBindings{}, diagnostics, err
 	}
@@ -447,7 +447,7 @@ func (c *coordinator) prepareMCPResources(
 	diagnostics := make([]sessionRuntime.ResolutionDiagnostic, 0)
 
 	if len(selection.Resources) != 0 {
-		available, err := c.mcpRuntime.runtime.ListResources(
+		available, err := c.mcpRuntime.ListResources(
 			ctx,
 			serverID,
 		)
@@ -497,7 +497,7 @@ func (c *coordinator) prepareMCPResources(
 					Availability: sessionRuntime.MCPSelectionAvailabilityAvailable,
 				})
 			}
-			response, err := c.mcpRuntime.runtime.ReadResource(
+			response, err := c.mcpRuntime.ReadResource(
 				ctx,
 				serverID,
 				expected.URI,
@@ -534,7 +534,7 @@ func (c *coordinator) prepareMCPResources(
 	}
 
 	if len(selection.ResourceTemplates) != 0 {
-		available, err := c.mcpRuntime.runtime.ListResourceTemplates(
+		available, err := c.mcpRuntime.ListResourceTemplates(
 			ctx,
 			serverID,
 		)
@@ -601,7 +601,7 @@ func (c *coordinator) prepareMCPResources(
 				continue
 			}
 
-			response, err := c.mcpRuntime.runtime.ReadResource(
+			response, err := c.mcpRuntime.ReadResource(
 				ctx,
 				serverID,
 				uri,
@@ -638,7 +638,7 @@ func (c *coordinator) prepareMCPResources(
 	}
 
 	if len(selection.Prompts) != 0 {
-		available, err := c.mcpRuntime.runtime.ListPrompts(
+		available, err := c.mcpRuntime.ListPrompts(
 			ctx,
 			serverID,
 		)
@@ -688,7 +688,7 @@ func (c *coordinator) prepareMCPResources(
 					Availability: sessionRuntime.MCPSelectionAvailabilityAvailable,
 				})
 			}
-			response, err := c.mcpRuntime.runtime.GetPrompt(
+			response, err := c.mcpRuntime.GetPrompt(
 				ctx,
 				serverID,
 				expected.PromptName,
@@ -770,11 +770,10 @@ func (c *coordinator) PrepareAppTool(
 		)
 	}
 
-	var origin invocation.MappedToolBinding
-	if err := json.Unmarshal(
+	origin, err := jsonutil.DecodeJSONRaw[invocation.MappedToolBinding](
 		request.App.Route.Binding.Data,
-		&origin,
-	); err != nil {
+	)
+	if err != nil {
 		return sessionRuntime.AppToolPreparation{}, err
 	}
 	if err := origin.Validate(); err != nil {
@@ -786,7 +785,7 @@ func (c *coordinator) PrepareAppTool(
 		)
 	}
 
-	tools, err := c.mcpRuntime.runtime.ListTools(ctx, origin.Server)
+	tools, err := c.mcpRuntime.ListTools(ctx, origin.Server)
 	if err != nil {
 		return sessionRuntime.AppToolPreparation{}, err
 	}
@@ -810,30 +809,24 @@ func (c *coordinator) PrepareAppTool(
 		)
 	}
 
-	bindingData, err := json.Marshal(
-		invocation.MappedToolBinding{
-			Server:           selected.Server,
-			ProviderToolName: selected.ProviderToolName,
-			ChoiceID:         selected.ChoiceID,
-			ToolName:         selected.ToolName,
-			ToolDigest:       selected.Digest,
-			ApprovalRule:     selected.ApprovalRule,
-			ExecutionMode:    selected.ExecutionMode,
-			AppResourceURI:   appResourceURI(selected.App),
-			Visibility:       appVisibility(selected.App),
-		},
+	bindingData, err := mcpruntime.ToolBindingData(
+		*selected,
 	)
 	if err != nil {
 		return sessionRuntime.AppToolPreparation{}, err
 	}
 
 	arguments := request.Arguments
-	if len(arguments) == 0 {
+	if strings.TrimSpace(string(arguments)) == "" {
 		arguments = json.RawMessage(`{}`)
 	}
-	if !json.Valid(arguments) {
+	canonicalArguments, err := jsonutil.CanonicalizeObject(
+		arguments,
+		maximumToolBindingBytes,
+	)
+	if err != nil {
 		return sessionRuntime.AppToolPreparation{}, errors.New(
-			"app Tool arguments are invalid JSON",
+			"app Tool arguments must be a JSON object",
 		)
 	}
 
@@ -842,7 +835,7 @@ func (c *coordinator) PrepareAppTool(
 			Name:      selected.ProviderToolName,
 			ChoiceID:  selected.ChoiceID,
 			Type:      inferenceSpec.ToolTypeFunction,
-			Arguments: append(json.RawMessage(nil), arguments...),
+			Arguments: json.RawMessage(canonicalArguments),
 			Required:  false,
 			Binding: sessionRuntime.ToolBinding{
 				Kind: sessionRuntime.ToolBindingKindMCP,
@@ -862,11 +855,10 @@ func (c *coordinator) ReadAppResource(
 		)
 	}
 
-	var binding invocation.MappedToolBinding
-	if err := json.Unmarshal(
+	binding, err := jsonutil.DecodeJSONRaw[invocation.MappedToolBinding](
 		request.App.Route.Binding.Data,
-		&binding,
-	); err != nil {
+	)
+	if err != nil {
 		return sessionRuntime.AppResourceReadResult{}, err
 	}
 	if err := binding.Validate(); err != nil {
@@ -888,7 +880,7 @@ func (c *coordinator) ReadAppResource(
 		)
 	}
 
-	resources, err := c.mcpRuntime.runtime.ListResources(
+	resources, err := c.mcpRuntime.ListResources(
 		ctx,
 		binding.Server,
 	)
@@ -906,7 +898,7 @@ func (c *coordinator) ReadAppResource(
 		)
 	}
 
-	response, err := c.mcpRuntime.runtime.ReadResource(
+	response, err := c.mcpRuntime.ReadResource(
 		ctx,
 		binding.Server,
 		uri,
@@ -914,13 +906,17 @@ func (c *coordinator) ReadAppResource(
 	if err != nil {
 		return sessionRuntime.AppResourceReadResult{}, err
 	}
-
-	raw, err := json.Marshal(response)
+	raw, err := jsonutil.EncodeToJSONRaw(response)
 	if err != nil {
 		return sessionRuntime.AppResourceReadResult{}, err
 	}
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return sessionRuntime.AppResourceReadResult{}, err
+	}
+
 	return sessionRuntime.AppResourceReadResult{
-		Content: raw,
+		Content: json.RawMessage(canonical),
 	}, nil
 }
 
@@ -951,14 +947,16 @@ func (c *coordinator) ValidateAppContext(
 			"app context update belongs to another MCP server",
 		)
 	}
-	var binding invocation.MappedToolBinding
-	if err := json.Unmarshal(request.App.Route.Binding.Data, &binding); err != nil {
+	binding, err := jsonutil.DecodeJSONRaw[invocation.MappedToolBinding](
+		request.App.Route.Binding.Data,
+	)
+	if err != nil {
 		return sessionRuntime.AppContextUpdate{}, err
 	}
 	if err := binding.Validate(); err != nil {
 		return sessionRuntime.AppContextUpdate{}, err
 	}
-	appsPolicy, err := c.mcpRuntime.runtime.AppPolicy(ctx, binding.Server)
+	appsPolicy, err := c.mcpRuntime.AppPolicy(ctx, binding.Server)
 	if err != nil {
 		return sessionRuntime.AppContextUpdate{}, err
 	}
@@ -1042,11 +1040,11 @@ func (c *coordinator) populateAppContextLabels(
 	update.AppDisplayName = ""
 	update.StructuredContentLabel = ""
 
-	if status, err := c.mcpRuntime.runtime.Status(ctx, binding.Server); err == nil {
+	if status, err := c.mcpRuntime.Status(ctx, binding.Server); err == nil {
 		update.ServerDisplayName = mcpServerDisplayLabel(status)
 	}
 
-	if tools, err := c.mcpRuntime.runtime.ListTools(ctx, binding.Server); err == nil {
+	if tools, err := c.mcpRuntime.ListTools(ctx, binding.Server); err == nil {
 		for _, tool := range tools {
 			if tool.ToolName != binding.ToolName {
 				continue
@@ -1150,18 +1148,4 @@ func mcpContentText(content mcpServer.MCPContent) string {
 		return "[MCP audio content omitted]"
 	}
 	return ""
-}
-
-func appResourceURI(info *mcpServer.MCPToolAppInfo) string {
-	if info == nil {
-		return ""
-	}
-	return info.ResourceURI
-}
-
-func appVisibility(info *mcpServer.MCPToolAppInfo) []string {
-	if info == nil {
-		return nil
-	}
-	return slices.Clone(info.Visibility)
 }

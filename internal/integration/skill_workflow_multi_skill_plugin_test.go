@@ -89,8 +89,8 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		t.Fatal("Plugin capability plan does not contain second Skill")
 	}
 
-	runtimeAdapter, _ := newSkillRuntimeAdapter(t, fixture)
-	selected, err := runtimeAdapter.ResolveSkills(
+	runtimeResolver, _ := newSkillRuntimeResolver(t, fixture)
+	selected, err := runtimeResolver.ResolveSkills(
 		ctx,
 		[]artifactModel.ArtifactRef{
 			first.Artifact.Ref(),
@@ -172,7 +172,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	secondResolved, err := resolveWorkflowSkill(
 		ctx,
-		runtimeAdapter,
+		runtimeResolver,
 		secondAfterFirstReplacement.Ref(),
 	)
 	requireNoError(t, err)
@@ -236,7 +236,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	_, err = resolveWorkflowSkill(
 		ctx,
-		runtimeAdapter,
+		runtimeResolver,
 		firstBeforePurge.Ref(),
 	)
 	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
@@ -288,7 +288,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	secondResolved, err = resolveWorkflowSkill(
 		ctx,
-		runtimeAdapter,
+		runtimeResolver,
 		secondAfterFirstPurge.Ref(),
 	)
 	requireNoError(t, err)

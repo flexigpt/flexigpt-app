@@ -44,7 +44,7 @@ func initModelWrappers(
 	cat catalog.API,
 	definitions definition.API,
 	hydrator installModel.CompiledHydrationCoordinator,
-) (installFlow.HydrationInstaller, *modelruntime.RuntimeAdapter, error) {
+) (installFlow.HydrationInstaller, *modelruntime.SourceResolver, error) {
 	if storeWrapper == nil || aggregateWrapper == nil || roots == nil {
 		return nil, nil, fmt.Errorf(
 			"%w: Model wrapper dependencies are incomplete",
@@ -77,7 +77,9 @@ func initModelWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	runtimeAdapter, err := modelruntime.NewRuntimeAdapter(credentials)
+	runtimeAdapter, err := modelruntime.NewRuntimeAdapter(
+		credentials,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -98,7 +100,12 @@ func initModelWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := runtimeAdapter.BindModelStore(api); err != nil {
+
+	sourceResolver, err := modelruntime.NewSourceResolver(
+		api,
+		runtimeAdapter,
+	)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -121,14 +128,14 @@ func initModelWrappers(
 	storeWrapper.protection = protection
 
 	aggregateWrapper.store = api
-	aggregateWrapper.runtime = runtimeAdapter
+	aggregateWrapper.runtime = sourceResolver
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
 	aggregateWrapper.fallbackProvider = storeSpec.LogicalName(
 		modelcatalog.ProviderNameOpenAIResponses,
 	)
 
-	return installer, runtimeAdapter, nil
+	return installer, sourceResolver, nil
 }
 
 // initModelProviderRuntime selects active management Roots after hydration.
@@ -136,7 +143,7 @@ func initModelWrappers(
 func initModelProviderRuntime(
 	ctx context.Context,
 	store *ModelStoreWrapper,
-	runtimeAdapter *modelruntime.RuntimeAdapter,
+	runtimeAdapter *modelruntime.SourceResolver,
 	publisher providerRuntimePublisher,
 ) error {
 	if store == nil || store.api == nil ||

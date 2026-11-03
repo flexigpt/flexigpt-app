@@ -1,7 +1,6 @@
 package sessionruntime
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,7 +11,6 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
@@ -155,14 +153,17 @@ func toolChoiceAndBinding(
 	sessionRuntime.ToolCallProposal,
 	error,
 ) {
-	arguments, err := toolArguments(resolved.Tool.InputSchema)
+	arguments, err := toolruntime.InputSchema(resolved.Tool.InputSchema)
 	if err != nil {
 		return inferenceSpec.ToolChoice{},
 			sessionRuntime.ToolCallProposal{},
 			err
 	}
 
-	choiceID := stableChoiceID(toolChoicePrefix, contribution.key)
+	choiceID := toolruntime.StableChoiceID(
+		toolChoicePrefix,
+		contribution.key,
+	)
 	choice := inferenceSpec.ToolChoice{
 		ID:          choiceID,
 		Name:        string(resolved.Tool.Name),
@@ -264,34 +265,6 @@ func toolChoiceAndBinding(
 	}
 }
 
-func toolArguments(
-	raw json.RawMessage,
-) (map[string]any, error) {
-	raw = bytes.TrimSpace(raw)
-	switch {
-	case len(raw) == 0:
-		return map[string]any{typeStr: jsonSchemaTypeObject}, nil
-	case bytes.Equal(raw, []byte("true")):
-		return map[string]any{typeStr: jsonSchemaTypeObject}, nil
-	case bytes.Equal(raw, []byte("false")):
-		return nil, errors.New(
-			"false Tool input schema cannot be advertised",
-		)
-	}
-
-	var output map[string]any
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return nil, fmt.Errorf(
-			"tool input schema must be an object: %w",
-			err,
-		)
-	}
-	if output == nil {
-		output = map[string]any{typeStr: jsonSchemaTypeObject}
-	}
-	return output, nil
-}
-
 func mergeToolBindings(
 	leftChoices []inferenceSpec.ToolChoice,
 	leftBindings preparedBindings,
@@ -383,12 +356,4 @@ func toolResolvedArtifact(
 		Revision:   sessionRuntime.Revision(value.Tool.Artifact.Revision),
 		Digest:     digest,
 	}
-}
-
-func stableChoiceID(prefix, key string) string {
-	digest := strings.TrimPrefix(
-		string(cryptoutil.DigestBytes([]byte(prefix+"\x00"+key))),
-		cryptoutil.DigestSHA256Prefix,
-	)
-	return prefix + "-" + digest[:16]
 }

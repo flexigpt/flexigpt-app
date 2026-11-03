@@ -32,7 +32,7 @@ func initSkillRuntimeWrappers(
 	resources resourceFlow.API,
 	nativeResources resourceFlow.NativePathAPI,
 	runtimeWrapper *SkillRuntimeWrapper,
-) (*skillruntime.RuntimeAdapter, error) {
+) (*skillruntime.Resolver, error) {
 	if aggregateWrapper == nil || runtimeWrapper == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill wrappers are required",
@@ -50,7 +50,7 @@ func initSkillRuntimeWrappers(
 		return nil, err
 	}
 
-	adapter, err := skillruntime.NewRuntimeAdapter(
+	catalogAdapter, err := skillruntime.NewCatalogAdapter(
 		artifacts,
 		cat,
 		resources,
@@ -60,20 +60,26 @@ func initSkillRuntimeWrappers(
 	if err != nil {
 		return nil, err
 	}
-	if err := InitSkillRuntimeWrapper(runtimeWrapper, adapter); err != nil {
+	if err := InitSkillRuntimeWrapper(runtimeWrapper, catalogAdapter); err != nil {
 		return nil, fmt.Errorf("initialize Skill runtime: %w", err)
 	}
-	if err := adapter.BindRuntime(runtimeWrapper.service); err != nil {
+
+	resolver, err := skillruntime.NewResolver(
+		catalogAdapter,
+		runtimeWrapper.service,
+	)
+	if err != nil {
 		runtimeWrapper.close()
 		return nil, err
 	}
+
 	if err := InitSkillAggregateWrapper(
 		aggregateWrapper,
-		adapter,
+		resolver,
 		runtimeWrapper.service,
 	); err != nil {
 		runtimeWrapper.close()
 		return nil, err
 	}
-	return adapter, nil
+	return resolver, nil
 }

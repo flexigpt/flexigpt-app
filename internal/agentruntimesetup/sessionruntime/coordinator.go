@@ -8,7 +8,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/flexigpt/agentskills-go/document"
@@ -17,10 +16,10 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
-
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -34,14 +33,13 @@ import (
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
-	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
 const operationResolutionVersion = uint32(1)
 
 type coordinator struct {
 	providers         *inferenceRuntime.ProviderSetAPI
-	models            *modelruntime.RuntimeAdapter
+	models            *modelruntime.SourceResolver
 	artifactSnapshots ArtifactSnapshotReader
 
 	agents     *agentAPI.Service
@@ -49,15 +47,11 @@ type coordinator struct {
 	texts      textMaterializer
 	tools      *toolAPI.Service
 
-	skillResolver *skillruntime.RuntimeAdapter
+	skillResolver *skillruntime.Resolver
 	skillRuntime  *skillRuntime.Service
 
-	mcpRuntime *mcpRuntimeAdapter
-
-	attachments *referenceMaterializer
-
-	skillMu       sync.RWMutex
-	skillSessions map[string]preparedSkillSession
+	mcpRuntime  *mcpConnection.MCPRuntimeManager
+	attachments *attachmentruntime.ReferenceMaterializer
 }
 
 type textMaterializer interface {
@@ -67,49 +61,9 @@ type textMaterializer interface {
 	) (textAPI.Materialization, error)
 }
 
-type mcpRuntimeAdapter struct {
-	runtime interface {
-		Status(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) (*mcpServer.MCPServerRuntimeSnapshot, error)
-		AppPolicy(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) (mcppolicy.MCPAppsPolicy, error)
-		ListTools(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) ([]mcpServer.MCPToolCapability, error)
-		ListResources(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) ([]mcpServer.MCPResourceRef, error)
-		ListResourceTemplates(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) ([]mcpServer.MCPResourceTemplateRef, error)
-		ListPrompts(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-		) ([]mcpServer.MCPPromptRef, error)
-		ReadResource(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-			uri string,
-		) (*mcpServer.MCPReadResourceResponseBody, error)
-		GetPrompt(
-			ctx context.Context,
-			serverID mcpServer.ServerID,
-			name string,
-			arguments map[string]string,
-		) (*mcpServer.MCPGetPromptResponseBody, error)
-	}
-}
-
 func newCoordinator(
 	dependencies Dependencies,
-	attachments *referenceMaterializer,
+	attachments *attachmentruntime.ReferenceMaterializer,
 ) *coordinator {
 	return &coordinator{
 		providers:         dependencies.Providers,
@@ -121,16 +75,9 @@ func newCoordinator(
 		tools:             dependencies.Tools,
 		skillResolver:     dependencies.SkillResolver,
 		skillRuntime:      dependencies.SkillRuntime,
-		mcpRuntime: &mcpRuntimeAdapter{
-			runtime: dependencies.MCPRuntime,
-		},
-		attachments:   attachments,
-		skillSessions: make(map[string]preparedSkillSession),
+		mcpRuntime:        dependencies.MCPRuntime,
+		attachments:       attachments,
 	}
-}
-
-type preparedSkillSession struct {
-	byDefinition map[provider.SkillDef]sessionRuntime.ArtifactReference
 }
 
 type preparedOperation struct {

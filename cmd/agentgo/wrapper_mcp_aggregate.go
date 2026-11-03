@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -18,37 +19,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
-
-type mcpAggregateRuntime interface {
-	Invalidate(ctx context.Context, server mcpServer.ServerID) error
-
-	Status(
-		ctx context.Context,
-		server mcpServer.ServerID,
-	) (*mcpServer.MCPServerRuntimeSnapshot, error)
-}
-
-type mcpAggregateAuth interface {
-	ClearAuthStatus(server mcpServer.ServerID)
-
-	BuildAuthHealth(
-		ctx context.Context,
-		config mcpServer.RuntimeConfig,
-	) mcpAuth.MCPAuthHealth
-
-	GetAuthStatus(
-		server mcpServer.ServerID,
-	) (mcpAuth.MCPAuthStatus, bool)
-
-	PendingAuthorizations() []mcpAuth.MCPOAuthAuthorization
-}
-
-type mcpRuntimeConfigInspector interface {
-	InspectRuntimeConfig(
-		ctx context.Context,
-		resolved serverMCPDomain.Resolved,
-	) (mcpServer.RuntimeConfig, error)
-}
 
 type mcpSecretWriter interface {
 	SetMCPSecret(
@@ -65,9 +35,9 @@ type MCPAggregateWrapper struct {
 	mu sync.Mutex
 
 	store   mcpAPI.ManagementStore
-	source  mcpRuntimeConfigInspector
-	runtime mcpAggregateRuntime
-	auth    mcpAggregateAuth
+	source  *mcpruntime.SourceAdapter
+	runtime *mcpConnection.MCPRuntimeManager
+	auth    *mcpAuth.AuthManager
 	secrets mcpSecretWriter
 }
 

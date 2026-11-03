@@ -743,9 +743,6 @@ func (a *App) initManagers() {
 		SessionV3Params{
 			Providers:     providerPublisher,
 			Models:        modelRuntime,
-			Agents:        a.agentStoreAPI.api,
-			Workspaces:    a.workspaceStoreAPI.api,
-			Texts:         a.textStoreAPI.service,
 			Tools:         a.toolStoreAPI.api,
 			ToolCaller:    toolAdapter,
 			SkillResolver: skillInference,

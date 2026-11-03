@@ -8,6 +8,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func decodeCompletionOutputs(
@@ -119,11 +120,13 @@ func normalizedArguments(value string) (json.RawMessage, error) {
 	if value == "" {
 		return json.RawMessage(`{}`), nil
 	}
-	raw := json.RawMessage(value)
-	if !json.Valid(raw) {
+	canonical, err := jsonutil.Canonicalize(
+		json.RawMessage(value),
+	)
+	if err != nil {
 		return nil, errors.New("provider Tool arguments are not valid JSON")
 	}
-	return append(json.RawMessage(nil), raw...), nil
+	return json.RawMessage(canonical), nil
 }
 
 func hasUsableProtocolOutput(outputs []inferenceSpec.OutputUnion) bool {

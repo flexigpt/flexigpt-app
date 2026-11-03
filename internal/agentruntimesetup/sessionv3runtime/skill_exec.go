@@ -18,6 +18,17 @@ func newSkillSessions() *skillSessions {
 	return &skillSessions{byExecution: map[sessionv3Runtime.ExecutionID]string{}}
 }
 
+func (s *skillSessions) take(
+	executionID sessionv3Runtime.ExecutionID,
+) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	value := s.byExecution[executionID]
+	delete(s.byExecution, executionID)
+	return value
+}
+
 func (b *Binder) executeSkillTool(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
@@ -94,6 +105,7 @@ func (b *Binder) ensureSkillSession(ctx context.Context, req sessionv3Runtime.Wo
 		return "", context.Canceled
 	}
 	id := string(created.Body.SessionID)
+
 	b.skills.mu.Lock()
 	b.skills.byExecution[req.Execution.ID] = id
 	b.skills.mu.Unlock()

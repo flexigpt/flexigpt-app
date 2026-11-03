@@ -41,13 +41,16 @@ func (b *Binder) executeGoTool(
 		}, nil
 	}
 
-	args := payload.Call.Arguments
+	args := payload.Call.Arguments.Clone()
 	if strings.TrimSpace(string(args)) == "" {
-		args = sessionv3Runtime.CanonicalValue(`{}`)
+		args = sessionv3Runtime.MustCanonicalValue(map[string]any{})
 	}
-	if !json.Valid([]byte(args)) {
+	if !args.Valid() {
 		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{Code: "invalid_arguments", Message: "tool arguments are not JSON"},
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "invalid_arguments",
+				Message: "tool arguments are not canonical JSON",
+			},
 		}, nil
 	}
 
@@ -55,7 +58,7 @@ func (b *Binder) executeGoTool(
 	outputs, err := b.deps.ToolCaller.CallGoTool(
 		ctx,
 		resolved.Tool.Implementation.Function,
-		json.RawMessage(args),
+		json.RawMessage(args.Clone()),
 		timeout,
 	)
 	if err != nil {

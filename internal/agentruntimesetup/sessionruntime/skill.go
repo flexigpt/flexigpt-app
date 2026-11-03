@@ -2,9 +2,7 @@ package sessionruntime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"maps"
 	"strings"
 
 	"github.com/flexigpt/agentskills-go/document"
@@ -16,7 +14,6 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -376,221 +373,6 @@ func (c *coordinator) prepareSkills(
 	return output, effective, activeRefs, instructionOutput, nil
 }
 
-func (c *coordinator) EnsureSkillSession(
-	ctx context.Context,
-	request sessionRuntime.SkillSessionRequest,
-) (sessionRuntime.SkillSessionResult, error) {
-	if err := sessionRuntime.RequirePreparedOperation(
-		request.Preparation,
-	); err != nil {
-		return sessionRuntime.SkillSessionResult{}, err
-	}
-
-	data, ok := request.Preparation.Private.(*preparedOperation)
-	if !ok || data == nil {
-		return sessionRuntime.SkillSessionResult{}, errors.New(
-			"skill Session request has no operation-owned Skill preparation",
-		)
-	}
-	if len(data.skills.definitions) == 0 {
-		return sessionRuntime.SkillSessionResult{}, errors.New(
-			"skill Session was requested without effective Skills",
-		)
-	}
-
-	if !artifactReferencesEqual(
-		request.Enabled,
-		request.Preparation.EffectiveSkills,
-	) {
-		return sessionRuntime.SkillSessionResult{}, errors.New(
-			"skill Session allow-list differs from immutable operation preparation",
-		)
-	}
-
-	activeDefinitions := make(
-		[]provider.SkillDef,
-		0,
-		len(request.Active),
-	)
-	for _, reference := range request.Active {
-		definition, found := data.skills.byArtifact[referenceKey(reference)]
-		if !found {
-			return sessionRuntime.SkillSessionResult{}, errors.New(
-				"active Skill is not part of the immutable operation preparation",
-			)
-		}
-		activeDefinitions = append(activeDefinitions, definition)
-	}
-
-	response, err := c.skillRuntime.CreateSkillSession(
-		ctx,
-		&skillRuntime.CreateSkillSessionRequest{
-			Body: &skillRuntime.CreateSkillSessionRequestBody{
-				CloseSessionID: agentskillsRuntimeSpec.SessionID(
-					request.SessionID,
-				),
-				AllowedSkills: data.skills.definitions,
-				ActiveSkills:  activeDefinitions,
-			},
-		},
-	)
-	if err != nil {
-		return sessionRuntime.SkillSessionResult{}, err
-	}
-	if response == nil ||
-		response.Body == nil ||
-		response.Body.SessionID == "" {
-		return sessionRuntime.SkillSessionResult{}, errors.New(
-			"skill runtime returned no Session identity",
-		)
-	}
-
-	active := make(
-		[]sessionRuntime.ArtifactReference,
-		0,
-		len(response.Body.ActiveSkills),
-	)
-	for _, definition := range response.Body.ActiveSkills {
-		if reference, found := data.skills.byDefinition[definition]; found {
-			active = append(active, reference)
-		}
-	}
-
-	c.skillMu.Lock()
-	if request.SessionID != "" &&
-		request.SessionID != string(response.Body.SessionID) {
-		delete(c.skillSessions, request.SessionID)
-	}
-	c.skillSessions[string(response.Body.SessionID)] = preparedSkillSession{
-		byDefinition: cloneSkillDefinitions(data.skills.byDefinition),
-	}
-	c.skillMu.Unlock()
-
-	return sessionRuntime.SkillSessionResult{
-		SessionID: string(response.Body.SessionID),
-		Active:    active,
-	}, nil
-}
-
-func (c *coordinator) CloseSkillSession(
-	ctx context.Context,
-	sessionID string,
-) error {
-	err := c.skillRuntime.CloseSession(
-		ctx,
-		agentskillsRuntimeSpec.SessionID(sessionID),
-	)
-	if err != nil {
-		return err
-	}
-
-	c.skillMu.Lock()
-	delete(c.skillSessions, sessionID)
-	c.skillMu.Unlock()
-	return nil
-}
-
-func (c *coordinator) InvokeSkillTool(
-	ctx context.Context,
-	request sessionRuntime.ToolExecutionRequest,
-) (sessionRuntime.ToolExecutionResult, error) {
-	if strings.TrimSpace(request.SkillSessionID) == "" {
-		return sessionRuntime.ToolExecutionResult{}, errors.New(
-			"skill Tool execution requires a Skill Session",
-		)
-	}
-
-	response, err := c.skillRuntime.InvokeSkillTool(
-		ctx,
-		&skillRuntime.InvokeSkillToolRequest{
-			Body: &skillRuntime.InvokeSkillToolRequestBody{
-				SessionID: agentskillsRuntimeSpec.SessionID(
-					request.SkillSessionID,
-				),
-				ToolName: request.ToolCall.Name,
-				Args:     string(request.ToolCall.Arguments),
-			},
-		},
-	)
-	if err != nil {
-		return sessionRuntime.ToolExecutionResult{}, err
-	}
-	if response == nil || response.Body == nil {
-		return sessionRuntime.ToolExecutionResult{}, errors.New(
-			"skill Tool invocation returned no response body",
-		)
-	}
-
-	outputs, err := json.Marshal(response.Body.Outputs)
-	if err != nil {
-		return sessionRuntime.ToolExecutionResult{}, err
-	}
-
-	result := sessionRuntime.ToolExecutionResult{
-		HasResult:  true,
-		Kind:       sessionRuntime.ToolResultKindSuccess,
-		Text:       string(outputs),
-		Contents:   toolruntime.OutputItemsFromLLMToolOutputs(response.Body.Outputs),
-		Structured: outputs,
-	}
-	if response.Body.IsError {
-		result.Kind = sessionRuntime.ToolResultKindError
-		result.Error = response.Body.ErrorMessage
-		if strings.TrimSpace(result.Error) == "" {
-			result.Error = "Skill Tool returned an error result"
-		}
-	}
-
-	if isSkillLifecycleTool(request.ToolCall.Name) {
-		active, err := c.activeSkillReferences(
-			ctx,
-			request.SkillSessionID,
-		)
-		if err == nil {
-			result.SkillSessionActive = active
-			result.SkillSessionActiveKnown = true
-		}
-	}
-	return result, nil
-}
-
-func (c *coordinator) activeSkillReferences(
-	ctx context.Context,
-	sessionID string,
-) ([]sessionRuntime.ArtifactReference, error) {
-	c.skillMu.RLock()
-	state := c.skillSessions[sessionID]
-	byDefinition := cloneSkillDefinitions(state.byDefinition)
-	c.skillMu.RUnlock()
-
-	if len(byDefinition) == 0 {
-		return nil, nil
-	}
-
-	records, err := c.skillRuntime.ListAgentSkills(
-		ctx,
-		&agentskillsRuntime.SkillListFilter{
-			SessionID: agentskillsRuntimeSpec.SessionID(sessionID),
-			Activity:  agentskillsRuntimeSpec.SkillActivity("active"),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make(
-		[]sessionRuntime.ArtifactReference,
-		0,
-		len(records),
-	)
-	for _, record := range records {
-		if reference, found := byDefinition[record.Def]; found {
-			output = append(output, reference)
-		}
-	}
-	return output, nil
-}
-
 func (c *coordinator) hydrateSkillSession(
 	ctx context.Context,
 	sessionID string,
@@ -776,49 +558,6 @@ func skillRulesPrompt(
 		return agentskillsRuntimeSpec.SkillsRulesPromptWithoutRunScript
 	}
 	return agentskillsRuntimeSpec.SkillsRulesPromptAll
-}
-
-func isSkillLifecycleTool(name string) bool {
-	switch name {
-	case skillToolLoadName, skillToolUnloadName:
-		return true
-	default:
-		return false
-	}
-}
-
-func cloneSkillDefinitions(
-	input map[provider.SkillDef]sessionRuntime.ArtifactReference,
-) map[provider.SkillDef]sessionRuntime.ArtifactReference {
-	output := make(
-		map[provider.SkillDef]sessionRuntime.ArtifactReference,
-		len(input),
-	)
-	maps.Copy(output, input)
-	return output
-}
-
-func artifactReferencesEqual(
-	left []sessionRuntime.ArtifactReference,
-	right []sessionRuntime.ArtifactReference,
-) bool {
-	if len(left) != len(right) {
-		return false
-	}
-
-	seen := make(
-		map[string]struct{},
-		len(left),
-	)
-	for _, reference := range left {
-		seen[referenceKey(reference)] = struct{}{}
-	}
-	for _, reference := range right {
-		if _, found := seen[referenceKey(reference)]; !found {
-			return false
-		}
-	}
-	return true
 }
 
 func referenceKey(

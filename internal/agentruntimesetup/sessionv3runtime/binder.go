@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
@@ -14,21 +15,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
-	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
-	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
-	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
 
 type Dependencies struct {
 	Providers     *inferenceRuntime.ProviderSetAPI
-	Models        *modelruntime.RuntimeAdapter
-	Agents        *agentAPI.Service
-	Workspaces    *workspaceAPI.Service
-	Texts         *textAPI.Service
+	Models        *modelruntime.SourceResolver
 	Tools         *toolAPI.Service
 	ToolCaller    toolruntime.GoToolCaller
-	SkillResolver *skillruntime.RuntimeAdapter
+	SkillResolver *skillruntime.Resolver
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
 	MCPBridge     *invocation.ToolBridge
@@ -111,8 +106,18 @@ func (b *Binder) ResolveWait(
 	)
 }
 
-func (b *Binder) CloseExecutionBinding(_ context.Context, _ sessionv3Runtime.ExecutionID) error {
-	return nil
+func (b *Binder) CloseExecutionBinding(
+	ctx context.Context,
+	executionID sessionv3Runtime.ExecutionID,
+) error {
+	sessionID := b.skills.take(executionID)
+	if sessionID == "" {
+		return nil
+	}
+	return b.deps.SkillRuntime.CloseSession(
+		ctx,
+		agentskillsRuntimeSpec.SessionID(sessionID),
+	)
 }
 
 func boundNow() time.Time {

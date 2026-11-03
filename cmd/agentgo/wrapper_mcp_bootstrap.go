@@ -59,7 +59,7 @@ func initMCPWrappers(
 	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	resolver *composition.Resolver,
-) (installFlow.HydrationInstaller, *mcpruntime.RuntimeAdapter, error) {
+) (installFlow.HydrationInstaller, *mcpruntime.SourceAdapter, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil {
@@ -148,7 +148,7 @@ func initMCPWrappers(
 		return nil, nil, err
 	}
 
-	adapter, err := mcpruntime.NewRuntimeAdapter(
+	adapter, err := mcpruntime.NewSourceAdapter(
 		storeAPI,
 		runtimeSecrets,
 		trustedSecrets,
@@ -175,7 +175,7 @@ func initMCPWrappers(
 	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(
 		cause error,
-	) (installFlow.HydrationInstaller, *mcpruntime.RuntimeAdapter, error) {
+	) (installFlow.HydrationInstaller, *mcpruntime.SourceAdapter, error) {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -214,11 +214,8 @@ func initMCPWrappers(
 		runtimeManager,
 		invocation.NewApprovalManager(5*time.Minute),
 	)
-	if err := adapter.BindRuntime(runtimeManager); err != nil {
-		return cleanup(err)
-	}
 
-	// Publish only after the entire construction and binding phase succeeds.
+	// Publish only after concrete runtime construction succeeds.
 	storeWrapper.api = storeAPI
 	storeWrapper.management = listService
 	storeWrapper.roots = roots

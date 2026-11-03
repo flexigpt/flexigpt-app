@@ -42,27 +42,30 @@ func (b *Binder) buildInputs(req sessionv3Runtime.WorkDispatchRequest) ([]infere
 }
 
 func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.LLMWork) []sessionv3Runtime.Activity {
-	_ = payload
-	out := []sessionv3Runtime.Activity{}
+	reversed := make([]sessionv3Runtime.Activity, 0)
 	countUser := 0
 	for _, a := range slices.Backward(session.Timeline) {
-
 		if a.Kind != sessionv3Runtime.ActivityKindMessage || a.Message == nil {
 			continue
 		}
 		if a.ID == payload.InputActivityID {
 			continue
 		}
-		out = append([]sessionv3Runtime.Activity{a}, out...)
+		reversed = append(reversed, a)
 		if a.Message.Role == sessionv3Runtime.MessageRoleUser {
 			countUser++
 		}
 		if !session.Defaults.History.All && countUser > session.Defaults.History.IncludePreviousUserTurns {
 			break
 		}
-		if len(out) >= 64 {
+		if len(reversed) >= 64 {
 			break
 		}
+	}
+
+	out := make([]sessionv3Runtime.Activity, len(reversed))
+	for index := range reversed {
+		out[len(reversed)-1-index] = reversed[index]
 	}
 	return out
 }

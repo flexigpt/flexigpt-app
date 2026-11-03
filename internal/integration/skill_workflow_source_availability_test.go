@@ -58,7 +58,7 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		)
 	}
 
-	runtimeAdapter, _ := newSkillRuntimeAdapter(t, fixture)
+	runtimeAdapter, _ := newSkillRuntimeResolver(t, fixture)
 
 	initial, err := resolveWorkflowSkill(
 		ctx,

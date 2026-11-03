@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -24,11 +25,9 @@ const (
 
 var ErrBindingUnavailable = errors.New("workflow target binding is unavailable")
 
-type ArtifactPinResolver interface {
-	PinArtifact(ctx context.Context, ref artifactModel.ArtifactRef) (sessionv3Runtime.ArtifactPin, error)
-}
-
-type ServiceBinding interface {
+// WorkBinding is the common private runtime binding for Workflow service and
+// activity targets. The target kind remains durable Workflow declaration data.
+type WorkBinding interface {
 	ID() string
 	Version() string
 	Effect() sessionv3Runtime.EffectContract
@@ -47,33 +46,18 @@ type ServiceBinding interface {
 	) (sessionv3Runtime.WaitResolutionResult, error)
 }
 
-type ActivityBinding interface {
-	ID() string
-	Version() string
-	Effect() sessionv3Runtime.EffectContract
-	Bind(ctx context.Context, input sessionv3Runtime.CanonicalValue) (sessionv3Runtime.SemanticBinding, any, error)
-	Execute(
-		ctx context.Context,
-		input sessionv3Runtime.CanonicalValue,
-		state any,
-	) (sessionv3Runtime.WorkExecutionResult, error)
-	ResolveWait(
-		ctx context.Context,
-		wait sessionv3Runtime.Wait,
-		resolution sessionv3Runtime.WaitResolution,
-		input sessionv3Runtime.CanonicalValue,
-		state any,
-	) (sessionv3Runtime.WaitResolutionResult, error)
-}
+type (
+	ServiceBinding  = WorkBinding
+	ActivityBinding = WorkBinding
+)
 
 type BindingRegistry struct {
-	mu         sync.RWMutex
-	services   map[string]ServiceBinding
-	activities map[string]ActivityBinding
+	mu       sync.RWMutex
+	bindings map[string]WorkBinding
 }
 
 func NewBindingRegistry() *BindingRegistry {
-	return &BindingRegistry{services: map[string]ServiceBinding{}, activities: map[string]ActivityBinding{}}
+	return &BindingRegistry{bindings: map[string]WorkBinding{}}
 }
 
 func (r *BindingRegistry) RegisterService(v ServiceBinding) error {
@@ -82,11 +66,7 @@ func (r *BindingRegistry) RegisterService(v ServiceBinding) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.services[v.ID()]; ok {
-		return fmt.Errorf("duplicate Workflow service binding %q", v.ID())
-	}
-	r.services[v.ID()] = v
-	return nil
+	return r.registerLocked("service", v)
 }
 
 func (r *BindingRegistry) RegisterActivity(v ActivityBinding) error {
@@ -95,44 +75,52 @@ func (r *BindingRegistry) RegisterActivity(v ActivityBinding) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.activities[v.ID()]; ok {
-		return fmt.Errorf("duplicate Workflow activity binding %q", v.ID())
-	}
-	r.activities[v.ID()] = v
-	return nil
+	return r.registerLocked("activity", v)
 }
 
 func (r *BindingRegistry) Service(id string) (ServiceBinding, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	v, ok := r.services[id]
+	v, ok := r.bindings["service:"+id]
 	return v, ok
 }
 
 func (r *BindingRegistry) Activity(id string) (ActivityBinding, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	v, ok := r.activities[id]
+	v, ok := r.bindings["activity:"+id]
 	return v, ok
+}
+
+func (r *BindingRegistry) registerLocked(
+	kind string,
+	value WorkBinding,
+) error {
+	key := kind + ":" + value.ID()
+	if _, found := r.bindings[key]; found {
+		return fmt.Errorf("duplicate Workflow %s binding %q", kind, value.ID())
+	}
+	r.bindings[key] = value
+	return nil
 }
 
 type Admission struct {
 	workflows *workflowAPI.Service
-	pins      ArtifactPinResolver
+	artifacts artifact.API
 	bindings  *BindingRegistry
 }
 
 func NewAdmission(
 	workflows *workflowAPI.Service,
-	pins ArtifactPinResolver,
+	artifacts artifact.API,
 	bindings *BindingRegistry,
 ) (*Admission, error) {
-	if workflows == nil || pins == nil || bindings == nil {
+	if workflows == nil || artifacts == nil || bindings == nil {
 		return nil, errors.New("workflow admission dependencies are incomplete")
 	}
 	return &Admission{
 		workflows: workflows,
-		pins:      pins,
+		artifacts: artifacts,
 		bindings:  bindings,
 	}, nil
 }
@@ -203,7 +191,7 @@ func (a *Admission) admit(
 	if selection.ExpectedDigest != "" && selection.ExpectedDigest != string(plan.Digest) {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New("selected Workflow definition changed")
 	}
-	pin, err := a.pins.PinArtifact(ctx, plan.Workflow)
+	pin, err := a.pinArtifact(ctx, plan.Workflow)
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
@@ -292,7 +280,7 @@ func (a *Admission) bindTarget(
 		if !ok {
 			return TargetBinding{}, fmt.Errorf("%w: Artifact target %q", ErrBindingUnavailable, name)
 		}
-		pin, err := a.pins.PinArtifact(ctx, ref)
+		pin, err := a.pinArtifact(ctx, ref)
 		if err != nil {
 			return TargetBinding{}, err
 		}
@@ -319,6 +307,49 @@ func (a *Admission) bindTarget(
 		return TargetBinding{}, fmt.Errorf("unsupported Workflow target kind %q", target.Kind)
 	}
 	return out, nil
+}
+
+func (a *Admission) pinArtifact(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (sessionv3Runtime.ArtifactPin, error) {
+	if err := ref.Validate(); err != nil {
+		return sessionv3Runtime.ArtifactPin{}, err
+	}
+
+	values, err := a.artifacts.GetMany(
+		ctx,
+		[]artifactModel.ArtifactRef{ref},
+	)
+	if err != nil {
+		return sessionv3Runtime.ArtifactPin{}, err
+	}
+	if len(values) != 1 || values[0].Ref() != ref {
+		return sessionv3Runtime.ArtifactPin{}, errors.New(
+			"workflow Artifact pinning returned an unexpected Artifact",
+		)
+	}
+
+	value := values[0]
+	if value.State != artifactModel.StateAvailable || !value.Enabled {
+		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
+			"workflow Artifact %q is not available and enabled",
+			ref.ArtifactID,
+		)
+	}
+	if value.ResolvedDefinition == nil {
+		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
+			"workflow Artifact %q has no resolved Definition",
+			ref.ArtifactID,
+		)
+	}
+
+	return sessionv3Runtime.ArtifactPin{
+		RootID:     string(value.RootID),
+		ArtifactID: string(value.ID),
+		Revision:   value.Revision,
+		Digest:     string(*value.ResolvedDefinition),
+	}, nil
 }
 
 func validateProgram(p Program) error {

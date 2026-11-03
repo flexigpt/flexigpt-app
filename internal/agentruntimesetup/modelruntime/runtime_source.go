@@ -15,30 +15,31 @@ import (
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
 
-// BindModelStore completes application assembly after Model Store has received
-// this adapter's lookup capability. Call exactly once, before serving requests.
-// Direct conversion of already-resolved values does not require this binding.
-func (a *RuntimeAdapter) BindModelStore(store *modelAPI.Service) error {
-	if store == nil {
-		return fmt.Errorf(
-			"%w: Model runtime store is required",
+// SourceResolver owns source-backed Model and Provider resolution. It is
+// constructed after Model Store receives RuntimeAdapter as its adapter lookup
+// capability, so no late BindModelStore mutation is required.
+type SourceResolver struct {
+	store   *modelAPI.Service
+	runtime *RuntimeAdapter
+}
+
+func NewSourceResolver(
+	store *modelAPI.Service,
+	runtime *RuntimeAdapter,
+) (*SourceResolver, error) {
+	if store == nil || runtime == nil {
+		return nil, fmt.Errorf(
+			"%w: Model source resolver dependencies are incomplete",
 			storeSpec.ErrInvalid,
 		)
 	}
-	if a == nil {
-		return storeSpec.ErrClosed
-	}
-	if a.store != nil {
-		return fmt.Errorf(
-			"%w: Model runtime store is already bound",
-			storeSpec.ErrConflict,
-		)
-	}
-	a.store = store
-	return nil
+	return &SourceResolver{
+		store:   store,
+		runtime: runtime,
+	}, nil
 }
 
-func (a *RuntimeAdapter) ResolveRuntimeModel(
+func (a *SourceResolver) ResolveRuntimeModel(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (inferenceRuntime.RuntimeConfiguration, error) {
@@ -46,7 +47,7 @@ func (a *RuntimeAdapter) ResolveRuntimeModel(
 	return value, err
 }
 
-func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
+func (a *SourceResolver) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	requestPatch *RuntimeRequestPatch,
@@ -63,7 +64,7 @@ func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 	if err != nil {
 		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
-	value, err := a.resolveRuntime(ctx, resolved, prepared)
+	value, err := a.runtime.resolveRuntime(ctx, resolved, prepared)
 	if err != nil {
 		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
@@ -76,8 +77,8 @@ func (a *RuntimeAdapter) ResolveRuntimeModelWithRequestPatch(
 }
 
 // ResolveRuntimeModelTarget handles source-backed Model capability targets.
-// Direct targets remain the application direct-capability provider's concern.
-func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
+// Direct targets remain the direct-capability provider's concern.
+func (a *SourceResolver) ResolveRuntimeModelTarget(
 	ctx context.Context,
 	target composition.CapabilityTarget,
 ) (inferenceRuntime.RuntimeConfiguration, error) {
@@ -113,12 +114,12 @@ func (a *RuntimeAdapter) ResolveRuntimeModelTarget(
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
-	return a.resolveRuntime(ctx, resolved, preparedRuntimeRequestPatch{})
+	return a.runtime.resolveRuntime(ctx, resolved, preparedRuntimeRequestPatch{})
 }
 
 // ResolveProvider resolves the current persisted Provider configuration.
 // Unlike Model completion resolution, it permits an unconfigured API key.
-func (a *RuntimeAdapter) ResolveProvider(
+func (a *SourceResolver) ResolveProvider(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (inferenceSpec.ProviderParam, error) {
@@ -130,14 +131,7 @@ func (a *RuntimeAdapter) ResolveProvider(
 	if err != nil {
 		return inferenceSpec.ProviderParam{}, err
 	}
-	return a.ResolveProviderRuntime(ctx, resolved)
-}
-
-func (a *RuntimeAdapter) modelStore() (*modelAPI.Service, error) {
-	if a == nil || a.store == nil {
-		return nil, storeSpec.ErrClosed
-	}
-	return a.store, nil
+	return a.runtime.ResolveProviderRuntime(ctx, resolved)
 }
 
 // InitializeProviderRuntime registers available enabled Providers after
@@ -146,7 +140,7 @@ func (a *RuntimeAdapter) modelStore() (*modelAPI.Service, error) {
 //
 // Registration is keyed by logical name, so colliding names are rejected
 // rather than selecting one Root's credentials arbitrarily.
-func (a *RuntimeAdapter) InitializeProviderRuntime(
+func (a *SourceResolver) InitializeProviderRuntime(
 	ctx context.Context,
 	providers []modelAPI.ProviderListItem,
 	publish func(context.Context, inferenceSpec.ProviderParam) error,
@@ -213,4 +207,11 @@ func (a *RuntimeAdapter) InitializeProviderRuntime(
 		}
 	}
 	return errors.Join(result, ctx.Err())
+}
+
+func (a *SourceResolver) modelStore() (*modelAPI.Service, error) {
+	if a == nil || a.store == nil {
+		return nil, storeSpec.ErrClosed
+	}
+	return a.store, nil
 }

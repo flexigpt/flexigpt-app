@@ -143,11 +143,11 @@ func (d AdapterDefinition) Validate() error {
 	return nil
 }
 
+// RuntimeAdapter compiles an already-resolved Model or Provider into
+// inference-ready configuration. It has no mutable source-store binding.
 type RuntimeAdapter struct {
 	credentials CredentialResolver
 	adapters    map[string]AdapterDefinition
-
-	store *modelAPI.Service
 }
 
 func NewRuntimeAdapter(
@@ -257,9 +257,9 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 	}, true, nil
 }
 
-// Resolve converts one source-backed resolved Model into ordinary inference-go
-// runtime values. It does not execute a completion and it does not reach into
-// Model Store itself.
+// Resolve converts one already-resolved Model into ordinary inference-go
+// runtime values. It does not execute a completion and it does not read Model
+// Store.
 func (a *RuntimeAdapter) Resolve(
 	ctx context.Context,
 	resolved modelAPI.ResolvedModel,

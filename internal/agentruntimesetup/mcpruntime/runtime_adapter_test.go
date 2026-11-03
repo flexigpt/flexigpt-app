@@ -106,7 +106,7 @@ func TestOAuthTokenPersistenceUsesArtifactScopedReference(t *testing.T) {
 	state := &memoryMCPSecretState{
 		values: map[string]string{},
 	}
-	adapter := newTestRuntimeAdapter(
+	adapter := newTestSourceAdapter(
 		t,
 		&memoryMCPSecretResolver{state: state},
 		&memoryOAuthTokenStore{state: state},
@@ -178,7 +178,7 @@ func TestOAuthTokenLoadPreservesPersistenceError(t *testing.T) {
 	}
 
 	cause := errors.New("secret persistence unavailable")
-	adapter := newTestRuntimeAdapter(
+	adapter := newTestSourceAdapter(
 		t,
 		&memoryMCPSecretResolver{
 			state: &memoryMCPSecretState{readErr: cause},
@@ -197,14 +197,14 @@ func TestOAuthTokenLoadPreservesPersistenceError(t *testing.T) {
 	}
 }
 
-func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
+func TestNewSourceAdapterRequiresEverySplitCapability(t *testing.T) {
 	state := &memoryMCPSecretState{
 		values: map[string]string{},
 	}
 	resolver := &memoryMCPSecretResolver{state: state}
 	tokens := &memoryOAuthTokenStore{state: state}
 
-	if _, err := NewRuntimeAdapter(
+	if _, err := NewSourceAdapter(
 		nil,
 		resolver,
 		tokens,
@@ -213,7 +213,7 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 		t.Fatalf("nil MCP server store error: %v", err)
 	}
 
-	if _, err := NewRuntimeAdapter(
+	if _, err := NewSourceAdapter(
 		testMCPServerStore{},
 		nil,
 		tokens,
@@ -222,7 +222,7 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 		t.Fatalf("nil MCP secret resolver error: %v", err)
 	}
 
-	if _, err := NewRuntimeAdapter(
+	if _, err := NewSourceAdapter(
 		testMCPServerStore{},
 		resolver,
 		nil,
@@ -232,14 +232,14 @@ func TestNewRuntimeAdapterRequiresEverySplitCapability(t *testing.T) {
 	}
 }
 
-func newTestRuntimeAdapter(
+func newTestSourceAdapter(
 	t *testing.T,
 	resolver serverMCPDomain.SecretResolver,
 	oauthTokens OAuthTokenStore,
-) *RuntimeAdapter {
+) *SourceAdapter {
 	t.Helper()
 
-	adapter, err := NewRuntimeAdapter(
+	adapter, err := NewSourceAdapter(
 		testMCPServerStore{},
 		resolver,
 		oauthTokens,

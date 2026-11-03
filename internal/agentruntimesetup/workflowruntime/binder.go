@@ -17,13 +17,8 @@ type Binder struct {
 	Deterministic sessionv3Runtime.DeterministicExecutor
 }
 
-type boundService struct {
-	binding ServiceBinding
-	private any
-}
-
-type boundActivity struct {
-	binding ActivityBinding
+type boundExternal struct {
+	binding WorkBinding
 	private any
 }
 
@@ -59,11 +54,14 @@ func (b *Binder) ExecuteWork(
 	if result, handled, err := b.Deterministic.Execute(ctx, request, bound); handled || err != nil {
 		return result, err
 	}
+
 	switch value := bound.Private.(type) {
-	case boundService:
-		return value.binding.Execute(ctx, request.WorkItem.Input.Service.Input, value.private)
-	case boundActivity:
-		return value.binding.Execute(ctx, request.WorkItem.Input.Activity.Input, value.private)
+	case boundExternal:
+		input, err := externalWorkInput(request.WorkItem)
+		if err != nil {
+			return sessionv3Runtime.WorkExecutionResult{}, err
+		}
+		return value.binding.Execute(ctx, input, value.private)
 	default:
 		return b.Base.ExecuteWork(ctx, request, bound)
 	}
@@ -76,10 +74,9 @@ func (b *Binder) ResolveWait(
 	if result, handled, err := b.Deterministic.ResolveWait(ctx, request); handled || err != nil {
 		return result, err
 	}
+
 	switch value := request.Private.(type) {
-	case boundService:
-		return value.binding.ResolveWait(ctx, request.Wait, request.Resolution, request.Response, value.private)
-	case boundActivity:
+	case boundExternal:
 		return value.binding.ResolveWait(ctx, request.Wait, request.Resolution, request.Response, value.private)
 	default:
 		return b.Base.ResolveWait(ctx, request)
@@ -110,14 +107,7 @@ func (b *Binder) bindService(
 			payload.BindingVersion,
 		)
 	}
-	semantic, private, err := binding.Bind(ctx, payload.Input)
-	if err != nil {
-		return sessionv3Runtime.BindResult{}, err
-	}
-	return sessionv3Runtime.BindResult{
-		SemanticBinding: semantic,
-		Private:         boundService{binding: binding, private: private},
-	}, nil
+	return bindExternal(ctx, binding, payload.BindingVersion, payload.Input)
 }
 
 func (b *Binder) bindActivity(
@@ -137,12 +127,53 @@ func (b *Binder) bindActivity(
 			payload.BindingVersion,
 		)
 	}
-	semantic, private, err := binding.Bind(ctx, payload.Input)
+	return bindExternal(ctx, binding, payload.BindingVersion, payload.Input)
+}
+
+func bindExternal(
+	ctx context.Context,
+	binding WorkBinding,
+	version string,
+	input sessionv3Runtime.CanonicalValue,
+) (sessionv3Runtime.BindResult, error) {
+	if binding == nil || binding.Version() != version {
+		return sessionv3Runtime.BindResult{}, fmt.Errorf(
+			"%w: external binding version %q",
+			ErrBindingUnavailable,
+			version,
+		)
+	}
+
+	semantic, private, err := binding.Bind(ctx, input)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
 	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
-		Private:         boundActivity{binding: binding, private: private},
+		Private:         boundExternal{binding: binding, private: private},
 	}, nil
+}
+
+func externalWorkInput(
+	item sessionv3Runtime.WorkItem,
+) (sessionv3Runtime.CanonicalValue, error) {
+	switch item.Type {
+	case sessionv3Runtime.WorkItemTypeService:
+		if item.Input.Service == nil {
+			return nil, errors.New("Service WorkItem payload is missing")
+		}
+		return item.Input.Service.Input.Clone(), nil
+
+	case sessionv3Runtime.WorkItemTypeActivity:
+		if item.Input.Activity == nil {
+			return nil, errors.New("activity WorkItem payload is missing")
+		}
+		return item.Input.Activity.Input.Clone(), nil
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported external WorkItem type %q",
+			item.Type,
+		)
+	}
 }

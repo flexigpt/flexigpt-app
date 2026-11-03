@@ -20,7 +20,7 @@ import (
 	skillAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill"
 )
 
-func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
+func TestSkillStoreWorkflowResolverFollowsSkillLifecycle(t *testing.T) {
 	fixture := newSkillWorkflowFixture(t)
 	fixture.bootstrapBuiltins(t)
 	fixture.ensureUserBaseline(t)
@@ -64,13 +64,13 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatalf("managed Skill Source is stale: %+v", inspection)
 	}
 
-	adapter, runtimeService := newSkillRuntimeAdapter(t, fixture)
-	requireNoError(t, adapter.SyncRootCatalog(ctx, topology.UserRootID()))
+	resolver, runtimeService := newSkillRuntimeResolver(t, fixture)
+	requireNoError(t, resolver.SyncRootCatalog(ctx, topology.UserRootID()))
 
 	requestedArtifacts := []artifactModel.ArtifactRef{
 		created.Artifact.Ref(),
 	}
-	selected, err := adapter.ResolveSkills(ctx, requestedArtifacts)
+	selected, err := resolver.ResolveSkills(ctx, requestedArtifacts)
 	requireNoError(t, err)
 	if len(selected.Values) != 1 {
 		t.Fatalf("resolved Skills=%d, want 1", len(selected.Values))
@@ -102,7 +102,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatalf("prompt does not mention Skill %q: %q", skillName, prompt)
 	}
 
-	_, err = adapter.ResolveSkills(ctx, nil)
+	_, err = resolver.ResolveSkills(ctx, nil)
 	if !errors.Is(err, skillruntime.ErrArtifactSkillSelectionRequired) {
 		t.Fatalf("empty selection error=%v, want selection required", err)
 	}
@@ -118,7 +118,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatal("Skill remains enabled after disable")
 	}
 
-	_, err = resolveWorkflowSkill(ctx, adapter, disabled.Ref())
+	_, err = resolveWorkflowSkill(ctx, resolver, disabled.Ref())
 	if !errors.Is(err, storeSpec.ErrReferenceUnresolved) {
 		t.Fatalf("resolution after disable error=%v, want ErrReferenceUnresolved", err)
 	}
@@ -146,7 +146,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	if !reenabled.Enabled {
 		t.Fatal("Skill remains disabled after enable")
 	}
-	active, err := resolveWorkflowSkill(ctx, adapter, reenabled.Ref())
+	active, err := resolveWorkflowSkill(ctx, resolver, reenabled.Ref())
 	requireNoError(t, err)
 	if !active.Enabled {
 		t.Fatal("re-enabled Skill resolved as disabled")
@@ -186,7 +186,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatalf("replacement changed Artifact identity: %+v", replaced.Artifact.Ref())
 	}
 
-	updated, err := resolveWorkflowSkill(ctx, adapter, replaced.Artifact.Ref())
+	updated, err := resolveWorkflowSkill(ctx, resolver, replaced.Artifact.Ref())
 	requireNoError(t, err)
 	if updated.Version == active.Version {
 		t.Fatalf("runtime revision did not change after replacement: %q", updated.Version)
@@ -201,7 +201,7 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 		t.Fatal("replacement revision was not registered")
 	}
 
-	selected, err = adapter.ResolveSkills(ctx, requestedArtifacts)
+	selected, err = resolver.ResolveSkills(ctx, requestedArtifacts)
 	requireNoError(t, err)
 	if len(selected.Values) != 1 ||
 		selected.Values[0].Artifact != created.Artifact.Ref() {
@@ -222,16 +222,16 @@ func TestSkillStoreWorkflowRuntimeAdapterFollowsSkillLifecycle(t *testing.T) {
 	}
 }
 
-func newSkillRuntimeAdapter(
+func newSkillRuntimeResolver(
 	t *testing.T,
 	fixture *skillWorkflowFixture,
-) (*skillruntime.RuntimeAdapter, *skillRuntime.Service) {
+) (*skillruntime.Resolver, *skillRuntime.Service) {
 	t.Helper()
 
 	support, err := llmsupport.Skill()
 	requireNoError(t, err)
 
-	adapter, err := skillruntime.NewRuntimeAdapter(
+	catalogAdapter, err := skillruntime.NewCatalogAdapter(
 		fixture.store.Artifacts,
 		fixture.store.Catalog,
 		fixture.store.Resources,
@@ -241,7 +241,7 @@ func newSkillRuntimeAdapter(
 	requireNoError(t, err)
 
 	runtimeService, err := skillRuntime.New(
-		skillRuntime.WithCatalogSource(adapter),
+		skillRuntime.WithCatalogSource(catalogAdapter),
 	)
 	requireNoError(t, err)
 
@@ -250,8 +250,13 @@ func newSkillRuntimeAdapter(
 			t.Errorf("close Skill runtime: %v", err)
 		}
 	})
-	requireNoError(t, adapter.BindRuntime(runtimeService))
-	return adapter, runtimeService
+
+	resolver, err := skillruntime.NewResolver(
+		catalogAdapter,
+		runtimeService,
+	)
+	requireNoError(t, err)
+	return resolver, runtimeService
 }
 
 func newWorkflowSkillSession(
@@ -279,10 +284,10 @@ func newWorkflowSkillSession(
 
 func resolveWorkflowSkill(
 	ctx context.Context,
-	adapter *skillruntime.RuntimeAdapter,
+	resolver *skillruntime.Resolver,
 	ref artifactModel.ArtifactRef,
 ) (skillruntime.ResolvedArtifactSkill, error) {
-	selected, err := adapter.ResolveSkills(ctx, []artifactModel.ArtifactRef{ref})
+	selected, err := resolver.ResolveSkills(ctx, []artifactModel.ArtifactRef{ref})
 	if err != nil {
 		return skillruntime.ResolvedArtifactSkill{}, err
 	}

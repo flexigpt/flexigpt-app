@@ -1,4 +1,4 @@
-package sessionruntime
+package attachmentruntime
 
 import (
 	"context"
@@ -14,18 +14,16 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 )
 
-// referenceMaterializer is the Session-facing attachment adapter.
-//
-// Attachment owns file and URL interpretation. Session owns durable attachment
-// references. Runtime setup is the sole boundary that is allowed to join those
-// two domains.
-type referenceMaterializer struct{}
+// ReferenceMaterializer bridges durable Session attachment references to the
+// attachment domain. Session owns durable references. Attachment owns file,
+// directory, and URL interpretation.
+type ReferenceMaterializer struct{}
 
-func newReferenceMaterializer() *referenceMaterializer {
-	return &referenceMaterializer{}
+func NewReferenceMaterializer() *ReferenceMaterializer {
+	return &ReferenceMaterializer{}
 }
 
-func (m *referenceMaterializer) Materialize(
+func (m *ReferenceMaterializer) Materialize(
 	ctx context.Context,
 	references []sessionRuntime.AttachmentReference,
 ) ([]attachmentRuntime.Attachment, error) {
@@ -35,6 +33,10 @@ func (m *referenceMaterializer) Materialize(
 
 	output := make([]attachmentRuntime.Attachment, 0, len(references))
 	for index := range references {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		values, err := m.materializeReference(references[index])
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -48,11 +50,10 @@ func (m *referenceMaterializer) Materialize(
 	return output, nil
 }
 
-// PrepareAttachments is the Session command-admission attachment boundary.
-//
-// It snapshots local files, expands directories exactly once, validates URLs,
-// and stores only durable references. It never stores hydrated file bytes.
-func (m *referenceMaterializer) PrepareAttachments(
+// PrepareAttachments performs Session submission admission for attachment
+// references. It snapshots local files, expands directories once, validates
+// URLs, and stores durable references only.
+func (m *ReferenceMaterializer) PrepareAttachments(
 	ctx context.Context,
 	references []sessionRuntime.AttachmentReference,
 ) ([]sessionRuntime.AttachmentReference, error) {
@@ -66,6 +67,10 @@ func (m *referenceMaterializer) PrepareAttachments(
 		len(references),
 	)
 	for index := range references {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		reference, err := m.prepareReference(ctx, references[index])
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -79,7 +84,7 @@ func (m *referenceMaterializer) PrepareAttachments(
 	return output, nil
 }
 
-func (m *referenceMaterializer) prepareReference(
+func (m *ReferenceMaterializer) prepareReference(
 	ctx context.Context,
 	reference sessionRuntime.AttachmentReference,
 ) (sessionRuntime.AttachmentReference, error) {
@@ -295,9 +300,6 @@ func copyAttachmentPresentation(
 	}
 }
 
-// attachmentReferenceAllowsMode preserves a user mode choice only when it was
-// offered by canonical backend type detection. AvailableModes is always
-// backend-owned; callers cannot widen it through persisted presentation data.
 func attachmentReferenceAllowsMode(
 	reference sessionRuntime.AttachmentReference,
 	mode string,
@@ -333,7 +335,7 @@ func ensureAttachmentSnapshot(
 	}
 }
 
-func (m *referenceMaterializer) materializeReference(
+func (m *ReferenceMaterializer) materializeReference(
 	reference sessionRuntime.AttachmentReference,
 ) ([]attachmentRuntime.Attachment, error) {
 	switch reference.Kind {
@@ -608,7 +610,7 @@ func attachmentReferenceFromAttachment(
 func parseReferenceTime(value string) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		//nolint:nilnil // Empty persisted timestamps represent omitted optional metadata.
+		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 

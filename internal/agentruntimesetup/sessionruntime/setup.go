@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
@@ -56,7 +57,7 @@ type Dependencies struct {
 	Events      sessionRuntime.EventPublisher
 
 	Providers         *inferenceRuntime.ProviderSetAPI
-	Models            *modelruntime.RuntimeAdapter
+	Models            *modelruntime.SourceResolver
 	ArtifactSnapshots ArtifactSnapshotReader
 
 	Agents     *agentAPI.Service
@@ -66,7 +67,7 @@ type Dependencies struct {
 
 	ToolCaller toolruntime.GoToolCaller
 
-	SkillResolver *skillruntime.RuntimeAdapter
+	SkillResolver *skillruntime.Resolver
 	SkillRuntime  *skillRuntime.Service
 
 	MCPRuntime *mcpConnection.MCPRuntimeManager
@@ -81,7 +82,7 @@ func New(
 		return nil, err
 	}
 
-	attachments := newReferenceMaterializer()
+	attachments := attachmentruntime.NewReferenceMaterializer()
 	coordinator := newCoordinator(dependencies, attachments)
 
 	goExecutor, err := toolruntime.NewGoToolExecutor(
@@ -100,7 +101,8 @@ func New(
 	}
 
 	skillExecutor, err := skillruntime.NewSessionToolExecutor(
-		coordinator,
+		dependencies.SkillResolver,
+		dependencies.SkillRuntime,
 	)
 	if err != nil {
 		return nil, err

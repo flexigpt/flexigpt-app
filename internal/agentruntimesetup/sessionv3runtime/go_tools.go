@@ -2,16 +2,14 @@ package sessionv3runtime
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -94,13 +92,9 @@ func v3GoOrProviderChoice(
 	if strings.TrimSpace(name) == "" {
 		return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 	}
-	args := getEmptySchema()
-	if len(resolved.Tool.InputSchema) != 0 {
-		var err error
-		args, err = jsonutil.DecodeJSONRaw[map[string]any](resolved.Tool.InputSchema)
-		if err != nil {
-			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
-		}
+	args, err := toolruntime.InputSchema(resolved.Tool.InputSchema)
+	if err != nil {
+		return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 	}
 	digest := ""
 	if resolved.Tool.Artifact.ResolvedDefinition != nil {
@@ -118,13 +112,14 @@ func v3GoOrProviderChoice(
 		if function == "" {
 			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 		}
-		id := stableV3ChoiceID(
+		id := toolruntime.StableChoiceID(
 			"v3-go",
 			pin.RootID,
 			pin.ArtifactID,
 			name,
 			pin.Digest,
 		)
+
 		choice := inferenceSpec.ToolChoice{
 			Type:        inferenceSpec.ToolTypeFunction,
 			ID:          id,
@@ -152,7 +147,7 @@ func v3GoOrProviderChoice(
 		if sdkType == "" {
 			return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 		}
-		id := stableV3ChoiceID(
+		id := toolruntime.StableChoiceID(
 			"v3-sdk",
 			pin.RootID,
 			pin.ArtifactID,
@@ -183,17 +178,6 @@ func v3GoOrProviderChoice(
 	default:
 		return inferenceSpec.ToolChoice{}, sessionv3Runtime.ToolCall{}, false
 	}
-}
-
-func stableV3ChoiceID(prefix string, values ...string) string {
-	var input strings.Builder
-	input.WriteString(prefix)
-	for _, value := range values {
-		input.WriteString("\x00")
-		input.WriteString(value)
-	}
-	sum := sha256.Sum256([]byte(input.String()))
-	return prefix + "-" + hex.EncodeToString(sum[:])[:16]
 }
 
 func getEmptySchema() map[string]any {
