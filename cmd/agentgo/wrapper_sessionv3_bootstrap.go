@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionv3runtime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
@@ -31,7 +31,7 @@ type SessionV3Params struct {
 	Workspaces    *workspaceAPI.Service
 	Texts         *textAPI.Service
 	Tools         *toolAPI.Service
-	ToolCaller    agentruntimesetup.GoToolCaller
+	ToolCaller    sessionruntime.GoToolCaller
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager

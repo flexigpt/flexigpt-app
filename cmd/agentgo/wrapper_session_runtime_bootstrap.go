@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 )
 
@@ -18,7 +18,7 @@ func InitComposedSessionRuntime(
 	recovery sessionRuntime.RecoverySource,
 	completion *CompletionWrapper,
 	modelRuntime *modelruntime.RuntimeAdapter,
-	artifactSnapshots agentruntimesetup.ArtifactSnapshotReader,
+	artifactSnapshots sessionruntime.ArtifactSnapshotReader,
 	tools *ToolStoreWrapper,
 	mcpWrapper *MCPRuntimeWrapper,
 	skillResolver *skillruntime.RuntimeAdapter,
@@ -56,9 +56,9 @@ func InitComposedSessionRuntime(
 		return errors.New("session runtime composition dependency is closed")
 	}
 
-	runtimeValue, err := agentruntimesetup.New(
+	runtimeValue, err := sessionruntime.New(
 		ctx,
-		agentruntimesetup.Dependencies{
+		sessionruntime.Dependencies{
 			Checkpoints:       checkpoints,
 			Recovery:          recovery,
 			Providers:         providers,

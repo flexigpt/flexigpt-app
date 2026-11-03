@@ -1,4 +1,4 @@
-package agentruntimesetup
+package sessionruntime
 
 import (
 	"encoding/json"

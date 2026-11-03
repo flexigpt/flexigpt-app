@@ -11,8 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
@@ -27,7 +27,7 @@ type Dependencies struct {
 	Workspaces    *workspaceAPI.Service
 	Texts         *textAPI.Service
 	Tools         *toolAPI.Service
-	ToolCaller    agentruntimesetup.GoToolCaller
+	ToolCaller    sessionruntime.GoToolCaller
 	SkillResolver *skillruntime.RuntimeAdapter
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
