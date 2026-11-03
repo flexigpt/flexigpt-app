@@ -6,9 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/agentpreferences"
@@ -72,17 +70,8 @@ func OpenArtifactStore(
 		return nil, err
 	}
 
-	workspacePolicySource, err := workspace.DefaultPolicySource()
-	if err != nil {
-		return nil, err
-	}
-	workspaceFS, err := artifactbuiltin.EmbeddedWorkspacePackages()
-	if err != nil {
-		return nil, err
-	}
-	workspaceContentDigest, err := iofs.ContentDigest(
+	embeddedProviders, err := workspace.DefaultPolicyProviderRegistrations(
 		ctx,
-		workspaceFS,
 	)
 	if err != nil {
 		return nil, err
@@ -114,18 +103,10 @@ func OpenArtifactStore(
 	)
 
 	store, err := local.Open(ctx, local.Config{
-		BaseDirectory: baseDirectory,
-		EmbeddedProviders: map[string]iofs.ProviderRegistration{
-			workspacePolicySource.ProviderKey: {
-				Filesystem: workspaceFS,
-				Immutable: &iofs.ImmutableContentEvidence{
-					Revision:      workspacePolicySource.Policy.Version,
-					ContentDigest: workspaceContentDigest,
-				},
-			},
-		},
-		SchemaCodecs: registrations.SchemaCodecs(),
-		Decoders:     registrations.Decoders(),
+		BaseDirectory:     baseDirectory,
+		EmbeddedProviders: embeddedProviders,
+		SchemaCodecs:      registrations.SchemaCodecs(),
+		Decoders:          registrations.Decoders(),
 
 		ProtectedRootIDs:           topology.ProtectedRootIDs(),
 		RetainedRoots:              topology.RetainedRootDrafts(),

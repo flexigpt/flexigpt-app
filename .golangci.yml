@@ -423,7 +423,6 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
             - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
-            - "github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 
         isolate_artifactbuiltin:
           files:

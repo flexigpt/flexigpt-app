@@ -11,12 +11,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/agentcatalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
@@ -139,20 +136,13 @@ func newWorkflowHarness(
 	requireNoError(t, err)
 	//nolint:gocritic // Ok assign.
 	decoders := append(canonicalDecoders, sourceFormatDecoders...)
-	workspaceFS, err := artifactbuiltin.EmbeddedWorkspacePackages()
-	requireNoError(t, err)
 
 	store, err := local.Open(
 		ctx,
 		local.Config{
 			BaseDirectory: t.TempDir(),
-			EmbeddedProviders: map[string]iofs.ProviderRegistration{
-				defaultpolicy.ProviderKey: {
-					Filesystem: workspaceFS,
-				},
-			},
-			SchemaCodecs: schemaCodecs,
-			Decoders:     decoders,
+			SchemaCodecs:  schemaCodecs,
+			Decoders:      decoders,
 
 			ProtectedRootIDs: topology.ProtectedRootIDs(),
 			RetainedRoots:    topology.RetainedRootDrafts(),

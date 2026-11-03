@@ -57,15 +57,6 @@ func EmbeddedToolPackages() (fs.FS, error) {
 	)
 }
 
-//go:embed workspaces
-var embeddedWorkspacesFS embed.FS
-
-// EmbeddedWorkspacePackages supplies the application base Workspace policy.
-// It is not installed as protected built-in content.
-func EmbeddedWorkspacePackages() (fs.FS, error) {
-	return embeddedSubtree(embeddedWorkspacesFS, "workspaces")
-}
-
 func embeddedSubtree(embedded fs.FS, root storeSpec.Locator) (fs.FS, error) {
 	if embedded == nil || !fs.ValidPath(string(root)) {
 		return nil, fmt.Errorf("invalid embedded built-in root %q", root)

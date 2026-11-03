@@ -29,10 +29,10 @@ func (s DefaultPolicySource) Validate() error {
 	); err != nil {
 		return err
 	}
-	if err := s.Root.ValidatePortable(false); err != nil {
+	if err := s.Root.ValidatePortable(true); err != nil {
 		return err
 	}
-	if err := s.Locator.ValidatePortable(false); err != nil {
+	if err := s.Locator.ValidatePortable(true); err != nil {
 		return err
 	}
 	if err := s.DecoderID.Validate(); err != nil {
