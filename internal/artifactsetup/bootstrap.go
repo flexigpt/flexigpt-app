@@ -34,6 +34,47 @@ type AgentBaselineEnsurer interface {
 	) (pluginAPI.PluginView, error)
 }
 
+// EnsureMutableRootBaselines provisions family baseline Plugins for each
+// currently active non-protected Root.
+func EnsureMutableRootBaselines(
+	ctx context.Context,
+	roots root.API,
+	protection root.ProtectionAPI,
+	skills SkillBaselineEnsurer,
+	mcp MCPBaselineEnsurer,
+	agents AgentBaselineEnsurer,
+) error {
+	if roots == nil || protection == nil {
+		return errors.New("user Artifact Root lifecycle dependencies are incomplete")
+	}
+
+	values, err := roots.List(ctx)
+	if err != nil {
+		return err
+	}
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].ID < values[right].ID
+	})
+
+	var result error
+	for _, value := range values {
+		if protection.IsProtectedRoot(value.ID) {
+			continue
+		}
+		if err := EnsureRootBaselines(ctx, value.ID, skills, mcp, agents); err != nil {
+			result = errors.Join(
+				result,
+				fmt.Errorf(
+					"ensure Artifact baselines for Root %q: %w",
+					value.ID,
+					err,
+				),
+			)
+		}
+	}
+	return result
+}
+
 // EnsureBuiltInTopology installs and reconciles all application-owned
 // protected package installers as one generic installation bootstrap.
 func EnsureBuiltInTopology(
@@ -102,47 +143,6 @@ func EnsureRootBaselines(
 			result,
 			fmt.Errorf("ensure Agent baseline Plugin: %w", err),
 		)
-	}
-	return result
-}
-
-// EnsureMutableRootBaselines provisions family baseline Plugins for each
-// currently active non-protected Root.
-func EnsureMutableRootBaselines(
-	ctx context.Context,
-	roots root.API,
-	protection root.ProtectionAPI,
-	skills SkillBaselineEnsurer,
-	mcp MCPBaselineEnsurer,
-	agents AgentBaselineEnsurer,
-) error {
-	if roots == nil || protection == nil {
-		return errors.New("user Artifact Root lifecycle dependencies are incomplete")
-	}
-
-	values, err := roots.List(ctx)
-	if err != nil {
-		return err
-	}
-	sort.Slice(values, func(left, right int) bool {
-		return values[left].ID < values[right].ID
-	})
-
-	var result error
-	for _, value := range values {
-		if protection.IsProtectedRoot(value.ID) {
-			continue
-		}
-		if err := EnsureRootBaselines(ctx, value.ID, skills, mcp, agents); err != nil {
-			result = errors.Join(
-				result,
-				fmt.Errorf(
-					"ensure Artifact baselines for Root %q: %w",
-					value.ID,
-					err,
-				),
-			)
-		}
 	}
 	return result
 }
