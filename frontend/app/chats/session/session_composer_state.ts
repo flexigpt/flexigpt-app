@@ -35,7 +35,8 @@ export function getSessionRunComposerState(run: SessionRun | undefined, hasUncon
 	const hasStagedContinuation = Boolean(
 		isActive && run && run.continuation.revision > (run.continuation.consumedRevision ?? 0)
 	);
-	const canComposeContinuationInput = isWaitingForUser && !hasUnresolvedToolCalls;
+	const canStageContinuationInput = isWaitingForUser;
+	const canComposeContinuationInput = canStageContinuationInput && !hasUnresolvedToolCalls;
 	const canContinueWithoutDraft =
 		canComposeContinuationInput &&
 		(hasStagedContinuation || hasUnconsumedToolResults || run?.continuationRequested === true);
@@ -46,6 +47,7 @@ export function getSessionRunComposerState(run: SessionRun | undefined, hasUncon
 		pendingExecutableToolCallIDs,
 		hasStagedContinuation,
 		canComposeContinuationInput,
+		canStageContinuationInput,
 		canContinueWithoutDraft,
 		canRunPendingToolCalls: isWaitingForUser && pendingExecutableToolCallIDs.length > 0,
 	};

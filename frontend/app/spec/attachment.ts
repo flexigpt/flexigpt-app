@@ -164,6 +164,7 @@ export interface PathAttachmentsResult {
 export enum AttachmentErrorReason {
 	TooLargeSingle = 'too-large-single',
 	TooLargeTotal = 'too-large-total',
+	Missing = 'missing',
 	Unreadable = 'unreadable',
 }
 

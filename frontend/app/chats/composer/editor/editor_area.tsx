@@ -46,7 +46,7 @@ import type { ConversationToolStateEntry } from '@/chats/composer/tools/lib/conv
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
-import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
+import { isAttachmentMissing, uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
@@ -121,6 +121,7 @@ interface EditorAreaProps {
 	isInputLocked: boolean;
 	isRunActive: boolean;
 	submissionMode?: 'message' | 'continuation';
+	continuationCanContinue?: boolean;
 	currentProviderSDKType: ProviderSDKType;
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
@@ -166,6 +167,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isActive,
 		isRunActive,
 		submissionMode = 'message',
+		continuationCanContinue = false,
 		currentProviderSDKType,
 		shortcutConfig,
 		onSubmit,
@@ -259,6 +261,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		applyAttachmentsDrop,
 		clearAttachments,
 		clearStandaloneAttachments: handleClearStandaloneAttachments,
+		ignoreMissingAttachments,
 		loadAttachmentsFromMessage,
 	} = useComposerAttachments({
 		isBusy: isGenerating,
@@ -376,6 +379,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		return attachments.filter(attachment => !ownedAttachmentKeys.has(uiAttachmentKey(attachment)));
 	}, [attachments, directoryGroups]);
+	const missingAttachments = useMemo(
+		() => attachments.filter(attachment => isAttachmentMissing(attachment)),
+		[attachments]
+	);
+	const hasMissingAttachments = missingAttachments.length > 0;
+
 	const hasEditorChips =
 		attachments.length > 0 ||
 		removedStandaloneAttachments.length > 0 ||
@@ -777,7 +786,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const isSendButtonEnabled = useMemo(() => {
-		if (isInputLocked || isSubmitting || workspaceExecutionBlocked || hasBlockingToolArgs) {
+		if (isInputLocked || isSubmitting || workspaceExecutionBlocked || hasBlockingToolArgs || hasMissingAttachments) {
 			return false;
 		}
 
@@ -796,6 +805,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		hasContinuationToSend,
 		hasText,
 		isInputLocked,
+		hasMissingAttachments,
 		isSubmitting,
 		mcp.selectedServerCount,
 		mcpAppContextUpdates.length,
@@ -885,6 +895,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [clearComposerTransientState, resetEditorDocument]);
 
 	const doSubmit = useCallback(async () => {
+		if (hasMissingAttachments) {
+			setSubmitError('Some local attachments are no longer available. Ignore them or remove them before sending.');
+			return;
+		}
+
 		if (isSubmittingRef.current || isInputLocked || !isSendButtonEnabled) {
 			return;
 		}
@@ -1019,6 +1034,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentInstalledActiveSkillRefs,
 		getCurrentInstalledEnabledSkillRefs,
 		getCurrentInstalledEnabledSkillSelections,
+		hasMissingAttachments,
 		hasBlockingMCPArgs,
 		hasBlockingToolArgs,
 		hasContinuationToSend,
@@ -1500,7 +1516,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
-	const sendActionText = submissionMode === 'continuation' ? 'Send and continue Run' : 'Send message';
+	const sendActionText =
+		submissionMode === 'continuation'
+			? continuationCanContinue
+				? 'Send and continue Run'
+				: 'Stage input for pending Tools'
+			: 'Send message';
 
 	const erroredToolOutputsReadyToSubmit =
 		toolOutputs.some(output => output.isError && !output.isSkipped) && !hasBlockingToolArgs && !isInputLocked;
@@ -1513,6 +1534,39 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						<FiAlertTriangle size={16} className="mt-0.5" />
 						<span>{submitError}</span>
 					</div>
+				) : null}
+
+				{hasMissingAttachments ? (
+					<div className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
+						<FiAlertTriangle size={16} className="mt-0.5 shrink-0" />
+						<div className="min-w-0 flex-1">
+							<div>
+								{missingAttachments.length} attachment{missingAttachments.length === 1 ? '' : 's'} can no longer be
+								found at the saved local path.
+							</div>
+							<div className="mt-1 text-xs">
+								Ignore unavailable attachments to move them to Not added. Review the draft, then submit manually.
+							</div>
+						</div>
+						<button
+							type="button"
+							className="btn btn-warning btn-xs shrink-0 rounded-lg"
+							disabled={isInputLocked || isSubmitting}
+							onClick={() => {
+								ignoreMissingAttachments();
+								setSubmitError(null);
+							}}
+						>
+							Ignore unavailable
+						</button>
+					</div>
+				) : null}
+
+				{submissionMode === 'continuation' && !continuationCanContinue ? (
+					<output className="alert alert-info mx-4 mt-3 mb-1 flex items-start gap-2 text-sm">
+						<FiTool size={16} className="mt-0.5 shrink-0" />
+						<span>Input will be staged until pending Tool calls are resolved.</span>
+					</output>
 				) : null}
 
 				{toolSelectionIssues.length > 0 ? (

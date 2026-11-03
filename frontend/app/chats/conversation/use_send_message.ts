@@ -169,12 +169,12 @@ export function useSendMessage({
 				const snapshot = await sessionManagementAPI.getSessionSnapshot(tab.sessionID);
 				const run = selectedSessionRun(snapshot, tab.activeRunID);
 
-				if (!run || !getSessionRunComposerState(run).canComposeContinuationInput) {
-					throw new Error('Resolve pending Tool calls or approval requests before continuing this Run.');
+				if (!run) {
+					throw new Error('The active Run is unavailable.');
 				}
-				const cs = getSessionRunComposerState(run);
-				if (!cs.canComposeContinuationInput) {
-					throw new Error('Resolve pending Tool calls or approval requests before continuing this Run.');
+				const composerState = getSessionRunComposerState(run);
+				if (!composerState.canStageContinuationInput) {
+					throw new Error('This Run cannot accept continuation input until its current wait is resolved.');
 				}
 
 				const submission = await buildSessionSubmissionIntent(payload, options);
@@ -207,6 +207,17 @@ export function useSendMessage({
 					}),
 					'Stage continuation input'
 				);
+
+				// A manual Tool batch can accept input before its calls finish.
+				// Keep that input staged for "Run Tools and continue" instead
+				// of sending a ContinueRun command that the Runtime must reject.
+				if (!composerState.canComposeContinuationInput) {
+					updateTab(tabId, current => ({
+						...current,
+						runtimeError: undefined,
+					}));
+					return submission.configuration;
+				}
 
 				try {
 					requireAcceptedSessionCommand(

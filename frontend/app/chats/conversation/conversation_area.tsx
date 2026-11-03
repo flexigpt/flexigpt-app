@@ -1479,7 +1479,8 @@ function ConversationAreaInner(
 										? projectSessionRunToolActivity(tab.sessionSnapshot, tabRun)
 										: undefined;
 							const composerState = getSessionRunComposerState(tabRun, (activity?.outputs.length ?? 0) > 0);
-							const allowContinuationInput = !suppressRuntimeActivity && composerState.canComposeContinuationInput;
+							const allowContinuationInput = !suppressRuntimeActivity && composerState.canStageContinuationInput;
+							const continuationCanContinue = !suppressRuntimeActivity && composerState.canComposeContinuationInput;
 							const showRuntimeControls =
 								tab.tabId === activeTabId && !suppressRuntimeActivity && composerState.isActive;
 
@@ -1492,6 +1493,7 @@ function ConversationAreaInner(
 									isGenerating={runHasGeneratingModelOperation(tabRun)}
 									isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
 									allowContinuationInput={allowContinuationInput}
+									continuationCanContinue={continuationCanContinue}
 									editingMessageId={tab.editingMessageId}
 									runtimeStateUpdatedAt={tabRun?.updatedAt}
 									setInputRef={setInputRef}
@@ -1506,7 +1508,7 @@ function ConversationAreaInner(
 										runSessionAction(toggleAutomationHold);
 									}}
 									showPendingToolControls={showRuntimeControls && canRunPendingToolCalls}
-									canContinueWithoutDraft={allowContinuationInput && composerState.canContinueWithoutDraft}
+									canContinueWithoutDraft={continuationCanContinue && composerState.canContinueWithoutDraft}
 									onRunPendingTools={continueRun => {
 										runSessionAction(() => executePendingSessionToolCalls(continueRun));
 									}}

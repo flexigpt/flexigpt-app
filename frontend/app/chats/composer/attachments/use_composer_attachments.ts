@@ -20,6 +20,7 @@ import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/atta
 import {
 	buildUIAttachmentForLocalPath,
 	buildUIAttachmentForURL,
+	isAttachmentMissing,
 	MAX_DIRECTORY_FILES_TO_SCAN,
 	MAX_FILES_PER_DIRECTORY,
 	uiAttachmentKey,
@@ -193,6 +194,7 @@ interface UseComposerAttachmentsResult {
 	removeOverflowDir: (groupId: string, dirPath: string) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	clearAttachments: () => void;
+	ignoreMissingAttachments: () => void;
 	clearStandaloneAttachments: () => void;
 	loadAttachmentsFromMessage: (incomingAttachments: Attachment[] | null | undefined) => void;
 }
@@ -568,6 +570,31 @@ export function useComposerAttachments({
 		[setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]
 	);
 
+	const ignoreMissingAttachments = useCallback(() => {
+		const missingByKey = new Map(
+			attachmentsRef.current
+				.filter(attachment => isAttachmentMissing(attachment))
+				.map(attachment => [uiAttachmentKey(attachment), attachment] as const)
+		);
+		if (missingByKey.size === 0) {
+			return;
+		}
+
+		const directoryAttachmentKeys = new Set(directoryGroupsRef.current.flatMap(group => group.attachmentKeys));
+		const missingStandaloneAttachments = [...missingByKey].flatMap(([key, attachment]) =>
+			directoryAttachmentKeys.has(key) ? [] : [attachment]
+		);
+
+		setAttachments(previous => previous.filter(attachment => !missingByKey.has(uiAttachmentKey(attachment))));
+
+		if (missingStandaloneAttachments.length > 0) {
+			setRemovedStandaloneAttachments(previous => mergeUniqueAttachments(previous, missingStandaloneAttachments));
+		}
+
+		setDirectoryGroups(previous => moveAttachmentsToDirectoryRemoved(previous, missingByKey));
+		focusEditorAtEnd();
+	}, [focusEditorAtEnd, setAttachments, setDirectoryGroups, setRemovedStandaloneAttachments]);
+
 	const clearStandaloneAttachments = useCallback(() => {
 		const directoryOwnedKeys = new Set<string>();
 		for (const group of directoryGroupsRef.current) {
@@ -834,6 +861,7 @@ export function useComposerAttachments({
 		removeOverflowDir,
 		applyAttachmentsDrop,
 		clearAttachments,
+		ignoreMissingAttachments,
 		clearStandaloneAttachments,
 		loadAttachmentsFromMessage,
 	};

@@ -102,6 +102,7 @@ export interface AgentManagerState {
 	getCapabilityExclusion(occurrence: AgentCapabilityOccurrence): AgentCapabilityExclusion | undefined;
 	toggleCapabilityExclusion(occurrence: AgentCapabilityOccurrence): void;
 	toggleCapabilityExclusionByPath(path: string): void;
+	excludeCapabilityContributions(kinds?: AgentCapabilityExclusion['kind'][]): void;
 	clearCapabilityExclusions(kinds?: AgentCapabilityExclusion['kind'][]): void;
 	isAgentSkillActive(projection: AgentSkillProjection): boolean;
 	setAgentSkillActive(projection: AgentSkillProjection, active: boolean): void;
@@ -939,6 +940,45 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		[currentSelectedAgentResolution, toggleCapabilityExclusion]
 	);
 
+	const excludeCapabilityContributions = useCallback(
+		(kinds?: AgentCapabilityExclusion['kind'][]) => {
+			const allowedKinds = kinds ? new Set(kinds) : undefined;
+			const exclusionKeys = new Set<string>();
+
+			for (const occurrence of currentSelectedAgentResolution?.capabilities.occurrences ?? []) {
+				const exclusion = capabilityExclusionForOccurrence(occurrence);
+				if (!exclusion || (allowedKinds && !allowedKinds.has(exclusion.kind))) {
+					continue;
+				}
+
+				exclusionKeys.add(exclusion.key);
+
+				if (
+					exclusion.kind === 'instruction' ||
+					(exclusion.kind === 'skill' &&
+						exclusion.target.form === CapabilityTargetForm.Artifact &&
+						exclusion.target.artifact)
+				) {
+					agentInstructionSourceSelectionRef.current?.(occurrence.path, false);
+				}
+			}
+
+			if (exclusionKeys.size === 0) {
+				return;
+			}
+
+			// A new removal must win over a previously queued release from the
+			// same Composer state.
+			setReleasedCapabilityExclusionKeys(previous => previous.filter(key => !exclusionKeys.has(key)));
+			setExcludedCapabilityKeys(previous => {
+				const next = [...new Set([...previous, ...exclusionKeys])];
+				excludedCapabilityKeysRef.current = next;
+				return next;
+			});
+		},
+		[currentSelectedAgentResolution]
+	);
+
 	const clearCapabilityExclusions = useCallback(
 		(kinds?: AgentCapabilityExclusion['kind'][]) => {
 			const allowedKinds = kinds ? new Set(kinds) : undefined;
@@ -1145,6 +1185,7 @@ export function useAgentManager(context: AgentComposerContext, options: AgentMan
 		getCapabilityExclusion,
 		toggleCapabilityExclusion,
 		toggleCapabilityExclusionByPath,
+		excludeCapabilityContributions,
 		clearCapabilityExclusions,
 		isAgentSkillActive,
 		setAgentSkillActive,

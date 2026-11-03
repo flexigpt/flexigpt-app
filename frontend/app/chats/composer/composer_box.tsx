@@ -63,6 +63,7 @@ interface ComposerBoxProps {
 	isBusy: boolean;
 	isGenerating: boolean;
 	allowContinuationInput?: boolean;
+	continuationCanContinue?: boolean;
 	isHydrating: boolean;
 	shortcutConfig: ShortcutConfig;
 	editingMessageId: string | null;
@@ -91,6 +92,7 @@ export const ComposerBox = memo(
 			isActive,
 			isGenerating,
 			allowContinuationInput = false,
+			continuationCanContinue = false,
 			isHydrating,
 			shortcutConfig,
 			editingMessageId,
@@ -423,6 +425,7 @@ export const ComposerBox = memo(
 					isRunActive={isBusy}
 					agentManager={agent}
 					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
+					continuationCanContinue={continuationCanContinue}
 					isInputLocked={(isBusy && !allowContinuationInput) || isHydrating || !composerContext.hasRunnableModel}
 					currentProviderSDKType={composerContext.modelOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}

@@ -161,10 +161,9 @@ export function ToolsBottomBarChip({
 	conversationToolsState,
 	setConversationToolsState,
 	onAttachTool,
-
 	onSetAttachedToolAutoExecute,
 	onRemoveAttachedTool,
-	onRemoveAllAttachedTools: _onRemoveAllAttachedTools,
+	onRemoveAllAttachedTools,
 	onEditAttachedToolOptions,
 	onOpenAttachedToolDetails,
 	onOpenConversationToolDetails,
@@ -265,6 +264,17 @@ export function ToolsBottomBarChip({
 			}),
 		[agentManager, agentToolProjections, attachedByKey, conversationToolsState]
 	);
+
+	const excludedAgentToolProjections = useMemo(
+		() =>
+			agentToolProjections.filter(projection => {
+				return Boolean(agentManager?.getCapabilityExclusion(projection.occurrence));
+			}),
+		[agentManager, agentToolProjections]
+	);
+	const excludedAgentToolCount = new Set(
+		excludedAgentToolProjections.map(projection => agentToolProjectionKey(projection))
+	).size;
 
 	const {
 		eligible: eligibleWebSearch,
@@ -385,6 +395,7 @@ export function ToolsBottomBarChip({
 	);
 	const configuredCount =
 		attached.length + visibleConversationTools.length + agentToolRows.length + webSearchTemplates.length;
+	const hasToolSessionChanges = configuredCount > 0 || excludedAgentToolCount > 0;
 	const resultCount = visibleAvailableToAdd.length + visibleWebSearchToAdd.length;
 	const toolsHeaderMeta = isSearchQueryActive(query)
 		? `${resultCount} match${resultCount === 1 ? '' : 'es'}`
@@ -699,38 +710,45 @@ export function ToolsBottomBarChip({
 
 	const hoverContent = shortcut ? `Attach tools (${shortcut})` : 'Attach tools';
 
-	const selectedToolsPanel =
-		configuredCount > 0 ? (
-			<>
-				{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
-				{activeWebSearch && !activeWebSearchItem ? (
-					<div className="alert alert-warning rounded-xl p-2 text-xs">
-						<div className="min-w-0 flex-1">
-							<div>{activeWebSearch.displayName || activeWebSearch.target.name}</div>
-							<div>This web-search selection is unavailable for the current provider.</div>
-						</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs text-error"
-							disabled={isInputLocked}
-							onClick={() => {
-								setWebSearchTemplates([]);
-							}}
-						>
-							Remove
-						</button>
+	const selectedToolsPanel = hasToolSessionChanges ? (
+		<>
+			{activeWebSearchItem ? renderWebSearch(activeWebSearchItem) : null}
+			{activeWebSearch && !activeWebSearchItem ? (
+				<div className="alert alert-warning rounded-xl p-2 text-xs">
+					<div className="min-w-0 flex-1">
+						<div>{activeWebSearch.displayName || activeWebSearch.target.name}</div>
+						<div>This web-search selection is unavailable for the current provider.</div>
 					</div>
-				) : null}
+					<button
+						type="button"
+						className="btn btn-ghost btn-xs text-error"
+						disabled={isInputLocked}
+						onClick={() => {
+							setWebSearchTemplates([]);
+						}}
+					>
+						Remove
+					</button>
+				</div>
+			) : null}
 
-				{attached.map(a => {
-					return renderAttached(a);
-				})}
-				{visibleConversationTools.map(a => {
-					return renderConversation(a);
-				})}
-				{agentToolRows.map(projection => renderAgentTool(projection))}
-			</>
-		) : undefined;
+			{attached.map(a => {
+				return renderAttached(a);
+			})}
+			{visibleConversationTools.map(a => {
+				return renderConversation(a);
+			})}
+			{agentToolRows.map(projection => renderAgentTool(projection))}
+
+			{excludedAgentToolCount > 0 ? (
+				<div className="border-warning/30 bg-warning/10 rounded-xl border p-2 text-xs">
+					{excludedAgentToolCount} inherited Agent tool
+					{excludedAgentToolCount === 1 ? ' is' : 's are'} removed for this Session. Use Restore Agent tools to include
+					them again.
+				</div>
+			) : null}
+		</>
+	) : undefined;
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
@@ -742,7 +760,7 @@ export function ToolsBottomBarChip({
 					className={`${actionTriggerChipButtonClasses} ${
 						missingCount
 							? 'border-warning/70 bg-warning/10 hover:bg-warning/15'
-							: configuredCount
+							: hasToolSessionChanges
 								? 'border-primary/50 bg-primary/10'
 								: 'border-transparent'
 					} ${isInputLocked ? 'opacity-60' : ''}`}
@@ -754,7 +772,7 @@ export function ToolsBottomBarChip({
 						suffix={
 							missingCount ? (
 								<span className="badge badge-warning badge-xs">Check</span>
-							) : configuredCount > 0 ? (
+							) : hasToolSessionChanges ? (
 								<FiCheck size={14} aria-hidden="true" />
 							) : undefined
 						}
@@ -877,31 +895,53 @@ export function ToolsBottomBarChip({
 						<ComposerDropdownSelectedPanel
 							label="Added tools"
 							ariaLabel="Added tools"
-							isEmpty={configuredCount === 0}
+							isEmpty={!hasToolSessionChanges}
 							emptyLabel="Choose a tool or enable web search above to add it to this message."
 							help="Added tools are available for the next message."
 							summary={
-								configuredCount > 0 ? (
+								hasToolSessionChanges ? (
 									<>
-										<span>{configuredCount} added</span>
+										{configuredCount > 0 ? <span>{configuredCount} added</span> : null}
+										{excludedAgentToolCount > 0 ? (
+											<span>
+												{excludedAgentToolCount} Agent tool
+												{excludedAgentToolCount === 1 ? '' : 's'} removed
+											</span>
+										) : null}
 										{missingCount > 0 ? <span className="text-warning">{missingCount} need attention</span> : null}
 									</>
 								) : undefined
 							}
 							actions={
-								configuredCount > 0 ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs text-error rounded-lg"
-										disabled={isInputLocked}
-										onClick={() => {
-											setConversationToolsState([]);
-											setWebSearchTemplates([]);
-											agentManager?.clearCapabilityExclusions(['tool']);
-										}}
-									>
-										Clear Session overrides
-									</button>
+								hasToolSessionChanges ? (
+									<>
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs text-error rounded-lg"
+											disabled={isInputLocked}
+											onClick={() => {
+												onRemoveAllAttachedTools(attached);
+												setConversationToolsState([]);
+												setWebSearchTemplates([]);
+												setAutoOverrides({});
+												agentManager?.excludeCapabilityContributions(['tool']);
+											}}
+										>
+											Remove all tools for this session
+										</button>
+										{excludedAgentToolCount > 0 ? (
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs rounded-lg"
+												disabled={isInputLocked}
+												onClick={() => {
+													agentManager?.clearCapabilityExclusions(['tool']);
+												}}
+											>
+												Restore Agent tools
+											</button>
+										) : null}
+									</>
 								) : undefined
 							}
 						>

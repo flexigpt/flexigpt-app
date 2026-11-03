@@ -17,6 +17,7 @@ function TabInputPaneInner(props: {
 	isGenerating: boolean;
 	isHydrating: boolean;
 	allowContinuationInput: boolean;
+	continuationCanContinue: boolean;
 	editingMessageId: string | null;
 	runtimeStateUpdatedAt?: string;
 	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
@@ -54,6 +55,7 @@ function TabInputPaneInner(props: {
 		isGenerating,
 		isHydrating,
 		allowContinuationInput,
+		continuationCanContinue,
 		editingMessageId,
 		setInputRef,
 		shortcutConfig,
@@ -97,6 +99,7 @@ function TabInputPaneInner(props: {
 				isGenerating={isGenerating}
 				isHydrating={isHydrating}
 				allowContinuationInput={allowContinuationInput}
+				continuationCanContinue={continuationCanContinue}
 				shortcutConfig={shortcutConfig}
 				editingMessageId={editingMessageId}
 				onCancelEditing={onCancelEditing}
@@ -138,6 +141,7 @@ export const TabInputPane = memo(TabInputPaneInner, (previous, next) => {
 		previous.isGenerating === next.isGenerating &&
 		previous.isHydrating === next.isHydrating &&
 		previous.allowContinuationInput === next.allowContinuationInput &&
+		previous.continuationCanContinue === next.continuationCanContinue &&
 		previous.editingMessageId === next.editingMessageId &&
 		previous.runtimeStateUpdatedAt === next.runtimeStateUpdatedAt &&
 		previous.shortcutConfig === next.shortcutConfig &&

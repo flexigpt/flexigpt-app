@@ -81,6 +81,14 @@ function getSafeAvailableModes(att: Partial<Attachment>): AttachmentContentBlock
 		: [att.mode ?? AttachmentContentBlockMode.notReadable];
 }
 
+export function isAttachmentMissing(att: Pick<Attachment, 'kind' | 'fileRef' | 'imageRef'>): boolean {
+	if (att.kind === AttachmentKind.file) {
+		return att.fileRef?.exists === false;
+	}
+
+	return att.kind === AttachmentKind.image && att.imageRef?.exists === false;
+}
+
 // Identity key used for de-duplication in the composer.
 export function uiAttachmentKey(att: UIAttachment): string {
 	let label = getAttachmentDisplayLabel(att);
@@ -132,6 +140,10 @@ function buildErrorAttachmentForLocalPath(att: Attachment, reason: AttachmentErr
 export function buildUIAttachmentForLocalPath(att: Attachment): UIAttachment | undefined {
 	if (!att.fileRef && !att.imageRef) {
 		return undefined;
+	}
+
+	if (isAttachmentMissing(att)) {
+		return buildErrorAttachmentForLocalPath(att, AttachmentErrorReason.Missing);
 	}
 	let sizeBytes = 0;
 	if (att.fileRef && att.fileRef.size !== undefined && att.fileRef.size > 0) {
@@ -199,6 +211,9 @@ export function getAttachmentErrorMessage(att: UIAttachment): string | null {
 		}
 		case AttachmentErrorReason.TooLargeTotal:
 			return 'Too many or too large files in this folder were skipped; only a subset was attached.';
+
+		case AttachmentErrorReason.Missing:
+			return 'This attachment is no longer available at its saved local path.';
 
 		default:
 			return 'This file type is not supported or could not be read.';
