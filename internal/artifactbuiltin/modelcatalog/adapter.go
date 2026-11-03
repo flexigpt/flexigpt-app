@@ -1,4 +1,4 @@
-package modelruntime
+package modelcatalog
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -42,7 +41,7 @@ type preparedModel struct {
 // independent source-backed Model Provider and Model packages.
 func PreparePackages(
 	ctx context.Context,
-) ([]modelcatalog.PreparedPackage, error) {
+) ([]PreparedPackage, error) {
 	catalog := modelpreset.DefaultCatalog()
 	if err := modelpreset.ValidateCatalog(catalog); err != nil {
 		return nil, fmt.Errorf(
@@ -128,7 +127,7 @@ func PreparePackages(
 		modelsByProvider[providerName] = prepared
 	}
 
-	output := make([]modelcatalog.PreparedPackage, 0)
+	output := make([]PreparedPackage, 0)
 	for _, providerName := range providerNames {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -163,7 +162,7 @@ func PreparePackages(
 				err,
 			)
 		}
-		preparedProvider, err := modelcatalog.PrepareProviderPackage(providerDocument)
+		preparedProvider, err := PrepareProviderPackage(providerDocument)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +183,7 @@ func PreparePackages(
 					err,
 				)
 			}
-			preparedModel, err := modelcatalog.PrepareModelPackage(document)
+			preparedModel, err := PrepareModelPackage(document)
 			if err != nil {
 				return nil, err
 			}

@@ -7,8 +7,8 @@ import (
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 )
 
 func InitComposedSessionRuntime(

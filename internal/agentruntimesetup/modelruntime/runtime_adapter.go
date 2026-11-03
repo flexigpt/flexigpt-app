@@ -19,6 +19,8 @@ import (
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 )
 
+const apiKeyHeaderStr = "apiKeyHeader"
+
 type RuntimeRequestPatch struct {
 	Defaults *modelDomain.DefaultsPatch `json:"defaults,omitempty"`
 	Clear    []RuntimeDefaultField      `json:"clear,omitempty"`

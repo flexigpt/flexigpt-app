@@ -1,4 +1,4 @@
-package modelruntime
+package modelcatalog
 
 import (
 	"github.com/flexigpt/inference-go/modelpreset"

@@ -14,6 +14,7 @@ var (
 	ErrSessionNotFound   = errors.New("session not found")
 	ErrExecutionNotFound = errors.New("execution not found")
 	ErrCommandConflict   = errors.New("command ID was reused with another payload")
+	ErrCommandInProgress = errors.New("command ID is already being processed")
 )
 
 func validateID(subject, value string) error {

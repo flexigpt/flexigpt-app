@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 )
 
 // Resolver is the trusted application-side bridge from a Model Provider

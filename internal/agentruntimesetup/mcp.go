@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )

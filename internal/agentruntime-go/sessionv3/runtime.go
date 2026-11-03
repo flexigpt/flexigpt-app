@@ -28,15 +28,16 @@ type RuntimeDependencies struct {
 }
 
 type Runtime struct {
-	mu              sync.RWMutex
-	deps            RuntimeDependencies
-	sessions        map[SessionID]*Session
-	retired         map[SessionID]struct{}
-	interpreters    map[string]ProgramInterpreter
-	privateBindings map[WorkItemID]BoundWork
-	privateWaits    map[WaitID]any
-	cancels         map[WorkItemID]context.CancelFunc
-	closed          bool
+	mu                 sync.RWMutex
+	deps               RuntimeDependencies
+	sessions           map[SessionID]*Session
+	retired            map[SessionID]struct{}
+	interpreters       map[string]ProgramInterpreter
+	privateBindings    map[WorkItemID]BoundWork
+	privateWaits       map[WaitID]any
+	cancels            map[WorkItemID]context.CancelFunc
+	workflowAdmissions map[CommandID]string
+	closed             bool
 }
 
 func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
@@ -53,13 +54,14 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		dependencies.Interpreters = NewBuiltinInterpreters()
 	}
 	r := &Runtime{
-		deps:            dependencies,
-		sessions:        map[SessionID]*Session{},
-		retired:         map[SessionID]struct{}{},
-		interpreters:    map[string]ProgramInterpreter{},
-		privateBindings: map[WorkItemID]BoundWork{},
-		privateWaits:    map[WaitID]any{},
-		cancels:         map[WorkItemID]context.CancelFunc{},
+		deps:               dependencies,
+		sessions:           map[SessionID]*Session{},
+		retired:            map[SessionID]struct{}{},
+		interpreters:       map[string]ProgramInterpreter{},
+		privateBindings:    map[WorkItemID]BoundWork{},
+		privateWaits:       map[WaitID]any{},
+		cancels:            map[WorkItemID]context.CancelFunc{},
+		workflowAdmissions: map[CommandID]string{},
 	}
 	for _, interpreter := range dependencies.Interpreters {
 		if interpreter == nil || interpreter.ID() == "" || interpreter.Version() == 0 {
@@ -368,6 +370,21 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		r.mu.Unlock()
 		return receipt, nil
 	}
+
+	fingerprint, err := fingerprintCommand(command)
+	if err != nil {
+		r.mu.Unlock()
+		return nil, err
+	}
+	if existing, found := r.workflowAdmissions[command.Meta.ID]; found {
+		r.mu.Unlock()
+		if existing != fingerprint {
+			return nil, ErrCommandConflict
+		}
+		return nil, ErrCommandInProgress
+	}
+	r.workflowAdmissions[command.Meta.ID] = fingerprint
+
 	revision := session.Revision
 	executionID := command.ExecutionID
 	if executionID == "" {
@@ -384,16 +401,35 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		},
 	)
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err != nil {
-		session = r.sessions[command.SessionID]
-		if session == nil {
-			return nil, ErrSessionNotFound
-		}
-		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
-	}
+	defer func() {
+		delete(r.workflowAdmissions, command.Meta.ID)
+		r.mu.Unlock()
+	}()
+
 	if r.closed {
 		return nil, ErrRuntimeClosed
+	}
+	session = r.sessions[command.SessionID]
+	if session == nil {
+		return nil, ErrSessionNotFound
+	}
+	if receipt, found, receiptErr := r.commandReceiptLocked(
+		session,
+		command.Meta,
+		command,
+	); receiptErr != nil || found {
+		return receipt, receiptErr
+	}
+	if session.Revision != revision {
+		return r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			"Session changed while Workflow admission was prepared; retry",
+		), nil
+	}
+	if err != nil {
+		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
 
 	if err := ValidateWorkflowAdmissionResult(admission); err != nil {
@@ -404,20 +440,17 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 			err.Error(),
 		), nil
 	}
-	session = r.sessions[command.SessionID]
-	if session == nil {
-		return nil, ErrSessionNotFound
-	}
-	if session.Revision != revision {
+	interpreter := r.interpreterLocked(admission.Program)
+	if interpreter == nil {
 		return r.rejectLocked(
 			session,
 			command.Meta,
 			command,
-			"Session changed while Workflow admission was prepared; retry",
+			"Workflow interpreter is unavailable",
 		), nil
 	}
-	if r.interpreterLocked(admission.Program) == nil {
-		return r.rejectLocked(session, command.Meta, command, "Workflow interpreter is unavailable"), nil
+	if err := interpreter.ValidateSnapshot(admission.Program); err != nil {
+		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
 	for _, existing := range session.Executions {
 		if existing.ID == executionID {
@@ -426,7 +459,6 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	previous := cloneSession(*session)
 	now := r.now()
-	interpreter := r.interpreterLocked(admission.Program)
 	state, err := interpreter.InitialState(admission.Program)
 	if err != nil {
 		return nil, err

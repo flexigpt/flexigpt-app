@@ -4,14 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -31,24 +31,57 @@ func (b *Binder) goToolChoices(ctx context.Context, req sessionv3.WorkDispatchRe
 			ArtifactID: artifactModel.ArtifactID(sel.ArtifactID),
 		}
 		if err := ref.Validate(); err != nil {
-			continue
+			return nil, fmt.Errorf("selected Tool reference: %w", err)
 		}
-		target := composition.CapabilityTarget{
-			Form:     composition.TargetFormArtifact,
-			Type:     declaration.TypeTool,
-			Artifact: &ref,
+		target, err := b.deps.Tools.MapToolTarget(ctx, ref)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"map selected Tool %s/%s: %w",
+				ref.RootID,
+				ref.ArtifactID,
+				err,
+			)
 		}
 		resolved, err := b.deps.Tools.ResolveToolTarget(ctx, target)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf(
+				"resolve selected Tool %s/%s: %w",
+				ref.RootID,
+				ref.ArtifactID,
+				err,
+			)
+		}
+		if err := validateV3ToolSelection(sel, resolved); err != nil {
+			return nil, err
 		}
 		choice, call, ok := v3GoOrProviderChoice(resolved)
 		if !ok {
-			continue
+			return nil, fmt.Errorf(
+				"selected Tool %s/%s has no supported v3 binding",
+				ref.RootID,
+				ref.ArtifactID,
+			)
 		}
 		out = append(out, preparedChoice{Choice: choice, Call: call})
 	}
 	return out, nil
+}
+
+func validateV3ToolSelection(
+	selection sessionv3.ArtifactSelection,
+	resolved toolAPI.ResolvedToolView,
+) error {
+	artifact := resolved.Tool.Artifact
+	if selection.ExpectedRevision != 0 &&
+		selection.ExpectedRevision != artifact.Revision {
+		return errors.New("selected Tool revision changed")
+	}
+	if selection.ExpectedDigest != "" &&
+		(artifact.ResolvedDefinition == nil ||
+			selection.ExpectedDigest != string(*artifact.ResolvedDefinition)) {
+		return errors.New("selected Tool Definition changed")
+	}
+	return nil
 }
 
 func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.ToolChoice, sessionv3.ToolCall, bool) {
@@ -80,7 +113,13 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 		if function == "" {
 			return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
 		}
-		id := stableV3ChoiceID("v3-go", name, pin.Digest)
+		id := stableV3ChoiceID(
+			"v3-go",
+			pin.RootID,
+			pin.ArtifactID,
+			name,
+			pin.Digest,
+		)
 		choice := inferenceSpec.ToolChoice{
 			Type:        inferenceSpec.ToolTypeFunction,
 			ID:          id,
@@ -108,7 +147,13 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 		if sdkType == "" {
 			return inferenceSpec.ToolChoice{}, sessionv3.ToolCall{}, false
 		}
-		id := stableV3ChoiceID("v3-sdk", name, pin.Digest)
+		id := stableV3ChoiceID(
+			"v3-sdk",
+			pin.RootID,
+			pin.ArtifactID,
+			name,
+			pin.Digest,
+		)
 		choice := inferenceSpec.ToolChoice{
 			Type:        inferenceSpec.ToolType(sdkType),
 			ID:          id,
@@ -135,8 +180,14 @@ func v3GoOrProviderChoice(resolved toolAPI.ResolvedToolView) (inferenceSpec.Tool
 	}
 }
 
-func stableV3ChoiceID(prefix, name, digest string) string {
-	sum := sha256.Sum256([]byte(prefix + "\x00" + name + "\x00" + digest))
+func stableV3ChoiceID(prefix string, values ...string) string {
+	var input strings.Builder
+	input.WriteString(prefix)
+	for _, value := range values {
+		input.WriteString("\x00")
+		input.WriteString(value)
+	}
+	sum := sha256.Sum256([]byte(input.String()))
 	return prefix + "-" + hex.EncodeToString(sum[:])[:16]
 }
 

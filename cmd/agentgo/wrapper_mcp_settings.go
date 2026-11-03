@@ -1,4 +1,4 @@
-package mcpsettings
+package main
 
 import (
 	"context"
@@ -24,23 +24,23 @@ type payload struct {
 
 // Settings persists application-level MCP runtime settings through the
 // generic Store-scoped overlay capability.
-type Settings struct {
+type mcpSettings struct {
 	overlays overlay.StoreAPI
 }
 
-func New(
+func newMCPSettings(
 	overlays overlay.StoreAPI,
-) (*Settings, error) {
+) (*mcpSettings, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP global settings overlay store is required",
 			storeSpec.ErrInvalid,
 		)
 	}
-	return &Settings{overlays: overlays}, nil
+	return &mcpSettings{overlays: overlays}, nil
 }
 
-func (s *Settings) Get(
+func (s *mcpSettings) Get(
 	ctx context.Context,
 ) (mcpAuth.MCPAuthSettings, uint64, error) {
 	record, found, err := s.overlays.GetStoreOverlay(
@@ -78,7 +78,7 @@ func (s *Settings) Get(
 	return settings, record.Revision, nil
 }
 
-func (s *Settings) Put(
+func (s *mcpSettings) Put(
 	ctx context.Context,
 	expectedRevision uint64,
 	value mcpAuth.MCPAuthSettings,
@@ -161,9 +161,9 @@ func isLoopbackHost(
 
 // EnvironmentResolver is the application environment capability supplied to
 // trusted MCP runtime materialization. It does not own request cancellation.
-type EnvironmentResolver struct{}
+type mcpEnvironmentResolver struct{}
 
-func (EnvironmentResolver) ResolveEnvironment(
+func (mcpEnvironmentResolver) ResolveEnvironment(
 	_ context.Context,
 	name string,
 ) (value string, found bool, err error) {

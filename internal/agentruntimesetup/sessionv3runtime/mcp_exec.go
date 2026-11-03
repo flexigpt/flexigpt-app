@@ -58,8 +58,13 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 				"MCP approval evaluation returned no result",
 			)
 		}
-		if evaluation.Decision == mcpServer.MCPApprovalDecisionApprovalRequired &&
-			evaluation.Summary != nil {
+		switch evaluation.Decision {
+		case mcpServer.MCPApprovalDecisionApprovalRequired:
+			if evaluation.Summary == nil || evaluation.ApprovalID == "" {
+				return sessionv3.BindResult{}, errors.New(
+					"MCP approval evaluation has no approval identity or summary",
+				)
+			}
 			wait := sessionv3.WaitRequest{
 				Kind:    sessionv3.WaitKindApproval,
 				Summary: sessionv3.MustCanonicalValue(evaluation.Summary),
@@ -82,8 +87,8 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 					Call:       call,
 				},
 			}, nil
-		}
-		if evaluation.Decision == mcpServer.MCPApprovalDecisionDenied {
+
+		case mcpServer.MCPApprovalDecisionDenied:
 			return sessionv3.BindResult{
 				SemanticBinding: semantic,
 				ImmediateOutput: &sessionv3.WorkItemOutput{
@@ -96,6 +101,14 @@ func (b *Binder) bindTool(ctx context.Context, req sessionv3.WorkDispatchRequest
 					},
 				},
 			}, nil
+
+		case mcpServer.MCPApprovalDecisionAllowed:
+			// Continue into the normal bound WorkItem path.
+
+		default:
+			return sessionv3.BindResult{}, fmt.Errorf(
+				"unsupported MCP approval decision %q", evaluation.Decision,
+			)
 		}
 	}
 	return sessionv3.BindResult{
@@ -216,6 +229,11 @@ func (b *Binder) executeMCPTool(
 			Error: &sessionv3.SanitizedError{Code: "mcp_failed", Message: err.Error()},
 		}, nil
 	}
+	if resp == nil {
+		return sessionv3.WorkExecutionResult{
+			Error: &sessionv3.SanitizedError{Code: "mcp_empty", Message: "MCP returned no response"},
+		}, nil
+	}
 	text := string(mustMarshal(resp.Content))
 	kind := sessionv3.ToolOutputKindSuccess
 	if resp.IsError {
@@ -254,6 +272,19 @@ func (b *Binder) resolveToolWait(
 			},
 			Confirmed: true,
 		}, nil
+	}
+
+	if result.Decision != mcpServer.MCPApprovalDecisionAllowed {
+		return sessionv3.WaitResolutionResult{}, fmt.Errorf(
+			"unsupported MCP approval resolution decision %q",
+			result.Decision,
+		)
+	}
+	if req.Resolution == sessionv3.WaitResolutionApproveOnce &&
+		result.Token == "" {
+		return sessionv3.WaitResolutionResult{}, errors.New(
+			"MCP one-time approval returned no approval token",
+		)
 	}
 	return sessionv3.WaitResolutionResult{
 		Resume: true,

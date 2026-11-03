@@ -82,6 +82,7 @@ func main() {
 			application.NewService(app.agentStoreAPI),
 			application.NewService(app.textStoreAPI),
 			application.NewService(app.sessionRuntimeAPI),
+			application.NewService(app.sessionV3RuntimeAPI),
 		},
 		Assets: application.AssetOptions{
 			Handler:        application.AssetFileServerFS(assets.Assets),

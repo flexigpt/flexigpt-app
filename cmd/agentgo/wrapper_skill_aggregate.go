@@ -10,9 +10,9 @@ import (
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
 type ArtifactSkillFilter struct {

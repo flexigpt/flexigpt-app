@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/catalogtest"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/registration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/domain"
 )

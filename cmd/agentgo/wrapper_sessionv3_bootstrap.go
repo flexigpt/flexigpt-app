@@ -9,14 +9,17 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/sessionv3runtime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionv3runtime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
+	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 )
@@ -57,13 +60,38 @@ func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3.Runtime)
 	return fn(runtime)
 }
 
+func newSessionV3WorkflowAdmission(
+	artifacts artifact.API,
+	resolver *composition.Resolver,
+) (sessionv3.WorkflowAdmission, error) {
+	if artifacts == nil || resolver == nil {
+		return nil, errSessionV3Deps
+	}
+
+	workflows, err := workflowAPI.NewService(resolver)
+	if err != nil {
+		return nil, err
+	}
+	pins, err := workflowruntime.NewArtifactPinResolver(artifacts)
+	if err != nil {
+		return nil, err
+	}
+
+	return workflowruntime.NewAdmission(
+		workflows,
+		pins,
+		workflowruntime.NewBindingRegistry(),
+	)
+}
+
 func InitComposedSessionV3Runtime(
 	ctx context.Context,
 	wrapper *SessionV3Wrapper,
 	store *sessionstorev3.Store,
 	params SessionV3Params,
 ) error {
-	if wrapper == nil || store == nil {
+	if wrapper == nil || store == nil ||
+		params.Workflow == nil {
 		return errSessionV3Deps
 	}
 	base, err := sessionv3runtime.New(
@@ -91,12 +119,17 @@ func InitComposedSessionV3Runtime(
 	}
 	interpreters := sessionv3.NewBuiltinInterpreters()
 	interpreters = append(interpreters, workflowruntime.NewInterpreter())
+
+	events := params.Events
+	if events == nil {
+		events = wrapper
+	}
 	runtime, err := sessionv3.NewRuntime(
 		sessionv3.RuntimeDependencies{
 			Binder:       composed,
 			Checkpoints:  store,
 			Recovery:     store,
-			Events:       params.Events,
+			Events:       events,
 			Workflow:     params.Workflow,
 			Interpreters: interpreters,
 		},

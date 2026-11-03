@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/workspacepreferences"
+	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/adrg/xdg"
@@ -61,8 +62,9 @@ type App struct {
 
 	dataBasePath string
 
-	settingsDirPath string
-	sessionsDirPath string
+	settingsDirPath   string
+	sessionsDirPath   string
+	sessionsV3DirPath string
 
 	artifactStoreDirPath string
 
@@ -80,6 +82,9 @@ func (a *App) ServiceStartup(
 	}
 	if a.sessionRuntimeAPI != nil {
 		a.sessionRuntimeAPI.setApplication(a.ctx, a.desktop)
+	}
+	if a.sessionV3RuntimeAPI != nil {
+		a.sessionV3RuntimeAPI.setApplication(a.desktop)
 	}
 	return nil
 }
@@ -111,6 +116,7 @@ func newApp() *App {
 		storageName(topology.ApplicationStorageSettingsDirectory),
 	)
 	app.sessionsDirPath = filepath.Join(app.dataBasePath, "sessions_v1")
+	app.sessionsV3DirPath = filepath.Join(app.dataBasePath, "sessions_v3")
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
@@ -118,13 +124,15 @@ func newApp() *App {
 		),
 	)
 
-	if app.settingsDirPath == "" || app.sessionsDirPath == "" ||
+	if app.settingsDirPath == "" ||
+		app.sessionsDirPath == "" || app.sessionsV3DirPath == "" ||
 		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"settingsDirPath", app.settingsDirPath,
 			"sessionsDirPath", app.sessionsDirPath,
+			"sessionsV3DirPath", app.sessionsV3DirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -157,6 +165,7 @@ func newApp() *App {
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
 	app.sessionRuntimeAPI = &SessionRuntimeWrapper{}
+	app.sessionV3RuntimeAPI = &SessionV3Wrapper{}
 
 	if err := ensureAppPrivateDirectory(app.settingsDirPath); err != nil {
 		slog.Error(
@@ -174,6 +183,16 @@ func newApp() *App {
 		)
 		panic("failed to initialize app: could not create sessions directory")
 	}
+	if err := ensureAppPrivateDirectory(app.sessionsV3DirPath); err != nil {
+		slog.Error(
+			"failed to create Session v3 directory",
+			"sessionsV3Path", app.sessionsV3DirPath,
+			"error", err,
+		)
+		panic(
+			"failed to initialize app: could not create Session v3 directory",
+		)
+	}
 
 	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
 
@@ -190,6 +209,7 @@ func newApp() *App {
 		"app data", app.dataBasePath,
 		"settingsDirPath", app.settingsDirPath,
 		"sessionsDirPath", app.sessionsDirPath,
+		"sessionsV3DirPath", app.sessionsV3DirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
@@ -697,6 +717,53 @@ func (a *App) initManagers() {
 		)
 	}
 	slog.Info("session runtime initialized")
+
+	workflowAdmission, err := newSessionV3WorkflowAdmission(
+		artifactComposition.Artifacts,
+		artifactCompositionResolver,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Session v3 Workflow admission initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	sessionV3Store, err := sessionstorev3.New(a.sessionsV3DirPath)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Session v3 store initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	if err := InitComposedSessionV3Runtime(
+		a.ctx,
+		a.sessionV3RuntimeAPI,
+		sessionV3Store,
+		SessionV3Params{
+			Providers:     providerPublisher,
+			Models:        modelRuntime,
+			Agents:        a.agentStoreAPI.api,
+			Workspaces:    a.workspaceStoreAPI.api,
+			Texts:         a.textStoreAPI.service,
+			Tools:         a.toolStoreAPI.api,
+			ToolRuntime:   a.toolRuntimeAPI.adapter,
+			SkillResolver: skillInference,
+			SkillRuntime:  a.skillRuntimeAPI.service,
+			MCPRuntime:    a.mcpRuntimeAPI.runtime,
+			MCPBridge:     a.mcpRuntimeAPI.toolBridge,
+			Events:        a.sessionV3RuntimeAPI,
+			Workflow:      workflowAdmission,
+		},
+	); err != nil {
+		closeErr := sessionV3Store.Close()
+		panic(
+			"failed to initialize managers: Session v3 runtime initialization failed\n" +
+				errors.Join(err, closeErr).Error(),
+		)
+	}
+	slog.Info("session v3 runtime initialized", "directory", a.sessionsV3DirPath)
 }
 
 // shutdown is also used by fail-closed initialization and deferred cleanup.

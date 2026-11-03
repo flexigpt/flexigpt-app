@@ -6,14 +6,20 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+const sessionV3RuntimeEventName = "session-v3-runtime:event"
 
 type SessionV3Wrapper struct {
 	mu      sync.RWMutex
 	runtime *sessionv3.Runtime
 	store   *sessionstorev3.Store
+	desktop *application.App
 	closed  bool
 }
+
+var _ sessionv3.EventPublisher = (*SessionV3Wrapper)(nil)
 
 func InitSessionV3Wrapper(wrapper *SessionV3Wrapper, runtime *sessionv3.Runtime, store *sessionstorev3.Store) error {
 	if wrapper == nil || runtime == nil || store == nil {
@@ -21,11 +27,31 @@ func InitSessionV3Wrapper(wrapper *SessionV3Wrapper, runtime *sessionv3.Runtime,
 	}
 	wrapper.mu.Lock()
 	defer wrapper.mu.Unlock()
-	if wrapper.runtime != nil {
+	if wrapper.closed || wrapper.runtime != nil {
 		return errSessionV3AlreadyInit
 	}
 	wrapper.runtime = runtime
 	wrapper.store = store
+	return nil
+}
+
+func (w *SessionV3Wrapper) PublishRuntimeEvent(
+	_ context.Context,
+	event sessionv3.RuntimeEvent,
+) error {
+	if w == nil {
+		return nil
+	}
+
+	w.mu.RLock()
+	desktop := w.desktop
+	closed := w.closed
+	w.mu.RUnlock()
+	if closed || desktop == nil {
+		return nil
+	}
+
+	desktop.Event.Emit(sessionV3RuntimeEventName, event)
 	return nil
 }
 
@@ -176,14 +202,25 @@ func (w *SessionV3Wrapper) Session(
 	})
 }
 
+func (w *SessionV3Wrapper) setApplication(desktop *application.App) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	w.desktop = desktop
+	w.mu.Unlock()
+}
+
 func (w *SessionV3Wrapper) close() {
 	w.mu.Lock()
 	runtime := w.runtime
 	store := w.store
 	w.runtime = nil
 	w.store = nil
+	w.desktop = nil
 	w.closed = true
 	w.mu.Unlock()
+
 	if runtime != nil {
 		runtime.Close()
 	}

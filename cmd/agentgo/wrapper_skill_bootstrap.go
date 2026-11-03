@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/skillcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -11,7 +12,6 @@ import (
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/skillruntime"
 )
 
 func NewSkillBuiltInInstaller(

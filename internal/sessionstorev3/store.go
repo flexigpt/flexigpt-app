@@ -202,7 +202,10 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3.CheckpointVie
 		(current.Session.Revision > incoming.Revision ||
 			(current.Session.Revision == incoming.Revision &&
 				!current.Session.UpdatedAt.Before(incoming.UpdatedAt))) {
-		incoming = cloneSession(*current.Session)
+		// A later checkpoint is already durable. Rewriting it changes the
+		// document mtime and can regress derived index and FTS ordering even
+		// when semantic Session data remains unchanged.
+		return nil
 	}
 
 	if err := s.writeDocument(incoming); err != nil {

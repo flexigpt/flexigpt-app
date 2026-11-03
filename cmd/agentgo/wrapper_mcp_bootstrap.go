@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/sdkclient"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/mcpcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -25,8 +26,6 @@ import (
 	storeSecret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpruntime"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
@@ -73,7 +72,7 @@ func initMCPWrappers(
 	}
 
 	// Each constructor validates the dependencies it actually owns.
-	settings, err := mcpsettings.New(storeOverlays)
+	settings, err := newMCPSettings(storeOverlays)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -153,7 +152,7 @@ func initMCPWrappers(
 		storeAPI,
 		runtimeSecrets,
 		trustedSecrets,
-		mcpsettings.EnvironmentResolver{},
+		mcpEnvironmentResolver{},
 	)
 	if err != nil {
 		return nil, nil, err

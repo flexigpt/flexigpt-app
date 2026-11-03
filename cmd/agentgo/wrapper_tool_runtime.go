@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 )
 
 type ToolRuntimeWrapper struct {

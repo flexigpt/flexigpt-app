@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/mcpsettings"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
 	mcpAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp"
 	pluginAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin"
@@ -23,7 +22,7 @@ type MCPStoreWrapper struct {
 	api        *mcpAPI.Service
 	management *mcpAPI.MCPListService
 	roots      root.API
-	settings   *mcpsettings.Settings
+	settings   *mcpSettings
 }
 
 func withMCPStore[T any](

@@ -12,7 +12,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"

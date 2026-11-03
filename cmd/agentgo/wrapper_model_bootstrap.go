@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelcredentials"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/modelcatalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
@@ -20,9 +22,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelcredentials"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
-	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelruntime"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
 )
@@ -126,7 +126,7 @@ func initModelWrappers(
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
 	aggregateWrapper.fallbackProvider = storeSpec.LogicalName(
-		modelruntime.ProviderNameOpenAIResponses,
+		modelcatalog.ProviderNameOpenAIResponses,
 	)
 
 	return installer, runtimeAdapter, nil

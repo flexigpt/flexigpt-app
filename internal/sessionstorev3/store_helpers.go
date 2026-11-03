@@ -160,8 +160,20 @@ func (s *Store) readIndexFile(filename string) (sessionIndexRecord, error) {
 	if err != nil {
 		return sessionIndexRecord{}, err
 	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		maximumDocumentBytes,
+	)
+	if err != nil {
+		return sessionIndexRecord{}, err
+	}
 	var record sessionIndexRecord
-	if err := json.Unmarshal(raw, &record); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		canonical,
+		&record,
+		maximumDocumentBytes,
+	); err != nil {
 		return sessionIndexRecord{}, err
 	}
 	if record.SchemaVersion != sessionv3.SchemaVersion {
@@ -310,9 +322,21 @@ func decodeStoreDocumentJSON(raw []byte) (sessionDocument, error) {
 	if len(raw) > maximumDocumentBytes {
 		return sessionDocument{}, fmt.Errorf("%w: document exceeds size limit", ErrInvalidDocument)
 	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		maximumDocumentBytes,
+	)
+	if err != nil {
+		return sessionDocument{}, fmt.Errorf("%w: %w", ErrInvalidDocument, err)
+	}
 	var doc sessionDocument
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return sessionDocument{}, err
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		canonical,
+		&doc,
+		maximumDocumentBytes,
+	); err != nil {
+		return sessionDocument{}, fmt.Errorf("%w: %w", ErrInvalidDocument, err)
 	}
 	if err := validateStoreDocument(doc); err != nil {
 		return sessionDocument{}, err

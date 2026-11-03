@@ -373,60 +373,55 @@ linters:
           # Applies to all files inside internal/artifactory-go and its sub-packages
           files:
             - "**/internal/artifactory-go/**/*.go"
-
-          # Only allow these specific packages/prefixes. Anything else is banned.
           allow:
-            # Allowed to use Go standard library packages.
             - "$gostd"
-            # Allowed to import its own sub-packages.
             - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
-            # Allowed utils.
             - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
             - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
             - "github.com/flexigpt/flexigpt-app/internal/clockutil"
             - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
             - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
+
             - "github.com/flexigpt/mapstore-go"
             - "github.com/glebarez/go-sqlite"
             - "github.com/zalando/go-keyring"
 
-        # Isolate the artifactory package completely
         isolate_llmartifact_store:
-          # Applies to all files inside internal/artifactory-go and its sub-packages
           files:
             - "**/internal/llmartifactory-go/**/*.go"
 
-          # Only allow these specific packages/prefixes. Anything else is banned.
           allow:
-            # Allowed to use Go standard library packages.
             - "$gostd"
-            # Allowed to import its own sub-packages and main deps.
             - "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
             - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
-            # Allowed utils.
+            - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
             - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
             - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
             - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
             - "github.com/flexigpt/flexigpt-app/internal/clockutil"
             - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
+
             - "github.com/flexigpt/agentskills-go"
-            - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
             - "cel.dev/cel-go/cel"
             - "cel.dev/cel-go/common/ast"
 
-        # Isolate the artifactory package completely
         isolate_agentruntime:
-          # Applies to all files inside internal/artifactory-go and its sub-packages
           files:
             - "**/internal/agentruntime-go/**/*.go"
 
-          # Only allow these specific packages/prefixes. Anything else is banned.
           allow:
-            # Allowed to use Go standard library packages.
             - "$gostd"
-            # Allowed Deps.
             - "github.com/flexigpt/flexigpt-app/internal/agentruntime-go"
+            - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+            - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
+            - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
+            - "github.com/flexigpt/flexigpt-app/internal/clockutil"
+            - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
+            - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+            - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+
             - "github.com/flexigpt/inference-go$"
             - "github.com/flexigpt/inference-go/"
             - "github.com/flexigpt/agentskills-go$"
@@ -436,7 +431,47 @@ linters:
             - "cel.dev/cel-go/cel"
             - "github.com/modelcontextprotocol/go-sdk/"
             - "golang.org/x/oauth2$"
-            # Allowed utils.
+
+        # Artifact setup owns Artifact Store deployment and Artifact-backed
+        # materialization. Runtime orchestration must not be added here.
+        isolate_artifactsetup:
+          files:
+            - "**/internal/artifactsetup/**/*.go"
+          allow:
+            - "$gostd"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactsetup"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
+            - "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
+            - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+            - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
+            - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
+            - "github.com/flexigpt/flexigpt-app/internal/clockutil"
+            - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
+            - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+            - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactbuiltin/workspacecatalog/defaultpolicy"
+
+            - "github.com/flexigpt/inference-go$"
+            - "github.com/flexigpt/inference-go/"
+            - "github.com/flexigpt/agentskills-go$"
+            - "github.com/flexigpt/agentskills-go/"
+            - "github.com/flexigpt/llmtools-go$"
+            - "github.com/flexigpt/llmtools-go/"
+            - "github.com/flexigpt/mapstore-go"
+            - "github.com/glebarez/go-sqlite"
+            - "github.com/zalando/go-keyring"
+
+        # Runtime setup composes explicit ports. It can depend on Artifact
+        # contracts, but it must not import concrete artifactsetup packages.
+        isolate_agentruntimesetup:
+          files:
+            - "**/internal/agentruntimesetup/**/*.go"
+          allow:
+            - "$gostd"
+            - "github.com/flexigpt/flexigpt-app/internal/agentruntimesetup"
+            - "github.com/flexigpt/flexigpt-app/internal/agentruntime-go"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
+            - "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go"
             - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
             - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
             - "github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -445,6 +480,15 @@ linters:
             - "github.com/flexigpt/flexigpt-app/internal/backgroundutil"
             - "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
             - "github.com/flexigpt/flexigpt-app/internal/mcppolicy"
+
+            - "github.com/flexigpt/inference-go$"
+            - "github.com/flexigpt/inference-go/"
+            - "github.com/flexigpt/agentskills-go$"
+            - "github.com/flexigpt/agentskills-go/"
+            - "github.com/flexigpt/llmtools-go$"
+            - "github.com/flexigpt/llmtools-go/"
+            - "github.com/modelcontextprotocol/go-sdk/"
+            - "golang.org/x/oauth2$"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
