@@ -103,9 +103,12 @@ export function ManagementArtifactSource<T>({
 		}
 	}, [defaultOpen, ensureSource]);
 
-	const getCopyValue = useCallback(async () => {
-		const source = await ensureSource();
-		return source?.text;
+	const getCopyValue = useCallback((): string | Promise<string | undefined> => {
+		const source = valueRef.current;
+		if (source) {
+			return source.text;
+		}
+		return ensureSource().then(loaded => loaded?.text);
 	}, [ensureSource]);
 
 	const getExportValue = useCallback(async () => {
@@ -161,6 +164,7 @@ export function ManagementArtifactSource<T>({
 				<div className="flex shrink-0 items-center gap-0.5">
 					<CopyButton
 						className="btn btn-ghost btn-xs shrink-0 rounded-lg p-1"
+						value={value?.text}
 						valueFetcher={getCopyValue}
 						size={14}
 						label="Copy"

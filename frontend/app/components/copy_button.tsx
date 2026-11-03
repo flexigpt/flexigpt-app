@@ -7,12 +7,56 @@ import { log } from '@/apis/baseapi';
 type CopyValue = string | null | undefined;
 type CopyState = 'idle' | 'copying' | 'copied' | 'failed';
 
-function writeClipboardText(text: string): Promise<void> {
-	if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+function getClipboard(): Clipboard {
+	if (typeof navigator === 'undefined' || !navigator.clipboard) {
 		throw new Error('Clipboard access is unavailable.');
 	}
 
-	return navigator.clipboard.writeText(text);
+	return navigator.clipboard;
+}
+
+function requireClipboardText(text: CopyValue): string {
+	if (text === null || text === undefined) {
+		throw new Error('No text is available to copy.');
+	}
+
+	return text;
+}
+
+function writeClipboardText(text: string): Promise<void> {
+	const clipboard = getClipboard();
+	if (typeof clipboard.writeText !== 'function') {
+		throw new TypeError('Clipboard access is unavailable.');
+	}
+
+	return clipboard.writeText(text);
+}
+
+async function writeFetchedClipboardText(value: Promise<CopyValue>): Promise<void> {
+	const clipboard = getClipboard();
+	const textValue = Promise.resolve(value).then(requireClipboardText);
+
+	// Begin the native write in the click task. The text representation can
+	// resolve after the asynchronous source load completes.
+	if (typeof clipboard.write === 'function' && typeof ClipboardItem !== 'undefined') {
+		const blobValue = textValue.then(text => new Blob([text], { type: 'text/plain' }));
+		void blobValue.catch(() => {});
+
+		try {
+			const clipboardItem = new ClipboardItem({ 'text/plain': blobValue });
+			await clipboard.write([clipboardItem]);
+			return;
+		} catch {
+			// Fall through for implementations that expose write but do not
+			// accept a promised ClipboardItem representation.
+		}
+	}
+
+	const text_2 = await textValue;
+	if (typeof clipboard.writeText !== 'function') {
+		throw new TypeError('Clipboard text access is unavailable.');
+	}
+	await clipboard.writeText(text_2);
 }
 
 interface CopyButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -51,18 +95,18 @@ export function CopyButton({
 	const mountedRef = useRef(true);
 
 	useEffect(() => {
-		// The first click can occur before passive effects run on a busy markdown tree.
 		mountedRef.current = true;
 		return () => {
 			mountedRef.current = false;
-			if (resultTimeoutRef.current) {
+			if (resultTimeoutRef.current !== null) {
 				window.clearTimeout(resultTimeoutRef.current);
+				resultTimeoutRef.current = null;
 			}
 		};
 	}, []);
 
 	const clearResultTimeout = () => {
-		if (resultTimeoutRef.current) {
+		if (resultTimeoutRef.current !== null) {
 			window.clearTimeout(resultTimeoutRef.current);
 			resultTimeoutRef.current = null;
 		}
@@ -111,7 +155,7 @@ export function CopyButton({
 		}
 
 		copyInFlightRef.current = false;
-		log.error('Failed to copy:', error);
+		console.error('Failed to copy:', error);
 		if (!mountedRef.current) {
 			return;
 		}
@@ -124,38 +168,10 @@ export function CopyButton({
 		}
 	};
 
-	const startClipboardWrite = (text: CopyValue, operationID: number) => {
-		if (copyOperationRef.current !== operationID) {
-			return;
-		}
-		if (text === null || text === undefined) {
-			finishCopyFailure(operationID, new Error('No text is available to copy.'));
-			return;
-		}
-
-		let writeRequest: Promise<void>;
-		try {
-			writeRequest = Promise.resolve(writeClipboardText(text));
-		} catch (error) {
-			finishCopyFailure(operationID, error);
-			return;
-		}
-
-		setCopyState('copying');
-		void writeRequest.then(
-			() => {
-				finishCopySuccess(operationID);
-			},
-			(error: unknown) => {
-				finishCopyFailure(operationID, error);
-			}
-		);
-	};
-
 	const copy = () => {
-		// Click-only entry. A new click supersedes a pending write.
-		// Do not gate on copying state, otherwise rapid retries are lost.
-		if (disabled) {
+		// The ref changes synchronously. React state alone cannot prevent two
+		// click handlers from starting work before the next render commits.
+		if (disabled || copyInFlightRef.current) {
 			return;
 		}
 
@@ -166,25 +182,30 @@ export function CopyButton({
 
 		let nextValue: CopyValue | Promise<CopyValue>;
 		try {
-			nextValue = valueFetcher ? valueFetcher() : value;
+			nextValue = value !== undefined ? value : valueFetcher ? valueFetcher() : undefined;
 		} catch (error) {
 			finishCopyFailure(operationID, error);
 			return;
 		}
 
-		if (typeof nextValue === 'string' || nextValue === null || nextValue === undefined) {
-			// Message and code-block callers pass a direct value. Start the native write
-			// before any await so it retains the click's transient user activation.
-			startClipboardWrite(nextValue, operationID);
+		let writeRequest: Promise<void>;
+		try {
+			if (typeof nextValue === 'string' || nextValue === null || nextValue === undefined) {
+				writeRequest = writeClipboardText(requireClipboardText(nextValue));
+			} else {
+				// Clipboard.write is invoked in this click task. ClipboardItem
+				// carries the source-loading promise without losing activation.
+				writeRequest = writeFetchedClipboardText(nextValue);
+			}
+		} catch (error) {
+			finishCopyFailure(operationID, error);
 			return;
 		}
-
-		// An asynchronous value fetch cannot preserve browser user activation. Callers
-		// with immediately available text should pass value instead of valueFetcher.
 		setCopyState('copying');
-		void Promise.resolve(nextValue).then(
-			text => {
-				startClipboardWrite(text, operationID);
+
+		void writeRequest.then(
+			() => {
+				finishCopySuccess(operationID);
 			},
 			(error: unknown) => {
 				finishCopyFailure(operationID, error);
@@ -207,13 +228,12 @@ export function CopyButton({
 			type="button"
 			aria-label={copyState === 'failed' ? failedLabel : (ariaLabel ?? buttonLabel ?? 'Copy To Clipboard')}
 			title={copyState === 'failed' ? failedLabel : (title ?? buttonLabel ?? 'Copy To Clipboard')}
-			disabled={disabled}
+			disabled={disabled || copying}
 			aria-busy={copying || undefined}
 			onClick={event => {
+				// Copy is this button's action, not a cancelable browser default.
+				copy();
 				onClick?.(event);
-				if (!event.defaultPrevented) {
-					copy();
-				}
 			}}
 		>
 			{copying ? (

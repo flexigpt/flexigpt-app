@@ -62,6 +62,7 @@ export function DownloadButton({
 	...buttonProps
 }: DownloadButtonProps) {
 	const [downloading, setDownloading] = useState(false);
+	const downloadInFlightRef = useRef(false);
 	const mountedRef = useRef(true);
 
 	useEffect(() => {
@@ -72,10 +73,11 @@ export function DownloadButton({
 	}, []);
 
 	const downloadAsFile = async () => {
-		if (disabled || downloading) {
+		if (disabled || downloadInFlightRef.current) {
 			return;
 		}
 
+		downloadInFlightRef.current = true;
 		setDownloading(true);
 		try {
 			const fetchedValue = await valueFetcher();
@@ -151,6 +153,7 @@ export function DownloadButton({
 				onDownloadError?.(error);
 			}
 		} finally {
+			downloadInFlightRef.current = false;
 			if (mountedRef.current) {
 				setDownloading(false);
 			}
@@ -167,10 +170,9 @@ export function DownloadButton({
 			title={title ?? buttonLabel ?? 'Download'}
 			disabled={disabled || downloading}
 			onClick={event => {
+				// Download is this button's action, not a cancelable browser default.
+				void downloadAsFile();
 				onClick?.(event);
-				if (!event.defaultPrevented) {
-					void downloadAsFile();
-				}
 			}}
 		>
 			{downloading ? (
