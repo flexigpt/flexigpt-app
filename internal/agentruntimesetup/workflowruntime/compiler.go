@@ -422,11 +422,12 @@ func compileWorkflowCall(
 	}
 	switch mode {
 	case sessionv3Runtime.WorkflowCallModeInvoke,
-		sessionv3Runtime.WorkflowCallModeStart:
+		sessionv3Runtime.WorkflowCallModeStart,
+		sessionv3Runtime.WorkflowCallModeHandoff:
 	default:
 		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
 			"call",
-			"handoff mode",
+			"unknown call mode",
 		)
 	}
 
@@ -435,26 +436,17 @@ func compileWorkflowCall(
 		lifetime = sessionv3Runtime.WorkflowChildLifetime(input.Lifetime)
 	}
 	if mode != sessionv3Runtime.WorkflowCallModeStart &&
+		mode != sessionv3Runtime.WorkflowCallModeHandoff &&
 		lifetime != "" {
 		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
 			"call",
 			"lifetime outside start mode",
 		)
 	}
-	if lifetime != "" &&
-		lifetime != sessionv3Runtime.WorkflowChildLifetimeAttached {
+	if len(input.Ports) != 0 {
 		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
 			"call",
-			"independent child lifetime",
-		)
-	}
-	if input.Ownership != nil ||
-		len(input.Conversation) != 0 ||
-		input.OnCompletion != "" ||
-		len(input.Ports) != 0 {
-		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
-			"call",
-			"call mode, ownership, conversation, or ports",
+			"ports",
 		)
 	}
 
@@ -479,14 +471,32 @@ func compileWorkflowCall(
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
 	output := sessionv3Runtime.WorkflowCall{
-		Target:   target,
-		Input:    callInput,
-		Context:  contextValue,
-		Contract: contract,
-		Mode:     mode,
-		Lifetime: lifetime,
+		Target:       target,
+		Input:        callInput,
+		Context:      contextValue,
+		Contract:     contract,
+		Mode:         mode,
+		Lifetime:     lifetime,
+		OnCompletion: input.OnCompletion,
+	}
+	if len(input.Conversation) != 0 {
+		conversation, err := compileWorkflowValue(input.Conversation)
+		if err != nil {
+			return sessionv3Runtime.WorkflowCall{}, err
+		}
+		output.Conversation = &conversation
+	}
+	if input.Ownership != nil {
+		ownership, err := compileWorkflowChildOwnership(*input.Ownership)
+		if err != nil {
+			return sessionv3Runtime.WorkflowCall{}, err
+		}
+		output.Ownership = &ownership
 	}
 	if input.Allowed == "" {
+		if err := output.Validate(); err != nil {
+			return sessionv3Runtime.WorkflowCall{}, err
+		}
 		return output, nil
 	}
 
@@ -503,12 +513,18 @@ func compileWorkflowCall(
 			"resolver-backed dynamic target set",
 		)
 	}
+	if len(set.Members) == 0 {
+		return sessionv3Runtime.WorkflowCall{}, errors.New("workflow target set has no members")
+	}
 	output.AllowedTargets = append([]string(nil), set.Members...)
 	output.SetContract, err = compileWorkflowCallableInterface(
 		document,
 		set.Interface,
 	)
 	if err != nil {
+		return sessionv3Runtime.WorkflowCall{}, err
+	}
+	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
 	return output, nil

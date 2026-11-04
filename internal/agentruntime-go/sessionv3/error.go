@@ -1,5 +1,10 @@
 package sessionv3
 
+const (
+	workflowChildCancelled = "workflow_child_cancelled"
+	completionCancelled    = "completion_cancelled"
+)
+
 // ErrorCategory identifies runtime-owned failure classification. Callable
 // domains can supply additional categories through their declared contract.
 type ErrorCategory string

@@ -61,6 +61,43 @@ func (s Session) Validate() error {
 		executionIDs[execution.ID] = struct{}{}
 	}
 
+	for _, execution := range s.Executions {
+		if execution.RootExecutionID != "" {
+			if _, found := executionIDs[execution.RootExecutionID]; !found {
+				return fmt.Errorf("execution %q has an unavailable root execution", execution.ID)
+			}
+		}
+		if execution.ParentExecutionID != "" {
+			if _, found := executionIDs[execution.ParentExecutionID]; !found {
+				return fmt.Errorf("execution %q has an unavailable parent execution", execution.ID)
+			}
+		}
+		for _, childID := range execution.ChildExecutionIDs {
+			if _, found := executionIDs[childID]; !found {
+				return fmt.Errorf("execution %q has an unavailable child execution", execution.ID)
+			}
+		}
+	}
+
+	for _, ownership := range s.ConversationOwnership {
+		if err := validateID("conversation ID", ownership.ConversationID); err != nil {
+			return err
+		}
+		if ownership.Owner.ExecutionID != "" {
+			if _, found := executionIDs[ownership.Owner.ExecutionID]; !found {
+				return fmt.Errorf(
+					"conversation %q has an unavailable owner execution",
+					ownership.ConversationID,
+				)
+			}
+		}
+		if ownership.Owner.Agent != nil {
+			if err := validatePin(*ownership.Owner.Agent); err != nil {
+				return err
+			}
+		}
+	}
+
 	commands := make(map[CommandID]struct{}, len(s.Commands))
 	for _, command := range s.Commands {
 		if err := validateID("command ID", string(command.ID)); err != nil {
@@ -404,6 +441,30 @@ func (e Execution) Validate(sessionID SessionID) error {
 		return fmt.Errorf("unsupported execution state %q", e.State)
 	}
 
+	switch e.Lifetime {
+	case "", ExecutionChildLifetimeRoot, ExecutionChildLifetimeIndependent:
+	default:
+		return fmt.Errorf("unsupported execution lifetime %q", e.Lifetime)
+	}
+	if e.RootExecutionID != "" {
+		if err := validateID("execution root ID", string(e.RootExecutionID)); err != nil {
+			return err
+		}
+	}
+	if e.ParentExecutionID != "" {
+		if err := validateID("execution parent ID", string(e.ParentExecutionID)); err != nil {
+			return err
+		}
+	}
+	if e.ParentFrameID != "" {
+		if err := validateID("execution parent frame ID", string(e.ParentFrameID)); err != nil {
+			return err
+		}
+	}
+	if err := e.ChildBudget.Validate(); err != nil {
+		return err
+	}
+
 	frames := make(map[ProgramFrameID]struct{}, len(e.ProgramFrames))
 	for _, frame := range e.ProgramFrames {
 		if err := frame.Validate(); err != nil {
@@ -501,6 +562,11 @@ func (p ProgramFrame) Validate() error {
 	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
 		return errors.New("ProgramFrame timestamps are required")
 	}
+	for _, executionID := range p.ChildExecutionIDs {
+		if err := validateID("ProgramFrame child Execution ID", string(executionID)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -572,6 +638,38 @@ func (e EffectContract) Validate() error {
 	}
 	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
 		return errors.New("non-keyed WorkItem has an idempotency key")
+	}
+	return nil
+}
+
+func (b ExecutionBudget) Validate() error {
+	if b.Duration != "" {
+		if err := validateWorkflowTimeout(b.Duration); err != nil {
+			return fmt.Errorf("execution budget duration: %w", err)
+		}
+	}
+	if b.CleanupDuration != "" {
+		if err := validateWorkflowTimeout(b.CleanupDuration); err != nil {
+			return fmt.Errorf("execution cleanup duration: %w", err)
+		}
+	}
+	for _, value := range []int{
+		b.StepExecutions,
+		b.CallAttempts,
+		b.WorkflowDepth,
+		b.Concurrency,
+		b.ModelTokens,
+		b.MessageCount,
+		b.MessageBytes,
+		b.EventCount,
+		b.EventBytes,
+	} {
+		if value < 0 {
+			return errors.New("execution budget cannot be negative")
+		}
+	}
+	if b.Cost != nil && (b.Cost.Amount < 0 || strings.TrimSpace(b.Cost.Currency) == "") {
+		return errors.New("execution budget cost is invalid")
 	}
 	return nil
 }
@@ -970,16 +1068,23 @@ func (w WaitRequest) Validate() error {
 }
 
 func (h CompletionHandle) Validate() error {
-	switch {
-	case h.WorkItemID != "" && h.FrameID != "":
-		return errors.New("completion handle has more than one target")
-	case h.WorkItemID != "":
-		return nil
-	case h.FrameID != "":
-		return nil
-	default:
-		return errors.New("completion handle has no target")
+	count := 0
+	for _, present := range []bool{
+		h.WorkItemID != "",
+		h.FrameID != "",
+		h.ExecutionID != "",
+	} {
+		if present {
+			count++
+		}
 	}
+	if count != 1 {
+		if count == 0 {
+			return errors.New("completion handle has no target")
+		}
+		return errors.New("completion handle has more than one target")
+	}
+	return nil
 }
 
 func (w Wait) Validate() error {

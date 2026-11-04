@@ -19,9 +19,6 @@ linters:
     # Checks whether HTTP response body is closed successfully.
     - bodyclose
 
-    # Check whether the function uses a non-inherited context.
-    - contextcheck
-
     # Checks if package imports are in a list of acceptable packages.
     # Useful to ban one package path to ban another itself to ban from another.
     - depguard
@@ -186,6 +183,9 @@ linters:
 
     # Detects struct containing context.Context field. Not a problem.
     - containedctx
+
+    # Check whether the function uses a non-inherited context.
+    - contextcheck
 
     # Detect if loop vars are copied. checked by modernize too.
     - copyloopvar
@@ -681,9 +681,6 @@ linters:
       - text: "(slog|log)\\.\\w+"
         linters:
           - noctx
-      - path: "cmd/agentgo/*"
-        linters:
-          - contextcheck
       - path: '(.+)_test\.go'
         linters:
           - goconst

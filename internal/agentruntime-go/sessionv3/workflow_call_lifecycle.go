@@ -38,11 +38,12 @@ func (i *WorkflowInterpreter) startCall(
 	if lifetime == "" {
 		lifetime = WorkflowChildLifetimeAttached
 	}
-	if lifetime != WorkflowChildLifetimeAttached {
+	if lifetime != WorkflowChildLifetimeAttached &&
+		lifetime != WorkflowChildLifetimeIndependent {
 		return workflowFailure(
 			state,
-			"workflow_start_lifetime_unsupported",
-			"independent workflow child lifetime requires a separate execution",
+			"workflow_start_lifetime_invalid",
+			"workflow start has an invalid child lifetime",
 		)
 	}
 
@@ -54,19 +55,36 @@ func (i *WorkflowInterpreter) startCall(
 		if contract == nil || len(contract.Modes) == 0 {
 			continue
 		}
-		if !slices.Contains(contract.Modes, WorkflowCallModeInvoke) {
+		if !slices.Contains(contract.Modes, WorkflowCallModeStart) {
 			return workflowFailure(
 				state,
-				"workflow_start_invoke_unavailable",
-				"started calls require an invoke-compatible target implementation",
+				"workflow_start_unavailable",
+				"started calls require a start-compatible target implementation",
 			)
 		}
+	}
+
+	ownership, err := i.childOwnership(
+		program,
+		state,
+		call,
+		lifetime,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_start_ownership_invalid", err.Error())
 	}
 
 	frameID := ProgramFrameID(
 		string(frame.ID) + ":" + path + ":started",
 	)
+	executionID := ExecutionID("")
 	handle := CompletionHandle{FrameID: frameID}
+	intentLifetime := ChildFrameLifetimeAttached
+	if lifetime == WorkflowChildLifetimeIndependent {
+		executionID = ExecutionID(string(frame.ID) + ":" + path + ":execution")
+		handle = CompletionHandle{ExecutionID: executionID}
+		intentLifetime = ChildFrameLifetimeIndependent
+	}
 	if err := handle.Validate(); err != nil {
 		return ProgramTransition{}, err
 	}
@@ -74,6 +92,10 @@ func (i *WorkflowInterpreter) startCall(
 	childCall := call
 	childCall.Mode = WorkflowCallModeInvoke
 	childCall.Lifetime = ""
+	childCall.Conversation = nil
+	childCall.Ownership = nil
+	childCall.OnCompletion = ""
+	childCall.InternalLifecycleChild = true
 	childCall.Target = WorkflowValue{
 		Kind:    WorkflowValueLiteral,
 		Literal: MustCanonicalValue(targetName),
@@ -162,14 +184,132 @@ func (i *WorkflowInterpreter) startCall(
 		return ProgramTransition{}, err
 	}
 	transition.Frames = []ProgramFrameIntent{{
-		ID:       frameID,
-		Path:     path + "/started",
-		Program:  childProgram,
-		Deadline: cloneTime(frame.Deadline),
-		Lifetime: ChildFrameLifetimeAttached,
+		ID:          frameID,
+		ExecutionID: executionID,
+		Path:        path + "/started",
+		Program:     childProgram,
+		Deadline:    cloneTime(frame.Deadline),
+		Lifetime:    intentLifetime,
+		Ownership:   &ownership,
 	}}
 	transition.ContinueParent = true
 	return transition, nil
+}
+
+func (i *WorkflowInterpreter) childOwnership(
+	program WorkflowProgram,
+	state WorkflowState,
+	call WorkflowCall,
+	lifetime WorkflowChildLifetime,
+) (ChildExecutionOwnership, error) {
+	value := ChildExecutionOwnership{
+		CancelWithParent: lifetime == WorkflowChildLifetimeAttached,
+	}
+	if call.Ownership == nil {
+		return value, nil
+	}
+
+	owner, err := i.stringValue(call.Ownership.Owner, program, state)
+	if err != nil {
+		return ChildExecutionOwnership{}, err
+	}
+	value.Owner = owner
+	value.CancelWithParent = call.Ownership.CancelWithParent
+	value.Budget = call.Ownership.Budget
+	if err := value.Budget.Validate(); err != nil {
+		return ChildExecutionOwnership{}, err
+	}
+	return value, nil
+}
+
+func (i *WorkflowInterpreter) handoffCall(
+	frame ProgramFrame,
+	program WorkflowProgram,
+	state WorkflowState,
+	path string,
+	targetName string,
+	target WorkflowTarget,
+	input CanonicalValue,
+	contextValue CanonicalValue,
+	call WorkflowCall,
+) (ProgramTransition, error) {
+	if target.Kind != WorkflowTargetAgent || target.Artifact == nil {
+		return workflowFailure(
+			state,
+			"workflow_handoff_target_invalid",
+			"workflow handoff requires an Agent target with an Artifact pin",
+		)
+	}
+	if call.Conversation == nil {
+		return workflowFailure(
+			state,
+			"workflow_handoff_invalid",
+			"workflow handoff requires a conversation",
+		)
+	}
+
+	conversationID, err := i.stringValue(*call.Conversation, program, state)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_handoff_invalid",
+			"workflow handoff conversation must resolve to a string",
+		)
+	}
+	ownership, err := i.childOwnership(
+		program,
+		state,
+		call,
+		WorkflowChildLifetimeAttached,
+	)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_handoff_ownership_invalid",
+			err.Error(),
+		)
+	}
+
+	childProgram, err := NewWorkflowAgentLoopProgram(
+		SessionDefaults{
+			Agent: workflowSelectionForPin(*target.Artifact),
+		},
+		LLMInvocationPlan{
+			Input:   input,
+			Context: contextValue,
+		},
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_handoff_prepare_failed", err.Error())
+	}
+
+	next := state
+	next.PendingPath = path
+	next.PendingTarget = targetName
+	nextState, err := encodeWorkflowProgramState(next)
+	if err != nil {
+		return ProgramTransition{}, err
+	}
+
+	handoffID := string(frame.ID) + ":" + path + ":handoff"
+	return ProgramTransition{
+		State: nextState,
+		Frames: []ProgramFrameIntent{{
+			ID:        ProgramFrameID(string(frame.ID) + ":" + path + ":handoff"),
+			Path:      path + "/handoff",
+			Program:   childProgram,
+			Deadline:  cloneTime(state.Deadline),
+			Lifetime:  ChildFrameLifetimeAttached,
+			Ownership: &ownership,
+			Handoff: &ConversationHandoffIntent{
+				ID:                  handoffID,
+				ConversationID:      conversationID,
+				Owner:               ownership.Owner,
+				TargetAgent:         *target.Artifact,
+				RestoreOnCompletion: call.OnCompletion != "retain",
+			},
+		}},
+	}, nil
 }
 
 func (i *WorkflowInterpreter) cancelCall(
@@ -203,11 +343,11 @@ func (i *WorkflowInterpreter) cancelCall(
 			err.Error(),
 		)
 	}
-	if handle.FrameID == "" {
+	if handle.FrameID == "" && handle.ExecutionID == "" {
 		return workflowFailure(
 			state,
 			"workflow_cancel_invalid",
-			"workflow cancel currently requires a child frame handle",
+			"workflow cancel requires a child frame or Execution handle",
 		)
 	}
 
@@ -261,8 +401,13 @@ func (i *WorkflowInterpreter) cancelCall(
 	if err != nil {
 		return ProgramTransition{}, err
 	}
-	transition.CancelChildFrameIDs = []ProgramFrameID{
-		handle.FrameID,
+	if handle.FrameID != "" {
+		transition.CancelChildFrameIDs = []ProgramFrameID{handle.FrameID}
+	}
+	if handle.ExecutionID != "" {
+		transition.CancelChildExecutionIDs = []ExecutionID{
+			handle.ExecutionID,
+		}
 	}
 	transition.ContinueParent = true
 	return transition, nil

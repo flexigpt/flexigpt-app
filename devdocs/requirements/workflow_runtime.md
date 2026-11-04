@@ -369,9 +369,15 @@ also keep an Execution active after the parent root frame settles.
 Workflow `cancel` now resolves a typed child-frame handle and requests
 cancellation through the common ProgramFrame lifecycle. It does not mutate a
 domain binder directly. Cancellation produces a typed Workflow step outcome.
-Independent child lifetime and conversation handoff remain separate execution
-and conversation-ownership implementation work. They are not mapped to local
-invoke fallback behavior.
+Independent child lifetime creates a separate child Execution inside the same
+Session document. The child persists parent and root Execution identities,
+evaluated ownership, child budget, cancellation linkage, and a typed
+Execution completion handle before it dispatches WorkItems.
+
+Workflow `handoff` creates durable typed conversation ownership state before
+the target Agent starts. It is not compiled as invoke. Child completion either
+restores the prior owner or retains the handoff target according to the
+declared completion behavior.
 
 The current compiler and interpreter are still incomplete. Full structured
 completion policies, child ownership, trigger scheduling, reconciliation,
@@ -395,3 +401,78 @@ Workflow v1 support. Session v2 and Session Store v2 remain preserved.
 Frontend adoption and migration remain separate. CanonicalValue remains
 limited to arbitrary JSON boundaries. Domain binders retain domain ownership,
 and no Workflow, Trigger, Event, or Invocation persistence root is added.
+
+## Implementation task list
+
+- This list is the completion tracker for Session Runtime v3 and Workflow Runtime v3.
+- `- [x]` means typed compiler and interpreter behavior exists with durable recovery semantics.
+- `- [ ]` means work remains.
+- Admission rejection during development is safety behavior, not completion.
+
+- [x] `call.mode: invoke` uses direct typed execution.
+- [x] `call.mode: start` with attached lifetime creates a child `ProgramFrame`.
+- [x] `call.mode: start` with independent lifetime creates a child `Execution` in the existing Session document.
+- [x] Independent child persists parent `ExecutionID`, root `ExecutionID`, ownership, budget, and cancel relationship.
+- [x] Typed `CompletionHandle` supports `WorkItemID`, `FrameID`, and `ExecutionID`.
+- [x] Completion waits resolve from child `WorkItem`, child frame, and child `Execution` terminal state.
+- [x] `cancel` accepts child frame handles and child `Execution` handles.
+- [x] Parent cancellation propagates only to independent children with `cancelWithParent`.
+- [x] Agent handoff has typed conversation ownership state in the Session document.
+- [x] `call.mode: handoff` creates distinct Agent ownership behavior and is not mapped to invoke.
+- [x] Independent lifetime is not mapped to attached behavior.
+- [x] No separate invocation store was added.
+- [ ] Tool Artifact target executes through a typed WorkItem.
+- [ ] MCP Tool target executes through a typed WorkItem and current MCP discovery.
+- [ ] Service target executes through a registered Service binding.
+- [ ] Activity target executes through a registered Activity binding.
+- [ ] Nested Workflow target executes as a child Workflow `ProgramFrame`.
+- [ ] Agent target executes as a child Agent-loop `ProgramFrame` with a typed plan.
+- [ ] Model target executes as a child single-model `ProgramFrame` with a typed plan.
+- [ ] Static target sets resolve and enforce allowed members.
+- [ ] Resolver-backed target sets use typed resolver WorkItems and persisted selected target identity.
+- [ ] Agent, Workspace, Model, instruction, Tool, Skill, MCP, attachment, message, and port plans compile before Agent-loop or single-model dispatch.
+- [ ] Provider SDK Tool Artifacts execute only inside a typed Model plan and never produce local success.
+- [ ] `read` effect contract is implemented.
+- [ ] `idempotent` effect contract is implemented.
+- [ ] `keyed` effect contract is implemented with a stable idempotency key.
+- [ ] `non-idempotent` effect contract is implemented without automatic replay after uncertainty.
+- [ ] Stable idempotency keys persist in WorkItems and Attempts.
+- [ ] Idempotency keys propagate into target execution plans.
+- [ ] Reconciliation WorkItems and recovery review are implemented.
+- [ ] Saga effect tracking uses reverse compensation order.
+- [ ] Compensation error policy and cleanup allowance are implemented.
+- [ ] Typed effect state persists in errors and receipts.
+- [ ] Block `catch` handlers are implemented.
+- [ ] Block `finally` behavior is implemented.
+- [ ] Machine initial state, entry, exit, transitions, timer transitions, event transitions, and final output are implemented.
+- [ ] Parallel `all` completion is implemented.
+- [ ] Parallel `first-completed` completion is implemented.
+- [ ] Parallel `first-success` completion is implemented.
+- [ ] Parallel `quorum` completion is implemented.
+- [ ] Parallel `remaining: cancel` and `remaining: wait` are implemented.
+- [ ] Parallel `fail-fast` and `collect` error behavior are implemented.
+- [ ] Foreach ordering, concurrency, all completion policies, cancellation, isolated state, and merge behavior are implemented.
+- [ ] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
+- [ ] Durable Fork and Join WorkItems exist where scheduling boundaries require them.
+- [ ] `break` and `continue` work across nested repeat scopes.
+- [ ] Event triggers are implemented.
+- [ ] Schedule triggers are implemented.
+- [ ] Trigger overlap and missed-occurrence policies are implemented.
+- [ ] Trigger state remains in the existing Session v3 document.
+- [ ] Event retention, event consumption, local channels, channel cursors, emit deduplication, human waits, completion waits, signals, and machine serialization are complete.
+- [ ] Attachment admission, snapshots, replay-safe materialization, and provider adaptation use Attachment Runtime.
+- [ ] Agent and Workspace planning use their domain services.
+- [ ] Model defaults layering and typed request patches use Model Runtime.
+- [ ] Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity execution use their domain binders.
+- [ ] MCP resources, prompts, Apps, approvals, App Tool calls, resource reads, and approved App context use MCP Runtime.
+- [ ] Skill sessions, active Skill lifecycle, Tool invocation, and resource handling use Skill Runtime.
+- [ ] Provider streaming, protocol outputs, usage, debugger projections, Tool result continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency are complete.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/go_exec.go`.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/go_tools.go`.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/mcp_exec.go`.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/mcp_tools.go`.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/skill_exec.go`.
+- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/skill_tools.go`.
+- [ ] Session V3 setup retains only typed routing, semantic binding adaptation, and lifecycle ownership.
+- [ ] Session v2 behavior is unchanged and Session v2 does not depend on Session v3.
+- [ ] Workflow HLDs are updated truthfully when functional behavior changes.

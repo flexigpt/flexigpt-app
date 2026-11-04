@@ -25,17 +25,18 @@ type (
 type InferenceUsage = inferenceSpec.Usage
 
 type Session struct {
-	ID            SessionID       `json:"id"`
-	Revision      Revision        `json:"revision"`
-	Title         string          `json:"title,omitempty"`
-	CreatedAt     time.Time       `json:"createdAt"`
-	UpdatedAt     time.Time       `json:"updatedAt"`
-	Defaults      SessionDefaults `json:"defaults"`
-	Metadata      CanonicalValue  `json:"metadata,omitempty"`
-	Timeline      []Activity      `json:"timeline"`
-	Executions    []Execution     `json:"executions"`
-	EventSequence uint64          `json:"eventSequence"`
-	Commands      []CommandRecord `json:"commands,omitempty"`
+	ID                    SessionID                    `json:"id"`
+	Revision              Revision                     `json:"revision"`
+	Title                 string                       `json:"title,omitempty"`
+	CreatedAt             time.Time                    `json:"createdAt"`
+	UpdatedAt             time.Time                    `json:"updatedAt"`
+	Defaults              SessionDefaults              `json:"defaults"`
+	Metadata              CanonicalValue               `json:"metadata,omitempty"`
+	Timeline              []Activity                   `json:"timeline"`
+	Executions            []Execution                  `json:"executions"`
+	ConversationOwnership []ConversationOwnershipState `json:"conversationOwnership,omitempty"`
+	EventSequence         uint64                       `json:"eventSequence"`
+	Commands              []CommandRecord              `json:"commands,omitempty"`
 }
 
 type SessionDefaults struct {
@@ -239,23 +240,104 @@ func (s ExecutionState) Terminal() bool {
 	}
 }
 
+// ExecutionChildLifetime describes an Execution that was created by another
+// Execution. Attached child work remains in the parent Execution as a frame.
+// Independent child work has its own durable Execution in the same Session.
+type ExecutionChildLifetime string
+
+const (
+	ExecutionChildLifetimeRoot        ExecutionChildLifetime = "root"
+	ExecutionChildLifetimeIndependent ExecutionChildLifetime = "independent"
+)
+
+// ExecutionBudget is the durable child budget inherited at independent child
+// admission. It contains only typed declarative limits and no process-local
+// scheduler or runtime handles.
+type ExecutionBudget struct {
+	Duration        WorkflowDuration     `json:"duration,omitempty"`
+	StepExecutions  int                  `json:"stepExecutions,omitempty"`
+	CallAttempts    int                  `json:"callAttempts,omitempty"`
+	WorkflowDepth   int                  `json:"workflowDepth,omitempty"`
+	Concurrency     int                  `json:"concurrency,omitempty"`
+	ModelTokens     int                  `json:"modelTokens,omitempty"`
+	MessageCount    int                  `json:"messageCount,omitempty"`
+	MessageBytes    int                  `json:"messageBytes,omitempty"`
+	EventCount      int                  `json:"eventCount,omitempty"`
+	EventBytes      int                  `json:"eventBytes,omitempty"`
+	CleanupDuration WorkflowDuration     `json:"cleanupDuration,omitempty"`
+	Cost            *ExecutionBudgetCost `json:"cost,omitempty"`
+}
+
+type ExecutionBudgetCost struct {
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"`
+}
+
+// ChildExecutionOwnership is the evaluated ownership contract captured before
+// an independent child Execution starts.
+type ChildExecutionOwnership struct {
+	Owner            string          `json:"owner,omitempty"`
+	CancelWithParent bool            `json:"cancelWithParent"`
+	Budget           ExecutionBudget `json:"budget"`
+}
+
+// ConversationParticipant identifies the durable owner of a logical
+// conversation. The owner is semantic state in the existing Session document.
+type ConversationParticipant struct {
+	Owner       string         `json:"owner,omitempty"`
+	ExecutionID ExecutionID    `json:"executionID,omitempty"`
+	FrameID     ProgramFrameID `json:"frameID,omitempty"`
+	Agent       *ArtifactPin   `json:"agent,omitempty"`
+}
+
+// ConversationOwnershipState is a typed handoff record. It contains no model
+// client, callback, browser state, or provider conversation handle.
+type ConversationOwnershipState struct {
+	ConversationID      string                   `json:"conversationID"`
+	Owner               ConversationParticipant  `json:"owner"`
+	PreviousOwner       *ConversationParticipant `json:"previousOwner,omitempty"`
+	ActiveHandoffID     string                   `json:"activeHandoffID,omitempty"`
+	RestoreOnCompletion bool                     `json:"restoreOnCompletion"`
+	UpdatedAt           time.Time                `json:"updatedAt"`
+	CompletedAt         *time.Time               `json:"completedAt,omitempty"`
+}
+
+// ConversationHandoffIntent is emitted only by the Workflow interpreter. The
+// runtime persists the resulting ownership state before child dispatch.
+type ConversationHandoffIntent struct {
+	ID                  string      `json:"id"`
+	ConversationID      string      `json:"conversationID"`
+	Owner               string      `json:"owner,omitempty"`
+	TargetAgent         ArtifactPin `json:"targetAgent"`
+	RestoreOnCompletion bool        `json:"restoreOnCompletion"`
+}
+
 type Execution struct {
-	ID            ExecutionID       `json:"id"`
-	SessionID     SessionID         `json:"sessionID"`
-	Revision      Revision          `json:"revision"`
-	State         ExecutionState    `json:"state"`
-	CreatedAt     time.Time         `json:"createdAt"`
-	UpdatedAt     time.Time         `json:"updatedAt"`
-	ProgramFrames []ProgramFrame    `json:"programFrames"`
-	WorkItems     []WorkItem        `json:"workItems"`
-	Attempts      []Attempt         `json:"attempts"`
-	Waits         []Wait            `json:"waits"`
-	Signals       []ExecutionSignal `json:"signals,omitempty"`
-	Channels      []ChannelLog      `json:"channels,omitempty"`
-	EmitReceipts  []EmitReceipt     `json:"emitReceipts,omitempty"`
-	Controls      ExecutionControls `json:"controls"`
-	Outcome       *ExecutionOutcome `json:"outcome,omitempty"`
-	EventSequence uint64            `json:"eventSequence"`
+	ID                ExecutionID            `json:"id"`
+	SessionID         SessionID              `json:"sessionID"`
+	Revision          Revision               `json:"revision"`
+	State             ExecutionState         `json:"state"`
+	CreatedAt         time.Time              `json:"createdAt"`
+	UpdatedAt         time.Time              `json:"updatedAt"`
+	ParentExecutionID ExecutionID            `json:"parentExecutionID,omitempty"`
+	RootExecutionID   ExecutionID            `json:"rootExecutionID,omitempty"`
+	ParentFrameID     ProgramFrameID         `json:"parentFrameID,omitempty"`
+	Lifetime          ExecutionChildLifetime `json:"lifetime,omitempty"`
+	Owner             string                 `json:"owner,omitempty"`
+	CancelWithParent  bool                   `json:"cancelWithParent,omitempty"`
+	ChildBudget       ExecutionBudget        `json:"childBudget"`
+	ChildExecutionIDs []ExecutionID          `json:"childExecutionIDs,omitempty"`
+	HandoffID         string                 `json:"handoffID,omitempty"`
+	ProgramFrames     []ProgramFrame         `json:"programFrames"`
+	WorkItems         []WorkItem             `json:"workItems"`
+	Attempts          []Attempt              `json:"attempts"`
+	Waits             []Wait                 `json:"waits"`
+	Signals           []ExecutionSignal      `json:"signals,omitempty"`
+	Channels          []ChannelLog           `json:"channels,omitempty"`
+	EmitReceipts      []EmitReceipt          `json:"emitReceipts,omitempty"`
+	Controls          ExecutionControls      `json:"controls"`
+	Outcome           *ExecutionOutcome      `json:"outcome,omitempty"`
+	EventSequence     uint64                 `json:"eventSequence"`
 }
 
 type ExecutionControls struct {
@@ -323,20 +405,22 @@ const (
 )
 
 type ProgramFrame struct {
-	ID            ProgramFrameID     `json:"id"`
-	ParentFrameID ProgramFrameID     `json:"parentFrameID,omitempty"`
-	Lifetime      ChildFrameLifetime `json:"lifetime,omitempty"`
-	Program       ProgramSnapshot    `json:"program"`
-	State         ProgramState       `json:"state"`
-	Status        ProgramFrameState  `json:"status"`
-	Path          string             `json:"path,omitempty"`
-	CreatedAt     time.Time          `json:"createdAt"`
-	UpdatedAt     time.Time          `json:"updatedAt"`
-	Deadline      *time.Time         `json:"deadline,omitempty"`
-	ChildFrameIDs []ProgramFrameID   `json:"childFrameIDs,omitempty"`
-	WorkItemIDs   []WorkItemID       `json:"workItemIDs,omitempty"`
-	Output        CanonicalValue     `json:"output,omitempty"`
-	Error         *SanitizedError    `json:"error,omitempty"`
+	ID                ProgramFrameID     `json:"id"`
+	ParentFrameID     ProgramFrameID     `json:"parentFrameID,omitempty"`
+	Lifetime          ChildFrameLifetime `json:"lifetime,omitempty"`
+	Program           ProgramSnapshot    `json:"program"`
+	State             ProgramState       `json:"state"`
+	Status            ProgramFrameState  `json:"status"`
+	Path              string             `json:"path,omitempty"`
+	CreatedAt         time.Time          `json:"createdAt"`
+	UpdatedAt         time.Time          `json:"updatedAt"`
+	Deadline          *time.Time         `json:"deadline,omitempty"`
+	ChildFrameIDs     []ProgramFrameID   `json:"childFrameIDs,omitempty"`
+	ChildExecutionIDs []ExecutionID      `json:"childExecutionIDs,omitempty"`
+	WorkItemIDs       []WorkItemID       `json:"workItemIDs,omitempty"`
+	Output            CanonicalValue     `json:"output,omitempty"`
+	Error             *SanitizedError    `json:"error,omitempty"`
+	HandoffID         string             `json:"handoffID,omitempty"`
 }
 
 type WorkItemType string
@@ -623,8 +707,9 @@ type EmitDestination struct {
 // CompletionHandle identifies one durable WorkItem or ProgramFrame. A caller
 // can wait for only one target per wait.
 type CompletionHandle struct {
-	WorkItemID WorkItemID     `json:"workItemID,omitempty"`
-	FrameID    ProgramFrameID `json:"frameID,omitempty"`
+	WorkItemID  WorkItemID     `json:"workItemID,omitempty"`
+	FrameID     ProgramFrameID `json:"frameID,omitempty"`
+	ExecutionID ExecutionID    `json:"executionID,omitempty"`
 }
 
 // ExecutionSignal is the durable event envelope accepted by SignalExecution.
@@ -873,11 +958,14 @@ type ProgramEvent struct {
 }
 
 type ProgramFrameIntent struct {
-	ID       ProgramFrameID     `json:"id,omitempty"`
-	Path     string             `json:"path,omitempty"`
-	Program  ProgramSnapshot    `json:"program"`
-	Deadline *time.Time         `json:"deadline,omitempty"`
-	Lifetime ChildFrameLifetime `json:"lifetime,omitempty"`
+	ID          ProgramFrameID             `json:"id,omitempty"`
+	ExecutionID ExecutionID                `json:"executionID,omitempty"`
+	Path        string                     `json:"path,omitempty"`
+	Program     ProgramSnapshot            `json:"program"`
+	Deadline    *time.Time                 `json:"deadline,omitempty"`
+	Lifetime    ChildFrameLifetime         `json:"lifetime,omitempty"`
+	Ownership   *ChildExecutionOwnership   `json:"ownership,omitempty"`
+	Handoff     *ConversationHandoffIntent `json:"handoff,omitempty"`
 }
 
 type WorkItemIntent struct {
@@ -891,16 +979,17 @@ type WorkItemIntent struct {
 }
 
 type ProgramTransition struct {
-	State               ProgramState         `json:"state"`
-	Status              *ProgramFrameState   `json:"status,omitempty"`
-	Output              CanonicalValue       `json:"output,omitempty"`
-	Error               *SanitizedError      `json:"error,omitempty"`
-	Activities          []Activity           `json:"activities,omitempty"`
-	Frames              []ProgramFrameIntent `json:"frames,omitempty"`
-	WorkItems           []WorkItemIntent     `json:"workItems,omitempty"`
-	CancelChildPaths    []string             `json:"cancelChildPaths,omitempty"`
-	CancelChildFrameIDs []ProgramFrameID     `json:"cancelChildFrameIDs,omitempty"`
-	ContinueParent      bool                 `json:"continueParent,omitempty"`
+	State                   ProgramState         `json:"state"`
+	Status                  *ProgramFrameState   `json:"status,omitempty"`
+	Output                  CanonicalValue       `json:"output,omitempty"`
+	Error                   *SanitizedError      `json:"error,omitempty"`
+	Activities              []Activity           `json:"activities,omitempty"`
+	Frames                  []ProgramFrameIntent `json:"frames,omitempty"`
+	WorkItems               []WorkItemIntent     `json:"workItems,omitempty"`
+	CancelChildPaths        []string             `json:"cancelChildPaths,omitempty"`
+	CancelChildFrameIDs     []ProgramFrameID     `json:"cancelChildFrameIDs,omitempty"`
+	CancelChildExecutionIDs []ExecutionID        `json:"cancelChildExecutionIDs,omitempty"`
+	ContinueParent          bool                 `json:"continueParent,omitempty"`
 }
 
 type ProgramInterpreter interface {

@@ -13,6 +13,7 @@ import (
 const (
 	maximumCoordinationRecords = 65_536
 	maximumCoordinationBytes   = 32 << 20
+	sessionV3Completion        = "session-v3-completion"
 )
 
 type eventWaitOutput struct {
@@ -35,9 +36,10 @@ type channelWaitOutput struct {
 }
 
 type completionWaitOutput struct {
-	WorkItemID WorkItemID     `json:"workItemID,omitempty"`
-	FrameID    ProgramFrameID `json:"frameID,omitempty"`
-	Output     CanonicalValue `json:"output,omitempty"`
+	WorkItemID  WorkItemID     `json:"workItemID,omitempty"`
+	FrameID     ProgramFrameID `json:"frameID,omitempty"`
+	ExecutionID ExecutionID    `json:"executionID,omitempty"`
+	Output      CanonicalValue `json:"output,omitempty"`
 }
 
 func canonicalValuesEqual(left, right CanonicalValue) bool {
@@ -130,6 +132,12 @@ func (r *Runtime) resolveReadyWaitLocked(
 			frame := mutableFrame(execution, handle.FrameID)
 			if frame != nil && frame.Status.Terminal() {
 				r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
+			}
+		}
+		if handle.ExecutionID != "" {
+			child := mutableSessionExecution(session, handle.ExecutionID)
+			if child != nil && child.State.Terminal() {
+				r.wakeCompletionExecutionWaitsLocked(session, *child)
 			}
 		}
 	default:
@@ -643,7 +651,7 @@ func (r *Runtime) wakeCompletionWorkWaitsLocked(
 			wait,
 			value,
 			&ExternalReceipt{
-				System:      "session-v3-completion",
+				System:      sessionV3Completion,
 				Reference:   string(completed.ID),
 				ConfirmedAt: r.now(),
 			},
@@ -684,7 +692,7 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 		}
 		if frame.Status == ProgramFrameStateCancelled {
 			errorValue = &SanitizedError{
-				Code:     "completion_cancelled",
+				Code:     completionCancelled,
 				Category: ErrorCategoryCancellation,
 				Message:  "completed frame was cancelled",
 			}
@@ -698,7 +706,7 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 			wait,
 			value,
 			&ExternalReceipt{
-				System:      "session-v3-completion",
+				System:      sessionV3Completion,
 				Reference:   string(frame.ID),
 				ConfirmedAt: r.now(),
 			},
@@ -729,7 +737,7 @@ func completionWorkItemResult(
 		return output, nil, true
 	case WorkItemStateCancelled:
 		return output, &SanitizedError{
-			Code:     "completion_cancelled",
+			Code:     completionCancelled,
 			Category: ErrorCategoryCancellation,
 			Message:  "completed WorkItem was cancelled",
 		}, true

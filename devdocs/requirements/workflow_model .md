@@ -1696,18 +1696,19 @@ They do not persist provider clients, callbacks, credentials, or compiled
 provider state. A provider SDK Tool remains provider-managed and cannot become
 a fabricated local Tool success.
 
-Workflow `call.mode: start` now creates a typed attached child ProgramFrame and
-returns a durable typed completion handle. The parent Workflow continues after
-the child starts. A completion wait can consume the child terminal outcome.
-Attached children keep the enclosing Execution active after their parent frame
-reaches a terminal state. Workflow `cancel` accepts a typed child-frame handle,
-requests cancellation through the common ProgramFrame lifecycle, records a
-typed cancellation receipt, and continues the parent block.
+Workflow `call.mode: start` creates either a typed attached child ProgramFrame
+or an independent child Execution in the existing Session document. An
+independent child persists parent Execution identity, root Execution identity,
+evaluated ownership, child budget, cancellation relationship, and a typed
+Execution completion handle before child dispatch. A completion wait can
+consume either a child-frame or child-Execution terminal outcome.
 
-The current start implementation supports attached child lifetime only.
-Independent child lifetime and Agent conversation handoff require separate
-Execution ownership and durable conversation-owner state. They remain
-implementation work and are not admitted as invoke-like fallback behavior.
+Workflow `call.mode: handoff` is distinct from invoke. It creates typed
+conversation ownership state in the existing Session document before the
+target Agent starts. Completion either restores the prior owner or retains the
+target owner according to the declared completion behavior. Parent cancellation
+propagates to independent children only when the persisted relationship
+declares `cancelWithParent`.
 
 This coverage is not backend completion. Structured blocks, fan-out, machines,
 human assignment authorization, events, channels, triggers, retries,

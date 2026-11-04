@@ -57,6 +57,16 @@ const (
 	WorkflowCallModeHandoff WorkflowCallMode = "handoff"
 )
 
+type WorkflowChildOwnership struct {
+	Owner            WorkflowValue   `json:"owner"`
+	CancelWithParent bool            `json:"cancelWithParent"`
+	Budget           ExecutionBudget `json:"budget"`
+}
+
+func (o WorkflowChildOwnership) Validate() error {
+	return o.Owner.Validate()
+}
+
 type WorkflowCallableInterface struct {
 	Modes         []WorkflowCallMode `json:"modes,omitempty"`
 	InputSchema   CanonicalValue     `json:"inputSchema"`
@@ -120,14 +130,18 @@ type WorkflowStep struct {
 }
 
 type WorkflowCall struct {
-	Target         WorkflowValue              `json:"target"`
-	AllowedTargets []string                   `json:"allowedTargets,omitempty"`
-	Input          WorkflowValue              `json:"input"`
-	Context        WorkflowValue              `json:"context"`
-	Contract       *WorkflowCallableInterface `json:"contract,omitempty"`
-	SetContract    *WorkflowCallableInterface `json:"setContract,omitempty"`
-	Mode           WorkflowCallMode           `json:"mode,omitempty"`
-	Lifetime       WorkflowChildLifetime      `json:"lifetime,omitempty"`
+	Target                 WorkflowValue              `json:"target"`
+	AllowedTargets         []string                   `json:"allowedTargets,omitempty"`
+	Input                  WorkflowValue              `json:"input"`
+	Context                WorkflowValue              `json:"context"`
+	Contract               *WorkflowCallableInterface `json:"contract,omitempty"`
+	SetContract            *WorkflowCallableInterface `json:"setContract,omitempty"`
+	Mode                   WorkflowCallMode           `json:"mode,omitempty"`
+	Lifetime               WorkflowChildLifetime      `json:"lifetime,omitempty"`
+	Conversation           *WorkflowValue             `json:"conversation,omitempty"`
+	Ownership              *WorkflowChildOwnership    `json:"ownership,omitempty"`
+	OnCompletion           string                     `json:"onCompletion,omitempty"`
+	InternalLifecycleChild bool                       `json:"internalLifecycleChild,omitempty"`
 }
 
 type WorkflowTransform struct {
@@ -820,11 +834,13 @@ func (i *WorkflowInterpreter) call(
 	}
 	for _, contract := range []*WorkflowCallableInterface{target.Contract, call.Contract, call.SetContract} {
 		if contract != nil && len(contract.Modes) != 0 && !slices.Contains(contract.Modes, mode) {
-			return workflowFailure(
-				state,
-				"workflow_call_mode_invalid",
-				"target interface does not permit the requested call mode",
-			)
+			if !call.InternalLifecycleChild {
+				return workflowFailure(
+					state,
+					"workflow_call_mode_invalid",
+					"target interface does not permit the requested call mode",
+				)
+			}
 		}
 	}
 	if mode == WorkflowCallModeStart {
@@ -842,10 +858,16 @@ func (i *WorkflowInterpreter) call(
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
-		return workflowFailure(
+		return i.handoffCall(
+			frame,
+			program,
 			state,
-			"workflow_handoff_unsupported",
-			"workflow handoff requires conversation ownership support",
+			path,
+			targetName,
+			target,
+			input,
+			contextValue,
+			call,
 		)
 	}
 	state.PendingTarget = targetName
@@ -1665,6 +1687,47 @@ func (c WorkflowCall) Validate() error {
 	}
 	if err := c.Context.Validate(); err != nil {
 		return err
+	}
+	mode := c.Mode
+	if mode == "" {
+		mode = WorkflowCallModeInvoke
+	}
+	switch mode {
+	case WorkflowCallModeInvoke, WorkflowCallModeStart, WorkflowCallModeHandoff:
+	default:
+		return errors.New("workflow call mode is invalid")
+	}
+	if c.Lifetime != "" &&
+		c.Lifetime != WorkflowChildLifetimeAttached &&
+		c.Lifetime != WorkflowChildLifetimeIndependent {
+		return errors.New("workflow child lifetime is invalid")
+	}
+	if mode == WorkflowCallModeInvoke && c.Lifetime != "" {
+		return errors.New("workflow invoke call cannot declare a child lifetime")
+	}
+	if mode == WorkflowCallModeHandoff {
+		if c.Conversation == nil {
+			return errors.New("workflow handoff requires a conversation")
+		}
+		if c.Lifetime == WorkflowChildLifetimeIndependent {
+			return errors.New("workflow handoff cannot use an independent child lifetime")
+		}
+	}
+	if c.Conversation != nil {
+		if err := c.Conversation.Validate(); err != nil {
+			return err
+		}
+	}
+	if c.Ownership != nil {
+		if err := c.Ownership.Validate(); err != nil {
+			return err
+		}
+		if err := c.Ownership.Budget.Validate(); err != nil {
+			return err
+		}
+	}
+	if c.OnCompletion != "" && c.OnCompletion != "restore" && c.OnCompletion != "retain" {
+		return errors.New("workflow handoff completion behavior is invalid")
 	}
 	seen := make(map[string]struct{}, len(c.AllowedTargets))
 	for _, target := range c.AllowedTargets {

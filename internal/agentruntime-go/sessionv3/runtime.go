@@ -543,12 +543,14 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		return nil, err
 	}
 	execution := Execution{
-		ID:        executionID,
-		SessionID: session.ID,
-		Revision:  1,
-		State:     ExecutionStateRunning,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:              executionID,
+		SessionID:       session.ID,
+		RootExecutionID: executionID,
+		Lifetime:        ExecutionChildLifetimeRoot,
+		Revision:        1,
+		State:           ExecutionStateRunning,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
@@ -587,6 +589,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		*session = previous
 		return nil, err
 	}
+	active = mutableSessionExecution(session, executionID)
 	r.refreshExecutionStateLocked(active)
 	r.touchSessionLocked(session)
 	receipt := CommandReceipt{
@@ -602,9 +605,9 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		*session = previous
 		return nil, err
 	}
-	ready := r.readyWorkLocked(*active)
+	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
-	r.launchWork(ctx, session.ID, active.ID, ready)
+	r.launchReadyWork(ctx, session.ID, ready)
 	return &receipt, nil
 }
 
@@ -784,6 +787,12 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 			execution.Controls.CancellationRequested = true
 			execution.State = ExecutionStateCancelling
 			now := r.now()
+			r.cancelOwnedChildExecutionsLocked(
+				ctx,
+				session,
+				execution.ID,
+				firstText(command.Reason, "execution was cancelled"),
+			)
 			for index := range execution.WorkItems {
 				item := &execution.WorkItems[index]
 				switch item.State {
@@ -1130,7 +1139,6 @@ func (r *Runtime) launchWork(
 			func() {
 				r.dispatchOne(r.lifecycleCtx, sessionID, executionID, id)
 			},
-			//nolint:contextcheck // Async work.
 			func(failure backgroundutil.PanicFailureError) {
 				r.finishPanickedWork(sessionID, executionID, id, failure)
 			},
@@ -1313,10 +1321,10 @@ func (r *Runtime) changeExecution(
 		r.mu.Unlock()
 		return nil, err
 	}
-	ready := r.readyWorkLocked(*execution)
+	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
-	r.launchWork(context.WithoutCancel(ctx), sessionID, executionID, ready)
+	r.launchReadyWork(context.WithoutCancel(ctx), sessionID, ready)
 	return receipt, nil
 }
 
@@ -1344,6 +1352,7 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 	execution := Execution{
 		ID:        ExecutionID(r.newID()),
 		SessionID: session.ID,
+		Lifetime:  ExecutionChildLifetimeRoot,
 		Revision:  1,
 		State:     ExecutionStateWaiting,
 		CreatedAt: now,
@@ -1363,6 +1372,7 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 		Attempts:  []Attempt{},
 		Waits:     []Wait{},
 	}
+	execution.RootExecutionID = execution.ID
 	session.Executions = append(session.Executions, execution)
 	return &session.Executions[len(session.Executions)-1], nil
 }
@@ -1377,12 +1387,21 @@ func (r *Runtime) advanceFrameLocked(
 		return errors.New("ProgramFrame execution is unavailable")
 	}
 
+	parentExecutionID := execution.ID
 	previousExecution := cloneExecution(*execution)
+	previousExecutionCount := len(session.Executions)
 	previousTimelineLength := len(session.Timeline)
+	previousConversationOwnership := cloneSession(*session).ConversationOwnership
 	defer func() {
 		if err != nil {
-			*execution = previousExecution
+			if current := mutableSessionExecution(session, parentExecutionID); current != nil {
+				*current = previousExecution
+			}
+			if len(session.Executions) > previousExecutionCount {
+				session.Executions = session.Executions[:previousExecutionCount]
+			}
 			session.Timeline = session.Timeline[:previousTimelineLength]
+			session.ConversationOwnership = previousConversationOwnership
 		}
 	}()
 
@@ -1425,6 +1444,7 @@ func (r *Runtime) advanceFrameLocked(
 		session.Timeline = append(session.Timeline, activity)
 	}
 	childIDs := []ProgramFrameID{}
+	childExecutionIDs := []ExecutionID{}
 	for _, intent := range transition.Frames {
 		childInterpreter := r.interpreterLocked(intent.Program)
 		if childInterpreter == nil {
@@ -1439,9 +1459,19 @@ func (r *Runtime) advanceFrameLocked(
 			lifetime = ChildFrameLifetimeAttached
 		case ChildFrameLifetimeAttached:
 		case ChildFrameLifetimeIndependent:
-			return errors.New(
-				"independent child frames require a separate execution",
+			child, childErr := r.createIndependentChildExecutionLocked(
+				session,
+				execution,
+				frame,
+				intent,
 			)
+			if childErr != nil {
+				return childErr
+			}
+			childExecutionIDs = append(childExecutionIDs, child.ID)
+			execution = mutableSessionExecution(session, parentExecutionID)
+			frame = mutableFrame(execution, frameID)
+			continue
 		default:
 			return errors.New("child ProgramFrame lifetime is invalid")
 		}
@@ -1467,7 +1497,13 @@ func (r *Runtime) advanceFrameLocked(
 			Path:          intent.Path,
 			CreatedAt:     now,
 			UpdatedAt:     now,
-			Deadline:      earlierDeadline(frame.Deadline, intent.Deadline),
+			HandoffID: func() string {
+				if intent.Handoff != nil {
+					return intent.Handoff.ID
+				}
+				return ""
+			}(),
+			Deadline: earlierDeadline(frame.Deadline, intent.Deadline),
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)
 		frame = mutableFrame(execution, frameID)
@@ -1476,6 +1512,17 @@ func (r *Runtime) advanceFrameLocked(
 		}
 		frame.ChildFrameIDs = append(frame.ChildFrameIDs, child.ID)
 		childIDs = append(childIDs, child.ID)
+		if intent.Handoff != nil {
+			childFrame := mutableFrame(execution, child.ID)
+			if childFrame == nil {
+				return errors.New("handoff child ProgramFrame is unavailable")
+			}
+			if err := r.applyConversationHandoffLocked(
+				session, execution, frame, execution, childFrame.ID, *intent.Handoff,
+			); err != nil {
+				return err
+			}
+		}
 		if frame.Program.InterpreterID == BuiltinConversationInterpreterID {
 			var cs conversationProgramState
 			if json.Unmarshal(frame.State.Data, &cs) == nil {
@@ -1549,6 +1596,16 @@ func (r *Runtime) advanceFrameLocked(
 	); err != nil {
 		return err
 	}
+	if err := r.cancelChildExecutionIDsLocked(
+		context.Background(),
+		session,
+		execution,
+		frameID,
+		transition.CancelChildExecutionIDs,
+		workflowChildCancelled,
+	); err != nil {
+		return err
+	}
 	for _, childID := range childIDs {
 		if err := r.advanceFrameLocked(
 			session,
@@ -1558,6 +1615,21 @@ func (r *Runtime) advanceFrameLocked(
 		); err != nil {
 			return err
 		}
+	}
+	for _, childExecutionID := range childExecutionIDs {
+		child := mutableSessionExecution(session, childExecutionID)
+		if child == nil || len(child.ProgramFrames) == 0 {
+			return errors.New("independent child Execution is unavailable")
+		}
+		if err := r.advanceFrameLocked(
+			session,
+			child,
+			child.ProgramFrames[0].ID,
+			ProgramEvent{Kind: ProgramEventStarted},
+		); err != nil {
+			return err
+		}
+		r.touchExecutionLocked(session, child)
 	}
 	if transition.ContinueParent {
 		frame = mutableFrame(execution, frameID)
@@ -1579,6 +1651,9 @@ func (r *Runtime) advanceFrameLocked(
 	if frame == nil {
 		return errors.New("program frame disappeared during child advancement")
 	}
+	if frame.Status.Terminal() && frame.HandoffID != "" {
+		r.settleConversationHandoffLocked(session, frame.HandoffID)
+	}
 	if frame.Status.Terminal() && frame.ParentFrameID != "" {
 		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
 		return r.advanceFrameLocked(
@@ -1588,6 +1663,8 @@ func (r *Runtime) advanceFrameLocked(
 			ProgramEvent{Kind: ProgramEventChildSettled, ChildFrameID: frame.ID},
 		)
 	}
+	r.refreshExecutionStateLocked(execution)
+	r.settleTerminalExecutionLocked(session, execution)
 	return nil
 }
 
@@ -1641,7 +1718,6 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	if hasPrebound {
 		bound = BindResult{SemanticBinding: prebound.SemanticBinding, Private: prebound.Private}
 	} else {
-		//nolint:contextcheck // Separate context.
 		bound, bindErr = r.deps.Binder.BindWork(bindCtx, request)
 	}
 
@@ -1825,7 +1901,6 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 				BoundWork{SemanticBinding: bound.SemanticBinding, Private: bound.Private},
 			)
 		},
-		//nolint:contextcheck // Async work.
 		func(failure backgroundutil.PanicFailureError) {
 			r.finishPanickedWork(sessionID, executionID, item.ID, failure)
 		},
@@ -1956,7 +2031,6 @@ func (r *Runtime) executeOne(
 		}
 	}
 	r.mu.Unlock()
-	//nolint:contextcheck // Separate work.
 	result, err := r.deps.Binder.ExecuteWork(executionCtx, request, bound)
 	cancel()
 	if err != nil && result.Error == nil {
@@ -2003,14 +2077,10 @@ func (r *Runtime) executeOne(
 		executionID,
 		*execution,
 	)
+	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	if item.State != WorkItemStateRetryWaiting {
-		r.launchWork(
-			ctx,
-			sessionID,
-			executionID,
-			r.readyWorkLocked(*execution),
-		)
+		r.launchReadyWork(ctx, sessionID, ready)
 	}
 }
 
@@ -2133,8 +2203,10 @@ func (r *Runtime) finishWorkLocked(
 			item.ID,
 		)
 	}
+	execution = mutableSessionExecution(session, execution.ID)
 	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
 	r.refreshExecutionStateLocked(execution)
+	r.settleTerminalExecutionLocked(session, execution)
 	r.touchExecutionLocked(session, execution)
 }
 
@@ -2174,7 +2246,6 @@ func (r *Runtime) addRecoveryWaitLocked(session *Session, execution *Execution, 
 	r.appendWaitActivityLocked(session, execution, wait)
 }
 
-//nolint:contextcheck // Separate work.
 func (r *Runtime) scheduleWaitDeadlineLocked(
 	ctx context.Context,
 	sessionID SessionID,
@@ -2490,6 +2561,7 @@ func (r *Runtime) completeExecutionLocked(
 	default:
 		execution.State = ExecutionStateCompleted
 	}
+	r.settleTerminalExecutionLocked(session, execution)
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {
 		id := execution.ID

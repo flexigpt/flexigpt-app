@@ -141,7 +141,6 @@ func New(
 	}
 
 	if err := runtimeValue.Restore(ctx); err != nil {
-		//nolint:contextcheck // Runtime.Close owns and cancels its lifecycle internally.
 		runtimeValue.Close()
 		return nil, fmt.Errorf("restore Session runtime: %w", err)
 	}

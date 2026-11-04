@@ -194,8 +194,6 @@ func (m *MCPRuntimeManager) Connect(
 // StartConnect starts one managed connection attempt and immediately returns
 // the Connecting snapshot. OAuth browser interaction and discovery continue in
 // the runtime-owned context and can be cancelled by Disconnect or Invalidate.
-
-//nolint:contextcheck // Background check.
 func (m *MCPRuntimeManager) StartConnect(
 	ctx context.Context,
 	ref mcpServer.ServerID,
@@ -1508,7 +1506,6 @@ func (m *MCPRuntimeManager) scheduleRefresh(
 	timer = backgroundutil.AfterFunc(
 		NotificationRefreshDebounce,
 		"MCP discovery refresh",
-		//nolint:contextcheck // Separate context used.
 		func() {
 			refreshCtx, cancel := context.WithTimeout(
 				m.lifecycleContext,
