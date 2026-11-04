@@ -761,9 +761,25 @@ func (a Attempt) Validate() error {
 
 func (w WaitRequest) Validate() error {
 	if !w.Summary.Valid() || !w.InputSchema.Valid() || !w.Correlation.Valid() {
-		return errors.New("wait request JSON is not canonical")
+		return errors.New("wait request json is not canonical")
 	}
-	if len(w.AllowedResolutions) == 0 {
+	switch w.Kind {
+	case WaitKindTimer:
+		if w.Timer == nil || len(w.AllowedResolutions) != 0 || w.RuntimeBound {
+			return errors.New("invalid timer wait request")
+		}
+		if err := w.Timer.Validate(); err != nil {
+			return err
+		}
+	case WaitKindApproval, WaitKindManual, WaitKindHuman,
+		WaitKindEvent, WaitKindChannel, WaitKindChild, WaitKindRecovery:
+		if w.Timer != nil {
+			return errors.New("non-timer wait contains timer state")
+		}
+	default:
+		return errors.New("unsupported wait kind")
+	}
+	if w.Kind != WaitKindTimer && len(w.AllowedResolutions) == 0 {
 		return errors.New("wait request has no allowed resolution")
 	}
 	if w.Deadline != nil && w.Deadline.IsZero() {

@@ -472,6 +472,8 @@ linters:
             - "github.com/flexigpt/llmtools-go$"
             - "github.com/flexigpt/llmtools-go/"
             - "cel.dev/cel-go/cel"
+            - "cel.dev/cel-go/common/types/ref"
+            - "cel.dev/cel-go/common/types/traits"
             - "github.com/modelcontextprotocol/go-sdk/"
             - "golang.org/x/oauth2$"
 

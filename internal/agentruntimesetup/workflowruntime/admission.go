@@ -482,6 +482,29 @@ func finalizeWorkflowTarget(
 	}
 	target.Contract = contract
 
+	if source.Interface != nil && source.Interface.Effect != nil {
+		requested, err := compileWorkflowEffect(source.Interface.Effect)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+		if target.Effect.Kind != "" && target.Effect.Kind != requested.Kind {
+			// A declaration can impose a more restrictive retry classification,
+			// but cannot assert safety that the current binding does not supply.
+			stricter := requested.Kind == sessionv3Runtime.EffectKindNonIdempotent ||
+				(target.Effect.Kind == sessionv3Runtime.EffectKindRead &&
+					requested.Kind == sessionv3Runtime.EffectKindIdempotent)
+			if !stricter {
+				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+					"%w: declared effect %q exceeds binding guarantee %q",
+					ErrBindingUnavailable,
+					requested.Kind,
+					target.Effect.Kind,
+				)
+			}
+		}
+		target.Effect = requested
+	}
+
 	if target.Effect.Kind == "" {
 		var sourceEffect *workflowv1.EffectContract
 		if source.Interface != nil {

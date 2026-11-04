@@ -1491,9 +1491,11 @@ independent versions.
 
 - `apiVersion: v1` identifies the declaration language.
 - An interpreter version identifies one durable compiled runtime payload.
-- A runtime payload version must never change meaning in place.
-- A new typed payload requires a new interpreter version, even when it is
-  compiled from the same `apiVersion: v1` declaration.
+- Stable runtime payload compatibility requires an explicit compatibility
+  policy. That policy does not apply to the current development payload.
+- Session Runtime v3 and Workflow Runtime v3 replace the current
+  `artifact.workflow.v1@1` development payload in place. They do not introduce
+  `artifact.workflow.v1@2` or increment the declaration version.
 
 ### 13.1 Typed compiler boundary
 
@@ -1642,3 +1644,28 @@ Completion still means a functional Session v2 backend superset plus typed,
 durable support for every valid Workflow v1 declaration feature. Until that
 condition is met, unsupported valid operations must fail during admission or
 binding before unrelated external work starts.
+
+### 13.7 Current implementation coverage
+
+The sequential compiler includes call, transform, set, return, fail, guarded
+steps, static allowed target sets, and timer waits. Timer firing and operation
+deadlines are separate persisted facts. A timer firing is successful output;
+an operation deadline is a timeout failure.
+
+The compiler retains failure category, retryability, and details. Calls retain
+their selected target identity and apply target, call, and target-set schemas.
+JSON literals can be scalars, arrays, objects, or null. CEL values cross a
+dedicated conversion boundary; compiled expressions are not persisted.
+
+This coverage is not backend completion. Structured blocks, fan-out, machines,
+human assignment authorization, events, channels, triggers, retries,
+reconciliation, compensation, resources, budgets, all callable modes, and
+complete Agent and Model execution plans remain required implementation work.
+Unsupported-field rejection during development must not become a permanent
+Workflow v1 capability restriction.
+
+Completion remains a functional Session v2 backend superset plus full typed,
+durable Workflow v1 support. V2 remains preserved. Frontend adoption and
+offline migration remain separate work. CanonicalValue is limited to arbitrary
+JSON boundaries, domain ownership remains mandatory, and all Workflow
+execution state remains inside the existing v3 Session document.

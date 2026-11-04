@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"cel.dev/cel-go/cel"
 
@@ -48,11 +49,20 @@ type WorkflowValuePair struct {
 	Value WorkflowValue `json:"value"`
 }
 
+type WorkflowCallMode string
+
+const (
+	WorkflowCallModeInvoke  WorkflowCallMode = "invoke"
+	WorkflowCallModeStart   WorkflowCallMode = "start"
+	WorkflowCallModeHandoff WorkflowCallMode = "handoff"
+)
+
 type WorkflowCallableInterface struct {
-	InputSchema   CanonicalValue `json:"inputSchema"`
-	OutputSchema  CanonicalValue `json:"outputSchema"`
-	ErrorSchema   CanonicalValue `json:"errorSchema,omitempty"`
-	ReceiptSchema CanonicalValue `json:"receiptSchema,omitempty"`
+	Modes         []WorkflowCallMode `json:"modes,omitempty"`
+	InputSchema   CanonicalValue     `json:"inputSchema"`
+	OutputSchema  CanonicalValue     `json:"outputSchema"`
+	ErrorSchema   CanonicalValue     `json:"errorSchema,omitempty"`
+	ReceiptSchema CanonicalValue     `json:"receiptSchema,omitempty"`
 }
 
 type WorkflowProgram struct {
@@ -79,15 +89,17 @@ type WorkflowStateSpec struct {
 }
 
 type WorkflowStep struct {
-	ID           string         `json:"id"`
-	When         *WorkflowValue `json:"when,omitempty"`
-	OutputSchema CanonicalValue `json:"outputSchema,omitempty"`
+	ID           string           `json:"id"`
+	Timeout      WorkflowDuration `json:"timeout,omitempty"`
+	When         *WorkflowValue   `json:"when,omitempty"`
+	OutputSchema CanonicalValue   `json:"outputSchema,omitempty"`
 
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
 	Set       *WorkflowSet       `json:"set,omitempty"`
 	Return    *WorkflowReturn    `json:"return,omitempty"`
 	Fail      *WorkflowFail      `json:"fail,omitempty"`
+	Wait      *WorkflowWait      `json:"wait,omitempty"`
 }
 
 type WorkflowCall struct {
@@ -95,6 +107,7 @@ type WorkflowCall struct {
 	AllowedTargets []string                   `json:"allowedTargets,omitempty"`
 	Input          WorkflowValue              `json:"input"`
 	Contract       *WorkflowCallableInterface `json:"contract,omitempty"`
+	SetContract    *WorkflowCallableInterface `json:"setContract,omitempty"`
 }
 
 type WorkflowTransform struct {
@@ -112,8 +125,16 @@ type WorkflowReturn struct {
 }
 
 type WorkflowFail struct {
-	Code    string        `json:"code"`
-	Message WorkflowValue `json:"message"`
+	Code      string         `json:"code"`
+	Category  ErrorCategory  `json:"category,omitempty"`
+	Message   WorkflowValue  `json:"message"`
+	Retryable bool           `json:"retryable,omitempty"`
+	Details   *WorkflowValue `json:"details,omitempty"`
+}
+
+type WorkflowWait struct {
+	After *WorkflowValue `json:"after,omitempty"`
+	At    *WorkflowValue `json:"at,omitempty"`
 }
 
 type WorkflowTargetKind string
@@ -169,10 +190,13 @@ type WorkflowStepOutcome struct {
 type WorkflowState struct {
 	Version uint32 `json:"version"`
 
-	Index       int                   `json:"index"`
-	PendingPath string                `json:"pendingPath,omitempty"`
-	State       CanonicalValue        `json:"state"`
-	Outcomes    []WorkflowStepOutcome `json:"outcomes"`
+	Index         int                   `json:"index"`
+	PendingPath   string                `json:"pendingPath,omitempty"`
+	PendingTarget string                `json:"pendingTarget,omitempty"`
+	LogicalTime   time.Time             `json:"logicalTime,omitzero"`
+	Deadline      *time.Time            `json:"deadline,omitempty"`
+	State         CanonicalValue        `json:"state"`
+	Outcomes      []WorkflowStepOutcome `json:"outcomes"`
 }
 
 type WorkflowInterpreter struct {
@@ -353,16 +377,33 @@ func (i *WorkflowInterpreter) Advance(
 		return ProgramTransition{}, err
 	}
 
+	//nolint:gocritic // If else is fine.
+	if !event.At.IsZero() {
+		state.LogicalTime = event.At.UTC()
+	} else if !frame.UpdatedAt.IsZero() {
+		state.LogicalTime = frame.UpdatedAt.UTC()
+	} else {
+		state.LogicalTime = frame.CreatedAt.UTC()
+	}
+
 	switch event.Kind {
 	case ProgramEventCancelled:
 		status := ProgramFrameStateCancelled
 		return workflowTransition(state, &status, nil, nil)
 
 	case ProgramEventWorkSettled:
+		item := executionWorkItem(execution, event.WorkItemID)
+		if item != nil && item.FrameID == frame.ID &&
+			state.PendingPath != "" && item.ProgramPath == state.PendingPath {
+			if failure := workflowSettledFailure(program, state, *item); failure != nil {
+				return workflowFailureTransition(state, failure)
+			}
+		}
 		if err := i.settleWork(
 			&state,
 			program,
 			execution,
+			frame.ID,
 			event.WorkItemID,
 		); err != nil {
 			return workflowFailure(state, "workflow_work_failed", err.Error())
@@ -373,6 +414,7 @@ func (i *WorkflowInterpreter) Advance(
 			&state,
 			program,
 			execution,
+			frame.ID,
 			event.ChildFrameID,
 		); err != nil {
 			return workflowFailure(state, "workflow_child_failed", err.Error())
@@ -458,6 +500,15 @@ func (i *WorkflowInterpreter) drive(
 			}
 		}
 
+		state.Deadline = cloneTime(frame.Deadline)
+		if step.Timeout != "" {
+			deadline, err := step.Timeout.Deadline(state.LogicalTime)
+			if err != nil {
+				return workflowFailure(state, "workflow_timeout_invalid", err.Error())
+			}
+			state.Deadline = earlierDeadline(state.Deadline, &deadline)
+		}
+
 		switch {
 		case step.Call != nil:
 			return i.call(
@@ -484,6 +535,9 @@ func (i *WorkflowInterpreter) drive(
 				*step.Set,
 			)
 
+		case step.Wait != nil:
+			return i.timerWait(program, state, path, *step.Wait)
+
 		case step.Return != nil:
 			output, err := i.evaluate(
 				step.Return.Value,
@@ -496,6 +550,9 @@ func (i *WorkflowInterpreter) drive(
 					"workflow_return_failed",
 					err.Error(),
 				)
+			}
+			if err := validateWorkflowSchema(step.OutputSchema, output); err != nil {
+				return workflowFailure(state, "workflow_step_output_invalid", err.Error())
 			}
 			if err := validateWorkflowSchema(
 				program.OutputSchema,
@@ -524,14 +581,21 @@ func (i *WorkflowInterpreter) drive(
 					err.Error(),
 				)
 			}
-			return workflowFailure(
-				state,
-				firstNonEmpty(
-					step.Fail.Code,
-					"workflow_failed",
-				),
-				message,
-			)
+			transition, err := workflowFailure(state, step.Fail.Code, message)
+			if err != nil {
+				return ProgramTransition{}, err
+			}
+			transition.Error.Category = step.Fail.Category
+			transition.Error.Retryable = step.Fail.Retryable
+			transition.Error.StepPath = path
+			if step.Fail.Details != nil {
+				details, err := i.evaluate(*step.Fail.Details, program, state)
+				if err != nil {
+					return workflowFailure(state, "workflow_fail_invalid", err.Error())
+				}
+				transition.Error.Details = details
+			}
+			return transition, nil
 
 		default:
 			return workflowFailure(
@@ -593,6 +657,15 @@ func (i *WorkflowInterpreter) call(
 	if err := validateWorkflowInterfaceInput(call.Contract, input); err != nil {
 		return workflowFailure(state, "workflow_call_input_invalid", err.Error())
 	}
+	if err := validateWorkflowInterfaceInput(call.SetContract, input); err != nil {
+		return workflowFailure(state, "workflow_target_set_input_invalid", err.Error())
+	}
+	for _, contract := range []*WorkflowCallableInterface{target.Contract, call.Contract, call.SetContract} {
+		if contract != nil && len(contract.Modes) != 0 && !slices.Contains(contract.Modes, WorkflowCallModeInvoke) {
+			return workflowFailure(state, "workflow_call_mode_invalid", "target interface does not permit invoke")
+		}
+	}
+	state.PendingTarget = targetName
 
 	switch target.Kind {
 	case WorkflowTargetTool:
@@ -736,8 +809,9 @@ func (i *WorkflowInterpreter) call(
 		return ProgramTransition{
 			State: nextState,
 			Frames: []ProgramFrameIntent{{
-				Path:    path,
-				Program: nested,
+				Path:     path,
+				Deadline: cloneTime(state.Deadline),
+				Program:  nested,
 			}},
 		}, nil
 
@@ -861,6 +935,7 @@ func (i *WorkflowInterpreter) settleWork(
 	state *WorkflowState,
 	program WorkflowProgram,
 	execution Execution,
+	frameID ProgramFrameID,
 	workID WorkItemID,
 ) error {
 	if state == nil {
@@ -871,11 +946,21 @@ func (i *WorkflowInterpreter) settleWork(
 	if item == nil {
 		return errors.New("Workflow WorkItem is unavailable")
 	}
+	if item.FrameID != frameID {
+		return nil
+	}
 	if state.PendingPath == "" || item.ProgramPath != state.PendingPath {
 		return nil
 	}
 	if item.State != WorkItemStateCompleted {
 		return fmt.Errorf("Workflow WorkItem %q did not complete successfully", workID)
+	}
+	step, err := workflowStepForPath(program.Root, item.ProgramPath)
+	if err != nil {
+		return err
+	}
+	if err := validateWorkflowCallReceipt(program, *state, step, item.Output); err != nil {
+		return err
 	}
 	if item.Output != nil &&
 		item.Output.Tool != nil &&
@@ -886,10 +971,6 @@ func (i *WorkflowInterpreter) settleWork(
 		)
 	}
 
-	step, err := workflowStepForPath(program.Root, item.ProgramPath)
-	if err != nil {
-		return err
-	}
 	value, err := workflowWorkValue(*item)
 	if err != nil {
 		return err
@@ -917,6 +998,8 @@ func (i *WorkflowInterpreter) settleWork(
 		return err
 	}
 	state.PendingPath = ""
+	state.PendingTarget = ""
+	state.Deadline = nil
 	state.Index++
 	return nil
 }
@@ -925,6 +1008,7 @@ func (i *WorkflowInterpreter) settleChild(
 	state *WorkflowState,
 	program WorkflowProgram,
 	execution Execution,
+	frameID ProgramFrameID,
 	childID ProgramFrameID,
 ) error {
 	if state == nil {
@@ -932,7 +1016,7 @@ func (i *WorkflowInterpreter) settleChild(
 	}
 
 	for _, child := range execution.ProgramFrames {
-		if child.ID != childID {
+		if child.ID != childID || child.ParentFrameID != frameID {
 			continue
 		}
 		if child.Path != state.PendingPath {
@@ -961,6 +1045,8 @@ func (i *WorkflowInterpreter) settleChild(
 			return err
 		}
 		state.PendingPath = ""
+		state.PendingTarget = ""
+		state.Deadline = nil
 		state.Index++
 		return nil
 	}
@@ -996,9 +1082,9 @@ func (i *WorkflowInterpreter) validateStepOutput(
 		return nil
 	}
 
-	targetName, err := i.stringValue(step.Call.Target, program, state)
-	if err != nil {
-		return fmt.Errorf("resolve Workflow call target: %w", err)
+	targetName := state.PendingTarget
+	if targetName == "" {
+		return errors.New("workflow call has no persisted selected target")
 	}
 	target, found := program.Targets[targetName]
 	if !found {
@@ -1009,6 +1095,9 @@ func (i *WorkflowInterpreter) validateStepOutput(
 	}
 	if err := validateWorkflowInterfaceOutput(step.Call.Contract, value); err != nil {
 		return fmt.Errorf("validate Workflow call output: %w", err)
+	}
+	if err := validateWorkflowInterfaceOutput(step.Call.SetContract, value); err != nil {
+		return fmt.Errorf("validate workflow target set output: %w", err)
 	}
 	return nil
 }
@@ -1058,16 +1147,18 @@ func (i *WorkflowInterpreter) evaluate(
 		if err != nil {
 			return nil, err
 		}
-		result, _, err := executable.Eval(
-			workflowActivation(program, state),
-		)
+		activation, err := workflowActivation(program, state)
+		if err != nil {
+			return nil, err
+		}
+		result, _, err := executable.Eval(activation)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"evaluate Workflow expression: %w",
 				err,
 			)
 		}
-		return canonicalWorkflowValue(result.Value())
+		return canonicalWorkflowCELValue(result)
 
 	case WorkflowValueObject:
 		output := make(
@@ -1203,6 +1294,7 @@ func (s WorkflowStep) Validate() error {
 		s.Set != nil,
 		s.Return != nil,
 		s.Fail != nil,
+		s.Wait != nil,
 	} {
 		if present {
 			count++
@@ -1210,6 +1302,9 @@ func (s WorkflowStep) Validate() error {
 	}
 	if count != 1 {
 		return errors.New("Workflow step must contain exactly one supported operation")
+	}
+	if err := validateWorkflowTimeout(s.Timeout); err != nil {
+		return err
 	}
 	if s.When != nil {
 		if err := s.When.Validate(); err != nil {
@@ -1231,9 +1326,23 @@ func (s WorkflowStep) Validate() error {
 	if s.Return != nil {
 		return s.Return.Value.Validate()
 	}
+	if s.Wait != nil {
+		if (s.Wait.After == nil) == (s.Wait.At == nil) {
+			return errors.New("timer wait requires exactly one of after or at")
+		}
+		if s.Wait.After != nil {
+			return s.Wait.After.Validate()
+		}
+		return s.Wait.At.Validate()
+	}
 	if s.Fail != nil {
 		if strings.TrimSpace(s.Fail.Code) == "" {
 			return errors.New("Workflow fail code is required")
+		}
+		if s.Fail.Details != nil {
+			if err := s.Fail.Details.Validate(); err != nil {
+				return err
+			}
 		}
 		return s.Fail.Message.Validate()
 	}
@@ -1256,6 +1365,11 @@ func (c WorkflowCall) Validate() error {
 			return errors.New("Workflow allowed target is duplicated")
 		}
 		seen[target] = struct{}{}
+	}
+	if c.SetContract != nil {
+		if err := c.SetContract.Validate(); err != nil {
+			return err
+		}
 	}
 	if c.Contract != nil {
 		return c.Contract.Validate()
@@ -1317,9 +1431,6 @@ func (v WorkflowValue) Validate() error {
 	case WorkflowValueObject:
 		seen := make(map[string]struct{}, len(v.Object))
 		for _, value := range v.Object {
-			if strings.TrimSpace(value.Key) == "" {
-				return errors.New("Workflow object key is empty")
-			}
 			if _, duplicate := seen[value.Key]; duplicate {
 				return errors.New("Workflow object key is duplicated")
 			}
@@ -1344,6 +1455,13 @@ func (v WorkflowValue) Validate() error {
 }
 
 func (c WorkflowCallableInterface) Validate() error {
+	for _, mode := range c.Modes {
+		switch mode {
+		case WorkflowCallModeInvoke, WorkflowCallModeStart, WorkflowCallModeHandoff:
+		default:
+			return errors.New("invalid workflow callable mode")
+		}
+	}
 	if len(c.InputSchema) == 0 ||
 		len(c.OutputSchema) == 0 ||
 		!c.InputSchema.Valid() ||
@@ -1503,6 +1621,7 @@ func workflowWork(
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
 	state.PendingPath = path
+	intent.Deadline = earlierDeadline(intent.Deadline, state.Deadline)
 	return workflowTransition(
 		state,
 		nil,
@@ -1528,9 +1647,15 @@ func encodeWorkflowProgramState(
 func workflowActivation(
 	program WorkflowProgram,
 	state WorkflowState,
-) map[string]any {
-	input, _ := DecodeCanonicalValue[any](program.Input)
-	currentState, _ := DecodeCanonicalValue[any](state.State)
+) (map[string]any, error) {
+	input, err := workflowActivationValue(program.Input)
+	if err != nil {
+		return nil, err
+	}
+	currentState, err := workflowActivationValue(state.State)
+	if err != nil {
+		return nil, err
+	}
 
 	steps := make(map[string]any, len(state.Outcomes))
 	for _, outcome := range state.Outcomes {
@@ -1538,7 +1663,10 @@ func workflowActivation(
 			"status": string(outcome.Status),
 		}
 		if len(outcome.Output) != 0 {
-			output, _ := DecodeCanonicalValue[any](outcome.Output)
+			output, err := workflowActivationValue(outcome.Output)
+			if err != nil {
+				return nil, err
+			}
 			value["output"] = output
 		}
 		steps[outcome.ID] = value
@@ -1558,7 +1686,7 @@ func workflowActivation(
 		"outcome":   nil,
 		"completed": nil,
 		"operation": nil,
-	}
+	}, nil
 }
 
 func applyWorkflowStateUpdate(

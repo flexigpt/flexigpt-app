@@ -296,6 +296,7 @@ type ProgramFrame struct {
 	Path          string            `json:"path,omitempty"`
 	CreatedAt     time.Time         `json:"createdAt"`
 	UpdatedAt     time.Time         `json:"updatedAt"`
+	Deadline      *time.Time        `json:"deadline,omitempty"`
 	ChildFrameIDs []ProgramFrameID  `json:"childFrameIDs,omitempty"`
 	WorkItemIDs   []WorkItemID      `json:"workItemIDs,omitempty"`
 	Output        CanonicalValue    `json:"output,omitempty"`
@@ -667,6 +668,7 @@ type WaitRequest struct {
 	Correlation        CanonicalValue   `json:"correlation,omitempty"`
 	Signal             string           `json:"signal,omitempty"`
 	Channel            string           `json:"channel,omitempty"`
+	Timer              *TimerWait       `json:"timer,omitempty"`
 }
 
 type Wait struct {
@@ -682,9 +684,13 @@ type Wait struct {
 }
 
 type SanitizedError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable,omitempty"`
+	Code      string           `json:"code"`
+	Category  ErrorCategory    `json:"category,omitempty"`
+	Message   string           `json:"message"`
+	Retryable bool             `json:"retryable,omitempty"`
+	StepPath  string           `json:"stepPath,omitempty"`
+	Details   CanonicalValue   `json:"details,omitempty"`
+	Causes    []SanitizedError `json:"causes,omitempty"`
 }
 
 type ProgramEventKind string
@@ -700,14 +706,16 @@ const (
 
 type ProgramEvent struct {
 	Kind         ProgramEventKind `json:"kind"`
+	At           time.Time        `json:"at"`
 	ActivityID   ActivityID       `json:"activityID,omitempty"`
 	WorkItemID   WorkItemID       `json:"workItemID,omitempty"`
 	ChildFrameID ProgramFrameID   `json:"childFrameID,omitempty"`
 }
 
 type ProgramFrameIntent struct {
-	Path    string          `json:"path,omitempty"`
-	Program ProgramSnapshot `json:"program"`
+	Path     string          `json:"path,omitempty"`
+	Program  ProgramSnapshot `json:"program"`
+	Deadline *time.Time      `json:"deadline,omitempty"`
 }
 
 type WorkItemIntent struct {

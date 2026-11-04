@@ -5,15 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
-
-const maxWorkflowDefinitionBytes = 16 << 20
 
 var ErrUnsupportedOperation = errors.New(
 	"workflow operation is unsupported by the typed runtime",
@@ -209,11 +206,6 @@ func compileWorkflowStep(
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
 	switch {
-	case input.Timeout != "":
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"timeout",
-		)
 	case input.Retry != nil:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
@@ -237,6 +229,13 @@ func compileWorkflowStep(
 	}
 
 	output := sessionv3Runtime.WorkflowStep{ID: input.ID}
+	if input.Timeout != "" {
+		timeout, err := sessionv3Runtime.ParseWorkflowDuration(input.Timeout)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Timeout = timeout
+	}
 	if len(input.When) != 0 {
 		when, err := compileWorkflowValue(input.When)
 		if err != nil {
@@ -325,8 +324,19 @@ func compileWorkflowStep(
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
 		output.Fail = &sessionv3Runtime.WorkflowFail{
-			Code:    input.Fail.Code,
-			Message: message,
+			Code:     input.Fail.Code,
+			Category: sessionv3Runtime.ErrorCategory(input.Fail.Category),
+			Message:  message,
+		}
+		if input.Fail.Retryable != nil {
+			output.Fail.Retryable = *input.Fail.Retryable
+		}
+		if len(input.Fail.Details) != 0 {
+			details, err := compileWorkflowValue(input.Fail.Details)
+			if err != nil {
+				return sessionv3Runtime.WorkflowStep{}, err
+			}
+			output.Fail.Details = &details
 		}
 
 	case input.Scope != nil:
@@ -360,10 +370,12 @@ func compileWorkflowStep(
 			"machine",
 		)
 	case input.Wait != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"wait",
-		)
+		wait, err := compileWorkflowWait(*input.Wait)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Wait = &wait
+
 	case input.Emit != nil:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
@@ -456,6 +468,13 @@ func compileWorkflowCall(
 		)
 	}
 	output.AllowedTargets = append([]string(nil), set.Members...)
+	output.SetContract, err = compileWorkflowCallableInterface(
+		document,
+		set.Interface,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowCall{}, err
+	}
 	return output, nil
 }
 
@@ -466,6 +485,16 @@ func compileWorkflowCallableInterface(
 	if input == nil {
 		//nolint:nilnil // Ok.
 		return nil, nil
+	}
+
+	// These fields must not be admitted and silently discarded. Their
+	// execution paths remain explicit development gaps.
+	if len(input.Context) != 0 || len(input.Ports) != 0 ||
+		input.Limits != nil || len(input.Capabilities) != 0 {
+		return nil, unsupportedWorkflowOperation(
+			"interface",
+			"context, ports, limits, or capability requirements",
+		)
 	}
 
 	inputSchema, err := compileWorkflowSchema(document, input.InputSchema)
@@ -489,6 +518,7 @@ func compileWorkflowCallableInterface(
 	}
 
 	return &sessionv3Runtime.WorkflowCallableInterface{
+		Modes:         append([]sessionv3Runtime.WorkflowCallMode(nil), workflowCallModes(input.Modes)...),
 		InputSchema:   inputSchema,
 		OutputSchema:  outputSchema,
 		ErrorSchema:   errorSchema,
@@ -503,6 +533,13 @@ func compileWorkflowEffect(
 		return sessionv3Runtime.EffectContract{
 			Kind: sessionv3Runtime.EffectKindNonIdempotent,
 		}, nil
+	}
+
+	if input.Keyed || input.Reconcile || input.Compensate {
+		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
+			"target.interface.effect",
+			"keying, reconciliation, or compensation capability",
+		)
 	}
 
 	switch input.Kind {
@@ -556,20 +593,10 @@ func compileWorkflowValue(
 		}, nil
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(input))
-	decoder.UseNumber()
-
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return sessionv3Runtime.WorkflowValue{}, err
-	}
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return sessionv3Runtime.WorkflowValue{}, errors.New(
-				"workflow value contains multiple JSON values",
-			)
-		}
+	value, err := jsonutil.DecodeJSONRawNumbers[any](
+		json.RawMessage(input),
+	)
+	if err != nil {
 		return sessionv3Runtime.WorkflowValue{}, err
 	}
 
@@ -605,10 +632,7 @@ func compileWorkflowValueNode(
 					"workflow literal has fields other than $literal",
 				)
 			}
-			raw, err := jsonutil.MarshalCanonicalObject(
-				literal,
-				maxWorkflowDefinitionBytes,
-			)
+			raw, err := jsonutil.EncodeToJSONRaw(literal)
 			if err != nil {
 				return sessionv3Runtime.WorkflowValue{}, err
 			}
@@ -666,10 +690,7 @@ func compileWorkflowValueNode(
 		}, nil
 
 	default:
-		raw, err := jsonutil.MarshalCanonicalObject(
-			typed,
-			maxWorkflowDefinitionBytes,
-		)
+		raw, err := jsonutil.EncodeToJSONRaw(typed)
 		if err != nil {
 			return sessionv3Runtime.WorkflowValue{}, err
 		}

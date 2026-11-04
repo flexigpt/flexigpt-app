@@ -95,6 +95,26 @@ func DecodeJSONRaw[T any](raw json.RawMessage) (T, error) {
 	return v, nil
 }
 
+// DecodeJSONRawNumbers preserves JSON numbers at arbitrary-value boundaries.
+// It uses the same strict field and trailing-value checks as DecodeJSONRaw.
+func DecodeJSONRawNumbers[T any](raw json.RawMessage) (T, error) {
+	var zero T
+	if isBlankJSON(raw) {
+		return zero, nil
+	}
+
+	var value T
+	decoder := newDecoder(bytes.NewReader(raw), true)
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return zero, fmt.Errorf("decode json: %w", err)
+	}
+	if err := requireNoTrailing(decoder); err != nil {
+		return zero, err
+	}
+	return value, nil
+}
+
 func CloneJSONInValue[T any](in T) T {
 	out, err := CloneJSON(in)
 	if err != nil {

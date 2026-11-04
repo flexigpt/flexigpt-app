@@ -102,8 +102,10 @@ The durable model persists semantic facts only:
   Workflow interpreter.
 
 The durable model also records the interpreter version. A declaration language
-version does not define a compiled ProgramFrame payload version. Existing
-interpreter payloads remain readable until migration is explicitly authorized.
+version does not define a compiled ProgramFrame payload version. Shipped V2
+payload compatibility remains unchanged. The current V3 Workflow payload is
+development-only and can be replaced in place as `artifact.workflow.v1@1`.
+Stable V3 payload compatibility requires a separate approved policy.
 
 The durable model does not persist API keys, OAuth tokens, MCP approval
 tokens, HTTP clients, MCP clients, function pointers, cancellation functions,
@@ -315,3 +317,31 @@ and Run data to V3 Timeline and Executions, removes private runtime data,
 changes in-flight external work to uncertain, and rebuilds derived Session
 Store data. Frontend adoption and deletion of legacy runtime paths occur only
 after V3 backend completion and migration approval.
+
+### Implemented lifecycle boundary and remaining work
+
+Timer waits persist their preparation time and firing time. An enclosing
+operation deadline remains separate. Recovery rearms pending durable timers
+only after the recovery source completes. A timer cannot be resolved manually.
+Response schemas are checked before a wait response reaches its domain binder.
+
+A failed checkpoint prevents new dispatch and event publication for that
+Session. The live confirmed result remains available for a later checkpoint.
+Restart uses the last committed Session document. Dispatched work without a
+committed result remains uncertain and requires recovery review.
+
+Cancellation before external invocation settles the unstarted attempt.
+Cancellation after invocation does not convert an unconfirmed mutating effect
+into proof of cancellation. Its WorkItem and Attempt retain uncertainty.
+
+The current compiler and interpreter are still incomplete. Full retries,
+structured control flow, child ownership, event and channel coordination,
+trigger scheduling, reconciliation, compensation, resource accounting, and
+complete normal V2 backend capability remain required. The existence of these
+lifecycle protections is not evidence of full backend completion.
+
+V3 backend completion still means a functional V2 backend superset plus full
+Workflow v1 support. Session v2 and Session Store v2 remain preserved.
+Frontend adoption and migration remain separate. CanonicalValue remains
+limited to arbitrary JSON boundaries. Domain binders retain domain ownership,
+and no Workflow, Trigger, Event, or Invocation persistence root is added.
