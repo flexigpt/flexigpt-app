@@ -405,8 +405,7 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 ## Implementation task list
 
 - This list is the completion tracker for Session Runtime v3 and Workflow Runtime v3.
-- `- [x]` means typed compiler and interpreter behavior exists with durable recovery semantics.
-- `- [ ]` means work remains.
+
 - Admission rejection during development is safety behavior, not completion.
 
 - [x] `call.mode: invoke` uses direct typed execution.
@@ -467,12 +466,6 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [ ] MCP resources, prompts, Apps, approvals, App Tool calls, resource reads, and approved App context use MCP Runtime.
 - [ ] Skill sessions, active Skill lifecycle, Tool invocation, and resource handling use Skill Runtime.
 - [ ] Provider streaming, protocol outputs, usage, debugger projections, Tool result continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency are complete.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/go_exec.go`.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/go_tools.go`.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/mcp_exec.go`.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/mcp_tools.go`.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/skill_exec.go`.
-- [ ] Duplicate setup logic is removed from `internal/agentruntimesetup/sessionv3runtime/skill_tools.go`.
 - [ ] Session V3 setup retains only typed routing, semantic binding adaptation, and lifecycle ownership.
 - [ ] Session v2 behavior is unchanged and Session v2 does not depend on Session v3.
 - [ ] Workflow HLDs are updated truthfully when functional behavior changes.
