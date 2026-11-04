@@ -35,38 +35,45 @@ func (b *Binder) toolChoices(
 	}
 
 	if len(req.Session.Defaults.Skills) != 0 {
-		var (
-			skillChoices []preparedChoice
-			err          error
-		)
-		if b.skillTools != nil {
-			skillChoices, err = b.skillLifecycleChoicesFromDomain(ctx, req)
-		} else {
-			skillChoices, err = b.skillLifecycleChoices()
+		if b.skillTools == nil {
+			return nil, nil, errors.New(
+				"session v3 Skill runtime is unavailable",
+			)
 		}
+		skillChoices, err := b.skillTools.Choices(ctx, req)
 		if err != nil {
 			return nil, nil, err
 		}
-		for _, c := range skillChoices {
+		for _, c := range preparedChoicesFromDomain(skillChoices) {
 			if err := register(c); err != nil {
 				return nil, nil, err
 			}
 		}
 	}
-	goChoices, err := b.goToolChoices(ctx, req)
+	if b.goTools == nil {
+		return nil, nil, errors.New(
+			"session v3 Tool runtime is unavailable",
+		)
+	}
+	goChoices, err := b.goTools.Choices(ctx, req.Session.Defaults.Tools)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, c := range goChoices {
+	for _, c := range preparedChoicesFromDomain(goChoices) {
 		if err := register(c); err != nil {
 			return nil, nil, err
 		}
 	}
-	mcpChoices, err := b.mcpToolChoices(ctx, req)
+	if b.mcpTools == nil {
+		return nil, nil, errors.New(
+			"session v3 MCP runtime is unavailable",
+		)
+	}
+	mcpChoices, err := b.mcpTools.Choices(ctx, req.Session.Defaults.MCP)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, c := range mcpChoices {
+	for _, c := range preparedChoicesFromDomain(mcpChoices) {
 		if err := register(c); err != nil {
 			return nil, nil, err
 		}
@@ -77,17 +84,6 @@ func (b *Binder) toolChoices(
 type preparedChoice struct {
 	Choice inferenceSpec.ToolChoice
 	Call   sessionv3Runtime.ToolCall
-}
-
-func (b *Binder) skillLifecycleChoicesFromDomain(
-	ctx context.Context,
-	req sessionv3Runtime.WorkDispatchRequest,
-) ([]preparedChoice, error) {
-	values, err := b.skillTools.Choices(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return preparedChoicesFromDomain(values), nil
 }
 
 func preparedChoicesFromDomain(

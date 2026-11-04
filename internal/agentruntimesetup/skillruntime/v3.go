@@ -96,6 +96,69 @@ func (e *V3Executor) Choices(
 	)
 }
 
+// Bind verifies the Skill allow-list and active-skill selections before a
+// Skill Tool WorkItem is dispatched. Runtime Session allocation remains lazy
+// and occurs only inside Execute.
+func (e *V3Executor) Bind(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.SemanticBinding, error) {
+	if e == nil || e.resolver == nil || e.runtime == nil {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"session v3 Skill runtime is unavailable",
+		)
+	}
+	if payload == nil ||
+		payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindSkill ||
+		payload.Call.Binding.Skill == nil ||
+		payload.Call.Binding.Skill.Name != payload.Call.Name {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"skill tool binding does not match the requested Tool",
+		)
+	}
+	if err := payload.Call.Validate(); err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
+	if len(request.Session.Defaults.Skills) == 0 {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"skill tool was requested without enabled Skills",
+		)
+	}
+	if _, _, err := e.resolveSelections(
+		ctx,
+		request.Session.Defaults.Skills,
+		request.Session.Defaults.ActiveSkills,
+	); err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
+
+	artifacts := make(
+		[]sessionv3Runtime.ArtifactPin,
+		0,
+		len(request.Session.Defaults.Skills),
+	)
+	for _, selection := range request.Session.Defaults.Skills {
+		if selection.ExpectedRevision == 0 ||
+			strings.TrimSpace(selection.ExpectedDigest) == "" {
+			continue
+		}
+		artifacts = append(artifacts, sessionv3Runtime.ArtifactPin{
+			RootID:     selection.RootID,
+			ArtifactID: selection.ArtifactID,
+			Revision:   selection.ExpectedRevision,
+			Digest:     selection.ExpectedDigest,
+		})
+	}
+
+	return sessionv3Runtime.SemanticBinding{
+		Version:           "session-v3-skill/v1",
+		Artifacts:         artifacts,
+		TargetFingerprint: "skill:" + payload.Call.Name,
+		BoundAt:           time.Now().UTC(),
+	}, nil
+}
+
 // Execute handles only Skill Tool bindings.
 func (e *V3Executor) Execute(
 	ctx context.Context,
@@ -192,6 +255,7 @@ func (e *V3Executor) Execute(
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,

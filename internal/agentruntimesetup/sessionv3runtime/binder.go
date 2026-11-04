@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
@@ -36,7 +34,6 @@ type Binder struct {
 	goTools    *toolruntime.V3Executor
 	mcpTools   *mcpruntime.V3Executor
 	skillTools *skillruntime.V3Executor
-	skills     *skillSessions
 
 	deterministic sessionv3Runtime.DeterministicExecutor
 }
@@ -82,7 +79,6 @@ func New(deps Dependencies) (*Binder, error) {
 		goTools:    goTools,
 		mcpTools:   mcpTools,
 		skillTools: skillTools,
-		skills:     newSkillSessions(),
 	}, nil
 }
 
@@ -119,10 +115,13 @@ func (b *Binder) ExecuteWork(
 	if v, ok := bound.Private.(privateLLM); ok {
 		return b.executeLLM(ctx, req, v)
 	}
-	if v, ok := bound.Private.(privateTool); ok {
-		return b.executeTool(ctx, req, bound, v)
+	if req.WorkItem.Type == sessionv3Runtime.WorkItemTypeTool {
+		return b.executeTool(ctx, req, bound)
 	}
-	return sessionv3Runtime.WorkExecutionResult{}, fmt.Errorf("unknown bound work type %T", bound.Private)
+	return sessionv3Runtime.WorkExecutionResult{}, fmt.Errorf(
+		"unknown bound work type %T",
+		bound.Private,
+	)
 }
 
 func (b *Binder) ResolveWait(
@@ -133,32 +132,15 @@ func (b *Binder) ResolveWait(
 		return result, err
 	}
 
-	if v, ok := req.Private.(privateToolWait); ok {
-		return b.resolveToolWait(ctx, req, v)
-	}
-	return sessionv3Runtime.WaitResolutionResult{}, errors.New(
-		"wait has no registered sessionv3 resolver",
-	)
+	return b.resolveToolWait(ctx, req)
 }
 
 func (b *Binder) CloseExecutionBinding(
 	ctx context.Context,
 	executionID sessionv3Runtime.ExecutionID,
 ) error {
-	if b.skillTools != nil {
-		return b.skillTools.CloseExecution(ctx, executionID)
-	}
-
-	sessionID := b.skills.take(executionID)
-	if sessionID == "" {
+	if b == nil || b.skillTools == nil {
 		return nil
 	}
-	return b.deps.SkillRuntime.CloseSession(
-		ctx,
-		agentskillsRuntimeSpec.SessionID(sessionID),
-	)
-}
-
-func boundNow() time.Time {
-	return time.Now().UTC()
+	return b.skillTools.CloseExecution(ctx, executionID)
 }

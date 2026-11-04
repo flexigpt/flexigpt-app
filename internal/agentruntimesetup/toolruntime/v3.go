@@ -32,6 +32,13 @@ type V3Executor struct {
 	caller GoToolCaller
 }
 
+// ErrProviderManagedWorkflowTool prevents a provider SDK Tool Artifact from
+// being treated as a locally executable Tool. Such a Tool must be executed by
+// its typed Model plan, not by a synthetic local success result.
+var ErrProviderManagedWorkflowTool = errors.New(
+	"provider-managed SDK Tool requires a typed Model execution plan",
+)
+
 func NewV3Executor(
 	tools *toolAPI.Service,
 	caller GoToolCaller,
@@ -108,6 +115,96 @@ func (e *V3Executor) Choices(
 	return output, nil
 }
 
+// BindWorkflowTool resolves a Workflow Tool Artifact target to its current
+// typed Tool binding. It verifies the durable Artifact pin before Session
+// creates a dispatch attempt.
+func (e *V3Executor) BindWorkflowTool(
+	ctx context.Context,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.ToolCall, error) {
+	if e == nil || e.tools == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"session v3 Tool runtime is unavailable",
+		)
+	}
+	if payload == nil || payload.Target == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow tool Artifact target is missing",
+		)
+	}
+
+	resolved, err := e.resolvePinnedTool(ctx, *payload.Target)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	_, call, err := v3ChoiceForResolvedTool(resolved)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindProvider {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"%w: Tool %q",
+			ErrProviderManagedWorkflowTool,
+			resolved.Tool.Name,
+		)
+	}
+	if payload.Call.Name != "" && payload.Call.Name != call.Name {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow tool name changed since Workflow admission",
+		)
+	}
+
+	call.ID = payload.Call.ID
+	call.ProviderCallID = payload.Call.ProviderCallID
+	call.Arguments = payload.Call.Arguments.Clone()
+	call.Automatic = payload.Call.Automatic
+	return call, nil
+}
+
+// BindGo verifies a current Go Tool binding and returns durable semantic
+// binding facts before Session Runtime v3 persists a dispatched Attempt.
+func (e *V3Executor) BindGo(
+	ctx context.Context,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.SemanticBinding, error) {
+	if e == nil || e.tools == nil {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"session v3 Tool runtime is unavailable",
+		)
+	}
+	if payload == nil ||
+		payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindGo ||
+		payload.Call.Binding.Go == nil {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"go tool binding is missing",
+		)
+	}
+	if err := payload.Call.Validate(); err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
+
+	binding := payload.Call.Binding.Go
+	if _, err := e.resolvePinnedGoTool(ctx, binding); err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
+
+	return sessionv3Runtime.SemanticBinding{
+		Version: "session-v3-go-tool/v1",
+		Artifacts: []sessionv3Runtime.ArtifactPin{
+			binding.Target,
+		},
+		TargetFingerprint: strings.Join([]string{
+			"go",
+			binding.Target.RootID,
+			binding.Target.ArtifactID,
+			binding.Target.Digest,
+			binding.Function,
+		}, ":"),
+		BoundAt: time.Now().UTC(),
+	}, nil
+}
+
 // ExecuteGo executes only a v3 Go Tool binding. It returns a durable result
 // instead of exposing source-backed Tool or caller details to Session core.
 func (e *V3Executor) ExecuteGo(
@@ -178,6 +275,7 @@ func (e *V3Executor) ExecuteGo(
 		}
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: &sessionv3Runtime.WorkItemOutput{
+				Value: structured,
 				Tool: &sessionv3Runtime.ToolOutput{
 					Kind:       sessionv3Runtime.ToolOutputKindError,
 					Text:       text,
@@ -200,6 +298,7 @@ func (e *V3Executor) ExecuteGo(
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       sessionv3Runtime.ToolOutputKindSuccess,
 				Text:       text,
@@ -232,22 +331,27 @@ func V3ToolOutputs(
 	return ToolOutputsText(outputs), value, nil
 }
 
-func (e *V3Executor) resolvePinnedGoTool(
+func (e *V3Executor) resolvePinnedTool(
 	ctx context.Context,
-	binding *sessionv3Runtime.GoToolBinding,
+	pin sessionv3Runtime.ArtifactPin,
 ) (toolAPI.ResolvedToolView, error) {
-	if binding == nil {
-		return toolAPI.ResolvedToolView{}, errors.New("go tool binding is missing")
-	}
-	if binding.TimeoutMS < 0 {
+	if e == nil || e.tools == nil {
 		return toolAPI.ResolvedToolView{}, errors.New(
-			"go tool timeout cannot be negative",
+			"session v3 Tool runtime is unavailable",
+		)
+	}
+	if pin.RootID == "" ||
+		pin.ArtifactID == "" ||
+		pin.Revision == 0 ||
+		strings.TrimSpace(pin.Digest) == "" {
+		return toolAPI.ResolvedToolView{}, errors.New(
+			"tool artifact pin is incomplete",
 		)
 	}
 
 	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(binding.Target.RootID),
-		ArtifactID: artifactModel.ArtifactID(binding.Target.ArtifactID),
+		RootID:     rootModel.RootID(pin.RootID),
+		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
 	}
 	if err := ref.Validate(); err != nil {
 		return toolAPI.ResolvedToolView{}, err
@@ -262,12 +366,32 @@ func (e *V3Executor) resolvePinnedGoTool(
 		return toolAPI.ResolvedToolView{}, err
 	}
 	if resolved.Tool.Artifact.Ref() != ref ||
-		resolved.Tool.Artifact.Revision != binding.Target.Revision ||
+		resolved.Tool.Artifact.Revision != pin.Revision ||
 		resolved.Tool.Artifact.ResolvedDefinition == nil ||
-		string(*resolved.Tool.Artifact.ResolvedDefinition) != binding.Target.Digest {
+		string(*resolved.Tool.Artifact.ResolvedDefinition) != pin.Digest {
 		return toolAPI.ResolvedToolView{}, errors.New(
-			"go tool Artifact changed since WorkItem binding",
+			"tool artifact changed since WorkItem binding",
 		)
+	}
+	return resolved, nil
+}
+
+func (e *V3Executor) resolvePinnedGoTool(
+	ctx context.Context,
+	binding *sessionv3Runtime.GoToolBinding,
+) (toolAPI.ResolvedToolView, error) {
+	if binding == nil {
+		return toolAPI.ResolvedToolView{}, errors.New("go tool binding is missing")
+	}
+	if binding.TimeoutMS < 0 {
+		return toolAPI.ResolvedToolView{}, errors.New(
+			"go tool timeout cannot be negative",
+		)
+	}
+
+	resolved, err := e.resolvePinnedTool(ctx, binding.Target)
+	if err != nil {
+		return toolAPI.ResolvedToolView{}, err
 	}
 	if strings.TrimSpace(binding.LogicalName) != "" &&
 		binding.LogicalName != string(resolved.Tool.Name) {
@@ -322,6 +446,12 @@ func v3ChoiceForResolvedTool(
 	if resolved.Tool.Artifact.ResolvedDefinition != nil {
 		digest = string(*resolved.Tool.Artifact.ResolvedDefinition)
 	}
+	if strings.TrimSpace(digest) == "" {
+		return inferenceSpec.ToolChoice{},
+			sessionv3Runtime.ToolCall{},
+			errors.New("resolved Tool has no Definition digest")
+	}
+
 	pin := sessionv3Runtime.ArtifactPin{
 		RootID:     string(resolved.Tool.Artifact.RootID),
 		ArtifactID: string(resolved.Tool.Artifact.ID),

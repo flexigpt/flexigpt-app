@@ -214,6 +214,28 @@ clients, callbacks, timers, and cancellation functions remain process-private.
 They must be bounded by Runtime or Execution lifetime and removed during close
 or execution settlement.
 
+### Current development implementation boundary
+
+The implementation is not complete merely because it can persist an Execution
+or run a subset of ProgramFrame interpreters. Completion remains the state
+defined below: a functional Session v2 backend superset plus full Workflow v1
+compiler and interpreter support.
+
+The current V3 implementation boundary is:
+
+- V2 Session Runtime and Session Store remain supported and unchanged.
+- Frontend V3 adoption and offline migration are separate work.
+- The current `artifact.workflow.v1@1` development payload remains in place;
+  no payload or declaration-language version is incremented.
+- `CanonicalValue` is used only for arbitrary JSON boundaries. Durable
+  orchestration semantics remain concrete typed values.
+- Model, Tool, MCP, Skill, attachment, Service, Activity, and Workflow
+  behavior remains in its owning domain runtime package.
+- Session V3 setup is an orchestration router, not a duplicate domain
+  fallback runtime.
+- Provider-managed SDK Tool Artifacts cannot produce local fabricated success.
+  They require a typed Model execution plan or fail before external dispatch.
+
 ## Provider execution
 
 `FetchCompletion` remains the provider-facing single-call boundary. Runtime

@@ -66,6 +66,14 @@ func (b *Binder) bindLLM(
 	if modelUse == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("runtime model resolution returned no Artifact use")
 	}
+	if modelUse.RootID == "" ||
+		modelUse.ArtifactID == "" ||
+		modelUse.Revision == 0 ||
+		strings.TrimSpace(modelUse.Digest) == "" {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"runtime model resolution returned an incomplete Artifact pin",
+		)
+	}
 	if modelSel.ExpectedRevision != 0 &&
 		modelSel.ExpectedRevision != modelUse.Revision {
 		return sessionv3Runtime.BindResult{}, errors.New("selected Model revision changed")
@@ -95,7 +103,13 @@ func (b *Binder) bindLLM(
 		resolved.CapabilityOverrides,
 	)
 	semantic := sessionv3Runtime.SemanticBinding{
-		Version:           "v3-llm/v1",
+		Version: "v3-llm/v1",
+		Artifacts: []sessionv3Runtime.ArtifactPin{{
+			RootID:     modelUse.RootID,
+			ArtifactID: modelUse.ArtifactID,
+			Revision:   modelUse.Revision,
+			Digest:     modelUse.Digest,
+		}},
 		TargetFingerprint: resolved.Fingerprint,
 		BoundAt:           time.Now().UTC(),
 	}

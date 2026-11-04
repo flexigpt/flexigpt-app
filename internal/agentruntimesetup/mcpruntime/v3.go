@@ -153,6 +153,110 @@ func (e *V3Executor) Choices(
 	return output, nil
 }
 
+// BindWorkflowTool resolves one Workflow MCP Tool target to the current
+// discovered provider Tool identity. The Workflow binder verifies the
+// persisted Server Artifact pin before this method runs; this method verifies
+// the current MCP runtime identity, policy visibility, and discovery state.
+func (e *V3Executor) BindWorkflowTool(
+	ctx context.Context,
+	payload *sessionv3Runtime.ToolWork,
+) (sessionv3Runtime.ToolCall, error) {
+	if e == nil || e.runtime == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"session v3 MCP runtime is unavailable",
+		)
+	}
+	if payload == nil || payload.MCP == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow MCP tool target is missing",
+		)
+	}
+	if payload.MCP.Server.RootID == "" ||
+		payload.MCP.Server.ArtifactID == "" ||
+		payload.MCP.Server.Revision == 0 ||
+		strings.TrimSpace(payload.MCP.Server.Digest) == "" {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow MCP server artifact pin is incomplete",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(payload.MCP.Server.RootID),
+		ArtifactID: artifactModel.ArtifactID(payload.MCP.Server.ArtifactID),
+	}
+	if err := ref.Validate(); err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	serverID, err := ServerIDForArtifact(ref)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	status, err := e.runtime.Status(ctx, serverID)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if status == nil || status.Status != mcpServer.MCPServerStatusReady {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow MCP server %q is not connected",
+			serverID,
+		)
+	}
+
+	tools, err := e.runtime.ListTools(ctx, serverID)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	var selected *mcpServer.MCPToolCapability
+	for index := range tools {
+		if tools[index].ToolName == payload.MCP.ToolName {
+			selected = &tools[index]
+			break
+		}
+	}
+	if selected == nil ||
+		selected.Server != serverID ||
+		!v3MCPToolAvailable(*selected) {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow MCP tool %q is unavailable",
+			payload.MCP.ToolName,
+		)
+	}
+
+	call := payload.Call
+	if call.Name != "" && call.Name != payload.MCP.ToolName {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow MCP tool name changed since Workflow admission",
+		)
+	}
+	serverPin := payload.MCP.Server
+	call.Name = selected.ProviderToolName
+	call.ChoiceID = selected.ChoiceID
+	call.DisplayName = firstNonBlank(
+		selected.DisplayName,
+		selected.ToolName,
+		"MCP Tool",
+	)
+	call.Description = strings.TrimSpace(selected.Description)
+	call.Automatic = selected.ExecutionMode ==
+		mcppolicy.MCPExecutionModeAuto
+	call.Binding = sessionv3Runtime.ToolBinding{
+		Kind: sessionv3Runtime.ToolBindingKindMCP,
+		MCP: &sessionv3Runtime.MCPToolBinding{
+			ServerArtifact:   &serverPin,
+			ServerID:         string(serverID),
+			ProviderToolName: selected.ProviderToolName,
+			ChoiceID:         selected.ChoiceID,
+			ToolName:         selected.ToolName,
+			ToolDigest:       selected.Digest,
+			ApprovalRule:     string(selected.ApprovalRule),
+			ExecutionMode:    string(selected.ExecutionMode),
+		},
+	}
+	return call, nil
+}
+
 // Bind handles MCP Tool evaluation. The private values returned here remain in
 // Session Runtime memory and are never written to checkpoints.
 func (e *V3Executor) Bind(

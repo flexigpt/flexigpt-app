@@ -164,11 +164,9 @@ func (w *SessionV3Wrapper) DeleteSession(
 func (w *SessionV3Wrapper) Conversation(
 	id sessionv3Runtime.SessionID,
 ) (sessionv3Runtime.ConversationProjection, error) {
-	w.mu.RLock()
-	store := w.store
-	w.mu.RUnlock()
-	if store == nil {
-		return sessionv3Runtime.ConversationProjection{}, errSessionV3Closed
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.ConversationProjection{}, err
 	}
 	return store.ReadConversation(id)
 }
@@ -176,11 +174,9 @@ func (w *SessionV3Wrapper) Conversation(
 func (w *SessionV3Wrapper) Activities(
 	id sessionv3Runtime.SessionID,
 ) (sessionv3Runtime.ActivityProjection, error) {
-	w.mu.RLock()
-	store := w.store
-	w.mu.RUnlock()
-	if store == nil {
-		return sessionv3Runtime.ActivityProjection{}, errSessionV3Closed
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.ActivityProjection{}, err
 	}
 	return store.ReadActivities(id)
 }
@@ -188,11 +184,9 @@ func (w *SessionV3Wrapper) Activities(
 func (w *SessionV3Wrapper) Workflow(
 	id sessionv3Runtime.SessionID,
 ) (sessionv3Runtime.WorkflowProjection, error) {
-	w.mu.RLock()
-	store := w.store
-	w.mu.RUnlock()
-	if store == nil {
-		return sessionv3Runtime.WorkflowProjection{}, errSessionV3Closed
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.WorkflowProjection{}, err
 	}
 	return store.ReadWorkflow(id)
 }
@@ -201,13 +195,41 @@ func (w *SessionV3Wrapper) Execution(
 	sessionID sessionv3Runtime.SessionID,
 	executionID sessionv3Runtime.ExecutionID,
 ) (sessionv3Runtime.Execution, error) {
-	w.mu.RLock()
-	store := w.store
-	w.mu.RUnlock()
-	if store == nil {
-		return sessionv3Runtime.Execution{}, errSessionV3Closed
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.Execution{}, err
 	}
 	return store.ReadExecution(sessionID, executionID)
+}
+
+func (w *SessionV3Wrapper) ListSessions(
+	request sessionstorev3.ListSessionsRequest,
+) (sessionstorev3.SessionPage, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionstorev3.SessionPage{}, err
+	}
+	return store.ListSessions(request)
+}
+
+func (w *SessionV3Wrapper) SearchSessions(
+	request sessionstorev3.SearchSessionsRequest,
+) (sessionstorev3.SessionPage, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionstorev3.SessionPage{}, err
+	}
+	return store.SearchSessions(context.Background(), request)
+}
+
+func (w *SessionV3Wrapper) ListExecutions(
+	request sessionstorev3.ListExecutionsRequest,
+) ([]sessionstorev3.ExecutionListItem, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return nil, err
+	}
+	return store.ListExecutions(request)
 }
 
 func (w *SessionV3Wrapper) Session(
@@ -216,6 +238,20 @@ func (w *SessionV3Wrapper) Session(
 	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.Session, error) {
 		return r.GetSession(context.Background(), id)
 	})
+}
+
+func (w *SessionV3Wrapper) projectionStore() (*sessionstorev3.Store, error) {
+	if w == nil {
+		return nil, errSessionV3Closed
+	}
+	w.mu.RLock()
+	store := w.store
+	closed := w.closed
+	w.mu.RUnlock()
+	if closed || store == nil {
+		return nil, errSessionV3Closed
+	}
+	return store, nil
 }
 
 func (w *SessionV3Wrapper) setApplication(desktop *application.App) {
@@ -228,6 +264,9 @@ func (w *SessionV3Wrapper) setApplication(desktop *application.App) {
 }
 
 func (w *SessionV3Wrapper) close() {
+	if w == nil {
+		return
+	}
 	w.mu.Lock()
 	runtime := w.runtime
 	store := w.store

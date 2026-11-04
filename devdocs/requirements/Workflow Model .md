@@ -1613,3 +1613,32 @@ The V3 backend must provide typed equivalents for:
 This does not require frontend V3 adoption, v2-to-v3 migration, or deletion of
 V2 paths. It requires V3 backend capability completeness before V2
 deprecation can be considered.
+
+### 13.6 Current development implementation boundary
+
+This document defines the completion contract. The existence of a Session v3
+document, a Workflow ProgramFrame, or a partial interpreter is not evidence of
+completion.
+
+The current development implementation must preserve the following boundaries
+while it progresses toward full Workflow v1 support:
+
+- Session v2 and Session Store v2 remain shipped and unchanged.
+- Frontend Session v3 adoption and offline v2-to-v3 migration remain separate
+  work.
+- `artifact.workflow.v1@1` remains the current development payload. It can be
+  replaced in place; no `artifact.workflow.v1@2` payload is introduced.
+- `CanonicalValue` remains limited to arbitrary JSON boundaries. Runtime IDs,
+  pins, effect contracts, attempts, waits, receipts, errors, budgets, and
+  selections remain typed structures.
+- Session Runtime setup routes work to the owning Model, Tool, MCP, Skill,
+  attachment, Service, Activity, or Workflow domain binder. It must not retain
+  duplicate fallback implementations of those domains.
+- A provider-managed SDK Tool Artifact cannot fabricate local Workflow
+  success. It must execute through a typed Model plan or fail before external
+  work starts.
+
+Completion still means a functional Session v2 backend superset plus typed,
+durable support for every valid Workflow v1 declaration feature. Until that
+condition is met, unsupported valid operations must fail during admission or
+binding before unrelated external work starts.
