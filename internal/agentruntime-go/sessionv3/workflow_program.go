@@ -75,6 +75,10 @@ type WorkflowProgram struct {
 
 	Root    WorkflowBlock             `json:"root"`
 	Targets map[string]WorkflowTarget `json:"targets"`
+
+	// Scope is empty for a root Workflow Program. Child block ProgramFrames
+	// receive an immutable parent snapshot through this typed envelope.
+	Scope WorkflowScopeContext `json:"scope"`
 }
 
 type WorkflowBlock struct {
@@ -97,9 +101,16 @@ type WorkflowStep struct {
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
 	Set       *WorkflowSet       `json:"set,omitempty"`
+	Scope     *WorkflowBlock     `json:"scope,omitempty"`
+	Choose    *WorkflowChoose    `json:"choose,omitempty"`
+	Parallel  *WorkflowParallel  `json:"parallel,omitempty"`
+	Foreach   *WorkflowForeach   `json:"foreach,omitempty"`
+	Repeat    *WorkflowRepeat    `json:"repeat,omitempty"`
+	Wait      *WorkflowWait      `json:"wait,omitempty"`
 	Return    *WorkflowReturn    `json:"return,omitempty"`
 	Fail      *WorkflowFail      `json:"fail,omitempty"`
-	Wait      *WorkflowWait      `json:"wait,omitempty"`
+	Break     bool               `json:"break,omitempty"`
+	Continue  bool               `json:"continue,omitempty"`
 }
 
 type WorkflowCall struct {
@@ -121,7 +132,8 @@ type WorkflowSet struct {
 }
 
 type WorkflowReturn struct {
-	Value WorkflowValue `json:"value"`
+	To    WorkflowReturnDestination `json:"to,omitempty"`
+	Value WorkflowValue             `json:"value"`
 }
 
 type WorkflowFail struct {
@@ -193,6 +205,9 @@ type WorkflowState struct {
 	Index         int                   `json:"index"`
 	PendingPath   string                `json:"pendingPath,omitempty"`
 	PendingTarget string                `json:"pendingTarget,omitempty"`
+	Pending       *WorkflowPending      `json:"pending,omitempty"`
+	Exit          WorkflowExitKind      `json:"exit,omitempty"`
+	ExitValue     CanonicalValue        `json:"exitValue,omitempty"`
 	LogicalTime   time.Time             `json:"logicalTime,omitzero"`
 	Deadline      *time.Time            `json:"deadline,omitempty"`
 	State         CanonicalValue        `json:"state"`
@@ -232,6 +247,9 @@ func (s *WorkflowState) Validate() error {
 			return errors.New("Workflow Program step outcome is duplicated")
 		}
 		seen[outcome.ID] = struct{}{}
+	}
+	if err := s.validateStructuredState(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -341,10 +359,15 @@ func (i *WorkflowInterpreter) InitialState(
 		return ProgramState{}, err
 	}
 
+	initialState := MustCanonicalValue(map[string]CanonicalValue{})
+	if program.Scope.Child && len(program.Scope.OuterState) != 0 {
+		initialState = program.Scope.OuterState.Clone()
+	}
 	state := WorkflowState{
-		Version:  WorkflowInterpreterVersion,
-		State:    MustCanonicalValue(map[string]any{}),
-		Outcomes: []WorkflowStepOutcome{},
+		Version:     WorkflowInterpreterVersion,
+		State:       initialState,
+		Outcomes:    []WorkflowStepOutcome{},
+		LogicalTime: time.Now().UTC(),
 	}
 	if program.Root.State != nil {
 		value, err := i.evaluate(
@@ -362,6 +385,15 @@ func (i *WorkflowInterpreter) InitialState(
 			return ProgramState{}, err
 		}
 		state.State = value
+	}
+
+	if program.Scope.Child &&
+		program.Root.State == nil &&
+		len(program.Scope.OuterState) != 0 {
+		state.State = program.Scope.OuterState.Clone()
+	}
+	if !program.Scope.Child && state.LogicalTime.IsZero() {
+		state.LogicalTime = time.Now().UTC()
 	}
 
 	return encodeWorkflowProgramState(state)
@@ -417,6 +449,12 @@ func (i *WorkflowInterpreter) Advance(
 			frame.ID,
 			event.ChildFrameID,
 		); err != nil {
+			if failure, ok := errors.AsType[workflowChildError](err); ok {
+				return workflowFailureTransition(
+					state,
+					&failure.errorValue,
+				)
+			}
 			return workflowFailure(state, "workflow_child_failed", err.Error())
 		}
 
@@ -435,6 +473,10 @@ func (i *WorkflowInterpreter) drive(
 	program WorkflowProgram,
 	state WorkflowState,
 ) (ProgramTransition, error) {
+	if state.Pending != nil {
+		return i.drivePending(frame, execution, program, state)
+	}
+
 	for {
 		if state.PendingPath != "" {
 			return workflowTransition(state, nil, nil, nil)
@@ -464,8 +506,7 @@ func (i *WorkflowInterpreter) drive(
 				)
 			}
 
-			status := ProgramFrameStateCompleted
-			return workflowTransition(state, &status, output, nil)
+			return i.completeWorkflowBlock(program, state, output, WorkflowExitNormal)
 		}
 
 		step := program.Root.Steps[state.Index]
@@ -509,6 +550,15 @@ func (i *WorkflowInterpreter) drive(
 			state.Deadline = earlierDeadline(state.Deadline, &deadline)
 		}
 
+		if state.Exit != "" {
+			return i.completeWorkflowBlock(
+				program,
+				state,
+				state.ExitValue,
+				state.Exit,
+			)
+		}
+
 		switch {
 		case step.Call != nil:
 			return i.call(
@@ -538,6 +588,51 @@ func (i *WorkflowInterpreter) drive(
 		case step.Wait != nil:
 			return i.timerWait(program, state, path, *step.Wait)
 
+		case step.Scope != nil:
+			return i.startScope(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
+		case step.Choose != nil:
+			return i.startChoose(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
+		case step.Parallel != nil:
+			return i.startParallel(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
+		case step.Foreach != nil:
+			return i.startForeach(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
+		case step.Repeat != nil:
+			return i.startRepeat(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
 		case step.Return != nil:
 			output, err := i.evaluate(
 				step.Return.Value,
@@ -551,22 +646,12 @@ func (i *WorkflowInterpreter) drive(
 					err.Error(),
 				)
 			}
-			if err := validateWorkflowSchema(step.OutputSchema, output); err != nil {
-				return workflowFailure(state, "workflow_step_output_invalid", err.Error())
-			}
-			if err := validateWorkflowSchema(
-				program.OutputSchema,
-				output,
-			); err != nil {
-				return workflowFailure(
-					state,
-					"workflow_output_invalid",
-					err.Error(),
-				)
-			}
 
-			status := ProgramFrameStateCompleted
-			return workflowTransition(state, &status, output, nil)
+			exit := WorkflowExitReturnBlock
+			if step.Return.To == WorkflowReturnDestinationWorkflow {
+				exit = WorkflowExitReturnWorkflow
+			}
+			return i.completeWorkflowBlock(program, state, output, exit)
 
 		case step.Fail != nil:
 			message, err := i.stringValue(
@@ -596,6 +681,22 @@ func (i *WorkflowInterpreter) drive(
 				transition.Error.Details = details
 			}
 			return transition, nil
+
+		case step.Break:
+			return i.completeWorkflowBlock(
+				program,
+				state,
+				MustCanonicalValue(nil),
+				WorkflowExitBreak,
+			)
+
+		case step.Continue:
+			return i.completeWorkflowBlock(
+				program,
+				state,
+				MustCanonicalValue(nil),
+				WorkflowExitContinue,
+			)
 
 		default:
 			return workflowFailure(
@@ -1014,6 +1115,15 @@ func (i *WorkflowInterpreter) settleChild(
 	if state == nil {
 		return errors.New("Workflow state is unavailable")
 	}
+	if state.Pending != nil {
+		return i.settleStructuredChild(
+			state,
+			program,
+			execution,
+			frameID,
+			childID,
+		)
+	}
 
 	for _, child := range execution.ProgramFrames {
 		if child.ID != childID || child.ParentFrameID != frameID {
@@ -1225,6 +1335,9 @@ func (p WorkflowProgram) Validate() error {
 	if p.Version != WorkflowInterpreterVersion {
 		return errors.New("unsupported Workflow Program version")
 	}
+	if err := p.Scope.Validate(); err != nil {
+		return err
+	}
 	if p.InputBound && len(p.Input) == 0 {
 		return errors.New("bound Workflow Program input is missing")
 	}
@@ -1254,36 +1367,6 @@ func (p WorkflowProgram) ValidateInput() error {
 		return errors.New("Workflow Program input has not been bound")
 	}
 	return validateWorkflowSchema(p.InputSchema, p.Input)
-}
-
-func (b WorkflowBlock) Validate() error {
-	if err := b.Output.Validate(); err != nil {
-		return err
-	}
-	if b.State != nil {
-		if !b.State.Schema.Valid() ||
-			len(b.State.Schema) == 0 {
-			return errors.New("Workflow state schema is invalid")
-		}
-		if err := b.State.Initial.Validate(); err != nil {
-			return err
-		}
-	}
-
-	ids := make(map[string]struct{}, len(b.Steps))
-	for index, step := range b.Steps {
-		if strings.TrimSpace(step.ID) == "" {
-			return fmt.Errorf("Workflow step %d has no ID", index)
-		}
-		if _, duplicate := ids[step.ID]; duplicate {
-			return fmt.Errorf("Workflow step %q is duplicated", step.ID)
-		}
-		ids[step.ID] = struct{}{}
-		if err := step.Validate(); err != nil {
-			return fmt.Errorf("Workflow step %q: %w", step.ID, err)
-		}
-	}
-	return nil
 }
 
 func (s WorkflowStep) Validate() error {
@@ -1373,6 +1456,18 @@ func (c WorkflowCall) Validate() error {
 	}
 	if c.Contract != nil {
 		return c.Contract.Validate()
+	}
+	return nil
+}
+
+func (s *WorkflowState) validateStructuredState() error {
+	if s.Pending != nil {
+		if err := s.Pending.Validate(); err != nil {
+			return err
+		}
+	}
+	if !s.ExitValue.Valid() {
+		return errors.New("Workflow Program exit value is invalid")
 	}
 	return nil
 }
@@ -1672,15 +1767,66 @@ func workflowActivation(
 		steps[outcome.ID] = value
 	}
 
+	for _, outcome := range program.Scope.OuterOutcomes {
+		value := map[string]any{
+			"status": string(outcome.Status),
+		}
+		if len(outcome.Output) != 0 {
+			output, err := workflowActivationValue(outcome.Output)
+			if err != nil {
+				return nil, err
+			}
+			value["output"] = output
+		}
+		steps[outcome.ID] = value
+	}
+
+	var item any
+	if program.Scope.Item != nil {
+		item, err = workflowActivationValue(*program.Scope.Item)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return workflowActivationWithScope(
+		program,
+		input,
+		currentState,
+		steps,
+		item,
+	)
+}
+
+func workflowActivationWithScope(
+	program WorkflowProgram,
+	input any,
+	currentState any,
+	steps map[string]any,
+	item any,
+) (map[string]any, error) {
+	var (
+		index  any
+		result any
+	)
+	if program.Scope.Index != nil {
+		index = *program.Scope.Index
+	}
+	if program.Scope.Result != nil {
+		value, err := workflowActivationValue(*program.Scope.Result)
+		if err != nil {
+			return nil, err
+		}
+		result = value
+	}
 	return map[string]any{
 		"input":     input,
 		"state":     currentState,
 		"steps":     steps,
 		"context":   nil,
 		"messages":  nil,
-		"item":      nil,
-		"index":     nil,
-		"result":    nil,
+		"item":      item,
+		"index":     index,
+		"result":    result,
 		"event":     nil,
 		"error":     nil,
 		"outcome":   nil,

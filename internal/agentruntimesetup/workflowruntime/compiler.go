@@ -309,12 +309,28 @@ func compileWorkflowStep(
 			Remove: append([]string(nil), input.Set.Remove...),
 		}
 
+	case input.Scope != nil,
+		input.Choose != nil,
+		input.Parallel != nil,
+		input.Foreach != nil,
+		input.Repeat != nil,
+		input.Break != nil,
+		input.Continue != nil:
+		if err := compileWorkflowStructuredOperation(
+			document,
+			input,
+			&output,
+		); err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+
 	case input.Return != nil:
 		value, err := compileWorkflowValue(input.Return.Value)
 		if err != nil {
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
 		output.Return = &sessionv3Runtime.WorkflowReturn{
+			To:    sessionv3Runtime.WorkflowReturnDestination(input.Return.To),
 			Value: value,
 		}
 
@@ -338,37 +354,6 @@ func compileWorkflowStep(
 			}
 			output.Fail.Details = &details
 		}
-
-	case input.Scope != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"scope",
-		)
-	case input.Choose != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"choose",
-		)
-	case input.Parallel != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"parallel",
-		)
-	case input.Foreach != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"foreach",
-		)
-	case input.Repeat != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"repeat",
-		)
-	case input.Machine != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"machine",
-		)
 	case input.Wait != nil:
 		wait, err := compileWorkflowWait(*input.Wait)
 		if err != nil {
@@ -390,16 +375,6 @@ func compileWorkflowStep(
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
 			"cancel",
-		)
-	case input.Break != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"break",
-		)
-	case input.Continue != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"continue",
 		)
 
 	default:
