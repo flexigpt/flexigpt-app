@@ -334,11 +334,34 @@ Cancellation before external invocation settles the unstarted attempt.
 Cancellation after invocation does not convert an unconfirmed mutating effect
 into proof of cancellation. Its WorkItem and Attempt retain uncertainty.
 
-The current compiler and interpreter are still incomplete. Full retries,
-structured control flow, child ownership, event and channel coordination,
-trigger scheduling, reconciliation, compensation, resource accounting, and
-complete normal V2 backend capability remain required. The existence of these
-lifecycle protections is not evidence of full backend completion.
+Workflow v3 coordination now uses the existing Session document as its only
+durable root. The compiler produces typed event, channel, subscription, wait,
+emit, and retry facts. The interpreter persists correlation, event source,
+filters, channel cursors, consumed records, emit receipts, human request data,
+retry policy, retry schedule, and attempt deadlines.
+
+Pending event, channel, and completion waits inspect retained durable facts
+when they are created. This prevents an already accepted signal, channel
+message, or child completion from being lost because it arrived before the
+Wait WorkItem bound. Runtime recovery rearms only durable timers and retry
+schedules.
+
+The current compiler and interpreter are still incomplete. Full structured
+completion policies, child ownership, trigger scheduling, reconciliation,
+compensation, resource accounting, complete Agent and Model target planning,
+and complete normal V2 backend capability remain required. The existence of
+these lifecycle protections is not evidence of full backend completion.
+
+Parallel and Foreach currently admit only explicit `all` completion with
+`collect` errors and `wait` remaining behavior. Other declared completion
+policies are rejected at admission rather than being accepted with incorrect
+all-join behavior. Ongoing Repeat lifetime is also rejected until its durable
+lifecycle is implemented.
+
+Full retries, complete structured-control policies, child ownership, event and
+channel coordination, trigger scheduling, reconciliation, compensation,
+resource accounting, and complete normal V2 backend capability remain
+required. This partial coverage is not backend completion.
 
 V3 backend completion still means a functional V2 backend superset plus full
 Workflow v1 support. Session v2 and Session Store v2 remain preserved.

@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -13,18 +14,20 @@ const (
 	cancelStr         = "cancel"
 	firstCompletedStr = "first-completed"
 	firstSuccessStr   = "first-success"
+	firstFastStr      = "fail-fast"
 )
 
 // WorkflowScopeContext is the durable parent visibility envelope for an
 // interpreter-created child block frame. It contains semantic values only.
 type WorkflowScopeContext struct {
-	Child         bool                  `json:"child,omitempty"`
-	MergeState    bool                  `json:"mergeState,omitempty"`
-	OuterState    CanonicalValue        `json:"outerState,omitempty"`
-	OuterOutcomes []WorkflowStepOutcome `json:"outerOutcomes,omitempty"`
-	Item          *CanonicalValue       `json:"item,omitempty"`
-	Index         *int                  `json:"index,omitempty"`
-	Result        *CanonicalValue       `json:"result,omitempty"`
+	Child              bool                        `json:"child,omitempty"`
+	MergeState         bool                        `json:"mergeState,omitempty"`
+	OuterState         CanonicalValue              `json:"outerState,omitempty"`
+	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
+	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
+	Item               *CanonicalValue             `json:"item,omitempty"`
+	Index              *int                        `json:"index,omitempty"`
+	Result             *CanonicalValue             `json:"result,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -50,6 +53,11 @@ func (s WorkflowScopeContext) Validate() error {
 			return errors.New("Workflow scope outcome is duplicated")
 		}
 		seen[outcome.ID] = struct{}{}
+	}
+	for _, subscription := range s.OuterSubscriptions {
+		if err := subscription.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -90,6 +98,22 @@ func (r WorkflowBlockResult) Validate() error {
 	if !r.Value.Valid() || !r.State.Valid() {
 		return errors.New("Workflow block result contains invalid JSON")
 	}
+	return nil
+}
+
+func (r WorkflowReturn) Validate() error {
+	switch r.To {
+	case "",
+		WorkflowReturnDestinationBlock,
+		WorkflowReturnDestinationWorkflow:
+	default:
+		return errors.New("workflow return destination is invalid")
+	}
+
+	if err := r.Value.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -195,6 +219,7 @@ type WorkflowParallelProgress struct {
 	Errors     string             `json:"errors,omitempty"`
 	Remaining  string             `json:"remaining,omitempty"`
 	Winners    []string           `json:"winners,omitempty"`
+	Cancelling bool               `json:"cancelling,omitempty"`
 }
 
 type WorkflowItemOutcome struct {
@@ -213,6 +238,7 @@ type WorkflowForeachProgress struct {
 	Errors      string                `json:"errors,omitempty"`
 	Remaining   string                `json:"remaining,omitempty"`
 	Winners     []int                 `json:"winners,omitempty"`
+	Cancelling  bool                  `json:"cancelling,omitempty"`
 }
 
 type WorkflowRepeatProgress struct {
@@ -405,13 +431,14 @@ func (i *WorkflowInterpreter) childBlockProgram(
 	child := program
 	child.Root = block
 	child.Scope = WorkflowScopeContext{
-		Child:         true,
-		MergeState:    mergeState,
-		OuterState:    state.State.Clone(),
-		OuterOutcomes: workflowScopeOutcomes(program, state),
-		Item:          item,
-		Index:         index,
-		Result:        result,
+		Child:              true,
+		MergeState:         mergeState,
+		OuterState:         state.State.Clone(),
+		OuterOutcomes:      workflowScopeOutcomes(program, state),
+		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
+		Item:               item,
+		Index:              index,
+		Result:             result,
 	}
 	child.Input = program.Input.Clone()
 	child.InputBound = true
@@ -880,6 +907,9 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 			}
 			return workflowFailure(state, "workflow_foreach_failed", err.Error())
 		}
+		if state.Pending != nil {
+			return workflowTransition(state, nil, nil, nil)
+		}
 		return i.drive(frame, Execution{}, program, state)
 	}
 	return workflowTransition(state, nil, nil, nil)
@@ -1029,7 +1059,7 @@ func workflowFrameResult(
 
 	case ProgramFrameStateCancelled:
 		return WorkflowBlockResult{}, &SanitizedError{
-			Code:     "workflow_child_cancelled",
+			Code:     workflowChildCancelled,
 			Category: ErrorCategoryCancellation,
 			Message:  "Workflow child block was cancelled",
 		}
@@ -1096,6 +1126,22 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 	} else {
 		child.Result = &result
 		child.State = WorkflowChildStateSucceeded
+	}
+
+	if state.Pending.Kind == WorkflowPendingParallel &&
+		state.Pending.Parallel != nil {
+		progress := state.Pending.Parallel
+		switch workflowCompletionMode(progress.Completion) {
+		case firstCompletedStr:
+			if len(progress.Winners) == 0 {
+				progress.Winners = []string{child.Name}
+			}
+		case firstSuccessStr, quorumStr:
+			if workflowParallelSucceeded(*child) &&
+				!slices.Contains(progress.Winners, child.Name) {
+				progress.Winners = append(progress.Winners, child.Name)
+			}
+		}
 	}
 
 	switch state.Pending.Kind {
@@ -1223,6 +1269,28 @@ func workflowParallelSuccessNames(children []WorkflowChild) []string {
 	return output
 }
 
+func workflowParallelAllTerminal(children []WorkflowChild) bool {
+	return workflowParallelTerminalCount(children) == len(children)
+}
+
+func workflowRequestParallelCancellation(
+	state *WorkflowState,
+	children []WorkflowChild,
+) {
+	if state == nil || state.Pending == nil || state.Pending.Parallel == nil {
+		return
+	}
+	if state.Pending.Parallel.Cancelling {
+		return
+	}
+	state.Pending.Parallel.Cancelling = true
+	for _, child := range children {
+		if child.State == WorkflowChildStatePending && child.Path != "" {
+			state.CancelChildPaths = append(state.CancelChildPaths, child.Path)
+		}
+	}
+}
+
 func workflowParallelOutput(
 	children []WorkflowChild,
 	winners []string,
@@ -1270,10 +1338,15 @@ func (i *WorkflowInterpreter) finishParallel(
 
 	mode := workflowCompletionMode(progress.Completion)
 	successes := workflowParallelSuccessNames(children)
-	allTerminal := workflowParallelTerminalCount(children) == len(children)
+	allTerminal := workflowParallelAllTerminal(children)
 
 	switch mode {
 	case "all":
+		hasFailure := len(successes) != len(children) &&
+			workflowParallelTerminalCount(children) != 0
+		if hasFailure && progress.Errors == firstFastStr {
+			workflowRequestParallelCancellation(state, children)
+		}
 		if !allTerminal {
 			return nil
 		}
@@ -1290,18 +1363,13 @@ func (i *WorkflowInterpreter) finishParallel(
 
 	case "first-completed":
 		if len(progress.Winners) == 0 {
-			for _, child := range children {
-				if child.State.terminal() {
-					progress.Winners = []string{child.Name}
-					break
-				}
-			}
+			return nil
+		}
+		if workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
 			return nil
-		}
-		if len(progress.Winners) == 0 {
-			return errors.New("Workflow parallel has no completed branch")
 		}
 		for _, child := range children {
 			if child.Name != progress.Winners[0] {
@@ -1320,8 +1388,9 @@ func (i *WorkflowInterpreter) finishParallel(
 		}
 
 	case "first-success":
-		if len(progress.Winners) == 0 && len(successes) != 0 {
-			progress.Winners = []string{successes[0]}
+		if len(progress.Winners) != 0 &&
+			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
 			return nil
@@ -1340,17 +1409,14 @@ func (i *WorkflowInterpreter) finishParallel(
 		if progress.Completion.Quorum <= 0 {
 			return errors.New("Workflow parallel quorum is invalid")
 		}
-		if len(progress.Winners) == 0 &&
-			len(successes) >= progress.Completion.Quorum {
-			progress.Winners = append(
-				[]string(nil),
-				successes[:progress.Completion.Quorum]...,
-			)
+		if len(progress.Winners) >= progress.Completion.Quorum &&
+			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
 			return nil
 		}
-		if len(successes) < progress.Completion.Quorum {
+		if len(progress.Winners) < progress.Completion.Quorum {
 			return workflowChildError{
 				errorValue: workflowAggregateChildFailure(
 					"workflow_parallel_quorum_unreachable",
@@ -1359,6 +1425,10 @@ func (i *WorkflowInterpreter) finishParallel(
 				),
 			}
 		}
+		progress.Winners = append(
+			[]string(nil),
+			progress.Winners[:progress.Completion.Quorum]...,
+		)
 
 	default:
 		return errors.New("Workflow parallel completion mode is invalid")
@@ -1411,6 +1481,53 @@ func workflowForeachSuccessIndexes(outcomes []WorkflowItemOutcome) []int {
 	return output
 }
 
+func workflowForeachAllTerminal(
+	progress *WorkflowForeachProgress,
+) bool {
+	if progress == nil || progress.Next != len(progress.Items) {
+		return false
+	}
+	return workflowForeachTerminalCount(progress.Outcomes) == len(progress.Outcomes)
+}
+
+func workflowRequestForeachCancellation(
+	state *WorkflowState,
+) {
+	if state == nil || state.Pending == nil || state.Pending.Foreach == nil {
+		return
+	}
+	pending := state.Pending
+	progress := pending.Foreach
+	if progress.Cancelling {
+		return
+	}
+	progress.Cancelling = true
+
+	for index := progress.Next; index < len(progress.Outcomes); index++ {
+		progress.Outcomes[index].State = WorkflowChildStateSkipped
+	}
+	progress.Next = len(progress.Items)
+
+	for _, child := range pending.Children {
+		if child.State == WorkflowChildStatePending && child.Path != "" {
+			state.CancelChildPaths = append(state.CancelChildPaths, child.Path)
+		}
+	}
+}
+
+func workflowForeachHasFailure(
+	outcomes []WorkflowItemOutcome,
+) bool {
+	for _, outcome := range outcomes {
+		switch outcome.State {
+		case WorkflowChildStateFailed, WorkflowChildStateCancelled:
+			return true
+		default:
+		}
+	}
+	return false
+}
+
 func (i *WorkflowInterpreter) settleForeachChild(
 	state *WorkflowState,
 	program WorkflowProgram,
@@ -1445,15 +1562,31 @@ func (i *WorkflowInterpreter) settleForeachChild(
 		}
 	}
 
-	if workflowForeachTerminalCount(progress.Outcomes) == len(progress.Outcomes) &&
-		progress.Next == len(progress.Items) {
-		step, err := workflowStepForPath(program.Root, pending.Path)
-		if err != nil {
-			return err
+	switch workflowCompletionMode(progress.Completion) {
+	case firstCompletedStr:
+		if len(progress.Winners) == 0 {
+			for _, outcome := range progress.Outcomes {
+				if outcome.State.terminal() {
+					progress.Winners = []int{outcome.Index}
+					break
+				}
+			}
 		}
-		return i.finishForeach(state, program, step)
+	case firstSuccessStr, quorumStr:
+		for _, outcome := range progress.Outcomes {
+			if outcome.State != WorkflowChildStateSucceeded ||
+				slices.Contains(progress.Winners, outcome.Index) {
+				continue
+			}
+			progress.Winners = append(progress.Winners, outcome.Index)
+		}
 	}
-	return nil
+
+	step, err := workflowStepForPath(program.Root, pending.Path)
+	if err != nil {
+		return err
+	}
+	return i.finishForeach(state, program, step)
 }
 
 func (i *WorkflowInterpreter) finishForeach(
@@ -1470,6 +1603,13 @@ func (i *WorkflowInterpreter) finishForeach(
 
 	switch mode {
 	case "all":
+		if workflowForeachHasFailure(progress.Outcomes) &&
+			progress.Errors == firstFastStr {
+			workflowRequestForeachCancellation(state)
+		}
+		if !workflowForeachAllTerminal(progress) {
+			return nil
+		}
 		if len(successes) != len(progress.Outcomes) {
 			return workflowChildError{
 				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
@@ -1478,28 +1618,57 @@ func (i *WorkflowInterpreter) finishForeach(
 		progress.Winners = append([]int(nil), successes...)
 
 	case "first-completed":
-		if len(progress.Outcomes) != 0 {
-			progress.Winners = []int{0}
+		if len(progress.Winners) == 0 {
+			return nil
 		}
-
-	case "first-success":
-		if len(successes) == 0 {
+		if workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestForeachCancellation(state)
+		}
+		if !workflowForeachAllTerminal(progress) {
+			return nil
+		}
+		winner := progress.Winners[0]
+		if winner < 0 || winner >= len(progress.Outcomes) ||
+			progress.Outcomes[winner].State != WorkflowChildStateSucceeded {
 			return workflowChildError{
 				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
 			}
 		}
-		progress.Winners = []int{successes[0]}
+
+	case "first-success":
+		if len(progress.Winners) != 0 &&
+			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestForeachCancellation(state)
+		}
+		if !workflowForeachAllTerminal(progress) {
+			return nil
+		}
+		if len(progress.Winners) == 0 {
+			return workflowChildError{
+				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
+			}
+		}
+		progress.Winners = []int{progress.Winners[0]}
 
 	case quorumStr:
-		if progress.Completion.Quorum <= 0 ||
-			len(successes) < progress.Completion.Quorum {
+		if progress.Completion.Quorum <= 0 {
+			return errors.New("Workflow foreach quorum is invalid")
+		}
+		if len(progress.Winners) >= progress.Completion.Quorum &&
+			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRequestForeachCancellation(state)
+		}
+		if !workflowForeachAllTerminal(progress) {
+			return nil
+		}
+		if len(progress.Winners) < progress.Completion.Quorum {
 			return workflowChildError{
 				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
 			}
 		}
 		progress.Winners = append(
 			[]int(nil),
-			successes[:progress.Completion.Quorum]...,
+			progress.Winners[:progress.Completion.Quorum]...,
 		)
 
 	default:
@@ -1605,15 +1774,19 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 		return errors.New("Workflow repeat child returned an invalid control value")
 	}
 
-	if !progress.LocalState {
-		progress.State = result.State.Clone()
-	}
 	progress.Result = result.Value.Clone()
 	progress.Iterations++
 
 	step, err := workflowStepForPath(program.Root, pending.Path)
 	if err != nil || step.Repeat == nil {
 		return errors.New("Workflow repeat step is unavailable")
+	}
+	if step.Repeat.Do.State == nil {
+		// The body inherits the repeat carried state when it has no local
+		// state declaration. Its completed state is the next iteration's
+		// durable carried state, even when Repeat itself owns a local state
+		// scope relative to its parent.
+		progress.State = result.State.Clone()
 	}
 
 	if step.Repeat.Until != nil {
@@ -1686,6 +1859,9 @@ func (b WorkflowBlock) Validate() error {
 	if err := b.Output.Validate(); err != nil {
 		return err
 	}
+	if err := validateWorkflowSubscriptions(b.Listen); err != nil {
+		return err
+	}
 	if b.State != nil {
 		if !b.State.Schema.Valid() || len(b.State.Schema) == 0 {
 			return errors.New("Workflow state schema is invalid")
@@ -1747,7 +1923,7 @@ func (p WorkflowParallel) Validate() error {
 		return err
 	}
 	switch p.Errors {
-	case "", "fail-fast", "collect":
+	case "", firstFastStr, "collect":
 	default:
 		return errors.New("Workflow parallel error policy is invalid")
 	}
@@ -1795,7 +1971,7 @@ func (f WorkflowForeach) Validate() error {
 		return err
 	}
 	switch f.Errors {
-	case "", "fail-fast", "collect":
+	case "", firstFastStr, "collect":
 	default:
 		return errors.New("Workflow foreach error policy is invalid")
 	}

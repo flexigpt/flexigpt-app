@@ -455,10 +455,30 @@ func (a *Admission) bindTarget(
 
 	case workflowv1.TargetAgent,
 		workflowv1.TargetModel:
-		return sessionv3Runtime.WorkflowTarget{}, unsupportedWorkflowOperation(
-			path,
-			"Agent or Model target without a typed execution-plan compiler",
-		)
+		ref, found := refs[path]
+		if !found {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: llm target %q",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		pin, err := a.pinArtifact(ctx, ref)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+
+		kind := sessionv3Runtime.WorkflowTargetModel
+		if target.Kind == workflowv1.TargetAgent {
+			kind = sessionv3Runtime.WorkflowTargetAgent
+		}
+		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
+			Kind:     kind,
+			Artifact: &pin,
+			Effect: sessionv3Runtime.EffectContract{
+				Kind: sessionv3Runtime.EffectKindRead,
+			},
+		})
 
 	default:
 		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(

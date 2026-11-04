@@ -449,6 +449,7 @@ type LLMWork struct {
 	ContinuationWorkItemIDs []WorkItemID       `json:"continuationWorkItemIDs,omitempty"`
 	SystemInstructions      []Instruction      `json:"systemInstructions,omitempty"`
 	Temperature             *float64           `json:"temperature,omitempty"`
+	Invocation              *LLMInvocationPlan `json:"invocation,omitempty"`
 }
 
 type ToolWork struct {
@@ -634,11 +635,16 @@ type EmitReceipt struct {
 }
 
 type EmitWork struct {
-	Destination      EmitDestination `json:"destination"`
-	Kind             string          `json:"kind,omitempty"`
-	Data             CanonicalValue  `json:"data"`
-	Correlation      CanonicalValue  `json:"correlation,omitempty"`
-	DeduplicationKey string          `json:"deduplicationKey,omitempty"`
+	Destination       EmitDestination `json:"destination"`
+	Kind              string          `json:"kind,omitempty"`
+	Data              CanonicalValue  `json:"data"`
+	Correlation       CanonicalValue  `json:"correlation,omitempty"`
+	DeduplicationKey  string          `json:"deduplicationKey,omitempty"`
+	EventSource       string          `json:"eventSource,omitempty"`
+	DataSchema        CanonicalValue  `json:"dataSchema,omitempty"`
+	CorrelationSchema CanonicalValue  `json:"correlationSchema,omitempty"`
+	MaxMessages       int             `json:"maxMessages,omitempty"`
+	MaxBytes          int             `json:"maxBytes,omitempty"`
 }
 
 type CompensationWork struct {
@@ -746,23 +752,38 @@ const (
 	WaitResolutionContinue      WaitResolution = "continue"
 	WaitResolutionCancel        WaitResolution = "cancel"
 	WaitResolutionExecute       WaitResolution = "execute"
+	WaitResolutionRespond       WaitResolution = "respond"
 	WaitResolutionSignal        WaitResolution = "signal"
 )
 
 type WaitRequest struct {
-	Kind               WaitKind          `json:"kind"`
-	Summary            CanonicalValue    `json:"summary,omitempty"`
-	InputSchema        CanonicalValue    `json:"inputSchema,omitempty"`
-	AllowedResolutions []WaitResolution  `json:"allowedResolutions"`
-	Deadline           *time.Time        `json:"deadline,omitempty"`
-	RuntimeBound       bool              `json:"runtimeBound"`
-	Correlation        CanonicalValue    `json:"correlation,omitempty"`
-	Signal             string            `json:"signal,omitempty"`
-	Channel            string            `json:"channel,omitempty"`
-	Cursor             uint64            `json:"cursor,omitempty"`
-	Consume            bool              `json:"consume,omitempty"`
-	Completion         *CompletionHandle `json:"completion,omitempty"`
-	Timer              *TimerWait        `json:"timer,omitempty"`
+	Kind               WaitKind         `json:"kind"`
+	Summary            CanonicalValue   `json:"summary,omitempty"`
+	InputSchema        CanonicalValue   `json:"inputSchema,omitempty"`
+	AllowedResolutions []WaitResolution `json:"allowedResolutions"`
+	Deadline           *time.Time       `json:"deadline,omitempty"`
+	RuntimeBound       bool             `json:"runtimeBound"`
+
+	Correlation       CanonicalValue      `json:"correlation,omitempty"`
+	CorrelationSchema CanonicalValue      `json:"correlationSchema,omitempty"`
+	DataSchema        CanonicalValue      `json:"dataSchema,omitempty"`
+	EventSource       string              `json:"eventSource,omitempty"`
+	Filter            *WorkflowWaitFilter `json:"filter,omitempty"`
+
+	Signal     string            `json:"signal,omitempty"`
+	Channel    string            `json:"channel,omitempty"`
+	Cursor     uint64            `json:"cursor,omitempty"`
+	Consume    bool              `json:"consume,omitempty"`
+	Completion *CompletionHandle `json:"completion,omitempty"`
+	Timer      *TimerWait        `json:"timer,omitempty"`
+
+	Assignees *WaitAssignees `json:"assignees,omitempty"`
+	Request   CanonicalValue `json:"request,omitempty"`
+}
+
+type WaitAssignees struct {
+	Users []string `json:"users,omitempty"`
+	Roles []string `json:"roles,omitempty"`
 }
 
 type Wait struct {
@@ -807,6 +828,7 @@ type ProgramEvent struct {
 }
 
 type ProgramFrameIntent struct {
+	ID       ProgramFrameID  `json:"id,omitempty"`
 	Path     string          `json:"path,omitempty"`
 	Program  ProgramSnapshot `json:"program"`
 	Deadline *time.Time      `json:"deadline,omitempty"`
@@ -818,17 +840,19 @@ type WorkItemIntent struct {
 	Automatic   bool            `json:"automatic"`
 	Deadline    *time.Time      `json:"deadline,omitempty"`
 	Effect      EffectContract  `json:"effect"`
+	Retry       *RetryPolicy    `json:"retry,omitempty"`
 	Input       WorkItemPayload `json:"input"`
 }
 
 type ProgramTransition struct {
-	State      ProgramState         `json:"state"`
-	Status     *ProgramFrameState   `json:"status,omitempty"`
-	Output     CanonicalValue       `json:"output,omitempty"`
-	Error      *SanitizedError      `json:"error,omitempty"`
-	Activities []Activity           `json:"activities,omitempty"`
-	Frames     []ProgramFrameIntent `json:"frames,omitempty"`
-	WorkItems  []WorkItemIntent     `json:"workItems,omitempty"`
+	State            ProgramState         `json:"state"`
+	Status           *ProgramFrameState   `json:"status,omitempty"`
+	Output           CanonicalValue       `json:"output,omitempty"`
+	Error            *SanitizedError      `json:"error,omitempty"`
+	Activities       []Activity           `json:"activities,omitempty"`
+	Frames           []ProgramFrameIntent `json:"frames,omitempty"`
+	WorkItems        []WorkItemIntent     `json:"workItems,omitempty"`
+	CancelChildPaths []string             `json:"cancelChildPaths,omitempty"`
 }
 
 type ProgramInterpreter interface {
@@ -1026,6 +1050,7 @@ type SignalExecutionCommand struct {
 	Meta        CommandMeta    `json:"meta"`
 	SessionID   SessionID      `json:"sessionID"`
 	ExecutionID ExecutionID    `json:"executionID"`
+	Source      string         `json:"source,omitempty"`
 	Name        string         `json:"name"`
 	Correlation CanonicalValue `json:"correlation,omitempty"`
 	Data        CanonicalValue `json:"data"`

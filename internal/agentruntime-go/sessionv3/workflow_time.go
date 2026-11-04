@@ -181,7 +181,7 @@ func (i *WorkflowInterpreter) timerWait(
 		)
 	}
 
-	return workflowWork(state, path, WorkItemIntent{
+	return i.workflowStepWork(program, state, path, WorkItemIntent{
 		ProgramPath: path,
 		Type:        WorkItemTypeWait,
 		Automatic:   true,

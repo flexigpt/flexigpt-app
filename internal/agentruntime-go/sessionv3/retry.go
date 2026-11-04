@@ -229,7 +229,7 @@ func (r *Runtime) waitForRetry(
 	workItemID WorkItemID,
 	at time.Time,
 ) {
-	delay := time.Until(at)
+	delay := at.Sub(r.now())
 	if delay > 0 {
 		timer := time.NewTimer(delay)
 		defer timer.Stop()

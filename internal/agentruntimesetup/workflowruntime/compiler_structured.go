@@ -109,13 +109,13 @@ func compileWorkflowCompletion(
 		return sessionv3Runtime.WorkflowCompletion{Mode: "all"}
 	}
 
-	value := sessionv3Runtime.WorkflowCompletion{
+	output := sessionv3Runtime.WorkflowCompletion{
 		Mode: input.Mode,
 	}
 	if input.Quorum != nil {
-		value.Quorum = *input.Quorum
+		output.Quorum = *input.Quorum
 	}
-	return value
+	return output
 }
 
 func compileWorkflowParallel(

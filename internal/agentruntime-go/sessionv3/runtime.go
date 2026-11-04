@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -623,10 +624,14 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 			if len(execution.Signals) >= maximumCoordinationRecords {
 				return nil, errors.New("execution signal retention limit exceeded")
 			}
+			source := strings.TrimSpace(command.Source)
+			if source == "" {
+				source = "command"
+			}
 			signal := ExecutionSignal{
 				ID:          string(command.Meta.ID),
 				Name:        command.Name,
-				Source:      "command",
+				Source:      source,
 				Data:        command.Data.Clone(),
 				Correlation: command.Correlation.Clone(),
 				CreatedAt:   r.now(),
@@ -1435,8 +1440,15 @@ func (r *Runtime) advanceFrameLocked(
 			return err
 		}
 		now := r.now()
+		childID := intent.ID
+		if childID == "" {
+			childID = ProgramFrameID(r.newID())
+		}
+		if mutableFrame(execution, childID) != nil {
+			return fmt.Errorf("child ProgramFrame %q already exists", childID)
+		}
 		child := ProgramFrame{
-			ID:            ProgramFrameID(r.newID()),
+			ID:            childID,
 			ParentFrameID: frame.ID,
 			Program:       intent.Program,
 			State:         state,
@@ -1471,6 +1483,7 @@ func (r *Runtime) advanceFrameLocked(
 			ProgramPath: intent.ProgramPath,
 			Deadline:    earlierDeadline(frame.Deadline, intent.Deadline),
 			Effect:      intent.Effect,
+			Retry:       cloneWorkflowRetryPolicy(intent.Retry),
 			Automatic:   intent.Automatic,
 			Input:       intent.Input,
 			CreatedAt:   now,
@@ -1508,6 +1521,14 @@ func (r *Runtime) advanceFrameLocked(
 				frame.State = encodeSingleModelState(ss)
 			}
 		}
+	}
+	if err := r.cancelChildFramesLocked(
+		session,
+		execution,
+		frameID,
+		transition.CancelChildPaths,
+	); err != nil {
+		return err
 	}
 	for _, childID := range childIDs {
 		if err := r.advanceFrameLocked(
@@ -1696,9 +1717,48 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.privateWaits[wait.ID] = bound.Private
 		r.touchExecutionLocked(session, execution)
 		r.appendWaitActivityLocked(session, execution, wait)
-		_ = r.persistLocked(ctx, "waitRequested", session)
+
+		if err := r.resolveReadyWaitLocked(session, execution, wait.ID); err != nil {
+			storedWait := mutableWait(execution, wait.ID)
+			if storedWait != nil {
+				storedWait.Status = WaitStatusInvalid
+				storedWait.Error = &SanitizedError{
+					Code:     "wait_replay_failed",
+					Category: ErrorCategoryExecution,
+					Message:  err.Error(),
+				}
+				storedWait.UpdatedAt = r.now()
+			}
+			item.WaitID = ""
+			delete(r.privateWaits, wait.ID)
+			r.finishWorkLocked(
+				session,
+				execution,
+				item,
+				nil,
+				WorkExecutionResult{
+					Error: &SanitizedError{
+						Code:     "wait_replay_failed",
+						Category: ErrorCategoryExecution,
+						Message:  err.Error(),
+					},
+					Confirmed: true,
+				},
+			)
+		}
+
+		if err := r.persistLocked(ctx, "waitRequested", session); err != nil {
+			return
+		}
 		r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
-		r.scheduleWaitDeadlineLocked(ctx, sessionID, executionID, wait)
+		storedWait := mutableWait(execution, wait.ID)
+		if storedWait != nil && storedWait.Status == WaitStatusPending {
+			r.scheduleWaitDeadlineLocked(ctx, sessionID, executionID, *storedWait)
+			return
+		}
+
+		r.armExecutionRetriesLocked(ctx, sessionID, executionID, *execution)
+		r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
 		return
 	}
 	previous = cloneSession(*session)

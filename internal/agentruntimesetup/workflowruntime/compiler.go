@@ -56,6 +56,14 @@ func compileWorkflowProgramWithInput(
 	if err := rejectUnsupportedWorkflowDocument(document); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
+	events, err := compileWorkflowEvents(document)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
+	channels, err := compileWorkflowChannels(document)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 	inputSchema, err := compileWorkflowSchema(
 		document,
 		document.InputSchema,
@@ -83,6 +91,8 @@ func compileWorkflowProgramWithInput(
 		InputBound:   inputBound,
 		Root:         root,
 		Targets:      make(map[string]sessionv3Runtime.WorkflowTarget),
+		Events:       events,
+		Channels:     channels,
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -99,10 +109,6 @@ func rejectUnsupportedWorkflowDocument(
 	document workflowv1.WorkflowDocument,
 ) error {
 	switch {
-	case len(document.Events) != 0:
-		return unsupportedWorkflowOperation("workflow", "events")
-	case len(document.Channels) != 0:
-		return unsupportedWorkflowOperation("workflow", "channels")
 	case len(document.Ports) != 0:
 		return unsupportedWorkflowOperation("workflow", "ports")
 	case len(document.Triggers) != 0:
@@ -135,12 +141,6 @@ func compileWorkflowBlock(
 	document workflowv1.WorkflowDocument,
 	block workflowv1.Block,
 ) (sessionv3Runtime.WorkflowBlock, error) {
-	if len(block.Listen) != 0 {
-		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
-			"block",
-			"listeners",
-		)
-	}
 	if len(block.Catch) != 0 {
 		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
 			"block",
@@ -153,7 +153,15 @@ func compileWorkflowBlock(
 			"finally block",
 		)
 	}
-	return compileWorkflowBlockCore(document, block)
+	output, err := compileWorkflowBlockCore(document, block)
+	if err != nil {
+		return sessionv3Runtime.WorkflowBlock{}, err
+	}
+	output.Listen, err = compileWorkflowSubscriptions(document, block.Listen)
+	if err != nil {
+		return sessionv3Runtime.WorkflowBlock{}, err
+	}
+	return output, nil
 }
 
 func compileWorkflowBlockCore(
@@ -206,11 +214,6 @@ func compileWorkflowStep(
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
 	switch {
-	case input.Retry != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"retry",
-		)
 	case input.Effect != nil:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
@@ -252,6 +255,19 @@ func compileWorkflowStep(
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
 		output.OutputSchema = schema
+	}
+	if input.Retry != nil {
+		if !workflowStepHasDispatchableWork(input) {
+			return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+				"steps/"+input.ID,
+				"retry for a structured operation",
+			)
+		}
+		retry, err := compileWorkflowRetry(*input.Retry)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Retry = &retry
 	}
 
 	switch {
@@ -355,17 +371,19 @@ func compileWorkflowStep(
 			output.Fail.Details = &details
 		}
 	case input.Wait != nil:
-		wait, err := compileWorkflowWait(*input.Wait)
+		wait, err := compileWorkflowWait(document, *input.Wait)
 		if err != nil {
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
 		output.Wait = &wait
 
 	case input.Emit != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"emit",
-		)
+		emit, err := compileWorkflowEmit(*input.Emit)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Emit = &emit
+
 	case input.Saga != nil:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
@@ -396,11 +414,10 @@ func compileWorkflowCall(
 		input.Ownership != nil ||
 		len(input.Conversation) != 0 ||
 		input.OnCompletion != "" ||
-		len(input.Context) != 0 ||
 		len(input.Ports) != 0 {
 		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
 			"call",
-			"call mode, ownership, context, or ports",
+			"call mode, ownership, conversation, or ports",
 		)
 	}
 
@@ -409,6 +426,10 @@ func compileWorkflowCall(
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
 	callInput, err := compileWorkflowValue(input.Input)
+	if err != nil {
+		return sessionv3Runtime.WorkflowCall{}, err
+	}
+	contextValue, err := compileWorkflowValueObject(input.Context)
 	if err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
@@ -423,6 +444,7 @@ func compileWorkflowCall(
 	output := sessionv3Runtime.WorkflowCall{
 		Target:   target,
 		Input:    callInput,
+		Context:  contextValue,
 		Contract: contract,
 	}
 	if input.Allowed == "" {

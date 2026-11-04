@@ -48,6 +48,96 @@ func containsWaitID(values []WaitID, want WaitID) bool {
 	return slices.Contains(values, want)
 }
 
+func waitMatchesEvent(
+	wait Wait,
+	event CanonicalValue,
+	source string,
+	data CanonicalValue,
+	correlation CanonicalValue,
+) bool {
+	if wait.Request.EventSource != "" &&
+		wait.Request.EventSource != source {
+		return false
+	}
+	if len(wait.Request.Correlation) != 0 &&
+		!canonicalValuesEqual(wait.Request.Correlation, correlation) {
+		return false
+	}
+	if err := validateWorkflowSchema(wait.Request.DataSchema, data); err != nil {
+		return false
+	}
+	if err := validateWorkflowSchema(
+		wait.Request.CorrelationSchema,
+		correlation,
+	); err != nil {
+		return false
+	}
+	if wait.Request.Filter == nil {
+		return true
+	}
+	matched, err := wait.Request.Filter.Matches(event)
+	return err == nil && matched
+}
+
+func (r *Runtime) resolveReadyWaitLocked(
+	session *Session,
+	execution *Execution,
+	waitID WaitID,
+) error {
+	wait := mutableWait(execution, waitID)
+	if wait == nil || wait.Status != WaitStatusPending {
+		return nil
+	}
+
+	switch wait.Request.Kind {
+	case WaitKindEvent:
+		for _, signal := range execution.Signals {
+			if err := r.wakeEventWaitsLocked(session, execution, signal); err != nil {
+				return err
+			}
+			if wait.Status != WaitStatusPending {
+				return nil
+			}
+		}
+
+	case WaitKindChannel:
+		for _, channel := range execution.Channels {
+			if channel.Name != wait.Request.Channel {
+				continue
+			}
+			for _, message := range channel.Messages {
+				if err := r.wakeChannelWaitsLocked(session, execution, message); err != nil {
+					return err
+				}
+				if wait.Status != WaitStatusPending {
+					return nil
+				}
+			}
+		}
+
+	case WaitKindChild:
+		if wait.Request.Completion == nil {
+			return errors.New("completion wait has no completion handle")
+		}
+		handle := wait.Request.Completion
+		if handle.WorkItemID != "" {
+			item := executionWorkItem(*execution, handle.WorkItemID)
+			if item != nil && item.State.Terminal() {
+				r.wakeCompletionWorkWaitsLocked(session, execution, *item)
+			}
+		}
+		if handle.FrameID != "" {
+			frame := mutableFrame(execution, handle.FrameID)
+			if frame != nil && frame.Status.Terminal() {
+				r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
+			}
+		}
+	default:
+	}
+
+	return nil
+}
+
 func (r *Runtime) dispatchEmit(
 	ctx context.Context,
 	sessionID SessionID,
@@ -190,6 +280,18 @@ func (r *Runtime) applyEmitLocked(
 	if !payload.Data.Valid() || !payload.Correlation.Valid() {
 		return EmitReceipt{}, nil, nil, errors.New("emit payload is not canonical JSON")
 	}
+	if err := validateWorkflowSchema(payload.DataSchema, payload.Data); err != nil {
+		return EmitReceipt{}, nil, nil, fmt.Errorf("validate emit data: %w", err)
+	}
+	if err := validateWorkflowSchema(
+		payload.CorrelationSchema,
+		payload.Correlation,
+	); err != nil {
+		return EmitReceipt{}, nil, nil, fmt.Errorf(
+			"validate emit correlation: %w",
+			err,
+		)
+	}
 	switch {
 	case payload.Destination.Channel == "" &&
 		payload.Destination.Event == "":
@@ -224,11 +326,18 @@ func (r *Runtime) applyEmitLocked(
 		if err != nil {
 			return EmitReceipt{}, nil, nil, err
 		}
-		if len(channel.Messages) >= maximumCoordinationRecords {
+		maxMessages := maximumCoordinationRecords
+		if payload.MaxMessages > 0 && payload.MaxMessages < maxMessages {
+			maxMessages = payload.MaxMessages
+		}
+		if len(channel.Messages) >= maxMessages {
 			return EmitReceipt{}, nil, nil, errors.New("channel retention limit exceeded")
 		}
-		if channelBytes(*channel)+len(payload.Data)+len(payload.Correlation) >
-			maximumCoordinationBytes {
+		maxBytes := maximumCoordinationBytes
+		if payload.MaxBytes > 0 && payload.MaxBytes < maxBytes {
+			maxBytes = payload.MaxBytes
+		}
+		if channelBytes(*channel)+len(payload.Data)+len(payload.Correlation) > maxBytes {
 			return EmitReceipt{}, nil, nil, errors.New("channel byte limit exceeded")
 		}
 
@@ -255,7 +364,7 @@ func (r *Runtime) applyEmitLocked(
 		signal := ExecutionSignal{
 			ID:          "emit:" + string(workItemID),
 			Name:        payload.Destination.Event,
-			Source:      "workflow",
+			Source:      firstNonEmpty(payload.EventSource, "workflow"),
 			Data:        payload.Data.Clone(),
 			Correlation: payload.Correlation.Clone(),
 			CreatedAt:   now,
@@ -330,10 +439,6 @@ func (r *Runtime) wakeEventWaitsLocked(
 			wait.Request.Signal != signal.Name {
 			continue
 		}
-		if len(wait.Request.Correlation) != 0 &&
-			!canonicalValuesEqual(wait.Request.Correlation, signal.Correlation) {
-			continue
-		}
 		if wait.Request.Consume &&
 			containsWaitID(signal.ConsumedBy, wait.ID) {
 			continue
@@ -347,6 +452,15 @@ func (r *Runtime) wakeEventWaitsLocked(
 			Correlation: signal.Correlation.Clone(),
 			Time:        signal.CreatedAt,
 		})
+		if !waitMatchesEvent(
+			*wait,
+			response,
+			signal.Source,
+			signal.Data,
+			signal.Correlation,
+		) {
+			continue
+		}
 		if err := validateWorkflowSchema(wait.Request.InputSchema, response); err != nil {
 			return fmt.Errorf("validate event wait response: %w", err)
 		}
@@ -399,10 +513,6 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			message.Sequence <= wait.Request.Cursor {
 			continue
 		}
-		if len(wait.Request.Correlation) != 0 &&
-			!canonicalValuesEqual(wait.Request.Correlation, message.Correlation) {
-			continue
-		}
 		if wait.Request.Consume &&
 			containsWaitID(message.ConsumedBy, wait.ID) {
 			continue
@@ -417,6 +527,15 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			Correlation: message.Correlation.Clone(),
 			Time:        message.CreatedAt,
 		})
+		if !waitMatchesEvent(
+			*wait,
+			response,
+			"",
+			message.Data,
+			message.Correlation,
+		) {
+			continue
+		}
 		if err := validateWorkflowSchema(wait.Request.InputSchema, response); err != nil {
 			return fmt.Errorf("validate channel wait response: %w", err)
 		}

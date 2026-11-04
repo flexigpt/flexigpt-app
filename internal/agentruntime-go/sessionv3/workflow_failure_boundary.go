@@ -86,14 +86,11 @@ func workflowFailureTransition(
 	if failure == nil {
 		return ProgramTransition{}, errors.New("workflow failure is missing")
 	}
-	next, err := encodeWorkflowProgramState(state)
+	status := ProgramFrameStateFailed
+	transition, err := workflowTransition(state, &status, nil, nil)
 	if err != nil {
 		return ProgramTransition{}, err
 	}
-	status := ProgramFrameStateFailed
-	return ProgramTransition{
-		State:  next,
-		Status: &status,
-		Error:  failure,
-	}, nil
+	transition.Error = failure
+	return transition, nil
 }

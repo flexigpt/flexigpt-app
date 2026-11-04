@@ -1647,10 +1647,35 @@ binding before unrelated external work starts.
 
 ### 13.7 Current implementation coverage
 
-The sequential compiler includes call, transform, set, return, fail, guarded
-steps, static allowed target sets, and timer waits. Timer firing and operation
-deadlines are separate persisted facts. A timer firing is successful output;
-an operation deadline is a timeout failure.
+The typed compiler and interpreter include call, transform, set, return, fail,
+guarded steps, static allowed target sets, scope, choose, bounded parallel,
+foreach, repeat, break, continue, timer waits, event waits, channel waits,
+completion waits, human waits, local channel emits, and execution signals.
+
+Workflow event and channel coordination persists typed subscriptions,
+correlation, filters, consumed identities, local channel cursors, retained
+messages, emit receipts, and human wait requests inside the existing v3
+Session document. Event and channel values remain canonical JSON only at their
+declared schema boundaries.
+
+Retries now compile to typed durable retry policies for WorkItem-backed steps.
+The WorkItem stores the retry policy, retry scheduler state, attempt deadline,
+stable keyed-effect idempotency key, semantic binding facts, and confirmed or
+uncertain result. Durable retry timing uses Runtime timers and the injected
+runtime clock; it does not use `time.Sleep`.
+
+The current structured fan-out implementation admits only its implemented
+durable policy subset:
+
+- `completion.mode: all`
+- `errors: collect`
+- `remaining: wait`
+
+Other Parallel and Foreach completion policies remain rejected during
+admission. This prevents a valid declaration from being accepted and then
+silently executed with all-join semantics. `repeat.lifetime: until-cancelled`
+also remains admission-rejected until its durable ongoing-process lifecycle is
+implemented.
 
 The compiler retains failure category, retryability, and details. Calls retain
 their selected target identity and apply target, call, and target-set schemas.
@@ -1661,8 +1686,8 @@ This coverage is not backend completion. Structured blocks, fan-out, machines,
 human assignment authorization, events, channels, triggers, retries,
 reconciliation, compensation, resources, budgets, all callable modes, and
 complete Agent and Model execution plans remain required implementation work.
-Unsupported-field rejection during development must not become a permanent
-Workflow v1 capability restriction.
+Admission rejection during development must not become a permanent Workflow v1
+capability restriction.
 
 Completion remains a functional Session v2 backend superset plus full typed,
 durable Workflow v1 support. V2 remains preserved. Frontend adoption and

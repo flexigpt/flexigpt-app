@@ -608,8 +608,15 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	}
 	switch kind {
 	case WorkItemTypeLLM:
-		if p.LLM.InputActivityID == "" {
-			return errors.New("LLM WorkItem input activity is required")
+		if p.LLM.InputActivityID == "" && p.LLM.Invocation == nil {
+			return errors.New(
+				"llm WorkItem requires an input activity or workflow invocation plan",
+			)
+		}
+		if p.LLM.Invocation != nil {
+			if err := p.LLM.Invocation.Validate(); err != nil {
+				return err
+			}
 		}
 
 	case WorkItemTypeTool:
@@ -676,8 +683,14 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeWait:
 		return p.Wait.Request.Validate()
 	case WorkItemTypeEmit:
-		if !p.Emit.Data.Valid() || !p.Emit.Correlation.Valid() {
+		if !p.Emit.Data.Valid() ||
+			!p.Emit.Correlation.Valid() ||
+			!p.Emit.DataSchema.Valid() ||
+			!p.Emit.CorrelationSchema.Valid() {
 			return errors.New("invalid emit WorkItem")
+		}
+		if p.Emit.MaxMessages < 0 || p.Emit.MaxBytes < 0 {
+			return errors.New("emit WorkItem limits cannot be negative")
 		}
 		switch {
 		case p.Emit.Destination.Channel == "" &&
@@ -832,12 +845,37 @@ func (a Attempt) Validate() error {
 }
 
 func (w WaitRequest) Validate() error {
-	if !w.Summary.Valid() || !w.InputSchema.Valid() || !w.Correlation.Valid() {
+	if !w.Summary.Valid() ||
+		!w.InputSchema.Valid() ||
+		!w.Correlation.Valid() ||
+		!w.CorrelationSchema.Valid() ||
+		!w.DataSchema.Valid() ||
+		!w.Request.Valid() {
 		return errors.New("wait request json is not canonical")
+	}
+	if w.EventSource != "" {
+		if err := validateID("wait event source", w.EventSource); err != nil {
+			return err
+		}
+	}
+	if w.Filter != nil {
+		if err := w.Filter.Validate(); err != nil {
+			return err
+		}
+	}
+	if w.Assignees != nil {
+		if err := w.Assignees.Validate(); err != nil {
+			return err
+		}
 	}
 	switch w.Kind {
 	case WaitKindTimer:
-		if w.Timer == nil || len(w.AllowedResolutions) != 0 || w.RuntimeBound {
+		if w.Timer == nil ||
+			len(w.AllowedResolutions) != 0 ||
+			w.RuntimeBound ||
+			w.Filter != nil ||
+			w.Assignees != nil ||
+			len(w.Request) != 0 {
 			return errors.New("invalid timer wait request")
 		}
 		if err := w.Timer.Validate(); err != nil {
@@ -877,6 +915,9 @@ func (w WaitRequest) Validate() error {
 			len(w.AllowedResolutions) != 0 {
 			return errors.New("event wait is incomplete")
 		}
+		if w.Assignees != nil || len(w.Request) != 0 {
+			return errors.New("event wait contains interactive fields")
+		}
 
 	case WaitKindChannel:
 		if w.Timer != nil ||
@@ -884,6 +925,9 @@ func (w WaitRequest) Validate() error {
 			w.Channel == "" ||
 			len(w.AllowedResolutions) != 0 {
 			return errors.New("channel wait is incomplete")
+		}
+		if w.Assignees != nil || len(w.Request) != 0 {
+			return errors.New("channel wait contains interactive fields")
 		}
 
 	case WaitKindChild:
@@ -895,6 +939,11 @@ func (w WaitRequest) Validate() error {
 		if err := w.Completion.Validate(); err != nil {
 			return err
 		}
+		if w.Filter != nil ||
+			w.Assignees != nil ||
+			len(w.Request) != 0 {
+			return errors.New("completion wait contains incompatible fields")
+		}
 
 	case WaitKindApproval,
 		WaitKindManual,
@@ -904,6 +953,13 @@ func (w WaitRequest) Validate() error {
 			w.Completion != nil ||
 			len(w.AllowedResolutions) == 0 {
 			return errors.New("interactive wait is incomplete")
+		}
+		if w.Kind == WaitKindHuman && w.Assignees == nil {
+			return errors.New("human wait has no assignees")
+		}
+		if w.Kind != WaitKindHuman &&
+			(w.Assignees != nil || len(w.Request) != 0) {
+			return errors.New("non-human interactive wait contains human fields")
 		}
 
 	default:
