@@ -490,13 +490,8 @@ func (w WorkItem) Validate() error {
 	if w.Deadline != nil && w.Deadline.IsZero() {
 		return errors.New("invalid WorkItem deadline")
 	}
-	switch w.Effect.Kind {
-	case EffectKindRead, EffectKindIdempotent, EffectKindKeyed, EffectKindNonIdempotent:
-	default:
-		return fmt.Errorf("unsupported effect kind %q", w.Effect.Kind)
-	}
-	if w.Effect.Kind == EffectKindKeyed && w.Effect.IdempotencyKey == "" {
-		return errors.New("keyed WorkItem has no idempotency key")
+	if err := w.Effect.Validate(); err != nil {
+		return err
 	}
 	if err := w.Input.Validate(w.Type); err != nil {
 		return err
@@ -510,6 +505,24 @@ func (w WorkItem) Validate() error {
 		if err := w.Output.Validate(w.Type); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (e EffectContract) Validate() error {
+	switch e.Kind {
+	case EffectKindRead,
+		EffectKindIdempotent,
+		EffectKindKeyed,
+		EffectKindNonIdempotent:
+	default:
+		return fmt.Errorf("unsupported effect kind %q", e.Kind)
+	}
+	if e.Kind == EffectKindKeyed && e.IdempotencyKey == "" {
+		return errors.New("keyed WorkItem has no idempotency key")
+	}
+	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
+		return errors.New("non-keyed WorkItem has an idempotency key")
 	}
 	return nil
 }
@@ -585,7 +598,8 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			return errors.New("invalid activity WorkItem")
 		}
 	case WorkItemTypeTransform:
-		if !p.Transform.Input.Valid() {
+		if !p.Transform.Input.Valid() ||
+			!p.Transform.OutputSchema.Valid() {
 			return errors.New("invalid transform WorkItem")
 		}
 	case WorkItemTypeCondition:
@@ -593,6 +607,10 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			return errors.New("invalid condition WorkItem")
 		}
 	case WorkItemTypeStateUpdate:
+		if !p.StateUpdate.Base.Valid() ||
+			!p.StateUpdate.Schema.Valid() {
+			return errors.New("invalid StateUpdate WorkItem state boundary")
+		}
 		for _, assignment := range p.StateUpdate.Assignments {
 			if assignment.Path == "" || !assignment.Value.Valid() {
 				return errors.New("invalid state assignment")

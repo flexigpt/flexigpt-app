@@ -365,6 +365,7 @@ func (e *V3Executor) Execute(
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
 				Text:       text,
@@ -433,6 +434,17 @@ func (e *V3Executor) ResolveWait(
 		}, true, nil
 
 	case mcpServer.MCPApprovalDecisionAllowed:
+		semantic := sessionv3Runtime.SemanticBinding{
+			Version:           "session-v3-mcp-resume/v1",
+			TargetFingerprint: private.TargetFingerprint,
+			BoundAt:           time.Now().UTC(),
+		}
+		if private.Call.Binding.MCP != nil &&
+			private.Call.Binding.MCP.ServerArtifact != nil {
+			semantic.Artifacts = []sessionv3Runtime.ArtifactPin{
+				*private.Call.Binding.MCP.ServerArtifact,
+			}
+		}
 		if request.Resolution ==
 			sessionv3Runtime.WaitResolutionApproveOnce &&
 			strings.TrimSpace(result.Token) == "" {
@@ -444,11 +456,7 @@ func (e *V3Executor) ResolveWait(
 		return sessionv3Runtime.WaitResolutionResult{
 			Resume: true,
 			Bound: &sessionv3Runtime.BoundWork{
-				SemanticBinding: sessionv3Runtime.SemanticBinding{
-					Version:           "session-v3-mcp-resume/v1",
-					TargetFingerprint: private.TargetFingerprint,
-					BoundAt:           time.Now().UTC(),
-				},
+				SemanticBinding: semantic,
 				Private: v3MCPExecution{
 					Call:              private.Call,
 					ApprovalID:        result.ApprovalID,

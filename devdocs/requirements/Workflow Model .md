@@ -51,6 +51,26 @@ The language supports:
 
 Domain-specific algorithms and integrations are typed callable work. They do not require new control-flow constructs.
 
+### 1.4 Completion requirement
+
+Workflow v1 is complete only when every valid Workflow v1 declaration feature
+has typed compiler and interpreter behavior with durable recovery semantics.
+
+Completion does not permit a valid Workflow v1 feature to remain permanently
+rejected because the runtime has not implemented it. Admission can reject:
+
+- Invalid declaration syntax or semantics.
+- Unsatisfied required Artifact pins or bindings.
+- Current policy, credential, approval, or external availability failures.
+- A declaration whose requested behavior is outside Workflow v1.
+
+Admission cannot reject a valid Workflow v1 operation merely because the
+interpreter has no implementation for it at completion.
+
+The completed backend supports all work, composition, coordination, lifecycle,
+reliability, and control behavior listed in this document. A partial
+interpreter is an implementation stage, not the completion state.
+
 ## 2. Document and Block Model
 
 ### 2.1 Root document
@@ -1497,10 +1517,17 @@ into a typed runtime-neutral program.
 
 The compiled program contains:
 
-- Typed blocks, steps, targets, state specifications, and value templates.
+- Typed blocks, steps, targets, state specifications, scopes, branch state,
+  loop state, machine state, waits, effects, and value templates.
 - Artifact pins where a target is Artifact-backed.
 - Stable Service and Activity binding IDs and versions.
 - Generic canonical values only at JSON value and JSON Schema boundaries.
+
+Canonical values are not a substitute for typed runtime semantics. IDs,
+versions, pins, target kinds, block state, WorkItem kinds, effect contracts,
+retry policies, waits, attempts, receipts, errors, and control-flow state use
+dedicated typed structures. Canonical values are used only where the Workflow
+contract intentionally permits arbitrary JSON.
 
 The Session Runtime does not receive Workflow declaration package types,
 Artifact services, Artifact references, locators, or source documents.
@@ -1515,23 +1542,74 @@ Runtime code uses typed value templates:
 - Typed array items.
 
 `CanonicalValue` is allowed only for generic JSON data boundaries. Runtime
-state must not use untyped `json.RawMessage` fields or persisted
-`map[string]any` semantic models.
+state must not use untyped `json.RawMessage` fields or persisted `map[string]any`
+semantic models.
+
+Use `CanonicalValue` only for:
+
+- Workflow invocation input and output.
+- JSON Schema documents.
+- Expression literal values and evaluated arbitrary JSON results.
+- Schema-defined Workflow state and state values.
+- Generic Tool payloads and external outputs.
+- Generic metadata, correlation, channel, event, and human-response values.
+- Generic ProgramSnapshot payload and ProgramState data envelopes.
+
+Do not use `CanonicalValue` for known runtime semantics. Decode it once at the
+typed boundary through a dedicated `jsonutil` conversion helper. Do not scatter
+JSON marshal or unmarshal calls through interpreter logic.
 
 ### 13.3 Admission conformance rule
 
 A declaration can be valid Workflow v1 source before every runtime feature is
-implemented. Workflow admission must compile only operations supported by the
-selected interpreter version.
+implemented. During implementation, admission must compile only operations
+supported by the selected interpreter version and reject other operations
+before any external work begins.
 
 If an operation is not implemented, admission returns an explicit typed
 unsupported-operation error before it creates external work. Runtime must not
 silently ignore the operation, change its meaning, or defer failure until
 after an external effect starts.
 
+This is an implementation-safety rule, not the final Workflow v1 capability
+boundary. Completion requires typed support for every valid Workflow v1
+operation and target behavior in this document. At completion, an
+unsupported-operation error is reserved for behavior outside Workflow v1, not
+for an omitted Workflow v1 feature.
+
 ### 13.4 Runtime compatibility rule
 
-Existing durable interpreter payload versions remain readable until a separate
-migration and deletion decision is approved. New Workflow admission emits only
-the current typed interpreter version. Declaration language compatibility does
-not require compiled payload compatibility.
+Workflow declaration language compatibility and compiled payload compatibility
+are different concerns.
+
+Session Runtime v3 and Workflow Runtime v3 are development features. The
+current `artifact.workflow.v1@1` payload is the current typed payload and can
+be replaced in place during development. No `artifact.workflow.v1@2` payload
+is introduced and no version is incremented.
+
+This development replacement rule does not alter shipped Session v2 durable
+payload compatibility. A future stable-payload compatibility policy requires a
+separate approval and is outside this development completion work.
+
+### 13.5 Session Runtime v3 backend completion
+
+Workflow Runtime completion also requires Session Runtime v3 to be a
+functional backend superset of normal Session v2 behavior.
+
+The V3 backend must provide typed equivalents for:
+
+- Direct Model chat.
+- Agent-backed chat.
+- Workspace contribution and instruction planning.
+- Attachment admission, snapshotting, replay, and provider adaptation.
+- Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity use.
+- MCP resources, prompts, Apps, approvals, and approved App context.
+- Provider output, streaming, usage, debugger, Tool-result, and continuation
+  behavior.
+- Cancellation, recovery, uncertainty, waits, retries, and durable command
+  idempotency.
+- Transport-neutral commands and projections.
+
+This does not require frontend V3 adoption, v2-to-v3 migration, or deletion of
+V2 paths. It requires V3 backend capability completeness before V2
+deprecation can be considered.

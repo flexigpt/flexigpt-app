@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -80,6 +81,15 @@ func (DeterministicExecutor) Execute(
 			)
 		}
 		value = item.Input.Transform.Input.Clone()
+		if err := validateWorkflowSchema(
+			item.Input.Transform.OutputSchema,
+			value,
+		); err != nil {
+			return WorkExecutionResult{}, true, fmt.Errorf(
+				"validate transform output: %w",
+				err,
+			)
+		}
 
 	case WorkItemTypeCondition:
 		if item.Input.Condition == nil {
@@ -102,7 +112,22 @@ func (DeterministicExecutor) Execute(
 				"deterministic StateUpdate WorkItem has no payload",
 			)
 		}
-		value = MustCanonicalValue(map[string]any{})
+		next, err := applyWorkflowStateUpdate(
+			*item.Input.StateUpdate,
+		)
+		if err != nil {
+			return WorkExecutionResult{}, true, err
+		}
+		if err := validateWorkflowSchema(
+			item.Input.StateUpdate.Schema,
+			next,
+		); err != nil {
+			return WorkExecutionResult{}, true, fmt.Errorf(
+				"validate state update output: %w",
+				err,
+			)
+		}
+		value = next
 
 	default:
 		return WorkExecutionResult{}, false, nil

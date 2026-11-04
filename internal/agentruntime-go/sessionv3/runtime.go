@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -41,7 +42,16 @@ type Runtime struct {
 	privateWaits       map[WaitID]any
 	cancels            map[WorkItemID]context.CancelFunc
 	workflowAdmissions map[CommandID]string
-	closed             bool
+
+	lifecycleCtx    context.Context
+	lifecycleCancel context.CancelFunc
+	waitTimers      map[WaitID]context.CancelFunc
+
+	asyncMu      sync.Mutex
+	asyncWG      sync.WaitGroup
+	asyncClosing bool
+
+	closed bool
 }
 
 func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
@@ -57,6 +67,8 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 	if len(dependencies.Interpreters) == 0 {
 		dependencies.Interpreters = NewBuiltinInterpreters()
 	}
+	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+
 	r := &Runtime{
 		deps:               dependencies,
 		sessions:           map[SessionID]*Session{},
@@ -66,6 +78,9 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		privateWaits:       map[WaitID]any{},
 		cancels:            map[WorkItemID]context.CancelFunc{},
 		workflowAdmissions: map[CommandID]string{},
+		lifecycleCtx:       lifecycleCtx,
+		lifecycleCancel:    lifecycleCancel,
+		waitTimers:         map[WaitID]context.CancelFunc{},
 	}
 	for _, interpreter := range dependencies.Interpreters {
 		if interpreter == nil || interpreter.ID() == "" || interpreter.Version() == 0 {
@@ -94,13 +109,49 @@ func (r *Runtime) Close() {
 		return
 	}
 	r.closed = true
+
+	lifecycleCancel := r.lifecycleCancel
+	r.lifecycleCancel = nil
+
 	for _, cancel := range r.cancels {
 		cancel()
 	}
 	clear(r.cancels)
+	for _, cancel := range r.waitTimers {
+		cancel()
+	}
+	clear(r.waitTimers)
+
+	executionIDs := make([]ExecutionID, 0)
+	for _, session := range r.sessions {
+		for _, execution := range session.Executions {
+			executionIDs = append(executionIDs, execution.ID)
+		}
+	}
 	clear(r.privateBindings)
 	clear(r.privateWaits)
 	r.mu.Unlock()
+
+	r.asyncMu.Lock()
+	r.asyncClosing = true
+	r.asyncMu.Unlock()
+	if lifecycleCancel != nil {
+		lifecycleCancel()
+	}
+	r.asyncWG.Wait()
+
+	closer, supported := r.deps.Binder.(ExecutionBindingCloser)
+	if !supported {
+		return
+	}
+	for _, executionID := range executionIDs {
+		closeCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		_ = closer.CloseExecutionBinding(closeCtx, executionID)
+		cancel()
+	}
 }
 
 func (r *Runtime) CreateSession(ctx context.Context, command CreateSessionCommand) (*CommandReceipt, error) {
@@ -528,7 +579,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	ready := r.readyWorkLocked(*active)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
-	go r.launchWork(context.WithoutCancel(ctx), session.ID, active.ID, ready)
+	r.launchWork(ctx, session.ID, active.ID, ready)
 	return &receipt, nil
 }
 
@@ -699,6 +750,7 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 				if wait.Status == WaitStatusPending || wait.Status == WaitStatusResolving {
 					wait.Status = WaitStatusCancelled
 					wait.UpdatedAt = now
+					r.cancelWaitDeadlineLocked(wait.ID)
 				}
 			}
 			for _, frame := range execution.ProgramFrames {
@@ -775,6 +827,7 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 	previous := cloneSession(*session)
 	wait.Status = WaitStatusResolving
 	wait.UpdatedAt = r.now()
+	r.cancelWaitDeadlineLocked(wait.ID)
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(ctx, "waitResolutionRequested", session); err != nil {
 		*session = previous
@@ -818,6 +871,14 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		wait.Error = &SanitizedError{Code: "wait_resolution_failed", Message: resolveErr.Error()}
 		wait.UpdatedAt = now
 		r.touchExecutionLocked(session, execution)
+		if wait.Request.Deadline != nil {
+			r.scheduleWaitDeadlineLocked(
+				ctx,
+				session.ID,
+				execution.ID,
+				*wait,
+			)
+		}
 		receipt := CommandReceipt{
 			CommandID:         command.Meta.ID,
 			Accepted:          true,
@@ -883,7 +944,7 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 	}
 	ready := r.readyWorkLocked(*execution)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
-	go r.launchWork(context.WithoutCancel(ctx), session.ID, execution.ID, ready)
+	r.launchWork(ctx, session.ID, execution.ID, ready)
 	return &receipt, nil
 }
 
@@ -961,6 +1022,43 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 		Activities:      activities,
 		Executions:      executions,
 	}, nil
+}
+
+func (r *Runtime) launchAsync(
+	operation string,
+	work func(),
+	onPanic func(backgroundutil.PanicFailureError),
+) {
+	if r == nil {
+		return
+	}
+	r.asyncMu.Lock()
+	defer r.asyncMu.Unlock()
+	if r.asyncClosing {
+		return
+	}
+	backgroundutil.Launch(&r.asyncWG, operation, work, onPanic)
+}
+
+func (r *Runtime) launchWork(
+	_ context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	items []WorkItemID,
+) {
+	for _, itemID := range items {
+		id := itemID
+		r.launchAsync(
+			"session-v3 WorkItem dispatch",
+			func() {
+				r.dispatchOne(r.lifecycleCtx, sessionID, executionID, id)
+			},
+			//nolint:contextcheck // Async work.
+			func(failure backgroundutil.PanicFailureError) {
+				r.finishPanickedWork(sessionID, executionID, id, failure)
+			},
+		)
+	}
 }
 
 func (r *Runtime) resolveRecoveryWaitLocked(
@@ -1139,7 +1237,7 @@ func (r *Runtime) changeExecution(
 	ready := r.readyWorkLocked(*execution)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
-	r.launchWork(ctx, sessionID, executionID, ready)
+	r.launchWork(context.WithoutCancel(ctx), sessionID, executionID, ready)
 	return receipt, nil
 }
 
@@ -1438,6 +1536,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	}
 	if bound.ImmediateOutput != nil {
 		delete(r.privateBindings, item.ID)
+		item.Binding = &bound.SemanticBinding
 		r.finishWorkLocked(
 			session,
 			execution,
@@ -1446,7 +1545,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 			WorkExecutionResult{Output: bound.ImmediateOutput, Confirmed: true},
 		)
 		_ = r.persistLocked(ctx, "workFinished", session)
-		go r.launchWork(context.WithoutCancel(ctx), sessionID, executionID, r.readyWorkLocked(*execution))
+		r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
 		return
 	}
 	if bound.Wait != nil {
@@ -1469,9 +1568,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.appendWaitActivityLocked(session, execution, wait)
 		_ = r.persistLocked(ctx, "waitRequested", session)
 		r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
-		if wait.Request.Deadline != nil {
-			go r.expireAt(context.WithoutCancel(ctx), sessionID, executionID, wait.ID, *wait.Request.Deadline)
-		}
+		r.scheduleWaitDeadlineLocked(ctx, sessionID, executionID, wait)
 		return
 	}
 	if err := r.startDispatchedLocked(
@@ -1485,13 +1582,22 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		return
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	go r.executeOne(
-		context.WithoutCancel(ctx),
-		sessionID,
-		executionID,
-		item.ID,
-		request,
-		BoundWork{SemanticBinding: bound.SemanticBinding, Private: bound.Private},
+	r.launchAsync(
+		"session-v3 WorkItem execution",
+		func() {
+			r.executeOne(
+				r.lifecycleCtx,
+				sessionID,
+				executionID,
+				item.ID,
+				request,
+				BoundWork{SemanticBinding: bound.SemanticBinding, Private: bound.Private},
+			)
+		},
+		//nolint:contextcheck // Async work.
+		func(failure backgroundutil.PanicFailureError) {
+			r.finishPanickedWork(sessionID, executionID, item.ID, failure)
+		},
 	)
 }
 
@@ -1530,7 +1636,7 @@ func (r *Runtime) executeOne(
 	request WorkDispatchRequest,
 	bound BoundWork,
 ) {
-	executionCtx, cancel := context.WithCancel(ctx)
+	executionCtx, cancel := context.WithCancel(r.lifecycleCtx)
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -1551,8 +1657,16 @@ func (r *Runtime) executeOne(
 		cancel()
 		return
 	}
+	if item.Deadline != nil {
+		cancel()
+		executionCtx, cancel = context.WithDeadline(
+			r.lifecycleCtx,
+			item.Deadline.UTC(),
+		)
+	}
 	r.cancels[itemID] = cancel
 	r.mu.Unlock()
+	//nolint:contextcheck // Separate work.
 	result, err := r.deps.Binder.ExecuteWork(executionCtx, request, bound)
 	cancel()
 	if err != nil && result.Error == nil {
@@ -1592,7 +1706,7 @@ func (r *Runtime) executeOne(
 	}
 	_ = r.persistLocked(ctx, "workFinished", session)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	go r.launchWork(context.WithoutCancel(ctx), sessionID, executionID, r.readyWorkLocked(*execution))
+	r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
 }
 
 func (r *Runtime) finishWorkLocked(
@@ -1729,6 +1843,36 @@ func (r *Runtime) addRecoveryWaitLocked(session *Session, execution *Execution, 
 	r.appendWaitActivityLocked(session, execution, wait)
 }
 
+//nolint:contextcheck // Separate work.
+func (r *Runtime) scheduleWaitDeadlineLocked(
+	ctx context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	wait Wait,
+) {
+	if wait.Request.Deadline == nil || wait.ID == "" {
+		return
+	}
+	r.cancelWaitDeadlineLocked(wait.ID)
+	waitCtx, cancel := context.WithCancel(r.lifecycleCtx)
+	r.waitTimers[wait.ID] = cancel
+	deadline := wait.Request.Deadline.UTC()
+	r.launchAsync(
+		"session-v3 wait deadline",
+		func() {
+			r.expireAt(waitCtx, sessionID, executionID, wait.ID, deadline)
+		},
+		nil,
+	)
+}
+
+func (r *Runtime) cancelWaitDeadlineLocked(waitID WaitID) {
+	if cancel := r.waitTimers[waitID]; cancel != nil {
+		cancel()
+		delete(r.waitTimers, waitID)
+	}
+}
+
 func (r *Runtime) expireAt(
 	ctx context.Context,
 	sessionID SessionID,
@@ -1737,9 +1881,14 @@ func (r *Runtime) expireAt(
 	deadline time.Time,
 ) {
 	delay := deadline.Sub(r.now())
-	if delay > 0 {
-		time.Sleep(delay)
+	timer := time.NewTimer(max(delay, 0))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
 	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	session, execution, err := r.executionLocked(sessionID, executionID)
@@ -1749,6 +1898,7 @@ func (r *Runtime) expireAt(
 	if r.closed {
 		return
 	}
+	delete(r.waitTimers, waitID)
 	wait := mutableWait(execution, waitID)
 	if wait == nil || wait.Status != WaitStatusPending || wait.Request.Deadline == nil ||
 		r.now().Before(*wait.Request.Deadline) {
@@ -1777,6 +1927,70 @@ func (r *Runtime) expireAt(
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 }
 
+func (r *Runtime) finishPanickedWork(
+	sessionID SessionID,
+	executionID ExecutionID,
+	itemID WorkItemID,
+	failure backgroundutil.PanicFailureError,
+) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
+	session, execution, err := r.executionLocked(sessionID, executionID)
+	if err != nil {
+		return
+	}
+	item := mutableWorkItem(execution, itemID)
+	if item == nil || item.State.Terminal() {
+		return
+	}
+
+	now := r.now()
+	result := WorkExecutionResult{
+		Error: &SanitizedError{
+			Code:    backgroundutil.PanicFailureCode,
+			Message: failure.Error(),
+		},
+	}
+	switch item.State {
+	case WorkItemStateBinding:
+		item.State = WorkItemStateBlocked
+		item.Error = result.Error
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+		_ = r.advanceFrameLocked(
+			session,
+			execution,
+			item.FrameID,
+			ProgramEvent{
+				Kind:       ProgramEventWorkSettled,
+				WorkItemID: item.ID,
+			},
+		)
+	case WorkItemStateDispatched:
+		r.finishWorkLocked(
+			session,
+			execution,
+			item,
+			activeAttempt(execution, item.ID),
+			result,
+		)
+	default:
+		return
+	}
+	delete(r.privateBindings, item.ID)
+	if cancel := r.cancels[item.ID]; cancel != nil {
+		cancel()
+		delete(r.cancels, item.ID)
+	}
+	r.refreshExecutionStateLocked(execution)
+	r.touchExecutionLocked(session, execution)
+	_ = r.persistLocked(context.Background(), "workPanicked", session)
+	r.publishLocked(context.Background(), session, execution.ID, RuntimeEventWorkChanged)
+}
+
 func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 	if execution.Controls.Paused || execution.Controls.CancellationRequested || execution.State.Terminal() {
 		return nil
@@ -1789,12 +2003,6 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 		}
 	}
 	return values
-}
-
-func (r *Runtime) launchWork(ctx context.Context, sessionID SessionID, executionID ExecutionID, items []WorkItemID) {
-	for _, id := range items {
-		go r.dispatchOne(context.WithoutCancel(ctx), sessionID, executionID, id)
-	}
 }
 
 func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
@@ -1923,7 +2131,9 @@ func (r *Runtime) completeExecutionLocked(
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {
 		id := execution.ID
-		go func(ctx context.Context) { _ = closer.CloseExecutionBinding(ctx, id) }(context.WithoutCancel(ctx))
+		r.launchAsync("session-v3 execution binding cleanup", func() {
+			_ = closer.CloseExecutionBinding(r.lifecycleCtx, id)
+		}, nil)
 	}
 }
 
@@ -1992,7 +2202,9 @@ func (r *Runtime) publishLocked(ctx context.Context, session *Session, execution
 		Kind:        kind,
 		At:          r.now(),
 	}
-	go func() { _ = r.deps.Events.PublishRuntimeEvent(context.WithoutCancel(ctx), event) }()
+	r.launchAsync("session-v3 event publication", func() {
+		_ = r.deps.Events.PublishRuntimeEvent(r.lifecycleCtx, event)
+	}, nil)
 }
 
 func (r *Runtime) touchSessionLocked(session *Session) {

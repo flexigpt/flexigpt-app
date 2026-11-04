@@ -15,10 +15,50 @@ import (
 
 const maxWorkflowDefinitionBytes = 16 << 20
 
+var ErrUnsupportedOperation = errors.New(
+	"workflow operation is unsupported by the typed runtime",
+)
+
+// UnsupportedOperationError is returned only during Workflow admission. It
+// prevents a syntactically valid declaration from being accepted and later
+// ignored or changed by Session Runtime.
+type UnsupportedOperationError struct {
+	Path      string
+	Operation string
+}
+
+func (e *UnsupportedOperationError) Error() string {
+	if e == nil {
+		return ErrUnsupportedOperation.Error()
+	}
+	return fmt.Sprintf("%s: %s", ErrUnsupportedOperation, e.Operation+" at "+e.Path)
+}
+
+func (*UnsupportedOperationError) Unwrap() error {
+	return ErrUnsupportedOperation
+}
+
 func compileWorkflowProgram(
 	document workflowv1.WorkflowDocument,
 	input sessionv3Runtime.CanonicalValue,
 ) (sessionv3Runtime.WorkflowProgram, error) {
+	return compileWorkflowProgramWithInput(document, input, true)
+}
+
+func compileWorkflowProgramTemplate(
+	document workflowv1.WorkflowDocument,
+) (sessionv3Runtime.WorkflowProgram, error) {
+	return compileWorkflowProgramWithInput(document, nil, false)
+}
+
+func compileWorkflowProgramWithInput(
+	document workflowv1.WorkflowDocument,
+	input sessionv3Runtime.CanonicalValue,
+	inputBound bool,
+) (sessionv3Runtime.WorkflowProgram, error) {
+	if err := rejectUnsupportedWorkflowDocument(document); err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 	inputSchema, err := compileWorkflowSchema(
 		document,
 		document.InputSchema,
@@ -43,30 +83,86 @@ func compileWorkflowProgram(
 		InputSchema:  inputSchema,
 		OutputSchema: outputSchema,
 		Input:        input.Clone(),
+		InputBound:   inputBound,
 		Root:         root,
 		Targets:      make(map[string]sessionv3Runtime.WorkflowTarget),
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
-	if err := output.ValidateInput(); err != nil {
-		return sessionv3Runtime.WorkflowProgram{}, err
+	if inputBound {
+		if err := output.ValidateInput(); err != nil {
+			return sessionv3Runtime.WorkflowProgram{}, err
+		}
 	}
 	return output, nil
+}
+
+func rejectUnsupportedWorkflowDocument(
+	document workflowv1.WorkflowDocument,
+) error {
+	switch {
+	case len(document.Events) != 0:
+		return unsupportedWorkflowOperation("workflow", "events")
+	case len(document.Channels) != 0:
+		return unsupportedWorkflowOperation("workflow", "channels")
+	case len(document.Ports) != 0:
+		return unsupportedWorkflowOperation("workflow", "ports")
+	case len(document.Triggers) != 0:
+		return unsupportedWorkflowOperation("workflow", "triggers")
+	case len(document.Resources) != 0:
+		return unsupportedWorkflowOperation("workflow", "resources")
+	case document.Limits != nil:
+		return unsupportedWorkflowOperation("workflow", "limits")
+	}
+
+	for name, targetSet := range document.TargetSets {
+		if targetSet.Resolved != nil {
+			return unsupportedWorkflowOperation(
+				"targetSets/"+name,
+				"resolver-backed dynamic target set",
+			)
+		}
+	}
+	return nil
+}
+
+func unsupportedWorkflowOperation(path, operation string) error {
+	return &UnsupportedOperationError{
+		Path:      path,
+		Operation: operation,
+	}
 }
 
 func compileWorkflowBlock(
 	document workflowv1.WorkflowDocument,
 	block workflowv1.Block,
 ) (sessionv3Runtime.WorkflowBlock, error) {
-	if len(block.Listen) != 0 ||
-		len(block.Catch) != 0 ||
-		block.Finally != nil {
-		return sessionv3Runtime.WorkflowBlock{}, errors.New(
-			"workflow listeners, catch handlers, and finally blocks are not executable by runtime v3 yet",
+	if len(block.Listen) != 0 {
+		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
+			"block",
+			"listeners",
 		)
 	}
+	if len(block.Catch) != 0 {
+		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
+			"block",
+			"catch handlers",
+		)
+	}
+	if block.Finally != nil {
+		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
+			"block",
+			"finally block",
+		)
+	}
+	return compileWorkflowBlockCore(document, block)
+}
 
+func compileWorkflowBlockCore(
+	document workflowv1.WorkflowDocument,
+	block workflowv1.Block,
+) (sessionv3Runtime.WorkflowBlock, error) {
 	output, err := compileWorkflowValue(block.Output)
 	if err != nil {
 		return sessionv3Runtime.WorkflowBlock{}, err
@@ -112,14 +208,31 @@ func compileWorkflowStep(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
-	if input.Timeout != "" ||
-		input.Retry != nil ||
-		input.Effect != nil ||
-		len(input.Claims) != 0 ||
-		input.Limits != nil {
-		return sessionv3Runtime.WorkflowStep{}, fmt.Errorf(
-			"workflow step %q uses retry, effect, claims, timeout, or limits that runtime v3 does not execute yet",
-			input.ID,
+	switch {
+	case input.Timeout != "":
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"timeout",
+		)
+	case input.Retry != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"retry",
+		)
+	case input.Effect != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"effect",
+		)
+	case len(input.Claims) != 0:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"resource claims",
+		)
+	case input.Limits != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"limits",
 		)
 	}
 
@@ -216,9 +329,71 @@ func compileWorkflowStep(
 			Message: message,
 		}
 
+	case input.Scope != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"scope",
+		)
+	case input.Choose != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"choose",
+		)
+	case input.Parallel != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"parallel",
+		)
+	case input.Foreach != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"foreach",
+		)
+	case input.Repeat != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"repeat",
+		)
+	case input.Machine != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"machine",
+		)
+	case input.Wait != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"wait",
+		)
+	case input.Emit != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"emit",
+		)
+	case input.Saga != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"saga",
+		)
+	case input.Cancel != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"cancel",
+		)
+	case input.Break != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"break",
+		)
+	case input.Continue != nil:
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"continue",
+		)
+
 	default:
-		return sessionv3Runtime.WorkflowStep{}, errors.New(
-			"workflow operation is not executable by runtime v3 yet",
+		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
+			"steps/"+input.ID,
+			"unknown operation",
 		)
 	}
 
@@ -229,16 +404,16 @@ func compileWorkflowCall(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Call,
 ) (sessionv3Runtime.WorkflowCall, error) {
-	if input.Mode != "" && input.Mode != "invoke" ||
+	if (input.Mode != "" && input.Mode != "invoke") ||
 		input.Lifetime != "" ||
 		input.Ownership != nil ||
 		len(input.Conversation) != 0 ||
 		input.OnCompletion != "" ||
 		len(input.Context) != 0 ||
-		len(input.Ports) != 0 ||
-		input.Interface != nil {
-		return sessionv3Runtime.WorkflowCall{}, errors.New(
-			"workflow call mode, ownership, context, ports, and inline interfaces are not executable by runtime v3 yet",
+		len(input.Ports) != 0 {
+		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
+			"call",
+			"call mode, ownership, context, or ports",
 		)
 	}
 
@@ -251,9 +426,17 @@ func compileWorkflowCall(
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
 
+	contract, err := compileWorkflowCallableInterface(
+		document,
+		input.Interface,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowCall{}, err
+	}
 	output := sessionv3Runtime.WorkflowCall{
-		Target: target,
-		Input:  callInput,
+		Target:   target,
+		Input:    callInput,
+		Contract: contract,
 	}
 	if input.Allowed == "" {
 		return output, nil
@@ -267,12 +450,85 @@ func compileWorkflowCall(
 		)
 	}
 	if set.Resolved != nil {
-		return sessionv3Runtime.WorkflowCall{}, errors.New(
-			"workflow dynamic target sets are not executable by runtime v3 yet",
+		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
+			"targetSets/"+input.Allowed,
+			"resolver-backed dynamic target set",
 		)
 	}
 	output.AllowedTargets = append([]string(nil), set.Members...)
 	return output, nil
+}
+
+func compileWorkflowCallableInterface(
+	document workflowv1.WorkflowDocument,
+	input *workflowv1.CallableInterface,
+) (*sessionv3Runtime.WorkflowCallableInterface, error) {
+	if input == nil {
+		//nolint:nilnil // Ok.
+		return nil, nil
+	}
+
+	inputSchema, err := compileWorkflowSchema(document, input.InputSchema)
+	if err != nil {
+		return nil, err
+	}
+	outputSchema, err := compileWorkflowSchema(document, input.OutputSchema)
+	if err != nil {
+		return nil, err
+	}
+	errorSchema, err := compileWorkflowSchema(document, input.ErrorSchema)
+	if err != nil {
+		return nil, err
+	}
+	receiptSchema, err := compileWorkflowSchema(document, input.ReceiptSchema)
+	if err != nil {
+		return nil, err
+	}
+	if len(inputSchema) == 0 || len(outputSchema) == 0 {
+		return nil, errors.New("workflow callable interface schemas are incomplete")
+	}
+
+	return &sessionv3Runtime.WorkflowCallableInterface{
+		InputSchema:   inputSchema,
+		OutputSchema:  outputSchema,
+		ErrorSchema:   errorSchema,
+		ReceiptSchema: receiptSchema,
+	}, nil
+}
+
+func compileWorkflowEffect(
+	input *workflowv1.EffectContract,
+) (sessionv3Runtime.EffectContract, error) {
+	if input == nil {
+		return sessionv3Runtime.EffectContract{
+			Kind: sessionv3Runtime.EffectKindNonIdempotent,
+		}, nil
+	}
+
+	switch input.Kind {
+	case "read":
+		return sessionv3Runtime.EffectContract{
+			Kind: sessionv3Runtime.EffectKindRead,
+		}, nil
+	case "idempotent":
+		return sessionv3Runtime.EffectContract{
+			Kind: sessionv3Runtime.EffectKindIdempotent,
+		}, nil
+	case "non-idempotent":
+		return sessionv3Runtime.EffectContract{
+			Kind: sessionv3Runtime.EffectKindNonIdempotent,
+		}, nil
+	case "keyed":
+		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
+			"target.interface.effect",
+			"keyed effect without a typed operation key",
+		)
+	default:
+		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
+			"target.interface.effect",
+			"unknown effect contract",
+		)
+	}
 }
 
 func compileWorkflowSchema(

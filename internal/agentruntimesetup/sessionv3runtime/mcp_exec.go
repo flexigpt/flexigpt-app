@@ -57,9 +57,17 @@ func (b *Binder) bindTool(
 	if err := call.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+
+	effectivePayload := *payload
+	effectivePayload.Call = call
+	effectiveRequest := req
+	effectiveRequest.WorkItem = req.WorkItem
+	effectiveRequest.WorkItem.Input = req.WorkItem.Input
+	effectiveRequest.WorkItem.Input.Tool = &effectivePayload
+
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindMCP &&
 		b.mcpTools != nil {
-		result, handled, err := b.mcpTools.Bind(ctx, req)
+		result, handled, err := b.mcpTools.Bind(ctx, effectiveRequest)
 		if handled || err != nil {
 			return result, err
 		}
@@ -71,9 +79,7 @@ func (b *Binder) bindTool(
 		BoundAt:           boundNow(),
 	}
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindMCP {
-		effective := *payload
-		effective.Call = call
-		mapping, invokeReq, err := b.mappedMCPRequest(&effective)
+		mapping, invokeReq, err := b.mappedMCPRequest(&effectivePayload)
 		if err != nil {
 			return sessionv3Runtime.BindResult{}, err
 		}

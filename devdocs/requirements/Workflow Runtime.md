@@ -55,6 +55,35 @@ program uses typed blocks, steps, targets, state, and value templates.
 semantic structures must not expose `json.RawMessage` or persist
 `map[string]any` as their primary model.
 
+## Typed boundary discipline
+
+Session Runtime v3 uses concrete types whenever the runtime owns the
+semantics. This includes:
+
+- Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, and Outcome.
+- Artifact pins, selections, target kinds, binding IDs, binding versions, and
+  semantic binding facts.
+- Retry policy, deadline, effect contract, resource claim, budget, receipt,
+  control-flow, and state-machine state.
+- Typed Workflow blocks, steps, targets, values, state, outcomes, and
+  WorkItem payload unions.
+
+`CanonicalValue` is used only for arbitrary JSON that is intentionally
+schema-defined or external:
+
+- User input and arbitrary Workflow values.
+- JSON Schema documents.
+- CEL expression literals and results.
+- Generic Tool arguments and external Tool output.
+- Schema-defined state values.
+- Event, channel, correlation, metadata, and human-response data.
+- Generic ProgramSnapshot payload and ProgramState data envelopes.
+
+`jsonutil` is a conversion utility, not a durable runtime model. A domain
+binder decodes a generic canonical value once into a concrete request type at
+its boundary. Session Runtime does not retain a decoded `map[string]any` as
+durable orchestration state.
+
 ## Persistence
 
 `internal/sessionstorev3` owns one Session document per Session ID. Index and
@@ -106,9 +135,10 @@ Built-in interpreters are versioned:
 | `builtin.conversation@1` | Ordinary Session chat and visible message history.       |
 | `builtin.agent-loop@1`   | LLM, Tool, approval, Tool result, and continuation loop. |
 | `builtin.single-model@1` | One direct Model call.                                   |
-| `artifact.workflow.v1@1` | Legacy early Workflow payload compatibility only.        |
-| `artifact.workflow.v1@2` | Current typed runtime-neutral Workflow program.          |
+| `artifact.workflow.v1@1` | Current typed runtime-neutral Workflow program.          |
 
+`artifact.workflow.v1@1` is development-only and is replaced in place by the
+typed runtime-neutral Workflow payload. It is not an offline migration target.
 The current Workflow interpreter owns its bounded typed ProgramFrame payload
 and state. Artifact setup compiles Workflow source into this payload before
 Session creates external work. It maps Workflow calls as follows:
@@ -130,6 +160,16 @@ Session creates external work. It maps Workflow calls as follows:
 | Emit                                               | Emit WorkItem.                                          |
 | Saga recovery                                      | Compensation WorkItem.                                  |
 
+At completion, every mapping in this table is implemented with typed durable
+semantics. A valid Workflow v1 operation cannot remain a permanent
+unsupported-operation admission failure because an implementation is missing.
+
+Agent and Model calls use typed Agent-loop and single-model execution plans.
+They do not serialize arbitrary Workflow JSON into a chat message. Workspace,
+instruction, text, Tool, Skill, MCP, attachment, message, and port
+contributions are compiled by their domain runtime setup packages before a
+Model WorkItem dispatches.
+
 ## Completion rule
 
 Workflow Runtime does not accept partially executable behavior.
@@ -144,6 +184,16 @@ the following during admission:
 The runtime must never accept an operation and later treat it as a no-op,
 silently omit it, or change its declared effect behavior.
 
+During development, typed admission rejection protects users from partial
+execution. It is not the target completion state. Completion requires all
+valid Workflow v1 operations to compile and execute. Admission rejection then
+applies only to invalid declarations, unavailable required bindings, current
+policy or credential failures, and behavior outside Workflow v1.
+
+No Workflow operation may fabricate a successful result. Provider, Tool, MCP,
+Skill, Service, Activity, Model, Agent, or child Workflow failure must produce
+a typed failure, cancellation, or uncertainty outcome.
+
 The required durable sequence for external work is:
 
 1. Persist WorkItem intent.
@@ -154,7 +204,10 @@ The required durable sequence for external work is:
 6. Persist confirmed result, failure, receipt, or uncertainty.
 
 After a process stop, a dispatched non-idempotent WorkItem without a confirmed
-outcome is uncertain. It is not automatically replayed.
+outcome is uncertain. It is not automatically replayed. Unsupported Workflow
+operations are rejected during admission with a typed unsupported-operation
+error. They are never silently omitted and never fail only after unrelated
+external work begins.
 
 Compiled CEL programs, compiled JSON Schemas, authorization references,
 clients, callbacks, timers, and cancellation functions remain process-private.
@@ -176,40 +229,73 @@ test clients use the same command and projection service.
 
 ## Implementation status
 
-Implemented foundation:
+This document defines the required completed V3 backend state. Foundation work
+does not satisfy completion by itself.
 
-- Session Runtime v3 durable model.
-- Session Store v3 one-document persistence, restore, index, FTS, search,
-  export, tombstones, and derived-data rebuild.
-- Conversation, Activity, and Workflow projections.
-- Built-in conversation, Agent-loop, and single-model ProgramFrames.
-- Workflow declaration validation and Artifact planning through
-  `workflow.Service.ResolvePlan`.
-- Workflow Artifact pinning, nested Workflow admission, and Service/Activity
-  binding registry foundation.
-- Service and Activity binding registry and runtime binder composition.
-- Tool approval waits, cancellation, recovery, uncertain effect handling, and
-  Session command idempotency.
-- Wails-independent backend command service and Wails delegation.
-- Runtime setup that preserves `FetchCompletion` as provider execution.
+The V3 backend is complete only when all of the following are true:
 
-Workflow Runtime is not complete until all Workflow v1 operations have typed
-compiler and interpreter support. Current completion work is ordered as:
+- Session Runtime v3 is a functional backend superset of normal Session v2
+  behavior.
+- Every valid Workflow v1 operation, target mode, control-flow construct,
+  coordination primitive, effect contract, and limit has typed compiler and
+  interpreter support.
+- All V3 external work follows durable intent, current dependency resolution,
+  pin verification, semantic binding persistence, dispatch persistence, and
+  confirmed-result-or-uncertainty persistence.
+- Agent, Model, Workspace, Tool, MCP, Skill, attachment, Service, Activity,
+  and Workflow behavior remains in its owning domain runtime package.
+- V3 WorkItems preserve cancellation, retry, deadline, panic, recovery,
+  uncertainty, reconciliation, and compensation semantics across restart.
+- V3 Session commands and projections are available through the
+  transport-neutral backend command service. Wails remains an adapter.
+- V3 Store persistence, restore, tombstones, derived index rebuild, FTS
+  rebuild, command idempotency, and recovery are verified.
+- No valid Workflow v1 feature is silently omitted or left as a permanent
+  unsupported runtime feature.
 
-1. Typed runtime-neutral Workflow program compiler and interpreter versioning.
-2. Sequential operations, typed Tool/MCP Tool targets, Service, Activity, and
-   nested Workflow execution.
-3. Runtime lifecycle correctness: retry, timeout, cancellation, panic,
-   uncertainty, and recovery.
-4. Agent, Model, Workspace, Skill, and MCP preparation plans.
-5. Structured control flow: scope, choose, repeat, parallel, foreach, fork,
-   join, break, and continue.
-6. Durable coordination: waits, events, channels, signals, machines, and
-   triggers.
-7. Effects, reconciliation, compensation, claims, and limits.
+### Session Runtime v3 functional superset requirement
 
-The offline migration remains separate tooling. It translates v2 transcript
-and Run data to v3 Timeline and Executions, removes private runtime data,
+Session Runtime v3 must provide typed backend equivalents for all normal
+Session v2 behavior:
+
+- Direct Model chat and Agent-backed chat.
+- Workspace and instruction contributions.
+- Attachment preparation, snapshotting, replay, and provider adaptation.
+- Model streaming, protocol outputs, usage, debugger data, and continuation.
+- Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity
+  behavior.
+- MCP resources, prompts, Apps, approvals, and approved App context.
+- Waiting, cancellation, recovery, uncertainty, retry, and command
+  idempotency behavior.
+
+This functional-superset requirement does not require:
+
+- Frontend Session v3 adoption.
+- Offline v2-to-v3 migration.
+- V2 Session Runtime or Session Store deletion.
+- Automatic reading of V2 durable documents by V3.
+
+V2 remains supported until separate migration, adoption, and deletion
+decisions are approved.
+
+### Required completion scope
+
+Completion includes:
+
+1. Typed compiler and interpreter integrity.
+2. Sequential Workflow execution and all callable targets.
+3. WorkItem lifecycle correctness.
+4. Agent, Model, Workspace, Skill, MCP, attachment, text, and instruction
+   execution plans.
+5. Structured control flow.
+6. Durable coordination.
+7. Effects, reconciliation, compensation, claims, budgets, and limits.
+8. Transport-neutral Session v3 command and projection service support.
+9. Removal of duplicate V3 fallback logic from Session setup when domain
+   runtimes own the behavior.
+
+The offline migration remains separate tooling. It translates V2 transcript
+and Run data to V3 Timeline and Executions, removes private runtime data,
 changes in-flight external work to uncertain, and rebuilds derived Session
 Store data. Frontend adoption and deletion of legacy runtime paths occur only
-after runtime completion and migration.
+after V3 backend completion and migration approval.

@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	WorkflowInterpreterID      = "artifact.workflow.v1"
+	WorkflowInterpreterID = "artifact.workflow.v1"
+
+	// WorkflowInterpreterVersion is the current typed Workflow program
+	// interpreter. This development-only payload replaces the prior
+	// development payload in place and intentionally remains version 1.
 	WorkflowInterpreterVersion = uint32(1)
 
 	maxWorkflowProgramJSONBytes = 2 << 20
@@ -44,12 +48,20 @@ type WorkflowValuePair struct {
 	Value WorkflowValue `json:"value"`
 }
 
+type WorkflowCallableInterface struct {
+	InputSchema   CanonicalValue `json:"inputSchema"`
+	OutputSchema  CanonicalValue `json:"outputSchema"`
+	ErrorSchema   CanonicalValue `json:"errorSchema,omitempty"`
+	ReceiptSchema CanonicalValue `json:"receiptSchema,omitempty"`
+}
+
 type WorkflowProgram struct {
 	Version uint32 `json:"version"`
 
 	InputSchema  CanonicalValue `json:"inputSchema"`
 	OutputSchema CanonicalValue `json:"outputSchema"`
 	Input        CanonicalValue `json:"input"`
+	InputBound   bool           `json:"inputBound"`
 
 	Root    WorkflowBlock             `json:"root"`
 	Targets map[string]WorkflowTarget `json:"targets"`
@@ -79,9 +91,10 @@ type WorkflowStep struct {
 }
 
 type WorkflowCall struct {
-	Target         WorkflowValue `json:"target"`
-	AllowedTargets []string      `json:"allowedTargets,omitempty"`
-	Input          WorkflowValue `json:"input"`
+	Target         WorkflowValue              `json:"target"`
+	AllowedTargets []string                   `json:"allowedTargets,omitempty"`
+	Input          WorkflowValue              `json:"input"`
+	Contract       *WorkflowCallableInterface `json:"contract,omitempty"`
 }
 
 type WorkflowTransform struct {
@@ -125,8 +138,10 @@ type WorkflowTarget struct {
 	ActivityID     string `json:"activityID,omitempty"`
 	BindingVersion string `json:"bindingVersion,omitempty"`
 
-	NestedProgram *ProgramSnapshot `json:"nestedProgram,omitempty"`
-	ToolName      string           `json:"toolName,omitempty"`
+	NestedProgram *ProgramSnapshot           `json:"nestedProgram,omitempty"`
+	ToolName      string                     `json:"toolName,omitempty"`
+	Contract      *WorkflowCallableInterface `json:"contract,omitempty"`
+	Effect        EffectContract             `json:"effect"`
 }
 
 type WorkflowMCP struct {
@@ -134,17 +149,89 @@ type WorkflowMCP struct {
 	ToolName string      `json:"toolName"`
 }
 
-type workflowProgramState struct {
+type WorkflowStepOutcomeStatus string
+
+const (
+	WorkflowStepOutcomeSucceeded WorkflowStepOutcomeStatus = "succeeded"
+	WorkflowStepOutcomeSkipped   WorkflowStepOutcomeStatus = "skipped"
+)
+
+type WorkflowStepOutcome struct {
+	ID     string                    `json:"id"`
+	Status WorkflowStepOutcomeStatus `json:"status"`
+	Output CanonicalValue            `json:"output,omitempty"`
+}
+
+// WorkflowState is the durable typed state of one sequential Workflow frame.
+// It contains semantic state and step outcomes only. It never contains CEL
+// programs, compiled schemas, Artifact services, clients, callbacks, or
+// private authorization data.
+type WorkflowState struct {
 	Version uint32 `json:"version"`
 
-	Index       int                       `json:"index"`
-	PendingPath string                    `json:"pendingPath,omitempty"`
-	State       CanonicalValue            `json:"state"`
-	Outputs     map[string]CanonicalValue `json:"outputs"`
+	Index       int                   `json:"index"`
+	PendingPath string                `json:"pendingPath,omitempty"`
+	State       CanonicalValue        `json:"state"`
+	Outcomes    []WorkflowStepOutcome `json:"outcomes"`
 }
 
 type WorkflowInterpreter struct {
 	env *cel.Env
+}
+
+func (s *WorkflowState) Validate() error {
+	if s.Version != WorkflowInterpreterVersion ||
+		s.Index < 0 ||
+		!s.State.Valid() ||
+		s.Outcomes == nil {
+		return errors.New("Workflow Program state is invalid")
+	}
+	seen := make(map[string]struct{}, len(s.Outcomes))
+	for _, outcome := range s.Outcomes {
+		if strings.TrimSpace(outcome.ID) == "" ||
+			!outcome.Output.Valid() {
+			return errors.New("Workflow Program output state is invalid")
+		}
+		switch outcome.Status {
+		case WorkflowStepOutcomeSucceeded:
+			if len(outcome.Output) == 0 {
+				return errors.New("successful Workflow step has no output")
+			}
+		case WorkflowStepOutcomeSkipped:
+			if len(outcome.Output) != 0 {
+				return errors.New("skipped Workflow step has an output")
+			}
+		default:
+			return errors.New("Workflow step outcome status is invalid")
+		}
+		if _, duplicate := seen[outcome.ID]; duplicate {
+			return errors.New("Workflow Program step outcome is duplicated")
+		}
+		seen[outcome.ID] = struct{}{}
+	}
+	return nil
+}
+
+func (s *WorkflowState) recordOutcome(
+	outcome WorkflowStepOutcome,
+) error {
+	if s == nil || strings.TrimSpace(outcome.ID) == "" {
+		return errors.New("workflow step outcome is invalid")
+	}
+	for _, current := range s.Outcomes {
+		if current.ID == outcome.ID {
+			return fmt.Errorf(
+				"workflow step %q already has an outcome",
+				outcome.ID,
+			)
+		}
+	}
+	s.Outcomes = append(s.Outcomes, WorkflowStepOutcome{
+		ID:     outcome.ID,
+		Status: outcome.Status,
+		Output: outcome.Output.Clone(),
+	})
+	return nil
 }
 
 func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
@@ -212,7 +299,7 @@ func (*WorkflowInterpreter) ValidateState(
 		return errors.New("unsupported Workflow state version")
 	}
 
-	value, err := DecodeCanonicalValue[workflowProgramState](state.Data)
+	value, err := DecodeCanonicalValue[WorkflowState](state.Data)
 	if err != nil {
 		return err
 	}
@@ -230,10 +317,10 @@ func (i *WorkflowInterpreter) InitialState(
 		return ProgramState{}, err
 	}
 
-	state := workflowProgramState{
-		Version: WorkflowInterpreterVersion,
-		State:   MustCanonicalValue(map[string]any{}),
-		Outputs: map[string]CanonicalValue{},
+	state := WorkflowState{
+		Version:  WorkflowInterpreterVersion,
+		State:    MustCanonicalValue(map[string]any{}),
+		Outcomes: []WorkflowStepOutcome{},
 	}
 	if program.Root.State != nil {
 		value, err := i.evaluate(
@@ -272,12 +359,22 @@ func (i *WorkflowInterpreter) Advance(
 		return workflowTransition(state, &status, nil, nil)
 
 	case ProgramEventWorkSettled:
-		if err := i.settleWork(&state, execution, event.WorkItemID); err != nil {
+		if err := i.settleWork(
+			&state,
+			program,
+			execution,
+			event.WorkItemID,
+		); err != nil {
 			return workflowFailure(state, "workflow_work_failed", err.Error())
 		}
 
 	case ProgramEventChildSettled:
-		if err := i.settleChild(&state, execution, event.ChildFrameID); err != nil {
+		if err := i.settleChild(
+			&state,
+			program,
+			execution,
+			event.ChildFrameID,
+		); err != nil {
 			return workflowFailure(state, "workflow_child_failed", err.Error())
 		}
 
@@ -294,7 +391,7 @@ func (i *WorkflowInterpreter) drive(
 	frame ProgramFrame,
 	execution Execution,
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 ) (ProgramTransition, error) {
 	for {
 		if state.PendingPath != "" {
@@ -346,6 +443,16 @@ func (i *WorkflowInterpreter) drive(
 				)
 			}
 			if !allowed {
+				if err := state.recordOutcome(WorkflowStepOutcome{
+					ID:     step.ID,
+					Status: WorkflowStepOutcomeSkipped,
+				}); err != nil {
+					return workflowFailure(
+						state,
+						"workflow_state_invalid",
+						err.Error(),
+					)
+				}
 				state.Index++
 				continue
 			}
@@ -439,7 +546,7 @@ func (i *WorkflowInterpreter) drive(
 func (i *WorkflowInterpreter) call(
 	frame ProgramFrame,
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 	path string,
 	call WorkflowCall,
 ) (ProgramTransition, error) {
@@ -477,6 +584,15 @@ func (i *WorkflowInterpreter) call(
 			err.Error(),
 		)
 	}
+	if err := validateWorkflowInterfaceInput(
+		target.Contract,
+		input,
+	); err != nil {
+		return workflowFailure(state, "workflow_target_input_invalid", err.Error())
+	}
+	if err := validateWorkflowInterfaceInput(call.Contract, input); err != nil {
+		return workflowFailure(state, "workflow_call_input_invalid", err.Error())
+	}
 
 	switch target.Kind {
 	case WorkflowTargetTool:
@@ -494,9 +610,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
-				Effect: EffectContract{
-					Kind: EffectKindNonIdempotent,
-				},
+				Effect:      target.Effect,
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -531,9 +645,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
-				Effect: EffectContract{
-					Kind: EffectKindNonIdempotent,
-				},
+				Effect:      target.Effect,
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -564,9 +676,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeService,
 				Automatic:   true,
-				Effect: EffectContract{
-					Kind: EffectKindNonIdempotent,
-				},
+				Effect:      target.Effect,
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
 						ServiceID:      target.ServiceID,
@@ -585,9 +695,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeActivity,
 				Automatic:   true,
-				Effect: EffectContract{
-					Kind: EffectKindNonIdempotent,
-				},
+				Effect:      target.Effect,
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
 						ActivityID:     target.ActivityID,
@@ -652,7 +760,7 @@ func (i *WorkflowInterpreter) call(
 
 func (i *WorkflowInterpreter) transform(
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 	path string,
 	step WorkflowStep,
 ) (ProgramTransition, error) {
@@ -665,26 +773,6 @@ func (i *WorkflowInterpreter) transform(
 		return workflowFailure(
 			state,
 			"workflow_transform_failed",
-			err.Error(),
-		)
-	}
-	if err := validateWorkflowSchema(
-		step.Transform.OutputSchema,
-		value,
-	); err != nil {
-		return workflowFailure(
-			state,
-			"workflow_transform_output_invalid",
-			err.Error(),
-		)
-	}
-	if err := validateWorkflowSchema(
-		step.OutputSchema,
-		value,
-	); err != nil {
-		return workflowFailure(
-			state,
-			"workflow_step_output_invalid",
 			err.Error(),
 		)
 	}
@@ -701,7 +789,8 @@ func (i *WorkflowInterpreter) transform(
 			},
 			Input: WorkItemPayload{
 				Transform: &TransformWork{
-					Input: value,
+					Input:        value,
+					OutputSchema: step.Transform.OutputSchema.Clone(),
 				},
 			},
 		},
@@ -710,7 +799,7 @@ func (i *WorkflowInterpreter) transform(
 
 func (i *WorkflowInterpreter) set(
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 	path string,
 	set WorkflowSet,
 ) (ProgramTransition, error) {
@@ -758,6 +847,8 @@ func (i *WorkflowInterpreter) set(
 			},
 			Input: WorkItemPayload{
 				StateUpdate: &StateUpdateWork{
+					Base:        state.State.Clone(),
+					Schema:      program.Root.State.Schema.Clone(),
 					Assignments: assignments,
 					RemovePaths: append([]string(nil), set.Remove...),
 				},
@@ -767,7 +858,8 @@ func (i *WorkflowInterpreter) set(
 }
 
 func (i *WorkflowInterpreter) settleWork(
-	state *workflowProgramState,
+	state *WorkflowState,
+	program WorkflowProgram,
 	execution Execution,
 	workID WorkItemID,
 ) error {
@@ -783,45 +875,55 @@ func (i *WorkflowInterpreter) settleWork(
 		return nil
 	}
 	if item.State != WorkItemStateCompleted {
+		return fmt.Errorf("Workflow WorkItem %q did not complete successfully", workID)
+	}
+	if item.Output != nil &&
+		item.Output.Tool != nil &&
+		item.Output.Tool.Kind != ToolOutputKindSuccess {
 		return fmt.Errorf(
-			"Workflow WorkItem %q did not complete successfully",
+			"Workflow Tool WorkItem %q returned an error result",
 			workID,
 		)
 	}
 
-	stepID, found := strings.CutPrefix(item.ProgramPath, "step/")
-	if !found || strings.TrimSpace(stepID) == "" {
-		return errors.New("Workflow WorkItem has an invalid program path")
+	step, err := workflowStepForPath(program.Root, item.ProgramPath)
+	if err != nil {
+		return err
 	}
-
+	value, err := workflowWorkValue(*item)
+	if err != nil {
+		return err
+	}
 	switch item.Type {
 	case WorkItemTypeStateUpdate:
 		if item.Input.StateUpdate == nil {
 			return errors.New("Workflow StateUpdate WorkItem has no payload")
 		}
-		if err := applyWorkflowState(
-			state,
-			*item.Input.StateUpdate,
-		); err != nil {
-			return err
+		if program.Root.State == nil {
+			return errors.New("Workflow StateUpdate WorkItem has no state declaration")
 		}
-		state.Outputs[stepID] = state.State.Clone()
-
+		state.State = value.Clone()
 	default:
-		value, err := workflowWorkValue(*item)
-		if err != nil {
-			return err
-		}
-		state.Outputs[stepID] = value
 	}
 
+	if err := i.validateStepOutput(program, *state, step, value); err != nil {
+		return err
+	}
+	if err := state.recordOutcome(WorkflowStepOutcome{
+		ID:     step.ID,
+		Status: WorkflowStepOutcomeSucceeded,
+		Output: value,
+	}); err != nil {
+		return err
+	}
 	state.PendingPath = ""
 	state.Index++
 	return nil
 }
 
 func (i *WorkflowInterpreter) settleChild(
-	state *workflowProgramState,
+	state *WorkflowState,
+	program WorkflowProgram,
 	execution Execution,
 	childID ProgramFrameID,
 ) error {
@@ -839,12 +941,25 @@ func (i *WorkflowInterpreter) settleChild(
 		if child.Status != ProgramFrameStateCompleted {
 			return errors.New("nested workflow ProgramFrame did not complete")
 		}
-
-		stepID, found := strings.CutPrefix(child.Path, "step/")
-		if !found || strings.TrimSpace(stepID) == "" {
-			return errors.New("nested workflow ProgramFrame has an invalid path")
+		step, err := workflowStepForPath(program.Root, child.Path)
+		if err != nil {
+			return err
 		}
-		state.Outputs[stepID] = child.Output.Clone()
+		if err := i.validateStepOutput(
+			program,
+			*state,
+			step,
+			child.Output,
+		); err != nil {
+			return err
+		}
+		if err := state.recordOutcome(WorkflowStepOutcome{
+			ID:     step.ID,
+			Status: WorkflowStepOutcomeSucceeded,
+			Output: child.Output,
+		}); err != nil {
+			return err
+		}
 		state.PendingPath = ""
 		state.Index++
 		return nil
@@ -852,10 +967,76 @@ func (i *WorkflowInterpreter) settleChild(
 	return errors.New("nested workflow ProgramFrame is unavailable")
 }
 
+func workflowStepForPath(
+	block WorkflowBlock,
+	path string,
+) (WorkflowStep, error) {
+	stepID, found := strings.CutPrefix(path, "step/")
+	if !found || strings.TrimSpace(stepID) == "" {
+		return WorkflowStep{}, errors.New("Workflow WorkItem has an invalid program path")
+	}
+	for _, step := range block.Steps {
+		if step.ID == stepID {
+			return step, nil
+		}
+	}
+	return WorkflowStep{}, fmt.Errorf("Workflow step %q is unavailable", stepID)
+}
+
+func (i *WorkflowInterpreter) validateStepOutput(
+	program WorkflowProgram,
+	state WorkflowState,
+	step WorkflowStep,
+	value CanonicalValue,
+) error {
+	if err := validateWorkflowSchema(step.OutputSchema, value); err != nil {
+		return fmt.Errorf("validate Workflow step output: %w", err)
+	}
+	if step.Call == nil {
+		return nil
+	}
+
+	targetName, err := i.stringValue(step.Call.Target, program, state)
+	if err != nil {
+		return fmt.Errorf("resolve Workflow call target: %w", err)
+	}
+	target, found := program.Targets[targetName]
+	if !found {
+		return fmt.Errorf("Workflow target %q is unavailable", targetName)
+	}
+	if err := validateWorkflowInterfaceOutput(target.Contract, value); err != nil {
+		return fmt.Errorf("validate Workflow target output: %w", err)
+	}
+	if err := validateWorkflowInterfaceOutput(step.Call.Contract, value); err != nil {
+		return fmt.Errorf("validate Workflow call output: %w", err)
+	}
+	return nil
+}
+
+func validateWorkflowInterfaceInput(
+	contract *WorkflowCallableInterface,
+	value CanonicalValue,
+) error {
+	if contract == nil {
+		return nil
+	}
+	return validateWorkflowSchema(contract.InputSchema, value)
+}
+
+func validateWorkflowInterfaceOutput(
+	contract *WorkflowCallableInterface,
+	value CanonicalValue,
+) error {
+	if contract == nil {
+		return nil
+	}
+	return validateWorkflowSchema(contract.OutputSchema, value)
+}
+
 func (i *WorkflowInterpreter) evaluate(
 	value WorkflowValue,
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 ) (CanonicalValue, error) {
 	switch value.Kind {
 	case WorkflowValueLiteral:
@@ -921,14 +1102,14 @@ func (i *WorkflowInterpreter) evaluate(
 		return canonicalWorkflowValue(output)
 
 	default:
-		return nil, errors.New("Workflow value has an unsupported kind")
+		return nil, errors.New("workflow value has an unsupported kind")
 	}
 }
 
 func (i *WorkflowInterpreter) condition(
 	value WorkflowValue,
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 ) (bool, error) {
 	result, err := i.evaluate(value, program, state)
 	if err != nil {
@@ -940,7 +1121,7 @@ func (i *WorkflowInterpreter) condition(
 func (i *WorkflowInterpreter) stringValue(
 	value WorkflowValue,
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 ) (string, error) {
 	result, err := i.evaluate(value, program, state)
 	if err != nil {
@@ -953,12 +1134,15 @@ func (p WorkflowProgram) Validate() error {
 	if p.Version != WorkflowInterpreterVersion {
 		return errors.New("unsupported Workflow Program version")
 	}
+	if p.InputBound && len(p.Input) == 0 {
+		return errors.New("bound Workflow Program input is missing")
+	}
 	if len(p.InputSchema) == 0 ||
 		len(p.OutputSchema) == 0 ||
 		!p.InputSchema.Valid() ||
 		!p.OutputSchema.Valid() ||
 		!p.Input.Valid() {
-		return errors.New("Workflow Program schemas or input are invalid")
+		return errors.New("workflow Program schemas or input are invalid")
 	}
 	if err := p.Root.Validate(); err != nil {
 		return err
@@ -975,6 +1159,9 @@ func (p WorkflowProgram) Validate() error {
 }
 
 func (p WorkflowProgram) ValidateInput() error {
+	if !p.InputBound {
+		return errors.New("Workflow Program input has not been bound")
+	}
 	return validateWorkflowSchema(p.InputSchema, p.Input)
 }
 
@@ -1070,6 +1257,9 @@ func (c WorkflowCall) Validate() error {
 		}
 		seen[target] = struct{}{}
 	}
+	if c.Contract != nil {
+		return c.Contract.Validate()
+	}
 	return nil
 }
 
@@ -1153,7 +1343,20 @@ func (v WorkflowValue) Validate() error {
 	}
 }
 
+func (c WorkflowCallableInterface) Validate() error {
+	if len(c.InputSchema) == 0 ||
+		len(c.OutputSchema) == 0 ||
+		!c.InputSchema.Valid() ||
+		!c.OutputSchema.Valid() ||
+		!c.ErrorSchema.Valid() ||
+		!c.ReceiptSchema.Valid() {
+		return errors.New("Workflow callable interface is invalid")
+	}
+	return nil
+}
+
 func (t WorkflowTarget) Validate() error {
+	var err error
 	switch t.Kind {
 	case WorkflowTargetTool:
 		if t.Artifact == nil ||
@@ -1161,44 +1364,51 @@ func (t WorkflowTarget) Validate() error {
 			t.MCP != nil {
 			return errors.New("Workflow Tool target is invalid")
 		}
-		return validatePin(*t.Artifact)
+		err = validatePin(*t.Artifact)
 
 	case WorkflowTargetMCPTool:
 		if t.MCP == nil || t.Artifact != nil {
 			return errors.New("Workflow MCP Tool target is invalid")
 		}
-		return t.MCP.Validate()
+		err = t.MCP.Validate()
 
 	case WorkflowTargetService:
 		if strings.TrimSpace(t.ServiceID) == "" ||
 			strings.TrimSpace(t.BindingVersion) == "" {
 			return errors.New("Workflow Service target is invalid")
 		}
-		return nil
 
 	case WorkflowTargetActivity:
 		if strings.TrimSpace(t.ActivityID) == "" ||
 			strings.TrimSpace(t.BindingVersion) == "" {
 			return errors.New("Workflow Activity target is invalid")
 		}
-		return nil
 
 	case WorkflowTargetWorkflow:
 		if t.NestedProgram == nil {
 			return errors.New("Workflow nested target is invalid")
 		}
-		return nil
+		_, err = workflowProgramFromSnapshot(*t.NestedProgram)
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
 		if t.Artifact == nil {
 			return errors.New("Workflow Artifact target is invalid")
 		}
-		return validatePin(*t.Artifact)
+		err = validatePin(*t.Artifact)
 
 	default:
 		return errors.New("Workflow target kind is unsupported")
 	}
+	if err != nil {
+		return err
+	}
+	if t.Contract != nil {
+		if err := t.Contract.Validate(); err != nil {
+			return err
+		}
+	}
+	return t.Effect.Validate()
 }
 
 func (m WorkflowMCP) Validate() error {
@@ -1206,21 +1416,6 @@ func (m WorkflowMCP) Validate() error {
 		return errors.New("Workflow MCP Tool name is required")
 	}
 	return validatePin(m.Server)
-}
-
-func (s workflowProgramState) Validate() error {
-	if s.Version != WorkflowInterpreterVersion ||
-		s.Index < 0 ||
-		!s.State.Valid() ||
-		s.Outputs == nil {
-		return errors.New("Workflow Program state is invalid")
-	}
-	for key, value := range s.Outputs {
-		if strings.TrimSpace(key) == "" || !value.Valid() {
-			return errors.New("Workflow Program output state is invalid")
-		}
-	}
-	return nil
 }
 
 func workflowProgramFromSnapshot(
@@ -1246,26 +1441,26 @@ func workflowProgramFromSnapshot(
 
 func decodeWorkflowProgram(
 	frame ProgramFrame,
-) (WorkflowProgram, workflowProgramState, error) {
+) (WorkflowProgram, WorkflowState, error) {
 	program, err := workflowProgramFromSnapshot(frame.Program)
 	if err != nil {
-		return WorkflowProgram{}, workflowProgramState{}, err
+		return WorkflowProgram{}, WorkflowState{}, err
 	}
 
-	state, err := DecodeCanonicalValue[workflowProgramState](
+	state, err := DecodeCanonicalValue[WorkflowState](
 		frame.State.Data,
 	)
 	if err != nil {
-		return WorkflowProgram{}, workflowProgramState{}, err
+		return WorkflowProgram{}, WorkflowState{}, err
 	}
 	if err := state.Validate(); err != nil {
-		return WorkflowProgram{}, workflowProgramState{}, err
+		return WorkflowProgram{}, WorkflowState{}, err
 	}
 	return program, state, nil
 }
 
 func workflowTransition(
-	state workflowProgramState,
+	state WorkflowState,
 	status *ProgramFrameState,
 	output CanonicalValue,
 	work []WorkItemIntent,
@@ -1283,7 +1478,7 @@ func workflowTransition(
 }
 
 func workflowFailure(
-	state workflowProgramState,
+	state WorkflowState,
 	code string,
 	message string,
 ) (ProgramTransition, error) {
@@ -1297,13 +1492,13 @@ func workflowFailure(
 		Status: &status,
 		Error: &SanitizedError{
 			Code:    firstNonEmpty(code, "workflow_failed"),
-			Message: firstNonEmpty(message, "Workflow execution failed"),
+			Message: firstNonEmpty(message, "workflow execution failed"),
 		},
 	}, nil
 }
 
 func workflowWork(
-	state workflowProgramState,
+	state WorkflowState,
 	path string,
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
@@ -1317,7 +1512,7 @@ func workflowWork(
 }
 
 func encodeWorkflowProgramState(
-	state workflowProgramState,
+	state WorkflowState,
 ) (ProgramState, error) {
 	data, err := canonicalWorkflowValue(state)
 	if err != nil {
@@ -1332,17 +1527,21 @@ func encodeWorkflowProgramState(
 
 func workflowActivation(
 	program WorkflowProgram,
-	state workflowProgramState,
+	state WorkflowState,
 ) map[string]any {
 	input, _ := DecodeCanonicalValue[any](program.Input)
 	currentState, _ := DecodeCanonicalValue[any](state.State)
 
-	steps := make(map[string]any, len(state.Outputs))
-	for name, output := range state.Outputs {
-		value, _ := DecodeCanonicalValue[any](output)
-		steps[name] = map[string]any{
-			"output": value,
+	steps := make(map[string]any, len(state.Outcomes))
+	for _, outcome := range state.Outcomes {
+		value := map[string]any{
+			"status": string(outcome.Status),
 		}
+		if len(outcome.Output) != 0 {
+			output, _ := DecodeCanonicalValue[any](outcome.Output)
+			value["output"] = output
+		}
+		steps[outcome.ID] = value
 	}
 
 	return map[string]any{
@@ -1362,19 +1561,14 @@ func workflowActivation(
 	}
 }
 
-func applyWorkflowState(
-	state *workflowProgramState,
+func applyWorkflowStateUpdate(
 	update StateUpdateWork,
-) error {
-	if state == nil {
-		return errors.New("Workflow state is unavailable")
-	}
-
+) (CanonicalValue, error) {
 	values, err := DecodeCanonicalValue[map[string]CanonicalValue](
-		state.State,
+		update.Base,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if values == nil {
 		values = map[string]CanonicalValue{}
@@ -1387,12 +1581,7 @@ func applyWorkflowState(
 		delete(values, path)
 	}
 
-	next, err := canonicalWorkflowValue(values)
-	if err != nil {
-		return err
-	}
-	state.State = next
-	return nil
+	return canonicalWorkflowValue(values)
 }
 
 func workflowWorkValue(
@@ -1423,6 +1612,7 @@ func workflowSnapshotWithInput(
 	}
 
 	program.Input = input.Clone()
+	program.InputBound = true
 	if err := program.ValidateInput(); err != nil {
 		return ProgramSnapshot{}, err
 	}

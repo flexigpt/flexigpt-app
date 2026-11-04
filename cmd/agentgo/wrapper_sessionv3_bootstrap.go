@@ -31,8 +31,8 @@ type SessionV3Params struct {
 	MCPRuntime       *mcpConnection.MCPRuntimeManager
 	MCPBridge        *invocation.ToolBridge
 	Events           sessionv3Runtime.EventPublisher
-	Workflow         sessionv3Runtime.WorkflowAdmission
 	WorkflowBindings *workflowruntime.BindingRegistry
+	Workflow         *workflowruntime.Admission
 }
 
 var (
@@ -59,7 +59,7 @@ func newSessionV3WorkflowAdmission(
 	artifacts artifact.API,
 	resolver *composition.Resolver,
 ) (
-	sessionv3Runtime.WorkflowAdmission,
+	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
 	error,
 ) {
@@ -110,32 +110,34 @@ func InitComposedSessionV3Runtime(
 	if err != nil {
 		return err
 	}
-	composed, err := workflowruntime.NewBinder(base, params.WorkflowBindings)
+	composed, err := workflowruntime.NewBinder(
+		base,
+		params.WorkflowBindings,
+		params.Workflow,
+	)
 	if err != nil {
 		return err
 	}
-
-	workflowInterpreter, err := workflowruntime.NewInterpreter()
-	if err != nil {
-		return err
-	}
-	interpreters := sessionv3Runtime.NewBuiltinInterpreters()
-	interpreters = append(interpreters, workflowInterpreter)
 
 	events := params.Events
 	if events == nil {
 		events = wrapper
 	}
-	runtime, err := sessionv3Runtime.NewRuntime(
+	dependencies, err := workflowruntime.ConfigureSessionV3Runtime(
 		sessionv3Runtime.RuntimeDependencies{
-			Binder:       composed,
-			Checkpoints:  store,
-			Recovery:     store,
-			Events:       events,
-			Workflow:     params.Workflow,
-			Interpreters: interpreters,
+			Binder:      composed,
+			Checkpoints: store,
+			Recovery:    store,
+			Events:      events,
 		},
+		params.Workflow,
+		composed,
 	)
+	if err != nil {
+		return err
+	}
+
+	runtime, err := sessionv3Runtime.NewRuntime(dependencies)
 	if err != nil {
 		return err
 	}

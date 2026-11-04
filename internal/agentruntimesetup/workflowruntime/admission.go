@@ -93,6 +93,15 @@ func (r *BindingRegistry) register(
 		value.Version() == "" {
 		return errors.New("invalid Workflow runtime binding")
 	}
+	effect := value.Effect()
+	if err := effect.Validate(); err != nil {
+		return fmt.Errorf(
+			"workflow %s binding %q effect: %w",
+			kind,
+			value.ID(),
+			err,
+		)
+	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -168,7 +177,29 @@ func (a *Admission) AdmitWorkflow(
 		request.Workflow,
 		request.Input,
 		make(map[artifactModel.ArtifactRef]struct{}),
+		true,
 	)
+}
+
+// VerifyArtifactPin is the setup-owned current Artifact verification boundary
+// used by Workflow binder dispatch. Session Runtime receives this only through
+// the narrow setup interface and never imports Artifact Store packages.
+func (a *Admission) VerifyArtifactPin(
+	ctx context.Context,
+	pin sessionv3Runtime.ArtifactPin,
+) error {
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(pin.RootID),
+		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
+	}
+	current, err := a.pinArtifact(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if current != pin {
+		return errors.New("workflow Artifact pin changed since admission")
+	}
+	return nil
 }
 
 func (a *Admission) admit(
@@ -177,6 +208,7 @@ func (a *Admission) admit(
 	selection sessionv3Runtime.ArtifactSelection,
 	input sessionv3Runtime.CanonicalValue,
 	active map[artifactModel.ArtifactRef]struct{},
+	inputBound bool,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	if _, found := active[ref]; found {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
@@ -220,7 +252,12 @@ func (a *Admission) admit(
 		)
 	}
 
-	program, err := compileWorkflowProgram(plan.Document, input)
+	var program sessionv3Runtime.WorkflowProgram
+	if inputBound {
+		program, err = compileWorkflowProgram(plan.Document, input)
+	} else {
+		program, err = compileWorkflowProgramTemplate(plan.Document)
+	}
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
@@ -230,8 +267,10 @@ func (a *Admission) admit(
 	if err := program.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := program.ValidateInput(); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	if inputBound {
+		if err := program.ValidateInput(); err != nil {
+			return sessionv3Runtime.WorkflowAdmissionResult{}, err
+		}
 	}
 
 	return sessionv3Runtime.WorkflowAdmissionResult{
@@ -287,6 +326,7 @@ func (a *Admission) bindTargets(
 
 			bound, err := a.bindTarget(
 				ctx,
+				plan.Document,
 				group.path+"/"+name,
 				target,
 				refs,
@@ -303,6 +343,7 @@ func (a *Admission) bindTargets(
 
 func (a *Admission) bindTarget(
 	ctx context.Context,
+	document workflowv1.WorkflowDocument,
 	path string,
 	target workflowv1.Target,
 	refs map[string]artifactModel.ArtifactRef,
@@ -318,11 +359,13 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
-		return sessionv3Runtime.WorkflowTarget{
+		bound := sessionv3Runtime.WorkflowTarget{
 			Kind:           sessionv3Runtime.WorkflowTargetService,
 			ServiceID:      value.ID(),
 			BindingVersion: value.Version(),
-		}, nil
+			Effect:         value.Effect(),
+		}
+		return finalizeWorkflowTarget(document, target, bound)
 
 	case workflowv1.TargetActivity:
 		value, found := a.bindings.Activity(target.Ref)
@@ -333,11 +376,13 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
-		return sessionv3Runtime.WorkflowTarget{
+		bound := sessionv3Runtime.WorkflowTarget{
 			Kind:           sessionv3Runtime.WorkflowTargetActivity,
 			ActivityID:     value.ID(),
 			BindingVersion: value.Version(),
-		}, nil
+			Effect:         value.Effect(),
+		}
+		return finalizeWorkflowTarget(document, target, bound)
 
 	case workflowv1.TargetTool:
 		ref, found := refs[path]
@@ -354,20 +399,20 @@ func (a *Admission) bindTarget(
 		}
 
 		if target.Server != nil {
-			return sessionv3Runtime.WorkflowTarget{
+			return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
 				Kind: sessionv3Runtime.WorkflowTargetMCPTool,
 				MCP: &sessionv3Runtime.WorkflowMCP{
 					Server:   pin,
 					ToolName: target.Ref,
 				},
-			}, nil
+			})
 		}
 
-		return sessionv3Runtime.WorkflowTarget{
+		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
 			Kind:     sessionv3Runtime.WorkflowTargetTool,
 			Artifact: &pin,
 			ToolName: target.Ref,
-		}, nil
+		})
 
 	case workflowv1.TargetWorkflow:
 		ref, found := refs[path]
@@ -392,41 +437,28 @@ func (a *Admission) bindTarget(
 				ExpectedRevision: pin.Revision,
 				ExpectedDigest:   pin.Digest,
 			},
-			sessionv3Runtime.MustCanonicalValue(map[string]any{}),
+			nil,
 			active,
+			false,
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 
-		return sessionv3Runtime.WorkflowTarget{
+		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
 			Kind:          sessionv3Runtime.WorkflowTargetWorkflow,
 			NestedProgram: &nested.Program,
-		}, nil
+			Effect: sessionv3Runtime.EffectContract{
+				Kind: sessionv3Runtime.EffectKindRead,
+			},
+		})
 
 	case workflowv1.TargetAgent,
 		workflowv1.TargetModel:
-		ref, found := refs[path]
-		if !found {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: Artifact target %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		pin, err := a.pinArtifact(ctx, ref)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
-
-		kind := sessionv3Runtime.WorkflowTargetAgent
-		if target.Kind == workflowv1.TargetModel {
-			kind = sessionv3Runtime.WorkflowTargetModel
-		}
-		return sessionv3Runtime.WorkflowTarget{
-			Kind:     kind,
-			Artifact: &pin,
-		}, nil
+		return sessionv3Runtime.WorkflowTarget{}, unsupportedWorkflowOperation(
+			path,
+			"Agent or Model target without a typed execution-plan compiler",
+		)
 
 	default:
 		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
@@ -434,6 +466,36 @@ func (a *Admission) bindTarget(
 			target.Kind,
 		)
 	}
+}
+
+func finalizeWorkflowTarget(
+	document workflowv1.WorkflowDocument,
+	source workflowv1.Target,
+	target sessionv3Runtime.WorkflowTarget,
+) (sessionv3Runtime.WorkflowTarget, error) {
+	contract, err := compileWorkflowCallableInterface(
+		document,
+		source.Interface,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	}
+	target.Contract = contract
+
+	if target.Effect.Kind == "" {
+		var sourceEffect *workflowv1.EffectContract
+		if source.Interface != nil {
+			sourceEffect = source.Interface.Effect
+		}
+		target.Effect, err = compileWorkflowEffect(sourceEffect)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+	}
+	if err := target.Effect.Validate(); err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	}
+	return target, nil
 }
 
 func (a *Admission) pinArtifact(

@@ -500,7 +500,8 @@ type ActivityWork struct {
 }
 
 type TransformWork struct {
-	Input CanonicalValue `json:"input"`
+	Input        CanonicalValue `json:"input"`
+	OutputSchema CanonicalValue `json:"outputSchema,omitempty"`
 }
 
 type ConditionWork struct {
@@ -513,6 +514,14 @@ type StateAssignment struct {
 }
 
 type StateUpdateWork struct {
+	// Base is the immutable state snapshot observed when the Workflow step was
+	// prepared. All assignments apply atomically to this value.
+	Base CanonicalValue `json:"base"`
+
+	// Schema is the state-owning block boundary. It is generic JSON Schema
+	// data, not a compiled schema.
+	Schema CanonicalValue `json:"schema,omitempty"`
+
 	Assignments []StateAssignment `json:"assignments,omitempty"`
 	RemovePaths []string          `json:"removePaths,omitempty"`
 }

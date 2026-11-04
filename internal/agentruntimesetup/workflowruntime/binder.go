@@ -21,7 +21,17 @@ func NewInterpreter() (*sessionv3Runtime.WorkflowInterpreter, error) {
 type Binder struct {
 	Base          sessionv3Runtime.WorkBinder
 	Bindings      *BindingRegistry
+	Pins          ArtifactPinVerifier
 	Deterministic sessionv3Runtime.DeterministicExecutor
+}
+
+// ArtifactPinVerifier validates a durable Workflow Artifact pin against
+// current Artifact state. It is implemented by setup, never by Session core.
+type ArtifactPinVerifier interface {
+	VerifyArtifactPin(
+		ctx context.Context,
+		pin sessionv3Runtime.ArtifactPin,
+	) error
 }
 
 type boundExternal struct {
@@ -29,11 +39,22 @@ type boundExternal struct {
 	private any
 }
 
-func NewBinder(base sessionv3Runtime.WorkBinder, bindings *BindingRegistry) (*Binder, error) {
+func NewBinder(
+	base sessionv3Runtime.WorkBinder,
+	bindings *BindingRegistry,
+	pins ...ArtifactPinVerifier,
+) (*Binder, error) {
 	if base == nil || bindings == nil {
 		return nil, errors.New("workflow binder dependencies are incomplete")
 	}
-	return &Binder{Base: base, Bindings: bindings}, nil
+	if len(pins) > 1 {
+		return nil, errors.New("workflow binder has more than one Artifact pin verifier")
+	}
+	var verifier ArtifactPinVerifier
+	if len(pins) == 1 {
+		verifier = pins[0]
+	}
+	return &Binder{Base: base, Bindings: bindings, Pins: verifier}, nil
 }
 
 func (b *Binder) BindWork(
@@ -42,6 +63,9 @@ func (b *Binder) BindWork(
 ) (sessionv3Runtime.BindResult, error) {
 	if result, handled, err := b.Deterministic.Bind(ctx, request); handled || err != nil {
 		return result, err
+	}
+	if err := b.verifyWorkflowToolPins(ctx, request.WorkItem); err != nil {
+		return sessionv3Runtime.BindResult{}, err
 	}
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService:
@@ -93,6 +117,33 @@ func (b *Binder) ResolveWait(
 func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv3Runtime.ExecutionID) error {
 	if closer, ok := b.Base.(sessionv3Runtime.ExecutionBindingCloser); ok {
 		return closer.CloseExecutionBinding(ctx, executionID)
+	}
+	return nil
+}
+
+func (b *Binder) verifyWorkflowToolPins(
+	ctx context.Context,
+	item sessionv3Runtime.WorkItem,
+) error {
+	if item.Type != sessionv3Runtime.WorkItemTypeTool || item.Input.Tool == nil {
+		return nil
+	}
+	payload := item.Input.Tool
+	if payload.Target == nil && payload.MCP == nil {
+		return nil
+	}
+	if b == nil || b.Pins == nil {
+		return fmt.Errorf("%w: Workflow Artifact pin verifier", ErrBindingUnavailable)
+	}
+	if payload.Target != nil {
+		if err := b.Pins.VerifyArtifactPin(ctx, *payload.Target); err != nil {
+			return err
+		}
+	}
+	if payload.MCP != nil {
+		if err := b.Pins.VerifyArtifactPin(ctx, payload.MCP.Server); err != nil {
+			return err
+		}
 	}
 	return nil
 }
