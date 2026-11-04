@@ -408,7 +408,6 @@ func (c *coordinator) ExecuteModel(
 	stream sessionRuntime.ModelStream,
 ) (sessionRuntime.ModelExecutionResult, error) {
 	if err := sessionRuntime.RequirePreparedOperation(request.Preparation); err != nil {
-		//nolint:nilerr // Session persists model-operation failures in the result.
 		return sessionRuntime.ModelExecutionResult{
 			Error: &sessionRuntime.OperationError{
 				Code:    "prepared_operation_unavailable",
@@ -441,7 +440,6 @@ func (c *coordinator) ExecuteModel(
 			data.skills,
 		)
 		if err != nil {
-			//nolint:nilerr // Session persists model-operation failures in the result.
 			return sessionRuntime.ModelExecutionResult{
 				Error: &sessionRuntime.OperationError{
 					Code:    "skill_session_unavailable",
@@ -462,7 +460,6 @@ func (c *coordinator) ExecuteModel(
 			skillBindings,
 		)
 		if err != nil {
-			//nolint:nilerr // Session persists model-operation failures in the result.
 			return sessionRuntime.ModelExecutionResult{
 				Error: &sessionRuntime.OperationError{
 					Code:    "prepared_tool_collision",
@@ -495,7 +492,6 @@ func (c *coordinator) ExecuteModel(
 				Code:    "completion_failed",
 				Message: executeErr.Error(),
 			}
-			//nolint:nilerr // Provider failures are represented as operation results.
 			return result, nil
 		}
 		result.Error = &sessionRuntime.OperationError{

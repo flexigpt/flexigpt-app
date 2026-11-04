@@ -275,7 +275,6 @@ func inheritedEnvironmentMap() map[string]string {
 
 func sdkOAuthHandler(value any) (mcpSDKAuth.OAuthHandler, error) {
 	if value == nil {
-		//nolint:nilnil // Explicit.
 		return nil, nil
 	}
 	handler, ok := value.(mcpSDKAuth.OAuthHandler)

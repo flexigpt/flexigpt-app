@@ -231,7 +231,6 @@ func (e *V3Executor) ExecuteGo(
 	binding := payload.Call.Binding.Go
 	resolved, err := e.resolvePinnedGoTool(ctx, binding)
 	if err != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "go_binding_stale",
@@ -261,7 +260,6 @@ func (e *V3Executor) ExecuteGo(
 	)
 	text, structured, conversionErr := V3ToolOutputs(outputs)
 	if conversionErr != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "go_tool_output_invalid",

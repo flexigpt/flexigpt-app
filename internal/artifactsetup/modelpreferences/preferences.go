@@ -60,7 +60,6 @@ func (s *Store) GetDefaultProvider(
 		)
 	}
 	if value.Provider == nil {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 	if err := value.Provider.Validate(); err != nil {

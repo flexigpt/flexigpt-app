@@ -68,6 +68,20 @@ func (b *Binder) bindTool(
 	if err := call.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindMCP {
+		if call.Binding.MCP == nil ||
+			call.Binding.MCP.ServerArtifact == nil {
+			return sessionv3Runtime.BindResult{}, errors.New(
+				"mcp tool binding has no server artifact pin",
+			)
+		}
+		if err := b.verifyArtifactPin(
+			ctx,
+			*call.Binding.MCP.ServerArtifact,
+		); err != nil {
+			return sessionv3Runtime.BindResult{}, err
+		}
+	}
 
 	effectiveRequest, err := requestWithBoundTool(req, call)
 	if err != nil {

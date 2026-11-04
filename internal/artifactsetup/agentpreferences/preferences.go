@@ -71,7 +71,6 @@ func (s *Store) GetDefaultAgent(
 		)
 	}
 	if value.Agent == nil {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 	if err := value.Agent.Validate(); err != nil {

@@ -9,14 +9,16 @@
   - [ ] test workspace
   - [ ] test all management pages again properly
 
-- [ ] verify diff applicability in streaming
-- [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
+- [x] verify diff applicability in streaming
+
 - [x] tools seem to be attached even if i have removed them in session. also remove session overrides does nothing for agent tools.
-- [ ] even if all files are attached larger models tend to just call tools if they are present for arbitrary things without actually seeing if analysis is to be done with current already present context or not. this is even with that skill we have related to use context. see if the skill needs more better wording.
 - [x] add text when a tool call or output is pending doesnt seem to work. this happens before a active tool call run is not done i.e composer has tool call.
 - [x] attachments that are not present have started to show that these are not there. may want to show that these are not there and do we want to continue.
-
 - [x] topology minor changes reallocates artifactids.
+
+- [ ] even if all files are attached larger models tend to just call tools if they are present for arbitrary things without actually seeing if analysis is to be done with current already present context or not. this is even with that skill we have related to use context. see if the skill needs more better wording.
+
+- [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 
 ## M-n
 

@@ -18,7 +18,6 @@ import (
 // where CEL has an exact integer representation.
 func workflowActivationValue(value CanonicalValue) (any, error) {
 	if len(value) == 0 {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 	if !value.Valid() {

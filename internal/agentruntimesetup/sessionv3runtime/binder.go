@@ -14,12 +14,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
+	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
 
 type Dependencies struct {
+	Artifacts     artifact.API
 	Providers     *inferenceRuntime.ProviderSetAPI
 	Models        *modelruntime.SourceResolver
+	Agents        *agentAPI.Service
+	Workspaces    *workspaceAPI.Service
+	Texts         *textAPI.Service
 	Tools         *toolAPI.Service
 	ToolCaller    toolruntime.GoToolCaller
 	SkillResolver *skillruntime.Resolver
@@ -50,6 +58,10 @@ func New(deps Dependencies) (*Binder, error) {
 	}
 	if deps.MCPRuntime == nil || deps.MCPBridge == nil {
 		return nil, errors.New("sessionv3 binder requires MCP runtime and bridge")
+	}
+
+	if deps.Artifacts == nil {
+		return nil, errors.New("sessionv3 binder requires artifact runtime")
 	}
 
 	goTools, err := toolruntime.NewV3Executor(

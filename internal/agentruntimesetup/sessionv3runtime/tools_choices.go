@@ -13,9 +13,12 @@ import (
 func (b *Binder) toolChoices(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
+	defaults sessionv3Runtime.SessionDefaults,
 ) ([]inferenceSpec.ToolChoice, map[string]sessionv3Runtime.ToolCall, error) {
 	choices := []inferenceSpec.ToolChoice{}
 	bindings := map[string]sessionv3Runtime.ToolCall{}
+	effectiveRequest := req
+	effectiveRequest.Session.Defaults = defaults
 
 	register := func(value preparedChoice) error {
 		if value.Choice.ID == "" || value.Choice.Name == "" {
@@ -34,13 +37,13 @@ func (b *Binder) toolChoices(
 		return nil
 	}
 
-	if len(req.Session.Defaults.Skills) != 0 {
+	if len(defaults.Skills) != 0 {
 		if b.skillTools == nil {
 			return nil, nil, errors.New(
 				"session v3 Skill runtime is unavailable",
 			)
 		}
-		skillChoices, err := b.skillTools.Choices(ctx, req)
+		skillChoices, err := b.skillTools.Choices(ctx, effectiveRequest)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -55,7 +58,7 @@ func (b *Binder) toolChoices(
 			"session v3 Tool runtime is unavailable",
 		)
 	}
-	goChoices, err := b.goTools.Choices(ctx, req.Session.Defaults.Tools)
+	goChoices, err := b.goTools.Choices(ctx, defaults.Tools)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +72,7 @@ func (b *Binder) toolChoices(
 			"session v3 MCP runtime is unavailable",
 		)
 	}
-	mcpChoices, err := b.mcpTools.Choices(ctx, req.Session.Defaults.MCP)
+	mcpChoices, err := b.mcpTools.Choices(ctx, defaults.MCP)
 	if err != nil {
 		return nil, nil, err
 	}

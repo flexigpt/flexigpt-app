@@ -548,7 +548,6 @@ func decodeOptionalObject[T any](
 	raw json.RawMessage,
 ) (*T, error) {
 	if len(raw) == 0 {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 

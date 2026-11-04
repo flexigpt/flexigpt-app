@@ -1682,6 +1682,33 @@ their selected target identity and apply target, call, and target-set schemas.
 JSON literals can be scalars, arrays, objects, or null. CEL values cross a
 dedicated conversion boundary; compiled expressions are not persisted.
 
+The V3 LLM dispatch path prepares Agent, Workspace, Text, Skill, Tool, and
+MCP contributions in runtime setup before Session dispatches a provider call.
+Session stores only typed selections, Artifact pins, semantic binding facts,
+and final generic JSON boundaries. Agent instruction Skills are rendered by
+the Skill runtime. Workspace instructions and selected MCP server
+instructions, resources, resource templates, and prompts are converted by
+their owning domain binders into typed provider input contributions.
+
+V3 LLM WorkItems persist streamed text and thinking, final provider usage,
+protocol output projections, and debugger data at their defined boundaries.
+They do not persist provider clients, callbacks, credentials, or compiled
+provider state. A provider SDK Tool remains provider-managed and cannot become
+a fabricated local Tool success.
+
+Workflow `call.mode: start` now creates a typed attached child ProgramFrame and
+returns a durable typed completion handle. The parent Workflow continues after
+the child starts. A completion wait can consume the child terminal outcome.
+Attached children keep the enclosing Execution active after their parent frame
+reaches a terminal state. Workflow `cancel` accepts a typed child-frame handle,
+requests cancellation through the common ProgramFrame lifecycle, records a
+typed cancellation receipt, and continues the parent block.
+
+The current start implementation supports attached child lifetime only.
+Independent child lifetime and Agent conversation handoff require separate
+Execution ownership and durable conversation-owner state. They remain
+implementation work and are not admitted as invoke-like fallback behavior.
+
 This coverage is not backend completion. Structured blocks, fan-out, machines,
 human assignment authorization, events, channels, triggers, retries,
 reconciliation, compensation, resources, budgets, all callable modes, and

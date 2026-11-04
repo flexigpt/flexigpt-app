@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -41,13 +42,12 @@ func (b *Binder) bindLLM(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
 	}
-	modelSel := payload.Model
-	if modelSel == nil {
-		modelSel = req.Session.Defaults.Model
+
+	plan, err := b.prepareLLMPlan(ctx, req)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
 	}
-	if modelSel == nil {
-		return sessionv3Runtime.BindResult{}, errors.New("no effective model selection")
-	}
+	modelSel := plan.model
 
 	ref := artifactRefForSelection(*modelSel)
 	if err := ref.Validate(); err != nil {
@@ -83,16 +83,41 @@ func (b *Binder) bindLLM(
 		return sessionv3Runtime.BindResult{}, errors.New("selected Model definition changed")
 	}
 
-	if prompt := b.systemPromptText(ctx, req); strings.TrimSpace(prompt) != "" {
+	if prompt := plan.systemPrompt(); strings.TrimSpace(prompt) != "" {
 		resolved.ModelParam.SystemPrompt = appendPrompt(resolved.ModelParam.SystemPrompt, prompt)
 	}
-	inputs, err := b.buildInputs(req)
+	inputs, err := b.buildInputs(req, plan.context)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-	choices, bindings, err := b.toolChoices(ctx, req)
+	choices, bindings, err := b.toolChoices(ctx, req, plan.defaults)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
+	}
+
+	artifacts := append(
+		[]sessionv3Runtime.ArtifactPin(nil),
+		plan.artifacts...,
+	)
+	modelPin := sessionv3Runtime.ArtifactPin{
+		RootID:     modelUse.RootID,
+		ArtifactID: modelUse.ArtifactID,
+		Revision:   modelUse.Revision,
+		Digest:     modelUse.Digest,
+	}
+	seen := make(map[string]sessionv3Runtime.ArtifactPin, len(artifacts)+1)
+	for _, artifact := range artifacts {
+		key := artifact.RootID + "\x00" + artifact.ArtifactID
+		seen[key] = artifact
+	}
+	if existing, found := seen[modelPin.RootID+"\x00"+modelPin.ArtifactID]; found {
+		if existing != modelPin {
+			return sessionv3Runtime.BindResult{}, errors.New(
+				"model execution plan contains a conflicting model pin",
+			)
+		}
+	} else {
+		artifacts = append(artifacts, modelPin)
 	}
 
 	configuration := resolved
@@ -103,13 +128,8 @@ func (b *Binder) bindLLM(
 		resolved.CapabilityOverrides,
 	)
 	semantic := sessionv3Runtime.SemanticBinding{
-		Version: "v3-llm/v1",
-		Artifacts: []sessionv3Runtime.ArtifactPin{{
-			RootID:     modelUse.RootID,
-			ArtifactID: modelUse.ArtifactID,
-			Revision:   modelUse.Revision,
-			Digest:     modelUse.Digest,
-		}},
+		Version:           "v3-llm/v1",
+		Artifacts:         artifacts,
 		TargetFingerprint: resolved.Fingerprint,
 		BoundAt:           time.Now().UTC(),
 	}
@@ -140,13 +160,14 @@ func (b *Binder) executeLLM(
 	resp, err := b.deps.Providers.FetchCompletion(
 		ctx,
 		&inferenceRuntime.CompletionRequest{
-			Configuration: configuration,
-			Inputs:        private.Inputs,
-			ToolChoices:   private.Choices,
+			Configuration:    configuration,
+			Inputs:           private.Inputs,
+			ToolChoices:      private.Choices,
+			OnStreamText:     req.Stream.OnText,
+			OnStreamThinking: req.Stream.OnThinking,
 		},
 	)
 	if err != nil {
-		//nolint:nilerr // Explicit return.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{Code: "completion_failed", Message: err.Error()},
 		}, nil
@@ -157,19 +178,53 @@ func (b *Binder) executeLLM(
 		}, nil
 	}
 	out := resp.Body.InferenceResponse
+	protocolOutputs, protocolErr := canonicalProviderOutputs(out.Outputs)
+	if protocolErr != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "provider_output_invalid",
+				Message: protocolErr.Error(),
+			},
+		}, nil
+	}
+	debugDetails, debugErr := canonicalProviderDebugDetails(out.DebugDetails)
+	if debugErr != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "provider_debug_output_invalid",
+				Message: debugErr.Error(),
+			},
+		}, nil
+	}
+	var usage *sessionv3Runtime.InferenceUsage
+	if out.Usage != nil {
+		value := *out.Usage
+		usage = &value
+	}
+	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
+	llmOutput := &sessionv3Runtime.LLMOutput{
+		Text:            text,
+		Thinking:        thinking,
+		ToolCalls:       calls,
+		Usage:           usage,
+		ProtocolOutputs: protocolOutputs,
+		DebugDetails:    debugDetails,
+	}
 	if out.Error != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: &sessionv3Runtime.WorkItemOutput{
-				LLM: &sessionv3Runtime.LLMOutput{Text: decodedProviderText(out.Outputs)},
+				LLM: llmOutput,
 			},
 			Error:     &sessionv3Runtime.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
 			Confirmed: true,
 		}, nil
 	}
-	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
-	confirmed := strings.TrimSpace(text) != "" || len(calls) != 0
+	confirmed := strings.TrimSpace(text) != "" ||
+		len(calls) != 0 ||
+		len(protocolOutputs) != 0
 	if !confirmed {
 		return sessionv3Runtime.WorkExecutionResult{
+			Output: &sessionv3Runtime.WorkItemOutput{LLM: llmOutput},
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "empty_completion",
 				Message: "provider returned no text or executable Tool call",
@@ -178,7 +233,7 @@ func (b *Binder) executeLLM(
 	}
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
-			LLM: &sessionv3Runtime.LLMOutput{Text: text, Thinking: thinking, ToolCalls: calls},
+			LLM: llmOutput,
 			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      "inference",
 				Reference:   private.Fingerprint,
@@ -189,18 +244,39 @@ func (b *Binder) executeLLM(
 	}, nil
 }
 
-func decodedProviderText(outputs []inferenceSpec.OutputUnion) string {
-	var sb strings.Builder
-	for _, o := range outputs {
-		if o.OutputMessage != nil {
-			for _, c := range o.OutputMessage.Contents {
-				if c.TextItem != nil {
-					sb.WriteString(c.TextItem.Text)
-				}
-			}
+func canonicalProviderOutputs(
+	values []inferenceSpec.OutputUnion,
+) ([]sessionv3Runtime.CanonicalValue, error) {
+	output := make(
+		[]sessionv3Runtime.CanonicalValue,
+		0,
+		len(values),
+	)
+	for index := range values {
+		raw, err := jsonutil.EncodeToJSONRaw(values[index])
+		if err != nil {
+			return nil, err
 		}
+		value, err := sessionv3Runtime.CanonicalValueFrom(raw)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
 	}
-	return sb.String()
+	return output, nil
+}
+
+func canonicalProviderDebugDetails(
+	value any,
+) (sessionv3Runtime.CanonicalValue, error) {
+	if value == nil {
+		return nil, nil
+	}
+	raw, err := jsonutil.EncodeToJSONRaw(value)
+	if err != nil {
+		return nil, err
+	}
+	return sessionv3Runtime.CanonicalValueFrom(raw)
 }
 
 func (b *Binder) decodeProviderOutputs(

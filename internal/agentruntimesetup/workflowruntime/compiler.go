@@ -214,11 +214,6 @@ func compileWorkflowStep(
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
 	switch {
-	case input.Effect != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"effect",
-		)
 	case len(input.Claims) != 0:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
@@ -257,10 +252,10 @@ func compileWorkflowStep(
 		output.OutputSchema = schema
 	}
 	if input.Retry != nil {
-		if !workflowStepHasDispatchableWork(input) {
+		if !workflowStepSupportsRetry(document, input) {
 			return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 				"steps/"+input.ID,
-				"retry for a structured operation",
+				"retry for this operation or target kind",
 			)
 		}
 		retry, err := compileWorkflowRetry(*input.Retry)
@@ -384,15 +379,27 @@ func compileWorkflowStep(
 		}
 		output.Emit = &emit
 
+	case input.Cancel != nil:
+		handle, err := compileWorkflowValue(input.Cancel.Handle)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		cancel := sessionv3Runtime.WorkflowCancel{
+			Handle: handle,
+		}
+		if len(input.Cancel.Reason) != 0 {
+			reason, reasonErr := compileWorkflowValue(input.Cancel.Reason)
+			if reasonErr != nil {
+				return sessionv3Runtime.WorkflowStep{}, reasonErr
+			}
+			cancel.Reason = &reason
+		}
+		output.Cancel = &cancel
+
 	case input.Saga != nil:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
 			"saga",
-		)
-	case input.Cancel != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"cancel",
 		)
 
 	default:
@@ -409,9 +416,39 @@ func compileWorkflowCall(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Call,
 ) (sessionv3Runtime.WorkflowCall, error) {
-	if (input.Mode != "" && input.Mode != "invoke") ||
-		input.Lifetime != "" ||
-		input.Ownership != nil ||
+	mode := sessionv3Runtime.WorkflowCallModeInvoke
+	if input.Mode != "" {
+		mode = sessionv3Runtime.WorkflowCallMode(input.Mode)
+	}
+	switch mode {
+	case sessionv3Runtime.WorkflowCallModeInvoke,
+		sessionv3Runtime.WorkflowCallModeStart:
+	default:
+		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
+			"call",
+			"handoff mode",
+		)
+	}
+
+	lifetime := sessionv3Runtime.WorkflowChildLifetime("")
+	if input.Lifetime != "" {
+		lifetime = sessionv3Runtime.WorkflowChildLifetime(input.Lifetime)
+	}
+	if mode != sessionv3Runtime.WorkflowCallModeStart &&
+		lifetime != "" {
+		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
+			"call",
+			"lifetime outside start mode",
+		)
+	}
+	if lifetime != "" &&
+		lifetime != sessionv3Runtime.WorkflowChildLifetimeAttached {
+		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
+			"call",
+			"independent child lifetime",
+		)
+	}
+	if input.Ownership != nil ||
 		len(input.Conversation) != 0 ||
 		input.OnCompletion != "" ||
 		len(input.Ports) != 0 {
@@ -446,6 +483,8 @@ func compileWorkflowCall(
 		Input:    callInput,
 		Context:  contextValue,
 		Contract: contract,
+		Mode:     mode,
+		Lifetime: lifetime,
 	}
 	if input.Allowed == "" {
 		return output, nil
@@ -480,7 +519,6 @@ func compileWorkflowCallableInterface(
 	input *workflowv1.CallableInterface,
 ) (*sessionv3Runtime.WorkflowCallableInterface, error) {
 	if input == nil {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 

@@ -15,15 +15,22 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
+	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 )
 
 type SessionV3Params struct {
+	Artifacts        artifact.API
 	Providers        *inferenceRuntime.ProviderSetAPI
 	Models           *modelruntime.SourceResolver
+	Agents           *agentAPI.Service
+	Workspaces       *workspaceAPI.Service
+	Texts            *textAPI.Service
 	Tools            *toolAPI.Service
 	ToolCaller       toolruntime.GoToolCaller
 	SkillResolver    *skillruntime.Resolver
@@ -97,8 +104,12 @@ func InitComposedSessionV3Runtime(
 	}
 	base, err := sessionv3runtime.New(
 		sessionv3runtime.Dependencies{
+			Artifacts:     params.Artifacts,
 			Providers:     params.Providers,
 			Models:        params.Models,
+			Agents:        params.Agents,
+			Workspaces:    params.Workspaces,
+			Texts:         params.Texts,
 			Tools:         params.Tools,
 			ToolCaller:    params.ToolCaller,
 			SkillResolver: params.SkillResolver,

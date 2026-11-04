@@ -113,6 +113,7 @@ type WorkflowStep struct {
 	Wait      *WorkflowWait      `json:"wait,omitempty"`
 	Emit      *WorkflowEmit      `json:"emit,omitempty"`
 	Return    *WorkflowReturn    `json:"return,omitempty"`
+	Cancel    *WorkflowCancel    `json:"cancel,omitempty"`
 	Fail      *WorkflowFail      `json:"fail,omitempty"`
 	Break     bool               `json:"break,omitempty"`
 	Continue  bool               `json:"continue,omitempty"`
@@ -125,11 +126,18 @@ type WorkflowCall struct {
 	Context        WorkflowValue              `json:"context"`
 	Contract       *WorkflowCallableInterface `json:"contract,omitempty"`
 	SetContract    *WorkflowCallableInterface `json:"setContract,omitempty"`
+	Mode           WorkflowCallMode           `json:"mode,omitempty"`
+	Lifetime       WorkflowChildLifetime      `json:"lifetime,omitempty"`
 }
 
 type WorkflowTransform struct {
 	Value        WorkflowValue  `json:"value"`
 	OutputSchema CanonicalValue `json:"outputSchema,omitempty"`
+}
+
+type WorkflowCancel struct {
+	Handle WorkflowValue  `json:"handle"`
+	Reason *WorkflowValue `json:"reason,omitempty"`
 }
 
 type WorkflowSet struct {
@@ -588,6 +596,7 @@ func (i *WorkflowInterpreter) drive(
 				program,
 				state,
 				path,
+				step,
 				*step.Call,
 			)
 
@@ -604,6 +613,7 @@ func (i *WorkflowInterpreter) drive(
 				program,
 				state,
 				path,
+				step,
 				*step.Set,
 			)
 
@@ -678,6 +688,15 @@ func (i *WorkflowInterpreter) drive(
 			}
 			return i.completeWorkflowBlock(program, state, output, exit)
 
+		case step.Cancel != nil:
+			return i.cancelCall(
+				program,
+				state,
+				path,
+				step,
+				*step.Cancel,
+			)
+
 		case step.Fail != nil:
 			message, err := i.stringValue(
 				step.Fail.Message,
@@ -738,6 +757,7 @@ func (i *WorkflowInterpreter) call(
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
+	step WorkflowStep,
 	call WorkflowCall,
 ) (ProgramTransition, error) {
 	targetName, err := i.stringValue(call.Target, program, state)
@@ -762,7 +782,7 @@ func (i *WorkflowInterpreter) call(
 		return workflowFailure(
 			state,
 			"workflow_target_unavailable",
-			"Workflow target is unavailable",
+			"workflow target is unavailable",
 		)
 	}
 
@@ -794,10 +814,39 @@ func (i *WorkflowInterpreter) call(
 	if err := validateWorkflowInterfaceInput(call.SetContract, input); err != nil {
 		return workflowFailure(state, "workflow_target_set_input_invalid", err.Error())
 	}
+	mode := call.Mode
+	if mode == "" {
+		mode = WorkflowCallModeInvoke
+	}
 	for _, contract := range []*WorkflowCallableInterface{target.Contract, call.Contract, call.SetContract} {
-		if contract != nil && len(contract.Modes) != 0 && !slices.Contains(contract.Modes, WorkflowCallModeInvoke) {
-			return workflowFailure(state, "workflow_call_mode_invalid", "target interface does not permit invoke")
+		if contract != nil && len(contract.Modes) != 0 && !slices.Contains(contract.Modes, mode) {
+			return workflowFailure(
+				state,
+				"workflow_call_mode_invalid",
+				"target interface does not permit the requested call mode",
+			)
 		}
+	}
+	if mode == WorkflowCallModeStart {
+		return i.startCall(
+			frame,
+			program,
+			state,
+			path,
+			step,
+			targetName,
+			target,
+			input,
+			contextValue,
+			call,
+		)
+	}
+	if mode == WorkflowCallModeHandoff {
+		return workflowFailure(
+			state,
+			"workflow_handoff_unsupported",
+			"workflow handoff requires conversation ownership support",
+		)
 	}
 	state.PendingTarget = targetName
 
@@ -810,7 +859,8 @@ func (i *WorkflowInterpreter) call(
 				"Workflow Tool target has no Artifact pin",
 			)
 		}
-		return workflowWork(
+		return i.workflowStepWork(
+			program,
 			state,
 			path,
 			WorkItemIntent{
@@ -845,7 +895,8 @@ func (i *WorkflowInterpreter) call(
 				"Workflow MCP Tool target has no MCP binding",
 			)
 		}
-		return workflowWork(
+		return i.workflowStepWork(
+			program,
 			state,
 			path,
 			WorkItemIntent{
@@ -876,7 +927,8 @@ func (i *WorkflowInterpreter) call(
 		)
 
 	case WorkflowTargetService:
-		return workflowWork(
+		return i.workflowStepWork(
+			program,
 			state,
 			path,
 			WorkItemIntent{
@@ -895,7 +947,8 @@ func (i *WorkflowInterpreter) call(
 		)
 
 	case WorkflowTargetActivity:
-		return workflowWork(
+		return i.workflowStepWork(
+			program,
 			state,
 			path,
 			WorkItemIntent{
@@ -914,6 +967,13 @@ func (i *WorkflowInterpreter) call(
 		)
 
 	case WorkflowTargetWorkflow:
+		if step.Retry != nil {
+			return workflowFailure(
+				state,
+				"workflow_retry_unsupported",
+				"nested workflow calls cannot retry until child-frame retry state is implemented",
+			)
+		}
 		if target.NestedProgram == nil {
 			return workflowFailure(
 				state,
@@ -951,6 +1011,13 @@ func (i *WorkflowInterpreter) call(
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
+		if step.Retry != nil {
+			return workflowFailure(
+				state,
+				"workflow_retry_unsupported",
+				"agent and model calls cannot retry until child-frame retry state is implemented",
+			)
+		}
 		if target.Artifact == nil {
 			return workflowFailure(
 				state,
@@ -1036,7 +1103,8 @@ func (i *WorkflowInterpreter) transform(
 		)
 	}
 
-	return workflowWork(
+	return i.workflowStepWork(
+		program,
 		state,
 		path,
 		WorkItemIntent{
@@ -1060,6 +1128,7 @@ func (i *WorkflowInterpreter) set(
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
+	step WorkflowStep,
 	set WorkflowSet,
 ) (ProgramTransition, error) {
 	if program.Root.State == nil {
@@ -1094,7 +1163,8 @@ func (i *WorkflowInterpreter) set(
 		})
 	}
 
-	return workflowWork(
+	return i.workflowStepWork(
+		program,
 		state,
 		path,
 		WorkItemIntent{
@@ -1467,7 +1537,9 @@ func (s WorkflowStep) Validate() error {
 		s.Parallel != nil,
 		s.Foreach != nil,
 		s.Repeat != nil,
+		s.Emit != nil,
 		s.Return != nil,
+		s.Cancel != nil,
 		s.Fail != nil,
 		s.Wait != nil,
 		s.Break,
@@ -1519,6 +1591,9 @@ func (s WorkflowStep) Validate() error {
 
 	case s.Return != nil:
 		return s.Return.Validate()
+
+	case s.Cancel != nil:
+		return nil
 
 	case s.Fail != nil:
 		if strings.TrimSpace(s.Fail.Code) == "" {
@@ -1620,6 +1695,16 @@ func (s *WorkflowState) validateStructuredState() error {
 	}
 	if !s.ExitValue.Valid() {
 		return errors.New("Workflow Program exit value is invalid")
+	}
+	return nil
+}
+
+func (c WorkflowCancel) Validate() error {
+	if err := c.Handle.Validate(); err != nil {
+		return err
+	}
+	if c.Reason != nil {
+		return c.Reason.Validate()
 	}
 	return nil
 }

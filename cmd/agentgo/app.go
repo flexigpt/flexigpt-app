@@ -741,8 +741,12 @@ func (a *App) initManagers() {
 		a.sessionV3RuntimeAPI,
 		sessionV3Store,
 		SessionV3Params{
+			Artifacts:        artifactComposition.Artifacts,
 			Providers:        providerPublisher,
 			Models:           modelRuntime,
+			Agents:           a.agentStoreAPI.api,
+			Workspaces:       a.workspaceStoreAPI.api,
+			Texts:            a.textStoreAPI.service,
 			Tools:            a.toolStoreAPI.api,
 			ToolCaller:       toolAdapter,
 			SkillResolver:    skillInference,

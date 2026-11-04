@@ -203,7 +203,6 @@ func (ref *URLRef) buildFileURLContentBlock(_ context.Context) (*ContentBlock, e
 func (ref *URLRef) buildBlocksForURLPage(ctx context.Context, onlyIfTextKind bool) (*ContentBlock, error) {
 	cb, err := ref.fetchURLContentBlock(ctx, webtool.FetchEncodingAuto)
 	if err != nil {
-		//nolint:nilerr // Text link content is a fallback.
 		return ref.buildTextLinkContentBlock(), nil
 	}
 	if onlyIfTextKind && cb.Kind != ContentBlockText {
@@ -215,7 +214,6 @@ func (ref *URLRef) buildBlocksForURLPage(ctx context.Context, onlyIfTextKind boo
 func (ref *URLRef) buildImageBlockFromURL(ctx context.Context) (*ContentBlock, error) {
 	cb, err := ref.fetchURLContentBlock(ctx, webtool.FetchEncodingBinary)
 	if err != nil {
-		//nolint:nilerr // Text link content is a fallback.
 		return ref.buildTextLinkContentBlock(), nil
 	}
 	if cb.Kind != ContentBlockImage {
@@ -230,7 +228,6 @@ func (ref *URLRef) buildImageBlockFromURL(ctx context.Context) (*ContentBlock, e
 func (ref *URLRef) buildFileBlockFromURL(ctx context.Context) (*ContentBlock, error) {
 	cb, err := ref.fetchURLContentBlock(ctx, webtool.FetchEncodingBinary)
 	if err != nil {
-		//nolint:nilerr // Text link content is a fallback.
 		return ref.buildTextLinkContentBlock(), nil
 	}
 	if cb.Kind == ContentBlockText {

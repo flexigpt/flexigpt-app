@@ -207,7 +207,6 @@ func convertScalar(
 ) (any, error) {
 	switch node.Tag {
 	case "!!null":
-		//nolint:nilnil // Explicit.
 		return nil, nil
 
 	case "", tagStr:

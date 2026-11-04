@@ -112,12 +112,6 @@ linters:
     # Finds naked/bare returns and requires change them.
     - nakedret
 
-    # Require a bit more explicit returns. Finds the code that returns nil even if it checks that the error is not nil.
-    - nilerr
-
-    # Require a bit more explicit returns. Checks that there is no simultaneous return of nil error and an invalid value.
-    - nilnil
-
     # Finds sending HTTP request without context.Context.
     - noctx
 
@@ -295,6 +289,12 @@ linters:
 
     # Deeply nested if statements, subjective.
     - nestif
+
+    # Require a bit more explicit returns. Finds the code that returns nil even if it checks that the error is not nil.
+    - nilerr
+
+    # Require a bit more explicit returns. Checks that there is no simultaneous return of nil error and an invalid value.
+    - nilnil
 
     # Reports constructs that check 'err != nil' but return a different nil value error.
     # nilerr covers the desired things.

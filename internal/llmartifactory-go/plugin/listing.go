@@ -298,7 +298,6 @@ func (a *API) pluginVisibleInList(
 			entry.Binding.Locator,
 		)
 		if err != nil || address.Name != entry.LogicalName {
-			//nolint:nilerr // Ok.
 			return false, nil
 		}
 		return true, a.validateEditableProjection(projection)

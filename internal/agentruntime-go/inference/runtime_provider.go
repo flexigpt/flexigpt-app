@@ -104,7 +104,7 @@ func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
 	if len(config.CapabilityOverrides) == 0 {
-		return nil, nil //nolint:nilnil // No authored override requires a resolver.
+		return nil, nil
 	}
 
 	value := config.ProviderParam

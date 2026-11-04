@@ -610,7 +610,6 @@ func attachmentReferenceFromAttachment(
 func parseReferenceTime(value string) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 

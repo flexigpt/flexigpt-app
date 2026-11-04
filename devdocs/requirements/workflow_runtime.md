@@ -346,6 +346,33 @@ message, or child completion from being lost because it arrived before the
 Wait WorkItem bound. Runtime recovery rearms only durable timers and retry
 schedules.
 
+The V3 LLM binder now builds an execution plan through the owning Agent,
+Workspace, Text, Skill, Tool, MCP, and Model domains before provider dispatch.
+The Session core remains an orchestration owner. It persists only semantic
+Artifact pins, selected identities, WorkItem state, attempts, waits, outputs,
+and receipts. It does not resolve Artifacts, read Workspace files, discover
+MCP capabilities, render Skills, or configure providers.
+
+LLM WorkItems persist typed streamed text and thinking state, final
+provider-neutral usage, canonical protocol-output projections, and canonical
+debugger projections. Stream callbacks, clients, credentials, provider
+configuration, and native attachment paths remain process-private. Selected
+MCP resources, resource templates, prompts, and server instructions are
+prepared by MCP Runtime before provider input construction.
+
+Workflow `start` calls now use attached child ProgramFrames. The interpreter
+persists the child identity before dispatch, returns a typed
+`CompletionHandle`, and continues the parent frame. The existing completion
+wait primitive resolves from the child terminal result. Attached child frames
+also keep an Execution active after the parent root frame settles.
+
+Workflow `cancel` now resolves a typed child-frame handle and requests
+cancellation through the common ProgramFrame lifecycle. It does not mutate a
+domain binder directly. Cancellation produces a typed Workflow step outcome.
+Independent child lifetime and conversation handoff remain separate execution
+and conversation-ownership implementation work. They are not mapped to local
+invoke fallback behavior.
+
 The current compiler and interpreter are still incomplete. Full structured
 completion policies, child ownership, trigger scheduling, reconciliation,
 compensation, resource accounting, complete Agent and Model target planning,

@@ -267,7 +267,6 @@ func (r *Runtime) UpdateSessionDefaults(
 		command,
 		func(session *Session) (*CommandReceipt, error) {
 			if err := validateDefaults(command.Defaults); err != nil {
-				//nolint:nilerr // Validation failure is encoded in receipt, not returned error.
 				return &CommandReceipt{
 					CommandID: command.Meta.ID,
 					SessionID: session.ID,
@@ -341,7 +340,6 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 	}
 	for _, attachment := range command.Input.Attachments {
 		if err := attachment.Validate(); err != nil {
-			//nolint:nilerr // Validation failure is encoded in receipt, not returned error.
 			return &CommandReceipt{
 				CommandID: command.Meta.ID,
 				SessionID: command.SessionID,
@@ -1435,6 +1433,18 @@ func (r *Runtime) advanceFrameLocked(
 		if err := childInterpreter.ValidateSnapshot(intent.Program); err != nil {
 			return err
 		}
+		lifetime := intent.Lifetime
+		switch lifetime {
+		case "":
+			lifetime = ChildFrameLifetimeAttached
+		case ChildFrameLifetimeAttached:
+		case ChildFrameLifetimeIndependent:
+			return errors.New(
+				"independent child frames require a separate execution",
+			)
+		default:
+			return errors.New("child ProgramFrame lifetime is invalid")
+		}
 		state, err := childInterpreter.InitialState(intent.Program)
 		if err != nil {
 			return err
@@ -1450,6 +1460,7 @@ func (r *Runtime) advanceFrameLocked(
 		child := ProgramFrame{
 			ID:            childID,
 			ParentFrameID: frame.ID,
+			Lifetime:      lifetime,
 			Program:       intent.Program,
 			State:         state,
 			Status:        ProgramFrameStateRunning,
@@ -1530,6 +1541,14 @@ func (r *Runtime) advanceFrameLocked(
 	); err != nil {
 		return err
 	}
+	if err := r.cancelChildFrameIDsLocked(
+		session,
+		execution,
+		frameID,
+		transition.CancelChildFrameIDs,
+	); err != nil {
+		return err
+	}
 	for _, childID := range childIDs {
 		if err := r.advanceFrameLocked(
 			session,
@@ -1538,6 +1557,22 @@ func (r *Runtime) advanceFrameLocked(
 			ProgramEvent{Kind: ProgramEventStarted},
 		); err != nil {
 			return err
+		}
+	}
+	if transition.ContinueParent {
+		frame = mutableFrame(execution, frameID)
+		if frame == nil {
+			return errors.New(
+				"parent ProgramFrame disappeared during continuation",
+			)
+		}
+		if !frame.Status.Terminal() {
+			return r.advanceFrameLocked(
+				session,
+				execution,
+				frameID,
+				ProgramEvent{Kind: ProgramEventContinue},
+			)
 		}
 	}
 	frame = mutableFrame(execution, frameID)
@@ -1896,6 +1931,30 @@ func (r *Runtime) executeOne(
 		Execution: cloneExecution(*execution),
 		WorkItem:  *item,
 	}
+	if item.Type == WorkItemTypeLLM {
+		request.Stream = WorkStream{
+			OnText: func(value string) error {
+				return r.appendLLMStream(
+					ctx,
+					sessionID,
+					executionID,
+					itemID,
+					value,
+					false,
+				)
+			},
+			OnThinking: func(value string) error {
+				return r.appendLLMStream(
+					ctx,
+					sessionID,
+					executionID,
+					itemID,
+					value,
+					true,
+				)
+			},
+		}
+	}
 	r.mu.Unlock()
 	//nolint:contextcheck // Separate work.
 	result, err := r.deps.Binder.ExecuteWork(executionCtx, request, bound)
@@ -1962,6 +2021,7 @@ func (r *Runtime) finishWorkLocked(
 	attempt *Attempt,
 	result WorkExecutionResult,
 ) {
+	result = mergeLLMStreamResult(*item, result)
 	result = normalizeWorkResult(*item, result)
 	now := r.now()
 	item.Output = result.Output
@@ -2386,6 +2446,16 @@ func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
 	}
 
 	if rootCount == 0 || !allTerminal {
+		return nil
+	}
+	for _, frame := range execution.ProgramFrames {
+		if frame.ParentFrameID == "" ||
+			frame.Lifetime == ChildFrameLifetimeIndependent ||
+			frame.Status.Terminal() {
+			continue
+		}
+		// Attached children keep their owning execution active after a
+		// parent reaches a terminal frame state.
 		return nil
 	}
 

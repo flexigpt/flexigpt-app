@@ -1,7 +1,6 @@
 package sessionv3
 
 import (
-	"context"
 	"errors"
 )
 
@@ -48,6 +47,58 @@ func (r *Runtime) cancelChildFramesLocked(
 		}
 	}
 	return nil
+}
+
+func (r *Runtime) cancelChildFrameIDsLocked(
+	session *Session,
+	execution *Execution,
+	parentID ProgramFrameID,
+	ids []ProgramFrameID,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if session == nil || execution == nil {
+		return errors.New("workflow child cancellation owner is unavailable")
+	}
+
+	for _, id := range ids {
+		frame := mutableFrame(execution, id)
+		if frame == nil {
+			return errors.New("workflow cancellation target frame is unavailable")
+		}
+		if !isDescendantFrame(*execution, parentID, frame.ID) {
+			return errors.New(
+				"workflow cancellation target is not owned by this frame",
+			)
+		}
+		if frame.Status.Terminal() {
+			continue
+		}
+
+		r.cancelFrameTreeLocked(execution, frame.ID)
+		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
+	}
+	return nil
+}
+
+func isDescendantFrame(
+	execution Execution,
+	parentID ProgramFrameID,
+	childID ProgramFrameID,
+) bool {
+	if parentID == "" || childID == "" || parentID == childID {
+		return false
+	}
+
+	current := mutableFrame(&execution, childID)
+	for current != nil && current.ParentFrameID != "" {
+		if current.ParentFrameID == parentID {
+			return true
+		}
+		current = mutableFrame(&execution, current.ParentFrameID)
+	}
+	return false
 }
 
 func (r *Runtime) cancelFrameTreeLocked(
@@ -107,6 +158,4 @@ func (r *Runtime) cancelFrameTreeLocked(
 	for _, childID := range frame.ChildFrameIDs {
 		r.cancelFrameTreeLocked(execution, childID)
 	}
-
-	_ = context.Canceled
 }

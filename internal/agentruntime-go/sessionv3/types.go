@@ -3,6 +3,8 @@ package sessionv3
 import (
 	"context"
 	"time"
+
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const SchemaVersion = "session-runtime/v3"
@@ -18,6 +20,9 @@ type (
 	CommandID      string
 	Revision       uint64
 )
+
+// InferenceUsage is the provider-neutral usage record for one LLM WorkItem.
+type InferenceUsage = inferenceSpec.Usage
 
 type Session struct {
 	ID            SessionID       `json:"id"`
@@ -67,11 +72,31 @@ type MCPToolSelection struct {
 	ExecutionMode  *string `json:"executionMode,omitempty"`
 }
 
+type MCPResourceSelection struct {
+	URI            string `json:"uri"`
+	ExpectedDigest string `json:"expectedDigest,omitempty"`
+}
+
+type MCPResourceTemplateSelection struct {
+	URITemplate    string            `json:"uriTemplate"`
+	ExpectedDigest string            `json:"expectedDigest,omitempty"`
+	Arguments      map[string]string `json:"arguments,omitempty"`
+}
+
+type MCPPromptSelection struct {
+	PromptName     string            `json:"promptName"`
+	ExpectedDigest string            `json:"expectedDigest,omitempty"`
+	Arguments      map[string]string `json:"arguments,omitempty"`
+}
+
 type MCPServerSelection struct {
-	Server                    ArtifactSelection  `json:"server"`
-	IncludeServerInstructions bool               `json:"includeServerInstructions,omitempty"`
-	ToolExposure              MCPToolExposure    `json:"toolExposure"`
-	SelectedTools             []MCPToolSelection `json:"selectedTools,omitempty"`
+	Server                    ArtifactSelection              `json:"server"`
+	IncludeServerInstructions bool                           `json:"includeServerInstructions,omitempty"`
+	ToolExposure              MCPToolExposure                `json:"toolExposure"`
+	SelectedTools             []MCPToolSelection             `json:"selectedTools,omitempty"`
+	Resources                 []MCPResourceSelection         `json:"resources,omitempty"`
+	ResourceTemplates         []MCPResourceTemplateSelection `json:"resourceTemplates,omitempty"`
+	Prompts                   []MCPPromptSelection           `json:"prompts,omitempty"`
 }
 
 type Instruction struct {
@@ -290,20 +315,28 @@ type ProgramState struct {
 	Data    CanonicalValue `json:"data,omitempty"`
 }
 
+type ChildFrameLifetime string
+
+const (
+	ChildFrameLifetimeAttached    ChildFrameLifetime = "attached"
+	ChildFrameLifetimeIndependent ChildFrameLifetime = "independent"
+)
+
 type ProgramFrame struct {
-	ID            ProgramFrameID    `json:"id"`
-	ParentFrameID ProgramFrameID    `json:"parentFrameID,omitempty"`
-	Program       ProgramSnapshot   `json:"program"`
-	State         ProgramState      `json:"state"`
-	Status        ProgramFrameState `json:"status"`
-	Path          string            `json:"path,omitempty"`
-	CreatedAt     time.Time         `json:"createdAt"`
-	UpdatedAt     time.Time         `json:"updatedAt"`
-	Deadline      *time.Time        `json:"deadline,omitempty"`
-	ChildFrameIDs []ProgramFrameID  `json:"childFrameIDs,omitempty"`
-	WorkItemIDs   []WorkItemID      `json:"workItemIDs,omitempty"`
-	Output        CanonicalValue    `json:"output,omitempty"`
-	Error         *SanitizedError   `json:"error,omitempty"`
+	ID            ProgramFrameID     `json:"id"`
+	ParentFrameID ProgramFrameID     `json:"parentFrameID,omitempty"`
+	Lifetime      ChildFrameLifetime `json:"lifetime,omitempty"`
+	Program       ProgramSnapshot    `json:"program"`
+	State         ProgramState       `json:"state"`
+	Status        ProgramFrameState  `json:"status"`
+	Path          string             `json:"path,omitempty"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	UpdatedAt     time.Time          `json:"updatedAt"`
+	Deadline      *time.Time         `json:"deadline,omitempty"`
+	ChildFrameIDs []ProgramFrameID   `json:"childFrameIDs,omitempty"`
+	WorkItemIDs   []WorkItemID       `json:"workItemIDs,omitempty"`
+	Output        CanonicalValue     `json:"output,omitempty"`
+	Error         *SanitizedError    `json:"error,omitempty"`
 }
 
 type WorkItemType string
@@ -418,6 +451,7 @@ type WorkItem struct {
 	Binding      *SemanticBinding `json:"binding,omitempty"`
 	Output       *WorkItemOutput  `json:"output,omitempty"`
 	Error        *SanitizedError  `json:"error,omitempty"`
+	LLMStream    *LLMStreamState  `json:"llmStream,omitempty"`
 	CreatedAt    time.Time        `json:"createdAt"`
 	UpdatedAt    time.Time        `json:"updatedAt"`
 	DispatchedAt *time.Time       `json:"dispatchedAt,omitempty"`
@@ -667,10 +701,21 @@ type WorkItemOutput struct {
 	Receipt *ExternalReceipt `json:"receipt,omitempty"`
 }
 
+// LLMStreamState is the durable incremental output observed before a final
+// provider result. It contains no provider callback, client, or token.
+type LLMStreamState struct {
+	Text      string    `json:"text,omitempty"`
+	Thinking  string    `json:"thinking,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 type LLMOutput struct {
-	Text      string     `json:"text,omitempty"`
-	Thinking  string     `json:"thinking,omitempty"`
-	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
+	Text            string           `json:"text,omitempty"`
+	Thinking        string           `json:"thinking,omitempty"`
+	ToolCalls       []ToolCall       `json:"toolCalls,omitempty"`
+	Usage           *InferenceUsage  `json:"usage,omitempty"`
+	ProtocolOutputs []CanonicalValue `json:"protocolOutputs,omitempty"`
+	DebugDetails    CanonicalValue   `json:"debugDetails,omitempty"`
 }
 
 type ToolOutputKind string
@@ -828,10 +873,11 @@ type ProgramEvent struct {
 }
 
 type ProgramFrameIntent struct {
-	ID       ProgramFrameID  `json:"id,omitempty"`
-	Path     string          `json:"path,omitempty"`
-	Program  ProgramSnapshot `json:"program"`
-	Deadline *time.Time      `json:"deadline,omitempty"`
+	ID       ProgramFrameID     `json:"id,omitempty"`
+	Path     string             `json:"path,omitempty"`
+	Program  ProgramSnapshot    `json:"program"`
+	Deadline *time.Time         `json:"deadline,omitempty"`
+	Lifetime ChildFrameLifetime `json:"lifetime,omitempty"`
 }
 
 type WorkItemIntent struct {
@@ -845,14 +891,16 @@ type WorkItemIntent struct {
 }
 
 type ProgramTransition struct {
-	State            ProgramState         `json:"state"`
-	Status           *ProgramFrameState   `json:"status,omitempty"`
-	Output           CanonicalValue       `json:"output,omitempty"`
-	Error            *SanitizedError      `json:"error,omitempty"`
-	Activities       []Activity           `json:"activities,omitempty"`
-	Frames           []ProgramFrameIntent `json:"frames,omitempty"`
-	WorkItems        []WorkItemIntent     `json:"workItems,omitempty"`
-	CancelChildPaths []string             `json:"cancelChildPaths,omitempty"`
+	State               ProgramState         `json:"state"`
+	Status              *ProgramFrameState   `json:"status,omitempty"`
+	Output              CanonicalValue       `json:"output,omitempty"`
+	Error               *SanitizedError      `json:"error,omitempty"`
+	Activities          []Activity           `json:"activities,omitempty"`
+	Frames              []ProgramFrameIntent `json:"frames,omitempty"`
+	WorkItems           []WorkItemIntent     `json:"workItems,omitempty"`
+	CancelChildPaths    []string             `json:"cancelChildPaths,omitempty"`
+	CancelChildFrameIDs []ProgramFrameID     `json:"cancelChildFrameIDs,omitempty"`
+	ContinueParent      bool                 `json:"continueParent,omitempty"`
 }
 
 type ProgramInterpreter interface {
@@ -868,6 +916,12 @@ type WorkDispatchRequest struct {
 	Session   Session
 	Execution Execution
 	WorkItem  WorkItem
+	Stream    WorkStream `json:"-"`
+}
+
+type WorkStream struct {
+	OnText     func(text string) error `json:"-"`
+	OnThinking func(text string) error `json:"-"`
 }
 
 type BindResult struct {

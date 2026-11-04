@@ -53,6 +53,7 @@ func (r *Runtime) prepareRetryLocked(
 
 	item.State = WorkItemStateRetryWaiting
 	item.Output = nil
+	item.LLMStream = nil
 	item.CompletedAt = nil
 	item.RetryState = &RetryState{
 		ScheduledAt:   now,

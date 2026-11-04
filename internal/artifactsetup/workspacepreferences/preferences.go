@@ -70,7 +70,6 @@ func (s *Store) GetDefaultWorkspace(
 		)
 	}
 	if value.Workspace == nil {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 	if err := value.Workspace.Validate(); err != nil {

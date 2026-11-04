@@ -1,7 +1,6 @@
 package sessionv3runtime
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -26,13 +25,16 @@ type workflowInvocationMessage struct {
 	Attachments []sessionv3Runtime.Attachment `json:"attachments,omitempty"`
 }
 
-func (b *Binder) buildInputs(req sessionv3Runtime.WorkDispatchRequest) ([]inferenceSpec.InputUnion, error) {
+func (b *Binder) buildInputs(
+	req sessionv3Runtime.WorkDispatchRequest,
+	injectedContext []string,
+) ([]inferenceSpec.InputUnion, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
 		return nil, errors.New("LLM payload is missing")
 	}
 	if payload.Invocation != nil {
-		return workflowInvocationInputs(*payload.Invocation)
+		return workflowInvocationInputs(*payload.Invocation, injectedContext)
 	}
 	session := req.Session
 	execution := req.Execution
@@ -40,6 +42,17 @@ func (b *Binder) buildInputs(req sessionv3Runtime.WorkDispatchRequest) ([]infere
 	history := selectHistory(session, payload)
 	for _, activity := range history {
 		inputs = append(inputs, activityToInput(activity))
+	}
+	for index, value := range injectedContext {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		inputs = append(inputs, injectedContextInput(
+			payload.InputActivityID,
+			index,
+			value,
+		))
 	}
 	current := findActivity(session, payload.InputActivityID)
 	if current == nil {
@@ -61,6 +74,7 @@ func (b *Binder) buildInputs(req sessionv3Runtime.WorkDispatchRequest) ([]infere
 
 func workflowInvocationInputs(
 	plan sessionv3Runtime.LLMInvocationPlan,
+	injectedContext []string,
 ) ([]inferenceSpec.InputUnion, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
@@ -89,7 +103,8 @@ func workflowInvocationInputs(
 	output := make(
 		[]inferenceSpec.InputUnion,
 		0,
-		len(contextValue.Instructions)+len(contextValue.Messages)+len(request.Messages),
+		len(injectedContext)+
+			len(contextValue.Instructions)+len(contextValue.Messages)+len(request.Messages),
 	)
 	nextID := 0
 	appendMessage := func(message workflowInvocationMessage) error {
@@ -109,6 +124,18 @@ func workflowInvocationInputs(
 		if err := appendMessage(workflowInvocationMessage{
 			Role: sessionv3Runtime.MessageRoleSystem,
 			Text: instruction,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	for _, value := range injectedContext {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if err := appendMessage(workflowInvocationMessage{
+			Role: sessionv3Runtime.MessageRoleUser,
+			Text: value,
 		}); err != nil {
 			return nil, err
 		}
@@ -251,6 +278,31 @@ func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 	}
 }
 
+func injectedContextInput(
+	activityID sessionv3Runtime.ActivityID,
+	index int,
+	text string,
+) inferenceSpec.InputUnion {
+	return inferenceSpec.InputUnion{
+		Kind: inferenceSpec.InputKindInputMessage,
+		InputMessage: &inferenceSpec.InputOutputContent{
+			ID: fmt.Sprintf(
+				"runtime-context:%s:%d",
+				activityID,
+				index,
+			),
+			Role:   inferenceSpec.RoleUser,
+			Status: inferenceSpec.StatusNone,
+			Contents: []inferenceSpec.InputOutputContentItemUnion{{
+				Kind: inferenceSpec.ContentItemKindText,
+				TextItem: &inferenceSpec.ContentItemText{
+					Text: text,
+				},
+			}},
+		},
+	}
+}
+
 func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.InputOutputContentItemUnion, bool) {
 	switch a.Kind {
 	case sessionv3Runtime.AttachmentKindText:
@@ -348,27 +400,4 @@ func toolResultToInput(item sessionv3Runtime.WorkItem) inferenceSpec.InputUnion 
 			},
 		},
 	}
-}
-
-func (b *Binder) systemPromptText(_ context.Context, req sessionv3Runtime.WorkDispatchRequest) string {
-	parts := []string{}
-	payload := req.WorkItem.Input.LLM
-	if payload != nil {
-		for _, inst := range payload.SystemInstructions {
-			if strings.TrimSpace(inst.Content) != "" {
-				parts = append(parts, inst.Content)
-			}
-		}
-	}
-	// Built-in programs copy Session defaults into LLMWork. Falling back only
-	// when the work item has no explicit instructions prevents duplicated
-	// system prompts on every Agent-loop round.
-	if len(parts) == 0 {
-		for _, inst := range req.Session.Defaults.SystemInstructions {
-			if strings.TrimSpace(inst.Content) != "" {
-				parts = append(parts, inst.Content)
-			}
-		}
-	}
-	return strings.Join(parts, "\n\n")
 }

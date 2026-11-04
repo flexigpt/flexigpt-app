@@ -158,16 +158,6 @@ func compileWorkflowEmit(
 	return output, nil
 }
 
-func workflowStepHasDispatchableWork(
-	input workflowv1.Step,
-) bool {
-	return input.Call != nil ||
-		input.Transform != nil ||
-		input.Set != nil ||
-		input.Wait != nil ||
-		input.Emit != nil
-}
-
 func compileWorkflowRetry(
 	input workflowv1.Retry,
 ) (sessionv3Runtime.RetryPolicy, error) {

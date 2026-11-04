@@ -164,6 +164,7 @@ type WorkflowRepeat struct {
 	State         *WorkflowStateSpec `json:"state,omitempty"`
 	MaxIterations int                `json:"maxIterations,omitempty"`
 	OnExhausted   string             `json:"onExhausted,omitempty"`
+	Timeout       WorkflowDuration   `json:"timeout,omitempty"`
 	Do            WorkflowBlock      `json:"do"`
 }
 
@@ -806,6 +807,19 @@ func (i *WorkflowInterpreter) startRepeat(
 		}
 		progress.Count = workflowIntegerPointer(count)
 	}
+	if step.Repeat.Timeout != "" {
+		deadline, timeoutErr := step.Repeat.Timeout.Deadline(
+			state.LogicalTime,
+		)
+		if timeoutErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_repeat_timeout_invalid",
+				timeoutErr.Error(),
+			)
+		}
+		state.Deadline = earlierDeadline(state.Deadline, &deadline)
+	}
 
 	state.Pending = &WorkflowPending{
 		Kind:   WorkflowPendingRepeat,
@@ -932,6 +946,14 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 	progress := pending.Repeat
 	if !progress.LaunchNext {
 		return workflowTransition(state, nil, nil, nil)
+	}
+	if state.Deadline != nil &&
+		!state.LogicalTime.Before(state.Deadline.UTC()) {
+		return workflowFailure(
+			state,
+			"workflow_repeat_timeout_elapsed",
+			"workflow repeat timeout elapsed",
+		)
 	}
 	progress.LaunchNext = false
 
@@ -2031,6 +2053,9 @@ func (r WorkflowRepeat) Validate() error {
 	case "", "fail", "return":
 	default:
 		return errors.New("Workflow repeat onExhausted is invalid")
+	}
+	if err := validateWorkflowTimeout(r.Timeout); err != nil {
+		return err
 	}
 	return r.Do.Validate()
 }

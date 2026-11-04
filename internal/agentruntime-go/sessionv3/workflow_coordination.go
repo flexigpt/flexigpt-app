@@ -573,7 +573,6 @@ func (i *WorkflowInterpreter) workflowWaitFilter(
 		}
 	}
 	if len(filters) == 0 {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 	return &WorkflowWaitFilter{

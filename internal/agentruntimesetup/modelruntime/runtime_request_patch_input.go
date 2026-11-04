@@ -29,7 +29,6 @@ func RuntimeRequestPatchFromJSON(
 ) (*RuntimeRequestPatch, error) {
 	trimmed := bytes.TrimSpace(input)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 
@@ -41,7 +40,6 @@ func RuntimeRequestPatchFromJSON(
 		return nil, fmt.Errorf("canonicalize Model runtime request patch: %w", err)
 	}
 	if string(canonical) == "{}" {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 

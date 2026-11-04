@@ -162,7 +162,6 @@ func explainOAuthRegistrationError(err error) error {
 
 func (h *trackedOAuthHandler) persistedTokenSource(ctx context.Context) (oauth2.TokenSource, error) {
 	if h == nil || h.tokenStore == nil {
-		//nolint:nilnil // The SDK contract allows a nil token source before authorization.
 		return nil, nil
 	}
 
@@ -171,7 +170,6 @@ func (h *trackedOAuthHandler) persistedTokenSource(ctx context.Context) (oauth2.
 
 	if h.persistedLoaded {
 		if h.persistedSource == nil {
-			//nolint:nilnil // No persisted token is available.
 			return nil, nil
 		}
 		return &trackingTokenSource{
@@ -187,20 +185,17 @@ func (h *trackedOAuthHandler) persistedTokenSource(ctx context.Context) (oauth2.
 	tok, err := h.tokenStore.LoadOAuthToken(ctx, h.status)
 	if err != nil {
 		if errors.Is(err, ErrOAuthTokenNotFound) {
-			//nolint:nilnil // No persisted token is available.
 			return nil, nil
 		}
 		h.publish(ctx, authStatusFromTokenError(h.status, err))
 		return nil, err
 	}
 	if tok == nil {
-		//nolint:nilnil // No persisted token is available.
 		return nil, nil
 	}
 	if !tok.Valid() {
 		_ = h.tokenStore.DeleteOAuthToken(context.WithoutCancel(ctx), h.status)
 		h.publish(ctx, authStatusFromTokenError(h.status, errors.New("persisted OAuth token is expired")))
-		//nolint:nilnil // Expired persisted token should trigger a fresh auth flow.
 		return nil, nil
 	}
 

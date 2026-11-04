@@ -1,4 +1,3 @@
-//nolint:nilerr // Ok.
 package session
 
 import (
@@ -725,7 +724,6 @@ func (r *Runtime) StartRun(
 			},
 		)
 		r.mu.Unlock()
-		//nolint:nilerr // Ok
 		return &receipt, nil
 	}
 

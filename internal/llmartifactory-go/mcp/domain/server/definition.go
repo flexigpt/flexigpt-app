@@ -442,7 +442,6 @@ func stringDefaultToJSON(value *string) *json.RawMessage {
 
 func jsonDefaultToString(value *json.RawMessage) (*string, error) {
 	if value == nil {
-		//nolint:nilnil // Nil to nil conversion.
 		return nil, nil
 	}
 	var output string

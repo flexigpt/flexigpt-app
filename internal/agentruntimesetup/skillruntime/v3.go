@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
@@ -96,6 +97,98 @@ func (e *V3Executor) Choices(
 	)
 }
 
+// Instruction resolves and renders an instruction-mode Skill through the
+// Skill domain. It does not create an Execution-owned Skill session.
+func (e *V3Executor) Instruction(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+) (string, error) {
+	if e == nil || e.resolver == nil || e.runtime == nil {
+		return "", errors.New("session v3 skill runtime is unavailable")
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(selection.RootID),
+		ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
+	}
+	if err := ref.Validate(); err != nil {
+		return "", err
+	}
+
+	resolved, err := e.resolver.ResolveSkills(
+		ctx,
+		[]artifactModel.ArtifactRef{ref},
+	)
+	if err != nil {
+		return "", err
+	}
+	if len(resolved.Values) != 1 {
+		return "", errors.New(
+			"skill resolver returned an unexpected instruction skill count",
+		)
+	}
+
+	value := resolved.Values[0]
+	if value.Artifact != ref {
+		return "", errors.New(
+			"skill resolver returned another instruction skill",
+		)
+	}
+	if selection.ExpectedRevision != 0 &&
+		selection.ExpectedRevision != value.Revision {
+		return "", errors.New("selected skill revision changed")
+	}
+	if selection.ExpectedDigest != "" &&
+		selection.ExpectedDigest != value.DefinitionDigest {
+		return "", errors.New("selected skill definition changed")
+	}
+	if !value.Enabled {
+		return "", errors.New("selected instruction skill is disabled")
+	}
+
+	records, err := e.runtime.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			AllowSkills: []provider.SkillDef{value.Definition},
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	for _, record := range records {
+		if record.Def != value.Definition {
+			continue
+		}
+		insert, supported := document.NormalizeSkillInsert(record.Insert)
+		if !supported || insert != document.SkillInsertInstructions {
+			return "", errors.New(
+				"selected skill is not an instruction skill",
+			)
+		}
+
+		rendered, err := e.runtime.RenderSkill(
+			ctx,
+			&skillRuntime.RenderSkillRequest{
+				Body: &skillRuntime.RenderSkillRequestBody{
+					Definition: value.Definition,
+					Arguments:  map[string]string{},
+				},
+			},
+		)
+		if err != nil {
+			return "", err
+		}
+		if rendered == nil || rendered.Body == nil {
+			return "", errors.New(
+				"skill runtime returned no rendered instruction skill",
+			)
+		}
+		return strings.TrimSpace(rendered.Body.Text), nil
+	}
+
+	return "", errors.New("skill runtime did not index the selected instruction skill")
+}
+
 // Bind verifies the Skill allow-list and active-skill selections before a
 // Skill Tool WorkItem is dispatched. Runtime Session allocation remains lazy
 // and occurs only inside Execute.
@@ -181,7 +274,6 @@ func (e *V3Executor) Execute(
 
 	sessionID, err := e.ensureSession(ctx, request)
 	if err != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "skill_session_failed",
@@ -214,7 +306,6 @@ func (e *V3Executor) Execute(
 		},
 	)
 	if err != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "skill_failed",

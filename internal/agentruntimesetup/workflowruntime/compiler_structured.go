@@ -195,7 +195,6 @@ func compileWorkflowRepeatState(
 	input *workflowv1.State,
 ) (*sessionv3Runtime.WorkflowStateSpec, error) {
 	if input == nil {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 
@@ -256,12 +255,14 @@ func compileWorkflowRepeat(
 		}
 		output.Until = &value
 	}
-
 	if input.Timeout != "" {
-		return sessionv3Runtime.WorkflowRepeat{}, unsupportedWorkflowOperation(
-			"repeat",
-			"repeat timeout",
+		timeout, err := sessionv3Runtime.ParseWorkflowDuration(
+			input.Timeout,
 		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRepeat{}, err
+		}
+		output.Timeout = timeout
 	}
 	return output, nil
 }

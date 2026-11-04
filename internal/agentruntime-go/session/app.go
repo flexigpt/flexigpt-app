@@ -401,7 +401,7 @@ func (r *Runtime) ExecuteAppTool(
 			},
 		)
 		r.mu.Unlock()
-		//nolint:nilerr // Explicit.
+
 		return &receipt, nil
 	}
 
@@ -676,7 +676,6 @@ func (r *Runtime) StageAppContext(
 			},
 		)
 		r.mu.Unlock()
-		//nolint:nilerr // Explicit.
 		return &receipt, nil
 	}
 

@@ -867,7 +867,6 @@ func (a *Service) managedAgentPackageConflict(
 	)
 	if err != nil {
 		if errors.Is(err, storeSpec.ErrNotFound) {
-			//nolint:nilnil // Explicit.
 			return nil, nil
 		}
 		return nil, err

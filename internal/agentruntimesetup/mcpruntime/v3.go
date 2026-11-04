@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -56,6 +57,81 @@ func NewV3Executor(
 		runtime: runtime,
 		bridge:  bridge,
 	}, nil
+}
+
+// Context materializes selected MCP instructions, resources, resource
+// templates, and prompts through the MCP domain. Session receives only text
+// contributions prepared at this domain boundary.
+func (e *V3Executor) Context(
+	ctx context.Context,
+	selections []sessionv3Runtime.MCPServerSelection,
+) ([]string, error) {
+	if len(selections) == 0 {
+		return nil, nil
+	}
+	if e == nil || e.runtime == nil {
+		return nil, errors.New("session v3 mcp runtime is unavailable")
+	}
+
+	output := make([]string, 0)
+	for index := range selections {
+		selection := selections[index]
+		serverID, _, err := v3MCPServerSelection(selection)
+		if err != nil {
+			return nil, err
+		}
+
+		status, err := e.runtime.Status(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		if status == nil || status.Status != mcpServer.MCPServerStatusReady {
+			return nil, fmt.Errorf("mcp server %q is not connected", serverID)
+		}
+
+		label := "MCP server"
+		if status.ServerInfo != nil &&
+			strings.TrimSpace(status.ServerInfo.Name) != "" {
+			label = strings.TrimSpace(status.ServerInfo.Name)
+		}
+		if selection.IncludeServerInstructions &&
+			strings.TrimSpace(status.Instructions) != "" {
+			output = append(output, strings.Join([]string{
+				"### MCP server instructions",
+				"server: " + label,
+				status.Instructions,
+			}, "\n\n"))
+		}
+
+		if err := e.appendResourceContext(
+			ctx,
+			&output,
+			serverID,
+			label,
+			selection.Resources,
+		); err != nil {
+			return nil, err
+		}
+		if err := e.appendResourceTemplateContext(
+			ctx,
+			&output,
+			serverID,
+			label,
+			selection.ResourceTemplates,
+		); err != nil {
+			return nil, err
+		}
+		if err := e.appendPromptContext(
+			ctx,
+			&output,
+			serverID,
+			label,
+			selection.Prompts,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return output, nil
 }
 
 // Choices adapts selected ready MCP servers into inference choices and durable
@@ -406,7 +482,6 @@ func (e *V3Executor) Execute(
 	effective.Call = private.Call
 	mapping, invokeRequest, err := v3MappedMCPRequest(&effective)
 	if err != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "invalid_mcp_binding",
@@ -419,7 +494,6 @@ func (e *V3Executor) Execute(
 
 	response, err := e.bridge.InvokeMapped(ctx, mapping, invokeRequest)
 	if err != nil {
-		//nolint:nilerr // Ok.
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "mcp_failed",
@@ -576,6 +650,236 @@ func (e *V3Executor) ResolveWait(
 			result.Decision,
 		)
 	}
+}
+
+func (e *V3Executor) appendResourceContext(
+	ctx context.Context,
+	output *[]string,
+	serverID mcpServer.ServerID,
+	label string,
+	selections []sessionv3Runtime.MCPResourceSelection,
+) error {
+	if len(selections) == 0 {
+		return nil
+	}
+
+	available, err := e.runtime.ListResources(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	byURI := make(map[string]mcpServer.MCPResourceRef, len(available))
+	for _, resource := range available {
+		byURI[resource.URI] = resource
+	}
+
+	for _, selection := range selections {
+		resource, found := byURI[selection.URI]
+		if !found {
+			return fmt.Errorf(
+				"selected mcp resource %q is unavailable",
+				selection.URI,
+			)
+		}
+		if selection.ExpectedDigest != "" &&
+			selection.ExpectedDigest != resource.Digest {
+			return fmt.Errorf(
+				"selected mcp resource %q changed since selection",
+				selection.URI,
+			)
+		}
+
+		response, err := e.runtime.ReadResource(
+			ctx,
+			serverID,
+			selection.URI,
+		)
+		if err != nil {
+			return err
+		}
+		if response == nil {
+			return errors.New("mcp resource read returned no response")
+		}
+		text := v3MCPContentsText(response.Contents)
+		if strings.TrimSpace(text) == "" {
+			return fmt.Errorf(
+				"selected mcp resource %q returned no textual context",
+				selection.URI,
+			)
+		}
+		*output = append(*output, strings.Join([]string{
+			"### MCP resource",
+			"server: " + label,
+			"uri: " + selection.URI,
+			text,
+		}, "\n\n"))
+	}
+	return nil
+}
+
+func (e *V3Executor) appendResourceTemplateContext(
+	ctx context.Context,
+	output *[]string,
+	serverID mcpServer.ServerID,
+	label string,
+	selections []sessionv3Runtime.MCPResourceTemplateSelection,
+) error {
+	if len(selections) == 0 {
+		return nil
+	}
+
+	available, err := e.runtime.ListResourceTemplates(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	byTemplate := make(
+		map[string]mcpServer.MCPResourceTemplateRef,
+		len(available),
+	)
+	for _, resource := range available {
+		byTemplate[resource.URITemplate] = resource
+	}
+
+	for _, selection := range selections {
+		template, found := byTemplate[selection.URITemplate]
+		if !found {
+			return fmt.Errorf(
+				"selected mcp resource template %q is unavailable",
+				selection.URITemplate,
+			)
+		}
+		if selection.ExpectedDigest != "" &&
+			selection.ExpectedDigest != template.Digest {
+			return fmt.Errorf(
+				"selected mcp resource template %q changed since selection",
+				selection.URITemplate,
+			)
+		}
+
+		uri, err := v3MCPResourceTemplateURI(
+			selection.URITemplate,
+			selection.Arguments,
+		)
+		if err != nil {
+			return err
+		}
+		response, err := e.runtime.ReadResource(ctx, serverID, uri)
+		if err != nil {
+			return err
+		}
+		if response == nil {
+			return errors.New("mcp resource template read returned no response")
+		}
+		text := v3MCPContentsText(response.Contents)
+		if strings.TrimSpace(text) == "" {
+			return fmt.Errorf(
+				"selected mcp resource template %q returned no textual context",
+				selection.URITemplate,
+			)
+		}
+		*output = append(*output, strings.Join([]string{
+			"### MCP resource template",
+			"server: " + label,
+			"uri: " + uri,
+			text,
+		}, "\n\n"))
+	}
+	return nil
+}
+
+func (e *V3Executor) appendPromptContext(
+	ctx context.Context,
+	output *[]string,
+	serverID mcpServer.ServerID,
+	label string,
+	selections []sessionv3Runtime.MCPPromptSelection,
+) error {
+	if len(selections) == 0 {
+		return nil
+	}
+
+	available, err := e.runtime.ListPrompts(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	byName := make(map[string]mcpServer.MCPPromptRef, len(available))
+	for _, prompt := range available {
+		byName[prompt.PromptName] = prompt
+	}
+
+	for _, selection := range selections {
+		prompt, found := byName[selection.PromptName]
+		if !found {
+			return fmt.Errorf(
+				"selected mcp prompt %q is unavailable",
+				selection.PromptName,
+			)
+		}
+		if selection.ExpectedDigest != "" &&
+			selection.ExpectedDigest != prompt.Digest {
+			return fmt.Errorf(
+				"selected mcp prompt %q changed since selection",
+				selection.PromptName,
+			)
+		}
+
+		response, err := e.runtime.GetPrompt(
+			ctx,
+			serverID,
+			selection.PromptName,
+			selection.Arguments,
+		)
+		if err != nil {
+			return err
+		}
+		if response == nil {
+			return errors.New("mcp prompt read returned no response")
+		}
+
+		parts := make([]string, 0, len(response.Messages))
+		for _, message := range response.Messages {
+			text := v3MCPContentText(message.Content)
+			if strings.TrimSpace(text) != "" {
+				parts = append(parts, message.Role+":\n"+text)
+			}
+		}
+		if len(parts) == 0 {
+			return fmt.Errorf(
+				"selected mcp prompt %q returned no textual context",
+				selection.PromptName,
+			)
+		}
+		*output = append(*output, strings.Join([]string{
+			"### MCP prompt",
+			"server: " + label,
+			"name: " + selection.PromptName,
+			strings.Join(parts, "\n\n"),
+		}, "\n\n"))
+	}
+	return nil
+}
+
+func v3MCPResourceTemplateURI(
+	template string,
+	arguments map[string]string,
+) (string, error) {
+	parsed, err := url.Parse(template)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New(
+			"mcp resource template must be an absolute uri",
+		)
+	}
+
+	for name, value := range arguments {
+		template = strings.ReplaceAll(
+			template,
+			"{"+name+"}",
+			url.PathEscape(value),
+		)
+	}
+	if strings.Contains(template, "{") || strings.Contains(template, "}") {
+		return "", errors.New("mcp resource template arguments are incomplete")
+	}
+	return template, nil
 }
 
 func v3MCPServerSelection(
@@ -827,7 +1131,6 @@ func canonicalV3MCPValue(
 func parseV3MCPDeadline(value string) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		//nolint:nilnil // Ok.
 		return nil, nil
 	}
 
@@ -909,4 +1212,32 @@ func v3MCPContentsText(
 		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+func v3MCPContentText(content mcpServer.MCPContent) string {
+	switch content.Type {
+	case mcpServer.MCPContentTypeText:
+		return content.Text
+
+	case mcpServer.MCPContentTypeResource:
+		if content.Resource == nil {
+			return ""
+		}
+		if strings.TrimSpace(content.Resource.Text) != "" {
+			return content.Resource.Text
+		}
+		if strings.TrimSpace(content.Resource.URI) != "" {
+			return "[mcp resource omitted: " + content.Resource.URI + "]"
+		}
+
+	case mcpServer.MCPContentTypeResourceLink:
+		return strings.TrimSpace(content.Name + " " + content.URI)
+
+	case mcpServer.MCPContentTypeImage:
+		return "[mcp image content omitted]"
+
+	case mcpServer.MCPContentTypeAudio:
+		return "[mcp audio content omitted]"
+	}
+	return ""
 }
