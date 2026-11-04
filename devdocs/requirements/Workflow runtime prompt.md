@@ -1,19 +1,12 @@
 Complete the FlexiGPT Session Runtime v3 and Workflow Runtime v3 backend.
 
-This is not a partial foundation task. Complete the full backend scope in this
-assignment: contracts, compiler, interpreter, lifecycle, domain binders,
-transport-neutral commands/projections, persistence integration, tests, and
-cleanup of V3 duplicate logic.
+Complete the full backend scope in this assignment as much as possible: contracts, compiler, interpreter, lifecycle, domain binders,
+transport-neutral commands/projections, persistence integration, and cleanup of V3 duplicate logic.
 
-The current repository source is authoritative. Earlier Session v3 and
-Workflow Runtime v3 patches are already applied. Inspect the current source
-before changing it. Do not regenerate old patches from a prior handoff and do
-not revert working changes.
+The current repository source is authoritative. Inspect the current source before changing it.
 
-Do not stop after one implementation phase. Use dependency order internally,
-but complete all dependency-ready work in this assignment. If an actual
-external blocker exists, complete all independent work and report the exact
-blocking contract, source path, and smallest required input. Do not treat
+Use dependency order internally, but complete all dependency-ready work in this assignment. If an actual
+external blocker exists, complete all independent work and report the exact blocking contract, source path, and smallest required input. Do not treat
 ordinary implementation scope as a blocker.
 
 Primary completion outcome:
@@ -56,18 +49,11 @@ Required source material to inspect or attach:
 Repository-wide:
 
 - `.golangci.yml`
-- `go.mod`
-- `go.sum`
-- `git status --short`
-- `git diff --stat`
-- `git diff`, including all currently uncommitted V3 and Workflow changes
-- Existing test output and lint output, if available
 
 Session Runtime v3:
 
 - `internal/agentruntime-go/sessionv3/`
 - `internal/sessionstorev3/`
-- `internal/sessioncommand/`
 - `internal/agentruntime-go/inference/`
 - `internal/agentruntime-go/attachment/`
 - `internal/agentruntime-go/session/`
@@ -216,11 +202,8 @@ Completion requirements:
 
 A. Repair and verify the current baseline first.
 
-- Run all relevant tests, vet, and golangci-lint.
-- Fix all compile, test, race, lint, depguard, and malformed partial-patch
-  defects.
-- Audit every currently applied Workflow compiler path for fields that are
-  accepted but ignored.
+- Fix all compile, race, lint, depguard, and malformed partial-patch defects if any.
+- Audit every currently applied Workflow compiler path for fields that are accepted but ignored.
 - Preserve all correct current work while repairing it.
 
 B. Complete Session Runtime v3 normal backend behavior.
@@ -241,8 +224,6 @@ Implement typed V3 equivalents for all normal V2 backend behavior:
 - Skill sessions and active-skill lifecycle.
 - Cancellation, waits, recovery, uncertainty, retries, and command
   idempotency.
-- Transport-neutral Session v3 command and projection APIs under
-  `internal/sessioncommand`; Wails must only delegate.
 
 A functional V3 superset does not require V3 to read V2 durable documents or
 share V2 Go types. It requires no loss of normal V2 backend capability.
@@ -409,35 +390,8 @@ J. Do not create redundant wrappers or persistence roots.
 
 - Do not create another Session v3 Store wrapper.
 - `SessionV3Wrapper` already owns Runtime and Store lifecycle for Wails.
-- Extend `internal/sessioncommand` for transport-neutral V3 commands and
-  projections.
 - Do not create Workflow, Trigger, Event, or Invocation persistence roots
   outside the V3 Session document.
-
-Validation and test requirements:
-
-- Unit tests for every compiler operation and every rejected-invalid case.
-- Unit tests for all typed IR validation and state transitions.
-- Unit tests for target pin and binding version verification.
-- Unit tests for Agent, Model, Workspace, Tool, MCP, Skill, Service, Activity,
-  attachment, and nested Workflow plans.
-- Unit tests for every control-flow policy.
-- Unit tests for all wait, event, channel, signal, machine, and trigger paths.
-- Unit tests for retry, timeout, cancellation, panic, uncertainty,
-  reconciliation, compensation, cleanup, and restart.
-- Integration tests with Session Store v3 restore, tombstones, index rebuild,
-  FTS rebuild, and command idempotency.
-- Race tests for runtime close, timers, cancellation, dispatch, and recovery.
-- Dependency-direction checks through depguard.
-- No fabricated successful output from a failed external dependency.
-- No persisted private runtime state.
-
-Required verification commands include:
-
-- `go test ./...`
-- focused race tests for affected runtime packages
-- `go vet ./...`
-- `golangci-lint run ./...`
 
 Documentation work:
 
@@ -457,7 +411,7 @@ The completed documentation must state:
 
 Delivery requirements:
 
-- Complete contracts, implementation, callers, wiring, tests, and docs.
+- Complete contracts, implementation, callers, wiring.
 - Do not leave a new partial milestone as the final result.
 - Do not defer ordinary implementation work to another handoff.
 - Provide unified diffs for modified files.

@@ -221,12 +221,6 @@ setup resolves provider configuration and credentials only when an LLM
 WorkItem dispatches. The provider layer does not know whether the WorkItem
 originated from chat, an Agent loop, or a Workflow.
 
-## Backend consumers
-
-`internal/sessioncommand.Service` is the transport-neutral backend command and
-projection API. Wails is an adapter only. CLI, VS Code, HTTP, automation, and
-test clients use the same command and projection service.
-
 ## Implementation status
 
 This document defines the required completed V3 backend state. Foundation work

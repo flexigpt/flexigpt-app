@@ -605,6 +605,17 @@ export interface StateAssignment {
 }
 
 export interface StateUpdateWork {
+    /**
+     * Base is the immutable state snapshot observed when the Workflow step was
+     * prepared. All assignments apply atomically to this value.
+     */
+    "base": CanonicalValue;
+
+    /**
+     * Schema is the state-owning block boundary. It is generic JSON Schema
+     * data, not a compiled schema.
+     */
+    "schema"?: CanonicalValue;
     "assignments"?: StateAssignment[] | null;
     "removePaths"?: string[] | null;
 }
@@ -675,6 +686,7 @@ export interface ToolWork {
 
 export interface TransformWork {
     "input": CanonicalValue;
+    "outputSchema"?: CanonicalValue;
 }
 
 export interface UnresolvedToolBinding {
