@@ -225,6 +225,9 @@ type Execution struct {
 	WorkItems     []WorkItem        `json:"workItems"`
 	Attempts      []Attempt         `json:"attempts"`
 	Waits         []Wait            `json:"waits"`
+	Signals       []ExecutionSignal `json:"signals,omitempty"`
+	Channels      []ChannelLog      `json:"channels,omitempty"`
+	EmitReceipts  []EmitReceipt     `json:"emitReceipts,omitempty"`
 	Controls      ExecutionControls `json:"controls"`
 	Outcome       *ExecutionOutcome `json:"outcome,omitempty"`
 	EventSequence uint64            `json:"eventSequence"`
@@ -323,15 +326,16 @@ const (
 type WorkItemState string
 
 const (
-	WorkItemStateReady      WorkItemState = "ready"
-	WorkItemStateBinding    WorkItemState = "binding"
-	WorkItemStateDispatched WorkItemState = "dispatched"
-	WorkItemStateWaiting    WorkItemState = "waiting"
-	WorkItemStateCompleted  WorkItemState = "completed"
-	WorkItemStateFailed     WorkItemState = "failed"
-	WorkItemStateUncertain  WorkItemState = "uncertain"
-	WorkItemStateCancelled  WorkItemState = "cancelled"
-	WorkItemStateBlocked    WorkItemState = "blocked"
+	WorkItemStateReady        WorkItemState = "ready"
+	WorkItemStateBinding      WorkItemState = "binding"
+	WorkItemStateDispatched   WorkItemState = "dispatched"
+	WorkItemStateRetryWaiting WorkItemState = "retryWaiting"
+	WorkItemStateWaiting      WorkItemState = "waiting"
+	WorkItemStateCompleted    WorkItemState = "completed"
+	WorkItemStateFailed       WorkItemState = "failed"
+	WorkItemStateUncertain    WorkItemState = "uncertain"
+	WorkItemStateCancelled    WorkItemState = "cancelled"
+	WorkItemStateBlocked      WorkItemState = "blocked"
 )
 
 func (s WorkItemState) Terminal() bool {
@@ -363,6 +367,39 @@ type EffectContract struct {
 	Compensate     bool       `json:"compensate,omitempty"`
 }
 
+// RetryMatcher selects failures that can retry one logical WorkItem.
+// Empty matcher fields do not restrict matching.
+type RetryMatcher struct {
+	Categories []ErrorCategory `json:"categories,omitempty"`
+	Codes      []string        `json:"codes,omitempty"`
+	Retryable  *bool           `json:"retryable,omitempty"`
+}
+
+// RetryBackoff is durable retry timing policy. Durations remain typed values
+// rather than generic JSON. Jitter is deterministic per WorkItem attempt.
+type RetryBackoff struct {
+	Initial    WorkflowDuration `json:"initial"`
+	Maximum    WorkflowDuration `json:"maximum,omitempty"`
+	Multiplier float64          `json:"multiplier,omitempty"`
+	Jitter     float64          `json:"jitter,omitempty"`
+}
+
+// RetryPolicy includes the first dispatch attempt in MaxAttempts.
+type RetryPolicy struct {
+	MaxAttempts       int              `json:"maxAttempts"`
+	Match             RetryMatcher     `json:"match"`
+	Backoff           RetryBackoff     `json:"backoff"`
+	PerAttemptTimeout WorkflowDuration `json:"perAttemptTimeout"`
+}
+
+// RetryState is durable scheduler state. It never contains a timer or
+// cancellation callback.
+type RetryState struct {
+	ScheduledAt   time.Time       `json:"scheduledAt"`
+	NextAttemptAt time.Time       `json:"nextAttemptAt"`
+	LastError     *SanitizedError `json:"lastError,omitempty"`
+}
+
 type WorkItem struct {
 	ID           WorkItemID       `json:"id"`
 	FrameID      ProgramFrameID   `json:"frameID"`
@@ -374,6 +411,8 @@ type WorkItem struct {
 	Deadline     *time.Time       `json:"deadline,omitempty"`
 	Effect       EffectContract   `json:"effect"`
 	Automatic    bool             `json:"automatic"`
+	Retry        *RetryPolicy     `json:"retry,omitempty"`
+	RetryState   *RetryState      `json:"retryState,omitempty"`
 	Requested    bool             `json:"requested"`
 	Input        WorkItemPayload  `json:"input"`
 	Binding      *SemanticBinding `json:"binding,omitempty"`
@@ -546,9 +585,59 @@ type EmitDestination struct {
 	Event   string `json:"event,omitempty"`
 }
 
+// CompletionHandle identifies one durable WorkItem or ProgramFrame. A caller
+// can wait for only one target per wait.
+type CompletionHandle struct {
+	WorkItemID WorkItemID     `json:"workItemID,omitempty"`
+	FrameID    ProgramFrameID `json:"frameID,omitempty"`
+}
+
+// ExecutionSignal is the durable event envelope accepted by SignalExecution.
+// ConsumedBy is scoped to one durable wait, not globally destructive.
+type ExecutionSignal struct {
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Source      string         `json:"source,omitempty"`
+	Data        CanonicalValue `json:"data"`
+	Correlation CanonicalValue `json:"correlation,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	ConsumedBy  []WaitID       `json:"consumedBy,omitempty"`
+}
+
+// ChannelMessage is one retained local channel record.
+type ChannelMessage struct {
+	ID               string         `json:"id"`
+	Sequence         uint64         `json:"sequence"`
+	Channel          string         `json:"channel"`
+	Kind             string         `json:"kind,omitempty"`
+	Data             CanonicalValue `json:"data"`
+	Correlation      CanonicalValue `json:"correlation,omitempty"`
+	DeduplicationKey string         `json:"deduplicationKey,omitempty"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	ConsumedBy       []WaitID       `json:"consumedBy,omitempty"`
+}
+
+// ChannelLog is an invocation-local append-only channel log.
+type ChannelLog struct {
+	Name         string           `json:"name"`
+	NextSequence uint64           `json:"nextSequence"`
+	Messages     []ChannelMessage `json:"messages"`
+}
+
+// EmitReceipt confirms durable local channel or execution-event acceptance.
+type EmitReceipt struct {
+	ID               string          `json:"id"`
+	Destination      EmitDestination `json:"destination"`
+	Sequence         uint64          `json:"sequence,omitempty"`
+	DeduplicationKey string          `json:"deduplicationKey,omitempty"`
+	AcceptedAt       time.Time       `json:"acceptedAt"`
+}
+
 type EmitWork struct {
 	Destination      EmitDestination `json:"destination"`
+	Kind             string          `json:"kind,omitempty"`
 	Data             CanonicalValue  `json:"data"`
+	Correlation      CanonicalValue  `json:"correlation,omitempty"`
 	DeduplicationKey string          `json:"deduplicationKey,omitempty"`
 }
 
@@ -568,6 +657,7 @@ type WorkItemOutput struct {
 	LLM     *LLMOutput       `json:"llm,omitempty"`
 	Tool    *ToolOutput      `json:"tool,omitempty"`
 	Value   CanonicalValue   `json:"value,omitempty"`
+	Emit    *EmitReceipt     `json:"emit,omitempty"`
 	Receipt *ExternalReceipt `json:"receipt,omitempty"`
 }
 
@@ -616,6 +706,7 @@ type Attempt struct {
 	Number         int              `json:"number"`
 	IdempotencyKey string           `json:"idempotencyKey,omitempty"`
 	StartedAt      time.Time        `json:"startedAt"`
+	Deadline       *time.Time       `json:"deadline,omitempty"`
 	FinishedAt     *time.Time       `json:"finishedAt,omitempty"`
 	Receipt        *ExternalReceipt `json:"receipt,omitempty"`
 	Error          *SanitizedError  `json:"error,omitempty"`
@@ -659,16 +750,19 @@ const (
 )
 
 type WaitRequest struct {
-	Kind               WaitKind         `json:"kind"`
-	Summary            CanonicalValue   `json:"summary,omitempty"`
-	InputSchema        CanonicalValue   `json:"inputSchema,omitempty"`
-	AllowedResolutions []WaitResolution `json:"allowedResolutions"`
-	Deadline           *time.Time       `json:"deadline,omitempty"`
-	RuntimeBound       bool             `json:"runtimeBound"`
-	Correlation        CanonicalValue   `json:"correlation,omitempty"`
-	Signal             string           `json:"signal,omitempty"`
-	Channel            string           `json:"channel,omitempty"`
-	Timer              *TimerWait       `json:"timer,omitempty"`
+	Kind               WaitKind          `json:"kind"`
+	Summary            CanonicalValue    `json:"summary,omitempty"`
+	InputSchema        CanonicalValue    `json:"inputSchema,omitempty"`
+	AllowedResolutions []WaitResolution  `json:"allowedResolutions"`
+	Deadline           *time.Time        `json:"deadline,omitempty"`
+	RuntimeBound       bool              `json:"runtimeBound"`
+	Correlation        CanonicalValue    `json:"correlation,omitempty"`
+	Signal             string            `json:"signal,omitempty"`
+	Channel            string            `json:"channel,omitempty"`
+	Cursor             uint64            `json:"cursor,omitempty"`
+	Consume            bool              `json:"consume,omitempty"`
+	Completion         *CompletionHandle `json:"completion,omitempty"`
+	Timer              *TimerWait        `json:"timer,omitempty"`
 }
 
 type Wait struct {

@@ -153,10 +153,35 @@ func (DeterministicExecutor) ResolveWait(
 	if request.WorkItem.Type != WorkItemTypeWait {
 		return WaitResolutionResult{}, false, nil
 	}
+	switch request.Wait.Request.Kind {
+	case WaitKindTimer:
+		return WaitResolutionResult{}, true, errors.New(
+			"timer waits cannot be resolved manually",
+		)
+	case WaitKindEvent:
+		return WaitResolutionResult{}, true, errors.New(
+			"event waits cannot be resolved manually",
+		)
+	case WaitKindChannel:
+		return WaitResolutionResult{}, true, errors.New(
+			"channel waits cannot be resolved manually",
+		)
+	case WaitKindChild:
+		return WaitResolutionResult{}, true, errors.New(
+			"completion waits cannot be resolved manually",
+		)
+	default:
+	}
 
 	value := request.Response.Clone()
 	if len(value) == 0 {
 		value = MustCanonicalValue(nil)
+	}
+	if err := validateWorkflowSchema(request.Wait.Request.InputSchema, value); err != nil {
+		return WaitResolutionResult{}, true, fmt.Errorf(
+			"validate wait response: %w",
+			err,
+		)
 	}
 
 	return WaitResolutionResult{

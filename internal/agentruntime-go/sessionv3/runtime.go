@@ -42,6 +42,7 @@ type Runtime struct {
 	privateWaits       map[WaitID]any
 	cancels            map[WorkItemID]context.CancelFunc
 	workflowAdmissions map[CommandID]string
+	retryTimers        map[WorkItemID]context.CancelFunc
 	checkpointPending  map[SessionID]bool
 
 	lifecycleCtx    context.Context
@@ -79,6 +80,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		privateWaits:       map[WaitID]any{},
 		cancels:            map[WorkItemID]context.CancelFunc{},
 		workflowAdmissions: map[CommandID]string{},
+		retryTimers:        map[WorkItemID]context.CancelFunc{},
 		checkpointPending:  map[SessionID]bool{},
 		lifecycleCtx:       lifecycleCtx,
 		lifecycleCancel:    lifecycleCancel,
@@ -126,6 +128,11 @@ func (r *Runtime) Close() {
 	for _, cancel := range r.waitTimers {
 		cancel()
 	}
+	retryCancels := make([]context.CancelFunc, 0, len(r.retryTimers))
+	for _, cancel := range r.retryTimers {
+		retryCancels = append(retryCancels, cancel)
+	}
+	clear(r.retryTimers)
 	clear(r.waitTimers)
 
 	executionIDs := make([]ExecutionID, 0)
@@ -143,6 +150,9 @@ func (r *Runtime) Close() {
 	r.asyncMu.Unlock()
 	if lifecycleCancel != nil {
 		lifecycleCancel()
+	}
+	for _, cancel := range retryCancels {
+		cancel()
 	}
 	r.asyncWG.Wait()
 
@@ -610,6 +620,31 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 		command.ExecutionID,
 		command,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
+			if len(execution.Signals) >= maximumCoordinationRecords {
+				return nil, errors.New("execution signal retention limit exceeded")
+			}
+			signal := ExecutionSignal{
+				ID:          string(command.Meta.ID),
+				Name:        command.Name,
+				Source:      "command",
+				Data:        command.Data.Clone(),
+				Correlation: command.Correlation.Clone(),
+				CreatedAt:   r.now(),
+			}
+			for _, existing := range execution.Signals {
+				if existing.ID == signal.ID {
+					return nil, errors.New("execution signal identity already exists")
+				}
+			}
+			execution.Signals = append(execution.Signals, signal)
+			if err := r.wakeEventWaitsLocked(
+				session,
+				execution,
+				signal,
+			); err != nil {
+				return nil, err
+			}
+
 			for _, frame := range execution.ProgramFrames {
 				if frame.Status.Terminal() {
 					continue
@@ -624,9 +659,13 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 					Workflow: &WorkflowActivity{
 						Phase:   "signal",
 						Summary: command.Name,
-						Output: MustCanonicalValue(
-							map[string]CanonicalValue{"correlation": command.Correlation, "data": command.Data},
-						),
+						Output: MustCanonicalValue(struct {
+							Correlation CanonicalValue `json:"correlation,omitempty"`
+							Data        CanonicalValue `json:"data"`
+						}{
+							Correlation: command.Correlation.Clone(),
+							Data:        command.Data.Clone(),
+						}),
 					},
 				}
 				session.Timeline = append(session.Timeline, activity)
@@ -750,6 +789,10 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 						cancel()
 						delete(r.cancels, item.ID)
 					}
+					item.State = WorkItemStateCancelled
+					item.UpdatedAt = now
+				case WorkItemStateRetryWaiting:
+					r.cancelRetryLocked(item.ID)
 					item.State = WorkItemStateCancelled
 					item.UpdatedAt = now
 				case WorkItemStateDispatched:
@@ -967,6 +1010,12 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 	if err := r.persistLocked(ctx, "waitResolved", session); err != nil {
 		return nil, err
 	}
+	r.armExecutionRetriesLocked(
+		ctx,
+		session.ID,
+		execution.ID,
+		*execution,
+	)
 	ready := r.readyWorkLocked(*execution)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 	r.launchWork(ctx, session.ID, execution.ID, ready)
@@ -1475,6 +1524,7 @@ func (r *Runtime) advanceFrameLocked(
 		return errors.New("program frame disappeared during child advancement")
 	}
 	if frame.Status.Terminal() && frame.ParentFrameID != "" {
+		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
 		return r.advanceFrameLocked(
 			session,
 			execution,
@@ -1502,6 +1552,11 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		(!item.Automatic && !item.Requested) ||
 		unresolvedDependencies(*execution, *item) {
 		r.mu.Unlock()
+		return
+	}
+	if item.Type == WorkItemTypeEmit {
+		r.mu.Unlock()
+		r.dispatchEmit(ctx, sessionID, executionID, itemID)
 		return
 	}
 	prebound, hasPrebound := r.privateBindings[item.ID]
@@ -1597,8 +1652,18 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 			activeAttempt(execution, item.ID),
 			WorkExecutionResult{Output: bound.ImmediateOutput, Confirmed: true},
 		)
-		_ = r.persistLocked(ctx, "workFinished", session)
-		r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
+		if err := r.persistLocked(ctx, "workFinished", session); err != nil {
+			return
+		}
+		r.armExecutionRetriesLocked(
+			ctx,
+			sessionID,
+			executionID,
+			*execution,
+		)
+		if item.State != WorkItemStateRetryWaiting {
+			r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
+		}
 		return
 	}
 	if err := bound.SemanticBinding.Validate(); err != nil {
@@ -1685,9 +1750,14 @@ func (r *Runtime) startDispatchedLocked(
 		return err
 	}
 	now := r.now()
+	attemptDeadlineValue, err := attemptDeadline(*item, now)
+	if err != nil {
+		return err
+	}
 	if item.Deadline != nil && !now.Before(*item.Deadline) {
 		return errors.New("work deadline elapsed before dispatch")
 	}
+
 	attempt := Attempt{
 		ID:             AttemptID(r.newID()),
 		WorkItemID:     item.ID,
@@ -1695,8 +1765,10 @@ func (r *Runtime) startDispatchedLocked(
 		Number:         nextAttempt(*execution, item.ID),
 		IdempotencyKey: item.Effect.IdempotencyKey,
 		StartedAt:      now,
+		Deadline:       attemptDeadlineValue,
 	}
 	item.State = WorkItemStateDispatched
+	item.RetryState = nil
 	item.Binding = &bound.SemanticBinding
 	item.AttemptIDs = append(item.AttemptIDs, attempt.ID)
 	item.DispatchedAt = &now
@@ -1744,7 +1816,14 @@ func (r *Runtime) executeOne(
 		cancel()
 		return
 	}
-	if item.Deadline != nil {
+	attempt := activeAttempt(execution, itemID)
+	if attempt != nil && attempt.Deadline != nil {
+		cancel()
+		executionCtx, cancel = context.WithDeadline(
+			r.lifecycleCtx,
+			attempt.Deadline.UTC(),
+		)
+	} else if item.Deadline != nil {
 		cancel()
 		executionCtx, cancel = context.WithDeadline(
 			r.lifecycleCtx,
@@ -1796,9 +1875,24 @@ func (r *Runtime) executeOne(
 			},
 		)
 	}
-	_ = r.persistLocked(ctx, "workFinished", session)
+	if err := r.persistLocked(ctx, "workFinished", session); err != nil {
+		return
+	}
+	r.armExecutionRetriesLocked(
+		ctx,
+		sessionID,
+		executionID,
+		*execution,
+	)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
+	if item.State != WorkItemStateRetryWaiting {
+		r.launchWork(
+			ctx,
+			sessionID,
+			executionID,
+			r.readyWorkLocked(*execution),
+		)
+	}
 }
 
 func (r *Runtime) finishWorkLocked(
@@ -1831,6 +1925,7 @@ func (r *Runtime) finishWorkLocked(
 	if attempt != nil {
 		attempt.FinishedAt = &now
 		attempt.Error = result.Error
+		attempt.Deadline = cloneTime(attempt.Deadline)
 		if result.Output != nil {
 			attempt.Receipt = result.Output.Receipt
 		}
@@ -1841,7 +1936,18 @@ func (r *Runtime) finishWorkLocked(
 		if attempt != nil {
 			attempt.State = AttemptStateConfirmed
 		}
-	case result.Confirmed || item.Effect.Kind == EffectKindRead:
+	case result.Confirmed:
+		item.State = WorkItemStateFailed
+		if attempt != nil {
+			attempt.State = AttemptStateFailed
+		}
+	case result.Error != nil &&
+		result.Error.Category == ErrorCategoryUncertainty:
+		item.State = WorkItemStateUncertain
+		if attempt != nil {
+			attempt.State = AttemptStateUncertain
+		}
+	case item.Effect.Kind == EffectKindRead:
 		item.State = WorkItemStateFailed
 		if attempt != nil {
 			attempt.State = AttemptStateFailed
@@ -1864,6 +1970,14 @@ func (r *Runtime) finishWorkLocked(
 			}
 		}
 	}
+
+	if item.State == WorkItemStateFailed &&
+		r.prepareRetryLocked(execution, item, attempt, now) {
+		r.refreshExecutionStateLocked(execution)
+		r.touchExecutionLocked(session, execution)
+		return
+	}
+
 	if item.Type == WorkItemTypeTool && item.Output != nil && item.Output.Tool != nil {
 		session.Timeline = append(
 			session.Timeline,
@@ -1899,6 +2013,7 @@ func (r *Runtime) finishWorkLocked(
 			item.ID,
 		)
 	}
+	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
 	r.refreshExecutionStateLocked(execution)
 	r.touchExecutionLocked(session, execution)
 }
@@ -2013,16 +2128,16 @@ func (r *Runtime) expireAt(
 	item := mutableWorkItem(execution, wait.WorkItemID)
 	delete(r.privateWaits, wait.ID)
 	if item != nil && !item.State.Terminal() {
-		item.State = WorkItemStateFailed
-		item.Error = wait.Error
-		item.CompletedAt = &now
-		item.UpdatedAt = now
 		item.WaitID = ""
-		r.advanceSettledWorkLocked(
+		r.finishWorkLocked(
 			session,
 			execution,
-			item.FrameID,
-			item.ID,
+			item,
+			activeAttempt(execution, item.ID),
+			WorkExecutionResult{
+				Error:     wait.Error,
+				Confirmed: true,
+			},
 		)
 	}
 	r.refreshExecutionStateLocked(execution)
@@ -2030,6 +2145,12 @@ func (r *Runtime) expireAt(
 	if err := r.persistLocked(context.WithoutCancel(ctx), "waitExpired", session); err != nil {
 		return
 	}
+	r.armExecutionRetriesLocked(
+		context.WithoutCancel(ctx),
+		session.ID,
+		execution.ID,
+		*execution,
+	)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 	r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
 }
@@ -2102,6 +2223,7 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 	if !r.dispatchAllowedLocked(execution) {
 		return nil
 	}
+
 	values := []WorkItemID{}
 	for _, item := range execution.WorkItems {
 		if item.State == WorkItemStateReady && (item.Automatic || item.Requested) &&
@@ -2149,6 +2271,9 @@ func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
 	for _, item := range execution.WorkItems {
 		switch item.State {
 		case WorkItemStateBinding, WorkItemStateDispatched:
+			execution.State = ExecutionStateRunning
+			return
+		case WorkItemStateRetryWaiting:
 			execution.State = ExecutionStateRunning
 			return
 		case WorkItemStateReady:
@@ -2569,13 +2694,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 						attempt.FinishedAt = &now
 					}
 				}
-			case WorkItemStateReady,
-				WorkItemStateWaiting,
-				WorkItemStateCompleted,
-				WorkItemStateFailed,
-				WorkItemStateUncertain,
-				WorkItemStateCancelled,
-				WorkItemStateBlocked:
+			default:
 				// No recovery action.
 			}
 		}

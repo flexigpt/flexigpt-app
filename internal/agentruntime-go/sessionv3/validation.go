@@ -453,6 +453,33 @@ func (e Execution) Validate(sessionID SessionID) error {
 		}
 		waits[wait.ID] = struct{}{}
 	}
+
+	signals := make(map[string]struct{}, len(e.Signals))
+	for _, signal := range e.Signals {
+		if err := signal.Validate(); err != nil {
+			return err
+		}
+		if _, duplicate := signals[signal.ID]; duplicate {
+			return fmt.Errorf("duplicate execution signal %q", signal.ID)
+		}
+		signals[signal.ID] = struct{}{}
+	}
+
+	channels := make(map[string]struct{}, len(e.Channels))
+	for _, channel := range e.Channels {
+		if err := channel.Validate(); err != nil {
+			return err
+		}
+		if _, duplicate := channels[channel.Name]; duplicate {
+			return fmt.Errorf("duplicate channel %q", channel.Name)
+		}
+		channels[channel.Name] = struct{}{}
+	}
+	for _, receipt := range e.EmitReceipts {
+		if err := receipt.Validate(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -492,6 +519,28 @@ func (w WorkItem) Validate() error {
 	}
 	if err := w.Effect.Validate(); err != nil {
 		return err
+	}
+	switch w.State {
+	case WorkItemStateReady,
+		WorkItemStateBinding,
+		WorkItemStateDispatched,
+		WorkItemStateRetryWaiting,
+		WorkItemStateWaiting,
+		WorkItemStateCompleted,
+		WorkItemStateFailed,
+		WorkItemStateUncertain,
+		WorkItemStateCancelled,
+		WorkItemStateBlocked:
+	default:
+		return fmt.Errorf("unsupported WorkItem state %q", w.State)
+	}
+	if w.Retry != nil {
+		if err := w.Retry.Validate(); err != nil {
+			return err
+		}
+	}
+	if w.RetryState != nil && w.State != WorkItemStateRetryWaiting {
+		return errors.New("non-retrying WorkItem has retry state")
 	}
 	if err := w.Input.Validate(w.Type); err != nil {
 		return err
@@ -627,8 +676,16 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeWait:
 		return p.Wait.Request.Validate()
 	case WorkItemTypeEmit:
-		if !p.Emit.Data.Valid() || (p.Emit.Destination.Channel == "" && p.Emit.Destination.Event == "") {
+		if !p.Emit.Data.Valid() || !p.Emit.Correlation.Valid() {
 			return errors.New("invalid emit WorkItem")
+		}
+		switch {
+		case p.Emit.Destination.Channel == "" &&
+			p.Emit.Destination.Event == "":
+			return errors.New("emit WorkItem has no destination")
+		case p.Emit.Destination.Channel != "" &&
+			p.Emit.Destination.Event != "":
+			return errors.New("emit WorkItem has more than one destination")
 		}
 	case WorkItemTypeCompensation:
 		if p.Compensation.OriginalWorkItemID == "" || !p.Compensation.Input.Valid() {
@@ -739,6 +796,18 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 	if kind == WorkItemTypeTool && o.Tool == nil {
 		return errors.New("tool WorkItem output is missing")
 	}
+	if kind == WorkItemTypeEmit && o.Emit == nil {
+		return errors.New("emit WorkItem output is missing")
+	}
+	if o.Emit != nil {
+		if o.Emit.ID == "" || o.Emit.AcceptedAt.IsZero() {
+			return errors.New("emit receipt is incomplete")
+		}
+		if o.Emit.Destination.Channel == "" &&
+			o.Emit.Destination.Event == "" {
+			return errors.New("emit receipt has no destination")
+		}
+	}
 	if o.LLM != nil {
 		for _, call := range o.LLM.ToolCalls {
 			if err := call.Validate(); err != nil {
@@ -755,6 +824,9 @@ func (a Attempt) Validate() error {
 	}
 	if a.FinishedAt != nil && a.FinishedAt.Before(a.StartedAt) {
 		return errors.New("attempt finished before it started")
+	}
+	if a.Deadline != nil && a.Deadline.Before(a.StartedAt) {
+		return errors.New("attempt deadline is before it started")
 	}
 	return nil
 }
@@ -779,13 +851,79 @@ func (w WaitRequest) Validate() error {
 	default:
 		return errors.New("unsupported wait kind")
 	}
-	if w.Kind != WaitKindTimer && len(w.AllowedResolutions) == 0 {
-		return errors.New("wait request has no allowed resolution")
-	}
+
 	if w.Deadline != nil && w.Deadline.IsZero() {
 		return errors.New("invalid wait deadline")
 	}
+	switch w.Kind {
+	case WaitKindTimer:
+		if w.Timer == nil {
+			return errors.New("timer wait has no timer state")
+		}
+		if err := w.Timer.Validate(); err != nil {
+			return err
+		}
+		if len(w.AllowedResolutions) != 0 ||
+			w.Completion != nil ||
+			w.Signal != "" ||
+			w.Channel != "" {
+			return errors.New("timer wait has incompatible fields")
+		}
+
+	case WaitKindEvent:
+		if w.Timer != nil ||
+			w.Completion != nil ||
+			w.Signal == "" ||
+			len(w.AllowedResolutions) != 0 {
+			return errors.New("event wait is incomplete")
+		}
+
+	case WaitKindChannel:
+		if w.Timer != nil ||
+			w.Completion != nil ||
+			w.Channel == "" ||
+			len(w.AllowedResolutions) != 0 {
+			return errors.New("channel wait is incomplete")
+		}
+
+	case WaitKindChild:
+		if w.Timer != nil ||
+			w.Completion == nil ||
+			len(w.AllowedResolutions) != 0 {
+			return errors.New("completion wait is incomplete")
+		}
+		if err := w.Completion.Validate(); err != nil {
+			return err
+		}
+
+	case WaitKindApproval,
+		WaitKindManual,
+		WaitKindHuman,
+		WaitKindRecovery:
+		if w.Timer != nil ||
+			w.Completion != nil ||
+			len(w.AllowedResolutions) == 0 {
+			return errors.New("interactive wait is incomplete")
+		}
+
+	default:
+		return fmt.Errorf("unsupported wait kind %q", w.Kind)
+	}
+
 	return nil
+}
+
+func (h CompletionHandle) Validate() error {
+	switch {
+	case h.WorkItemID != "" && h.FrameID != "":
+		return errors.New("completion handle has more than one target")
+	case h.WorkItemID != "":
+		return nil
+	case h.FrameID != "":
+		return nil
+	default:
+		return errors.New("completion handle has no target")
+	}
 }
 
 func (w Wait) Validate() error {
@@ -793,6 +931,136 @@ func (w Wait) Validate() error {
 		return errors.New("invalid wait")
 	}
 	return w.Request.Validate()
+}
+
+func (p RetryPolicy) Validate() error {
+	if p.MaxAttempts < 1 {
+		return errors.New("retry maxAttempts must be positive")
+	}
+	if p.MaxAttempts == 1 {
+		return nil
+	}
+	if err := validateWorkflowTimeout(p.Backoff.Initial); err != nil {
+		return fmt.Errorf("retry initial backoff: %w", err)
+	}
+	if p.Backoff.Maximum != "" {
+		if err := validateWorkflowTimeout(p.Backoff.Maximum); err != nil {
+			return fmt.Errorf("retry maximum backoff: %w", err)
+		}
+	}
+	if p.Backoff.Multiplier != 0 && p.Backoff.Multiplier < 1 {
+		return errors.New("retry multiplier must be at least one")
+	}
+	if p.Backoff.Jitter < 0 || p.Backoff.Jitter > 1 {
+		return errors.New("retry jitter must be between zero and one")
+	}
+	if p.PerAttemptTimeout != "" {
+		if err := validateWorkflowTimeout(p.PerAttemptTimeout); err != nil {
+			return fmt.Errorf("retry per-attempt timeout: %w", err)
+		}
+	}
+	for _, category := range p.Match.Categories {
+		switch category {
+		case ErrorCategoryValidation,
+			ErrorCategoryRouting,
+			ErrorCategoryExecution,
+			ErrorCategoryTransient,
+			ErrorCategoryTimeout,
+			ErrorCategoryAuthorization,
+			ErrorCategoryLimit,
+			ErrorCategoryCancellation,
+			ErrorCategoryUncertainty:
+		default:
+			return fmt.Errorf("unsupported retry error category %q", category)
+		}
+	}
+	for _, code := range p.Match.Codes {
+		if err := validateID("retry error code", code); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s ExecutionSignal) Validate() error {
+	if err := validateID("execution signal ID", s.ID); err != nil {
+		return err
+	}
+	if err := validateID("execution signal name", s.Name); err != nil {
+		return err
+	}
+	if !s.Data.Valid() || !s.Correlation.Valid() || s.CreatedAt.IsZero() {
+		return errors.New("execution signal is invalid")
+	}
+	for _, waitID := range s.ConsumedBy {
+		if err := validateID("signal consumed wait ID", string(waitID)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m ChannelMessage) Validate() error {
+	if err := validateID("channel message ID", m.ID); err != nil {
+		return err
+	}
+	if err := validateID("channel message channel", m.Channel); err != nil {
+		return err
+	}
+	if m.Sequence == 0 || !m.Data.Valid() || !m.Correlation.Valid() || m.CreatedAt.IsZero() {
+		return errors.New("channel message is invalid")
+	}
+	for _, waitID := range m.ConsumedBy {
+		if err := validateID("channel consumed wait ID", string(waitID)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l ChannelLog) Validate() error {
+	if err := validateID("channel name", l.Name); err != nil {
+		return err
+	}
+	if l.NextSequence < uint64(len(l.Messages)) {
+		return errors.New("channel sequence is invalid")
+	}
+	seen := make(map[string]struct{}, len(l.Messages))
+	var previous uint64
+	for _, message := range l.Messages {
+		if err := message.Validate(); err != nil {
+			return err
+		}
+		if message.Channel != l.Name {
+			return errors.New("channel message belongs to another channel")
+		}
+		if message.Sequence <= previous {
+			return errors.New("channel messages are not ordered")
+		}
+		if _, duplicate := seen[message.ID]; duplicate {
+			return errors.New("channel message identity is duplicated")
+		}
+		seen[message.ID] = struct{}{}
+		previous = message.Sequence
+	}
+	return nil
+}
+
+func (r EmitReceipt) Validate() error {
+	if err := validateID("emit receipt ID", r.ID); err != nil {
+		return err
+	}
+	if r.AcceptedAt.IsZero() {
+		return errors.New("emit receipt timestamp is required")
+	}
+	switch {
+	case r.Destination.Channel == "" && r.Destination.Event == "":
+		return errors.New("emit receipt has no destination")
+	case r.Destination.Channel != "" && r.Destination.Event != "":
+		return errors.New("emit receipt has more than one destination")
+	default:
+		return nil
+	}
 }
 
 func cloneTime(value *time.Time) *time.Time {
