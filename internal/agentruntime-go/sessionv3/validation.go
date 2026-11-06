@@ -586,6 +586,10 @@ func (w WorkItem) Validate() error {
 	if err := w.Effect.Validate(); err != nil {
 		return err
 	}
+	if w.Effect.Kind == EffectKindKeyed &&
+		strings.TrimSpace(w.Effect.IdempotencyKey) == "" {
+		return errors.New("keyed work item has no idempotency key")
+	}
 	switch w.State {
 	case WorkItemStateReady,
 		WorkItemStateBinding,
@@ -633,11 +637,27 @@ func (e EffectContract) Validate() error {
 	default:
 		return fmt.Errorf("unsupported effect kind %q", e.Kind)
 	}
-	if e.Kind == EffectKindKeyed && e.IdempotencyKey == "" {
-		return errors.New("keyed WorkItem has no idempotency key")
-	}
 	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
-		return errors.New("non-keyed WorkItem has an idempotency key")
+		return errors.New("non-keyed work item has an idempotency key")
+	}
+	return nil
+}
+
+func (e WorkflowStepEffect) Validate() error {
+	switch e.Kind {
+	case EffectKindRead, EffectKindIdempotent, EffectKindNonIdempotent:
+		if e.Key != nil {
+			return errors.New("non-keyed workflow effect contains a key")
+		}
+	case EffectKindKeyed:
+		if e.Key == nil {
+			return errors.New("keyed workflow effect has no key")
+		}
+		if err := e.Key.Validate(); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported workflow effect kind %q", e.Kind)
 	}
 	return nil
 }
@@ -1155,6 +1175,14 @@ func (s ExecutionSignal) Validate() error {
 	}
 	for _, waitID := range s.ConsumedBy {
 		if err := validateID("signal consumed wait ID", string(waitID)); err != nil {
+			return err
+		}
+	}
+	for _, subscription := range s.ConsumedSubscriptions {
+		if err := validateID(
+			"signal consumed subscription",
+			subscription,
+		); err != nil {
 			return err
 		}
 	}

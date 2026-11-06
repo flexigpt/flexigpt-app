@@ -484,8 +484,14 @@ type EffectContract struct {
 	Compensate     bool       `json:"compensate,omitempty"`
 }
 
-// RetryMatcher selects failures that can retry one logical WorkItem.
-// Empty matcher fields do not restrict matching.
+// WorkflowStepEffect is the evaluated effect constraint attached to one
+// Workflow call. Key remains a typed value template until the interpreter
+// prepares the concrete WorkItem.
+type WorkflowStepEffect struct {
+	Kind EffectKind     `json:"kind"`
+	Key  *WorkflowValue `json:"key,omitempty"`
+}
+
 type RetryMatcher struct {
 	Categories []ErrorCategory `json:"categories,omitempty"`
 	Codes      []string        `json:"codes,omitempty"`
@@ -715,13 +721,14 @@ type CompletionHandle struct {
 // ExecutionSignal is the durable event envelope accepted by SignalExecution.
 // ConsumedBy is scoped to one durable wait, not globally destructive.
 type ExecutionSignal struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Source      string         `json:"source,omitempty"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	ConsumedBy  []WaitID       `json:"consumedBy,omitempty"`
+	ID                    string         `json:"id"`
+	Name                  string         `json:"name"`
+	Source                string         `json:"source,omitempty"`
+	Data                  CanonicalValue `json:"data"`
+	Correlation           CanonicalValue `json:"correlation,omitempty"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	ConsumedBy            []WaitID       `json:"consumedBy,omitempty"`
+	ConsumedSubscriptions []string       `json:"consumedSubscriptions,omitempty"`
 }
 
 // ChannelMessage is one retained local channel record.
@@ -900,12 +907,13 @@ type WaitRequest struct {
 	EventSource       string              `json:"eventSource,omitempty"`
 	Filter            *WorkflowWaitFilter `json:"filter,omitempty"`
 
-	Signal     string            `json:"signal,omitempty"`
-	Channel    string            `json:"channel,omitempty"`
-	Cursor     uint64            `json:"cursor,omitempty"`
-	Consume    bool              `json:"consume,omitempty"`
-	Completion *CompletionHandle `json:"completion,omitempty"`
-	Timer      *TimerWait        `json:"timer,omitempty"`
+	Subscription string            `json:"subscription,omitempty"`
+	Signal       string            `json:"signal,omitempty"`
+	Channel      string            `json:"channel,omitempty"`
+	Cursor       uint64            `json:"cursor,omitempty"`
+	Consume      bool              `json:"consume,omitempty"`
+	Completion   *CompletionHandle `json:"completion,omitempty"`
+	Timer        *TimerWait        `json:"timer,omitempty"`
 
 	Assignees *WaitAssignees `json:"assignees,omitempty"`
 	Request   CanonicalValue `json:"request,omitempty"`
@@ -1193,6 +1201,7 @@ type SignalExecutionCommand struct {
 	Meta        CommandMeta    `json:"meta"`
 	SessionID   SessionID      `json:"sessionID"`
 	ExecutionID ExecutionID    `json:"executionID"`
+	SignalID    string         `json:"signalID,omitempty"`
 	Source      string         `json:"source,omitempty"`
 	Name        string         `json:"name"`
 	Correlation CanonicalValue `json:"correlation,omitempty"`

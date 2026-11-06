@@ -106,11 +106,12 @@ type WorkflowStateSpec struct {
 }
 
 type WorkflowStep struct {
-	ID           string           `json:"id"`
-	Timeout      WorkflowDuration `json:"timeout,omitempty"`
-	When         *WorkflowValue   `json:"when,omitempty"`
-	Retry        *RetryPolicy     `json:"retry,omitempty"`
-	OutputSchema CanonicalValue   `json:"outputSchema,omitempty"`
+	ID           string              `json:"id"`
+	Timeout      WorkflowDuration    `json:"timeout,omitempty"`
+	When         *WorkflowValue      `json:"when,omitempty"`
+	Retry        *RetryPolicy        `json:"retry,omitempty"`
+	Effect       *WorkflowStepEffect `json:"effect,omitempty"`
+	OutputSchema CanonicalValue      `json:"outputSchema,omitempty"`
 
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
@@ -828,6 +829,17 @@ func (i *WorkflowInterpreter) call(
 	if err := validateWorkflowInterfaceInput(call.SetContract, input); err != nil {
 		return workflowFailure(state, "workflow_target_set_input_invalid", err.Error())
 	}
+
+	effect, err := i.workflowCallEffect(
+		program,
+		state,
+		step,
+		target,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_effect_invalid", err.Error())
+	}
+
 	mode := call.Mode
 	if mode == "" {
 		mode = WorkflowCallModeInvoke
@@ -889,7 +901,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
-				Effect:      target.Effect,
+				Effect:      effect,
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -925,7 +937,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
-				Effect:      target.Effect,
+				Effect:      effect,
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -957,7 +969,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeService,
 				Automatic:   true,
-				Effect:      target.Effect,
+				Effect:      effect,
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
 						ServiceID:      target.ServiceID,
@@ -977,7 +989,7 @@ func (i *WorkflowInterpreter) call(
 				ProgramPath: path,
 				Type:        WorkItemTypeActivity,
 				Automatic:   true,
-				Effect:      target.Effect,
+				Effect:      effect,
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
 						ActivityID:     target.ActivityID,
@@ -1104,6 +1116,85 @@ func (i *WorkflowInterpreter) call(
 			"Workflow target kind is invalid",
 		)
 	}
+}
+
+func (i *WorkflowInterpreter) workflowCallEffect(
+	program WorkflowProgram,
+	state WorkflowState,
+	step WorkflowStep,
+	target WorkflowTarget,
+) (EffectContract, error) {
+	effect := target.Effect
+	if step.Effect == nil {
+		if effect.Kind == EffectKindKeyed &&
+			strings.TrimSpace(effect.IdempotencyKey) == "" {
+			return EffectContract{}, errors.New(
+				"keyed target requires a workflow operation key",
+			)
+		}
+		return effect, nil
+	}
+
+	requested := step.Effect.Kind
+	switch requested {
+	case EffectKindRead:
+		if target.Effect.Kind != EffectKindRead {
+			return EffectContract{}, errors.New(
+				"workflow call cannot strengthen a mutating target to read",
+			)
+		}
+
+	case EffectKindIdempotent:
+		if target.Effect.Kind != EffectKindRead &&
+			target.Effect.Kind != EffectKindIdempotent {
+			return EffectContract{}, errors.New(
+				"workflow call exceeds the target idempotency guarantee",
+			)
+		}
+
+	case EffectKindKeyed:
+		switch target.Effect.Kind {
+		case EffectKindRead, EffectKindIdempotent, EffectKindKeyed:
+		default:
+			return EffectContract{}, errors.New(
+				"workflow call requests keying from a target without a keying guarantee",
+			)
+		}
+		if step.Effect.Key == nil {
+			return EffectContract{}, errors.New(
+				"keyed workflow call has no operation key",
+			)
+		}
+		key, err := i.stringValue(
+			*step.Effect.Key,
+			program,
+			state,
+		)
+		if err != nil {
+			return EffectContract{}, fmt.Errorf(
+				"evaluate workflow operation key: %w",
+				err,
+			)
+		}
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(key) != key {
+			return EffectContract{}, errors.New(
+				"workflow operation key must be a non-empty normalized string",
+			)
+		}
+		effect.IdempotencyKey = key
+
+	case EffectKindNonIdempotent:
+		effect.IdempotencyKey = ""
+
+	default:
+		return EffectContract{}, fmt.Errorf(
+			"unsupported workflow effect kind %q",
+			requested,
+		)
+	}
+
+	effect.Kind = requested
+	return effect, nil
 }
 
 func (i *WorkflowInterpreter) transform(
@@ -1585,6 +1676,21 @@ func (s WorkflowStep) Validate() error {
 	if len(s.OutputSchema) != 0 && !s.OutputSchema.Valid() {
 		return errors.New("workflow step output schema is invalid")
 	}
+	if s.Retry != nil {
+		if err := s.Retry.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Effect != nil {
+		if s.Call == nil {
+			return errors.New(
+				"workflow effect is supported only for callable work",
+			)
+		}
+		if err := s.Effect.Validate(); err != nil {
+			return err
+		}
+	}
 
 	switch {
 	case s.Call != nil:
@@ -1615,7 +1721,7 @@ func (s WorkflowStep) Validate() error {
 		return s.Return.Validate()
 
 	case s.Cancel != nil:
-		return nil
+		return s.Cancel.Validate()
 
 	case s.Fail != nil:
 		if strings.TrimSpace(s.Fail.Code) == "" {

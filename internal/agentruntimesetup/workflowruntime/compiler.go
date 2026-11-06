@@ -264,6 +264,13 @@ func compileWorkflowStep(
 		}
 		output.Retry = &retry
 	}
+	if input.Effect != nil {
+		effect, err := compileWorkflowStepEffect(*input.Effect)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Effect = &effect
+	}
 
 	switch {
 	case input.Call != nil:
@@ -586,37 +593,85 @@ func compileWorkflowEffect(
 		}, nil
 	}
 
-	if input.Keyed || input.Reconcile || input.Compensate {
-		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
-			"target.interface.effect",
-			"keying, reconciliation, or compensation capability",
-		)
+	output := sessionv3Runtime.EffectContract{
+		Reconcile:  input.Reconcile,
+		Compensate: input.Compensate,
 	}
-
 	switch input.Kind {
 	case "read":
-		return sessionv3Runtime.EffectContract{
-			Kind: sessionv3Runtime.EffectKindRead,
-		}, nil
+		output.Kind = sessionv3Runtime.EffectKindRead
 	case "idempotent":
-		return sessionv3Runtime.EffectContract{
-			Kind: sessionv3Runtime.EffectKindIdempotent,
-		}, nil
+		if input.Keyed {
+			output.Kind = sessionv3Runtime.EffectKindKeyed
+		} else {
+			output.Kind = sessionv3Runtime.EffectKindIdempotent
+		}
 	case "non-idempotent":
-		return sessionv3Runtime.EffectContract{
-			Kind: sessionv3Runtime.EffectKindNonIdempotent,
-		}, nil
+		if input.Keyed {
+			output.Kind = sessionv3Runtime.EffectKindKeyed
+		} else {
+			output.Kind = sessionv3Runtime.EffectKindNonIdempotent
+		}
 	case "keyed":
-		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
-			"target.interface.effect",
-			"keyed effect without a typed operation key",
-		)
+		output.Kind = sessionv3Runtime.EffectKindKeyed
 	default:
 		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
 			"target.interface.effect",
 			"unknown effect contract",
 		)
 	}
+	if err := output.Validate(); err != nil {
+		return sessionv3Runtime.EffectContract{}, err
+	}
+	return output, nil
+}
+
+func compileWorkflowStepEffect(
+	input workflowv1.Effect,
+) (sessionv3Runtime.WorkflowStepEffect, error) {
+	if input.Reconcile != nil || input.Compensate != nil {
+		return sessionv3Runtime.WorkflowStepEffect{},
+			unsupportedWorkflowOperation(
+				"step.effect",
+				"reconciliation or compensation block",
+			)
+	}
+
+	output := sessionv3Runtime.WorkflowStepEffect{}
+	switch input.Kind {
+	case "read":
+		output.Kind = sessionv3Runtime.EffectKindRead
+	case "idempotent":
+		output.Kind = sessionv3Runtime.EffectKindIdempotent
+	case "keyed":
+		output.Kind = sessionv3Runtime.EffectKindKeyed
+	case "non-idempotent":
+		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
+	default:
+		return sessionv3Runtime.WorkflowStepEffect{},
+			unsupportedWorkflowOperation(
+				"step.effect",
+				"unknown effect contract",
+			)
+	}
+
+	if len(input.Key) != 0 {
+		if output.Kind != sessionv3Runtime.EffectKindKeyed {
+			return sessionv3Runtime.WorkflowStepEffect{},
+				errors.New(
+					"non-keyed workflow effect cannot declare an operation key",
+				)
+		}
+		key, err := compileWorkflowValue(input.Key)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStepEffect{}, err
+		}
+		output.Key = &key
+	}
+	if err := output.Validate(); err != nil {
+		return sessionv3Runtime.WorkflowStepEffect{}, err
+	}
+	return output, nil
 }
 
 func compileWorkflowSchema(

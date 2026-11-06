@@ -379,17 +379,19 @@ the target Agent starts. It is not compiled as invoke. Child completion either
 restores the prior owner or retains the handoff target according to the
 declared completion behavior.
 
-The current compiler and interpreter are still incomplete. Full structured
-completion policies, child ownership, trigger scheduling, reconciliation,
-compensation, resource accounting, complete Agent and Model target planning,
-and complete normal V2 backend capability remain required. The existence of
-these lifecycle protections is not evidence of full backend completion.
+Parallel and Foreach support `all`, `first-completed`, `first-success`, and
+`quorum` completion. They retain typed winner and branch or item outcome state,
+support `remaining: cancel` and `remaining: wait`, and support `fail-fast` and
+`collect` behavior. Foreach preserves source ordering and bounded concurrency.
 
-Parallel and Foreach currently admit only explicit `all` completion with
-`collect` errors and `wait` remaining behavior. Other declared completion
-policies are rejected at admission rather than being accepted with incorrect
-all-join behavior. Ongoing Repeat lifetime is also rejected until its durable
-lifecycle is implemented.
+Repeat supports count, while, until, timeout, carried state, local state,
+exhaustion, break, continue, and ongoing `until-cancelled` execution.
+
+The compiler and interpreter are still incomplete. Catch, finally, machines,
+trigger scheduling, resolver-backed target sets, reconciliation,
+compensation, resource accounting, complete port behavior, and complete
+normal V2 backend capability remain required. The existence of the completed
+lifecycle slices is not evidence of full backend completion.
 
 Full retries, complete structured-control policies, child ownership, event and
 channel coordination, trigger scheduling, reconciliation, compensation,
@@ -420,23 +422,23 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [x] `call.mode: handoff` creates distinct Agent ownership behavior and is not mapped to invoke.
 - [x] Independent lifetime is not mapped to attached behavior.
 - [x] No separate invocation store was added.
-- [ ] Tool Artifact target executes through a typed WorkItem.
-- [ ] MCP Tool target executes through a typed WorkItem and current MCP discovery.
-- [ ] Service target executes through a registered Service binding.
-- [ ] Activity target executes through a registered Activity binding.
-- [ ] Nested Workflow target executes as a child Workflow `ProgramFrame`.
-- [ ] Agent target executes as a child Agent-loop `ProgramFrame` with a typed plan.
-- [ ] Model target executes as a child single-model `ProgramFrame` with a typed plan.
-- [ ] Static target sets resolve and enforce allowed members.
+- [x] Tool Artifact target executes through a typed WorkItem.
+- [x] MCP Tool target executes through a typed WorkItem and current MCP discovery.
+- [x] Service target executes through a registered Service binding.
+- [x] Activity target executes through a registered Activity binding.
+- [x] Nested Workflow target executes as a child Workflow `ProgramFrame`.
+- [x] Agent target executes as a child Agent-loop `ProgramFrame` with a typed plan.
+- [x] Model target executes as a child single-model `ProgramFrame` with a typed plan.
+- [x] Static target sets resolve and enforce allowed members.
 - [ ] Resolver-backed target sets use typed resolver WorkItems and persisted selected target identity.
 - [ ] Agent, Workspace, Model, instruction, Tool, Skill, MCP, attachment, message, and port plans compile before Agent-loop or single-model dispatch.
-- [ ] Provider SDK Tool Artifacts execute only inside a typed Model plan and never produce local success.
-- [ ] `read` effect contract is implemented.
-- [ ] `idempotent` effect contract is implemented.
-- [ ] `keyed` effect contract is implemented with a stable idempotency key.
-- [ ] `non-idempotent` effect contract is implemented without automatic replay after uncertainty.
-- [ ] Stable idempotency keys persist in WorkItems and Attempts.
-- [ ] Idempotency keys propagate into target execution plans.
+- [x] Provider SDK Tool Artifacts execute only inside a typed Model plan and never produce local success.
+- [x] `read` effect contract is implemented.
+- [x] `idempotent` effect contract is implemented.
+- [x] `keyed` effect contract is implemented with a stable idempotency key.
+- [x] `non-idempotent` effect contract is implemented without automatic replay after uncertainty.
+- [x] Stable idempotency keys persist in WorkItems and Attempts.
+- [x] Idempotency keys propagate through the typed WorkItem dispatch request.
 - [ ] Reconciliation WorkItems and recovery review are implemented.
 - [ ] Saga effect tracking uses reverse compensation order.
 - [ ] Compensation error policy and cleanup allowance are implemented.
@@ -444,28 +446,28 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [ ] Block `catch` handlers are implemented.
 - [ ] Block `finally` behavior is implemented.
 - [ ] Machine initial state, entry, exit, transitions, timer transitions, event transitions, and final output are implemented.
-- [ ] Parallel `all` completion is implemented.
-- [ ] Parallel `first-completed` completion is implemented.
-- [ ] Parallel `first-success` completion is implemented.
-- [ ] Parallel `quorum` completion is implemented.
-- [ ] Parallel `remaining: cancel` and `remaining: wait` are implemented.
-- [ ] Parallel `fail-fast` and `collect` error behavior are implemented.
-- [ ] Foreach ordering, concurrency, all completion policies, cancellation, isolated state, and merge behavior are implemented.
-- [ ] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
+- [x] Parallel `all` completion is implemented.
+- [x] Parallel `first-completed` completion is implemented.
+- [x] Parallel `first-success` completion is implemented.
+- [x] Parallel `quorum` completion is implemented.
+- [x] Parallel `remaining: cancel` and `remaining: wait` are implemented.
+- [x] Parallel `fail-fast` and `collect` error behavior are implemented.
+- [x] Foreach ordering, concurrency, all completion policies, cancellation, isolated state, and merge behavior are implemented.
+- [x] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
 - [ ] Durable Fork and Join WorkItems exist where scheduling boundaries require them.
-- [ ] `break` and `continue` work across nested repeat scopes.
+- [x] `break` and `continue` work across nested repeat scopes.
 - [ ] Event triggers are implemented.
 - [ ] Schedule triggers are implemented.
 - [ ] Trigger overlap and missed-occurrence policies are implemented.
 - [ ] Trigger state remains in the existing Session v3 document.
 - [ ] Event retention, event consumption, local channels, channel cursors, emit deduplication, human waits, completion waits, signals, and machine serialization are complete.
 - [ ] Attachment admission, snapshots, replay-safe materialization, and provider adaptation use Attachment Runtime.
-- [ ] Agent and Workspace planning use their domain services.
-- [ ] Model defaults layering and typed request patches use Model Runtime.
+- [x] Agent and Workspace planning use their domain services.
+- [x] Model defaults layering and typed request patches use Model Runtime.
 - [ ] Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity execution use their domain binders.
 - [ ] MCP resources, prompts, Apps, approvals, App Tool calls, resource reads, and approved App context use MCP Runtime.
 - [ ] Skill sessions, active Skill lifecycle, Tool invocation, and resource handling use Skill Runtime.
-- [ ] Provider streaming, protocol outputs, usage, debugger projections, Tool result continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency are complete.
+- [x] Provider streaming, protocol outputs, usage, debugger projections, Tool result continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency are implemented for current typed V3 paths.
 - [ ] Session V3 setup retains only typed routing, semantic binding adaptation, and lifecycle ownership.
-- [ ] Session v2 behavior is unchanged and Session v2 does not depend on Session v3.
-- [ ] Workflow HLDs are updated truthfully when functional behavior changes.
+- [x] Session v2 behavior is unchanged and Session v2 does not depend on Session v3.
+- [x] Workflow HLDs are updated truthfully when functional behavior changes.

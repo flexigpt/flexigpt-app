@@ -447,9 +447,18 @@ func (r *Runtime) wakeEventWaitsLocked(
 			wait.Request.Signal != signal.Name {
 			continue
 		}
-		if wait.Request.Consume &&
-			containsWaitID(signal.ConsumedBy, wait.ID) {
-			continue
+		if wait.Request.Consume {
+			if wait.Request.Subscription != "" &&
+				slices.Contains(
+					signal.ConsumedSubscriptions,
+					wait.Request.Subscription,
+				) {
+				continue
+			}
+			if wait.Request.Subscription == "" &&
+				containsWaitID(signal.ConsumedBy, wait.ID) {
+				continue
+			}
 		}
 
 		response := MustCanonicalValue(eventWaitOutput{
@@ -497,6 +506,12 @@ func (r *Runtime) wakeEventWaitsLocked(
 					execution.Signals[signalIndex].ConsumedBy,
 					wait.ID,
 				)
+				if wait.Request.Subscription != "" {
+					execution.Signals[signalIndex].ConsumedSubscriptions = append(
+						execution.Signals[signalIndex].ConsumedSubscriptions,
+						wait.Request.Subscription,
+					)
+				}
 				break
 			}
 		}

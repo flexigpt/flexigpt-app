@@ -609,12 +609,14 @@ func (i *WorkflowInterpreter) wait(
 			Effect:      EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{Wait: &WaitWork{Request: WaitRequest{
 				Kind:              WaitKindEvent,
+				Subscription:      subscription.Name,
 				Signal:            subscription.Event,
 				EventSource:       subscription.Source,
 				Correlation:       subscription.Correlation.Clone(),
 				CorrelationSchema: subscription.CorrelationSchema.Clone(),
 				DataSchema:        subscription.DataSchema.Clone(),
 				Filter:            filter,
+				Consume:           spec.Event.Consume,
 			}}},
 		})
 

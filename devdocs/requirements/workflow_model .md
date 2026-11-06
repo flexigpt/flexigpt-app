@@ -1664,18 +1664,16 @@ stable keyed-effect idempotency key, semantic binding facts, and confirmed or
 uncertain result. Durable retry timing uses Runtime timers and the injected
 runtime clock; it does not use `time.Sleep`.
 
-The current structured fan-out implementation admits only its implemented
-durable policy subset:
+The structured fan-out interpreter supports `all`, `first-completed`,
+`first-success`, and `quorum` completion for Parallel and Foreach. It supports
+`remaining: cancel`, `remaining: wait`, `errors: fail-fast`, and
+`errors: collect`. Branch and item outcomes, winners, cancellation requests,
+and ordered Foreach results remain in typed ProgramFrame state.
 
-- `completion.mode: all`
-- `errors: collect`
-- `remaining: wait`
-
-Other Parallel and Foreach completion policies remain rejected during
-admission. This prevents a valid declaration from being accepted and then
-silently executed with all-join semantics. `repeat.lifetime: until-cancelled`
-also remains admission-rejected until its durable ongoing-process lifecycle is
-implemented.
+Repeat supports counted, pre-condition, post-condition, timeout, carried-state,
+local-state, exhaustion, break, continue, and `until-cancelled` execution.
+The ongoing form remains active until normal cancellation reaches its owning
+ProgramFrame or Execution.
 
 The compiler retains failure category, retryability, and details. Calls retain
 their selected target identity and apply target, call, and target-set schemas.
@@ -1710,10 +1708,16 @@ target owner according to the declared completion behavior. Parent cancellation
 propagates to independent children only when the persisted relationship
 declares `cancelWithParent`.
 
-This coverage is not backend completion. Structured blocks, fan-out, machines,
-human assignment authorization, events, channels, triggers, retries,
-reconciliation, compensation, resources, budgets, all callable modes, and
-complete Agent and Model execution plans remain required implementation work.
+Workflow calls currently execute Tool Artifact, MCP Tool, Service, Activity,
+nested Workflow, Agent, and Model targets through typed WorkItems or child
+ProgramFrames. Static target sets preserve their allowed members and the
+selected target identity. Current MCP discovery and Artifact pins are checked
+before external dispatch.
+
+This coverage is not backend completion. Catch, finally, machines,
+resolver-backed target sets, triggers, reconciliation, compensation, resource
+accounting, complete ports, and complete normal Session v2 capability parity
+remain required implementation work.
 Admission rejection during development must not become a permanent Workflow v1
 capability restriction.
 

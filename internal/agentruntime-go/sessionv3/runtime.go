@@ -629,8 +629,12 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 			if source == "" {
 				source = "command"
 			}
+			signalID := strings.TrimSpace(command.SignalID)
+			if signalID == "" {
+				signalID = string(command.Meta.ID)
+			}
 			signal := ExecutionSignal{
-				ID:          string(command.Meta.ID),
+				ID:          signalID,
 				Name:        command.Name,
 				Source:      source,
 				Data:        command.Data.Clone(),
@@ -638,8 +642,11 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 				CreatedAt:   r.now(),
 			}
 			for _, existing := range execution.Signals {
-				if existing.ID == signal.ID {
-					return nil, errors.New("execution signal identity already exists")
+				if existing.ID == signal.ID &&
+					existing.Source == signal.Source {
+					return nil, errors.New(
+						"execution signal source and identity already exist",
+					)
 				}
 			}
 			execution.Signals = append(execution.Signals, signal)
@@ -2879,14 +2886,15 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				item.UpdatedAt = now
 				changed = true
 			case WorkItemStateDispatched:
+				replaySafe := effectReplaySafe(item.Effect)
 				item.State = WorkItemStateUncertain
 				item.Error = &SanitizedError{
-					Code:    "recovered_external_outcome_uncertain",
-					Message: "external WorkItem was dispatched when the runtime stopped",
+					Code:     "recovered_external_outcome_uncertain",
+					Category: ErrorCategoryUncertainty,
+					Message:  "external work was dispatched when the runtime stopped",
 				}
 				item.CompletedAt = &now
 				item.UpdatedAt = now
-				needsReview = true
 				changed = true
 				for attemptIndex := range execution.Attempts {
 					attempt := &execution.Attempts[attemptIndex]
@@ -2895,6 +2903,20 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 						attempt.Error = item.Error
 						attempt.FinishedAt = &now
 					}
+				}
+				if replaySafe {
+					// Read, idempotent, and keyed work can be rebound against
+					// current dependencies and replayed with the same logical
+					// WorkItem identity and persisted idempotency key.
+					item.State = WorkItemStateReady
+					item.Binding = nil
+					item.Output = nil
+					item.Error = nil
+					item.CompletedAt = nil
+					item.DispatchedAt = nil
+					item.RetryState = nil
+				} else {
+					needsReview = true
 				}
 			default:
 				// No recovery action.

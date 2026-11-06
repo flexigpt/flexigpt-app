@@ -65,12 +65,7 @@ func (r *Runtime) prepareRetryLocked(
 }
 
 func retryEffectSafe(effect EffectContract) bool {
-	switch effect.Kind {
-	case EffectKindRead, EffectKindIdempotent, EffectKindKeyed:
-		return true
-	default:
-		return false
-	}
+	return effectReplaySafe(effect)
 }
 
 func retryMatches(match RetryMatcher, failure SanitizedError) bool {
