@@ -33,14 +33,11 @@ func (r *Runtime) cancelChildFramesLocked(
 		}
 
 		r.cancelFrameTreeLocked(execution, child.ID)
-		if err := r.advanceFrameLocked(
+		if err := r.queueChildJoinLocked(
 			session,
 			execution,
 			parentID,
-			ProgramEvent{
-				Kind:         ProgramEventChildSettled,
-				ChildFrameID: child.ID,
-			},
+			child.ID,
 		); err != nil {
 			return err
 		}

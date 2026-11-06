@@ -425,23 +425,43 @@ type ProgramFrame struct {
 	Output            CanonicalValue     `json:"output,omitempty"`
 	Error             *SanitizedError    `json:"error,omitempty"`
 	HandoffID         string             `json:"handoffID,omitempty"`
+	Fork              *ForkBoundary      `json:"fork,omitempty"`
+	Joins             []JoinBoundary     `json:"joins,omitempty"`
+}
+
+// ForkBoundary is a durable child-scheduling boundary. The parent frame
+// persists every child ProgramFrame intent before its Fork WorkItem dispatches.
+// No child starts before that WorkItem has a confirmed result.
+type ForkBoundary struct {
+	WorkItemID     WorkItemID           `json:"workItemID"`
+	Frames         []ProgramFrameIntent `json:"frames"`
+	ContinueParent bool                 `json:"continueParent,omitempty"`
+}
+
+// JoinBoundary persists a pending child completion aggregation. A parent
+// interpreter receives ProgramEventChildSettled only after the typed Join
+// WorkItem confirms that the named child is terminal.
+type JoinBoundary struct {
+	WorkItemID   WorkItemID     `json:"workItemID"`
+	ChildFrameID ProgramFrameID `json:"childFrameID"`
 }
 
 type WorkItemType string
 
 const (
-	WorkItemTypeLLM          WorkItemType = "llm"
-	WorkItemTypeTool         WorkItemType = "tool"
-	WorkItemTypeService      WorkItemType = "service"
-	WorkItemTypeActivity     WorkItemType = "activity"
-	WorkItemTypeTransform    WorkItemType = "transform"
-	WorkItemTypeCondition    WorkItemType = "condition"
-	WorkItemTypeStateUpdate  WorkItemType = "stateUpdate"
-	WorkItemTypeFork         WorkItemType = "fork"
-	WorkItemTypeJoin         WorkItemType = "join"
-	WorkItemTypeWait         WorkItemType = "wait"
-	WorkItemTypeEmit         WorkItemType = "emit"
-	WorkItemTypeCompensation WorkItemType = "compensation"
+	WorkItemTypeLLM            WorkItemType = "llm"
+	WorkItemTypeTool           WorkItemType = "tool"
+	WorkItemTypeService        WorkItemType = "service"
+	WorkItemTypeActivity       WorkItemType = "activity"
+	WorkItemTypeTransform      WorkItemType = "transform"
+	WorkItemTypeCondition      WorkItemType = "condition"
+	WorkItemTypeStateUpdate    WorkItemType = "stateUpdate"
+	WorkItemTypeFork           WorkItemType = "fork"
+	WorkItemTypeJoin           WorkItemType = "join"
+	WorkItemTypeTargetResolver WorkItemType = "targetResolver"
+	WorkItemTypeWait           WorkItemType = "wait"
+	WorkItemTypeEmit           WorkItemType = "emit"
+	WorkItemTypeCompensation   WorkItemType = "compensation"
 )
 
 type WorkItemState string
@@ -575,18 +595,19 @@ type WorkItem struct {
 // WorkItemPayload is a closed tagged union. It must contain exactly one
 // non-nil member that matches WorkItem.Type.
 type WorkItemPayload struct {
-	LLM          *LLMWork          `json:"llm,omitempty"`
-	Tool         *ToolWork         `json:"tool,omitempty"`
-	Service      *ServiceWork      `json:"service,omitempty"`
-	Activity     *ActivityWork     `json:"activity,omitempty"`
-	Transform    *TransformWork    `json:"transform,omitempty"`
-	Condition    *ConditionWork    `json:"condition,omitempty"`
-	StateUpdate  *StateUpdateWork  `json:"stateUpdate,omitempty"`
-	Fork         *ForkWork         `json:"fork,omitempty"`
-	Join         *JoinWork         `json:"join,omitempty"`
-	Wait         *WaitWork         `json:"wait,omitempty"`
-	Emit         *EmitWork         `json:"emit,omitempty"`
-	Compensation *CompensationWork `json:"compensation,omitempty"`
+	LLM            *LLMWork            `json:"llm,omitempty"`
+	Tool           *ToolWork           `json:"tool,omitempty"`
+	Service        *ServiceWork        `json:"service,omitempty"`
+	Activity       *ActivityWork       `json:"activity,omitempty"`
+	Transform      *TransformWork      `json:"transform,omitempty"`
+	Condition      *ConditionWork      `json:"condition,omitempty"`
+	StateUpdate    *StateUpdateWork    `json:"stateUpdate,omitempty"`
+	Fork           *ForkWork           `json:"fork,omitempty"`
+	Join           *JoinWork           `json:"join,omitempty"`
+	TargetResolver *TargetResolverWork `json:"targetResolver,omitempty"`
+	Wait           *WaitWork           `json:"wait,omitempty"`
+	Emit           *EmitWork           `json:"emit,omitempty"`
+	Compensation   *CompensationWork   `json:"compensation,omitempty"`
 }
 
 type LLMWork struct {
@@ -724,6 +745,20 @@ type JoinWork struct {
 	Quorum      int              `json:"quorum,omitempty"`
 }
 
+// TargetResolverWork is a durable resolver result boundary. The interpreter
+// evaluates declaration templates once, stores normalized candidate members in
+// this intent, then persists a resolver WorkItem before accepting membership.
+// This prevents selection from changing during retries or recovery.
+type TargetResolverWork struct {
+	TargetSet string   `json:"targetSet"`
+	Members   []string `json:"members"`
+}
+
+type TargetResolverOutput struct {
+	TargetSet string   `json:"targetSet"`
+	Members   []string `json:"members"`
+}
+
 type WaitWork struct {
 	Request WaitRequest `json:"request"`
 }
@@ -809,11 +844,12 @@ type SemanticBinding struct {
 }
 
 type WorkItemOutput struct {
-	LLM     *LLMOutput       `json:"llm,omitempty"`
-	Tool    *ToolOutput      `json:"tool,omitempty"`
-	Value   CanonicalValue   `json:"value,omitempty"`
-	Emit    *EmitReceipt     `json:"emit,omitempty"`
-	Receipt *ExternalReceipt `json:"receipt,omitempty"`
+	LLM            *LLMOutput            `json:"llm,omitempty"`
+	Tool           *ToolOutput           `json:"tool,omitempty"`
+	Value          CanonicalValue        `json:"value,omitempty"`
+	Emit           *EmitReceipt          `json:"emit,omitempty"`
+	TargetResolver *TargetResolverOutput `json:"targetResolver,omitempty"`
+	Receipt        *ExternalReceipt      `json:"receipt,omitempty"`
 }
 
 // LLMStreamState is the durable incremental output observed before a final
@@ -1003,14 +1039,15 @@ type ProgramFrameIntent struct {
 }
 
 type WorkItemIntent struct {
-	ID          WorkItemID      `json:"id,omitempty"`
-	ProgramPath string          `json:"programPath,omitempty"`
-	Type        WorkItemType    `json:"type"`
-	Automatic   bool            `json:"automatic"`
-	Deadline    *time.Time      `json:"deadline,omitempty"`
-	Effect      EffectContract  `json:"effect"`
-	Retry       *RetryPolicy    `json:"retry,omitempty"`
-	Input       WorkItemPayload `json:"input"`
+	ID           WorkItemID      `json:"id,omitempty"`
+	ProgramPath  string          `json:"programPath,omitempty"`
+	Type         WorkItemType    `json:"type"`
+	Automatic    bool            `json:"automatic"`
+	Deadline     *time.Time      `json:"deadline,omitempty"`
+	Effect       EffectContract  `json:"effect"`
+	Retry        *RetryPolicy    `json:"retry,omitempty"`
+	Dependencies []WorkItemID    `json:"dependencies,omitempty"`
+	Input        WorkItemPayload `json:"input"`
 }
 
 type ProgramTransition struct {

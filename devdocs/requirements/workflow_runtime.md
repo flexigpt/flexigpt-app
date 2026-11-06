@@ -384,6 +384,12 @@ Parallel and Foreach support `all`, `first-completed`, `first-success`, and
 support `remaining: cancel` and `remaining: wait`, and support `fail-fast` and
 `collect` behavior. Foreach preserves source ordering and bounded concurrency.
 
+Structured child scheduling crosses typed durable boundaries. A parent frame
+persists a Fork WorkItem containing immutable child frame intents before
+children start. A terminal child produces a Join WorkItem before its parent
+interpreter receives child settlement. Fork and Join remain ordinary typed
+WorkItems with attempts, receipts, cancellation, persistence, and recovery.
+
 Repeat supports count, while, until, timeout, carried state, local state,
 exhaustion, break, continue, and ongoing `until-cancelled` execution.
 
@@ -393,6 +399,12 @@ terminal handling before the ProgramFrame becomes terminal. Matching catch
 blocks receive typed `error` context. Finalizers receive typed `outcome`
 context. Catch recovery output is schema-checked. A finalizer failure replaces
 a success and is attached as a cause to a preceding failure or cancellation.
+
+Resolver-backed target sets now create a typed target-resolver WorkItem at the
+first call boundary. The WorkItem persists normalized membership before target
+selection. A call stores the selected target in its durable step outcome and
+uses the same resolved membership through retry, wait, recovery, and
+resumption.
 
 Workflow machines now compile into typed durable ProgramFrame state. The
 runtime persists current machine state, carried state, entry time, active
@@ -467,7 +479,8 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [x] Parallel `fail-fast` and `collect` error behavior are implemented.
 - [x] Foreach ordering, concurrency, all completion policies, cancellation, isolated state, and merge behavior are implemented.
 - [x] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
-- [ ] Durable Fork and Join WorkItems exist where scheduling boundaries require them.
+- [x] Durable Fork WorkItems persist child ProgramFrame scheduling intent before child dispatch.
+- [x] Durable Join WorkItems persist child terminal aggregation before parent-frame continuation.
 - [x] `break` and `continue` work across nested repeat scopes.
 - [x] Event triggers are implemented through durable Session trigger registrations and transport-neutral event ingress.
 - [x] Schedule triggers are implemented through Runtime-owned durable interval and five-field cron timers.

@@ -1442,6 +1442,24 @@ func (r *Runtime) advanceFrameLocked(
 	if frame == nil || frame.Status.Terminal() {
 		return nil
 	}
+	if event.Kind == ProgramEventWorkSettled {
+		if handled, forkErr := r.settleForkBoundaryLocked(
+			session,
+			execution,
+			frame,
+			event,
+		); handled {
+			return forkErr
+		}
+		if handled, joinErr := r.settleJoinBoundaryLocked(
+			session,
+			execution,
+			frame,
+			event,
+		); handled {
+			return joinErr
+		}
+	}
 	interpreter := r.interpreterLocked(frame.Program)
 	if interpreter == nil {
 		return fmt.Errorf("interpreter %q is unavailable", frame.Program.InterpreterID)
@@ -1476,109 +1494,34 @@ func (r *Runtime) advanceFrameLocked(
 		activity.FrameID = frame.ID
 		session.Timeline = append(session.Timeline, activity)
 	}
-	childIDs := []ProgramFrameID{}
-	childExecutionIDs := []ExecutionID{}
-	for _, intent := range transition.Frames {
-		childInterpreter := r.interpreterLocked(intent.Program)
-		if childInterpreter == nil {
-			return fmt.Errorf("child interpreter %q unavailable", intent.Program.InterpreterID)
-		}
-		if err := childInterpreter.ValidateSnapshot(intent.Program); err != nil {
+	if len(transition.Frames) != 0 {
+		if err := r.deferFrameForkLocked(
+			execution,
+			frame,
+			transition.Frames,
+			transition.ContinueParent,
+		); err != nil {
 			return err
 		}
-		lifetime := intent.Lifetime
-		switch lifetime {
-		case "":
-			lifetime = ChildFrameLifetimeAttached
-		case ChildFrameLifetimeAttached:
-		case ChildFrameLifetimeIndependent:
-			child, childErr := r.createIndependentChildExecutionLocked(
-				session,
-				execution,
-				frame,
-				intent,
-			)
-			if childErr != nil {
-				return childErr
-			}
-			childExecutionIDs = append(childExecutionIDs, child.ID)
-			execution = mutableSessionExecution(session, parentExecutionID)
-			frame = mutableFrame(execution, frameID)
-			continue
-		default:
-			return errors.New("child ProgramFrame lifetime is invalid")
-		}
-		state, err := childInterpreter.InitialState(intent.Program)
-		if err != nil {
-			return err
-		}
-		now := r.now()
-		childID := intent.ID
-		if childID == "" {
-			childID = ProgramFrameID(r.newID())
-		}
-		if mutableFrame(execution, childID) != nil {
-			return fmt.Errorf("child ProgramFrame %q already exists", childID)
-		}
-		child := ProgramFrame{
-			ID:            childID,
-			ParentFrameID: frame.ID,
-			Lifetime:      lifetime,
-			Program:       intent.Program,
-			State:         state,
-			Status:        ProgramFrameStateRunning,
-			Path:          intent.Path,
-			CreatedAt:     now,
-			UpdatedAt:     now,
-			HandoffID: func() string {
-				if intent.Handoff != nil {
-					return intent.Handoff.ID
-				}
-				return ""
-			}(),
-			Deadline: earlierDeadline(frame.Deadline, intent.Deadline),
-		}
-		execution.ProgramFrames = append(execution.ProgramFrames, child)
-		frame = mutableFrame(execution, frameID)
-		if frame == nil {
-			return errors.New("parent ProgramFrame disappeared while adding a child")
-		}
-		frame.ChildFrameIDs = append(frame.ChildFrameIDs, child.ID)
-		childIDs = append(childIDs, child.ID)
-		if intent.Handoff != nil {
-			childFrame := mutableFrame(execution, child.ID)
-			if childFrame == nil {
-				return errors.New("handoff child ProgramFrame is unavailable")
-			}
-			if err := r.applyConversationHandoffLocked(
-				session, execution, frame, execution, childFrame.ID, *intent.Handoff,
-			); err != nil {
-				return err
-			}
-		}
-		if frame.Program.InterpreterID == BuiltinConversationInterpreterID {
-			var cs conversationProgramState
-			if json.Unmarshal(frame.State.Data, &cs) == nil {
-				cs.ActiveFrameID = child.ID
-				frame.State = encodeConversationState(cs)
-			}
-		}
+		transition.Frames = nil
+		transition.ContinueParent = false
 	}
 	for _, intent := range transition.WorkItems {
 		now := r.now()
 		item := WorkItem{
-			ID:          intent.ID,
-			FrameID:     frame.ID,
-			Type:        intent.Type,
-			State:       WorkItemStateReady,
-			ProgramPath: intent.ProgramPath,
-			Deadline:    earlierDeadline(frame.Deadline, intent.Deadline),
-			Effect:      intent.Effect,
-			Retry:       cloneWorkflowRetryPolicy(intent.Retry),
-			Automatic:   intent.Automatic,
-			Input:       intent.Input,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:           intent.ID,
+			FrameID:      frame.ID,
+			Type:         intent.Type,
+			State:        WorkItemStateReady,
+			ProgramPath:  intent.ProgramPath,
+			Deadline:     earlierDeadline(frame.Deadline, intent.Deadline),
+			Effect:       intent.Effect,
+			Retry:        cloneWorkflowRetryPolicy(intent.Retry),
+			Automatic:    intent.Automatic,
+			Dependencies: append([]WorkItemID(nil), intent.Dependencies...),
+			Input:        intent.Input,
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}
 		if item.ID == "" {
 			item.ID = WorkItemID(r.newID())
@@ -1656,31 +1599,6 @@ func (r *Runtime) advanceFrameLocked(
 	); err != nil {
 		return err
 	}
-	for _, childID := range childIDs {
-		if err := r.advanceFrameLocked(
-			session,
-			execution,
-			childID,
-			ProgramEvent{Kind: ProgramEventStarted},
-		); err != nil {
-			return err
-		}
-	}
-	for _, childExecutionID := range childExecutionIDs {
-		child := mutableSessionExecution(session, childExecutionID)
-		if child == nil || len(child.ProgramFrames) == 0 {
-			return errors.New("independent child Execution is unavailable")
-		}
-		if err := r.advanceFrameLocked(
-			session,
-			child,
-			child.ProgramFrames[0].ID,
-			ProgramEvent{Kind: ProgramEventStarted},
-		); err != nil {
-			return err
-		}
-		r.touchExecutionLocked(session, child)
-	}
 	if transition.ContinueParent {
 		frame = mutableFrame(execution, frameID)
 		if frame == nil {
@@ -1706,11 +1624,11 @@ func (r *Runtime) advanceFrameLocked(
 	}
 	if frame.Status.Terminal() && frame.ParentFrameID != "" {
 		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
-		return r.advanceFrameLocked(
+		return r.queueChildJoinLocked(
 			session,
 			execution,
 			frame.ParentFrameID,
-			ProgramEvent{Kind: ProgramEventChildSettled, ChildFrameID: frame.ID},
+			frame.ID,
 		)
 	}
 	r.refreshExecutionStateLocked(execution)

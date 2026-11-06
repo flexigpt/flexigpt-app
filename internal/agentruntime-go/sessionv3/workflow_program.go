@@ -234,6 +234,16 @@ type WorkflowStepOutcome struct {
 	ID     string                    `json:"id"`
 	Status WorkflowStepOutcomeStatus `json:"status"`
 	Output CanonicalValue            `json:"output,omitempty"`
+	Target string                    `json:"target,omitempty"`
+}
+
+// WorkflowTargetSetResolution is persisted while a resolver WorkItem is
+// running. It prevents a later retry, pause, or restore from evaluating the
+// target-set expression again and changing the accepted membership.
+type WorkflowTargetSetResolution struct {
+	Name       string     `json:"name"`
+	WorkItemID WorkItemID `json:"workItemID"`
+	Members    []string   `json:"members"`
 }
 
 // WorkflowState is the durable typed state of one sequential Workflow frame.
@@ -243,21 +253,22 @@ type WorkflowStepOutcome struct {
 type WorkflowState struct {
 	Version uint32 `json:"version"`
 
-	Index             int                         `json:"index"`
-	PendingPath       string                      `json:"pendingPath,omitempty"`
-	PendingTarget     string                      `json:"pendingTarget,omitempty"`
-	Pending           *WorkflowPending            `json:"pending,omitempty"`
-	Exit              WorkflowExitKind            `json:"exit,omitempty"`
-	ExitValue         CanonicalValue              `json:"exitValue,omitempty"`
-	LogicalTime       time.Time                   `json:"logicalTime,omitzero"`
-	Deadline          *time.Time                  `json:"deadline,omitempty"`
-	State             CanonicalValue              `json:"state"`
-	Outcomes          []WorkflowStepOutcome       `json:"outcomes"`
-	Subscriptions     []WorkflowSubscriptionState `json:"subscriptions,omitempty"`
-	CancelChildPaths  []string                    `json:"cancelChildPaths,omitempty"`
-	CancelWorkItemIDs []WorkItemID                `json:"cancelWorkItemIDs,omitempty"`
-	Terminal          *WorkflowTerminalState      `json:"terminal,omitempty"`
-	TargetSets        []WorkflowTargetSetState    `json:"targetSets,omitempty"`
+	Index               int                          `json:"index"`
+	PendingPath         string                       `json:"pendingPath,omitempty"`
+	PendingTarget       string                       `json:"pendingTarget,omitempty"`
+	Pending             *WorkflowPending             `json:"pending,omitempty"`
+	Exit                WorkflowExitKind             `json:"exit,omitempty"`
+	ExitValue           CanonicalValue               `json:"exitValue,omitempty"`
+	LogicalTime         time.Time                    `json:"logicalTime,omitzero"`
+	Deadline            *time.Time                   `json:"deadline,omitempty"`
+	State               CanonicalValue               `json:"state"`
+	Outcomes            []WorkflowStepOutcome        `json:"outcomes"`
+	Subscriptions       []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
+	CancelChildPaths    []string                     `json:"cancelChildPaths,omitempty"`
+	CancelWorkItemIDs   []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
+	Terminal            *WorkflowTerminalState       `json:"terminal,omitempty"`
+	TargetSets          []WorkflowTargetSetState     `json:"targetSets,omitempty"`
+	TargetSetResolution *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
 }
 
 type WorkflowInterpreter struct {
@@ -293,6 +304,11 @@ func (s *WorkflowState) Validate() error {
 			return errors.New("Workflow Program step outcome is duplicated")
 		}
 		seen[outcome.ID] = struct{}{}
+	}
+	if s.TargetSetResolution != nil {
+		if err := s.TargetSetResolution.Validate(); err != nil {
+			return err
+		}
 	}
 	for _, subscription := range s.Subscriptions {
 		if err := subscription.Validate(); err != nil {
@@ -339,6 +355,7 @@ func (s *WorkflowState) recordOutcome(
 		ID:     outcome.ID,
 		Status: outcome.Status,
 		Output: outcome.Output.Clone(),
+		Target: outcome.Target,
 	})
 	return nil
 }
@@ -520,6 +537,25 @@ func (i *WorkflowInterpreter) Advance(
 
 	case ProgramEventWorkSettled:
 		item := executionWorkItem(execution, event.WorkItemID)
+		handled, resolverErr := i.settleTargetSetResolver(
+			&state,
+			program,
+			execution,
+			frame.ID,
+			event.WorkItemID,
+		)
+		if resolverErr != nil {
+			transition, err = workflowFailure(
+				state,
+				"workflow_target_set_resolution_failed",
+				resolverErr.Error(),
+			)
+			break
+		}
+		if handled {
+			transition, err = i.drive(frame, execution, program, state)
+			break
+		}
 		if item != nil && item.FrameID == frame.ID &&
 			state.PendingPath != "" && item.ProgramPath == state.PendingPath {
 			if failure := workflowSettledFailure(program, state, *item); failure != nil {
@@ -880,6 +916,18 @@ func (i *WorkflowInterpreter) call(
 	step WorkflowStep,
 	call WorkflowCall,
 ) (ProgramTransition, error) {
+	if transition, waiting, err := i.beginTargetSetResolution(
+		frame,
+		program,
+		&state,
+		path,
+		call,
+	); err != nil {
+		return workflowFailure(state, "workflow_target_set_invalid", err.Error())
+	} else if waiting {
+		return transition, nil
+	}
+
 	targetName, err := i.stringValue(call.Target, program, state)
 	if err != nil {
 		return workflowFailure(
@@ -1480,10 +1528,12 @@ func (i *WorkflowInterpreter) settleWork(
 	if err := i.validateStepOutput(program, *state, step, value); err != nil {
 		return err
 	}
+	selectedTarget := state.PendingTarget
 	if err := state.recordOutcome(WorkflowStepOutcome{
 		ID:     step.ID,
 		Status: WorkflowStepOutcomeSucceeded,
 		Output: value,
+		Target: selectedTarget,
 	}); err != nil {
 		return err
 	}
@@ -1536,10 +1586,12 @@ func (i *WorkflowInterpreter) settleChild(
 		); err != nil {
 			return err
 		}
+		selectedTarget := state.PendingTarget
 		if err := state.recordOutcome(WorkflowStepOutcome{
 			ID:     step.ID,
 			Status: WorkflowStepOutcomeSucceeded,
 			Output: child.Output,
+			Target: selectedTarget,
 		}); err != nil {
 			return err
 		}

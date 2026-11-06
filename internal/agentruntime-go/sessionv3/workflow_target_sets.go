@@ -162,90 +162,10 @@ func (i *WorkflowInterpreter) resolveWorkflowCallTargets(
 	); found {
 		return append([]string(nil), previous.Members...), nil
 	}
-
-	value, err := i.evaluate(
-		targetSet.Resolved.Value,
-		program,
-		*state,
+	return nil, fmt.Errorf(
+		"workflow target set %q has no durable resolver result",
+		call.AllowedTargetSet,
 	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"evaluate workflow target set %q: %w",
-			call.AllowedTargetSet,
-			err,
-		)
-	}
-	members, err := DecodeCanonicalValue[[]string](value)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"workflow target set %q must resolve to a string array",
-			call.AllowedTargetSet,
-		)
-	}
-	if len(members) == 0 {
-		return nil, fmt.Errorf(
-			"workflow target set %q resolved no targets",
-			call.AllowedTargetSet,
-		)
-	}
-
-	normalized := make([]string, 0, len(members))
-	seen := make(map[string]struct{}, len(members))
-	for _, member := range members {
-		if err := validateID(
-			"workflow target set resolved target",
-			member,
-		); err != nil {
-			return nil, err
-		}
-		if _, exists := program.Targets[member]; !exists {
-			return nil, fmt.Errorf(
-				"workflow target set %q resolved unknown target %q",
-				call.AllowedTargetSet,
-				member,
-			)
-		}
-		if _, duplicate := seen[member]; duplicate {
-			continue
-		}
-		if targetSet.Resolved.Constraints != nil {
-			candidate := MustCanonicalValue(member)
-			constrainedProgram := program
-			constrainedProgram.Scope.Item = &candidate
-			matched, matchErr := i.condition(
-				*targetSet.Resolved.Constraints,
-				constrainedProgram,
-				*state,
-			)
-			if matchErr != nil {
-				return nil, fmt.Errorf(
-					"evaluate workflow target set constraint: %w",
-					matchErr,
-				)
-			}
-			if !matched {
-				continue
-			}
-		}
-		seen[member] = struct{}{}
-		normalized = append(normalized, member)
-	}
-	if len(normalized) == 0 {
-		return nil, fmt.Errorf(
-			"workflow target set %q has no permitted targets",
-			call.AllowedTargetSet,
-		)
-	}
-
-	state.TargetSets = append(
-		state.TargetSets,
-		WorkflowTargetSetState{
-			Name:       call.AllowedTargetSet,
-			Members:    normalized,
-			ResolvedAt: state.LogicalTime.UTC(),
-		},
-	)
-	return append([]string(nil), normalized...), nil
 }
 
 func workflowTargetSetContract(

@@ -161,6 +161,7 @@ func (i *WorkflowInterpreter) startCall(
 		ID:     step.ID,
 		Status: WorkflowStepOutcomeSucceeded,
 		Output: output,
+		Target: targetName,
 	}); err != nil {
 		return workflowFailure(
 			state,

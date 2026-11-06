@@ -994,6 +994,7 @@ func cloneWorkflowStepOutcomes(
 			ID:     values[index].ID,
 			Status: values[index].Status,
 			Output: values[index].Output.Clone(),
+			Target: values[index].Target,
 		}
 	}
 	return output

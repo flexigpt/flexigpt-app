@@ -576,6 +576,65 @@ func (p ProgramFrame) Validate() error {
 			return err
 		}
 	}
+	if p.Fork != nil {
+		if err := p.Fork.Validate(); err != nil {
+			return err
+		}
+	}
+	seenJoins := make(map[WorkItemID]struct{}, len(p.Joins))
+	for _, join := range p.Joins {
+		if err := join.Validate(); err != nil {
+			return err
+		}
+		if _, duplicate := seenJoins[join.WorkItemID]; duplicate {
+			return errors.New("ProgramFrame join WorkItem is duplicated")
+		}
+		seenJoins[join.WorkItemID] = struct{}{}
+	}
+	return nil
+}
+
+func (b ForkBoundary) Validate() error {
+	if err := validateID("fork WorkItem ID", string(b.WorkItemID)); err != nil {
+		return err
+	}
+	if len(b.Frames) == 0 {
+		return errors.New("fork boundary has no child frames")
+	}
+	seenFrames := make(map[ProgramFrameID]struct{}, len(b.Frames))
+	for _, frame := range b.Frames {
+		if err := validateDeferredFrameIntent(frame); err != nil {
+			return err
+		}
+		if _, duplicate := seenFrames[frame.ID]; duplicate {
+			return errors.New("fork boundary child frame is duplicated")
+		}
+		seenFrames[frame.ID] = struct{}{}
+	}
+	return nil
+}
+
+func (b JoinBoundary) Validate() error {
+	if err := validateID("join WorkItem ID", string(b.WorkItemID)); err != nil {
+		return err
+	}
+	return validateID("join child ProgramFrame ID", string(b.ChildFrameID))
+}
+
+func validateDeferredFrameIntent(value ProgramFrameIntent) error {
+	if err := validateID("deferred ProgramFrame ID", string(value.ID)); err != nil {
+		return err
+	}
+	if value.ExecutionID != "" {
+		if err := validateID("deferred Execution ID", string(value.ExecutionID)); err != nil {
+			return err
+		}
+	}
+	if value.Program.InterpreterID == "" ||
+		value.Program.InterpreterVersion == 0 ||
+		!value.Program.Payload.Valid() {
+		return errors.New("deferred ProgramFrame program is invalid")
+	}
 	return nil
 }
 
@@ -724,6 +783,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		{WorkItemTypeStateUpdate, p.StateUpdate != nil},
 		{WorkItemTypeFork, p.Fork != nil},
 		{WorkItemTypeJoin, p.Join != nil},
+		{WorkItemTypeTargetResolver, p.TargetResolver != nil},
 		{WorkItemTypeWait, p.Wait != nil},
 		{WorkItemTypeEmit, p.Emit != nil},
 		{WorkItemTypeCompensation, p.Compensation != nil},
@@ -813,6 +873,18 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeJoin:
 		if len(p.Join.ChildFrames) == 0 || p.Join.Policy == "" {
 			return errors.New("invalid join WorkItem")
+		}
+		for _, childID := range p.Join.ChildFrames {
+			if err := validateID(
+				"join WorkItem child ProgramFrame ID",
+				string(childID),
+			); err != nil {
+				return err
+			}
+		}
+	case WorkItemTypeTargetResolver:
+		if err := p.TargetResolver.Validate(); err != nil {
+			return err
 		}
 	case WorkItemTypeWait:
 		return p.Wait.Request.Validate()
@@ -946,6 +1018,14 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 	if kind == WorkItemTypeEmit && o.Emit == nil {
 		return errors.New("emit WorkItem output is missing")
 	}
+	if kind == WorkItemTypeTargetResolver && o.TargetResolver == nil {
+		return errors.New("target resolver WorkItem output is missing")
+	}
+	if o.TargetResolver != nil {
+		if err := o.TargetResolver.Validate(); err != nil {
+			return err
+		}
+	}
 	if o.Emit != nil {
 		if o.Emit.ID == "" || o.Emit.AcceptedAt.IsZero() {
 			return errors.New("emit receipt is incomplete")
@@ -982,6 +1062,46 @@ func (a Attempt) Validate() error {
 	}
 	if err := a.EffectState.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (w TargetResolverWork) Validate() error {
+	if err := validateID("target resolver target set", w.TargetSet); err != nil {
+		return err
+	}
+	if len(w.Members) == 0 {
+		return errors.New("target resolver WorkItem has no members")
+	}
+	seen := make(map[string]struct{}, len(w.Members))
+	for _, member := range w.Members {
+		if err := validateID("target resolver member", member); err != nil {
+			return err
+		}
+		if _, duplicate := seen[member]; duplicate {
+			return errors.New("target resolver member is duplicated")
+		}
+		seen[member] = struct{}{}
+	}
+	return nil
+}
+
+func (o TargetResolverOutput) Validate() error {
+	if err := validateID("target resolver target set", o.TargetSet); err != nil {
+		return err
+	}
+	if len(o.Members) == 0 {
+		return errors.New("target resolver output has no members")
+	}
+	seen := make(map[string]struct{}, len(o.Members))
+	for _, member := range o.Members {
+		if err := validateID("target resolver output member", member); err != nil {
+			return err
+		}
+		if _, duplicate := seen[member]; duplicate {
+			return errors.New("target resolver output member is duplicated")
+		}
+		seen[member] = struct{}{}
 	}
 	return nil
 }

@@ -419,6 +419,7 @@ func workflowScopeOutcomes(
 			ID:     outcome.ID,
 			Status: outcome.Status,
 			Output: outcome.Output.Clone(),
+			Target: outcome.Target,
 		})
 	}
 	for _, outcome := range state.Outcomes {
@@ -426,6 +427,7 @@ func workflowScopeOutcomes(
 			ID:     outcome.ID,
 			Status: outcome.Status,
 			Output: outcome.Output.Clone(),
+			Target: outcome.Target,
 		})
 	}
 	return values

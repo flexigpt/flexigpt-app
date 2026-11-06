@@ -32,7 +32,10 @@ func (DeterministicExecutor) Bind(
 	switch item.Type {
 	case WorkItemTypeTransform,
 		WorkItemTypeCondition,
-		WorkItemTypeStateUpdate:
+		WorkItemTypeStateUpdate,
+		WorkItemTypeFork,
+		WorkItemTypeJoin,
+		WorkItemTypeTargetResolver:
 		return BindResult{
 			SemanticBinding: binding,
 			Private:         deterministicBinding{},
@@ -74,6 +77,12 @@ func (DeterministicExecutor) Execute(
 	var value CanonicalValue
 
 	switch item.Type {
+	case WorkItemTypeFork:
+		return deterministicForkResult(item)
+
+	case WorkItemTypeJoin:
+		return deterministicJoinResult(request.Execution, item)
+
 	case WorkItemTypeTransform:
 		if item.Input.Transform == nil {
 			return WorkExecutionResult{}, true, errors.New(
@@ -129,6 +138,36 @@ func (DeterministicExecutor) Execute(
 		}
 		value = next
 
+	case WorkItemTypeTargetResolver:
+		if item.Input.TargetResolver == nil {
+			return WorkExecutionResult{}, true, errors.New(
+				"deterministic target resolver WorkItem has no payload",
+			)
+		}
+		output := TargetResolverOutput{
+			TargetSet: item.Input.TargetResolver.TargetSet,
+			Members: append(
+				[]string(nil),
+				item.Input.TargetResolver.Members...,
+			),
+		}
+		if err := output.Validate(); err != nil {
+			return WorkExecutionResult{}, true, err
+		}
+		value = MustCanonicalValue(output)
+		return WorkExecutionResult{
+			Output: &WorkItemOutput{
+				Value:          value,
+				TargetResolver: &output,
+				Receipt: &ExternalReceipt{
+					System:      "session-v3-target-resolver",
+					Reference:   string(item.ID),
+					ConfirmedAt: time.Now().UTC(),
+				},
+			},
+			Confirmed: true,
+		}, true, nil
+
 	default:
 		return WorkExecutionResult{}, false, nil
 	}
@@ -138,6 +177,118 @@ func (DeterministicExecutor) Execute(
 			Value: value,
 			Receipt: &ExternalReceipt{
 				System:      "session-v3-deterministic",
+				Reference:   string(item.ID),
+				ConfirmedAt: time.Now().UTC(),
+			},
+		},
+		Confirmed: true,
+	}, true, nil
+}
+
+type forkWorkOutput struct {
+	ChildFrames []ProgramFrameID `json:"childFrames"`
+}
+
+type joinWorkFrame struct {
+	ID     ProgramFrameID    `json:"id"`
+	Status ProgramFrameState `json:"status"`
+	Output CanonicalValue    `json:"output,omitempty"`
+	Error  *SanitizedError   `json:"error,omitempty"`
+}
+
+type joinWorkOutput struct {
+	Policy string          `json:"policy"`
+	Frames []joinWorkFrame `json:"frames"`
+}
+
+func deterministicForkResult(
+	item WorkItem,
+) (WorkExecutionResult, bool, error) {
+	if item.Input.Fork == nil {
+		return WorkExecutionResult{}, true, errors.New(
+			"deterministic fork WorkItem has no payload",
+		)
+	}
+	if len(item.Input.Fork.ChildFrames) == 0 {
+		return WorkExecutionResult{}, true, errors.New(
+			"deterministic fork WorkItem has no child frames",
+		)
+	}
+	value := MustCanonicalValue(forkWorkOutput{
+		ChildFrames: append(
+			[]ProgramFrameID(nil),
+			item.Input.Fork.ChildFrames...,
+		),
+	})
+	return WorkExecutionResult{
+		Output: &WorkItemOutput{
+			Value: value,
+			Receipt: &ExternalReceipt{
+				System:      "session-v3-fork",
+				Reference:   string(item.ID),
+				ConfirmedAt: time.Now().UTC(),
+			},
+		},
+		Confirmed: true,
+	}, true, nil
+}
+
+func deterministicJoinResult(
+	execution Execution,
+	item WorkItem,
+) (WorkExecutionResult, bool, error) {
+	if item.Input.Join == nil {
+		return WorkExecutionResult{}, true, errors.New(
+			"deterministic join WorkItem has no payload",
+		)
+	}
+	if len(item.Input.Join.ChildFrames) == 0 {
+		return WorkExecutionResult{}, true, errors.New(
+			"deterministic join WorkItem has no child frames",
+		)
+	}
+
+	frames := make([]joinWorkFrame, 0, len(item.Input.Join.ChildFrames))
+	for _, id := range item.Input.Join.ChildFrames {
+		frame := mutableFrame(&execution, id)
+		if frame == nil {
+			return WorkExecutionResult{}, true, fmt.Errorf(
+				"join WorkItem child ProgramFrame %q is unavailable",
+				id,
+			)
+		}
+		if !frame.Status.Terminal() {
+			return WorkExecutionResult{}, true, fmt.Errorf(
+				"join WorkItem child ProgramFrame %q is not terminal",
+				id,
+			)
+		}
+		value := joinWorkFrame{
+			ID:     frame.ID,
+			Status: frame.Status,
+			Output: frame.Output.Clone(),
+		}
+		if frame.Error != nil {
+			copyValue := *frame.Error
+			copyValue.Details = frame.Error.Details.Clone()
+			copyValue.Causes = append(
+				[]SanitizedError(nil),
+				frame.Error.Causes...,
+			)
+			value.Error = &copyValue
+		}
+		frames = append(frames, value)
+	}
+	output := joinWorkOutput{
+		Policy: item.Input.Join.Policy,
+		Frames: frames,
+	}
+	value := MustCanonicalValue(output)
+	return WorkExecutionResult{
+		Output: &WorkItemOutput{
+			Value: value,
+			Receipt: &ExternalReceipt{
+				System:      "session-v3-join",
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
