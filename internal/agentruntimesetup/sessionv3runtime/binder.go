@@ -39,9 +39,10 @@ type Dependencies struct {
 type Binder struct {
 	deps Dependencies
 
-	goTools    *toolruntime.V3Executor
-	mcpTools   *mcpruntime.V3Executor
-	skillTools *skillruntime.V3Executor
+	goTools     *toolruntime.V3Executor
+	mcpTools    *mcpruntime.V3Executor
+	skillTools  *skillruntime.V3Executor
+	attachments *V3AttachmentAdmitter
 
 	deterministic sessionv3Runtime.DeterministicExecutor
 }
@@ -86,11 +87,14 @@ func New(deps Dependencies) (*Binder, error) {
 		return nil, err
 	}
 
+	attachments := NewV3AttachmentAdmitter()
+
 	return &Binder{
-		deps:       deps,
-		goTools:    goTools,
-		mcpTools:   mcpTools,
-		skillTools: skillTools,
+		deps:        deps,
+		goTools:     goTools,
+		mcpTools:    mcpTools,
+		skillTools:  skillTools,
+		attachments: attachments,
 	}, nil
 }
 
@@ -156,3 +160,15 @@ func (b *Binder) CloseExecutionBinding(
 	}
 	return b.skillTools.CloseExecution(ctx, executionID)
 }
+
+func (b *Binder) AdmitAttachments(
+	ctx context.Context,
+	request sessionv3Runtime.AttachmentAdmissionRequest,
+) ([]sessionv3Runtime.Attachment, error) {
+	if b == nil || b.attachments == nil {
+		return nil, errors.New("session v3 attachment runtime is unavailable")
+	}
+	return b.attachments.AdmitAttachments(ctx, request)
+}
+
+var _ sessionv3Runtime.AttachmentAdmission = (*Binder)(nil)

@@ -17,6 +17,8 @@ var (
 	ErrCommandInProgress = errors.New("command ID is already being processed")
 )
 
+const maximumMessageAttachmentSources = 4096
+
 func validateID(subject, value string) error {
 	if strings.TrimSpace(value) == "" || strings.TrimSpace(value) != value ||
 		!utf8.ValidString(value) || strings.ContainsRune(value, 0) || len(value) > 16<<10 {
@@ -425,8 +427,71 @@ func (a Attachment) Validate() error {
 	default:
 		return fmt.Errorf("unsupported attachment kind %q", a.Kind)
 	}
-	if strings.ContainsRune(a.Label, 0) || strings.ContainsRune(a.URL, 0) {
+	if strings.ContainsRune(a.Label, 0) ||
+		strings.ContainsRune(a.URL, 0) ||
+		strings.ContainsRune(a.SourceURL, 0) {
 		return errors.New("attachment contains NUL")
+	}
+	return nil
+}
+
+func (s AttachmentSource) Validate() error {
+	switch s.Kind {
+	case AttachmentSourceKindFile:
+		if strings.TrimSpace(s.Path) == "" || s.URL != "" {
+			return errors.New("file attachment source is invalid")
+		}
+
+	case AttachmentSourceKindDirectory:
+		if strings.TrimSpace(s.Path) == "" || s.URL != "" {
+			return errors.New("directory attachment source is invalid")
+		}
+
+	case AttachmentSourceKindURL:
+		if strings.TrimSpace(s.URL) == "" || s.Path != "" {
+			return errors.New("url attachment source is invalid")
+		}
+
+	default:
+		return fmt.Errorf("unsupported attachment source kind %q", s.Kind)
+	}
+
+	switch s.Mode {
+	case "",
+		AttachmentSourceModeAuto,
+		AttachmentSourceModeText,
+		AttachmentSourceModeFile,
+		AttachmentSourceModeImage,
+		AttachmentSourceModePage,
+		AttachmentSourceModeLink:
+	default:
+		return fmt.Errorf("unsupported attachment source mode %q", s.Mode)
+	}
+
+	if strings.ContainsRune(s.Label, 0) ||
+		strings.ContainsRune(s.Path, 0) ||
+		strings.ContainsRune(s.URL, 0) {
+		return errors.New("attachment source contains NUL")
+	}
+	return nil
+}
+
+func (m MessageInput) Validate() error {
+	if !m.Metadata.Valid() {
+		return errors.New("message metadata is invalid")
+	}
+	for index := range m.Attachments {
+		if err := m.Attachments[index].Validate(); err != nil {
+			return fmt.Errorf("message attachment %d: %w", index, err)
+		}
+	}
+	if len(m.AttachmentSources) > maximumMessageAttachmentSources {
+		return errors.New("message attachment source count exceeds the limit")
+	}
+	for index := range m.AttachmentSources {
+		if err := m.AttachmentSources[index].Validate(); err != nil {
+			return fmt.Errorf("message attachment source %d: %w", index, err)
+		}
 	}
 	return nil
 }
@@ -529,10 +594,14 @@ func (e Execution) Validate(sessionID SessionID) error {
 		if err := signal.Validate(); err != nil {
 			return err
 		}
-		if _, duplicate := signals[signal.ID]; duplicate {
-			return fmt.Errorf("duplicate execution signal %q", signal.ID)
+		identity := signal.Source + "\x00" + signal.ID
+		if _, duplicate := signals[identity]; duplicate {
+			return fmt.Errorf(
+				"duplicate execution signal source and identity %q",
+				identity,
+			)
 		}
-		signals[signal.ID] = struct{}{}
+		signals[identity] = struct{}{}
 	}
 
 	channels := make(map[string]struct{}, len(e.Channels))
@@ -1314,11 +1383,22 @@ func (s ExecutionSignal) Validate() error {
 	if err := validateID("execution signal name", s.Name); err != nil {
 		return err
 	}
+	if err := validateID("execution signal source", s.Source); err != nil {
+		return err
+	}
 	if !s.Data.Valid() || !s.Correlation.Valid() || s.CreatedAt.IsZero() {
 		return errors.New("execution signal is invalid")
 	}
 	for _, waitID := range s.ConsumedBy {
 		if err := validateID("signal consumed wait ID", string(waitID)); err != nil {
+			return err
+		}
+	}
+	for _, subscription := range s.ConsumedSubscriptions {
+		if err := validateID(
+			"signal consumed subscription",
+			subscription,
+		); err != nil {
 			return err
 		}
 	}
@@ -1363,8 +1443,14 @@ func (l ChannelLog) Validate() error {
 	if err := validateID("channel name", l.Name); err != nil {
 		return err
 	}
+	if l.MaxMessages < 0 || l.MaxBytes < 0 || l.Bytes < 0 {
+		return errors.New("channel retention facts cannot be negative")
+	}
 	if l.NextSequence < uint64(len(l.Messages)) {
 		return errors.New("channel sequence is invalid")
+	}
+	if l.MaxMessages != 0 && len(l.Messages) > l.MaxMessages {
+		return errors.New("channel message retention limit is exceeded")
 	}
 	seen := make(map[string]struct{}, len(l.Messages))
 	var previous uint64
@@ -1383,6 +1469,16 @@ func (l ChannelLog) Validate() error {
 		}
 		seen[message.ID] = struct{}{}
 		previous = message.Sequence
+	}
+	actualBytes := channelBytes(l)
+	if l.MaxBytes != 0 && actualBytes > l.MaxBytes {
+		return errors.New("channel byte retention limit is exceeded")
+	}
+	// Zero is accepted for documents written before durable byte accounting
+	// existed. The first subsequent emit initializes Bytes from all retained
+	// messages before enforcing the configured retention fact.
+	if l.Bytes != 0 && l.Bytes != actualBytes {
+		return errors.New("channel byte accounting is invalid")
 	}
 	return nil
 }

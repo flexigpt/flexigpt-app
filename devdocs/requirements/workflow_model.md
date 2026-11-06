@@ -1810,9 +1810,9 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Trigger missed-occurrence policies are typed.
 - [ ] Event retention limits are complete per subscription identity.
 - [ ] Subscription capacity and byte limits are complete.
-- [ ] Channel retention and byte limits are complete across all paths.
+- [x] Channel retention and byte limits are complete across all paths.
 - [ ] Human response actor authorization is complete.
-- [ ] Trigger registration without an initial explicit Workflow start is complete.
+- [x] Trigger registration without an initial explicit Workflow start is complete.
 - [ ] Trigger occurrence failure projection and operational management commands are complete.
 
 ### Phase 7: resources, budgets, and limits
@@ -1838,14 +1838,14 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
-- [ ] Attachment admission uses a narrow Attachment Runtime domain port.
-- [ ] Local file snapshotting is complete for V3 attachment admission.
-- [ ] Image snapshotting is complete for V3 attachment admission.
-- [ ] Directory expansion is complete for V3 attachment admission.
-- [ ] URL normalization is complete for V3 attachment admission.
-- [ ] Replay-safe attachment materialization is complete for V3 attachment admission.
-- [ ] Historical attachment modification handling is complete for V3 attachment admission.
-- [ ] Provider attachment adaptation is complete for V3 attachment admission.
+- [x] Attachment admission uses a narrow Attachment Runtime domain port.
+- [x] Local file snapshotting is complete for V3 attachment admission.
+- [x] Image snapshotting is complete for V3 attachment admission.
+- [x] Directory expansion is complete for V3 attachment admission.
+- [x] URL normalization is complete for V3 attachment admission.
+- [x] Replay-safe attachment materialization is complete for V3 attachment admission.
+- [x] Historical attachment modification handling is complete for V3 attachment admission.
+- [x] Provider attachment adaptation is complete for V3 attachment admission.
 - [ ] Service and Activity runtime binding registration is complete in application composition.
 - [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 

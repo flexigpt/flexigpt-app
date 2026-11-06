@@ -330,22 +330,23 @@ func (r *Runtime) applyEmitLocked(
 
 	switch {
 	case payload.Destination.Channel != "":
-		channel, err := mutableChannelLog(execution, payload.Destination.Channel)
+		maxMessages, maxBytes := channelRetentionLimits(payload)
+		channel, err := mutableChannelLog(
+			execution,
+			payload.Destination.Channel,
+			maxMessages,
+			maxBytes,
+		)
 		if err != nil {
 			return EmitReceipt{}, nil, nil, err
 		}
-		maxMessages := maximumCoordinationRecords
-		if payload.MaxMessages > 0 && payload.MaxMessages < maxMessages {
-			maxMessages = payload.MaxMessages
+		if channel.Bytes == 0 && len(channel.Messages) != 0 {
+			channel.Bytes = channelBytes(*channel)
 		}
-		if len(channel.Messages) >= maxMessages {
+		if len(channel.Messages) >= channel.MaxMessages {
 			return EmitReceipt{}, nil, nil, errors.New("channel retention limit exceeded")
 		}
-		maxBytes := maximumCoordinationBytes
-		if payload.MaxBytes > 0 && payload.MaxBytes < maxBytes {
-			maxBytes = payload.MaxBytes
-		}
-		if channelBytes(*channel)+len(payload.Data)+len(payload.Correlation) > maxBytes {
+		if channel.Bytes+len(payload.Data)+len(payload.Correlation) > channel.MaxBytes {
 			return EmitReceipt{}, nil, nil, errors.New("channel byte limit exceeded")
 		}
 
@@ -361,6 +362,7 @@ func (r *Runtime) applyEmitLocked(
 			CreatedAt:        now,
 		}
 		channel.Messages = append(channel.Messages, message)
+		channel.Bytes += len(message.Data) + len(message.Correlation)
 		receipt.Sequence = message.Sequence
 		execution.EmitReceipts = append(execution.EmitReceipts, receipt)
 		return receipt, nil, &message, nil
@@ -404,21 +406,58 @@ func findEmitReceipt(
 	return EmitReceipt{}, false
 }
 
+func channelRetentionLimits(payload EmitWork) (maxMessages, maxBytes int) {
+	maxMessages = maximumCoordinationRecords
+	if payload.MaxMessages > 0 && payload.MaxMessages < maxMessages {
+		maxMessages = payload.MaxMessages
+	}
+
+	maxBytes = maximumCoordinationBytes
+	if payload.MaxBytes > 0 && payload.MaxBytes < maxBytes {
+		maxBytes = payload.MaxBytes
+	}
+	return maxMessages, maxBytes
+}
+
 func mutableChannelLog(
 	execution *Execution,
 	name string,
+	maxMessages int,
+	maxBytes int,
 ) (*ChannelLog, error) {
 	if execution == nil || strings.TrimSpace(name) == "" {
 		return nil, errors.New("channel name is required")
 	}
+	if maxMessages < 1 || maxBytes < 1 {
+		return nil, errors.New("channel retention facts are invalid")
+	}
 	for index := range execution.Channels {
+		//nolint:gocritic // Nested If ok.
 		if execution.Channels[index].Name == name {
+			channel := &execution.Channels[index]
+			switch {
+			case channel.MaxMessages == 0:
+				channel.MaxMessages = maxMessages
+			case channel.MaxMessages != maxMessages:
+				return nil, errors.New("channel message retention facts changed")
+			}
+			switch {
+			case channel.MaxBytes == 0:
+				channel.MaxBytes = maxBytes
+			case channel.MaxBytes != maxBytes:
+				return nil, errors.New("channel byte retention facts changed")
+			}
+			if channel.Bytes == 0 && len(channel.Messages) != 0 {
+				channel.Bytes = channelBytes(*channel)
+			}
 			return &execution.Channels[index], nil
 		}
 	}
 	execution.Channels = append(execution.Channels, ChannelLog{
-		Name:     name,
-		Messages: []ChannelMessage{},
+		Name:        name,
+		MaxMessages: maxMessages,
+		MaxBytes:    maxBytes,
+		Messages:    []ChannelMessage{},
 	})
 	return &execution.Channels[len(execution.Channels)-1], nil
 }

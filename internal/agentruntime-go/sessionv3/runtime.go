@@ -28,6 +28,7 @@ type RuntimeDependencies struct {
 	Recovery     RecoverySource
 	Events       EventPublisher
 	Workflow     WorkflowAdmission
+	Attachments  AttachmentAdmission
 	Interpreters []ProgramInterpreter
 	Now          func() time.Time
 	NewID        func() string
@@ -341,22 +342,27 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 	if command.Meta.ID == "" {
 		return nil, errors.New("command ID is required")
 	}
-	if !command.Input.Metadata.Valid() {
+	if err := command.Input.Validate(); err != nil {
 		return &CommandReceipt{
 			CommandID: command.Meta.ID,
 			SessionID: command.SessionID,
-			Message:   "message metadata is invalid",
+			Message:   err.Error(),
 		}, nil
 	}
-	for _, attachment := range command.Input.Attachments {
-		if err := attachment.Validate(); err != nil {
-			return &CommandReceipt{
-				CommandID: command.Meta.ID,
-				SessionID: command.SessionID,
-				Message:   err.Error(),
-			}, nil
-		}
+
+	admittedAttachments, admitErr := r.admitMessageAttachments(
+		ctx,
+		command.SessionID,
+		command.Input.AttachmentSources,
+	)
+	if admitErr != nil {
+		return &CommandReceipt{
+			CommandID: command.Meta.ID,
+			SessionID: command.SessionID,
+			Message:   admitErr.Error(),
+		}, nil
 	}
+
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -384,11 +390,14 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		Visibility: ActivityVisibilityBoth,
 		CreatedAt:  now,
 		Message: &MessageActivity{
-			Role:        MessageRoleUser,
-			Status:      "accepted",
-			Text:        command.Input.Text,
-			Attachments: append([]Attachment(nil), command.Input.Attachments...),
-			Metadata:    command.Input.Metadata.Clone(),
+			Role:   MessageRoleUser,
+			Status: "accepted",
+			Text:   command.Input.Text,
+			Attachments: appendMessageAttachments(
+				command.Input.Attachments,
+				admittedAttachments,
+			),
+			Metadata: command.Input.Metadata.Clone(),
 		},
 	}
 	session.Timeline = append(session.Timeline, activity)
@@ -624,6 +633,228 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
 	r.launchReadyWork(ctx, session.ID, ready)
 	return &receipt, nil
+}
+
+const (
+	checkpointReasonWorkflowTriggersRegistered = "workflowTriggersRegistered"
+	checkpointReasonWorkflowTriggerRejected    = "workflowTriggerRegistrationRejected"
+)
+
+// RegisterWorkflowTriggers admits an input-unbound Workflow template and
+// persists its trigger registrations without creating an initial Execution.
+// Schedule timers remain Runtime-owned and are armed only after persistence.
+func (r *Runtime) RegisterWorkflowTriggers(
+	ctx context.Context,
+	command RegisterWorkflowTriggersCommand,
+) (*CommandReceipt, error) {
+	if command.Meta.ID == "" {
+		return nil, errors.New("command ID is required")
+	}
+	if r.deps.Workflow == nil {
+		return nil, errors.New("workflow trigger registration admission is unavailable")
+	}
+	admission, supported := r.deps.Workflow.(WorkflowTriggerRegistrationAdmission)
+	if !supported {
+		return nil, errors.New("workflow trigger registration admission is unavailable")
+	}
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return nil, ErrRuntimeClosed
+	}
+	session := r.sessions[command.SessionID]
+	if session == nil {
+		r.mu.Unlock()
+		return nil, ErrSessionNotFound
+	}
+	if receipt, found, err := r.commandReceiptLocked(session, command.Meta, command); err != nil || found {
+		r.mu.Unlock()
+		return receipt, err
+	}
+	if message := expectedSessionRevision(session, command.Meta); message != "" {
+		receipt := r.rejectLocked(session, command.Meta, command, message)
+		r.mu.Unlock()
+		return receipt, nil
+	}
+
+	fingerprint, err := fingerprintCommand(command)
+	if err != nil {
+		r.mu.Unlock()
+		return nil, err
+	}
+	if current, found := r.workflowAdmissions[command.Meta.ID]; found {
+		r.mu.Unlock()
+		if current != fingerprint {
+			return nil, ErrCommandConflict
+		}
+		return nil, ErrCommandInProgress
+	}
+	r.workflowAdmissions[command.Meta.ID] = fingerprint
+	revision := session.Revision
+	r.mu.Unlock()
+
+	result, admissionErr := admission.AdmitWorkflowTriggers(
+		ctx,
+		WorkflowTriggerRegistrationRequest{
+			SessionID: command.SessionID,
+			Workflow:  command.Workflow,
+		},
+	)
+
+	r.mu.Lock()
+	defer func() {
+		delete(r.workflowAdmissions, command.Meta.ID)
+		r.mu.Unlock()
+	}()
+
+	if r.closed {
+		return nil, ErrRuntimeClosed
+	}
+	session = r.sessions[command.SessionID]
+	if session == nil {
+		return nil, ErrSessionNotFound
+	}
+	if receipt, found, err := r.commandReceiptLocked(session, command.Meta, command); err != nil || found {
+		return receipt, err
+	}
+	if session.Revision != revision {
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			"session changed while workflow trigger registration was prepared; retry",
+		)
+	}
+	if admissionErr != nil {
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			admissionErr.Error(),
+		)
+	}
+	if err := ValidateWorkflowTriggerRegistrationResult(result); err != nil {
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			err.Error(),
+		)
+	}
+
+	interpreter := r.interpreterLocked(result.Program)
+	if interpreter == nil {
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			"workflow trigger interpreter is unavailable",
+		)
+	}
+	if err := interpreter.ValidateSnapshot(result.Program); err != nil {
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			err.Error(),
+		)
+	}
+
+	previous := cloneSession(*session)
+	if err := r.registerWorkflowTriggersLocked(session, result.Program); err != nil {
+		*session = previous
+		return r.rejectTriggerRegistrationLocked(
+			ctx,
+			session,
+			command.Meta,
+			command,
+			err.Error(),
+		)
+	}
+
+	r.touchSessionLocked(session)
+	receipt := CommandReceipt{
+		CommandID:       command.Meta.ID,
+		Accepted:        true,
+		SessionID:       session.ID,
+		SessionRevision: session.Revision,
+	}
+	r.rememberCommandLocked(session, command.Meta, command, receipt)
+	if err := r.persistLocked(
+		ctx,
+		checkpointReasonWorkflowTriggersRegistered,
+		session,
+	); err != nil {
+		*session = previous
+		return nil, err
+	}
+	r.armSessionTriggersLocked(ctx, session)
+	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
+	return &receipt, nil
+}
+
+func (r *Runtime) SetTriggerRegistrationState(
+	ctx context.Context,
+	command SetTriggerRegistrationStateCommand,
+) (*CommandReceipt, error) {
+	receipt, err := r.changeSession(
+		ctx,
+		command.Meta,
+		command.SessionID,
+		command,
+		func(session *Session) (*CommandReceipt, error) {
+			switch command.State {
+			case TriggerRegistrationStateActive, TriggerRegistrationStateDisabled:
+			default:
+				return &CommandReceipt{
+					CommandID: command.Meta.ID,
+					SessionID: session.ID,
+					Message:   "trigger registration state is invalid",
+				}, nil
+			}
+
+			registration := mutableTriggerRegistration(session, command.TriggerID)
+			if registration == nil {
+				return &CommandReceipt{
+					CommandID: command.Meta.ID,
+					SessionID: session.ID,
+					Message:   "trigger registration is unavailable",
+				}, nil
+			}
+
+			if command.State == TriggerRegistrationStateDisabled {
+				r.cancelTriggerLocked(session.ID, registration.ID)
+			}
+			registration.State = command.State
+			registration.UpdatedAt = r.now()
+			r.touchSessionLocked(session)
+			return &CommandReceipt{
+				CommandID:       command.Meta.ID,
+				Accepted:        true,
+				SessionID:       session.ID,
+				SessionRevision: session.Revision,
+			}, nil
+		},
+	)
+	if err != nil || receipt == nil || !receipt.Accepted ||
+		command.State != TriggerRegistrationStateActive {
+		return receipt, err
+	}
+
+	r.mu.Lock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			r.armSessionTriggersLocked(context.WithoutCancel(ctx), session)
+		}
+	}
+	r.mu.Unlock()
+	return receipt, nil
 }
 
 func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCommand) (*CommandReceipt, error) {
@@ -1141,6 +1372,68 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 		Activities:      activities,
 		Executions:      executions,
 	}, nil
+}
+
+func (r *Runtime) rejectTriggerRegistrationLocked(
+	ctx context.Context,
+	session *Session,
+	meta CommandMeta,
+	payload RegisterWorkflowTriggersCommand,
+	message string,
+) (*CommandReceipt, error) {
+	previous := cloneSession(*session)
+	r.touchSessionLocked(session)
+	receipt := CommandReceipt{
+		CommandID:       meta.ID,
+		SessionID:       session.ID,
+		SessionRevision: session.Revision,
+		Message:         message,
+	}
+	r.rememberCommandLocked(session, meta, payload, receipt)
+	if err := r.persistLocked(
+		ctx,
+		checkpointReasonWorkflowTriggerRejected,
+		session,
+	); err != nil {
+		*session = previous
+		return nil, err
+	}
+	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
+	return &receipt, nil
+}
+
+func (r *Runtime) admitMessageAttachments(
+	ctx context.Context,
+	sessionID SessionID,
+	sources []AttachmentSource,
+) ([]Attachment, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	if r == nil || r.deps.Attachments == nil {
+		return nil, errors.New("attachment admission is unavailable")
+	}
+
+	return r.deps.Attachments.AdmitAttachments(
+		ctx,
+		AttachmentAdmissionRequest{
+			SessionID: sessionID,
+			Sources:   append([]AttachmentSource(nil), sources...),
+		},
+	)
+}
+
+func appendMessageAttachments(
+	persisted []Attachment,
+	admitted []Attachment,
+) []Attachment {
+	output := make([]Attachment, 0, len(persisted)+len(admitted))
+	output = append(output, persisted...)
+	output = append(output, admitted...)
+	if len(output) == 0 {
+		return nil
+	}
+	return output
 }
 
 func (r *Runtime) launchAsync(

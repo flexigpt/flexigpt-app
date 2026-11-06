@@ -279,6 +279,17 @@ func triggerTimerKey(sessionID SessionID, triggerID TriggerID) string {
 	return string(sessionID) + "\x00" + string(triggerID)
 }
 
+func (r *Runtime) cancelTriggerLocked(
+	sessionID SessionID,
+	triggerID TriggerID,
+) {
+	key := triggerTimerKey(sessionID, triggerID)
+	if cancel, found := r.triggerTimers[key]; found {
+		delete(r.triggerTimers, key)
+		cancel()
+	}
+}
+
 func workflowTriggerRegistrationID(
 	program ProgramSnapshot,
 	name string,
@@ -400,6 +411,7 @@ func (r *Runtime) armTriggerLocked(
 	}
 	timerCtx, cancel := context.WithCancel(r.lifecycleCtx)
 	r.triggerTimers[key] = cancel
+
 	at := registration.NextOccurrence.UTC()
 	r.launchAsync(
 		triggerTimerOperation,

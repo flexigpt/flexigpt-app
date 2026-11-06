@@ -140,6 +140,7 @@ func InitComposedSessionV3Runtime(
 			Checkpoints: store,
 			Recovery:    store,
 			Events:      events,
+			Attachments: base,
 		},
 		params.Workflow,
 		composed,

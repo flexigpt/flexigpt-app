@@ -81,6 +81,22 @@ func (w *SessionV3Wrapper) StartWorkflow(
 	})
 }
 
+func (w *SessionV3Wrapper) RegisterWorkflowTriggers(
+	command sessionv3Runtime.RegisterWorkflowTriggersCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.RegisterWorkflowTriggers(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) SetTriggerRegistrationState(
+	command sessionv3Runtime.SetTriggerRegistrationStateCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.SetTriggerRegistrationState(context.Background(), command)
+	})
+}
+
 func (w *SessionV3Wrapper) AcceptTriggerEvent(
 	command sessionv3Runtime.AcceptTriggerEventCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {

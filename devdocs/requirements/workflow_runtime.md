@@ -900,7 +900,7 @@ Functional backend completion does not require:
 - [ ] Subscription capacity enforcement exists.
 - [ ] Subscription byte-limit enforcement exists.
 - [ ] Full human response authorization exists.
-- [ ] Trigger administration commands exist.
+- [x] Trigger administration commands exist.
 
 ### Phase 7: effects and cleanup
 
@@ -940,10 +940,10 @@ Functional backend completion does not require:
 - [x] Skill Tool execution path exists.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, and App resource reads have domain routes.
 - [x] Skill session lifecycle has domain routes.
-- [ ] V3 attachment admission exists.
-- [ ] V3 replay-safe attachment materialization exists.
-- [ ] V3 historical attachment protection exists.
-- [ ] V3 provider attachment adaptation exists.
+- [x] V3 attachment admission exists.
+- [x] V3 replay-safe attachment materialization exists.
+- [x] V3 historical attachment protection exists.
+- [x] V3 provider attachment adaptation exists.
 - [ ] V3 Service binding composition is complete.
 - [ ] V3 Activity binding composition is complete.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.

@@ -5,6 +5,27 @@ import (
 	"errors"
 )
 
+func ValidateWorkflowTriggerRegistrationResult(
+	result WorkflowAdmissionResult,
+) error {
+	if err := ValidateWorkflowAdmissionResult(result); err != nil {
+		return err
+	}
+	program, err := workflowProgramFromSnapshot(result.Program)
+	if err != nil {
+		return err
+	}
+	if len(program.Triggers) == 0 {
+		return errors.New("workflow trigger registration returned no triggers")
+	}
+	if program.InputBound {
+		return errors.New(
+			"workflow trigger registration returned an input-bound program",
+		)
+	}
+	return nil
+}
+
 // StartWorkflow and SignalExecution are implemented in runtime.go so that
 // all Session mutations share one lock, revision, idempotency, checkpoint,
 // cancellation, and recovery path. This file retains compile-time assertions

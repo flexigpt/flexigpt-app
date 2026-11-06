@@ -181,6 +181,47 @@ func (a *Admission) AdmitWorkflow(
 	)
 }
 
+// AdmitWorkflowTriggers compiles an input-unbound Workflow program for
+// Session-owned trigger registration. Trigger occurrence input is bound only
+// when a durable occurrence is accepted.
+func (a *Admission) AdmitWorkflowTriggers(
+	ctx context.Context,
+	request sessionv3Runtime.WorkflowTriggerRegistrationRequest,
+) (sessionv3Runtime.WorkflowAdmissionResult, error) {
+	if request.Workflow.RootID == "" || request.Workflow.ArtifactID == "" {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
+			"invalid workflow trigger registration request",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(request.Workflow.RootID),
+		ArtifactID: artifactModel.ArtifactID(request.Workflow.ArtifactID),
+	}
+	result, err := a.admit(
+		ctx,
+		ref,
+		request.Workflow,
+		nil,
+		make(map[artifactModel.ArtifactRef]struct{}),
+		false,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+
+	program, err := sessionv3Runtime.DecodeCanonicalValue[sessionv3Runtime.WorkflowProgram](result.Program.Payload)
+	if err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	if len(program.Triggers) == 0 {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
+			"workflow declares no triggers",
+		)
+	}
+	return result, nil
+}
+
 // VerifyArtifactPin is the setup-owned current Artifact verification boundary
 // used by Workflow binder dispatch. Session Runtime receives this only through
 // the narrow setup interface and never imports Artifact Store packages.

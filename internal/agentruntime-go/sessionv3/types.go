@@ -183,6 +183,25 @@ const (
 	AttachmentKindURL   AttachmentKind = "url"
 )
 
+type AttachmentSourceKind string
+
+const (
+	AttachmentSourceKindFile      AttachmentSourceKind = "file"
+	AttachmentSourceKindDirectory AttachmentSourceKind = "directory"
+	AttachmentSourceKindURL       AttachmentSourceKind = "url"
+)
+
+type AttachmentSourceMode string
+
+const (
+	AttachmentSourceModeAuto  AttachmentSourceMode = "auto"
+	AttachmentSourceModeText  AttachmentSourceMode = "text"
+	AttachmentSourceModeFile  AttachmentSourceMode = "file"
+	AttachmentSourceModeImage AttachmentSourceMode = "image"
+	AttachmentSourceModePage  AttachmentSourceMode = "page"
+	AttachmentSourceModeLink  AttachmentSourceMode = "link"
+)
+
 // Attachment is a semantic snapshot. It deliberately has no native path,
 // file handle, browser object, or process-local reference.
 type Attachment struct {
@@ -193,6 +212,36 @@ type Attachment struct {
 	Text       string         `json:"text,omitempty"`
 	Base64Data string         `json:"base64Data,omitempty"`
 	URL        string         `json:"url,omitempty"`
+	SourceURL  string         `json:"sourceURL,omitempty"`
+}
+
+// AttachmentSource is command-only admission input. It is never stored in a
+// Session document. The setup-owned AttachmentAdmission boundary converts it
+// to immutable Attachment values before a message Activity is persisted.
+type AttachmentSource struct {
+	Kind  AttachmentSourceKind `json:"kind"`
+	Path  string               `json:"path,omitempty"`
+	URL   string               `json:"url,omitempty"`
+	Label string               `json:"label,omitempty"`
+	Mode  AttachmentSourceMode `json:"mode,omitempty"`
+}
+
+// AttachmentAdmissionRequest contains no durable Attachment payload. Native
+// paths and URLs can exist only while the setup-owned admission domain creates
+// immutable semantic snapshots.
+type AttachmentAdmissionRequest struct {
+	SessionID SessionID          `json:"sessionID"`
+	Sources   []AttachmentSource `json:"sources"`
+}
+
+// AttachmentAdmission is the narrow external-domain boundary for V3 message
+// attachment admission. Session Runtime does not inspect native paths, walk
+// directories, read files, fetch URLs, or configure provider attachments.
+type AttachmentAdmission interface {
+	AdmitAttachments(
+		ctx context.Context,
+		request AttachmentAdmissionRequest,
+	) ([]Attachment, error)
 }
 
 type ActionActivity struct {
@@ -806,6 +855,9 @@ type ChannelMessage struct {
 type ChannelLog struct {
 	Name         string           `json:"name"`
 	NextSequence uint64           `json:"nextSequence"`
+	MaxMessages  int              `json:"maxMessages,omitempty"`
+	MaxBytes     int              `json:"maxBytes,omitempty"`
+	Bytes        int              `json:"bytes,omitempty"`
 	Messages     []ChannelMessage `json:"messages"`
 }
 
@@ -1147,6 +1199,16 @@ type WorkflowAdmission interface {
 	AdmitWorkflow(ctx context.Context, w WorkflowAdmissionRequest) (WorkflowAdmissionResult, error)
 }
 
+// WorkflowTriggerRegistrationAdmission compiles and pins a Workflow program
+// template for trigger registration. Unlike WorkflowAdmission, it does not
+// require invocation input and does not create an Execution.
+type WorkflowTriggerRegistrationAdmission interface {
+	AdmitWorkflowTriggers(
+		ctx context.Context,
+		request WorkflowTriggerRegistrationRequest,
+	) (WorkflowAdmissionResult, error)
+}
+
 type CheckpointView struct {
 	Reason    string    `json:"reason"`
 	Session   Session   `json:"session"`
@@ -1262,6 +1324,24 @@ type StartWorkflowCommand struct {
 	Input       CanonicalValue    `json:"input"`
 }
 
+type WorkflowTriggerRegistrationRequest struct {
+	SessionID SessionID         `json:"sessionID"`
+	Workflow  ArtifactSelection `json:"workflow"`
+}
+
+type RegisterWorkflowTriggersCommand struct {
+	Meta      CommandMeta       `json:"meta"`
+	SessionID SessionID         `json:"sessionID"`
+	Workflow  ArtifactSelection `json:"workflow"`
+}
+
+type SetTriggerRegistrationStateCommand struct {
+	Meta      CommandMeta              `json:"meta"`
+	SessionID SessionID                `json:"sessionID"`
+	TriggerID TriggerID                `json:"triggerID"`
+	State     TriggerRegistrationState `json:"state"`
+}
+
 // AcceptTriggerEventCommand supplies one externally accepted event to the
 // durable Workflow trigger registry inside an existing Session document.
 //
@@ -1290,9 +1370,10 @@ type SignalExecutionCommand struct {
 }
 
 type MessageInput struct {
-	Text        string         `json:"text,omitempty"`
-	Attachments []Attachment   `json:"attachments,omitempty"`
-	Metadata    CanonicalValue `json:"metadata,omitempty"`
+	Text              string             `json:"text,omitempty"`
+	Attachments       []Attachment       `json:"attachments,omitempty"`
+	AttachmentSources []AttachmentSource `json:"attachmentSources,omitempty"`
+	Metadata          CanonicalValue     `json:"metadata,omitempty"`
 }
 
 type ExecuteWorkItemsCommand struct {
