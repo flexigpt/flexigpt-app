@@ -64,6 +64,10 @@ func compileWorkflowProgramWithInput(
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
+	triggers, err := compileWorkflowTriggers(document)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 	inputSchema, err := compileWorkflowSchema(document, document.InputSchema)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -91,6 +95,7 @@ func compileWorkflowProgramWithInput(
 		TargetSets:   targetSets,
 		Events:       events,
 		Channels:     channels,
+		Triggers:     triggers,
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err

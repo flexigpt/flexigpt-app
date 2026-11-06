@@ -61,6 +61,10 @@ func (s Session) Validate() error {
 		executionIDs[execution.ID] = struct{}{}
 	}
 
+	if err := validateTriggerRegistrations(s, executionIDs); err != nil {
+		return err
+	}
+
 	for _, execution := range s.Executions {
 		if execution.RootExecutionID != "" {
 			if _, found := executionIDs[execution.RootExecutionID]; !found {
@@ -463,6 +467,11 @@ func (e Execution) Validate(sessionID SessionID) error {
 	}
 	if err := e.ChildBudget.Validate(); err != nil {
 		return err
+	}
+	if e.Trigger != nil {
+		if err := e.Trigger.Validate(); err != nil {
+			return err
+		}
 	}
 
 	frames := make(map[ProgramFrameID]struct{}, len(e.ProgramFrames))

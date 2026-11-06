@@ -45,6 +45,16 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 		if r.checkpointPending[session.ID] {
 			continue
 		}
+		triggerChanged, triggerErr := r.recoverSessionTriggersLocked(
+			ctx,
+			session,
+		)
+		if triggerErr == nil && triggerChanged {
+			if err := r.persistLocked(ctx, "triggerRecovery", session); err != nil {
+				continue
+			}
+		}
+		r.armSessionTriggersLocked(ctx, session)
 		for index := range session.Executions {
 			execution := &session.Executions[index]
 			if execution.State.Terminal() {

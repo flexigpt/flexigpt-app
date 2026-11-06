@@ -469,10 +469,10 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [x] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
 - [ ] Durable Fork and Join WorkItems exist where scheduling boundaries require them.
 - [x] `break` and `continue` work across nested repeat scopes.
-- [ ] Event triggers are implemented.
-- [ ] Schedule triggers are implemented.
-- [ ] Trigger overlap and missed-occurrence policies are implemented.
-- [ ] Trigger state remains in the existing Session v3 document.
+- [x] Event triggers are implemented through durable Session trigger registrations and transport-neutral event ingress.
+- [x] Schedule triggers are implemented through Runtime-owned durable interval and five-field cron timers.
+- [x] Trigger overlap and missed-occurrence policies are implemented for durable schedule registrations.
+- [x] Trigger state remains in the existing Session v3 document.
 - [ ] Event retention, event consumption, local channels, channel cursors, emit deduplication, human waits, completion waits, signals, and machine serialization are complete.
 - [ ] Attachment admission, snapshots, replay-safe materialization, and provider adaptation use Attachment Runtime.
 - [x] Agent and Workspace planning use their domain services.

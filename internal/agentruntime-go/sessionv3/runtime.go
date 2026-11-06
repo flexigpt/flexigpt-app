@@ -49,6 +49,7 @@ type Runtime struct {
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
 	waitTimers      map[WaitID]context.CancelFunc
+	triggerTimers   map[string]context.CancelFunc
 
 	asyncMu      sync.Mutex
 	asyncWG      sync.WaitGroup
@@ -86,6 +87,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		lifecycleCtx:       lifecycleCtx,
 		lifecycleCancel:    lifecycleCancel,
 		waitTimers:         map[WaitID]context.CancelFunc{},
+		triggerTimers:      map[string]context.CancelFunc{},
 	}
 	for _, interpreter := range dependencies.Interpreters {
 		if interpreter == nil || interpreter.ID() == "" || interpreter.Version() == 0 {
@@ -129,12 +131,17 @@ func (r *Runtime) Close() {
 	for _, cancel := range r.waitTimers {
 		cancel()
 	}
+	triggerCancels := make([]context.CancelFunc, 0, len(r.triggerTimers))
+	for _, cancel := range r.triggerTimers {
+		triggerCancels = append(triggerCancels, cancel)
+	}
 	retryCancels := make([]context.CancelFunc, 0, len(r.retryTimers))
 	for _, cancel := range r.retryTimers {
 		retryCancels = append(retryCancels, cancel)
 	}
 	clear(r.retryTimers)
 	clear(r.waitTimers)
+	clear(r.triggerTimers)
 
 	executionIDs := make([]ExecutionID, 0)
 	for _, session := range r.sessions {
@@ -153,6 +160,9 @@ func (r *Runtime) Close() {
 		lifecycleCancel()
 	}
 	for _, cancel := range retryCancels {
+		cancel()
+	}
+	for _, cancel := range triggerCancels {
 		cancel()
 	}
 	r.asyncWG.Wait()
@@ -591,6 +601,10 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	active = mutableSessionExecution(session, executionID)
 	r.refreshExecutionStateLocked(active)
+	if err := r.registerWorkflowTriggersLocked(session, admission.Program); err != nil {
+		*session = previous
+		return nil, err
+	}
 	r.touchSessionLocked(session)
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
@@ -606,6 +620,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		return nil, err
 	}
 	ready := r.readyWorkForSessionLocked(session)
+	r.armSessionTriggersLocked(ctx, session)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
 	r.launchReadyWork(ctx, session.ID, ready)
 	return &receipt, nil
@@ -702,6 +717,17 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 			}, nil
 		},
 	)
+}
+
+// AcceptTriggerEvent records one external event occurrence and routes it to
+// durable Workflow trigger registrations in this Session. The trigger
+// registry, deduplication facts, selected Execution, and queue state remain
+// inside the Session document.
+func (r *Runtime) AcceptTriggerEvent(
+	ctx context.Context,
+	command AcceptTriggerEventCommand,
+) (*CommandReceipt, error) {
+	return r.acceptTriggerEvent(ctx, command)
 }
 
 func (r *Runtime) ExecuteWorkItems(ctx context.Context, command ExecuteWorkItemsCommand) (*CommandReceipt, error) {

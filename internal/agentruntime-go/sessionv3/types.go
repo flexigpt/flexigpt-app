@@ -10,15 +10,17 @@ import (
 const SchemaVersion = "session-runtime/v3"
 
 type (
-	SessionID      string
-	ExecutionID    string
-	ActivityID     string
-	ProgramFrameID string
-	WorkItemID     string
-	AttemptID      string
-	WaitID         string
-	CommandID      string
-	Revision       uint64
+	SessionID           string
+	ExecutionID         string
+	ActivityID          string
+	ProgramFrameID      string
+	WorkItemID          string
+	AttemptID           string
+	WaitID              string
+	TriggerID           string
+	TriggerOccurrenceID string
+	CommandID           string
+	Revision            uint64
 )
 
 // InferenceUsage is the provider-neutral usage record for one LLM WorkItem.
@@ -35,6 +37,7 @@ type Session struct {
 	Timeline              []Activity                   `json:"timeline"`
 	Executions            []Execution                  `json:"executions"`
 	ConversationOwnership []ConversationOwnershipState `json:"conversationOwnership,omitempty"`
+	Triggers              []TriggerRegistration        `json:"triggers,omitempty"`
 	EventSequence         uint64                       `json:"eventSequence"`
 	Commands              []CommandRecord              `json:"commands,omitempty"`
 }
@@ -331,6 +334,7 @@ type Execution struct {
 	ProgramFrames     []ProgramFrame         `json:"programFrames"`
 	WorkItems         []WorkItem             `json:"workItems"`
 	Attempts          []Attempt              `json:"attempts"`
+	Trigger           *TriggerExecution      `json:"trigger,omitempty"`
 	Waits             []Wait                 `json:"waits"`
 	Signals           []ExecutionSignal      `json:"signals,omitempty"`
 	Channels          []ChannelLog           `json:"channels,omitempty"`
@@ -1219,6 +1223,22 @@ type StartWorkflowCommand struct {
 	ExecutionID ExecutionID       `json:"executionID,omitempty"`
 	Workflow    ArtifactSelection `json:"workflow"`
 	Input       CanonicalValue    `json:"input"`
+}
+
+// AcceptTriggerEventCommand supplies one externally accepted event to the
+// durable Workflow trigger registry inside an existing Session document.
+//
+// Source and EventID form the external deduplication identity. Command
+// idempotency remains independent and is retained by Session.Commands.
+type AcceptTriggerEventCommand struct {
+	Meta        CommandMeta    `json:"meta"`
+	SessionID   SessionID      `json:"sessionID"`
+	Source      string         `json:"source"`
+	EventID     string         `json:"eventID"`
+	Name        string         `json:"name"`
+	Data        CanonicalValue `json:"data"`
+	Correlation CanonicalValue `json:"correlation,omitempty"`
+	OccurredAt  time.Time      `json:"occurredAt"`
 }
 
 type SignalExecutionCommand struct {

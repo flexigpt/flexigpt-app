@@ -88,6 +88,7 @@ type WorkflowProgram struct {
 	TargetSets map[string]WorkflowTargetSet `json:"targetSets,omitempty"`
 	Events     []WorkflowEventContract      `json:"events,omitempty"`
 	Channels   []WorkflowChannel            `json:"channels,omitempty"`
+	Triggers   []WorkflowTrigger            `json:"triggers,omitempty"`
 
 	// Scope is empty for a root Workflow Program. Child block ProgramFrames
 	// receive an immutable parent snapshot through this typed envelope.
@@ -1744,6 +1745,9 @@ func (p WorkflowProgram) Validate() error {
 		return err
 	}
 	if err := validateWorkflowCoordinationProgram(p); err != nil {
+		return err
+	}
+	if err := validateWorkflowTriggers(p.Triggers); err != nil {
 		return err
 	}
 	for name, target := range p.Targets {

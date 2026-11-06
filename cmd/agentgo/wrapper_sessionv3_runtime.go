@@ -81,6 +81,17 @@ func (w *SessionV3Wrapper) StartWorkflow(
 	})
 }
 
+func (w *SessionV3Wrapper) AcceptTriggerEvent(
+	command sessionv3Runtime.AcceptTriggerEventCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(
+		w,
+		func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+			return r.AcceptTriggerEvent(context.Background(), command)
+		},
+	)
+}
+
 func (w *SessionV3Wrapper) SignalExecution(
 	command sessionv3Runtime.SignalExecutionCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
