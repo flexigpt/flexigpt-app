@@ -74,6 +74,18 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		return nil, err
 	}
 
+	resources := []WorkflowResourceDefinition(nil)
+	if intent.Program.InterpreterID == WorkflowInterpreterID {
+		program, err := workflowProgramFromSnapshot(intent.Program)
+		if err != nil {
+			return nil, err
+		}
+		resources, err = initialExecutionResources(program.Resources)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ownership := ChildExecutionOwnership{}
 	if intent.Ownership != nil {
 		ownership = *intent.Ownership
@@ -132,9 +144,12 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			Deadline:  deadline,
 			HandoffID: handoffID,
 		}},
-		WorkItems: []WorkItem{},
-		Attempts:  []Attempt{},
-		Waits:     []Wait{},
+		WorkItems:      []WorkItem{},
+		Attempts:       []Attempt{},
+		Waits:          []Wait{},
+		Resources:      resources,
+		ResourceLeases: []ResourceLease{},
+		ResourceRates:  []ResourceRateWindow{},
 	}
 
 	parent.ChildExecutionIDs = append(parent.ChildExecutionIDs, child.ID)

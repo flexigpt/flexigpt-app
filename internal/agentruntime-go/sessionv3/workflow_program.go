@@ -87,6 +87,7 @@ type WorkflowProgram struct {
 	Targets    map[string]WorkflowTarget    `json:"targets"`
 	TargetSets map[string]WorkflowTargetSet `json:"targetSets,omitempty"`
 	Events     []WorkflowEventContract      `json:"events,omitempty"`
+	Resources  []WorkflowResourceDefinition `json:"resources,omitempty"`
 	Channels   []WorkflowChannel            `json:"channels,omitempty"`
 	Triggers   []WorkflowTrigger            `json:"triggers,omitempty"`
 
@@ -110,12 +111,13 @@ type WorkflowStateSpec struct {
 }
 
 type WorkflowStep struct {
-	ID           string              `json:"id"`
-	Timeout      WorkflowDuration    `json:"timeout,omitempty"`
-	When         *WorkflowValue      `json:"when,omitempty"`
-	Retry        *RetryPolicy        `json:"retry,omitempty"`
-	Effect       *WorkflowStepEffect `json:"effect,omitempty"`
-	OutputSchema CanonicalValue      `json:"outputSchema,omitempty"`
+	ID           string                  `json:"id"`
+	Timeout      WorkflowDuration        `json:"timeout,omitempty"`
+	When         *WorkflowValue          `json:"when,omitempty"`
+	Retry        *RetryPolicy            `json:"retry,omitempty"`
+	Effect       *WorkflowStepEffect     `json:"effect,omitempty"`
+	OutputSchema CanonicalValue          `json:"outputSchema,omitempty"`
+	Claims       []WorkflowResourceClaim `json:"claims,omitempty"`
 
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
@@ -269,6 +271,27 @@ type WorkflowState struct {
 	Terminal            *WorkflowTerminalState       `json:"terminal,omitempty"`
 	TargetSets          []WorkflowTargetSetState     `json:"targetSets,omitempty"`
 	TargetSetResolution *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
+}
+
+// WorkflowResourceClaim is a declaration-level resource claim template. Key
+// becomes a concrete ResourceClaim when the controlling WorkItem is created.
+type WorkflowResourceClaim struct {
+	Resource string         `json:"resource"`
+	Units    int            `json:"units"`
+	Key      *WorkflowValue `json:"key,omitempty"`
+}
+
+func (c WorkflowResourceClaim) Validate() error {
+	if err := validateID("workflow resource claim resource", c.Resource); err != nil {
+		return err
+	}
+	if c.Units < 1 {
+		return errors.New("workflow resource claim units are invalid")
+	}
+	if c.Key != nil {
+		return c.Key.Validate()
+	}
+	return nil
 }
 
 type WorkflowInterpreter struct {
@@ -536,6 +559,24 @@ func (i *WorkflowInterpreter) Advance(
 		}
 
 	case ProgramEventWorkSettled:
+		if _, handled, settleErr := i.settleReconciliationIntent(
+			frame,
+			execution,
+			program,
+			state,
+			event.WorkItemID,
+		); handled {
+			if settleErr != nil {
+				transition, err = workflowFailure(
+					state,
+					"workflow_reconciliation_failed",
+					settleErr.Error(),
+				)
+			} else {
+				err = nil
+			}
+			break
+		}
 		item := executionWorkItem(execution, event.WorkItemID)
 		handled, resolverErr := i.settleTargetSetResolver(
 			&state,
@@ -555,6 +596,23 @@ func (i *WorkflowInterpreter) Advance(
 		if handled {
 			transition, err = i.drive(frame, execution, program, state)
 			break
+		}
+		if item != nil &&
+			item.FrameID == frame.ID &&
+			item.State == WorkItemStateReconciling &&
+			state.PendingPath != "" &&
+			item.ProgramPath == state.PendingPath {
+			_, handled, reconcileErr := i.beginReconciliation(
+				frame,
+				execution,
+				program,
+				state,
+				*item,
+			)
+			if handled {
+				err = reconcileErr
+				break
+			}
 		}
 		if item != nil && item.FrameID == frame.ID &&
 			state.PendingPath != "" && item.ProgramPath == state.PendingPath {
@@ -600,6 +658,24 @@ func (i *WorkflowInterpreter) Advance(
 		transition, err = i.drive(frame, execution, program, state)
 
 	case ProgramEventChildSettled:
+		if _, handled, settleErr := i.settleReconciliationChild(
+			frame,
+			execution,
+			program,
+			state,
+			event.ChildFrameID,
+		); handled {
+			if settleErr != nil {
+				transition, err = workflowFailure(
+					state,
+					"workflow_reconciliation_failed",
+					settleErr.Error(),
+				)
+			} else {
+				err = nil
+			}
+			break
+		}
 		err = i.settleChild(
 			&state,
 			program,
@@ -764,7 +840,7 @@ func (i *WorkflowInterpreter) drive(
 			)
 
 		case step.Wait != nil:
-			return i.wait(program, state, path, *step.Wait)
+			return i.wait(frame, program, state, path, *step.Wait)
 
 		case step.Emit != nil:
 			return i.emit(program, state, path, *step.Emit)
@@ -1362,6 +1438,14 @@ func (i *WorkflowInterpreter) workflowCallEffect(
 			requested,
 		)
 	}
+	if step.Effect != nil && step.Effect.Reconcile != nil {
+		if !target.Effect.Reconcile {
+			return EffectContract{}, errors.New(
+				"workflow reconciliation requires target reconciliation support",
+			)
+		}
+		effect.Reconcile = true
+	}
 
 	effect.Kind = requested
 	return effect, nil
@@ -1891,6 +1975,11 @@ func (s WorkflowStep) Validate() error {
 			)
 		}
 		if err := s.Effect.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, claim := range s.Claims {
+		if err := claim.Validate(); err != nil {
 			return err
 		}
 	}
@@ -2483,6 +2572,14 @@ func workflowActivationWithScope(
 		}
 		outcomeValue = value
 	}
+	var operationValue any
+	if program.Scope.Operation != nil {
+		value, err := workflowActivationValue(*program.Scope.Operation)
+		if err != nil {
+			return nil, err
+		}
+		operationValue = value
+	}
 	return map[string]any{
 		"input":     input,
 		"state":     currentState,
@@ -2496,7 +2593,7 @@ func workflowActivationWithScope(
 		"error":     errorValue,
 		"outcome":   outcomeValue,
 		"completed": nil,
-		"operation": nil,
+		"operation": operationValue,
 	}, nil
 }
 

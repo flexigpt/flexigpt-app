@@ -184,6 +184,18 @@ func (v *validator) listen(
 		if err := validateDuration(value.Retention, true); err != nil {
 			return scope, err
 		}
+		if value.Capacity != nil && *value.Capacity < 1 {
+			return scope, invalid(
+				"subscription %q capacity must be positive",
+				name,
+			)
+		}
+		if value.MaxBytes != nil && *value.MaxBytes < 1 {
+			return scope, invalid(
+				"subscription %q maxBytes must be positive",
+				name,
+			)
+		}
 		scope.subscriptions[name] = value
 	}
 	return scope, nil

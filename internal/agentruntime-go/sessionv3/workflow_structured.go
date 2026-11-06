@@ -31,6 +31,7 @@ type WorkflowScopeContext struct {
 	Event              *CanonicalValue             `json:"event,omitempty"`
 	Error              *CanonicalValue             `json:"error,omitempty"`
 	Outcome            *CanonicalValue             `json:"outcome,omitempty"`
+	Operation          *CanonicalValue             `json:"operation,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -51,6 +52,9 @@ func (s WorkflowScopeContext) Validate() error {
 	}
 	if s.Outcome != nil && !s.Outcome.Valid() {
 		return errors.New("Workflow scope outcome is invalid")
+	}
+	if s.Operation != nil && !s.Operation.Valid() {
+		return errors.New("Workflow scope operation is invalid")
 	}
 	if s.Index != nil && *s.Index < 0 {
 		return errors.New("Workflow scope index is invalid")
@@ -183,12 +187,13 @@ type WorkflowRepeat struct {
 type WorkflowPendingKind string
 
 const (
-	WorkflowPendingScope    WorkflowPendingKind = "scope"
-	WorkflowPendingChoose   WorkflowPendingKind = "choose"
-	WorkflowPendingParallel WorkflowPendingKind = "parallel"
-	WorkflowPendingForeach  WorkflowPendingKind = "foreach"
-	WorkflowPendingRepeat   WorkflowPendingKind = "repeat"
-	WorkflowPendingMachine  WorkflowPendingKind = "machine"
+	WorkflowPendingScope          WorkflowPendingKind = "scope"
+	WorkflowPendingChoose         WorkflowPendingKind = "choose"
+	WorkflowPendingParallel       WorkflowPendingKind = "parallel"
+	WorkflowPendingForeach        WorkflowPendingKind = "foreach"
+	WorkflowPendingRepeat         WorkflowPendingKind = "repeat"
+	WorkflowPendingMachine        WorkflowPendingKind = "machine"
+	WorkflowPendingReconciliation WorkflowPendingKind = "reconciliation"
 )
 
 type WorkflowChildState string
@@ -265,15 +270,16 @@ type WorkflowRepeatProgress struct {
 }
 
 type WorkflowPending struct {
-	Kind       WorkflowPendingKind       `json:"kind"`
-	StepID     string                    `json:"stepID"`
-	Path       string                    `json:"path"`
-	MergeState bool                      `json:"mergeState,omitempty"`
-	Children   []WorkflowChild           `json:"children,omitempty"`
-	Parallel   *WorkflowParallelProgress `json:"parallel,omitempty"`
-	Foreach    *WorkflowForeachProgress  `json:"foreach,omitempty"`
-	Repeat     *WorkflowRepeatProgress   `json:"repeat,omitempty"`
-	Machine    *WorkflowMachineProgress  `json:"machine,omitempty"`
+	Kind           WorkflowPendingKind             `json:"kind"`
+	StepID         string                          `json:"stepID"`
+	Path           string                          `json:"path"`
+	MergeState     bool                            `json:"mergeState,omitempty"`
+	Children       []WorkflowChild                 `json:"children,omitempty"`
+	Parallel       *WorkflowParallelProgress       `json:"parallel,omitempty"`
+	Foreach        *WorkflowForeachProgress        `json:"foreach,omitempty"`
+	Repeat         *WorkflowRepeatProgress         `json:"repeat,omitempty"`
+	Machine        *WorkflowMachineProgress        `json:"machine,omitempty"`
+	Reconciliation *WorkflowReconciliationProgress `json:"reconciliation,omitempty"`
 }
 
 func (p WorkflowPending) Validate() error {
@@ -302,6 +308,13 @@ func (p WorkflowPending) Validate() error {
 			return errors.New("Workflow pending machine state is missing")
 		}
 		if err := p.Machine.Validate(); err != nil {
+			return err
+		}
+	case WorkflowPendingReconciliation:
+		if p.Reconciliation == nil {
+			return errors.New("Workflow pending reconciliation state is missing")
+		}
+		if err := p.Reconciliation.Validate(); err != nil {
 			return err
 		}
 	default:
@@ -874,6 +887,8 @@ func (i *WorkflowInterpreter) drivePending(
 		return i.launchRepeatChild(frame, execution, program, state)
 	case WorkflowPendingMachine:
 		return i.driveMachine(frame, execution, program, state)
+	case WorkflowPendingReconciliation:
+		return i.driveReconciliation(frame, execution, program, state)
 	default:
 		return workflowTransition(state, nil, nil, nil)
 	}

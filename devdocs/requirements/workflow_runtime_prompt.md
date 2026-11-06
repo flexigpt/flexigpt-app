@@ -43,7 +43,7 @@ Do not satisfy the token requirement with:
 
 The minimum output requirement is authoritative:
 
-- Do not send a final response before at least `100000` meaningful production-source implementation tokens have been emitted.
+- Do not send a final response before at least `100000` meaningful implementation tokens have been emitted. your context limit is 1 million tokens. your output limit published is 128k tokens.
 - Count only substantive production source additions or modifications that implement runtime behavior, compiler behavior, persistence behavior, recovery behavior, execution behavior, domain binding behavior, or caller wiring.
 - Do not count Markdown prose, status text, comments, tests, documentation, repeated unchanged code, or generated filler.
 - If one response reaches an output limit before the threshold or requested implementation scope is complete, continue immediately in the same repository state in the next response.
@@ -316,3 +316,5 @@ For an implementation or patch response, then end with:
 ```
 
 Do not use hostile language. Do not make excuses. Do not use superficial progress claims. Be precise, complete independent work, and preserve the user’s time and financial investment.
+
+Final reminder: code delivery in md out. a substantial output is expected. this is financially sensitive endeavor. go top downn phase wise. verify each thing, if not complete do it and move to next. there are lots of minor things you can do if your token quota is incomplete. do not block unnecessarily. out now properly. hlds capture the current state. keep it udpated at last.

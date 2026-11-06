@@ -723,6 +723,11 @@ func (w WorkItem) Validate() error {
 	if err := w.Effect.Validate(); err != nil {
 		return err
 	}
+	if w.EffectPlan != nil {
+		if err := w.EffectPlan.Validate(); err != nil {
+			return err
+		}
+	}
 	if w.Effect.Kind == EffectKindKeyed &&
 		strings.TrimSpace(w.Effect.IdempotencyKey) == "" {
 		return errors.New("keyed work item has no idempotency key")
@@ -730,11 +735,26 @@ func (w WorkItem) Validate() error {
 	if err := validateEffectStateForWork(w); err != nil {
 		return err
 	}
+	if w.ResourceWait != nil &&
+		w.State != WorkItemStateResourceWaiting {
+		return errors.New("non-resource-waiting work item has resource wait state")
+	}
+	if w.State == WorkItemStateResourceWaiting &&
+		w.ResourceWait == nil {
+		return errors.New("resource-waiting work item has no resource wait state")
+	}
+	if w.ResourceWait != nil {
+		if err := w.ResourceWait.Validate(); err != nil {
+			return err
+		}
+	}
 	switch w.State {
 	case WorkItemStateReady,
 		WorkItemStateBinding,
 		WorkItemStateDispatched,
 		WorkItemStateRetryWaiting,
+		WorkItemStateReconciling,
+		WorkItemStateResourceWaiting,
 		WorkItemStateWaiting,
 		WorkItemStateCompleted,
 		WorkItemStateFailed,
@@ -787,6 +807,128 @@ func (e EffectContract) Validate() error {
 	return nil
 }
 
+func (o WorkflowOperationTargetFacts) Validate() error {
+	if err := validateID("reconciliation target name", o.Name); err != nil {
+		return err
+	}
+	switch o.WorkItemType {
+	case WorkItemTypeTool, WorkItemTypeService, WorkItemTypeActivity:
+	default:
+		return errors.New("reconciliation target work item type is invalid")
+	}
+	if o.Binding != nil {
+		return o.Binding.Validate()
+	}
+	return nil
+}
+
+func (o WorkflowOperationFacts) Validate() error {
+	if err := validateID(
+		"reconciliation original work item ID",
+		string(o.WorkItemID),
+	); err != nil {
+		return err
+	}
+	if o.AttemptID != "" {
+		if err := validateID(
+			"reconciliation original attempt ID",
+			string(o.AttemptID),
+		); err != nil {
+			return err
+		}
+	}
+	if !o.Input.Valid() {
+		return errors.New("reconciliation operation input is invalid")
+	}
+	if err := o.Target.Validate(); err != nil {
+		return err
+	}
+	if o.Receipt != nil {
+		if err := o.Receipt.Validate(); err != nil {
+			return err
+		}
+	}
+	if o.Uncertainty == nil {
+		return errors.New("reconciliation operation has no uncertainty")
+	}
+	return validateReconciliationError(o.Uncertainty)
+}
+
+func (w ReconciliationWork) Validate() error {
+	if w.OriginalWorkItemID == "" {
+		return errors.New("reconciliation work item has no original work item")
+	}
+	if w.Operation.WorkItemID != w.OriginalWorkItemID {
+		return errors.New("reconciliation work item identity differs from operation facts")
+	}
+	return w.Operation.Validate()
+}
+
+func (s ReconciliationSettlement) Validate() error {
+	if s.OriginalWorkItemID == "" {
+		return errors.New("reconciliation settlement has no original work item")
+	}
+	if !s.Output.Valid() {
+		return errors.New("reconciliation settlement output is invalid")
+	}
+	if s.Receipt != nil {
+		if err := s.Receipt.Validate(); err != nil {
+			return err
+		}
+	}
+	if err := validateReconciliationError(s.Error); err != nil {
+		return err
+	}
+
+	switch s.Decision {
+	case ReconciliationDecisionApplied:
+		if len(s.Output) == 0 || s.Receipt == nil || s.Error != nil {
+			return errors.New("applied reconciliation settlement is incomplete")
+		}
+	case ReconciliationDecisionNotApplied:
+		if len(s.Output) != 0 || s.Receipt != nil {
+			return errors.New("not-applied reconciliation settlement has output facts")
+		}
+	case ReconciliationDecisionUnknown:
+		if s.Error == nil {
+			return errors.New("unknown reconciliation settlement has no error")
+		}
+	default:
+		return errors.New("reconciliation settlement decision is invalid")
+	}
+	return nil
+}
+
+func validateReconciliationError(value *SanitizedError) error {
+	if value == nil {
+		return nil
+	}
+	if strings.TrimSpace(value.Code) == "" ||
+		strings.TrimSpace(value.Message) == "" ||
+		!value.Details.Valid() {
+		return errors.New("reconciliation error is invalid")
+	}
+	if err := value.Effect.Validate(); err != nil {
+		return err
+	}
+	for index := range value.Causes {
+		cause := value.Causes[index]
+		if err := validateReconciliationError(&cause); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r ExternalReceipt) Validate() error {
+	if strings.TrimSpace(r.System) == "" ||
+		strings.TrimSpace(r.Reference) == "" ||
+		r.ConfirmedAt.IsZero() {
+		return errors.New("external receipt is incomplete")
+	}
+	return r.EffectState.Validate()
+}
+
 func (e WorkflowStepEffect) Validate() error {
 	switch e.Kind {
 	case EffectKindRead, EffectKindIdempotent, EffectKindNonIdempotent:
@@ -802,6 +944,11 @@ func (e WorkflowStepEffect) Validate() error {
 		}
 	default:
 		return fmt.Errorf("unsupported workflow effect kind %q", e.Kind)
+	}
+	if e.Reconcile != nil {
+		if err := e.Reconcile.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -856,6 +1003,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		{WorkItemTypeWait, p.Wait != nil},
 		{WorkItemTypeEmit, p.Emit != nil},
 		{WorkItemTypeCompensation, p.Compensation != nil},
+		{WorkItemTypeReconciliation, p.Reconciliation != nil},
 	}
 	count := 0
 	for _, value := range values {
@@ -978,6 +1126,10 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeCompensation:
 		if p.Compensation.OriginalWorkItemID == "" || !p.Compensation.Input.Valid() {
 			return errors.New("invalid compensation WorkItem")
+		}
+	case WorkItemTypeReconciliation:
+		if err := p.Reconciliation.Validate(); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1108,6 +1260,9 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 		if err := o.Receipt.EffectState.Validate(); err != nil {
 			return err
 		}
+		if err := o.Receipt.Validate(); err != nil {
+			return err
+		}
 	}
 	if o.LLM != nil {
 		for _, call := range o.LLM.ToolCalls {
@@ -1189,6 +1344,19 @@ func (w WaitRequest) Validate() error {
 			return err
 		}
 	}
+	if w.Subscription != "" {
+		if err := validateID("wait subscription", w.Subscription); err != nil {
+			return err
+		}
+	}
+	if w.SubscriptionFrameID != "" {
+		if err := validateID(
+			"wait subscription frame ID",
+			string(w.SubscriptionFrameID),
+		); err != nil {
+			return err
+		}
+	}
 	if w.Filter != nil {
 		if err := w.Filter.Validate(); err != nil {
 			return err
@@ -1249,6 +1417,15 @@ func (w WaitRequest) Validate() error {
 		if w.Assignees != nil || len(w.Request) != 0 {
 			return errors.New("event wait contains interactive fields")
 		}
+		if w.Subscription != "" &&
+			w.SubscriptionFrameID == "" {
+			return errors.New(
+				"event wait subscription has no owning frame identity",
+			)
+		}
+		if w.Subscription == "" && w.SubscriptionFrameID != "" {
+			return errors.New("event wait has a frame identity without a subscription")
+		}
 
 	case WaitKindChannel:
 		if w.Timer != nil ||
@@ -1275,6 +1452,9 @@ func (w WaitRequest) Validate() error {
 			len(w.Request) != 0 {
 			return errors.New("completion wait contains incompatible fields")
 		}
+		if w.SubscriptionFrameID != "" {
+			return errors.New("completion wait has a subscription frame identity")
+		}
 
 	case WaitKindApproval,
 		WaitKindManual,
@@ -1291,6 +1471,9 @@ func (w WaitRequest) Validate() error {
 		if w.Kind != WaitKindHuman &&
 			(w.Assignees != nil || len(w.Request) != 0) {
 			return errors.New("non-human interactive wait contains human fields")
+		}
+		if w.SubscriptionFrameID != "" {
+			return errors.New("interactive wait has a subscription frame identity")
 		}
 
 	default:
@@ -1376,6 +1559,90 @@ func (p RetryPolicy) Validate() error {
 	return nil
 }
 
+func (r WorkflowResourceRate) Validate() error {
+	if r.Units < 1 || r.Burst < 0 {
+		return errors.New("workflow resource rate is invalid")
+	}
+	return validateWorkflowTimeout(r.Per)
+}
+
+func (r WorkflowResourceDefinition) Validate() error {
+	if err := validateID("workflow resource name", r.Name); err != nil {
+		return err
+	}
+	if r.Concurrency < 0 {
+		return errors.New("workflow resource concurrency is invalid")
+	}
+	if r.Rate != nil {
+		if err := r.Rate.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c ResourceClaim) Validate() error {
+	if err := validateID("resource claim resource", c.Resource); err != nil {
+		return err
+	}
+	if c.Units < 1 {
+		return errors.New("resource claim units are invalid")
+	}
+	if strings.TrimSpace(c.Key) != c.Key {
+		return errors.New("resource claim key is not normalized")
+	}
+	return nil
+}
+
+func (l ResourceLease) Validate() error {
+	if err := validateID(
+		"resource lease work item ID",
+		string(l.WorkItemID),
+	); err != nil {
+		return err
+	}
+	if err := validateID("resource lease resource", l.Resource); err != nil {
+		return err
+	}
+	if l.Units < 1 || l.AcquiredAt.IsZero() {
+		return errors.New("resource lease is invalid")
+	}
+	if strings.TrimSpace(l.Key) != l.Key {
+		return errors.New("resource lease key is not normalized")
+	}
+	return nil
+}
+
+func (r ResourceRateWindow) Validate() error {
+	if err := validateID("resource rate window resource", r.Resource); err != nil {
+		return err
+	}
+	if r.WindowStarted.IsZero() || r.UnitsConsumed < 0 {
+		return errors.New("resource rate window is invalid")
+	}
+	return nil
+}
+
+func (r ResourceWaitState) Validate() error {
+	switch r.Reason {
+	case ResourceWaitReasonConcurrency,
+		ResourceWaitReasonKeyed,
+		ResourceWaitReasonRate:
+	default:
+		return errors.New("resource wait reason is invalid")
+	}
+	if r.Generation == 0 {
+		return errors.New("resource wait generation is invalid")
+	}
+	if r.Reason == ResourceWaitReasonRate && r.WakeAt == nil {
+		return errors.New("rate resource wait has no wake time")
+	}
+	if r.WakeAt != nil && r.WakeAt.IsZero() {
+		return errors.New("resource wait wake time is invalid")
+	}
+	return nil
+}
+
 func (s ExecutionSignal) Validate() error {
 	if err := validateID("execution signal ID", s.ID); err != nil {
 		return err
@@ -1418,7 +1685,35 @@ func (s ExecutionSignal) Validate() error {
 			return err
 		}
 	}
+	consumedSubscriptions := make(
+		map[string]struct{},
+		len(s.SubscriptionConsumptions),
+	)
+	for _, consumption := range s.SubscriptionConsumptions {
+		if err := consumption.Validate(); err != nil {
+			return err
+		}
+		identity := string(consumption.FrameID) + ":" +
+			consumption.Subscription
+		if _, duplicate := consumedSubscriptions[identity]; duplicate {
+			return errors.New("signal subscription consumption is duplicated")
+		}
+		consumedSubscriptions[identity] = struct{}{}
+	}
 	return nil
+}
+
+func (s SubscriptionConsumption) Validate() error {
+	if err := validateID(
+		"signal consumed subscription frame ID",
+		string(s.FrameID),
+	); err != nil {
+		return err
+	}
+	return validateID(
+		"signal consumed subscription",
+		s.Subscription,
+	)
 }
 
 func (m ChannelMessage) Validate() error {

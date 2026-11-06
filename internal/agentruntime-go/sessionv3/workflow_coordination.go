@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 type WorkflowEventContract struct {
@@ -24,20 +25,39 @@ type WorkflowChannel struct {
 }
 
 type WorkflowSubscription struct {
-	Name        string         `json:"name"`
-	Event       string         `json:"event"`
-	Correlation *WorkflowValue `json:"correlation,omitempty"`
-	Filter      *WorkflowValue `json:"filter,omitempty"`
+	Name        string           `json:"name"`
+	Event       string           `json:"event"`
+	Correlation *WorkflowValue   `json:"correlation,omitempty"`
+	Filter      *WorkflowValue   `json:"filter,omitempty"`
+	Retention   WorkflowDuration `json:"retention,omitempty"`
+	Capacity    int              `json:"capacity,omitempty"`
+	MaxBytes    int              `json:"maxBytes,omitempty"`
 }
 
 type WorkflowSubscriptionState struct {
-	Name              string         `json:"name"`
-	Event             string         `json:"event"`
-	Source            string         `json:"source"`
-	Correlation       CanonicalValue `json:"correlation,omitempty"`
-	CorrelationSchema CanonicalValue `json:"correlationSchema,omitempty"`
-	DataSchema        CanonicalValue `json:"dataSchema,omitempty"`
-	Filter            *WorkflowValue `json:"filter,omitempty"`
+	Name              string                      `json:"name"`
+	Event             string                      `json:"event"`
+	Source            string                      `json:"source"`
+	Correlation       CanonicalValue              `json:"correlation,omitempty"`
+	CorrelationSchema CanonicalValue              `json:"correlationSchema,omitempty"`
+	DataSchema        CanonicalValue              `json:"dataSchema,omitempty"`
+	Filter            *WorkflowWaitFilter         `json:"filter,omitempty"`
+	Retention         WorkflowDuration            `json:"retention,omitempty"`
+	Capacity          int                         `json:"capacity"`
+	MaxBytes          int                         `json:"maxBytes"`
+	ActivatedAt       time.Time                   `json:"activatedAt"`
+	Accepted          []WorkflowSubscriptionEvent `json:"accepted,omitempty"`
+	Bytes             int                         `json:"bytes,omitempty"`
+}
+
+// WorkflowSubscriptionEvent is one subscription-local acceptance fact. Event
+// data remains canonical in Execution.Signals, while this record preserves
+// durable retention, capacity, and subscription-identity semantics.
+type WorkflowSubscriptionEvent struct {
+	Source     string    `json:"source"`
+	ID         string    `json:"id"`
+	AcceptedAt time.Time `json:"acceptedAt"`
+	Bytes      int       `json:"bytes"`
 }
 
 type WorkflowWaitFilter struct {
@@ -139,6 +159,17 @@ func (s WorkflowSubscription) Validate() error {
 			return err
 		}
 	}
+	if s.Retention != "" {
+		if err := validateWorkflowTimeout(s.Retention); err != nil {
+			return err
+		}
+	}
+	if s.Capacity < 0 || s.Capacity > maximumCoordinationRecords {
+		return errors.New("workflow subscription capacity is invalid")
+	}
+	if s.MaxBytes < 0 || s.MaxBytes > maximumCoordinationBytes {
+		return errors.New("workflow subscription byte limit is invalid")
+	}
 	return nil
 }
 
@@ -166,15 +197,88 @@ func (s WorkflowSubscriptionState) Validate() error {
 	if err := validateID("workflow subscription source", s.Source); err != nil {
 		return err
 	}
+	if s.Capacity < 1 || s.Capacity > maximumCoordinationRecords {
+		return errors.New("workflow subscription state capacity is invalid")
+	}
+	if s.MaxBytes < 1 || s.MaxBytes > maximumCoordinationBytes {
+		return errors.New("workflow subscription state byte limit is invalid")
+	}
+	if s.Retention != "" {
+		if err := validateWorkflowTimeout(s.Retention); err != nil {
+			return err
+		}
+	}
+
 	if !s.Correlation.Valid() ||
 		!s.CorrelationSchema.Valid() ||
 		!s.DataSchema.Valid() {
 		return errors.New("workflow subscription state is invalid")
 	}
 	if s.Filter != nil {
-		return s.Filter.Validate()
+		if err := s.Filter.Validate(); err != nil {
+			return err
+		}
+	}
+	seen := make(map[string]struct{}, len(s.Accepted))
+	bytes := 0
+	for _, event := range s.Accepted {
+		if err := event.Validate(); err != nil {
+			return err
+		}
+		identity := event.Source + "\x00" + event.ID
+		if _, duplicate := seen[identity]; duplicate {
+			return errors.New("workflow subscription event is duplicated")
+		}
+		seen[identity] = struct{}{}
+		bytes += event.Bytes
+	}
+	if len(s.Accepted) > s.Capacity {
+		return errors.New("workflow subscription capacity is exceeded")
+	}
+	if bytes > s.MaxBytes {
+		return errors.New("workflow subscription byte limit is exceeded")
+	}
+	if s.Bytes != 0 && s.Bytes != bytes {
+		return errors.New("workflow subscription byte accounting is invalid")
 	}
 	return nil
+}
+
+func (e WorkflowSubscriptionEvent) Validate() error {
+	if err := validateID("workflow subscription event source", e.Source); err != nil {
+		return err
+	}
+	if err := validateID("workflow subscription event ID", e.ID); err != nil {
+		return err
+	}
+	if e.AcceptedAt.IsZero() || e.Bytes < 0 {
+		return errors.New("workflow subscription event is invalid")
+	}
+	return nil
+}
+
+func workflowSubscriptionLimits(
+	value WorkflowSubscription,
+) (capacity, maxBytes int) {
+	capacity = value.Capacity
+	if capacity == 0 {
+		capacity = maximumCoordinationRecords
+	}
+	maxBytes = value.MaxBytes
+	if maxBytes == 0 {
+		maxBytes = maximumCoordinationBytes
+	}
+	return capacity, maxBytes
+}
+
+func workflowSubscriptionIdentity(
+	frameID ProgramFrameID,
+	subscription string,
+) SubscriptionConsumption {
+	return SubscriptionConsumption{
+		FrameID:      frameID,
+		Subscription: subscription,
+	}
 }
 
 func (a WaitAssignees) Validate() error {
@@ -601,6 +705,15 @@ func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 			return fmt.Errorf("workflow subscription %q has no event", declaration.Name)
 		}
 
+		filter, err := i.workflowWaitFilter(
+			program,
+			*state,
+			declaration.Filter,
+		)
+		if err != nil {
+			return err
+		}
+
 		correlation := CanonicalValue(nil)
 		if declaration.Correlation != nil {
 			value, err := i.evaluate(*declaration.Correlation, program, *state)
@@ -613,6 +726,7 @@ func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 			correlation = value
 		}
 
+		capacity, maxBytes := workflowSubscriptionLimits(declaration)
 		state.Subscriptions = append(state.Subscriptions, WorkflowSubscriptionState{
 			Name:              declaration.Name,
 			Event:             event.Name,
@@ -620,7 +734,11 @@ func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 			Correlation:       correlation,
 			CorrelationSchema: event.CorrelationSchema.Clone(),
 			DataSchema:        event.Schema.Clone(),
-			Filter:            cloneWorkflowValuePointer(declaration.Filter),
+			Filter:            filter,
+			Retention:         declaration.Retention,
+			Capacity:          capacity,
+			MaxBytes:          maxBytes,
+			ActivatedAt:       state.LogicalTime.UTC(),
 		})
 		active[declaration.Name] = struct{}{}
 	}
@@ -650,6 +768,7 @@ func (i *WorkflowInterpreter) workflowWaitFilter(
 }
 
 func (i *WorkflowInterpreter) wait(
+	frame ProgramFrame,
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
@@ -664,7 +783,7 @@ func (i *WorkflowInterpreter) wait(
 		if !found {
 			return workflowFailure(state, "workflow_wait_invalid", "workflow event subscription is inactive")
 		}
-		filter, err := i.workflowWaitFilter(program, state, subscription.Filter, spec.Event.Match)
+		filter, err := i.workflowWaitFilter(program, state, spec.Event.Match)
 		if err != nil {
 			return workflowFailure(state, "workflow_wait_invalid", err.Error())
 		}
@@ -674,15 +793,16 @@ func (i *WorkflowInterpreter) wait(
 			Automatic:   true,
 			Effect:      EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{Wait: &WaitWork{Request: WaitRequest{
-				Kind:              WaitKindEvent,
-				Subscription:      subscription.Name,
-				Signal:            subscription.Event,
-				EventSource:       subscription.Source,
-				Correlation:       subscription.Correlation.Clone(),
-				CorrelationSchema: subscription.CorrelationSchema.Clone(),
-				DataSchema:        subscription.DataSchema.Clone(),
-				Filter:            filter,
-				Consume:           spec.Event.Consume,
+				SubscriptionFrameID: frame.ID,
+				Kind:                WaitKindEvent,
+				Subscription:        subscription.Name,
+				Signal:              subscription.Event,
+				EventSource:         subscription.Source,
+				Correlation:         subscription.Correlation.Clone(),
+				CorrelationSchema:   subscription.CorrelationSchema.Clone(),
+				DataSchema:          subscription.DataSchema.Clone(),
+				Filter:              filter,
+				Consume:             spec.Event.Consume,
 			}}},
 		})
 
@@ -896,8 +1016,94 @@ func (i *WorkflowInterpreter) workflowStepWork(
 	if err != nil {
 		return workflowFailure(state, "workflow_step_invalid", err.Error())
 	}
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_resource_claim_invalid",
+			err.Error(),
+		)
+	}
+	intent.Claims = claims
+	if step.Effect != nil && step.Effect.Reconcile != nil {
+		plan := WorkflowEffectPlan{
+			Reconcile: step.Effect.Reconcile,
+		}
+		if err := plan.Validate(); err != nil {
+			return workflowFailure(
+				state,
+				"workflow_reconciliation_invalid",
+				err.Error(),
+			)
+		}
+		intent.EffectPlan = &plan
+	}
 	intent.Retry = cloneWorkflowRetryPolicy(step.Retry)
 	return workflowWork(state, path, intent)
+}
+
+func (i *WorkflowInterpreter) workflowResourceClaims(
+	program WorkflowProgram,
+	state WorkflowState,
+	step WorkflowStep,
+) ([]ResourceClaim, error) {
+	if len(step.Claims) == 0 {
+		return nil, nil
+	}
+
+	resources := make(
+		map[string]WorkflowResourceDefinition,
+		len(program.Resources),
+	)
+	for _, resource := range program.Resources {
+		resources[resource.Name] = resource
+	}
+
+	output := make([]ResourceClaim, 0, len(step.Claims))
+	for _, template := range step.Claims {
+		resource, found := resources[template.Resource]
+		if !found {
+			return nil, fmt.Errorf(
+				"workflow resource %q is unavailable",
+				template.Resource,
+			)
+		}
+		claim := ResourceClaim{
+			Resource: template.Resource,
+			Units:    template.Units,
+		}
+		if template.Key != nil {
+			key, err := i.stringValue(
+				*template.Key,
+				program,
+				state,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if strings.TrimSpace(key) == "" ||
+				strings.TrimSpace(key) != key {
+				return nil, errors.New(
+					"workflow resource claim key must be a non-empty normalized string",
+				)
+			}
+			claim.Key = key
+		}
+		if resource.Keyed && claim.Key == "" {
+			return nil, fmt.Errorf(
+				"keyed workflow resource %q has no key",
+				resource.Name,
+			)
+		}
+		if !resource.Keyed && claim.Key != "" {
+			return nil, fmt.Errorf(
+				"non-keyed workflow resource %q has a key",
+				resource.Name,
+			)
+		}
+		output = append(output, claim)
+	}
+	return output, nil
 }
 
 func workflowEventForName(
@@ -977,14 +1183,6 @@ func cloneWorkflowValue(value WorkflowValue) WorkflowValue {
 	return output
 }
 
-func cloneWorkflowValuePointer(value *WorkflowValue) *WorkflowValue {
-	if value == nil {
-		return nil
-	}
-	output := cloneWorkflowValue(*value)
-	return &output
-}
-
 func cloneWorkflowStepOutcomes(
 	values []WorkflowStepOutcome,
 ) []WorkflowStepOutcome {
@@ -1012,7 +1210,13 @@ func cloneWorkflowSubscriptionStates(
 			Correlation:       values[index].Correlation.Clone(),
 			CorrelationSchema: values[index].CorrelationSchema.Clone(),
 			DataSchema:        values[index].DataSchema.Clone(),
-			Filter:            cloneWorkflowValuePointer(values[index].Filter),
+			Filter:            cloneWorkflowWaitFilter(values[index].Filter),
+			Retention:         values[index].Retention,
+			Capacity:          values[index].Capacity,
+			MaxBytes:          values[index].MaxBytes,
+			ActivatedAt:       values[index].ActivatedAt,
+			Accepted:          append([]WorkflowSubscriptionEvent(nil), values[index].Accepted...),
+			Bytes:             values[index].Bytes,
 		}
 	}
 	return output
@@ -1024,6 +1228,24 @@ func cloneWorkflowStringSet(
 	output := make(map[string]struct{}, len(input))
 	for value := range input {
 		output[value] = struct{}{}
+	}
+	return output
+}
+
+func cloneWorkflowWaitFilter(
+	value *WorkflowWaitFilter,
+) *WorkflowWaitFilter {
+	if value == nil {
+		return nil
+	}
+	output := &WorkflowWaitFilter{
+		Filters: make([]WorkflowValue, len(value.Filters)),
+		Input:   value.Input.Clone(),
+		State:   value.State.Clone(),
+		Steps:   cloneWorkflowStepOutcomes(value.Steps),
+	}
+	for index := range value.Filters {
+		output.Filters[index] = cloneWorkflowValue(value.Filters[index])
 	}
 	return output
 }

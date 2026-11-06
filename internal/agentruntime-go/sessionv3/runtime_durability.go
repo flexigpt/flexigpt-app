@@ -60,11 +60,48 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 			if execution.State.Terminal() {
 				continue
 			}
+			for _, frame := range execution.ProgramFrames {
+				if !reconciliationResumeRequired(
+					frame,
+					*execution,
+				) {
+					continue
+				}
+				if err := r.advanceFrameLocked(
+					session,
+					execution,
+					frame.ID,
+					ProgramEvent{Kind: ProgramEventContinue},
+				); err != nil {
+					continue
+				}
+				r.touchExecutionLocked(session, execution)
+				if err := r.persistLocked(
+					ctx,
+					"reconciliationRecovery",
+					session,
+				); err != nil {
+					continue
+				}
+				execution = mutableSessionExecution(
+					session,
+					execution.ID,
+				)
+				if execution == nil {
+					break
+				}
+			}
 			for _, wait := range execution.Waits {
 				if wait.Status == WaitStatusPending {
 					r.scheduleWaitDeadlineLocked(ctx, session.ID, execution.ID, wait)
 				}
 			}
+			r.armExecutionResourceWaitsLocked(
+				ctx,
+				session.ID,
+				execution.ID,
+				*execution,
+			)
 			r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
 		}
 	}

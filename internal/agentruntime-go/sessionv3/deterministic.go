@@ -35,6 +35,7 @@ func (DeterministicExecutor) Bind(
 		WorkItemTypeStateUpdate,
 		WorkItemTypeFork,
 		WorkItemTypeJoin,
+		WorkItemTypeReconciliation,
 		WorkItemTypeTargetResolver:
 		return BindResult{
 			SemanticBinding: binding,
@@ -79,6 +80,9 @@ func (DeterministicExecutor) Execute(
 	switch item.Type {
 	case WorkItemTypeFork:
 		return deterministicForkResult(item)
+
+	case WorkItemTypeReconciliation:
+		return deterministicReconciliationResult(item)
 
 	case WorkItemTypeJoin:
 		return deterministicJoinResult(request.Execution, item)
@@ -225,6 +229,36 @@ func deterministicForkResult(
 			Value: value,
 			Receipt: &ExternalReceipt{
 				System:      "session-v3-fork",
+				Reference:   string(item.ID),
+				ConfirmedAt: time.Now().UTC(),
+			},
+		},
+		Confirmed: true,
+	}, true, nil
+}
+
+func deterministicReconciliationResult(
+	item WorkItem,
+) (WorkExecutionResult, bool, error) {
+	if item.Input.Reconciliation == nil {
+		return WorkExecutionResult{}, true, errors.New(
+			"deterministic reconciliation WorkItem has no payload",
+		)
+	}
+	if err := item.Input.Reconciliation.Validate(); err != nil {
+		return WorkExecutionResult{}, true, err
+	}
+
+	value := MustCanonicalValue(struct {
+		OriginalWorkItemID WorkItemID `json:"originalWorkItemID"`
+	}{
+		OriginalWorkItemID: item.Input.Reconciliation.OriginalWorkItemID,
+	})
+	return WorkExecutionResult{
+		Output: &WorkItemOutput{
+			Value: value,
+			Receipt: &ExternalReceipt{
+				System:      "session-v3-reconciliation",
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},

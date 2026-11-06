@@ -170,6 +170,14 @@ func validateEffectStateForWork(
 				"dispatched mutating work item has no dispatched effect state",
 			)
 		}
+	case WorkItemStateResourceWaiting:
+	case WorkItemStateReconciling:
+		if item.Effect.Kind != EffectKindRead &&
+			item.EffectState != EffectStateUncertain {
+			return errors.New(
+				"reconciling mutating work item has no uncertain effect state",
+			)
+		}
 
 	case WorkItemStateUncertain:
 		if item.Effect.Kind != EffectKindRead &&

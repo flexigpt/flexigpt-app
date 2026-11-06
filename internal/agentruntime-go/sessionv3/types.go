@@ -2,6 +2,7 @@ package sessionv3
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -365,32 +366,35 @@ type ConversationHandoffIntent struct {
 }
 
 type Execution struct {
-	ID                ExecutionID            `json:"id"`
-	SessionID         SessionID              `json:"sessionID"`
-	Revision          Revision               `json:"revision"`
-	State             ExecutionState         `json:"state"`
-	CreatedAt         time.Time              `json:"createdAt"`
-	UpdatedAt         time.Time              `json:"updatedAt"`
-	ParentExecutionID ExecutionID            `json:"parentExecutionID,omitempty"`
-	RootExecutionID   ExecutionID            `json:"rootExecutionID,omitempty"`
-	ParentFrameID     ProgramFrameID         `json:"parentFrameID,omitempty"`
-	Lifetime          ExecutionChildLifetime `json:"lifetime,omitempty"`
-	Owner             string                 `json:"owner,omitempty"`
-	CancelWithParent  bool                   `json:"cancelWithParent,omitempty"`
-	ChildBudget       ExecutionBudget        `json:"childBudget"`
-	ChildExecutionIDs []ExecutionID          `json:"childExecutionIDs,omitempty"`
-	HandoffID         string                 `json:"handoffID,omitempty"`
-	ProgramFrames     []ProgramFrame         `json:"programFrames"`
-	WorkItems         []WorkItem             `json:"workItems"`
-	Attempts          []Attempt              `json:"attempts"`
-	Trigger           *TriggerExecution      `json:"trigger,omitempty"`
-	Waits             []Wait                 `json:"waits"`
-	Signals           []ExecutionSignal      `json:"signals,omitempty"`
-	Channels          []ChannelLog           `json:"channels,omitempty"`
-	EmitReceipts      []EmitReceipt          `json:"emitReceipts,omitempty"`
-	Controls          ExecutionControls      `json:"controls"`
-	Outcome           *ExecutionOutcome      `json:"outcome,omitempty"`
-	EventSequence     uint64                 `json:"eventSequence"`
+	ID                ExecutionID                  `json:"id"`
+	SessionID         SessionID                    `json:"sessionID"`
+	Revision          Revision                     `json:"revision"`
+	State             ExecutionState               `json:"state"`
+	CreatedAt         time.Time                    `json:"createdAt"`
+	UpdatedAt         time.Time                    `json:"updatedAt"`
+	ParentExecutionID ExecutionID                  `json:"parentExecutionID,omitempty"`
+	RootExecutionID   ExecutionID                  `json:"rootExecutionID,omitempty"`
+	ParentFrameID     ProgramFrameID               `json:"parentFrameID,omitempty"`
+	Lifetime          ExecutionChildLifetime       `json:"lifetime,omitempty"`
+	Owner             string                       `json:"owner,omitempty"`
+	CancelWithParent  bool                         `json:"cancelWithParent,omitempty"`
+	ChildBudget       ExecutionBudget              `json:"childBudget"`
+	ChildExecutionIDs []ExecutionID                `json:"childExecutionIDs,omitempty"`
+	HandoffID         string                       `json:"handoffID,omitempty"`
+	ProgramFrames     []ProgramFrame               `json:"programFrames"`
+	WorkItems         []WorkItem                   `json:"workItems"`
+	Attempts          []Attempt                    `json:"attempts"`
+	Trigger           *TriggerExecution            `json:"trigger,omitempty"`
+	Waits             []Wait                       `json:"waits"`
+	Signals           []ExecutionSignal            `json:"signals,omitempty"`
+	Channels          []ChannelLog                 `json:"channels,omitempty"`
+	Resources         []WorkflowResourceDefinition `json:"resources,omitempty"`
+	ResourceLeases    []ResourceLease              `json:"resourceLeases,omitempty"`
+	ResourceRates     []ResourceRateWindow         `json:"resourceRates,omitempty"`
+	EmitReceipts      []EmitReceipt                `json:"emitReceipts,omitempty"`
+	Controls          ExecutionControls            `json:"controls"`
+	Outcome           *ExecutionOutcome            `json:"outcome,omitempty"`
+	EventSequence     uint64                       `json:"eventSequence"`
 }
 
 type ExecutionControls struct {
@@ -511,21 +515,24 @@ const (
 	WorkItemTypeWait           WorkItemType = "wait"
 	WorkItemTypeEmit           WorkItemType = "emit"
 	WorkItemTypeCompensation   WorkItemType = "compensation"
+	WorkItemTypeReconciliation WorkItemType = "reconciliation"
 )
 
 type WorkItemState string
 
 const (
-	WorkItemStateReady        WorkItemState = "ready"
-	WorkItemStateBinding      WorkItemState = "binding"
-	WorkItemStateDispatched   WorkItemState = "dispatched"
-	WorkItemStateRetryWaiting WorkItemState = "retryWaiting"
-	WorkItemStateWaiting      WorkItemState = "waiting"
-	WorkItemStateCompleted    WorkItemState = "completed"
-	WorkItemStateFailed       WorkItemState = "failed"
-	WorkItemStateUncertain    WorkItemState = "uncertain"
-	WorkItemStateCancelled    WorkItemState = "cancelled"
-	WorkItemStateBlocked      WorkItemState = "blocked"
+	WorkItemStateReady           WorkItemState = "ready"
+	WorkItemStateBinding         WorkItemState = "binding"
+	WorkItemStateDispatched      WorkItemState = "dispatched"
+	WorkItemStateRetryWaiting    WorkItemState = "retryWaiting"
+	WorkItemStateResourceWaiting WorkItemState = "resourceWaiting"
+	WorkItemStateWaiting         WorkItemState = "waiting"
+	WorkItemStateReconciling     WorkItemState = "reconciling"
+	WorkItemStateCompleted       WorkItemState = "completed"
+	WorkItemStateFailed          WorkItemState = "failed"
+	WorkItemStateUncertain       WorkItemState = "uncertain"
+	WorkItemStateCancelled       WorkItemState = "cancelled"
+	WorkItemStateBlocked         WorkItemState = "blocked"
 )
 
 func (s WorkItemState) Terminal() bool {
@@ -574,13 +581,75 @@ type EffectContract struct {
 	Compensate     bool       `json:"compensate,omitempty"`
 }
 
+type ReconciliationDecision string
+
+const (
+	ReconciliationDecisionApplied    ReconciliationDecision = "applied"
+	ReconciliationDecisionNotApplied ReconciliationDecision = "notApplied"
+	ReconciliationDecisionUnknown    ReconciliationDecision = "unknown"
+)
+
+// WorkflowOperationTargetFacts preserve the semantic target evidence visible
+// to a reconciliation block. Private clients and setup-domain handles remain
+// outside this durable value.
+type WorkflowOperationTargetFacts struct {
+	Name         string           `json:"name"`
+	WorkItemType WorkItemType     `json:"workItemType"`
+	Binding      *SemanticBinding `json:"binding,omitempty"`
+}
+
+// WorkflowOperationFacts are the stable facts provided to a reconciliation
+// block through the Workflow `operation` CEL variable.
+type WorkflowOperationFacts struct {
+	WorkItemID     WorkItemID                   `json:"workItemID"`
+	AttemptID      AttemptID                    `json:"attemptID,omitempty"`
+	Input          CanonicalValue               `json:"input"`
+	Target         WorkflowOperationTargetFacts `json:"target"`
+	IdempotencyKey string                       `json:"idempotencyKey,omitempty"`
+	Receipt        *ExternalReceipt             `json:"receipt,omitempty"`
+	Uncertainty    *SanitizedError              `json:"uncertainty"`
+}
+
+// ReconciliationWork is a durable intent boundary. It records the original
+// operation facts before a reconciliation child ProgramFrame starts.
+type ReconciliationWork struct {
+	OriginalWorkItemID WorkItemID             `json:"originalWorkItemID"`
+	Operation          WorkflowOperationFacts `json:"operation"`
+}
+
+// ReconciliationSettlement is emitted by the Workflow interpreter only after
+// a reconciliation child block returns a validated typed decision. Runtime
+// applies it atomically to the original WorkItem.
+type ReconciliationSettlement struct {
+	OriginalWorkItemID WorkItemID             `json:"originalWorkItemID"`
+	Decision           ReconciliationDecision `json:"decision"`
+	Output             CanonicalValue         `json:"output,omitempty"`
+	Receipt            *ExternalReceipt       `json:"receipt,omitempty"`
+	Error              *SanitizedError        `json:"error,omitempty"`
+}
+
 // WorkflowStepEffect is the evaluated declaration-level effect constraint for
 // one Workflow call. Its Key is a typed value template. The interpreter
 // evaluates it once when the logical WorkItem is prepared and persists the
 // concrete key in EffectContract.IdempotencyKey.
 type WorkflowStepEffect struct {
-	Kind EffectKind     `json:"kind"`
-	Key  *WorkflowValue `json:"key,omitempty"`
+	Kind      EffectKind     `json:"kind"`
+	Key       *WorkflowValue `json:"key,omitempty"`
+	Reconcile *WorkflowBlock `json:"reconcile,omitempty"`
+}
+
+// WorkflowEffectPlan is persisted in an effect-bearing WorkItem. It contains
+// only the reconciliation block required to recover an uncertain original
+// operation. Compensation remains a separate later durable boundary.
+type WorkflowEffectPlan struct {
+	Reconcile *WorkflowBlock `json:"reconcile,omitempty"`
+}
+
+func (p WorkflowEffectPlan) Validate() error {
+	if p.Reconcile == nil {
+		return errors.New("workflow effect plan has no reconciliation block")
+	}
+	return p.Reconcile.Validate()
 }
 
 type RetryMatcher struct {
@@ -614,31 +683,97 @@ type RetryState struct {
 	LastError     *SanitizedError `json:"lastError,omitempty"`
 }
 
+// WorkflowResourceRate is the durable declaration-level rate capacity. Units
+// are consumed in fixed windows of Per. Burst is additional capacity available
+// within one window.
+type WorkflowResourceRate struct {
+	Units int              `json:"units"`
+	Per   WorkflowDuration `json:"per"`
+	Burst int              `json:"burst,omitempty"`
+}
+
+// WorkflowResourceDefinition is a named resource available to all attached
+// ProgramFrames inside one Execution. It contains no process-local lock,
+// ticker, channel, callback, or client.
+type WorkflowResourceDefinition struct {
+	Name        string                `json:"name"`
+	Concurrency int                   `json:"concurrency,omitempty"`
+	Rate        *WorkflowResourceRate `json:"rate,omitempty"`
+	Keyed       bool                  `json:"keyed,omitempty"`
+}
+
+// ResourceClaim is an evaluated WorkItem claim. Key is a concrete durable
+// value evaluated once before the WorkItem intent is persisted.
+type ResourceClaim struct {
+	Resource string `json:"resource"`
+	Units    int    `json:"units"`
+	Key      string `json:"key,omitempty"`
+}
+
+// ResourceLease records a held claim. It is part of the existing Execution
+// document and never contains a mutex, cancellation function, or timer.
+type ResourceLease struct {
+	WorkItemID WorkItemID `json:"workItemID"`
+	Resource   string     `json:"resource"`
+	Units      int        `json:"units"`
+	Key        string     `json:"key,omitempty"`
+	AcquiredAt time.Time  `json:"acquiredAt"`
+}
+
+// ResourceRateWindow is durable rate-accounting state for one declared
+// resource. The Runtime reconstructs timing behavior from these facts after
+// restore.
+type ResourceRateWindow struct {
+	Resource      string    `json:"resource"`
+	WindowStarted time.Time `json:"windowStarted"`
+	UnitsConsumed int       `json:"unitsConsumed"`
+}
+
+type ResourceWaitReason string
+
+const (
+	ResourceWaitReasonConcurrency ResourceWaitReason = "concurrency"
+	ResourceWaitReasonKeyed       ResourceWaitReason = "keyed"
+	ResourceWaitReasonRate        ResourceWaitReason = "rate"
+)
+
+// ResourceWaitState is durable scheduler state. WakeAt is absent for keyed
+// and concurrency waits because the owning Runtime wakes them after lease
+// release. A rate wait always has a WakeAt.
+type ResourceWaitState struct {
+	Reason     ResourceWaitReason `json:"reason"`
+	WakeAt     *time.Time         `json:"wakeAt,omitempty"`
+	Generation uint64             `json:"generation"`
+}
+
 type WorkItem struct {
-	ID           WorkItemID       `json:"id"`
-	FrameID      ProgramFrameID   `json:"frameID"`
-	Type         WorkItemType     `json:"type"`
-	State        WorkItemState    `json:"state"`
-	ProgramPath  string           `json:"programPath,omitempty"`
-	Dependencies []WorkItemID     `json:"dependencies,omitempty"`
-	AttemptIDs   []AttemptID      `json:"attemptIDs,omitempty"`
-	Deadline     *time.Time       `json:"deadline,omitempty"`
-	Effect       EffectContract   `json:"effect"`
-	EffectState  EffectState      `json:"effectState,omitempty"`
-	Automatic    bool             `json:"automatic"`
-	Retry        *RetryPolicy     `json:"retry,omitempty"`
-	RetryState   *RetryState      `json:"retryState,omitempty"`
-	Requested    bool             `json:"requested"`
-	Input        WorkItemPayload  `json:"input"`
-	Binding      *SemanticBinding `json:"binding,omitempty"`
-	Output       *WorkItemOutput  `json:"output,omitempty"`
-	Error        *SanitizedError  `json:"error,omitempty"`
-	LLMStream    *LLMStreamState  `json:"llmStream,omitempty"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	UpdatedAt    time.Time        `json:"updatedAt"`
-	DispatchedAt *time.Time       `json:"dispatchedAt,omitempty"`
-	CompletedAt  *time.Time       `json:"completedAt,omitempty"`
-	WaitID       WaitID           `json:"waitID,omitempty"`
+	ID           WorkItemID          `json:"id"`
+	FrameID      ProgramFrameID      `json:"frameID"`
+	Type         WorkItemType        `json:"type"`
+	State        WorkItemState       `json:"state"`
+	ProgramPath  string              `json:"programPath,omitempty"`
+	Dependencies []WorkItemID        `json:"dependencies,omitempty"`
+	AttemptIDs   []AttemptID         `json:"attemptIDs,omitempty"`
+	Deadline     *time.Time          `json:"deadline,omitempty"`
+	Effect       EffectContract      `json:"effect"`
+	EffectState  EffectState         `json:"effectState,omitempty"`
+	EffectPlan   *WorkflowEffectPlan `json:"effectPlan,omitempty"`
+	Automatic    bool                `json:"automatic"`
+	Retry        *RetryPolicy        `json:"retry,omitempty"`
+	RetryState   *RetryState         `json:"retryState,omitempty"`
+	Requested    bool                `json:"requested"`
+	Claims       []ResourceClaim     `json:"claims,omitempty"`
+	ResourceWait *ResourceWaitState  `json:"resourceWait,omitempty"`
+	Input        WorkItemPayload     `json:"input"`
+	Binding      *SemanticBinding    `json:"binding,omitempty"`
+	Output       *WorkItemOutput     `json:"output,omitempty"`
+	Error        *SanitizedError     `json:"error,omitempty"`
+	LLMStream    *LLMStreamState     `json:"llmStream,omitempty"`
+	CreatedAt    time.Time           `json:"createdAt"`
+	UpdatedAt    time.Time           `json:"updatedAt"`
+	DispatchedAt *time.Time          `json:"dispatchedAt,omitempty"`
+	CompletedAt  *time.Time          `json:"completedAt,omitempty"`
+	WaitID       WaitID              `json:"waitID,omitempty"`
 }
 
 // WorkItemPayload is a closed tagged union. It must contain exactly one
@@ -657,6 +792,7 @@ type WorkItemPayload struct {
 	Wait           *WaitWork           `json:"wait,omitempty"`
 	Emit           *EmitWork           `json:"emit,omitempty"`
 	Compensation   *CompensationWork   `json:"compensation,omitempty"`
+	Reconciliation *ReconciliationWork `json:"reconciliation,omitempty"`
 }
 
 type LLMWork struct {
@@ -828,14 +964,23 @@ type CompletionHandle struct {
 // ExecutionSignal is the durable event envelope accepted by SignalExecution.
 // ConsumedBy is scoped to one durable wait, not globally destructive.
 type ExecutionSignal struct {
-	ID                    string         `json:"id"`
-	Name                  string         `json:"name"`
-	Source                string         `json:"source,omitempty"`
-	Data                  CanonicalValue `json:"data"`
-	Correlation           CanonicalValue `json:"correlation,omitempty"`
-	CreatedAt             time.Time      `json:"createdAt"`
-	ConsumedBy            []WaitID       `json:"consumedBy,omitempty"`
-	ConsumedSubscriptions []string       `json:"consumedSubscriptions,omitempty"`
+	ID                       string                    `json:"id"`
+	Name                     string                    `json:"name"`
+	Source                   string                    `json:"source,omitempty"`
+	Data                     CanonicalValue            `json:"data"`
+	Correlation              CanonicalValue            `json:"correlation,omitempty"`
+	CreatedAt                time.Time                 `json:"createdAt"`
+	ConsumedBy               []WaitID                  `json:"consumedBy,omitempty"`
+	ConsumedSubscriptions    []string                  `json:"consumedSubscriptions,omitempty"`
+	SubscriptionConsumptions []SubscriptionConsumption `json:"subscriptionConsumptions,omitempty"`
+}
+
+// SubscriptionConsumption identifies one subscription-scoped event
+// consumption fact. FrameID is required because inherited subscriptions can
+// have the same declaration name in more than one active ProgramFrame.
+type SubscriptionConsumption struct {
+	FrameID      ProgramFrameID `json:"frameID"`
+	Subscription string         `json:"subscription"`
 }
 
 // ChannelMessage is one retained local channel record.
@@ -1020,13 +1165,14 @@ type WaitRequest struct {
 	EventSource       string              `json:"eventSource,omitempty"`
 	Filter            *WorkflowWaitFilter `json:"filter,omitempty"`
 
-	Subscription string            `json:"subscription,omitempty"`
-	Signal       string            `json:"signal,omitempty"`
-	Channel      string            `json:"channel,omitempty"`
-	Cursor       uint64            `json:"cursor,omitempty"`
-	Consume      bool              `json:"consume,omitempty"`
-	Completion   *CompletionHandle `json:"completion,omitempty"`
-	Timer        *TimerWait        `json:"timer,omitempty"`
+	Subscription        string            `json:"subscription,omitempty"`
+	SubscriptionFrameID ProgramFrameID    `json:"subscriptionFrameID,omitempty"`
+	Signal              string            `json:"signal,omitempty"`
+	Channel             string            `json:"channel,omitempty"`
+	Cursor              uint64            `json:"cursor,omitempty"`
+	Consume             bool              `json:"consume,omitempty"`
+	Completion          *CompletionHandle `json:"completion,omitempty"`
+	Timer               *TimerWait        `json:"timer,omitempty"`
 
 	Assignees *WaitAssignees `json:"assignees,omitempty"`
 	Request   CanonicalValue `json:"request,omitempty"`
@@ -1091,30 +1237,33 @@ type ProgramFrameIntent struct {
 }
 
 type WorkItemIntent struct {
-	ID           WorkItemID      `json:"id,omitempty"`
-	ProgramPath  string          `json:"programPath,omitempty"`
-	Type         WorkItemType    `json:"type"`
-	Automatic    bool            `json:"automatic"`
-	Deadline     *time.Time      `json:"deadline,omitempty"`
-	Effect       EffectContract  `json:"effect"`
-	Retry        *RetryPolicy    `json:"retry,omitempty"`
-	Dependencies []WorkItemID    `json:"dependencies,omitempty"`
-	Input        WorkItemPayload `json:"input"`
+	ID           WorkItemID          `json:"id,omitempty"`
+	ProgramPath  string              `json:"programPath,omitempty"`
+	Type         WorkItemType        `json:"type"`
+	Automatic    bool                `json:"automatic"`
+	Deadline     *time.Time          `json:"deadline,omitempty"`
+	Effect       EffectContract      `json:"effect"`
+	Retry        *RetryPolicy        `json:"retry,omitempty"`
+	EffectPlan   *WorkflowEffectPlan `json:"effectPlan,omitempty"`
+	Claims       []ResourceClaim     `json:"claims,omitempty"`
+	Dependencies []WorkItemID        `json:"dependencies,omitempty"`
+	Input        WorkItemPayload     `json:"input"`
 }
 
 type ProgramTransition struct {
-	State                   ProgramState         `json:"state"`
-	Status                  *ProgramFrameState   `json:"status,omitempty"`
-	Output                  CanonicalValue       `json:"output,omitempty"`
-	Error                   *SanitizedError      `json:"error,omitempty"`
-	Activities              []Activity           `json:"activities,omitempty"`
-	Frames                  []ProgramFrameIntent `json:"frames,omitempty"`
-	WorkItems               []WorkItemIntent     `json:"workItems,omitempty"`
-	CancelChildPaths        []string             `json:"cancelChildPaths,omitempty"`
-	CancelChildFrameIDs     []ProgramFrameID     `json:"cancelChildFrameIDs,omitempty"`
-	CancelChildExecutionIDs []ExecutionID        `json:"cancelChildExecutionIDs,omitempty"`
-	CancelWorkItemIDs       []WorkItemID         `json:"cancelWorkItemIDs,omitempty"`
-	ContinueParent          bool                 `json:"continueParent,omitempty"`
+	State                   ProgramState               `json:"state"`
+	Status                  *ProgramFrameState         `json:"status,omitempty"`
+	Output                  CanonicalValue             `json:"output,omitempty"`
+	Error                   *SanitizedError            `json:"error,omitempty"`
+	Activities              []Activity                 `json:"activities,omitempty"`
+	Frames                  []ProgramFrameIntent       `json:"frames,omitempty"`
+	WorkItems               []WorkItemIntent           `json:"workItems,omitempty"`
+	CancelChildPaths        []string                   `json:"cancelChildPaths,omitempty"`
+	CancelChildFrameIDs     []ProgramFrameID           `json:"cancelChildFrameIDs,omitempty"`
+	CancelChildExecutionIDs []ExecutionID              `json:"cancelChildExecutionIDs,omitempty"`
+	CancelWorkItemIDs       []WorkItemID               `json:"cancelWorkItemIDs,omitempty"`
+	Reconciliations         []ReconciliationSettlement `json:"reconciliations,omitempty"`
+	ContinueParent          bool                       `json:"continueParent,omitempty"`
 }
 
 type ProgramInterpreter interface {

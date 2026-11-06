@@ -188,6 +188,18 @@ func (r *Runtime) materializeForkFramesLocked(
 				intent.Program.InterpreterID,
 			)
 		}
+		if intent.Program.InterpreterID == WorkflowInterpreterID {
+			childProgram, err := workflowProgramFromSnapshot(intent.Program)
+			if err != nil {
+				return err
+			}
+			if err := r.mergeExecutionResourcesLocked(
+				execution,
+				childProgram.Resources,
+			); err != nil {
+				return err
+			}
+		}
 		if err := childInterpreter.ValidateSnapshot(intent.Program); err != nil {
 			return err
 		}

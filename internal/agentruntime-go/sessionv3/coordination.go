@@ -246,6 +246,13 @@ func (r *Runtime) dispatchEmit(
 
 		switch {
 		case signal != nil:
+			if err := r.acceptSignalForSubscriptionsLocked(
+				execution,
+				*signal,
+			); err != nil {
+				*session = previous
+				return
+			}
 			if err := r.wakeEventWaitsLocked(session, execution, *signal); err != nil {
 				*session = previous
 				return
@@ -487,17 +494,28 @@ func (r *Runtime) wakeEventWaitsLocked(
 			continue
 		}
 		if wait.Request.Consume {
-			if wait.Request.Subscription != "" &&
-				slices.Contains(
-					signal.ConsumedSubscriptions,
-					wait.Request.Subscription,
-				) {
+			if consumption, found := subscriptionConsumptionForWait(
+				execution,
+				*wait,
+			); found &&
+				signalConsumedBySubscription(signal, consumption) {
 				continue
 			}
 			if wait.Request.Subscription == "" &&
 				containsWaitID(signal.ConsumedBy, wait.ID) {
 				continue
 			}
+		}
+		accepted, err := r.subscriptionAcceptedForWaitLocked(
+			execution,
+			*wait,
+			signal,
+		)
+		if err != nil {
+			return err
+		}
+		if !accepted {
+			continue
 		}
 
 		response := MustCanonicalValue(eventWaitOutput{
@@ -545,10 +563,17 @@ func (r *Runtime) wakeEventWaitsLocked(
 					execution.Signals[signalIndex].ConsumedBy,
 					wait.ID,
 				)
-				if wait.Request.Subscription != "" {
+				if consumption, found := subscriptionConsumptionForWait(
+					execution,
+					*wait,
+				); found {
 					execution.Signals[signalIndex].ConsumedSubscriptions = append(
 						execution.Signals[signalIndex].ConsumedSubscriptions,
-						wait.Request.Subscription,
+						consumption.Subscription,
+					)
+					execution.Signals[signalIndex].SubscriptionConsumptions = append(
+						execution.Signals[signalIndex].SubscriptionConsumptions,
+						consumption,
 					)
 				}
 				break

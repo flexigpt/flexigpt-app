@@ -425,6 +425,15 @@ func (i *WorkflowInterpreter) machineSubscriptions(
 				declaration.Name,
 			)
 		}
+		filter, err := i.workflowWaitFilter(
+			program,
+			evaluationState,
+			declaration.Filter,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		correlation := CanonicalValue(nil)
 		if declaration.Correlation != nil {
 			value, err := i.evaluate(
@@ -446,6 +455,7 @@ func (i *WorkflowInterpreter) machineSubscriptions(
 			}
 			correlation = value
 		}
+		capacity, maxBytes := workflowSubscriptionLimits(declaration)
 		output = append(output, WorkflowSubscriptionState{
 			Name:              declaration.Name,
 			Event:             event.Name,
@@ -453,7 +463,11 @@ func (i *WorkflowInterpreter) machineSubscriptions(
 			Correlation:       correlation,
 			CorrelationSchema: event.CorrelationSchema.Clone(),
 			DataSchema:        event.Schema.Clone(),
-			Filter:            cloneWorkflowValuePointer(declaration.Filter),
+			Filter:            filter,
+			Retention:         declaration.Retention,
+			Capacity:          capacity,
+			MaxBytes:          maxBytes,
+			ActivatedAt:       state.LogicalTime.UTC(),
 		})
 		active[declaration.Name] = struct{}{}
 	}
@@ -786,15 +800,16 @@ func (i *WorkflowInterpreter) armMachineWaits(
 			Automatic: true,
 			Effect:    EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{Wait: &WaitWork{Request: WaitRequest{
-				Kind:              WaitKindEvent,
-				Subscription:      subscription.Name,
-				Signal:            subscription.Event,
-				EventSource:       subscription.Source,
-				Correlation:       subscription.Correlation.Clone(),
-				CorrelationSchema: subscription.CorrelationSchema.Clone(),
-				DataSchema:        subscription.DataSchema.Clone(),
-				Consume:           true,
-				Deadline:          cloneTime(state.Deadline),
+				SubscriptionFrameID: frame.ID,
+				Kind:                WaitKindEvent,
+				Subscription:        subscription.Name,
+				Signal:              subscription.Event,
+				EventSource:         subscription.Source,
+				Correlation:         subscription.Correlation.Clone(),
+				CorrelationSchema:   subscription.CorrelationSchema.Clone(),
+				DataSchema:          subscription.DataSchema.Clone(),
+				Consume:             true,
+				Deadline:            cloneTime(state.Deadline),
 			}}},
 		})
 	}

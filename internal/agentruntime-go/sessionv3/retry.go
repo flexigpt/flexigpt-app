@@ -27,7 +27,8 @@ func (r *Runtime) prepareRetryLocked(
 		item.Error == nil {
 		return false
 	}
-	if !retryEffectSafe(item.Effect) ||
+	if (!retryEffectSafe(item.Effect) &&
+		item.EffectState != EffectStateConfirmedNotApplied) ||
 		!retryMatches(item.Retry.Match, *item.Error) ||
 		attempt.Number >= item.Retry.MaxAttempts {
 		return false

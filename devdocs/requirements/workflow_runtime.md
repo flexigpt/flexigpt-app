@@ -896,9 +896,9 @@ Functional backend completion does not require:
 - [x] Five-field cron schedules exist.
 - [x] Trigger overlap policies exist.
 - [x] Missed-occurrence policies exist.
-- [ ] Subscription retention enforcement exists.
-- [ ] Subscription capacity enforcement exists.
-- [ ] Subscription byte-limit enforcement exists.
+- [x] Subscription retention enforcement exists.
+- [x] Subscription capacity enforcement exists.
+- [x] Subscription byte-limit enforcement exists.
 - [ ] Full human response authorization exists.
 - [x] Trigger administration commands exist.
 
@@ -914,10 +914,10 @@ Functional backend completion does not require:
 - [x] Confirmed effect ledger records exist.
 - [x] Compensation WorkItem intent exists.
 - [x] Cleanup state exists.
-- [ ] Reconciliation execution is complete for all target kinds.
-- [ ] Reconciliation result validation is complete.
-- [ ] Confirmed non-application retry is complete.
-- [ ] Unknown reconciliation recovery review is complete in every path.
+- [x] Reconciliation execution is complete for all effect-bearing target kinds.
+- [x] Reconciliation result validation is complete.
+- [x] Confirmed non-application retry is complete.
+- [x] Unknown reconciliation recovery review is complete in every reconciliation path.
 - [ ] Reverse dependency-aware compensation is complete.
 - [ ] Compensation concurrency is complete.
 - [ ] Compensation `continue` behavior is complete.

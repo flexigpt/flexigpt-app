@@ -35,17 +35,19 @@ type RuntimeDependencies struct {
 }
 
 type Runtime struct {
-	mu                 sync.RWMutex
-	deps               RuntimeDependencies
-	sessions           map[SessionID]*Session
-	retired            map[SessionID]struct{}
-	interpreters       map[string]ProgramInterpreter
-	privateBindings    map[WorkItemID]BoundWork
-	privateWaits       map[WaitID]any
-	cancels            map[WorkItemID]context.CancelFunc
-	workflowAdmissions map[CommandID]string
-	retryTimers        map[WorkItemID]context.CancelFunc
-	checkpointPending  map[SessionID]bool
+	mu                   sync.RWMutex
+	deps                 RuntimeDependencies
+	sessions             map[SessionID]*Session
+	retired              map[SessionID]struct{}
+	interpreters         map[string]ProgramInterpreter
+	privateBindings      map[WorkItemID]BoundWork
+	privateWaits         map[WaitID]any
+	cancels              map[WorkItemID]context.CancelFunc
+	workflowAdmissions   map[CommandID]string
+	retryTimers          map[WorkItemID]context.CancelFunc
+	checkpointPending    map[SessionID]bool
+	resourceTimers       map[WorkItemID]context.CancelFunc
+	resourceWaitSequence uint64
 
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
@@ -85,6 +87,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		workflowAdmissions: map[CommandID]string{},
 		retryTimers:        map[WorkItemID]context.CancelFunc{},
 		checkpointPending:  map[SessionID]bool{},
+		resourceTimers:     map[WorkItemID]context.CancelFunc{},
 		lifecycleCtx:       lifecycleCtx,
 		lifecycleCancel:    lifecycleCancel,
 		waitTimers:         map[WaitID]context.CancelFunc{},
@@ -140,7 +143,12 @@ func (r *Runtime) Close() {
 	for _, cancel := range r.retryTimers {
 		retryCancels = append(retryCancels, cancel)
 	}
+	resourceCancels := make([]context.CancelFunc, 0, len(r.resourceTimers))
+	for _, cancel := range r.resourceTimers {
+		resourceCancels = append(resourceCancels, cancel)
+	}
 	clear(r.retryTimers)
+	clear(r.resourceTimers)
 	clear(r.waitTimers)
 	clear(r.triggerTimers)
 
@@ -161,6 +169,9 @@ func (r *Runtime) Close() {
 		lifecycleCancel()
 	}
 	for _, cancel := range retryCancels {
+		cancel()
+	}
+	for _, cancel := range resourceCancels {
 		cancel()
 	}
 	for _, cancel := range triggerCancels {
@@ -550,6 +561,14 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	if err := interpreter.ValidateSnapshot(admission.Program); err != nil {
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
+	workflowProgram, err := workflowProgramFromSnapshot(admission.Program)
+	if err != nil {
+		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
+	}
+	resources, err := initialExecutionResources(workflowProgram.Resources)
+	if err != nil {
+		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
+	}
 	for _, existing := range session.Executions {
 		if existing.ID == executionID {
 			return r.rejectLocked(session, command.Meta, command, "Execution ID already exists"), nil
@@ -581,9 +600,12 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 				UpdatedAt: now,
 			},
 		},
-		WorkItems: []WorkItem{},
-		Attempts:  []Attempt{},
-		Waits:     []Wait{},
+		WorkItems:      []WorkItem{},
+		Attempts:       []Attempt{},
+		Waits:          []Wait{},
+		Resources:      resources,
+		ResourceLeases: []ResourceLease{},
+		ResourceRates:  []ResourceRateWindow{},
 	}
 	session.Executions = append(session.Executions, execution)
 	active := &session.Executions[len(session.Executions)-1]
@@ -896,6 +918,12 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 				}
 			}
 			execution.Signals = append(execution.Signals, signal)
+			if err := r.acceptSignalForSubscriptionsLocked(
+				execution,
+				signal,
+			); err != nil {
+				return nil, err
+			}
 			if err := r.wakeEventWaitsLocked(
 				session,
 				execution,
@@ -1067,6 +1095,18 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 					}
 					item.State = WorkItemStateCancelled
 					item.UpdatedAt = now
+					released := r.releaseWorkResourcesLocked(
+						execution,
+						item.ID,
+					)
+					r.wakeResourceWaitersLocked(
+						execution,
+						released,
+					)
+				case WorkItemStateResourceWaiting:
+					r.cancelResourceWaitLocked(item.ID)
+					item.State = WorkItemStateCancelled
+					item.UpdatedAt = now
 				case WorkItemStateRetryWaiting:
 					r.cancelRetryLocked(item.ID)
 					item.State = WorkItemStateCancelled
@@ -1082,6 +1122,7 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 					WorkItemStateCancelled,
 					WorkItemStateBlocked:
 					// Terminal or blocked; no action.
+				default:
 				}
 			}
 			for index := range execution.Waits {
@@ -1776,6 +1817,14 @@ func (r *Runtime) advanceFrameLocked(
 	if transition.Error != nil {
 		frame.Error = transition.Error
 	}
+	reconciliationFailures, err := r.applyReconciliationSettlementsLocked(
+		session,
+		execution,
+		transition.Reconciliations,
+	)
+	if err != nil {
+		return err
+	}
 	for _, activity := range transition.Activities {
 		if activity.ID == "" {
 			activity.ID = ActivityID(r.newID())
@@ -1802,10 +1851,14 @@ func (r *Runtime) advanceFrameLocked(
 	for _, intent := range transition.WorkItems {
 		now := r.now()
 		item := WorkItem{
-			ID:           intent.ID,
-			FrameID:      frame.ID,
-			Type:         intent.Type,
-			State:        WorkItemStateReady,
+			ID:      intent.ID,
+			FrameID: frame.ID,
+			Type:    intent.Type,
+			State:   WorkItemStateReady,
+			Claims: append(
+				[]ResourceClaim(nil),
+				intent.Claims...,
+			),
 			ProgramPath:  intent.ProgramPath,
 			Deadline:     earlierDeadline(frame.Deadline, intent.Deadline),
 			Effect:       intent.Effect,
@@ -1908,6 +1961,14 @@ func (r *Runtime) advanceFrameLocked(
 			)
 		}
 	}
+	for _, workItemID := range reconciliationFailures {
+		r.advanceSettledWorkLocked(
+			session,
+			execution,
+			frameID,
+			workItemID,
+		)
+	}
 	frame = mutableFrame(execution, frameID)
 	if frame == nil {
 		return errors.New("program frame disappeared during child advancement")
@@ -1953,8 +2014,49 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.dispatchEmit(ctx, sessionID, executionID, itemID)
 		return
 	}
-	prebound, hasPrebound := r.privateBindings[item.ID]
 	previous := cloneSession(*session)
+	acquired, reason, wakeAt, resourceErr := r.acquireWorkResourcesLocked(
+		execution,
+		item,
+	)
+	if resourceErr != nil {
+		now := r.now()
+		item.State = WorkItemStateBlocked
+		item.Error = &SanitizedError{
+			Code:     "resource_claim_invalid",
+			Category: ErrorCategoryValidation,
+			Message:  resourceErr.Error(),
+		}
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+		r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
+		r.refreshExecutionStateLocked(execution)
+		r.touchExecutionLocked(session, execution)
+		if err := r.persistLocked(ctx, "resourceClaimInvalid", session); err != nil {
+			*session = previous
+		}
+		r.mu.Unlock()
+		return
+	}
+	if !acquired {
+		r.setResourceWaitingLocked(item, reason, wakeAt)
+		r.touchExecutionLocked(session, execution)
+		if err := r.persistLocked(ctx, "resourceWait", session); err != nil {
+			*session = previous
+			r.mu.Unlock()
+			return
+		}
+		r.armResourceWaitLocked(ctx, session.ID, execution.ID, *item)
+		r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
+		r.mu.Unlock()
+		return
+	}
+	if err := r.persistLocked(ctx, "resourceAcquired", session); err != nil {
+		*session = previous
+		r.mu.Unlock()
+		return
+	}
+	prebound, hasPrebound := r.privateBindings[item.ID]
 	item.State = WorkItemStateBinding
 	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
@@ -2013,6 +2115,9 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	if bindErr != nil {
 		delete(r.privateBindings, item.ID)
 		now := r.now()
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
+		r.cancelResourceWaitLocked(item.ID)
 		item.State = WorkItemStateBlocked
 		item.Error = &SanitizedError{
 			Code:    "runtime_binding_failed",
@@ -2426,6 +2531,24 @@ func (r *Runtime) finishWorkLocked(
 	}
 
 	recordEffectSettlement(item, attempt, result)
+	if item.State.Terminal() {
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
+		r.cancelResourceWaitLocked(item.ID)
+	}
+
+	if item.State == WorkItemStateUncertain &&
+		r.reconciliationRequiredLocked(execution, item) {
+		item.State = WorkItemStateReconciling
+		item.CompletedAt = nil
+		item.UpdatedAt = now
+		r.advanceSettledWorkLocked(
+			session,
+			execution,
+			item.FrameID,
+			item.ID,
+		)
+	}
 
 	if item.State == WorkItemStateFailed &&
 		r.prepareRetryLocked(execution, item, attempt, now) {
@@ -2737,6 +2860,9 @@ func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
 			if item.Automatic || item.Requested {
 				runnable = true
 			}
+		case WorkItemStateResourceWaiting:
+			execution.State = ExecutionStateWaiting
+			return
 		default:
 		}
 	}
@@ -3198,6 +3324,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				// No recovery action.
 			}
 		}
+		normalizeRecoveredResources(execution)
 		for waitIndex := range execution.Waits {
 			wait := &execution.Waits[waitIndex]
 			if !wait.Request.RuntimeBound && wait.Status == WaitStatusResolving {

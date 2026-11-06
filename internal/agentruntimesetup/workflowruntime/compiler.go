@@ -56,6 +56,10 @@ func compileWorkflowProgramWithInput(
 	if err := rejectUnsupportedWorkflowDocument(document); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
+	resources, err := compileWorkflowResources(document)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 	events, err := compileWorkflowEvents(document)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -94,6 +98,7 @@ func compileWorkflowProgramWithInput(
 		Targets:      make(map[string]sessionv3Runtime.WorkflowTarget),
 		TargetSets:   targetSets,
 		Events:       events,
+		Resources:    resources,
 		Channels:     channels,
 		Triggers:     triggers,
 	}
@@ -210,13 +215,7 @@ func compileWorkflowStep(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
-	switch {
-	case len(input.Claims) != 0:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"resource claims",
-		)
-	case input.Limits != nil:
+	if input.Limits != nil {
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
 			"steps/"+input.ID,
 			"limits",
@@ -262,12 +261,20 @@ func compileWorkflowStep(
 		output.Retry = &retry
 	}
 	if input.Effect != nil {
-		effect, err := compileWorkflowStepEffect(*input.Effect)
+		effect, err := compileWorkflowStepEffect(
+			document,
+			*input.Effect,
+		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
 		output.Effect = &effect
 	}
+	claims, err := compileWorkflowResourceClaims(input.Claims)
+	if err != nil {
+		return sessionv3Runtime.WorkflowStep{}, err
+	}
+	output.Claims = claims
 
 	switch {
 	case input.Call != nil:
@@ -616,14 +623,14 @@ func compileWorkflowEffect(
 }
 
 func compileWorkflowStepEffect(
+	document workflowv1.WorkflowDocument,
 	input workflowv1.Effect,
 ) (sessionv3Runtime.WorkflowStepEffect, error) {
-	if input.Reconcile != nil || input.Compensate != nil {
-		return sessionv3Runtime.WorkflowStepEffect{},
-			unsupportedWorkflowOperation(
-				"step.effect",
-				"reconciliation or compensation block",
-			)
+	if input.Compensate != nil {
+		return sessionv3Runtime.WorkflowStepEffect{}, unsupportedWorkflowOperation(
+			"step.effect",
+			"compensation block",
+		)
 	}
 
 	output := sessionv3Runtime.WorkflowStepEffect{}
@@ -656,6 +663,16 @@ func compileWorkflowStepEffect(
 			return sessionv3Runtime.WorkflowStepEffect{}, err
 		}
 		output.Key = &key
+	}
+	if input.Reconcile != nil {
+		block, err := compileWorkflowBlock(
+			document,
+			*input.Reconcile,
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStepEffect{}, err
+		}
+		output.Reconcile = &block
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowStepEffect{}, err

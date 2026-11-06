@@ -955,6 +955,15 @@ func (r *Runtime) startTriggerExecutionLocked(
 	if err != nil {
 		return err
 	}
+	workflow, err := workflowProgramFromSnapshot(program)
+	if err != nil {
+		return err
+	}
+	resources, err := initialExecutionResources(workflow.Resources)
+	if err != nil {
+		return err
+	}
+
 	interpreter := r.interpreterLocked(program)
 	if interpreter == nil {
 		return errors.New("workflow trigger interpreter is unavailable")
@@ -990,9 +999,12 @@ func (r *Runtime) startTriggerExecutionLocked(
 			CreatedAt: now,
 			UpdatedAt: now,
 		}},
-		WorkItems: []WorkItem{},
-		Attempts:  []Attempt{},
-		Waits:     []Wait{},
+		WorkItems:      []WorkItem{},
+		Attempts:       []Attempt{},
+		Waits:          []Wait{},
+		Resources:      resources,
+		ResourceLeases: []ResourceLease{},
+		ResourceRates:  []ResourceRateWindow{},
 	}
 	session.Executions = append(session.Executions, execution)
 	current := &session.Executions[len(session.Executions)-1]
@@ -1058,6 +1070,12 @@ func (r *Runtime) signalTriggerExecutionLocked(
 		CreatedAt:   event.Time,
 	}
 	execution.Signals = append(execution.Signals, signal)
+	if err := r.acceptSignalForSubscriptionsLocked(
+		execution,
+		signal,
+	); err != nil {
+		return err
+	}
 	if err := r.wakeEventWaitsLocked(session, execution, signal); err != nil {
 		return err
 	}

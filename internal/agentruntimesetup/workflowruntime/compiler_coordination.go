@@ -94,14 +94,6 @@ func compileWorkflowSubscriptions(
 				value.Event,
 			)
 		}
-		if value.Retention != "" ||
-			value.Capacity != nil ||
-			value.MaxBytes != nil {
-			return nil, unsupportedWorkflowOperation(
-				"listen/"+name,
-				"subscription-specific retention limits",
-			)
-		}
 
 		subscription := sessionv3Runtime.WorkflowSubscription{
 			Name:  name,
@@ -120,6 +112,28 @@ func compileWorkflowSubscriptions(
 				return nil, err
 			}
 			subscription.Filter = &filter
+		}
+		if value.Retention != "" {
+			retention, err := sessionv3Runtime.ParseWorkflowDuration(
+				value.Retention,
+			)
+			if err != nil {
+				return nil, err
+			}
+			subscription.Retention = retention
+		}
+		if value.Capacity != nil {
+			subscription.Capacity = *value.Capacity
+		}
+		if value.MaxBytes != nil {
+			subscription.MaxBytes = *value.MaxBytes
+		}
+		if err := subscription.Validate(); err != nil {
+			return nil, fmt.Errorf(
+				"workflow subscription %q: %w",
+				name,
+				err,
+			)
 		}
 		output = append(output, subscription)
 	}

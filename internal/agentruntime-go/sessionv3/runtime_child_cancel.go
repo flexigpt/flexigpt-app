@@ -112,6 +112,9 @@ func (r *Runtime) cancelWorkItemsLocked(
 			cancel()
 			delete(r.cancels, item.ID)
 		}
+		r.cancelResourceWaitLocked(item.ID)
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
 		r.cancelRetryLocked(item.ID)
 
 		if item.WaitID != "" {
@@ -198,6 +201,9 @@ func (r *Runtime) cancelFrameTreeLocked(
 			cancel()
 			delete(r.cancels, item.ID)
 		}
+		r.cancelResourceWaitLocked(item.ID)
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
 		r.cancelRetryLocked(item.ID)
 		item.State = WorkItemStateCancelled
 		item.CompletedAt = &now
@@ -309,6 +315,14 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 				cancel()
 				delete(r.cancels, item.ID)
 			}
+			item.State = WorkItemStateCancelled
+			item.CompletedAt = &now
+			r.cancelResourceWaitLocked(item.ID)
+			released := r.releaseWorkResourcesLocked(execution, item.ID)
+			r.wakeResourceWaitersLocked(execution, released)
+			item.UpdatedAt = now
+		case WorkItemStateResourceWaiting:
+			r.cancelResourceWaitLocked(item.ID)
 			item.State = WorkItemStateCancelled
 			item.CompletedAt = &now
 			item.UpdatedAt = now

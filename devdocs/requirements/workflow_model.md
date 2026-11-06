@@ -1789,10 +1789,10 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Reconciliation WorkItem intent and typed reconciliation result states exist.
 - [x] Saga scope identity and confirmed compensatable effect ledger facts exist.
 - [x] Compensation WorkItem intent and cleanup state exist.
-- [ ] Reconciliation child-block execution is complete for all effect-bearing target kinds.
-- [ ] Applied reconciliation output validation is complete against original target and call contracts.
-- [ ] Confirmed non-application retry behavior is complete for all retry policies.
-- [ ] Unknown reconciliation outcomes always route to typed recovery review.
+- [x] Reconciliation child-block execution is complete for all effect-bearing target kinds.
+- [x] Applied reconciliation output validation is complete against original target and call contracts.
+- [x] Confirmed non-application retry behavior is complete for all retry policies.
+- [x] Unknown reconciliation outcomes always route to typed recovery review.
 - [ ] Reverse dependency-aware compensation scheduling is complete.
 - [ ] Compensation concurrency limits are complete.
 - [ ] Compensation `continue` and `stop` policies are complete.
@@ -1808,8 +1808,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Schedule triggers support interval and five-field cron scheduling with IANA time zones.
 - [x] Trigger overlap policies are typed.
 - [x] Trigger missed-occurrence policies are typed.
-- [ ] Event retention limits are complete per subscription identity.
-- [ ] Subscription capacity and byte limits are complete.
+- [x] Event retention limits are complete per subscription identity.
+- [x] Subscription capacity and byte limits are complete.
 - [x] Channel retention and byte limits are complete across all paths.
 - [ ] Human response actor authorization is complete.
 - [x] Trigger registration without an initial explicit Workflow start is complete.
@@ -1821,11 +1821,11 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Child cleanup duration is typed and durable.
 - [ ] Root Workflow limits compile to typed Execution budgets.
 - [ ] Step limits compile to typed nested budgets.
-- [ ] Resource declarations compile to typed resource definitions.
-- [ ] Resource claims compile to typed WorkItem claim plans.
-- [ ] Concurrency claims are enforced.
-- [ ] Rate claims are enforced.
-- [ ] Keyed serialization claims are enforced.
+- [x] Resource declarations compile to typed resource definitions.
+- [x] Resource claims compile to typed WorkItem claim plans.
+- [x] Concurrency claims are enforced.
+- [x] Rate claims are enforced.
+- [x] Keyed serialization claims are enforced.
 - [ ] Model token, message, event, cost, and step budget accounting are enforced.
 - [ ] Budget exhaustion propagates typed limit errors.
 
