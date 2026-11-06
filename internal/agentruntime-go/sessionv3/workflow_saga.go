@@ -6,6 +6,20 @@ import (
 	"strings"
 )
 
+type WorkflowSagaCompensationPhase string
+
+const (
+	WorkflowSagaCompensationPhaseIntent WorkflowSagaCompensationPhase = "intent"
+	WorkflowSagaCompensationPhaseChild  WorkflowSagaCompensationPhase = "child"
+)
+
+type WorkflowSagaActiveCompensation struct {
+	EffectID   EffectRecordID                `json:"effectID"`
+	WorkItemID WorkItemID                    `json:"workItemID"`
+	ChildPath  string                        `json:"childPath,omitempty"`
+	Phase      WorkflowSagaCompensationPhase `json:"phase"`
+}
+
 type WorkflowSaga struct {
 	CompensateOn       []WorkflowSagaOutcome   `json:"compensateOn,omitempty"`
 	CompensationErrors CompensationErrorPolicy `json:"compensationErrors,omitempty"`
@@ -34,20 +48,19 @@ type WorkflowSagaScope struct {
 }
 
 type WorkflowSagaProgress struct {
-	ID                 string                  `json:"id"`
-	CompensateOn       []WorkflowSagaOutcome   `json:"compensateOn"`
-	CompensationPolicy CompensationErrorPolicy `json:"compensationPolicy"`
-	Concurrency        int                     `json:"concurrency"`
-	Phase              WorkflowSagaPhase       `json:"phase"`
-	BodyPath           string                  `json:"bodyPath"`
-	PrimaryStatus      ProgramFrameState       `json:"primaryStatus,omitempty"`
-	PrimaryError       *SanitizedError         `json:"primaryError,omitempty"`
-	PrimaryValue       CanonicalValue          `json:"primaryValue,omitempty"`
-	Remaining          []EffectRecordID        `json:"remaining,omitempty"`
-	ActiveEffectID     EffectRecordID          `json:"activeEffectID,omitempty"`
-	ActiveWorkItemID   WorkItemID              `json:"activeWorkItemID,omitempty"`
-	ActiveChildPath    string                  `json:"activeChildPath,omitempty"`
-	Causes             []SanitizedError        `json:"causes,omitempty"`
+	ID                 string                           `json:"id"`
+	CompensateOn       []WorkflowSagaOutcome            `json:"compensateOn"`
+	CompensationPolicy CompensationErrorPolicy          `json:"compensationPolicy"`
+	Concurrency        int                              `json:"concurrency"`
+	Phase              WorkflowSagaPhase                `json:"phase"`
+	BodyPath           string                           `json:"bodyPath"`
+	PrimaryStatus      ProgramFrameState                `json:"primaryStatus,omitempty"`
+	PrimaryError       *SanitizedError                  `json:"primaryError,omitempty"`
+	PrimaryValue       CanonicalValue                   `json:"primaryValue,omitempty"`
+	Remaining          []EffectRecordID                 `json:"remaining,omitempty"`
+	Active             []WorkflowSagaActiveCompensation `json:"active,omitempty"`
+	StopRequested      bool                             `json:"stopRequested,omitempty"`
+	Causes             []SanitizedError                 `json:"causes,omitempty"`
 }
 
 func (s WorkflowSaga) Validate() error {
@@ -109,22 +122,6 @@ func (p WorkflowSagaProgress) Validate() error {
 	}
 	if p.PrimaryStatus != "" && p.PrimaryError == nil {
 		return errors.New("workflow saga primary error is unavailable")
-	}
-	if p.ActiveEffectID != "" {
-		if err := validateID(
-			"workflow saga active effect ID",
-			string(p.ActiveEffectID),
-		); err != nil {
-			return err
-		}
-	}
-	if p.ActiveWorkItemID != "" {
-		if err := validateID(
-			"workflow saga active work item ID",
-			string(p.ActiveWorkItemID),
-		); err != nil {
-			return err
-		}
 	}
 	for _, cause := range p.Causes {
 		if strings.TrimSpace(cause.Code) == "" ||
@@ -216,36 +213,59 @@ func (i *WorkflowInterpreter) driveSaga(
 	if progress.PrimaryStatus == "" {
 		return workflowTransition(state, nil, nil, nil)
 	}
-	if len(progress.Remaining) == 0 &&
-		progress.ActiveEffectID == "" {
-		return i.finishSaga(frame, program, state), nil
-	}
-	if progress.ActiveEffectID != "" {
+
+	if progress.StopRequested {
+		if len(progress.Active) == 0 {
+			return i.finishSaga(frame, program, state), nil
+		}
 		return workflowTransition(state, nil, nil, nil)
 	}
 
-	effectID := progress.Remaining[0]
-	progress.Remaining = progress.Remaining[1:]
-	record := effectRecordByID(&execution, effectID)
-	if record == nil {
-		return workflowFailure(
-			state,
-			"workflow_compensation_invalid",
-			"workflow compensation effect record is unavailable",
+	intents := make([]WorkItemIntent, 0)
+	for len(progress.Active) < progress.Concurrency {
+		effectID, found, err := workflowSagaNextEligibleEffect(
+			execution,
+			*progress,
 		)
-	}
-	workID := WorkItemID(
-		string(frame.ID) + ":saga:" + string(effectID) + ":compensation",
-	)
-	progress.ActiveEffectID = effectID
-	progress.ActiveWorkItemID = workID
-	progress.Phase = WorkflowSagaPhaseCompensationIntent
+		if err != nil {
+			return workflowFailure(
+				state,
+				"workflow_compensation_invalid",
+				err.Error(),
+			)
+		}
+		if !found {
+			break
+		}
 
-	return workflowTransition(
-		state,
-		nil,
-		nil,
-		[]WorkItemIntent{{
+		record := effectRecordByID(&execution, effectID)
+		if record == nil || record.Compensation == nil {
+			return workflowFailure(
+				state,
+				"workflow_compensation_invalid",
+				"workflow compensation effect record is unavailable",
+			)
+		}
+
+		workID := WorkItemID(
+			string(frame.ID) + ":saga:" + string(effectID) + ":compensation",
+		)
+		record.State = CompensationStateDispatching
+		record.CompensationWorkItemID = workID
+		progress.Remaining = removeWorkflowSagaEffect(
+			progress.Remaining,
+			effectID,
+		)
+		progress.Active = append(
+			progress.Active,
+			WorkflowSagaActiveCompensation{
+				EffectID:   effectID,
+				WorkItemID: workID,
+				Phase:      WorkflowSagaCompensationPhaseIntent,
+			},
+		)
+		progress.Phase = WorkflowSagaPhaseCompensationIntent
+		intents = append(intents, WorkItemIntent{
 			ID:          workID,
 			ProgramPath: state.Pending.Path + "/compensation/" + string(effectID),
 			Type:        WorkItemTypeCompensation,
@@ -259,8 +279,98 @@ func (i *WorkflowInterpreter) driveSaga(
 					Input:              MustCanonicalValue(record.Completed),
 				},
 			},
-		}},
+		})
+	}
+
+	if len(intents) != 0 {
+		return workflowTransition(state, nil, nil, intents)
+	}
+	if len(progress.Active) == 0 && len(progress.Remaining) == 0 {
+		return i.finishSaga(frame, program, state), nil
+	}
+
+	if len(progress.Active) != 0 {
+		return workflowTransition(state, nil, nil, nil)
+	}
+
+	return workflowFailure(
+		state,
+		"workflow_compensation_deadlock",
+		"workflow compensation has no dependency-eligible effect",
 	)
+}
+
+func workflowSagaNextEligibleEffect(
+	execution Execution,
+	progress WorkflowSagaProgress,
+) (EffectRecordID, bool, error) {
+	for _, effectID := range progress.Remaining {
+		candidate := effectRecordByID(&execution, effectID)
+		if candidate == nil {
+			return "", false, errors.New("workflow compensation effect record is unavailable")
+		}
+		if candidate.State != CompensationStatePending {
+			continue
+		}
+
+		blocked := false
+		for _, other := range execution.Effects {
+			if other.SagaID != progress.ID ||
+				other.ID == candidate.ID ||
+				!slices.Contains(other.Dependencies, candidate.OriginalWorkItemID) {
+				continue
+			}
+			switch other.State {
+			case CompensationStatePending, CompensationStateDispatching:
+				blocked = true
+			default:
+			}
+			if blocked {
+				break
+			}
+		}
+		if !blocked {
+			return effectID, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func removeWorkflowSagaEffect(
+	values []EffectRecordID,
+	want EffectRecordID,
+) []EffectRecordID {
+	output := make([]EffectRecordID, 0, len(values))
+	for _, value := range values {
+		if value != want {
+			output = append(output, value)
+		}
+	}
+	return output
+}
+
+func workflowSagaActiveIndexByWorkItem(
+	values []WorkflowSagaActiveCompensation,
+	workItemID WorkItemID,
+) int {
+	for index := range values {
+		if values[index].WorkItemID == workItemID {
+			return index
+		}
+	}
+	return -1
+}
+
+func workflowSagaActiveIndexByChild(
+	values []WorkflowSagaActiveCompensation,
+	childPath string,
+) int {
+	for index := range values {
+		if values[index].ChildPath == childPath {
+			return index
+		}
+	}
+	return -1
 }
 
 func (i *WorkflowInterpreter) settleSagaWork(
@@ -276,10 +386,15 @@ func (i *WorkflowInterpreter) settleSagaWork(
 		return ProgramTransition{}, false, nil
 	}
 	progress := state.Pending.Saga
-	if progress.Phase != WorkflowSagaPhaseCompensationIntent ||
-		progress.ActiveWorkItemID != workID {
+	activeIndex := workflowSagaActiveIndexByWorkItem(
+		progress.Active,
+		workID,
+	)
+	if activeIndex < 0 ||
+		progress.Active[activeIndex].Phase != WorkflowSagaCompensationPhaseIntent {
 		return ProgramTransition{}, false, nil
 	}
+	active := progress.Active[activeIndex]
 	item := executionWorkItem(execution, workID)
 	if item == nil || item.FrameID != frame.ID {
 		return ProgramTransition{}, true, errors.New(
@@ -300,11 +415,12 @@ func (i *WorkflowInterpreter) settleSagaWork(
 			execution,
 			program,
 			state,
+			active,
 			*cause,
 		)
 	}
 
-	record := effectRecordByID(&execution, progress.ActiveEffectID)
+	record := effectRecordByID(&execution, active.EffectID)
 	if record == nil || record.Compensation == nil {
 		return ProgramTransition{}, true, errors.New(
 			"workflow compensation block is unavailable",
@@ -314,6 +430,7 @@ func (i *WorkflowInterpreter) settleSagaWork(
 	completed := MustCanonicalValue(record.Completed)
 	scope := WorkflowScopeContext{
 		Completed: &completed,
+		Cleanup:   true,
 	}
 	snapshot, err := i.childBlockProgramWithScope(
 		frame,
@@ -328,10 +445,10 @@ func (i *WorkflowInterpreter) settleSagaWork(
 	}
 
 	childPath := state.Pending.Path + "/compensation/" +
-		string(record.ID) + "/child"
-	progress.ActiveChildPath = childPath
+		string(active.EffectID) + "/child"
+	progress.Active[activeIndex].ChildPath = childPath
+	progress.Active[activeIndex].Phase = WorkflowSagaCompensationPhaseChild
 	progress.Phase = WorkflowSagaPhaseCompensationChild
-	record.CompensationWorkItemID = workID
 
 	t, err := workflowStructuredTransition(
 		state,
@@ -361,23 +478,16 @@ func (i *WorkflowInterpreter) settleSagaChild(
 	}
 	progress := state.Pending.Saga
 
-	child := workflowTerminalChildFrame(
-		execution,
-		frame.ID,
-		progress.BodyPath,
-	)
-	if progress.Phase == WorkflowSagaPhaseCompensationChild {
-		child = workflowTerminalChildFrame(
+	if progress.Phase == WorkflowSagaPhaseBody {
+		child := workflowTerminalChildFrame(
 			execution,
 			frame.ID,
-			progress.ActiveChildPath,
+			progress.BodyPath,
 		)
-	}
-	if child == nil || child.ID != childID || !child.Status.Terminal() {
-		return ProgramTransition{}, false, nil
-	}
+		if child == nil || child.ID != childID || !child.Status.Terminal() {
+			return ProgramTransition{}, false, nil
+		}
 
-	if progress.Phase == WorkflowSagaPhaseBody {
 		result, failure := workflowFrameResult(*child)
 		if failure == nil {
 			return i.settleSagaBodySuccess(
@@ -397,10 +507,21 @@ func (i *WorkflowInterpreter) settleSagaChild(
 		)
 	}
 
-	if progress.Phase != WorkflowSagaPhaseCompensationChild {
-		return ProgramTransition{}, true, errors.New(
-			"workflow saga child settled in an invalid phase",
-		)
+	activeIndex := workflowSagaActiveIndexByChild(
+		progress.Active,
+		workflowTerminalChildPath(execution, childID),
+	)
+	if activeIndex < 0 {
+		return ProgramTransition{}, false, nil
+	}
+	active := progress.Active[activeIndex]
+	child := workflowTerminalChildFrame(
+		execution,
+		frame.ID,
+		active.ChildPath,
+	)
+	if child == nil || child.ID != childID || !child.Status.Terminal() {
+		return ProgramTransition{}, false, nil
 	}
 
 	result, failure := workflowFrameResult(*child)
@@ -410,6 +531,7 @@ func (i *WorkflowInterpreter) settleSagaChild(
 			execution,
 			program,
 			state,
+			active,
 			*failure,
 		)
 	}
@@ -420,6 +542,7 @@ func (i *WorkflowInterpreter) settleSagaChild(
 			execution,
 			program,
 			state,
+			active,
 			SanitizedError{
 				Code:     "compensation_control_invalid",
 				Category: ErrorCategoryValidation,
@@ -428,23 +551,29 @@ func (i *WorkflowInterpreter) settleSagaChild(
 		)
 	}
 
-	record := effectRecordByID(&execution, progress.ActiveEffectID)
+	record := effectRecordByID(&execution, active.EffectID)
 	if record == nil {
 		return ProgramTransition{}, true, errors.New(
 			"workflow compensation effect record is unavailable",
 		)
 	}
+	record.State = CompensationStateCompleted
 	record.CompensationFrameID = child.ID
+	record.Receipt = compensationReceipt(record.ID, child.ID, state.LogicalTime)
+	record.Error = nil
 	settlement := CompensationSettlement{
-		EffectID: progress.ActiveEffectID,
-		State:    CompensationStateCompleted,
-		Receipt:  compensationReceipt(record.ID, child.ID, state.LogicalTime),
+		EffectID:   active.EffectID,
+		WorkItemID: active.WorkItemID,
+		FrameID:    child.ID,
+		State:      CompensationStateCompleted,
+		Receipt:    cloneReconciliationReceipt(record.Receipt),
 	}
 
-	progress.ActiveEffectID = ""
-	progress.ActiveWorkItemID = ""
-	progress.ActiveChildPath = ""
-	progress.Phase = WorkflowSagaPhaseCompensationIntent
+	progress.Active = append(
+		progress.Active[:activeIndex],
+		progress.Active[activeIndex+1:]...,
+	)
+	progress.Phase = workflowSagaCompensationPhase(progress.Active)
 
 	next, err := i.driveSaga(frame, execution, program, state)
 	if err != nil {
@@ -534,6 +663,13 @@ func (i *WorkflowInterpreter) beginSagaCompensation(
 		return ProgramTransition{}, true, errors.New("workflow saga state is unavailable")
 	}
 	progress := state.Pending.Saga
+	if progress.PrimaryStatus != "" {
+		transition, err := i.driveSaga(frame, execution, program, state)
+		if err != nil {
+			return ProgramTransition{}, true, err
+		}
+		return transition, true, nil
+	}
 	progress.PrimaryStatus = status
 	progress.PrimaryError = cloneWorkflowSanitizedError(failure)
 
@@ -564,36 +700,53 @@ func (i *WorkflowInterpreter) settleSagaCompensationFailure(
 	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
+	active WorkflowSagaActiveCompensation,
 	failure SanitizedError,
 ) (ProgramTransition, bool, error) {
 	if state.Pending == nil || state.Pending.Saga == nil {
 		return ProgramTransition{}, true, errors.New("workflow saga state is unavailable")
 	}
 	progress := state.Pending.Saga
-	record := effectRecordByID(&execution, progress.ActiveEffectID)
-	if record != nil {
-		record.CompensationFrameID = ""
+	record := effectRecordByID(&execution, active.EffectID)
+	if record == nil {
+		return ProgramTransition{}, true, errors.New(
+			"workflow compensation effect record is unavailable",
+		)
 	}
+	stateValue := CompensationStateFailed
+	if failure.Category == ErrorCategoryUncertainty {
+		stateValue = CompensationStateUncertain
+	}
+	record.State = stateValue
+	record.CompensationWorkItemID = active.WorkItemID
+	record.CompensationFrameID = ""
+	record.Error = cloneWorkflowSanitizedError(&failure)
 	progress.Causes = append(
 		progress.Causes,
-		compensationFailureCause(
-			EffectRecord{OriginalWorkItemID: WorkItemID(progress.ActiveEffectID)},
-			&failure,
-		),
+		compensationFailureCause(*record, &failure),
 	)
 	settlement := CompensationSettlement{
-		EffectID: progress.ActiveEffectID,
-		State:    CompensationStateFailed,
-		Error:    cloneWorkflowSanitizedError(&failure),
+		EffectID:   active.EffectID,
+		WorkItemID: active.WorkItemID,
+		State:      stateValue,
+		Error:      cloneWorkflowSanitizedError(&failure),
 	}
-	progress.ActiveEffectID = ""
-	progress.ActiveWorkItemID = ""
-	progress.ActiveChildPath = ""
-	progress.Phase = WorkflowSagaPhaseCompensationIntent
+	progress.Active = append(
+		progress.Active[:workflowSagaActiveIndexByWorkItem(
+			progress.Active,
+			active.WorkItemID,
+		)],
+		progress.Active[workflowSagaActiveIndexByWorkItem(
+			progress.Active,
+			active.WorkItemID,
+		)+1:]...,
+	)
 
 	if progress.CompensationPolicy == CompensationErrorPolicyStop {
+		progress.StopRequested = true
 		progress.Remaining = nil
 	}
+	progress.Phase = workflowSagaCompensationPhase(progress.Active)
 	next, err := i.driveSaga(frame, execution, program, state)
 	if err != nil {
 		return ProgramTransition{}, true, err
@@ -650,4 +803,41 @@ func sagaShouldCompensate(progress WorkflowSagaProgress) bool {
 	default:
 	}
 	return false
+}
+
+func workflowSagaCompensationPhase(
+	active []WorkflowSagaActiveCompensation,
+) WorkflowSagaPhase {
+	for _, value := range active {
+		if value.Phase == WorkflowSagaCompensationPhaseChild {
+			return WorkflowSagaPhaseCompensationChild
+		}
+	}
+	return WorkflowSagaPhaseCompensationIntent
+}
+
+func workflowTerminalChildPath(
+	execution Execution,
+	childID ProgramFrameID,
+) string {
+	for _, frame := range execution.ProgramFrames {
+		if frame.ID == childID {
+			return frame.Path
+		}
+	}
+	return ""
+}
+
+func workflowProgramRunsCleanup(
+	program ProgramSnapshot,
+) bool {
+	if program.InterpreterID != WorkflowInterpreterID {
+		return false
+	}
+	value, err := workflowProgramFromSnapshot(program)
+	return err == nil && value.Scope.Cleanup
+}
+
+func workflowFrameRunsCleanup(frame ProgramFrame) bool {
+	return workflowProgramRunsCleanup(frame.Program)
 }

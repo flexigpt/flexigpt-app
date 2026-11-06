@@ -88,11 +88,14 @@ func (b *Binder) ExecuteWork(
 
 	switch value := bound.Private.(type) {
 	case boundExternal:
-		input, err := externalWorkInput(request.WorkItem)
+		domainRequest, err := externalWorkRequest(
+			request.WorkItem,
+			request.PortStream,
+		)
 		if err != nil {
 			return sessionv3Runtime.WorkExecutionResult{}, err
 		}
-		return value.binding.Execute(ctx, input, value.private)
+		return value.binding.Execute(ctx, domainRequest, value.private)
 	default:
 		return b.Base.ExecuteWork(ctx, request, bound)
 	}
@@ -108,7 +111,15 @@ func (b *Binder) ResolveWait(
 
 	switch value := request.Private.(type) {
 	case boundExternal:
-		return value.binding.ResolveWait(ctx, request.Wait, request.Resolution, request.Response, value.private)
+		domainRequest, err := externalWaitRequest(request)
+		if err != nil {
+			return sessionv3Runtime.WaitResolutionResult{}, err
+		}
+		return value.binding.ResolveWait(
+			ctx,
+			domainRequest,
+			value.private,
+		)
 	default:
 		return b.Base.ResolveWait(ctx, request)
 	}
@@ -127,6 +138,12 @@ func (b *Binder) ValidatePortPlans(
 ) error {
 	if len(request.WorkItem.Ports) == 0 {
 		return nil
+	}
+	switch request.WorkItem.Type {
+	case sessionv3Runtime.WorkItemTypeService,
+		sessionv3Runtime.WorkItemTypeActivity:
+		return nil
+	default:
 	}
 	validator, found := b.Base.(sessionv3Runtime.PortPlanValidator)
 	if !found {
@@ -181,7 +198,7 @@ func (b *Binder) bindService(
 			payload.BindingVersion,
 		)
 	}
-	return bindExternal(ctx, binding, payload.BindingVersion, payload.Input)
+	return bindExternal(ctx, binding, payload.BindingVersion, request)
 }
 
 func (b *Binder) bindActivity(
@@ -201,14 +218,14 @@ func (b *Binder) bindActivity(
 			payload.BindingVersion,
 		)
 	}
-	return bindExternal(ctx, binding, payload.BindingVersion, payload.Input)
+	return bindExternal(ctx, binding, payload.BindingVersion, request)
 }
 
 func bindExternal(
 	ctx context.Context,
 	binding WorkBinding,
 	version string,
-	input sessionv3Runtime.CanonicalValue,
+	request sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
 	if binding == nil || binding.Version() != version {
 		return sessionv3Runtime.BindResult{}, fmt.Errorf(
@@ -218,13 +235,54 @@ func bindExternal(
 		)
 	}
 
-	semantic, private, err := binding.Bind(ctx, input)
+	domainRequest, err := externalWorkRequest(
+		request.WorkItem,
+		request.PortStream,
+	)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
+	semantic, private, err := binding.Bind(ctx, domainRequest)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
 	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private:         boundExternal{binding: binding, private: private},
+	}, nil
+}
+
+func externalWorkRequest(
+	item sessionv3Runtime.WorkItem,
+	stream sessionv3Runtime.WorkPortStream,
+) (WorkBindingRequest, error) {
+	input, err := externalWorkInput(item)
+	if err != nil {
+		return WorkBindingRequest{}, err
+	}
+	return WorkBindingRequest{
+		Input:  input,
+		Ports:  append([]sessionv3Runtime.PortInput(nil), item.PortInputs...),
+		Stream: stream,
+	}, nil
+}
+
+func externalWaitRequest(
+	request sessionv3Runtime.WaitResolutionRequest,
+) (WorkBindingWaitRequest, error) {
+	input, err := externalWorkInput(request.WorkItem)
+	if err != nil {
+		return WorkBindingWaitRequest{}, err
+	}
+	return WorkBindingWaitRequest{
+		Wait:       request.Wait,
+		Resolution: request.Resolution,
+		Response:   request.Response.Clone(),
+		Input:      input,
+		Ports: append(
+			[]sessionv3Runtime.PortInput(nil),
+			request.WorkItem.PortInputs...,
+		),
 	}, nil
 }
 

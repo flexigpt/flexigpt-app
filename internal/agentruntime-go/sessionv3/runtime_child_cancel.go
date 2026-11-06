@@ -185,6 +185,9 @@ func (r *Runtime) cancelFrameTreeLocked(
 	if frame == nil || frame.Status.Terminal() {
 		return
 	}
+	if workflowFrameRunsCleanup(*frame) {
+		return
+	}
 
 	now := r.now()
 	frame.Status = ProgramFrameStateCancelled
@@ -359,7 +362,7 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 		delete(r.privateWaits, wait.ID)
 	}
 	for _, frame := range execution.ProgramFrames {
-		if frame.Status.Terminal() {
+		if frame.Status.Terminal() || workflowFrameRunsCleanup(frame) {
 			continue
 		}
 		_ = r.advanceFrameLocked(

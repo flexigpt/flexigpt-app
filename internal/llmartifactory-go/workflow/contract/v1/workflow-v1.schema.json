@@ -839,7 +839,8 @@
 						"for": { "const": "channel" },
 						"channel": { "$ref": "#/$defs/name" },
 						"cursor": { "$ref": "#/$defs/value" },
-						"match": { "$ref": "#/$defs/condition" }
+						"match": { "$ref": "#/$defs/condition" },
+						"consume": { "type": "boolean" }
 					}
 				},
 				{

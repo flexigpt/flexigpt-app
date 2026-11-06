@@ -24,6 +24,25 @@ const (
 
 var ErrBindingUnavailable = errors.New("workflow target binding is unavailable")
 
+// WorkBindingRequest is the typed application-domain boundary for a Workflow
+// Service or Activity invocation. Ports are already durable Runtime facts.
+// Stream is process-private and can only emit to declared streamed ports.
+type WorkBindingRequest struct {
+	Input  sessionv3Runtime.CanonicalValue
+	Ports  []sessionv3Runtime.PortInput
+	Stream sessionv3Runtime.WorkPortStream
+}
+
+// WorkBindingWaitRequest is the typed domain boundary for a Service or
+// Activity wait resolution. It contains no Runtime private handles.
+type WorkBindingWaitRequest struct {
+	Wait       sessionv3Runtime.Wait
+	Resolution sessionv3Runtime.WaitResolution
+	Response   sessionv3Runtime.CanonicalValue
+	Input      sessionv3Runtime.CanonicalValue
+	Ports      []sessionv3Runtime.PortInput
+}
+
 // WorkBinding is an application-owned Service or Activity runtime binding.
 // Artifact Workflow declarations only persist its stable ID and version.
 type WorkBinding interface {
@@ -32,18 +51,16 @@ type WorkBinding interface {
 	Effect() sessionv3Runtime.EffectContract
 	Bind(
 		ctx context.Context,
-		input sessionv3Runtime.CanonicalValue,
+		request WorkBindingRequest,
 	) (sessionv3Runtime.SemanticBinding, any, error)
 	Execute(
 		ctx context.Context,
-		input sessionv3Runtime.CanonicalValue,
+		request WorkBindingRequest,
 		state any,
 	) (sessionv3Runtime.WorkExecutionResult, error)
 	ResolveWait(
 		ctx context.Context,
-		wait sessionv3Runtime.Wait,
-		resolution sessionv3Runtime.WaitResolution,
-		input sessionv3Runtime.CanonicalValue,
+		request WorkBindingWaitRequest,
 		state any,
 	) (sessionv3Runtime.WaitResolutionResult, error)
 }

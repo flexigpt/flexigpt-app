@@ -918,12 +918,12 @@ Functional backend completion does not require:
 - [x] Reconciliation result validation is complete.
 - [x] Confirmed non-application retry is complete.
 - [x] Unknown reconciliation recovery review is complete in every reconciliation path.
-- [ ] Reverse dependency-aware compensation is complete.
-- [ ] Compensation concurrency is complete.
-- [ ] Compensation `continue` behavior is complete.
-- [ ] Compensation `stop` behavior is complete.
-- [ ] Cleanup deadline expiry is complete.
-- [ ] Public projection of primary failure with compensation causes is complete.
+- [x] Reverse dependency-aware compensation is complete.
+- [x] Compensation concurrency is complete.
+- [x] Compensation `continue` behavior is complete.
+- [x] Compensation `stop` behavior is complete.
+- [x] Cleanup deadline expiry is complete.
+- [x] Public projection of primary failure with compensation causes is complete.
 
 ### Phase 8: normal Session capability
 

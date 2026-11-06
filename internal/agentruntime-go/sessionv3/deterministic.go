@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+const deterministicCompensationIntentSystem = "session-v3-compensation-intent"
+
+type deterministicCompensationIntentOutput struct {
+	EffectID           EffectRecordID `json:"effectID"`
+	OriginalWorkItemID WorkItemID     `json:"originalWorkItemID"`
+}
+
 // DeterministicExecutor handles only WorkItem kinds whose behavior is fully
 // defined by durable Session state. It has no Artifact, provider, native-path,
 // credential, callback, or transport dependency.
@@ -36,6 +43,7 @@ func (DeterministicExecutor) Bind(
 		WorkItemTypeFork,
 		WorkItemTypeJoin,
 		WorkItemTypeReconciliation,
+		WorkItemTypeCompensation,
 		WorkItemTypeTargetResolver:
 		return BindResult{
 			SemanticBinding: binding,
@@ -83,6 +91,28 @@ func (DeterministicExecutor) Execute(
 
 	case WorkItemTypeReconciliation:
 		return deterministicReconciliationResult(item)
+
+	case WorkItemTypeCompensation:
+		if item.Input.Compensation == nil {
+			return WorkExecutionResult{}, true, errors.New(
+				"deterministic compensation WorkItem has no payload",
+			)
+		}
+		value := MustCanonicalValue(deterministicCompensationIntentOutput{
+			EffectID:           item.Input.Compensation.EffectID,
+			OriginalWorkItemID: item.Input.Compensation.OriginalWorkItemID,
+		})
+		return WorkExecutionResult{
+			Output: &WorkItemOutput{
+				Value: value,
+				Receipt: &ExternalReceipt{
+					System:      deterministicCompensationIntentSystem,
+					Reference:   string(item.ID),
+					ConfirmedAt: time.Now().UTC(),
+				},
+			},
+			Confirmed: true,
+		}, true, nil
 
 	case WorkItemTypeJoin:
 		return deterministicJoinResult(request.Execution, item)

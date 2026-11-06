@@ -769,11 +769,6 @@ func (w WorkItem) Validate() error {
 			return err
 		}
 	}
-	if w.Cleanup {
-		if w.Effect.Kind == EffectKindRead {
-			return errors.New("cleanup work item cannot use a read effect")
-		}
-	}
 	if w.SagaID != "" {
 		if err := validateID("work item saga ID", w.SagaID); err != nil {
 			return err
@@ -1736,22 +1731,6 @@ func (s ExecutionSignal) Validate() error {
 	}
 	for _, waitID := range s.ConsumedBy {
 		if err := validateID("signal consumed wait ID", string(waitID)); err != nil {
-			return err
-		}
-	}
-	for _, subscription := range s.ConsumedSubscriptions {
-		if err := validateID(
-			"signal consumed subscription",
-			subscription,
-		); err != nil {
-			return err
-		}
-	}
-	for _, subscription := range s.ConsumedSubscriptions {
-		if err := validateID(
-			"signal consumed subscription",
-			subscription,
-		); err != nil {
 			return err
 		}
 	}

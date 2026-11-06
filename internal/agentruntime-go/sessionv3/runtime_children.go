@@ -423,6 +423,20 @@ func (r *Runtime) readyWorkForSessionLocked(
 	return output
 }
 
+func (r *Runtime) armSessionExecutionTimersLocked(
+	ctx context.Context,
+	session *Session,
+) {
+	if r == nil || session == nil {
+		return
+	}
+	for index := range session.Executions {
+		execution := &session.Executions[index]
+		r.armExecutionDeadlineLocked(ctx, session.ID, execution.ID, *execution)
+		r.armCleanupDeadlineLocked(ctx, session.ID, execution.ID, *execution)
+	}
+}
+
 func (r *Runtime) launchReadyWork(
 	ctx context.Context,
 	sessionID SessionID,

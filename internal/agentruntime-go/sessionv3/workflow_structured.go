@@ -35,6 +35,7 @@ type WorkflowScopeContext struct {
 	Completed          *CanonicalValue             `json:"completed,omitempty"`
 	Ports              []PortInput                 `json:"ports,omitempty"`
 	Saga               *WorkflowSagaScope          `json:"saga,omitempty"`
+	Cleanup            bool                        `json:"cleanup,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -503,6 +504,7 @@ func (i *WorkflowInterpreter) childBlockProgram(
 		Item:               item,
 		Index:              index,
 		Result:             result,
+		Cleanup:            program.Scope.Cleanup,
 	}
 	child.Input = program.Input.Clone()
 	child.InputBound = true
@@ -2025,6 +2027,7 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 ) (ProgramSnapshot, error) {
 	scope.Child = true
 	scope.MergeState = mergeState
+	scope.Cleanup = scope.Cleanup || program.Scope.Cleanup
 	scope.OuterState = state.State.Clone()
 	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
 	if state.Saga != nil && scope.Saga == nil {

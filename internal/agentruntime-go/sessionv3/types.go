@@ -420,6 +420,7 @@ type ExecutionOutcome struct {
 	Kind        ExecutionOutcomeKind `json:"kind"`
 	Code        string               `json:"code,omitempty"`
 	Message     string               `json:"message,omitempty"`
+	Error       *SanitizedError      `json:"error,omitempty"`
 	CompletedAt time.Time            `json:"completedAt"`
 }
 
@@ -1311,11 +1312,19 @@ type ProgramInterpreter interface {
 	Advance(frame ProgramFrame, execution Execution, event ProgramEvent) (ProgramTransition, error)
 }
 
+// WorkPortStream is the narrow runtime-owned callback used by a bound
+// external domain to append a value to one declared streamed output port.
+// The callback is process-private and is never serialized.
+type WorkPortStream struct {
+	Emit func(name string, value CanonicalValue) error `json:"-"`
+}
+
 type WorkDispatchRequest struct {
-	Session   Session
-	Execution Execution
-	WorkItem  WorkItem
-	Stream    WorkStream `json:"-"`
+	Session    Session
+	Execution  Execution
+	WorkItem   WorkItem
+	Stream     WorkStream     `json:"-"`
+	PortStream WorkPortStream `json:"-"`
 }
 
 type WorkStream struct {

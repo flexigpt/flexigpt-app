@@ -1793,11 +1793,11 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Applied reconciliation output validation is complete against original target and call contracts.
 - [x] Confirmed non-application retry behavior is complete for all retry policies.
 - [x] Unknown reconciliation outcomes always route to typed recovery review.
-- [ ] Reverse dependency-aware compensation scheduling is complete.
-- [ ] Compensation concurrency limits are complete.
-- [ ] Compensation `continue` and `stop` policies are complete.
-- [ ] Primary outcome cause projection includes typed compensation causes.
-- [ ] Cleanup timer expiration and bounded cleanup cancellation behavior are complete.
+- [x] Reverse dependency-aware compensation scheduling is complete.
+- [x] Compensation concurrency limits are complete.
+- [x] Compensation `continue` and `stop` policies are complete.
+- [x] Primary outcome cause projection includes typed compensation causes.
+- [x] Cleanup timer expiration and bounded cleanup cancellation behavior are complete.
 
 ### Phase 6: coordination and triggers
 

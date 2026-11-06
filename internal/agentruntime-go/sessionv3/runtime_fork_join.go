@@ -28,6 +28,7 @@ func (r *Runtime) deferFrameForkLocked(
 	prepared := make([]ProgramFrameIntent, 0, len(intents))
 	childIDs := make([]ProgramFrameID, 0, len(intents))
 	seen := make(map[ProgramFrameID]struct{}, len(intents))
+	cleanup := false
 	for _, input := range intents {
 		intent, err := cloneForkIntent(input)
 		if err != nil {
@@ -52,6 +53,9 @@ func (r *Runtime) deferFrameForkLocked(
 		seen[intent.ID] = struct{}{}
 		prepared = append(prepared, intent)
 		childIDs = append(childIDs, intent.ID)
+		if workflowProgramRunsCleanup(intent.Program) {
+			cleanup = true
+		}
 	}
 
 	workID := WorkItemID(r.newID())
@@ -64,6 +68,7 @@ func (r *Runtime) deferFrameForkLocked(
 		ProgramPath: frame.Path + "/fork",
 		Effect:      EffectContract{Kind: EffectKindRead},
 		Automatic:   true,
+		Cleanup:     cleanup,
 		Input: WorkItemPayload{
 			Fork: &ForkWork{
 				ChildFrames: append([]ProgramFrameID(nil), childIDs...),
@@ -392,6 +397,7 @@ func (r *Runtime) queueChildJoinLocked(
 		ProgramPath: parent.Path + "/join/" + string(childID),
 		Effect:      EffectContract{Kind: EffectKindRead},
 		Automatic:   true,
+		Cleanup:     workflowFrameRunsCleanup(*child),
 		Input: WorkItemPayload{
 			Join: &JoinWork{
 				ChildFrames: []ProgramFrameID{childID},

@@ -201,6 +201,9 @@ func (r *Runtime) deliverWorkPortsLocked(
 			return err
 		}
 	}
+	for _, plan := range item.Ports {
+		_ = plan
+	}
 	return nil
 }
 
@@ -232,6 +235,72 @@ func (r *Runtime) deliverFramePortsLocked(
 	return nil
 }
 
+func (r *Runtime) appendWorkPortStream(
+	ctx context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	workItemID WorkItemID,
+	name string,
+	value CanonicalValue,
+) error {
+	if len(value) == 0 || !value.Valid() {
+		return errors.New("port stream value is not canonical json")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		return ErrRuntimeClosed
+	}
+	session, execution, err := r.executionLocked(sessionID, executionID)
+	if err != nil {
+		return err
+	}
+	item := mutableWorkItem(execution, workItemID)
+	if item == nil ||
+		item.State != WorkItemStateDispatched ||
+		execution.Controls.CancellationRequested ||
+		execution.State.Terminal() {
+		return context.Canceled
+	}
+
+	var plan *PortPlan
+	for index := range item.Ports {
+		current := &item.Ports[index]
+		if current.Name != name ||
+			current.Direction != WorkflowPortDirectionOutput ||
+			!current.Stream {
+			continue
+		}
+		plan = current
+		break
+	}
+	if plan == nil {
+		return errors.New("streamed port is not declared for the work item")
+	}
+
+	sequence := nextPortStreamSequence(item, name)
+	if err := r.appendPortMessageLocked(
+		session,
+		execution,
+		*plan,
+		portMessageID(item.ID, name, sequence),
+		portStreamMessageKind,
+		value,
+	); err != nil {
+		return err
+	}
+	item.UpdatedAt = r.now()
+	r.touchExecutionLocked(session, execution)
+
+	if err := r.persistLocked(ctx, "portStream", session); err != nil {
+		return err
+	}
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
+	return nil
+}
+
 func (r *Runtime) deliverLLMStreamPortsLocked(
 	session *Session,
 	execution *Execution,
@@ -243,6 +312,7 @@ func (r *Runtime) deliverLLMStreamPortsLocked(
 	}
 	streamValue := MustCanonicalValue(value)
 	for _, plan := range item.Ports {
+		// A streamed port carries incremental records only.
 		if plan.Direction != WorkflowPortDirectionOutput || !plan.Stream {
 			continue
 		}

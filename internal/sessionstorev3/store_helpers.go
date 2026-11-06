@@ -234,8 +234,20 @@ func cloneOutcome(v *sessionv3Runtime.ExecutionOutcome) *sessionv3Runtime.Execut
 	if v == nil {
 		return nil
 	}
-	c := *v
-	return &c
+	output := *v
+	if v.Error != nil {
+		output.Error = &sessionv3Runtime.SanitizedError{
+			Code:      v.Error.Code,
+			Category:  v.Error.Category,
+			Message:   v.Error.Message,
+			Retryable: v.Error.Retryable,
+			StepPath:  v.Error.StepPath,
+			Effect:    v.Error.Effect,
+			Details:   v.Error.Details.Clone(),
+			Causes:    append([]sessionv3Runtime.SanitizedError(nil), v.Error.Causes...),
+		}
+	}
+	return &output
 }
 
 func normalizePageSize(n int) int {

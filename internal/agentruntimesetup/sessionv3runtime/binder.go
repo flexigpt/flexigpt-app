@@ -180,21 +180,13 @@ func (b *Binder) ValidatePortPlans(
 	}
 
 	switch request.WorkItem.Type {
+	case sessionv3Runtime.WorkItemTypeLLM,
+		sessionv3Runtime.WorkItemTypeService,
+		sessionv3Runtime.WorkItemTypeActivity:
+		return nil
 	case sessionv3Runtime.WorkItemTypeTool:
 		return errors.New(
 			"tool port adaptation is unavailable for this binding",
-		)
-	case sessionv3Runtime.WorkItemTypeService:
-		return errors.New(
-			"service port adaptation is unavailable for this binding",
-		)
-	case sessionv3Runtime.WorkItemTypeActivity:
-		return errors.New(
-			"activity port adaptation is unavailable for this binding",
-		)
-	case sessionv3Runtime.WorkItemTypeLLM:
-		return errors.New(
-			"model port adaptation is unavailable for this binding",
 		)
 	default:
 		return errors.New(

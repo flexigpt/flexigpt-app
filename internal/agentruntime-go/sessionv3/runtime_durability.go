@@ -66,6 +66,12 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				execution.ID,
 				*execution,
 			)
+			r.armCleanupDeadlineLocked(
+				ctx,
+				session.ID,
+				execution.ID,
+				*execution,
+			)
 			if execution.State.Terminal() {
 				continue
 			}
@@ -245,7 +251,9 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 		activeAttempt(execution, item.ID),
 		WorkExecutionResult{Error: failure, Confirmed: true},
 	)
-	if execution.Controls.CancellationRequested && !hasDispatched(*execution) {
+	if execution.Controls.CancellationRequested &&
+		!hasDispatched(*execution) &&
+		!hasOutstandingCleanup(*execution) {
 		r.completeExecutionLocked(ctx, session, execution, ExecutionOutcome{
 			Kind:        ExecutionOutcomeCancelled,
 			Code:        string(ExecutionOutcomeCancelled),

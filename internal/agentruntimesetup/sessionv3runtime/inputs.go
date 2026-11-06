@@ -10,6 +10,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+const workflowPortContextPrefix = "workflow port context"
+
 type workflowInvocationRequest struct {
 	Messages []workflowInvocationMessage `json:"messages"`
 }
@@ -25,6 +27,11 @@ type workflowInvocationMessage struct {
 	Attachments []sessionv3Runtime.Attachment `json:"attachments,omitempty"`
 }
 
+type workflowInvocationPortContext struct {
+	Port   string                            `json:"port"`
+	Values []sessionv3Runtime.CanonicalValue `json:"values"`
+}
+
 func (b *Binder) buildInputs(
 	req sessionv3Runtime.WorkDispatchRequest,
 	injectedContext []string,
@@ -34,7 +41,11 @@ func (b *Binder) buildInputs(
 		return nil, errors.New("LLM payload is missing")
 	}
 	if payload.Invocation != nil {
-		return workflowInvocationInputs(*payload.Invocation, injectedContext)
+		return workflowInvocationInputs(
+			*payload.Invocation,
+			injectedContext,
+			req.WorkItem.PortInputs,
+		)
 	}
 	session := req.Session
 	execution := req.Execution
@@ -75,6 +86,7 @@ func (b *Binder) buildInputs(
 func workflowInvocationInputs(
 	plan sessionv3Runtime.LLMInvocationPlan,
 	injectedContext []string,
+	portInputs []sessionv3Runtime.PortInput,
 ) ([]inferenceSpec.InputUnion, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
@@ -104,6 +116,7 @@ func workflowInvocationInputs(
 		[]inferenceSpec.InputUnion,
 		0,
 		len(injectedContext)+
+			len(portInputs)+
 			len(contextValue.Instructions)+len(contextValue.Messages)+len(request.Messages),
 	)
 	nextID := 0
@@ -136,6 +149,23 @@ func workflowInvocationInputs(
 		if err := appendMessage(workflowInvocationMessage{
 			Role: sessionv3Runtime.MessageRoleUser,
 			Text: value,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	for _, input := range portInputs {
+		if len(input.Values) == 0 {
+			continue
+		}
+		value := sessionv3Runtime.MustCanonicalValue(
+			workflowInvocationPortContext{
+				Port:   input.Name,
+				Values: input.Values,
+			},
+		)
+		if err := appendMessage(workflowInvocationMessage{
+			Role: sessionv3Runtime.MessageRoleDeveloper,
+			Text: workflowPortContextPrefix + "\n" + string(value),
 		}); err != nil {
 			return nil, err
 		}

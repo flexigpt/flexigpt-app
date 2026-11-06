@@ -1043,6 +1043,9 @@ func (i *WorkflowInterpreter) workflowStepWork(
 		budget := cloneExecutionBudget(*step.Limits)
 		intent.Budget = &budget
 	}
+	if program.Scope.Cleanup {
+		intent.Cleanup = true
+	}
 	if program.Scope.Saga != nil && step.Effect != nil &&
 		step.Effect.Compensate != nil {
 		intent.SagaID = program.Scope.Saga.ID

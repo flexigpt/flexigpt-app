@@ -58,10 +58,12 @@ type EffectRecord struct {
 }
 
 type CompensationSettlement struct {
-	EffectID EffectRecordID    `json:"effectID"`
-	State    CompensationState `json:"state"`
-	Receipt  *ExternalReceipt  `json:"receipt,omitempty"`
-	Error    *SanitizedError   `json:"error,omitempty"`
+	EffectID   EffectRecordID    `json:"effectID"`
+	WorkItemID WorkItemID        `json:"workItemID,omitempty"`
+	FrameID    ProgramFrameID    `json:"frameID,omitempty"`
+	State      CompensationState `json:"state"`
+	Receipt    *ExternalReceipt  `json:"receipt,omitempty"`
+	Error      *SanitizedError   `json:"error,omitempty"`
 }
 
 func (s CompensationErrorPolicy) Validate() error {
@@ -358,6 +360,19 @@ func compensationRecordsInReverseDependencyOrder(
 	return output, nil
 }
 
+func (r *Runtime) markCompensationIntentLocked(
+	execution *Execution,
+	item *WorkItem,
+) {
+	intent := item.Input.Compensation
+	record := effectRecordByID(execution, intent.EffectID)
+	record.State = CompensationStateDispatching
+	record.CompensationWorkItemID = item.ID
+	original := mutableWorkItem(execution, record.OriginalWorkItemID)
+	original.EffectState = EffectStateCompensating
+	original.UpdatedAt = r.now()
+}
+
 func (r *Runtime) applyCompensationSettlementsLocked(
 	execution *Execution,
 	values []CompensationSettlement,
@@ -370,9 +385,6 @@ func (r *Runtime) applyCompensationSettlementsLocked(
 	}
 
 	for _, value := range values {
-		if err := value.Validate(); err != nil {
-			return err
-		}
 		record := effectRecordByID(execution, value.EffectID)
 		if record == nil {
 			return fmt.Errorf(
@@ -387,8 +399,13 @@ func (r *Runtime) applyCompensationSettlementsLocked(
 			)
 		}
 
-		now := r.now()
 		record.State = value.State
+		if value.WorkItemID != "" {
+			record.CompensationWorkItemID = value.WorkItemID
+		}
+		if value.FrameID != "" {
+			record.CompensationFrameID = value.FrameID
+		}
 		record.Receipt = cloneReconciliationReceipt(value.Receipt)
 		record.Error = cloneWorkflowSanitizedError(value.Error)
 
@@ -396,6 +413,7 @@ func (r *Runtime) applyCompensationSettlementsLocked(
 		if item == nil {
 			return errors.New("compensation original work item is unavailable")
 		}
+		now := r.now()
 		switch value.State {
 		case CompensationStateCompleted:
 			item.EffectState = EffectStateCompensated

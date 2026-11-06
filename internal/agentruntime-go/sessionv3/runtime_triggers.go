@@ -959,6 +959,11 @@ func (r *Runtime) startTriggerExecutionLocked(
 	if err != nil {
 		return err
 	}
+	now := r.now()
+	budget, deadline, err := initialExecutionBudget(workflow.Limits, now)
+	if err != nil {
+		return err
+	}
 	resources, err := initialExecutionResources(workflow.Resources)
 	if err != nil {
 		return err
@@ -972,7 +977,6 @@ func (r *Runtime) startTriggerExecutionLocked(
 	if err != nil {
 		return err
 	}
-	now := r.now()
 	executionID := ExecutionID(r.newID())
 	frameID := ProgramFrameID(r.newID())
 	execution := Execution{
@@ -984,6 +988,10 @@ func (r *Runtime) startTriggerExecutionLocked(
 		State:           ExecutionStateRunning,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		Deadline:        deadline,
+		Budget:          budget,
+		Usage:           ExecutionBudgetUsage{},
+		Cleanup:         CleanupState{},
 		Trigger: &TriggerExecution{
 			RegistrationID: registration.ID,
 			OccurrenceID:   occurrence.ID,
@@ -998,6 +1006,7 @@ func (r *Runtime) startTriggerExecutionLocked(
 			Path:      "workflow",
 			CreatedAt: now,
 			UpdatedAt: now,
+			Deadline:  cloneTime(deadline),
 		}},
 		WorkItems:      []WorkItem{},
 		Attempts:       []Attempt{},
@@ -1128,6 +1137,7 @@ func (r *Runtime) drainTriggerQueuesLocked(
 	session *Session,
 	terminalExecutionID ExecutionID,
 ) {
+	_ = terminalExecutionID
 	if session == nil || terminalExecutionID == "" {
 		return
 	}
@@ -1137,28 +1147,42 @@ func (r *Runtime) drainTriggerQueuesLocked(
 			registration.State != TriggerRegistrationStateActive {
 			continue
 		}
-		if len(activeTriggerExecutions(*session, registration.ID, "")) != 0 {
-			continue
+
+		queued := append([]TriggerOccurrenceID(nil), registration.Queue...)
+		registration.Queue = registration.Queue[:0]
+		for _, nextID := range queued {
+			occurrence := mutableTriggerOccurrence(registration, nextID)
+			if occurrence == nil || occurrence.State != triggerOccurrenceStateQueued {
+				continue
+			}
+			if len(activeTriggerExecutions(
+				*session,
+				registration.ID,
+				occurrence.InstanceKey,
+			)) != 0 {
+				registration.Queue = append(registration.Queue, nextID)
+				continue
+			}
+			if err := r.startTriggerExecutionLocked(
+				session,
+				registration,
+				occurrence,
+			); err != nil {
+				occurrence.State = triggerOccurrenceStateFailed
+				occurrence.Error = &SanitizedError{
+					Code:     "trigger_queue_start_failed",
+					Category: ErrorCategoryExecution,
+					Message:  err.Error(),
+				}
+			}
+			registration.UpdatedAt = r.now()
 		}
-		nextID := registration.Queue[0]
-		registration.Queue = registration.Queue[1:]
-		occurrence := mutableTriggerOccurrence(registration, nextID)
-		if occurrence == nil || occurrence.State != triggerOccurrenceStateQueued {
-			continue
-		}
-		if err := r.startTriggerExecutionLocked(
-			session,
-			registration,
-			occurrence,
-		); err != nil {
-			occurrence.State = triggerOccurrenceStateFailed
-			occurrence.Error = &SanitizedError{
-				Code:     "trigger_queue_start_failed",
-				Category: ErrorCategoryExecution,
-				Message:  err.Error(),
+		for queueIndex, occurrenceID := range registration.Queue {
+			occurrence := mutableTriggerOccurrence(registration, occurrenceID)
+			if occurrence != nil {
+				occurrence.QueuePosition = queueIndex + 1
 			}
 		}
-		registration.UpdatedAt = r.now()
 	}
 }
 

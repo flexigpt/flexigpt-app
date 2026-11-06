@@ -14,6 +14,7 @@ const (
 	budgetCostUnavailableErrorCode  = "cost_accounting_unavailable"
 	budgetCleanupExpiredErrorCode   = "cleanup_deadline_elapsed"
 	executionDeadlineTimerOperation = "session-v3 execution deadline"
+	cleanupDeadlineTimerOperation   = "session-v3 cleanup deadline"
 )
 
 type ExecutionBudgetUsage struct {
@@ -475,11 +476,13 @@ func (r *Runtime) beginCleanupLocked(
 	execution.Cleanup.Active = true
 	execution.Cleanup.StartedAt = &now
 	execution.Cleanup.Primary = cloneWorkflowSanitizedError(primary)
+	deadline := now
 	if execution.Budget.CleanupDuration != "" {
-		if deadline, err := execution.Budget.CleanupDuration.Deadline(now); err == nil {
-			execution.Cleanup.Deadline = &deadline
+		if value, err := execution.Budget.CleanupDuration.Deadline(now); err == nil {
+			deadline = value
 		}
 	}
+	execution.Cleanup.Deadline = &deadline
 }
 
 func (r *Runtime) cleanupDispatchAllowedLocked(
@@ -542,6 +545,225 @@ func (r *Runtime) cancelExecutionDeadlineLocked(
 		delete(r.executionTimers, executionID)
 		cancel()
 	}
+}
+
+func (r *Runtime) armCleanupDeadlineLocked(
+	ctx context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	execution Execution,
+) {
+	if r == nil ||
+		!execution.Cleanup.Active ||
+		execution.Cleanup.Deadline == nil ||
+		execution.Cleanup.Expired ||
+		execution.ID == "" {
+		return
+	}
+	if r.cleanupTimers == nil {
+		r.cleanupTimers = make(map[ExecutionID]context.CancelFunc)
+	}
+	if _, found := r.cleanupTimers[execution.ID]; found {
+		return
+	}
+
+	timerCtx, cancel := context.WithCancel(r.lifecycleCtx)
+	r.cleanupTimers[execution.ID] = cancel
+	deadline := execution.Cleanup.Deadline.UTC()
+	r.launchAsync(
+		cleanupDeadlineTimerOperation,
+		func() {
+			r.waitForCleanupDeadline(
+				timerCtx,
+				context.WithoutCancel(ctx),
+				sessionID,
+				executionID,
+				deadline,
+			)
+		},
+		nil,
+	)
+}
+
+func (r *Runtime) cancelCleanupDeadlineLocked(
+	executionID ExecutionID,
+) {
+	if r == nil || r.cleanupTimers == nil {
+		return
+	}
+	if cancel, found := r.cleanupTimers[executionID]; found {
+		delete(r.cleanupTimers, executionID)
+		cancel()
+	}
+}
+
+func (r *Runtime) waitForCleanupDeadline(
+	ctx context.Context,
+	persistContext context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	deadline time.Time,
+) {
+	delay := deadline.Sub(r.now())
+	timer := time.NewTimer(max(delay, 0))
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		return
+	}
+	session, execution, err := r.executionLocked(sessionID, executionID)
+	if err != nil ||
+		!execution.Cleanup.Active ||
+		execution.Cleanup.Deadline == nil ||
+		!execution.Cleanup.Deadline.Equal(deadline) ||
+		execution.State.Terminal() {
+		return
+	}
+	delete(r.cleanupTimers, executionID)
+
+	now := r.now()
+	execution.Cleanup.Expired = true
+	expired := &SanitizedError{
+		Code:     cleanupDeadlineExceededCode,
+		Category: ErrorCategoryTimeout,
+		Message:  cleanupDeadlineExceededMessage,
+	}
+	execution.Cleanup.Primary = appendCleanupCause(
+		execution.Cleanup.Primary,
+		*expired,
+	)
+
+	for index := range execution.WorkItems {
+		item := &execution.WorkItems[index]
+		if !item.Cleanup || item.State.Terminal() {
+			continue
+		}
+		r.expireCleanupWorkItemLocked(execution, item, now, expired)
+	}
+	for index := range execution.ProgramFrames {
+		frame := &execution.ProgramFrames[index]
+		if frame.Status.Terminal() || !workflowFrameRunsCleanup(*frame) {
+			continue
+		}
+		frame.Status = ProgramFrameStateCancelled
+		frame.Error = cloneWorkflowSanitizedError(expired)
+		frame.UpdatedAt = now
+	}
+
+	outcome := ExecutionOutcome{
+		Kind:        ExecutionOutcomeFailed,
+		Code:        cleanupDeadlineExceededCode,
+		Message:     cleanupDeadlineExceededMessage,
+		Error:       cloneWorkflowSanitizedError(execution.Cleanup.Primary),
+		CompletedAt: now,
+	}
+	if execution.Controls.CancellationRequested {
+		outcome.Kind = ExecutionOutcomeCancelled
+	}
+	r.completeExecutionLocked(persistContext, session, execution, outcome)
+	if err := r.persistLocked(persistContext, "cleanupDeadlineElapsed", session); err != nil {
+		return
+	}
+	r.publishLocked(
+		persistContext,
+		session,
+		execution.ID,
+		RuntimeEventExecutionChanged,
+	)
+}
+
+func (r *Runtime) expireCleanupWorkItemLocked(
+	execution *Execution,
+	item *WorkItem,
+	now time.Time,
+	expired *SanitizedError,
+) {
+	if execution == nil || item == nil || item.State.Terminal() {
+		return
+	}
+
+	if cancel := r.cancels[item.ID]; cancel != nil {
+		cancel()
+		delete(r.cancels, item.ID)
+	}
+	r.cancelResourceWaitLocked(item.ID)
+	r.cancelRetryLocked(item.ID)
+	delete(r.privateBindings, item.ID)
+
+	if item.WaitID != "" {
+		if wait := mutableWait(execution, item.WaitID); wait != nil &&
+			(wait.Status == WaitStatusPending || wait.Status == WaitStatusResolving) {
+			wait.Status = WaitStatusCancelled
+			wait.Error = cloneWorkflowSanitizedError(expired)
+			wait.UpdatedAt = now
+			r.cancelWaitDeadlineLocked(wait.ID)
+			delete(r.privateWaits, wait.ID)
+		}
+		item.WaitID = ""
+	}
+
+	effectState := EffectStateConfirmedNotApplied
+	attemptState := AttemptStateCancelled
+	if item.State == WorkItemStateDispatched &&
+		item.Effect.Kind != EffectKindRead {
+		effectState = EffectStateUncertain
+		attemptState = AttemptStateUncertain
+		item.State = WorkItemStateUncertain
+	} else {
+		item.State = WorkItemStateCancelled
+	}
+	if item.Effect.Kind == EffectKindRead {
+		effectState = EffectStateNotApplicable
+	}
+	item.EffectState = effectState
+	item.Error = copyEffectError(expired, effectState)
+	item.Output = nil
+	item.CompletedAt = &now
+	item.UpdatedAt = now
+
+	if attempt := activeAttempt(execution, item.ID); attempt != nil {
+		attempt.State = attemptState
+		attempt.EffectState = effectState
+		attempt.Error = copyEffectError(expired, effectState)
+		attempt.Receipt = nil
+		attempt.FinishedAt = &now
+	}
+
+	released := r.releaseWorkResourcesLocked(execution, item.ID)
+	r.wakeResourceWaitersLocked(execution, released)
+}
+
+func appendCleanupCause(
+	primary *SanitizedError,
+	cause SanitizedError,
+) *SanitizedError {
+	if primary == nil {
+		return cloneWorkflowSanitizedError(&cause)
+	}
+	return appendWorkflowErrorCause(primary, cause)
+}
+
+func hasOutstandingCleanup(execution Execution) bool {
+	for _, item := range execution.WorkItems {
+		if item.Cleanup && !item.State.Terminal() {
+			return true
+		}
+	}
+	for _, frame := range execution.ProgramFrames {
+		if workflowFrameRunsCleanup(frame) && !frame.Status.Terminal() {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Runtime) waitForExecutionDeadline(
@@ -613,6 +835,21 @@ func (r *Runtime) waitForExecutionDeadline(
 		default:
 		}
 	}
+	frameIDs := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
+	for _, frame := range execution.ProgramFrames {
+		if frame.Status.Terminal() || workflowFrameRunsCleanup(frame) {
+			continue
+		}
+		frameIDs = append(frameIDs, frame.ID)
+	}
+	for _, frameID := range frameIDs {
+		_ = r.advanceFrameLocked(
+			session,
+			execution,
+			frameID,
+			ProgramEvent{Kind: ProgramEventCancelled},
+		)
+	}
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(persistContext, "executionDeadlineElapsed", session); err != nil {
 		return
@@ -622,6 +859,12 @@ func (r *Runtime) waitForExecutionDeadline(
 		session,
 		execution.ID,
 		RuntimeEventExecutionChanged,
+	)
+	r.armCleanupDeadlineLocked(
+		persistContext,
+		session.ID,
+		execution.ID,
+		*execution,
 	)
 	r.launchWork(
 		persistContext,

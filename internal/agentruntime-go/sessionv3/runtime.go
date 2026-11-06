@@ -47,6 +47,7 @@ type Runtime struct {
 	retryTimers          map[WorkItemID]context.CancelFunc
 	checkpointPending    map[SessionID]bool
 	executionTimers      map[ExecutionID]context.CancelFunc
+	cleanupTimers        map[ExecutionID]context.CancelFunc
 	resourceTimers       map[WorkItemID]context.CancelFunc
 	resourceWaitSequence uint64
 
@@ -89,6 +90,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		retryTimers:        map[WorkItemID]context.CancelFunc{},
 		checkpointPending:  map[SessionID]bool{},
 		executionTimers:    map[ExecutionID]context.CancelFunc{},
+		cleanupTimers:      map[ExecutionID]context.CancelFunc{},
 		resourceTimers:     map[WorkItemID]context.CancelFunc{},
 		lifecycleCtx:       lifecycleCtx,
 		lifecycleCancel:    lifecycleCancel,
@@ -141,6 +143,10 @@ func (r *Runtime) Close() {
 		cancel()
 	}
 	clear(r.executionTimers)
+	for _, cancel := range r.cleanupTimers {
+		cancel()
+	}
+	clear(r.cleanupTimers)
 	triggerCancels := make([]context.CancelFunc, 0, len(r.triggerTimers))
 	for _, cancel := range r.triggerTimers {
 		triggerCancels = append(triggerCancels, cancel)
@@ -1182,10 +1188,14 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 			}
 			for _, frame := range execution.ProgramFrames {
 				if !frame.Status.Terminal() {
+					if workflowFrameRunsCleanup(frame) {
+						continue
+					}
 					_ = r.advanceFrameLocked(session, execution, frame.ID, ProgramEvent{Kind: ProgramEventCancelled})
 				}
 			}
-			if !hasDispatched(*execution) {
+			if !hasDispatched(*execution) &&
+				!hasOutstandingCleanup(*execution) {
 				r.completeExecutionLocked(
 					ctx,
 					session,
@@ -1698,6 +1708,7 @@ func (r *Runtime) changeSession(
 		*session = previous
 		return nil, err
 	}
+	r.armSessionExecutionTimersLocked(ctx, session)
 	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
 	return receipt, nil
 }
@@ -1746,6 +1757,13 @@ func (r *Runtime) changeExecution(
 		r.mu.Unlock()
 		return nil, err
 	}
+	r.armExecutionDeadlineLocked(ctx, session.ID, execution.ID, *execution)
+	r.armCleanupDeadlineLocked(
+		ctx,
+		session.ID,
+		execution.ID,
+		*execution,
+	)
 	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
@@ -1966,6 +1984,8 @@ func (r *Runtime) advanceFrameLocked(
 			return err
 		}
 		execution.WorkItems = append(execution.WorkItems, item)
+		stored := &execution.WorkItems[len(execution.WorkItems)-1]
+		r.markCompensationIntentLocked(execution, stored)
 		frame = mutableFrame(execution, frameID)
 		if frame == nil {
 			return errors.New("parent ProgramFrame disappeared while adding work")
@@ -2524,6 +2544,18 @@ func (r *Runtime) executeOne(
 		Execution: cloneExecution(*execution),
 		WorkItem:  *item,
 	}
+	request.PortStream = WorkPortStream{
+		Emit: func(name string, value CanonicalValue) error {
+			return r.appendWorkPortStream(
+				ctx,
+				sessionID,
+				executionID,
+				itemID,
+				name,
+				value,
+			)
+		},
+	}
 	if item.Type == WorkItemTypeLLM {
 		request.Stream = WorkStream{
 			OnText: func(value string) error {
@@ -2573,7 +2605,9 @@ func (r *Runtime) executeOne(
 	delete(r.cancels, itemID)
 	delete(r.privateBindings, itemID)
 	r.finishWorkLocked(session, execution, item, activeAttempt(execution, itemID), result)
-	if execution.Controls.CancellationRequested && !hasDispatched(*execution) {
+	if execution.Controls.CancellationRequested &&
+		!hasDispatched(*execution) &&
+		!hasOutstandingCleanup(*execution) {
 		r.completeExecutionLocked(
 			context.WithoutCancel(ctx),
 			session,
@@ -3071,6 +3105,7 @@ func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
 	allTerminal := true
 	failed := false
 	cancelled := false
+	var terminalError *SanitizedError
 
 	for _, frame := range execution.ProgramFrames {
 		if frame.ParentFrameID != "" {
@@ -3091,8 +3126,14 @@ func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
 		switch frame.Status {
 		case ProgramFrameStateFailed:
 			failed = true
+			if terminalError == nil {
+				terminalError = cloneWorkflowSanitizedError(frame.Error)
+			}
 		case ProgramFrameStateCancelled:
 			cancelled = true
+			if terminalError == nil {
+				terminalError = cloneWorkflowSanitizedError(frame.Error)
+			}
 		default:
 		}
 	}
@@ -3117,12 +3158,28 @@ func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
 	}
 	if failed {
 		outcome.Kind = ExecutionOutcomeFailed
-		outcome.Code = "program_frame_failed"
-		outcome.Message = "a root ProgramFrame failed"
+		outcome.Code = workflowProgramFrameFailedCode
+		outcome.Message = workflowProgramFrameFailedMessage
+		if terminalError != nil {
+			outcome.Error = terminalError
+			outcome.Code = firstText(
+				terminalError.Code,
+				workflowProgramFrameFailedCode,
+			)
+			outcome.Message = firstText(
+				terminalError.Message,
+				workflowProgramFrameFailedMessage,
+			)
+		}
 	} else if cancelled {
 		outcome.Kind = ExecutionOutcomeCancelled
-		outcome.Code = "program_frame_cancelled"
-		outcome.Message = "a root ProgramFrame was cancelled"
+		outcome.Code = workflowProgramFrameCancelledCode
+		outcome.Message = workflowProgramFrameCancelMessage
+		if terminalError != nil {
+			outcome.Error = terminalError
+			outcome.Code = firstText(terminalError.Code, workflowProgramFrameCancelledCode)
+			outcome.Message = firstText(terminalError.Message, workflowProgramFrameCancelMessage)
+		}
 	}
 	return outcome
 }
@@ -3133,6 +3190,21 @@ func (r *Runtime) completeExecutionLocked(
 	execution *Execution,
 	outcome ExecutionOutcome,
 ) {
+	if outcome.Kind != ExecutionOutcomeCompleted && outcome.Error == nil &&
+		execution.Cleanup.Primary != nil {
+		outcome.Error = cloneWorkflowSanitizedError(execution.Cleanup.Primary)
+		outcome.Code = firstText(outcome.Error.Code, outcome.Code)
+		outcome.Message = firstText(outcome.Error.Message, outcome.Message)
+	}
+	if outcome.Error != nil {
+		outcome.Error = cloneWorkflowSanitizedError(outcome.Error)
+		if outcome.Code == "" {
+			outcome.Code = outcome.Error.Code
+		}
+		if outcome.Message == "" {
+			outcome.Message = outcome.Error.Message
+		}
+	}
 	execution.Outcome = &outcome
 	switch outcome.Kind {
 	case ExecutionOutcomeCancelled:
@@ -3144,6 +3216,7 @@ func (r *Runtime) completeExecutionLocked(
 	}
 	r.settleTerminalExecutionLocked(session, execution)
 	r.cancelExecutionDeadlineLocked(execution.ID)
+	r.cancelCleanupDeadlineLocked(execution.ID)
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {
 		id := execution.ID
