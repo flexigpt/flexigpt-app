@@ -292,6 +292,15 @@ func (r *Runtime) applyEmitLocked(
 	if execution == nil {
 		return EmitReceipt{}, nil, nil, errors.New("execution is unavailable")
 	}
+	if payload.Destination.Event != "" {
+		if err := r.reserveEventBudgetLocked(
+			execution,
+			payload.Data,
+			payload.Correlation,
+		); err != nil {
+			return EmitReceipt{}, nil, nil, err
+		}
+	}
 	if !payload.Data.Valid() || !payload.Correlation.Valid() {
 		return EmitReceipt{}, nil, nil, errors.New("emit payload is not canonical JSON")
 	}

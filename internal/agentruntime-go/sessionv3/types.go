@@ -381,9 +381,14 @@ type Execution struct {
 	ChildBudget       ExecutionBudget              `json:"childBudget"`
 	ChildExecutionIDs []ExecutionID                `json:"childExecutionIDs,omitempty"`
 	HandoffID         string                       `json:"handoffID,omitempty"`
+	Deadline          *time.Time                   `json:"deadline,omitempty"`
+	Budget            ExecutionBudget              `json:"budget"`
+	Usage             ExecutionBudgetUsage         `json:"usage"`
+	Cleanup           CleanupState                 `json:"cleanup"`
 	ProgramFrames     []ProgramFrame               `json:"programFrames"`
 	WorkItems         []WorkItem                   `json:"workItems"`
 	Attempts          []Attempt                    `json:"attempts"`
+	Effects           []EffectRecord               `json:"effects,omitempty"`
 	Trigger           *TriggerExecution            `json:"trigger,omitempty"`
 	Waits             []Wait                       `json:"waits"`
 	Signals           []ExecutionSignal            `json:"signals,omitempty"`
@@ -475,6 +480,8 @@ type ProgramFrame struct {
 	ChildFrameIDs     []ProgramFrameID   `json:"childFrameIDs,omitempty"`
 	ChildExecutionIDs []ExecutionID      `json:"childExecutionIDs,omitempty"`
 	WorkItemIDs       []WorkItemID       `json:"workItemIDs,omitempty"`
+	Ports             []PortPlan         `json:"ports,omitempty"`
+	PortInputs        []PortInput        `json:"portInputs,omitempty"`
 	Output            CanonicalValue     `json:"output,omitempty"`
 	Error             *SanitizedError    `json:"error,omitempty"`
 	HandoffID         string             `json:"handoffID,omitempty"`
@@ -633,23 +640,35 @@ type ReconciliationSettlement struct {
 // evaluates it once when the logical WorkItem is prepared and persists the
 // concrete key in EffectContract.IdempotencyKey.
 type WorkflowStepEffect struct {
-	Kind      EffectKind     `json:"kind"`
-	Key       *WorkflowValue `json:"key,omitempty"`
-	Reconcile *WorkflowBlock `json:"reconcile,omitempty"`
+	Kind       EffectKind     `json:"kind"`
+	Key        *WorkflowValue `json:"key,omitempty"`
+	Reconcile  *WorkflowBlock `json:"reconcile,omitempty"`
+	Compensate *WorkflowBlock `json:"compensate,omitempty"`
 }
 
 // WorkflowEffectPlan is persisted in an effect-bearing WorkItem. It contains
 // only the reconciliation block required to recover an uncertain original
 // operation. Compensation remains a separate later durable boundary.
 type WorkflowEffectPlan struct {
-	Reconcile *WorkflowBlock `json:"reconcile,omitempty"`
+	Reconcile  *WorkflowBlock `json:"reconcile,omitempty"`
+	Compensate *WorkflowBlock `json:"compensate,omitempty"`
 }
 
 func (p WorkflowEffectPlan) Validate() error {
-	if p.Reconcile == nil {
-		return errors.New("workflow effect plan has no reconciliation block")
+	if p.Reconcile == nil && p.Compensate == nil {
+		return errors.New("workflow effect plan has no recovery block")
 	}
-	return p.Reconcile.Validate()
+	if p.Reconcile != nil {
+		if err := p.Reconcile.Validate(); err != nil {
+			return err
+		}
+	}
+	if p.Compensate != nil {
+		if err := p.Compensate.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type RetryMatcher struct {
@@ -747,33 +766,40 @@ type ResourceWaitState struct {
 }
 
 type WorkItem struct {
-	ID           WorkItemID          `json:"id"`
-	FrameID      ProgramFrameID      `json:"frameID"`
-	Type         WorkItemType        `json:"type"`
-	State        WorkItemState       `json:"state"`
-	ProgramPath  string              `json:"programPath,omitempty"`
-	Dependencies []WorkItemID        `json:"dependencies,omitempty"`
-	AttemptIDs   []AttemptID         `json:"attemptIDs,omitempty"`
-	Deadline     *time.Time          `json:"deadline,omitempty"`
-	Effect       EffectContract      `json:"effect"`
-	EffectState  EffectState         `json:"effectState,omitempty"`
-	EffectPlan   *WorkflowEffectPlan `json:"effectPlan,omitempty"`
-	Automatic    bool                `json:"automatic"`
-	Retry        *RetryPolicy        `json:"retry,omitempty"`
-	RetryState   *RetryState         `json:"retryState,omitempty"`
-	Requested    bool                `json:"requested"`
-	Claims       []ResourceClaim     `json:"claims,omitempty"`
-	ResourceWait *ResourceWaitState  `json:"resourceWait,omitempty"`
-	Input        WorkItemPayload     `json:"input"`
-	Binding      *SemanticBinding    `json:"binding,omitempty"`
-	Output       *WorkItemOutput     `json:"output,omitempty"`
-	Error        *SanitizedError     `json:"error,omitempty"`
-	LLMStream    *LLMStreamState     `json:"llmStream,omitempty"`
-	CreatedAt    time.Time           `json:"createdAt"`
-	UpdatedAt    time.Time           `json:"updatedAt"`
-	DispatchedAt *time.Time          `json:"dispatchedAt,omitempty"`
-	CompletedAt  *time.Time          `json:"completedAt,omitempty"`
-	WaitID       WaitID              `json:"waitID,omitempty"`
+	ID                 WorkItemID              `json:"id"`
+	FrameID            ProgramFrameID          `json:"frameID"`
+	Type               WorkItemType            `json:"type"`
+	State              WorkItemState           `json:"state"`
+	ProgramPath        string                  `json:"programPath,omitempty"`
+	Dependencies       []WorkItemID            `json:"dependencies,omitempty"`
+	AttemptIDs         []AttemptID             `json:"attemptIDs,omitempty"`
+	Deadline           *time.Time              `json:"deadline,omitempty"`
+	Effect             EffectContract          `json:"effect"`
+	EffectState        EffectState             `json:"effectState,omitempty"`
+	EffectPlan         *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
+	Automatic          bool                    `json:"automatic"`
+	Retry              *RetryPolicy            `json:"retry,omitempty"`
+	RetryState         *RetryState             `json:"retryState,omitempty"`
+	Budget             *ExecutionBudget        `json:"budget,omitempty"`
+	Cleanup            bool                    `json:"cleanup,omitempty"`
+	SagaID             string                  `json:"sagaID,omitempty"`
+	CompensationPolicy CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
+	Requested          bool                    `json:"requested"`
+	Claims             []ResourceClaim         `json:"claims,omitempty"`
+	ResourceWait       *ResourceWaitState      `json:"resourceWait,omitempty"`
+	Ports              []PortPlan              `json:"ports,omitempty"`
+	PortInputs         []PortInput             `json:"portInputs,omitempty"`
+	PortStreams        []PortStream            `json:"portStreams,omitempty"`
+	Input              WorkItemPayload         `json:"input"`
+	Binding            *SemanticBinding        `json:"binding,omitempty"`
+	Output             *WorkItemOutput         `json:"output,omitempty"`
+	Error              *SanitizedError         `json:"error,omitempty"`
+	LLMStream          *LLMStreamState         `json:"llmStream,omitempty"`
+	CreatedAt          time.Time               `json:"createdAt"`
+	UpdatedAt          time.Time               `json:"updatedAt"`
+	DispatchedAt       *time.Time              `json:"dispatchedAt,omitempty"`
+	CompletedAt        *time.Time              `json:"completedAt,omitempty"`
+	WaitID             WaitID                  `json:"waitID,omitempty"`
 }
 
 // WorkItemPayload is a closed tagged union. It must contain exactly one
@@ -1030,14 +1056,16 @@ type EmitWork struct {
 
 type CompensationWork struct {
 	OriginalWorkItemID WorkItemID     `json:"originalWorkItemID"`
+	EffectID           EffectRecordID `json:"effectID"`
 	Input              CanonicalValue `json:"input,omitempty"`
 }
 
 type SemanticBinding struct {
-	Version           string        `json:"version"`
-	Artifacts         []ArtifactPin `json:"artifacts,omitempty"`
-	TargetFingerprint string        `json:"targetFingerprint"`
-	BoundAt           time.Time     `json:"boundAt"`
+	Version           string             `json:"version"`
+	Artifacts         []ArtifactPin      `json:"artifacts,omitempty"`
+	Plan              *ModelDispatchPlan `json:"plan,omitempty"`
+	TargetFingerprint string             `json:"targetFingerprint"`
+	BoundAt           time.Time          `json:"boundAt"`
 }
 
 type WorkItemOutput struct {
@@ -1192,6 +1220,7 @@ type Wait struct {
 	Response   CanonicalValue  `json:"response,omitempty"`
 	CreatedAt  time.Time       `json:"createdAt"`
 	UpdatedAt  time.Time       `json:"updatedAt"`
+	ResolvedBy *HumanActor     `json:"resolvedBy,omitempty"`
 	Error      *SanitizedError `json:"error,omitempty"`
 }
 
@@ -1233,21 +1262,27 @@ type ProgramFrameIntent struct {
 	Deadline    *time.Time                 `json:"deadline,omitempty"`
 	Lifetime    ChildFrameLifetime         `json:"lifetime,omitempty"`
 	Ownership   *ChildExecutionOwnership   `json:"ownership,omitempty"`
+	Ports       []PortPlan                 `json:"ports,omitempty"`
 	Handoff     *ConversationHandoffIntent `json:"handoff,omitempty"`
 }
 
 type WorkItemIntent struct {
-	ID           WorkItemID          `json:"id,omitempty"`
-	ProgramPath  string              `json:"programPath,omitempty"`
-	Type         WorkItemType        `json:"type"`
-	Automatic    bool                `json:"automatic"`
-	Deadline     *time.Time          `json:"deadline,omitempty"`
-	Effect       EffectContract      `json:"effect"`
-	Retry        *RetryPolicy        `json:"retry,omitempty"`
-	EffectPlan   *WorkflowEffectPlan `json:"effectPlan,omitempty"`
-	Claims       []ResourceClaim     `json:"claims,omitempty"`
-	Dependencies []WorkItemID        `json:"dependencies,omitempty"`
-	Input        WorkItemPayload     `json:"input"`
+	ID                 WorkItemID              `json:"id,omitempty"`
+	ProgramPath        string                  `json:"programPath,omitempty"`
+	Type               WorkItemType            `json:"type"`
+	Automatic          bool                    `json:"automatic"`
+	Deadline           *time.Time              `json:"deadline,omitempty"`
+	Effect             EffectContract          `json:"effect"`
+	Retry              *RetryPolicy            `json:"retry,omitempty"`
+	EffectPlan         *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
+	Budget             *ExecutionBudget        `json:"budget,omitempty"`
+	Cleanup            bool                    `json:"cleanup,omitempty"`
+	SagaID             string                  `json:"sagaID,omitempty"`
+	CompensationPolicy CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
+	Claims             []ResourceClaim         `json:"claims,omitempty"`
+	Dependencies       []WorkItemID            `json:"dependencies,omitempty"`
+	Ports              []PortPlan              `json:"ports,omitempty"`
+	Input              WorkItemPayload         `json:"input"`
 }
 
 type ProgramTransition struct {
@@ -1263,6 +1298,7 @@ type ProgramTransition struct {
 	CancelChildExecutionIDs []ExecutionID              `json:"cancelChildExecutionIDs,omitempty"`
 	CancelWorkItemIDs       []WorkItemID               `json:"cancelWorkItemIDs,omitempty"`
 	Reconciliations         []ReconciliationSettlement `json:"reconciliations,omitempty"`
+	Compensations           []CompensationSettlement   `json:"compensations,omitempty"`
 	ContinueParent          bool                       `json:"continueParent,omitempty"`
 }
 
@@ -1545,6 +1581,7 @@ type ResolveWaitCommand struct {
 	WaitID      WaitID         `json:"waitID"`
 	Resolution  WaitResolution `json:"resolution"`
 	Response    CanonicalValue `json:"response,omitempty"`
+	Actor       *HumanActor    `json:"actor,omitempty"`
 }
 
 type PauseExecutionCommand struct {

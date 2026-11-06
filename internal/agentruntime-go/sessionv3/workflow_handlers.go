@@ -81,6 +81,9 @@ func (m WorkflowErrorMatch) Validate() error {
 			return errors.New("workflow error match has an empty effect state")
 		}
 	}
+	if len(m.EffectStates) > 0 && len(m.EffectStates) > 3 {
+		return errors.New("workflow error match has too many effect states")
+	}
 	if !m.Schema.Valid() {
 		return errors.New("workflow error match schema is invalid")
 	}

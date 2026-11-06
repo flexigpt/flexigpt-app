@@ -1039,6 +1039,19 @@ func (i *WorkflowInterpreter) workflowStepWork(
 		intent.EffectPlan = &plan
 	}
 	intent.Retry = cloneWorkflowRetryPolicy(step.Retry)
+	if step.Limits != nil {
+		budget := cloneExecutionBudget(*step.Limits)
+		intent.Budget = &budget
+	}
+	if program.Scope.Saga != nil && step.Effect != nil &&
+		step.Effect.Compensate != nil {
+		intent.SagaID = program.Scope.Saga.ID
+		intent.CompensationPolicy = program.Scope.Saga.CompensationPolicy
+		if intent.EffectPlan == nil {
+			intent.EffectPlan = &WorkflowEffectPlan{}
+		}
+		intent.EffectPlan.Compensate = cloneWorkflowBlock(step.Effect.Compensate)
+	}
 	return workflowWork(state, path, intent)
 }
 

@@ -171,4 +171,34 @@ func (b *Binder) AdmitAttachments(
 	return b.attachments.AdmitAttachments(ctx, request)
 }
 
-var _ sessionv3Runtime.AttachmentAdmission = (*Binder)(nil)
+func (b *Binder) ValidatePortPlans(
+	_ context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+) error {
+	if len(request.WorkItem.Ports) == 0 {
+		return nil
+	}
+
+	switch request.WorkItem.Type {
+	case sessionv3Runtime.WorkItemTypeTool:
+		return errors.New(
+			"tool port adaptation is unavailable for this binding",
+		)
+	case sessionv3Runtime.WorkItemTypeService:
+		return errors.New(
+			"service port adaptation is unavailable for this binding",
+		)
+	case sessionv3Runtime.WorkItemTypeActivity:
+		return errors.New(
+			"activity port adaptation is unavailable for this binding",
+		)
+	case sessionv3Runtime.WorkItemTypeLLM:
+		return errors.New(
+			"model port adaptation is unavailable for this binding",
+		)
+	default:
+		return errors.New(
+			"port adaptation is unavailable for this work item",
+		)
+	}
+}

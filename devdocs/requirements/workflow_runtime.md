@@ -899,7 +899,7 @@ Functional backend completion does not require:
 - [x] Subscription retention enforcement exists.
 - [x] Subscription capacity enforcement exists.
 - [x] Subscription byte-limit enforcement exists.
-- [ ] Full human response authorization exists.
+- [x] Full human response authorization exists.
 - [x] Trigger administration commands exist.
 
 ### Phase 7: effects and cleanup

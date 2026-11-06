@@ -21,6 +21,13 @@ const (
 	ErrorCategoryUncertainty   ErrorCategory = "uncertainty"
 )
 
+func (e *SanitizedError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.Message
+}
+
 func deadlineError() *SanitizedError {
 	return &SanitizedError{
 		Code:     "work_deadline_elapsed",

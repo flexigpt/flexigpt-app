@@ -139,12 +139,15 @@ func validateWorkflowCallReceipt(
 		step.Call.Contract,
 		step.Call.SetContract,
 	}
+	if effective := workflowTargetSetContract(program, *step.Call); effective != nil {
+		contracts[2] = effective
+	}
 	for _, contract := range contracts {
 		if contract == nil || len(contract.ReceiptSchema) == 0 {
 			continue
 		}
 		if output == nil || output.Receipt == nil {
-			return errors.New("workflow call requires an effect receipt")
+			return errors.New("workflow call requires a receipt")
 		}
 		value, err := canonicalWorkflowValue(output.Receipt)
 		if err != nil {

@@ -533,6 +533,22 @@ func (e Execution) Validate(sessionID SessionID) error {
 	if err := e.ChildBudget.Validate(); err != nil {
 		return err
 	}
+	if e.Deadline != nil && e.Deadline.IsZero() {
+		return errors.New("execution deadline is invalid")
+	}
+	if err := e.Budget.Validate(); err != nil {
+		return err
+	}
+	if err := e.Usage.Validate(); err != nil {
+		return err
+	}
+	if err := e.Cleanup.Validate(); err != nil {
+		return err
+	}
+	if e.Cleanup.Deadline != nil && e.Deadline != nil &&
+		e.Cleanup.Deadline.Before(*e.Deadline) {
+		return errors.New("execution cleanup deadline is invalid")
+	}
 	if e.Trigger != nil {
 		if err := e.Trigger.Validate(); err != nil {
 			return err
@@ -589,6 +605,20 @@ func (e Execution) Validate(sessionID SessionID) error {
 		waits[wait.ID] = struct{}{}
 	}
 
+	effects := make(map[EffectRecordID]struct{}, len(e.Effects))
+	for _, effect := range e.Effects {
+		if err := effect.Validate(); err != nil {
+			return err
+		}
+		if _, duplicate := effects[effect.ID]; duplicate {
+			return errors.New("effect record is duplicated")
+		}
+		effects[effect.ID] = struct{}{}
+		if _, found := items[effect.OriginalWorkItemID]; !found {
+			return errors.New("effect record original work item is unavailable")
+		}
+	}
+
 	signals := make(map[string]struct{}, len(e.Signals))
 	for _, signal := range e.Signals {
 		if err := signal.Validate(); err != nil {
@@ -639,6 +669,12 @@ func (p ProgramFrame) Validate() error {
 	}
 	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
 		return errors.New("ProgramFrame timestamps are required")
+	}
+	if err := validateUniquePortPlans(p.Ports); err != nil {
+		return err
+	}
+	if err := validateUniquePortInputs(p.PortInputs); err != nil {
+		return err
 	}
 	for _, executionID := range p.ChildExecutionIDs {
 		if err := validateID("ProgramFrame child Execution ID", string(executionID)); err != nil {
@@ -728,6 +764,24 @@ func (w WorkItem) Validate() error {
 			return err
 		}
 	}
+	if w.Budget != nil {
+		if err := w.Budget.Validate(); err != nil {
+			return err
+		}
+	}
+	if w.Cleanup {
+		if w.Effect.Kind == EffectKindRead {
+			return errors.New("cleanup work item cannot use a read effect")
+		}
+	}
+	if w.SagaID != "" {
+		if err := validateID("work item saga ID", w.SagaID); err != nil {
+			return err
+		}
+		if err := w.CompensationPolicy.Validate(); err != nil {
+			return err
+		}
+	}
 	if w.Effect.Kind == EffectKindKeyed &&
 		strings.TrimSpace(w.Effect.IdempotencyKey) == "" {
 		return errors.New("keyed work item has no idempotency key")
@@ -771,6 +825,17 @@ func (w WorkItem) Validate() error {
 	}
 	if w.RetryState != nil && w.State != WorkItemStateRetryWaiting {
 		return errors.New("non-retrying WorkItem has retry state")
+	}
+	if err := validateUniquePortPlans(w.Ports); err != nil {
+		return err
+	}
+	if err := validateUniquePortInputs(w.PortInputs); err != nil {
+		return err
+	}
+	for _, stream := range w.PortStreams {
+		if err := stream.Validate(); err != nil {
+			return err
+		}
 	}
 	if err := w.Input.Validate(w.Type); err != nil {
 		return err
@@ -950,6 +1015,11 @@ func (e WorkflowStepEffect) Validate() error {
 			return err
 		}
 	}
+	if e.Compensate != nil {
+		if err := e.Compensate.Validate(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1124,7 +1194,9 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			return errors.New("emit WorkItem has more than one destination")
 		}
 	case WorkItemTypeCompensation:
-		if p.Compensation.OriginalWorkItemID == "" || !p.Compensation.Input.Valid() {
+		if p.Compensation.OriginalWorkItemID == "" ||
+			p.Compensation.EffectID == "" ||
+			!p.Compensation.Input.Valid() {
 			return errors.New("invalid compensation WorkItem")
 		}
 	case WorkItemTypeReconciliation:
@@ -1222,6 +1294,9 @@ func (b SemanticBinding) Validate() error {
 		if err := validatePin(artifact); err != nil {
 			return err
 		}
+	}
+	if b.Plan != nil {
+		return b.Plan.Validate()
 	}
 	return nil
 }
@@ -1506,6 +1581,9 @@ func (h CompletionHandle) Validate() error {
 func (w Wait) Validate() error {
 	if w.ID == "" || w.WorkItemID == "" || w.CreatedAt.IsZero() || w.UpdatedAt.IsZero() {
 		return errors.New("invalid wait")
+	}
+	if w.ResolvedBy != nil {
+		return w.ResolvedBy.Validate()
 	}
 	return w.Request.Validate()
 }

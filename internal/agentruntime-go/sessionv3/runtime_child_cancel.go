@@ -107,6 +107,9 @@ func (r *Runtime) cancelWorkItemsLocked(
 		if item.State.Terminal() {
 			continue
 		}
+		if item.Cleanup {
+			continue
+		}
 
 		if cancel := r.cancels[item.ID]; cancel != nil {
 			cancel()
@@ -195,6 +198,9 @@ func (r *Runtime) cancelFrameTreeLocked(
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
 		if item.FrameID != frameID || item.State.Terminal() {
+			continue
+		}
+		if item.Cleanup {
 			continue
 		}
 		if cancel := r.cancels[item.ID]; cancel != nil {
@@ -307,6 +313,9 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 	execution.State = ExecutionStateCancelling
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
+		if item.Cleanup {
+			continue
+		}
 		switch item.State {
 		case WorkItemStateReady,
 			WorkItemStateBinding,

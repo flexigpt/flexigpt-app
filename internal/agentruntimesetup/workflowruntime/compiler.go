@@ -60,6 +60,14 @@ func compileWorkflowProgramWithInput(
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
+	ports, err := compileWorkflowPorts(document)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
+	limits, err := compileWorkflowOptionalExecutionBudget(document.Limits)
+	if err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 	events, err := compileWorkflowEvents(document)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -100,7 +108,11 @@ func compileWorkflowProgramWithInput(
 		Events:       events,
 		Resources:    resources,
 		Channels:     channels,
+		Ports:        ports,
 		Triggers:     triggers,
+	}
+	if limits != nil {
+		output.Limits = *limits
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -116,14 +128,7 @@ func compileWorkflowProgramWithInput(
 func rejectUnsupportedWorkflowDocument(
 	document workflowv1.WorkflowDocument,
 ) error {
-	switch {
-	case len(document.Ports) != 0:
-		return unsupportedWorkflowOperation("workflow", "ports")
-	case len(document.Resources) != 0:
-		return unsupportedWorkflowOperation("workflow", "resources")
-	case document.Limits != nil:
-		return unsupportedWorkflowOperation("workflow", "limits")
-	}
+	_ = document
 	return nil
 }
 
@@ -215,14 +220,12 @@ func compileWorkflowStep(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Step,
 ) (sessionv3Runtime.WorkflowStep, error) {
-	if input.Limits != nil {
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"limits",
-		)
-	}
-
 	output := sessionv3Runtime.WorkflowStep{ID: input.ID}
+	limits, err := compileWorkflowOptionalExecutionBudget(input.Limits)
+	if err != nil {
+		return sessionv3Runtime.WorkflowStep{}, err
+	}
+	output.Limits = limits
 	if input.Timeout != "" {
 		timeout, err := sessionv3Runtime.ParseWorkflowDuration(input.Timeout)
 		if err != nil {
@@ -409,10 +412,11 @@ func compileWorkflowStep(
 		output.Cancel = &cancel
 
 	case input.Saga != nil:
-		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-			"steps/"+input.ID,
-			"saga",
-		)
+		saga, err := compileWorkflowSaga(document, *input.Saga)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStep{}, err
+		}
+		output.Saga = &saga
 
 	default:
 		return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
@@ -455,12 +459,6 @@ func compileWorkflowCall(
 			"lifetime outside start mode",
 		)
 	}
-	if len(input.Ports) != 0 {
-		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
-			"call",
-			"ports",
-		)
-	}
 	target, err := compileWorkflowValue(input.Target)
 	if err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
@@ -481,10 +479,15 @@ func compileWorkflowCall(
 	if err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
+	ports, err := compileWorkflowPortBindings(input.Ports)
+	if err != nil {
+		return sessionv3Runtime.WorkflowCall{}, err
+	}
 	output := sessionv3Runtime.WorkflowCall{
 		Target:       target,
 		Input:        callInput,
 		Context:      contextValue,
+		Ports:        ports,
 		Contract:     contract,
 		Mode:         mode,
 		Lifetime:     lifetime,
@@ -547,16 +550,6 @@ func compileWorkflowCallableInterface(
 		return nil, nil
 	}
 
-	// These fields must not be admitted and silently discarded. Their
-	// execution paths remain explicit development gaps.
-	if len(input.Context) != 0 || len(input.Ports) != 0 ||
-		input.Limits != nil || len(input.Capabilities) != 0 {
-		return nil, unsupportedWorkflowOperation(
-			"interface",
-			"context, ports, limits, or capability requirements",
-		)
-	}
-
 	inputSchema, err := compileWorkflowSchema(document, input.InputSchema)
 	if err != nil {
 		return nil, err
@@ -576,6 +569,27 @@ func compileWorkflowCallableInterface(
 	if len(inputSchema) == 0 || len(outputSchema) == 0 {
 		return nil, errors.New("workflow callable interface schemas are incomplete")
 	}
+	contextRequirements, err := compileWorkflowContextRequirements(
+		document,
+		input.Context,
+	)
+	if err != nil {
+		return nil, err
+	}
+	ports, err := compileWorkflowCallablePorts(document, input.Ports)
+	if err != nil {
+		return nil, err
+	}
+	limits, err := compileWorkflowOptionalExecutionBudget(input.Limits)
+	if err != nil {
+		return nil, err
+	}
+	capabilities, err := compileWorkflowCapabilityRequirements(
+		input.Capabilities,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &sessionv3Runtime.WorkflowCallableInterface{
 		Modes:         append([]sessionv3Runtime.WorkflowCallMode(nil), workflowCallModes(input.Modes)...),
@@ -583,6 +597,10 @@ func compileWorkflowCallableInterface(
 		OutputSchema:  outputSchema,
 		ErrorSchema:   errorSchema,
 		ReceiptSchema: receiptSchema,
+		Context:       contextRequirements,
+		Ports:         ports,
+		Limits:        limits,
+		Capabilities:  capabilities,
 	}, nil
 }
 
@@ -626,13 +644,6 @@ func compileWorkflowStepEffect(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Effect,
 ) (sessionv3Runtime.WorkflowStepEffect, error) {
-	if input.Compensate != nil {
-		return sessionv3Runtime.WorkflowStepEffect{}, unsupportedWorkflowOperation(
-			"step.effect",
-			"compensation block",
-		)
-	}
-
 	output := sessionv3Runtime.WorkflowStepEffect{}
 	switch input.Kind {
 	case string(sessionv3Runtime.EffectKindRead):
@@ -673,6 +684,16 @@ func compileWorkflowStepEffect(
 			return sessionv3Runtime.WorkflowStepEffect{}, err
 		}
 		output.Reconcile = &block
+	}
+	if input.Compensate != nil {
+		block, err := compileWorkflowBlock(
+			document,
+			*input.Compensate,
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowStepEffect{}, err
+		}
+		output.Compensate = &block
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowStepEffect{}, err

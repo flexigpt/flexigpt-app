@@ -239,6 +239,16 @@ func (r *Runtime) materializeForkFramesLocked(
 				intent.ID,
 			)
 		}
+		ports := bindFramePortPlans(intent.Ports, parent.ID, intent.ID)
+		if len(ports) != 0 {
+			intent.Program, err = workflowProgramWithPortInputs(
+				intent.Program,
+				nil,
+			)
+			if err != nil {
+				return err
+			}
+		}
 		now := r.now()
 		handoffID := ""
 		if intent.Handoff != nil {
@@ -256,6 +266,7 @@ func (r *Runtime) materializeForkFramesLocked(
 			UpdatedAt:     now,
 			HandoffID:     handoffID,
 			Deadline:      earlierDeadline(parent.Deadline, intent.Deadline),
+			Ports:         ports,
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)
 		parent = mutableFrame(execution, parentID)
@@ -264,6 +275,23 @@ func (r *Runtime) materializeForkFramesLocked(
 		}
 		parent.ChildFrameIDs = append(parent.ChildFrameIDs, child.ID)
 		attached = append(attached, child.ID)
+		childFrame := mutableFrame(execution, child.ID)
+		if childFrame == nil {
+			return errors.New("fork child ProgramFrame is unavailable")
+		}
+		if err := r.stageFramePortInputsLocked(execution, childFrame); err != nil {
+			return err
+		}
+		if len(childFrame.PortInputs) != 0 {
+			next, inputErr := workflowProgramWithPortInputs(
+				childFrame.Program,
+				childFrame.PortInputs,
+			)
+			if inputErr != nil {
+				return inputErr
+			}
+			childFrame.Program = next
+		}
 
 		if intent.Handoff != nil {
 			childFrame := mutableFrame(execution, child.ID)

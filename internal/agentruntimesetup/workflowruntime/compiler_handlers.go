@@ -67,16 +67,19 @@ func compileWorkflowErrorMatch(
 		output.Categories = append(output.Categories, value)
 	}
 	for _, effect := range input.EffectStates {
-		value := sessionv3Runtime.EffectState(effect)
-		if err := value.Validate(); err != nil || value == "" {
-			if err != nil {
-				return sessionv3Runtime.WorkflowErrorMatch{}, err
-			}
-			return sessionv3Runtime.WorkflowErrorMatch{},
-				fmt.Errorf(
-					"unsupported workflow error effect state %q",
-					effect,
-				)
+		var value sessionv3Runtime.EffectState
+		switch effect {
+		case "not-applied":
+			value = sessionv3Runtime.EffectStateConfirmedNotApplied
+		case "applied":
+			value = sessionv3Runtime.EffectStateConfirmedApplied
+		case "unknown":
+			value = sessionv3Runtime.EffectStateUncertain
+		default:
+			return sessionv3Runtime.WorkflowErrorMatch{}, fmt.Errorf(
+				"unsupported workflow error effect state %q",
+				effect,
+			)
 		}
 		output.EffectStates = append(output.EffectStates, value)
 	}

@@ -94,6 +94,13 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if err := ownership.Budget.Validate(); err != nil {
 		return nil, err
 	}
+	effectiveBudget, err := narrowExecutionBudget(
+		parent.Budget,
+		ownership.Budget,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	now := r.now()
 	deadline := earlierDeadline(parentFrame.Deadline, intent.Deadline)
@@ -103,6 +110,13 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			return nil, deadlineErr
 		}
 		deadline = earlierDeadline(deadline, &budgetDeadline)
+	}
+	if effectiveBudget.Duration != "" {
+		value, deadlineErr := effectiveBudget.Duration.Deadline(now)
+		if deadlineErr != nil {
+			return nil, deadlineErr
+		}
+		deadline = earlierDeadline(deadline, &value)
 	}
 
 	rootID := parent.RootExecutionID
@@ -133,6 +147,10 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		State:             ExecutionStateRunning,
 		CreatedAt:         now,
 		UpdatedAt:         now,
+		Deadline:          deadline,
+		Budget:            effectiveBudget,
+		Usage:             ExecutionBudgetUsage{},
+		Cleanup:           CleanupState{},
 		ProgramFrames: []ProgramFrame{{
 			ID:        frameID,
 			Program:   intent.Program,
@@ -143,6 +161,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			UpdatedAt: now,
 			Deadline:  deadline,
 			HandoffID: handoffID,
+			Ports:     bindFramePortPlans(intent.Ports, parentFrame.ID, frameID),
 		}},
 		WorkItems:      []WorkItem{},
 		Attempts:       []Attempt{},
@@ -156,6 +175,19 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	parentFrame.ChildExecutionIDs = append(parentFrame.ChildExecutionIDs, child.ID)
 	session.Executions = append(session.Executions, child)
 	created := &session.Executions[len(session.Executions)-1]
+	if err := r.stageFramePortInputsLocked(created, &created.ProgramFrames[0]); err != nil {
+		return nil, err
+	}
+	if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 {
+		next, inputErr := workflowProgramWithPortInputs(
+			created.ProgramFrames[0].Program,
+			inputs,
+		)
+		if inputErr != nil {
+			return nil, inputErr
+		}
+		created.ProgramFrames[0].Program = next
+	}
 
 	if intent.Handoff != nil {
 		if err := r.applyConversationHandoffLocked(
@@ -269,6 +301,7 @@ func (r *Runtime) settleTerminalExecutionLocked(
 		return
 	}
 	r.settleConversationHandoffLocked(session, execution.HandoffID)
+	r.cancelExecutionDeadlineLocked(execution.ID)
 	if execution.Outcome != nil {
 		switch execution.Outcome.Kind {
 		case ExecutionOutcomeFailed, ExecutionOutcomeCancelled:

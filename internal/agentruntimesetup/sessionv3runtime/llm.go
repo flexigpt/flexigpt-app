@@ -133,6 +133,16 @@ func (b *Binder) bindLLM(
 		TargetFingerprint: resolved.Fingerprint,
 		BoundAt:           time.Now().UTC(),
 	}
+	dispatchPlan, err := b.durableLLMDispatchPlan(
+		req,
+		plan,
+		modelPin,
+		preparedChoicesFromBindings(choices, bindings),
+	)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
+	semantic.Plan = &dispatchPlan
 	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private: privateLLM{
@@ -368,6 +378,24 @@ func unresolvedProviderToolCall(
 			Unresolved: &sessionv3Runtime.UnresolvedToolBinding{Reason: reason},
 		},
 	}
+}
+
+func preparedChoicesFromBindings(
+	choices []inferenceSpec.ToolChoice,
+	bindings map[string]sessionv3Runtime.ToolCall,
+) []preparedChoice {
+	output := make([]preparedChoice, 0, len(choices))
+	for _, choice := range choices {
+		call, found := bindings[choice.ID]
+		if !found {
+			continue
+		}
+		output = append(output, preparedChoice{
+			Choice: choice,
+			Call:   call,
+		})
+	}
+	return output
 }
 
 func firstText(values ...string) string {

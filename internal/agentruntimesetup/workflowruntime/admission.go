@@ -400,6 +400,13 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
+		if target.Interface != nil && len(target.Interface.Capabilities) != 0 {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: service %q has unavailable capability requirements",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
 		bound := sessionv3Runtime.WorkflowTarget{
 			Kind:           sessionv3Runtime.WorkflowTargetService,
 			ServiceID:      value.ID(),
@@ -413,6 +420,13 @@ func (a *Admission) bindTarget(
 		if !found {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
 				"%w: activity %q",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		if target.Interface != nil && len(target.Interface.Capabilities) != 0 {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: activity %q has unavailable capability requirements",
 				ErrBindingUnavailable,
 				target.Ref,
 			)

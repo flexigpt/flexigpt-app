@@ -52,6 +52,11 @@ func (s WorkflowTargetSet) Validate() error {
 			return err
 		}
 	}
+	if s.Contract != nil && s.Resolved != nil {
+		return errors.New(
+			"workflow target set cannot contain direct and resolver interfaces",
+		)
+	}
 	if s.Resolved != nil {
 		if err := s.Resolved.Value.Validate(); err != nil {
 			return err

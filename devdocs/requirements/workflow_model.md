@@ -1811,7 +1811,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Event retention limits are complete per subscription identity.
 - [x] Subscription capacity and byte limits are complete.
 - [x] Channel retention and byte limits are complete across all paths.
-- [ ] Human response actor authorization is complete.
+- [x] Human response actor authorization is complete.
 - [x] Trigger registration without an initial explicit Workflow start is complete.
 - [ ] Trigger occurrence failure projection and operational management commands are complete.
 
@@ -1819,8 +1819,8 @@ Those are aggregate-stage work after functional backend completion.
 
 - [x] Child Execution budget facts are typed and durable.
 - [x] Child cleanup duration is typed and durable.
-- [ ] Root Workflow limits compile to typed Execution budgets.
-- [ ] Step limits compile to typed nested budgets.
+- [x] Root Workflow limits compile to typed Execution budgets.
+- [x] Step limits compile to typed nested budgets.
 - [x] Resource declarations compile to typed resource definitions.
 - [x] Resource claims compile to typed WorkItem claim plans.
 - [x] Concurrency claims are enforced.

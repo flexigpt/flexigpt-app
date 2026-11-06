@@ -32,6 +32,9 @@ type WorkflowScopeContext struct {
 	Error              *CanonicalValue             `json:"error,omitempty"`
 	Outcome            *CanonicalValue             `json:"outcome,omitempty"`
 	Operation          *CanonicalValue             `json:"operation,omitempty"`
+	Completed          *CanonicalValue             `json:"completed,omitempty"`
+	Ports              []PortInput                 `json:"ports,omitempty"`
+	Saga               *WorkflowSagaScope          `json:"saga,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -55,6 +58,17 @@ func (s WorkflowScopeContext) Validate() error {
 	}
 	if s.Operation != nil && !s.Operation.Valid() {
 		return errors.New("Workflow scope operation is invalid")
+	}
+	if s.Completed != nil && !s.Completed.Valid() {
+		return errors.New("Workflow scope completed facts are invalid")
+	}
+	if err := validateUniquePortInputs(s.Ports); err != nil {
+		return err
+	}
+	if s.Saga != nil {
+		if err := s.Saga.Validate(); err != nil {
+			return err
+		}
 	}
 	if s.Index != nil && *s.Index < 0 {
 		return errors.New("Workflow scope index is invalid")
@@ -194,6 +208,7 @@ const (
 	WorkflowPendingRepeat         WorkflowPendingKind = "repeat"
 	WorkflowPendingMachine        WorkflowPendingKind = "machine"
 	WorkflowPendingReconciliation WorkflowPendingKind = "reconciliation"
+	WorkflowPendingSaga           WorkflowPendingKind = "saga"
 )
 
 type WorkflowChildState string
@@ -280,6 +295,7 @@ type WorkflowPending struct {
 	Repeat         *WorkflowRepeatProgress         `json:"repeat,omitempty"`
 	Machine        *WorkflowMachineProgress        `json:"machine,omitempty"`
 	Reconciliation *WorkflowReconciliationProgress `json:"reconciliation,omitempty"`
+	Saga           *WorkflowSagaProgress           `json:"saga,omitempty"`
 }
 
 func (p WorkflowPending) Validate() error {
@@ -315,6 +331,13 @@ func (p WorkflowPending) Validate() error {
 			return errors.New("Workflow pending reconciliation state is missing")
 		}
 		if err := p.Reconciliation.Validate(); err != nil {
+			return err
+		}
+	case WorkflowPendingSaga:
+		if p.Saga == nil || len(p.Children) != 1 {
+			return errors.New("Workflow pending saga state is invalid")
+		}
+		if err := p.Saga.Validate(); err != nil {
 			return err
 		}
 	default:
@@ -889,6 +912,8 @@ func (i *WorkflowInterpreter) drivePending(
 		return i.driveMachine(frame, execution, program, state)
 	case WorkflowPendingReconciliation:
 		return i.driveReconciliation(frame, execution, program, state)
+	case WorkflowPendingSaga:
+		return i.driveSaga(frame, execution, program, state)
 	default:
 		return workflowTransition(state, nil, nil, nil)
 	}
@@ -1225,6 +1250,9 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 
 	case WorkflowPendingMachine:
 		return i.settleMachineChild(state, program)
+
+	case WorkflowPendingSaga:
+		return nil
 
 	default:
 		return errors.New("Workflow pending control kind is invalid")
@@ -1953,6 +1981,9 @@ func (b WorkflowBlock) Validate() error {
 			return fmt.Errorf("Workflow step %q: %w", step.ID, err)
 		}
 	}
+	if err := validateWorkflowStepSagaDependencies(b.Steps); err != nil {
+		return err
+	}
 	for index := range b.Catch {
 		if err := b.Catch[index].Validate(); err != nil {
 			return fmt.Errorf(
@@ -1970,6 +2001,20 @@ func (b WorkflowBlock) Validate() error {
 	return nil
 }
 
+func validateWorkflowStepSagaDependencies(
+	steps []WorkflowStep,
+) error {
+	for _, step := range steps {
+		if step.Saga == nil {
+			continue
+		}
+		if err := step.Saga.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	frame ProgramFrame,
 	program WorkflowProgram,
@@ -1982,6 +2027,10 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	scope.MergeState = mergeState
 	scope.OuterState = state.State.Clone()
 	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
+	if state.Saga != nil && scope.Saga == nil {
+		value := *state.Saga
+		scope.Saga = &value
+	}
 	scope.OuterSubscriptions = cloneWorkflowSubscriptionStates(state.Subscriptions)
 	child := program
 	child.Root = block

@@ -33,6 +33,7 @@ func (i *WorkflowInterpreter) startCall(
 	input CanonicalValue,
 	contextValue CanonicalValue,
 	call WorkflowCall,
+	ports []PortPlan,
 ) (ProgramTransition, error) {
 	lifetime := call.Lifetime
 	if lifetime == "" {
@@ -94,6 +95,7 @@ func (i *WorkflowInterpreter) startCall(
 	childCall.Lifetime = ""
 	childCall.Conversation = nil
 	childCall.Ownership = nil
+	childCall.Ports = append([]WorkflowPortBinding(nil), call.Ports...)
 	childCall.OnCompletion = ""
 	childCall.InternalLifecycleChild = true
 	childCall.Target = WorkflowValue{
@@ -192,6 +194,7 @@ func (i *WorkflowInterpreter) startCall(
 		Deadline:    cloneTime(frame.Deadline),
 		Lifetime:    intentLifetime,
 		Ownership:   &ownership,
+		Ports:       clonePortPlans(ports),
 	}}
 	transition.ContinueParent = true
 	return transition, nil
@@ -233,6 +236,7 @@ func (i *WorkflowInterpreter) handoffCall(
 	input CanonicalValue,
 	contextValue CanonicalValue,
 	call WorkflowCall,
+	ports []PortPlan,
 ) (ProgramTransition, error) {
 	if target.Kind != WorkflowTargetAgent || target.Artifact == nil {
 		return workflowFailure(
@@ -302,6 +306,7 @@ func (i *WorkflowInterpreter) handoffCall(
 			Deadline:  cloneTime(state.Deadline),
 			Lifetime:  ChildFrameLifetimeAttached,
 			Ownership: &ownership,
+			Ports:     clonePortPlans(ports),
 			Handoff: &ConversationHandoffIntent{
 				ID:                  handoffID,
 				ConversationID:      conversationID,

@@ -121,6 +121,22 @@ func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv
 	return nil
 }
 
+func (b *Binder) ValidatePortPlans(
+	ctx context.Context,
+	request sessionv3Runtime.WorkDispatchRequest,
+) error {
+	if len(request.WorkItem.Ports) == 0 {
+		return nil
+	}
+	validator, found := b.Base.(sessionv3Runtime.PortPlanValidator)
+	if !found {
+		return errors.New(
+			"port adapter is unavailable for the selected workflow target",
+		)
+	}
+	return validator.ValidatePortPlans(ctx, request)
+}
+
 func (b *Binder) verifyWorkflowToolPins(
 	ctx context.Context,
 	item sessionv3Runtime.WorkItem,

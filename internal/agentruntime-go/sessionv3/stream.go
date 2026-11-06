@@ -47,6 +47,16 @@ func (r *Runtime) appendLLMStream(
 	} else {
 		item.LLMStream.Text += value
 	}
+	if !thinking {
+		if err := r.deliverLLMStreamPortsLocked(
+			session,
+			execution,
+			item,
+			value,
+		); err != nil {
+			return err
+		}
+	}
 	item.LLMStream.UpdatedAt = now
 	item.UpdatedAt = now
 	r.touchExecutionLocked(session, execution)

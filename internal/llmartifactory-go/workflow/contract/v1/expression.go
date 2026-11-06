@@ -30,9 +30,14 @@ type expressionScope struct {
 
 func rootExpressionScope() expressionScope {
 	return expressionScope{
-		steps:         map[string]bool{},
-		reserved:      map[string]bool{},
-		variables:     map[string]bool{"input": true, "context": true, "messages": true},
+		steps:    map[string]bool{},
+		reserved: map[string]bool{},
+		variables: map[string]bool{
+			"input":    true,
+			"context":  true,
+			"messages": true,
+			"ports":    true,
+		},
 		subscriptions: map[string]Subscription{},
 	}
 }

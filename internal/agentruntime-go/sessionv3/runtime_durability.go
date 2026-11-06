@@ -12,8 +12,11 @@ import (
 func (r *Runtime) dispatchAllowedLocked(execution Execution) bool {
 	if r.checkpointPending[execution.SessionID] ||
 		execution.Controls.Paused ||
-		execution.Controls.CancellationRequested ||
 		execution.State.Terminal() {
+		return false
+	}
+	if execution.Controls.CancellationRequested &&
+		!execution.Cleanup.Active {
 		return false
 	}
 	for _, wait := range execution.Waits {
@@ -57,6 +60,12 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 		r.armSessionTriggersLocked(ctx, session)
 		for index := range session.Executions {
 			execution := &session.Executions[index]
+			r.armExecutionDeadlineLocked(
+				ctx,
+				session.ID,
+				execution.ID,
+				*execution,
+			)
 			if execution.State.Terminal() {
 				continue
 			}

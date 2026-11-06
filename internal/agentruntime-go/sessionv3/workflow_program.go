@@ -68,11 +68,15 @@ func (o WorkflowChildOwnership) Validate() error {
 }
 
 type WorkflowCallableInterface struct {
-	Modes         []WorkflowCallMode `json:"modes,omitempty"`
-	InputSchema   CanonicalValue     `json:"inputSchema"`
-	OutputSchema  CanonicalValue     `json:"outputSchema"`
-	ErrorSchema   CanonicalValue     `json:"errorSchema,omitempty"`
-	ReceiptSchema CanonicalValue     `json:"receiptSchema,omitempty"`
+	Modes         []WorkflowCallMode              `json:"modes,omitempty"`
+	InputSchema   CanonicalValue                  `json:"inputSchema"`
+	OutputSchema  CanonicalValue                  `json:"outputSchema"`
+	ErrorSchema   CanonicalValue                  `json:"errorSchema,omitempty"`
+	ReceiptSchema CanonicalValue                  `json:"receiptSchema,omitempty"`
+	Context       []WorkflowContextRequirement    `json:"context,omitempty"`
+	Ports         []WorkflowCallablePort          `json:"ports,omitempty"`
+	Limits        *ExecutionBudget                `json:"limits,omitempty"`
+	Capabilities  []WorkflowCapabilityRequirement `json:"capabilities,omitempty"`
 }
 
 type WorkflowProgram struct {
@@ -89,7 +93,9 @@ type WorkflowProgram struct {
 	Events     []WorkflowEventContract      `json:"events,omitempty"`
 	Resources  []WorkflowResourceDefinition `json:"resources,omitempty"`
 	Channels   []WorkflowChannel            `json:"channels,omitempty"`
+	Ports      []WorkflowPort               `json:"ports,omitempty"`
 	Triggers   []WorkflowTrigger            `json:"triggers,omitempty"`
+	Limits     ExecutionBudget              `json:"limits"`
 
 	// Scope is empty for a root Workflow Program. Child block ProgramFrames
 	// receive an immutable parent snapshot through this typed envelope.
@@ -118,11 +124,13 @@ type WorkflowStep struct {
 	Effect       *WorkflowStepEffect     `json:"effect,omitempty"`
 	OutputSchema CanonicalValue          `json:"outputSchema,omitempty"`
 	Claims       []WorkflowResourceClaim `json:"claims,omitempty"`
+	Limits       *ExecutionBudget        `json:"limits,omitempty"`
 
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
 	Set       *WorkflowSet       `json:"set,omitempty"`
 	Scope     *WorkflowBlock     `json:"scope,omitempty"`
+	Saga      *WorkflowSaga      `json:"saga,omitempty"`
 	Choose    *WorkflowChoose    `json:"choose,omitempty"`
 	Parallel  *WorkflowParallel  `json:"parallel,omitempty"`
 	Foreach   *WorkflowForeach   `json:"foreach,omitempty"`
@@ -143,6 +151,7 @@ type WorkflowCall struct {
 	AllowedTargetSet       string                     `json:"allowedTargetSet,omitempty"`
 	Input                  WorkflowValue              `json:"input"`
 	Context                WorkflowValue              `json:"context"`
+	Ports                  []WorkflowPortBinding      `json:"ports,omitempty"`
 	Contract               *WorkflowCallableInterface `json:"contract,omitempty"`
 	SetContract            *WorkflowCallableInterface `json:"setContract,omitempty"`
 	Mode                   WorkflowCallMode           `json:"mode,omitempty"`
@@ -230,6 +239,7 @@ type WorkflowStepOutcomeStatus string
 const (
 	WorkflowStepOutcomeSucceeded WorkflowStepOutcomeStatus = "succeeded"
 	WorkflowStepOutcomeSkipped   WorkflowStepOutcomeStatus = "skipped"
+	WorkflowStepOutcomeCancelled WorkflowStepOutcomeStatus = "cancelled"
 )
 
 type WorkflowStepOutcome struct {
@@ -269,6 +279,7 @@ type WorkflowState struct {
 	CancelChildPaths    []string                     `json:"cancelChildPaths,omitempty"`
 	CancelWorkItemIDs   []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
 	Terminal            *WorkflowTerminalState       `json:"terminal,omitempty"`
+	Saga                *WorkflowSagaScope           `json:"saga,omitempty"`
 	TargetSets          []WorkflowTargetSetState     `json:"targetSets,omitempty"`
 	TargetSetResolution *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
 }
@@ -320,6 +331,10 @@ func (s *WorkflowState) Validate() error {
 			if len(outcome.Output) != 0 {
 				return errors.New("skipped Workflow step has an output")
 			}
+		case WorkflowStepOutcomeCancelled:
+			if len(outcome.Output) != 0 {
+				return errors.New("cancelled Workflow step has an output")
+			}
 		default:
 			return errors.New("Workflow step outcome status is invalid")
 		}
@@ -348,6 +363,11 @@ func (s *WorkflowState) Validate() error {
 	}
 	if s.Terminal != nil {
 		if err := s.Terminal.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Saga != nil {
+		if err := s.Saga.Validate(); err != nil {
 			return err
 		}
 	}
@@ -397,6 +417,7 @@ func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
 		cel.Variable("error", cel.DynType),
 		cel.Variable("outcome", cel.DynType),
 		cel.Variable("completed", cel.DynType),
+		cel.Variable("ports", cel.DynType),
 		cel.Variable("operation", cel.DynType),
 	)
 	if err != nil {
@@ -543,6 +564,20 @@ func (i *WorkflowInterpreter) Advance(
 	var transition ProgramTransition
 	switch event.Kind {
 	case ProgramEventCancelled:
+		if state.Pending != nil && state.Pending.Kind == WorkflowPendingSaga {
+			sagaTransition, _, sagaErr := i.beginSagaCompensation(
+				frame,
+				execution,
+				program,
+				state,
+				ProgramFrameStateCancelled,
+				workflowTerminalFailure(ProgramFrameStateCancelled, nil),
+			)
+			if sagaErr != nil {
+				return ProgramTransition{}, sagaErr
+			}
+			return sagaTransition, nil
+		}
 		status := ProgramFrameStateCancelled
 		transition, err = workflowTransition(
 			state,
@@ -574,6 +609,24 @@ func (i *WorkflowInterpreter) Advance(
 				)
 			} else {
 				err = nil
+			}
+			break
+		}
+		if sagaTransition, handled, sagaErr := i.settleSagaWork(
+			frame,
+			execution,
+			program,
+			state,
+			event.WorkItemID,
+		); handled {
+			if sagaErr != nil {
+				transition, err = workflowFailure(
+					state,
+					"workflow_compensation_failed",
+					sagaErr.Error(),
+				)
+			} else {
+				transition = sagaTransition
 			}
 			break
 		}
@@ -673,6 +726,20 @@ func (i *WorkflowInterpreter) Advance(
 				)
 			} else {
 				err = nil
+			}
+			break
+		}
+		if sagaTransition, handled, sagaErr := i.settleSagaChild(
+			frame,
+			execution,
+			program,
+			state,
+			event.ChildFrameID,
+		); handled {
+			if sagaErr != nil {
+				transition, err = workflowFailure(state, "workflow_compensation_failed", sagaErr.Error())
+			} else {
+				transition = sagaTransition
 			}
 			break
 		}
@@ -900,6 +967,15 @@ func (i *WorkflowInterpreter) drive(
 				path,
 			)
 
+		case step.Saga != nil:
+			return i.startSaga(
+				frame,
+				program,
+				state,
+				step,
+				path,
+			)
+
 		case step.Return != nil:
 			output, err := i.evaluate(
 				step.Return.Value,
@@ -1058,6 +1134,32 @@ func (i *WorkflowInterpreter) call(
 			err.Error(),
 		)
 	}
+	setContract := call.SetContract
+	if effective := workflowTargetSetContract(program, call); effective != nil {
+		setContract = effective
+	}
+	if err := validateWorkflowCallContext(
+		target.Contract,
+		call.Contract,
+		setContract,
+	)(contextValue); err != nil {
+		return workflowFailure(
+			state,
+			"workflow_context_invalid",
+			err.Error(),
+		)
+	}
+	ports, err := i.workflowCallPortPlans(
+		frame,
+		program,
+		state,
+		path,
+		call,
+		target,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_port_invalid", err.Error())
+	}
 	if err := validateWorkflowInterfaceInput(
 		target.Contract,
 		input,
@@ -1066,10 +1168,6 @@ func (i *WorkflowInterpreter) call(
 	}
 	if err := validateWorkflowInterfaceInput(call.Contract, input); err != nil {
 		return workflowFailure(state, "workflow_call_input_invalid", err.Error())
-	}
-	setContract := call.SetContract
-	if effective := workflowTargetSetContract(program, call); effective != nil {
-		setContract = effective
 	}
 	if err := validateWorkflowInterfaceInput(setContract, input); err != nil {
 		return workflowFailure(state, "workflow_target_set_input_invalid", err.Error())
@@ -1112,6 +1210,7 @@ func (i *WorkflowInterpreter) call(
 			input,
 			contextValue,
 			call,
+			ports,
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
@@ -1125,6 +1224,7 @@ func (i *WorkflowInterpreter) call(
 			input,
 			contextValue,
 			call,
+			ports,
 		)
 	}
 	state.PendingTarget = targetName
@@ -1147,6 +1247,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
 				Effect:      effect,
+				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -1183,6 +1284,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
 				Effect:      effect,
+				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -1215,6 +1317,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeService,
 				Automatic:   true,
 				Effect:      effect,
+				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
 						ServiceID:      target.ServiceID,
@@ -1235,6 +1338,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeActivity,
 				Automatic:   true,
 				Effect:      effect,
+				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
 						ActivityID:     target.ActivityID,
@@ -1285,6 +1389,7 @@ func (i *WorkflowInterpreter) call(
 				Path:     path,
 				Deadline: cloneTime(state.Deadline),
 				Program:  nested,
+				Ports:    ports,
 			}},
 		}, nil
 
@@ -1351,6 +1456,7 @@ func (i *WorkflowInterpreter) call(
 				Path:     path,
 				Deadline: cloneTime(state.Deadline),
 				Program:  childProgram,
+				Ports:    ports,
 			}},
 		}, nil
 
@@ -1591,6 +1697,10 @@ func (i *WorkflowInterpreter) settleWork(
 			"Workflow Tool WorkItem %q returned an error result",
 			workID,
 		)
+	}
+
+	if item.EffectState == EffectStateCompensationFailed {
+		return errors.New("workflow work item compensation failed")
 	}
 
 	value, err := workflowWorkValue(*item)
@@ -1883,6 +1993,9 @@ func (p WorkflowProgram) Validate() error {
 	if err := validateWorkflowCoordinationProgram(p); err != nil {
 		return err
 	}
+	if err := validateUniqueWorkflowPorts(p.Ports); err != nil {
+		return err
+	}
 	if err := validateWorkflowTriggers(p.Triggers); err != nil {
 		return err
 	}
@@ -1893,6 +2006,9 @@ func (p WorkflowProgram) Validate() error {
 		if err := target.Validate(); err != nil {
 			return fmt.Errorf("Workflow target %q: %w", name, err)
 		}
+	}
+	if err := p.Limits.Validate(); err != nil {
+		return err
 	}
 	for name, targetSet := range p.TargetSets {
 		if err := validateID("workflow target set name", name); err != nil {
@@ -1932,6 +2048,7 @@ func (s WorkflowStep) Validate() error {
 		s.Transform != nil,
 		s.Set != nil,
 		s.Scope != nil,
+		s.Saga != nil,
 		s.Choose != nil,
 		s.Parallel != nil,
 		s.Foreach != nil,
@@ -1968,6 +2085,11 @@ func (s WorkflowStep) Validate() error {
 			return err
 		}
 	}
+	if s.Limits != nil {
+		if err := s.Limits.Validate(); err != nil {
+			return err
+		}
+	}
 	if s.Effect != nil {
 		if s.Call == nil {
 			return errors.New(
@@ -1996,6 +2118,9 @@ func (s WorkflowStep) Validate() error {
 
 	case s.Scope != nil:
 		return s.Scope.Validate()
+
+	case s.Saga != nil:
+		return s.Saga.Validate()
 
 	case s.Choose != nil:
 		return s.Choose.Validate()
@@ -2087,6 +2212,9 @@ func (c WorkflowCall) Validate() error {
 		return err
 	}
 	if err := c.Context.Validate(); err != nil {
+		return err
+	}
+	if err := validateUniqueWorkflowPortBindings(c.Ports); err != nil {
 		return err
 	}
 	mode := c.Mode
@@ -2279,6 +2407,26 @@ func (c WorkflowCallableInterface) Validate() error {
 		!c.ErrorSchema.Valid() ||
 		!c.ReceiptSchema.Valid() {
 		return errors.New("Workflow callable interface is invalid")
+	}
+	for _, requirement := range c.Context {
+		if err := requirement.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, port := range c.Ports {
+		if err := port.Validate(); err != nil {
+			return err
+		}
+	}
+	if c.Limits != nil {
+		if err := c.Limits.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, capability := range c.Capabilities {
+		if err := capability.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -2580,6 +2728,18 @@ func workflowActivationWithScope(
 		}
 		operationValue = value
 	}
+	var completedValue any
+	if program.Scope.Completed != nil {
+		value, err := workflowActivationValue(*program.Scope.Completed)
+		if err != nil {
+			return nil, err
+		}
+		completedValue = value
+	}
+	portsValue, err := workflowActivationValue(MustCanonicalValue(program.Scope.Ports))
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"input":     input,
 		"state":     currentState,
@@ -2592,8 +2752,9 @@ func workflowActivationWithScope(
 		"event":     eventValue,
 		"error":     errorValue,
 		"outcome":   outcomeValue,
-		"completed": nil,
+		"completed": completedValue,
 		"operation": operationValue,
+		"ports":     portsValue,
 	}, nil
 }
 

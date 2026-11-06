@@ -70,5 +70,8 @@ func ValidateWorkflowAdmissionResult(
 	if !program.Payload.Valid() {
 		return errors.New("workflow ProgramFrame payload is not canonical JSON")
 	}
+	if _, err := workflowProgramFromSnapshot(program); err != nil {
+		return err
+	}
 	return nil
 }

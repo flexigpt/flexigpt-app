@@ -360,19 +360,36 @@ func startAgentLLM(
 				Automatic:   true,
 				Effect:      EffectContract{Kind: EffectKindRead},
 				Input: WorkItemPayload{
-					LLM: &LLMWork{
-						Model:                   cloneSelection(defaults.Model),
-						Agent:                   cloneSelection(defaults.Agent),
-						InputActivityID:         state.InputActivityID,
-						ContinuationWorkItemIDs: continuations,
-						SystemInstructions:      append([]Instruction(nil), defaults.SystemInstructions...),
-						Temperature:             cloneFloat(defaults.Temperature),
-						Invocation:              cloneLLMInvocationPlan(invocation),
-					},
+					LLM: new(agentLLMWork(
+						state,
+						defaults,
+						invocation,
+						continuations,
+					)),
 				},
 			},
 		},
 	}, nil
+}
+
+func agentLLMWork(
+	state agentLoopProgramState,
+	defaults SessionDefaults,
+	invocation *LLMInvocationPlan,
+	continuations []WorkItemID,
+) LLMWork {
+	return LLMWork{
+		Model:           cloneSelection(defaults.Model),
+		Agent:           cloneSelection(defaults.Agent),
+		InputActivityID: state.InputActivityID,
+		ContinuationWorkItemIDs: append(
+			[]WorkItemID(nil),
+			continuations...,
+		),
+		SystemInstructions: append([]Instruction(nil), defaults.SystemInstructions...),
+		Temperature:        cloneFloat(defaults.Temperature),
+		Invocation:         cloneLLMInvocationPlan(invocation),
+	}
 }
 
 func failedAgentTransition(state agentLoopProgramState, code, message string) (ProgramTransition, error) {

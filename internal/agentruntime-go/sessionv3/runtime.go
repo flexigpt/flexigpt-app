@@ -46,6 +46,7 @@ type Runtime struct {
 	workflowAdmissions   map[CommandID]string
 	retryTimers          map[WorkItemID]context.CancelFunc
 	checkpointPending    map[SessionID]bool
+	executionTimers      map[ExecutionID]context.CancelFunc
 	resourceTimers       map[WorkItemID]context.CancelFunc
 	resourceWaitSequence uint64
 
@@ -87,6 +88,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		workflowAdmissions: map[CommandID]string{},
 		retryTimers:        map[WorkItemID]context.CancelFunc{},
 		checkpointPending:  map[SessionID]bool{},
+		executionTimers:    map[ExecutionID]context.CancelFunc{},
 		resourceTimers:     map[WorkItemID]context.CancelFunc{},
 		lifecycleCtx:       lifecycleCtx,
 		lifecycleCancel:    lifecycleCancel,
@@ -135,6 +137,10 @@ func (r *Runtime) Close() {
 	for _, cancel := range r.waitTimers {
 		cancel()
 	}
+	for _, cancel := range r.executionTimers {
+		cancel()
+	}
+	clear(r.executionTimers)
 	triggerCancels := make([]context.CancelFunc, 0, len(r.triggerTimers))
 	for _, cancel := range r.triggerTimers {
 		triggerCancels = append(triggerCancels, cancel)
@@ -565,6 +571,13 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	if err != nil {
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
+	budget, deadline, err := initialExecutionBudget(
+		workflowProgram.Limits,
+		r.now(),
+	)
+	if err != nil {
+		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
+	}
 	resources, err := initialExecutionResources(workflowProgram.Resources)
 	if err != nil {
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
@@ -589,6 +602,10 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		State:           ExecutionStateRunning,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		Deadline:        deadline,
+		Budget:          budget,
+		Usage:           ExecutionBudgetUsage{},
+		Cleanup:         CleanupState{},
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
@@ -598,6 +615,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 				Path:      "workflow",
 				CreatedAt: now,
 				UpdatedAt: now,
+				Deadline:  cloneTime(deadline),
 			},
 		},
 		WorkItems:      []WorkItem{},
@@ -650,6 +668,12 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		*session = previous
 		return nil, err
 	}
+	r.armExecutionDeadlineLocked(
+		ctx,
+		session.ID,
+		active.ID,
+		*active,
+	)
 	ready := r.readyWorkForSessionLocked(session)
 	r.armSessionTriggersLocked(ctx, session)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
@@ -893,6 +917,18 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 			if len(execution.Signals) >= maximumCoordinationRecords {
 				return nil, errors.New("execution signal retention limit exceeded")
 			}
+			if err := r.reserveEventBudgetLocked(
+				execution,
+				command.Data,
+				command.Correlation,
+			); err != nil {
+				return &CommandReceipt{
+					CommandID:   command.Meta.ID,
+					SessionID:   session.ID,
+					ExecutionID: execution.ID,
+					Message:     err.Error(),
+				}, nil
+			}
 			source := strings.TrimSpace(command.Source)
 			if source == "" {
 				source = "command"
@@ -1079,6 +1115,14 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 			execution.Controls.CancellationRequested = true
 			execution.State = ExecutionStateCancelling
 			now := r.now()
+			r.beginCleanupLocked(
+				execution,
+				&SanitizedError{
+					Code:     "execution_cancelled",
+					Category: ErrorCategoryCancellation,
+					Message:  firstText(command.Reason, "execution was cancelled"),
+				},
+			)
 			r.cancelOwnedChildExecutionsLocked(
 				ctx,
 				session,
@@ -1087,6 +1131,9 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 			)
 			for index := range execution.WorkItems {
 				item := &execution.WorkItems[index]
+				if item.Cleanup {
+					continue
+				}
 				switch item.State {
 				case WorkItemStateReady, WorkItemStateBinding, WorkItemStateWaiting:
 					if cancel := r.cancels[item.ID]; cancel != nil {
@@ -1191,6 +1238,16 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		r.mu.Unlock()
 		return receipt, nil
 	}
+	if err := humanWaitActorAuthorized(*wait, command.Actor); err != nil {
+		receipt := r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			err.Error(),
+		)
+		r.mu.Unlock()
+		return receipt, nil
+	}
 	if !containsResolution(wait.Request.AllowedResolutions, command.Resolution) {
 		receipt := r.rejectLocked(session, command.Meta, command, "wait resolution is not allowed")
 		r.mu.Unlock()
@@ -1213,6 +1270,7 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 	wait.Status = WaitStatusResolving
 	wait.UpdatedAt = r.now()
 	r.cancelWaitDeadlineLocked(wait.ID)
+	wait.ResolvedBy = cloneHumanActor(command.Actor)
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(ctx, "waitResolutionRequested", session); err != nil {
 		*session = previous
@@ -1825,7 +1883,16 @@ func (r *Runtime) advanceFrameLocked(
 	if err != nil {
 		return err
 	}
+	if err := r.applyCompensationSettlementsLocked(
+		execution,
+		transition.Compensations,
+	); err != nil {
+		return err
+	}
 	for _, activity := range transition.Activities {
+		if err := r.reserveActivityBudgetLocked(execution, activity); err != nil {
+			return err
+		}
 		if activity.ID == "" {
 			activity.ID = ActivityID(r.newID())
 		}
@@ -1859,21 +1926,38 @@ func (r *Runtime) advanceFrameLocked(
 				[]ResourceClaim(nil),
 				intent.Claims...,
 			),
-			ProgramPath:  intent.ProgramPath,
-			Deadline:     earlierDeadline(frame.Deadline, intent.Deadline),
-			Effect:       intent.Effect,
-			Retry:        cloneWorkflowRetryPolicy(intent.Retry),
-			Automatic:    intent.Automatic,
-			Dependencies: append([]WorkItemID(nil), intent.Dependencies...),
-			Input:        intent.Input,
-			CreatedAt:    now,
-			UpdatedAt:    now,
+			ProgramPath:        intent.ProgramPath,
+			Deadline:           earlierDeadline(frame.Deadline, intent.Deadline),
+			Effect:             intent.Effect,
+			Retry:              cloneWorkflowRetryPolicy(intent.Retry),
+			Automatic:          intent.Automatic,
+			Dependencies:       append([]WorkItemID(nil), intent.Dependencies...),
+			Budget:             cloneBudget(intent.Budget),
+			Cleanup:            intent.Cleanup,
+			SagaID:             intent.SagaID,
+			CompensationPolicy: intent.CompensationPolicy,
+			Ports:              bindWorkPortPlans(intent.Ports, frame.ID),
+			Input:              intent.Input,
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if item.ID == "" {
 			item.ID = WorkItemID(r.newID())
 		}
+		item.Ports = bindWorkPortPlans(intent.Ports, frame.ID)
+		if item.Type == WorkItemTypeLLM {
+			item.Ports = append(
+				item.Ports,
+				streamPortPlansForFrame(*frame)...,
+			)
+		}
+		if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
+			return err
+		}
+		item.EffectPlan = cloneEffectPlan(intent.EffectPlan)
 		if mutableWorkItem(execution, item.ID) != nil {
 			return fmt.Errorf(
+
 				"WorkItem %q already exists in Execution",
 				item.ID,
 			)
@@ -1976,6 +2060,16 @@ func (r *Runtime) advanceFrameLocked(
 	if frame.Status.Terminal() && frame.HandoffID != "" {
 		r.settleConversationHandoffLocked(session, frame.HandoffID)
 	}
+	if frame.Status.Terminal() {
+		if err := r.deliverFramePortsLocked(session, execution, frame); err != nil {
+			frame.Status = ProgramFrameStateFailed
+			frame.Error = portPlanError(
+				"port_delivery_failed",
+				err.Error(),
+			)
+			frame.UpdatedAt = r.now()
+		}
+	}
 	if frame.Status.Terminal() && frame.ParentFrameID != "" {
 		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
 		return r.queueChildJoinLocked(
@@ -2003,9 +2097,35 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	}
 	item := mutableWorkItem(execution, itemID)
 	if item == nil || item.State != WorkItemStateReady ||
-		!r.dispatchAllowedLocked(*execution) ||
+		!r.dispatchAllowedForWorkLocked(*execution, *item) ||
 		(!item.Automatic && !item.Requested) ||
 		unresolvedDependencies(*execution, *item) {
+		r.mu.Unlock()
+		return
+	}
+	if budgetErr := r.checkDispatchBudgetLocked(*execution, *item); budgetErr != nil {
+		now := r.now()
+		item.State = WorkItemStateBlocked
+		//nolint:errorlint // We are taking error val.
+		item.Error, _ = budgetErr.(*SanitizedError)
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+		r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
+		r.refreshExecutionStateLocked(execution)
+		r.touchExecutionLocked(session, execution)
+		_ = r.persistLocked(ctx, "workBudgetBlocked", session)
+		r.mu.Unlock()
+		return
+	}
+	if err := r.stageWorkPortInputsLocked(execution, item); err != nil {
+		now := r.now()
+		item.State = WorkItemStateBlocked
+		item.Error = portPlanError("port_input_invalid", err.Error())
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+		r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
+		r.touchExecutionLocked(session, execution)
+		_ = r.persistLocked(ctx, "portInputBlocked", session)
 		r.mu.Unlock()
 		return
 	}
@@ -2073,7 +2193,30 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		Execution: cloneExecution(*execution),
 		WorkItem:  *item,
 	}
+	portErr := r.validatePortPlansForDispatch(bindCtx, request)
 	r.mu.Unlock()
+	if portErr != nil {
+		r.mu.Lock()
+		session, execution, lookupErr := r.executionLocked(sessionID, executionID)
+		if lookupErr == nil {
+			current := mutableWorkItem(execution, itemID)
+			if current != nil && current.State == WorkItemStateBinding {
+				now := r.now()
+				current.State = WorkItemStateBlocked
+				current.Error = portPlanError(
+					"port_adapter_unavailable",
+					portErr.Error(),
+				)
+				current.CompletedAt = &now
+				current.UpdatedAt = now
+				r.advanceSettledWorkLocked(session, execution, current.FrameID, current.ID)
+				r.touchExecutionLocked(session, execution)
+				_ = r.persistLocked(ctx, "portBindingUnavailable", session)
+			}
+		}
+		r.mu.Unlock()
+		return
+	}
 	var (
 		bound   BindResult
 		bindErr error
@@ -2293,6 +2436,13 @@ func (r *Runtime) startDispatchedLocked(
 	if item.Deadline != nil && !now.Before(*item.Deadline) {
 		return errors.New("work deadline elapsed before dispatch")
 	}
+	if err := r.reserveCallAttemptLocked(execution, *item); err != nil {
+		//nolint:errorlint // We are taking error val.
+		if failure, ok := err.(*SanitizedError); ok {
+			return failure
+		}
+		return err
+	}
 
 	attempt := Attempt{
 		ID:             AttemptID(r.newID()),
@@ -2467,6 +2617,19 @@ func (r *Runtime) finishWorkLocked(
 	item.CompletedAt = &now
 	item.UpdatedAt = now
 
+	if result.Error == nil && item.Output != nil {
+		if err := r.deliverWorkPortsLocked(session, execution, item); err != nil {
+			result.Error = portPlanError("port_delivery_failed", err.Error())
+			item.Error = result.Error
+		}
+	}
+	if result.Error == nil && item.Type == WorkItemTypeLLM {
+		if err := r.consumeLLMUsageLocked(execution, item.Output); err != nil {
+			result.Error = portPlanError("model_budget_invalid", err.Error())
+			item.Error = result.Error
+		}
+	}
+
 	if execution.Controls.CancellationRequested &&
 		(result.Confirmed || item.Effect.Kind == EffectKindRead) {
 		item.State = WorkItemStateCancelled
@@ -2531,6 +2694,10 @@ func (r *Runtime) finishWorkLocked(
 	}
 
 	recordEffectSettlement(item, attempt, result)
+	if err := r.recordConfirmedEffectLocked(execution, item); err != nil {
+		item.State = WorkItemStateFailed
+		item.Error = portPlanError("effect_record_failed", err.Error())
+	}
 	if item.State.Terminal() {
 		released := r.releaseWorkResourcesLocked(execution, item.ID)
 		r.wakeResourceWaitersLocked(execution, released)
@@ -2807,11 +2974,25 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 	values := []WorkItemID{}
 	for _, item := range execution.WorkItems {
 		if item.State == WorkItemStateReady && (item.Automatic || item.Requested) &&
-			!unresolvedDependencies(execution, item) {
+			!unresolvedDependencies(execution, item) &&
+			r.dispatchAllowedForWorkLocked(execution, item) {
 			values = append(values, item.ID)
 		}
 	}
 	return values
+}
+
+func (r *Runtime) dispatchAllowedForWorkLocked(
+	execution Execution,
+	item WorkItem,
+) bool {
+	if !r.dispatchAllowedLocked(execution) {
+		if !execution.Controls.CancellationRequested {
+			return false
+		}
+		return r.cleanupDispatchAllowedLocked(execution, item)
+	}
+	return true
 }
 
 func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
@@ -2833,6 +3014,14 @@ func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
 	}
 
 	if execution.Controls.CancellationRequested {
+		if execution.Cleanup.Active {
+			for _, item := range execution.WorkItems {
+				if item.Cleanup && !item.State.Terminal() {
+					execution.State = ExecutionStateRunning
+					return
+				}
+			}
+		}
 		execution.State = ExecutionStateCancelling
 		return
 	}
@@ -2954,6 +3143,7 @@ func (r *Runtime) completeExecutionLocked(
 		execution.State = ExecutionStateCompleted
 	}
 	r.settleTerminalExecutionLocked(session, execution)
+	r.cancelExecutionDeadlineLocked(execution.ID)
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {
 		id := execution.ID
@@ -3206,6 +3396,25 @@ func hasDispatched(execution Execution) bool {
 
 func containsResolution(values []WaitResolution, want WaitResolution) bool {
 	return slices.Contains(values, want)
+}
+
+func cloneBudget(value *ExecutionBudget) *ExecutionBudget {
+	if value == nil {
+		return nil
+	}
+	output := cloneExecutionBudget(*value)
+	return &output
+}
+
+func cloneEffectPlan(value *WorkflowEffectPlan) *WorkflowEffectPlan {
+	if value == nil {
+		return nil
+	}
+	output := &WorkflowEffectPlan{
+		Reconcile:  cloneWorkflowBlock(value.Reconcile),
+		Compensate: cloneWorkflowBlock(value.Compensate),
+	}
+	return output
 }
 
 func firstText(values ...string) string {
