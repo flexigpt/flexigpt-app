@@ -2,9 +2,7 @@ You are taking over the FlexiGPT Session Runtime v3 and Workflow Runtime v3 back
 
 This is a Markdown-to-Markdown implementation handoff.
 
-The supplied repository file bodies and the supplied HLD Markdown files are authoritative source context. This is not a tool-driven session unless a filesystem or editing tool is explicitly provided by the execution environment.
-
-When no filesystem tool is available:
+The supplied repository file bodies and the supplied HLD Markdown files are authoritative source context. This is not a tool-driven session. It is a md text output one.
 
 - Produce apply-ready unified diffs for existing files.
 - Produce complete replacement-file contents for deliberate file replacement.
@@ -12,13 +10,6 @@ When no filesystem tool is available:
 - Distinguish authored patch content from applied working-tree changes.
 - Do not claim that a patch was applied when no write tool exists.
 - Do not stop merely because the environment has no tool. Produce the requested Markdown patch artifacts.
-
-When filesystem tools are available:
-
-- Edit the working tree directly.
-- Use repository state as authoritative.
-- Do not substitute a hypothetical patch for direct edits.
-- Still provide a concise change record that distinguishes authored, applied, and verified work.
 
 Treat this work as financially consequential engineering work. Incomplete, fabricated, repetitive, or misleading output can waste significant user time and money. Preserve trust through exact scope tracking, substantive implementation, and truthful status reporting.
 
@@ -40,10 +31,12 @@ Do not satisfy the token requirement with:
 - Repeated unchanged source.
 - Speculative guards.
 - Broad refactors unrelated to the requested feature slice.
+- Unnnecessary additional validations
+- Repetitive work that is already present in domains.
 
 The minimum output requirement is authoritative:
 
-- Do not send a final response before at least `100000` meaningful implementation tokens have been emitted. your context limit is 1 million tokens. your output limit published is 128k tokens.
+- Do not send a final response before a very large substantial meaningful implementation tokens have been emitted. your context limit in docs is 1 million tokens (my input is ~500k) and your output limit published is 128000 tokens.
 - Count only substantive production source additions or modifications that implement runtime behavior, compiler behavior, persistence behavior, recovery behavior, execution behavior, domain binding behavior, or caller wiring.
 - Do not count Markdown prose, status text, comments, tests, documentation, repeated unchanged code, or generated filler.
 - If one response reaches an output limit before the threshold or requested implementation scope is complete, continue immediately in the same repository state in the next response.
@@ -317,4 +310,7 @@ For an implementation or patch response, then end with:
 
 Do not use hostile language. Do not make excuses. Do not use superficial progress claims. Be precise, complete independent work, and preserve the user’s time and financial investment.
 
-Final reminder: code delivery in md out. a substantial output is expected. this is financially sensitive endeavor. go top downn phase wise. verify each thing, if not complete do it and move to next. there are lots of minor things you can do if your token quota is incomplete. do not block unnecessarily. out now properly. hlds capture the current state. keep it udpated at last.
+Above phases are indicative of full work. current completion state is in HLDs.
+Make sure domain related things are in domains and not aggregated as a dump in session folders.
+
+Final reminder: code delivery in md out. a substantial output is expected. this is financially sensitive endeavor. go top down phase wise. verify each thing, if not complete do it and move to next. if already done, go to next. there are lots of minor things you can do if your token quota is incomplete. again very large single shot output is needed. Do not block unnecessarily. out now properly. hlds capture the current state. keep it udpated at last as a diff..
