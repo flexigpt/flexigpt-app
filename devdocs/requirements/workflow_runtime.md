@@ -1,8 +1,30 @@
-# Workflow Runtime HLD
+# Workflow Runtime v3 and Session Runtime v3 HLD
 
-## Durable root
+## 1. Purpose
 
-A Session is the only durable root for one coherent activity.
+Session Runtime v3 is the durable backend for conversation, Agent loops, direct Model calls, Workflow execution, coordination, effects, and long-lived process behavior.
+
+Workflow Runtime v3 is the typed Workflow compiler and ProgramFrame interpreter path inside Session Runtime v3.
+
+The functional goal is:
+
+```text
+Session Runtime v3
+    +
+Workflow Runtime v3
+    =
+functional typed durable backend superset of normal Session v2 behavior
+    +
+full Workflow v1 execution behavior
+```
+
+Functional completion is backend completion.
+
+Frontend adoption, migration, deprecation, and deletion are later aggregate-stage work.
+
+## 2. Durable root
+
+A Session is the only authoritative durable root for one coherent activity.
 
 ```text
 Session
@@ -12,488 +34,936 @@ Session
 │   ├── WorkItems[]
 │   ├── Attempts[]
 │   ├── Waits[]
-│   ├── Controls
+│   ├── Effects[]
+│   ├── Cleanup
+│   ├── Signals[]
+│   ├── Channels[]
 │   └── Outcome
+├── TriggerRegistrations[]
+├── ConversationOwnership[]
+├── CommandRecords[]
 └── Defaults and metadata
 ```
 
-Chat, Agent loops, and Workflow execution are ProgramFrames inside the same
-Session. They are not Session kinds, Execution kinds, or separate persistence
-roots.
+A Session document can contain:
 
-## Architecture boundary
+- Conversation ProgramFrames.
+- Agent-loop ProgramFrames.
+- Single-model ProgramFrames.
+- Workflow ProgramFrames.
+- Independent child Executions.
+- Trigger registrations.
+- Durable event and channel records.
+- Effect and compensation records.
 
-Workflow execution has four separate ownership layers.
+A Session document must not contain:
+
+- Provider clients.
+- HTTP clients.
+- MCP clients.
+- Artifact service handles.
+- Native file paths used as live handles.
+- Browser state.
+- Wails state.
+- Credentials.
+- OAuth tokens.
+- Approval tokens.
+- Callbacks.
+- Cancellation functions.
+- Timers.
+- Compiled CEL programs.
+- Compiled JSON Schemas.
+
+## 3. Ownership boundaries
 
 ```text
 Workflow declaration contract
         |
         v
-Artifact admission and typed program compiler
+Artifact admission and typed program compilation
         |
         v
-Session v3 typed Workflow interpreter
+Session Runtime v3 ProgramFrame interpreter
         |
         v
-Domain runtime binders and external execution
+Setup-owned domain binders and domain runtimes
 ```
 
-| Layer                                                  | Owner                                    | Must not own                                               |
-| ------------------------------------------------------ | ---------------------------------------- | ---------------------------------------------------------- |
-| Declaration syntax and static validation               | `llmartifactory-go/workflow/contract/v1` | Session state, Artifact mutation, external work            |
-| Artifact admission, pins, and typed IR compilation     | `agentruntimesetup/workflowruntime`      | Session mutation, WorkItem dispatch, external execution    |
-| ProgramFrame execution and durable Workflow state      | `agentruntime-go/sessionv3`              | Artifact imports, Artifact services, source locators       |
-| Model, Tool, MCP, Skill, Service, and Activity binding | Domain runtime setup packages            | Session persistence roots and Workflow declaration parsing |
+| Layer                     | Owner                                    | Responsibilities                                                                                               | Must not own                                              |
+| ------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Declaration syntax        | `llmartifactory-go/workflow/contract/v1` | Source grammar, static validation, CEL scope, target relationships, portable validity                          | Session state, Artifact mutation, external work           |
+| Admission and compilation | `agentruntimesetup/workflowruntime`      | Artifact pins, typed program compilation, registered Service and Activity binding selection                    | Session mutation, WorkItem dispatch, provider invocation  |
+| Durable orchestration     | `agentruntime-go/sessionv3`              | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, persistence-safe semantics | Artifact services, source parsing, provider configuration |
+| Domain binding            | `agentruntimesetup` and domain runtimes  | Model, Tool, MCP, Skill, Workspace, attachment, Service, Activity, provider adaptation                         | Session persistence roots, Workflow source parsing        |
 
-`agentruntime-go` must not import Artifact or LLM Artifactory packages.
-`llmartifactory-go` must not import Agent Runtime packages. Runtime setup is
-the explicit dependency bridge.
+Session Runtime v3 must not import Artifact packages or setup packages.
 
-Workflow source is compiled into a typed runtime-neutral program. The runtime
-program uses typed blocks, steps, targets, state, and value templates.
-`CanonicalValue` is used only for generic JSON values and schemas. New runtime
-semantic structures must not expose `json.RawMessage` or persist
-`map[string]any` as their primary model.
+Session Runtime v3 must not:
 
-## Typed boundary discipline
+- Resolve Artifacts.
+- Read Workspace files.
+- Discover MCP tools.
+- Render Skills.
+- Configure providers.
+- Invoke Tool implementations directly.
+- Materialize local attachments.
+- Resolve credentials.
+- Persist domain-private values.
 
-Session Runtime v3 uses concrete types whenever the runtime owns the
-semantics. This includes:
+## 4. Typed runtime discipline
 
-- Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, and Outcome.
-- Artifact pins, selections, target kinds, binding IDs, binding versions, and
-  semantic binding facts.
-- Retry policy, deadline, effect contract, resource claim, budget, receipt,
-  control-flow, and state-machine state.
-- Typed Workflow blocks, steps, targets, values, state, outcomes, and
-  WorkItem payload unions.
+Runtime-owned semantics use concrete types.
 
-`CanonicalValue` is used only for arbitrary JSON that is intentionally
-schema-defined or external:
+This includes:
 
-- User input and arbitrary Workflow values.
-- JSON Schema documents.
-- CEL expression literals and results.
-- Generic Tool arguments and external Tool output.
-- Schema-defined state values.
-- Event, channel, correlation, metadata, and human-response data.
-- Generic ProgramSnapshot payload and ProgramState data envelopes.
+- Session identity.
+- Execution identity.
+- ProgramFrame identity.
+- WorkItem identity.
+- Attempt identity.
+- Wait identity.
+- Trigger identity.
+- Artifact pin.
+- Target selection.
+- Binding version.
+- Retry policy.
+- Deadline.
+- Effect contract.
+- Effect state.
+- Effect ledger record.
+- Compensation state.
+- Receipt.
+- Error.
+- Budget.
+- Claim.
+- Channel cursor.
+- Port plan.
+- Trigger occurrence.
+- Machine state.
+- Structured control-flow state.
 
-`jsonutil` is a conversion utility, not a durable runtime model. A domain
-binder decodes a generic canonical value once into a concrete request type at
-its boundary. Session Runtime does not retain a decoded `map[string]any` as
-durable orchestration state.
+`CanonicalValue` is used only at arbitrary JSON boundaries:
 
-## Persistence
+- Invocation input.
+- Invocation output.
+- JSON Schema.
+- Literal expression values.
+- Expression results.
+- Schema-defined Workflow state.
+- Generic Tool input and output.
+- Generic metadata.
+- Event data.
+- Event correlation.
+- Channel message data.
+- Human response.
+- Generic protocol projections.
+- Generic debugger projections.
 
-`internal/sessionstorev3` owns one Session document per Session ID. Index and
-FTS records are derived documents and are rebuilt from the authoritative
-Session document. Workflow runtime does not create a Workflow repository,
-Workflow store, filesystem execution store, or standalone invocation record.
+No durable semantic model uses `map[string]any` or `json.RawMessage` as its primary representation.
 
-The durable model persists semantic facts only:
+## 5. Persistence and Session Store v3
 
-- Program snapshots and interpreter versions.
-- Artifact identity, revision, and definition digest pins.
-- Canonical semantic input and output values.
-- WorkItem dependencies, state, retry history, idempotency keys, deadlines,
-  waits, decisions, safe receipts, errors, and outcomes.
-- Branch, loop, scope, compensation, and reconciliation state owned by the
-  Workflow interpreter.
+`internal/sessionstorev3` is the only authoritative V3 persistence store.
 
-The durable model also records the interpreter version. A declaration language
-version does not define a compiled ProgramFrame payload version. Shipped V2
-payload compatibility remains unchanged. The current V3 Workflow payload is
-development-only and can be replaced in place as `artifact.workflow.v1@1`.
-Stable V3 payload compatibility requires a separate approved policy.
+The authoritative document is one Session document per Session ID.
 
-The durable model does not persist API keys, OAuth tokens, MCP approval
-tokens, HTTP clients, MCP clients, function pointers, cancellation functions,
-stream callbacks, debug configuration, native paths, compiled CEL programs,
-or browser and Wails state.
+Derived data includes:
 
-## Runtime binding
+- Session list index.
+- Execution list index.
+- Full-text search records.
+- Projection records.
 
-A ready WorkItem follows this durable sequence:
+Derived data can be rebuilt from the authoritative Session document.
 
-1. Persist semantic WorkItem intent.
-2. Resolve current runtime dependencies.
-3. Verify current bindings against durable semantic pins.
+Tombstones are durable deletion barriers.
+
+A tombstone prevents a stale checkpoint from resurrecting a deleted Session.
+
+A Session restore must preserve:
+
+- Durable command records.
+- Trigger registrations.
+- Trigger occurrences.
+- Execution hierarchy.
+- ProgramFrame state.
+- WorkItems.
+- Attempts.
+- Waits.
+- Signals.
+- Channels.
+- Emit receipts.
+- Effect records.
+- Compensation records.
+- Outcomes.
+
+## 6. Durable external-work sequence
+
+Every external WorkItem follows this sequence:
+
+1. Persist typed WorkItem intent.
+2. Resolve current dependencies through the owning setup domain.
+3. Verify Artifact pins and current binding facts.
 4. Persist semantic binding facts.
-5. Persist dispatched attempt state.
-6. Dispatch external work.
-7. Persist confirmed result, failure, receipt, or uncertainty.
+5. Persist an Attempt before external invocation.
+6. Invoke external work.
+7. Persist confirmed output, receipt, failure, cancellation fact, or uncertainty.
+8. Never automatically replay uncertain non-idempotent work.
+9. Use Runtime timers for durable time behavior.
+10. Cancel timers and owned goroutines during `Runtime.Close`.
 
-A process stop after dispatch and before a confirmed outcome changes the
-WorkItem to uncertain. Non-idempotent uncertain work is not automatically
-repeated. Recovery creates a durable review wait.
+The sequence applies to:
 
-## ProgramFrame interpreters
+- Tool WorkItems.
+- MCP Tool WorkItems.
+- Service WorkItems.
+- Activity WorkItems.
+- LLM WorkItems.
+- Resolver WorkItems when a resolver performs external discovery.
+- Reconciliation WorkItems.
+- Compensation WorkItems.
 
-Built-in interpreters are versioned:
+A process stop after external dispatch but before a confirmed result produces uncertainty unless the durable effect contract proves safe replay behavior.
 
-| Interpreter              | Purpose                                                  |
-| ------------------------ | -------------------------------------------------------- |
-| `builtin.conversation@1` | Ordinary Session chat and visible message history.       |
-| `builtin.agent-loop@1`   | LLM, Tool, approval, Tool result, and continuation loop. |
-| `builtin.single-model@1` | One direct Model call.                                   |
-| `artifact.workflow.v1@1` | Current typed runtime-neutral Workflow program.          |
+## 7. ProgramFrame interpreters
 
-`artifact.workflow.v1@1` is development-only and is replaced in place by the
-typed runtime-neutral Workflow payload. It is not an offline migration target.
-The current Workflow interpreter owns its bounded typed ProgramFrame payload
-and state. Artifact setup compiles Workflow source into this payload before
-Session creates external work. It maps Workflow calls as follows:
+Built-in interpreters are versioned.
 
-| Workflow target or operation                       | Session runtime mapping                                 |
-| -------------------------------------------------- | ------------------------------------------------------- |
-| Agent call                                         | Child built-in Agent-loop ProgramFrame.                 |
-| Model call                                         | Child built-in single-model ProgramFrame.               |
-| Workflow call                                      | Child Artifact-backed Workflow ProgramFrame.            |
-| Tool call                                          | Tool WorkItem.                                          |
-| Service call                                       | Service WorkItem bound by registered Service binding.   |
-| Activity call                                      | Activity WorkItem bound by registered Activity binding. |
-| Transform                                          | Transform WorkItem.                                     |
-| Choice and loop guard                              | Condition WorkItem.                                     |
-| Set                                                | StateUpdate WorkItem.                                   |
-| Parallel and foreach fan-out                       | Fork WorkItem plus child scopes.                        |
-| Parallel and foreach completion                    | Join WorkItem.                                          |
-| Human, approval, timer, event, channel, child wait | Wait WorkItem.                                          |
-| Emit                                               | Emit WorkItem.                                          |
-| Saga recovery                                      | Compensation WorkItem.                                  |
+| Interpreter              | Purpose                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| `builtin.conversation@1` | Conversation activity routing and visible message history.          |
+| `builtin.agent-loop@1`   | Agent reasoning, Model calls, Tool calls, waits, Tool continuation. |
+| `builtin.single-model@1` | One direct Model call.                                              |
+| `artifact.workflow.v1@1` | Typed Workflow program execution.                                   |
 
-At completion, every mapping in this table is implemented with typed durable
-semantics. A valid Workflow v1 operation cannot remain a permanent
-unsupported-operation admission failure because an implementation is missing.
+A ProgramFrame contains:
 
-Agent and Model calls use typed Agent-loop and single-model execution plans.
-They do not serialize arbitrary Workflow JSON into a chat message. Workspace,
-instruction, text, Tool, Skill, MCP, attachment, message, and port
-contributions are compiled by their domain runtime setup packages before a
-Model WorkItem dispatches.
+- Interpreter identity.
+- Interpreter version.
+- Typed program snapshot.
+- Typed program state.
+- Parent relationship.
+- Child frame identities.
+- Child execution identities.
+- WorkItem identities.
+- Output.
+- Error.
+- Deadline.
+- Fork boundary.
+- Join boundaries.
+- Effect-frame linkage where applicable.
 
-## Completion rule
+A ProgramFrame interpreter must not persist:
 
-Workflow Runtime does not accept partially executable behavior.
+- Compiled CEL.
+- Compiled schemas.
+- Clients.
+- Callbacks.
+- Credentials.
+- Timers.
+- Context cancellation functions.
 
-For each Workflow operation, one interpreter version must do exactly one of
-the following during admission:
+## 8. Workflow compiler contract
 
-1. Compile it to typed ProgramFrame and WorkItem behavior with durable
-   recovery semantics.
-2. Reject it as unsupported before any external WorkItem is created.
+Workflow source is not a ProgramFrame payload.
 
-The runtime must never accept an operation and later treat it as a no-op,
-silently omit it, or change its declared effect behavior.
+```text
+Workflow declaration v1
+        |
+        v
+Artifact pinning and target binding preparation
+        |
+        v
+Typed runtime-neutral WorkflowProgram
+        |
+        v
+Workflow ProgramFrame
+```
 
-During development, typed admission rejection protects users from partial
-execution. It is not the target completion state. Completion requires all
-valid Workflow v1 operations to compile and execute. Admission rejection then
-applies only to invalid declarations, unavailable required bindings, current
-policy or credential failures, and behavior outside Workflow v1.
+The typed program contains:
 
-No Workflow operation may fabricate a successful result. Provider, Tool, MCP,
-Skill, Service, Activity, Model, Agent, or child Workflow failure must produce
-a typed failure, cancellation, or uncertainty outcome.
+- Typed blocks.
+- Typed steps.
+- Typed target descriptions.
+- Typed target sets.
+- Typed state specifications.
+- Typed values.
+- Typed retry policies.
+- Typed effect plans.
+- Typed saga plans.
+- Typed waits.
+- Typed channels.
+- Typed subscriptions.
+- Typed triggers.
+- Typed ports.
+- Typed machine state.
+- Typed structured-control state.
+- Stable Artifact pins where required.
+- Stable Service and Activity binding IDs and versions.
 
-The required durable sequence for external work is:
+The compiler must preserve every valid Workflow v1 field.
 
-1. Persist WorkItem intent.
-2. Resolve and verify runtime dependencies against durable pins.
-3. Persist semantic binding facts.
-4. Persist dispatched Attempt state.
-5. Dispatch external work.
-6. Persist confirmed result, failure, receipt, or uncertainty.
+The compiler must not:
 
-After a process stop, a dispatched non-idempotent WorkItem without a confirmed
-outcome is uncertain. It is not automatically replayed. Unsupported Workflow
-operations are rejected during admission with a typed unsupported-operation
-error. They are never silently omitted and never fail only after unrelated
-external work begins.
+- Invent chat text from generic Workflow input.
+- Omit valid fields.
+- Convert a provider-managed Tool into local work.
+- Fabricate target success.
+- Defer a known unsupported source feature until after unrelated external work starts.
 
-Compiled CEL programs, compiled JSON Schemas, authorization references,
-clients, callbacks, timers, and cancellation functions remain process-private.
-They must be bounded by Runtime or Execution lifetime and removed during close
-or execution settlement.
+## 9. Callable target runtime mapping
 
-### Current development implementation boundary
+| Workflow target | Runtime mapping                                           |
+| --------------- | --------------------------------------------------------- |
+| Agent           | Child Agent-loop ProgramFrame with typed Agent plan.      |
+| Model           | Child single-model ProgramFrame with typed Model plan.    |
+| Nested Workflow | Child Workflow ProgramFrame.                              |
+| Tool Artifact   | Tool WorkItem.                                            |
+| MCP Tool        | Tool WorkItem with persisted MCP binding facts.           |
+| Service         | Service WorkItem with registered binding ID and version.  |
+| Activity        | Activity WorkItem with registered binding ID and version. |
 
-The implementation is not complete merely because it can persist an Execution
-or run a subset of ProgramFrame interpreters. Completion remains the state
-defined below: a functional Session v2 backend superset plus full Workflow v1
-compiler and interpreter support.
+A target-set resolver maps to a typed resolver WorkItem when membership requires durable resolution.
 
-The current V3 implementation boundary is:
+A target-set selection persists:
 
-- V2 Session Runtime and Session Store remain supported and unchanged.
-- Frontend V3 adoption and offline migration are separate work.
-- The current `artifact.workflow.v1@1` development payload remains in place;
-  no payload or declaration-language version is incremented.
-- `CanonicalValue` is used only for arbitrary JSON boundaries. Durable
-  orchestration semantics remain concrete typed values.
-- Model, Tool, MCP, Skill, attachment, Service, Activity, and Workflow
-  behavior remains in its owning domain runtime package.
-- Session V3 setup is an orchestration router, not a duplicate domain
-  fallback runtime.
-- Provider-managed SDK Tool Artifacts cannot produce local fabricated success.
-  They require a typed Model execution plan or fail before external dispatch.
+- Target-set identity.
+- Normalized member identities.
+- Resolver time.
+- Selected target identity.
+- Input.
+- Context.
+- Effect key.
+- Retry identity.
 
-## Provider execution
+## 10. Model and Agent execution plans
 
-`FetchCompletion` remains the provider-facing single-call boundary. Runtime
-setup resolves provider configuration and credentials only when an LLM
-WorkItem dispatches. The provider layer does not know whether the WorkItem
-originated from chat, an Agent loop, or a Workflow.
+A typed Model or Agent plan is complete before provider dispatch.
 
-## Implementation status
+The plan can contain:
 
-This document defines the required completed V3 backend state. Foundation work
-does not satisfy completion by itself.
+- Selected Agent.
+- Selected Workspace.
+- Selected Model.
+- Model request patch.
+- Instruction contributions.
+- Text contributions.
+- Tool choices.
+- Provider-managed Tool choices.
+- Skill contributions.
+- MCP server contributions.
+- MCP Tool choices.
+- MCP resource contributions.
+- MCP resource-template contributions.
+- MCP prompt contributions.
+- Attachment contributions.
+- Message contributions.
+- Channel contributions.
+- Port contributions.
+- Conversation ownership facts.
+- Artifact pins.
+- Semantic binding facts.
 
-The V3 backend is complete only when all of the following are true:
+Session Runtime persists only durable semantic facts.
 
-- Session Runtime v3 is a functional backend superset of normal Session v2
-  behavior.
-- Every valid Workflow v1 operation, target mode, control-flow construct,
-  coordination primitive, effect contract, and limit has typed compiler and
-  interpreter support.
-- All V3 external work follows durable intent, current dependency resolution,
-  pin verification, semantic binding persistence, dispatch persistence, and
-  confirmed-result-or-uncertainty persistence.
-- Agent, Model, Workspace, Tool, MCP, Skill, attachment, Service, Activity,
-  and Workflow behavior remains in its owning domain runtime package.
-- V3 WorkItems preserve cancellation, retry, deadline, panic, recovery,
-  uncertainty, reconciliation, and compensation semantics across restart.
-- V3 Session commands and projections are available through the
-  transport-neutral backend command service. Wails remains an adapter.
-- V3 Store persistence, restore, tombstones, derived index rebuild, FTS
-  rebuild, command idempotency, and recovery are verified.
-- No valid Workflow v1 feature is silently omitted or left as a permanent
-  unsupported runtime feature.
+Runtime setup keeps private provider-ready state in memory until dispatch completes.
 
-### Session Runtime v3 functional superset requirement
+## 11. Tool behavior
 
-Session Runtime v3 must provide typed backend equivalents for all normal
-Session v2 behavior:
+### 11.1 Go Tools
 
-- Direct Model chat and Agent-backed chat.
-- Workspace and instruction contributions.
-- Attachment preparation, snapshotting, replay, and provider adaptation.
-- Model streaming, protocol outputs, usage, debugger data, and continuation.
-- Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity
-  behavior.
-- MCP resources, prompts, Apps, approvals, and approved App context.
-- Waiting, cancellation, recovery, uncertainty, retry, and command
-  idempotency behavior.
+Go Tools use:
 
-This functional-superset requirement does not require:
+- Typed Tool binding.
+- Artifact pin verification.
+- Function identity.
+- Canonical arguments.
+- Typed Tool output.
+- Receipt or error facts.
 
-- Frontend Session v3 adoption.
-- Offline v2-to-v3 migration.
-- V2 Session Runtime or Session Store deletion.
-- Automatic reading of V2 durable documents by V3.
+### 11.2 Provider SDK Tools
 
-V2 remains supported until separate migration, adoption, and deletion
-decisions are approved.
+Provider SDK Tools are provider-managed.
 
-### Required completion scope
+They remain Tool choices in the typed Model plan.
 
-Completion includes:
+They do not produce local Tool WorkItems.
 
-1. Typed compiler and interpreter integrity.
-2. Sequential Workflow execution and all callable targets.
-3. WorkItem lifecycle correctness.
-4. Agent, Model, Workspace, Skill, MCP, attachment, text, and instruction
-   execution plans.
-5. Structured control flow.
-6. Durable coordination.
-7. Effects, reconciliation, compensation, claims, budgets, and limits.
-8. Transport-neutral Session v3 command and projection service support.
-9. Removal of duplicate V3 fallback logic from Session setup when domain
-   runtimes own the behavior.
+They do not produce fabricated local success.
 
-The offline migration remains separate tooling. It translates V2 transcript
-and Run data to V3 Timeline and Executions, removes private runtime data,
-changes in-flight external work to uncertain, and rebuilds derived Session
-Store data. Frontend adoption and deletion of legacy runtime paths occur only
-after V3 backend completion and migration approval.
+### 11.3 MCP Tools
 
-### Implemented lifecycle boundary and remaining work
+MCP Tool binding performs:
 
-Timer waits persist their preparation time and firing time. An enclosing
-operation deadline remains separate. Recovery rearms pending durable timers
-only after the recovery source completes. A timer cannot be resolved manually.
-Response schemas are checked before a wait response reaches its domain binder.
+1. Current MCP server verification.
+2. Current discovery lookup.
+3. Provider Tool identity verification.
+4. Digest verification.
+5. Current policy evaluation.
+6. Approval behavior.
+7. Invocation.
+8. Typed result adaptation.
 
-A failed checkpoint prevents new dispatch and event publication for that
-Session. The live confirmed result remains available for a later checkpoint.
-Restart uses the last committed Session document. Dispatched work without a
-committed result remains uncertain and requires recovery review.
+MCP binding facts persist before invocation.
 
-Cancellation before external invocation settles the unstarted attempt.
-Cancellation after invocation does not convert an unconfirmed mutating effect
-into proof of cancellation. Its WorkItem and Attempt retain uncertainty.
+MCP approval tokens remain process-private.
 
-Workflow v3 coordination now uses the existing Session document as its only
-durable root. The compiler produces typed event, channel, subscription, wait,
-emit, and retry facts. The interpreter persists correlation, event source,
-filters, channel cursors, consumed records, emit receipts, human request data,
-retry policy, retry schedule, and attempt deadlines.
+### 11.4 Skill Tools
 
-Pending event, channel, and completion waits inspect retained durable facts
-when they are created. This prevents an already accepted signal, channel
-message, or child completion from being lost because it arrived before the
-Wait WorkItem bound. Runtime recovery rearms only durable timers and retry
-schedules.
+Skill Tools use an Execution-owned Skill session.
 
-The V3 LLM binder now builds an execution plan through the owning Agent,
-Workspace, Text, Skill, Tool, MCP, and Model domains before provider dispatch.
-The Session core remains an orchestration owner. It persists only semantic
-Artifact pins, selected identities, WorkItem state, attempts, waits, outputs,
-and receipts. It does not resolve Artifacts, read Workspace files, discover
-MCP capabilities, render Skills, or configure providers.
+The durable model persists selected Skill Artifact identities and active state facts.
 
-LLM WorkItems persist typed streamed text and thinking state, final
-provider-neutral usage, canonical protocol-output projections, and canonical
-debugger projections. Stream callbacks, clients, credentials, provider
-configuration, and native attachment paths remain process-private. Selected
-MCP resources, resource templates, prompts, and server instructions are
-prepared by MCP Runtime before provider input construction.
+The durable model does not persist the Skill runtime session handle.
 
-Workflow `start` calls now use attached child ProgramFrames. The interpreter
-persists the child identity before dispatch, returns a typed
-`CompletionHandle`, and continues the parent frame. The existing completion
-wait primitive resolves from the child terminal result. Attached child frames
-also keep an Execution active after the parent root frame settles.
+### 11.5 Service and Activity bindings
 
-Workflow `cancel` now resolves a typed child-frame handle and requests
-cancellation through the common ProgramFrame lifecycle. It does not mutate a
-domain binder directly. Cancellation produces a typed Workflow step outcome.
-Independent child lifetime creates a separate child Execution inside the same
-Session document. The child persists parent and root Execution identities,
-evaluated ownership, child budget, cancellation linkage, and a typed
-Execution completion handle before it dispatches WorkItems.
+Service and Activity bindings are registered typed domain bindings.
 
-Workflow `handoff` creates durable typed conversation ownership state before
-the target Agent starts. It is not compiled as invoke. Child completion either
-restores the prior owner or retains the handoff target according to the
-declared completion behavior.
+A binding provides:
 
-Parallel and Foreach support `all`, `first-completed`, `first-success`, and
-`quorum` completion. They retain typed winner and branch or item outcome state,
-support `remaining: cancel` and `remaining: wait`, and support `fail-fast` and
-`collect` behavior. Foreach preserves source ordering and bounded concurrency.
+- Stable binding identity.
+- Stable binding version.
+- Effect contract.
+- Typed bind behavior.
+- Typed execution behavior.
+- Typed wait behavior when applicable.
 
-Structured child scheduling crosses typed durable boundaries. A parent frame
-persists a Fork WorkItem containing immutable child frame intents before
-children start. A terminal child produces a Join WorkItem before its parent
-interpreter receives child settlement. Fork and Join remain ordinary typed
-WorkItems with attempts, receipts, cancellation, persistence, and recovery.
+The Session core does not implement Service or Activity domain behavior.
 
-Repeat supports count, while, until, timeout, carried state, local state,
-exhaustion, break, continue, and ongoing `until-cancelled` execution.
+## 12. Ports, channels, and messaging
 
-Workflow blocks now compile ordered typed catch handlers and one typed finally
-block. A terminal success, failure, timeout, or cancellation enters durable
-terminal handling before the ProgramFrame becomes terminal. Matching catch
-blocks receive typed `error` context. Finalizers receive typed `outcome`
-context. Catch recovery output is schema-checked. A finalizer failure replaces
-a success and is attached as a cause to a preceding failure or cancellation.
+A typed port plan contains:
 
-Resolver-backed target sets now create a typed target-resolver WorkItem at the
-first call boundary. The WorkItem persists normalized membership before target
-selection. A call stores the selected target in its durable step outcome and
-uses the same resolved membership through retry, wait, recovery, and
-resumption.
+- Port name.
+- Port direction.
+- Stream capability.
+- Schema.
+- Channel identity.
+- Reader or writer access.
+- Parent-child ownership.
+- Input cursor where applicable.
+- Output delivery semantics.
 
-Workflow machines now compile into typed durable ProgramFrame state. The
-runtime persists current machine state, carried state, entry time, active
-subscription identities, active wait WorkItem identities, selected transition,
-and transition generation. Entry, exit, transition blocks, immediate
-conditions, event transitions, timer transitions, and final output use normal
-typed child ProgramFrames and Wait WorkItems. Machine transition handling is
-serialized by the owning ProgramFrame.
+The runtime validates ports before external dispatch.
 
-Resolver-backed target sets now resolve once at their first call boundary,
-persist their accepted target names, and preserve the selected concrete target
-identity in `WorkflowState` before external dispatch.
+A port failure is a typed binding or validation failure.
 
-Full retries, complete structured-control policies, child ownership, event and
-channel coordination, trigger scheduling, reconciliation, compensation,
-resource accounting, and complete normal V2 backend capability remain
-required. This partial coverage is not backend completion.
+A channel stores:
 
-V3 backend completion still means a functional V2 backend superset plus full
-Workflow v1 support. Session v2 and Session Store v2 remain preserved.
-Frontend adoption and migration remain separate. CanonicalValue remains
-limited to arbitrary JSON boundaries. Domain binders retain domain ownership,
-and no Workflow, Trigger, Event, or Invocation persistence root is added.
+- Ordered messages.
+- Message identities.
+- Cursors.
+- Retention facts.
+- Capacity facts.
+- Byte accounting.
+- Consumption facts.
+- Observe facts.
+- Deduplication receipts.
 
-## Implementation task list
+Port delivery must preserve:
 
-- This list is the completion tracker for Session Runtime v3 and Workflow Runtime v3.
+- Schema validity.
+- Channel authorization.
+- Parent-child ownership.
+- Message ordering.
+- Stream ordering.
+- Durable replay semantics.
 
-- Admission rejection during development is safety behavior, not completion.
+## 13. Structured execution
 
-- [x] `call.mode: invoke` uses direct typed execution.
-- [x] `call.mode: start` with attached lifetime creates a child `ProgramFrame`.
-- [x] `call.mode: start` with independent lifetime creates a child `Execution` in the existing Session document.
-- [x] Independent child persists parent `ExecutionID`, root `ExecutionID`, ownership, budget, and cancel relationship.
-- [x] Typed `CompletionHandle` supports `WorkItemID`, `FrameID`, and `ExecutionID`.
-- [x] Completion waits resolve from child `WorkItem`, child frame, and child `Execution` terminal state.
-- [x] `cancel` accepts child frame handles and child `Execution` handles.
-- [x] Parent cancellation propagates only to independent children with `cancelWithParent`.
-- [x] Agent handoff has typed conversation ownership state in the Session document.
-- [x] `call.mode: handoff` creates distinct Agent ownership behavior and is not mapped to invoke.
-- [x] Independent lifetime is not mapped to attached behavior.
-- [x] No separate invocation store was added.
-- [x] Tool Artifact target executes through a typed WorkItem.
-- [x] MCP Tool target executes through a typed WorkItem and current MCP discovery.
-- [x] Service target executes through a registered Service binding.
-- [x] Activity target executes through a registered Activity binding.
-- [x] Nested Workflow target executes as a child Workflow `ProgramFrame`.
-- [x] Agent target executes as a child Agent-loop `ProgramFrame` with a typed plan.
-- [x] Model target executes as a child single-model `ProgramFrame` with a typed plan.
-- [x] Static target sets resolve and enforce allowed members.
-- [x] Resolver-backed target sets resolve once at the call boundary and persist selected target identity.
-- [ ] Agent, Workspace, Model, instruction, Tool, Skill, MCP, attachment, message, and port plans compile before Agent-loop or single-model dispatch.
-- [x] Provider SDK Tool Artifacts execute only inside a typed Model plan and never produce local success.
-- [x] `read` effect contract is implemented.
-- [x] `idempotent` effect contract is implemented.
-- [x] `keyed` effect contract is implemented with a stable idempotency key.
-- [x] `non-idempotent` effect contract is implemented without automatic replay after uncertainty.
-- [x] Stable idempotency keys persist in WorkItems and Attempts.
-- [x] Idempotency keys propagate through the typed WorkItem dispatch request.
-- [ ] Reconciliation WorkItems and recovery review are implemented.
-- [ ] Saga effect tracking uses reverse compensation order.
-- [ ] Compensation error policy and cleanup allowance are implemented.
-- [x] Typed effect state persists in WorkItems, Attempts, errors, and receipts.
-- [x] Block `catch` handlers are implemented.
-- [x] Block `finally` behavior is implemented.
-- [x] Machine initial state, entry, exit, transitions, timer transitions, event transitions, and final output are implemented.
-- [x] Parallel `all` completion is implemented.
-- [x] Parallel `first-completed` completion is implemented.
-- [x] Parallel `first-success` completion is implemented.
-- [x] Parallel `quorum` completion is implemented.
-- [x] Parallel `remaining: cancel` and `remaining: wait` are implemented.
-- [x] Parallel `fail-fast` and `collect` error behavior are implemented.
-- [x] Foreach ordering, concurrency, all completion policies, cancellation, isolated state, and merge behavior are implemented.
-- [x] Repeat `count`, `while`, `until`, timeout, carried state, local state, exhaustion, and `until-cancelled` lifecycle are implemented.
-- [x] Durable Fork WorkItems persist child ProgramFrame scheduling intent before child dispatch.
-- [x] Durable Join WorkItems persist child terminal aggregation before parent-frame continuation.
-- [x] `break` and `continue` work across nested repeat scopes.
-- [x] Event triggers are implemented through durable Session trigger registrations and transport-neutral event ingress.
-- [x] Schedule triggers are implemented through Runtime-owned durable interval and five-field cron timers.
-- [x] Trigger overlap and missed-occurrence policies are implemented for durable schedule registrations.
-- [x] Trigger state remains in the existing Session v3 document.
-- [ ] Event retention, event consumption, local channels, channel cursors, emit deduplication, human waits, completion waits, signals, and machine serialization are complete.
-- [ ] Attachment admission, snapshots, replay-safe materialization, and provider adaptation use Attachment Runtime.
-- [x] Agent and Workspace planning use their domain services.
-- [x] Model defaults layering and typed request patches use Model Runtime.
-- [ ] Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity execution use their domain binders.
-- [ ] MCP resources, prompts, Apps, approvals, App Tool calls, resource reads, and approved App context use MCP Runtime.
-- [ ] Skill sessions, active Skill lifecycle, Tool invocation, and resource handling use Skill Runtime.
-- [x] Provider streaming, protocol outputs, usage, debugger projections, Tool result continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency are implemented for current typed V3 paths.
-- [ ] Session V3 setup retains only typed routing, semantic binding adaptation, and lifecycle ownership.
-- [x] Session v2 behavior is unchanged and Session v2 does not depend on Session v3.
-- [x] Workflow HLDs are updated truthfully when functional behavior changes.
+### 13.1 Sequential execution
+
+The Workflow interpreter advances ordered steps only after the controlling predecessor settles.
+
+### 13.2 Fork
+
+A Fork WorkItem persists child ProgramFrame intents before child scheduling.
+
+A Fork WorkItem is required whenever child scheduling crosses a durable boundary.
+
+### 13.3 Join
+
+A Join WorkItem persists child terminal aggregation before a parent interpreter receives child settlement.
+
+A Join WorkItem is required whenever completion aggregation crosses a durable boundary.
+
+### 13.4 Parallel and Foreach
+
+Parallel and Foreach retain:
+
+- Selected branch or item identities.
+- Branch or item state.
+- Child frame identities.
+- Winner identities.
+- Cancellation requests.
+- Ordered outcomes.
+- Uncertain outcomes.
+- Merge behavior.
+
+### 13.5 Repeat
+
+Repeat retains:
+
+- Current iteration.
+- Carried state.
+- Local iteration state.
+- Last result.
+- Exhaustion state.
+- Deadline.
+- Nested break and continue behavior.
+
+### 13.6 Machine
+
+A machine retains:
+
+- Current state.
+- Entry time.
+- Transition generation.
+- Carried state.
+- Active subscriptions.
+- Timer WorkItems.
+- Event WorkItems.
+- Selected transition.
+- Current event.
+- Child block identities.
+
+## 14. Waits and timers
+
+A Wait WorkItem persists:
+
+- Wait identity.
+- Owner WorkItem identity.
+- Wait kind.
+- Typed request.
+- Deadline.
+- Timer state.
+- Subscription identity.
+- Channel cursor.
+- Completion handle.
+- Assignee facts.
+- Response schema.
+- Resolution.
+- Response.
+- Error.
+
+Runtime timers exist only in process memory.
+
+A durable timer is reconstructed from its persisted semantic timer state after restore completes.
+
+Retry timers and trigger timers follow the same rule.
+
+## 15. Event and channel coordination
+
+An event signal persists:
+
+- Source.
+- Identity.
+- Event name.
+- Data.
+- Correlation.
+- Time.
+- Consumption facts.
+
+Duplicate event identity is `(source, id)`.
+
+An event can be consumed once per subscription identity.
+
+A channel message persists:
+
+- Channel.
+- Sequence.
+- Identity.
+- Kind.
+- Data.
+- Correlation.
+- Deduplication key.
+- Consumption facts.
+
+A channel observe operation does not consume a message.
+
+A channel consume operation records the consuming wait identity.
+
+## 16. Trigger runtime
+
+A trigger registration persists:
+
+- Trigger identity.
+- Workflow Artifact pin.
+- Typed Workflow Program snapshot.
+- Trigger declaration identity.
+- Trigger kind.
+- Registration state.
+- Next schedule occurrence.
+- Last occurrence.
+- Last calendar local occurrence.
+- Accepted occurrences.
+- Queue state.
+
+A trigger occurrence persists:
+
+- Trigger identity.
+- External source.
+- External source identity.
+- Occurrence time.
+- Acceptance time.
+- Input.
+- Instance key.
+- Selected Execution.
+- Queue position.
+- State.
+- Typed error.
+
+The Runtime owns trigger timer rearming.
+
+Trigger timers start only after restore completes.
+
+A trigger does not create another persistence root.
+
+## 17. Effects, reconciliation, compensation, and cleanup
+
+### 17.1 Effect facts
+
+A WorkItem retains:
+
+- Effect contract.
+- Effect state.
+- Stable idempotency key.
+- Effect plan.
+- Reconciliation state.
+- Cleanup marker.
+- Receipt.
+- Error.
+
+An Attempt retains:
+
+- Attempt identity.
+- Stable idempotency key.
+- Effect state.
+- Receipt.
+- Error.
+- Deadline.
+
+An EffectRecord retains:
+
+- Original WorkItem identity.
+- Original ProgramFrame identity.
+- Saga identity.
+- Confirmation order.
+- Dependencies.
+- Typed original operation facts.
+- Compensation block.
+- Compensation policy.
+- Compensation WorkItem identity.
+- Compensation ProgramFrame identity.
+- Compensation receipt.
+- Compensation error.
+
+### 17.2 Reconciliation flow
+
+```text
+uncertain mutating WorkItem
+        |
+        v
+persist Reconciliation WorkItem
+        |
+        v
+start reconciliation child ProgramFrame
+        |
+        +-- applied ------> confirm original WorkItem
+        |
+        +-- not-applied --> retry only when policy permits
+        |
+        +-- unknown ------> typed recovery review wait
+```
+
+### 17.3 Compensation flow
+
+```text
+failed or cancelled Saga boundary
+        |
+        v
+select confirmed compensatable effects
+        |
+        v
+reverse dependency-aware order
+        |
+        v
+persist Compensation WorkItem
+        |
+        v
+start compensation child ProgramFrame
+        |
+        +-- success -----> record compensated
+        |
+        +-- failure -----> record typed cause
+```
+
+Unknown effects do not enter automatic compensation before reconciliation confirms application.
+
+### 17.4 Cleanup
+
+Cleanup is active after normal failure, timeout, or cancellation when finalization, reconciliation, compensation, or release work remains.
+
+Cleanup work can dispatch after normal cancellation only when it is marked as cleanup work and remains inside cleanup allowance.
+
+## 18. Cancellation and close
+
+Cancellation requests:
+
+- Stop queued normal WorkItems.
+- Cancel active normal dispatch contexts.
+- Cancel ordinary waits.
+- Cancel attached children.
+- Cancel eligible independent children.
+- Preserve uncertain dispatched mutations.
+- Permit bounded cleanup work.
+- Preserve cancellation as the primary terminal meaning.
+
+`Runtime.Close`:
+
+1. Marks the Runtime closed.
+2. Cancels lifecycle context.
+3. Cancels WorkItem dispatch contexts.
+4. Cancels wait timers.
+5. Cancels retry timers.
+6. Cancels trigger timers.
+7. Waits for owned asynchronous work.
+8. Closes process-private domain bindings.
+9. Closes process-private Skill sessions.
+10. Releases subscribers.
+
+## 19. Recovery
+
+Restore behavior:
+
+1. Restore all Session documents.
+2. Restore tombstones.
+3. Restore durable command records.
+4. Normalize private runtime handles out of durable state.
+5. Mark dispatched work uncertain when no confirmed terminal result exists.
+6. Rebind only replay-safe WorkItems through current dependency verification.
+7. Preserve stable keyed idempotency keys.
+8. Create recovery review waits for unresolved uncertainty.
+9. Rearm waits, retries, and triggers after complete restore.
+10. Resume only dispatchable WorkItems.
+
+Recovery never automatically replays uncertain non-idempotent work.
+
+Recovery never automatically compensates unknown effects.
+
+## 20. Commands and projections
+
+Commands are transport-neutral.
+
+Transport adapters can expose commands but must not own runtime semantics.
+
+Core command categories include:
+
+- Session creation, rename, defaults update, and deletion.
+- Message submission.
+- Workflow start.
+- Trigger event acceptance.
+- Execution signal.
+- WorkItem execution request.
+- Execution continue.
+- Wait resolution.
+- Execution pause.
+- Execution resume.
+- Execution cancellation.
+
+Core projections include:
+
+- Conversation projection.
+- Activity projection.
+- Workflow projection.
+- Execution projection.
+- Session list.
+- Execution list.
+- Search projection.
+
+Wails is an adapter.
+
+## 21. Functional completion
+
+Functional backend completion requires:
+
+- Full typed Workflow v1 support.
+- Durable external-work sequence for every external domain.
+- Typed planning before Model and Agent dispatch.
+- Typed callable target support.
+- Typed port support.
+- Typed coordination support.
+- Typed trigger support.
+- Typed effect, reconciliation, saga, compensation, and cleanup support.
+- Typed resource and budget support.
+- Session Runtime v3 backend parity for normal Session v2 behavior.
+- Durable persistence, recovery, cancellation, uncertainty, and command idempotency.
+
+Functional backend completion does not require:
+
+- Frontend migration.
+- Frontend V3 adoption.
+- Session v2 deletion.
+- Session Store v2 deletion.
+- Offline migration.
+- Legacy cleanup.
+
+## 22. Implementation status
+
+### Phase 1: architecture and durable core
+
+- [x] Session v3 is the only V3 durable root.
+- [x] Session Store v3 stores authoritative Session documents.
+- [x] Index and FTS records are derived.
+- [x] Tombstones are durable deletion barriers.
+- [x] Durable command idempotency exists.
+- [x] Runtime-owned timers have explicit close ownership.
+- [x] Restore runs before timer rearming.
+- [x] Private clients, credentials, callbacks, timers, and native handles remain non-durable.
+
+### Phase 2: ProgramFrames and WorkItem lifecycle
+
+- [x] Conversation ProgramFrames exist.
+- [x] Agent-loop ProgramFrames exist.
+- [x] Single-model ProgramFrames exist.
+- [x] Workflow ProgramFrames exist.
+- [x] Typed WorkItems, Attempts, Waits, receipts, errors, and outcomes exist.
+- [x] Typed external-work bind, dispatch, and settlement sequence exists.
+- [x] Typed retry schedule state exists.
+- [x] Typed timer wait state exists.
+- [x] Typed recovery review waits exist.
+- [ ] WorkItem-level resource acquisition and release exists.
+- [ ] WorkItem-level aggregate budget accounting exists.
+
+### Phase 3: callable targets
+
+- [x] Tool Artifact targets map to Tool WorkItems.
+- [x] MCP Tool targets map to Tool WorkItems with discovery binding.
+- [x] Service targets map to Service WorkItems.
+- [x] Activity targets map to Activity WorkItems.
+- [x] Nested Workflow targets map to child ProgramFrames.
+- [x] Agent targets map to child Agent-loop ProgramFrames.
+- [x] Model targets map to child single-model ProgramFrames.
+- [x] Static target sets persist member selection.
+- [x] Resolver-backed target sets persist resolver WorkItems and membership.
+- [x] Provider SDK Tools remain Model-plan-only capabilities.
+- [ ] Full callable interface context enforcement exists for every target kind.
+- [ ] Full callable interface port enforcement exists for every target kind.
+- [ ] Full receipt schema enforcement exists for every target kind.
+
+### Phase 4: planning and domain integration
+
+- [x] Model resolution is setup-owned.
+- [x] Provider configuration is setup-owned.
+- [x] Agent capability planning is setup-owned.
+- [x] Workspace planning is setup-owned.
+- [x] Text contribution planning is setup-owned.
+- [x] Go Tool binding is setup-owned.
+- [x] MCP discovery and policy binding are setup-owned.
+- [x] Skill resolution and Skill session setup are setup-owned.
+- [x] Service and Activity binding registration has a typed runtime boundary.
+- [ ] Typed attachment planning is setup-owned for V3.
+- [ ] Typed port planning is setup-owned for V3.
+- [ ] Full plan persistence facts exist for every Model and Agent contribution kind.
+
+### Phase 5: structured execution
+
+- [x] Sequence, transform, set, scope, choose, return, fail, break, and continue exist.
+- [x] Parallel completion modes exist.
+- [x] Parallel error policies exist.
+- [x] Foreach source ordering and concurrency state exist.
+- [x] Repeat controls and carried state exist.
+- [x] Machine lifecycle state exists.
+- [x] Catch and finally behavior exists.
+- [x] Fork WorkItems persist child scheduling boundaries.
+- [x] Join WorkItems persist child aggregation boundaries.
+- [ ] Resource and budget behavior is enforced inside Parallel and Foreach.
+- [ ] Cleanup behavior is enforced inside all structured cancellation paths.
+
+### Phase 6: coordination and triggers
+
+- [x] Timer waits exist.
+- [x] Event waits exist.
+- [x] Channel waits exist.
+- [x] Completion waits exist.
+- [x] Human waits exist.
+- [x] Signals use durable source and identity facts.
+- [x] Channel cursors and emit receipts exist.
+- [x] Trigger registrations persist in Session documents.
+- [x] Event trigger occurrences persist.
+- [x] Interval schedules exist.
+- [x] Five-field cron schedules exist.
+- [x] Trigger overlap policies exist.
+- [x] Missed-occurrence policies exist.
+- [ ] Subscription retention enforcement exists.
+- [ ] Subscription capacity enforcement exists.
+- [ ] Subscription byte-limit enforcement exists.
+- [ ] Full human response authorization exists.
+- [ ] Trigger administration commands exist.
+
+### Phase 7: effects and cleanup
+
+- [x] Effect kinds exist.
+- [x] Stable keyed idempotency keys exist.
+- [x] Effect state exists in WorkItems, Attempts, receipts, and errors.
+- [x] Effect operation facts are typed.
+- [x] Reconciliation WorkItem intent exists.
+- [x] Reconciliation decision union exists.
+- [x] Saga scope identity exists.
+- [x] Confirmed effect ledger records exist.
+- [x] Compensation WorkItem intent exists.
+- [x] Cleanup state exists.
+- [ ] Reconciliation execution is complete for all target kinds.
+- [ ] Reconciliation result validation is complete.
+- [ ] Confirmed non-application retry is complete.
+- [ ] Unknown reconciliation recovery review is complete in every path.
+- [ ] Reverse dependency-aware compensation is complete.
+- [ ] Compensation concurrency is complete.
+- [ ] Compensation `continue` behavior is complete.
+- [ ] Compensation `stop` behavior is complete.
+- [ ] Cleanup deadline expiry is complete.
+- [ ] Public projection of primary failure with compensation causes is complete.
+
+### Phase 8: normal Session capability
+
+- [x] Direct Model chat exists.
+- [x] Agent-backed chat exists.
+- [x] Provider streaming exists.
+- [x] Protocol output projections exist.
+- [x] Usage projections exist.
+- [x] Debugger projections exist.
+- [x] Tool result continuation exists.
+- [x] Go Tool execution path exists.
+- [x] Provider SDK Tool planning exists.
+- [x] MCP Tool execution path exists.
+- [x] Skill Tool execution path exists.
+- [x] MCP resources, prompts, Apps, approvals, App Tool calls, and App resource reads have domain routes.
+- [x] Skill session lifecycle has domain routes.
+- [ ] V3 attachment admission exists.
+- [ ] V3 replay-safe attachment materialization exists.
+- [ ] V3 historical attachment protection exists.
+- [ ] V3 provider attachment adaptation exists.
+- [ ] V3 Service binding composition is complete.
+- [ ] V3 Activity binding composition is complete.
+- [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
+
+### Phase 9: functional completion gate
+
+- [ ] Every valid Workflow v1 field has typed behavior, language-invalidity rejection, or pre-dispatch unavailable-binding failure.
+- [ ] No valid Workflow v1 field is silently omitted.
+- [ ] No valid Workflow v1 feature remains permanently unsupported because implementation is absent.
+- [ ] All external mutating work preserves uncertainty semantics through restart.
+- [ ] All typed WorkItems preserve cancellation, retry, deadline, panic, recovery, reconciliation, and compensation semantics.
+- [ ] V3 is a functional backend superset of normal Session v2 behavior.
+- [ ] Functional backend completion is reached.
+
+### Phase 10: aggregate stage after functional completion
+
+- [ ] Frontend V3 adoption.
+- [ ] Frontend command migration.
+- [ ] Offline Session v2 to Session v3 migration.
+- [ ] Session v2 deprecation.
+- [ ] Session Store v2 deprecation.
+- [ ] Legacy path deletion.
+- [ ] Aggregate cleanup.

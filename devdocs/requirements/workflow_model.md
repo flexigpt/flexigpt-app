@@ -1,79 +1,116 @@
 # Workflow Declaration and Flow Contract
 
-A Workflow is a composition of operations, not just a graph with additional restrictions. Structured blocks cover ordinary processes. Explicit state machines cover cyclic and event-driven lifecycles. Typed callable targets provide the extension point for domain-specific work.
+A Workflow is a typed durable process declaration.
 
-## 1. Decision and Scope
-
-### 1.1 Version decision
-
-This is the `v1` contract.
-
-It replaces the existing declaration through a breaking change. There are no current consumers, so the language needs no compatibility layer or legacy execution format.
-
-### 1.2 Core model
+An Agent defines reusable reasoning and interaction behavior. A Workflow defines process behavior, coordination, lifecycle, reliability, and business control flow.
 
 ```text
 Agent       = reusable reasoning and interaction configuration
 
-Workflow    = typed process, coordination, and lifecycle declaration
+Workflow    = typed durable process declaration
 
 Invocation  = one durable execution of a Workflow
 ```
 
-A Workflow owns process behavior:
+Workflow v1 is complete only when every valid declaration feature has a typed compiler path, typed runtime behavior, durable persistence semantics, and recovery behavior.
 
-- What work starts.
-- Which inputs each operation receives.
-- How work depends on other work.
-- How state changes.
-- Which events or decisions permit progress.
-- How success, failure, cancellation, and compensation affect the process.
+## 1. Scope and version
 
-An Agent owns its reasoning and internal interaction behavior. Workflows coordinate Agents in the same way that they coordinate other typed capabilities.
+### 1.1 Language version
 
-### 1.3 Coverage
+Workflow declarations use:
 
-The language supports:
+```yaml
+apiVersion: v1
+type: workflow
+```
 
-| Area         | Supported behavior                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| Work         | Agent, Tool, MCP Tool, Model, service, code activity, and nested Workflow calls.              |
-| Composition  | Sequences, choices, parallel branches, dependency-based work, and reusable subworkflows.      |
-| Dynamic work | Runtime target selection, dynamic collections, and planner-worker processes.                  |
-| Iteration    | Counted loops, conditional loops, iterative refinement, and concurrent collection processing. |
-| State        | Typed process state, explicit updates, and isolated parallel state.                           |
-| Coordination | Messages, signals, callbacks, typed streams, and conversation handoff.                        |
-| Human work   | Approvals, forms, assignments, escalation, and multi-person decisions.                        |
-| Time         | Delays, deadlines, expiry, recurring schedules, and missed-schedule behavior.                 |
-| Lifecycle    | Long-lived state machines, attached children, and independent processes.                      |
-| Reliability  | Retry, recovery, cancellation, reconciliation, and compensation.                              |
-| Control      | Execution budgets, concurrency limits, rate limits, and keyed resource claims.                |
+`apiVersion: v1` identifies the declaration language.
 
-Domain-specific algorithms and integrations are typed callable work. They do not require new control-flow constructs.
+The declaration language version is not the durable runtime payload version.
 
-### 1.4 Completion requirement
+The current typed runtime payload remains:
 
-Workflow v1 is complete only when every valid Workflow v1 declaration feature
-has typed compiler and interpreter behavior with durable recovery semantics.
+```text
+artifact.workflow.v1@1
+```
 
-Completion does not permit a valid Workflow v1 feature to remain permanently
-rejected because the runtime has not implemented it. Admission can reject:
+The runtime payload can change in place during development. It must not create `artifact.workflow.v1@2`. The declaration language version must remain `v1`.
 
-- Invalid declaration syntax or semantics.
-- Unsatisfied required Artifact pins or bindings.
-- Current policy, credential, approval, or external availability failures.
-- A declaration whose requested behavior is outside Workflow v1.
+### 1.2 Workflow responsibilities
 
-Admission cannot reject a valid Workflow v1 operation merely because the
-interpreter has no implementation for it at completion.
+A Workflow owns:
 
-The completed backend supports all work, composition, coordination, lifecycle,
-reliability, and control behavior listed in this document. A partial
-interpreter is an implementation stage, not the completion state.
+- Ordered work.
+- Typed callable invocation.
+- Runtime target selection.
+- Structured control flow.
+- State updates.
+- Parallel and collection execution.
+- State machines.
+- Events, channels, ports, waits, and human work.
+- Timers and schedules.
+- Trigger behavior.
+- Retry, reconciliation, compensation, and saga behavior.
+- Resource claims and budgets.
+- Cancellation and cleanup behavior.
 
-## 2. Document and Block Model
+A Workflow does not own:
 
-### 2.1 Root document
+- Artifact source parsing.
+- Artifact storage.
+- Credentials.
+- Provider configuration.
+- Provider clients.
+- Native file access.
+- MCP client sessions.
+- Browser state.
+- Frontend state.
+- Wails transport behavior.
+
+### 1.3 Agent responsibilities
+
+An Agent owns reusable reasoning and interaction configuration.
+
+An Agent can contribute:
+
+- A Model selection.
+- Text and instruction contributions.
+- Tool capabilities.
+- Skill capabilities.
+- MCP capabilities.
+- Model system-prompt behavior.
+- Agent-specific capability requirements.
+
+A Workflow can invoke an Agent as a typed callable target. The invocation creates a child Agent-loop ProgramFrame. A Workflow input must not become arbitrary chat text.
+
+### 1.4 Invocation responsibilities
+
+An Invocation is one durable Workflow execution.
+
+An Invocation owns:
+
+- Invocation input.
+- Selected Workflow definition pin.
+- ProgramFrames.
+- WorkItems.
+- Attempts.
+- Waits.
+- Timers.
+- Trigger occurrences.
+- Event and channel records.
+- Effect facts.
+- Reconciliation facts.
+- Compensation facts.
+- Resource claims.
+- Budgets.
+- Execution outcome.
+
+The existing Session v3 document is the only durable root for an Invocation.
+
+## 2. Root declaration
+
+A root Workflow declaration has this shape:
 
 ```yaml
 apiVersion: v1
@@ -86,199 +123,214 @@ inputSchema:
 outputSchema:
   type: object
 
+schemas: {}
+
 targets: {}
+
+targetSets: {}
+
+events: {}
+
+channels: {}
+
+ports: {}
+
+triggers: {}
+
+requirements: {}
+
+resources: {}
+
+limits: {}
+
+state:
+  schema:
+    type: object
+  initial: {}
+
+listen: {}
 
 steps: []
 
 output: {}
+
+catch: []
+
+finally:
+  steps: []
 ```
 
-| Field          | Required | Meaning                                        |
-| -------------- | -------: | ---------------------------------------------- |
-| `apiVersion`   |      Yes | Language version. Must be `v1`.                |
-| `type`         |      Yes | Must be `workflow`.                            |
-| `name`         |      Yes | Portable Workflow name.                        |
-| `inputSchema`  |      Yes | Accepted invocation input.                     |
-| `outputSchema` |      Yes | Successful invocation output.                  |
-| `schemas`      |       No | Reusable schema definitions.                   |
-| `targets`      |       No | Named callable dependencies.                   |
-| `targetSets`   |       No | Allowed target sets for dynamic dispatch.      |
-| `events`       |       No | Typed external event contracts.                |
-| `channels`     |       No | Workflow-local typed message channels.         |
-| `ports`        |       No | Published typed message or stream ports.       |
-| `triggers`     |       No | Event and schedule entry points.               |
-| `requirements` |       No | Additional named capability requirements.      |
-| `resources`    |       No | Named concurrency and rate-control resources.  |
-| `limits`       |       No | Invocation budgets and deadlines.              |
-| `state`        |       No | Initial typed process state.                   |
-| `listen`       |       No | Event subscriptions active for the root scope. |
-| `steps`        |      Yes | Ordered root steps.                            |
-| `output`       |      Yes | Explicit successful output mapping.            |
-| `catch`        |       No | Error handlers.                                |
-| `finally`      |       No | Finalization block.                            |
+| Field          |                 Required | Meaning                                            |
+| -------------- | -----------------------: | -------------------------------------------------- |
+| `apiVersion`   | Yes in standalone source | Must be `v1`.                                      |
+| `type`         |                      Yes | Must be `workflow`.                                |
+| `name`         |                      Yes | Portable Workflow name.                            |
+| `inputSchema`  |                      Yes | JSON Schema for invocation input.                  |
+| `outputSchema` |                      Yes | JSON Schema for successful root output.            |
+| `schemas`      |                       No | Reusable JSON Schema definitions.                  |
+| `targets`      |                       No | Named callable targets.                            |
+| `targetSets`   |                       No | Static or resolver-backed target collections.      |
+| `events`       |                       No | Typed external event contracts.                    |
+| `channels`     |                       No | Invocation-local durable message logs.             |
+| `ports`        |                       No | Published typed port bindings.                     |
+| `triggers`     |                       No | Event and schedule entry points.                   |
+| `requirements` |                       No | Named capability requirements.                     |
+| `resources`    |                       No | Named claimable resource definitions.              |
+| `limits`       |                       No | Invocation limits and cleanup allowance.           |
+| `state`        |                       No | Root typed state declaration.                      |
+| `listen`       |                       No | Root subscriptions active before root work begins. |
+| `steps`        |                      Yes | Ordered root steps.                                |
+| `output`       |                      Yes | Explicit successful root output mapping.           |
+| `catch`        |                       No | Ordered root failure handlers.                     |
+| `finally`      |                       No | Root finalization block.                           |
 
-Requirements implied by the declaration are automatic. For example, a call that connects a streaming port requires streaming support. Authors need not repeat that requirement in a feature list.
+The root Workflow has no implicit output. The final successful result is the value of `output` or a selected Workflow-level `return`.
 
-### 2.2 Blocks
-
-A block is the basic unit of composition.
+## 3. Blocks and step identity
 
 A block contains:
 
-- An ordered `steps` array.
-- An optional `output` mapping.
-- Optional local `state`.
-- Optional event subscriptions in `listen`.
-- Optional `catch` handlers.
-- An optional `finally` block.
-
-Steps run in declaration order unless a composition operation introduces concurrency.
-
-A nested block returns its explicit `output`. Its default output is `null`. The root Workflow always declares `output`.
-
-There is no implicit last-step result.
-
-### 2.3 Steps
-
-Each step has an `id` and exactly one operation.
+- Optional local state.
+- Optional subscriptions.
+- Ordered steps.
+- Explicit output.
+- Optional ordered catch handlers.
+- Optional finalizer.
 
 ```yaml
-- id: research
-  when:
-    $expr: input.includeResearch
+steps:
+  - id: prepare
+    transform:
+      value:
+        request:
+          $expr: input.request
 
-  timeout: PT2M
-
-  retry:
-    maxAttempts: 3
-    match:
-      categories: [transient, timeout]
-    backoff:
-      initial: PT1S
-      maximum: PT20S
-      multiplier: 2
-
-  call:
-    target: researcher
-    input:
-      request:
-        $expr: input.request
+output:
+  prepared:
+    $expr: steps.prepare.output
 ```
 
-Common step fields are:
+A block output defaults to `null` only when the block grammar permits omission. The root output is always explicit.
 
-| Field             | Meaning                                                               |
-| ----------------- | --------------------------------------------------------------------- |
-| `id`              | Stable identity within its block.                                     |
-| `when`            | Boolean condition evaluated before the operation starts.              |
-| `timeout`         | Maximum elapsed duration, including retries and waits.                |
-| `retry`           | Retry policy for the logical operation.                               |
-| `effect`          | Effect classification, idempotency, reconciliation, and compensation. |
-| `claims`          | Required named resource claims.                                       |
-| `limits`          | Lower limits for this step and its descendants.                       |
-| One operation key | The work or composition performed by the step.                        |
+A step identity is unique within its block.
 
-Step IDs are unique within their block. A nested block cannot shadow an enclosing step ID that remains visible.
+A nested step identity must not shadow an enclosing visible step identity.
 
-An operation instance has its own identity for each loop iteration or collection item. Retry attempts retain the same logical operation identity.
+A logical operation identity includes:
 
-## 3. Values, Types, and State
+- Workflow definition identity.
+- ProgramFrame path.
+- Step identity.
+- Repeat iteration identity.
+- Foreach item index.
+- Target-set selection identity.
+- Retry attempt sequence.
 
-### 3.1 Schemas
+A retry does not create a new logical operation identity.
 
-Workflow uses JSON Schema Draft 2020-12 for:
+A Repeat iteration and a Foreach item do create a new logical operation identity.
 
-- Workflow input and output.
-- Callable interfaces.
-- Process state.
-- Events and messages.
-- Human responses.
-- Optional intermediate-result constraints.
+## 4. Values, schemas, and expressions
 
-Schema references resolve from the declaration and its declared schema dependencies.
+### 4.1 Canonical JSON values
 
-Validation occurs when a value crosses its declared boundary. Static checks validate what can be established from the declaration. Data-dependent constraints are checked when values become available.
+Workflow values can be:
 
-A business rejection can be a valid output. Schema validity and business acceptance are separate decisions.
-
-### 3.2 Value construction
-
-A value is a JSON literal, an object, an array, or an expression.
+- JSON literals.
+- Objects.
+- Arrays.
+- CEL expressions.
+- Explicit literal directives.
 
 ```yaml
 input:
   request:
     $expr: input.request
-  documents:
-    $expr: input.documents.filter(d, d.enabled)
-  language:
-    $expr: "has(input.language) ? input.language : 'en'"
-  mode: concise
+  language: en
+  flags:
+    - concise
+    - reviewed
 ```
 
-An expression uses a single-key object:
+A CEL expression uses one field:
 
 ```yaml
 $expr: input.price * input.quantity
 ```
 
-Ordinary strings remain literal strings. A literal directive-shaped value can use `$literal`.
-
-Expressions use CEL with a defined, pure standard library for:
-
-- Boolean logic and comparison.
-- Arithmetic.
-- Conditional values.
-- Strings.
-- Lists and maps.
-- Collection filtering and projection.
-- Presence checks.
-- Timestamps and durations.
-
-Expressions construct values and evaluate conditions. Custom algorithms and external access use typed callable targets.
-
-All expressions in one binding operation see the same input snapshot.
-
-### 3.3 Expression scopes
-
-| Scope       | Meaning                                                           |
-| ----------- | ----------------------------------------------------------------- |
-| `input`     | Immutable Workflow invocation input.                              |
-| `state`     | Current state of the nearest state-owning scope.                  |
-| `steps`     | Completed step outcomes in the current and enclosing blocks.      |
-| `item`      | Current collection item.                                          |
-| `index`     | Current collection index.                                         |
-| `result`    | Current controlled-block result, where the construct defines one. |
-| `event`     | Event currently being matched or handled.                         |
-| `messages`  | Authorized channel snapshots at the binding boundary.             |
-| `error`     | Error being handled.                                              |
-| `outcome`   | Block outcome available during finalization.                      |
-| `completed` | Confirmed operation data available during compensation.           |
-| `operation` | Original operation data available during reconciliation.          |
-| `context`   | Defined invocation metadata and logical evaluation time.          |
-
-For example:
+A literal directive suppresses expression interpretation:
 
 ```yaml
-$expr: steps.research.output.findings
+$literal:
+  $expr: this-is-data
 ```
 
-A nested block can read completed enclosing results. Parallel branches cannot read each other’s unfinished results.
+Ordinary strings are literal strings.
 
-Missing values produce a binding error unless the expression handles absence. Conditional expressions evaluate only the selected branch.
+### 4.2 Schema boundaries
 
-### 3.4 Step outcomes
+Workflow uses JSON Schema Draft 2020-12 at these boundaries:
 
-A completed step has an outcome:
+- Invocation input.
+- Invocation output.
+- State initialization and state updates.
+- Target input.
+- Target output.
+- Target error.
+- Target receipt.
+- Event data.
+- Event correlation.
+- Channel message data.
+- Human response.
+- Foreach item.
+- Step output when `outputSchema` is declared.
+- Port payloads.
+- Trigger input.
 
-```text
-status
-output, when successful
-error, when failed or uncertain
-metadata
-```
+Schema validity and business success are separate concepts.
 
-Terminal statuses are:
+A business decline can be valid output data.
+
+### 4.3 Expression scope
+
+Expressions can use these variables where the controlling construct provides them:
+
+| Variable    | Meaning                                                 |
+| ----------- | ------------------------------------------------------- |
+| `input`     | Immutable invocation input.                             |
+| `state`     | Current state of the nearest state-owning scope.        |
+| `steps`     | Completed step outcomes in the visible scope chain.     |
+| `item`      | Current Foreach item.                                   |
+| `index`     | Current Foreach or Repeat index.                        |
+| `result`    | Controlled-block result where defined.                  |
+| `event`     | Current matched event, trigger event, or machine event. |
+| `messages`  | Authorized channel snapshot at the evaluation boundary. |
+| `error`     | Error visible to a catch handler.                       |
+| `outcome`   | Scope outcome visible to finalization.                  |
+| `completed` | Confirmed operation facts visible to compensation.      |
+| `operation` | Original operation facts visible to reconciliation.     |
+| `context`   | Invocation metadata and logical evaluation time.        |
+
+Expressions are pure.
+
+Expressions cannot:
+
+- Call external services.
+- Read files.
+- Resolve Artifacts.
+- Resolve credentials.
+- Open MCP connections.
+- Invoke Tools.
+- Invoke Models.
+- Invoke Agents.
+- Start timers.
+- Mutate state.
+
+External behavior must use a typed callable target or a Workflow operation.
+
+### 4.4 Step outcomes
+
+A completed Workflow step has one terminal outcome:
 
 ```text
 succeeded
@@ -288,76 +340,88 @@ cancelled
 uncertain
 ```
 
-A false `when` condition produces `skipped`, with no output.
+A successful outcome can contain:
 
-Pending, running, and waiting states can be observed during execution, but their unfinished outputs are unavailable to expressions.
+- Typed output.
+- Selected target identity.
+- Receipt facts.
+- Effect facts.
 
-### 3.5 Process state
+A false `when` condition produces `skipped`.
 
-State is optional and explicitly typed.
+A skipped outcome has no output.
+
+An uncertain outcome indicates that an external effect may have happened but cannot yet be confirmed.
+
+## 5. State
+
+### 5.1 State declaration
 
 ```yaml
 state:
   schema:
     type: object
-    required: [attempts, approved]
+    required: [attempts]
     properties:
       attempts:
         type: integer
         minimum: 0
-      approved:
-        type: boolean
     additionalProperties: false
-
   initial:
     attempts: 0
-    approved: false
 ```
 
-`set` applies one atomic state update:
+State is optional.
+
+A state declaration creates a state-owning scope.
+
+A nested block without local state reads and updates the nearest enclosing state-owning scope.
+
+A nested block with local state initializes and owns its own state.
+
+### 5.2 Atomic update
 
 ```yaml
-- id: record-review
+- id: record
   set:
     values:
       attempts:
         $expr: state.attempts + 1
-      approved:
-        $expr: steps.review.output.approved
+    remove:
+      - obsoleteField
 ```
 
-All update expressions read the previous state snapshot. The complete updated state must satisfy its schema.
+All assignment expressions observe the same prior state snapshot.
 
-`set` supports:
+The complete resulting state must validate against the owning state schema.
 
-- `values`: shallow field assignments.
-- `remove`: field names to remove.
+`set` returns the resulting state.
 
-It returns the updated state.
+### 5.3 Isolated concurrent state
 
-A nested state declaration creates local state. A sequential block without local state uses the enclosing state.
+Parallel branches and Foreach items receive isolated state snapshots.
 
-Parallel branches and collection items receive isolated state snapshots. Their changes become parent state only through an explicit merge after their results are available.
+Their local state cannot race or mutate parent state directly.
 
-## 4. Callable Work
+A parent state changes only through an explicit merge rule after child results are available.
 
-### 4.1 Targets
+## 6. Callable targets
 
-Targets have a named reference and a typed interface.
+### 6.1 Target kinds
 
 ```yaml
 targets:
-  researcher:
+  research-agent:
     kind: agent
     ref: researcher
-
-  release-items:
-    kind: tool
-    ref: issue-tracker.list-release-items
 
   summarize:
     kind: model
     ref: summary-model
+
+  list-issues:
+    kind: tool
+    ref: issues.list
 
   publish:
     kind: service
@@ -372,76 +436,133 @@ targets:
     ref: review-process
 ```
 
-| Kind       | Meaning                                                             |
-| ---------- | ------------------------------------------------------------------- |
-| `agent`    | Reusable reasoning and interaction capability.                      |
-| `tool`     | Named Tool operation, including an MCP Tool.                        |
-| `model`    | Direct Model request with a declared request and response contract. |
-| `service`  | Typed local or remote service operation.                            |
-| `activity` | Named program, function, script, or worker activity.                |
-| `workflow` | Another Workflow.                                                   |
+Supported target kinds are:
 
-The target interface declares:
+| Kind       | Meaning                              |
+| ---------- | ------------------------------------ |
+| `agent`    | Reusable Agent capability.           |
+| `model`    | Direct Model request.                |
+| `tool`     | Tool Artifact or MCP Tool operation. |
+| `service`  | Registered typed Service binding.    |
+| `activity` | Registered typed Activity binding.   |
+| `workflow` | Nested Workflow declaration.         |
 
-- Input, output, and error schemas.
-- Supported invocation modes.
+A Tool target with `server` is an MCP Tool target.
+
+```yaml
+targets:
+  publish-issue:
+    kind: tool
+    server:
+      name: issue-tracker
+    ref: publish_issue
+```
+
+### 6.2 Callable interface
+
+A target, target set, or call can declare a callable interface.
+
+```yaml
+interface:
+  inputSchema:
+    type: object
+  outputSchema:
+    type: object
+  errorSchema:
+    type: object
+  receiptSchema:
+    type: object
+  modes: [invoke, start]
+  context: {}
+  ports: {}
+  effect:
+    kind: keyed
+    keyed: true
+```
+
+A callable interface defines:
+
+- Input schema.
+- Output schema.
+- Error schema.
+- Receipt schema.
+- Supported modes.
 - Accepted context forms.
-- Typed message and streaming ports.
-- Effect and idempotency behavior.
-- Applicable capability limits.
+- Typed ports.
+- Effect capability.
+- Capability limits.
 
-A target binding supplies transport, authentication, and deployment details. Local and remote bindings use the same flow contract.
+A call-level interface can narrow a target interface. It must not widen the target interface.
 
-### 4.2 Invoke
-
-`call` defaults to typed call-return behavior.
+### 6.3 Invocation
 
 ```yaml
 - id: research
   call:
-    target: researcher
+    target: research-agent
     input:
       request:
         $expr: input.request
     context:
       messages:
         $expr: messages.research
-      attachments:
-        $expr: input.attachments
 ```
 
-The call validates its input, invokes the target, and returns typed output or a typed error.
+A call evaluates input and context once.
 
-A nested Workflow receives the mapped input as its own invocation input.
+The selected concrete target, prepared input, selected target-set membership, effect key, retry identity, and deadline remain stable for that logical operation.
 
-Direct Model calls are part of this contract. Their interfaces define request messages, generation parameters, structured output, and available stream ports.
+### 6.4 Modes
 
-### 4.3 Explicit context transfer
+| Mode      | Meaning                                            |
+| --------- | -------------------------------------------------- |
+| `invoke`  | Typed call-return behavior.                        |
+| `start`   | Starts child work and returns a completion handle. |
+| `handoff` | Transfers conversation ownership to an Agent.      |
 
-Only mapped call input, context, and ports cross the target boundary.
+`invoke` is the default.
 
-Context can include explicit projections of:
+`start` supports:
 
-- Conversation history.
-- Channel messages.
-- Attachments.
-- Tool results.
-- Prior Agent outputs.
-- Other permitted context.
+| Lifetime      | Meaning                                                          |
+| ------------- | ---------------------------------------------------------------- |
+| `attached`    | Child belongs to the parent scope.                               |
+| `independent` | Child becomes a separate Execution in the same Session document. |
 
-Omitted context is empty.
+An independent child has:
 
-Incoming content retains its declared data or context classification. It does not acquire instruction authority merely because another Agent or Tool produced it.
+- Parent Execution identity.
+- Root Execution identity.
+- Ownership facts.
+- Cancellation relationship.
+- Child budget.
+- Completion handle.
 
-### 4.4 Dynamic dispatch
+`handoff` is valid only for an Agent target.
 
-A call can select its target at runtime.
+A handoff declares:
+
+- Conversation identity.
+- Target Agent.
+- Ownership.
+- Completion behavior.
+
+Completion behavior is:
+
+| Value     | Meaning                                                             |
+| --------- | ------------------------------------------------------------------- |
+| `restore` | Restore the previous conversation owner after child completion.     |
+| `retain`  | Keep the target Agent as conversation owner after child completion. |
+
+### 6.5 Target sets
+
+A target set limits dynamic dispatch.
 
 ```yaml
 targetSets:
   specialists:
     members:
-      - researcher
+      - analyst
       - reviewer
 ```
 
@@ -455,438 +576,104 @@ targetSets:
       $expr: steps.plan.output.task
 ```
 
-The selected target must belong to the allowed set and satisfy the call’s interface.
+A static target set has explicit members.
 
-A target set can be:
+A resolver-backed target set has:
 
-- An explicit member list.
-- A typed, constrained set supplied by an authorized resolver.
+- A resolver value.
+- A callable interface.
+- Optional constraints.
 
-Resolver work is an ordinary call. This makes discovery failures, timing, and retries explicit.
+The runtime creates a typed resolver WorkItem at the first call boundary.
 
-Heterogeneous targets can use `choose` blocks or typed adapters to map their different interfaces.
+The resolver WorkItem persists normalized allowed membership before target selection.
 
-The concrete target is fixed once the operation starts. Retry and resumption use that same target.
+The selected target identity becomes part of the durable step outcome.
 
-### 4.5 Asynchronous work
+A retry, wait, recovery operation, or resumed operation uses the persisted membership and selected target identity.
 
-A call can start work and return a handle:
+### 6.6 Provider-managed Tool Artifacts
 
-```yaml
-- id: start-analysis
-  call:
-    target: analyzer
-    mode: start
-    lifetime: attached
-    input:
-      $expr: input.document
+A provider SDK Tool Artifact is a provider-managed Model capability.
 
-- id: collect-analysis
-  wait:
-    for: completion
-    handle:
-      $expr: steps['start-analysis'].output.handle
-```
+It can appear only in a typed Model execution plan.
 
-`lifetime` is:
+It must not become:
 
-| Value         | Meaning                                                                     |
-| ------------- | --------------------------------------------------------------------------- |
-| `attached`    | Work belongs to the enclosing scope. This is the default.                   |
-| `independent` | Work becomes a separately owned process with its own lifecycle and budgets. |
+- A local Tool WorkItem.
+- A synthetic local result.
+- A fabricated local success.
+- A local retry target.
 
-An attached scope settles its children before it completes. Failure or cancellation propagates to attached work.
+A Workflow call to a provider-managed Tool Artifact requires a typed Model plan that owns the provider Tool choice. If such a plan is unavailable, admission or binding fails before unrelated external work begins.
 
-An independent start returns a reference, not the child’s final result. Its ownership and cancellation relationship are explicit. This supports background business processes without confusing them with ordinary subroutine calls.
+## 7. Context, ports, and channels
 
-Async starts and completion waits can express dependency DAGs that do not fit a simple nested fork-join structure.
+### 7.1 Explicit context transfer
 
-### 4.6 Conversation handoff
+Only mapped input, context, ports, and copied message values cross a target boundary.
 
-`mode: handoff` is an Agent call that changes conversation ownership.
+A target does not implicitly receive:
 
-It declares:
+- Whole Session history.
+- Workspace files.
+- Tool outputs.
+- Attachments.
+- Agent outputs.
+- Channel logs.
+- Credentials.
+- Native paths.
+- App state.
 
-- The bound conversation.
-- The target Agent.
-- The transferred input and context.
-- Whether completion restores the source owner or retains the target owner.
+### 7.2 Ports
 
-Ownership changes after target acceptance. The target’s result follows normal success, failure, wait, cancellation, and uncertainty semantics.
+A port is a typed named boundary between a caller and a target.
 
-`invoke` delegates work. `handoff` transfers conversation ownership. These are separate authoring decisions.
-
-### 4.7 Typed ports and streams
-
-Targets can declare typed input and output ports. A call can connect a port to a local channel:
+A callable port declares:
 
 ```yaml
 ports:
   progress:
-    channel: analysis-progress
-    access: write
-```
-
-Port direction, schema, and permissions must agree.
-
-Ports support:
-
-- Progress updates.
-- Model or Agent output streams.
-- Incremental results.
-- Live parent-child messaging.
-
-Final call output remains separate from streamed messages.
-
-## 5. Composition and Control Flow
-
-### 5.1 Operation set
-
-| Operation   | Purpose                                                   |
-| ----------- | --------------------------------------------------------- |
-| `call`      | Invoke, start, dispatch, or hand off to a target.         |
-| `transform` | Construct a deterministic value.                          |
-| `set`       | Update typed process state.                               |
-| `scope`     | Create a nested block and lifecycle boundary.             |
-| `choose`    | Select one conditional block.                             |
-| `parallel`  | Run named branches with a completion policy.              |
-| `foreach`   | Process a captured collection.                            |
-| `repeat`    | Repeat a process with carried state.                      |
-| `machine`   | Execute an explicit state lifecycle.                      |
-| `wait`      | Suspend for time, events, completion, or human input.     |
-| `emit`      | Append or publish a typed message or event.               |
-| `saga`      | Coordinate compensatable effects.                         |
-| `cancel`    | Request cancellation of referenced work.                  |
-| `return`    | Complete a block or the Workflow with an explicit result. |
-| `fail`      | Produce a typed error.                                    |
-| `break`     | Exit the nearest Repeat.                                  |
-| `continue`  | Complete the current Repeat iteration.                    |
-
-### 5.2 Transform
-
-```yaml
-- id: prepare-request
-  transform:
-    value:
-      title:
-        $expr: input.title
-      enabledDocuments:
-        $expr: input.documents.filter(d, d.enabled)
-    outputSchema:
+    direction: output
+    stream: true
+    schema:
       type: object
-      required: [title, enabledDocuments]
 ```
 
-A transform returns `value`. Its optional `outputSchema` constrains the constructed result.
-
-### 5.3 Choice
-
-`choose` evaluates ordered cases and runs the first matching block.
+A call binds a target port to a Workflow channel:
 
 ```yaml
-- id: decide
-  choose:
-    cases:
-      - when:
-          $expr: steps.review.output.approved
-        do:
-          steps: []
-          output:
-            status: approved
-
-    default:
-      steps: []
-      output:
-        status: needs-revision
+call:
+  target: analyzer
+  ports:
+    progress:
+      channel: analysis-progress
+      access: write
 ```
 
-Each case is `{when, do}`. `default` is an optional block.
+Port validation checks:
 
-The selected block’s output becomes the choice output. No match and no default produces `routing.no_match`.
+- Port name.
+- Port direction.
+- Stream capability.
+- Channel existence.
+- Channel read or write authorization.
+- Source schema.
+- Destination schema.
+- Parent-child ownership.
+- Target interface compatibility.
 
-Inclusive conditional branching uses guarded parallel branches.
+Input ports transfer authorized retained channel values or explicitly mapped values.
 
-### 5.4 Parallel work
+Output ports transfer final target values.
 
-`parallel.branches` is a map from branch name to `{when?, do}`.
+Streamed ports transfer ordered incremental values.
 
-All branch conditions evaluate from the same entry snapshot. Only selected branches participate in completion.
+A final call output remains separate from a streamed port.
 
-```yaml
-parallel:
-  completion:
-    mode: all
-  errors: collect
-  branches:
-    legal:
-      do:
-        steps: []
-        output:
-          required: true
+### 7.3 Channels
 
-    security:
-      when:
-        $expr: input.requiresSecurityReview
-      do:
-        steps: []
-        output:
-          required: true
-```
-
-Completion policies are:
-
-| Mode              | Completion condition                                     |
-| ----------------- | -------------------------------------------------------- |
-| `all`             | Every selected branch succeeds.                          |
-| `first-completed` | The first terminal branch outcome determines the result. |
-| `first-success`   | The first successful branch wins.                        |
-| `quorum`          | A declared positive number of branches succeed.          |
-
-For `all`, `errors` is:
-
-- `fail-fast`: stop remaining work after a failure.
-- `collect`: wait for all branches and return their outcomes.
-
-For `first-success` and `quorum`, ordinary branch failures are retained while the required success remains possible. If success becomes impossible, the operation returns an aggregate error.
-
-`remaining` is `cancel` or `wait`, with `cancel` as the default.
-
-The result contains named branch outcomes and, where applicable, winning branch names. Unselected branches are `skipped`.
-
-The operation settles remaining attached work before returning. Uncertain effects remain visible even when another branch satisfies the success condition.
-
-### 5.5 Foreach
-
-```yaml
-foreach:
-  items:
-    $expr: input.files
-  itemSchema:
-    type: object
-  concurrency: 4
-  maxItems: 1000
-  errors: collect
-  do:
-    steps: []
-    output:
-      name:
-        $expr: item.name
-      position:
-        $expr: index
-```
-
-Foreach behavior:
-
-- Captures the source collection once.
-- Validates each item.
-- Creates isolated item scopes.
-- Runs within effective concurrency and resource limits.
-- Returns item outcomes in source order.
-- Returns an empty collection for empty input under `all` completion.
-
-Foreach supports the same completion policies as Parallel. This permits all-item processing, first-match searches, and quorum processing.
-
-Its result contains `items`, an ordered array of outcomes, and winning indices when applicable.
-
-`maxItems` is an optional author limit. Platform and inherited work budgets still apply.
-
-### 5.6 Repeat
-
-Repeat supports:
-
-- `count`: a fixed number of iterations.
-- `while`: a condition checked before each iteration.
-- `until`: a condition checked after each iteration.
-- `lifetime: until-cancelled`: an explicitly ongoing process.
-
-Exactly one of these controls is selected.
-
-A Repeat can declare local carried `state`. Its `do` block runs once per iteration. State initialization occurs once when the Repeat starts.
-
-Optional controls are:
-
-- `maxIterations`.
-- `timeout`.
-- `onExhausted: fail` or `return`, defaulting to `fail`.
-
-The body can update carried state with `set`. A body-local state declaration is initialized separately for each iteration.
-
-The result is:
-
-```text
-state
-result       = final body output, or null if no iteration ran
-iterations
-exhausted
-```
-
-The termination condition is checked before exhaustion is declared.
-
-Retry reattempts the same logical operation. Repeat performs a new process iteration with current state and new operation instances.
-
-### 5.7 Early completion
-
-`return` contains a value and a destination:
-
-```yaml
-return:
-  to: workflow
-  value:
-    status: already-complete
-```
-
-`to` is `block` or `workflow`, defaulting to `block`.
-
-A Workflow-level return cancels remaining attached work, runs finalization, and validates the selected result against `outputSchema`.
-
-A first accepted Workflow-level return determines the selected result when concurrent returns race. Outstanding uncertain effects remain part of the invocation outcome.
-
-`break` and `continue` apply to Repeat. Per-item early completion uses block return. Early collection completion uses Foreach completion policies.
-
-## 6. State Machines and Long-Lived Processes
-
-A state machine represents a business lifecycle with named states and explicit transitions.
-
-It is appropriate when the process can revisit states, wait for different events, or remain active for a long period.
-
-A machine declares:
-
-- `initial`: initial state name.
-- Optional carried `state`.
-- Optional `listen` subscriptions.
-- Named `states`.
-
-Each state can declare:
-
-- `entry`: a block run on entry.
-- `exit`: a block run on exit.
-- Ordered `transitions`.
-- `final: true` and an `output`.
-
-A transition contains:
-
-- An event subscription, an `after` timer, or an immediate condition.
-- Optional `when`.
-- Optional `do`.
-- A destination `to`.
-
-```yaml
-machine:
-  initial: open
-
-  listen:
-    updates:
-      event: case-updated
-      correlation:
-        caseId:
-          $expr: input.caseId
-
-  states:
-    open:
-      transitions:
-        - event: updates
-          when:
-            $expr: event.data.action == 'close'
-          to: closed
-
-        - event: updates
-          to: open
-
-        - after: P30D
-          to: expired
-
-    closed:
-      final: true
-      output:
-        status: closed
-
-    expired:
-      final: true
-      output:
-        status: expired
-```
-
-In this example, each update re-enters `open` and restarts its inactivity timer.
-
-Transition semantics are:
-
-- Entry actions finish before transition selection.
-- Immediate transitions are checked first.
-- Event and timer transitions then wait for an eligible occurrence.
-- For the same occurrence, the first matching transition wins.
-- The machine exits the current state, runs transition actions, and enters the destination.
-- A state timer starts on entry and ends on exit.
-- A final state returns its explicit output.
-
-Event handling is serialized within one machine. Parallel machines express independent lifecycles.
-
-Machines can contain ordinary Workflow blocks, including nested machines. Repeat remains the simpler form for iterative computation.
-
-## 7. Events, Messages, Human Work, and Time
-
-### 7.1 External events
-
-An event has a typed envelope:
-
-```text
-id
-type
-source
-data
-correlation
-time
-```
-
-An event declaration defines its data schema and source contract.
-
-A subscription in `listen` specifies:
-
-- Event contract.
-- Correlation values.
-- Optional filtering.
-- Retention and capacity constraints.
-
-Subscriptions become active when their scope starts, before its steps execute.
-
-This makes request-and-callback processes safe when a callback arrives before the corresponding wait.
-
-```yaml
-- id: payment
-  scope:
-    listen:
-      confirmation:
-        event: payment-confirmed
-        correlation:
-          orderId:
-            $expr: input.orderId
-
-    steps:
-      - id: request-payment
-        call:
-          target: payments-request
-          input:
-            orderId:
-              $expr: input.orderId
-
-      - id: receive-confirmation
-        timeout: PT15M
-        wait:
-          for: event
-          subscription: confirmation
-
-    output:
-      $expr: steps['receive-confirmation'].output.data
-```
-
-Matching events remain available within subscription retention until consumed.
-
-An event wait can consume an event or observe it. Consumption affects that subscription, not every other subscriber.
-
-Duplicate identity is defined by source and event ID. Accepted order is defined per subscription; unrelated sources have no implied global order.
-
-### 7.2 Local channels
-
-A channel is a typed append-only log within an invocation.
+A channel is an invocation-local append-only durable message log.
 
 ```yaml
 channels:
@@ -897,14 +684,32 @@ channels:
       properties:
         notes:
           type: string
-      additionalProperties: false
+    additionalProperties: false
     maxMessages: 50
     maxBytes: 262144
+    readers:
+      - review
+    writers:
+      - draft
 ```
 
-Channels can restrict writers and readers by declared step path.
+A channel message has:
 
-`emit` appends a local message or publishes an external event.
+- Message identity.
+- Sequence.
+- Channel identity.
+- Kind.
+- Data.
+- Correlation.
+- Deduplication key.
+- Creation time.
+- Consumption facts.
+
+Channel reads are non-destructive unless a wait explicitly consumes a message.
+
+A consume operation is scoped to a wait or subscription identity. It does not globally remove the message.
+
+### 7.4 Emit
 
 ```yaml
 - id: publish-draft
@@ -919,590 +724,922 @@ Channels can restrict writers and readers by declared step path.
       $expr: input.requestId
 ```
 
-An emit returns a receipt.
+An emit can target:
 
-Channel reads are non-destructive. A channel wait can use a cursor to wait for new messages.
+- A local channel.
+- A Workflow event.
 
-Nested targets receive copied message values unless an explicit typed port grants live access.
+An emit returns a durable receipt.
 
-External publication follows the destination’s delivery contract. A publication receipt confirms acceptance, not completion of the receiving business process.
+A duplicate deduplication key for the same destination returns the existing receipt and does not append another message.
 
-### 7.3 Wait
+## 8. Structured operations
 
-`wait` suspends until its declared condition resolves.
+### 8.1 Operation set
 
-| `for`        | Required declaration                     | Successful output           |
-| ------------ | ---------------------------------------- | --------------------------- |
-| `timer`      | `after` or absolute `at`                 | Firing information.         |
-| `event`      | Subscription and optional match          | Event envelope.             |
-| `channel`    | Channel and optional cursor or match     | Message and cursor.         |
-| `completion` | Started-operation handle                 | Target’s successful output. |
-| `human`      | Assignment, request, and response schema | Validated human response.   |
+| Operation   | Purpose                                                 |
+| ----------- | ------------------------------------------------------- |
+| `call`      | Invoke, start, dispatch, or hand off to a typed target. |
+| `transform` | Construct a deterministic value.                        |
+| `set`       | Atomically update typed state.                          |
+| `scope`     | Create a nested block and lifecycle boundary.           |
+| `choose`    | Select one conditional block.                           |
+| `parallel`  | Run named branches.                                     |
+| `foreach`   | Process a captured collection.                          |
+| `repeat`    | Repeat a block with carried state.                      |
+| `machine`   | Run an explicit state lifecycle.                        |
+| `wait`      | Suspend for a typed condition.                          |
+| `emit`      | Publish a local channel message or event.               |
+| `saga`      | Define a compensation boundary.                         |
+| `cancel`    | Request cancellation of child work.                     |
+| `return`    | Complete a block or Workflow with an explicit value.    |
+| `fail`      | Produce a typed failure.                                |
+| `break`     | Exit the nearest Repeat.                                |
+| `continue`  | Complete the current Repeat iteration.                  |
 
-Completion waits propagate target failure, cancellation, and uncertainty.
+### 8.2 Transform
 
-Human waits declare authorized users or roles, the information presented, and the accepted response schema.
+```yaml
+- id: prepare
+  transform:
+    value:
+      title:
+        $expr: input.title
+      enabled:
+        $expr: input.documents.filter(d, d.enabled)
+    outputSchema:
+      type: object
+```
+
+A transform is deterministic.
+
+A transform cannot create an external effect.
+
+### 8.3 Scope
+
+```yaml
+- id: protected
+  scope:
+    state:
+      schema:
+        type: object
+      initial: {}
+    steps: []
+    output: null
+```
+
+A scope creates a lifecycle boundary.
+
+A scope can own:
+
+- Local state.
+- Subscriptions.
+- Catch handlers.
+- Finalization.
+- Attached children.
+- Resource claims.
+- Cleanup work.
+
+### 8.4 Choose
+
+```yaml
+- id: route
+  choose:
+    cases:
+      - when:
+          $expr: input.priority == 'high'
+        do:
+          steps: []
+          output:
+            queue: urgent
+    default:
+      steps: []
+      output:
+        queue: normal
+```
+
+Cases evaluate in declaration order.
+
+The first matching case executes.
+
+No matching case without `default` produces `routing.no_match`.
+
+### 8.5 Parallel
+
+```yaml
+parallel:
+  completion:
+    mode: all
+  errors: collect
+  remaining: wait
+  branches:
+    legal:
+      do:
+        steps: []
+        output:
+          approved: true
+    security:
+      when:
+        $expr: input.requiresSecurityReview
+      do:
+        steps: []
+        output:
+          approved: true
+```
+
+All branch conditions evaluate from the same entry snapshot.
+
+Only selected branches participate in completion.
+
+Completion modes:
+
+| Mode              | Completion condition                            |
+| ----------------- | ----------------------------------------------- |
+| `all`             | Every selected branch succeeds.                 |
+| `first-completed` | First terminal branch determines the result.    |
+| `first-success`   | First successful branch wins.                   |
+| `quorum`          | A declared positive number of branches succeed. |
+
+`remaining` is:
+
+| Value    | Meaning                                              |
+| -------- | ---------------------------------------------------- |
+| `cancel` | Request cancellation of remaining selected branches. |
+| `wait`   | Wait for remaining selected branches to settle.      |
+
+For `all`, `errors` is:
+
+| Value       | Meaning                                                       |
+| ----------- | ------------------------------------------------------------- |
+| `fail-fast` | Request cancellation after a branch failure.                  |
+| `collect`   | Wait for all selected branches and return aggregate outcomes. |
+
+Branch outcomes remain durable and visible even after another branch wins.
+
+An uncertain branch remains visible. It is not converted to success, skipped, or cancellation merely because another branch completes the policy.
+
+### 8.6 Foreach
+
+```yaml
+foreach:
+  items:
+    $expr: input.files
+  itemSchema:
+    type: object
+  concurrency: 4
+  maxItems: 1000
+  completion:
+    mode: all
+  errors: collect
+  remaining: wait
+  do:
+    steps: []
+    output:
+      name:
+        $expr: item.name
+      index:
+        $expr: index
+```
+
+Foreach:
+
+- Captures the source collection once.
+- Validates each item.
+- Creates isolated item state.
+- Preserves source-order outputs.
+- Applies effective concurrency and resource limits.
+- Supports all Parallel completion modes.
+- Supports cancellation.
+- Supports explicit parent-state merge.
+- Returns an empty ordered item list for an empty `all` collection.
+
+A Foreach item identity includes its captured source index.
+
+### 8.7 Repeat
+
+```yaml
+repeat:
+  state:
+    schema:
+      type: object
+    initial:
+      attempts: 0
+  until:
+    $expr: state.approved
+  maxIterations: 3
+  onExhausted: fail
+  timeout: PT10M
+  do:
+    steps: []
+    output: null
+```
+
+Exactly one repeat control is selected:
+
+| Control                     | Meaning                          |
+| --------------------------- | -------------------------------- |
+| `count`                     | Fixed number of iterations.      |
+| `while`                     | Condition before each iteration. |
+| `until`                     | Condition after each iteration.  |
+| `lifetime: until-cancelled` | Ongoing lifecycle.               |
+
+Repeat returns:
+
+```text
+state
+result
+iterations
+exhausted
+```
+
+A body-local state initializes once per iteration.
+
+A carried Repeat state initializes once for the Repeat.
+
+`break` exits the nearest Repeat.
+
+`continue` completes the current iteration of the nearest Repeat.
+
+### 8.8 Durable Fork and Join
+
+A child scheduling boundary uses a typed Fork WorkItem.
+
+A child settlement aggregation boundary uses a typed Join WorkItem.
+
+A Fork WorkItem persists:
+
+- Parent ProgramFrame identity.
+- Child ProgramFrame intents.
+- Child identities.
+- Child lifetimes.
+- Child ownership facts.
+- Child deadlines.
+- Child program snapshots.
+
+A Join WorkItem persists:
+
+- Parent ProgramFrame identity.
+- Child ProgramFrame identity or identities.
+- Join policy.
+- Child terminal facts.
+
+A parent interpreter receives child settlement only after the Join WorkItem confirms the child terminal state.
+
+## 9. State machines
+
+A state machine models cyclic and event-driven lifecycle behavior.
+
+```yaml
+machine:
+  initial: open
+  state:
+    schema:
+      type: object
+    initial:
+      version: 1
+  listen:
+    updates:
+      event: case-updated
+      correlation:
+        caseId:
+          $expr: input.caseId
+  states:
+    open:
+      entry:
+        steps: []
+        output: null
+      transitions:
+        - event: updates
+          when:
+            $expr: event.data.action == 'close'
+          to: closed
+        - after: P30D
+          to: expired
+    closed:
+      final: true
+      output:
+        status: closed
+    expired:
+      final: true
+      output:
+        status: expired
+```
+
+A machine persists:
+
+- Current state.
+- Carried state.
+- Local state ownership.
+- Entry time.
+- Transition generation.
+- Active subscriptions.
+- Active event waits.
+- Active timer waits.
+- Selected transition.
+- Current event.
+- Child block state.
+
+Machine behavior is serialized within the owning ProgramFrame.
+
+State entry behavior completes before transition selection.
+
+Transition selection order is:
+
+1. Immediate transitions.
+2. Event transitions.
+3. Timer transitions.
+
+For one accepted event, the first matching transition wins.
+
+A transition performs:
+
+1. Current state exit block.
+2. Transition block.
+3. Target state entry block.
+4. Target state transition selection.
+
+A state timer begins on entry and ends on exit.
+
+A final state returns its explicit output.
+
+## 10. Events, waits, and human work
+
+### 10.1 Event contracts
+
+```yaml
+events:
+  payment-confirmed:
+    source: payments
+    schema:
+      type: object
+    correlationSchema:
+      type: object
+```
+
+An event envelope has:
+
+```text
+id
+type
+source
+data
+correlation
+time
+```
+
+Duplicate event identity is `(source, id)`.
+
+An event contract controls:
+
+- Source.
+- Data schema.
+- Correlation schema.
+
+### 10.2 Subscriptions
+
+```yaml
+listen:
+  confirmation:
+    event: payment-confirmed
+    correlation:
+      orderId:
+        $expr: input.orderId
+    filter:
+      $expr: event.data.status == 'confirmed'
+    retention: P1D
+    capacity: 100
+    maxBytes: 262144
+```
+
+A subscription becomes active when its scope begins, before its steps run.
+
+A subscription stores:
+
+- Event contract identity.
+- Correlation facts.
+- Filter facts.
+- Retention settings.
+- Capacity settings.
+- Byte settings.
+- Accepted event identities.
+- Consumption facts.
+
+### 10.3 Wait
+
+```yaml
+wait:
+  for: event
+  subscription: confirmation
+  consume: true
+```
+
+Supported wait forms:
+
+| `for`        | Required fields                     | Successful output           |
+| ------------ | ----------------------------------- | --------------------------- |
+| `timer`      | `after` or `at`                     | Timer firing facts.         |
+| `event`      | `subscription`                      | Event envelope.             |
+| `channel`    | `channel`                           | Channel message and cursor. |
+| `completion` | `handle`                            | Child completion output.    |
+| `human`      | assignees, request, response schema | Validated human response.   |
+
+A completion handle can identify one:
+
+- WorkItem.
+- ProgramFrame.
+- Execution.
+
+A completion wait propagates success, failure, cancellation, and uncertainty.
+
+### 10.4 Human wait
 
 ```yaml
 wait:
   for: human
   assignees:
-    roles: [release-manager]
+    users:
+      - release-manager-1
+    roles:
+      - release-manager
   request:
-    notes:
-      $expr: steps.write.output.notes
+    release:
+      $expr: input.release
   responseSchema:
     type: object
     required: [approved]
-    properties:
-      approved:
-        type: boolean
-      comment:
-        type: string
-    additionalProperties: false
 ```
 
-A human rejection is response data. The Workflow decides whether it means revision, termination, escalation, or another business outcome.
+A human wait persists:
 
-Multi-person approvals compose human waits with Foreach or Parallel. Timers, choices, and completion policies express reminders, escalation, first-response decisions, and quorum decisions.
+- User assignments.
+- Role assignments.
+- Request value.
+- Response schema.
+- Response authorization requirements.
+- Deadline.
+- Resolution identity.
+- Typed response.
 
-Configuration, authentication, and recovery decisions use the same typed human or event waits.
+A response is accepted only when the response actor satisfies the persisted assignment facts.
 
-### 7.4 Time
+A business rejection remains response data unless the Workflow explicitly fails.
 
-Durations use ISO 8601. Absolute times use RFC 3339.
+### 10.5 Timer behavior
 
-A timeout measures elapsed time, including durable waiting and retry backoff.
+Durations use ISO 8601.
 
-A wait preserves its prepared input, correlation, assignments, and deadline across suspension. Resumption does not silently create a new wait.
+Absolute times use RFC 3339.
 
-A timeout produces a typed error. If an external effect may already have occurred, its effect state is uncertain.
+A timer preserves:
 
-### 7.5 Triggers
+- Scheduling time.
+- Intended fire time.
+- Actual fire time.
+- Enclosing step deadline.
 
-Triggers describe entry into the Workflow. They are separate from the body’s internal coordination.
+A timer cannot be manually resolved.
 
-Supported trigger forms are:
+A timeout remains separate from successful timer firing.
 
-| Form                | Behavior                                                             |
-| ------------------- | -------------------------------------------------------------------- |
-| Explicit invocation | Starts with supplied input. Available without a trigger declaration. |
-| Event               | Maps a typed event into invocation input.                            |
-| Schedule            | Starts at declared calendar or interval occurrences.                 |
+## 11. Triggers
 
-An event trigger declares:
+Triggers start or address Workflow Executions.
 
-- Event contract and filter.
-- Input mapping.
-- An instance key when deduplication or instance addressing is needed.
-- `start`, `signal`, or `start-or-signal` behavior.
+A trigger is not a subscription.
 
-A schedule declares:
+A subscription receives an event inside an existing Invocation.
 
-- Calendar expression or interval.
-- Time zone for calendar schedules.
-- Overlap policy: `allow`, `skip`, `queue`, or `replace`.
-- Missed-occurrence policy: `skip`, `latest`, or bounded `catch-up`.
+A trigger creates or addresses an Invocation from outside the body.
 
-Calendar gaps are skipped. Repeated local times produce one occurrence for that scheduled local time. UTC schedules avoid local-time ambiguity.
-
-A trigger starts or addresses an invocation. A subscription receives events within an existing invocation.
-
-## 8. Failure, Effects, and Lifecycle
-
-### 8.1 Typed errors
-
-Errors contain:
-
-```text
-code
-category
-message
-retryable
-step path
-effect state
-sanitized details
-causes
-```
-
-Categories include validation, routing, execution, transient availability, timeout, authorization, limit, cancellation, and uncertainty.
-
-Targets can add domain-specific error codes and typed details.
-
-Business decisions remain output data unless the Workflow explicitly treats them as process failures.
-
-### 8.2 Catch and finally
-
-A block can declare ordered handlers:
+### 11.1 Event trigger
 
 ```yaml
-catch:
-  - match:
-      categories: [timeout, transient]
-    do:
-      steps:
-        - id: notify-delay
-          call:
-            target: notify-operator
-            input:
-              code:
-                $expr: error.code
-      output:
-        status: deferred
-
-finally:
-  steps:
-    - id: release-session
-      call:
-        target: release-session
-        input: {}
+triggers:
+  intake:
+    event:
+      event: request-received
+      filter:
+        $expr: event.data.enabled
+      input:
+        request:
+          $expr: event.data
+      instanceKey:
+        $expr: event.correlation.requestId
+      behavior: start-or-signal
 ```
 
-A matcher can constrain category, code, or other defined error fields. Specified fields combine with AND. Values within one field are alternatives.
+Event trigger behavior:
 
-The first matching handler runs.
+| Behavior          | Meaning                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `start`           | Start a new Execution.                                             |
+| `signal`          | Signal an active matching Execution.                               |
+| `start-or-signal` | Signal an active matching Execution or start one when none exists. |
 
-A handler can:
+A trigger occurrence persists:
 
-- Return a recovery result.
-- Perform alternate work.
-- Request human resolution.
-- Raise another error.
+- Trigger identity.
+- Event source.
+- Event identity.
+- Occurrence time.
+- Accepted time.
+- Mapped invocation input.
+- Instance key.
+- Selected Execution.
+- Queue position.
+- State.
+- Failure facts.
 
-An unhandled error propagates to the enclosing scope.
+### 11.2 Schedule trigger
 
-Finalization runs after success, failure, timeout, or cancellation. Its output is ignored. It receives the scope’s `outcome`.
+```yaml
+triggers:
+  hourly:
+    schedule:
+      calendar: "0 * * * *"
+      timeZone: America/New_York
+      input:
+        reportDate:
+          $expr: context.time
+      overlap: queue
+      missed:
+        mode: catch-up
+        maxOccurrences: 3
+```
 
-A finalization failure becomes the primary error if the scope had succeeded. Otherwise, it is attached to the original error.
+A schedule has exactly one of:
 
-Cancellation retains its cancellation status through ordinary error handling. Finalization provides its cleanup path.
+| Field      | Meaning                             |
+| ---------- | ----------------------------------- |
+| `calendar` | Five-field numeric cron expression. |
+| `interval` | ISO 8601 interval.                  |
 
-### 8.3 Retry
+A calendar schedule requires an IANA time zone.
 
-Retry policy declares:
+A schedule overlap policy is:
 
-- `maxAttempts`, including the first attempt.
-- Error matching.
-- Backoff.
-- Optional per-attempt timeout.
+| Policy    | Meaning                                                   |
+| --------- | --------------------------------------------------------- |
+| `allow`   | Start another Execution.                                  |
+| `skip`    | Record and skip while an instance is active.              |
+| `queue`   | Persist the occurrence until an active instance settles.  |
+| `replace` | Cancel matching active work and start the new occurrence. |
 
-Retry reuses prepared input, the selected target, and the logical operation key.
+A missed-occurrence policy is:
 
-A composite retry restarts its local control and state from the step’s entry snapshot. Completed external effects remain subject to the same idempotency and reconciliation rules.
+| Policy     | Meaning                                             |
+| ---------- | --------------------------------------------------- |
+| `skip`     | Skip missed occurrences.                            |
+| `latest`   | Accept only the latest missed occurrence.           |
+| `catch-up` | Accept at most `maxOccurrences` missed occurrences. |
 
-Automatic retry requires both:
+Calendar gaps are skipped.
 
-- A matching retry policy.
-- A safe effect contract.
+Repeated local times produce one occurrence for that scheduled local time.
 
-A retryable error flag alone is insufficient.
+UTC schedules avoid local-time ambiguity.
 
-### 8.4 Effect contracts
+## 12. Effects, retries, reconciliation, and compensation
 
-An effect declaration states retry safety and optional recovery behavior.
+### 12.1 Effect contract
 
 ```yaml
 effect:
   kind: keyed
   key:
-    $expr: input.requestId + ':reserve'
+    $expr: input.requestId + ':publish'
+  reconcile:
+    steps: []
+    output:
+      decision: unknown
   compensate:
-    steps:
-      - id: release-reservation
-        call:
-          target: release-reservation
-          input:
-            reservationId:
-              $expr: completed.output.reservationId
+    steps: []
+    output: null
 ```
 
-Effect kinds are:
+Effect kinds:
 
-| Kind             | Meaning                                                        |
-| ---------------- | -------------------------------------------------------------- |
-| `read`           | No externally visible business mutation.                       |
-| `idempotent`     | Repeating the operation has the same business effect.          |
-| `keyed`          | The target deduplicates repeated requests by the supplied key. |
-| `non-idempotent` | Repetition can create another effect.                          |
+| Kind             | Meaning                                                    |
+| ---------------- | ---------------------------------------------------------- |
+| `read`           | No externally visible business mutation.                   |
+| `idempotent`     | Repeating has the same business effect.                    |
+| `keyed`          | Target deduplicates repeated requests with one stable key. |
+| `non-idempotent` | Repeating can create another business effect.              |
 
-The target interface supplies the base effect contract. A call can add safeguards or stronger constraints.
+A keyed operation has one stable idempotency key per logical WorkItem.
 
-The same logical operation uses the same key across retries. New Repeat iterations and collection items are distinct operations.
+The key remains unchanged through:
 
-### 8.5 Reconciliation and uncertainty
+- Attempts.
+- Retry backoff.
+- Durable waits.
+- Recovery.
+- Reconciliation.
+- Resumption.
 
-Uncertainty means that an effect may have happened, but its outcome is not known.
+A new Repeat iteration or Foreach item receives a new logical WorkItem identity and can have a new key.
 
-An operation can declare an `effect.reconcile` block. It receives the original input, key, and error through `operation`.
+### 12.2 Effect state
 
-Reconciliation reports:
+Effect state is distinct from WorkItem state.
 
-- `applied`, with a confirmed outcome or typed effect receipt.
-- `not-applied`.
-- `unknown`.
+| Effect state          | Meaning                                 |
+| --------------------- | --------------------------------------- |
+| `notApplicable`       | Read-only work.                         |
+| `notStarted`          | No external invocation started.         |
+| `dispatched`          | External invocation may be in progress. |
+| `confirmedApplied`    | Effect is confirmed.                    |
+| `confirmedNotApplied` | Non-application is confirmed.           |
+| `uncertain`           | Effect may have happened.               |
+| `compensating`        | Compensation is in progress.            |
+| `compensated`         | Compensation is confirmed.              |
+| `compensationFailed`  | Compensation failed or is uncertain.    |
 
-The block can call a status service, await a callback, or request human confirmation.
+Effect state persists in:
 
-Confirmed success follows normal output validation. Confirmed non-application can permit retry. An unknown outcome remains uncertain.
+- WorkItems.
+- Attempts.
+- Receipts.
+- Errors.
+- Effect records.
+- Reconciliation facts.
+- Compensation facts.
 
-A callable that can leave partial effects exposes typed effect receipts, including on failure. Compensation eligibility follows confirmed effects, not merely whole-step success.
+### 12.3 Retry
 
-### 8.6 Sagas and compensation
+A retry policy contains:
 
-A saga defines a business compensation boundary.
+```yaml
+retry:
+  maxAttempts: 3
+  match:
+    categories: [transient, timeout]
+  backoff:
+    initial: PT1S
+    maximum: PT30S
+    multiplier: 2
+    jitter: 0.2
+  perAttemptTimeout: PT10S
+```
+
+Automatic retry requires:
+
+1. A matching retry policy.
+2. A retry-safe effect contract.
+
+Read, idempotent, and keyed work can retry according to the policy.
+
+Non-idempotent work must not retry after uncertainty.
+
+Confirmed non-application from reconciliation can enable a retry for a non-idempotent operation.
+
+### 12.4 Reconciliation
+
+A reconciliation block receives typed `operation` facts.
+
+`operation` contains:
+
+- Original WorkItem identity.
+- Original attempt identity.
+- Original input.
+- Selected target facts.
+- Idempotency key.
+- Receipt.
+- Uncertainty error.
+
+A reconciliation result must distinguish:
+
+```json
+{
+  "decision": "applied",
+  "output": {},
+  "receipt": {}
+}
+```
+
+```json
+{
+  "decision": "notApplied"
+}
+```
+
+```json
+{
+  "decision": "unknown",
+  "error": {
+    "code": "status_unavailable",
+    "message": "status service did not confirm the effect"
+  }
+}
+```
+
+Reconciliation behavior:
+
+| Decision     | Runtime behavior                                                  |
+| ------------ | ----------------------------------------------------------------- |
+| `applied`    | Confirm the original WorkItem and continue with confirmed output. |
+| `notApplied` | Mark confirmed non-application and evaluate retry eligibility.    |
+| `unknown`    | Keep the original WorkItem uncertain and require recovery review. |
+
+A reconciliation starts through a typed Reconciliation WorkItem.
+
+The Reconciliation WorkItem persists original operation facts before the reconciliation block starts.
+
+### 12.5 Saga
 
 ```yaml
 saga:
   compensateOn: [failed, cancelled]
   compensationErrors: continue
+  concurrency: 1
   do:
     steps: []
     output: {}
 ```
 
-The saga:
+A Saga defines a business compensation boundary.
 
-- Tracks confirmed effects with declared compensation.
-- Compensates in reverse dependency order.
-- Can compensate independent effects concurrently within limits.
-- Preserves the original failure and records compensation outcomes.
-- Supports `continue` or `stop` after a compensation failure.
+A Saga records confirmed compensatable effects in dependency and confirmation order.
 
-A handled error inside the body does not fail the saga. An outer handler can recover after the saga has compensated.
+A Saga does not compensate:
 
-Nested Workflow compensation is defined by its callable compensation contract. The parent does not depend on the child’s private steps.
+- Read effects.
+- Confirmed non-application.
+- Unknown effects.
+- Effects without a compensation block.
+- Effects outside the Saga boundary.
 
-Unknown effects require reconciliation before automatic compensation.
+A Saga must reconcile an uncertain effect before automatic compensation.
 
-Compensation is a business action. It can reverse or offset an effect; it does not erase history or promise atomic rollback.
+### 12.6 Compensation
 
-### 8.7 Cancellation and child lifetime
+Compensation runs in reverse effect order while preserving dependency constraints.
 
-`cancel` requests cancellation of referenced work.
+A compensation operation receives typed `completed` facts.
+
+`completed` contains:
+
+- Original operation facts.
+- Confirmed output.
+- Receipt.
+- Effect identity.
+- Compensation identity.
+
+A Compensation WorkItem persists compensation intent before a compensation child ProgramFrame starts.
+
+Compensation policy:
+
+| Policy     | Meaning                                            |
+| ---------- | -------------------------------------------------- |
+| `continue` | Record failure and continue eligible compensation. |
+| `stop`     | Record failure and stop later compensation.        |
+
+A compensation failure does not replace the primary failure or cancellation.
+
+The primary failure remains primary.
+
+Compensation failures attach as typed causes.
+
+### 12.7 Cleanup allowance
+
+Cleanup allowance is separate from normal work duration.
+
+A normal deadline can stop ordinary work while still allowing bounded:
+
+- Finalization.
+- Reconciliation.
+- Compensation.
+- Target cancellation acknowledgment.
+- Resource release.
+
+Cleanup work uses the declared cleanup duration where present.
+
+## 13. Cancellation
 
 Cancellation:
 
 - Stops queued normal work.
-- Propagates to attached children.
-- Resolves active waits as cancelled.
 - Requests cancellation from active targets.
-- Runs finalization and applicable compensation.
+- Resolves ordinary waits as cancelled.
+- Propagates to attached children.
+- Propagates to independent children only when `cancelWithParent` is true.
+- Runs finalization.
+- Starts eligible reconciliation and compensation.
+- Retains uncertainty when cancellation races with an external mutation.
 
-Cleanup uses a separate bounded cleanup allowance so that an expired normal-work deadline does not prevent cleanup from starting.
+Cancellation does not prove that a dispatched mutating target did not apply its effect.
 
-Independent processes follow their declared ownership relationship.
+Cancellation remains cancellation through catch and finally behavior.
 
-A cancellation acknowledgment confirms cancellation handling. It does not prove that an external effect never occurred.
+A catch handler cannot convert cancellation into ordinary success unless the Workflow explicitly returns an allowed result after cancellation cleanup.
 
-## 9. Limits, Resources, and Consistency
+## 14. Resources and limits
 
-### 9.1 Limits
-
-Limits are optional author constraints, combined with inherited and platform limits.
-
-Standard limits include:
-
-- Total duration.
-- Step executions.
-- Call attempts.
-- Nested Workflow depth.
-- Concurrency.
-- Model tokens.
-- Monetary cost.
-- Message and event storage.
-- Cleanup duration.
-
-Attached work shares the parent’s aggregate budgets. Child scopes can lower limits.
-
-Independent processes require separate authorized budgets. Starting them still consumes the caller’s applicable work budget.
-
-A long-lived process can omit a declaration deadline. Waiting time and active-work budgets are separate concerns.
-
-### 9.2 Resource claims
-
-Named resource claims provide:
-
-- Concurrency control.
-- Rate limits.
-- Per-key serialization.
-- Shared service capacity.
-
-A step can claim units from a resource, optionally using a key such as customer, tenant, or account.
-
-A scope can hold a claim across several operations. Claims end when their owning scope settles.
-
-This expresses per-customer ordering or shared API throttling without using process state as a lock.
-
-### 9.3 Definition and binding consistency
-
-An invocation uses a stable Workflow definition.
-
-Once an operation starts, its prepared values, concrete target, logical key, and deadlines remain stable through retry, wait, and resumption.
-
-New discovery or target selection is explicit work. It can affect later operations without changing operations already in progress.
-
-### 9.4 Declaration validity
-
-A valid declaration has:
-
-- Known fields and well-formed operations.
-- Unique, visible step identities.
-- Valid expression scopes and references.
-- Compatible callable, channel, and port interfaces.
-- Valid machine states and transition destinations.
-- Valid loop, completion, and concurrency parameters.
-- Explicit root output mapping.
-- Satisfiable declared capabilities and resource requirements.
-
-Known declaration and capability errors are rejected before business work starts.
-
-Late availability changes and data-dependent validation failures become typed operational errors before the affected target performs work.
-
-All control constructs in this proposal belong to `v1`. Integration capabilities are declared by targets rather than left as unfinished language operations.
-
-## 10. Complete Example
-
-This example drafts release notes, performs bounded review and revision, requests human approval, and publishes with a stable idempotency key.
-
-The referenced target interfaces provide:
-
-- Writer: returns `notes`.
-- Reviewer: returns `approved` and `feedback`.
-- Publisher: accepts release notes and supports keyed invocation.
+### 14.1 Resources
 
 ```yaml
-apiVersion: v1
-type: workflow
-name: prepare-release-notes
-
-inputSchema:
-  type: object
-  required: [requestId, release]
-  properties:
-    requestId:
-      type: string
-    release:
-      type: string
-  additionalProperties: false
-
-outputSchema:
-  type: object
-  required: [status, notes]
-  properties:
-    status:
-      enum: [published, declined]
-    notes:
-      type: string
-  additionalProperties: false
-
-targets:
-  writer:
-    kind: agent
-    ref: release-note-writer
-
-  reviewer:
-    kind: agent
-    ref: release-note-reviewer
-
-  publisher:
-    kind: tool
-    ref: releases.publish-notes
-
-limits:
-  concurrency: 2
-  duration: P2D
-
-steps:
-  - id: draft
-    call:
-      target: writer
-      input:
-        release:
-          $expr: input.release
-
-  - id: refine
-    repeat:
-      state:
-        schema:
-          type: object
-          required: [notes, approved]
-          properties:
-            notes:
-              type: string
-            approved:
-              type: boolean
-          additionalProperties: false
-
-        initial:
-          notes:
-            $expr: steps.draft.output.notes
-          approved: false
-
-      until:
-        $expr: state.approved
-
-      maxIterations: 3
-      onExhausted: fail
-
-      do:
-        steps:
-          - id: review
-            call:
-              target: reviewer
-              input:
-                release:
-                  $expr: input.release
-                notes:
-                  $expr: state.notes
-
-          - id: revise
-            when:
-              $expr: "!steps.review.output.approved"
-            call:
-              target: writer
-              input:
-                release:
-                  $expr: input.release
-                notes:
-                  $expr: state.notes
-                feedback:
-                  $expr: steps.review.output.feedback
-
-          - id: update-review-state
-            set:
-              values:
-                approved:
-                  $expr: steps.review.output.approved
-                notes:
-                  $expr: >-
-                    steps.review.output.approved
-                    ? state.notes
-                    : steps.revise.output.notes
-
-  - id: approval
-    timeout: P1D
-    wait:
-      for: human
-      assignees:
-        roles: [release-manager]
-      request:
-        release:
-          $expr: input.release
-        notes:
-          $expr: steps.refine.output.state.notes
-      responseSchema:
-        type: object
-        required: [approved]
-        properties:
-          approved:
-            type: boolean
-          comment:
-            type: string
-        additionalProperties: false
-
-  - id: publish
-    when:
-      $expr: steps.approval.output.approved
-
-    retry:
-      maxAttempts: 3
-      match:
-        categories: [transient, timeout]
-      backoff:
-        initial: PT1S
-        maximum: PT10S
-        multiplier: 2
-
-    effect:
-      kind: keyed
-      key:
-        $expr: input.requestId + ':publish-notes'
-
-    call:
-      target: publisher
-      input:
-        requestId:
-          $expr: input.requestId
-        release:
-          $expr: input.release
-        notes:
-          $expr: steps.refine.output.state.notes
-
-output:
-  status:
-    $expr: >-
-      steps.approval.output.approved
-      ? 'published'
-      : 'declined'
-  notes:
-    $expr: steps.refine.output.state.notes
+resources:
+  customer-write:
+    concurrency: 1
+    keyed: true
+  vendor-api:
+    rate:
+      units: 100
+      per: PT1M
+      burst: 10
 ```
 
-The example distinguishes three different decisions:
+A resource can define:
 
-- Review and revision are process iteration.
-- Publishing retry is another attempt at the same logical effect.
-- Human rejection is a valid business result.
+- Concurrency.
+- Rate.
+- Burst.
+- Per-key serialization.
 
-## 11. Comparative Design Decisions
+### 14.2 Claims
 
-| Decision                                            | Alternative considered                               | Reason                                                                                      |
-| --------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Structured blocks plus explicit state machines      | One general edge graph                               | Sequences, joins, loop state, and lifecycle transitions have direct semantics.              |
-| Pure standard expressions plus typed activities     | Tiny mapping operators or embedded unrestricted code | Authors get useful data processing without mixing external effects into value construction. |
-| One typed call model                                | Separate process rules for each target kind          | Agent, Model, Tool, service, code, and Workflow work compose consistently.                  |
-| Separate invoke, start, and handoff modes           | One ambiguous delegation concept                     | Return values, child lifetime, and conversation ownership are different concerns.           |
-| Explicit parallel completion policies               | A single join rule                                   | All-results, first-result, first-success, and quorum are distinct practical requirements.   |
-| Scoped state and explicit result merging            | Shared mutable branch state                          | Parallel behavior remains understandable and independent of completion timing.              |
-| Events, subscriptions, and durable waits            | Polling as the main coordination mechanism           | Callbacks, human decisions, and long-lived processes become direct declarations.            |
-| Business decisions as typed output                  | Treating every rejection as failure                  | Declines, revisions, and negative findings can follow normal process logic.                 |
-| Separate work budgets and process lifetime          | Mandatory small bounds on every process              | Finite jobs and long-lived business processes use the same language.                        |
-| Explicit effect, reconciliation, and saga contracts | General rollback or exactly-once promises            | The declaration reflects what external systems can actually guarantee.                      |
-| Protocol-neutral target bindings                    | Local-only control-flow semantics                    | Remote integrations can use the same language without a separate workflow model.            |
+```yaml
+claims:
+  - resource: customer-write
+    units: 1
+    key:
+      $expr: input.customerId
+```
 
-The result is one process language for pipelines, dynamic Agent work, human decisions, asynchronous integrations, and event-driven business lifecycles. Practical breadth comes from these composable contracts, with typed callable work as the extension point.
+A claim is acquired before its owning WorkItem dispatches.
 
-## 12. Declaration implementation boundary
+A claim is released when its owner settles.
 
-- Standalone Workflow source requires `apiVersion: v1`.
-- Canonical Definition bodies omit dispatch-only `apiVersion`.
-- Contained Workflow declarations inherit the enclosing v1 admission context.
-- The previous `start`, `nodes`, `edges`, and `join` format is removed.
-- Workflow documents are concrete declarations, not locator aliases.
-- Target references can use registered portable locator handlers.
-- MCP Tool targets use `kind: tool`, an MCP `server` reference, and the
-  operation name in `ref`.
-- Service and activity targets remain explicit binding requirements. They do
-  not create synthetic Artifacts.
-- Reusable schemas are available under `#/$defs/<name>`.
-- Calendar schedules use five-field numeric cron syntax and an IANA time zone.
-- Hyphenated step IDs use CEL bracket access, such as
-  `steps['request-payment'].output`.
-- Declaration admission compiles expressions and validates static facts. It
-  does not evaluate expressions or execute any Workflow operation.
-- Full callable binding preparation, data-dependent boundary validation,
-  invocation persistence, scheduling, execution, and recovery belong to the
-  separate runtime implementation.
+A claim can be held by a scope.
 
-## 13. Runtime compiler and interpreter conformance
+### 14.3 Limits
 
-The Workflow declaration language and the Workflow interpreter payload have
-independent versions.
+```yaml
+limits:
+  duration: P1D
+  cleanupDuration: PT10M
+  stepExecutions: 1000
+  callAttempts: 100
+  workflowDepth: 16
+  concurrency: 10
+  modelTokens: 200000
+  messageCount: 10000
+  messageBytes: 10485760
+  eventCount: 10000
+  eventBytes: 10485760
+  cost:
+    amount: 100
+    currency: USD
+```
 
-- `apiVersion: v1` identifies the declaration language.
-- An interpreter version identifies one durable compiled runtime payload.
-- Stable runtime payload compatibility requires an explicit compatibility
-  policy. That policy does not apply to the current development payload.
-- Session Runtime v3 and Workflow Runtime v3 replace the current
-  `artifact.workflow.v1@1` development payload in place. They do not introduce
-  `artifact.workflow.v1@2` or increment the declaration version.
+A child limit can only narrow an inherited limit.
 
-### 13.1 Typed compiler boundary
+Attached children share the parent aggregate budget.
 
-Workflow source is not a runtime ProgramFrame payload.
+Independent children persist an authorized child budget.
+
+## 15. Declaration validity
+
+A valid Workflow declaration has:
+
+- Known fields.
+- Valid operation forms.
+- Unique visible step identities.
+- Valid CEL scope references.
+- Valid JSON Schemas.
+- Valid target relationships.
+- Valid target-set membership.
+- Valid callable interfaces.
+- Valid port bindings.
+- Valid channel permissions.
+- Valid machine state names and transitions.
+- Valid Repeat and Foreach controls.
+- Valid trigger schedules.
+- Valid event and correlation contracts.
+- Valid resource claims.
+- Valid limit inheritance.
+- Explicit root output mapping.
+
+Admission rejects:
+
+- Invalid syntax.
+- Invalid language semantics.
+- Invalid static interface relationships.
+- Unsatisfied required Artifact pins.
+- Missing registered Service or Activity bindings.
+- Missing required credentials.
+- Missing current policy approval.
+- Missing current external binding availability.
+
+Admission must not accept a valid operation and later ignore it.
+
+## 16. Compiler and runtime boundary
 
 ```text
-Workflow declaration v1
+Workflow source v1
+        |
+        v
+Declaration validation
         |
         v
 Artifact admission and pinning
@@ -1511,233 +1648,222 @@ Artifact admission and pinning
 Typed runtime-neutral Workflow program
         |
         v
-Session v3 Workflow ProgramFrame interpreter
+Session Runtime v3 ProgramFrame interpreter
+        |
+        v
+Setup-owned domain binders
 ```
 
-Artifact admission compiles a validated declaration and resolved target pins
-into a typed runtime-neutral program.
+The declaration layer owns:
 
-The compiled program contains:
+- Source syntax.
+- Schema validity.
+- Static CEL scope.
+- Static target relationships.
+- Portable declaration validity.
 
-- Typed blocks, steps, targets, state specifications, scopes, branch state,
-  loop state, machine state, waits, effects, and value templates.
-- Artifact pins where a target is Artifact-backed.
-- Stable Service and Activity binding IDs and versions.
-- Generic canonical values only at JSON value and JSON Schema boundaries.
+Runtime setup owns:
 
-Canonical values are not a substitute for typed runtime semantics. IDs,
-versions, pins, target kinds, block state, WorkItem kinds, effect contracts,
-retry policies, waits, attempts, receipts, errors, and control-flow state use
-dedicated typed structures. Canonical values are used only where the Workflow
-contract intentionally permits arbitrary JSON.
+- Artifact pinning.
+- Current dependency verification.
+- Provider planning.
+- Tool binding.
+- MCP discovery.
+- Skill resolution.
+- Workspace planning.
+- Attachment materialization.
+- Service binding.
+- Activity binding.
+- External domain adaptation.
 
-The Session Runtime does not receive Workflow declaration package types,
-Artifact services, Artifact references, locators, or source documents.
+Session Runtime v3 owns:
 
-### 13.2 Runtime value representation
+- ProgramFrames.
+- WorkItems.
+- Attempts.
+- Waits.
+- Timers.
+- Recovery.
+- Idempotency.
+- Cancellation.
+- Durable effect state.
+- Trigger state.
+- Control-flow state.
+- Persistence-safe semantics.
 
-Runtime code uses typed value templates:
+Canonical JSON values are allowed only at arbitrary JSON boundaries.
 
-- Literal canonical values.
-- CEL expression source.
-- Typed object fields.
-- Typed array items.
+Typed structures own:
 
-`CanonicalValue` is allowed only for generic JSON data boundaries. Runtime
-state must not use untyped `json.RawMessage` fields or persisted `map[string]any`
-semantic models.
+- IDs.
+- Pins.
+- Kinds.
+- Limits.
+- Effects.
+- Attempts.
+- Waits.
+- Receipts.
+- Errors.
+- Budgets.
+- Trigger state.
+- Port state.
+- Resource claims.
+- Control-flow state.
 
-Use `CanonicalValue` only for:
+## 17. Functional completion
 
-- Workflow invocation input and output.
-- JSON Schema documents.
-- Expression literal values and evaluated arbitrary JSON results.
-- Schema-defined Workflow state and state values.
-- Generic Tool payloads and external outputs.
-- Generic metadata, correlation, channel, event, and human-response values.
-- Generic ProgramSnapshot payload and ProgramState data envelopes.
+Workflow Runtime v3 functional completion requires every valid Workflow v1 field to satisfy one of these conditions:
 
-Do not use `CanonicalValue` for known runtime semantics. Decode it once at the
-typed boundary through a dedicated `jsonutil` conversion helper. Do not scatter
-JSON marshal or unmarshal calls through interpreter logic.
+1. It compiles into typed runtime behavior with durable recovery semantics.
+2. It is invalid by Workflow v1 language semantics.
+3. It requires a currently unavailable required Artifact pin, binding, credential, policy, or external domain capability and fails before unrelated external work begins.
 
-### 13.3 Admission conformance rule
+Functional completion does not require:
 
-A declaration can be valid Workflow v1 source before every runtime feature is
-implemented. During implementation, admission must compile only operations
-supported by the selected interpreter version and reject other operations
-before any external work begins.
+- Frontend Workflow adoption.
+- Session v2 deletion.
+- Session Store v2 deletion.
+- Offline migration from v2 to v3.
+- Removal of legacy code paths.
+- Wails transport redesign.
 
-If an operation is not implemented, admission returns an explicit typed
-unsupported-operation error before it creates external work. Runtime must not
-silently ignore the operation, change its meaning, or defer failure until
-after an external effect starts.
+Those are aggregate-stage work after functional backend completion.
 
-This is an implementation-safety rule, not the final Workflow v1 capability
-boundary. Completion requires typed support for every valid Workflow v1
-operation and target behavior in this document. At completion, an
-unsupported-operation error is reserved for behavior outside Workflow v1, not
-for an omitted Workflow v1 feature.
+## 18. Implementation status
 
-### 13.4 Runtime compatibility rule
+### Phase 1: durable runtime foundation
 
-Workflow declaration language compatibility and compiled payload compatibility
-are different concerns.
+- [x] Session v3 is the durable root for Executions, ProgramFrames, WorkItems, Attempts, Waits, effects, triggers, and control-flow state.
+- [x] Session Store v3 is the only authoritative V3 persistence store.
+- [x] Derived index and FTS data are rebuildable.
+- [x] Tombstones are durable deletion barriers.
+- [x] Command idempotency records persist in the Session document.
+- [x] Restore preserves command idempotency records.
+- [x] Runtime close cancels tracked timers, dispatch contexts, and owned asynchronous work.
 
-Session Runtime v3 and Workflow Runtime v3 are development features. The
-current `artifact.workflow.v1@1` payload is the current typed payload and can
-be replaced in place during development. No `artifact.workflow.v1@2` payload
-is introduced and no version is incremented.
+### Phase 2: callable targets and planning
 
-This development replacement rule does not alter shipped Session v2 durable
-payload compatibility. A future stable-payload compatibility policy requires a
-separate approval and is outside this development completion work.
+- [x] Tool Artifact targets use typed Tool WorkItems.
+- [x] MCP Tool targets use current MCP discovery and persisted MCP binding facts.
+- [x] Service targets use registered typed Service bindings.
+- [x] Activity targets use registered typed Activity bindings.
+- [x] Nested Workflow targets use child Workflow ProgramFrames.
+- [x] Agent targets use child Agent-loop ProgramFrames.
+- [x] Model targets use child single-model ProgramFrames.
+- [x] Static target sets enforce member identity.
+- [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
+- [x] Selected target identity persists with the logical Workflow step.
+- [x] Provider SDK Tool Artifacts remain provider-managed Model choices.
+- [ ] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
+- [ ] Full typed Service and Activity execution-plan propagation is complete for every binding kind.
 
-### 13.5 Session Runtime v3 backend completion
+### Phase 3: ports, channels, and parent-child messaging
 
-Workflow Runtime completion also requires Session Runtime v3 to be a
-functional backend superset of normal Session v2 behavior.
+- [x] Local channel emit, retained channel records, cursors, consume facts, observe behavior, and emit deduplication are typed runtime concepts.
+- [x] Completion handles support WorkItems, ProgramFrames, and Executions.
+- [x] Parent-child completion waits preserve terminal outcome semantics.
+- [ ] Input port plans are compiled and delivered for all callable target kinds.
+- [ ] Output port plans are compiled and delivered for all callable target kinds.
+- [ ] Streamed port plans are compiled and delivered for all callable target kinds.
+- [ ] Port ownership, channel authorization, and schema enforcement are complete at every target boundary.
+- [ ] Durable parent-child live port messaging is complete.
 
-The V3 backend must provide typed equivalents for:
+### Phase 4: structured Workflow behavior
 
-- Direct Model chat.
-- Agent-backed chat.
-- Workspace contribution and instruction planning.
-- Attachment admission, snapshotting, replay, and provider adaptation.
-- Go Tool, provider SDK Tool, MCP Tool, Skill Tool, Service, and Activity use.
-- MCP resources, prompts, Apps, approvals, and approved App context.
-- Provider output, streaming, usage, debugger, Tool-result, and continuation
-  behavior.
-- Cancellation, recovery, uncertainty, waits, retries, and durable command
-  idempotency.
-- Transport-neutral commands and projections.
+- [x] Transform, Set, Scope, Choose, Return, Fail, Break, and Continue are typed Workflow operations.
+- [x] Parallel supports `all`, `first-completed`, `first-success`, `quorum`, `cancel`, `wait`, `fail-fast`, and `collect`.
+- [x] Foreach captures source order, validates items, preserves ordered outcomes, isolates item state, and supports completion policies.
+- [x] Repeat supports count, while, until, timeout, carried state, local state, exhaustion, break, continue, and until-cancelled lifecycle.
+- [x] Machine initial state, entry, exit, immediate transitions, event transitions, timer transitions, transition blocks, final output, serialized handling, cancellation, and recovery are typed runtime behavior.
+- [x] Fork WorkItems persist child scheduling boundaries.
+- [x] Join WorkItems persist child aggregation boundaries.
+- [ ] Structured control-flow budget interaction is complete.
+- [ ] Structured control-flow resource claim interaction is complete.
 
-This does not require frontend V3 adoption, v2-to-v3 migration, or deletion of
-V2 paths. It requires V3 backend capability completeness before V2
-deprecation can be considered.
+### Phase 5: effects, reconciliation, and compensation
 
-### 13.6 Current development implementation boundary
+- [x] Read, idempotent, keyed, and non-idempotent effect contracts are typed.
+- [x] Stable keyed idempotency keys persist in WorkItems and Attempts.
+- [x] Effect state persists in WorkItems, Attempts, receipts, and errors.
+- [x] Uncertain non-idempotent work does not automatically replay.
+- [x] Reconciliation WorkItem intent and typed reconciliation result states exist.
+- [x] Saga scope identity and confirmed compensatable effect ledger facts exist.
+- [x] Compensation WorkItem intent and cleanup state exist.
+- [ ] Reconciliation child-block execution is complete for all effect-bearing target kinds.
+- [ ] Applied reconciliation output validation is complete against original target and call contracts.
+- [ ] Confirmed non-application retry behavior is complete for all retry policies.
+- [ ] Unknown reconciliation outcomes always route to typed recovery review.
+- [ ] Reverse dependency-aware compensation scheduling is complete.
+- [ ] Compensation concurrency limits are complete.
+- [ ] Compensation `continue` and `stop` policies are complete.
+- [ ] Primary outcome cause projection includes typed compensation causes.
+- [ ] Cleanup timer expiration and bounded cleanup cancellation behavior are complete.
 
-This document defines the completion contract. The existence of a Session v3
-document, a Workflow ProgramFrame, or a partial interpreter is not evidence of
-completion.
+### Phase 6: coordination and triggers
 
-The current development implementation must preserve the following boundaries
-while it progresses toward full Workflow v1 support:
+- [x] Event waits, channel waits, timer waits, completion waits, and human waits are typed WorkItem behavior.
+- [x] Signals use source and identity deduplication.
+- [x] Trigger registrations persist inside the existing Session v3 document.
+- [x] Event triggers persist accepted occurrence identity, mapped input, instance key, and selected Execution facts.
+- [x] Schedule triggers support interval and five-field cron scheduling with IANA time zones.
+- [x] Trigger overlap policies are typed.
+- [x] Trigger missed-occurrence policies are typed.
+- [ ] Event retention limits are complete per subscription identity.
+- [ ] Subscription capacity and byte limits are complete.
+- [ ] Channel retention and byte limits are complete across all paths.
+- [ ] Human response actor authorization is complete.
+- [ ] Trigger registration without an initial explicit Workflow start is complete.
+- [ ] Trigger occurrence failure projection and operational management commands are complete.
 
-- Session v2 and Session Store v2 remain shipped and unchanged.
-- Frontend Session v3 adoption and offline v2-to-v3 migration remain separate
-  work.
-- `artifact.workflow.v1@1` remains the current development payload. It can be
-  replaced in place; no `artifact.workflow.v1@2` payload is introduced.
-- `CanonicalValue` remains limited to arbitrary JSON boundaries. Runtime IDs,
-  pins, effect contracts, attempts, waits, receipts, errors, budgets, and
-  selections remain typed structures.
-- Session Runtime setup routes work to the owning Model, Tool, MCP, Skill,
-  attachment, Service, Activity, or Workflow domain binder. It must not retain
-  duplicate fallback implementations of those domains.
-- A provider-managed SDK Tool Artifact cannot fabricate local Workflow
-  success. It must execute through a typed Model plan or fail before external
-  work starts.
+### Phase 7: resources, budgets, and limits
 
-Completion still means a functional Session v2 backend superset plus typed,
-durable support for every valid Workflow v1 declaration feature. Until that
-condition is met, unsupported valid operations must fail during admission or
-binding before unrelated external work starts.
+- [x] Child Execution budget facts are typed and durable.
+- [x] Child cleanup duration is typed and durable.
+- [ ] Root Workflow limits compile to typed Execution budgets.
+- [ ] Step limits compile to typed nested budgets.
+- [ ] Resource declarations compile to typed resource definitions.
+- [ ] Resource claims compile to typed WorkItem claim plans.
+- [ ] Concurrency claims are enforced.
+- [ ] Rate claims are enforced.
+- [ ] Keyed serialization claims are enforced.
+- [ ] Model token, message, event, cost, and step budget accounting are enforced.
+- [ ] Budget exhaustion propagates typed limit errors.
 
-### 13.7 Current implementation coverage
+### Phase 8: Session Runtime v3 normal capability
 
-The typed compiler and interpreter include call, transform, set, return, fail,
-guarded steps, static allowed target sets, scope, choose, bounded parallel,
-foreach, repeat, break, continue, timer waits, event waits, channel waits,
-completion waits, human waits, local channel emits, and execution signals.
+- [x] Direct Model ProgramFrames exist.
+- [x] Agent-loop ProgramFrames exist.
+- [x] Provider streaming, usage, protocol output, debugger projection, Tool continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency exist for current V3 paths.
+- [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
+- [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
+- [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
+- [x] Skill sessions and active Skill lifecycle have typed domain routes.
+- [ ] Attachment admission uses a narrow Attachment Runtime domain port.
+- [ ] Local file snapshotting is complete for V3 attachment admission.
+- [ ] Image snapshotting is complete for V3 attachment admission.
+- [ ] Directory expansion is complete for V3 attachment admission.
+- [ ] URL normalization is complete for V3 attachment admission.
+- [ ] Replay-safe attachment materialization is complete for V3 attachment admission.
+- [ ] Historical attachment modification handling is complete for V3 attachment admission.
+- [ ] Provider attachment adaptation is complete for V3 attachment admission.
+- [ ] Service and Activity runtime binding registration is complete in application composition.
+- [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 
-Workflow event and channel coordination persists typed subscriptions,
-correlation, filters, consumed identities, local channel cursors, retained
-messages, emit receipts, and human wait requests inside the existing v3
-Session document. Event and channel values remain canonical JSON only at their
-declared schema boundaries.
+### Phase 9: functional completion gate
 
-Retries now compile to typed durable retry policies for WorkItem-backed steps.
-The WorkItem stores the retry policy, retry scheduler state, attempt deadline,
-stable keyed-effect idempotency key, semantic binding facts, and confirmed or
-uncertain result. Durable retry timing uses Runtime timers and the injected
-runtime clock; it does not use `time.Sleep`.
+- [ ] Every valid Workflow v1 source field is audited against typed compilation, language invalidity, or pre-dispatch unavailable-binding failure.
+- [ ] No valid Workflow v1 operation remains a permanent unsupported runtime branch.
+- [ ] No valid Workflow v1 field is silently ignored.
+- [ ] No external mutating WorkItem can replay automatically after uncertainty without confirmed non-application.
+- [ ] All normal Session v2 backend capabilities have typed V3 equivalents.
+- [ ] Functional backend completion is reached.
 
-The structured fan-out interpreter supports `all`, `first-completed`,
-`first-success`, and `quorum` completion for Parallel and Foreach. It supports
-`remaining: cancel`, `remaining: wait`, `errors: fail-fast`, and
-`errors: collect`. Branch and item outcomes, winners, cancellation requests,
-and ordered Foreach results remain in typed ProgramFrame state.
+### Phase 10: aggregate stage after functional completion
 
-Repeat supports counted, pre-condition, post-condition, timeout, carried-state,
-local-state, exhaustion, break, continue, and `until-cancelled` execution.
-The ongoing form remains active until normal cancellation reaches its owning
-ProgramFrame or Execution.
-
-The compiler retains failure category, retryability, and details. Calls retain
-their selected target identity and apply target, call, and target-set schemas.
-JSON literals can be scalars, arrays, objects, or null. CEL values cross a
-dedicated conversion boundary; compiled expressions are not persisted.
-
-The V3 LLM dispatch path prepares Agent, Workspace, Text, Skill, Tool, and
-MCP contributions in runtime setup before Session dispatches a provider call.
-Session stores only typed selections, Artifact pins, semantic binding facts,
-and final generic JSON boundaries. Agent instruction Skills are rendered by
-the Skill runtime. Workspace instructions and selected MCP server
-instructions, resources, resource templates, and prompts are converted by
-their owning domain binders into typed provider input contributions.
-
-V3 LLM WorkItems persist streamed text and thinking, final provider usage,
-protocol output projections, and debugger data at their defined boundaries.
-They do not persist provider clients, callbacks, credentials, or compiled
-provider state. A provider SDK Tool remains provider-managed and cannot become
-a fabricated local Tool success.
-
-Workflow `call.mode: start` creates either a typed attached child ProgramFrame
-or an independent child Execution in the existing Session document. An
-independent child persists parent Execution identity, root Execution identity,
-evaluated ownership, child budget, cancellation relationship, and a typed
-Execution completion handle before child dispatch. A completion wait can
-consume either a child-frame or child-Execution terminal outcome.
-
-Workflow `call.mode: handoff` is distinct from invoke. It creates typed
-conversation ownership state in the existing Session document before the
-target Agent starts. Completion either restores the prior owner or retains the
-target owner according to the declared completion behavior. Parent cancellation
-propagates to independent children only when the persisted relationship
-declares `cancelWithParent`.
-
-The typed runtime now compiles block `catch` and `finally` declarations. A
-catch matcher uses typed category, code, retryable, effect-state, and optional
-schema constraints. The first matching handler executes in a child
-ProgramFrame. A finalizer executes after success, failure, timeout, or
-cancellation. Its output is ignored. Its failure becomes the primary failure
-after prior success and becomes a typed cause after prior failure or
-cancellation.
-
-Machines compile to typed runtime state. A machine persists current state,
-carried state, transition generation, entry time, active subscriptions, active
-Wait WorkItem identities, and selected transition identity. Entry, exit, and
-transition blocks use ordinary typed child ProgramFrames. Event and timer
-transitions use ordinary durable Wait WorkItems. Event processing is serialized
-by the owning machine ProgramFrame.
-
-Workflow calls currently execute Tool Artifact, MCP Tool, Service, Activity,
-nested Workflow, Agent, and Model targets through typed WorkItems or child
-ProgramFrames. Static target sets preserve their allowed members and the
-selected target identity. Current MCP discovery and Artifact pins are checked
-before external dispatch.
-
-This coverage is not backend completion. Catch, finally, machines,
-resolver-backed target sets, triggers, reconciliation, compensation, resource
-accounting, complete ports, and complete normal Session v2 capability parity
-remain required implementation work.
-Admission rejection during development must not become a permanent Workflow v1
-capability restriction.
-
-Completion remains a functional Session v2 backend superset plus full typed,
-durable Workflow v1 support. V2 remains preserved. Frontend adoption and
-offline migration remain separate work. CanonicalValue is limited to arbitrary
-JSON boundaries, domain ownership remains mandatory, and all Workflow
-execution state remains inside the existing v3 Session document.
+- [ ] Frontend V3 adoption.
+- [ ] Frontend transport migration.
+- [ ] Offline Session v2 to V3 migration tooling.
+- [ ] Session v2 deprecation decision.
+- [ ] Session Store v2 deprecation decision.
+- [ ] Legacy runtime path removal.
+- [ ] Final aggregate cleanup.

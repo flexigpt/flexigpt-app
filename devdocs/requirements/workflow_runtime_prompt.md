@@ -1,59 +1,105 @@
 You are taking over the FlexiGPT Session Runtime v3 and Workflow Runtime v3 backend implementation.
 
-Work directly in the supplied FlexiGPT source tree. The repository state is authoritative.
+This is a Markdown-to-Markdown implementation handoff.
 
-The primary deliverable is source changes in the working tree. Do not return a hypothetical patch instead of editing the tree.
+The supplied repository file bodies and the supplied HLD Markdown files are authoritative source context. This is not a tool-driven session unless a filesystem or editing tool is explicitly provided by the execution environment.
 
-Hard execution and output contract:
+When no filesystem tool is available:
 
-- Use the FULL available implementation budget.
-- The caller has reserved `128000` output tokens.
-- Do not produce a final response before at least `100000` meaningful implementation tokens have been used, unless every requirement below is actually complete in the source tree.
-- Meaningful implementation tokens are production source edits only. Do not satisfy this requirement with explanations, repeated source, comments, Markdown, docs, tests, generated filler, speculative guards, empty interfaces, placeholder types, no-op branches, or fake completion markers.
-- If one completion reaches an output limit, continue in the same tree immediately. Do not stop at a partial milestone.
-- Do not ask for confirmation, do not ask for missing work items, and do not defer feasible work.
-- Do not write tests.
-- Do not run tests.
-- Do not add test files.
-- Do not modify requirements, Markdown, changelogs, or documentation in this pass.
-- Do not spend time on cosmetic cleanup, broad hardening, formatting-only changes, speculative validation, compatibility wrappers, or unrelated refactors.
-- Do not add a new persistence root.
-- Do not create a Workflow repository, invocation store, event store, trigger store, or execution store outside the existing Session v3 document and derived Session Store v3 index and FTS data.
-- Do not modify Session v2 or Session Store v2 behavior.
-- Do not make Session v2 depend on Session v3.
-- Do not increment `apiVersion: v1`.
-- Do not change `artifact.workflow.v1@1`.
-- Do not introduce `artifact.workflow.v1@2`.
-- Do not create fallback chat text from arbitrary Workflow JSON.
-- Do not silently omit a declaration field.
-- Do not accept a valid Workflow v1 feature and later ignore it, fabricate success, or execute it as a no-op.
-- Error messages added by this pass must be lower-case.
+- Produce apply-ready unified diffs for existing files.
+- Produce complete replacement-file contents for deliberate file replacement.
+- Identify exact paths.
+- Distinguish authored patch content from applied working-tree changes.
+- Do not claim that a patch was applied when no write tool exists.
+- Do not stop merely because the environment has no tool. Produce the requested Markdown patch artifacts.
 
-Read these files first and treat them as the required behavior:
+When filesystem tools are available:
 
-- `devdocs/requirements/workflow_runtime.md`
+- Edit the working tree directly.
+- Use repository state as authoritative.
+- Do not substitute a hypothetical patch for direct edits.
+- Still provide a concise change record that distinguishes authored, applied, and verified work.
+
+Treat this work as financially consequential engineering work. Incomplete, fabricated, repetitive, or misleading output can waste significant user time and money. Preserve trust through exact scope tracking, substantive implementation, and truthful status reporting.
+
+Do not use loopholes to avoid the required implementation volume or scope.
+
+Do not satisfy the token requirement with:
+
+- Explanations.
+- Repeated code.
+- Comments.
+- Documentation.
+- Tests.
+- Generated filler.
+- Placeholder types.
+- Empty interfaces.
+- No-op branches.
+- Compatibility wrappers.
+- Fake status markers.
+- Repeated unchanged source.
+- Speculative guards.
+- Broad refactors unrelated to the requested feature slice.
+
+The minimum output requirement is authoritative:
+
+- Do not send a final response before at least `100000` meaningful production-source implementation tokens have been emitted.
+- Count only substantive production source additions or modifications that implement runtime behavior, compiler behavior, persistence behavior, recovery behavior, execution behavior, domain binding behavior, or caller wiring.
+- Do not count Markdown prose, status text, comments, tests, documentation, repeated unchanged code, or generated filler.
+- If one response reaches an output limit before the threshold or requested implementation scope is complete, continue immediately in the same repository state in the next response.
+- A preferred response length is not a completion boundary.
+- The only valid reasons to stop before the threshold are:
+  - Every requested requirement is actually complete in the source tree.
+  - A hard platform output limit prevents continuation.
+  - A required input, authorization, source file, repository write capability, or external domain contract is unavailable.
+- If blocked, complete all independent unblocked work first. State the exact blocker, evidence, and smallest resumption input.
+
+Use plain Markdown.
+
+Markdown output rules are attached as instructions. Follow ALL instructions properly including language and output formats.
+
+Do not write tests.
+Do not add test files.
+Do not make tests, documentation, changelogs, or release notes part of the functional completion gate.
+Do not modify Session v2 behavior.
+Do not make Session v2 depend on Session v3.
+Do not add a new persistence root.
+Do not create a Workflow repository, invocation store, execution store, event store, trigger store, or task store outside the existing Session v3 document and Session Store v3 derived data.
+Do not increment `apiVersion: v1`.
+Do not change `artifact.workflow.v1@1`.
+Do not introduce `artifact.workflow.v1@2`.
+Do not convert arbitrary Workflow JSON into fallback chat text.
+Do not silently omit a valid declaration field.
+Do not accept a valid Workflow v1 feature and later ignore it, fabricate success, or execute it as a no-op.
+
+All newly added error messages must be lower-case.
+Proper enums and consts are to be used end to end. no hardcoded strings/numbers anywhere.
+
+Read these authoritative files first:
+
 - `devdocs/requirements/workflow_model.md`
+- `devdocs/requirements/workflow_runtime.md`
 - `internal/agentruntime-go/sessionv3/...`
 - `internal/agentruntimesetup/sessionv3runtime/...`
 - `internal/agentruntimesetup/workflowruntime/...`
 - `internal/llmartifactory-go/workflow/...`
 - `internal/sessionstorev3/...`
 
-Architecture is mandatory:
+Use the architecture boundaries exactly:
 
 - `internal/agentruntime-go/...` owns typed orchestration, ProgramFrames, WorkItems, Attempts, Waits, timers, recovery, command idempotency, cancellation, durable state, and persistence-safe semantics.
 - `internal/llmartifactory-go/...` owns declaration syntax, schema validity, static CEL scope, declaration target relationships, and portable declaration validity.
-- `internal/agentruntimesetup/...` owns declaration-to-runtime compilation, Artifact pinning, current dependency resolution, provider plans, Tool binding, MCP discovery, Skill resolution, Workspace planning, attachment materialization, Service binding, Activity binding, and external domain execution adaptation.
+- `internal/agentruntimesetup/...` owns declaration-to-runtime compilation, Artifact pinning, dependency resolution, provider plans, Tool binding, MCP discovery, Skill resolution, Workspace planning, attachment materialization, Service binding, Activity binding, and external domain execution adaptation.
 - Session Runtime v3 must not import Artifact packages or setup packages.
 - Session Runtime v3 must not resolve Artifacts, configure providers, read Workspace files, discover MCP tools, render Skills, execute Tools, or materialize attachments itself.
 - Do not add broad facade interfaces. Use concrete dependencies or narrow typed domain ports only at real domain boundaries.
 - Use `CanonicalValue` only for arbitrary JSON boundaries.
 - Keep IDs, pins, kinds, limits, effects, attempts, waits, receipts, errors, budgets, trigger state, and control-flow state as concrete typed structures.
 
-The durable external-work sequence is non-negotiable:
+Use the durable external-work sequence exactly:
 
 1. Persist typed WorkItem intent.
-2. Resolve current dependencies.
+2. Resolve current dependencies through the owning setup domain.
 3. Verify Artifact pins and current target bindings.
 4. Persist semantic binding facts.
 5. Persist an Attempt before external invocation.
@@ -61,296 +107,212 @@ The durable external-work sequence is non-negotiable:
 7. Persist confirmed output, receipt, failure, cancellation fact, or uncertainty.
 8. Never automatically replay uncertain non-idempotent work.
 9. Use Runtime timers for durable timing.
-10. Cancel all timers and goroutines in `Runtime.Close`.
+10. Cancel all timers and owned goroutines in `Runtime.Close`.
 
-Implement all remaining Workflow Runtime v3 and Session Runtime v3 backend work in this order.
+Implement in this order.
 
-First: complete callable targets and executable planning.
+### Phase A: callable targets and typed plans
 
-- Finish Tool Artifact targets through typed WorkItems.
-- Finish MCP Tool targets through current MCP discovery and persisted MCP binding facts.
-- Finish Service targets through registered typed Service bindings.
-- Finish Activity targets through registered typed Activity bindings.
-- Finish nested Workflow targets through child Workflow ProgramFrames.
-- Finish Agent targets through child Agent-loop ProgramFrames with typed Agent execution plans.
-- Finish Model targets through child single-model ProgramFrames with typed Model execution plans.
-- Finish static target sets.
-- Finish resolver-backed target sets with typed resolver WorkItems where external discovery is required, persisted resolved membership, and persisted selected target identity.
-- Finish full typed plans before Agent-loop or single-model dispatch:
-  - Agent,
-  - Workspace,
-  - Model,
-  - instruction,
-  - Text,
-  - Tool,
-  - Skill,
-  - MCP,
-  - attachment,
-  - message,
-  - context,
-  - channel,
-  - port.
-- Provider SDK Tool Artifacts must execute only as provider-managed Tool choices inside typed Model plans.
-- Provider SDK Tool Artifacts must never be converted into local Tool WorkItems or fabricated local success.
-- Finish typed port plans and runtime delivery:
-  - input ports,
-  - output ports,
-  - streamed ports,
-  - channel access,
-  - schema validation,
-  - port ownership,
-  - parent-child messaging,
-  - durable messages.
-- Preserve target, call, and target-set input, output, error, receipt, mode, and effect contracts.
+Complete:
 
-Second: complete effects, reliability, reconciliation, and compensation.
+- Tool Artifact targets.
+- MCP Tool targets.
+- Service targets.
+- Activity targets.
+- Nested Workflow targets.
+- Agent targets.
+- Model targets.
+- Static target sets.
+- Resolver-backed target sets.
+- Typed Agent plans.
+- Typed Workspace plans.
+- Typed Model plans.
+- Typed instruction plans.
+- Typed Text plans.
+- Typed Tool plans.
+- Typed Skill plans.
+- Typed MCP plans.
+- Typed attachment plans.
+- Typed message plans.
+- Typed context plans.
+- Typed channel plans.
+- Typed port plans.
+- Input ports.
+- Output ports.
+- Streamed ports.
+- Parent-child durable messaging.
+- Port ownership.
+- Port schema validation.
+- Port channel authorization.
 
-- Complete `read`, `idempotent`, `keyed`, and `non-idempotent` contracts.
-- Persist one stable idempotency key per logical keyed WorkItem.
-- Preserve that same key through retries, waits, recovery, and resumption.
-- Propagate idempotency keys into Tool, Service, Activity, MCP, Agent, Model, and Workflow execution plans where the owning domain supports it.
-- Add typed effect state to WorkItems, Attempts, receipts, and errors.
-- Model partial application explicitly.
-- Implement reconciliation as typed WorkItems.
-- Reconciliation must receive typed original operation facts, input, selected target, key, receipt, and uncertainty error.
-- Reconciliation outcomes must distinguish:
-  - applied,
-  - not applied,
-  - unknown.
-- Only confirmed non-application can enable a retry after uncertainty.
-- Unknown remains uncertain and requires typed recovery review.
-- Implement saga tracking.
-- Persist confirmed compensatable effects in dependency order.
-- Implement reverse compensation order.
-- Implement compensation WorkItems.
-- Implement compensation receipts, failures, uncertainty, and reverse dependency behavior.
-- Implement compensation error policy:
-  - continue,
-  - stop.
-- Preserve the primary failure and attach compensation failures as typed causes.
-- Implement cleanup allowance separately from normal deadline allowance.
-- Cancellation must permit bounded cleanup and compensation work after normal work deadlines.
-- Do not automatically replay uncertain non-idempotent work.
-- Do not automatically compensate unknown effects before reconciliation.
+Provider SDK Tool Artifacts must execute only through typed Model plans. They must never become local Tool WorkItems or fabricated local success.
 
-Third: complete all Workflow structured behavior.
+### Phase B: effects, reliability, reconciliation, compensation, and cleanup
 
-- Finish block `catch`.
-- Finish block `finally`.
-- Ensure cancellation retains cancellation semantics through catch and finally.
-- Ensure finalizer failure becomes primary only after prior success.
-- Ensure finalizer failure is attached as a cause after prior failure or cancellation.
-- Finish machines:
-  - initial state,
-  - local state,
-  - inherited state,
-  - entry,
-  - exit,
-  - immediate transitions,
-  - event transitions,
-  - timer transitions,
-  - transition blocks,
-  - final output,
-  - serialized event handling,
-  - durable re-entry timers,
-  - cancellation,
-  - recovery.
-- Finish all Parallel policies:
-  - all,
-  - first-completed,
-  - first-success,
-  - quorum,
-  - remaining cancel,
-  - remaining wait,
-  - fail-fast,
-  - collect.
-- Ensure uncertain branch work remains visible after another branch wins.
-- Finish Foreach:
-  - source-order output,
-  - captured input collection,
-  - concurrency,
-  - all completion modes,
-  - cancellation,
-  - isolated state,
-  - explicit merge,
-  - empty collection semantics,
-  - item schemas,
-  - max items,
-  - budget interaction.
-- Finish Repeat:
-  - count,
-  - while,
-  - until,
-  - until-cancelled,
-  - timeout,
-  - carried state,
-  - local per-iteration state,
-  - exhaustion,
-  - onExhausted,
-  - nested break,
-  - nested continue,
-  - cancellation,
-  - recovery.
-- Implement durable Fork WorkItems where child scheduling crosses a durable boundary.
-- Implement durable Join WorkItems where completion aggregation crosses a durable boundary.
-- Do not represent Fork or Join only as transient interpreter behavior where durable scheduling state is required.
+Complete:
 
-Fourth: complete durable coordination and triggers.
+- `read`, `idempotent`, `keyed`, and `non-idempotent` contracts.
+- Stable keyed idempotency through retry, waits, recovery, and resumption.
+- Typed effect state in WorkItems, Attempts, receipts, and errors.
+- Partial application facts.
+- Reconciliation WorkItems.
+- Reconciliation operation facts.
+- Reconciliation outcomes: `applied`, `notApplied`, `unknown`.
+- Retry only after confirmed non-application.
+- Recovery review for unknown results.
+- Saga effect tracking.
+- Reverse dependency-aware compensation.
+- Compensation WorkItems.
+- Compensation receipts, failures, and uncertainty.
+- Compensation policies `continue` and `stop`.
+- Primary failure preservation with typed compensation causes.
+- Cleanup allowance separate from normal deadlines.
+- Cancellation-safe cleanup.
+- No automatic compensation of unknown effects before reconciliation.
 
-- Implement event triggers.
-- Implement schedule triggers.
-- Persist trigger registrations and trigger state inside the existing Session v3 document.
-- Do not add a trigger persistence root.
-- Implement trigger overlap policies:
-  - allow,
-  - skip,
-  - queue,
-  - replace.
-- Implement missed-occurrence policies:
-  - skip,
-  - latest,
-  - bounded catch-up.
-- Implement interval schedules.
-- Implement five-field cron schedule behavior with IANA timezone semantics.
-- Preserve calendar gap and repeated-local-time behavior defined by Workflow v1.
-- Implement event trigger behaviors:
-  - start,
-  - signal,
-  - start-or-signal.
-- Persist accepted trigger occurrence identity, input, instance key, occurrence time, selected execution, queue state, and deduplication facts.
-- Complete event retention.
-- Complete subscription retention.
-- Complete subscription capacity and byte limits.
-- Complete event consumption by subscription identity.
-- Complete channel retention and byte limits.
-- Complete channel cursors.
-- Complete channel consume and observe semantics.
-- Complete emit deduplication.
-- Complete human waits:
-  - users,
-  - roles,
-  - typed request,
-  - typed response schema,
-  - durable assignment facts,
-  - response authorization boundary.
-- Complete completion waits for WorkItems, ProgramFrames, and Executions.
-- Complete signals with `(source, id)` identity.
-- Complete machine serialization and recovery.
-- Runtime timers must be rearmed only after full restore completes.
+### Phase C: structured behavior
 
-Fifth: complete normal Session v2 backend capability in Session Runtime v3.
+Complete:
 
-- Implement direct Model chat.
-- Implement Agent-backed chat.
-- Implement Workspace contribution and instruction planning.
-- Implement attachment admission through Attachment Runtime:
-  - local file snapshotting,
-  - image snapshotting,
-  - directory expansion,
-  - URL normalization,
-  - replay-safe materialization,
-  - historical modification handling,
-  - provider adaptation.
-- Session Runtime v3 must use a narrow Attachment domain port.
-- Session Runtime v3 must not import setup packages or implement file access itself.
-- Implement Go Tools.
-- Implement provider SDK Tools.
-- Implement MCP Tools.
-- Implement Skill Tools.
-- Implement Service and Activity runtime bindings.
-- Implement MCP resources.
-- Implement MCP prompts.
-- Implement MCP Apps.
-- Implement MCP approvals.
-- Implement App Tool calls.
-- Implement App resource reads.
-- Implement approved App context staging.
-- Implement Skill sessions.
-- Implement active Skill lifecycle.
-- Implement Skill Tool invocation and resource handling.
-- Implement provider streaming.
-- Implement protocol outputs.
-- Implement usage.
-- Implement debugger projections.
-- Implement Tool result continuation.
-- Implement cancellation.
-- Implement retries.
-- Implement waits.
-- Implement recovery.
-- Implement uncertainty.
-- Implement durable command idempotency.
-- Ensure V3 command and projection APIs remain transport-neutral.
-- Wails must remain only an adapter.
+- Block catch.
+- Block finally.
+- Cancellation semantics through catch and finally.
+- Finalizer primary failure and cause behavior.
+- Machines.
+- Parallel policies.
+- Foreach behavior.
+- Repeat behavior.
+- Durable Fork WorkItems.
+- Durable Join WorkItems.
 
-Persistence and recovery requirements:
+### Phase D: durable coordination and triggers
 
-- `internal/sessionstorev3` remains the only V3 authoritative store.
-- Derived index and FTS remain rebuildable.
-- Tombstones remain durable deletion barriers.
-- Restore must preserve command idempotency records.
-- Restore must turn unknown dispatched mutating work into uncertainty.
-- Restore must never replay uncertain non-idempotent work.
-- Restore must rebind only replay-safe work through current dependency verification.
-- Private clients, callbacks, credentials, approval tokens, OAuth tokens, native paths, compiled CEL, compiled schemas, timers, cancellation functions, and browser state must not persist.
+Complete:
 
-Strict implementation rules:
+- Event triggers.
+- Schedule triggers.
+- Trigger overlap policies.
+- Missed-occurrence policies.
+- Interval schedules.
+- Five-field cron schedules with IANA time zones.
+- Calendar gaps.
+- Repeated local-time behavior.
+- Trigger occurrence facts.
+- Subscription retention.
+- Subscription capacity and byte limits.
+- Event consumption by subscription identity.
+- Channel retention and byte limits.
+- Channel cursors.
+- Emit deduplication.
+- Human waits with actor authorization.
+- Completion waits.
+- Signals with `(source, id)` identity.
+- Machine serialization and recovery.
+- Timer rearming only after complete restore.
 
-- Replace each temporary unsupported branch with typed behavior in the same feature slice.
-- Remove development-only admission rejection only after the corresponding typed behavior exists.
-- Do not leave valid Workflow v1 features permanently rejected.
-- Do not create `map[string]any` durable semantic state.
-- Do not persist `json.RawMessage` as a semantic runtime model.
-- Do not create broad facade interfaces.
-- Do not turn generic Workflow input into arbitrary chat text.
-- Do not add fallback success paths.
-- Do not omit failure, cancellation, or uncertainty propagation.
-- Do not silently weaken declared effect behavior.
-- Do not silently weaken declared target, port, channel, event, schema, resource, budget, or trigger behavior.
-- Use and rectifyy if missing proper ENUM usage everywhere.
-- Do not add broad guard code before functional coverage is complete.
-- Do not stop after implementing type definitions without compiler, interpreter, persistence, recovery, and execution wiring.
+### Phase E: normal Session Runtime v3 capability
 
-Use actual source inspection to find every remaining temporary branch, including:
+Complete:
 
-- `unsupportedWorkflowOperation`,
-- `ErrUnsupportedOperation`,
-- `unsupported sessionv3 WorkItem type`,
-- incomplete `WorkflowStep` switch branches,
-- compiler rejections for valid Workflow v1 fields,
-- ignored declaration fields,
-- temporary return values,
-- incomplete trigger manager behavior,
-- placeholder Service or Activity binding behavior,
-- provider Tool branches,
-- attachment bypasses,
-- App omissions,
-- source-schema/runtime mismatches,
-- recovery paths that lose effect semantics,
-- close paths that leave timers or goroutines running.
+- Direct Model chat.
+- Agent-backed chat.
+- Workspace contribution.
+- Instruction planning.
+- Attachment Runtime admission.
+- Local file snapshotting.
+- Image snapshotting.
+- Directory expansion.
+- URL normalization.
+- Replay-safe attachment materialization.
+- Historical attachment modification handling.
+- Provider attachment adaptation.
+- Go Tools.
+- Provider SDK Tools.
+- MCP Tools.
+- Skill Tools.
+- Service bindings.
+- Activity bindings.
+- MCP resources.
+- MCP prompts.
+- MCP Apps.
+- MCP approvals.
+- App Tool calls.
+- App resource reads.
+- Approved App context staging.
+- Skill sessions.
+- Active Skill lifecycle.
+- Skill Tool invocation.
+- Skill resource handling.
+- Provider streaming.
+- Protocol outputs.
+- Usage.
+- Debugger projections.
+- Tool result continuation.
+- Cancellation.
+- Retries.
+- Waits.
+- Recovery.
+- Uncertainty.
+- Durable command idempotency.
+- Transport-neutral commands and projections.
 
-Before finalizing, audit all valid Workflow v1 source fields in:
+### Phase F: functional completion audit
+
+Audit every valid Workflow v1 source field in:
 
 - `internal/llmartifactory-go/workflow/contract/v1/types.go`
 - `internal/llmartifactory-go/workflow/contract/v1/validation.go`
 - `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json`
 
-For every valid field, prove one of these is true in source:
+For every valid field, prove exactly one result in source:
 
-1. It compiles into typed runtime behavior.
-2. It is invalid by language semantics.
-3. It requires a currently unavailable external binding, credential, policy, or Artifact pin and fails before unrelated external work begins.
+1. The field compiles into typed runtime behavior.
+2. The field is invalid by Workflow language semantics.
+3. The field requires an unavailable required Artifact pin, binding, credential, policy, or external domain capability and fails before unrelated external work begins.
 
 Do not leave a valid field as a permanent unsupported runtime feature.
 
-Final response requirements:
+At the end of the implementation pass:
 
-- No progress narrative.
-- No tests section.
-- No documentation section.
-- No apology.
-- No claim that work is complete unless every listed requirement is implemented in the source tree.
-- Return only:
-  - `implemented:` with concise source-level facts,
-  - `files changed:` with paths,
-  - `remaining:` only if an actual unavailable input, authorization, tool, or environment constraint blocked work.
-- If no real blocker exists, continue implementing instead of listing remaining work.
+- Update only the phase-wise implementation status sections in the two HLD files.
+- Mark completed source behavior with `- [x]`.
+- Mark pending source behavior with `- [ ]`.
+- Do not mark a task complete from type definitions alone.
+- Do not mark a task complete from compiler support alone.
+- Do not mark a task complete from one happy-path dispatch route alone.
+- A completed task requires compiler, interpreter, persistence, recovery, execution, cancellation, and relevant caller wiring.
+- Do not include tests or documentation tasks in the functional completion matrix.
+- Do not claim functional completion until every Phase A through Phase F functional task is complete.
+
+Final response format after source changes:
+
+```text
+implemented:
+- concise source-level facts
+
+files changed:
+- exact paths
+
+remaining:
+- only actual unavailable input, authorization, external contract, environment, or output-limit blockers
+
+hld status diffs
+- mark proper items in hlds complete truthfully.
+```
+
+For an implementation or patch response, then end with:
+
+```text
+## Implementation status
+- [x] evidenced completed work
+- [ ] pending work or exact blocker
+
+## Next steps
+- [x] completed scope, when applicable
+- [ ] remaining implementation work
+
+### Expected user actions
+- only patch application, required authorization, exact missing input, or environment-only verification
+```
+
+Do not use hostile language. Do not make excuses. Do not use superficial progress claims. Be precise, complete independent work, and preserve the user’s time and financial investment.
