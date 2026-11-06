@@ -81,6 +81,80 @@ func (r *Runtime) cancelChildFrameIDsLocked(
 	return nil
 }
 
+func (r *Runtime) cancelWorkItemsLocked(
+	session *Session,
+	execution *Execution,
+	parentFrameID ProgramFrameID,
+	ids []WorkItemID,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if session == nil || execution == nil {
+		return errors.New("workflow work cancellation owner is unavailable")
+	}
+
+	now := r.now()
+	for _, id := range ids {
+		item := mutableWorkItem(execution, id)
+		if item == nil {
+			return errors.New(
+				"workflow cancellation target work item is unavailable",
+			)
+		}
+		if item.FrameID != parentFrameID {
+			return errors.New(
+				"workflow cancellation target work item is not owned by this frame",
+			)
+		}
+		if item.State.Terminal() {
+			continue
+		}
+
+		if cancel := r.cancels[item.ID]; cancel != nil {
+			cancel()
+			delete(r.cancels, item.ID)
+		}
+		r.cancelRetryLocked(item.ID)
+
+		if item.WaitID != "" {
+			wait := mutableWait(execution, item.WaitID)
+			if wait != nil &&
+				(wait.Status == WaitStatusPending ||
+					wait.Status == WaitStatusResolving) {
+				wait.Status = WaitStatusCancelled
+				wait.UpdatedAt = now
+				wait.Error = &SanitizedError{
+					Code:     workflowChildCancelled,
+					Category: ErrorCategoryCancellation,
+					Message:  "workflow wait was cancelled by its owner",
+				}
+				r.cancelWaitDeadlineLocked(wait.ID)
+				delete(r.privateWaits, wait.ID)
+			}
+			item.WaitID = ""
+		}
+
+		item.State = WorkItemStateCancelled
+		item.EffectState = EffectStateConfirmedNotApplied
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+		item.Error = &SanitizedError{
+			Code:     workflowChildCancelled,
+			Category: ErrorCategoryCancellation,
+			Effect:   EffectStateConfirmedNotApplied,
+			Message:  "workflow work item was cancelled by its owner",
+		}
+		if attempt := activeAttempt(execution, item.ID); attempt != nil {
+			attempt.State = AttemptStateCancelled
+			attempt.EffectState = EffectStateConfirmedNotApplied
+			attempt.FinishedAt = &now
+			attempt.Error = cloneWorkflowSanitizedError(item.Error)
+		}
+	}
+	return nil
+}
+
 func isDescendantFrame(
 	execution Execution,
 	parentID ProgramFrameID,

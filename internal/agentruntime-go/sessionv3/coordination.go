@@ -760,6 +760,7 @@ func completionWorkItemResult(
 		return output, &SanitizedError{
 			Code:     "completion_uncertain",
 			Category: ErrorCategoryUncertainty,
+			Effect:   item.EffectState,
 			Message:  "completed WorkItem outcome is uncertain",
 		}, false
 	default:
@@ -772,6 +773,7 @@ func completionWorkItemResult(
 		return output, &SanitizedError{
 			Code:     "completion_failed",
 			Category: ErrorCategoryExecution,
+			Effect:   item.EffectState,
 			Message:  "completed WorkItem did not succeed",
 		}, true
 	}

@@ -1541,7 +1541,7 @@ func (r *Runtime) advanceFrameLocked(
 	for _, intent := range transition.WorkItems {
 		now := r.now()
 		item := WorkItem{
-			ID:          WorkItemID(r.newID()),
+			ID:          intent.ID,
 			FrameID:     frame.ID,
 			Type:        intent.Type,
 			State:       WorkItemStateReady,
@@ -1553,6 +1553,15 @@ func (r *Runtime) advanceFrameLocked(
 			Input:       intent.Input,
 			CreatedAt:   now,
 			UpdatedAt:   now,
+		}
+		if item.ID == "" {
+			item.ID = WorkItemID(r.newID())
+		}
+		if mutableWorkItem(execution, item.ID) != nil {
+			return fmt.Errorf(
+				"WorkItem %q already exists in Execution",
+				item.ID,
+			)
 		}
 		if err := item.Validate(); err != nil {
 			return err
@@ -1600,6 +1609,14 @@ func (r *Runtime) advanceFrameLocked(
 		execution,
 		frameID,
 		transition.CancelChildFrameIDs,
+	); err != nil {
+		return err
+	}
+	if err := r.cancelWorkItemsLocked(
+		session,
+		execution,
+		frameID,
+		transition.CancelWorkItemIDs,
 	); err != nil {
 		return err
 	}
@@ -1941,10 +1958,12 @@ func (r *Runtime) startDispatchedLocked(
 		State:          AttemptStateDispatched,
 		Number:         nextAttempt(*execution, item.ID),
 		IdempotencyKey: item.Effect.IdempotencyKey,
+		EffectState:    effectStateForDispatch(item.Effect),
 		StartedAt:      now,
 		Deadline:       attemptDeadlineValue,
 	}
 	item.State = WorkItemStateDispatched
+	item.EffectState = effectStateForDispatch(item.Effect)
 	item.RetryState = nil
 	item.Binding = &bound.SemanticBinding
 	item.AttemptIDs = append(item.AttemptIDs, attempt.ID)
@@ -2114,6 +2133,7 @@ func (r *Runtime) finishWorkLocked(
 			attempt.FinishedAt = &now
 			attempt.Error = result.Error
 		}
+		recordEffectSettlement(item, attempt, result)
 		r.refreshExecutionStateLocked(execution)
 		r.touchExecutionLocked(session, execution)
 		return
@@ -2167,6 +2187,8 @@ func (r *Runtime) finishWorkLocked(
 			}
 		}
 	}
+
+	recordEffectSettlement(item, attempt, result)
 
 	if item.State == WorkItemStateFailed &&
 		r.prepareRetryLocked(execution, item, attempt, now) {
@@ -2887,12 +2909,15 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				changed = true
 			case WorkItemStateDispatched:
 				replaySafe := effectReplaySafe(item.Effect)
+
 				item.State = WorkItemStateUncertain
 				item.Error = &SanitizedError{
 					Code:     "recovered_external_outcome_uncertain",
 					Category: ErrorCategoryUncertainty,
+					Effect:   EffectStateUncertain,
 					Message:  "external work was dispatched when the runtime stopped",
 				}
+				item.EffectState = EffectStateUncertain
 				item.CompletedAt = &now
 				item.UpdatedAt = now
 				changed = true
@@ -2900,9 +2925,23 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 					attempt := &execution.Attempts[attemptIndex]
 					if attempt.WorkItemID == item.ID && attempt.State == AttemptStateDispatched {
 						attempt.State = AttemptStateUncertain
+						attempt.EffectState = EffectStateUncertain
 						attempt.Error = item.Error
 						attempt.FinishedAt = &now
 					}
+				}
+				if replaySafe {
+					item.State = WorkItemStateReady
+					item.Binding = nil
+					item.Output = nil
+					item.Error = nil
+					item.EffectState = EffectStateNotStarted
+					item.CompletedAt = nil
+					item.DispatchedAt = nil
+					item.RetryState = nil
+					item.Requested = item.Automatic
+				} else {
+					needsReview = true
 				}
 				if replaySafe {
 					// Read, idempotent, and keyed work can be rebound against

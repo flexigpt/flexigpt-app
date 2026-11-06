@@ -37,6 +37,7 @@ func workflowSettledFailure(
 	copyValue.StepPath = item.ProgramPath
 	copyValue.Details = failure.Details.Clone()
 	failure = &copyValue
+	failure.Effect = item.EffectState
 
 	step, err := workflowStepForPath(program.Root, item.ProgramPath)
 	if err != nil || step.Call == nil {
@@ -44,6 +45,9 @@ func workflowSettledFailure(
 	}
 	target, found := program.Targets[state.PendingTarget]
 	if !found {
+		if state.PendingTarget == "" {
+			return failure
+		}
 		return &SanitizedError{
 			Code:     "workflow_selected_target_missing",
 			Category: ErrorCategoryValidation,

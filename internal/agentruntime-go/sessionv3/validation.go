@@ -590,6 +590,9 @@ func (w WorkItem) Validate() error {
 		strings.TrimSpace(w.Effect.IdempotencyKey) == "" {
 		return errors.New("keyed work item has no idempotency key")
 	}
+	if err := validateEffectStateForWork(w); err != nil {
+		return err
+	}
 	switch w.State {
 	case WorkItemStateReady,
 		WorkItemStateBinding,
@@ -636,6 +639,10 @@ func (e EffectContract) Validate() error {
 		EffectKindNonIdempotent:
 	default:
 		return fmt.Errorf("unsupported effect kind %q", e.Kind)
+	}
+	if e.Kind == EffectKindKeyed &&
+		strings.TrimSpace(e.IdempotencyKey) == "" {
+		return errors.New("keyed work item has no idempotency key")
 	}
 	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
 		return errors.New("non-keyed work item has an idempotency key")
@@ -939,6 +946,11 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 			return errors.New("emit receipt has no destination")
 		}
 	}
+	if o.Receipt != nil {
+		if err := o.Receipt.EffectState.Validate(); err != nil {
+			return err
+		}
+	}
 	if o.LLM != nil {
 		for _, call := range o.LLM.ToolCalls {
 			if err := call.Validate(); err != nil {
@@ -958,6 +970,9 @@ func (a Attempt) Validate() error {
 	}
 	if a.Deadline != nil && a.Deadline.Before(a.StartedAt) {
 		return errors.New("attempt deadline is before it started")
+	}
+	if err := a.EffectState.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1175,6 +1190,14 @@ func (s ExecutionSignal) Validate() error {
 	}
 	for _, waitID := range s.ConsumedBy {
 		if err := validateID("signal consumed wait ID", string(waitID)); err != nil {
+			return err
+		}
+	}
+	for _, subscription := range s.ConsumedSubscriptions {
+		if err := validateID(
+			"signal consumed subscription",
+			subscription,
+		); err != nil {
 			return err
 		}
 	}

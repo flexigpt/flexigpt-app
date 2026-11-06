@@ -37,13 +37,16 @@ func workflowCallSupportsRetry(
 
 	for _, name := range targetNames {
 		target, found := document.Targets[name]
-		if !found {
+		if !found || target.Interface == nil {
 			return false
 		}
 		switch target.Kind {
 		case workflowv1.TargetTool,
 			workflowv1.TargetService,
 			workflowv1.TargetActivity:
+			if target.Interface.Effect == nil {
+				return false
+			}
 		default:
 			return false
 		}
@@ -65,7 +68,21 @@ func workflowCallTargetNames(
 		return nil, false
 	}
 	set, found := document.TargetSets[call.Allowed]
-	if !found || set.Resolved != nil || len(set.Members) == 0 {
+	if !found {
+		return nil, false
+	}
+	if set.Resolved != nil {
+		// A resolver-backed set can contain only target names declared in the
+		// document, but its selected subset is unavailable until runtime.
+		// Its retry safety is therefore the intersection of all potential
+		// declared target guarantees.
+		output := make([]string, 0, len(document.Targets))
+		for name := range document.Targets {
+			output = append(output, name)
+		}
+		return output, len(output) != 0
+	}
+	if len(set.Members) == 0 {
 		return nil, false
 	}
 

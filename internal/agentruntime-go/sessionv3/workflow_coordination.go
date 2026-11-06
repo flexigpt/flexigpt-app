@@ -482,6 +482,57 @@ func validateWorkflowCoordinationBlock(
 				return err
 			}
 		}
+		if step.Machine != nil {
+			machineActive := cloneWorkflowStringSet(active)
+			for _, subscription := range step.Machine.Listen {
+				if _, found := events[subscription.Event]; !found {
+					return fmt.Errorf(
+						"workflow machine subscription %q has no event",
+						subscription.Name,
+					)
+				}
+				if _, duplicate := machineActive[subscription.Name]; duplicate {
+					return fmt.Errorf(
+						"workflow machine subscription %q shadows an active subscription",
+						subscription.Name,
+					)
+				}
+				machineActive[subscription.Name] = struct{}{}
+			}
+			for _, machineState := range step.Machine.States {
+				for _, transition := range machineState.Transitions {
+					if transition.Event == "" {
+						continue
+					}
+					if _, found := machineActive[transition.Event]; !found {
+						return fmt.Errorf(
+							"workflow machine transition references inactive subscription %q",
+							transition.Event,
+						)
+					}
+				}
+			}
+		}
+	}
+	for index := range block.Catch {
+		if err := validateWorkflowCoordinationBlock(
+			block.Catch[index].Do,
+			events,
+			channels,
+			active,
+		); err != nil {
+			return err
+		}
+	}
+	if block.Finally != nil {
+		if err := validateWorkflowCoordinationBlock(
+			*block.Finally,
+			events,
+			channels,
+			active,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -509,6 +560,21 @@ func workflowStepBlocks(step WorkflowStep) []WorkflowBlock {
 	}
 	if step.Repeat != nil {
 		output = append(output, step.Repeat.Do)
+	}
+	if step.Machine != nil {
+		for _, state := range step.Machine.States {
+			if state.Entry != nil {
+				output = append(output, *state.Entry)
+			}
+			if state.Exit != nil {
+				output = append(output, *state.Exit)
+			}
+			for _, transition := range state.Transitions {
+				if transition.Do != nil {
+					output = append(output, *transition.Do)
+				}
+			}
+		}
 	}
 	return output
 }

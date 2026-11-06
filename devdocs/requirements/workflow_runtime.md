@@ -387,11 +387,24 @@ support `remaining: cancel` and `remaining: wait`, and support `fail-fast` and
 Repeat supports count, while, until, timeout, carried state, local state,
 exhaustion, break, continue, and ongoing `until-cancelled` execution.
 
-The compiler and interpreter are still incomplete. Catch, finally, machines,
-trigger scheduling, resolver-backed target sets, reconciliation,
-compensation, resource accounting, complete port behavior, and complete
-normal V2 backend capability remain required. The existence of the completed
-lifecycle slices is not evidence of full backend completion.
+Workflow blocks now compile ordered typed catch handlers and one typed finally
+block. A terminal success, failure, timeout, or cancellation enters durable
+terminal handling before the ProgramFrame becomes terminal. Matching catch
+blocks receive typed `error` context. Finalizers receive typed `outcome`
+context. Catch recovery output is schema-checked. A finalizer failure replaces
+a success and is attached as a cause to a preceding failure or cancellation.
+
+Workflow machines now compile into typed durable ProgramFrame state. The
+runtime persists current machine state, carried state, entry time, active
+subscription identities, active wait WorkItem identities, selected transition,
+and transition generation. Entry, exit, transition blocks, immediate
+conditions, event transitions, timer transitions, and final output use normal
+typed child ProgramFrames and Wait WorkItems. Machine transition handling is
+serialized by the owning ProgramFrame.
+
+Resolver-backed target sets now resolve once at their first call boundary,
+persist their accepted target names, and preserve the selected concrete target
+identity in `WorkflowState` before external dispatch.
 
 Full retries, complete structured-control policies, child ownership, event and
 channel coordination, trigger scheduling, reconciliation, compensation,
@@ -430,7 +443,7 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [x] Agent target executes as a child Agent-loop `ProgramFrame` with a typed plan.
 - [x] Model target executes as a child single-model `ProgramFrame` with a typed plan.
 - [x] Static target sets resolve and enforce allowed members.
-- [ ] Resolver-backed target sets use typed resolver WorkItems and persisted selected target identity.
+- [x] Resolver-backed target sets resolve once at the call boundary and persist selected target identity.
 - [ ] Agent, Workspace, Model, instruction, Tool, Skill, MCP, attachment, message, and port plans compile before Agent-loop or single-model dispatch.
 - [x] Provider SDK Tool Artifacts execute only inside a typed Model plan and never produce local success.
 - [x] `read` effect contract is implemented.
@@ -442,10 +455,10 @@ and no Workflow, Trigger, Event, or Invocation persistence root is added.
 - [ ] Reconciliation WorkItems and recovery review are implemented.
 - [ ] Saga effect tracking uses reverse compensation order.
 - [ ] Compensation error policy and cleanup allowance are implemented.
-- [ ] Typed effect state persists in errors and receipts.
-- [ ] Block `catch` handlers are implemented.
-- [ ] Block `finally` behavior is implemented.
-- [ ] Machine initial state, entry, exit, transitions, timer transitions, event transitions, and final output are implemented.
+- [x] Typed effect state persists in WorkItems, Attempts, errors, and receipts.
+- [x] Block `catch` handlers are implemented.
+- [x] Block `finally` behavior is implemented.
+- [x] Machine initial state, entry, exit, transitions, timer transitions, event transitions, and final output are implemented.
 - [x] Parallel `all` completion is implemented.
 - [x] Parallel `first-completed` completion is implemented.
 - [x] Parallel `first-success` completion is implemented.

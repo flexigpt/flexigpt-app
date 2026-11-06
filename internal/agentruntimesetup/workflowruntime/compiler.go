@@ -60,14 +60,11 @@ func compileWorkflowProgramWithInput(
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
-	channels, err := compileWorkflowChannels(document)
+	channels, targetSets, err := compileWorkflowChannelsAndTargetSets(document)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
-	inputSchema, err := compileWorkflowSchema(
-		document,
-		document.InputSchema,
-	)
+	inputSchema, err := compileWorkflowSchema(document, document.InputSchema)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
 	}
@@ -91,6 +88,7 @@ func compileWorkflowProgramWithInput(
 		InputBound:   inputBound,
 		Root:         root,
 		Targets:      make(map[string]sessionv3Runtime.WorkflowTarget),
+		TargetSets:   targetSets,
 		Events:       events,
 		Channels:     channels,
 	}
@@ -111,21 +109,10 @@ func rejectUnsupportedWorkflowDocument(
 	switch {
 	case len(document.Ports) != 0:
 		return unsupportedWorkflowOperation("workflow", "ports")
-	case len(document.Triggers) != 0:
-		return unsupportedWorkflowOperation("workflow", "triggers")
 	case len(document.Resources) != 0:
 		return unsupportedWorkflowOperation("workflow", "resources")
 	case document.Limits != nil:
 		return unsupportedWorkflowOperation("workflow", "limits")
-	}
-
-	for name, targetSet := range document.TargetSets {
-		if targetSet.Resolved != nil {
-			return unsupportedWorkflowOperation(
-				"targetSets/"+name,
-				"resolver-backed dynamic target set",
-			)
-		}
 	}
 	return nil
 }
@@ -141,18 +128,6 @@ func compileWorkflowBlock(
 	document workflowv1.WorkflowDocument,
 	block workflowv1.Block,
 ) (sessionv3Runtime.WorkflowBlock, error) {
-	if len(block.Catch) != 0 {
-		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
-			"block",
-			"catch handlers",
-		)
-	}
-	if block.Finally != nil {
-		return sessionv3Runtime.WorkflowBlock{}, unsupportedWorkflowOperation(
-			"block",
-			"finally block",
-		)
-	}
 	output, err := compileWorkflowBlockCore(document, block)
 	if err != nil {
 		return sessionv3Runtime.WorkflowBlock{}, err
@@ -160,6 +135,23 @@ func compileWorkflowBlock(
 	output.Listen, err = compileWorkflowSubscriptions(document, block.Listen)
 	if err != nil {
 		return sessionv3Runtime.WorkflowBlock{}, err
+	}
+	output.Catch, err = compileWorkflowCatchHandlers(
+		document,
+		block.Catch,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowBlock{}, err
+	}
+	if block.Finally != nil {
+		finallyBlock, finallyErr := compileWorkflowBlock(
+			document,
+			*block.Finally,
+		)
+		if finallyErr != nil {
+			return sessionv3Runtime.WorkflowBlock{}, finallyErr
+		}
+		output.Finally = &finallyBlock
 	}
 	return output, nil
 }
@@ -332,6 +324,7 @@ func compileWorkflowStep(
 		input.Parallel != nil,
 		input.Foreach != nil,
 		input.Repeat != nil,
+		input.Machine != nil,
 		input.Break != nil,
 		input.Continue != nil:
 		if err := compileWorkflowStructuredOperation(
@@ -456,7 +449,6 @@ func compileWorkflowCall(
 			"ports",
 		)
 	}
-
 	target, err := compileWorkflowValue(input.Target)
 	if err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
@@ -514,20 +506,18 @@ func compileWorkflowCall(
 			input.Allowed,
 		)
 	}
-	if set.Resolved != nil {
-		return sessionv3Runtime.WorkflowCall{}, unsupportedWorkflowOperation(
-			"targetSets/"+input.Allowed,
-			"resolver-backed dynamic target set",
-		)
-	}
-	if len(set.Members) == 0 {
+	if len(set.Members) == 0 && set.Resolved == nil {
 		return sessionv3Runtime.WorkflowCall{}, errors.New("workflow target set has no members")
 	}
-	output.AllowedTargets = append([]string(nil), set.Members...)
-	output.SetContract, err = compileWorkflowCallableInterface(
-		document,
-		set.Interface,
-	)
+	output.AllowedTargetSet = input.Allowed
+	if set.Resolved == nil {
+		output.AllowedTargets = append([]string(nil), set.Members...)
+	}
+	interfaceValue := set.Interface
+	if set.Resolved != nil {
+		interfaceValue = &set.Resolved.Interface
+	}
+	output.SetContract, err = compileWorkflowCallableInterface(document, interfaceValue)
 	if err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
@@ -598,22 +588,16 @@ func compileWorkflowEffect(
 		Compensate: input.Compensate,
 	}
 	switch input.Kind {
-	case "read":
+	case string(sessionv3Runtime.EffectKindRead):
 		output.Kind = sessionv3Runtime.EffectKindRead
-	case "idempotent":
-		if input.Keyed {
-			output.Kind = sessionv3Runtime.EffectKindKeyed
-		} else {
-			output.Kind = sessionv3Runtime.EffectKindIdempotent
-		}
-	case "non-idempotent":
-		if input.Keyed {
-			output.Kind = sessionv3Runtime.EffectKindKeyed
-		} else {
-			output.Kind = sessionv3Runtime.EffectKindNonIdempotent
-		}
-	case "keyed":
-		output.Kind = sessionv3Runtime.EffectKindKeyed
+	case string(sessionv3Runtime.EffectKindIdempotent):
+		output.Kind = sessionv3Runtime.EffectKindIdempotent
+	case string(sessionv3Runtime.EffectKindNonIdempotent):
+		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
+	case string(sessionv3Runtime.EffectKindKeyed):
+		// A declaration-level target contract describes capability. The
+		// concrete key is a call-level stable semantic value.
+		output.Kind = sessionv3Runtime.EffectKindIdempotent
 	default:
 		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
 			"target.interface.effect",
@@ -639,13 +623,13 @@ func compileWorkflowStepEffect(
 
 	output := sessionv3Runtime.WorkflowStepEffect{}
 	switch input.Kind {
-	case "read":
+	case string(sessionv3Runtime.EffectKindRead):
 		output.Kind = sessionv3Runtime.EffectKindRead
-	case "idempotent":
+	case string(sessionv3Runtime.EffectKindIdempotent):
 		output.Kind = sessionv3Runtime.EffectKindIdempotent
-	case "keyed":
+	case string(sessionv3Runtime.EffectKindKeyed):
 		output.Kind = sessionv3Runtime.EffectKindKeyed
-	case "non-idempotent":
+	case string(sessionv3Runtime.EffectKindNonIdempotent):
 		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
 	default:
 		return sessionv3Runtime.WorkflowStepEffect{},

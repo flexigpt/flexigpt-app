@@ -7,15 +7,6 @@ import (
 	"time"
 )
 
-func effectReplaySafe(effect EffectContract) bool {
-	switch effect.Kind {
-	case EffectKindRead, EffectKindIdempotent, EffectKindKeyed:
-		return true
-	default:
-		return false
-	}
-}
-
 // dispatchAllowedLocked is used both when work is queued and immediately
 // before binding. A failed checkpoint or recovery review prevents new work.
 func (r *Runtime) dispatchAllowedLocked(execution Execution) bool {

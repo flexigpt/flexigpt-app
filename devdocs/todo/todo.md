@@ -18,6 +18,8 @@
 
 - [ ] even if all files are attached larger models tend to just call tools if they are present for arbitrary things without actually seeing if analysis is to be done with current already present context or not. this is even with that skill we have related to use context. see if the skill needs more better wording.
 
+- [ ] need the composer to collapse as needed or auto when reading or some better ux.
+- [ ] apply all diffs in convo is also needed in some way.
 - [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 
 ## M-n

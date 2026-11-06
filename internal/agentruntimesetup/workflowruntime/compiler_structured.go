@@ -58,6 +58,17 @@ func compileWorkflowStructuredOperation(
 		output.Repeat = &value
 		return nil
 
+	case input.Machine != nil:
+		value, err := compileWorkflowMachine(
+			document,
+			*input.Machine,
+		)
+		if err != nil {
+			return err
+		}
+		output.Machine = &value
+		return nil
+
 	case input.Break != nil:
 		output.Break = true
 		return nil

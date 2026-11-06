@@ -54,6 +54,7 @@ func (r *Runtime) prepareRetryLocked(
 	item.State = WorkItemStateRetryWaiting
 	item.Output = nil
 	item.LLMStream = nil
+	item.EffectState = EffectStateNotStarted
 	item.CompletedAt = nil
 	item.RetryState = &RetryState{
 		ScheduledAt:   now,
@@ -62,10 +63,6 @@ func (r *Runtime) prepareRetryLocked(
 	}
 	item.UpdatedAt = now
 	return true
-}
-
-func retryEffectSafe(effect EffectContract) bool {
-	return effectReplaySafe(effect)
 }
 
 func retryMatches(match RetryMatcher, failure SanitizedError) bool {

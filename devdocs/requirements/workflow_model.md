@@ -1708,6 +1708,21 @@ target owner according to the declared completion behavior. Parent cancellation
 propagates to independent children only when the persisted relationship
 declares `cancelWithParent`.
 
+The typed runtime now compiles block `catch` and `finally` declarations. A
+catch matcher uses typed category, code, retryable, effect-state, and optional
+schema constraints. The first matching handler executes in a child
+ProgramFrame. A finalizer executes after success, failure, timeout, or
+cancellation. Its output is ignored. Its failure becomes the primary failure
+after prior success and becomes a typed cause after prior failure or
+cancellation.
+
+Machines compile to typed runtime state. A machine persists current state,
+carried state, transition generation, entry time, active subscriptions, active
+Wait WorkItem identities, and selected transition identity. Entry, exit, and
+transition blocks use ordinary typed child ProgramFrames. Event and timer
+transitions use ordinary durable Wait WorkItems. Event processing is serialized
+by the owning machine ProgramFrame.
+
 Workflow calls currently execute Tool Artifact, MCP Tool, Service, Activity,
 nested Workflow, Agent, and Model targets through typed WorkItems or child
 ProgramFrames. Static target sets preserve their allowed members and the

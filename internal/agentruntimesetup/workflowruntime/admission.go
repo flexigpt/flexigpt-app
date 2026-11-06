@@ -502,6 +502,13 @@ func finalizeWorkflowTarget(
 	}
 	target.Contract = contract
 
+	if source.Interface != nil &&
+		source.Interface.Effect != nil &&
+		(source.Interface.Effect.Kind == string(sessionv3Runtime.EffectKindKeyed) ||
+			source.Interface.Effect.Keyed) {
+		target.KeyedCapable = true
+	}
+
 	if source.Interface != nil && source.Interface.Effect != nil {
 		requested, err := compileWorkflowEffect(source.Interface.Effect)
 		if err != nil {

@@ -468,6 +468,23 @@ func (s WorkItemState) Terminal() bool {
 	}
 }
 
+// EffectState records the strongest durable fact known about a business
+// effect. It is distinct from WorkItem state. A WorkItem can fail while an
+// external effect is confirmed, uncertain, or compensated.
+type EffectState string
+
+const (
+	EffectStateNotApplicable       EffectState = "notApplicable"
+	EffectStateNotStarted          EffectState = "notStarted"
+	EffectStateDispatched          EffectState = "dispatched"
+	EffectStateConfirmedApplied    EffectState = "confirmedApplied"
+	EffectStateConfirmedNotApplied EffectState = "confirmedNotApplied"
+	EffectStateUncertain           EffectState = "uncertain"
+	EffectStateCompensating        EffectState = "compensating"
+	EffectStateCompensated         EffectState = "compensated"
+	EffectStateCompensationFailed  EffectState = "compensationFailed"
+)
+
 type EffectKind string
 
 const (
@@ -484,9 +501,10 @@ type EffectContract struct {
 	Compensate     bool       `json:"compensate,omitempty"`
 }
 
-// WorkflowStepEffect is the evaluated effect constraint attached to one
-// Workflow call. Key remains a typed value template until the interpreter
-// prepares the concrete WorkItem.
+// WorkflowStepEffect is the evaluated declaration-level effect constraint for
+// one Workflow call. Its Key is a typed value template. The interpreter
+// evaluates it once when the logical WorkItem is prepared and persists the
+// concrete key in EffectContract.IdempotencyKey.
 type WorkflowStepEffect struct {
 	Kind EffectKind     `json:"kind"`
 	Key  *WorkflowValue `json:"key,omitempty"`
@@ -533,6 +551,7 @@ type WorkItem struct {
 	AttemptIDs   []AttemptID      `json:"attemptIDs,omitempty"`
 	Deadline     *time.Time       `json:"deadline,omitempty"`
 	Effect       EffectContract   `json:"effect"`
+	EffectState  EffectState      `json:"effectState,omitempty"`
 	Automatic    bool             `json:"automatic"`
 	Retry        *RetryPolicy     `json:"retry,omitempty"`
 	RetryState   *RetryState      `json:"retryState,omitempty"`
@@ -826,9 +845,10 @@ type ToolOutput struct {
 }
 
 type ExternalReceipt struct {
-	System      string    `json:"system"`
-	Reference   string    `json:"reference"`
-	ConfirmedAt time.Time `json:"confirmedAt"`
+	System      string      `json:"system"`
+	Reference   string      `json:"reference"`
+	ConfirmedAt time.Time   `json:"confirmedAt"`
+	EffectState EffectState `json:"effectState,omitempty"`
 }
 
 type AttemptState string
@@ -848,6 +868,7 @@ type Attempt struct {
 	State          AttemptState     `json:"state"`
 	Number         int              `json:"number"`
 	IdempotencyKey string           `json:"idempotencyKey,omitempty"`
+	EffectState    EffectState      `json:"effectState,omitempty"`
 	StartedAt      time.Time        `json:"startedAt"`
 	Deadline       *time.Time       `json:"deadline,omitempty"`
 	FinishedAt     *time.Time       `json:"finishedAt,omitempty"`
@@ -942,6 +963,7 @@ type SanitizedError struct {
 	Message   string           `json:"message"`
 	Retryable bool             `json:"retryable,omitempty"`
 	StepPath  string           `json:"stepPath,omitempty"`
+	Effect    EffectState      `json:"effectState,omitempty"`
 	Details   CanonicalValue   `json:"details,omitempty"`
 	Causes    []SanitizedError `json:"causes,omitempty"`
 }
@@ -977,6 +999,7 @@ type ProgramFrameIntent struct {
 }
 
 type WorkItemIntent struct {
+	ID          WorkItemID      `json:"id,omitempty"`
 	ProgramPath string          `json:"programPath,omitempty"`
 	Type        WorkItemType    `json:"type"`
 	Automatic   bool            `json:"automatic"`
@@ -997,6 +1020,7 @@ type ProgramTransition struct {
 	CancelChildPaths        []string             `json:"cancelChildPaths,omitempty"`
 	CancelChildFrameIDs     []ProgramFrameID     `json:"cancelChildFrameIDs,omitempty"`
 	CancelChildExecutionIDs []ExecutionID        `json:"cancelChildExecutionIDs,omitempty"`
+	CancelWorkItemIDs       []WorkItemID         `json:"cancelWorkItemIDs,omitempty"`
 	ContinueParent          bool                 `json:"continueParent,omitempty"`
 }
 

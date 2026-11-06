@@ -28,6 +28,9 @@ type WorkflowScopeContext struct {
 	Item               *CanonicalValue             `json:"item,omitempty"`
 	Index              *int                        `json:"index,omitempty"`
 	Result             *CanonicalValue             `json:"result,omitempty"`
+	Event              *CanonicalValue             `json:"event,omitempty"`
+	Error              *CanonicalValue             `json:"error,omitempty"`
+	Outcome            *CanonicalValue             `json:"outcome,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -39,6 +42,15 @@ func (s WorkflowScopeContext) Validate() error {
 	}
 	if s.Result != nil && !s.Result.Valid() {
 		return errors.New("Workflow scope result is invalid")
+	}
+	if s.Event != nil && !s.Event.Valid() {
+		return errors.New("Workflow scope event is invalid")
+	}
+	if s.Error != nil && !s.Error.Valid() {
+		return errors.New("Workflow scope error is invalid")
+	}
+	if s.Outcome != nil && !s.Outcome.Valid() {
+		return errors.New("Workflow scope outcome is invalid")
 	}
 	if s.Index != nil && *s.Index < 0 {
 		return errors.New("Workflow scope index is invalid")
@@ -176,6 +188,7 @@ const (
 	WorkflowPendingParallel WorkflowPendingKind = "parallel"
 	WorkflowPendingForeach  WorkflowPendingKind = "foreach"
 	WorkflowPendingRepeat   WorkflowPendingKind = "repeat"
+	WorkflowPendingMachine  WorkflowPendingKind = "machine"
 )
 
 type WorkflowChildState string
@@ -260,6 +273,7 @@ type WorkflowPending struct {
 	Parallel   *WorkflowParallelProgress `json:"parallel,omitempty"`
 	Foreach    *WorkflowForeachProgress  `json:"foreach,omitempty"`
 	Repeat     *WorkflowRepeatProgress   `json:"repeat,omitempty"`
+	Machine    *WorkflowMachineProgress  `json:"machine,omitempty"`
 }
 
 func (p WorkflowPending) Validate() error {
@@ -282,6 +296,13 @@ func (p WorkflowPending) Validate() error {
 	case WorkflowPendingRepeat:
 		if p.Repeat == nil {
 			return errors.New("Workflow pending repeat state is missing")
+		}
+	case WorkflowPendingMachine:
+		if p.Machine == nil {
+			return errors.New("Workflow pending machine state is missing")
+		}
+		if err := p.Machine.Validate(); err != nil {
+			return err
 		}
 	default:
 		return errors.New("Workflow pending control kind is invalid")
@@ -327,6 +348,10 @@ func (i *WorkflowInterpreter) completeWorkflowBlock(
 ) (ProgramTransition, error) {
 	if !value.Valid() {
 		return ProgramTransition{}, errors.New("Workflow block completion value is invalid")
+	}
+
+	if exit == "" {
+		exit = WorkflowExitNormal
 	}
 
 	if program.Scope.Child {
@@ -845,6 +870,8 @@ func (i *WorkflowInterpreter) drivePending(
 		return i.launchForeachChildren(frame, execution, program, state)
 	case WorkflowPendingRepeat:
 		return i.launchRepeatChild(frame, execution, program, state)
+	case WorkflowPendingMachine:
+		return i.driveMachine(frame, execution, program, state)
 	default:
 		return workflowTransition(state, nil, nil, nil)
 	}
@@ -1178,6 +1205,9 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 
 	case WorkflowPendingRepeat:
 		return i.settleRepeatChild(state, program)
+
+	case WorkflowPendingMachine:
+		return i.settleMachineChild(state, program)
 
 	default:
 		return errors.New("Workflow pending control kind is invalid")
@@ -1906,7 +1936,51 @@ func (b WorkflowBlock) Validate() error {
 			return fmt.Errorf("Workflow step %q: %w", step.ID, err)
 		}
 	}
+	for index := range b.Catch {
+		if err := b.Catch[index].Validate(); err != nil {
+			return fmt.Errorf(
+				"Workflow catch handler %d: %w",
+				index,
+				err,
+			)
+		}
+	}
+	if b.Finally != nil {
+		if err := b.Finally.Validate(); err != nil {
+			return fmt.Errorf("Workflow finally block: %w", err)
+		}
+	}
 	return nil
+}
+
+func (i *WorkflowInterpreter) childBlockProgramWithScope(
+	frame ProgramFrame,
+	program WorkflowProgram,
+	state WorkflowState,
+	block WorkflowBlock,
+	mergeState bool,
+	scope WorkflowScopeContext,
+) (ProgramSnapshot, error) {
+	scope.Child = true
+	scope.MergeState = mergeState
+	scope.OuterState = state.State.Clone()
+	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
+	scope.OuterSubscriptions = cloneWorkflowSubscriptionStates(state.Subscriptions)
+	child := program
+	child.Root = block
+	child.Scope = scope
+	child.Input = program.Input.Clone()
+	child.InputBound = true
+	if err := child.Validate(); err != nil {
+		return ProgramSnapshot{}, err
+	}
+	payload, err := canonicalWorkflowValue(child)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	snapshot := frame.Program
+	snapshot.Payload = payload
+	return snapshot, nil
 }
 
 func (c WorkflowChoose) Validate() error {
