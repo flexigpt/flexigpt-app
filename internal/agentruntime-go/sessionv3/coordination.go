@@ -824,6 +824,32 @@ func completionWorkItemResult(
 		})
 	}
 
+	// Tool domains can return a confirmed typed error or skipped result as a
+	// completed WorkItem. Completion waits must preserve that terminal meaning
+	// instead of converting it into synthetic child success.
+	if item.State == WorkItemStateCompleted &&
+		item.Output != nil &&
+		item.Output.Tool != nil &&
+		item.Output.Tool.Kind != ToolOutputKindSuccess {
+		code := "completion_tool_failed"
+		message := item.Output.Tool.Error
+		if item.Output.Tool.Kind == ToolOutputKindSkipped {
+			code = "completion_tool_skipped"
+		}
+		if message == "" {
+			message = item.Output.Tool.Text
+		}
+		if message == "" {
+			message = "completed Tool WorkItem did not succeed"
+		}
+		return output, &SanitizedError{
+			Code:     code,
+			Category: ErrorCategoryExecution,
+			Effect:   item.EffectState,
+			Message:  message,
+		}, true
+	}
+
 	switch item.State {
 	case WorkItemStateCompleted:
 		return output, nil, true

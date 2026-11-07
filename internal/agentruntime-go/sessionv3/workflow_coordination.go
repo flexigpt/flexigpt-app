@@ -61,10 +61,11 @@ type WorkflowSubscriptionEvent struct {
 }
 
 type WorkflowWaitFilter struct {
-	Filters []WorkflowValue       `json:"filters"`
-	Input   CanonicalValue        `json:"input"`
-	State   CanonicalValue        `json:"state"`
-	Steps   []WorkflowStepOutcome `json:"steps"`
+	Filters  []WorkflowValue       `json:"filters"`
+	Input    CanonicalValue        `json:"input"`
+	State    CanonicalValue        `json:"state"`
+	Messages CanonicalValue        `json:"messages,omitempty"`
+	Steps    []WorkflowStepOutcome `json:"steps"`
 }
 
 type WorkflowEventWait struct {
@@ -311,7 +312,8 @@ func (a WaitAssignees) Validate() error {
 func (f WorkflowWaitFilter) Validate() error {
 	if len(f.Filters) == 0 ||
 		!f.Input.Valid() ||
-		!f.State.Valid() {
+		!f.State.Valid() ||
+		!f.Messages.Valid() {
 		return errors.New("workflow wait filter is invalid")
 	}
 	for _, value := range f.Filters {
@@ -342,6 +344,7 @@ func (f WorkflowWaitFilter) Matches(event CanonicalValue) (bool, error) {
 	activationState := WorkflowState{
 		Version:  WorkflowInterpreterVersion,
 		State:    f.State.Clone(),
+		Messages: f.Messages.Clone(),
 		Outcomes: cloneWorkflowStepOutcomes(f.Steps),
 	}
 	activation, err := workflowActivation(
@@ -760,10 +763,11 @@ func (i *WorkflowInterpreter) workflowWaitFilter(
 		return nil, nil
 	}
 	return &WorkflowWaitFilter{
-		Filters: filters,
-		Input:   program.Input.Clone(),
-		State:   state.State.Clone(),
-		Steps:   cloneWorkflowStepOutcomes(workflowScopeOutcomes(program, state)),
+		Filters:  filters,
+		Input:    program.Input.Clone(),
+		State:    state.State.Clone(),
+		Messages: state.Messages.Clone(),
+		Steps:    cloneWorkflowStepOutcomes(workflowScopeOutcomes(program, state)),
 	}, nil
 }
 
@@ -1270,10 +1274,11 @@ func cloneWorkflowWaitFilter(
 		return nil
 	}
 	output := &WorkflowWaitFilter{
-		Filters: make([]WorkflowValue, len(value.Filters)),
-		Input:   value.Input.Clone(),
-		State:   value.State.Clone(),
-		Steps:   cloneWorkflowStepOutcomes(value.Steps),
+		Filters:  make([]WorkflowValue, len(value.Filters)),
+		Input:    value.Input.Clone(),
+		State:    value.State.Clone(),
+		Messages: value.Messages.Clone(),
+		Steps:    cloneWorkflowStepOutcomes(value.Steps),
 	}
 	for index := range value.Filters {
 		output.Filters[index] = cloneWorkflowValue(value.Filters[index])

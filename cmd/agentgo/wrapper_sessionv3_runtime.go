@@ -180,6 +180,94 @@ func (w *SessionV3Wrapper) UpdateSessionDefaults(
 	})
 }
 
+func (w *SessionV3Wrapper) UpdateContinuationInput(
+	command sessionv3Runtime.UpdateContinuationInputCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.UpdateContinuationInput(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) ExecuteToolCalls(
+	command sessionv3Runtime.ExecuteToolCallsCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.ExecuteToolCalls(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) RetryToolCall(
+	command sessionv3Runtime.RetryToolCallCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.RetryToolCall(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) SkipToolCall(
+	command sessionv3Runtime.SkipToolCallCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.SkipToolCall(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) CompleteToolCallAsError(
+	command sessionv3Runtime.CompleteToolCallAsErrorCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.CompleteToolCallAsError(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) SetAutomationHold(
+	command sessionv3Runtime.SetAutomationHoldCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.SetAutomationHold(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) OpenAppView(
+	command sessionv3Runtime.OpenAppViewCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.OpenAppView(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) ExecuteAppTool(
+	command sessionv3Runtime.ExecuteAppToolCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.ExecuteAppTool(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) StageAppContext(
+	command sessionv3Runtime.StageAppContextCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.StageAppContext(context.Background(), command)
+	})
+}
+
+func (w *SessionV3Wrapper) ReadAppResource(
+	request sessionv3Runtime.AppResourceReadRequest,
+) (sessionv3Runtime.AppResourceReadResult, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.AppResourceReadResult, error) {
+		return r.ReadAppResource(context.Background(), request)
+	})
+}
+
+func (w *SessionV3Wrapper) EditAndResend(
+	command sessionv3Runtime.EditAndResendCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.EditAndResend(context.Background(), command)
+	})
+}
+
 func (w *SessionV3Wrapper) DeleteSession(
 	command sessionv3Runtime.DeleteSessionCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
@@ -206,6 +294,76 @@ func (w *SessionV3Wrapper) Activities(
 		return sessionv3Runtime.ActivityProjection{}, err
 	}
 	return store.ReadActivities(id)
+}
+
+func (w *SessionV3Wrapper) SessionRuntimeProjection(
+	id sessionv3Runtime.SessionID,
+) (sessionv3Runtime.SessionRuntimeProjection, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.SessionRuntimeProjection{}, err
+	}
+	return store.ReadSessionRuntimeProjection(id)
+}
+
+func (w *SessionV3Wrapper) ModelOperations(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.ModelOperationProjection, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.ModelOperations, nil
+}
+
+func (w *SessionV3Wrapper) ToolCalls(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.ToolCallProjection, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.ToolCalls, nil
+}
+
+func (w *SessionV3Wrapper) ToolAttempts(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.ToolAttemptProjection, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.Attempts, nil
+}
+
+func (w *SessionV3Wrapper) Waits(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.WaitProjection, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.Waits, nil
+}
+
+func (w *SessionV3Wrapper) Apps(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.AppInstance, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.Apps, nil
+}
+
+func (w *SessionV3Wrapper) Usage(
+	id sessionv3Runtime.SessionID,
+) ([]sessionv3Runtime.ExecutionUsageProjection, error) {
+	projection, err := w.SessionRuntimeProjection(id)
+	if err != nil {
+		return nil, err
+	}
+	return projection.Usage, nil
 }
 
 func (w *SessionV3Wrapper) Workflow(

@@ -57,6 +57,7 @@ func (b *Binder) buildInputs(
 	history := selectHistory(session, payload)
 	for _, activity := range history {
 		inputs = append(inputs, activityToInput(activity))
+		inputs = append(inputs, activityToolResultInputs(activity)...)
 	}
 	for index, value := range injectedContext {
 		value = strings.TrimSpace(value)
@@ -74,6 +75,7 @@ func (b *Binder) buildInputs(
 		return nil, fmt.Errorf("LLM input activity %q not found", payload.InputActivityID)
 	}
 	inputs = append(inputs, activityToInput(*current))
+	inputs = append(inputs, activityToolResultInputs(*current)...)
 	for _, id := range payload.ContinuationWorkItemIDs {
 		item := findWorkItem(execution, id)
 		if item == nil || item.Output == nil || item.Output.Tool == nil {
@@ -341,6 +343,17 @@ func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 				contents = append(contents, item)
 			}
 		}
+		for _, update := range a.Message.AppContext {
+			contents = append(
+				contents,
+				inferenceSpec.InputOutputContentItemUnion{
+					Kind: inferenceSpec.ContentItemKindText,
+					TextItem: &inferenceSpec.ContentItemText{
+						Text: appContextInputText(update),
+					},
+				},
+			)
+		}
 	}
 
 	role := inferenceSpec.RoleUser
@@ -366,6 +379,67 @@ func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 		Kind:         inferenceSpec.InputKindInputMessage,
 		InputMessage: message,
 	}
+}
+
+func activityToolResultInputs(
+	activity sessionv3Runtime.Activity,
+) []inferenceSpec.InputUnion {
+	if activity.Message == nil ||
+		len(activity.Message.ToolResults) == 0 {
+		return nil
+	}
+	output := make(
+		[]inferenceSpec.InputUnion,
+		0,
+		len(activity.Message.ToolResults),
+	)
+	for _, result := range activity.Message.ToolResults {
+		text := strings.TrimSpace(result.Text)
+		if text == "" {
+			text = strings.TrimSpace(result.Error)
+		}
+		if text == "" {
+			text = "Tool completed."
+		}
+		output = append(output, inferenceSpec.InputUnion{
+			Kind: inferenceSpec.InputKindFunctionToolOutput,
+			FunctionToolOutput: &inferenceSpec.ToolOutput{
+				Type:     inferenceSpec.ToolTypeFunction,
+				ID:       string(result.WorkItemID),
+				CallID:   firstText(result.ProviderCallID, result.CallID),
+				ChoiceID: result.ChoiceID,
+				Name:     result.Name,
+				Role:     inferenceSpec.RoleTool,
+				Status:   inferenceSpec.StatusCompleted,
+				IsError:  result.Kind != sessionv3Runtime.ToolOutputKindSuccess,
+				Contents: []inferenceSpec.ToolOutputItemUnion{{
+					Kind: inferenceSpec.ContentItemKindText,
+					TextItem: &inferenceSpec.ContentItemText{
+						Text: text,
+					},
+				}},
+			},
+		})
+	}
+	return output
+}
+
+func appContextInputText(
+	update sessionv3Runtime.AppContextUpdate,
+) string {
+	value := sessionv3Runtime.MustCanonicalValue(struct {
+		Source            string                               `json:"source"`
+		ResourceURI       string                               `json:"resourceURI,omitempty"`
+		Content           []sessionv3Runtime.AppContextContent `json:"content,omitempty"`
+		StructuredContent sessionv3Runtime.CanonicalValue      `json:"structuredContent,omitempty"`
+	}{
+		Source:            "approved MCP App context",
+		ResourceURI:       update.ResourceURI,
+		Content:           update.Content,
+		StructuredContent: update.StructuredContent.Clone(),
+	})
+	return "The following context was explicitly approved from a Session-scoped MCP App.\n\n" +
+		string(value)
 }
 
 func injectedContextInput(

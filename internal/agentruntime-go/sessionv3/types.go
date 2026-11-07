@@ -21,6 +21,8 @@ type (
 	TriggerID           string
 	TriggerOccurrenceID string
 	CommandID           string
+	AppInstanceID       string
+	AppViewID           string
 	Revision            uint64
 )
 
@@ -167,12 +169,14 @@ type Activity struct {
 }
 
 type MessageActivity struct {
-	Role        MessageRole     `json:"role"`
-	Status      string          `json:"status,omitempty"`
-	Text        string          `json:"text,omitempty"`
-	Attachments []Attachment    `json:"attachments,omitempty"`
-	Metadata    CanonicalValue  `json:"metadata,omitempty"`
-	Error       *SanitizedError `json:"error,omitempty"`
+	Role        MessageRole          `json:"role"`
+	Status      string               `json:"status,omitempty"`
+	Text        string               `json:"text,omitempty"`
+	Attachments []Attachment         `json:"attachments,omitempty"`
+	ToolResults []ToolResultActivity `json:"toolResults,omitempty"`
+	AppContext  []AppContextUpdate   `json:"appContext,omitempty"`
+	Metadata    CanonicalValue       `json:"metadata,omitempty"`
+	Error       *SanitizedError      `json:"error,omitempty"`
 }
 
 type AttachmentKind string
@@ -243,6 +247,51 @@ type AttachmentAdmission interface {
 		ctx context.Context,
 		request AttachmentAdmissionRequest,
 	) ([]Attachment, error)
+}
+
+// ToolResultActivity is an explicit carried Tool result. It is used only by
+// normal Session edit-and-resend and continuation behavior. It never fabricates
+// Tool success because it is built only from a durable completed WorkItem.
+type ToolResultActivity struct {
+	WorkItemID     WorkItemID     `json:"workItemID"`
+	CallID         string         `json:"callID"`
+	ProviderCallID string         `json:"providerCallID,omitempty"`
+	ChoiceID       string         `json:"choiceID,omitempty"`
+	Name           string         `json:"name"`
+	Kind           ToolOutputKind `json:"kind"`
+	Text           string         `json:"text,omitempty"`
+	Structured     CanonicalValue `json:"structured,omitempty"`
+	Error          string         `json:"error,omitempty"`
+}
+
+type AppContextContent struct {
+	Type        string `json:"type"`
+	Text        string `json:"text,omitempty"`
+	URI         string `json:"uri,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+	Data        []byte `json:"data,omitempty"`
+
+	DisplayName string `json:"displayName,omitempty"`
+}
+
+// AppContextUpdate is Session-owned approved context from an MCP App.
+// It contains semantic values only. It does not contain a browser handle,
+// MCP connection, approval token, or callback.
+type AppContextUpdate struct {
+	AppInstanceID     AppInstanceID       `json:"appInstanceID"`
+	ViewID            AppViewID           `json:"viewID"`
+	ServerID          string              `json:"serverID"`
+	ResourceURI       string              `json:"resourceURI,omitempty"`
+	Content           []AppContextContent `json:"content,omitempty"`
+	StructuredContent CanonicalValue      `json:"structuredContent,omitempty"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+
+	ServerDisplayName      string `json:"serverDisplayName,omitempty"`
+	AppDisplayName         string `json:"appDisplayName,omitempty"`
+	ContextLabel           string `json:"contextLabel,omitempty"`
+	StructuredContentLabel string `json:"structuredContentLabel,omitempty"`
 }
 
 type ActionActivity struct {
@@ -388,6 +437,8 @@ type Execution struct {
 	ProgramFrames     []ProgramFrame               `json:"programFrames"`
 	WorkItems         []WorkItem                   `json:"workItems"`
 	Attempts          []Attempt                    `json:"attempts"`
+	Continuation      ContinuationInput            `json:"continuation"`
+	Apps              []AppInstance                `json:"apps,omitempty"`
 	Effects           []EffectRecord               `json:"effects,omitempty"`
 	Trigger           *TriggerExecution            `json:"trigger,omitempty"`
 	Waits             []Wait                       `json:"waits"`
@@ -403,9 +454,25 @@ type Execution struct {
 }
 
 type ExecutionControls struct {
-	Paused                bool `json:"paused"`
-	CancellationRequested bool `json:"cancellationRequested"`
-	ContinueRequested     bool `json:"continueRequested"`
+	Paused                bool           `json:"paused"`
+	CancellationRequested bool           `json:"cancellationRequested"`
+	ContinueRequested     bool           `json:"continueRequested"`
+	AutomaticTools        AutomationHold `json:"automaticTools"`
+	AutomaticContinuation AutomationHold `json:"automaticContinuation"`
+}
+
+type AutomationHoldScope string
+
+const (
+	AutomationHoldOneBatch   AutomationHoldScope = "oneBatch"
+	AutomationHoldIndefinite AutomationHoldScope = "indefinite"
+)
+
+type AutomationHold struct {
+	Enabled          bool                `json:"enabled"`
+	Scope            AutomationHoldScope `json:"scope,omitempty"`
+	TargetWorkItemID WorkItemID          `json:"targetWorkItemID,omitempty"`
+	SetByCommandID   CommandID           `json:"setByCommandID,omitempty"`
 }
 
 type ExecutionOutcomeKind string
@@ -776,6 +843,7 @@ type WorkItem struct {
 	ID                    WorkItemID              `json:"id"`
 	FrameID               ProgramFrameID          `json:"frameID"`
 	Type                  WorkItemType            `json:"type"`
+	OriginWorkItemID      WorkItemID              `json:"originWorkItemID,omitempty"`
 	State                 WorkItemState           `json:"state"`
 	ProgramPath           string                  `json:"programPath,omitempty"`
 	Dependencies          []WorkItemID            `json:"dependencies,omitempty"`
@@ -847,6 +915,13 @@ type ToolWork struct {
 	MCP     *MCPToolTarget `json:"mcp,omitempty"`
 }
 
+type ToolCallSource string
+
+const (
+	ToolCallSourceModel ToolCallSource = "model"
+	ToolCallSourceApp   ToolCallSource = "app"
+)
+
 // MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
 // discovers the current provider Tool and creates the executable MCP binding
 // immediately before dispatch.
@@ -862,6 +937,8 @@ type ToolCall struct {
 	ChoiceID       string         `json:"choiceID,omitempty"`
 	DisplayName    string         `json:"displayName,omitempty"`
 	Description    string         `json:"description,omitempty"`
+	Source         ToolCallSource `json:"source,omitempty"`
+	AppInstanceID  AppInstanceID  `json:"appInstanceID,omitempty"`
 	Arguments      CanonicalValue `json:"arguments,omitempty"`
 	Binding        ToolBinding    `json:"binding"`
 	Automatic      bool           `json:"automatic"`
@@ -1088,8 +1165,40 @@ type WorkItemOutput struct {
 	Tool           *ToolOutput           `json:"tool,omitempty"`
 	Value          CanonicalValue        `json:"value,omitempty"`
 	Emit           *EmitReceipt          `json:"emit,omitempty"`
+	App            *AppOutput            `json:"app,omitempty"`
+	AppInstanceID  AppInstanceID         `json:"appInstanceID,omitempty"`
 	TargetResolver *TargetResolverOutput `json:"targetResolver,omitempty"`
 	Receipt        *ExternalReceipt      `json:"receipt,omitempty"`
+}
+
+// AppOutput is the durable semantic result of an MCP Tool response that
+// exposes an App. The Tool binding is retained on the originating WorkItem.
+type AppOutput struct {
+	ServerID    string `json:"serverID"`
+	ResourceURI string `json:"resourceURI,omitempty"`
+}
+
+type AppInstance struct {
+	ID                AppInstanceID  `json:"id"`
+	ExecutionID       ExecutionID    `json:"executionID"`
+	OriginWorkItemID  WorkItemID     `json:"originWorkItemID"`
+	OriginFrameID     ProgramFrameID `json:"originFrameID"`
+	ServerID          string         `json:"serverID"`
+	ResourceURI       string         `json:"resourceURI,omitempty"`
+	Binding           ToolBinding    `json:"binding"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	Views             []AppViewID    `json:"views,omitempty"`
+	UnavailableReason string         `json:"unavailableReason,omitempty"`
+}
+
+type ContinuationInput struct {
+	Revision         Revision           `json:"revision"`
+	ConsumedRevision Revision           `json:"consumedRevision,omitempty"`
+	Text             string             `json:"text,omitempty"`
+	Attachments      []Attachment       `json:"attachments,omitempty"`
+	AppContext       []AppContextUpdate `json:"appContext,omitempty"`
+	Metadata         CanonicalValue     `json:"metadata,omitempty"`
+	UpdatedAt        time.Time          `json:"updatedAt,omitzero"`
 }
 
 // LLMStreamState is the durable incremental output observed before a final
@@ -1286,6 +1395,7 @@ type WorkItemIntent struct {
 	ID                   WorkItemID              `json:"id,omitempty"`
 	ProgramPath          string                  `json:"programPath,omitempty"`
 	Type                 WorkItemType            `json:"type"`
+	OriginWorkItemID     WorkItemID              `json:"originWorkItemID,omitempty"`
 	Automatic            bool                    `json:"automatic"`
 	Deadline             *time.Time              `json:"deadline,omitempty"`
 	Effect               EffectContract          `json:"effect"`
@@ -1392,6 +1502,24 @@ type WorkBinder interface {
 	ResolveWait(ctx context.Context, req WaitResolutionRequest) (WaitResolutionResult, error)
 }
 
+// AppExecutor is an optional setup-owned bridge for Session-scoped MCP App
+// operations. Session Runtime owns App identity, views, staged context, and
+// command idempotency. Setup owns MCP policy, discovery, and transport.
+type AppExecutor interface {
+	PrepareAppTool(
+		ctx context.Context,
+		request AppToolPreparationRequest,
+	) (ToolCall, error)
+	ReadAppResource(
+		ctx context.Context,
+		request AppResourceReadRequest,
+	) (AppResourceReadResult, error)
+	ValidateAppContext(
+		ctx context.Context,
+		request AppContextStagingRequest,
+	) (AppContextUpdate, error)
+}
+
 type ExecutionBindingCloser interface {
 	CloseExecutionBinding(ctx context.Context, executionID ExecutionID) error
 }
@@ -1433,6 +1561,23 @@ type CheckpointSink interface {
 
 type SessionDeletionSink interface {
 	HandleSessionDeleted(ctx context.Context, sessionID SessionID) error
+}
+
+// SessionTombstoneDeletionSink preserves deletion-command idempotency with
+// the durable deletion barrier. It is optional for compatibility with older
+// checkpoint sinks.
+type SessionTombstoneDeletionSink interface {
+	HandleSessionTombstone(
+		ctx context.Context,
+		tombstone SessionTombstone,
+	) error
+}
+
+type SessionTombstoneRestorer interface {
+	RestoreSessionTombstone(
+		ctx context.Context,
+		tombstone SessionTombstone,
+	) error
 }
 
 type RuntimeRestorer interface {
@@ -1483,18 +1628,28 @@ type CommandRecord struct {
 	RecordedAt  time.Time      `json:"recordedAt"`
 }
 
+// SessionTombstone is the durable deletion barrier retained after a Session
+// document is deleted. Commands are retained so an accepted deletion command
+// remains idempotent across Runtime restart.
+type SessionTombstone struct {
+	SessionID SessionID       `json:"sessionID"`
+	DeletedAt time.Time       `json:"deletedAt"`
+	Commands  []CommandRecord `json:"commands,omitempty"`
+}
+
 type CommandReceipt struct {
-	CommandID         CommandID    `json:"commandID"`
-	Accepted          bool         `json:"accepted"`
-	Duplicate         bool         `json:"duplicate,omitempty"`
-	SessionID         SessionID    `json:"sessionID,omitempty"`
-	ExecutionID       ExecutionID  `json:"executionID,omitempty"`
-	SessionRevision   Revision     `json:"sessionRevision,omitempty"`
-	ExecutionRevision Revision     `json:"executionRevision,omitempty"`
-	ActivityIDs       []ActivityID `json:"activityIDs,omitempty"`
-	WorkItemIDs       []WorkItemID `json:"workItemIDs,omitempty"`
-	WaitIDs           []WaitID     `json:"waitIDs,omitempty"`
-	Message           string       `json:"message,omitempty"`
+	CommandID         CommandID       `json:"commandID"`
+	Accepted          bool            `json:"accepted"`
+	Duplicate         bool            `json:"duplicate,omitempty"`
+	SessionID         SessionID       `json:"sessionID,omitempty"`
+	ExecutionID       ExecutionID     `json:"executionID,omitempty"`
+	SessionRevision   Revision        `json:"sessionRevision,omitempty"`
+	ExecutionRevision Revision        `json:"executionRevision,omitempty"`
+	ActivityIDs       []ActivityID    `json:"activityIDs,omitempty"`
+	WorkItemIDs       []WorkItemID    `json:"workItemIDs,omitempty"`
+	WaitIDs           []WaitID        `json:"waitIDs,omitempty"`
+	AppInstanceIDs    []AppInstanceID `json:"appInstanceIDs,omitempty"`
+	Message           string          `json:"message,omitempty"`
 }
 
 type CreateSessionCommand struct {
@@ -1588,6 +1743,44 @@ type MessageInput struct {
 	Metadata          CanonicalValue     `json:"metadata,omitempty"`
 }
 
+type UpdateContinuationInputCommand struct {
+	Meta                  CommandMeta  `json:"meta"`
+	SessionID             SessionID    `json:"sessionID"`
+	ExecutionID           ExecutionID  `json:"executionID"`
+	ExpectedInputRevision *Revision    `json:"expectedInputRevision,omitempty"`
+	Input                 MessageInput `json:"input"`
+}
+
+type ExecuteToolCallsCommand struct {
+	Meta        CommandMeta  `json:"meta"`
+	SessionID   SessionID    `json:"sessionID"`
+	ExecutionID ExecutionID  `json:"executionID"`
+	WorkItemIDs []WorkItemID `json:"workItemIDs,omitempty"`
+	Continue    bool         `json:"continue,omitempty"`
+}
+
+type RetryToolCallCommand struct {
+	Meta        CommandMeta `json:"meta"`
+	SessionID   SessionID   `json:"sessionID"`
+	ExecutionID ExecutionID `json:"executionID"`
+	WorkItemID  WorkItemID  `json:"workItemID"`
+}
+
+type SkipToolCallCommand struct {
+	Meta        CommandMeta `json:"meta"`
+	SessionID   SessionID   `json:"sessionID"`
+	ExecutionID ExecutionID `json:"executionID"`
+	WorkItemID  WorkItemID  `json:"workItemID"`
+}
+
+type CompleteToolCallAsErrorCommand struct {
+	Meta        CommandMeta `json:"meta"`
+	SessionID   SessionID   `json:"sessionID"`
+	ExecutionID ExecutionID `json:"executionID"`
+	WorkItemID  WorkItemID  `json:"workItemID"`
+	Error       string      `json:"error"`
+}
+
 type ExecuteWorkItemsCommand struct {
 	Meta        CommandMeta  `json:"meta"`
 	SessionID   SessionID    `json:"sessionID"`
@@ -1628,6 +1821,74 @@ type CancelExecutionCommand struct {
 	SessionID   SessionID   `json:"sessionID"`
 	ExecutionID ExecutionID `json:"executionID"`
 	Reason      string      `json:"reason,omitempty"`
+}
+
+type SetAutomationHoldCommand struct {
+	Meta         CommandMeta         `json:"meta"`
+	SessionID    SessionID           `json:"sessionID"`
+	ExecutionID  ExecutionID         `json:"executionID"`
+	Tools        bool                `json:"tools"`
+	Continuation bool                `json:"continuation"`
+	Enabled      bool                `json:"enabled"`
+	Scope        AutomationHoldScope `json:"scope,omitempty"`
+}
+
+type OpenAppViewCommand struct {
+	Meta          CommandMeta   `json:"meta"`
+	SessionID     SessionID     `json:"sessionID"`
+	ExecutionID   ExecutionID   `json:"executionID"`
+	AppInstanceID AppInstanceID `json:"appInstanceID"`
+	ViewID        AppViewID     `json:"viewID"`
+}
+
+type ExecuteAppToolCommand struct {
+	Meta          CommandMeta    `json:"meta"`
+	SessionID     SessionID      `json:"sessionID"`
+	ExecutionID   ExecutionID    `json:"executionID"`
+	AppInstanceID AppInstanceID  `json:"appInstanceID"`
+	ViewID        AppViewID      `json:"viewID"`
+	ToolName      string         `json:"toolName"`
+	Arguments     CanonicalValue `json:"arguments,omitempty"`
+}
+
+type StageAppContextCommand struct {
+	Meta          CommandMeta      `json:"meta"`
+	SessionID     SessionID        `json:"sessionID"`
+	ExecutionID   ExecutionID      `json:"executionID"`
+	AppInstanceID AppInstanceID    `json:"appInstanceID"`
+	ViewID        AppViewID        `json:"viewID"`
+	Update        AppContextUpdate `json:"update"`
+}
+
+type AppResourceReadRequest struct {
+	SessionID     SessionID     `json:"sessionID"`
+	ExecutionID   ExecutionID   `json:"executionID"`
+	AppInstanceID AppInstanceID `json:"appInstanceID"`
+	ViewID        AppViewID     `json:"viewID"`
+	ResourceURI   string        `json:"resourceURI,omitempty"`
+
+	App AppInstance `json:"-"`
+}
+
+type AppContextStagingRequest struct {
+	SessionID   SessionID
+	ExecutionID ExecutionID
+	App         AppInstance
+	ViewID      AppViewID
+	Update      AppContextUpdate
+}
+
+type AppResourceReadResult struct {
+	Content CanonicalValue `json:"content"`
+}
+
+type EditAndResendCommand struct {
+	Meta                    CommandMeta  `json:"meta"`
+	SessionID               SessionID    `json:"sessionID"`
+	ReplaceActivityID       ActivityID   `json:"replaceActivityID"`
+	ExecutionID             ExecutionID  `json:"executionID,omitempty"`
+	Input                   MessageInput `json:"input"`
+	CarryForwardWorkItemIDs []WorkItemID `json:"carryForwardWorkItemIDs,omitempty"`
 }
 
 type ConversationProjection struct {

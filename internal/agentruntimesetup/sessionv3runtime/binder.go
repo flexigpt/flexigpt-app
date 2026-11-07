@@ -171,6 +171,42 @@ func (b *Binder) AdmitAttachments(
 	return b.attachments.AdmitAttachments(ctx, request)
 }
 
+func (b *Binder) PrepareAppTool(
+	ctx context.Context,
+	request sessionv3Runtime.AppToolPreparationRequest,
+) (sessionv3Runtime.ToolCall, error) {
+	if b == nil || b.mcpTools == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"session v3 MCP App runtime is unavailable",
+		)
+	}
+	return b.mcpTools.PrepareAppTool(ctx, request)
+}
+
+func (b *Binder) ReadAppResource(
+	ctx context.Context,
+	request sessionv3Runtime.AppResourceReadRequest,
+) (sessionv3Runtime.AppResourceReadResult, error) {
+	if b == nil || b.mcpTools == nil {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"session v3 MCP App runtime is unavailable",
+		)
+	}
+	return b.mcpTools.ReadAppResource(ctx, request)
+}
+
+func (b *Binder) ValidateAppContext(
+	ctx context.Context,
+	request sessionv3Runtime.AppContextStagingRequest,
+) (sessionv3Runtime.AppContextUpdate, error) {
+	if b == nil || b.mcpTools == nil {
+		return sessionv3Runtime.AppContextUpdate{}, errors.New(
+			"session v3 MCP App runtime is unavailable",
+		)
+	}
+	return b.mcpTools.ValidateAppContext(ctx, request)
+}
+
 func (b *Binder) ValidatePortPlans(
 	_ context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,

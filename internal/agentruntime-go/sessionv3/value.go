@@ -85,6 +85,12 @@ func cloneExecution(value Execution) Execution {
 	return jsonutil.CloneJSONInValue(value)
 }
 
+func cloneSessionTombstone(
+	value SessionTombstone,
+) SessionTombstone {
+	return jsonutil.CloneJSONInValue(value)
+}
+
 func cloneFrame(value ProgramFrame) ProgramFrame {
 	return jsonutil.CloneJSONInValue(value)
 }

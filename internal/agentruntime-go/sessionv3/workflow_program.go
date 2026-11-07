@@ -274,6 +274,7 @@ type WorkflowState struct {
 	LogicalTime         time.Time                    `json:"logicalTime,omitzero"`
 	Deadline            *time.Time                   `json:"deadline,omitempty"`
 	State               CanonicalValue               `json:"state"`
+	Messages            CanonicalValue               `json:"messages,omitempty"`
 	Outcomes            []WorkflowStepOutcome        `json:"outcomes"`
 	Subscriptions       []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
 	CancelChildPaths    []string                     `json:"cancelChildPaths,omitempty"`
@@ -315,6 +316,7 @@ func (s *WorkflowState) Validate() error {
 	if s.Version != WorkflowInterpreterVersion ||
 		s.Index < 0 ||
 		!s.State.Valid() ||
+		!s.Messages.Valid() ||
 		s.Outcomes == nil {
 		return errors.New("Workflow Program state is invalid")
 	}
@@ -498,6 +500,7 @@ func (i *WorkflowInterpreter) InitialState(
 		State:       initialState,
 		Outcomes:    []WorkflowStepOutcome{},
 		TargetSets:  []WorkflowTargetSetState{},
+		Messages:    MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
 		LogicalTime: time.Now().UTC(),
 	}
 	if program.Root.State != nil {
@@ -551,6 +554,10 @@ func (i *WorkflowInterpreter) Advance(
 		state.LogicalTime = frame.UpdatedAt.UTC()
 	} else {
 		state.LogicalTime = frame.CreatedAt.UTC()
+	}
+
+	if err := captureWorkflowMessages(program, &state, execution); err != nil {
+		return ProgramTransition{}, err
 	}
 
 	if state.Terminal != nil {
@@ -2788,12 +2795,25 @@ func workflowActivation(
 			return nil, err
 		}
 	}
+	messages, err := workflowActivationValue(state.Messages)
+	if err != nil {
+		return nil, err
+	}
+	contextValue, err := workflowActivationContext(
+		program.Scope.Context,
+		state.LogicalTime,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return workflowActivationWithScope(
 		program,
 		input,
 		currentState,
 		steps,
 		item,
+		contextValue,
+		messages,
 	)
 }
 
@@ -2803,6 +2823,8 @@ func workflowActivationWithScope(
 	currentState any,
 	steps map[string]any,
 	item any,
+	contextValue any,
+	messagesValue any,
 ) (map[string]any, error) {
 	var (
 		index        any
@@ -2850,14 +2872,6 @@ func workflowActivationWithScope(
 		}
 		operationValue = value
 	}
-	var contextValue any
-	if program.Scope.Context != nil {
-		value, err := workflowActivationValue(*program.Scope.Context)
-		if err != nil {
-			return nil, err
-		}
-		contextValue = value
-	}
 	var completedValue any
 	if program.Scope.Completed != nil {
 		value, err := workflowActivationValue(*program.Scope.Completed)
@@ -2875,7 +2889,7 @@ func workflowActivationWithScope(
 		"state":     currentState,
 		"steps":     steps,
 		"context":   contextValue,
-		"messages":  nil,
+		"messages":  messagesValue,
 		"item":      item,
 		"index":     index,
 		"result":    result,

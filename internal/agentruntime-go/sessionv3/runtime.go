@@ -39,7 +39,7 @@ type Runtime struct {
 	mu                   sync.RWMutex
 	deps                 RuntimeDependencies
 	sessions             map[SessionID]*Session
-	retired              map[SessionID]struct{}
+	retired              map[SessionID]SessionTombstone
 	interpreters         map[string]ProgramInterpreter
 	privateBindings      map[WorkItemID]BoundWork
 	privateWaits         map[WaitID]any
@@ -82,7 +82,7 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 	r := &Runtime{
 		deps:               dependencies,
 		sessions:           map[SessionID]*Session{},
-		retired:            map[SessionID]struct{}{},
+		retired:            map[SessionID]SessionTombstone{},
 		interpreters:       map[string]ProgramInterpreter{},
 		privateBindings:    map[WorkItemID]BoundWork{},
 		privateWaits:       map[WaitID]any{},
@@ -216,14 +216,24 @@ func (r *Runtime) CreateSession(ctx context.Context, command CreateSessionComman
 		return nil, ErrRuntimeClosed
 	}
 	for _, existing := range r.sessions {
-		for _, record := range existing.Commands {
-			if record.ID != command.Meta.ID {
-				continue
-			}
-			receipt, _, err := r.commandReceiptLocked(existing, command.Meta, command)
+		if receipt, found, err := r.commandReceiptLocked(
+			existing,
+			command.Meta,
+			command,
+		); err != nil || found {
 			return receipt, err
 		}
 	}
+	for _, tombstone := range r.retired {
+		if receipt, found, err := commandReceiptFromRecords(
+			tombstone.Commands,
+			command.Meta,
+			command,
+		); err != nil || found {
+			return receipt, err
+		}
+	}
+
 	id := command.SessionID
 	if id == "" {
 		id = SessionID(r.newID())
@@ -331,8 +341,29 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 	}
 	session := r.sessions[command.SessionID]
 	if session == nil {
-		r.mu.Unlock()
+		if tombstone, found := r.retired[command.SessionID]; found {
+			receipt, duplicate, err := commandReceiptFromRecords(
+				tombstone.Commands,
+				command.Meta,
+				command,
+			)
+			r.mu.Unlock()
+			if err != nil {
+				return nil, err
+			}
+			if duplicate {
+				return receipt, nil
+			}
+		}
 		return nil, ErrSessionNotFound
+	}
+	if receipt, found, receiptErr := r.commandReceiptLocked(
+		session,
+		command.Meta,
+		command,
+	); receiptErr != nil || found {
+		r.mu.Unlock()
+		return receipt, receiptErr
 	}
 	if message := expectedSessionRevision(session, command.Meta); message != "" {
 		receipt := r.rejectLocked(session, command.Meta, command, message)
@@ -351,15 +382,38 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 			return receipt, nil
 		}
 	}
+	now := r.now()
+	receipt := CommandReceipt{
+		CommandID:       command.Meta.ID,
+		Accepted:        true,
+		SessionID:       session.ID,
+		SessionRevision: session.Revision,
+	}
+	r.rememberCommandLocked(session, command.Meta, command, receipt)
+
+	tombstone := SessionTombstone{
+		SessionID: session.ID,
+		DeletedAt: now,
+		Commands:  append([]CommandRecord(nil), session.Commands...),
+	}
 	delete(r.sessions, session.ID)
-	r.retired[session.ID] = struct{}{}
+	r.retired[session.ID] = cloneSessionTombstone(tombstone)
 	r.mu.Unlock()
-	if sink, ok := r.deps.Checkpoints.(SessionDeletionSink); ok {
+
+	//nolint:gocritic // Need If.
+	if sink, ok := r.deps.Checkpoints.(SessionTombstoneDeletionSink); ok {
+		if err := sink.HandleSessionTombstone(
+			context.WithoutCancel(ctx),
+			tombstone,
+		); err != nil {
+			return nil, err
+		}
+	} else if sink, ok := r.deps.Checkpoints.(SessionDeletionSink); ok {
 		if err := sink.HandleSessionDeleted(context.WithoutCancel(ctx), command.SessionID); err != nil {
 			return nil, err
 		}
 	}
-	return &CommandReceipt{CommandID: command.Meta.ID, Accepted: true, SessionID: command.SessionID}, nil
+	return &receipt, nil
 }
 
 func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageCommand) (*CommandReceipt, error) {
@@ -1076,6 +1130,24 @@ func (r *Runtime) ContinueExecution(ctx context.Context, command ContinueExecuti
 		command.ExecutionID,
 		command,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
+			if activityIDs, consumed, err := r.consumeContinuationLocked(
+				session,
+				execution,
+			); err != nil {
+				return nil, err
+			} else if consumed {
+				r.refreshExecutionStateLocked(execution)
+				return &CommandReceipt{
+					CommandID:         command.Meta.ID,
+					Accepted:          true,
+					SessionID:         session.ID,
+					ExecutionID:       execution.ID,
+					SessionRevision:   session.Revision,
+					ExecutionRevision: execution.Revision,
+					ActivityIDs:       activityIDs,
+				}, nil
+			}
+
 			execution.Controls.ContinueRequested = true
 			for _, frame := range execution.ProgramFrames {
 				if frame.Status.Terminal() {
@@ -1929,10 +2001,11 @@ func (r *Runtime) advanceFrameLocked(
 		}
 		now := r.now()
 		item := WorkItem{
-			ID:      intent.ID,
-			FrameID: frame.ID,
-			Type:    intent.Type,
-			State:   WorkItemStateReady,
+			ID:               intent.ID,
+			FrameID:          frame.ID,
+			Type:             intent.Type,
+			OriginWorkItemID: intent.OriginWorkItemID,
+			State:            WorkItemStateReady,
 			Claims: append(
 				[]ResourceClaim(nil),
 				intent.Claims...,
@@ -2151,6 +2224,8 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	if item == nil || item.State != WorkItemStateReady ||
 		!r.dispatchAllowedForWorkLocked(*execution, *item) ||
 		(!item.Automatic && !item.Requested) ||
+		(item.Type == WorkItemTypeTool && item.Automatic &&
+			automationHoldApplies(execution.Controls.AutomaticTools, item.OriginWorkItemID)) ||
 		unresolvedDependencies(*execution, *item) {
 		r.mu.Unlock()
 		return
@@ -2929,6 +3004,10 @@ func (r *Runtime) finishWorkLocked(
 		return
 	}
 
+	if item.Output != nil && item.Output.App != nil {
+		r.recordAppInstanceLocked(execution, item)
+	}
+
 	if item.Type == WorkItemTypeTool && item.Output != nil && item.Output.Tool != nil {
 		session.Timeline = append(
 			session.Timeline,
@@ -3181,6 +3260,14 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 		if item.State == WorkItemStateReady && (item.Automatic || item.Requested) &&
 			!unresolvedDependencies(execution, item) &&
 			r.dispatchAllowedForWorkLocked(execution, item) {
+			if item.Type == WorkItemTypeTool &&
+				item.Automatic &&
+				automationHoldApplies(
+					execution.Controls.AutomaticTools,
+					item.OriginWorkItemID,
+				) {
+				continue
+			}
 			values = append(values, item.ID)
 		}
 	}
@@ -3486,11 +3573,25 @@ func (r *Runtime) commandReceiptLocked(session *Session, meta CommandMeta, paylo
 	if meta.ID == "" {
 		return nil, false, errors.New("command ID is required")
 	}
+	if session == nil {
+		return nil, false, errors.New("Session is unavailable")
+	}
+	return commandReceiptFromRecords(session.Commands, meta, payload)
+}
+
+func commandReceiptFromRecords(
+	records []CommandRecord,
+	meta CommandMeta,
+	payload any,
+) (*CommandReceipt, bool, error) {
+	if meta.ID == "" {
+		return nil, false, errors.New("command ID is required")
+	}
 	fingerprint, err := fingerprintCommand(payload)
 	if err != nil {
 		return nil, false, err
 	}
-	for _, record := range session.Commands {
+	for _, record := range records {
 		if record.ID != meta.ID {
 			continue
 		}
@@ -3685,6 +3786,9 @@ func (r runtimeRestorer) RestoreSession(ctx context.Context, value Session) erro
 	}
 	copyValue := cloneSession(value)
 	changed := r.runtime.recoverLocked(&copyValue)
+	if _, retired := r.runtime.retired[copyValue.ID]; retired {
+		return fmt.Errorf("restored Session %q is tombstoned", copyValue.ID)
+	}
 	r.runtime.sessions[copyValue.ID] = &copyValue
 	if changed {
 		if err := r.runtime.persistLocked(ctx, "recoveryApplied", &copyValue); err != nil {
@@ -3699,9 +3803,34 @@ func (r runtimeRestorer) RestoreRetiredSession(_ context.Context, id SessionID) 
 	if r.runtime == nil {
 		return ErrRuntimeClosed
 	}
+	return r.RestoreSessionTombstone(
+		context.Background(),
+		SessionTombstone{SessionID: id},
+	)
+}
+
+func (r runtimeRestorer) RestoreSessionTombstone(
+	_ context.Context,
+	tombstone SessionTombstone,
+) error {
+	if r.runtime == nil {
+		return ErrRuntimeClosed
+	}
+	if tombstone.SessionID == "" {
+		return errors.New("restored Session tombstone has an empty Session ID")
+	}
 	r.runtime.mu.Lock()
 	defer r.runtime.mu.Unlock()
-	r.runtime.retired[id] = struct{}{}
+	if tombstone.DeletedAt.IsZero() {
+		tombstone.DeletedAt = r.runtime.now()
+	}
+	if _, found := r.runtime.sessions[tombstone.SessionID]; found {
+		return fmt.Errorf(
+			"restored Session tombstone %q conflicts with a live Session",
+			tombstone.SessionID,
+		)
+	}
+	r.runtime.retired[tombstone.SessionID] = cloneSessionTombstone(tombstone)
 	return nil
 }
 

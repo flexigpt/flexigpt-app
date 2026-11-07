@@ -334,6 +334,185 @@ func (e *V3Executor) BindWorkflowTool(
 	return call, nil
 }
 
+func (e *V3Executor) PrepareAppTool(
+	ctx context.Context,
+	request sessionv3Runtime.AppToolPreparationRequest,
+) (sessionv3Runtime.ToolCall, error) {
+	if e == nil || e.runtime == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"session v3 MCP runtime is unavailable",
+		)
+	}
+	mapping, err := v3AppMapping(request.App)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if request.App.ServerID != string(mapping.Server) {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"app route belongs to another MCP server",
+		)
+	}
+	if _, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+		nonEmptyV3Arguments(request.Arguments),
+	); err != nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"app Tool arguments must be a JSON object",
+		)
+	}
+
+	tools, err := e.runtime.ListTools(ctx, mapping.Server)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	var selected *mcpServer.MCPToolCapability
+	for index := range tools {
+		if tools[index].ToolName == strings.TrimSpace(request.ToolName) {
+			selected = &tools[index]
+			break
+		}
+	}
+	if selected == nil ||
+		!selected.Enabled ||
+		!mcpApps.ToolVisibleToApp(selected.App) {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"app requested an unavailable MCP Tool",
+		)
+	}
+	policy, err := e.runtime.AppPolicy(ctx, mapping.Server)
+	if err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+	if err := mcpApps.ValidateAppToolInvocation(
+		policy,
+		*selected,
+		mapping.Server,
+	); err != nil {
+		return sessionv3Runtime.ToolCall{}, err
+	}
+
+	serverPin := *request.App.Binding.MCP.ServerArtifact
+	return sessionv3Runtime.ToolCall{
+		Name:          selected.ProviderToolName,
+		ChoiceID:      selected.ChoiceID,
+		DisplayName:   firstNonBlank(selected.DisplayName, selected.ToolName, "MCP Tool"),
+		Description:   strings.TrimSpace(selected.Description),
+		Source:        sessionv3Runtime.ToolCallSourceApp,
+		AppInstanceID: request.App.ID,
+		Arguments:     nonEmptyV3Arguments(request.Arguments),
+		Binding: sessionv3Runtime.ToolBinding{
+			Kind: sessionv3Runtime.ToolBindingKindMCP,
+			MCP: &sessionv3Runtime.MCPToolBinding{
+				ServerArtifact:   &serverPin,
+				ServerID:         string(mapping.Server),
+				ProviderToolName: selected.ProviderToolName,
+				ChoiceID:         selected.ChoiceID,
+				ToolName:         selected.ToolName,
+				ToolDigest:       selected.Digest,
+				ApprovalRule:     string(selected.ApprovalRule),
+				ExecutionMode:    string(selected.ExecutionMode),
+			},
+		},
+		Automatic: false,
+	}, nil
+}
+
+func (e *V3Executor) ReadAppResource(
+	ctx context.Context,
+	request sessionv3Runtime.AppResourceReadRequest,
+) (sessionv3Runtime.AppResourceReadResult, error) {
+	if e == nil || e.runtime == nil {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"session v3 MCP runtime is unavailable",
+		)
+	}
+	mapping, err := v3AppMapping(request.App)
+	if err != nil {
+		return sessionv3Runtime.AppResourceReadResult{}, err
+	}
+	if request.App.ServerID != string(mapping.Server) {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"app route belongs to another MCP server",
+		)
+	}
+	uri := strings.TrimSpace(request.ResourceURI)
+	if uri == "" {
+		uri = strings.TrimSpace(request.App.ResourceURI)
+	}
+	if uri == "" {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"app resource URI is required",
+		)
+	}
+	resources, err := e.runtime.ListResources(ctx, mapping.Server)
+	if err != nil {
+		return sessionv3Runtime.AppResourceReadResult{}, err
+	}
+	found := false
+	for _, resource := range resources {
+		if resource.URI == uri {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"app resource is unavailable on the originating MCP server",
+		)
+	}
+	response, err := e.runtime.ReadResource(ctx, mapping.Server, uri)
+	if err != nil {
+		return sessionv3Runtime.AppResourceReadResult{}, err
+	}
+	value, err := canonicalV3MCPValue(response)
+	if err != nil {
+		return sessionv3Runtime.AppResourceReadResult{}, err
+	}
+	return sessionv3Runtime.AppResourceReadResult{Content: value}, nil
+}
+
+func (e *V3Executor) ValidateAppContext(
+	ctx context.Context,
+	request sessionv3Runtime.AppContextStagingRequest,
+) (sessionv3Runtime.AppContextUpdate, error) {
+	mapping, err := v3AppMapping(request.App)
+	if err != nil {
+		return sessionv3Runtime.AppContextUpdate{}, err
+	}
+	policy, err := e.runtime.AppPolicy(ctx, mapping.Server)
+	if err != nil {
+		return sessionv3Runtime.AppContextUpdate{}, err
+	}
+	if !policy.Enabled {
+		return sessionv3Runtime.AppContextUpdate{}, errors.New(
+			"MCP Apps are not enabled for this server",
+		)
+	}
+	update := request.Update
+	update.AppInstanceID = request.App.ID
+	update.ViewID = request.ViewID
+	update.ServerID = request.App.ServerID
+	if update.ResourceURI == "" {
+		update.ResourceURI = request.App.ResourceURI
+	}
+	if update.UpdatedAt.IsZero() {
+		update.UpdatedAt = time.Now().UTC()
+	}
+	if status, statusErr := e.runtime.Status(ctx, mapping.Server); statusErr == nil &&
+		status != nil && status.ServerInfo != nil {
+		update.ServerDisplayName = strings.TrimSpace(status.ServerInfo.Name)
+	}
+	for index := range update.Content {
+		if update.Content[index].DisplayName == "" {
+			update.Content[index].DisplayName = firstNonBlank(
+				update.Content[index].Name,
+				update.Content[index].Type,
+				"app context",
+			)
+		}
+	}
+	return update, nil
+}
+
 // Bind handles MCP Tool evaluation. The private values returned here remain in
 // Session Runtime memory and are never written to checkpoints.
 func (e *V3Executor) Bind(
@@ -541,6 +720,17 @@ func (e *V3Executor) Execute(
 			"MCP Tool returned an error result",
 		)
 	}
+	var app *sessionv3Runtime.AppOutput
+	if response.App != nil {
+		resourceURI := strings.TrimSpace(response.App.ResourceURI)
+		if resourceURI == "" {
+			resourceURI = mapping.AppResourceURI
+		}
+		app = &sessionv3Runtime.AppOutput{
+			ServerID:    string(mapping.Server),
+			ResourceURI: resourceURI,
+		}
+	}
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
@@ -556,6 +746,7 @@ func (e *V3Executor) Execute(
 				Reference:   private.TargetFingerprint,
 				ConfirmedAt: time.Now().UTC(),
 			},
+			App: app,
 		},
 		Confirmed: true,
 	}, true, nil
@@ -1088,6 +1279,32 @@ func v3MCPMapping(
 	return mapping, nil
 }
 
+func v3AppMapping(
+	app sessionv3Runtime.AppInstance,
+) (invocation.MappedToolBinding, error) {
+	if app.Binding.Kind != sessionv3Runtime.ToolBindingKindMCP ||
+		app.Binding.MCP == nil ||
+		app.Binding.MCP.ServerArtifact == nil {
+		return invocation.MappedToolBinding{}, errors.New(
+			"app has no MCP Tool binding",
+		)
+	}
+	return v3MCPMapping(&sessionv3Runtime.ToolWork{
+		Call: sessionv3Runtime.ToolCall{
+			Binding: app.Binding,
+		},
+	})
+}
+
+func nonEmptyV3Arguments(
+	value sessionv3Runtime.CanonicalValue,
+) sessionv3Runtime.CanonicalValue {
+	if len(value) != 0 {
+		return value.Clone()
+	}
+	return sessionv3Runtime.MustCanonicalValue(map[string]any{})
+}
+
 func v3MappedMCPRequest(
 	payload *sessionv3Runtime.ToolWork,
 ) (
@@ -1115,8 +1332,13 @@ func v3MappedMCPRequest(
 			errors.New("mcp tool arguments must be a json object")
 	}
 
+	source := mcpServer.MCPInvocationSourceModel
+	if payload.Call.Source == sessionv3Runtime.ToolCallSourceApp {
+		source = mcpServer.MCPInvocationSourceApp
+	}
+
 	return mapping, mcpServer.InvokeMCPToolRequestBody{
-		Source:           mcpServer.MCPInvocationSourceModel,
+		Source:           source,
 		ToolName:         mapping.ToolName,
 		ProviderToolName: mapping.ProviderToolName,
 		ChoiceID:         mapping.ChoiceID,
@@ -1126,6 +1348,7 @@ func v3MappedMCPRequest(
 			payload.Call.ProviderCallID,
 			payload.Call.ID,
 		),
+		AppInstanceID: string(payload.Call.AppInstanceID),
 	}, nil
 }
 

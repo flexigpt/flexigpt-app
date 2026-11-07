@@ -56,11 +56,12 @@ const (
 )
 
 type sessionDocument struct {
-	SchemaVersion string                     `json:"schemaVersion"`
-	Kind          sessionDocumentKind        `json:"kind"`
-	SessionID     sessionv3Runtime.SessionID `json:"sessionID"`
-	Session       *sessionv3Runtime.Session  `json:"session,omitempty"`
-	DeletedAt     *time.Time                 `json:"deletedAt,omitempty"`
+	SchemaVersion string                           `json:"schemaVersion"`
+	Kind          sessionDocumentKind              `json:"kind"`
+	SessionID     sessionv3Runtime.SessionID       `json:"sessionID"`
+	Session       *sessionv3Runtime.Session        `json:"session,omitempty"`
+	DeletedAt     *time.Time                       `json:"deletedAt,omitempty"`
+	Commands      []sessionv3Runtime.CommandRecord `json:"commands,omitempty"`
 }
 
 type sessionIndexRecord struct {

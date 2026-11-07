@@ -376,11 +376,13 @@ func (i *WorkflowInterpreter) cancelCall(
 			err.Error(),
 		)
 	}
-	if handle.FrameID == "" && handle.ExecutionID == "" {
+	if handle.WorkItemID == "" &&
+		handle.FrameID == "" &&
+		handle.ExecutionID == "" {
 		return workflowFailure(
 			state,
 			"workflow_cancel_invalid",
-			"workflow cancel requires a child frame or Execution handle",
+			"workflow cancel requires a WorkItem, child frame, or Execution handle",
 		)
 	}
 
@@ -440,6 +442,11 @@ func (i *WorkflowInterpreter) cancelCall(
 	if handle.ExecutionID != "" {
 		transition.CancelChildExecutionIDs = []ExecutionID{
 			handle.ExecutionID,
+		}
+	}
+	if handle.WorkItemID != "" {
+		transition.CancelWorkItemIDs = []WorkItemID{
+			handle.WorkItemID,
 		}
 	}
 	transition.ContinueParent = true

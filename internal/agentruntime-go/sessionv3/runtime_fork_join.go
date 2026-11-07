@@ -269,6 +269,12 @@ func (r *Runtime) materializeForkFramesLocked(
 			)
 		}
 		ports := bindFramePortPlans(intent.Ports, parent.ID, intent.ID)
+		if err := validateWorkflowFramePortBoundary(
+			intent.Program,
+			ports,
+		); err != nil {
+			return err
+		}
 		if len(ports) != 0 {
 			intent.Program, err = workflowProgramWithPortInputs(
 				intent.Program,

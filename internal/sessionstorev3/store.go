@@ -214,25 +214,48 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3Runtime.Checkp
 	return s.writeIndex(incoming)
 }
 
-func (s *Store) HandleSessionDeleted(_ context.Context, id sessionv3Runtime.SessionID) error {
+func (s *Store) HandleSessionDeleted(
+	ctx context.Context,
+	id sessionv3Runtime.SessionID,
+) error {
+	return s.HandleSessionTombstone(
+		ctx,
+		sessionv3Runtime.SessionTombstone{
+			SessionID: id,
+			DeletedAt: time.Now().UTC(),
+		},
+	)
+}
+
+func (s *Store) HandleSessionTombstone(
+	_ context.Context,
+	tombstone sessionv3Runtime.SessionTombstone,
+) error {
 	if err := s.lock(); err != nil {
 		return err
 	}
 	defer s.mu.Unlock()
-	if err := validateStoreSessionID(id); err != nil {
+	if err := validateStoreSessionID(tombstone.SessionID); err != nil {
 		return err
 	}
-	now := time.Now().UTC()
+	deletedAt := tombstone.DeletedAt.UTC()
+	if deletedAt.IsZero() {
+		deletedAt = time.Now().UTC()
+	}
 	doc := sessionDocument{
 		SchemaVersion: sessionv3Runtime.SchemaVersion,
 		Kind:          sessionDocumentKindDeleted,
-		SessionID:     id,
-		DeletedAt:     &now,
+		SessionID:     tombstone.SessionID,
+		DeletedAt:     &deletedAt,
+		Commands: append(
+			[]sessionv3Runtime.CommandRecord(nil),
+			tombstone.Commands...,
+		),
 	}
-	if err := s.writeRawDocument(id, doc); err != nil {
+	if err := s.writeRawDocument(tombstone.SessionID, doc); err != nil {
 		return err
 	}
-	return s.deleteIndex(id)
+	return s.deleteIndex(tombstone.SessionID)
 }
 
 func (s *Store) Restore(ctx context.Context, restorer sessionv3Runtime.RuntimeRestorer) error {
@@ -247,7 +270,27 @@ func (s *Store) Restore(ctx context.Context, restorer sessionv3Runtime.RuntimeRe
 	if err != nil {
 		return err
 	}
-	if retired, ok := restorer.(sessionv3Runtime.RetiredSessionRestorer); ok {
+	//nolint:gocritic // Need If.
+	if tombstones, ok := restorer.(sessionv3Runtime.SessionTombstoneRestorer); ok {
+		for _, doc := range documents {
+			if doc.Kind != sessionDocumentKindDeleted {
+				continue
+			}
+			if err := tombstones.RestoreSessionTombstone(
+				ctx,
+				sessionv3Runtime.SessionTombstone{
+					SessionID: doc.SessionID,
+					DeletedAt: *doc.DeletedAt,
+					Commands: append(
+						[]sessionv3Runtime.CommandRecord(nil),
+						doc.Commands...,
+					),
+				},
+			); err != nil {
+				return err
+			}
+		}
+	} else if retired, ok := restorer.(sessionv3Runtime.RetiredSessionRestorer); ok {
 		for _, doc := range documents {
 			if doc.Kind == sessionDocumentKindDeleted {
 				if err := retired.RestoreRetiredSession(ctx, doc.SessionID); err != nil {
@@ -312,6 +355,19 @@ func (s *Store) ReadActivities(id sessionv3Runtime.SessionID) (sessionv3Runtime.
 		SessionRevision: session.Revision,
 		Activities:      append([]sessionv3Runtime.Activity(nil), session.Timeline...),
 	}, nil
+}
+
+// ReadSessionRuntimeProjection returns normal Session Runtime v3 facts from
+// the authoritative durable Session document. It has no dependency on the
+// live Runtime and remains available after restart.
+func (s *Store) ReadSessionRuntimeProjection(
+	id sessionv3Runtime.SessionID,
+) (sessionv3Runtime.SessionRuntimeProjection, error) {
+	session, err := s.ReadSession(id)
+	if err != nil {
+		return sessionv3Runtime.SessionRuntimeProjection{}, err
+	}
+	return sessionv3Runtime.BuildSessionRuntimeProjection(session), nil
 }
 
 func (s *Store) ReadWorkflow(id sessionv3Runtime.SessionID) (sessionv3Runtime.WorkflowProjection, error) {

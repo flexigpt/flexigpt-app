@@ -1426,6 +1426,32 @@ func workflowParallelSuccessNames(children []WorkflowChild) []string {
 	return output
 }
 
+func workflowParallelSelectedCount(
+	children []WorkflowChild,
+) int {
+	count := 0
+	for _, child := range children {
+		if child.State != WorkflowChildStateSkipped {
+			count++
+		}
+	}
+	return count
+}
+
+func workflowParallelHasSelectedFailure(
+	children []WorkflowChild,
+) bool {
+	for _, child := range children {
+		if child.State == WorkflowChildStateSkipped ||
+			!child.State.terminal() ||
+			workflowParallelSucceeded(child) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func workflowParallelAllTerminal(children []WorkflowChild) bool {
 	return workflowParallelTerminalCount(children) == len(children)
 }
@@ -1495,19 +1521,19 @@ func (i *WorkflowInterpreter) finishParallel(
 
 	mode := workflowCompletionMode(progress.Completion)
 	successes := workflowParallelSuccessNames(children)
+	selected := workflowParallelSelectedCount(children)
 	allTerminal := workflowParallelAllTerminal(children)
 
 	switch mode {
 	case "all":
-		hasFailure := len(successes) != len(children) &&
-			workflowParallelTerminalCount(children) != 0
+		hasFailure := workflowParallelHasSelectedFailure(children)
 		if hasFailure && progress.Errors == firstFastStr {
 			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
 			return nil
 		}
-		if len(successes) != len(children) {
+		if len(successes) != selected {
 			return workflowChildError{
 				errorValue: workflowAggregateChildFailure(
 					"workflow_parallel_failed",
@@ -1520,6 +1546,15 @@ func (i *WorkflowInterpreter) finishParallel(
 
 	case "first-completed":
 		if len(progress.Winners) == 0 {
+			if allTerminal {
+				return workflowChildError{
+					errorValue: SanitizedError{
+						Code:     "workflow_parallel_no_selected_branch",
+						Category: ErrorCategoryRouting,
+						Message:  "parallel selected no branch",
+					},
+				}
+			}
 			return nil
 		}
 		if workflowRemainingMode(progress.Remaining) == cancelStr {

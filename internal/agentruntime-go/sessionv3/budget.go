@@ -256,12 +256,20 @@ func (r *Runtime) reserveCallAttemptLocked(
 		); err != nil {
 			return err
 		}
+	}
+
+	// Cost is the only declared budget that this Runtime cannot account for
+	// without a setup-owned meter. A nested item budget alone must not make
+	// every child WorkItem fail before dispatch.
+	if execution.Budget.Cost != nil ||
+		(item.Budget != nil && item.Budget.Cost != nil) {
 		return &SanitizedError{
 			Code:     budgetCostUnavailableErrorCode,
 			Category: ErrorCategoryLimit,
 			Message:  "cost budgeting requires a setup-owned cost meter",
 		}
 	}
+
 	execution.Usage.CallAttempts++
 	return nil
 }

@@ -43,6 +43,13 @@ func effectStateForSettlement(
 		return EffectStateConfirmedApplied
 
 	case WorkItemStateCancelled:
+		// A confirmed receipt after cancellation proves that the target
+		// settled. It can also prove that a mutating effect applied. Do not
+		// erase that fact merely because cancellation won the execution
+		// outcome race.
+		if result.Output != nil && result.Output.Receipt != nil {
+			return EffectStateConfirmedApplied
+		}
 		if result.Confirmed {
 			return EffectStateConfirmedNotApplied
 		}

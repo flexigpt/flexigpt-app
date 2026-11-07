@@ -132,6 +132,45 @@ func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv
 	return nil
 }
 
+func (b *Binder) PrepareAppTool(
+	ctx context.Context,
+	request sessionv3Runtime.AppToolPreparationRequest,
+) (sessionv3Runtime.ToolCall, error) {
+	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
+	if !found || executor == nil {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"session v3 App runtime is unavailable",
+		)
+	}
+	return executor.PrepareAppTool(ctx, request)
+}
+
+func (b *Binder) ReadAppResource(
+	ctx context.Context,
+	request sessionv3Runtime.AppResourceReadRequest,
+) (sessionv3Runtime.AppResourceReadResult, error) {
+	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
+	if !found || executor == nil {
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
+			"session v3 App runtime is unavailable",
+		)
+	}
+	return executor.ReadAppResource(ctx, request)
+}
+
+func (b *Binder) ValidateAppContext(
+	ctx context.Context,
+	request sessionv3Runtime.AppContextStagingRequest,
+) (sessionv3Runtime.AppContextUpdate, error) {
+	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
+	if !found || executor == nil {
+		return sessionv3Runtime.AppContextUpdate{}, errors.New(
+			"session v3 App runtime is unavailable",
+		)
+	}
+	return executor.ValidateAppContext(ctx, request)
+}
+
 func (b *Binder) ValidatePortPlans(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,

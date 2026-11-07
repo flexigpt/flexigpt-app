@@ -818,6 +818,7 @@ Functional backend completion does not require:
 - [x] Index and FTS records are derived.
 - [x] Tombstones are durable deletion barriers.
 - [x] Durable command idempotency exists.
+- [x] Accepted Session deletion commands are retained in tombstones and remain idempotent after restore.
 - [x] Runtime-owned timers have explicit close ownership.
 - [x] Restore runs before timer rearming.
 - [x] Private clients, credentials, callbacks, timers, and native handles remain non-durable.
@@ -854,6 +855,7 @@ Functional backend completion does not require:
 - [x] Nested Workflow targets map to child ProgramFrames.
 - [x] Agent targets map to child Agent-loop ProgramFrames.
 - [x] Model targets map to child single-model ProgramFrames.
+- [x] Completion waits preserve confirmed Tool error and skip semantics rather than reporting synthetic success.
 - [x] Static target sets persist member selection.
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
@@ -886,6 +888,7 @@ Functional backend completion does not require:
 - [x] Sequence, transform, set, scope, choose, return, fail, break, and continue exist.
 - [x] Parallel completion modes exist.
 - [x] Parallel error policies exist.
+- [x] Parallel `all` completion excludes condition-skipped branches, and no selected branch produces a typed routing outcome.
 - [x] Foreach source ordering and concurrency state exist.
 - [x] Repeat controls and carried state exist.
 - [x] Machine lifecycle state exists.
@@ -966,8 +969,12 @@ Functional backend completion does not require:
 - [x] Go Tool, MCP Tool, and Skill Tool final output supports normal output-port routing after confirmed settlement.
 - [x] V2 Tool contracts remain unchanged and do not depend on Session Runtime v3 or Workflow Runtime v3.
 - [x] No Tool-family port-extension task remains. Future work must not reopen this decision through Workflow-owned protocol changes.
-- [ ] V3 command parity covers Session configuration, continuation input, explicit Tool execution, retry, skip, manual completion, automation controls, App actions, and edit-and-resend semantics.
-- [ ] V3 projection parity exposes model operation, Tool, Attempt, Wait, App, usage, protocol, debugger, and activity facts without a Session v2 dependency.
+- [x] V3 command parity covers defaults updates, continuation input, explicit Tool execution, retry, skip, manual error completion, automation holds, App view and App Tool operations, approved App context staging, App resource reads, and edit-and-resend.
+- [x] V3 projection parity exposes model WorkItems, stream state, Tool calls, Attempts, Waits, Apps, usage, protocol output, debugger facts, and activities from durable V3 Session documents.
+- [x] V3 App routing remains setup-owned through the MCP runtime. Session v3 stores only App identity, view identity, semantic Tool bindings, staged approved context, and resource-read output.
+- [x] A confirmed target receipt received after execution cancellation remains a confirmed applied effect when the receipt proves settlement.
+- [x] V3 child-frame Workflow ports verify published root port ownership, and Service or Activity transport capability failure occurs during Workflow admission.
+- [x] Workflow CEL evaluation persists logical `context.time` and authorized channel message snapshots.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate
@@ -976,6 +983,7 @@ Functional backend completion does not require:
 - [ ] The audit resolves every compiler and interpreter fallback branch reachable from a valid Workflow v1 declaration.
 - [ ] No valid Workflow v1 field is silently omitted.
 - [ ] No valid Workflow v1 feature remains permanently unsupported because implementation is absent.
+- [ ] Integration evidence is still required for every source-field path, including dynamic nested ports, schedule recovery, machine event ordering, compensation concurrency, and cancellation races.
 - [ ] All external mutating work preserves uncertainty semantics through restart.
 - [ ] All typed WorkItems preserve cancellation, retry, deadline, panic, recovery, reconciliation, and compensation semantics.
 - [x] Workflow Tool-family transport requirements are resolved by explicit pre-dispatch unavailable-capability failure, not by domain invasion or silent omission.

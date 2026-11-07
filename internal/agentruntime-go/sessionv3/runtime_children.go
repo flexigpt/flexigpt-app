@@ -245,6 +245,14 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		handoffID = intent.Handoff.ID
 	}
 
+	ports := bindFramePortPlans(intent.Ports, parentFrame.ID, frameID)
+	if err := validateWorkflowFramePortBoundary(
+		intent.Program,
+		ports,
+	); err != nil {
+		return nil, err
+	}
+
 	child := Execution{
 		ID:                intent.ExecutionID,
 		SessionID:         session.ID,
@@ -276,7 +284,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			Deadline:  deadline,
 			Budget:    cloneBudget(&effectiveBudget),
 			HandoffID: handoffID,
-			Ports:     bindFramePortPlans(intent.Ports, parentFrame.ID, frameID),
+			Ports:     ports,
 		}},
 		WorkItems:      []WorkItem{},
 		Attempts:       []Attempt{},

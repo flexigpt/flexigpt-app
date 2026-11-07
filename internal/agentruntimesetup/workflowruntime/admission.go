@@ -354,6 +354,9 @@ func (a *Admission) admit(
 	if err := rejectUnsupportedWorkflowToolTransport(program); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
+	if err := a.verifyTargetTransportCapabilities(program); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
 	if err := program.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}

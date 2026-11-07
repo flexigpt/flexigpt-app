@@ -37,6 +37,7 @@ type agentLoopProgramState struct {
 	PendingToolIDs    []WorkItemID `json:"pendingToolIDs,omitempty"`
 	Round             int          `json:"round"`
 	AwaitingContinue  bool         `json:"awaitingContinue"`
+	ContinueRequested bool         `json:"continueRequested,omitempty"`
 }
 
 type singleModelProgramPayload struct {
@@ -303,11 +304,12 @@ func (agentLoopInterpreter) Advance(
 				work = append(
 					work,
 					WorkItemIntent{
-						ProgramPath: "tools/" + call.ID,
-						Type:        WorkItemTypeTool,
-						Automatic:   call.Automatic,
-						Effect:      EffectContract{Kind: EffectKindNonIdempotent},
-						Input:       WorkItemPayload{Tool: &ToolWork{Call: call}},
+						ProgramPath:      "tools/" + call.ID,
+						Type:             WorkItemTypeTool,
+						OriginWorkItemID: item.ID,
+						Automatic:        call.Automatic,
+						Effect:           EffectContract{Kind: EffectKindNonIdempotent},
+						Input:            WorkItemPayload{Tool: &ToolWork{Call: call}},
 					},
 				)
 			}
@@ -321,7 +323,14 @@ func (agentLoopInterpreter) Advance(
 		}
 		if containsWorkItemID(state.PendingToolIDs, event.WorkItemID) &&
 			allToolItemsSettled(execution, state.PendingToolIDs) {
-			if allAutomaticToolItemsSucceeded(execution, state.PendingToolIDs) {
+			automaticContinuation := allAutomaticToolItemsSucceeded(
+				execution,
+				state.PendingToolIDs,
+			) && !automationHoldApplies(
+				execution.Controls.AutomaticContinuation,
+				state.LastLLMWorkItemID,
+			)
+			if state.ContinueRequested || automaticContinuation {
 				return startAgentLLM(state, payload.Defaults, payload.Invocation)
 			}
 			status := ProgramFrameStateWaiting
@@ -330,6 +339,7 @@ func (agentLoopInterpreter) Advance(
 	case ProgramEventActivity, ProgramEventChildSettled:
 		// Agent loop observes only work settlement and continue; no action.
 	case ProgramEventContinue:
+		state.ContinueRequested = true
 		if state.AwaitingContinue && allToolItemsSettled(execution, state.PendingToolIDs) {
 			return startAgentLLM(state, payload.Defaults, payload.Invocation)
 		}
@@ -349,6 +359,7 @@ func startAgentLLM(
 	state.Round++
 	state.PendingToolIDs = nil
 	state.AwaitingContinue = false
+	state.ContinueRequested = false
 	status := ProgramFrameStateRunning
 	return ProgramTransition{
 		State:  encodeAgentLoopState(state),

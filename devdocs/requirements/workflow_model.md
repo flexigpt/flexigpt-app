@@ -1739,6 +1739,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Tombstones are durable deletion barriers.
 - [x] Command idempotency records persist in the Session document.
 - [x] Restore preserves command idempotency records.
+- [x] Tombstones retain accepted deletion command records and restore them before a deleted Session can be recreated.
 - [x] Runtime close cancels tracked timers, dispatch contexts, and owned asynchronous work.
 
 ### Architecture decision: Workflow target transport ownership
@@ -1762,6 +1763,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Static target sets enforce member identity.
 - [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
 - [x] Selected target identity persists with the logical Workflow step.
+- [x] Completion waits propagate confirmed Tool error and skipped outcomes as typed terminal failure instead of fabricated success.
 - [x] Provider SDK Tool Artifacts remain provider-managed Model choices.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [x] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
@@ -1786,6 +1788,7 @@ Those are aggregate-stage work after functional backend completion.
 
 - [x] Transform, Set, Scope, Choose, Return, Fail, Break, and Continue are typed Workflow operations.
 - [x] Parallel supports `all`, `first-completed`, `first-success`, `quorum`, `cancel`, `wait`, `fail-fast`, and `collect`.
+- [x] Parallel excludes condition-skipped branches from `all` completion and settles an empty selected `all` set deterministically.
 - [x] Foreach captures source order, validates items, preserves ordered outcomes, isolates item state, and supports completion policies.
 - [x] Repeat supports count, while, until, timeout, carried state, local state, exhaustion, break, continue, and until-cancelled lifecycle.
 - [x] Machine initial state, entry, exit, immediate transitions, event transitions, timer transitions, transition blocks, final output, serialized handling, cancellation, and recovery are typed runtime behavior.
@@ -1868,8 +1871,14 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Service and Activity runtime binding registration is complete in application composition.
 - [x] Application composition registers `flexigpt.url.normalize` as a typed read Service binding.
 - [x] Application composition registers `flexigpt.text.apply-unified-diff` as a typed non-idempotent Activity binding.
-- [ ] V3 command parity covers Session configuration, continuation input, explicit Tool execution, retry, skip, manual completion, automation controls, App actions, and edit-and-resend semantics.
-- [ ] V3 projection parity exposes model operation, Tool, Attempt, Wait, App, usage, protocol, debugger, and activity facts without a Session v2 dependency.
+- [x] V3 command parity covers Session defaults updates, continuation input, explicit Tool execution, retry, skip, manual error completion, automation holds, App view and App Tool operations, approved App context staging, App resource reads, and edit-and-resend.
+- [x] V3 projection parity exposes model WorkItems, streamed output, Tool WorkItems, Attempts, Waits, Apps, usage, protocol output, debugger facts, and activities from the V3 Session document without a Session v2 dependency.
+- [x] Manual Tool completion records confirmed non-application and cannot fabricate a successful external effect.
+- [x] Cancellation preserves a confirmed post-cancellation external receipt as confirmed application instead of rewriting it to confirmed non-application.
+- [x] Workflow CEL `context.time` and authorized retained channel snapshots are durable evaluation facts.
+- [x] Workflow cancellation accepts a typed WorkItem completion handle in addition to ProgramFrame and Execution handles.
+- [x] Root Workflow port declarations participate in nested Workflow parent-child boundary checks.
+- [x] Service and Activity Workflow context, input-port, and streamed-port capability failures are decided during admission.
 - [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 
 ### Phase 9: functional completion gate
@@ -1878,6 +1887,7 @@ Those are aggregate-stage work after functional backend completion.
 - [ ] The audit resolves every compiler and interpreter fallback branch reachable from a valid Workflow v1 declaration.
 - [ ] No valid Workflow v1 operation remains a permanent unsupported runtime branch.
 - [ ] No valid Workflow v1 field is silently ignored.
+- [ ] The remaining audit must verify all Workflow source-to-runtime paths with integration tests, including nested published ports, dynamic target-set transport, machine transitions, trigger recovery, and saga cleanup races.
 - [x] Workflow target transport behavior is classified: runtime-owned or explicit application-binding ports deliver data; unsupported Tool-family context, input-port, and stream-port contracts fail during admission.
 - [x] No external mutating WorkItem can replay automatically after uncertainty without confirmed non-application.
 - [ ] All normal Session v2 backend capabilities have typed V3 equivalents.
