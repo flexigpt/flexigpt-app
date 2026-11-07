@@ -822,6 +822,15 @@ Functional backend completion does not require:
 - [x] Restore runs before timer rearming.
 - [x] Private clients, credentials, callbacks, timers, and native handles remain non-durable.
 
+### Architecture decision: Workflow target transport ownership
+
+- [x] Session Runtime v3 owns Workflow ports, channels, cursors, ordering, retention, parent-child delivery, and durable replay semantics.
+- [x] Generic Go Tool, MCP, Skill, Text, inference, provider, and Artifact domains do not know Workflow, Session v3, ProgramFrames, channels, ports, waits, or Workflow context.
+- [x] Setup adapts native target output to durable Session Runtime output only after target settlement. Setup does not alter native target input contracts.
+- [x] Go Tool, MCP Tool, and Skill Tool targets reject Workflow call context, input ports, and streamed output ports during Workflow admission before target dispatch.
+- [x] Go Tool, MCP Tool, and Skill Tool final output may use a normal non-stream output port because Runtime performs that routing after confirmed settlement.
+- [x] No future implementation may add FlexiGPT Workflow metadata, MCP extensions, request fields, argument envelope fields, Go `context.Context` sidecars, Skill Runtime sidecars, or provider metadata to bypass this decision.
+
 ### Phase 2: ProgramFrames and WorkItem lifecycle
 
 - [x] Conversation ProgramFrames exist.
@@ -849,8 +858,10 @@ Functional backend completion does not require:
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
-- [x] Callable interface context declarations are enforced for every target kind. Unsupported Tool context transport fails during admission.
-- [x] Callable interface port declarations are enforced for every target kind. Unsupported Tool input and streamed-port transport fails during admission.
+- [x] Callable interface context declarations are enforced for every target kind. Tool-family context transport fails during admission rather than being injected into a native request.
+- [x] Callable interface input-port declarations are enforced for every target kind. Tool-family input-port transport fails during admission rather than being injected into a native request.
+- [x] Callable interface non-stream output-port declarations are enforced for every target kind through Runtime output routing after confirmed settlement.
+- [x] Callable interface streamed-port declarations are enforced for every target kind. Tool-family streamed-port transport fails during admission rather than fabricating a stream.
 - [x] Full receipt schema enforcement exists for direct WorkItems, child Agent/Model/Workflow ProgramFrames, and start-call scheduling.
 
 ### Phase 4: planning and domain integration
@@ -866,6 +877,7 @@ Functional backend completion does not require:
 - [x] Service and Activity binding registration has a typed runtime boundary.
 - [x] Typed attachment planning is setup-owned for V3.
 - [x] Typed port planning is setup-owned for V3 Model, Agent, nested Workflow, Service, and Activity paths.
+- [x] Tool-family context, input-port, and stream-port unavailability is decided by setup admission and is not delegated to base domain implementations.
 - [x] Tool-family port unavailability is resolved by setup admission, not by Tool, MCP, or Skill domain APIs.
 - [x] Full plan persistence facts exist for every Model and Agent contribution kind.
 
@@ -949,10 +961,11 @@ Functional backend completion does not require:
 - [x] V3 Service binding composition is complete.
 - [x] V3 Activity binding composition is complete.
 - [x] V3 Tool streamed output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
-- [ ] Go Tool, MCP Tool, and Skill Tool input-port adaptation is unavailable because their native invocation contracts have no Workflow input transport.
-- [ ] Go Tool, MCP Tool, and Skill Tool streamed-port adaptation is unavailable because their native invocation contracts expose no typed progress stream.
-- [x] Go Tool, MCP Tool, and Skill Tool calls with unsupported Workflow context, input-port, or streamed-port declarations fail before external work begins.
+- [x] Go Tool, MCP Tool, and Skill Tool input-port adaptation is intentionally unavailable because their native invocation contracts have no Workflow input transport. Workflow admission rejects the declaration before external work begins.
+- [x] Go Tool, MCP Tool, and Skill Tool streamed-port adaptation is intentionally unavailable because their native invocation contracts expose no typed progress stream. Workflow admission rejects the declaration before external work begins.
+- [x] Go Tool, MCP Tool, and Skill Tool final output supports normal output-port routing after confirmed settlement.
 - [x] V2 Tool contracts remain unchanged and do not depend on Session Runtime v3 or Workflow Runtime v3.
+- [x] No Tool-family port-extension task remains. Future work must not reopen this decision through Workflow-owned protocol changes.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate
@@ -962,6 +975,7 @@ Functional backend completion does not require:
 - [ ] No valid Workflow v1 feature remains permanently unsupported because implementation is absent.
 - [ ] All external mutating work preserves uncertainty semantics through restart.
 - [ ] All typed WorkItems preserve cancellation, retry, deadline, panic, recovery, reconciliation, and compensation semantics.
+- [x] Workflow Tool-family transport requirements are resolved by explicit pre-dispatch unavailable-capability failure, not by domain invasion or silent omission.
 - [ ] V3 is a functional backend superset of normal Session v2 behavior.
 - [ ] Functional backend completion is reached.
 

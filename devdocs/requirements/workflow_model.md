@@ -1741,6 +1741,15 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Restore preserves command idempotency records.
 - [x] Runtime close cancels tracked timers, dispatch contexts, and owned asynchronous work.
 
+### Architecture decision: Workflow target transport ownership
+
+- [x] Workflow Runtime v3 is an orchestrator and must not add Workflow-specific fields, sidecars, metadata, capability extensions, or imports to generic Go Tool, MCP, Skill, Text, inference, provider, or Artifact domain APIs.
+- [x] Native target contracts remain authoritative: Go Tool function arguments, MCP `tools/call` arguments, Skill Tool arguments, and provider request plans do not carry Workflow orchestration data.
+- [x] Setup may adapt native confirmed target output into a Workflow output port after target settlement, without changing the target request contract.
+- [x] Go Tool, MCP Tool, and Skill Tool targets do not support Workflow call context, input ports, or streamed output ports. Workflow admission rejects such declarations before unrelated external work starts.
+- [x] This is a final architecture rule, not a deferred adapter task. Future Workflow work must not solve it through Tool argument rewriting, Go `context.Context` sidecars, MCP metadata, MCP extensions, Skill Runtime fields, provider metadata, or Session v2 dependencies.
+- [x] A future independently defined native target capability can be adapted by setup only after its own domain declares it without importing Workflow or Session Runtime types.
+
 ### Phase 2: callable targets and planning
 
 - [x] Tool Artifact targets use typed Tool WorkItems.
@@ -1765,10 +1774,10 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Completion handles support WorkItems, ProgramFrames, and Executions.
 - [x] Parent-child completion waits preserve terminal outcome semantics.
 - [x] Input port plans are compiled and delivered to Model, Agent, nested Workflow, and explicitly port-aware Service or Activity bindings.
-- [ ] Input port plans are delivered to Go Tool, MCP Tool, and Skill Tool targets. Their native contracts do not carry Workflow orchestration input.
-- [x] Output port plans are compiled and delivered for all callable target kinds.
+- [x] Go Tool, MCP Tool, and Skill Tool input-port declarations are rejected during admission because their native contracts do not carry Workflow orchestration input.
+- [x] Non-stream output ports are compiled and delivered for all callable target kinds from confirmed final output.
 - [x] Streamed port plans are delivered through Model, Agent, nested Workflow, and explicitly streaming Service or Activity bindings.
-- [ ] Go Tool, MCP Tool, and Skill Tool targets support Workflow streamed output ports. A terminal Tool result is not fabricated as a stream.
+- [x] Go Tool, MCP Tool, and Skill Tool streamed-port declarations are rejected during admission. A terminal Tool result is not fabricated as a stream.
 - [x] Port ownership, channel authorization, and schema enforcement are complete at every target boundary.
 - [x] Durable parent-child live port messaging is complete for attached and independent child Executions.
 - [x] Workflow calls to Tool, MCP Tool, or Skill Tool targets with unsupported context, input ports, or streamed ports fail during admission before external work begins.
@@ -1844,6 +1853,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
 - [x] Go Tool, MCP Tool, and Skill Tool preserve their native input and output contracts. Workflow does not inject orchestration fields into their domain requests.
+- [x] Go Tool, MCP Tool, and Skill Tool final output can be routed to a normal Workflow output port after confirmed settlement.
 - [x] Unsupported Workflow Tool context, input-port, and streamed-port declarations fail before Tool invocation rather than being silently ignored.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
@@ -1865,6 +1875,7 @@ Those are aggregate-stage work after functional backend completion.
 - [ ] Every valid Workflow v1 source field is audited against typed compilation, language invalidity, or pre-dispatch unavailable-binding failure.
 - [ ] No valid Workflow v1 operation remains a permanent unsupported runtime branch.
 - [ ] No valid Workflow v1 field is silently ignored.
+- [x] Workflow target transport behavior is classified: runtime-owned or explicit application-binding ports deliver data; unsupported Tool-family context, input-port, and stream-port contracts fail during admission.
 - [ ] No external mutating WorkItem can replay automatically after uncertainty without confirmed non-application.
 - [ ] All normal Session v2 backend capabilities have typed V3 equivalents.
 - [ ] Functional backend completion is reached.
