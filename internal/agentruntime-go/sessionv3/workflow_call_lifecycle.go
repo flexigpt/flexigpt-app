@@ -34,6 +34,7 @@ func (i *WorkflowInterpreter) startCall(
 	contextValue CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
+	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
 	lifetime := call.Lifetime
 	if lifetime == "" {
@@ -192,6 +193,7 @@ func (i *WorkflowInterpreter) startCall(
 		Path:        path + "/started",
 		Program:     childProgram,
 		Deadline:    cloneTime(frame.Deadline),
+		Budget:      cloneBudget(budget),
 		Lifetime:    intentLifetime,
 		Ownership:   &ownership,
 		Ports:       clonePortPlans(ports),
@@ -237,6 +239,7 @@ func (i *WorkflowInterpreter) handoffCall(
 	contextValue CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
+	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
 	if target.Kind != WorkflowTargetAgent || target.Artifact == nil {
 		return workflowFailure(
@@ -304,6 +307,7 @@ func (i *WorkflowInterpreter) handoffCall(
 			Path:      path + "/handoff",
 			Program:   childProgram,
 			Deadline:  cloneTime(state.Deadline),
+			Budget:    cloneBudget(budget),
 			Lifetime:  ChildFrameLifetimeAttached,
 			Ownership: &ownership,
 			Ports:     clonePortPlans(ports),

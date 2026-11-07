@@ -24,6 +24,7 @@ type expressionScope struct {
 	subscriptions map[string]Subscription
 	state         bool
 	repeat        bool
+	saga          bool
 	path          string
 	depth         int
 }

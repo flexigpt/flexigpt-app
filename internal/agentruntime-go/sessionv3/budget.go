@@ -256,7 +256,8 @@ func (r *Runtime) reserveCallAttemptLocked(
 			return err
 		}
 	}
-	if item.Type == WorkItemTypeLLM && execution.Budget.Cost != nil {
+	if execution.Budget.Cost != nil ||
+		(item.Budget != nil && item.Budget.Cost != nil) {
 		return &SanitizedError{
 			Code:     budgetCostUnavailableErrorCode,
 			Category: ErrorCategoryLimit,

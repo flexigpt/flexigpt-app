@@ -24,13 +24,25 @@ const (
 
 var ErrBindingUnavailable = errors.New("workflow target binding is unavailable")
 
+// ToolTargetInspector is the narrow setup-domain boundary used during
+// admission to prevent provider-managed SDK Tools from becoming local Tool
+// WorkItems. It resolves only a pinned Tool target and exposes no Artifact
+// implementation details to Session Runtime.
+type ToolTargetInspector interface {
+	IsProviderManagedWorkflowTool(
+		ctx context.Context,
+		pin sessionv3Runtime.ArtifactPin,
+	) (bool, error)
+}
+
 // WorkBindingRequest is the typed application-domain boundary for a Workflow
 // Service or Activity invocation. Ports are already durable Runtime facts.
 // Stream is process-private and can only emit to declared streamed ports.
 type WorkBindingRequest struct {
-	Input  sessionv3Runtime.CanonicalValue
-	Ports  []sessionv3Runtime.PortInput
-	Stream sessionv3Runtime.WorkPortStream
+	Input   sessionv3Runtime.CanonicalValue
+	Context sessionv3Runtime.CanonicalValue
+	Ports   []sessionv3Runtime.PortInput
+	Stream  sessionv3Runtime.WorkPortStream
 }
 
 // WorkBindingWaitRequest is the typed domain boundary for a Service or
@@ -40,6 +52,7 @@ type WorkBindingWaitRequest struct {
 	Resolution sessionv3Runtime.WaitResolution
 	Response   sessionv3Runtime.CanonicalValue
 	Input      sessionv3Runtime.CanonicalValue
+	Context    sessionv3Runtime.CanonicalValue
 	Ports      []sessionv3Runtime.PortInput
 }
 
@@ -153,14 +166,19 @@ type Admission struct {
 	workflows *workflowAPI.Service
 	artifacts artifact.API
 	bindings  *BindingRegistry
+	tools     ToolTargetInspector
 }
 
 func NewAdmission(
 	workflows *workflowAPI.Service,
 	artifacts artifact.API,
 	bindings *BindingRegistry,
+	tools ToolTargetInspector,
 ) (*Admission, error) {
-	if workflows == nil || artifacts == nil || bindings == nil {
+	if workflows == nil ||
+		artifacts == nil ||
+		bindings == nil ||
+		tools == nil {
 		return nil, errors.New(
 			"workflow admission dependencies are incomplete",
 		)
@@ -169,6 +187,7 @@ func NewAdmission(
 		workflows: workflows,
 		artifacts: artifacts,
 		bindings:  bindings,
+		tools:     tools,
 	}, nil
 }
 
@@ -417,13 +436,6 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
-		if target.Interface != nil && len(target.Interface.Capabilities) != 0 {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: service %q has unavailable capability requirements",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
 		bound := sessionv3Runtime.WorkflowTarget{
 			Kind:           sessionv3Runtime.WorkflowTargetService,
 			ServiceID:      value.ID(),
@@ -437,13 +449,6 @@ func (a *Admission) bindTarget(
 		if !found {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
 				"%w: activity %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		if target.Interface != nil && len(target.Interface.Capabilities) != 0 {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: activity %q has unavailable capability requirements",
 				ErrBindingUnavailable,
 				target.Ref,
 			)
@@ -469,7 +474,6 @@ func (a *Admission) bindTarget(
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
-
 		if target.Server != nil {
 			return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
 				Kind: sessionv3Runtime.WorkflowTargetMCPTool,
@@ -478,6 +482,21 @@ func (a *Admission) bindTarget(
 					ToolName: target.Ref,
 				},
 			})
+		}
+
+		providerManaged, inspectErr := a.tools.IsProviderManagedWorkflowTool(
+			ctx,
+			pin,
+		)
+		if inspectErr != nil {
+			return sessionv3Runtime.WorkflowTarget{}, inspectErr
+		}
+		if providerManaged {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: provider-managed tool target %q requires a typed model execution plan",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
 		}
 
 		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
@@ -565,6 +584,14 @@ func finalizeWorkflowTarget(
 	source workflowv1.Target,
 	target sessionv3Runtime.WorkflowTarget,
 ) (sessionv3Runtime.WorkflowTarget, error) {
+	if source.Interface != nil &&
+		len(source.Interface.Capabilities) != 0 {
+		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+			"%w: target capability requirements are unavailable",
+			ErrBindingUnavailable,
+		)
+	}
+
 	contract, err := compileWorkflowCallableInterface(
 		document,
 		source.Interface,

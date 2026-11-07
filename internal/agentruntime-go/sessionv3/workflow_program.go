@@ -1182,6 +1182,14 @@ func (i *WorkflowInterpreter) call(
 	if err != nil {
 		return workflowFailure(state, "workflow_effect_invalid", err.Error())
 	}
+	callBudget, err := workflowCallableBudget(
+		target.Contract,
+		call.Contract,
+		setContract,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_limit_invalid", err.Error())
+	}
 
 	mode := call.Mode
 	if mode == "" {
@@ -1211,6 +1219,7 @@ func (i *WorkflowInterpreter) call(
 			contextValue,
 			call,
 			ports,
+			callBudget,
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
@@ -1225,6 +1234,7 @@ func (i *WorkflowInterpreter) call(
 			contextValue,
 			call,
 			ports,
+			callBudget,
 		)
 	}
 	state.PendingTarget = targetName
@@ -1247,6 +1257,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
 				Effect:      effect,
+				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
@@ -1261,7 +1272,8 @@ func (i *WorkflowInterpreter) call(
 								},
 							},
 						},
-						Target: target.Artifact,
+						Context: workflowExternalContext(contextValue),
+						Target:  target.Artifact,
 					},
 				},
 			},
@@ -1284,6 +1296,7 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeTool,
 				Automatic:   true,
 				Effect:      effect,
+				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
@@ -1298,6 +1311,7 @@ func (i *WorkflowInterpreter) call(
 								},
 							},
 						},
+						Context: workflowExternalContext(contextValue),
 						MCP: &MCPToolTarget{
 							Server:   target.MCP.Server,
 							ToolName: target.MCP.ToolName,
@@ -1317,12 +1331,14 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeService,
 				Automatic:   true,
 				Effect:      effect,
+				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
 						ServiceID:      target.ServiceID,
 						BindingVersion: target.BindingVersion,
 						Input:          input,
+						Context:        workflowExternalContext(contextValue),
 					},
 				},
 			},
@@ -1338,12 +1354,14 @@ func (i *WorkflowInterpreter) call(
 				Type:        WorkItemTypeActivity,
 				Automatic:   true,
 				Effect:      effect,
+				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
 						ActivityID:     target.ActivityID,
 						BindingVersion: target.BindingVersion,
 						Input:          input,
+						Context:        workflowExternalContext(contextValue),
 					},
 				},
 			},
@@ -1376,6 +1394,17 @@ func (i *WorkflowInterpreter) call(
 				err.Error(),
 			)
 		}
+		nested, err = workflowSnapshotWithContext(
+			nested,
+			contextValue,
+		)
+		if err != nil {
+			return workflowFailure(
+				state,
+				"workflow_context_invalid",
+				err.Error(),
+			)
+		}
 
 		next := state
 		next.PendingPath = path
@@ -1388,6 +1417,7 @@ func (i *WorkflowInterpreter) call(
 			Frames: []ProgramFrameIntent{{
 				Path:     path,
 				Deadline: cloneTime(state.Deadline),
+				Budget:   cloneBudget(callBudget),
 				Program:  nested,
 				Ports:    ports,
 			}},
@@ -1455,6 +1485,7 @@ func (i *WorkflowInterpreter) call(
 				ID:       ProgramFrameID(string(frame.ID) + ":" + path),
 				Path:     path,
 				Deadline: cloneTime(state.Deadline),
+				Budget:   cloneBudget(callBudget),
 				Program:  childProgram,
 				Ports:    ports,
 			}},
@@ -1869,6 +1900,33 @@ func validateWorkflowInterfaceOutput(
 		return nil
 	}
 	return validateWorkflowSchema(contract.OutputSchema, value)
+}
+
+func workflowCallableBudget(
+	contracts ...*WorkflowCallableInterface,
+) (*ExecutionBudget, error) {
+	var output *ExecutionBudget
+	for _, contract := range contracts {
+		if contract == nil || contract.Limits == nil {
+			continue
+		}
+
+		if output == nil {
+			value := cloneExecutionBudget(*contract.Limits)
+			output = &value
+			continue
+		}
+
+		value, err := narrowExecutionBudget(
+			*output,
+			*contract.Limits,
+		)
+		if err != nil {
+			return nil, err
+		}
+		output = &value
+	}
+	return output, nil
 }
 
 func (i *WorkflowInterpreter) evaluate(
@@ -2728,6 +2786,14 @@ func workflowActivationWithScope(
 		}
 		operationValue = value
 	}
+	var contextValue any
+	if program.Scope.Context != nil {
+		value, err := workflowActivationValue(*program.Scope.Context)
+		if err != nil {
+			return nil, err
+		}
+		contextValue = value
+	}
 	var completedValue any
 	if program.Scope.Completed != nil {
 		value, err := workflowActivationValue(*program.Scope.Completed)
@@ -2744,7 +2810,7 @@ func workflowActivationWithScope(
 		"input":     input,
 		"state":     currentState,
 		"steps":     steps,
-		"context":   nil,
+		"context":   contextValue,
 		"messages":  nil,
 		"item":      item,
 		"index":     index,
@@ -2832,6 +2898,14 @@ func workflowWorkValue(
 	)
 }
 
+func workflowExternalContext(value CanonicalValue) CanonicalValue {
+	context, err := DecodeCanonicalValue[map[string]CanonicalValue](value)
+	if err == nil && len(context) == 0 {
+		return nil
+	}
+	return value.Clone()
+}
+
 func workflowSnapshotWithInput(
 	snapshot ProgramSnapshot,
 	input CanonicalValue,
@@ -2844,6 +2918,38 @@ func workflowSnapshotWithInput(
 	program.Input = input.Clone()
 	program.InputBound = true
 	if err := program.ValidateInput(); err != nil {
+		return ProgramSnapshot{}, err
+	}
+
+	payload, err := canonicalWorkflowValue(program)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	snapshot.Payload = payload
+	return snapshot, nil
+}
+
+func workflowSnapshotWithContext(
+	snapshot ProgramSnapshot,
+	context CanonicalValue,
+) (ProgramSnapshot, error) {
+	if !context.Valid() {
+		return ProgramSnapshot{}, errors.New(
+			"workflow child context is not canonical json",
+		)
+	}
+
+	program, err := workflowProgramFromSnapshot(snapshot)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	if len(context) == 0 {
+		program.Scope.Context = nil
+	} else {
+		value := context.Clone()
+		program.Scope.Context = &value
+	}
+	if err := program.Validate(); err != nil {
 		return ProgramSnapshot{}, err
 	}
 

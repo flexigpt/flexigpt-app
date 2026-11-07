@@ -670,6 +670,14 @@ func (p ProgramFrame) Validate() error {
 	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
 		return errors.New("ProgramFrame timestamps are required")
 	}
+	if p.Depth < 0 {
+		return errors.New("program frame depth is invalid")
+	}
+	if p.Budget != nil {
+		if err := p.Budget.Validate(); err != nil {
+			return err
+		}
+	}
 	if err := validateUniquePortPlans(p.Ports); err != nil {
 		return err
 	}
@@ -739,6 +747,11 @@ func validateDeferredFrameIntent(value ProgramFrameIntent) error {
 		value.Program.InterpreterVersion == 0 ||
 		!value.Program.Payload.Valid() {
 		return errors.New("deferred ProgramFrame program is invalid")
+	}
+	if value.Budget != nil {
+		if err := value.Budget.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1099,6 +1112,9 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if err := p.Tool.Call.Validate(); err != nil {
 			return err
 		}
+		if !p.Tool.Context.Valid() {
+			return errors.New("invalid tool work context")
+		}
 		if p.Tool.Target != nil && p.Tool.MCP != nil {
 			return errors.New(
 				"tool workItem cannot contain both Artifact and MCP targets",
@@ -1122,11 +1138,17 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		}
 
 	case WorkItemTypeService:
-		if p.Service.ServiceID == "" || p.Service.BindingVersion == "" || !p.Service.Input.Valid() {
+		if p.Service.ServiceID == "" ||
+			p.Service.BindingVersion == "" ||
+			!p.Service.Input.Valid() ||
+			!p.Service.Context.Valid() {
 			return errors.New("invalid service WorkItem")
 		}
 	case WorkItemTypeActivity:
-		if p.Activity.ActivityID == "" || p.Activity.BindingVersion == "" || !p.Activity.Input.Valid() {
+		if p.Activity.ActivityID == "" ||
+			p.Activity.BindingVersion == "" ||
+			!p.Activity.Input.Valid() ||
+			!p.Activity.Context.Valid() {
 			return errors.New("invalid activity WorkItem")
 		}
 	case WorkItemTypeTransform:
@@ -1628,6 +1650,17 @@ func (p RetryPolicy) Validate() error {
 		if err := validateID("retry error code", code); err != nil {
 			return err
 		}
+	}
+	for _, state := range p.Match.EffectStates {
+		if state == "" {
+			return errors.New("retry effect state is invalid")
+		}
+		if err := state.Validate(); err != nil {
+			return err
+		}
+	}
+	if !p.Match.Schema.Valid() {
+		return errors.New("retry error schema is invalid")
 	}
 	return nil
 }

@@ -331,6 +331,9 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 		if effect.Kind == "keyed" && len(effect.Key) == 0 {
 			return invalid("keyed effects require a key")
 		}
+		if effect.Compensate != nil && !scope.saga {
+			return invalid("compensation requires an enclosing saga")
+		}
 		if effect.Reconcile != nil {
 			if err := v.block(*effect.Reconcile, scope.with("operation").child("reconcile"), limits); err != nil {
 				return err
@@ -499,7 +502,9 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 		}
 		return v.document.validateLiteral(value.Data, event.Schema)
 	case step.Saga != nil:
-		return v.block(step.Saga.Do, scope.child("do"), limits)
+		sagaScope := scope.clone()
+		sagaScope.saga = true
+		return v.block(step.Saga.Do, sagaScope.child("do"), limits)
 	case step.Cancel != nil:
 		if err := scope.validate(step.Cancel.Handle, ""); err != nil {
 			return err

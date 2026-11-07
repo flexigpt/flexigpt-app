@@ -53,6 +53,31 @@ func NewV3Executor(
 	}, nil
 }
 
+// IsProviderManagedWorkflowTool verifies a pinned Workflow Tool target before
+// admission. Provider SDK Tools must remain inside a typed Model plan and
+// cannot be admitted as local Tool WorkItems.
+func (e *V3Executor) IsProviderManagedWorkflowTool(
+	ctx context.Context,
+	pin sessionv3Runtime.ArtifactPin,
+) (bool, error) {
+	resolved, err := e.resolvePinnedTool(ctx, pin)
+	if err != nil {
+		return false, err
+	}
+
+	switch resolved.Tool.Implementation.Kind {
+	case toolv1.ImplementationKindGo:
+		return false, nil
+	case toolv1.ImplementationKindSDK:
+		return true, nil
+	default:
+		return false, fmt.Errorf(
+			"unsupported tool implementation %q",
+			resolved.Tool.Implementation.Kind,
+		)
+	}
+}
+
 // Choices resolves selected Tool Artifacts, verifies requested pins, and
 // creates provider choices plus durable v3 bindings.
 func (e *V3Executor) Choices(

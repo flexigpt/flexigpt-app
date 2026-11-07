@@ -201,15 +201,16 @@ func (i *WorkflowInterpreter) workflowCallPortPlans(
 			return nil, err
 		}
 		output = append(output, PortPlan{
-			Name:         binding.Name,
-			Direction:    port.Direction,
-			Stream:       port.Stream,
-			Schema:       port.Schema.Clone(),
-			Channel:      channel.Name,
-			Access:       access,
-			MaxMessages:  channel.MaxMessages,
-			MaxBytes:     channel.MaxBytes,
-			OwnerFrameID: frame.ID,
+			Name:          binding.Name,
+			Direction:     port.Direction,
+			Stream:        port.Stream,
+			Schema:        port.Schema.Clone(),
+			ChannelSchema: channel.Schema.Clone(),
+			Channel:       channel.Name,
+			Access:        access,
+			MaxMessages:   channel.MaxMessages,
+			MaxBytes:      channel.MaxBytes,
+			OwnerFrameID:  frame.ID,
 		})
 	}
 	if err := validateUniquePortPlans(output); err != nil {

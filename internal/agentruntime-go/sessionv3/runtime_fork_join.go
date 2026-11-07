@@ -95,6 +95,7 @@ func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {
 	output := value
 	output.Deadline = cloneTime(value.Deadline)
 	output.Program.Payload = value.Program.Payload.Clone()
+	output.Budget = cloneBudget(value.Budget)
 	if value.Program.Artifact != nil {
 		pin := *value.Program.Artifact
 		output.Program.Artifact = &pin
@@ -233,7 +234,27 @@ func (r *Runtime) materializeForkFramesLocked(
 		default:
 			return errors.New("fork child ProgramFrame lifetime is invalid")
 		}
-
+		childBudget, budgetErr := narrowProgramFrameBudget(
+			effectiveProgramFrameBudget(*execution, *parent),
+			intent,
+		)
+		if budgetErr != nil {
+			return budgetErr
+		}
+		depth, budgetErr := childProgramFrameDepth(*parent, childBudget)
+		if budgetErr != nil {
+			return budgetErr
+		}
+		now := r.now()
+		deadline, budgetErr := programFrameDeadline(
+			now,
+			parent.Deadline,
+			intent.Deadline,
+			childBudget,
+		)
+		if budgetErr != nil {
+			return budgetErr
+		}
 		state, err := childInterpreter.InitialState(intent.Program)
 		if err != nil {
 			return err
@@ -254,7 +275,7 @@ func (r *Runtime) materializeForkFramesLocked(
 				return err
 			}
 		}
-		now := r.now()
+
 		handoffID := ""
 		if intent.Handoff != nil {
 			handoffID = intent.Handoff.ID
@@ -263,6 +284,7 @@ func (r *Runtime) materializeForkFramesLocked(
 			ID:            intent.ID,
 			ParentFrameID: parent.ID,
 			Lifetime:      lifetime,
+			Depth:         depth,
 			Program:       intent.Program,
 			State:         state,
 			Status:        ProgramFrameStateRunning,
@@ -270,7 +292,8 @@ func (r *Runtime) materializeForkFramesLocked(
 			CreatedAt:     now,
 			UpdatedAt:     now,
 			HandoffID:     handoffID,
-			Deadline:      earlierDeadline(parent.Deadline, intent.Deadline),
+			Deadline:      deadline,
+			Budget:        cloneBudget(&childBudget),
 			Ports:         ports,
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)

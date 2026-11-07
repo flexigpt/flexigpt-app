@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 type readyExecutionWork struct {
@@ -33,6 +34,112 @@ func cloneExecutionBudget(value ExecutionBudget) ExecutionBudget {
 		output.Cost = &cost
 	}
 	return output
+}
+
+func programFrameDepth(value ProgramFrame) int {
+	if value.Depth > 0 {
+		return value.Depth
+	}
+	return 1
+}
+
+func effectiveProgramFrameBudget(
+	execution Execution,
+	frame ProgramFrame,
+) ExecutionBudget {
+	if frame.Budget != nil {
+		return cloneExecutionBudget(*frame.Budget)
+	}
+	return cloneExecutionBudget(execution.Budget)
+}
+
+func workflowProgramFrameBudget(
+	snapshot ProgramSnapshot,
+) (*ExecutionBudget, error) {
+	if snapshot.InterpreterID != WorkflowInterpreterID {
+		return nil, nil
+	}
+	program, err := workflowProgramFromSnapshot(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	value := cloneExecutionBudget(program.Limits)
+	return &value, nil
+}
+
+func narrowProgramFrameBudget(
+	parent ExecutionBudget,
+	intent ProgramFrameIntent,
+) (ExecutionBudget, error) {
+	output := cloneExecutionBudget(parent)
+
+	programBudget, err := workflowProgramFrameBudget(intent.Program)
+	if err != nil {
+		return ExecutionBudget{}, err
+	}
+	if programBudget != nil {
+		output, err = narrowExecutionBudget(output, *programBudget)
+		if err != nil {
+			return ExecutionBudget{}, err
+		}
+	}
+	if intent.Budget != nil {
+		output, err = narrowExecutionBudget(output, *intent.Budget)
+		if err != nil {
+			return ExecutionBudget{}, err
+		}
+	}
+	return output, nil
+}
+
+func childProgramFrameDepth(
+	parent ProgramFrame,
+	budget ExecutionBudget,
+) (int, error) {
+	depth := programFrameDepth(parent) + 1
+	if budget.WorkflowDepth > 0 &&
+		depth > budget.WorkflowDepth {
+		return 0, errors.New("workflow depth budget is exceeded")
+	}
+	return depth, nil
+}
+
+func programFrameDeadline(
+	now time.Time,
+	parentDeadline *time.Time,
+	intentDeadline *time.Time,
+	budget ExecutionBudget,
+) (*time.Time, error) {
+	deadline := earlierDeadline(parentDeadline, intentDeadline)
+	if budget.Duration == "" {
+		return deadline, nil
+	}
+	budgetDeadline, err := budget.Duration.Deadline(now)
+	if err != nil {
+		return nil, err
+	}
+	return earlierDeadline(deadline, &budgetDeadline), nil
+}
+
+func workItemBudgetForFrame(
+	execution Execution,
+	frame ProgramFrame,
+	requested *ExecutionBudget,
+) (*ExecutionBudget, error) {
+	if frame.Budget == nil && requested == nil {
+		return nil, nil
+	}
+
+	inherited := effectiveProgramFrameBudget(execution, frame)
+	if requested == nil {
+		return &inherited, nil
+	}
+
+	value, err := narrowExecutionBudget(inherited, *requested)
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
 }
 
 func cloneConversationParticipant(
@@ -94,29 +201,35 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if err := ownership.Budget.Validate(); err != nil {
 		return nil, err
 	}
+	parentBudget := effectiveProgramFrameBudget(*parent, *parentFrame)
 	effectiveBudget, err := narrowExecutionBudget(
-		parent.Budget,
+		parentBudget,
 		ownership.Budget,
+	)
+	if err != nil {
+		return nil, err
+	}
+	effectiveBudget, err = narrowProgramFrameBudget(
+		effectiveBudget,
+		intent,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	now := r.now()
-	deadline := earlierDeadline(parentFrame.Deadline, intent.Deadline)
-	if ownership.Budget.Duration != "" {
-		budgetDeadline, deadlineErr := ownership.Budget.Duration.Deadline(now)
-		if deadlineErr != nil {
-			return nil, deadlineErr
-		}
-		deadline = earlierDeadline(deadline, &budgetDeadline)
+	depth, err := childProgramFrameDepth(*parentFrame, effectiveBudget)
+	if err != nil {
+		return nil, err
 	}
-	if effectiveBudget.Duration != "" {
-		value, deadlineErr := effectiveBudget.Duration.Deadline(now)
-		if deadlineErr != nil {
-			return nil, deadlineErr
-		}
-		deadline = earlierDeadline(deadline, &value)
+	deadline, err := programFrameDeadline(
+		now,
+		parentFrame.Deadline,
+		intent.Deadline,
+		effectiveBudget,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	rootID := parent.RootExecutionID
@@ -141,7 +254,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		Lifetime:          ExecutionChildLifetimeIndependent,
 		Owner:             ownership.Owner,
 		CancelWithParent:  ownership.CancelWithParent,
-		ChildBudget:       ownership.Budget,
+		ChildBudget:       cloneExecutionBudget(effectiveBudget),
 		HandoffID:         handoffID,
 		Revision:          1,
 		State:             ExecutionStateRunning,
@@ -153,6 +266,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		Cleanup:           CleanupState{},
 		ProgramFrames: []ProgramFrame{{
 			ID:        frameID,
+			Depth:     depth,
 			Program:   intent.Program,
 			State:     state,
 			Status:    ProgramFrameStateRunning,
@@ -160,6 +274,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			CreatedAt: now,
 			UpdatedAt: now,
 			Deadline:  deadline,
+			Budget:    cloneBudget(&effectiveBudget),
 			HandoffID: handoffID,
 			Ports:     bindFramePortPlans(intent.Ports, parentFrame.ID, frameID),
 		}},
@@ -178,7 +293,9 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if err := r.stageFramePortInputsLocked(created, &created.ProgramFrames[0]); err != nil {
 		return nil, err
 	}
-	if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 {
+	if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 &&
+		created.ProgramFrames[0].Program.InterpreterID ==
+			WorkflowInterpreterID {
 		next, inputErr := workflowProgramWithPortInputs(
 			created.ProgramFrames[0].Program,
 			inputs,

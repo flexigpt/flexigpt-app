@@ -30,6 +30,11 @@ func (b *Binder) bindTool(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("tool payload is missing")
 	}
+	if len(payload.Context) != 0 {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"tool context adaptation is unavailable",
+		)
+	}
 
 	call := payload.Call
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindUnresolved {

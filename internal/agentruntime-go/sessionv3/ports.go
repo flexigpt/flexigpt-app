@@ -37,6 +37,7 @@ type PortPlan struct {
 	Direction     WorkflowPortDirection `json:"direction"`
 	Stream        bool                  `json:"stream,omitempty"`
 	Schema        CanonicalValue        `json:"schema"`
+	ChannelSchema CanonicalValue        `json:"channelSchema"`
 	Channel       string                `json:"channel"`
 	Access        WorkflowPortAccess    `json:"access"`
 	MaxMessages   int                   `json:"maxMessages,omitempty"`
@@ -121,6 +122,9 @@ func (p PortPlan) Validate() error {
 	if len(p.Schema) == 0 || !p.Schema.Valid() {
 		return errors.New("port plan schema is invalid")
 	}
+	if len(p.ChannelSchema) == 0 || !p.ChannelSchema.Valid() {
+		return errors.New("port plan channel schema is invalid")
+	}
 	if p.MaxMessages < 0 || p.MaxBytes < 0 {
 		return errors.New("port plan retention limit is invalid")
 	}
@@ -201,6 +205,7 @@ func clonePortPlans(values []PortPlan) []PortPlan {
 	for index := range values {
 		output[index] = values[index]
 		output[index].Schema = values[index].Schema.Clone()
+		output[index].ChannelSchema = values[index].ChannelSchema.Clone()
 	}
 	return output
 }

@@ -833,7 +833,7 @@ Functional backend completion does not require:
 - [x] Typed retry schedule state exists.
 - [x] Typed timer wait state exists.
 - [x] Typed recovery review waits exist.
-- [ ] WorkItem-level resource acquisition and release exists.
+- [x] WorkItem-level resource acquisition and release exists.
 - [ ] WorkItem-level aggregate budget accounting exists.
 
 ### Phase 3: callable targets
@@ -848,6 +848,7 @@ Functional backend completion does not require:
 - [x] Static target sets persist member selection.
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
+- [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [ ] Full callable interface context enforcement exists for every target kind.
 - [ ] Full callable interface port enforcement exists for every target kind.
 - [ ] Full receipt schema enforcement exists for every target kind.
@@ -863,7 +864,7 @@ Functional backend completion does not require:
 - [x] MCP discovery and policy binding are setup-owned.
 - [x] Skill resolution and Skill session setup are setup-owned.
 - [x] Service and Activity binding registration has a typed runtime boundary.
-- [ ] Typed attachment planning is setup-owned for V3.
+- [x] Typed attachment planning is setup-owned for V3.
 - [ ] Typed port planning is setup-owned for V3.
 - [ ] Full plan persistence facts exist for every Model and Agent contribution kind.
 

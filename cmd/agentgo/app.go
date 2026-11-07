@@ -720,6 +720,8 @@ func (a *App) initManagers() {
 	workflowAdmission, workflowBindings, err := newSessionV3WorkflowAdmission(
 		artifactComposition.Artifacts,
 		artifactCompositionResolver,
+		a.toolStoreAPI.api,
+		toolAdapter,
 	)
 	if err != nil {
 		panic(

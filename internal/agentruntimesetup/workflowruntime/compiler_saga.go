@@ -38,6 +38,12 @@ func compileWorkflowSaga(
 		Concurrency:        concurrency,
 		Do:                 block,
 	}
+	if len(input.CompensateOn) == 0 {
+		output.CompensateOn = []sessionv3Runtime.WorkflowSagaOutcome{
+			sessionv3Runtime.WorkflowSagaOutcomeFailed,
+			sessionv3Runtime.WorkflowSagaOutcomeCancelled,
+		}
+	}
 	for _, value := range input.CompensateOn {
 		switch value {
 		case string(sessionv3Runtime.WorkflowSagaOutcomeFailed):

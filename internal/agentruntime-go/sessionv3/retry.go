@@ -82,6 +82,19 @@ func retryMatches(match RetryMatcher, failure SanitizedError) bool {
 	if match.Retryable != nil && failure.Retryable != *match.Retryable {
 		return false
 	}
+	if len(match.EffectStates) != 0 &&
+		!slices.Contains(match.EffectStates, failure.Effect) {
+		return false
+	}
+	if len(match.Schema) != 0 {
+		value, err := canonicalWorkflowValue(failure)
+		if err != nil {
+			return false
+		}
+		if err := validateWorkflowSchema(match.Schema, value); err != nil {
+			return false
+		}
+	}
 	return true
 }
 

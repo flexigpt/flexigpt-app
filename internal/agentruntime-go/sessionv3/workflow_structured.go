@@ -25,6 +25,7 @@ type WorkflowScopeContext struct {
 	OuterState         CanonicalValue              `json:"outerState,omitempty"`
 	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
 	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
+	Context            *CanonicalValue             `json:"context,omitempty"`
 	Item               *CanonicalValue             `json:"item,omitempty"`
 	Index              *int                        `json:"index,omitempty"`
 	Result             *CanonicalValue             `json:"result,omitempty"`
@@ -41,6 +42,9 @@ type WorkflowScopeContext struct {
 func (s WorkflowScopeContext) Validate() error {
 	if !s.OuterState.Valid() {
 		return errors.New("Workflow scope outer state is invalid")
+	}
+	if s.Context != nil && !s.Context.Valid() {
+		return errors.New("Workflow scope context is invalid")
 	}
 	if s.Item != nil && !s.Item.Valid() {
 		return errors.New("Workflow scope item is invalid")
@@ -478,6 +482,15 @@ func workflowCanonicalPointer(value CanonicalValue) *CanonicalValue {
 	return &copyValue
 }
 
+func cloneWorkflowCanonicalPointer(
+	value *CanonicalValue,
+) *CanonicalValue {
+	if value == nil {
+		return nil
+	}
+	return workflowCanonicalPointer(*value)
+}
+
 func workflowIntegerPointer(value int) *int {
 	copyValue := value
 	return &copyValue
@@ -501,6 +514,7 @@ func (i *WorkflowInterpreter) childBlockProgram(
 		OuterState:         state.State.Clone(),
 		OuterOutcomes:      workflowScopeOutcomes(program, state),
 		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
+		Context:            cloneWorkflowCanonicalPointer(program.Scope.Context),
 		Item:               item,
 		Index:              index,
 		Result:             result,
@@ -2028,6 +2042,9 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	scope.Child = true
 	scope.MergeState = mergeState
 	scope.Cleanup = scope.Cleanup || program.Scope.Cleanup
+	if scope.Context == nil {
+		scope.Context = cloneWorkflowCanonicalPointer(program.Scope.Context)
+	}
 	scope.OuterState = state.State.Clone()
 	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
 	if state.Saga != nil && scope.Saga == nil {

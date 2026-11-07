@@ -1040,8 +1040,23 @@ func (i *WorkflowInterpreter) workflowStepWork(
 	}
 	intent.Retry = cloneWorkflowRetryPolicy(step.Retry)
 	if step.Limits != nil {
-		budget := cloneExecutionBudget(*step.Limits)
-		intent.Budget = &budget
+		if intent.Budget == nil {
+			budget := cloneExecutionBudget(*step.Limits)
+			intent.Budget = &budget
+		} else {
+			budget, err := narrowExecutionBudget(
+				*intent.Budget,
+				*step.Limits,
+			)
+			if err != nil {
+				return workflowFailure(
+					state,
+					"workflow_limit_invalid",
+					err.Error(),
+				)
+			}
+			intent.Budget = &budget
+		}
 	}
 	if program.Scope.Cleanup {
 		intent.Cleanup = true

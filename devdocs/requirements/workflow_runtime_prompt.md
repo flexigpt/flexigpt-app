@@ -313,4 +313,11 @@ Do not use hostile language. Do not make excuses. Do not use superficial progres
 Above phases are indicative of full work. current completion state is in HLDs.
 Make sure domain related things are in domains and not aggregated as a dump in session folders.
 
+What all is already there:
+
+- the wrappers are FULLY there with you. this is wails app, there are no other entry points other than this. you need to implement things as a wails entry point nad composition only like others. inspect that and then implement.
+- the agentruntime-go folder, agentruntimesetup and llmartifactory-go and sessionstorev3 folder are fully provided. there is nothing else other than attached things. you need to complete things in the provided things properly. if naything doesnt exist and you think you need it, that jsut means you need to implement it yourself and then integrate.
+- remove all unnecessary validations. nno new validations are to be added. if a validation is added and you think that is a task, revert it and then assume validations and nil checks are not tasks. only functional work is to be done and nothing else anywhere.
+- at last when you update hlds, take a look at phases carefully, if new phases or new work items are discovered you nneed to update that and then mark them incompelte or compelte accordingly.
+
 Final reminder: code delivery in md out. a substantial output is expected. this is financially sensitive endeavor. go top down phase wise. verify each thing, if not complete do it and move to next. if already done, go to next. there are lots of minor things you can do if your token quota is incomplete. again very large single shot output is needed. Do not block unnecessarily. out now properly. hlds capture the current state. keep it udpated at last as a diff..

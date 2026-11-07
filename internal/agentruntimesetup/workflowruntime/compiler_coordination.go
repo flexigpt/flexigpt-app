@@ -189,6 +189,18 @@ func compileWorkflowRetry(
 			output.Match.Categories = append(output.Match.Categories, value)
 		}
 	}
+	if input.Match != nil {
+		for _, effect := range input.Match.EffectStates {
+			value, err := compileWorkflowEffectState(effect)
+			if err != nil {
+				return sessionv3Runtime.RetryPolicy{}, err
+			}
+			output.Match.EffectStates = append(
+				output.Match.EffectStates,
+				value,
+			)
+		}
+	}
 	if input.Backoff != nil {
 		initial, err := sessionv3Runtime.ParseWorkflowDuration(input.Backoff.Initial)
 		if err != nil {

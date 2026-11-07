@@ -10,7 +10,11 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-const workflowPortContextPrefix = "workflow port context"
+const (
+	workflowPortContextPrefix           = "workflow port context"
+	workflowInvocationMessagesField     = "messages"
+	workflowInvocationInstructionsField = "instructions"
+)
 
 type workflowInvocationRequest struct {
 	Messages []workflowInvocationMessage `json:"messages"`
@@ -92,9 +96,7 @@ func workflowInvocationInputs(
 		return nil, err
 	}
 
-	request, err := sessionv3Runtime.DecodeCanonicalValue[workflowInvocationRequest](
-		plan.Input,
-	)
+	request, err := decodeWorkflowInvocationRequest(plan.Input)
 	if err != nil {
 		return nil, fmt.Errorf("decode workflow model request: %w", err)
 	}
@@ -102,14 +104,9 @@ func workflowInvocationInputs(
 		return nil, errors.New("workflow model request has no messages")
 	}
 
-	contextValue := workflowInvocationContext{}
-	if len(plan.Context) != 0 {
-		contextValue, err = sessionv3Runtime.DecodeCanonicalValue[workflowInvocationContext](
-			plan.Context,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("decode workflow model context: %w", err)
-		}
+	contextValue, err := decodeWorkflowInvocationContext(plan.Context)
+	if err != nil {
+		return nil, fmt.Errorf("decode workflow model context: %w", err)
 	}
 
 	output := make(
@@ -183,6 +180,69 @@ func workflowInvocationInputs(
 
 	if len(output) == 0 {
 		return nil, errors.New("workflow model request produced no provider inputs")
+	}
+	return output, nil
+}
+
+func decodeWorkflowInvocationRequest(
+	value sessionv3Runtime.CanonicalValue,
+) (workflowInvocationRequest, error) {
+	fields, err := sessionv3Runtime.DecodeCanonicalValue[map[string]sessionv3Runtime.CanonicalValue](value)
+	if err != nil {
+		return workflowInvocationRequest{}, err
+	}
+	for name := range fields {
+		if name != workflowInvocationMessagesField {
+			return workflowInvocationRequest{}, errors.New(
+				"workflow model request contains an unsupported field",
+			)
+		}
+	}
+	raw, found := fields[workflowInvocationMessagesField]
+	if !found {
+		return workflowInvocationRequest{}, errors.New(
+			"workflow model request has no messages field",
+		)
+	}
+	messages, err := sessionv3Runtime.DecodeCanonicalValue[[]workflowInvocationMessage](raw)
+	if err != nil {
+		return workflowInvocationRequest{}, err
+	}
+	return workflowInvocationRequest{Messages: messages}, nil
+}
+
+func decodeWorkflowInvocationContext(
+	value sessionv3Runtime.CanonicalValue,
+) (workflowInvocationContext, error) {
+	if len(value) == 0 {
+		return workflowInvocationContext{}, nil
+	}
+	fields, err := sessionv3Runtime.DecodeCanonicalValue[map[string]sessionv3Runtime.CanonicalValue](value)
+	if err != nil {
+		return workflowInvocationContext{}, err
+	}
+	output := workflowInvocationContext{}
+	for name, raw := range fields {
+		switch name {
+		case workflowInvocationMessagesField:
+			messages, decodeErr := sessionv3Runtime.DecodeCanonicalValue[[]workflowInvocationMessage](raw)
+			if decodeErr != nil {
+				return workflowInvocationContext{}, decodeErr
+			}
+			output.Messages = messages
+
+		case workflowInvocationInstructionsField:
+			instructions, decodeErr := sessionv3Runtime.DecodeCanonicalValue[[]string](raw)
+			if decodeErr != nil {
+				return workflowInvocationContext{}, decodeErr
+			}
+			output.Instructions = instructions
+
+		default:
+			return workflowInvocationContext{}, errors.New(
+				"workflow model context contains an unsupported form",
+			)
+		}
 	}
 	return output, nil
 }

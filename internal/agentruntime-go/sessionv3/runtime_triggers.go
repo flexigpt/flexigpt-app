@@ -3,24 +3,27 @@ package sessionv3
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	maximumTriggerOccurrences                              = 65_536
-	maximumTriggerCalendarSearch                           = 3_200_000
-	triggerTimerOperation                                  = "session-v3 trigger timer"
-	triggerEventSourceSchedule                             = "schedule"
-	triggerOccurrenceStateAccepted  TriggerOccurrenceState = "accepted"
-	triggerOccurrenceStateStarted   TriggerOccurrenceState = "started"
-	triggerOccurrenceStateSignalled TriggerOccurrenceState = "signalled"
-	triggerOccurrenceStateQueued    TriggerOccurrenceState = "queued"
-	triggerOccurrenceStateSkipped   TriggerOccurrenceState = "skipped"
-	triggerOccurrenceStateReplaced  TriggerOccurrenceState = "replaced"
-	triggerOccurrenceStateFailed    TriggerOccurrenceState = "failed"
+	maximumTriggerOccurrences                               = 65_536
+	maximumTriggerCalendarSearch                            = 3_200_000
+	triggerTimerOperation                                   = "session-v3 trigger timer"
+	triggerEventSourceSchedule                              = "schedule"
+	triggerOccurrenceStateAccepted   TriggerOccurrenceState = "accepted"
+	triggerOccurrenceStateStarted    TriggerOccurrenceState = "started"
+	triggerOccurrenceStateSignalled  TriggerOccurrenceState = "signalled"
+	triggerOccurrenceStateQueued     TriggerOccurrenceState = "queued"
+	triggerOccurrenceStateSkipped    TriggerOccurrenceState = "skipped"
+	triggerOccurrenceStateReplaced   TriggerOccurrenceState = "replaced"
+	triggerOccurrenceStateFailed     TriggerOccurrenceState = "failed"
+	triggerEventSchemaFailureCode                           = "trigger_event_schema_invalid"
+	triggerInputFailureCode                                 = "trigger_input_invalid"
+	triggerEventSchemaFailureMessage                        = "trigger event does not satisfy the declared contract"
+	triggerInputFailureMessage                              = "trigger input could not be prepared"
 )
 
 type TriggerRegistrationState string
@@ -468,6 +471,7 @@ func (r *Runtime) waitForTrigger(
 		session,
 		registration,
 		at,
+		true,
 	)
 	if err != nil {
 		r.mu.Unlock()
@@ -496,6 +500,7 @@ func (r *Runtime) fireScheduledTriggerLocked(
 	session *Session,
 	registration *TriggerRegistration,
 	at time.Time,
+	advanceSchedule bool,
 ) ([]readyExecutionWork, bool, error) {
 	if session == nil || registration == nil {
 		return nil, false, errors.New("scheduled trigger owner is unavailable")
@@ -537,17 +542,19 @@ func (r *Runtime) fireScheduledTriggerLocked(
 		occurrence.InstanceKey = evaluation.InstanceKey
 	}
 
-	next, local, nextErr := workflowTriggerNextOccurrence(
-		*trigger.Schedule,
-		at,
-		registration.LastLocalOccurrence,
-	)
-	if nextErr != nil {
-		return nil, false, nextErr
+	if advanceSchedule {
+		next, local, nextErr := workflowTriggerNextOccurrence(
+			*trigger.Schedule,
+			at,
+			registration.LastLocalOccurrence,
+		)
+		if nextErr != nil {
+			return nil, false, nextErr
+		}
+		registration.LastOccurrence = cloneTime(&at)
+		registration.LastLocalOccurrence = local
+		registration.NextOccurrence = &next
 	}
-	registration.LastOccurrence = cloneTime(&at)
-	registration.LastLocalOccurrence = local
-	registration.NextOccurrence = &next
 	registration.UpdatedAt = r.now()
 
 	if existing := mutableTriggerOccurrence(registration, occurrence.ID); existing != nil {
@@ -617,6 +624,41 @@ func appendTriggerOccurrence(
 	return nil
 }
 
+func appendFailedEventTriggerOccurrence(
+	registration *TriggerRegistration,
+	event TriggerEventEnvelope,
+	now time.Time,
+	code string,
+	message string,
+) error {
+	if registration == nil {
+		return errors.New("trigger registration is unavailable")
+	}
+	occurrence := TriggerOccurrence{
+		ID: TriggerOccurrenceID(
+			string(registration.ID) + ":event:" +
+				event.Source + ":" + event.ID,
+		),
+		Source:      event.Source,
+		SourceID:    event.ID,
+		OccurredAt:  event.Time,
+		AcceptedAt:  now,
+		Data:        event.Data.Clone(),
+		Correlation: event.Correlation.Clone(),
+		Input:       MustCanonicalValue(nil),
+		State:       triggerOccurrenceStateFailed,
+		Error: &SanitizedError{
+			Code:     code,
+			Category: ErrorCategoryValidation,
+			Message:  message,
+		},
+	}
+	if mutableTriggerOccurrence(registration, occurrence.ID) != nil {
+		return nil
+	}
+	return appendTriggerOccurrence(registration, occurrence)
+}
+
 func (r *Runtime) acceptTriggerEvent(
 	ctx context.Context,
 	command AcceptTriggerEventCommand,
@@ -680,13 +722,33 @@ func (r *Runtime) acceptTriggerEvent(
 					continue
 				}
 				if err := validateWorkflowSchema(contract.Schema, event.Data); err != nil {
-					return nil, fmt.Errorf("validate trigger event data: %w", err)
+					if appendErr := appendFailedEventTriggerOccurrence(
+						registration,
+						event,
+						r.now(),
+						triggerEventSchemaFailureCode,
+						triggerEventSchemaFailureMessage,
+					); appendErr != nil {
+						return nil, appendErr
+					}
+					registration.UpdatedAt = r.now()
+					continue
 				}
 				if err := validateWorkflowSchema(
 					contract.CorrelationSchema,
 					event.Correlation,
 				); err != nil {
-					return nil, fmt.Errorf("validate trigger event correlation: %w", err)
+					if appendErr := appendFailedEventTriggerOccurrence(
+						registration,
+						event,
+						r.now(),
+						triggerEventSchemaFailureCode,
+						triggerEventSchemaFailureMessage,
+					); appendErr != nil {
+						return nil, appendErr
+					}
+					registration.UpdatedAt = r.now()
+					continue
 				}
 				evaluation, err := PrepareWorkflowTrigger(
 					registration.Program,
@@ -695,7 +757,17 @@ func (r *Runtime) acceptTriggerEvent(
 					event.Time,
 				)
 				if err != nil {
-					return nil, err
+					if appendErr := appendFailedEventTriggerOccurrence(
+						registration,
+						event,
+						r.now(),
+						triggerInputFailureCode,
+						triggerInputFailureMessage,
+					); appendErr != nil {
+						return nil, appendErr
+					}
+					registration.UpdatedAt = r.now()
+					continue
 				}
 				if !evaluation.Matched {
 					continue
@@ -1000,6 +1072,7 @@ func (r *Runtime) startTriggerExecutionLocked(
 		},
 		ProgramFrames: []ProgramFrame{{
 			ID:        frameID,
+			Depth:     1,
 			Program:   program,
 			State:     state,
 			Status:    ProgramFrameStateRunning,
@@ -1263,6 +1336,7 @@ func (r *Runtime) recoverSessionTriggersLocked(
 						session,
 						registration,
 						at,
+						false,
 					); fireErr != nil {
 						return changed, fireErr
 					}
@@ -1278,6 +1352,7 @@ func (r *Runtime) recoverSessionTriggersLocked(
 				session,
 				registration,
 				*latest,
+				false,
 			); fireErr != nil {
 				return changed, fireErr
 			}

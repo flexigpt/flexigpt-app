@@ -260,10 +260,15 @@ func externalWorkRequest(
 	if err != nil {
 		return WorkBindingRequest{}, err
 	}
+	contextValue, err := externalWorkContext(item)
+	if err != nil {
+		return WorkBindingRequest{}, err
+	}
 	return WorkBindingRequest{
-		Input:  input,
-		Ports:  append([]sessionv3Runtime.PortInput(nil), item.PortInputs...),
-		Stream: stream,
+		Input:   input,
+		Context: contextValue,
+		Ports:   append([]sessionv3Runtime.PortInput(nil), item.PortInputs...),
+		Stream:  stream,
 	}, nil
 }
 
@@ -274,16 +279,45 @@ func externalWaitRequest(
 	if err != nil {
 		return WorkBindingWaitRequest{}, err
 	}
+	contextValue, err := externalWorkContext(request.WorkItem)
+	if err != nil {
+		return WorkBindingWaitRequest{}, err
+	}
 	return WorkBindingWaitRequest{
 		Wait:       request.Wait,
 		Resolution: request.Resolution,
 		Response:   request.Response.Clone(),
 		Input:      input,
+		Context:    contextValue,
 		Ports: append(
 			[]sessionv3Runtime.PortInput(nil),
 			request.WorkItem.PortInputs...,
 		),
 	}, nil
+}
+
+func externalWorkContext(
+	item sessionv3Runtime.WorkItem,
+) (sessionv3Runtime.CanonicalValue, error) {
+	switch item.Type {
+	case sessionv3Runtime.WorkItemTypeService:
+		if item.Input.Service == nil {
+			return nil, errors.New("service workItem payload is missing")
+		}
+		return item.Input.Service.Context.Clone(), nil
+
+	case sessionv3Runtime.WorkItemTypeActivity:
+		if item.Input.Activity == nil {
+			return nil, errors.New("activity workItem payload is missing")
+		}
+		return item.Input.Activity.Context.Clone(), nil
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported external workItem type %q",
+			item.Type,
+		)
+	}
 }
 
 func externalWorkInput(

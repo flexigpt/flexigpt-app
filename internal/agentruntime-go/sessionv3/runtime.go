@@ -615,6 +615,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
+				Depth:     1,
 				Program:   admission.Program,
 				State:     state,
 				Status:    ProgramFrameStateRunning,
@@ -1803,6 +1804,7 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
+				Depth:     1,
 				Program:   program,
 				State:     state,
 				Status:    ProgramFrameStateWaiting,
@@ -1934,6 +1936,14 @@ func (r *Runtime) advanceFrameLocked(
 		transition.ContinueParent = false
 	}
 	for _, intent := range transition.WorkItems {
+		itemBudget, budgetErr := workItemBudgetForFrame(
+			*execution,
+			*frame,
+			intent.Budget,
+		)
+		if budgetErr != nil {
+			return budgetErr
+		}
 		now := r.now()
 		item := WorkItem{
 			ID:      intent.ID,
@@ -1950,7 +1960,7 @@ func (r *Runtime) advanceFrameLocked(
 			Retry:              cloneWorkflowRetryPolicy(intent.Retry),
 			Automatic:          intent.Automatic,
 			Dependencies:       append([]WorkItemID(nil), intent.Dependencies...),
-			Budget:             cloneBudget(intent.Budget),
+			Budget:             itemBudget,
 			Cleanup:            intent.Cleanup,
 			SagaID:             intent.SagaID,
 			CompensationPolicy: intent.CompensationPolicy,
@@ -1964,10 +1974,13 @@ func (r *Runtime) advanceFrameLocked(
 		}
 		item.Ports = bindWorkPortPlans(intent.Ports, frame.ID)
 		if item.Type == WorkItemTypeLLM {
-			item.Ports = append(
+			item.Ports, err = mergeWorkPortPlans(
 				item.Ports,
-				streamPortPlansForFrame(*frame)...,
+				llmPortPlansForFrame(*frame),
 			)
+			if err != nil {
+				return err
+			}
 		}
 		if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
 			return err

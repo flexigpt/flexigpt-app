@@ -65,16 +65,25 @@ func withSessionV3[T any](wrapper *SessionV3Wrapper, fn func(*sessionv3Runtime.R
 func newSessionV3WorkflowAdmission(
 	artifacts artifact.API,
 	resolver *composition.Resolver,
+	tools *toolAPI.Service,
+	toolCaller toolruntime.GoToolCaller,
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
 	error,
 ) {
-	if artifacts == nil || resolver == nil {
+	if artifacts == nil ||
+		resolver == nil ||
+		tools == nil ||
+		toolCaller == nil {
 		return nil, nil, errSessionV3Deps
 	}
 
 	workflows, err := workflowAPI.NewService(resolver)
+	if err != nil {
+		return nil, nil, err
+	}
+	toolInspector, err := toolruntime.NewV3Executor(tools, toolCaller)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -84,6 +93,7 @@ func newSessionV3WorkflowAdmission(
 		workflows,
 		artifacts,
 		bindings,
+		toolInspector,
 	)
 	if err != nil {
 		return nil, nil, err

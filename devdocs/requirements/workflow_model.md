@@ -1754,6 +1754,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
 - [x] Selected target identity persists with the logical Workflow step.
 - [x] Provider SDK Tool Artifacts remain provider-managed Model choices.
+- [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [ ] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
 - [ ] Full typed Service and Activity execution-plan propagation is complete for every binding kind.
 
@@ -1813,7 +1814,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Channel retention and byte limits are complete across all paths.
 - [x] Human response actor authorization is complete.
 - [x] Trigger registration without an initial explicit Workflow start is complete.
-- [ ] Trigger occurrence failure projection and operational management commands are complete.
+- [x] Trigger occurrence failure projection and operational management commands are complete.
 
 ### Phase 7: resources, budgets, and limits
 

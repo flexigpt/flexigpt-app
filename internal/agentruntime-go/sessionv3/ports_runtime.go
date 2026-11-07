@@ -38,12 +38,14 @@ func bindFramePortPlans(
 	return output
 }
 
-func streamPortPlansForFrame(
+func llmPortPlansForFrame(
 	frame ProgramFrame,
 ) []PortPlan {
 	output := make([]PortPlan, 0, len(frame.Ports))
 	for _, plan := range frame.Ports {
-		if plan.Direction == WorkflowPortDirectionOutput && plan.Stream {
+		if plan.Direction == WorkflowPortDirectionInput ||
+			(plan.Direction == WorkflowPortDirectionOutput &&
+				plan.Stream) {
 			output = append(output, plan)
 		}
 	}
@@ -60,6 +62,9 @@ func (r *Runtime) stageWorkPortInputsLocked(
 	if len(item.Ports) == 0 {
 		return nil
 	}
+	if err := validateWorkPortOwnership(*execution, *item); err != nil {
+		return err
+	}
 
 	inputs, err := r.portInputsLocked(
 		execution,
@@ -71,6 +76,42 @@ func (r *Runtime) stageWorkPortInputsLocked(
 	}
 	item.PortInputs = inputs
 	return nil
+}
+
+func validateWorkPortOwnership(
+	execution Execution,
+	item WorkItem,
+) error {
+	frame := mutableFrame(&execution, item.FrameID)
+	if frame == nil {
+		return errors.New("work port owner frame is unavailable")
+	}
+	for _, plan := range item.Ports {
+		if plan.OwnerFrameID == "" || plan.OwnerFrameID != item.FrameID {
+			return errors.New("work port owner differs from its work item frame")
+		}
+		if plan.ParentFrameID != "" &&
+			frame.ParentFrameID != plan.ParentFrameID {
+			return errors.New("work port parent ownership differs from its frame")
+		}
+	}
+	return nil
+}
+
+func mergeWorkPortPlans(
+	work []PortPlan,
+	frame []PortPlan,
+) ([]PortPlan, error) {
+	output := clonePortPlans(work)
+	for _, plan := range frame {
+		for _, current := range output {
+			if current.Name == plan.Name {
+				return nil, errors.New("work and frame port plans have a duplicate name")
+			}
+		}
+		output = append(output, plan)
+	}
+	return output, validateUniquePortPlans(output)
 }
 
 func (r *Runtime) stageFramePortInputsLocked(
@@ -147,6 +188,16 @@ func (r *Runtime) portInputsLocked(
 					err,
 				)
 			}
+			if err := validateWorkflowSchema(
+				plan.ChannelSchema,
+				message.Data,
+			); err != nil {
+				return nil, fmt.Errorf(
+					"port input %q channel schema: %w",
+					plan.Name,
+					err,
+				)
+			}
 			input.Values = append(input.Values, message.Data.Clone())
 			input.Cursor = message.Sequence
 		}
@@ -181,6 +232,9 @@ func (r *Runtime) deliverWorkPortsLocked(
 		len(item.Ports) == 0 || item.Output == nil {
 		return nil
 	}
+	if err := validateWorkPortOwnership(*execution, *item); err != nil {
+		return err
+	}
 
 	value, err := portOutputValue(*item)
 	if err != nil {
@@ -188,6 +242,9 @@ func (r *Runtime) deliverWorkPortsLocked(
 	}
 	for _, plan := range item.Ports {
 		if plan.Direction != WorkflowPortDirectionOutput {
+			continue
+		}
+		if item.Type == WorkItemTypeLLM && plan.Stream {
 			continue
 		}
 		if err := r.appendPortMessageLocked(
@@ -200,9 +257,6 @@ func (r *Runtime) deliverWorkPortsLocked(
 		); err != nil {
 			return err
 		}
-	}
-	for _, plan := range item.Ports {
-		_ = plan
 	}
 	return nil
 }
@@ -263,6 +317,9 @@ func (r *Runtime) appendWorkPortStream(
 		execution.Controls.CancellationRequested ||
 		execution.State.Terminal() {
 		return context.Canceled
+	}
+	if err := validateWorkPortOwnership(*execution, *item); err != nil {
+		return err
 	}
 
 	var plan *PortPlan
@@ -375,6 +432,12 @@ func (r *Runtime) appendPortMessageLocked(
 	}
 	if err := validateWorkflowSchema(plan.Schema, value); err != nil {
 		return fmt.Errorf("validate port output: %w", err)
+	}
+	if err := validateWorkflowSchema(plan.ChannelSchema, value); err != nil {
+		return fmt.Errorf(
+			"validate port channel output: %w",
+			err,
+		)
 	}
 
 	maxMessages, maxBytes := portRetention(plan)

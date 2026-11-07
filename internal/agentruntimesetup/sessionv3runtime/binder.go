@@ -185,12 +185,32 @@ func (b *Binder) ValidatePortPlans(
 		sessionv3Runtime.WorkItemTypeActivity:
 		return nil
 	case sessionv3Runtime.WorkItemTypeTool:
-		return errors.New(
-			"tool port adaptation is unavailable for this binding",
-		)
+		return validateV3ToolPortPlans(request.WorkItem.Ports)
 	default:
 		return errors.New(
 			"port adaptation is unavailable for this work item",
 		)
 	}
+}
+
+func validateV3ToolPortPlans(
+	plans []sessionv3Runtime.PortPlan,
+) error {
+	for _, plan := range plans {
+		switch plan.Direction {
+		case sessionv3Runtime.WorkflowPortDirectionInput:
+			return errors.New("tool input port adaptation is unavailable")
+
+		case sessionv3Runtime.WorkflowPortDirectionOutput:
+			if plan.Stream {
+				return errors.New(
+					"tool streamed port adaptation is unavailable",
+				)
+			}
+
+		default:
+			return errors.New("tool port direction is invalid")
+		}
+	}
+	return nil
 }

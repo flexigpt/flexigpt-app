@@ -471,6 +471,7 @@ type ProgramFrame struct {
 	ID                ProgramFrameID     `json:"id"`
 	ParentFrameID     ProgramFrameID     `json:"parentFrameID,omitempty"`
 	Lifetime          ChildFrameLifetime `json:"lifetime,omitempty"`
+	Depth             int                `json:"depth,omitempty"`
 	Program           ProgramSnapshot    `json:"program"`
 	State             ProgramState       `json:"state"`
 	Status            ProgramFrameState  `json:"status"`
@@ -478,6 +479,7 @@ type ProgramFrame struct {
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Deadline          *time.Time         `json:"deadline,omitempty"`
+	Budget            *ExecutionBudget   `json:"budget,omitempty"`
 	ChildFrameIDs     []ProgramFrameID   `json:"childFrameIDs,omitempty"`
 	ChildExecutionIDs []ExecutionID      `json:"childExecutionIDs,omitempty"`
 	WorkItemIDs       []WorkItemID       `json:"workItemIDs,omitempty"`
@@ -673,9 +675,11 @@ func (p WorkflowEffectPlan) Validate() error {
 }
 
 type RetryMatcher struct {
-	Categories []ErrorCategory `json:"categories,omitempty"`
-	Codes      []string        `json:"codes,omitempty"`
-	Retryable  *bool           `json:"retryable,omitempty"`
+	Categories   []ErrorCategory `json:"categories,omitempty"`
+	Codes        []string        `json:"codes,omitempty"`
+	Retryable    *bool           `json:"retryable,omitempty"`
+	EffectStates []EffectState   `json:"effectStates,omitempty"`
+	Schema       CanonicalValue  `json:"schema,omitempty"`
 }
 
 // RetryBackoff is durable retry timing policy. Durations remain typed values
@@ -833,9 +837,10 @@ type LLMWork struct {
 }
 
 type ToolWork struct {
-	Call   ToolCall       `json:"call"`
-	Target *ArtifactPin   `json:"target,omitempty"`
-	MCP    *MCPToolTarget `json:"mcp,omitempty"`
+	Call    ToolCall       `json:"call"`
+	Context CanonicalValue `json:"context,omitempty"`
+	Target  *ArtifactPin   `json:"target,omitempty"`
+	MCP     *MCPToolTarget `json:"mcp,omitempty"`
 }
 
 // MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
@@ -912,12 +917,14 @@ type ServiceWork struct {
 	ServiceID      string         `json:"serviceID"`
 	BindingVersion string         `json:"bindingVersion"`
 	Input          CanonicalValue `json:"input"`
+	Context        CanonicalValue `json:"context,omitempty"`
 }
 
 type ActivityWork struct {
 	ActivityID     string         `json:"activityID"`
 	BindingVersion string         `json:"bindingVersion"`
 	Input          CanonicalValue `json:"input"`
+	Context        CanonicalValue `json:"context,omitempty"`
 }
 
 type TransformWork struct {
@@ -1261,6 +1268,7 @@ type ProgramFrameIntent struct {
 	Path        string                     `json:"path,omitempty"`
 	Program     ProgramSnapshot            `json:"program"`
 	Deadline    *time.Time                 `json:"deadline,omitempty"`
+	Budget      *ExecutionBudget           `json:"budget,omitempty"`
 	Lifetime    ChildFrameLifetime         `json:"lifetime,omitempty"`
 	Ownership   *ChildExecutionOwnership   `json:"ownership,omitempty"`
 	Ports       []PortPlan                 `json:"ports,omitempty"`

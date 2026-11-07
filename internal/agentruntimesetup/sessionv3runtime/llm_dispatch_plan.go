@@ -152,14 +152,20 @@ func (b *Binder) durableLLMDispatchPlan(
 		}
 	}
 
+	for _, port := range request.WorkItem.Ports {
+		appendLLMDispatchChannel(
+			&output,
+			port.Channel,
+			port.Access,
+			0,
+		)
+	}
 	for _, input := range request.WorkItem.PortInputs {
-		output.Channels = append(
-			output.Channels,
-			sessionv3Runtime.ChannelDispatchPlan{
-				Name:   input.Channel,
-				Cursor: input.Cursor,
-				Access: sessionv3Runtime.WorkflowPortAccessRead,
-			},
+		appendLLMDispatchChannel(
+			&output,
+			input.Channel,
+			sessionv3Runtime.WorkflowPortAccessRead,
+			input.Cursor,
 		)
 	}
 
@@ -167,6 +173,39 @@ func (b *Binder) durableLLMDispatchPlan(
 		return sessionv3Runtime.ModelDispatchPlan{}, err
 	}
 	return output, nil
+}
+
+func appendLLMDispatchChannel(
+	output *sessionv3Runtime.ModelDispatchPlan,
+	name string,
+	access sessionv3Runtime.WorkflowPortAccess,
+	cursor uint64,
+) {
+	if output == nil {
+		return
+	}
+	for index := range output.Channels {
+		channel := &output.Channels[index]
+		if channel.Name != name {
+			continue
+		}
+		if cursor > channel.Cursor {
+			channel.Cursor = cursor
+		}
+		if channel.Access == access {
+			return
+		}
+		channel.Access = sessionv3Runtime.WorkflowPortAccessReadWrite
+		return
+	}
+	output.Channels = append(
+		output.Channels,
+		sessionv3Runtime.ChannelDispatchPlan{
+			Name:   name,
+			Cursor: cursor,
+			Access: access,
+		},
+	)
 }
 
 func appendWorkflowInvocationDispatchPlan(
@@ -262,6 +301,7 @@ func clonePlanPortValues(
 	for index := range values {
 		output[index] = values[index]
 		output[index].Schema = values[index].Schema.Clone()
+		output[index].ChannelSchema = values[index].ChannelSchema.Clone()
 	}
 	return output
 }
