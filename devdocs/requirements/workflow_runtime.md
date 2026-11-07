@@ -945,8 +945,10 @@ Functional backend completion does not require:
 - [x] V3 replay-safe attachment materialization exists.
 - [x] V3 historical attachment protection exists.
 - [x] V3 provider attachment adaptation exists.
-- [ ] V3 Service binding composition is complete.
-- [ ] V3 Activity binding composition is complete.
+- [x] V3 Service binding composition is complete.
+- [x] V3 Activity binding composition is complete.
+- [x] V3 Tool streamed output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
+- [ ] V3 Tool input-port adaptation remains unavailable because the Go Tool, MCP Tool, and Skill Tool invocation contracts expose no typed input-port field.
 - [ ] Go Tool, MCP Tool, and Skill Tool port adapters remain incomplete for input and streamed ports.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 

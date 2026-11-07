@@ -341,6 +341,9 @@ func (a *Admission) admit(
 	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
+	if err := rejectUnavailableWorkflowToolInputPorts(program); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
 	if err := program.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime/appbinding"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -23,6 +24,12 @@ import (
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 )
+
+func registerApplicationWorkflowBindings(
+	registry *workflowruntime.BindingRegistry,
+) error {
+	return appbinding.Register(registry)
+}
 
 type SessionV3Params struct {
 	Artifacts        artifact.API

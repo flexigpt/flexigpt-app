@@ -269,7 +269,21 @@ func (r *Runtime) deliverWorkPortsLocked(
 		if plan.Direction != WorkflowPortDirectionOutput {
 			continue
 		}
-		if item.Type == WorkItemTypeLLM && plan.Stream {
+		if plan.Stream {
+			if portStreamIndex(item.PortStreams, plan.Name) >= 0 {
+				continue
+			}
+			sequence := nextPortStreamSequence(item, plan.Name)
+			if err := r.appendPortMessageLocked(
+				session,
+				execution,
+				plan,
+				portMessageID(item.ID, plan.Name, sequence),
+				portStreamMessageKind,
+				value,
+			); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := r.appendPortMessageLocked(

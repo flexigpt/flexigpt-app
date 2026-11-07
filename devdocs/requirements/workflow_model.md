@@ -1848,7 +1848,10 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Replay-safe attachment materialization is complete for V3 attachment admission.
 - [x] Historical attachment modification handling is complete for V3 attachment admission.
 - [x] Provider attachment adaptation is complete for V3 attachment admission.
-- [ ] Service and Activity runtime binding registration is complete in application composition.
+- [x] Service and Activity runtime binding registration is complete in application composition.
+- [x] Application composition registers `flexigpt.url.normalize` as a typed read Service binding.
+- [x] Application composition registers `flexigpt.text.apply-unified-diff` as a typed non-idempotent Activity binding.
+- [ ] Go Tool, MCP Tool, and Skill Tool input-port adaptation remains unavailable in their existing execution contracts.
 - [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 
 ### Phase 9: functional completion gate

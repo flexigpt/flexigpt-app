@@ -729,6 +729,14 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
+	if err := registerApplicationWorkflowBindings(
+		workflowBindings,
+	); err != nil {
+		panic(
+			"failed to initialize managers: session v3 workflow binding registration failed\n" +
+				err.Error(),
+		)
+	}
 
 	sessionV3Store, err := sessionstorev3.New(a.sessionsV3DirPath)
 	if err != nil {

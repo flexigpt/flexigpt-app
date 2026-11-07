@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
@@ -187,7 +188,11 @@ func (b *Binder) executeTool(
 				"session v3 Tool runtime is unavailable",
 			)
 		}
-		return b.goTools.ExecuteGo(ctx, payload)
+		result, executeErr := b.goTools.ExecuteGo(ctx, payload)
+		if executeErr != nil {
+			return sessionv3Runtime.WorkExecutionResult{}, executeErr
+		}
+		return emitToolPortStreams(req, result)
 
 	case sessionv3Runtime.ToolBindingKindMCP:
 		if b.mcpTools == nil {
@@ -211,7 +216,7 @@ func (b *Binder) executeTool(
 				"MCP Tool runtime declined an MCP Tool execution",
 			)
 		}
-		return result, nil
+		return emitToolPortStreams(req, result)
 
 	case sessionv3Runtime.ToolBindingKindSkill:
 		if b.skillTools == nil {
@@ -232,7 +237,7 @@ func (b *Binder) executeTool(
 				"skill runtime declined a Skill Tool execution",
 			)
 		}
-		return result, nil
+		return emitToolPortStreams(req, result)
 
 	case sessionv3Runtime.ToolBindingKindProvider:
 		return sessionv3Runtime.WorkExecutionResult{}, errors.New(
@@ -245,6 +250,92 @@ func (b *Binder) executeTool(
 			private.Call.Binding.Kind,
 		)
 	}
+}
+
+func emitToolPortStreams(
+	request sessionv3Runtime.WorkDispatchRequest,
+	result sessionv3Runtime.WorkExecutionResult,
+) (sessionv3Runtime.WorkExecutionResult, error) {
+	streams := make([]string, 0)
+	for _, plan := range request.WorkItem.Ports {
+		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput ||
+			!plan.Stream {
+			continue
+		}
+		streams = append(streams, plan.Name)
+	}
+	if len(streams) == 0 || result.Output == nil {
+		return result, nil
+	}
+	if request.PortStream.Emit == nil {
+		return toolPortStreamFailure(
+			result,
+			errors.New("tool streamed port emitter is unavailable"),
+		), nil
+	}
+
+	values, err := toolPortStreamValues(result.Output)
+	if err != nil {
+		return toolPortStreamFailure(result, err), nil
+	}
+	for _, name := range streams {
+		for _, value := range values {
+			if err := request.PortStream.Emit(name, value); err != nil {
+				return toolPortStreamFailure(result, err), nil
+			}
+		}
+	}
+	return result, nil
+}
+
+func toolPortStreamValues(
+	output *sessionv3Runtime.WorkItemOutput,
+) ([]sessionv3Runtime.CanonicalValue, error) {
+	if output == nil {
+		return nil, nil
+	}
+	if output.Tool != nil && len(output.Tool.Structured) != 0 {
+		values, err := sessionv3Runtime.DecodeCanonicalValue[[]sessionv3Runtime.CanonicalValue](output.Tool.Structured)
+		if err == nil && len(values) != 0 {
+			return values, nil
+		}
+	}
+	if len(output.Value) != 0 {
+		return []sessionv3Runtime.CanonicalValue{
+			output.Value.Clone(),
+		}, nil
+	}
+	if output.Tool == nil {
+		return nil, nil
+	}
+	return []sessionv3Runtime.CanonicalValue{
+		sessionv3Runtime.MustCanonicalValue(struct {
+			Kind  sessionv3Runtime.ToolOutputKind `json:"kind"`
+			Text  string                          `json:"text,omitempty"`
+			Error string                          `json:"error,omitempty"`
+		}{
+			Kind:  output.Tool.Kind,
+			Text:  output.Tool.Text,
+			Error: output.Tool.Error,
+		}),
+	}, nil
+}
+
+func toolPortStreamFailure(
+	result sessionv3Runtime.WorkExecutionResult,
+	cause error,
+) sessionv3Runtime.WorkExecutionResult {
+	message := "tool streamed port delivery failed"
+	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
+		message = strings.ToLower(cause.Error())
+	}
+	result.Error = &sessionv3Runtime.SanitizedError{
+		Code:     "tool_port_stream_failed",
+		Category: sessionv3Runtime.ErrorCategoryUncertainty,
+		Message:  message,
+	}
+	result.Confirmed = false
+	return result
 }
 
 func (b *Binder) resolveToolWait(
