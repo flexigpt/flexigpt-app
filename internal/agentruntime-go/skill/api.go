@@ -234,8 +234,15 @@ func (s *Service) InvokeSkillTool(
 		)
 	}
 
+	invocationContext := ctx
+	if req.Body.Workflow != nil {
+		invocationContext = WithWorkflowToolInvocation(
+			ctx,
+			*req.Body.Workflow,
+		)
+	}
 	outputs, callErr := llmtoolsutil.CallUsingRegistry(
-		ctx,
+		invocationContext,
 		registry,
 		functionID,
 		rArgs,

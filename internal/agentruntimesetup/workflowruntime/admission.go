@@ -78,6 +78,16 @@ type WorkBinding interface {
 	) (sessionv3Runtime.WaitResolutionResult, error)
 }
 
+type WorkBindingPortCapabilities struct {
+	Context      bool
+	InputPorts   bool
+	OutputStream bool
+}
+
+type WorkBindingPortCapability interface {
+	WorkflowPortCapabilities() WorkBindingPortCapabilities
+}
+
 type BindingRegistry struct {
 	mu       sync.RWMutex
 	bindings map[string]WorkBinding
@@ -339,9 +349,6 @@ func (a *Admission) admit(
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
-	if err := rejectUnavailableWorkflowToolInputPorts(program); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := program.Validate(); err != nil {

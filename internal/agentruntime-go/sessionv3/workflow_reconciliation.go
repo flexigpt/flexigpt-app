@@ -169,6 +169,7 @@ func (i *WorkflowInterpreter) beginReconciliation(
 			ID:          intentID,
 			ProgramPath: item.ProgramPath + "/reconciliation",
 			Type:        WorkItemTypeReconciliation,
+			Cleanup:     true,
 			Automatic:   true,
 			Effect:      EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{
@@ -527,6 +528,7 @@ func (i *WorkflowInterpreter) driveReconciliation(
 			[]WorkItemIntent{{
 				ID:          progress.IntentWorkItemID,
 				ProgramPath: pending.Path + "/reconciliation",
+				Cleanup:     true,
 				Type:        WorkItemTypeReconciliation,
 				Automatic:   true,
 				Effect:      EffectContract{Kind: EffectKindRead},
@@ -566,6 +568,7 @@ func (i *WorkflowInterpreter) driveReconciliation(
 			[]WorkItemIntent{{
 				ID:          reviewID,
 				ProgramPath: pending.Path + "/reconciliation/review",
+				Cleanup:     true,
 				Type:        WorkItemTypeWait,
 				Automatic:   true,
 				Effect:      EffectContract{Kind: EffectKindRead},

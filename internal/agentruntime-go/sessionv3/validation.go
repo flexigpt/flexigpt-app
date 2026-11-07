@@ -1730,11 +1730,27 @@ func (c ResourceClaim) Validate() error {
 }
 
 func (l ResourceLease) Validate() error {
-	if err := validateID(
-		"resource lease work item ID",
-		string(l.WorkItemID),
-	); err != nil {
-		return err
+	owners := 0
+	if l.WorkItemID != "" {
+		if err := validateID(
+			"resource lease work item ID",
+			string(l.WorkItemID),
+		); err != nil {
+			return err
+		}
+		owners++
+	}
+	if l.FrameID != "" {
+		if err := validateID(
+			"resource lease frame ID",
+			string(l.FrameID),
+		); err != nil {
+			return err
+		}
+		owners++
+	}
+	if owners != 1 {
+		return errors.New("resource lease must have exactly one owner")
 	}
 	if err := validateID("resource lease resource", l.Resource); err != nil {
 		return err

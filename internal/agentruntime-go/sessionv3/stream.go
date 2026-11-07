@@ -38,6 +38,18 @@ func (r *Runtime) appendLLMStream(
 		return context.Canceled
 	}
 
+	if execution.Budget.MessageBytes > 0 {
+		if err := checkBudgetCount(
+			execution.Budget.MessageBytes,
+			execution.Usage.MessageBytes,
+			len(value),
+			"message bytes",
+		); err != nil {
+			return err
+		}
+		execution.Usage.MessageBytes += len(value)
+	}
+
 	now := r.now()
 	if item.LLMStream == nil {
 		item.LLMStream = &LLMStreamState{}

@@ -738,11 +738,12 @@ type ResourceClaim struct {
 // ResourceLease records a held claim. It is part of the existing Execution
 // document and never contains a mutex, cancellation function, or timer.
 type ResourceLease struct {
-	WorkItemID WorkItemID `json:"workItemID"`
-	Resource   string     `json:"resource"`
-	Units      int        `json:"units"`
-	Key        string     `json:"key,omitempty"`
-	AcquiredAt time.Time  `json:"acquiredAt"`
+	WorkItemID WorkItemID     `json:"workItemID,omitempty"`
+	FrameID    ProgramFrameID `json:"frameID,omitempty"`
+	Resource   string         `json:"resource"`
+	Units      int            `json:"units"`
+	Key        string         `json:"key,omitempty"`
+	AcquiredAt time.Time      `json:"acquiredAt"`
 }
 
 // ResourceRateWindow is durable rate-accounting state for one declared
@@ -791,6 +792,7 @@ type WorkItem struct {
 	SagaID                string                  `json:"sagaID,omitempty"`
 	CompensationPolicy    CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
 	Requested             bool                    `json:"requested"`
+	RetainClaimsForFrame  bool                    `json:"retainClaimsForFrame,omitempty"`
 	StepExecutionReserved bool                    `json:"stepExecutionReserved,omitempty"`
 	Claims                []ResourceClaim         `json:"claims,omitempty"`
 	ResourceWait          *ResourceWaitState      `json:"resourceWait,omitempty"`
@@ -903,7 +905,8 @@ type MCPToolBinding struct {
 }
 
 type SkillToolBinding struct {
-	Name string `json:"name"`
+	Name          string `json:"name"`
+	WorkflowPorts bool   `json:"workflowPorts,omitempty"`
 }
 
 type ProviderToolBinding struct {
@@ -1281,22 +1284,23 @@ type ProgramFrameIntent struct {
 }
 
 type WorkItemIntent struct {
-	ID                 WorkItemID              `json:"id,omitempty"`
-	ProgramPath        string                  `json:"programPath,omitempty"`
-	Type               WorkItemType            `json:"type"`
-	Automatic          bool                    `json:"automatic"`
-	Deadline           *time.Time              `json:"deadline,omitempty"`
-	Effect             EffectContract          `json:"effect"`
-	Retry              *RetryPolicy            `json:"retry,omitempty"`
-	EffectPlan         *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
-	Budget             *ExecutionBudget        `json:"budget,omitempty"`
-	Cleanup            bool                    `json:"cleanup,omitempty"`
-	SagaID             string                  `json:"sagaID,omitempty"`
-	CompensationPolicy CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
-	Claims             []ResourceClaim         `json:"claims,omitempty"`
-	Dependencies       []WorkItemID            `json:"dependencies,omitempty"`
-	Ports              []PortPlan              `json:"ports,omitempty"`
-	Input              WorkItemPayload         `json:"input"`
+	ID                   WorkItemID              `json:"id,omitempty"`
+	ProgramPath          string                  `json:"programPath,omitempty"`
+	Type                 WorkItemType            `json:"type"`
+	Automatic            bool                    `json:"automatic"`
+	Deadline             *time.Time              `json:"deadline,omitempty"`
+	Effect               EffectContract          `json:"effect"`
+	Retry                *RetryPolicy            `json:"retry,omitempty"`
+	EffectPlan           *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
+	Budget               *ExecutionBudget        `json:"budget,omitempty"`
+	Cleanup              bool                    `json:"cleanup,omitempty"`
+	SagaID               string                  `json:"sagaID,omitempty"`
+	CompensationPolicy   CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
+	Claims               []ResourceClaim         `json:"claims,omitempty"`
+	Dependencies         []WorkItemID            `json:"dependencies,omitempty"`
+	RetainClaimsForFrame bool                    `json:"retainClaimsForFrame,omitempty"`
+	Ports                []PortPlan              `json:"ports,omitempty"`
+	Input                WorkItemPayload         `json:"input"`
 }
 
 type ProgramTransition struct {
@@ -1307,6 +1311,8 @@ type ProgramTransition struct {
 	Activities              []Activity                 `json:"activities,omitempty"`
 	Frames                  []ProgramFrameIntent       `json:"frames,omitempty"`
 	WorkItems               []WorkItemIntent           `json:"workItems,omitempty"`
+	ForkClaims              []ResourceClaim            `json:"forkClaims,omitempty"`
+	ReleaseFrameClaims      bool                       `json:"releaseFrameClaims,omitempty"`
 	CancelChildPaths        []string                   `json:"cancelChildPaths,omitempty"`
 	CancelChildFrameIDs     []ProgramFrameID           `json:"cancelChildFrameIDs,omitempty"`
 	CancelChildExecutionIDs []ExecutionID              `json:"cancelChildExecutionIDs,omitempty"`

@@ -23,6 +23,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
+const (
+	workflowMCPPortExtensionID     = "io.flexigpt.workflow.ports/v1"
+	workflowMCPPortEnvelopeField   = "_flexigptWorkflow"
+	workflowMCPPortEnvelopeVersion = "v1"
+)
+
 // V3Executor owns MCP Tool discovery adaptation, policy evaluation, approval
 // waits, and invocation for Session Runtime v3. Session retains only durable
 // WorkItem state and generic wait orchestration.
@@ -44,6 +50,18 @@ type v3MCPWait struct {
 	Request           mcpServer.InvokeMCPToolRequestBody
 	ApprovalID        string
 	TargetFingerprint string
+}
+
+type v3MCPWorkflowPortEnvelope struct {
+	Version     string                          `json:"version"`
+	Context     sessionv3Runtime.CanonicalValue `json:"context,omitempty"`
+	PortInputs  []sessionv3Runtime.PortInput    `json:"portInputs,omitempty"`
+	OutputPorts []string                        `json:"outputPorts,omitempty"`
+}
+
+func (v v3MCPWorkflowPortEnvelope) required() bool {
+	return len(v.Context) != 0 ||
+		len(v.PortInputs) != 0
 }
 
 func NewV3Executor(
@@ -350,7 +368,26 @@ func (e *V3Executor) Bind(
 		return sessionv3Runtime.BindResult{}, true, err
 	}
 
-	mapping, invokeRequest, err := v3MappedMCPRequest(payload)
+	mapping, err := v3MCPMapping(payload)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, true, err
+	}
+	envelope := v3MCPWorkflowPortEnvelopeForRequest(
+		request,
+		payload,
+	)
+	if envelope.required() {
+		if err := e.requireWorkflowMCPPortExtension(
+			ctx,
+			mapping.Server,
+		); err != nil {
+			return sessionv3Runtime.BindResult{}, true, err
+		}
+	}
+	mapping, invokeRequest, err := v3MappedMCPRequest(
+		payload,
+		&envelope,
+	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, true, err
 	}
@@ -480,7 +517,11 @@ func (e *V3Executor) Execute(
 
 	effective := *payload
 	effective.Call = private.Call
-	mapping, invokeRequest, err := v3MappedMCPRequest(&effective)
+	envelope := v3MCPWorkflowPortEnvelopeForRequest(
+		request,
+		&effective,
+	)
+	mapping, invokeRequest, err := v3MappedMCPRequest(&effective, &envelope)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
@@ -1062,17 +1103,13 @@ func v3MCPExecutionMode(
 	}
 }
 
-func v3MappedMCPRequest(
+func v3MCPMapping(
 	payload *sessionv3Runtime.ToolWork,
-) (
-	invocation.MappedToolBinding,
-	mcpServer.InvokeMCPToolRequestBody,
-	error,
-) {
+) (invocation.MappedToolBinding, error) {
 	if payload == nil || payload.Call.Binding.MCP == nil {
-		return invocation.MappedToolBinding{},
-			mcpServer.InvokeMCPToolRequestBody{},
-			errors.New("MCP Tool binding is missing")
+		return invocation.MappedToolBinding{}, errors.New(
+			"mcp tool binding is missing",
+		)
 	}
 
 	binding := payload.Call.Binding.MCP
@@ -1086,6 +1123,21 @@ func v3MappedMCPRequest(
 		ExecutionMode:    mcppolicy.MCPExecutionMode(binding.ExecutionMode),
 	}
 	if err := mapping.Validate(); err != nil {
+		return invocation.MappedToolBinding{}, err
+	}
+	return mapping, nil
+}
+
+func v3MappedMCPRequest(
+	payload *sessionv3Runtime.ToolWork,
+	envelope *v3MCPWorkflowPortEnvelope,
+) (
+	invocation.MappedToolBinding,
+	mcpServer.InvokeMCPToolRequestBody,
+	error,
+) {
+	mapping, err := v3MCPMapping(payload)
+	if err != nil {
 		return invocation.MappedToolBinding{},
 			mcpServer.InvokeMCPToolRequestBody{},
 			err
@@ -1101,21 +1153,103 @@ func v3MappedMCPRequest(
 	if err != nil || values == nil {
 		return invocation.MappedToolBinding{},
 			mcpServer.InvokeMCPToolRequestBody{},
-			errors.New("MCP Tool arguments must be a JSON object")
+			errors.New("mcp tool arguments must be a json object")
+	}
+	if envelope != nil && envelope.required() {
+		if _, found := values[workflowMCPPortEnvelopeField]; found {
+			return invocation.MappedToolBinding{},
+				mcpServer.InvokeMCPToolRequestBody{},
+				errors.New("mcp tool arguments reserve workflow port envelope")
+		}
+		encoded, encodeErr := canonicalV3MCPValue(*envelope)
+		if encodeErr != nil {
+			return invocation.MappedToolBinding{},
+				mcpServer.InvokeMCPToolRequestBody{},
+				encodeErr
+		}
+		decoded, decodeErr := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+			encoded,
+		)
+		if decodeErr != nil {
+			return invocation.MappedToolBinding{},
+				mcpServer.InvokeMCPToolRequestBody{},
+				decodeErr
+		}
+		values[workflowMCPPortEnvelopeField] = decoded
 	}
 
 	return mapping, mcpServer.InvokeMCPToolRequestBody{
 		Source:           mcpServer.MCPInvocationSourceModel,
-		ToolName:         binding.ToolName,
-		ProviderToolName: binding.ProviderToolName,
-		ChoiceID:         binding.ChoiceID,
-		ToolDigest:       binding.ToolDigest,
+		ToolName:         mapping.ToolName,
+		ProviderToolName: mapping.ProviderToolName,
+		ChoiceID:         mapping.ChoiceID,
+		ToolDigest:       mapping.ToolDigest,
 		Arguments:        values,
 		ToolUseID: firstNonBlank(
 			payload.Call.ProviderCallID,
 			payload.Call.ID,
 		),
 	}, nil
+}
+
+func (e *V3Executor) requireWorkflowMCPPortExtension(
+	ctx context.Context,
+	serverID mcpServer.ServerID,
+) error {
+	if e == nil || e.runtime == nil {
+		return errors.New("session v3 mcp runtime is unavailable")
+	}
+	status, err := e.runtime.Status(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	if status == nil || status.ServerCapabilities == nil {
+		return errors.New("mcp server does not support workflow port transport")
+	}
+	if _, found := status.ServerCapabilities.Extensions[workflowMCPPortExtensionID]; !found {
+		return errors.New("mcp server does not support workflow port transport")
+	}
+	return nil
+}
+
+func v3MCPWorkflowPortEnvelopeForRequest(
+	request sessionv3Runtime.WorkDispatchRequest,
+	payload *sessionv3Runtime.ToolWork,
+) v3MCPWorkflowPortEnvelope {
+	output := v3MCPWorkflowPortEnvelope{
+		Version:    workflowMCPPortEnvelopeVersion,
+		PortInputs: cloneV3MCPPortInputs(request.WorkItem.PortInputs),
+	}
+	if payload != nil {
+		output.Context = payload.Context.Clone()
+	}
+	for _, plan := range request.WorkItem.Ports {
+		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
+			plan.Stream {
+			output.OutputPorts = append(output.OutputPorts, plan.Name)
+		}
+	}
+	return output
+}
+
+func cloneV3MCPPortInputs(
+	values []sessionv3Runtime.PortInput,
+) []sessionv3Runtime.PortInput {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make([]sessionv3Runtime.PortInput, len(values))
+	for index := range values {
+		output[index] = values[index]
+		output[index].Values = make(
+			[]sessionv3Runtime.CanonicalValue,
+			len(values[index].Values),
+		)
+		for valueIndex := range values[index].Values {
+			output[index].Values[valueIndex] = values[index].Values[valueIndex].Clone()
+		}
+	}
+	return output
 }
 
 func canonicalV3MCPValue(

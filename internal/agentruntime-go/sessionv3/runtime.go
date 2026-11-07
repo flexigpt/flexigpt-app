@@ -1137,63 +1137,28 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 				execution.ID,
 				firstText(command.Reason, "execution was cancelled"),
 			)
+			rootFrames := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
 			for index := range execution.WorkItems {
-				item := &execution.WorkItems[index]
-				if item.Cleanup {
-					continue
-				}
-				switch item.State {
-				case WorkItemStateReady, WorkItemStateBinding, WorkItemStateWaiting:
-					if cancel := r.cancels[item.ID]; cancel != nil {
-						cancel()
-						delete(r.cancels, item.ID)
-					}
-					item.State = WorkItemStateCancelled
-					item.UpdatedAt = now
-					released := r.releaseWorkResourcesLocked(
-						execution,
-						item.ID,
-					)
-					r.wakeResourceWaitersLocked(
-						execution,
-						released,
-					)
-				case WorkItemStateResourceWaiting:
-					r.cancelResourceWaitLocked(item.ID)
-					item.State = WorkItemStateCancelled
-					item.UpdatedAt = now
-				case WorkItemStateRetryWaiting:
-					r.cancelRetryLocked(item.ID)
-					item.State = WorkItemStateCancelled
-					item.UpdatedAt = now
-				case WorkItemStateDispatched:
-					if cancel := r.cancels[item.ID]; cancel != nil {
-						cancel()
-						delete(r.cancels, item.ID)
-					}
-				case WorkItemStateCompleted,
-					WorkItemStateFailed,
-					WorkItemStateUncertain,
-					WorkItemStateCancelled,
-					WorkItemStateBlocked:
-					// Terminal or blocked; no action.
-				default:
-				}
-			}
-			for index := range execution.Waits {
-				wait := &execution.Waits[index]
-				if wait.Status == WaitStatusPending || wait.Status == WaitStatusResolving {
-					wait.Status = WaitStatusCancelled
-					wait.UpdatedAt = now
-					r.cancelWaitDeadlineLocked(wait.ID)
-				}
+				r.cancelFrameWorkItemLocked(
+					execution,
+					&execution.WorkItems[index],
+					now,
+				)
 			}
 			for _, frame := range execution.ProgramFrames {
-				if !frame.Status.Terminal() {
-					if workflowFrameRunsCleanup(frame) {
-						continue
-					}
-					_ = r.advanceFrameLocked(session, execution, frame.ID, ProgramEvent{Kind: ProgramEventCancelled})
+				if frame.ParentFrameID == "" &&
+					!frame.Status.Terminal() &&
+					!workflowFrameRunsCleanup(frame) {
+					rootFrames = append(rootFrames, frame.ID)
+				}
+			}
+			for _, frameID := range rootFrames {
+				if err := r.cancelFrameTreeLocked(
+					session,
+					execution,
+					frameID,
+				); err != nil {
+					return nil, err
 				}
 			}
 			if !hasDispatched(*execution) &&
@@ -1946,6 +1911,7 @@ func (r *Runtime) advanceFrameLocked(
 			frame,
 			transition.Frames,
 			transition.ContinueParent,
+			transition.ForkClaims,
 		); err != nil {
 			return err
 		}
@@ -1971,20 +1937,21 @@ func (r *Runtime) advanceFrameLocked(
 				[]ResourceClaim(nil),
 				intent.Claims...,
 			),
-			ProgramPath:        intent.ProgramPath,
-			Deadline:           earlierDeadline(frame.Deadline, intent.Deadline),
-			Effect:             intent.Effect,
-			Retry:              cloneWorkflowRetryPolicy(intent.Retry),
-			Automatic:          intent.Automatic,
-			Dependencies:       append([]WorkItemID(nil), intent.Dependencies...),
-			Budget:             itemBudget,
-			Cleanup:            intent.Cleanup,
-			SagaID:             intent.SagaID,
-			CompensationPolicy: intent.CompensationPolicy,
-			Ports:              bindWorkPortPlans(intent.Ports, frame.ID),
-			Input:              intent.Input,
-			CreatedAt:          now,
-			UpdatedAt:          now,
+			ProgramPath:          intent.ProgramPath,
+			Deadline:             earlierDeadline(frame.Deadline, intent.Deadline),
+			Effect:               intent.Effect,
+			Retry:                cloneWorkflowRetryPolicy(intent.Retry),
+			Automatic:            intent.Automatic,
+			Dependencies:         append([]WorkItemID(nil), intent.Dependencies...),
+			Budget:               itemBudget,
+			Cleanup:              intent.Cleanup,
+			SagaID:               intent.SagaID,
+			CompensationPolicy:   intent.CompensationPolicy,
+			RetainClaimsForFrame: intent.RetainClaimsForFrame,
+			Ports:                bindWorkPortPlans(intent.Ports, frame.ID),
+			Input:                intent.Input,
+			CreatedAt:            now,
+			UpdatedAt:            now,
 		}
 		if item.ID == "" {
 			item.ID = WorkItemID(r.newID())
@@ -2077,6 +2044,11 @@ func (r *Runtime) advanceFrameLocked(
 		return err
 	}
 	if transition.ContinueParent {
+		if transition.ReleaseFrameClaims {
+			released := r.releaseFrameResourcesLocked(execution, frame.ID)
+			r.wakeResourceWaitersLocked(execution, released)
+		}
+
 		frame = mutableFrame(execution, frameID)
 		if frame == nil {
 			return errors.New(
@@ -2106,6 +2078,14 @@ func (r *Runtime) advanceFrameLocked(
 	}
 	if frame.Status.Terminal() && frame.HandoffID != "" {
 		r.settleConversationHandoffLocked(session, frame.HandoffID)
+	}
+	if frame.Status.Terminal() {
+		released := r.releaseFrameResourcesLocked(execution, frame.ID)
+		r.wakeResourceWaitersLocked(execution, released)
+	}
+	if transition.ReleaseFrameClaims && !frame.Status.Terminal() {
+		released := r.releaseFrameResourcesLocked(execution, frame.ID)
+		r.wakeResourceWaitersLocked(execution, released)
 	}
 	if frame.Status.Terminal() {
 		if err := r.deliverFramePortsLocked(session, execution, frame); err != nil {
@@ -2913,9 +2893,19 @@ func (r *Runtime) finishWorkLocked(
 		item.State = WorkItemStateFailed
 		item.Error = portPlanError("effect_record_failed", err.Error())
 	}
+
 	if item.State.Terminal() {
-		released := r.releaseWorkResourcesLocked(execution, item.ID)
-		r.wakeResourceWaitersLocked(execution, released)
+		if item.RetainClaimsForFrame &&
+			item.State == WorkItemStateCompleted {
+			r.transferWorkResourcesToFrameLocked(
+				execution,
+				item.ID,
+				item.FrameID,
+			)
+		} else {
+			released := r.releaseWorkResourcesLocked(execution, item.ID)
+			r.wakeResourceWaitersLocked(execution, released)
+		}
 		r.cancelResourceWaitLocked(item.ID)
 	}
 
@@ -3229,13 +3219,9 @@ func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {
 	}
 
 	if execution.Controls.CancellationRequested {
-		if execution.Cleanup.Active {
-			for _, item := range execution.WorkItems {
-				if item.Cleanup && !item.State.Terminal() {
-					execution.State = ExecutionStateRunning
-					return
-				}
-			}
+		if hasOutstandingCleanup(*execution) {
+			execution.State = ExecutionStateRunning
+			return
 		}
 		execution.State = ExecutionStateCancelling
 		return

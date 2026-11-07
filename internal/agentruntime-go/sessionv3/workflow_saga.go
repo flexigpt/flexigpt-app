@@ -147,6 +147,11 @@ func (i *WorkflowInterpreter) startSaga(
 		return workflowFailure(state, "workflow_saga_invalid", err.Error())
 	}
 
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
+	}
+
 	id := string(frame.ID) + ":" + path + ":saga"
 	scope := WorkflowScopeContext{
 		Saga: &WorkflowSagaScope{
@@ -175,6 +180,7 @@ func (i *WorkflowInterpreter) startSaga(
 		Kind:   WorkflowPendingSaga,
 		StepID: step.ID,
 		Path:   path,
+		Claims: claims,
 		Children: []WorkflowChild{{
 			Name:  "body",
 			Path:  bodyPath,
@@ -627,6 +633,7 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 			)
 			return transition
 		}
+		workflowReleasePendingClaims(&state, pending)
 		state.Pending = nil
 		state.Index++
 		state.PendingPath = ""

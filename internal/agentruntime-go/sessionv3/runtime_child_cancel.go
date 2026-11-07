@@ -326,63 +326,40 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 	now := r.now()
 	execution.Controls.CancellationRequested = true
 	execution.State = ExecutionStateCancelling
+	r.beginCleanupLocked(
+		execution,
+		&SanitizedError{
+			Code:     "execution_cancelled",
+			Category: ErrorCategoryCancellation,
+			Message:  firstText(reason, "execution was cancelled"),
+		},
+	)
+
 	for index := range execution.WorkItems {
-		item := &execution.WorkItems[index]
-		if item.Cleanup {
-			continue
-		}
-		switch item.State {
-		case WorkItemStateReady,
-			WorkItemStateBinding,
-			WorkItemStateWaiting:
-			if cancel := r.cancels[item.ID]; cancel != nil {
-				cancel()
-				delete(r.cancels, item.ID)
-			}
-			item.State = WorkItemStateCancelled
-			item.CompletedAt = &now
-			r.cancelResourceWaitLocked(item.ID)
-			released := r.releaseWorkResourcesLocked(execution, item.ID)
-			r.wakeResourceWaitersLocked(execution, released)
-			item.UpdatedAt = now
-		case WorkItemStateResourceWaiting:
-			r.cancelResourceWaitLocked(item.ID)
-			item.State = WorkItemStateCancelled
-			item.CompletedAt = &now
-			item.UpdatedAt = now
-		case WorkItemStateRetryWaiting:
-			r.cancelRetryLocked(item.ID)
-			item.State = WorkItemStateCancelled
-			item.CompletedAt = &now
-			item.UpdatedAt = now
-		case WorkItemStateDispatched:
-			if cancel := r.cancels[item.ID]; cancel != nil {
-				cancel()
-				delete(r.cancels, item.ID)
-			}
-		default:
-		}
+		r.cancelFrameWorkItemLocked(
+			execution,
+			&execution.WorkItems[index],
+			now,
+		)
 	}
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
-		if wait.Status != WaitStatusPending && wait.Status != WaitStatusResolving {
-			continue
-		}
-		wait.Status = WaitStatusCancelled
-		wait.UpdatedAt = now
-		r.cancelWaitDeadlineLocked(wait.ID)
-		delete(r.privateWaits, wait.ID)
-	}
+
+	rootFrames := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
 	for _, frame := range execution.ProgramFrames {
-		if frame.Status.Terminal() || workflowFrameRunsCleanup(frame) {
+		if frame.ParentFrameID != "" ||
+			frame.Status.Terminal() ||
+			workflowFrameRunsCleanup(frame) {
 			continue
 		}
-		_ = r.advanceFrameLocked(
+		rootFrames = append(rootFrames, frame.ID)
+	}
+	for _, frameID := range rootFrames {
+		if err := r.cancelFrameTreeLocked(
 			session,
 			execution,
-			frame.ID,
-			ProgramEvent{Kind: ProgramEventCancelled},
-		)
+			frameID,
+		); err != nil {
+			return
+		}
 	}
 	if hasDispatched(*execution) {
 		r.touchExecutionLocked(session, execution)

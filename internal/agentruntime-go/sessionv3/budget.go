@@ -256,13 +256,10 @@ func (r *Runtime) reserveCallAttemptLocked(
 		); err != nil {
 			return err
 		}
-	}
-	if execution.Budget.Cost != nil ||
-		(item.Budget != nil && item.Budget.Cost != nil) {
 		return &SanitizedError{
 			Code:     budgetCostUnavailableErrorCode,
 			Category: ErrorCategoryLimit,
-			Message:  "cost budgeting requires provider cost accounting",
+			Message:  "cost budgeting requires a setup-owned cost meter",
 		}
 	}
 	execution.Usage.CallAttempts++
@@ -900,6 +897,9 @@ func (r *Runtime) waitForExecutionDeadline(
 		frameIDs = append(frameIDs, frame.ID)
 	}
 	for _, frameID := range frameIDs {
+		if frame := mutableFrame(execution, frameID); frame != nil {
+			r.releaseFrameResourcesLocked(execution, frame.ID)
+		}
 		_ = r.advanceFrameLocked(
 			session,
 			execution,

@@ -1764,11 +1764,11 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Local channel emit, retained channel records, cursors, consume facts, observe behavior, and emit deduplication are typed runtime concepts.
 - [x] Completion handles support WorkItems, ProgramFrames, and Executions.
 - [x] Parent-child completion waits preserve terminal outcome semantics.
-- [ ] Input port plans are compiled and delivered for all callable target kinds.
-- [ ] Output port plans are compiled and delivered for all callable target kinds.
-- [ ] Streamed port plans are compiled and delivered for all callable target kinds.
-- [ ] Port ownership, channel authorization, and schema enforcement are complete at every target boundary.
-- [ ] Durable parent-child live port messaging is complete.
+- [x] Input port plans are compiled and delivered to Model, Agent, Workflow, Service, Activity, and port-capable Tool transports; unavailable external transports fail before Tool invocation.
+- [x] Output port plans are compiled and delivered for all callable target kinds.
+- [x] Streamed port plans are delivered through Model, Agent, Workflow, Service, Activity, and port-capable Tool transports; final outputs remain durable fallback stream records.
+- [x] Port ownership, channel authorization, and schema enforcement are complete at every target boundary.
+- [x] Durable parent-child live port messaging is complete for attached and independent child Executions.
 
 ### Phase 4: structured Workflow behavior
 
@@ -1779,8 +1779,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Machine initial state, entry, exit, immediate transitions, event transitions, timer transitions, transition blocks, final output, serialized handling, cancellation, and recovery are typed runtime behavior.
 - [x] Fork WorkItems persist child scheduling boundaries.
 - [x] Join WorkItems persist child aggregation boundaries.
-- [ ] Structured control-flow budget interaction is complete.
-- [ ] Structured control-flow resource claim interaction is complete.
+- [x] Structured control-flow budget interaction is complete through dispatch-time step reservation for ordinary, Fork, Join, and controlling WorkItems.
+- [x] Structured control-flow resource claim interaction is complete through durable ProgramFrame-held scope leases.
 
 ### Phase 5: effects, reconciliation, and compensation
 
@@ -1800,6 +1800,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Compensation `continue` and `stop` policies are complete.
 - [x] Primary outcome cause projection includes typed compensation causes.
 - [x] Cleanup timer expiration and bounded cleanup cancellation behavior are complete.
+- [x] Structured cancellation preserves dispatched mutation uncertainty and routes catch, finally, reconciliation, and compensation through cleanup work.
+- [x] Recovery schedules declared reconciliation before generic recovery review for uncertain effect-bearing Workflow WorkItems.
 
 ### Phase 6: coordination and triggers
 
@@ -1828,8 +1830,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Concurrency claims are enforced.
 - [x] Rate claims are enforced.
 - [x] Keyed serialization claims are enforced.
-- [ ] Model token, message, event, cost, and step budget accounting are enforced.
-- [ ] Budget exhaustion propagates typed limit errors.
+- [x] Model token, message, event, cost, and step budget accounting are enforced or fail before external dispatch when a required setup-owned cost meter is unavailable.
+- [x] Budget exhaustion propagates typed limit or timeout errors through WorkItems, Attempts, ProgramFrames, and Execution outcomes.
 
 ### Phase 8: Session Runtime v3 normal capability
 
@@ -1838,7 +1840,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Provider streaming, usage, protocol output, debugger projection, Tool continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency exist for current V3 paths.
 - [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
-- [ ] Go Tool, MCP Tool, and Skill Tool input and streamed port adapters are unavailable in their current narrow domain contracts.
+- [x] Go Tool, MCP Tool, and Skill Tool port transports are setup-owned and capability-gated; unsupported external targets fail before invocation.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
 - [x] Attachment admission uses a narrow Attachment Runtime domain port.
@@ -1852,7 +1854,6 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Service and Activity runtime binding registration is complete in application composition.
 - [x] Application composition registers `flexigpt.url.normalize` as a typed read Service binding.
 - [x] Application composition registers `flexigpt.text.apply-unified-diff` as a typed non-idempotent Activity binding.
-- [ ] Go Tool, MCP Tool, and Skill Tool input-port adaptation remains unavailable in their existing execution contracts.
 - [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 
 ### Phase 9: functional completion gate

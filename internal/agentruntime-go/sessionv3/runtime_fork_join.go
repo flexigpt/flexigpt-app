@@ -14,6 +14,7 @@ func (r *Runtime) deferFrameForkLocked(
 	frame *ProgramFrame,
 	intents []ProgramFrameIntent,
 	continueParent bool,
+	claims []ResourceClaim,
 ) error {
 	if execution == nil || frame == nil {
 		return errors.New("fork boundary owner is unavailable")
@@ -61,14 +62,16 @@ func (r *Runtime) deferFrameForkLocked(
 	workID := WorkItemID(r.newID())
 	now := r.now()
 	work := WorkItem{
-		ID:          workID,
-		FrameID:     frame.ID,
-		Type:        WorkItemTypeFork,
-		State:       WorkItemStateReady,
-		ProgramPath: frame.Path + "/fork",
-		Effect:      EffectContract{Kind: EffectKindRead},
-		Automatic:   true,
-		Cleanup:     cleanup,
+		ID:                   workID,
+		FrameID:              frame.ID,
+		Type:                 WorkItemTypeFork,
+		State:                WorkItemStateReady,
+		Claims:               append([]ResourceClaim(nil), claims...),
+		ProgramPath:          frame.Path + "/fork",
+		Effect:               EffectContract{Kind: EffectKindRead},
+		Automatic:            true,
+		Cleanup:              cleanup,
+		RetainClaimsForFrame: len(claims) != 0,
 		Input: WorkItemPayload{
 			Fork: &ForkWork{
 				ChildFrames: append([]ProgramFrameID(nil), childIDs...),

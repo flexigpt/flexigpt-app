@@ -23,16 +23,18 @@ type Service struct {
 	lifecycleMu sync.RWMutex
 	catalogMu   sync.Mutex
 
-	closed     bool // Guarded by lifecycleMu.
-	catalogs   map[CatalogID]catalogView
-	registered map[provider.SkillDef]string
-	generation map[CatalogID]uint64
+	closed                          bool // Guarded by lifecycleMu.
+	catalogs                        map[CatalogID]catalogView
+	registered                      map[provider.SkillDef]string
+	generation                      map[CatalogID]uint64
+	workflowToolInvocationSupported bool
 }
 
 type options struct {
-	agentRuntime      *agentskillsRuntime.Runtime
-	catalogSource     CatalogSource
-	runScriptsEnabled bool
+	agentRuntime                    *agentskillsRuntime.Runtime
+	catalogSource                   CatalogSource
+	runScriptsEnabled               bool
+	workflowToolInvocationSupported bool
 }
 
 type Option func(*options) error
@@ -64,6 +66,13 @@ func WithRunScripts(enabled bool) Option {
 	}
 }
 
+func WithWorkflowToolInvocationSupport(enabled bool) Option {
+	return func(options *options) error {
+		options.workflowToolInvocationSupported = enabled
+		return nil
+	}
+}
+
 func New(opts ...Option) (*Service, error) {
 	cfg := options{}
 	for _, option := range opts {
@@ -91,17 +100,27 @@ func New(opts ...Option) (*Service, error) {
 	}
 
 	return &Service{
-		agentRuntime:  cfg.agentRuntime,
-		catalogSource: cfg.catalogSource,
-		catalogs:      map[CatalogID]catalogView{},
-		registered:    map[provider.SkillDef]string{},
-		generation:    map[CatalogID]uint64{},
+		agentRuntime:                    cfg.agentRuntime,
+		catalogSource:                   cfg.catalogSource,
+		catalogs:                        map[CatalogID]catalogView{},
+		registered:                      map[provider.SkillDef]string{},
+		generation:                      map[CatalogID]uint64{},
+		workflowToolInvocationSupported: cfg.workflowToolInvocationSupported,
 	}, nil
 }
 
 func (s *Service) SupportsRunScript() bool {
 	value, err := s.readyAgentRuntime()
 	return err == nil && value.SupportsRunScript()
+}
+
+func (s *Service) SupportsWorkflowToolInvocation() bool {
+	if s == nil {
+		return false
+	}
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
+	return !s.closed && s.workflowToolInvocationSupported
 }
 
 func (s *Service) NewSession(

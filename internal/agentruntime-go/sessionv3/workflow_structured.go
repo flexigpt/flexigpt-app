@@ -294,6 +294,8 @@ type WorkflowPending struct {
 	StepID         string                          `json:"stepID"`
 	Path           string                          `json:"path"`
 	MergeState     bool                            `json:"mergeState,omitempty"`
+	Claims         []ResourceClaim                 `json:"claims,omitempty"`
+	ClaimsBound    bool                            `json:"claimsBound,omitempty"`
 	Children       []WorkflowChild                 `json:"children,omitempty"`
 	Parallel       *WorkflowParallelProgress       `json:"parallel,omitempty"`
 	Foreach        *WorkflowForeachProgress        `json:"foreach,omitempty"`
@@ -349,6 +351,11 @@ func (p WorkflowPending) Validate() error {
 		return errors.New("Workflow pending control kind is invalid")
 	}
 
+	for _, claim := range p.Claims {
+		if err := claim.Validate(); err != nil {
+			return err
+		}
+	}
 	seen := make(map[string]struct{}, len(p.Children))
 	for _, child := range p.Children {
 		if strings.TrimSpace(child.Name) == "" {
@@ -436,13 +443,25 @@ func workflowStructuredTransition(
 	state WorkflowState,
 	frames []ProgramFrameIntent,
 ) (ProgramTransition, error) {
+	forkClaims := []ResourceClaim(nil)
+	if state.Pending != nil &&
+		!state.Pending.ClaimsBound &&
+		len(state.Pending.Claims) != 0 &&
+		len(frames) != 0 {
+		forkClaims = append(
+			forkClaims,
+			state.Pending.Claims...,
+		)
+		state.Pending.ClaimsBound = true
+	}
 	next, err := encodeWorkflowProgramState(state)
 	if err != nil {
 		return ProgramTransition{}, err
 	}
 	return ProgramTransition{
-		State:  next,
-		Frames: frames,
+		State:      next,
+		Frames:     frames,
+		ForkClaims: forkClaims,
 	}, nil
 }
 
@@ -551,6 +570,11 @@ func (i *WorkflowInterpreter) startSingleChild(
 	index *int,
 	result *CanonicalValue,
 ) (ProgramTransition, error) {
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
+	}
+
 	snapshot, err := i.childBlockProgram(
 		frame,
 		program,
@@ -571,6 +595,7 @@ func (i *WorkflowInterpreter) startSingleChild(
 		StepID:     step.ID,
 		Path:       path,
 		MergeState: mergeState,
+		Claims:     claims,
 		Children: []WorkflowChild{{
 			Name:  childName,
 			Path:  childPath,
@@ -696,10 +721,16 @@ func (i *WorkflowInterpreter) startParallel(
 		return workflowFailure(state, "workflow_parallel_invalid", "Workflow parallel is missing")
 	}
 
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
+	}
+
 	pending := &WorkflowPending{
 		Kind:   WorkflowPendingParallel,
 		StepID: step.ID,
 		Path:   path,
+		Claims: claims,
 		Parallel: &WorkflowParallelProgress{
 			Completion: step.Parallel.Completion,
 			Errors:     step.Parallel.Errors,
@@ -779,6 +810,11 @@ func (i *WorkflowInterpreter) startForeach(
 		return workflowFailure(state, "workflow_foreach_invalid", "Workflow foreach is missing")
 	}
 
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
+	}
+
 	value, err := i.evaluate(step.Foreach.Items, program, state)
 	if err != nil {
 		return workflowFailure(state, "workflow_foreach_items_invalid", err.Error())
@@ -825,6 +861,7 @@ func (i *WorkflowInterpreter) startForeach(
 		Kind:   WorkflowPendingForeach,
 		StepID: step.ID,
 		Path:   path,
+		Claims: claims,
 		Foreach: &WorkflowForeachProgress{
 			Items:       append([]CanonicalValue(nil), items...),
 			Outcomes:    outcomes,
@@ -846,6 +883,11 @@ func (i *WorkflowInterpreter) startRepeat(
 ) (ProgramTransition, error) {
 	if step.Repeat == nil {
 		return workflowFailure(state, "workflow_repeat_invalid", "Workflow repeat is missing")
+	}
+
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
 	}
 
 	progress := &WorkflowRepeatProgress{
@@ -904,6 +946,7 @@ func (i *WorkflowInterpreter) startRepeat(
 		Kind:   WorkflowPendingRepeat,
 		StepID: step.ID,
 		Path:   path,
+		Claims: claims,
 		Repeat: progress,
 	}
 	return i.drivePending(frame, Execution{}, program, state)
@@ -1328,6 +1371,7 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 	}); err != nil {
 		return err
 	}
+	workflowReleasePendingClaims(state, pending)
 	state.Pending = nil
 	state.Index++
 	return nil
@@ -1565,6 +1609,7 @@ func (i *WorkflowInterpreter) finishParallel(
 	}); err != nil {
 		return err
 	}
+	workflowReleasePendingClaims(state, pending)
 	state.Pending = nil
 	state.Index++
 	return nil
@@ -1808,6 +1853,7 @@ func (i *WorkflowInterpreter) finishForeach(
 	}); err != nil {
 		return err
 	}
+	workflowReleasePendingClaims(state, state.Pending)
 	state.Pending = nil
 	state.Index++
 	return nil
@@ -1963,6 +2009,7 @@ func (i *WorkflowInterpreter) finishRepeat(
 	}); err != nil {
 		return err
 	}
+	workflowReleasePendingClaims(state, state.Pending)
 	state.Pending = nil
 	state.Index++
 	return nil
@@ -2218,4 +2265,14 @@ func (r WorkflowRepeat) Validate() error {
 		return err
 	}
 	return r.Do.Validate()
+}
+
+func workflowReleasePendingClaims(
+	state *WorkflowState,
+	pending *WorkflowPending,
+) {
+	if state == nil || pending == nil || !pending.ClaimsBound {
+		return
+	}
+	state.ReleaseFrameClaims = true
 }

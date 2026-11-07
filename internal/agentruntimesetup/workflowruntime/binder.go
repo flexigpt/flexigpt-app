@@ -242,6 +242,9 @@ func bindExternal(
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+	if err := requireExternalPortCapabilities(binding, request.WorkItem, domainRequest); err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
 	semantic, private, err := binding.Bind(ctx, domainRequest)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
@@ -417,6 +420,50 @@ func cloneExternalPortPlans(
 		output[index].ChannelSchema = values[index].ChannelSchema.Clone()
 	}
 	return output
+}
+
+func requireExternalPortCapabilities(
+	binding WorkBinding,
+	item sessionv3Runtime.WorkItem,
+	request WorkBindingRequest,
+) error {
+	needsContext := len(request.Context) != 0
+	needsInputPorts := len(request.Ports) != 0
+	needsOutputStream := false
+	for _, plan := range item.Ports {
+		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
+			plan.Stream {
+			needsOutputStream = true
+			break
+		}
+	}
+	if !needsContext && !needsInputPorts && !needsOutputStream {
+		return nil
+	}
+
+	capability, found := binding.(WorkBindingPortCapability)
+	if !found {
+		return errors.New(
+			"external binding does not support workflow port transport",
+		)
+	}
+	support := capability.WorkflowPortCapabilities()
+	switch {
+	case needsContext && !support.Context:
+		return errors.New(
+			"external binding does not support workflow context",
+		)
+	case needsInputPorts && !support.InputPorts:
+		return errors.New(
+			"external binding does not support workflow input ports",
+		)
+	case needsOutputStream && !support.OutputStream:
+		return errors.New(
+			"external binding does not support workflow output streams",
+		)
+	default:
+		return nil
+	}
 }
 
 func cloneExternalPortInputs(

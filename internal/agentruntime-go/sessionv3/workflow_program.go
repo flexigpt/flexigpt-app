@@ -278,6 +278,8 @@ type WorkflowState struct {
 	Subscriptions       []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
 	CancelChildPaths    []string                     `json:"cancelChildPaths,omitempty"`
 	CancelWorkItemIDs   []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
+	ReleaseFrameClaims  bool                         `json:"releaseFrameClaims,omitempty"`
+	CancellationPending bool                         `json:"cancellationPending,omitempty"`
 	Terminal            *WorkflowTerminalState       `json:"terminal,omitempty"`
 	Saga                *WorkflowSagaScope           `json:"saga,omitempty"`
 	TargetSets          []WorkflowTargetSetState     `json:"targetSets,omitempty"`
@@ -578,6 +580,16 @@ func (i *WorkflowInterpreter) Advance(
 			}
 			return sagaTransition, nil
 		}
+		if state.Pending != nil &&
+			state.Pending.Kind == WorkflowPendingReconciliation {
+			state.CancellationPending = true
+			return i.driveReconciliation(
+				frame,
+				execution,
+				program,
+				state,
+			)
+		}
 		status := ProgramFrameStateCancelled
 		transition, err = workflowTransition(
 			state,
@@ -806,6 +818,20 @@ func (i *WorkflowInterpreter) drive(
 	program WorkflowProgram,
 	state WorkflowState,
 ) (ProgramTransition, error) {
+	if state.CancellationPending && state.Pending == nil {
+		status := ProgramFrameStateCancelled
+		transition, err := workflowTransition(
+			state,
+			&status,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return ProgramTransition{}, err
+		}
+		transition.Error = workflowTerminalFailure(status, nil)
+		return transition, nil
+	}
 	if state.Pending != nil {
 		return i.drivePending(frame, execution, program, state)
 	}
@@ -2633,6 +2659,21 @@ func workflowTransition(
 	output CanonicalValue,
 	work []WorkItemIntent,
 ) (ProgramTransition, error) {
+	releaseClaims := state.ReleaseFrameClaims
+	state.ReleaseFrameClaims = false
+
+	if state.Pending != nil &&
+		!state.Pending.ClaimsBound &&
+		len(state.Pending.Claims) != 0 &&
+		len(work) != 0 {
+		work[0].Claims = append(
+			work[0].Claims,
+			state.Pending.Claims...,
+		)
+		work[0].RetainClaimsForFrame = true
+		state.Pending.ClaimsBound = true
+	}
+
 	cancelPaths := append([]string(nil), state.CancelChildPaths...)
 	cancelWork := append([]WorkItemID(nil), state.CancelWorkItemIDs...)
 	state.CancelChildPaths = nil
@@ -2642,12 +2683,13 @@ func workflowTransition(
 		return ProgramTransition{}, err
 	}
 	return ProgramTransition{
-		State:             next,
-		Status:            status,
-		Output:            output.Clone(),
-		WorkItems:         work,
-		CancelChildPaths:  cancelPaths,
-		CancelWorkItemIDs: cancelWork,
+		State:              next,
+		Status:             status,
+		Output:             output.Clone(),
+		WorkItems:          work,
+		ReleaseFrameClaims: releaseClaims,
+		CancelChildPaths:   cancelPaths,
+		CancelWorkItemIDs:  cancelWork,
 	}, nil
 }
 

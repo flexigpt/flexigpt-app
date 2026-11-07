@@ -368,6 +368,50 @@ func (r *Runtime) releaseWorkResourcesLocked(
 	return output
 }
 
+func (r *Runtime) transferWorkResourcesToFrameLocked(
+	execution *Execution,
+	workItemID WorkItemID,
+	frameID ProgramFrameID,
+) {
+	if execution == nil || workItemID == "" || frameID == "" {
+		return
+	}
+	for index := range execution.ResourceLeases {
+		lease := &execution.ResourceLeases[index]
+		if lease.WorkItemID != workItemID {
+			continue
+		}
+		lease.WorkItemID = ""
+		lease.FrameID = frameID
+	}
+}
+
+func (r *Runtime) releaseFrameResourcesLocked(
+	execution *Execution,
+	frameID ProgramFrameID,
+) []string {
+	if execution == nil || frameID == "" {
+		return nil
+	}
+
+	released := make(map[string]struct{})
+	next := execution.ResourceLeases[:0]
+	for _, lease := range execution.ResourceLeases {
+		if lease.FrameID == frameID {
+			released[lease.Resource] = struct{}{}
+			continue
+		}
+		next = append(next, lease)
+	}
+	execution.ResourceLeases = next
+
+	output := make([]string, 0, len(released))
+	for resource := range released {
+		output = append(output, resource)
+	}
+	return output
+}
+
 func (r *Runtime) wakeResourceWaitersLocked(
 	execution *Execution,
 	released []string,
@@ -545,7 +589,9 @@ func normalizeRecoveredResources(
 	if execution == nil {
 		return
 	}
+
 	active := make(map[WorkItemID]struct{}, len(execution.WorkItems))
+	activeFrames := make(map[ProgramFrameID]struct{}, len(execution.ProgramFrames))
 	for _, item := range execution.WorkItems {
 		switch item.State {
 		case WorkItemStateBinding,
@@ -555,10 +601,19 @@ func normalizeRecoveredResources(
 		default:
 		}
 	}
+	for _, frame := range execution.ProgramFrames {
+		if !frame.Status.Terminal() {
+			activeFrames[frame.ID] = struct{}{}
+		}
+	}
 
 	leases := execution.ResourceLeases[:0]
 	for _, lease := range execution.ResourceLeases {
 		if _, found := active[lease.WorkItemID]; found {
+			leases = append(leases, lease)
+			continue
+		}
+		if _, found := activeFrames[lease.FrameID]; found {
 			leases = append(leases, lease)
 		}
 	}

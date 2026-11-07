@@ -178,6 +178,18 @@ func (b *Binder) executeLLM(
 		},
 	)
 	if err != nil {
+		var typed *sessionv3Runtime.SanitizedError
+		if errors.As(err, &typed) && typed != nil {
+			value := *typed
+			value.Details = typed.Details.Clone()
+			value.Causes = append(
+				[]sessionv3Runtime.SanitizedError(nil),
+				typed.Causes...,
+			)
+			return sessionv3Runtime.WorkExecutionResult{
+				Error: &value,
+			}, nil
+		}
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{Code: "completion_failed", Message: err.Error()},
 		}, nil

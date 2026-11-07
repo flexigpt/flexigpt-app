@@ -31,11 +31,6 @@ func (b *Binder) bindTool(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("tool payload is missing")
 	}
-	if len(payload.Context) != 0 {
-		return sessionv3Runtime.BindResult{}, errors.New(
-			"tool context adaptation is unavailable",
-		)
-	}
 
 	call := payload.Call
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindUnresolved {
@@ -103,6 +98,7 @@ func (b *Binder) bindTool(
 		}
 		semantic, err := b.goTools.BindGo(
 			ctx,
+			effectiveRequest,
 			effectiveRequest.WorkItem.Input.Tool,
 		)
 		if err != nil {
@@ -188,7 +184,11 @@ func (b *Binder) executeTool(
 				"session v3 Tool runtime is unavailable",
 			)
 		}
-		result, executeErr := b.goTools.ExecuteGo(ctx, payload)
+		result, executeErr := b.goTools.ExecuteGo(
+			ctx,
+			effectiveRequest,
+			payload,
+		)
 		if executeErr != nil {
 			return sessionv3Runtime.WorkExecutionResult{}, executeErr
 		}
@@ -325,6 +325,19 @@ func toolPortStreamFailure(
 	result sessionv3Runtime.WorkExecutionResult,
 	cause error,
 ) sessionv3Runtime.WorkExecutionResult {
+	var typed *sessionv3Runtime.SanitizedError
+	if errors.As(cause, &typed) && typed != nil {
+		value := *typed
+		value.Details = typed.Details.Clone()
+		value.Causes = append(
+			[]sessionv3Runtime.SanitizedError(nil),
+			typed.Causes...,
+		)
+		result.Error = &value
+		result.Confirmed = false
+		return result
+	}
+
 	message := "tool streamed port delivery failed"
 	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
 		message = strings.ToLower(cause.Error())

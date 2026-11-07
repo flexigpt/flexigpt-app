@@ -351,6 +351,20 @@ func (i *WorkflowInterpreter) settleReconciliationReview(
 
 	switch review.Resolution {
 	case WaitResolutionContinue:
+		if state.CancellationPending {
+			status := ProgramFrameStateCancelled
+			transition, err := workflowTransition(
+				state,
+				&status,
+				nil,
+				nil,
+			)
+			if err != nil {
+				return ProgramTransition{}, true, err
+			}
+			transition.Error = workflowTerminalFailure(status, nil)
+			return transition, true, nil
+		}
 		t, err := workflowFailureTransition(state, failure)
 		if err != nil {
 			return ProgramTransition{}, true, err

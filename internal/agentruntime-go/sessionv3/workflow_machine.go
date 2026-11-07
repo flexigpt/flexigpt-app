@@ -321,6 +321,11 @@ func (i *WorkflowInterpreter) startMachine(
 		)
 	}
 
+	claims, err := i.workflowResourceClaims(program, state, step)
+	if err != nil {
+		return workflowFailure(state, "workflow_resource_claim_invalid", err.Error())
+	}
+
 	machineState := state.State.Clone()
 	localState := step.Machine.State != nil
 	if step.Machine.State != nil {
@@ -372,6 +377,7 @@ func (i *WorkflowInterpreter) startMachine(
 		Kind:   WorkflowPendingMachine,
 		StepID: step.ID,
 		Path:   path,
+		Claims: claims,
 		Machine: &WorkflowMachineProgress{
 			Current:            step.Machine.Initial,
 			State:              machineState,
@@ -1200,6 +1206,7 @@ func (i *WorkflowInterpreter) finishMachine(
 			err.Error(),
 		)
 	}
+	workflowReleasePendingClaims(&state, pending)
 
 	for _, wait := range progress.Waits {
 		state.CancelWorkItemIDs = append(

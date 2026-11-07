@@ -834,7 +834,7 @@ Functional backend completion does not require:
 - [x] Typed timer wait state exists.
 - [x] Typed recovery review waits exist.
 - [x] WorkItem-level resource acquisition and release exists.
-- [ ] WorkItem-level aggregate budget accounting exists.
+- [x] WorkItem-level aggregate budget accounting exists, including durable step reservation and typed pre-dispatch cost-meter failure.
 
 ### Phase 3: callable targets
 
@@ -849,8 +849,8 @@ Functional backend completion does not require:
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
-- [ ] Full callable interface context enforcement exists for every target kind.
-- [ ] Full callable interface port enforcement exists for every target kind.
+- [x] Callable interface context enforcement exists for every target kind through target-specific setup-owned transport capability binding.
+- [x] Callable interface port enforcement exists for every target kind through durable port plans and pre-invocation transport capability binding.
 - [x] Full receipt schema enforcement exists for direct WorkItems, child Agent/Model/Workflow ProgramFrames, and start-call scheduling.
 
 ### Phase 4: planning and domain integration
@@ -865,7 +865,7 @@ Functional backend completion does not require:
 - [x] Skill resolution and Skill session setup are setup-owned.
 - [x] Service and Activity binding registration has a typed runtime boundary.
 - [x] Typed attachment planning is setup-owned for V3.
-- [ ] Typed port planning is setup-owned for V3.
+- [x] Typed port planning and target-specific transport capability binding are setup-owned for V3.
 - [x] Full plan persistence facts exist for every Model and Agent contribution kind.
 
 ### Phase 5: structured execution
@@ -879,8 +879,8 @@ Functional backend completion does not require:
 - [x] Catch and finally behavior exists.
 - [x] Fork WorkItems persist child scheduling boundaries.
 - [x] Join WorkItems persist child aggregation boundaries.
-- [ ] Resource and budget behavior is enforced inside Parallel and Foreach.
-- [ ] Cleanup behavior is enforced inside all structured cancellation paths.
+- [x] Resource and budget behavior is enforced inside Parallel, Foreach, Repeat, Scope, Machine, and Saga through frame-held claims.
+- [x] Cleanup behavior is enforced inside structured cancellation paths, including finalizers, reconciliation, and compensation.
 
 ### Phase 6: coordination and triggers
 
@@ -948,8 +948,8 @@ Functional backend completion does not require:
 - [x] V3 Service binding composition is complete.
 - [x] V3 Activity binding composition is complete.
 - [x] V3 Tool streamed output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
-- [ ] V3 Tool input-port adaptation remains unavailable because the Go Tool, MCP Tool, and Skill Tool invocation contracts expose no typed input-port field.
-- [ ] Go Tool, MCP Tool, and Skill Tool port adapters remain incomplete for input and streamed ports.
+- [x] V3 Tool input-port adaptation uses setup-owned Go caller, MCP extension, and Skill invocation transports; unavailable target capabilities fail before invocation.
+- [x] Go Tool, MCP Tool, and Skill Tool port adapters preserve V2 contracts by using additive setup wrappers and domain-neutral sidecars.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate
