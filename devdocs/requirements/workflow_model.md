@@ -1868,15 +1868,18 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Service and Activity runtime binding registration is complete in application composition.
 - [x] Application composition registers `flexigpt.url.normalize` as a typed read Service binding.
 - [x] Application composition registers `flexigpt.text.apply-unified-diff` as a typed non-idempotent Activity binding.
+- [ ] V3 command parity covers Session configuration, continuation input, explicit Tool execution, retry, skip, manual completion, automation controls, App actions, and edit-and-resend semantics.
+- [ ] V3 projection parity exposes model operation, Tool, Attempt, Wait, App, usage, protocol, debugger, and activity facts without a Session v2 dependency.
 - [ ] V3 transport-neutral command and projection APIs cover all normal Session v2 backend behavior.
 
 ### Phase 9: functional completion gate
 
 - [ ] Every valid Workflow v1 source field is audited against typed compilation, language invalidity, or pre-dispatch unavailable-binding failure.
+- [ ] The audit resolves every compiler and interpreter fallback branch reachable from a valid Workflow v1 declaration.
 - [ ] No valid Workflow v1 operation remains a permanent unsupported runtime branch.
 - [ ] No valid Workflow v1 field is silently ignored.
 - [x] Workflow target transport behavior is classified: runtime-owned or explicit application-binding ports deliver data; unsupported Tool-family context, input-port, and stream-port contracts fail during admission.
-- [ ] No external mutating WorkItem can replay automatically after uncertainty without confirmed non-application.
+- [x] No external mutating WorkItem can replay automatically after uncertainty without confirmed non-application.
 - [ ] All normal Session v2 backend capabilities have typed V3 equivalents.
 - [ ] Functional backend completion is reached.
 

@@ -960,17 +960,20 @@ Functional backend completion does not require:
 - [x] V3 provider attachment adaptation exists.
 - [x] V3 Service binding composition is complete.
 - [x] V3 Activity binding composition is complete.
-- [x] V3 Tool streamed output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
+- [x] V3 Tool final output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
 - [x] Go Tool, MCP Tool, and Skill Tool input-port adaptation is intentionally unavailable because their native invocation contracts have no Workflow input transport. Workflow admission rejects the declaration before external work begins.
 - [x] Go Tool, MCP Tool, and Skill Tool streamed-port adaptation is intentionally unavailable because their native invocation contracts expose no typed progress stream. Workflow admission rejects the declaration before external work begins.
 - [x] Go Tool, MCP Tool, and Skill Tool final output supports normal output-port routing after confirmed settlement.
 - [x] V2 Tool contracts remain unchanged and do not depend on Session Runtime v3 or Workflow Runtime v3.
 - [x] No Tool-family port-extension task remains. Future work must not reopen this decision through Workflow-owned protocol changes.
+- [ ] V3 command parity covers Session configuration, continuation input, explicit Tool execution, retry, skip, manual completion, automation controls, App actions, and edit-and-resend semantics.
+- [ ] V3 projection parity exposes model operation, Tool, Attempt, Wait, App, usage, protocol, debugger, and activity facts without a Session v2 dependency.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate
 
 - [ ] Every valid Workflow v1 field has typed behavior, language-invalidity rejection, or pre-dispatch unavailable-binding failure.
+- [ ] The audit resolves every compiler and interpreter fallback branch reachable from a valid Workflow v1 declaration.
 - [ ] No valid Workflow v1 field is silently omitted.
 - [ ] No valid Workflow v1 feature remains permanently unsupported because implementation is absent.
 - [ ] All external mutating work preserves uncertainty semantics through restart.
