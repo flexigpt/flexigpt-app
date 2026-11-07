@@ -1983,6 +1983,21 @@ func (r *Runtime) advanceFrameLocked(
 			}
 		}
 		if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
+			if failure, found := budgetFailure(err); found {
+				frame.Status = ProgramFrameStateFailed
+				frame.Error = failure
+				frame.UpdatedAt = r.now()
+				if frame.ParentFrameID != "" {
+					return r.queueChildJoinLocked(
+						session,
+						execution,
+						frame.ParentFrameID,
+						frame.ID,
+					)
+				}
+				r.refreshExecutionStateLocked(execution)
+				return nil
+			}
 			return err
 		}
 		item.EffectPlan = cloneEffectPlan(intent.EffectPlan)
@@ -2423,11 +2438,52 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		BoundWork{SemanticBinding: bound.SemanticBinding, Private: bound.Private},
 	); err != nil {
 		*session = previous
-		if _, current, lookupErr := r.executionLocked(sessionID, executionID); lookupErr == nil {
-			if currentItem := mutableWorkItem(current, itemID); currentItem != nil {
-				currentItem.State = WorkItemStateReady
-			}
+		currentSession, currentExecution, lookupErr := r.executionLocked(
+			sessionID,
+			executionID,
+		)
+		if lookupErr != nil {
+			return
 		}
+		currentItem := mutableWorkItem(currentExecution, itemID)
+		if currentItem == nil {
+			return
+		}
+		if failure, found := budgetFailure(err); found {
+			now := r.now()
+			currentItem.State = WorkItemStateBlocked
+			currentItem.Error = failure
+			currentItem.CompletedAt = &now
+			currentItem.UpdatedAt = now
+			r.advanceSettledWorkLocked(
+				currentSession,
+				currentExecution,
+				currentItem.FrameID,
+				currentItem.ID,
+			)
+			r.refreshExecutionStateLocked(currentExecution)
+			r.touchExecutionLocked(currentSession, currentExecution)
+			if persistErr := r.persistLocked(
+				ctx,
+				"workBudgetBlocked",
+				currentSession,
+			); persistErr == nil {
+				r.publishLocked(
+					ctx,
+					currentSession,
+					currentExecution.ID,
+					RuntimeEventWorkChanged,
+				)
+				r.launchWork(
+					ctx,
+					sessionID,
+					executionID,
+					r.readyWorkLocked(*currentExecution),
+				)
+			}
+			return
+		}
+		currentItem.State = WorkItemStateReady
 		return
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
@@ -2671,8 +2727,20 @@ func (r *Runtime) finishWorkLocked(
 		}
 	}
 	if result.Error == nil && item.Type == WorkItemTypeLLM {
-		if err := r.consumeLLMUsageLocked(execution, item.Output); err != nil {
-			result.Error = portPlanError("model_budget_invalid", err.Error())
+		if err := r.consumeLLMUsageLocked(
+			execution,
+			*item,
+			item.Output,
+		); err != nil {
+			if failure, found := budgetFailure(err); found {
+				result.Error = failure
+			} else {
+				result.Error = &SanitizedError{
+					Code:     "model_usage_invalid",
+					Category: ErrorCategoryValidation,
+					Message:  err.Error(),
+				}
+			}
 			item.Error = result.Error
 		}
 	}

@@ -866,7 +866,7 @@ Functional backend completion does not require:
 - [x] Service and Activity binding registration has a typed runtime boundary.
 - [x] Typed attachment planning is setup-owned for V3.
 - [ ] Typed port planning is setup-owned for V3.
-- [ ] Full plan persistence facts exist for every Model and Agent contribution kind.
+- [x] Full plan persistence facts exist for every Model and Agent contribution kind.
 
 ### Phase 5: structured execution
 
@@ -947,6 +947,7 @@ Functional backend completion does not require:
 - [x] V3 provider attachment adaptation exists.
 - [ ] V3 Service binding composition is complete.
 - [ ] V3 Activity binding composition is complete.
+- [ ] Go Tool, MCP Tool, and Skill Tool port adapters remain incomplete for input and streamed ports.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate

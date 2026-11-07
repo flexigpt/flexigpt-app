@@ -1293,6 +1293,11 @@ func (b ToolBinding) Validate() error {
 		if b.Provider == nil || b.Provider.Name == "" {
 			return errors.New("invalid provider Tool binding")
 		}
+		if b.Provider.Artifact != nil {
+			if err := validatePin(*b.Provider.Artifact); err != nil {
+				return err
+			}
+		}
 	case ToolBindingKindUnresolved:
 		if b.Unresolved == nil || b.Unresolved.Reason == "" {
 			return errors.New("invalid unresolved Tool binding")
@@ -1312,8 +1317,27 @@ func (b SemanticBinding) Validate() error {
 			return err
 		}
 	}
+	plans := 0
 	if b.Plan != nil {
-		return b.Plan.Validate()
+		plans++
+		if err := b.Plan.Validate(); err != nil {
+			return err
+		}
+	}
+	if b.Service != nil {
+		plans++
+		if err := b.Service.Validate(); err != nil {
+			return err
+		}
+	}
+	if b.Activity != nil {
+		plans++
+		if err := b.Activity.Validate(); err != nil {
+			return err
+		}
+	}
+	if plans > 1 {
+		return errors.New("semantic binding has more than one dispatch plan")
 	}
 	return nil
 }

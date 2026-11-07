@@ -553,8 +553,9 @@ func v3ChoiceForResolvedTool(
 			Binding: sessionv3Runtime.ToolBinding{
 				Kind: sessionv3Runtime.ToolBindingKindProvider,
 				Provider: &sessionv3Runtime.ProviderToolBinding{
-					Type: sdkType,
-					Name: name,
+					Artifact: &pin,
+					Type:     sdkType,
+					Name:     name,
 				},
 			},
 		}

@@ -90,9 +90,31 @@ func validateWorkPortOwnership(
 		if plan.OwnerFrameID == "" || plan.OwnerFrameID != item.FrameID {
 			return errors.New("work port owner differs from its work item frame")
 		}
-		if plan.ParentFrameID != "" &&
-			frame.ParentFrameID != plan.ParentFrameID {
+		parent := frame.ParentFrameID
+		if parent == "" && execution.ParentFrameID != "" {
+			parent = execution.ParentFrameID
+		}
+		if plan.ParentFrameID != "" && parent != plan.ParentFrameID {
 			return errors.New("work port parent ownership differs from its frame")
+		}
+	}
+	return nil
+}
+
+func validateFramePortOwnership(
+	execution Execution,
+	frame ProgramFrame,
+) error {
+	parent := frame.ParentFrameID
+	if parent == "" && execution.ParentFrameID != "" {
+		parent = execution.ParentFrameID
+	}
+	for _, plan := range frame.Ports {
+		if plan.OwnerFrameID == "" || plan.OwnerFrameID != frame.ID {
+			return errors.New("frame port owner differs from its program frame")
+		}
+		if plan.ParentFrameID != "" && plan.ParentFrameID != parent {
+			return errors.New("frame port parent ownership differs from its program frame")
 		}
 	}
 	return nil
@@ -123,6 +145,9 @@ func (r *Runtime) stageFramePortInputsLocked(
 	}
 	if len(frame.Ports) == 0 {
 		return nil
+	}
+	if err := validateFramePortOwnership(*execution, *frame); err != nil {
+		return err
 	}
 	inputs, err := r.portInputsLocked(
 		execution,
@@ -269,6 +294,9 @@ func (r *Runtime) deliverFramePortsLocked(
 	if session == nil || execution == nil || frame == nil ||
 		len(frame.Ports) == 0 || len(frame.Output) == 0 {
 		return nil
+	}
+	if err := validateFramePortOwnership(*execution, *frame); err != nil {
+		return err
 	}
 
 	for _, plan := range frame.Ports {

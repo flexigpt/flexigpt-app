@@ -1755,8 +1755,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Selected target identity persists with the logical Workflow step.
 - [x] Provider SDK Tool Artifacts remain provider-managed Model choices.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
-- [ ] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
-- [ ] Full typed Service and Activity execution-plan propagation is complete for every binding kind.
+- [x] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
+- [x] Full typed Service and Activity execution-plan propagation is complete for every binding kind.
 
 ### Phase 3: ports, channels, and parent-child messaging
 
@@ -1837,6 +1837,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Provider streaming, usage, protocol output, debugger projection, Tool continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency exist for current V3 paths.
 - [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
+- [ ] Go Tool, MCP Tool, and Skill Tool input and streamed port adapters are unavailable in their current narrow domain contracts.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
 - [x] Attachment admission uses a narrow Attachment Runtime domain port.

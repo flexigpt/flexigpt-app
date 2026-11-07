@@ -905,8 +905,9 @@ type SkillToolBinding struct {
 }
 
 type ProviderToolBinding struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
+	Artifact *ArtifactPin `json:"artifact,omitempty"`
+	Type     string       `json:"type"`
+	Name     string       `json:"name"`
 }
 
 type UnresolvedToolBinding struct {
@@ -1069,11 +1070,13 @@ type CompensationWork struct {
 }
 
 type SemanticBinding struct {
-	Version           string             `json:"version"`
-	Artifacts         []ArtifactPin      `json:"artifacts,omitempty"`
-	Plan              *ModelDispatchPlan `json:"plan,omitempty"`
-	TargetFingerprint string             `json:"targetFingerprint"`
-	BoundAt           time.Time          `json:"boundAt"`
+	Version           string                `json:"version"`
+	Artifacts         []ArtifactPin         `json:"artifacts,omitempty"`
+	Plan              *ModelDispatchPlan    `json:"plan,omitempty"`
+	Service           *ServiceDispatchPlan  `json:"service,omitempty"`
+	Activity          *ActivityDispatchPlan `json:"activity,omitempty"`
+	TargetFingerprint string                `json:"targetFingerprint"`
+	BoundAt           time.Time             `json:"boundAt"`
 }
 
 type WorkItemOutput struct {

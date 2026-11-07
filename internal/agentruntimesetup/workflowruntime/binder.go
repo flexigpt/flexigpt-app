@@ -246,6 +246,13 @@ func bindExternal(
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
+	semantic, err = externalSemanticBinding(
+		request.WorkItem,
+		semantic,
+	)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
 	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
 		Private:         boundExternal{binding: binding, private: private},
@@ -267,7 +274,7 @@ func externalWorkRequest(
 	return WorkBindingRequest{
 		Input:   input,
 		Context: contextValue,
-		Ports:   append([]sessionv3Runtime.PortInput(nil), item.PortInputs...),
+		Ports:   cloneExternalPortInputs(item.PortInputs),
 		Stream:  stream,
 	}, nil
 }
@@ -289,10 +296,7 @@ func externalWaitRequest(
 		Response:   request.Response.Clone(),
 		Input:      input,
 		Context:    contextValue,
-		Ports: append(
-			[]sessionv3Runtime.PortInput(nil),
-			request.WorkItem.PortInputs...,
-		),
+		Ports:      cloneExternalPortInputs(request.WorkItem.PortInputs),
 	}, nil
 }
 
@@ -342,4 +346,95 @@ func externalWorkInput(
 			item.Type,
 		)
 	}
+}
+
+func externalSemanticBinding(
+	item sessionv3Runtime.WorkItem,
+	binding sessionv3Runtime.SemanticBinding,
+) (sessionv3Runtime.SemanticBinding, error) {
+	if binding.Service != nil || binding.Activity != nil {
+		return sessionv3Runtime.SemanticBinding{}, errors.New(
+			"external binding returned an unexpected dispatch plan",
+		)
+	}
+
+	switch item.Type {
+	case sessionv3Runtime.WorkItemTypeService:
+		if item.Input.Service == nil {
+			return sessionv3Runtime.SemanticBinding{}, errors.New(
+				"service work item payload is missing",
+			)
+		}
+		binding.Service = &sessionv3Runtime.ServiceDispatchPlan{
+			ID:             item.Input.Service.ServiceID,
+			BindingVersion: item.Input.Service.BindingVersion,
+			Input:          item.Input.Service.Input.Clone(),
+			Context:        item.Input.Service.Context.Clone(),
+			Ports:          cloneExternalPortPlans(item.Ports),
+			PortInputs:     cloneExternalPortInputs(item.PortInputs),
+			Effect:         item.Effect,
+		}
+
+	case sessionv3Runtime.WorkItemTypeActivity:
+		if item.Input.Activity == nil {
+			return sessionv3Runtime.SemanticBinding{}, errors.New(
+				"activity work item payload is missing",
+			)
+		}
+		binding.Activity = &sessionv3Runtime.ActivityDispatchPlan{
+			ID:             item.Input.Activity.ActivityID,
+			BindingVersion: item.Input.Activity.BindingVersion,
+			Input:          item.Input.Activity.Input.Clone(),
+			Context:        item.Input.Activity.Context.Clone(),
+			Ports:          cloneExternalPortPlans(item.Ports),
+			PortInputs:     cloneExternalPortInputs(item.PortInputs),
+			Effect:         item.Effect,
+		}
+
+	default:
+		return sessionv3Runtime.SemanticBinding{}, fmt.Errorf(
+			"unsupported external work item type %q",
+			item.Type,
+		)
+	}
+
+	if err := binding.Validate(); err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
+	return binding, nil
+}
+
+func cloneExternalPortPlans(
+	values []sessionv3Runtime.PortPlan,
+) []sessionv3Runtime.PortPlan {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make([]sessionv3Runtime.PortPlan, len(values))
+	for index := range values {
+		output[index] = values[index]
+		output[index].Schema = values[index].Schema.Clone()
+		output[index].ChannelSchema = values[index].ChannelSchema.Clone()
+	}
+	return output
+}
+
+func cloneExternalPortInputs(
+	values []sessionv3Runtime.PortInput,
+) []sessionv3Runtime.PortInput {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make([]sessionv3Runtime.PortInput, len(values))
+	for index := range values {
+		output[index] = values[index]
+		output[index].Values = make(
+			[]sessionv3Runtime.CanonicalValue,
+			len(values[index].Values),
+		)
+		for valueIndex := range values[index].Values {
+			output[index].Values[valueIndex] = values[index].Values[valueIndex].Clone()
+		}
+	}
+	return output
 }

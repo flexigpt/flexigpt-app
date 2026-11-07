@@ -22,6 +22,7 @@ type llmExecutionPlan struct {
 	model              *sessionv3Runtime.ArtifactSelection
 	defaults           sessionv3Runtime.SessionDefaults
 	systemInstructions []sessionv3Runtime.Instruction
+	texts              []sessionv3Runtime.TextDispatchPlan
 	context            []string
 	artifacts          []sessionv3Runtime.ArtifactPin
 }
@@ -43,8 +44,9 @@ type v3WorkspaceArtifactWire struct {
 
 type v3WorkspacePlanWire struct {
 	Prompt struct {
-		Instructions string `json:"instructions"`
-		UserMessage  string `json:"userMessage"`
+		Instructions  string                          `json:"instructions"`
+		UserMessage   string                          `json:"userMessage"`
+		Contributions []v3WorkspacePromptContribution `json:"contributions"`
 	} `json:"prompt"`
 
 	Skills struct {
@@ -54,6 +56,13 @@ type v3WorkspacePlanWire struct {
 	MCPServers struct {
 		Servers []v3WorkspaceArtifactWire `json:"servers"`
 	} `json:"mcpServers"`
+}
+
+type v3WorkspacePromptContribution struct {
+	Artifact         artifactModel.ArtifactRef `json:"artifact"`
+	ArtifactRevision uint64                    `json:"artifactRevision"`
+	DefinitionDigest string                    `json:"definitionDigest"`
+	Insert           string                    `json:"insert"`
 }
 
 func (b *Binder) prepareLLMPlan(
@@ -69,7 +78,10 @@ func (b *Binder) prepareLLMPlan(
 		return llmExecutionPlan{}, errors.New("llm payload is missing")
 	}
 
-	defaults := jsonutil.CloneJSONInValue(request.Session.Defaults)
+	defaults := sessionv3Runtime.SessionDefaults{}
+	if payload.Invocation == nil {
+		defaults = jsonutil.CloneJSONInValue(request.Session.Defaults)
+	}
 	if payload.Model != nil {
 		defaults.Model = cloneLLMArtifactSelection(payload.Model)
 	}
@@ -261,6 +273,7 @@ func (b *Binder) applyAgentPlan(
 				ctx,
 				plan,
 				value,
+				textPin,
 			); err != nil && occurrence.Required {
 				return err
 			}
@@ -360,6 +373,24 @@ func (b *Binder) applyAgentPlan(
 					ToolExposure:              sessionv3Runtime.MCPToolExposureAll,
 				},
 			)
+
+		case declaration.TypeWorkspace:
+			value, workspacePin, selectionErr := b.selectionForCapabilityTarget(
+				ctx,
+				occurrence.Target,
+			)
+			if selectionErr != nil {
+				if occurrence.Required {
+					return selectionErr
+				}
+				continue
+			}
+			if plan.defaults.Workspace == nil {
+				plan.defaults.Workspace = &value
+			}
+			if err := plan.addArtifact(workspacePin); err != nil {
+				return err
+			}
 		default:
 		}
 	}
@@ -371,6 +402,7 @@ func (b *Binder) appendAgentTextInstruction(
 	ctx context.Context,
 	plan *llmExecutionPlan,
 	selection sessionv3Runtime.ArtifactSelection,
+	pin sessionv3Runtime.ArtifactPin,
 ) error {
 	if b.deps.Texts == nil {
 		return errors.New("session v3 text runtime is unavailable")
@@ -395,6 +427,22 @@ func (b *Binder) appendAgentTextInstruction(
 			"agent text materialization returned another artifact",
 		)
 	}
+	if value.ArtifactRevision != pin.Revision ||
+		value.DefinitionDigest != pin.Digest {
+		return errors.New(
+			"agent text materialization differs from its resolved artifact pin",
+		)
+	}
+
+	insert, err := textDispatchInsert(value.Insert)
+	if err != nil {
+		return err
+	}
+	plan.addText(sessionv3Runtime.TextDispatchPlan{
+		Artifact: pin,
+		Insert:   insert,
+		Content:  value.Content,
+	})
 
 	switch value.Insert {
 	case "instructions":
@@ -480,6 +528,30 @@ func (b *Binder) applyWorkspacePlan(
 	wire, err := decodeV3WorkspaceRuntimePlan(runtimePlan)
 	if err != nil {
 		return err
+	}
+
+	for _, contribution := range wire.Prompt.Contributions {
+		selection, pin, selectionErr := b.selectionForWorkspaceArtifact(
+			ctx,
+			v3WorkspaceArtifactWire{
+				Artifact:         contribution.Artifact,
+				ArtifactRevision: contribution.ArtifactRevision,
+				DefinitionDigest: contribution.DefinitionDigest,
+			},
+		)
+		if selectionErr != nil {
+			return selectionErr
+		}
+		insert, insertErr := textDispatchInsert(contribution.Insert)
+		if insertErr != nil {
+			return insertErr
+		}
+		plan.addText(sessionv3Runtime.TextDispatchPlan{
+			Artifact: pin,
+			Insert:   insert,
+			Content:  "",
+		})
+		_ = selection
 	}
 
 	plan.addInstruction(sessionv3Runtime.Instruction{
@@ -827,6 +899,40 @@ func (p *llmExecutionPlan) addInstruction(
 		p.systemInstructions,
 		instruction,
 	)
+}
+
+func (p *llmExecutionPlan) addText(
+	value sessionv3Runtime.TextDispatchPlan,
+) {
+	if p == nil {
+		return
+	}
+	for index := range p.texts {
+		current := &p.texts[index]
+		if current.Artifact.RootID != value.Artifact.RootID ||
+			current.Artifact.ArtifactID != value.Artifact.ArtifactID ||
+			current.Insert != value.Insert {
+			continue
+		}
+		if current.Content == "" {
+			current.Content = value.Content
+		}
+		return
+	}
+	p.texts = append(p.texts, value)
+}
+
+func textDispatchInsert(
+	value string,
+) (sessionv3Runtime.TextDispatchInsert, error) {
+	switch value {
+	case string(sessionv3Runtime.TextDispatchInsertInstructions):
+		return sessionv3Runtime.TextDispatchInsertInstructions, nil
+	case string(sessionv3Runtime.TextDispatchInsertUserMessage):
+		return sessionv3Runtime.TextDispatchInsertUserMessage, nil
+	default:
+		return "", fmt.Errorf("unsupported text dispatch insert %q", value)
+	}
 }
 
 func (p *llmExecutionPlan) addContext(value string) {

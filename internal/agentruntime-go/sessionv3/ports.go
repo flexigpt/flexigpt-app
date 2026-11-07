@@ -293,13 +293,83 @@ func portSchemaCompatible(
 	if len(portSchema) == 0 || len(channelSchema) == 0 {
 		return errors.New("port or channel schema is unavailable")
 	}
-	if err := validateWorkflowSchema(portSchema, MustCanonicalValue(nil)); err == nil {
+
+	portTypes, portImpossible, err := workflowSchemaTypes(portSchema)
+	if err != nil {
+		return err
+	}
+	channelTypes, channelImpossible, err := workflowSchemaTypes(channelSchema)
+	if err != nil {
+		return err
+	}
+	if portImpossible || channelImpossible {
+		return errors.New("port or channel schema accepts no values")
+	}
+	if len(portTypes) == 0 || len(channelTypes) == 0 {
 		return nil
 	}
-	if err := validateWorkflowSchema(channelSchema, MustCanonicalValue(nil)); err == nil {
-		return nil
+
+	for value := range portTypes {
+		if _, found := channelTypes[value]; found {
+			return nil
+		}
 	}
-	return nil
+	return errors.New("port and channel schemas have disjoint JSON types")
+}
+
+func workflowSchemaTypes(
+	schema CanonicalValue,
+) (portTypes map[string]struct{}, portImpossible bool, err error) {
+	if !schema.Valid() {
+		return nil, false, errors.New("port schema is not canonical json")
+	}
+
+	if value, err := DecodeCanonicalValue[bool](schema); err == nil {
+		return nil, !value, nil
+	}
+
+	fields, err := DecodeCanonicalValue[map[string]CanonicalValue](schema)
+	if err != nil {
+		return nil, false, errors.New("port schema must be an object or boolean")
+	}
+	raw, found := fields["type"]
+	if !found {
+		return nil, false, nil
+	}
+
+	output := make(map[string]struct{})
+	if value, err := DecodeCanonicalValue[string](raw); err == nil {
+		workflowSchemaType(output, value)
+		return output, false, nil
+	}
+
+	values, err := DecodeCanonicalValue[[]string](raw)
+	if err != nil {
+		return nil, false, errors.New("port schema type is invalid")
+	}
+	for _, value := range values {
+		workflowSchemaType(output, value)
+	}
+	if len(output) == 0 {
+		return nil, false, errors.New("port schema type is empty")
+	}
+	return output, true, nil
+}
+
+func workflowSchemaType(
+	values map[string]struct{},
+	value string,
+) {
+	switch value {
+	case "integer":
+		values["integer"] = struct{}{}
+		values["number"] = struct{}{}
+	case "number":
+		values["number"] = struct{}{}
+		values["integer"] = struct{}{}
+	default:
+		values[value] = struct{}{}
+	}
 }
 
 func portPlanError(

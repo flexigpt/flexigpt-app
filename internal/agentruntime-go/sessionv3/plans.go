@@ -36,14 +36,27 @@ type ModelDispatchPlan struct {
 	Context      []ContextDispatchPlan     `json:"context,omitempty"`
 	Channels     []ChannelDispatchPlan     `json:"channels,omitempty"`
 	Ports        []PortPlan                `json:"ports,omitempty"`
+	PortInputs   []PortInput               `json:"portInputs,omitempty"`
 }
 
 type AgentDispatchPlan struct {
-	Artifact ArtifactPin `json:"artifact"`
+	Artifact     ArtifactPin               `json:"artifact"`
+	Model        *ModelDispatchTarget      `json:"model,omitempty"`
+	Workspace    *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
+	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
+	Texts        []TextDispatchPlan        `json:"texts,omitempty"`
+	Tools        []ToolDispatchPlan        `json:"tools,omitempty"`
+	Skills       []SkillDispatchPlan       `json:"skills,omitempty"`
+	MCP          []MCPDispatchPlan         `json:"mcp,omitempty"`
 }
 
 type WorkspaceDispatchPlan struct {
-	Artifact ArtifactPin `json:"artifact"`
+	Artifact     ArtifactPin               `json:"artifact"`
+	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
+	Texts        []TextDispatchPlan        `json:"texts,omitempty"`
+	Skills       []SkillDispatchPlan       `json:"skills,omitempty"`
+	MCP          []MCPDispatchPlan         `json:"mcp,omitempty"`
+	Context      []ContextDispatchPlan     `json:"context,omitempty"`
 }
 
 type ModelDispatchTarget struct {
@@ -58,13 +71,14 @@ type InstructionDispatchPlan struct {
 }
 
 type TextDispatchPlan struct {
-	Artifact ArtifactPin `json:"artifact"`
-	Insert   string      `json:"insert"`
-	Content  string      `json:"content"`
+	Artifact ArtifactPin        `json:"artifact"`
+	Insert   TextDispatchInsert `json:"insert"`
+	Content  string             `json:"content,omitempty"`
 }
 
 type ToolDispatchPlan struct {
-	Call ToolCall `json:"call"`
+	Call            ToolCall `json:"call"`
+	ProviderManaged bool     `json:"providerManaged,omitempty"`
 }
 
 type SkillDispatchPlan struct {
@@ -73,16 +87,22 @@ type SkillDispatchPlan struct {
 }
 
 type MCPDispatchPlan struct {
-	Server                    ArtifactPin     `json:"server"`
-	IncludeServerInstructions bool            `json:"includeServerInstructions,omitempty"`
-	ToolExposure              MCPToolExposure `json:"toolExposure"`
+	Server                    ArtifactPin                       `json:"server"`
+	IncludeServerInstructions bool                              `json:"includeServerInstructions,omitempty"`
+	ToolExposure              MCPToolExposure                   `json:"toolExposure"`
+	Tools                     []MCPToolDispatchPlan             `json:"tools,omitempty"`
+	Resources                 []MCPResourceDispatchPlan         `json:"resources,omitempty"`
+	ResourceTemplates         []MCPResourceTemplateDispatchPlan `json:"resourceTemplates,omitempty"`
+	Prompts                   []MCPPromptDispatchPlan           `json:"prompts,omitempty"`
 }
 
 type AttachmentDispatchPlan struct {
+	MessageID  string     `json:"messageID,omitempty"`
 	Attachment Attachment `json:"attachment"`
 }
 
 type MessageDispatchPlan struct {
+	ID          string       `json:"id,omitempty"`
 	Role        MessageRole  `json:"role"`
 	Text        string       `json:"text,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
@@ -104,12 +124,12 @@ func (p ModelDispatchPlan) Validate() error {
 		return fmt.Errorf("model dispatch plan model: %w", err)
 	}
 	if p.Agent != nil {
-		if err := validatePin(p.Agent.Artifact); err != nil {
+		if err := p.Agent.Validate(); err != nil {
 			return fmt.Errorf("model dispatch plan agent: %w", err)
 		}
 	}
 	if p.Workspace != nil {
-		if err := validatePin(p.Workspace.Artifact); err != nil {
+		if err := p.Workspace.Validate(); err != nil {
 			return fmt.Errorf("model dispatch plan workspace: %w", err)
 		}
 	}
@@ -139,7 +159,7 @@ func (p ModelDispatchPlan) Validate() error {
 		if err := validatePin(value.Artifact); err != nil {
 			return fmt.Errorf("model dispatch plan text artifact: %w", err)
 		}
-		if strings.TrimSpace(value.Insert) == "" {
+		if strings.TrimSpace(string(value.Insert)) == "" {
 			return errors.New("model dispatch plan text has no insert mode")
 		}
 	}
@@ -245,7 +265,7 @@ func (p ModelDispatchPlan) Validate() error {
 		}
 		portNames[value.Name] = struct{}{}
 	}
-	return nil
+	return validateExtendedModelDispatchPlan(p)
 }
 
 func (p WorkflowContextRequirement) Validate() error {

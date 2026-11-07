@@ -19,7 +19,8 @@ func (b *Binder) durableLLMDispatchPlan(
 		Model: sessionv3Runtime.ModelDispatchTarget{
 			Artifact: model,
 		},
-		Ports: clonePlanPortValues(request.WorkItem.Ports),
+		Ports:      clonePlanPortValues(request.WorkItem.Ports),
+		PortInputs: clonePlanPortInputs(request.WorkItem.PortInputs),
 	}
 
 	if plan.defaults.Agent != nil {
@@ -99,6 +100,8 @@ func (b *Binder) durableLLMDispatchPlan(
 			output.Tools,
 			sessionv3Runtime.ToolDispatchPlan{
 				Call: choice.Call,
+				ProviderManaged: choice.Call.Binding.Kind ==
+					sessionv3Runtime.ToolBindingKindProvider,
 			},
 		)
 	}
@@ -129,29 +132,6 @@ func (b *Binder) durableLLMDispatchPlan(
 		}
 	}
 
-	if current := findActivity(
-		request.Session,
-		request.WorkItem.Input.LLM.InputActivityID,
-	); current != nil && current.Message != nil {
-		message := current.Message
-		output.Messages = append(
-			output.Messages,
-			sessionv3Runtime.MessageDispatchPlan{
-				Role:        message.Role,
-				Text:        message.Text,
-				Attachments: append([]sessionv3Runtime.Attachment(nil), message.Attachments...),
-			},
-		)
-		for _, attachment := range message.Attachments {
-			output.Attachments = append(
-				output.Attachments,
-				sessionv3Runtime.AttachmentDispatchPlan{
-					Attachment: attachment,
-				},
-			)
-		}
-	}
-
 	for _, port := range request.WorkItem.Ports {
 		appendLLMDispatchChannel(
 			&output,
@@ -169,6 +149,14 @@ func (b *Binder) durableLLMDispatchPlan(
 		)
 	}
 
+	if err := enrichDurableLLMDispatchPlan(
+		&output,
+		request,
+		plan,
+		model,
+	); err != nil {
+		return sessionv3Runtime.ModelDispatchPlan{}, err
+	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.ModelDispatchPlan{}, err
 	}
@@ -222,22 +210,15 @@ func appendWorkflowInvocationDispatchPlan(
 	}
 
 	appendMessage := func(message workflowInvocationMessage) {
-		output.Messages = append(
-			output.Messages,
+		appendDurableMessageDispatchPlan(
+			output,
 			sessionv3Runtime.MessageDispatchPlan{
+				ID:          workflowInvocationMessageID(len(output.Messages)),
 				Role:        message.Role,
 				Text:        message.Text,
 				Attachments: append([]sessionv3Runtime.Attachment(nil), message.Attachments...),
 			},
 		)
-		for _, attachment := range message.Attachments {
-			output.Attachments = append(
-				output.Attachments,
-				sessionv3Runtime.AttachmentDispatchPlan{
-					Attachment: attachment,
-				},
-			)
-		}
 	}
 
 	contextValue := workflowInvocationContext{}

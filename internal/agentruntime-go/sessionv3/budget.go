@@ -12,6 +12,7 @@ const (
 	budgetErrorCode                 = "budget_limit_exceeded"
 	budgetDeadlineErrorCode         = "execution_deadline_elapsed"
 	budgetCostUnavailableErrorCode  = "cost_accounting_unavailable"
+	budgetUsageUnavailableErrorCode = "usage_accounting_unavailable"
 	budgetCleanupExpiredErrorCode   = "cleanup_deadline_elapsed"
 	executionDeadlineTimerOperation = "session-v3 execution deadline"
 	cleanupDeadlineTimerOperation   = "session-v3 cleanup deadline"
@@ -423,11 +424,24 @@ func (r *Runtime) reserveEventBudgetLocked(
 
 func (r *Runtime) consumeLLMUsageLocked(
 	execution *Execution,
+	item WorkItem,
 	output *WorkItemOutput,
 ) error {
-	if execution == nil || output == nil || output.LLM == nil ||
-		output.LLM.Usage == nil {
-		return nil
+	if execution == nil {
+		return errors.New("execution budget owner is unavailable")
+	}
+
+	requiresUsage := execution.Budget.ModelTokens > 0 ||
+		(item.Budget != nil && item.Budget.ModelTokens > 0)
+	if output == nil || output.LLM == nil || output.LLM.Usage == nil {
+		if !requiresUsage {
+			return nil
+		}
+		return &SanitizedError{
+			Code:     budgetUsageUnavailableErrorCode,
+			Category: ErrorCategoryLimit,
+			Message:  "model token budgeting requires provider usage",
+		}
 	}
 
 	raw, err := json.Marshal(output.LLM.Usage)
@@ -462,8 +476,29 @@ func (r *Runtime) consumeLLMUsageLocked(
 	); err != nil {
 		return err
 	}
+	if item.Budget != nil {
+		if err := checkBudgetCount(
+			item.Budget.ModelTokens,
+			execution.Usage.ModelTokens,
+			tokens,
+			"model tokens",
+		); err != nil {
+			return err
+		}
+	}
 	execution.Usage.ModelTokens += tokens
 	return nil
+}
+
+func budgetFailure(
+	err error,
+) (*SanitizedError, bool) {
+	//nolint:errorlint // Type assertion on wrapped errors is not handled.
+	value, found := err.(*SanitizedError)
+	if !found || value == nil {
+		return nil, false
+	}
+	return cloneWorkflowSanitizedError(value), true
 }
 
 func (r *Runtime) beginCleanupLocked(
