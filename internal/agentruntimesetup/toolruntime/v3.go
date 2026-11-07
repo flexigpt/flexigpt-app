@@ -191,7 +191,6 @@ func (e *V3Executor) BindWorkflowTool(
 // binding facts before Session Runtime v3 persists a dispatched Attempt.
 func (e *V3Executor) BindGo(
 	ctx context.Context,
-	request sessionv3Runtime.WorkDispatchRequest,
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.SemanticBinding, error) {
 	if e == nil || e.tools == nil {
@@ -207,10 +206,6 @@ func (e *V3Executor) BindGo(
 		)
 	}
 	if err := payload.Call.Validate(); err != nil {
-		return sessionv3Runtime.SemanticBinding{}, err
-	}
-	invocation := NewWorkflowGoToolInvocation(request, payload)
-	if err := ValidateWorkflowGoToolTransport(e.caller, invocation); err != nil {
 		return sessionv3Runtime.SemanticBinding{}, err
 	}
 
@@ -239,7 +234,6 @@ func (e *V3Executor) BindGo(
 // instead of exposing source-backed Tool or caller details to Session core.
 func (e *V3Executor) ExecuteGo(
 	ctx context.Context,
-	request sessionv3Runtime.WorkDispatchRequest,
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
 	if e == nil || e.tools == nil || e.caller == nil {
@@ -283,15 +277,11 @@ func (e *V3Executor) ExecuteGo(
 		}, nil
 	}
 
-	invocation := NewWorkflowGoToolInvocation(request, payload)
-	timeout := durationMilliseconds(binding.TimeoutMS)
-	outputs, invokeErr := CallGoToolWithWorkflowInvocation(
+	outputs, invokeErr := e.caller.CallGoTool(
 		ctx,
-		e.caller,
 		resolved.Tool.Implementation.Function,
 		json.RawMessage(arguments.Clone()),
-		timeout,
-		invocation,
+		durationMilliseconds(binding.TimeoutMS),
 	)
 	text, structured, conversionErr := V3ToolOutputs(outputs)
 	if conversionErr != nil {

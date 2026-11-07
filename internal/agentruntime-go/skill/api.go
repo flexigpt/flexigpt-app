@@ -234,21 +234,8 @@ func (s *Service) InvokeSkillTool(
 		)
 	}
 
-	invocationContext := ctx
-	if req.Body.Workflow != nil {
-		if !s.SupportsWorkflowToolInvocation() {
-			return nil, fmt.Errorf(
-				"%w: skill tool does not support workflow port transport",
-				ErrInvalidRequest,
-			)
-		}
-		invocationContext = WithWorkflowToolInvocation(
-			ctx,
-			*req.Body.Workflow,
-		)
-	}
 	outputs, callErr := llmtoolsutil.CallUsingRegistry(
-		invocationContext,
+		ctx,
 		registry,
 		functionID,
 		rArgs,

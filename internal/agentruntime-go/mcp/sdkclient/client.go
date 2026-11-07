@@ -20,7 +20,6 @@ import (
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	mcpWorkflowPorts "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/workflowports"
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
@@ -339,11 +338,6 @@ func buildClientCapabilities(
 	p mcppolicy.MCPAppsPolicy,
 ) *mcpSDK.ClientCapabilities {
 	c := &mcpSDK.ClientCapabilities{}
-	c.AddExtension(mcpWorkflowPorts.ExtensionID, map[string]any{
-		mcpWorkflowPorts.CapabilityVersionKey:  mcpWorkflowPorts.Version,
-		mcpWorkflowPorts.CapabilityRequestKey:  true,
-		mcpWorkflowPorts.CapabilityResponseKey: true,
-	})
 	if p.Enabled {
 		c.AddExtension(mcpApps.AppExtensionID, map[string]any{
 			"mimeTypes": []string{mcpApps.AppMIMEType},

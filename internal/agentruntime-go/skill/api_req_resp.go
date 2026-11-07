@@ -138,7 +138,6 @@ type InvokeSkillToolRequestBody struct {
 	SessionID agentskillsRuntimeSpec.SessionID `json:"sessionID"      required:"true"`
 	ToolName  string                           `json:"toolName"       required:"true"`
 	Args      string                           `json:"args,omitempty"`
-	Workflow  *WorkflowToolInvocation          `json:"-"`
 }
 
 type InvokeSkillToolRequest struct {

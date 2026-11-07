@@ -1764,11 +1764,14 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Local channel emit, retained channel records, cursors, consume facts, observe behavior, and emit deduplication are typed runtime concepts.
 - [x] Completion handles support WorkItems, ProgramFrames, and Executions.
 - [x] Parent-child completion waits preserve terminal outcome semantics.
-- [x] Input port plans are compiled and delivered to Model, Agent, Workflow, Service, Activity, and port-capable Tool transports; unavailable external transports fail before Tool invocation.
+- [x] Input port plans are compiled and delivered to Model, Agent, nested Workflow, and explicitly port-aware Service or Activity bindings.
+- [ ] Input port plans are delivered to Go Tool, MCP Tool, and Skill Tool targets. Their native contracts do not carry Workflow orchestration input.
 - [x] Output port plans are compiled and delivered for all callable target kinds.
-- [x] Streamed port plans are delivered through Model, Agent, Workflow, Service, Activity, and port-capable Tool transports; final outputs remain durable fallback stream records.
+- [x] Streamed port plans are delivered through Model, Agent, nested Workflow, and explicitly streaming Service or Activity bindings.
+- [ ] Go Tool, MCP Tool, and Skill Tool targets support Workflow streamed output ports. A terminal Tool result is not fabricated as a stream.
 - [x] Port ownership, channel authorization, and schema enforcement are complete at every target boundary.
 - [x] Durable parent-child live port messaging is complete for attached and independent child Executions.
+- [x] Workflow calls to Tool, MCP Tool, or Skill Tool targets with unsupported context, input ports, or streamed ports fail during admission before external work begins.
 
 ### Phase 4: structured Workflow behavior
 
@@ -1840,9 +1843,8 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Provider streaming, usage, protocol output, debugger projection, Tool continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency exist for current V3 paths.
 - [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
-- [x] Go Tool port transport is provided by an application-side `GoToolCaller` wrapper that passes a domain-neutral invocation sidecar through `context.Context`.
-- [x] MCP Tool port transport is registered as `io.flexigpt.workflow.ports/v1` and is sent through MCP request metadata only to servers that advertise the extension.
-- [x] Skill Tool port transport is capability-gated and remains disabled until the registered Skill handler consumes the domain-neutral sidecar.
+- [x] Go Tool, MCP Tool, and Skill Tool preserve their native input and output contracts. Workflow does not inject orchestration fields into their domain requests.
+- [x] Unsupported Workflow Tool context, input-port, and streamed-port declarations fail before Tool invocation rather than being silently ignored.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
 - [x] Attachment admission uses a narrow Attachment Runtime domain port.

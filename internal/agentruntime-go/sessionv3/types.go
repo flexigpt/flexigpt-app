@@ -905,8 +905,7 @@ type MCPToolBinding struct {
 }
 
 type SkillToolBinding struct {
-	Name          string `json:"name"`
-	WorkflowPorts bool   `json:"workflowPorts,omitempty"`
+	Name string `json:"name"`
 }
 
 type ProviderToolBinding struct {

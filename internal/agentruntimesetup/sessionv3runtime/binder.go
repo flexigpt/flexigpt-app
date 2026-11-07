@@ -199,7 +199,15 @@ func validateV3ToolPortPlans(
 	for _, plan := range plans {
 		switch plan.Direction {
 		case sessionv3Runtime.WorkflowPortDirectionInput:
+			return errors.New(
+				"workflow tool input port transport is unavailable",
+			)
 		case sessionv3Runtime.WorkflowPortDirectionOutput:
+			if plan.Stream {
+				return errors.New(
+					"workflow tool streamed port transport is unavailable",
+				)
+			}
 		default:
 			return errors.New("tool port direction is invalid")
 		}

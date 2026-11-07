@@ -2,7 +2,6 @@ package skillruntime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -92,7 +91,7 @@ func (e *V3Executor) Choices(
 		includeAll = len(active) != 0
 	}
 
-	return e.v3SkillChoices(
+	return v3SkillChoices(
 		includeAll,
 		e.runtime.SupportsRunScript(),
 	)
@@ -214,14 +213,6 @@ func (e *V3Executor) Bind(
 	if err := payload.Call.Validate(); err != nil {
 		return sessionv3Runtime.SemanticBinding{}, err
 	}
-	invocation := v3SkillWorkflowInvocation(request, payload)
-	if invocation != nil &&
-		(!payload.Call.Binding.Skill.WorkflowPorts ||
-			!e.runtime.SupportsWorkflowToolInvocation()) {
-		return sessionv3Runtime.SemanticBinding{}, errors.New(
-			"skill tool does not support workflow port transport",
-		)
-	}
 	if len(request.Session.Defaults.Skills) == 0 {
 		return sessionv3Runtime.SemanticBinding{}, errors.New(
 			"skill tool was requested without enabled Skills",
@@ -281,12 +272,6 @@ func (e *V3Executor) Execute(
 		}, true, nil
 	}
 
-	invocation := v3SkillWorkflowInvocation(request, payload)
-	if invocation != nil && !e.runtime.SupportsWorkflowToolInvocation() {
-		return sessionv3Runtime.WorkExecutionResult{}, true, errors.New(
-			"skill tool does not support workflow port transport",
-		)
-	}
 	sessionID, err := e.ensureSession(ctx, request)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
@@ -317,7 +302,6 @@ func (e *V3Executor) Execute(
 				SessionID: agentskillsRuntimeSpec.SessionID(sessionID),
 				ToolName:  payload.Call.Name,
 				Args:      string(arguments),
-				Workflow:  invocation,
 			},
 		},
 	)
@@ -572,7 +556,7 @@ func (e *V3Executor) executionSession(
 	return value
 }
 
-func (e *V3Executor) v3SkillChoices(
+func v3SkillChoices(
 	includeAll bool,
 	includeRunScript bool,
 ) ([]toolruntime.V3PreparedChoice, error) {
@@ -646,8 +630,6 @@ func (e *V3Executor) v3SkillChoices(
 				Kind: sessionv3Runtime.ToolBindingKindSkill,
 				Skill: &sessionv3Runtime.SkillToolBinding{
 					Name: definition.name,
-					WorkflowPorts: e != nil && e.runtime != nil &&
-						e.runtime.SupportsWorkflowToolInvocation(),
 				},
 			},
 		}
@@ -672,67 +654,6 @@ func v3SkillToolDisplayName(name string) string {
 	default:
 		return "Skill Tool"
 	}
-}
-
-func v3SkillWorkflowInvocation(
-	request sessionv3Runtime.WorkDispatchRequest,
-	payload *sessionv3Runtime.ToolWork,
-) *skillRuntime.WorkflowToolInvocation {
-	if payload == nil {
-		return nil
-	}
-
-	outputPorts := make([]string, 0)
-	for _, plan := range request.WorkItem.Ports {
-		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
-			plan.Stream {
-			outputPorts = append(outputPorts, plan.Name)
-		}
-	}
-	if len(payload.Context) == 0 &&
-		len(request.WorkItem.PortInputs) == 0 &&
-		len(outputPorts) == 0 {
-		return nil
-	}
-
-	output := &skillRuntime.WorkflowToolInvocation{
-		Context: append(json.RawMessage(nil), payload.Context...),
-		PortInputs: make(
-			[]skillRuntime.WorkflowPortInput,
-			0,
-			len(request.WorkItem.PortInputs),
-		),
-		OutputPorts: outputPorts,
-	}
-	for _, input := range request.WorkItem.PortInputs {
-		value := skillRuntime.WorkflowPortInput{
-			Name:     input.Name,
-			Channel:  input.Channel,
-			Cursor:   input.Cursor,
-			Streamed: input.Streamed,
-			Values:   make([]json.RawMessage, 0, len(input.Values)),
-		}
-		for _, current := range input.Values {
-			value.Values = append(
-				value.Values,
-				json.RawMessage(current.Clone()),
-			)
-		}
-		output.PortInputs = append(output.PortInputs, value)
-	}
-	if request.PortStream.Emit != nil {
-		output.Emit = func(
-			name string,
-			value json.RawMessage,
-		) error {
-			canonical, err := sessionv3Runtime.CanonicalValueFrom(value)
-			if err != nil {
-				return err
-			}
-			return request.PortStream.Emit(name, canonical)
-		}
-	}
-	return output
 }
 
 func v3SkillArtifactKey(rootID, artifactID string) string {

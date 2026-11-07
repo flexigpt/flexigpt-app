@@ -2,7 +2,6 @@ package mcpruntime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,7 +15,7 @@ import (
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/connection"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	mcpWorkflowPorts "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/workflowports"
+
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -352,23 +351,7 @@ func (e *V3Executor) Bind(
 		return sessionv3Runtime.BindResult{}, true, err
 	}
 
-	mapping, err := v3MCPMapping(payload)
-	if err != nil {
-		return sessionv3Runtime.BindResult{}, true, err
-	}
-	portRequest := v3MCPWorkflowPortRequest(
-		request,
-		payload,
-	)
-	if portRequest != nil {
-		if err := e.requireWorkflowMCPPortExtension(
-			ctx,
-			mapping.Server,
-		); err != nil {
-			return sessionv3Runtime.BindResult{}, true, err
-		}
-	}
-	mapping, invokeRequest, err := v3MappedMCPRequest(payload, portRequest)
+	mapping, invokeRequest, err := v3MappedMCPRequest(payload)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, true, err
 	}
@@ -498,11 +481,7 @@ func (e *V3Executor) Execute(
 
 	effective := *payload
 	effective.Call = private.Call
-	portRequest := v3MCPWorkflowPortRequest(
-		request,
-		&effective,
-	)
-	mapping, invokeRequest, err := v3MappedMCPRequest(&effective, portRequest)
+	mapping, invokeRequest, err := v3MappedMCPRequest(&effective)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
@@ -1111,7 +1090,6 @@ func v3MCPMapping(
 
 func v3MappedMCPRequest(
 	payload *sessionv3Runtime.ToolWork,
-	portRequest *mcpWorkflowPorts.Request,
 ) (
 	invocation.MappedToolBinding,
 	mcpServer.InvokeMCPToolRequestBody,
@@ -1148,70 +1126,7 @@ func v3MappedMCPRequest(
 			payload.Call.ProviderCallID,
 			payload.Call.ID,
 		),
-		WorkflowPorts: mcpWorkflowPorts.CloneRequest(portRequest),
 	}, nil
-}
-
-func (e *V3Executor) requireWorkflowMCPPortExtension(
-	ctx context.Context,
-	serverID mcpServer.ServerID,
-) error {
-	if e == nil || e.runtime == nil {
-		return errors.New("session v3 mcp runtime is unavailable")
-	}
-	status, err := e.runtime.Status(ctx, serverID)
-	if err != nil {
-		return err
-	}
-	if status == nil || status.ServerCapabilities == nil {
-		return errors.New("mcp server does not support workflow port transport")
-	}
-	if _, found := status.ServerCapabilities.Extensions[mcpWorkflowPorts.ExtensionID]; !found {
-		return errors.New("mcp server does not support workflow port transport")
-	}
-	return nil
-}
-
-func v3MCPWorkflowPortRequest(
-	request sessionv3Runtime.WorkDispatchRequest,
-	payload *sessionv3Runtime.ToolWork,
-) *mcpWorkflowPorts.Request {
-	if payload == nil {
-		return nil
-	}
-	output := &mcpWorkflowPorts.Request{
-		Version: mcpWorkflowPorts.Version,
-		Context: append(json.RawMessage(nil), payload.Context...),
-	}
-	for _, input := range request.WorkItem.PortInputs {
-		value := mcpWorkflowPorts.PortInput{
-			Name:     input.Name,
-			Channel:  input.Channel,
-			Cursor:   input.Cursor,
-			Streamed: input.Streamed,
-			Values:   make([]json.RawMessage, 0, len(input.Values)),
-		}
-		for _, current := range input.Values {
-			value.Values = append(
-				value.Values,
-				json.RawMessage(current.Clone()),
-			)
-		}
-		output.PortInputs = append(output.PortInputs, value)
-	}
-	for _, plan := range request.WorkItem.Ports {
-		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput ||
-			!plan.Stream {
-			continue
-		}
-		output.OutputPorts = append(output.OutputPorts, plan.Name)
-	}
-	if len(output.Context) == 0 &&
-		len(output.PortInputs) == 0 &&
-		len(output.OutputPorts) == 0 {
-		return nil
-	}
-	return output
 }
 
 func canonicalV3MCPValue(

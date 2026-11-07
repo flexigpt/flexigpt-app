@@ -607,8 +607,6 @@ linters:
           alias: ${1}Server
         - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/auth
           alias: ${1}Auth
-        - pkg: github.com/flexigpt/flexigpt-app/internal/agentruntime-go/(\w+)/workflowports
-          alias: ${1}WorkflowPorts
 
     nakedret:
       # No naked returns, ever.

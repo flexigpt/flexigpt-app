@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
@@ -30,6 +29,12 @@ func (b *Binder) bindTool(
 	payload := req.WorkItem.Input.Tool
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("tool payload is missing")
+	}
+	if err := rejectUnsupportedWorkflowToolTransport(
+		req.WorkItem,
+		payload,
+	); err != nil {
+		return sessionv3Runtime.BindResult{}, err
 	}
 
 	call := payload.Call
@@ -96,11 +101,7 @@ func (b *Binder) bindTool(
 				"session v3 Tool runtime is unavailable",
 			)
 		}
-		semantic, err := b.goTools.BindGo(
-			ctx,
-			effectiveRequest,
-			effectiveRequest.WorkItem.Input.Tool,
-		)
+		semantic, err := b.goTools.BindGo(ctx, effectiveRequest.WorkItem.Input.Tool)
 		if err != nil {
 			return sessionv3Runtime.BindResult{}, err
 		}
@@ -184,15 +185,11 @@ func (b *Binder) executeTool(
 				"session v3 Tool runtime is unavailable",
 			)
 		}
-		result, executeErr := b.goTools.ExecuteGo(
-			ctx,
-			effectiveRequest,
-			payload,
-		)
+		result, executeErr := b.goTools.ExecuteGo(ctx, payload)
 		if executeErr != nil {
 			return sessionv3Runtime.WorkExecutionResult{}, executeErr
 		}
-		return emitToolPortStreams(req, result)
+		return result, nil
 
 	case sessionv3Runtime.ToolBindingKindMCP:
 		if b.mcpTools == nil {
@@ -216,7 +213,7 @@ func (b *Binder) executeTool(
 				"MCP Tool runtime declined an MCP Tool execution",
 			)
 		}
-		return emitToolPortStreams(req, result)
+		return result, nil
 
 	case sessionv3Runtime.ToolBindingKindSkill:
 		if b.skillTools == nil {
@@ -237,7 +234,7 @@ func (b *Binder) executeTool(
 				"skill runtime declined a Skill Tool execution",
 			)
 		}
-		return emitToolPortStreams(req, result)
+		return result, nil
 
 	case sessionv3Runtime.ToolBindingKindProvider:
 		return sessionv3Runtime.WorkExecutionResult{}, errors.New(
@@ -252,103 +249,26 @@ func (b *Binder) executeTool(
 	}
 }
 
-func emitToolPortStreams(
-	request sessionv3Runtime.WorkDispatchRequest,
-	result sessionv3Runtime.WorkExecutionResult,
-) (sessionv3Runtime.WorkExecutionResult, error) {
-	streams := make([]string, 0)
-	for _, plan := range request.WorkItem.Ports {
-		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput ||
-			!plan.Stream {
-			continue
-		}
-		streams = append(streams, plan.Name)
+func rejectUnsupportedWorkflowToolTransport(
+	item sessionv3Runtime.WorkItem,
+	payload *sessionv3Runtime.ToolWork,
+) error {
+	if payload == nil {
+		return errors.New("tool payload is missing")
 	}
-	if len(streams) == 0 || result.Output == nil {
-		return result, nil
+	if len(payload.Context) != 0 {
+		return errors.New("workflow tool context transport is unavailable")
 	}
-	if request.PortStream.Emit == nil {
-		return toolPortStreamFailure(
-			result,
-			errors.New("tool streamed port emitter is unavailable"),
-		), nil
+	if len(item.PortInputs) != 0 {
+		return errors.New("workflow tool input port transport is unavailable")
 	}
-
-	values, err := toolPortStreamValues(result.Output)
-	if err != nil {
-		return toolPortStreamFailure(result, err), nil
-	}
-	for _, name := range streams {
-		for _, value := range values {
-			if err := request.PortStream.Emit(name, value); err != nil {
-				return toolPortStreamFailure(result, err), nil
-			}
+	for _, plan := range item.Ports {
+		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
+			plan.Stream {
+			return errors.New("workflow tool streamed port transport is unavailable")
 		}
 	}
-	return result, nil
-}
-
-func toolPortStreamValues(
-	output *sessionv3Runtime.WorkItemOutput,
-) ([]sessionv3Runtime.CanonicalValue, error) {
-	if output == nil {
-		return nil, nil
-	}
-	if output.Tool != nil && len(output.Tool.Structured) != 0 {
-		values, err := sessionv3Runtime.DecodeCanonicalValue[[]sessionv3Runtime.CanonicalValue](output.Tool.Structured)
-		if err == nil && len(values) != 0 {
-			return values, nil
-		}
-	}
-	if len(output.Value) != 0 {
-		return []sessionv3Runtime.CanonicalValue{
-			output.Value.Clone(),
-		}, nil
-	}
-	if output.Tool == nil {
-		return nil, nil
-	}
-	return []sessionv3Runtime.CanonicalValue{
-		sessionv3Runtime.MustCanonicalValue(struct {
-			Kind  sessionv3Runtime.ToolOutputKind `json:"kind"`
-			Text  string                          `json:"text,omitempty"`
-			Error string                          `json:"error,omitempty"`
-		}{
-			Kind:  output.Tool.Kind,
-			Text:  output.Tool.Text,
-			Error: output.Tool.Error,
-		}),
-	}, nil
-}
-
-func toolPortStreamFailure(
-	result sessionv3Runtime.WorkExecutionResult,
-	cause error,
-) sessionv3Runtime.WorkExecutionResult {
-	var typed *sessionv3Runtime.SanitizedError
-	if errors.As(cause, &typed) && typed != nil {
-		value := *typed
-		value.Details = typed.Details.Clone()
-		value.Causes = append(
-			[]sessionv3Runtime.SanitizedError(nil),
-			typed.Causes...,
-		)
-		result.Error = &value
-		result.Confirmed = false
-		return result
-	}
-
-	message := "tool streamed port delivery failed"
-	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
-		message = strings.ToLower(cause.Error())
-	}
-	result.Error = &sessionv3Runtime.SanitizedError{
-		Code:     "tool_port_stream_failed",
-		Category: sessionv3Runtime.ErrorCategoryUncertainty,
-		Message:  message,
-	}
-	result.Confirmed = false
-	return result
+	return nil
 }
 
 func (b *Binder) resolveToolWait(
