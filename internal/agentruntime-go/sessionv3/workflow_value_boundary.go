@@ -129,7 +129,25 @@ func validateWorkflowCallReceipt(
 	if step.Call == nil {
 		return nil
 	}
-	target, found := program.Targets[state.PendingTarget]
+	var receipt *ExternalReceipt
+	if output != nil {
+		receipt = output.Receipt
+	}
+	return validateWorkflowCallReceiptForTarget(
+		program,
+		state.PendingTarget,
+		step,
+		receipt,
+	)
+}
+
+func validateWorkflowCallReceiptForTarget(
+	program WorkflowProgram,
+	targetName string,
+	step WorkflowStep,
+	receipt *ExternalReceipt,
+) error {
+	target, found := program.Targets[targetName]
 	if !found {
 		return errors.New("workflow call has no persisted selected target")
 	}
@@ -146,10 +164,10 @@ func validateWorkflowCallReceipt(
 		if contract == nil || len(contract.ReceiptSchema) == 0 {
 			continue
 		}
-		if output == nil || output.Receipt == nil {
+		if receipt == nil {
 			return errors.New("workflow call requires a receipt")
 		}
-		value, err := canonicalWorkflowValue(output.Receipt)
+		value, err := canonicalWorkflowValue(receipt)
 		if err != nil {
 			return err
 		}

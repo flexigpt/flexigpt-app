@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 func (r *Runtime) cancelChildFramesLocked(
@@ -32,11 +33,9 @@ func (r *Runtime) cancelChildFramesLocked(
 			continue
 		}
 
-		r.cancelFrameTreeLocked(execution, child.ID)
-		if err := r.queueChildJoinLocked(
+		if err := r.cancelFrameTreeLocked(
 			session,
 			execution,
-			parentID,
 			child.ID,
 		); err != nil {
 			return err
@@ -72,8 +71,13 @@ func (r *Runtime) cancelChildFrameIDsLocked(
 			continue
 		}
 
-		r.cancelFrameTreeLocked(execution, frame.ID)
-		r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
+		if err := r.cancelFrameTreeLocked(
+			session,
+			execution,
+			frame.ID,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -104,56 +108,7 @@ func (r *Runtime) cancelWorkItemsLocked(
 				"workflow cancellation target work item is not owned by this frame",
 			)
 		}
-		if item.State.Terminal() {
-			continue
-		}
-		if item.Cleanup {
-			continue
-		}
-
-		if cancel := r.cancels[item.ID]; cancel != nil {
-			cancel()
-			delete(r.cancels, item.ID)
-		}
-		r.cancelResourceWaitLocked(item.ID)
-		released := r.releaseWorkResourcesLocked(execution, item.ID)
-		r.wakeResourceWaitersLocked(execution, released)
-		r.cancelRetryLocked(item.ID)
-
-		if item.WaitID != "" {
-			wait := mutableWait(execution, item.WaitID)
-			if wait != nil &&
-				(wait.Status == WaitStatusPending ||
-					wait.Status == WaitStatusResolving) {
-				wait.Status = WaitStatusCancelled
-				wait.UpdatedAt = now
-				wait.Error = &SanitizedError{
-					Code:     workflowChildCancelled,
-					Category: ErrorCategoryCancellation,
-					Message:  "workflow wait was cancelled by its owner",
-				}
-				r.cancelWaitDeadlineLocked(wait.ID)
-				delete(r.privateWaits, wait.ID)
-			}
-			item.WaitID = ""
-		}
-
-		item.State = WorkItemStateCancelled
-		item.EffectState = EffectStateConfirmedNotApplied
-		item.CompletedAt = &now
-		item.UpdatedAt = now
-		item.Error = &SanitizedError{
-			Code:     workflowChildCancelled,
-			Category: ErrorCategoryCancellation,
-			Effect:   EffectStateConfirmedNotApplied,
-			Message:  "workflow work item was cancelled by its owner",
-		}
-		if attempt := activeAttempt(execution, item.ID); attempt != nil {
-			attempt.State = AttemptStateCancelled
-			attempt.EffectState = EffectStateConfirmedNotApplied
-			attempt.FinishedAt = &now
-			attempt.Error = cloneWorkflowSanitizedError(item.Error)
-		}
+		r.cancelFrameWorkItemLocked(execution, item, now)
 	}
 	return nil
 }
@@ -178,71 +133,128 @@ func isDescendantFrame(
 }
 
 func (r *Runtime) cancelFrameTreeLocked(
+	session *Session,
 	execution *Execution,
 	frameID ProgramFrameID,
-) {
+) error {
 	frame := mutableFrame(execution, frameID)
 	if frame == nil || frame.Status.Terminal() {
-		return
+		return nil
 	}
 	if workflowFrameRunsCleanup(*frame) {
-		return
+		return nil
+	}
+
+	children := append([]ProgramFrameID(nil), frame.ChildFrameIDs...)
+	for _, childID := range children {
+		if err := r.cancelFrameTreeLocked(
+			session,
+			execution,
+			childID,
+		); err != nil {
+			return err
+		}
 	}
 
 	now := r.now()
-	frame.Status = ProgramFrameStateCancelled
-	frame.Error = &SanitizedError{
-		Code:     workflowChildCancelled,
-		Category: ErrorCategoryCancellation,
-		Message:  "workflow child was cancelled by its parent completion policy",
-	}
-	frame.UpdatedAt = now
-
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
 		if item.FrameID != frameID || item.State.Terminal() {
 			continue
 		}
-		if item.Cleanup {
-			continue
-		}
+		r.cancelFrameWorkItemLocked(execution, item, now)
+	}
+
+	frame = mutableFrame(execution, frameID)
+	if frame == nil || frame.Status.Terminal() {
+		return nil
+	}
+	return r.advanceFrameLocked(
+		session,
+		execution,
+		frame.ID,
+		ProgramEvent{Kind: ProgramEventCancelled},
+	)
+}
+
+func (r *Runtime) cancelFrameWorkItemLocked(
+	execution *Execution,
+	item *WorkItem,
+	now time.Time,
+) {
+	if execution == nil || item == nil || item.State.Terminal() || item.Cleanup {
+		return
+	}
+
+	switch item.State {
+	case WorkItemStateDispatched:
+		// Dispatch crossed the external-invocation boundary. Cancellation is
+		// not proof of non-application. Let the executing domain settle the
+		// Attempt as confirmed, failed, cancelled, or uncertain.
 		if cancel := r.cancels[item.ID]; cancel != nil {
 			cancel()
 			delete(r.cancels, item.ID)
 		}
-		r.cancelResourceWaitLocked(item.ID)
-		released := r.releaseWorkResourcesLocked(execution, item.ID)
-		r.wakeResourceWaitersLocked(execution, released)
-		r.cancelRetryLocked(item.ID)
-		item.State = WorkItemStateCancelled
-		item.CompletedAt = &now
-		item.UpdatedAt = now
+		return
+
+	case WorkItemStateBinding:
+		if cancel := r.cancels[item.ID]; cancel != nil {
+			cancel()
+			delete(r.cancels, item.ID)
+		}
+		delete(r.privateBindings, item.ID)
+
+	case WorkItemStateReady,
+		WorkItemStateResourceWaiting,
+		WorkItemStateRetryWaiting,
+		WorkItemStateWaiting:
+	default:
+		return
 	}
 
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
-		item := mutableWorkItem(execution, wait.WorkItemID)
-		if item == nil || item.FrameID != frameID {
-			continue
+	r.cancelResourceWaitLocked(item.ID)
+	r.cancelRetryLocked(item.ID)
+	if item.WaitID != "" {
+		wait := mutableWait(execution, item.WaitID)
+		if wait != nil &&
+			(wait.Status == WaitStatusPending ||
+				wait.Status == WaitStatusResolving) {
+			wait.Status = WaitStatusCancelled
+			wait.UpdatedAt = now
+			wait.Error = &SanitizedError{
+				Code:     workflowChildCancelled,
+				Category: ErrorCategoryCancellation,
+				Message:  "workflow wait was cancelled by its owner",
+			}
+			r.cancelWaitDeadlineLocked(wait.ID)
+			delete(r.privateWaits, wait.ID)
 		}
-		if wait.Status != WaitStatusPending &&
-			wait.Status != WaitStatusResolving {
-			continue
-		}
-		wait.Status = WaitStatusCancelled
-		wait.Error = &SanitizedError{
-			Code:     workflowChildCancelled,
-			Category: ErrorCategoryCancellation,
-			Message:  "workflow child was cancelled by its parent completion policy",
-		}
-		wait.UpdatedAt = now
-		r.cancelWaitDeadlineLocked(wait.ID)
-		delete(r.privateWaits, wait.ID)
+		item.WaitID = ""
 	}
 
-	for _, childID := range frame.ChildFrameIDs {
-		r.cancelFrameTreeLocked(execution, childID)
+	effectState := EffectStateConfirmedNotApplied
+	if item.Effect.Kind == EffectKindRead {
+		effectState = EffectStateNotApplicable
 	}
+	item.State = WorkItemStateCancelled
+	item.EffectState = effectState
+	item.Output = nil
+	item.CompletedAt = &now
+	item.UpdatedAt = now
+	item.Error = &SanitizedError{
+		Code:     workflowChildCancelled,
+		Category: ErrorCategoryCancellation,
+		Effect:   effectState,
+		Message:  "workflow work item was cancelled by its owner",
+	}
+	if attempt := activeAttempt(execution, item.ID); attempt != nil {
+		attempt.State = AttemptStateCancelled
+		attempt.EffectState = effectState
+		attempt.FinishedAt = &now
+		attempt.Error = cloneWorkflowSanitizedError(item.Error)
+	}
+	released := r.releaseWorkResourcesLocked(execution, item.ID)
+	r.wakeResourceWaitersLocked(execution, released)
 }
 
 func (r *Runtime) cancelChildExecutionIDsLocked(

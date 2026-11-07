@@ -307,7 +307,11 @@ func (r *Runtime) materializeForkFramesLocked(
 		if childFrame == nil {
 			return errors.New("fork child ProgramFrame is unavailable")
 		}
-		if err := r.stageFramePortInputsLocked(execution, childFrame); err != nil {
+		if err := r.stageFramePortInputsLocked(
+			session,
+			execution,
+			childFrame,
+		); err != nil {
 			return err
 		}
 		if len(childFrame.PortInputs) != 0 {

@@ -851,7 +851,7 @@ Functional backend completion does not require:
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [ ] Full callable interface context enforcement exists for every target kind.
 - [ ] Full callable interface port enforcement exists for every target kind.
-- [ ] Full receipt schema enforcement exists for every target kind.
+- [x] Full receipt schema enforcement exists for direct WorkItems, child Agent/Model/Workflow ProgramFrames, and start-call scheduling.
 
 ### Phase 4: planning and domain integration
 

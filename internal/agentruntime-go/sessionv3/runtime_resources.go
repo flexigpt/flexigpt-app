@@ -550,8 +550,7 @@ func normalizeRecoveredResources(
 		switch item.State {
 		case WorkItemStateBinding,
 			WorkItemStateDispatched,
-			WorkItemStateRetryWaiting,
-			WorkItemStateReconciling:
+			WorkItemStateRetryWaiting:
 			active[item.ID] = struct{}{}
 		default:
 		}

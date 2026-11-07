@@ -399,13 +399,22 @@ func (i *WorkflowInterpreter) workflowTerminalChildProgram(
 		errorValue, encodeErr := canonicalWorkflowValue(
 			state.Terminal.Error,
 		)
+		child.Scope.Cleanup = child.Scope.Cleanup ||
+			state.Terminal.Status != ProgramFrameStateCompleted
 		if encodeErr != nil {
 			return ProgramSnapshot{}, encodeErr
 		}
+
 		child.Scope.Error = &errorValue
 	}
 	outcomeValue := workflowTerminalOutcomeValue(*state.Terminal)
 	child.Scope.Outcome = &outcomeValue
+	child.Scope.Cleanup = child.Scope.Cleanup ||
+		state.Terminal.Status != ProgramFrameStateCompleted
+
+	// The completed cleanup marker is persisted in the child Program snapshot.
+	child.Scope.Cleanup = child.Scope.Cleanup ||
+		state.Terminal.Status != ProgramFrameStateCompleted
 	child.Scope.Event = nil
 
 	payload, err := canonicalWorkflowValue(child)

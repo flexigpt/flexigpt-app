@@ -20,6 +20,7 @@ import (
 const (
 	maxDurableCommandRecords       = 1024
 	maximumCommandFingerprintBytes = 32 << 20
+	frameReceiptSystem             = "session-v3-frame"
 )
 
 type RuntimeDependencies struct {
@@ -1269,7 +1270,8 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		r.mu.Unlock()
 		return receipt, nil
 	}
-	if wait.Request.Kind == WaitKindRecovery {
+	if wait.Request.Kind == WaitKindRecovery &&
+		!workflowReconciliationReviewWait(execution, *wait) {
 		receipt, resolveErr := r.resolveRecoveryWaitLocked(
 			ctx, session, execution, wait, command,
 		)
@@ -1396,6 +1398,10 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 	if err := r.persistLocked(ctx, "waitResolved", session); err != nil {
 		return nil, err
 	}
+	r.armSessionExecutionTimersLocked(
+		ctx,
+		session,
+	)
 	r.armExecutionRetriesLocked(
 		ctx,
 		session.ID,
@@ -1886,14 +1892,25 @@ func (r *Runtime) advanceFrameLocked(
 	if err := interpreter.ValidateState(transition.State); err != nil {
 		return err
 	}
+	now := r.now()
 	frame.State = transition.State
-	frame.UpdatedAt = r.now()
+	frame.UpdatedAt = now
 	if transition.Status != nil {
 		frame.Status = *transition.Status
 	}
 	frame.Output = transition.Output.Clone()
 	if transition.Error != nil {
 		frame.Error = transition.Error
+	}
+	if frame.Status == ProgramFrameStateCompleted &&
+		transition.Error == nil &&
+		frame.Receipt == nil {
+		frame.Receipt = frameTerminalReceipt(
+			*execution,
+			event,
+			frame.ID,
+			now,
+		)
 	}
 	reconciliationFailures, err := r.applyReconciliationSettlementsLocked(
 		session,
@@ -1981,24 +1998,6 @@ func (r *Runtime) advanceFrameLocked(
 			if err != nil {
 				return err
 			}
-		}
-		if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
-			if failure, found := budgetFailure(err); found {
-				frame.Status = ProgramFrameStateFailed
-				frame.Error = failure
-				frame.UpdatedAt = r.now()
-				if frame.ParentFrameID != "" {
-					return r.queueChildJoinLocked(
-						session,
-						execution,
-						frame.ParentFrameID,
-						frame.ID,
-					)
-				}
-				r.refreshExecutionStateLocked(execution)
-				return nil
-			}
-			return err
 		}
 		item.EffectPlan = cloneEffectPlan(intent.EffectPlan)
 		if mutableWorkItem(execution, item.ID) != nil {
@@ -2132,6 +2131,31 @@ func (r *Runtime) advanceFrameLocked(
 	return nil
 }
 
+func frameTerminalReceipt(
+	execution Execution,
+	event ProgramEvent,
+	frameID ProgramFrameID,
+	now time.Time,
+) *ExternalReceipt {
+	if event.Kind == ProgramEventWorkSettled {
+		item := executionWorkItem(execution, event.WorkItemID)
+		if item != nil &&
+			item.FrameID == frameID &&
+			item.Output != nil &&
+			item.Output.Receipt != nil {
+			value := *item.Output.Receipt
+			return &value
+		}
+	}
+
+	return &ExternalReceipt{
+		System:      frameReceiptSystem,
+		Reference:   string(frameID),
+		ConfirmedAt: now,
+		EffectState: EffectStateNotApplicable,
+	}
+}
+
 func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executionID ExecutionID, itemID WorkItemID) {
 	r.mu.Lock()
 	if r.closed {
@@ -2151,21 +2175,31 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.mu.Unlock()
 		return
 	}
-	if budgetErr := r.checkDispatchBudgetLocked(*execution, *item); budgetErr != nil {
-		now := r.now()
-		item.State = WorkItemStateBlocked
-		//nolint:errorlint // We are taking error val.
-		item.Error, _ = budgetErr.(*SanitizedError)
-		item.CompletedAt = &now
-		item.UpdatedAt = now
-		r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
-		r.refreshExecutionStateLocked(execution)
-		r.touchExecutionLocked(session, execution)
-		_ = r.persistLocked(ctx, "workBudgetBlocked", session)
+	if !r.reserveWorkStepLocked(ctx, session, execution, item) {
 		r.mu.Unlock()
 		return
 	}
-	if err := r.stageWorkPortInputsLocked(execution, item); err != nil {
+	if budgetErr := r.checkDispatchBudgetLocked(*execution, *item); budgetErr != nil {
+		failure, found := budgetFailure(budgetErr)
+		if !found {
+			failure = &SanitizedError{
+				Code:     budgetErrorCode,
+				Category: ErrorCategoryLimit,
+				Message:  budgetErr.Error(),
+			}
+		}
+		r.blockWorkForBudgetLocked(
+			ctx,
+			session,
+			execution,
+			item,
+			failure,
+			"workBudgetBlocked",
+		)
+		r.mu.Unlock()
+		return
+	}
+	if err := r.stageWorkPortInputsLocked(session, execution, item); err != nil {
 		now := r.now()
 		item.State = WorkItemStateBlocked
 		item.Error = portPlanError("port_input_invalid", err.Error())
@@ -2505,6 +2539,68 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	)
 }
 
+func (r *Runtime) reserveWorkStepLocked(
+	ctx context.Context,
+	session *Session,
+	execution *Execution,
+	item *WorkItem,
+) bool {
+	if item == nil || item.StepExecutionReserved {
+		return item != nil
+	}
+	if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
+		failure, found := budgetFailure(err)
+		if !found {
+			failure = &SanitizedError{
+				Code:     budgetErrorCode,
+				Category: ErrorCategoryLimit,
+				Message:  err.Error(),
+			}
+		}
+		r.blockWorkForBudgetLocked(
+			ctx,
+			session,
+			execution,
+			item,
+			failure,
+			"workStepBudgetBlocked",
+		)
+		return false
+	}
+	item.StepExecutionReserved = true
+	return true
+}
+
+func (r *Runtime) blockWorkForBudgetLocked(
+	ctx context.Context,
+	session *Session,
+	execution *Execution,
+	item *WorkItem,
+	failure *SanitizedError,
+	reason string,
+) {
+	if session == nil || execution == nil || item == nil || failure == nil {
+		return
+	}
+
+	now := r.now()
+	item.State = WorkItemStateBlocked
+	item.Error = cloneWorkflowSanitizedError(failure)
+	item.CompletedAt = &now
+	item.UpdatedAt = now
+	r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
+	r.refreshExecutionStateLocked(execution)
+	r.touchExecutionLocked(session, execution)
+	if err := r.persistLocked(ctx, reason, session); err != nil {
+		return
+	}
+
+	r.armSessionExecutionTimersLocked(ctx, session)
+	ready := r.readyWorkForSessionLocked(session)
+	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
+	r.launchReadyWork(ctx, session.ID, ready)
+}
+
 func (r *Runtime) startDispatchedLocked(
 	ctx context.Context,
 	session *Session,
@@ -2692,6 +2788,10 @@ func (r *Runtime) executeOne(
 	if err := r.persistLocked(ctx, "workFinished", session); err != nil {
 		return
 	}
+	r.armSessionExecutionTimersLocked(
+		ctx,
+		session,
+	)
 	r.armExecutionRetriesLocked(
 		ctx,
 		sessionID,
@@ -2720,12 +2820,6 @@ func (r *Runtime) finishWorkLocked(
 	item.CompletedAt = &now
 	item.UpdatedAt = now
 
-	if result.Error == nil && item.Output != nil {
-		if err := r.deliverWorkPortsLocked(session, execution, item); err != nil {
-			result.Error = portPlanError("port_delivery_failed", err.Error())
-			item.Error = result.Error
-		}
-	}
 	if result.Error == nil && item.Type == WorkItemTypeLLM {
 		if err := r.consumeLLMUsageLocked(
 			execution,
@@ -2741,6 +2835,12 @@ func (r *Runtime) finishWorkLocked(
 					Message:  err.Error(),
 				}
 			}
+			item.Error = result.Error
+		}
+	}
+	if result.Error == nil && item.Output != nil {
+		if err := r.deliverWorkPortsLocked(session, execution, item); err != nil {
+			result.Error = portPlanError("port_delivery_failed", err.Error())
 			item.Error = result.Error
 		}
 	}
@@ -3656,6 +3756,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 						attempt.FinishedAt = &now
 					}
 				}
+				//nolint:gocritic // No switch.
 				if replaySafe {
 					item.State = WorkItemStateReady
 					item.Binding = nil
@@ -3666,20 +3767,11 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 					item.DispatchedAt = nil
 					item.RetryState = nil
 					item.Requested = item.Automatic
-				} else {
-					needsReview = true
-				}
-				if replaySafe {
-					// Read, idempotent, and keyed work can be rebound against
-					// current dependencies and replayed with the same logical
-					// WorkItem identity and persisted idempotency key.
-					item.State = WorkItemStateReady
-					item.Binding = nil
-					item.Output = nil
-					item.Error = nil
+				} else if r.reconciliationRequiredLocked(execution, item) {
+					item.State = WorkItemStateReconciling
 					item.CompletedAt = nil
-					item.DispatchedAt = nil
 					item.RetryState = nil
+					item.Requested = false
 				} else {
 					needsReview = true
 				}

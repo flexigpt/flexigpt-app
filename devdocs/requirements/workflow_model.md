@@ -1757,6 +1757,7 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [x] Full typed Agent, Workspace, Model, instruction, Text, Tool, Skill, MCP, attachment, message, channel, and port plans are complete before every Agent-loop and single-model dispatch.
 - [x] Full typed Service and Activity execution-plan propagation is complete for every binding kind.
+- [x] Callable receipt schemas are enforced for direct WorkItems and child ProgramFrame target boundaries.
 
 ### Phase 3: ports, channels, and parent-child messaging
 

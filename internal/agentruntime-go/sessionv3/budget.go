@@ -363,6 +363,27 @@ func (r *Runtime) reserveActivityBudgetLocked(
 	if err != nil {
 		return err
 	}
+	return r.reserveMessageBudgetLocked(execution, bytes)
+}
+
+func (r *Runtime) reserveChannelMessageBudgetLocked(
+	execution *Execution,
+	data CanonicalValue,
+	correlation CanonicalValue,
+) error {
+	return r.reserveMessageBudgetLocked(
+		execution,
+		len(data)+len(correlation),
+	)
+}
+
+func (r *Runtime) reserveMessageBudgetLocked(
+	execution *Execution,
+	bytes int,
+) error {
+	if execution == nil {
+		return errors.New("execution budget owner is unavailable")
+	}
 	if err := checkBudgetCount(
 		execution.Budget.MessageCount,
 		execution.Usage.MessageCount,

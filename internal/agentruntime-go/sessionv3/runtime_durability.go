@@ -75,6 +75,56 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 			if execution.State.Terminal() {
 				continue
 			}
+
+			reconciling := make([]struct {
+				frameID ProgramFrameID
+				workID  WorkItemID
+			}, 0)
+			for _, item := range execution.WorkItems {
+				if item.State != WorkItemStateReconciling {
+					continue
+				}
+				reconciling = append(reconciling, struct {
+					frameID ProgramFrameID
+					workID  WorkItemID
+				}{
+					frameID: item.FrameID,
+					workID:  item.ID,
+				})
+			}
+			for _, value := range reconciling {
+				current := mutableSessionExecution(session, execution.ID)
+				if current == nil {
+					break
+				}
+				item := mutableWorkItem(current, value.workID)
+				if item == nil ||
+					item.State != WorkItemStateReconciling ||
+					item.FrameID != value.frameID {
+					continue
+				}
+				if err := r.advanceFrameLocked(
+					session,
+					current,
+					value.frameID,
+					ProgramEvent{
+						Kind:       ProgramEventWorkSettled,
+						WorkItemID: value.workID,
+					},
+				); err != nil {
+					continue
+				}
+				r.touchExecutionLocked(session, current)
+				if err := r.persistLocked(
+					ctx,
+					"reconciliationRecovery",
+					session,
+				); err != nil {
+					continue
+				}
+				execution = current
+			}
+
 			for _, frame := range execution.ProgramFrames {
 				if !reconciliationResumeRequired(
 					frame,

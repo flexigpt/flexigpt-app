@@ -5,6 +5,15 @@ import (
 	"fmt"
 )
 
+const (
+	reconciliationReviewCancelledCode    = "reconciliation_review_cancelled"
+	reconciliationUnknownCode            = "reconciliation_unknown"
+	reconciliationReviewCancelledMessage = "reconciliation review was cancelled"
+	reconciliationReviewMissingMessage   = "reconciliation review work item is unavailable"
+	reconciliationOriginalMissingMessage = "reconciliation original work item is unavailable"
+	reconciliationUnknownMessage         = "reconciliation did not confirm the external effect"
+)
+
 func (r *Runtime) reconciliationRequiredLocked(
 	execution *Execution,
 	item *WorkItem,
@@ -20,6 +29,32 @@ func (r *Runtime) reconciliationRequiredLocked(
 	frame := mutableFrame(execution, item.FrameID)
 	return frame != nil &&
 		frame.Program.InterpreterID == WorkflowInterpreterID
+}
+
+func workflowReconciliationReviewWait(
+	execution *Execution,
+	wait Wait,
+) bool {
+	if execution == nil || wait.WorkItemID == "" {
+		return false
+	}
+	item := mutableWorkItem(execution, wait.WorkItemID)
+	if item == nil || item.Type != WorkItemTypeWait {
+		return false
+	}
+	frame := mutableFrame(execution, item.FrameID)
+	if frame == nil || frame.Program.InterpreterID != WorkflowInterpreterID {
+		return false
+	}
+	_, state, err := decodeWorkflowProgram(*frame)
+	if err != nil || state.Pending == nil ||
+		state.Pending.Kind != WorkflowPendingReconciliation ||
+		state.Pending.Reconciliation == nil {
+		return false
+	}
+	return state.Pending.Reconciliation.Phase ==
+		WorkflowReconciliationPhaseReview &&
+		state.Pending.Reconciliation.ReviewWorkItemID == item.ID
 }
 
 func (r *Runtime) applyReconciliationSettlementsLocked(
@@ -192,10 +227,10 @@ func (r *Runtime) settleReconciledUnknownLocked(
 	item.Error = cloneReconciliationError(cause)
 	if item.Error == nil {
 		item.Error = &SanitizedError{
-			Code:     "reconciliation_unknown",
+			Code:     reconciliationUnknownCode,
 			Category: ErrorCategoryUncertainty,
 			Effect:   EffectStateUncertain,
-			Message:  "reconciliation did not confirm the external effect",
+			Message:  reconciliationUnknownMessage,
 		}
 	}
 	item.CompletedAt = &now
@@ -235,6 +270,115 @@ func reconciledNonApplicationError(
 	output.Message = "reconciliation confirmed that the external effect was not applied" + ":" + output.Message
 
 	return output
+}
+
+func (i *WorkflowInterpreter) settleReconciliationReview(
+	frame ProgramFrame,
+	execution Execution,
+	_ WorkflowProgram,
+	state WorkflowState,
+	workItemID WorkItemID,
+) (ProgramTransition, bool, error) {
+	pending := state.Pending
+	if pending == nil ||
+		pending.Kind != WorkflowPendingReconciliation ||
+		pending.Reconciliation == nil ||
+		pending.Reconciliation.Phase != WorkflowReconciliationPhaseReview ||
+		pending.Reconciliation.ReviewWorkItemID != workItemID {
+		return ProgramTransition{}, false, nil
+	}
+
+	item := executionWorkItem(execution, workItemID)
+	if item == nil || item.FrameID != frame.ID {
+		return ProgramTransition{}, true, errors.New(
+			reconciliationReviewMissingMessage,
+		)
+	}
+	if !item.State.Terminal() {
+		transition, err := workflowTransition(state, nil, nil, nil)
+		return transition, true, err
+	}
+	if item.State != WorkItemStateCompleted {
+		return ProgramTransition{}, true, errors.New(
+			"reconciliation review did not complete successfully",
+		)
+	}
+
+	var review *Wait
+	for index := range execution.Waits {
+		if execution.Waits[index].WorkItemID != workItemID {
+			continue
+		}
+		value := execution.Waits[index]
+		review = &value
+		break
+	}
+	if review == nil || review.Status != WaitStatusResolved {
+		return ProgramTransition{}, true, errors.New(
+			"reconciliation review resolution is unavailable",
+		)
+	}
+
+	original := executionWorkItem(
+		execution,
+		pending.Reconciliation.OriginalWorkItemID,
+	)
+	if original == nil {
+		return ProgramTransition{}, true, errors.New(
+			reconciliationOriginalMissingMessage,
+		)
+	}
+
+	failure := cloneReconciliationError(original.Error)
+	if failure == nil {
+		failure = cloneReconciliationError(
+			pending.Reconciliation.ReviewError,
+		)
+	}
+	if failure == nil {
+		failure = &SanitizedError{
+			Code:     reconciliationUnknownCode,
+			Category: ErrorCategoryUncertainty,
+			Message:  reconciliationUnknownMessage,
+		}
+	}
+	failure.StepPath = pending.Path
+
+	state.Pending = nil
+	state.PendingPath = ""
+	state.PendingTarget = ""
+	state.Deadline = nil
+
+	switch review.Resolution {
+	case WaitResolutionContinue:
+		t, err := workflowFailureTransition(state, failure)
+		if err != nil {
+			return ProgramTransition{}, true, err
+		}
+		return t, true, nil
+	case WaitResolutionCancel:
+		status := ProgramFrameStateCancelled
+		transition, err := workflowTransition(
+			state,
+			&status,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return ProgramTransition{}, true, err
+		}
+		transition.Error = &SanitizedError{
+			Code:     reconciliationReviewCancelledCode,
+			Category: ErrorCategoryCancellation,
+			Message:  reconciliationReviewCancelledMessage,
+		}
+		return transition, true, nil
+
+	default:
+		return ProgramTransition{}, true, errors.New(
+			"reconciliation review resolution is invalid",
+		)
+	}
 }
 
 func mutableLatestAttemptForWorkItem(

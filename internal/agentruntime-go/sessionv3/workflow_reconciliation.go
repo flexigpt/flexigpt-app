@@ -235,6 +235,7 @@ func (i *WorkflowInterpreter) settleReconciliationIntent(
 		pending.Reconciliation.Operation,
 	)
 	childScope := WorkflowScopeContext{
+		Cleanup:   true,
 		Operation: &operationValue,
 	}
 	snapshot, err := i.childBlockProgramWithScope(
@@ -458,9 +459,9 @@ func (i *WorkflowInterpreter) beginReconciliationReview(
 ) (ProgramTransition, bool, error) {
 	if failure == nil {
 		failure = &SanitizedError{
-			Code:     "reconciliation_unknown",
+			Code:     reconciliationUnknownCode,
 			Category: ErrorCategoryUncertainty,
-			Message:  "reconciliation did not confirm the external effect",
+			Message:  reconciliationUnknownMessage,
 		}
 	}
 	pending := state.Pending

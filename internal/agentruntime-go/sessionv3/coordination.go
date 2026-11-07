@@ -292,15 +292,6 @@ func (r *Runtime) applyEmitLocked(
 	if execution == nil {
 		return EmitReceipt{}, nil, nil, errors.New("execution is unavailable")
 	}
-	if payload.Destination.Event != "" {
-		if err := r.reserveEventBudgetLocked(
-			execution,
-			payload.Data,
-			payload.Correlation,
-		); err != nil {
-			return EmitReceipt{}, nil, nil, err
-		}
-	}
 	if !payload.Data.Valid() || !payload.Correlation.Valid() {
 		return EmitReceipt{}, nil, nil, errors.New("emit payload is not canonical JSON")
 	}
@@ -335,7 +326,6 @@ func (r *Runtime) applyEmitLocked(
 	if len(execution.EmitReceipts) >= maximumCoordinationRecords {
 		return EmitReceipt{}, nil, nil, errors.New("execution emit receipt limit exceeded")
 	}
-
 	now := r.now()
 	receipt := EmitReceipt{
 		ID:               string(workItemID),
@@ -365,6 +355,13 @@ func (r *Runtime) applyEmitLocked(
 		if channel.Bytes+len(payload.Data)+len(payload.Correlation) > channel.MaxBytes {
 			return EmitReceipt{}, nil, nil, errors.New("channel byte limit exceeded")
 		}
+		if err := r.reserveChannelMessageBudgetLocked(
+			execution,
+			payload.Data,
+			payload.Correlation,
+		); err != nil {
+			return EmitReceipt{}, nil, nil, err
+		}
 
 		channel.NextSequence++
 		message := ChannelMessage{
@@ -386,6 +383,13 @@ func (r *Runtime) applyEmitLocked(
 	case payload.Destination.Event != "":
 		if len(execution.Signals) >= maximumCoordinationRecords {
 			return EmitReceipt{}, nil, nil, errors.New("execution signal retention limit exceeded")
+		}
+		if err := r.reserveEventBudgetLocked(
+			execution,
+			payload.Data,
+			payload.Correlation,
+		); err != nil {
+			return EmitReceipt{}, nil, nil, err
 		}
 		signal := ExecutionSignal{
 			ID:          "emit:" + string(workItemID),

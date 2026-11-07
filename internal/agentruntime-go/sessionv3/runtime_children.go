@@ -290,7 +290,11 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	parentFrame.ChildExecutionIDs = append(parentFrame.ChildExecutionIDs, child.ID)
 	session.Executions = append(session.Executions, child)
 	created := &session.Executions[len(session.Executions)-1]
-	if err := r.stageFramePortInputsLocked(created, &created.ProgramFrames[0]); err != nil {
+	if err := r.stageFramePortInputsLocked(
+		session,
+		created,
+		&created.ProgramFrames[0],
+	); err != nil {
 		return nil, err
 	}
 	if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 &&

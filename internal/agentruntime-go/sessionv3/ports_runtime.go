@@ -8,6 +8,14 @@ import (
 )
 
 const (
+	portInputOwnerUnavailableMessage             = "port input owner is unavailable"
+	portInputNotDeclaredMessage                  = "port input is not declared"
+	portInputFactsChangedMessage                 = "port input facts differ from its plan"
+	portChannelParentExecutionUnavailableMessage = "parent port channel execution is unavailable"
+	portChannelParentFrameUnavailableMessage     = "parent port channel frame is unavailable"
+)
+
+const (
 	portMessageKind       = "port"
 	portStreamMessageKind = "port-stream"
 	portMessageSeparator  = ":"
@@ -53,10 +61,11 @@ func llmPortPlansForFrame(
 }
 
 func (r *Runtime) stageWorkPortInputsLocked(
+	session *Session,
 	execution *Execution,
 	item *WorkItem,
 ) error {
-	if execution == nil || item == nil {
+	if session == nil || execution == nil || item == nil {
 		return errors.New("work port owner is unavailable")
 	}
 	if len(item.Ports) == 0 {
@@ -67,6 +76,7 @@ func (r *Runtime) stageWorkPortInputsLocked(
 	}
 
 	inputs, err := r.portInputsLocked(
+		session,
 		execution,
 		item.Ports,
 		item.PortInputs,
@@ -137,10 +147,11 @@ func mergeWorkPortPlans(
 }
 
 func (r *Runtime) stageFramePortInputsLocked(
+	session *Session,
 	execution *Execution,
 	frame *ProgramFrame,
 ) error {
-	if execution == nil || frame == nil {
+	if session == nil || execution == nil || frame == nil {
 		return errors.New("frame port owner is unavailable")
 	}
 	if len(frame.Ports) == 0 {
@@ -150,6 +161,7 @@ func (r *Runtime) stageFramePortInputsLocked(
 		return err
 	}
 	inputs, err := r.portInputsLocked(
+		session,
 		execution,
 		frame.Ports,
 		frame.PortInputs,
@@ -162,11 +174,32 @@ func (r *Runtime) stageFramePortInputsLocked(
 }
 
 func (r *Runtime) portInputsLocked(
+	session *Session,
 	execution *Execution,
 	plans []PortPlan,
 	existing []PortInput,
 ) ([]PortInput, error) {
+	if session == nil || execution == nil {
+		return nil, errors.New(portInputOwnerUnavailableMessage)
+	}
+
 	output := clonePortInputs(existing)
+	inputPlans := make(map[string]PortPlan, len(plans))
+	for _, plan := range plans {
+		if plan.Direction == WorkflowPortDirectionInput {
+			inputPlans[plan.Name] = plan
+		}
+	}
+	for _, input := range output {
+		plan, found := inputPlans[input.Name]
+		if !found {
+			return nil, errors.New(portInputNotDeclaredMessage)
+		}
+		if input.Channel != plan.Channel || input.Streamed != plan.Stream {
+			return nil, errors.New(portInputFactsChangedMessage)
+		}
+	}
+
 	for _, plan := range plans {
 		if plan.Direction != WorkflowPortDirectionInput {
 			continue
@@ -174,12 +207,27 @@ func (r *Runtime) portInputsLocked(
 		if err := plan.Validate(); err != nil {
 			return nil, err
 		}
-		channel := executionChannel(execution, plan.Channel)
+		channelExecution, err := portChannelExecution(
+			session,
+			execution,
+			plan,
+		)
+		if err != nil {
+			return nil, err
+		}
+		channel := executionChannel(channelExecution, plan.Channel)
 		if channel == nil {
-			return nil, fmt.Errorf(
-				"port input channel %q is unavailable",
+			maxMessages, maxBytes := portRetention(plan)
+			channel, err = mutableChannelLog(
+				channelExecution,
 				plan.Channel,
+				maxMessages,
+				maxBytes,
 			)
+			if err != nil {
+				return nil, err
+			}
+			r.touchExecutionLocked(session, channelExecution)
 		}
 
 		index := -1
@@ -246,6 +294,32 @@ func executionChannel(
 		}
 	}
 	return nil
+}
+
+func portChannelExecution(
+	session *Session,
+	execution *Execution,
+	plan PortPlan,
+) (*Execution, error) {
+	if session == nil || execution == nil {
+		return nil, errors.New(portInputOwnerUnavailableMessage)
+	}
+
+	// Attached child frames share their parent Execution. Independent child
+	// Executions retain the parent-frame identity in the port plan and must
+	// use the parent Execution channel log.
+	if plan.ParentFrameID == "" || execution.ParentExecutionID == "" {
+		return execution, nil
+	}
+
+	parent := mutableSessionExecution(session, execution.ParentExecutionID)
+	if parent == nil {
+		return nil, errors.New(portChannelParentExecutionUnavailableMessage)
+	}
+	if mutableFrame(parent, plan.ParentFrameID) == nil {
+		return nil, errors.New(portChannelParentFrameUnavailableMessage)
+	}
+	return parent, nil
 }
 
 func (r *Runtime) deliverWorkPortsLocked(
@@ -472,6 +546,7 @@ func (r *Runtime) appendPortMessageLocked(
 	if !value.Valid() {
 		return errors.New("port output is not canonical json")
 	}
+
 	if err := validateWorkflowSchema(plan.Schema, value); err != nil {
 		return fmt.Errorf("validate port output: %w", err)
 	}
@@ -483,8 +558,16 @@ func (r *Runtime) appendPortMessageLocked(
 	}
 
 	maxMessages, maxBytes := portRetention(plan)
-	channel, err := mutableChannelLog(
+	channelExecution, err := portChannelExecution(
+		session,
 		execution,
+		plan,
+	)
+	if err != nil {
+		return err
+	}
+	channel, err := mutableChannelLog(
+		channelExecution,
 		plan.Channel,
 		maxMessages,
 		maxBytes,
@@ -503,6 +586,13 @@ func (r *Runtime) appendPortMessageLocked(
 	if channel.Bytes+len(value) > channel.MaxBytes {
 		return errors.New("port channel byte limit exceeded")
 	}
+	if err := r.reserveChannelMessageBudgetLocked(
+		channelExecution,
+		value,
+		nil,
+	); err != nil {
+		return err
+	}
 
 	now := r.now()
 	channel.NextSequence++
@@ -516,9 +606,10 @@ func (r *Runtime) appendPortMessageLocked(
 	}
 	channel.Messages = append(channel.Messages, message)
 	channel.Bytes += len(message.Data)
-	if err := r.wakeChannelWaitsLocked(session, execution, message); err != nil {
+	if err := r.wakeChannelWaitsLocked(session, channelExecution, message); err != nil {
 		return err
 	}
+	r.touchExecutionLocked(session, channelExecution)
 	return nil
 }
 

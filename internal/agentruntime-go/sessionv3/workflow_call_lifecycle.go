@@ -4,6 +4,8 @@ import (
 	"slices"
 )
 
+const workflowStartReceiptSystem = "workflow-start"
+
 type WorkflowChildLifetime string
 
 const (
@@ -157,6 +159,27 @@ func (i *WorkflowInterpreter) startCall(
 		return workflowFailure(
 			state,
 			"workflow_start_output_invalid",
+			err.Error(),
+		)
+	}
+	receiptReference := string(frameID)
+	if executionID != "" {
+		receiptReference = string(executionID)
+	}
+	if err := validateWorkflowCallReceiptForTarget(
+		program,
+		targetName,
+		step,
+		&ExternalReceipt{
+			System:      workflowStartReceiptSystem,
+			Reference:   receiptReference,
+			ConfirmedAt: state.LogicalTime,
+			EffectState: EffectStateNotApplicable,
+		},
+	); err != nil {
+		return workflowFailure(
+			state,
+			"workflow_start_receipt_invalid",
 			err.Error(),
 		)
 	}

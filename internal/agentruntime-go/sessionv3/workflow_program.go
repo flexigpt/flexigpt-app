@@ -612,6 +612,20 @@ func (i *WorkflowInterpreter) Advance(
 			}
 			break
 		}
+		if reviewTransition, handled, reviewErr := i.settleReconciliationReview(
+			frame,
+			execution,
+			program,
+			state,
+			event.WorkItemID,
+		); handled {
+			if reviewErr != nil {
+				transition, err = workflowFailure(state, "workflow_reconciliation_failed", reviewErr.Error())
+			} else {
+				transition = reviewTransition
+			}
+			break
+		}
 		if sagaTransition, handled, sagaErr := i.settleSagaWork(
 			frame,
 			execution,
@@ -1808,6 +1822,14 @@ func (i *WorkflowInterpreter) settleChild(
 			*state,
 			step,
 			child.Output,
+		); err != nil {
+			return err
+		}
+		if err := validateWorkflowCallReceiptForTarget(
+			program,
+			state.PendingTarget,
+			step,
+			child.Receipt,
 		); err != nil {
 			return err
 		}

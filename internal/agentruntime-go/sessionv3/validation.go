@@ -684,6 +684,11 @@ func (p ProgramFrame) Validate() error {
 	if err := validateUniquePortInputs(p.PortInputs); err != nil {
 		return err
 	}
+	if p.Receipt != nil {
+		if err := p.Receipt.Validate(); err != nil {
+			return err
+		}
+	}
 	for _, executionID := range p.ChildExecutionIDs {
 		if err := validateID("ProgramFrame child Execution ID", string(executionID)); err != nil {
 			return err
