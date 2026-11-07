@@ -7,7 +7,7 @@ import (
 	"time"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/tool"
+	toolRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/tool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
@@ -23,7 +23,7 @@ type WorkflowGoToolCaller interface {
 		function string,
 		args json.RawMessage,
 		timeout time.Duration,
-		invocation tool.Invocation,
+		invocation toolRuntime.Invocation,
 	) ([]llmtoolsSpec.ToolOutputUnion, error)
 }
 
@@ -60,15 +60,15 @@ func (a *WorkflowGoToolCallerAdapter) CallGoToolWithWorkflowInvocation(
 	function string,
 	args json.RawMessage,
 	timeout time.Duration,
-	invocation tool.Invocation,
+	invocation toolRuntime.Invocation,
 ) ([]llmtoolsSpec.ToolOutputUnion, error) {
 	if a == nil || a.caller == nil {
 		return nil, ErrWorkflowGoToolPortTransportUnavailable
 	}
 
-	invocation.Version = tool.Version
+	invocation.Version = toolRuntime.Version
 	return a.caller.CallGoTool(
-		tool.WithInvocation(ctx, invocation),
+		toolRuntime.WithInvocation(ctx, invocation),
 		function,
 		append(json.RawMessage(nil), args...),
 		timeout,
@@ -78,17 +78,17 @@ func (a *WorkflowGoToolCallerAdapter) CallGoToolWithWorkflowInvocation(
 func NewWorkflowGoToolInvocation(
 	request sessionv3Runtime.WorkDispatchRequest,
 	payload *sessionv3Runtime.ToolWork,
-) tool.Invocation {
+) toolRuntime.Invocation {
 	if payload == nil {
-		return tool.Invocation{}
+		return toolRuntime.Invocation{}
 	}
 
-	output := tool.Invocation{
-		Version: tool.Version,
+	output := toolRuntime.Invocation{
+		Version: toolRuntime.Version,
 		Context: append(json.RawMessage(nil), payload.Context...),
 	}
 	for _, input := range request.WorkItem.PortInputs {
-		value := tool.PortInput{
+		value := toolRuntime.PortInput{
 			Name:     input.Name,
 			Channel:  input.Channel,
 			Cursor:   input.Cursor,
@@ -127,7 +127,7 @@ func NewWorkflowGoToolInvocation(
 
 func ValidateWorkflowGoToolTransport(
 	caller GoToolCaller,
-	invocation tool.Invocation,
+	invocation toolRuntime.Invocation,
 ) error {
 	if !invocation.RequiresTransport() {
 		return nil
@@ -144,7 +144,7 @@ func CallGoToolWithWorkflowInvocation(
 	function string,
 	args json.RawMessage,
 	timeout time.Duration,
-	invocation tool.Invocation,
+	invocation toolRuntime.Invocation,
 ) ([]llmtoolsSpec.ToolOutputUnion, error) {
 	if err := ValidateWorkflowGoToolTransport(caller, invocation); err != nil {
 		return nil, err

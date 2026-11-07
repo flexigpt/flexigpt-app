@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/workflowports"
+	mcpWorkflowPorts "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/workflowports"
 )
 
 type MCPInvocationSource string
@@ -32,7 +32,7 @@ type InvokeMCPToolRequestBody struct {
 
 	AppInstanceID string `json:"appInstanceID,omitempty"`
 
-	WorkflowPorts *workflowports.Request `json:"-"`
+	WorkflowPorts *mcpWorkflowPorts.Request `json:"-"`
 }
 
 type InvokeMCPToolRequest struct {
