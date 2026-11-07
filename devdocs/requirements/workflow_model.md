@@ -1840,7 +1840,9 @@ Those are aggregate-stage work after functional backend completion.
 - [x] Provider streaming, usage, protocol output, debugger projection, Tool continuation, cancellation, retries, waits, recovery, uncertainty, and command idempotency exist for current V3 paths.
 - [x] Agent, Workspace, Model, Text, Tool, Skill, and MCP setup paths have typed ownership boundaries.
 - [x] Go Tool, provider SDK Tool, MCP Tool, and Skill Tool have typed domain routes.
-- [x] Go Tool, MCP Tool, and Skill Tool port transports are setup-owned and capability-gated; unsupported external targets fail before invocation.
+- [x] Go Tool port transport is provided by an application-side `GoToolCaller` wrapper that passes a domain-neutral invocation sidecar through `context.Context`.
+- [x] MCP Tool port transport is registered as `io.flexigpt.workflow.ports/v1` and is sent through MCP request metadata only to servers that advertise the extension.
+- [x] Skill Tool port transport is capability-gated and remains disabled until the registered Skill handler consumes the domain-neutral sidecar.
 - [x] MCP resources, prompts, Apps, approvals, App Tool calls, App resource reads, and App context staging have typed domain routes.
 - [x] Skill sessions and active Skill lifecycle have typed domain routes.
 - [x] Attachment admission uses a narrow Attachment Runtime domain port.

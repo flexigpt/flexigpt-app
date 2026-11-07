@@ -119,6 +119,12 @@ func InitComposedSessionV3Runtime(
 		params.WorkflowBindings == nil {
 		return errSessionV3Deps
 	}
+	workflowToolCaller, err := toolruntime.NewWorkflowGoToolCaller(
+		params.ToolCaller,
+	)
+	if err != nil {
+		return err
+	}
 	base, err := sessionv3runtime.New(
 		sessionv3runtime.Dependencies{
 			Artifacts:     params.Artifacts,
@@ -128,7 +134,7 @@ func InitComposedSessionV3Runtime(
 			Workspaces:    params.Workspaces,
 			Texts:         params.Texts,
 			Tools:         params.Tools,
-			ToolCaller:    params.ToolCaller,
+			ToolCaller:    workflowToolCaller,
 			SkillResolver: params.SkillResolver,
 			SkillRuntime:  params.SkillRuntime,
 			MCPRuntime:    params.MCPRuntime,

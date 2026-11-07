@@ -233,11 +233,12 @@ func (s *Session) CallTool(
 	if args == nil {
 		args = map[string]any{}
 	}
-
-	res, err := s.session.CallTool(ctx, &mcpSDK.CallToolParams{
+	params := &mcpSDK.CallToolParams{
 		Name:      toolName,
 		Arguments: args,
-	})
+	}
+
+	res, err := s.session.CallTool(ctx, params)
 	if err != nil {
 		return nil, err
 	}

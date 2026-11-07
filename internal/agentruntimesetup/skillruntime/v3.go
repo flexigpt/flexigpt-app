@@ -645,8 +645,9 @@ func (e *V3Executor) v3SkillChoices(
 			Binding: sessionv3Runtime.ToolBinding{
 				Kind: sessionv3Runtime.ToolBindingKindSkill,
 				Skill: &sessionv3Runtime.SkillToolBinding{
-					Name:          definition.name,
-					WorkflowPorts: e.runtime.SupportsWorkflowToolInvocation(),
+					Name: definition.name,
+					WorkflowPorts: e != nil && e.runtime != nil &&
+						e.runtime.SupportsWorkflowToolInvocation(),
 				},
 			},
 		}

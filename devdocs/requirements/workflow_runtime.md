@@ -948,8 +948,10 @@ Functional backend completion does not require:
 - [x] V3 Service binding composition is complete.
 - [x] V3 Activity binding composition is complete.
 - [x] V3 Tool streamed output ports emit durable typed output records for Go Tool, MCP Tool, and Skill Tool routes.
-- [x] V3 Tool input-port adaptation uses setup-owned Go caller, MCP extension, and Skill invocation transports; unavailable target capabilities fail before invocation.
-- [x] Go Tool, MCP Tool, and Skill Tool port adapters preserve V2 contracts by using additive setup wrappers and domain-neutral sidecars.
+- [x] Go Tool input-port adaptation is provided by an additive application-side `GoToolCaller` wrapper and does not alter V2 callers.
+- [x] MCP Tool input-port adaptation is provided through the advertised `io.flexigpt.workflow.ports/v1` MCP metadata extension.
+- [x] Skill Tool input-port adaptation is capability-gated through a domain-neutral sidecar and fails before invocation until a registered Skill handler enables consumption.
+- [x] Go Tool, MCP Tool, and Skill Tool port adapters preserve V2 contracts by using setup wrappers, MCP metadata, and domain-neutral sidecars.
 - [ ] V3 command and projection coverage is complete for all normal Session v2 behavior.
 
 ### Phase 9: functional completion gate

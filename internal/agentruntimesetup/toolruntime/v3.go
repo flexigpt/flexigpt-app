@@ -2,6 +2,7 @@ package toolruntime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -283,12 +284,13 @@ func (e *V3Executor) ExecuteGo(
 	}
 
 	invocation := NewWorkflowGoToolInvocation(request, payload)
+	timeout := durationMilliseconds(binding.TimeoutMS)
 	outputs, invokeErr := CallGoToolWithWorkflowInvocation(
 		ctx,
 		e.caller,
 		resolved.Tool.Implementation.Function,
-		arguments.Clone(),
-		binding.TimeoutMS,
+		json.RawMessage(arguments.Clone()),
+		timeout,
 		invocation,
 	)
 	text, structured, conversionErr := V3ToolOutputs(outputs)
