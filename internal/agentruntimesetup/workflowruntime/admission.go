@@ -491,13 +491,20 @@ func (a *Admission) bindTarget(
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 		if target.Server != nil {
-			return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
-				Kind: sessionv3Runtime.WorkflowTargetMCPTool,
-				MCP: &sessionv3Runtime.WorkflowMCP{
-					Server:   pin,
-					ToolName: target.Ref,
+			return finalizeWorkflowTarget(
+				document,
+				target,
+				sessionv3Runtime.WorkflowTarget{
+					Kind: sessionv3Runtime.WorkflowTargetMCPTool,
+					MCP: &sessionv3Runtime.WorkflowMCP{
+						Server:   pin,
+						ToolName: target.Ref,
+					},
+					Effect: sessionv3Runtime.EffectContract{
+						Kind: sessionv3Runtime.EffectKindNonIdempotent,
+					},
 				},
-			})
+			)
 		}
 
 		providerManaged, inspectErr := a.tools.IsProviderManagedWorkflowTool(
@@ -515,11 +522,18 @@ func (a *Admission) bindTarget(
 			)
 		}
 
-		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
-			Kind:     sessionv3Runtime.WorkflowTargetTool,
-			Artifact: &pin,
-			ToolName: target.Ref,
-		})
+		return finalizeWorkflowTarget(
+			document,
+			target,
+			sessionv3Runtime.WorkflowTarget{
+				Kind:     sessionv3Runtime.WorkflowTargetTool,
+				Artifact: &pin,
+				ToolName: target.Ref,
+				Effect: sessionv3Runtime.EffectContract{
+					Kind: sessionv3Runtime.EffectKindNonIdempotent,
+				},
+			},
+		)
 
 	case workflowv1.TargetWorkflow:
 		ref, found := refs[path]
@@ -562,30 +576,12 @@ func (a *Admission) bindTarget(
 
 	case workflowv1.TargetAgent,
 		workflowv1.TargetModel:
-		ref, found := refs[path]
-		if !found {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: llm target %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		pin, err := a.pinArtifact(ctx, ref)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
-
-		kind := sessionv3Runtime.WorkflowTargetModel
-		if target.Kind == workflowv1.TargetAgent {
-			kind = sessionv3Runtime.WorkflowTargetAgent
-		}
-		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
-			Kind:     kind,
-			Artifact: &pin,
-			Effect: sessionv3Runtime.EffectContract{
-				Kind: sessionv3Runtime.EffectKindRead,
-			},
-		})
+		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+			"%w: workflow %s target %q requires a typed workflow invocation adapter",
+			ErrBindingUnavailable,
+			target.Kind,
+			target.Ref,
+		)
 
 	default:
 		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(

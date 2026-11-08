@@ -85,6 +85,29 @@ A Workflow does not own:
 - Wails transport behavior.
 - Browser state.
 
+### 3.4 Workflow target-adapter boundary
+
+Workflow owns orchestration adapters for callable targets.
+
+Workflow adapters:
+
+- Depend on existing typed Model, Agent, Tool, Skill, MCP, Workspace, Service, and Activity APIs.
+- Convert Workflow-owned typed declarations and evaluated Workflow values into existing domain request types.
+- Persist Workflow semantic facts before external dispatch.
+- Keep native domain calls, provider clients, credentials, native paths, and domain-private handles outside Session documents.
+
+Domains do not:
+
+- Import Workflow Runtime or Session Runtime types.
+- Add Workflow-only request contracts.
+- Accept Workflow context through native Tool arguments, provider metadata, MCP metadata, Skill sidecars, or native context sidecars.
+
+`CanonicalValue` can represent Workflow data boundaries. It must not become a
+second Model or Agent request grammar. A Workflow Model or Agent target needs
+a Workflow-owned typed adapter that uses the existing Model or Agent domain
+contract. Until that adapter exists, admission rejects the target before
+Workflow execution starts.
+
 ### 3.2 Agent responsibilities
 
 An Agent owns reusable reasoning and interaction configuration.
@@ -1894,8 +1917,8 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Service targets use registered typed Service bindings.
 - [x] Activity targets use registered typed Activity bindings.
 - [x] Nested Workflow targets use child Workflow ProgramFrames.
-- [x] Agent targets use child Agent-loop ProgramFrames.
-- [x] Model targets use child single-model ProgramFrames.
+- [ ] Agent targets are rejected at admission until a Workflow-owned typed Agent invocation adapter is composed from existing Agent APIs.
+- [ ] Model targets are rejected at admission until a Workflow-owned typed Model invocation adapter is composed from existing Model APIs.
 - [x] Static target sets enforce member identity.
 - [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
 - [x] Selected target identity persists with the logical Workflow step.
@@ -1904,6 +1927,8 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
 - [x] Receipt schemas are enforced for direct WorkItems and child ProgramFrame boundaries.
 - [x] Typed Model and Agent dispatch plans persist artifact pins, Workspace, Model, Agent, instruction, Text, Tool, Skill, MCP, attachment, message, channel, context, and port facts.
+- [x] Tool and MCP Tool target effect safety is conservative unless a current setup-domain binding supplies the authoritative effect fact.
+- [x] Workflow does not convert input ports or arbitrary Workflow context into synthetic Model or Agent chat messages.
 - [x] Typed Service and Activity dispatch plans persist binding identity, binding version, input, context, port facts, and effect facts.
 
 ### 22.4 Ports, channels, and messaging
@@ -1987,8 +2012,9 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Workflow Model and Agent targets create typed child ProgramFrames.
 - [x] Workflow Model and Agent plans persist durable selection and dispatch-plan facts before provider dispatch.
 - [x] Workflow input never becomes fallback chat text.
-- [ ] Typed Model and Agent invocation adapters need full callable-interface coverage. The current binder accepts Workflow invocation input as a typed `messages` request and context forms `messages` and `instructions`. The declaration model accepts target-specific schemas and context forms. The completion work creates explicit typed adapter contracts for each Model and Agent target, validates them at admission, and prepares every accepted form before dispatch.
-- [ ] Admission must prove Model and Agent context-form availability before Workflow execution starts. The completion work aligns callable-interface context declarations with setup-owned Model and Agent invocation adapters.
+- [ ] Workflow Model and Agent execution is intentionally unavailable at admission. The removed generic `messages` and `instructions` JSON envelope was a Workflow-local duplicate of Model and Agent invocation behavior.
+- [ ] The remaining work is a Workflow-owned typed adapter layer over existing Model and Agent APIs. It must not require a Workflow-specific Model or Agent domain contract.
+- [ ] Admission must prove Model and Agent input, context, port, and mode compatibility through that Workflow adapter before Workflow execution starts.
 
 ## 23. Remaining implementation phases
 

@@ -11,6 +11,7 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -36,35 +37,6 @@ type v3TextMaterializationWire struct {
 	Content          string                    `json:"content"`
 }
 
-type v3WorkspaceArtifactWire struct {
-	Artifact         artifactModel.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64                    `json:"artifactRevision"`
-	DefinitionDigest string                    `json:"definitionDigest"`
-}
-
-type v3WorkspacePlanWire struct {
-	Prompt struct {
-		Instructions  string                          `json:"instructions"`
-		UserMessage   string                          `json:"userMessage"`
-		Contributions []v3WorkspacePromptContribution `json:"contributions"`
-	} `json:"prompt"`
-
-	Skills struct {
-		Skills []v3WorkspaceArtifactWire `json:"skills"`
-	} `json:"skills"`
-
-	MCPServers struct {
-		Servers []v3WorkspaceArtifactWire `json:"servers"`
-	} `json:"mcpServers"`
-}
-
-type v3WorkspacePromptContribution struct {
-	Artifact         artifactModel.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64                    `json:"artifactRevision"`
-	DefinitionDigest string                    `json:"definitionDigest"`
-	Insert           string                    `json:"insert"`
-}
-
 func (b *Binder) prepareLLMPlan(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
@@ -77,11 +49,13 @@ func (b *Binder) prepareLLMPlan(
 	if payload == nil {
 		return llmExecutionPlan{}, errors.New("llm payload is missing")
 	}
-
-	defaults := sessionv3Runtime.SessionDefaults{}
-	if payload.Invocation == nil {
-		defaults = jsonutil.CloneJSONInValue(request.Session.Defaults)
+	if payload.Invocation != nil {
+		return llmExecutionPlan{}, errors.New(
+			"workflow model and agent invocation adapter is unavailable",
+		)
 	}
+
+	defaults := jsonutil.CloneJSONInValue(request.Session.Defaults)
 	if payload.Model != nil {
 		defaults.Model = cloneLLMArtifactSelection(payload.Model)
 	}
@@ -525,24 +499,17 @@ func (b *Binder) applyWorkspacePlan(
 		return err
 	}
 
-	wire, err := decodeV3WorkspaceRuntimePlan(runtimePlan)
-	if err != nil {
-		return err
-	}
-
-	for _, contribution := range wire.Prompt.Contributions {
+	for _, contribution := range runtimePlan.Prompt.Contributions {
 		selection, pin, selectionErr := b.selectionForWorkspaceArtifact(
 			ctx,
-			v3WorkspaceArtifactWire{
-				Artifact:         contribution.Artifact,
-				ArtifactRevision: contribution.ArtifactRevision,
-				DefinitionDigest: contribution.DefinitionDigest,
-			},
+			contribution.Artifact,
+			contribution.ArtifactRevision,
+			contribution.DefinitionDigest,
 		)
 		if selectionErr != nil {
 			return selectionErr
 		}
-		insert, insertErr := textDispatchInsert(contribution.Insert)
+		insert, insertErr := textDispatchInsert(string(contribution.Insert))
 		if insertErr != nil {
 			return insertErr
 		}
@@ -557,14 +524,16 @@ func (b *Binder) applyWorkspacePlan(
 	plan.addInstruction(sessionv3Runtime.Instruction{
 		ID:      "workspace:" + selection.RootID + ":" + selection.ArtifactID,
 		Label:   selection.ArtifactID,
-		Content: wire.Prompt.Instructions,
+		Content: runtimePlan.Prompt.Instructions,
 	})
-	plan.addContext(wire.Prompt.UserMessage)
+	plan.addContext(runtimePlan.Prompt.UserMessage)
 
-	for _, skill := range wire.Skills.Skills {
+	for _, skill := range runtimePlan.Skills.Skills {
 		value, pin, selectionErr := b.selectionForWorkspaceArtifact(
 			ctx,
-			skill,
+			skill.Artifact,
+			skill.ArtifactRevision,
+			skill.DefinitionDigest,
 		)
 		if selectionErr != nil {
 			return selectionErr
@@ -578,10 +547,12 @@ func (b *Binder) applyWorkspacePlan(
 		}
 	}
 
-	for _, server := range wire.MCPServers.Servers {
+	for _, server := range runtimePlan.MCPServers.Servers {
 		value, pin, selectionErr := b.selectionForWorkspaceArtifact(
 			ctx,
-			server,
+			server.Artifact,
+			server.ArtifactRevision,
+			server.DefinitionDigest,
 		)
 		if selectionErr != nil {
 			return selectionErr
@@ -621,29 +592,29 @@ func (b *Binder) applyWorkspacePlan(
 
 func (b *Binder) selectionForWorkspaceArtifact(
 	ctx context.Context,
-	value v3WorkspaceArtifactWire,
+	ref artifactModel.ArtifactRef,
+	revision uint64,
+	digest cryptoutil.Digest,
 ) (
 	sessionv3Runtime.ArtifactSelection,
 	sessionv3Runtime.ArtifactPin,
 	error,
 ) {
-	selection, pin, err := b.selectionForArtifactRef(ctx, value.Artifact)
+	selection, pin, err := b.selectionForArtifactRef(ctx, ref)
 	if err != nil {
 		return sessionv3Runtime.ArtifactSelection{},
 			sessionv3Runtime.ArtifactPin{},
 			err
 	}
 
-	if value.ArtifactRevision != 0 &&
-		value.ArtifactRevision != pin.Revision {
+	if revision != 0 && revision != pin.Revision {
 		return sessionv3Runtime.ArtifactSelection{},
 			sessionv3Runtime.ArtifactPin{},
 			errors.New(
 				"workspace runtime plan artifact revision changed",
 			)
 	}
-	if value.DefinitionDigest != "" &&
-		value.DefinitionDigest != pin.Digest {
+	if digest != "" && string(digest) != pin.Digest {
 		return sessionv3Runtime.ArtifactSelection{},
 			sessionv3Runtime.ArtifactPin{},
 			errors.New(
@@ -1038,28 +1009,6 @@ func decodeV3TextMaterialization(
 	if err := json.Unmarshal(canonical, &output); err != nil {
 		return v3TextMaterializationWire{}, fmt.Errorf(
 			"decode text materialization: %w",
-			err,
-		)
-	}
-	return output, nil
-}
-
-func decodeV3WorkspaceRuntimePlan(
-	value any,
-) (v3WorkspacePlanWire, error) {
-	raw, err := jsonutil.EncodeToJSONRaw(value)
-	if err != nil {
-		return v3WorkspacePlanWire{}, err
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return v3WorkspacePlanWire{}, err
-	}
-
-	var output v3WorkspacePlanWire
-	if err := json.Unmarshal(canonical, &output); err != nil {
-		return v3WorkspacePlanWire{}, fmt.Errorf(
-			"decode workspace runtime plan: %w",
 			err,
 		)
 	}

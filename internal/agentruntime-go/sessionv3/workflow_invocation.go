@@ -32,14 +32,3 @@ func cloneLLMInvocationPlan(
 	output.Context = value.Context.Clone()
 	return &output
 }
-
-func workflowSelectionForPin(
-	pin ArtifactPin,
-) *ArtifactSelection {
-	return &ArtifactSelection{
-		RootID:           pin.RootID,
-		ArtifactID:       pin.ArtifactID,
-		ExpectedRevision: pin.Revision,
-		ExpectedDigest:   pin.Digest,
-	}
-}

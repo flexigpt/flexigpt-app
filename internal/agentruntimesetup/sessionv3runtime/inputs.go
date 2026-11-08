@@ -10,32 +10,6 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-const (
-	workflowPortContextPrefix           = "workflow port context"
-	workflowInvocationMessagesField     = "messages"
-	workflowInvocationInstructionsField = "instructions"
-)
-
-type workflowInvocationRequest struct {
-	Messages []workflowInvocationMessage `json:"messages"`
-}
-
-type workflowInvocationContext struct {
-	Messages     []workflowInvocationMessage `json:"messages,omitempty"`
-	Instructions []string                    `json:"instructions,omitempty"`
-}
-
-type workflowInvocationMessage struct {
-	Role        sessionv3Runtime.MessageRole  `json:"role"`
-	Text        string                        `json:"text,omitempty"`
-	Attachments []sessionv3Runtime.Attachment `json:"attachments,omitempty"`
-}
-
-type workflowInvocationPortContext struct {
-	Port   string                            `json:"port"`
-	Values []sessionv3Runtime.CanonicalValue `json:"values"`
-}
-
 func (b *Binder) buildInputs(
 	req sessionv3Runtime.WorkDispatchRequest,
 	injectedContext []string,
@@ -45,12 +19,11 @@ func (b *Binder) buildInputs(
 		return nil, errors.New("LLM payload is missing")
 	}
 	if payload.Invocation != nil {
-		return workflowInvocationInputs(
-			*payload.Invocation,
-			injectedContext,
-			req.WorkItem.PortInputs,
+		return nil, errors.New(
+			"workflow model and agent invocation adapter is unavailable",
 		)
 	}
+
 	session := req.Session
 	execution := req.Execution
 	inputs := []inferenceSpec.InputUnion{}
@@ -87,193 +60,6 @@ func (b *Binder) buildInputs(
 		return nil, errors.New("LLM has no inputs")
 	}
 	return inputs, nil
-}
-
-func workflowInvocationInputs(
-	plan sessionv3Runtime.LLMInvocationPlan,
-	injectedContext []string,
-	portInputs []sessionv3Runtime.PortInput,
-) ([]inferenceSpec.InputUnion, error) {
-	if err := plan.Validate(); err != nil {
-		return nil, err
-	}
-
-	request, err := decodeWorkflowInvocationRequest(plan.Input)
-	if err != nil {
-		return nil, fmt.Errorf("decode workflow model request: %w", err)
-	}
-	if len(request.Messages) == 0 {
-		return nil, errors.New("workflow model request has no messages")
-	}
-
-	contextValue, err := decodeWorkflowInvocationContext(plan.Context)
-	if err != nil {
-		return nil, fmt.Errorf("decode workflow model context: %w", err)
-	}
-
-	output := make(
-		[]inferenceSpec.InputUnion,
-		0,
-		len(injectedContext)+
-			len(portInputs)+
-			len(contextValue.Instructions)+len(contextValue.Messages)+len(request.Messages),
-	)
-	nextID := 0
-	appendMessage := func(message workflowInvocationMessage) error {
-		input, err := workflowInvocationMessageInput(nextID, message)
-		if err != nil {
-			return err
-		}
-		nextID++
-		output = append(output, input)
-		return nil
-	}
-
-	for _, instruction := range contextValue.Instructions {
-		if strings.TrimSpace(instruction) == "" {
-			continue
-		}
-		if err := appendMessage(workflowInvocationMessage{
-			Role: sessionv3Runtime.MessageRoleSystem,
-			Text: instruction,
-		}); err != nil {
-			return nil, err
-		}
-	}
-	for _, value := range injectedContext {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if err := appendMessage(workflowInvocationMessage{
-			Role: sessionv3Runtime.MessageRoleUser,
-			Text: value,
-		}); err != nil {
-			return nil, err
-		}
-	}
-	for _, input := range portInputs {
-		if len(input.Values) == 0 {
-			continue
-		}
-		value := sessionv3Runtime.MustCanonicalValue(
-			workflowInvocationPortContext{
-				Port:   input.Name,
-				Values: input.Values,
-			},
-		)
-		if err := appendMessage(workflowInvocationMessage{
-			Role: sessionv3Runtime.MessageRoleDeveloper,
-			Text: workflowPortContextPrefix + "\n" + string(value),
-		}); err != nil {
-			return nil, err
-		}
-	}
-	for _, message := range contextValue.Messages {
-		if err := appendMessage(message); err != nil {
-			return nil, err
-		}
-	}
-	for _, message := range request.Messages {
-		if err := appendMessage(message); err != nil {
-			return nil, err
-		}
-	}
-
-	if len(output) == 0 {
-		return nil, errors.New("workflow model request produced no provider inputs")
-	}
-	return output, nil
-}
-
-func decodeWorkflowInvocationRequest(
-	value sessionv3Runtime.CanonicalValue,
-) (workflowInvocationRequest, error) {
-	fields, err := sessionv3Runtime.DecodeCanonicalValue[map[string]sessionv3Runtime.CanonicalValue](value)
-	if err != nil {
-		return workflowInvocationRequest{}, err
-	}
-	for name := range fields {
-		if name != workflowInvocationMessagesField {
-			return workflowInvocationRequest{}, errors.New(
-				"workflow model request contains an unsupported field",
-			)
-		}
-	}
-	raw, found := fields[workflowInvocationMessagesField]
-	if !found {
-		return workflowInvocationRequest{}, errors.New(
-			"workflow model request has no messages field",
-		)
-	}
-	messages, err := sessionv3Runtime.DecodeCanonicalValue[[]workflowInvocationMessage](raw)
-	if err != nil {
-		return workflowInvocationRequest{}, err
-	}
-	return workflowInvocationRequest{Messages: messages}, nil
-}
-
-func decodeWorkflowInvocationContext(
-	value sessionv3Runtime.CanonicalValue,
-) (workflowInvocationContext, error) {
-	if len(value) == 0 {
-		return workflowInvocationContext{}, nil
-	}
-	fields, err := sessionv3Runtime.DecodeCanonicalValue[map[string]sessionv3Runtime.CanonicalValue](value)
-	if err != nil {
-		return workflowInvocationContext{}, err
-	}
-	output := workflowInvocationContext{}
-	for name, raw := range fields {
-		switch name {
-		case workflowInvocationMessagesField:
-			messages, decodeErr := sessionv3Runtime.DecodeCanonicalValue[[]workflowInvocationMessage](raw)
-			if decodeErr != nil {
-				return workflowInvocationContext{}, decodeErr
-			}
-			output.Messages = messages
-
-		case workflowInvocationInstructionsField:
-			instructions, decodeErr := sessionv3Runtime.DecodeCanonicalValue[[]string](raw)
-			if decodeErr != nil {
-				return workflowInvocationContext{}, decodeErr
-			}
-			output.Instructions = instructions
-
-		default:
-			return workflowInvocationContext{}, errors.New(
-				"workflow model context contains an unsupported form",
-			)
-		}
-	}
-	return output, nil
-}
-
-func workflowInvocationMessageInput(
-	index int,
-	message workflowInvocationMessage,
-) (inferenceSpec.InputUnion, error) {
-	switch message.Role {
-	case sessionv3Runtime.MessageRoleSystem,
-		sessionv3Runtime.MessageRoleDeveloper,
-		sessionv3Runtime.MessageRoleUser,
-		sessionv3Runtime.MessageRoleAssistant:
-	default:
-		return inferenceSpec.InputUnion{}, errors.New("workflow model message role is invalid")
-	}
-
-	activity := sessionv3Runtime.Activity{
-		ID: sessionv3Runtime.ActivityID(
-			fmt.Sprintf("workflow-invocation-%d", index),
-		),
-		Kind: sessionv3Runtime.ActivityKindMessage,
-		Message: &sessionv3Runtime.MessageActivity{
-			Role:        message.Role,
-			Text:        message.Text,
-			Attachments: append([]sessionv3Runtime.Attachment(nil), message.Attachments...),
-		},
-	}
-	return activityToInput(activity), nil
 }
 
 func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.LLMWork) []sessionv3Runtime.Activity {

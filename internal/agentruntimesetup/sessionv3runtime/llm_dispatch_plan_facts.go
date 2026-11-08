@@ -2,13 +2,10 @@ package sessionv3runtime
 
 import (
 	"errors"
-	"strconv"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
-
-const workflowInvocationMessageIDPrefix = "workflow-invocation-"
 
 func enrichDurableLLMDispatchPlan(
 	output *sessionv3Runtime.ModelDispatchPlan,
@@ -168,10 +165,6 @@ func appendDurableMessageDispatchPlan(
 			},
 		)
 	}
-}
-
-func workflowInvocationMessageID(index int) string {
-	return workflowInvocationMessageIDPrefix + strconv.Itoa(index)
 }
 
 func cloneInstructionDispatchPlans(

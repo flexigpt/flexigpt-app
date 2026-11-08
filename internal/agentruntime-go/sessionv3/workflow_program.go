@@ -1294,18 +1294,10 @@ func (i *WorkflowInterpreter) call(
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
-		return i.handoffCall(
-			frame,
-			program,
+		return workflowFailure(
 			state,
-			path,
-			targetName,
-			target,
-			input,
-			contextValue,
-			call,
-			ports,
-			callBudget,
+			"workflow_invocation_adapter_unavailable",
+			"workflow Agent handoff requires a typed workflow invocation adapter",
 		)
 	}
 	state.PendingTarget = targetName
@@ -1496,71 +1488,11 @@ func (i *WorkflowInterpreter) call(
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
-		if step.Retry != nil {
-			return workflowFailure(
-				state,
-				"workflow_retry_unsupported",
-				"agent and model calls cannot retry until child-frame retry state is implemented",
-			)
-		}
-		if target.Artifact == nil {
-			return workflowFailure(
-				state,
-				"workflow_target_invalid",
-				"workflow llm target has no artifact pin",
-			)
-		}
-
-		invocation := LLMInvocationPlan{
-			Input:   input,
-			Context: contextValue,
-		}
-		defaults := SessionDefaults{}
-		switch target.Kind {
-		case WorkflowTargetModel:
-			defaults.Model = workflowSelectionForPin(*target.Artifact)
-		case WorkflowTargetAgent:
-			defaults.Agent = workflowSelectionForPin(*target.Artifact)
-		default:
-		}
-
-		var childProgram ProgramSnapshot
-		if target.Kind == WorkflowTargetAgent {
-			childProgram, err = NewWorkflowAgentLoopProgram(
-				defaults,
-				invocation,
-			)
-		} else {
-			childProgram, err = NewWorkflowSingleModelProgram(
-				defaults,
-				invocation,
-			)
-		}
-		if err != nil {
-			return workflowFailure(
-				state,
-				"workflow_target_invalid",
-				err.Error(),
-			)
-		}
-
-		next := state
-		next.PendingPath = path
-		nextState, err := encodeWorkflowProgramState(next)
-		if err != nil {
-			return ProgramTransition{}, err
-		}
-		return ProgramTransition{
-			State: nextState,
-			Frames: []ProgramFrameIntent{{
-				ID:       ProgramFrameID(string(frame.ID) + ":" + path),
-				Path:     path,
-				Deadline: cloneTime(state.Deadline),
-				Budget:   cloneBudget(callBudget),
-				Program:  childProgram,
-				Ports:    ports,
-			}},
-		}, nil
+		return workflowFailure(
+			state,
+			"workflow_invocation_adapter_unavailable",
+			"workflow Model and Agent targets require a typed workflow invocation adapter",
+		)
 
 	default:
 		return workflowFailure(

@@ -124,6 +124,26 @@ Session Runtime v3 does not:
 - Resolve credentials.
 - Persist domain-private values.
 
+### 3.1 Workflow adapter ownership
+
+Workflow setup adapters are the only layer that translates Workflow callable
+targets into existing domain operations.
+
+```text
+Workflow declaration and ProgramFrame
+        |
+        v
+Workflow setup adapter
+        |
+        v
+existing Model, Agent, Tool, Skill, MCP, Workspace, Service, or Activity API
+```
+
+The target domain remains independent of Workflow. It does not import Workflow
+or Session Runtime packages and it does not define Workflow-only request
+types. Workflow generic JSON is allowed only for Workflow values and schema
+boundaries. It is not a substitute for a typed Model or Agent invocation.
+
 ## 4. Typed runtime discipline
 
 Runtime-owned semantics use concrete types.
@@ -924,8 +944,8 @@ The Wails application composes V2 and V3 independently.
 - [x] Service targets map to Service WorkItems.
 - [x] Activity targets map to Activity WorkItems.
 - [x] Nested Workflow targets map to child ProgramFrames.
-- [x] Agent targets map to child Agent-loop ProgramFrames.
-- [x] Model targets map to child single-model ProgramFrames.
+- [ ] Workflow Agent targets are held at admission pending a Workflow-owned adapter over current Agent APIs.
+- [ ] Workflow Model targets are held at admission pending a Workflow-owned adapter over current Model APIs.
 - [x] Static target sets persist member selection.
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
@@ -935,7 +955,10 @@ The Wails application composes V2 and V3 independently.
 - [x] Callable interface non-stream output-port declarations route through Session Runtime after confirmed settlement.
 - [x] Callable interface stream-port declarations route through Model, Agent, nested Workflow, and port-aware Service or Activity bindings.
 - [x] Full receipt schema enforcement exists for direct WorkItems, child Agent, child Model, child Workflow, and started child work.
-- [ ] Model and Agent callable-interface input and context adapters need completion. Current V3 binding accepts a strict Workflow invocation message plan. The final adapter layer will support every declared target-specific typed request and context form before provider dispatch.
+- [x] Workflow Tool and MCP Tool effect guarantees are conservative unless the setup-domain binding provides the authoritative fact.
+- [x] Workflow does not inject ports or arbitrary context into synthetic Model or Agent provider messages.
+- [ ] Model and Agent callable-interface input and context adapters need completion. Current generic Workflow invocation parsing is disabled at admission and dispatch.
+- [ ] A Workflow-owned adapter layer must use existing Model and Agent domain APIs without requiring Model or Agent domains to understand Workflow.
 
 ### 21.6 Structured execution
 
@@ -1109,7 +1132,9 @@ Required source coverage:
 - [x] Parallel and Foreach have typed `merge` declarations and durable StateUpdate merge boundaries.
 - [x] Workflow failed and uncertain outcomes retain typed facts and are included in Workflow projections.
 - [x] Nested Workflow published-port checks compare caller and target channel schemas before child dispatch.
-- [ ] Model and Agent callable-interface adapters remain limited to the current explicit typed message and instruction forms.
+- [ ] Model and Agent Workflow targets are currently admission failures, not partial generic JSON invocations.
+- [ ] The remaining adapter work belongs in Workflow setup composition over existing domain APIs.
+- [ ] No Model, Agent, Tool, Skill, MCP, or Workspace domain contract changes are required merely to support Workflow.
 - [ ] Structured retry remains incomplete for every accepted structured retry declaration.
 
 ### Phase 3: Close domain binding and durable recovery edges

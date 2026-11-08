@@ -7,8 +7,6 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
-const workflowInvocationInstructionIDPrefix = "workflow-invocation-instruction-"
-
 func (b *Binder) durableLLMDispatchPlan(
 	request sessionv3Runtime.WorkDispatchRequest,
 	plan llmExecutionPlan,
@@ -115,23 +113,6 @@ func (b *Binder) durableLLMDispatchPlan(
 		)
 	}
 
-	if payload := request.WorkItem.Input.LLM; payload != nil &&
-		payload.Invocation != nil {
-		output.Context = append(
-			output.Context,
-			sessionv3Runtime.ContextDispatchPlan{
-				Name:  "workflow-context",
-				Value: payload.Invocation.Context.Clone(),
-			},
-		)
-		if err := appendWorkflowInvocationDispatchPlan(
-			&output,
-			*payload.Invocation,
-		); err != nil {
-			return sessionv3Runtime.ModelDispatchPlan{}, err
-		}
-	}
-
 	for _, port := range request.WorkItem.Ports {
 		appendLLMDispatchChannel(
 			&output,
@@ -194,56 +175,6 @@ func appendLLMDispatchChannel(
 			Access: access,
 		},
 	)
-}
-
-func appendWorkflowInvocationDispatchPlan(
-	output *sessionv3Runtime.ModelDispatchPlan,
-	invocation sessionv3Runtime.LLMInvocationPlan,
-) error {
-	if output == nil {
-		return errors.New("model dispatch plan is unavailable")
-	}
-
-	request, err := sessionv3Runtime.DecodeCanonicalValue[workflowInvocationRequest](invocation.Input)
-	if err != nil {
-		return fmt.Errorf("decode workflow model request: %w", err)
-	}
-
-	appendMessage := func(message workflowInvocationMessage) {
-		appendDurableMessageDispatchPlan(
-			output,
-			sessionv3Runtime.MessageDispatchPlan{
-				ID:          workflowInvocationMessageID(len(output.Messages)),
-				Role:        message.Role,
-				Text:        message.Text,
-				Attachments: append([]sessionv3Runtime.Attachment(nil), message.Attachments...),
-			},
-		)
-	}
-
-	contextValue := workflowInvocationContext{}
-	if len(invocation.Context) != 0 {
-		contextValue, err = sessionv3Runtime.DecodeCanonicalValue[workflowInvocationContext](invocation.Context)
-		if err != nil {
-			return fmt.Errorf("decode workflow model context: %w", err)
-		}
-	}
-	for index, instruction := range contextValue.Instructions {
-		output.Instructions = append(
-			output.Instructions,
-			sessionv3Runtime.InstructionDispatchPlan{
-				ID:      fmt.Sprintf("%s%d", workflowInvocationInstructionIDPrefix, index),
-				Content: instruction,
-			},
-		)
-	}
-	for _, message := range contextValue.Messages {
-		appendMessage(message)
-	}
-	for _, message := range request.Messages {
-		appendMessage(message)
-	}
-	return nil
 }
 
 func pinForSelection(

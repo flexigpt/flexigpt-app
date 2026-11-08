@@ -42,6 +42,11 @@ func (b *Binder) bindLLM(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
 	}
+	if payload.Invocation != nil {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"workflow model and agent invocation adapter is unavailable",
+		)
+	}
 
 	plan, err := b.prepareLLMPlan(ctx, req)
 	if err != nil {
