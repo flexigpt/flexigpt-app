@@ -341,7 +341,7 @@ func (e *V3Executor) ExecuteGo(
 // structured representation from one Tool Runtime response.
 func V3ToolOutputs(
 	outputs []llmtoolsSpec.ToolOutputUnion,
-) (string, sessionv3Runtime.CanonicalValue, error) {
+) (t string, s sessionv3Runtime.CanonicalValue, err error) {
 	raw, err := CanonicalToolOutputs(outputs)
 	if err != nil {
 		return "", nil, err

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -48,13 +49,33 @@ type TargetResolution struct {
 	Message string `json:"message,omitempty"`
 }
 
+// TargetUseKind is a source-planning fact. It lets setup select a current
+// adapter without importing Workflow source grammar.
+type TargetUseKind string
+
+const (
+	TargetUseKindAgent    TargetUseKind = "agent"
+	TargetUseKindTool     TargetUseKind = "tool"
+	TargetUseKindModel    TargetUseKind = "model"
+	TargetUseKindService  TargetUseKind = "service"
+	TargetUseKindActivity TargetUseKind = "activity"
+	TargetUseKindWorkflow TargetUseKind = "workflow"
+)
+
+// TargetUse is one statically known possible target of a call site.
+type TargetUse struct {
+	Name string        `json:"name"`
+	Kind TargetUseKind `json:"kind"`
+}
+
 // CallSite identifies one declared call operation. Mode is normalized to
 // `invoke` when the source declaration omits it.
 type CallSite struct {
-	Path      string          `json:"path"`
-	Mode      string          `json:"mode"`
-	TargetSet string          `json:"targetSet,omitempty"`
-	Call      workflowv1.Call `json:"call"`
+	Path       string          `json:"path"`
+	Mode       string          `json:"mode"`
+	TargetSet  string          `json:"targetSet,omitempty"`
+	TargetUses []TargetUse     `json:"targetUses,omitempty"`
+	Call       workflowv1.Call `json:"call"`
 }
 
 // ContextUse identifies one explicit Workflow call-context value.
@@ -74,13 +95,20 @@ const (
 
 // PortUse identifies a published Workflow port or a call-site port binding.
 type PortUse struct {
-	Path     string                 `json:"path"`
-	CallPath string                 `json:"callPath,omitempty"`
-	Kind     PortUseKind            `json:"kind"`
-	Name     string                 `json:"name"`
-	Channel  string                 `json:"channel"`
-	Access   string                 `json:"access"`
-	Binding  workflowv1.PortBinding `json:"binding"`
+	Path     string      `json:"path"`
+	CallPath string      `json:"callPath,omitempty"`
+	Kind     PortUseKind `json:"kind"`
+
+	Name    string                 `json:"name"`
+	Channel string                 `json:"channel"`
+	Access  string                 `json:"access"`
+	Binding workflowv1.PortBinding `json:"binding"`
+
+	TargetName    string        `json:"targetName,omitempty"`
+	TargetKind    TargetUseKind `json:"targetKind,omitempty"`
+	Direction     string        `json:"direction,omitempty"`
+	Stream        bool          `json:"stream,omitempty"`
+	ContractKnown bool          `json:"contractKnown,omitempty"`
 }
 
 // RetryDeclaration identifies one source-declared retry policy at a stable
@@ -137,6 +165,7 @@ func buildWorkflowInventory(
 	}
 
 	builder := inventoryBuilder{
+		document: document,
 		inventory: Inventory{
 			Targets:     targets,
 			Calls:       []CallSite{},
@@ -282,6 +311,7 @@ func cloneWorkflowTarget(
 }
 
 type inventoryBuilder struct {
+	document  workflowv1.WorkflowDocument
 	inventory Inventory
 	blocks    map[string]struct{}
 }
@@ -572,6 +602,11 @@ func (b *inventoryBuilder) addCall(
 		)
 	}
 
+	targetUses, err := b.callTargetUses(cloned)
+	if err != nil {
+		return err
+	}
+
 	mode := cloned.Mode
 	if mode == "" {
 		mode = "invoke"
@@ -580,10 +615,11 @@ func (b *inventoryBuilder) addCall(
 	b.inventory.Calls = append(
 		b.inventory.Calls,
 		CallSite{
-			Path:      callPath,
-			Mode:      mode,
-			TargetSet: cloned.Allowed,
-			Call:      cloned,
+			Path:       callPath,
+			Mode:       mode,
+			TargetSet:  cloned.Allowed,
+			TargetUses: targetUses,
+			Call:       cloned,
 		},
 	)
 
@@ -611,20 +647,168 @@ func (b *inventoryBuilder) addCall(
 	sort.Strings(portNames)
 	for _, name := range portNames {
 		binding := cloned.Ports[name]
-		b.inventory.PortUses = append(
-			b.inventory.PortUses,
-			PortUse{
-				Path:     callPath + "/ports/" + name,
-				CallPath: callPath,
-				Kind:     PortUseKindCall,
-				Name:     name,
-				Channel:  binding.Channel,
-				Access:   binding.Access,
-				Binding:  binding,
-			},
-		)
+		if len(targetUses) == 0 {
+			b.inventory.PortUses = append(
+				b.inventory.PortUses,
+				PortUse{
+					Path:     callPath + "/ports/" + name,
+					CallPath: callPath,
+					Kind:     PortUseKindCall,
+					Name:     name,
+					Channel:  binding.Channel,
+					Access:   binding.Access,
+					Binding:  binding,
+				},
+			)
+			continue
+		}
+
+		for _, target := range targetUses {
+			direction, stream, known := b.callPortFacts(
+				cloned,
+				target.Name,
+				name,
+			)
+			b.inventory.PortUses = append(
+				b.inventory.PortUses,
+				PortUse{
+					Path:          callPath + "/ports/" + name,
+					CallPath:      callPath,
+					Kind:          PortUseKindCall,
+					Name:          name,
+					Channel:       binding.Channel,
+					Access:        binding.Access,
+					Binding:       binding,
+					TargetName:    target.Name,
+					TargetKind:    target.Kind,
+					Direction:     direction,
+					Stream:        stream,
+					ContractKnown: known,
+				},
+			)
+		}
 	}
 	return nil
+}
+
+func (b *inventoryBuilder) callTargetUses(
+	call workflowv1.Call,
+) ([]TargetUse, error) {
+	names := make(map[string]struct{})
+
+	if name, literal, err := workflowLiteralTargetName(call.Target); err != nil {
+		return nil, err
+	} else if literal {
+		if _, found := b.document.Targets[name]; !found {
+			return nil, fmt.Errorf(
+				"%w: Workflow call target %q is unavailable",
+				storeSpec.ErrInvalid,
+				name,
+			)
+		}
+		names[name] = struct{}{}
+	}
+
+	if call.Allowed != "" {
+		set, found := b.document.TargetSets[call.Allowed]
+		if !found {
+			return nil, fmt.Errorf(
+				"%w: Workflow target set %q is unavailable",
+				storeSpec.ErrInvalid,
+				call.Allowed,
+			)
+		}
+		for _, name := range set.Members {
+			names[name] = struct{}{}
+		}
+		if set.Resolved != nil {
+			for name := range b.document.Targets {
+				names[name] = struct{}{}
+			}
+		}
+	}
+
+	ordered := make([]string, 0, len(names))
+	for name := range names {
+		ordered = append(ordered, name)
+	}
+	sort.Strings(ordered)
+
+	output := make([]TargetUse, 0, len(ordered))
+	for _, name := range ordered {
+		target, found := b.document.Targets[name]
+		if !found {
+			return nil, fmt.Errorf(
+				"%w: Workflow target %q is unavailable",
+				storeSpec.ErrInvalid,
+				name,
+			)
+		}
+		output = append(output, TargetUse{
+			Name: name,
+			Kind: TargetUseKind(target.Kind),
+		})
+	}
+	return output, nil
+}
+
+func (b *inventoryBuilder) callPortFacts(
+	call workflowv1.Call,
+	targetName string,
+	portName string,
+) (direction string, stream, known bool) {
+	target := b.document.Targets[targetName]
+	contracts := []*workflowv1.CallableInterface{
+		target.Interface,
+		call.Interface,
+	}
+	if call.Allowed != "" {
+		set := b.document.TargetSets[call.Allowed]
+		if set.Resolved != nil {
+			contracts = append(contracts, &set.Resolved.Interface)
+		} else {
+			contracts = append(contracts, set.Interface)
+		}
+	}
+
+	for _, contract := range contracts {
+		if contract == nil {
+			continue
+		}
+		port, found := contract.Ports[portName]
+		if found {
+			return port.Direction, port.Stream, true
+		}
+	}
+	return "", false, false
+}
+
+func workflowLiteralTargetName(
+	value workflowv1.Value,
+) (name string, lit bool, err error) {
+	var decoded any
+	v := json.RawMessage(value)
+	decoded, err = jsonutil.DecodeJSONRawNumbers[json.RawMessage](v)
+	if err != nil {
+		return "", false, err
+	}
+
+	switch current := decoded.(type) {
+	case string:
+		return current, true, nil
+	case map[string]any:
+		if len(current) != 1 {
+			return "", false, nil
+		}
+		literal, found := current["$literal"]
+		if !found {
+			return "", false, nil
+		}
+		name, ok := literal.(string)
+		return name, ok, nil
+	default:
+		return "", false, nil
+	}
 }
 
 func cloneWorkflowValue(

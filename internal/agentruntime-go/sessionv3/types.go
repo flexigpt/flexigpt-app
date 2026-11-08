@@ -2029,18 +2029,3 @@ func (id ProgramFrameID) String() string { return string(id) }
 func (id ExecutionID) String() string    { return string(id) }
 func (id SessionID) String() string      { return string(id) }
 func (id WaitID) String() string         { return string(id) }
-func (v CanonicalValue) MarshalJSON() ([]byte, error) {
-	if len(v) == 0 {
-		return []byte("null"), nil
-	}
-	return append([]byte(nil), v...), nil
-}
-
-func (v *CanonicalValue) UnmarshalJSON(raw []byte) error {
-	value, err := CanonicalValueFrom(raw)
-	if err != nil {
-		return err
-	}
-	*v = value
-	return nil
-}
