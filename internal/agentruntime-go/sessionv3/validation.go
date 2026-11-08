@@ -1166,15 +1166,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			return errors.New("invalid condition WorkItem")
 		}
 	case WorkItemTypeStateUpdate:
-		if !p.StateUpdate.Base.Valid() ||
-			!p.StateUpdate.Schema.Valid() {
-			return errors.New("invalid StateUpdate WorkItem state boundary")
-		}
-		for _, assignment := range p.StateUpdate.Assignments {
-			if assignment.Path == "" || !assignment.Value.Valid() {
-				return errors.New("invalid state assignment")
-			}
-		}
+		return p.StateUpdate.Validate()
 	case WorkItemTypeFork:
 		if len(p.Fork.ChildFrames) == 0 {
 			return errors.New("fork WorkItem has no child frames")
@@ -1225,6 +1217,38 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if err := p.Reconciliation.Validate(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (w StateUpdateWork) Validate() error {
+	if err := validateID("state update owner ID", w.StateOwnerID); err != nil {
+		return err
+	}
+	if len(w.Base) == 0 || len(w.Schema) == 0 ||
+		!w.Base.Valid() || !w.Schema.Valid() {
+		return errors.New("invalid state update work item state boundary")
+	}
+
+	seen := make(map[string]struct{}, len(w.Assignments)+len(w.RemovePaths))
+	for _, assignment := range w.Assignments {
+		if strings.TrimSpace(assignment.Path) == "" ||
+			!assignment.Value.Valid() {
+			return errors.New("invalid state assignment")
+		}
+		if _, duplicate := seen[assignment.Path]; duplicate {
+			return errors.New("state assignment is duplicated")
+		}
+		seen[assignment.Path] = struct{}{}
+	}
+	for _, path := range w.RemovePaths {
+		if strings.TrimSpace(path) == "" {
+			return errors.New("invalid state removal")
+		}
+		if _, duplicate := seen[path]; duplicate {
+			return errors.New("state assignment and removal overlap")
+		}
+		seen[path] = struct{}{}
 	}
 	return nil
 }

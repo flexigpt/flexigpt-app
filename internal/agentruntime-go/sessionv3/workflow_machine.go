@@ -677,6 +677,23 @@ func (i *WorkflowInterpreter) startMachineChild(
 		Event:              workflowCanonicalPointer(progress.Event),
 		Outcome:            nil,
 	}
+	if progress.LocalState {
+		step, err := workflowStepForPath(program.Root, pending.Path)
+		if err != nil {
+			return ProgramTransition{}, err
+		}
+		if step.Machine == nil || step.Machine.State == nil {
+			return ProgramTransition{}, errors.New(
+				"workflow machine local state declaration is unavailable",
+			)
+		}
+		scope.StateOwner = workflowSyntheticStateOwner(
+			frame.ID,
+			pending.Path,
+			"machine",
+			step.Machine.State.Schema,
+		)
+	}
 	childState := state
 	childState.State = progress.State.Clone()
 	snapshot, err := i.childBlockProgramWithScope(

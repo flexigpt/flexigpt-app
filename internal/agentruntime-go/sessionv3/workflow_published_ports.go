@@ -1,6 +1,9 @@
 package sessionv3
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // validateWorkflowFramePortBoundary gives root Workflow ports their durable
 // parent-child boundary behavior. A Workflow with no root port declarations
@@ -44,8 +47,23 @@ func validateWorkflowFramePortBoundary(
 		default:
 			return errors.New("workflow child port direction is invalid")
 		}
-		if _, found := workflowChannelForName(program, port.Channel); !found {
+		channel, found := workflowChannelForName(program, port.Channel)
+		if !found {
 			return errors.New("workflow published port has no declared channel")
+		}
+		if err := portSchemaCompatible(plan.ChannelSchema, channel.Schema); err != nil {
+			return fmt.Errorf(
+				"workflow child port %q caller channel schema is incompatible with target channel schema: %w",
+				plan.Name,
+				err,
+			)
+		}
+		if err := portSchemaCompatible(plan.Schema, channel.Schema); err != nil {
+			return fmt.Errorf(
+				"workflow child port %q callable schema is incompatible with target channel schema: %w",
+				plan.Name,
+				err,
+			)
 		}
 	}
 	return nil

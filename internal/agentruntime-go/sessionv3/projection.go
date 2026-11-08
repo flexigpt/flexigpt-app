@@ -188,6 +188,54 @@ func BuildSessionRuntimeProjection(
 	return output
 }
 
+// BuildWorkflowProjection derives Workflow activity, execution, and typed step
+// outcome views only from a durable Session document.
+func BuildWorkflowProjection(
+	session Session,
+) WorkflowProjection {
+	value := cloneSession(session)
+	output := WorkflowProjection{
+		SchemaVersion:   SchemaVersion,
+		SessionID:       value.ID,
+		SessionRevision: value.Revision,
+		Activities:      []Activity{},
+		Executions:      []Execution{},
+		StepOutcomes:    []WorkflowStepOutcomeProjection{},
+	}
+	for _, activity := range value.Timeline {
+		switch activity.Kind {
+		case ActivityKindWorkflow, ActivityKindAction, ActivityKindWait:
+			output.Activities = append(output.Activities, activity)
+		default:
+		}
+	}
+	for _, execution := range value.Executions {
+		workflowExecution := false
+		for _, frame := range execution.ProgramFrames {
+			if frame.Program.InterpreterID != WorkflowInterpreterID {
+				continue
+			}
+			workflowExecution = true
+			state, err := DecodeCanonicalValue[WorkflowState](frame.State.Data)
+			if err != nil {
+				continue
+			}
+			output.StepOutcomes = append(
+				output.StepOutcomes,
+				WorkflowStepOutcomeProjection{
+					ExecutionID: execution.ID,
+					FrameID:     frame.ID,
+					Outcomes:    cloneWorkflowStepOutcomes(state.Outcomes),
+				},
+			)
+		}
+		if workflowExecution {
+			output.Executions = append(output.Executions, execution)
+		}
+	}
+	return output
+}
+
 func cloneCanonicalValues(values []CanonicalValue) []CanonicalValue {
 	if len(values) == 0 {
 		return nil

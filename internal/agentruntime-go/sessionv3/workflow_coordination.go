@@ -322,8 +322,8 @@ func (f WorkflowWaitFilter) Validate() error {
 		}
 	}
 	for _, outcome := range f.Steps {
-		if strings.TrimSpace(outcome.ID) == "" || !outcome.Output.Valid() {
-			return errors.New("workflow wait filter step outcome is invalid")
+		if err := outcome.Validate(); err != nil {
+			return fmt.Errorf("workflow wait filter step outcome: %w", err)
 		}
 	}
 	return nil
@@ -1223,12 +1223,7 @@ func cloneWorkflowStepOutcomes(
 ) []WorkflowStepOutcome {
 	output := make([]WorkflowStepOutcome, len(values))
 	for index := range values {
-		output[index] = WorkflowStepOutcome{
-			ID:     values[index].ID,
-			Status: values[index].Status,
-			Output: values[index].Output.Clone(),
-			Target: values[index].Target,
-		}
+		output[index] = cloneWorkflowStepOutcome(values[index])
 	}
 	return output
 }

@@ -1024,6 +1024,11 @@ type StateAssignment struct {
 }
 
 type StateUpdateWork struct {
+	// StateOwnerID identifies the nearest state-owning scope that supplied
+	// Base and Schema. It prevents a child frame from applying its result to
+	// a different state boundary after restore or structured control flow.
+	StateOwnerID string `json:"stateOwnerID"`
+
 	// Base is the immutable state snapshot observed when the Workflow step was
 	// prepared. All assignments apply atomically to this value.
 	Base CanonicalValue `json:"base"`
@@ -1502,6 +1507,20 @@ type WorkBinder interface {
 	ResolveWait(ctx context.Context, req WaitResolutionRequest) (WaitResolutionResult, error)
 }
 
+type UserMessageSkillTemplatePreparer interface {
+	PrepareUserMessageSkillTemplate(
+		ctx context.Context,
+		request UserMessageSkillTemplatePreparationRequest,
+	) (UserMessageSkillTemplateResult, error)
+}
+
+type InstructionSkillPreviewer interface {
+	PreviewInstructionSkill(
+		ctx context.Context,
+		request InstructionSkillPreviewRequest,
+	) (InstructionSkillPreviewResult, error)
+}
+
 // AppExecutor is an optional setup-owned bridge for Session-scoped MCP App
 // operations. Session Runtime owns App identity, views, staged context, and
 // command idempotency. Setup owns MCP policy, discovery, and transport.
@@ -1743,6 +1762,32 @@ type MessageInput struct {
 	Metadata          CanonicalValue     `json:"metadata,omitempty"`
 }
 
+// UserMessageSkillTemplatePreparationRequest renders a selected Skill with
+// user-message insertion behavior. It is read-only and never creates an
+// Execution-owned Skill session.
+type UserMessageSkillTemplatePreparationRequest struct {
+	SessionID SessionID         `json:"sessionID,omitempty"`
+	Skill     ArtifactSelection `json:"skill"`
+	Arguments map[string]string `json:"arguments,omitempty"`
+}
+
+type UserMessageSkillTemplateResult struct {
+	Skill ArtifactPin `json:"skill"`
+	Text  string      `json:"text"`
+}
+
+// InstructionSkillPreviewRequest renders an instructions Skill without
+// creating a Session, Execution, provider request, or Skill session.
+type InstructionSkillPreviewRequest struct {
+	Skill     ArtifactSelection `json:"skill"`
+	Arguments map[string]string `json:"arguments,omitempty"`
+}
+
+type InstructionSkillPreviewResult struct {
+	Skill ArtifactPin `json:"skill"`
+	Text  string      `json:"text"`
+}
+
 type UpdateContinuationInputCommand struct {
 	Meta                  CommandMeta  `json:"meta"`
 	SessionID             SessionID    `json:"sessionID"`
@@ -1907,11 +1952,18 @@ type ActivityProjection struct {
 }
 
 type WorkflowProjection struct {
-	SchemaVersion   string      `json:"schemaVersion"`
-	SessionID       SessionID   `json:"sessionID"`
-	SessionRevision Revision    `json:"sessionRevision"`
-	Activities      []Activity  `json:"activities"`
-	Executions      []Execution `json:"executions"`
+	SchemaVersion   string                          `json:"schemaVersion"`
+	SessionID       SessionID                       `json:"sessionID"`
+	SessionRevision Revision                        `json:"sessionRevision"`
+	Activities      []Activity                      `json:"activities"`
+	Executions      []Execution                     `json:"executions"`
+	StepOutcomes    []WorkflowStepOutcomeProjection `json:"stepOutcomes"`
+}
+
+type WorkflowStepOutcomeProjection struct {
+	ExecutionID ExecutionID           `json:"executionID"`
+	FrameID     ProgramFrameID        `json:"frameID"`
+	Outcomes    []WorkflowStepOutcome `json:"outcomes"`
 }
 
 func (id WorkItemID) String() string     { return string(id) }

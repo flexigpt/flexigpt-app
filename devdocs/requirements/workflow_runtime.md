@@ -1071,6 +1071,11 @@ Required source coverage:
 - `internal/sessionstorev3/`
 - `cmd/agentgo/`
 
+#### Phase 1 implementation status
+
+- [x] V3 exposes typed user-message Skill template preparation and instruction Skill preview through SessionV3Wrapper and setup-owned Skill resolution.
+- [ ] V3 still lacks the complete V2-equivalent typed configuration, override, execution-budget, command, projection, and frontend snapshot surface.
+
 ### Phase 2: Complete Workflow v1 semantic closure
 
 This phase completes the remaining Workflow language semantics.
@@ -1094,6 +1099,15 @@ Required source coverage:
 - `internal/agentruntime-go/sessionv3/`
 - `internal/agentruntimesetup/sessionv3runtime/`
 - `internal/sessionstorev3/`
+
+#### Phase 2 implementation status
+
+- [x] State-owner identity and schema propagate through nested Workflow scope construction, and inherited `set` uses the nearest owner schema.
+- [x] Parallel and Foreach have typed `merge` declarations and durable StateUpdate merge boundaries.
+- [x] Workflow failed and uncertain outcomes retain typed facts and are included in Workflow projections.
+- [x] Nested Workflow published-port checks compare caller and target channel schemas before child dispatch.
+- [ ] Model and Agent callable-interface adapters remain limited to the current explicit typed message and instruction forms.
+- [ ] Structured retry remains incomplete for every accepted structured retry declaration.
 
 ### Phase 3: Close domain binding and durable recovery edges
 

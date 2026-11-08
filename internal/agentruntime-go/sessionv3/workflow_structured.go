@@ -23,6 +23,7 @@ type WorkflowScopeContext struct {
 	Child              bool                        `json:"child,omitempty"`
 	MergeState         bool                        `json:"mergeState,omitempty"`
 	OuterState         CanonicalValue              `json:"outerState,omitempty"`
+	StateOwner         *WorkflowStateOwner         `json:"stateOwner,omitempty"`
 	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
 	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
 	Context            *CanonicalValue             `json:"context,omitempty"`
@@ -42,6 +43,11 @@ type WorkflowScopeContext struct {
 func (s WorkflowScopeContext) Validate() error {
 	if !s.OuterState.Valid() {
 		return errors.New("Workflow scope outer state is invalid")
+	}
+	if s.StateOwner != nil {
+		if err := s.StateOwner.Validate(); err != nil {
+			return err
+		}
 	}
 	if s.Context != nil && !s.Context.Valid() {
 		return errors.New("Workflow scope context is invalid")
@@ -81,8 +87,8 @@ func (s WorkflowScopeContext) Validate() error {
 
 	seen := make(map[string]struct{}, len(s.OuterOutcomes))
 	for _, outcome := range s.OuterOutcomes {
-		if strings.TrimSpace(outcome.ID) == "" || !outcome.Output.Valid() {
-			return errors.New("Workflow scope outcome is invalid")
+		if err := outcome.Validate(); err != nil {
+			return fmt.Errorf("workflow scope outcome: %w", err)
 		}
 		if _, duplicate := seen[outcome.ID]; duplicate {
 			return errors.New("Workflow scope outcome is duplicated")
@@ -173,22 +179,41 @@ type WorkflowBranch struct {
 	Do   WorkflowBlock  `json:"do"`
 }
 
+// WorkflowParentStateMerge is an explicit deterministic merge from isolated
+// parallel or foreach child results into the nearest parent state owner.
+type WorkflowParentStateMerge struct {
+	Values []WorkflowValuePair `json:"values,omitempty"`
+	Remove []string            `json:"remove,omitempty"`
+}
+
+// WorkflowParentStateMergeProgress persists the StateUpdate boundary after
+// all selected child outcomes settle and before the parent receives success.
+type WorkflowParentStateMergeProgress struct {
+	WorkItemID WorkItemID         `json:"workItemID"`
+	Owner      WorkflowStateOwner `json:"owner"`
+	Update     StateUpdateWork    `json:"update"`
+	Output     CanonicalValue     `json:"output"`
+	Applied    bool               `json:"applied,omitempty"`
+}
+
 type WorkflowParallel struct {
-	Completion WorkflowCompletion `json:"completion"`
-	Errors     string             `json:"errors,omitempty"`
-	Remaining  string             `json:"remaining,omitempty"`
-	Branches   []WorkflowBranch   `json:"branches"`
+	Completion WorkflowCompletion        `json:"completion"`
+	Errors     string                    `json:"errors,omitempty"`
+	Remaining  string                    `json:"remaining,omitempty"`
+	Merge      *WorkflowParentStateMerge `json:"merge,omitempty"`
+	Branches   []WorkflowBranch          `json:"branches"`
 }
 
 type WorkflowForeach struct {
-	Items       WorkflowValue      `json:"items"`
-	ItemSchema  CanonicalValue     `json:"itemSchema"`
-	Concurrency int                `json:"concurrency,omitempty"`
-	MaxItems    int                `json:"maxItems,omitempty"`
-	Completion  WorkflowCompletion `json:"completion"`
-	Errors      string             `json:"errors,omitempty"`
-	Remaining   string             `json:"remaining,omitempty"`
-	Do          WorkflowBlock      `json:"do"`
+	Items       WorkflowValue             `json:"items"`
+	ItemSchema  CanonicalValue            `json:"itemSchema"`
+	Concurrency int                       `json:"concurrency,omitempty"`
+	MaxItems    int                       `json:"maxItems,omitempty"`
+	Completion  WorkflowCompletion        `json:"completion"`
+	Errors      string                    `json:"errors,omitempty"`
+	Merge       *WorkflowParentStateMerge `json:"merge,omitempty"`
+	Remaining   string                    `json:"remaining,omitempty"`
+	Do          WorkflowBlock             `json:"do"`
 }
 
 type WorkflowRepeat struct {
@@ -269,15 +294,16 @@ type WorkflowItemOutcome struct {
 }
 
 type WorkflowForeachProgress struct {
-	Items       []CanonicalValue      `json:"items"`
-	Outcomes    []WorkflowItemOutcome `json:"outcomes"`
-	Next        int                   `json:"next"`
-	Concurrency int                   `json:"concurrency"`
-	Completion  WorkflowCompletion    `json:"completion"`
-	Errors      string                `json:"errors,omitempty"`
-	Remaining   string                `json:"remaining,omitempty"`
-	Winners     []int                 `json:"winners,omitempty"`
-	Cancelling  bool                  `json:"cancelling,omitempty"`
+	Items       []CanonicalValue          `json:"items"`
+	Outcomes    []WorkflowItemOutcome     `json:"outcomes"`
+	Next        int                       `json:"next"`
+	Concurrency int                       `json:"concurrency"`
+	Completion  WorkflowCompletion        `json:"completion"`
+	Errors      string                    `json:"errors,omitempty"`
+	Remaining   string                    `json:"remaining,omitempty"`
+	Merge       *WorkflowParentStateMerge `json:"merge,omitempty"`
+	Winners     []int                     `json:"winners,omitempty"`
+	Cancelling  bool                      `json:"cancelling,omitempty"`
 }
 
 type WorkflowRepeatProgress struct {
@@ -290,19 +316,22 @@ type WorkflowRepeatProgress struct {
 }
 
 type WorkflowPending struct {
-	Kind           WorkflowPendingKind             `json:"kind"`
-	StepID         string                          `json:"stepID"`
-	Path           string                          `json:"path"`
-	MergeState     bool                            `json:"mergeState,omitempty"`
-	Claims         []ResourceClaim                 `json:"claims,omitempty"`
-	ClaimsBound    bool                            `json:"claimsBound,omitempty"`
-	Children       []WorkflowChild                 `json:"children,omitempty"`
-	Parallel       *WorkflowParallelProgress       `json:"parallel,omitempty"`
-	Foreach        *WorkflowForeachProgress        `json:"foreach,omitempty"`
-	Repeat         *WorkflowRepeatProgress         `json:"repeat,omitempty"`
-	Machine        *WorkflowMachineProgress        `json:"machine,omitempty"`
-	Reconciliation *WorkflowReconciliationProgress `json:"reconciliation,omitempty"`
-	Saga           *WorkflowSagaProgress           `json:"saga,omitempty"`
+	Kind             WorkflowPendingKind               `json:"kind"`
+	StepID           string                            `json:"stepID"`
+	Path             string                            `json:"path"`
+	ParentStateMerge *WorkflowParentStateMerge         `json:"parentStateMerge,omitempty"`
+	StateOwner       *WorkflowStateOwner               `json:"stateOwner,omitempty"`
+	StateMerge       *WorkflowParentStateMergeProgress `json:"stateMerge,omitempty"`
+	MergeState       bool                              `json:"mergeState,omitempty"`
+	Claims           []ResourceClaim                   `json:"claims,omitempty"`
+	ClaimsBound      bool                              `json:"claimsBound,omitempty"`
+	Children         []WorkflowChild                   `json:"children,omitempty"`
+	Parallel         *WorkflowParallelProgress         `json:"parallel,omitempty"`
+	Foreach          *WorkflowForeachProgress          `json:"foreach,omitempty"`
+	Repeat           *WorkflowRepeatProgress           `json:"repeat,omitempty"`
+	Machine          *WorkflowMachineProgress          `json:"machine,omitempty"`
+	Reconciliation   *WorkflowReconciliationProgress   `json:"reconciliation,omitempty"`
+	Saga             *WorkflowSagaProgress             `json:"saga,omitempty"`
 }
 
 func (p WorkflowPending) Validate() error {
@@ -351,6 +380,34 @@ func (p WorkflowPending) Validate() error {
 		return errors.New("Workflow pending control kind is invalid")
 	}
 
+	if p.ParentStateMerge != nil {
+		switch p.Kind {
+		case WorkflowPendingParallel, WorkflowPendingForeach:
+		default:
+			return errors.New("workflow parent state merge has an invalid control owner")
+		}
+		if err := p.ParentStateMerge.Validate(); err != nil {
+			return err
+		}
+		if p.StateOwner == nil {
+			return errors.New("workflow parent state merge has no state owner")
+		}
+		if err := p.StateOwner.Validate(); err != nil {
+			return err
+		}
+	}
+	if p.StateMerge != nil {
+		if p.ParentStateMerge == nil || p.StateOwner == nil {
+			return errors.New("workflow state merge progress has no declaration owner")
+		}
+		if err := p.StateMerge.Validate(); err != nil {
+			return err
+		}
+	}
+	if p.StateOwner != nil && p.ParentStateMerge == nil {
+		return errors.New("workflow pending state owner has no parent merge")
+	}
+
 	for _, claim := range p.Claims {
 		if err := claim.Validate(); err != nil {
 			return err
@@ -376,6 +433,57 @@ func (p WorkflowPending) Validate() error {
 		if child.Error != nil && !child.Error.Details.Valid() {
 			return errors.New("Workflow pending child error details are invalid")
 		}
+	}
+	return nil
+}
+
+func (m WorkflowParentStateMerge) Validate() error {
+	if len(m.Values) == 0 && len(m.Remove) == 0 {
+		return errors.New("workflow parent state merge has no update")
+	}
+	seen := make(map[string]struct{}, len(m.Values)+len(m.Remove))
+	for _, assignment := range m.Values {
+		if strings.TrimSpace(assignment.Key) == "" {
+			return errors.New("workflow parent state merge assignment key is empty")
+		}
+		if _, duplicate := seen[assignment.Key]; duplicate {
+			return errors.New("workflow parent state merge assignment is duplicated")
+		}
+		if err := assignment.Value.Validate(); err != nil {
+			return err
+		}
+		seen[assignment.Key] = struct{}{}
+	}
+	for _, path := range m.Remove {
+		if strings.TrimSpace(path) == "" {
+			return errors.New("workflow parent state merge removal path is empty")
+		}
+		if _, duplicate := seen[path]; duplicate {
+			return errors.New("workflow parent state merge assignment and removal overlap")
+		}
+		seen[path] = struct{}{}
+	}
+	return nil
+}
+
+func (p WorkflowParentStateMergeProgress) Validate() error {
+	if err := validateID(
+		"workflow state merge work item ID",
+		string(p.WorkItemID),
+	); err != nil {
+		return err
+	}
+	if err := p.Owner.Validate(); err != nil {
+		return err
+	}
+	if p.Update.StateOwnerID != p.Owner.ID {
+		return errors.New("workflow state merge owner differs from its update")
+	}
+	if err := p.Update.Validate(); err != nil {
+		return err
+	}
+	if !p.Output.Valid() {
+		return errors.New("workflow state merge output is invalid")
 	}
 	return nil
 }
@@ -525,6 +633,11 @@ func (i *WorkflowInterpreter) childBlockProgram(
 	index *int,
 	result *CanonicalValue,
 ) (ProgramSnapshot, error) {
+	owner, err := workflowStateOwnerForFrame(frame, program)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+
 	child := program
 	child.Root = block
 	child.Scope = WorkflowScopeContext{
@@ -532,6 +645,7 @@ func (i *WorkflowInterpreter) childBlockProgram(
 		MergeState:         mergeState,
 		OuterState:         state.State.Clone(),
 		OuterOutcomes:      workflowScopeOutcomes(program, state),
+		StateOwner:         owner,
 		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
 		Context:            cloneWorkflowCanonicalPointer(program.Scope.Context),
 		Item:               item,
@@ -737,6 +851,25 @@ func (i *WorkflowInterpreter) startParallel(
 			Remaining:  step.Parallel.Remaining,
 		},
 	}
+	if step.Parallel.Merge != nil {
+		owner, ownerErr := workflowStateOwnerForFrame(frame, program)
+		if ownerErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_state_merge_invalid",
+				ownerErr.Error(),
+			)
+		}
+		if owner == nil {
+			return workflowFailure(
+				state,
+				"workflow_state_unavailable",
+				"workflow parent state merge has no state owner",
+			)
+		}
+		pending.ParentStateMerge = cloneWorkflowParentStateMerge(step.Parallel.Merge)
+		pending.StateOwner = owner
+	}
 	frames := make([]ProgramFrameIntent, 0, len(step.Parallel.Branches))
 
 	for _, branch := range step.Parallel.Branches {
@@ -788,7 +921,7 @@ func (i *WorkflowInterpreter) startParallel(
 
 	state.Pending = pending
 	if len(frames) == 0 {
-		if err := i.finishParallel(&state, program, step); err != nil {
+		if err := i.finishParallel(frame, &state, program, step); err != nil {
 			if failure, ok := errors.AsType[workflowChildError](err); ok {
 				return workflowFailureTransition(state, &failure.errorValue)
 			}
@@ -857,7 +990,7 @@ func (i *WorkflowInterpreter) startForeach(
 		}
 	}
 
-	state.Pending = &WorkflowPending{
+	pending := &WorkflowPending{
 		Kind:   WorkflowPendingForeach,
 		StepID: step.ID,
 		Path:   path,
@@ -871,6 +1004,22 @@ func (i *WorkflowInterpreter) startForeach(
 			Remaining:   step.Foreach.Remaining,
 		},
 	}
+	if step.Foreach.Merge != nil {
+		owner, ownerErr := workflowStateOwnerForFrame(frame, program)
+		if ownerErr != nil {
+			return workflowFailure(state, "workflow_state_merge_invalid", ownerErr.Error())
+		}
+		if owner == nil {
+			return workflowFailure(
+				state,
+				"workflow_state_unavailable",
+				"workflow parent state merge has no state owner",
+			)
+		}
+		pending.ParentStateMerge = cloneWorkflowParentStateMerge(step.Foreach.Merge)
+		pending.StateOwner = owner
+	}
+	state.Pending = pending
 	return i.drivePending(frame, Execution{}, program, state)
 }
 
@@ -961,6 +1110,14 @@ func (i *WorkflowInterpreter) drivePending(
 	if state.Pending == nil {
 		return i.drive(frame, execution, program, state)
 	}
+	if transition, handled, err := i.driveParentStateMerge(
+		frame,
+		execution,
+		program,
+		&state,
+	); handled || err != nil {
+		return transition, err
+	}
 
 	switch state.Pending.Kind {
 	case WorkflowPendingForeach:
@@ -1043,7 +1200,7 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 	}
 	if progress.Next == len(progress.Items) &&
 		workflowActiveChildren(pending.Children) == 0 {
-		if err := i.finishForeach(&state, program, step); err != nil {
+		if err := i.finishForeach(frame, &state, program, step); err != nil {
 			if failure, ok := errors.AsType[workflowChildError](err); ok {
 				return workflowFailureTransition(state, &failure.errorValue)
 			}
@@ -1123,6 +1280,14 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 		return workflowFailure(state, "workflow_repeat_prepare_failed", err.Error())
 	}
 	childProgram.Scope.OuterState = carry
+	if step.Repeat.State != nil {
+		childProgram.Scope.StateOwner = workflowSyntheticStateOwner(
+			frame.ID,
+			pending.Path,
+			"repeat",
+			step.Repeat.State.Schema,
+		)
+	}
 	payload, err := canonicalWorkflowValue(childProgram)
 	if err != nil {
 		return workflowFailure(state, "workflow_repeat_prepare_failed", err.Error())
@@ -1297,12 +1462,19 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 	switch state.Pending.Kind {
 	case WorkflowPendingScope, WorkflowPendingChoose:
 		return i.settleSingleStructuredChild(state, program)
-
 	case WorkflowPendingParallel:
-		return i.finishParallel(state, program, WorkflowStep{})
+		parent := mutableFrame(&execution, parentFrameID)
+		if parent == nil {
+			return errors.New("workflow parallel parent frame is unavailable")
+		}
+		return i.finishParallel(*parent, state, program, WorkflowStep{})
 
 	case WorkflowPendingForeach:
-		return i.settleForeachChild(state, program)
+		parent := mutableFrame(&execution, parentFrameID)
+		if parent == nil {
+			return errors.New("workflow foreach parent frame is unavailable")
+		}
+		return i.settleForeachChild(*parent, state, program)
 
 	case WorkflowPendingRepeat:
 		return i.settleRepeatChild(state, program)
@@ -1505,6 +1677,7 @@ func workflowParallelOutput(
 }
 
 func (i *WorkflowInterpreter) finishParallel(
+	frame ProgramFrame,
 	state *WorkflowState,
 	program WorkflowProgram,
 	_ WorkflowStep,
@@ -1630,6 +1803,13 @@ func (i *WorkflowInterpreter) finishParallel(
 	if err != nil {
 		return err
 	}
+	waiting, err := i.ensureParentStateMerge(frame, program, state, value)
+	if err != nil {
+		return err
+	}
+	if waiting {
+		return nil
+	}
 	step, err := workflowStepForPath(program.Root, pending.Path)
 	if err != nil {
 		return err
@@ -1722,6 +1902,7 @@ func workflowForeachHasFailure(
 }
 
 func (i *WorkflowInterpreter) settleForeachChild(
+	frame ProgramFrame,
 	state *WorkflowState,
 	program WorkflowProgram,
 ) error {
@@ -1779,10 +1960,11 @@ func (i *WorkflowInterpreter) settleForeachChild(
 	if err != nil {
 		return err
 	}
-	return i.finishForeach(state, program, step)
+	return i.finishForeach(frame, state, program, step)
 }
 
 func (i *WorkflowInterpreter) finishForeach(
+	frame ProgramFrame,
 	state *WorkflowState,
 	program WorkflowProgram,
 	step WorkflowStep,
@@ -1877,6 +2059,13 @@ func (i *WorkflowInterpreter) finishForeach(
 	})
 	if err != nil {
 		return err
+	}
+	waiting, err := i.ensureParentStateMerge(frame, program, state, value)
+	if err != nil {
+		return err
+	}
+	if waiting {
+		return nil
 	}
 	if err := i.validateStepOutput(program, *state, step, value); err != nil {
 		return err
@@ -2127,7 +2316,16 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	if scope.Context == nil {
 		scope.Context = cloneWorkflowCanonicalPointer(program.Scope.Context)
 	}
-	scope.OuterState = state.State.Clone()
+	if len(scope.OuterState) == 0 {
+		scope.OuterState = state.State.Clone()
+	}
+	if scope.StateOwner == nil {
+		owner, err := workflowStateOwnerForFrame(frame, program)
+		if err != nil {
+			return ProgramSnapshot{}, err
+		}
+		scope.StateOwner = owner
+	}
 	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
 	if state.Saga != nil && scope.Saga == nil {
 		value := *state.Saga

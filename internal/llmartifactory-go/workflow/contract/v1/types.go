@@ -158,6 +158,14 @@ type Set struct {
 	Remove []string         `json:"remove,omitempty"`
 }
 
+// StateMerge is an explicit deterministic parent-state update boundary for
+// parallel and foreach child state. Values evaluate after the selected child
+// outcomes settle, with the aggregate result available through `result`.
+type StateMerge struct {
+	Values map[string]Value `json:"values,omitempty"`
+	Remove []string         `json:"remove,omitempty"`
+}
+
 type Choose struct {
 	Cases   []Case `json:"cases"`
 	Default *Block `json:"default,omitempty"`
@@ -182,6 +190,7 @@ type Parallel struct {
 	Completion *Completion       `json:"completion,omitempty"`
 	Errors     string            `json:"errors,omitempty"`
 	Remaining  string            `json:"remaining,omitempty"`
+	Merge      *StateMerge       `json:"merge,omitempty"`
 	Branches   map[string]Branch `json:"branches"`
 }
 
@@ -193,6 +202,7 @@ type Foreach struct {
 	Completion  *Completion `json:"completion,omitempty"`
 	Errors      string      `json:"errors,omitempty"`
 	Remaining   string      `json:"remaining,omitempty"`
+	Merge       *StateMerge `json:"merge,omitempty"`
 	Do          Block       `json:"do"`
 }
 

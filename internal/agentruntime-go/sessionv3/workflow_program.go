@@ -240,13 +240,18 @@ const (
 	WorkflowStepOutcomeSucceeded WorkflowStepOutcomeStatus = "succeeded"
 	WorkflowStepOutcomeSkipped   WorkflowStepOutcomeStatus = "skipped"
 	WorkflowStepOutcomeCancelled WorkflowStepOutcomeStatus = "cancelled"
+	WorkflowStepOutcomeFailed    WorkflowStepOutcomeStatus = "failed"
+	WorkflowStepOutcomeUncertain WorkflowStepOutcomeStatus = "uncertain"
 )
 
 type WorkflowStepOutcome struct {
-	ID     string                    `json:"id"`
-	Status WorkflowStepOutcomeStatus `json:"status"`
-	Output CanonicalValue            `json:"output,omitempty"`
-	Target string                    `json:"target,omitempty"`
+	ID      string                    `json:"id"`
+	Status  WorkflowStepOutcomeStatus `json:"status"`
+	Output  CanonicalValue            `json:"output,omitempty"`
+	Target  string                    `json:"target,omitempty"`
+	Receipt *ExternalReceipt          `json:"receipt,omitempty"`
+	Error   *SanitizedError           `json:"error,omitempty"`
+	Effect  EffectState               `json:"effectState,omitempty"`
 }
 
 // WorkflowTargetSetResolution is persisted while a resolver WorkItem is
@@ -322,25 +327,8 @@ func (s *WorkflowState) Validate() error {
 	}
 	seen := make(map[string]struct{}, len(s.Outcomes))
 	for _, outcome := range s.Outcomes {
-		if strings.TrimSpace(outcome.ID) == "" ||
-			!outcome.Output.Valid() {
-			return errors.New("Workflow Program output state is invalid")
-		}
-		switch outcome.Status {
-		case WorkflowStepOutcomeSucceeded:
-			if len(outcome.Output) == 0 {
-				return errors.New("successful Workflow step has no output")
-			}
-		case WorkflowStepOutcomeSkipped:
-			if len(outcome.Output) != 0 {
-				return errors.New("skipped Workflow step has an output")
-			}
-		case WorkflowStepOutcomeCancelled:
-			if len(outcome.Output) != 0 {
-				return errors.New("cancelled Workflow step has an output")
-			}
-		default:
-			return errors.New("Workflow step outcome status is invalid")
+		if err := outcome.Validate(); err != nil {
+			return fmt.Errorf("workflow step outcome: %w", err)
 		}
 		if _, duplicate := seen[outcome.ID]; duplicate {
 			return errors.New("Workflow Program step outcome is duplicated")
@@ -398,12 +386,7 @@ func (s *WorkflowState) recordOutcome(
 			)
 		}
 	}
-	s.Outcomes = append(s.Outcomes, WorkflowStepOutcome{
-		ID:     outcome.ID,
-		Status: outcome.Status,
-		Output: outcome.Output.Clone(),
-		Target: outcome.Target,
-	})
+	s.Outcomes = append(s.Outcomes, cloneWorkflowStepOutcome(outcome))
 	return nil
 }
 
@@ -613,6 +596,24 @@ func (i *WorkflowInterpreter) Advance(
 		}
 
 	case ProgramEventWorkSettled:
+		if handled, mergeErr := i.settleParentStateMerge(
+			frame,
+			execution,
+			program,
+			&state,
+			event.WorkItemID,
+		); handled {
+			if mergeErr != nil {
+				if failure, found := errors.AsType[workflowChildError](mergeErr); found {
+					transition, err = workflowFailureTransition(state, &failure.errorValue)
+				} else {
+					transition, err = workflowFailure(state, "workflow_state_merge_failed", mergeErr.Error())
+				}
+			} else {
+				transition, err = i.drive(frame, execution, program, state)
+			}
+			break
+		}
 		if _, handled, settleErr := i.settleReconciliationIntent(
 			frame,
 			execution,
@@ -811,6 +812,14 @@ func (i *WorkflowInterpreter) Advance(
 	if err != nil {
 		return ProgramTransition{}, err
 	}
+	transition, err = i.recordTerminalWorkflowStepOutcome(
+		program,
+		state,
+		transition,
+	)
+	if err != nil {
+		return ProgramTransition{}, err
+	}
 	return i.prepareWorkflowTerminal(
 		frame,
 		execution,
@@ -877,6 +886,7 @@ func (i *WorkflowInterpreter) drive(
 
 		step := program.Root.Steps[state.Index]
 		path := "step/" + step.ID
+		state.PendingPath = path
 
 		if step.When != nil {
 			allowed, err := i.condition(
@@ -903,6 +913,9 @@ func (i *WorkflowInterpreter) drive(
 					)
 				}
 				state.Index++
+				state.PendingPath = ""
+				state.PendingTarget = ""
+				state.Deadline = nil
 				continue
 			}
 		}
@@ -946,6 +959,7 @@ func (i *WorkflowInterpreter) drive(
 
 		case step.Set != nil:
 			return i.set(
+				frame,
 				program,
 				state,
 				path,
@@ -1676,17 +1690,26 @@ func (i *WorkflowInterpreter) transform(
 }
 
 func (i *WorkflowInterpreter) set(
+	frame ProgramFrame,
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
 	step WorkflowStep,
 	set WorkflowSet,
 ) (ProgramTransition, error) {
-	if program.Root.State == nil {
+	owner, err := workflowStateOwnerForFrame(frame, program)
+	if err != nil {
 		return workflowFailure(
 			state,
 			"workflow_state_unavailable",
-			"Workflow set operation has no state declaration",
+			err.Error(),
+		)
+	}
+	if owner == nil {
+		return workflowFailure(
+			state,
+			"workflow_state_unavailable",
+			"workflow set operation has no state-owning scope",
 		)
 	}
 
@@ -1696,16 +1719,16 @@ func (i *WorkflowInterpreter) set(
 		len(set.Values),
 	)
 	for _, assignment := range set.Values {
-		value, err := i.evaluate(
+		value, evaluateErr := i.evaluate(
 			assignment.Value,
 			program,
 			state,
 		)
-		if err != nil {
+		if evaluateErr != nil {
 			return workflowFailure(
 				state,
 				"workflow_state_update_invalid",
-				err.Error(),
+				evaluateErr.Error(),
 			)
 		}
 		assignments = append(assignments, StateAssignment{
@@ -1727,10 +1750,11 @@ func (i *WorkflowInterpreter) set(
 			},
 			Input: WorkItemPayload{
 				StateUpdate: &StateUpdateWork{
-					Base:        state.State.Clone(),
-					Schema:      program.Root.State.Schema.Clone(),
-					Assignments: assignments,
-					RemovePaths: append([]string(nil), set.Remove...),
+					StateOwnerID: owner.ID,
+					Base:         state.State.Clone(),
+					Schema:       owner.Schema.Clone(),
+					Assignments:  assignments,
+					RemovePaths:  append([]string(nil), set.Remove...),
 				},
 			},
 		},
@@ -1788,10 +1812,24 @@ func (i *WorkflowInterpreter) settleWork(
 	switch item.Type {
 	case WorkItemTypeStateUpdate:
 		if item.Input.StateUpdate == nil {
-			return errors.New("Workflow StateUpdate WorkItem has no payload")
+			return errors.New("workflow state update work item has no payload")
 		}
-		if program.Root.State == nil {
-			return errors.New("Workflow StateUpdate WorkItem has no state declaration")
+		frame := mutableFrame(&execution, frameID)
+		if frame == nil {
+			return errors.New("workflow state update owner frame is unavailable")
+		}
+		owner, ownerErr := workflowStateOwnerForFrame(*frame, program)
+		if ownerErr != nil {
+			return ownerErr
+		}
+		if owner == nil {
+			return errors.New("workflow state update has no state owner")
+		}
+		if item.Input.StateUpdate.StateOwnerID != owner.ID ||
+			!canonicalValuesEqual(item.Input.StateUpdate.Schema, owner.Schema) {
+			return errors.New(
+				"workflow state update differs from its nearest state owner",
+			)
 		}
 		state.State = value.Clone()
 	default:
@@ -2771,6 +2809,32 @@ func workflowActivation(
 			}
 			value["output"] = output
 		}
+		if outcome.Target != "" {
+			value["target"] = outcome.Target
+		}
+		if outcome.Effect != "" {
+			value["effectState"] = string(outcome.Effect)
+		}
+		if outcome.Receipt != nil {
+			receipt, err := canonicalWorkflowValue(outcome.Receipt)
+			if err != nil {
+				return nil, err
+			}
+			value["receipt"], err = workflowActivationValue(receipt)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if outcome.Error != nil {
+			errorValue, err := canonicalWorkflowValue(outcome.Error)
+			if err != nil {
+				return nil, err
+			}
+			value["error"], err = workflowActivationValue(errorValue)
+			if err != nil {
+				return nil, err
+			}
+		}
 		steps[outcome.ID] = value
 	}
 
@@ -2784,6 +2848,32 @@ func workflowActivation(
 				return nil, err
 			}
 			value["output"] = output
+		}
+		if outcome.Target != "" {
+			value["target"] = outcome.Target
+		}
+		if outcome.Effect != "" {
+			value["effectState"] = string(outcome.Effect)
+		}
+		if outcome.Receipt != nil {
+			receipt, err := canonicalWorkflowValue(outcome.Receipt)
+			if err != nil {
+				return nil, err
+			}
+			value["receipt"], err = workflowActivationValue(receipt)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if outcome.Error != nil {
+			errorValue, err := canonicalWorkflowValue(outcome.Error)
+			if err != nil {
+				return nil, err
+			}
+			value["error"], err = workflowActivationValue(errorValue)
+			if err != nil {
+				return nil, err
+			}
 		}
 		steps[outcome.ID] = value
 	}

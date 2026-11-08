@@ -171,6 +171,34 @@ func (b *Binder) AdmitAttachments(
 	return b.attachments.AdmitAttachments(ctx, request)
 }
 
+func (b *Binder) PrepareUserMessageSkillTemplate(
+	ctx context.Context,
+	request sessionv3Runtime.UserMessageSkillTemplatePreparationRequest,
+) (sessionv3Runtime.UserMessageSkillTemplateResult, error) {
+	if b == nil || b.skillTools == nil {
+		return sessionv3Runtime.UserMessageSkillTemplateResult{}, errors.New(
+			"session v3 skill runtime is unavailable",
+		)
+	}
+	return b.skillTools.PrepareUserMessageTemplate(
+		ctx,
+		request.Skill,
+		request.Arguments,
+	)
+}
+
+func (b *Binder) PreviewInstructionSkill(
+	ctx context.Context,
+	request sessionv3Runtime.InstructionSkillPreviewRequest,
+) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
+	if b == nil || b.skillTools == nil {
+		return sessionv3Runtime.InstructionSkillPreviewResult{}, errors.New(
+			"session v3 skill runtime is unavailable",
+		)
+	}
+	return b.skillTools.PreviewInstruction(ctx, request.Skill, request.Arguments)
+}
+
 func (b *Binder) PrepareAppTool(
 	ctx context.Context,
 	request sessionv3Runtime.AppToolPreparationRequest,

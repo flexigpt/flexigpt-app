@@ -2025,6 +2025,12 @@ Required source coverage:
 - `internal/sessionstorev3/`
 - `cmd/agentgo/`
 
+#### Phase 1 implementation status
+
+- [x] V3 user-message Skill template preparation and instruction Skill preview use typed Runtime, setup-domain, and Wails routes.
+- [ ] The full V2-equivalent normal Session configuration model, per-message overrides, per-continuation overrides, execution budgets, and immutable operation configuration facts remain incomplete.
+- [ ] The full V2 command, projection, and frontend snapshot parity ledger remains incomplete.
+
 ### Phase 2: Complete Workflow state, outcome, structured merge, and invocation semantics
 
 This phase completes the Workflow v1 language behavior that currently has durable model gaps.
@@ -2048,6 +2054,15 @@ Required source coverage:
 - `internal/agentruntimesetup/workflowruntime/`
 - `internal/agentruntime-go/sessionv3/`
 - `internal/agentruntimesetup/sessionv3runtime/`
+
+#### Phase 2 implementation status
+
+- [x] Child Workflow scope context now carries nearest state-owner identity and schema, and inherited `set` uses that owner through structured, terminal, machine, reconciliation, and compensation child blocks.
+- [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
+- [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
+- [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
+- [ ] Typed Model and Agent invocation adapters still support only the existing explicit `messages` and `instructions` request forms.
+- [ ] Structured retry remains incomplete for accepted Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child-frame boundaries.
 
 ### Phase 3: Complete structured retry and published-port boundary behavior
 

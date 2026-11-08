@@ -158,6 +158,47 @@ func (v *validator) state(value *State, scope expressionScope) (expressionScope,
 	return scope, nil
 }
 
+func (v *validator) parentStateMerge(
+	value *StateMerge,
+	scope expressionScope,
+) error {
+	if value == nil {
+		return nil
+	}
+	if !scope.state {
+		return invalid(
+			"parallel and foreach state merge requires an enclosing state-owning scope",
+		)
+	}
+	if len(value.Values) == 0 && len(value.Remove) == 0 {
+		return invalid("parent state merge requires values or remove")
+	}
+
+	seen := make(map[string]struct{}, len(value.Values)+len(value.Remove))
+	for _, name := range sortedKeys(value.Values) {
+		if strings.TrimSpace(name) == "" {
+			return invalid("parent state merge assignment key is empty")
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return invalid("parent state merge assignment key %q is duplicated", name)
+		}
+		if err := scope.validate(value.Values[name], ""); err != nil {
+			return fmt.Errorf("parent state merge assignment %q: %w", name, err)
+		}
+		seen[name] = struct{}{}
+	}
+	for _, path := range value.Remove {
+		if strings.TrimSpace(path) == "" {
+			return invalid("parent state merge removal path is empty")
+		}
+		if _, duplicate := seen[path]; duplicate {
+			return invalid("parent state merge assignment and removal overlap")
+		}
+		seen[path] = struct{}{}
+	}
+	return nil
+}
+
 func (v *validator) listen(
 	values map[string]Subscription,
 	scope expressionScope,
@@ -387,6 +428,9 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 		if err := completion(value.Completion, value.Errors, len(value.Branches)); err != nil {
 			return err
 		}
+		if err := v.parentStateMerge(value.Merge, scope.with("result")); err != nil {
+			return err
+		}
 		for _, name := range sortedKeys(value.Branches) {
 			branch := value.Branches[name]
 			if err := scope.validate(branch.When, "bool"); err != nil {
@@ -402,6 +446,9 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 			return err
 		}
 		if err := completion(value.Completion, value.Errors, -1); err != nil {
+			return err
+		}
+		if err := v.parentStateMerge(value.Merge, scope.with("result")); err != nil {
 			return err
 		}
 		if value.Concurrency != nil && limits != nil && limits.Concurrency != nil &&

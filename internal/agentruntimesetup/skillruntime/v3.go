@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -103,90 +104,53 @@ func (e *V3Executor) Instruction(
 	ctx context.Context,
 	selection sessionv3Runtime.ArtifactSelection,
 ) (string, error) {
-	if e == nil || e.resolver == nil || e.runtime == nil {
-		return "", errors.New("session v3 skill runtime is unavailable")
-	}
-
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(selection.RootID),
-		ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
-	}
-	if err := ref.Validate(); err != nil {
-		return "", err
-	}
-
-	resolved, err := e.resolver.ResolveSkills(
+	_, text, err := e.renderSelectedSkill(
 		ctx,
-		[]artifactModel.ArtifactRef{ref},
+		selection,
+		nil,
+		document.SkillInsertInstructions,
+	)
+	return text, err
+}
+
+func (e *V3Executor) PrepareUserMessageTemplate(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+	arguments map[string]string,
+) (sessionv3Runtime.UserMessageSkillTemplateResult, error) {
+	pin, text, err := e.renderSelectedSkill(
+		ctx,
+		selection,
+		arguments,
+		document.SkillInsertUserMessage,
 	)
 	if err != nil {
-		return "", err
+		return sessionv3Runtime.UserMessageSkillTemplateResult{}, err
 	}
-	if len(resolved.Values) != 1 {
-		return "", errors.New(
-			"skill resolver returned an unexpected instruction skill count",
-		)
-	}
+	return sessionv3Runtime.UserMessageSkillTemplateResult{
+		Skill: pin,
+		Text:  text,
+	}, nil
+}
 
-	value := resolved.Values[0]
-	if value.Artifact != ref {
-		return "", errors.New(
-			"skill resolver returned another instruction skill",
-		)
-	}
-	if selection.ExpectedRevision != 0 &&
-		selection.ExpectedRevision != value.Revision {
-		return "", errors.New("selected skill revision changed")
-	}
-	if selection.ExpectedDigest != "" &&
-		selection.ExpectedDigest != value.DefinitionDigest {
-		return "", errors.New("selected skill definition changed")
-	}
-	if !value.Enabled {
-		return "", errors.New("selected instruction skill is disabled")
-	}
-
-	records, err := e.runtime.ListAgentSkills(
+func (e *V3Executor) PreviewInstruction(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+	arguments map[string]string,
+) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
+	pin, text, err := e.renderSelectedSkill(
 		ctx,
-		&agentskillsRuntime.SkillListFilter{
-			AllowSkills: []provider.SkillDef{value.Definition},
-		},
+		selection,
+		arguments,
+		document.SkillInsertInstructions,
 	)
 	if err != nil {
-		return "", err
+		return sessionv3Runtime.InstructionSkillPreviewResult{}, err
 	}
-	for _, record := range records {
-		if record.Def != value.Definition {
-			continue
-		}
-		insert, supported := document.NormalizeSkillInsert(record.Insert)
-		if !supported || insert != document.SkillInsertInstructions {
-			return "", errors.New(
-				"selected skill is not an instruction skill",
-			)
-		}
-
-		rendered, err := e.runtime.RenderSkill(
-			ctx,
-			&skillRuntime.RenderSkillRequest{
-				Body: &skillRuntime.RenderSkillRequestBody{
-					Definition: value.Definition,
-					Arguments:  map[string]string{},
-				},
-			},
-		)
-		if err != nil {
-			return "", err
-		}
-		if rendered == nil || rendered.Body == nil {
-			return "", errors.New(
-				"skill runtime returned no rendered instruction skill",
-			)
-		}
-		return strings.TrimSpace(rendered.Body.Text), nil
-	}
-
-	return "", errors.New("skill runtime did not index the selected instruction skill")
+	return sessionv3Runtime.InstructionSkillPreviewResult{
+		Skill: pin,
+		Text:  text,
+	}, nil
 }
 
 // Bind verifies the Skill allow-list and active-skill selections before a
@@ -386,6 +350,124 @@ func (e *V3Executor) CloseExecution(
 		ctx,
 		agentskillsRuntimeSpec.SessionID(session.id),
 	)
+}
+
+func (e *V3Executor) renderSelectedSkill(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+	arguments map[string]string,
+	expectedInsert document.SkillInsert,
+) (sessionv3Runtime.ArtifactPin, string, error) {
+	if e == nil || e.resolver == nil || e.runtime == nil {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"session v3 skill runtime is unavailable",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(selection.RootID),
+		ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
+	}
+	if err := ref.Validate(); err != nil {
+		return sessionv3Runtime.ArtifactPin{}, "", err
+	}
+
+	resolved, err := e.resolver.ResolveSkills(
+		ctx,
+		[]artifactModel.ArtifactRef{ref},
+	)
+	if err != nil {
+		return sessionv3Runtime.ArtifactPin{}, "", err
+	}
+	if len(resolved.Values) != 1 {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"skill resolver returned an unexpected selected skill count",
+		)
+	}
+
+	value := resolved.Values[0]
+	if value.Artifact != ref {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"skill resolver returned another selected skill",
+		)
+	}
+	if selection.ExpectedRevision != 0 &&
+		selection.ExpectedRevision != value.Revision {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"selected skill revision changed",
+		)
+	}
+	if selection.ExpectedDigest != "" &&
+		selection.ExpectedDigest != value.DefinitionDigest {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"selected skill definition changed",
+		)
+	}
+	if !value.Enabled {
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+			"selected skill is disabled",
+		)
+	}
+
+	records, err := e.runtime.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			AllowSkills: []provider.SkillDef{value.Definition},
+		},
+	)
+	if err != nil {
+		return sessionv3Runtime.ArtifactPin{}, "", err
+	}
+	for _, record := range records {
+		if record.Def != value.Definition {
+			continue
+		}
+		insert, supported := document.NormalizeSkillInsert(record.Insert)
+		if !supported || insert != expectedInsert {
+			return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+				"selected skill has a different insertion behavior",
+			)
+		}
+
+		rendered, err := e.runtime.RenderSkill(
+			ctx,
+			&skillRuntime.RenderSkillRequest{
+				Body: &skillRuntime.RenderSkillRequestBody{
+					Definition: value.Definition,
+					Arguments:  cloneV3SkillArguments(arguments),
+				},
+			},
+		)
+		if err != nil {
+			return sessionv3Runtime.ArtifactPin{}, "", err
+		}
+		if rendered == nil || rendered.Body == nil {
+			return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+				"skill runtime returned no rendered skill",
+			)
+		}
+		return sessionv3Runtime.ArtifactPin{
+			RootID:     string(value.Artifact.RootID),
+			ArtifactID: string(value.Artifact.ArtifactID),
+			Revision:   value.Revision,
+			Digest:     value.DefinitionDigest,
+		}, rendered.Body.Text, nil
+	}
+
+	return sessionv3Runtime.ArtifactPin{}, "", errors.New(
+		"skill runtime did not index the selected skill",
+	)
+}
+
+func cloneV3SkillArguments(
+	value map[string]string,
+) map[string]string {
+	if len(value) == 0 {
+		return map[string]string{}
+	}
+	output := make(map[string]string, len(value))
+	maps.Copy(output, value)
+	return output
 }
 
 func (e *V3Executor) ensureSession(

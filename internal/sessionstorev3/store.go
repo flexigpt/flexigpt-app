@@ -375,29 +375,7 @@ func (s *Store) ReadWorkflow(id sessionv3Runtime.SessionID) (sessionv3Runtime.Wo
 	if err != nil {
 		return sessionv3Runtime.WorkflowProjection{}, err
 	}
-	activities := []sessionv3Runtime.Activity{}
-	executions := []sessionv3Runtime.Execution{}
-	for _, a := range session.Timeline {
-		if a.Kind == sessionv3Runtime.ActivityKindWorkflow || a.Kind == sessionv3Runtime.ActivityKindAction ||
-			a.Kind == sessionv3Runtime.ActivityKindWait {
-			activities = append(activities, a)
-		}
-	}
-	for _, e := range session.Executions {
-		for _, f := range e.ProgramFrames {
-			if f.Program.InterpreterID == "artifact.workflow.v1" {
-				executions = append(executions, e)
-				break
-			}
-		}
-	}
-	return sessionv3Runtime.WorkflowProjection{
-		SchemaVersion:   sessionv3Runtime.SchemaVersion,
-		SessionID:       session.ID,
-		SessionRevision: session.Revision,
-		Activities:      activities,
-		Executions:      executions,
-	}, nil
+	return sessionv3Runtime.BuildWorkflowProjection(session), nil
 }
 
 func (s *Store) ReadExecution(

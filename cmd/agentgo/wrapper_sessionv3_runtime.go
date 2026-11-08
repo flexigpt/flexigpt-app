@@ -180,6 +180,28 @@ func (w *SessionV3Wrapper) UpdateSessionDefaults(
 	})
 }
 
+func (w *SessionV3Wrapper) PrepareUserMessageSkillTemplate(
+	request sessionv3Runtime.UserMessageSkillTemplatePreparationRequest,
+) (sessionv3Runtime.UserMessageSkillTemplateResult, error) {
+	return withSessionV3(
+		w,
+		func(r *sessionv3Runtime.Runtime) (
+			sessionv3Runtime.UserMessageSkillTemplateResult,
+			error,
+		) {
+			return r.PrepareUserMessageSkillTemplate(context.Background(), request)
+		},
+	)
+}
+
+func (w *SessionV3Wrapper) PreviewInstructionSkill(
+	request sessionv3Runtime.InstructionSkillPreviewRequest,
+) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
+		return r.PreviewInstructionSkill(context.Background(), request)
+	})
+}
+
 func (w *SessionV3Wrapper) UpdateContinuationInput(
 	command sessionv3Runtime.UpdateContinuationInputCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {

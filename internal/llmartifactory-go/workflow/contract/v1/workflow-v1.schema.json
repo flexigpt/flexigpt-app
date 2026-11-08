@@ -635,6 +635,15 @@
 			},
 			"anyOf": [{ "required": ["values"] }, { "required": ["remove"] }]
 		},
+		"stateMerge": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"values": { "$ref": "#/$defs/valueMap" },
+				"remove": { "$ref": "#/$defs/strings" }
+			},
+			"anyOf": [{ "required": ["values"] }, { "required": ["remove"] }]
+		},
 		"choose": {
 			"type": "object",
 			"additionalProperties": false,
@@ -679,6 +688,7 @@
 				"completion": { "$ref": "#/$defs/completion" },
 				"errors": { "enum": ["fail-fast", "collect"] },
 				"remaining": { "enum": ["cancel", "wait"] },
+				"merge": { "$ref": "#/$defs/stateMerge" },
 				"branches": {
 					"type": "object",
 					"minProperties": 1,
@@ -708,6 +718,7 @@
 				"completion": { "$ref": "#/$defs/completion" },
 				"errors": { "enum": ["fail-fast", "collect"] },
 				"remaining": { "enum": ["cancel", "wait"] },
+				"merge": { "$ref": "#/$defs/stateMerge" },
 				"do": { "$ref": "#/$defs/block" }
 			}
 		},

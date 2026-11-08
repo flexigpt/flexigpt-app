@@ -1464,6 +1464,56 @@ func (r *Runtime) GetSession(_ context.Context, id SessionID) (Session, error) {
 	return cloneSession(*session), nil
 }
 
+func (r *Runtime) PrepareUserMessageSkillTemplate(
+	ctx context.Context,
+	request UserMessageSkillTemplatePreparationRequest,
+) (UserMessageSkillTemplateResult, error) {
+	if r == nil {
+		return UserMessageSkillTemplateResult{}, ErrRuntimeClosed
+	}
+
+	r.mu.RLock()
+	closed := r.closed
+	binder := r.deps.Binder
+	r.mu.RUnlock()
+	if closed {
+		return UserMessageSkillTemplateResult{}, ErrRuntimeClosed
+	}
+
+	preparer, found := binder.(UserMessageSkillTemplatePreparer)
+	if !found || preparer == nil {
+		return UserMessageSkillTemplateResult{}, errors.New(
+			"user-message skill template preparation is unavailable",
+		)
+	}
+	return preparer.PrepareUserMessageSkillTemplate(ctx, request)
+}
+
+func (r *Runtime) PreviewInstructionSkill(
+	ctx context.Context,
+	request InstructionSkillPreviewRequest,
+) (InstructionSkillPreviewResult, error) {
+	if r == nil {
+		return InstructionSkillPreviewResult{}, ErrRuntimeClosed
+	}
+
+	r.mu.RLock()
+	closed := r.closed
+	binder := r.deps.Binder
+	r.mu.RUnlock()
+	if closed {
+		return InstructionSkillPreviewResult{}, ErrRuntimeClosed
+	}
+
+	previewer, found := binder.(InstructionSkillPreviewer)
+	if !found || previewer == nil {
+		return InstructionSkillPreviewResult{}, errors.New(
+			"instruction skill preview is unavailable",
+		)
+	}
+	return previewer.PreviewInstructionSkill(ctx, request)
+}
+
 func (r *Runtime) Conversation(ctx context.Context, id SessionID) (ConversationProjection, error) {
 	session, err := r.GetSession(ctx, id)
 	if err != nil {
@@ -1502,29 +1552,7 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 	if err != nil {
 		return WorkflowProjection{}, err
 	}
-	activities := []Activity{}
-	executions := []Execution{}
-	for _, activity := range session.Timeline {
-		if activity.Kind == ActivityKindWorkflow || activity.Kind == ActivityKindAction ||
-			activity.Kind == ActivityKindWait {
-			activities = append(activities, activity)
-		}
-	}
-	for _, execution := range session.Executions {
-		for _, frame := range execution.ProgramFrames {
-			if frame.Program.InterpreterID == "artifact.workflow.v1" {
-				executions = append(executions, execution)
-				break
-			}
-		}
-	}
-	return WorkflowProjection{
-		SchemaVersion:   SchemaVersion,
-		SessionID:       id,
-		SessionRevision: session.Revision,
-		Activities:      activities,
-		Executions:      executions,
-	}, nil
+	return BuildWorkflowProjection(session), nil
 }
 
 func (r *Runtime) rejectTriggerRegistrationLocked(
@@ -3033,7 +3061,25 @@ func (r *Runtime) finishWorkLocked(
 	}
 	if item.State == WorkItemStateUncertain {
 		if !execution.Controls.CancellationRequested {
-			r.addRecoveryWaitLocked(session, execution, item)
+			if err := r.recordUncertainWorkflowStepOutcomeLocked(
+				execution,
+				item,
+			); err != nil {
+				item.State = WorkItemStateFailed
+				item.Error = &SanitizedError{
+					Code:     "workflow_outcome_record_failed",
+					Category: ErrorCategoryExecution,
+					Message:  err.Error(),
+				}
+				r.advanceSettledWorkLocked(
+					session,
+					execution,
+					item.FrameID,
+					item.ID,
+				)
+			} else {
+				r.addRecoveryWaitLocked(session, execution, item)
+			}
 		}
 	} else {
 		r.advanceSettledWorkLocked(

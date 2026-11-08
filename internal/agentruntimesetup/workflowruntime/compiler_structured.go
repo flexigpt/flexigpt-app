@@ -138,11 +138,15 @@ func compileWorkflowParallel(
 		names = append(names, name)
 	}
 	sort.Strings(names)
-
+	merge, err := compileWorkflowParentStateMerge(input.Merge)
+	if err != nil {
+		return sessionv3Runtime.WorkflowParallel{}, err
+	}
 	output := sessionv3Runtime.WorkflowParallel{
 		Completion: compileWorkflowCompletion(input.Completion),
 		Errors:     input.Errors,
 		Remaining:  input.Remaining,
+		Merge:      merge,
 		Branches:   make([]sessionv3Runtime.WorkflowBranch, 0, len(names)),
 	}
 	for _, name := range names {
@@ -184,12 +188,17 @@ func compileWorkflowForeach(
 		return sessionv3Runtime.WorkflowForeach{}, err
 	}
 
+	merge, err := compileWorkflowParentStateMerge(input.Merge)
+	if err != nil {
+		return sessionv3Runtime.WorkflowForeach{}, err
+	}
 	output := sessionv3Runtime.WorkflowForeach{
 		Items:      items,
 		ItemSchema: itemSchema,
 		Completion: compileWorkflowCompletion(input.Completion),
 		Errors:     input.Errors,
 		Remaining:  input.Remaining,
+		Merge:      merge,
 		Do:         block,
 	}
 	if input.Concurrency != nil {
