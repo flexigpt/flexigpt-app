@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime/appbinding"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -28,7 +27,17 @@ import (
 func registerApplicationWorkflowBindings(
 	registry *workflowruntime.BindingRegistry,
 ) error {
-	return appbinding.Register(registry)
+	if registry == nil {
+		return errors.New("application workflow binding registry is unavailable")
+	}
+	if err := registry.RegisterService(
+		workflowruntime.NormalizeURLServiceBinding(),
+	); err != nil {
+		return err
+	}
+	return registry.RegisterActivity(
+		workflowruntime.ApplyUnifiedDiffActivityBinding(),
+	)
 }
 
 type SessionV3Params struct {
