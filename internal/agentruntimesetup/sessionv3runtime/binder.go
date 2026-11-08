@@ -246,35 +246,12 @@ func (b *Binder) ValidatePortPlans(
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeLLM,
 		sessionv3Runtime.WorkItemTypeService,
-		sessionv3Runtime.WorkItemTypeActivity:
+		sessionv3Runtime.WorkItemTypeActivity,
+		sessionv3Runtime.WorkItemTypeTool:
 		return nil
-	case sessionv3Runtime.WorkItemTypeTool:
-		return validateV3ToolPortPlans(request.WorkItem.Ports)
 	default:
 		return errors.New(
 			"port adaptation is unavailable for this work item",
 		)
 	}
-}
-
-func validateV3ToolPortPlans(
-	plans []sessionv3Runtime.PortPlan,
-) error {
-	for _, plan := range plans {
-		switch plan.Direction {
-		case sessionv3Runtime.WorkflowPortDirectionInput:
-			return errors.New(
-				"workflow tool input port transport is unavailable",
-			)
-		case sessionv3Runtime.WorkflowPortDirectionOutput:
-			if plan.Stream {
-				return errors.New(
-					"workflow tool streamed port transport is unavailable",
-				)
-			}
-		default:
-			return errors.New("tool port direction is invalid")
-		}
-	}
-	return nil
 }

@@ -1123,23 +1123,13 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	}
 	switch kind {
 	case WorkItemTypeLLM:
-		if p.LLM.InputActivityID == "" && p.LLM.Invocation == nil {
-			return errors.New(
-				"llm WorkItem requires an input activity or workflow invocation plan",
-			)
-		}
-		if p.LLM.Invocation != nil {
-			if err := p.LLM.Invocation.Validate(); err != nil {
-				return err
-			}
+		if p.LLM.InputActivityID == "" {
+			return errors.New("llm WorkItem requires an input activity")
 		}
 
 	case WorkItemTypeTool:
 		if err := p.Tool.Call.Validate(); err != nil {
 			return err
-		}
-		if !p.Tool.Context.Valid() {
-			return errors.New("invalid tool work context")
 		}
 		if p.Tool.Target != nil && p.Tool.MCP != nil {
 			return errors.New(

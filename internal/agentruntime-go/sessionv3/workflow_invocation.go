@@ -19,16 +19,3 @@ func (p LLMInvocationPlan) Validate() error {
 	}
 	return nil
 }
-
-func cloneLLMInvocationPlan(
-	value *LLMInvocationPlan,
-) *LLMInvocationPlan {
-	if value == nil {
-		return nil
-	}
-
-	output := *value
-	output.Input = value.Input.Clone()
-	output.Context = value.Context.Clone()
-	return &output
-}

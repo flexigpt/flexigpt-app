@@ -39,11 +39,6 @@ func (b *Binder) prepareLLMPlan(
 	if payload == nil {
 		return llmExecutionPlan{}, errors.New("llm payload is missing")
 	}
-	if payload.Invocation != nil {
-		return llmExecutionPlan{}, errors.New(
-			"workflow model and agent invocation adapter is unavailable",
-		)
-	}
 
 	defaults := jsonutil.CloneJSONInValue(request.Session.Defaults)
 	if payload.Model != nil {

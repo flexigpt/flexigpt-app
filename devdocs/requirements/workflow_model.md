@@ -122,7 +122,11 @@ An Agent can contribute:
 - Model system prompt behavior.
 - Agent-specific capability requirements.
 
-A Workflow invokes an Agent as a typed callable target. The invocation creates an Agent-loop ProgramFrame. Workflow input is converted only through a declared, typed Agent invocation plan. It is never converted into fallback chat text.
+Workflow source can declare an Agent target, but current admission rejects it
+until a Workflow-owned typed Agent invocation adapter exists. That future
+adapter must use existing Agent and setup-owned invocation APIs. Workflow input
+must never become fallback chat text or a generic Agent-domain request
+envelope.
 
 ### 3.3 Invocation responsibilities
 
@@ -168,7 +172,7 @@ flowchart TD
 | ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Declaration language      | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target relationships, portable declaration validity |
 | Workflow planning         | `internal/llmartifactory-go/workflow/`                                  | Artifact-backed relationship resolution and typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory           |
-| Admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, nested Workflow admission, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission     |
+| Admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, lowering from planning facts, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission  |
 | Durable orchestration     | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                        |
 | Domain binding            | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                                               |
 | Persistence               | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                      |
@@ -571,6 +575,10 @@ Supported target kinds are:
 | `activity` | Registered typed Activity binding.   |
 | `workflow` | Nested Workflow declaration.         |
 
+Agent and Model target declarations are valid source language, but they are not
+currently admitted for execution. Admission returns a typed unavailable-adapter
+failure before a Workflow Execution is created.
+
 An MCP Tool target declares a server:
 
 ```yaml
@@ -762,17 +770,17 @@ Workflow owns:
 
 Generic domain APIs preserve their own native contracts.
 
-| Target family       |                           Workflow context |                                Input ports |               Non-stream output port |                       Streamed output port |
-| ------------------- | -----------------------------------------: | -----------------------------------------: | -----------------------------------: | -----------------------------------------: |
-| Model               |         Supported through typed Model plan |                                  Supported |                            Supported |                                  Supported |
-| Agent               |         Supported through typed Agent plan |                                  Supported |                            Supported |                                  Supported |
-| Nested Workflow     | Supported through child ProgramFrame scope |                                  Supported |                            Supported |                                  Supported |
-| Port-aware Service  | Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
-| Port-aware Activity | Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
-| Go Tool             |                                Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| MCP Tool            |                                Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| Skill Tool          |                                Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| Provider SDK Tool   |                            Model-plan only |                            Model-plan only |                     Provider-managed |                           Provider-managed |
+| Target family       |                           Workflow context |                                Input ports |                     Non-stream output port |                       Streamed output port |
+| ------------------- | -----------------------------------------: | -----------------------------------------: | -----------------------------------------: | -----------------------------------------: |
+| Model               | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter |
+| Agent               | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter |
+| Nested Workflow     | Supported through child ProgramFrame scope |                                  Supported |                                  Supported |                                  Supported |
+| Port-aware Service  | Supported when binding declares capability | Supported when binding declares capability |                                  Supported | Supported when binding declares capability |
+| Port-aware Activity | Supported when binding declares capability | Supported when binding declares capability |                                  Supported | Supported when binding declares capability |
+| Go Tool             |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
+| MCP Tool            |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
+| Skill Tool          |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
+| Provider SDK Tool   |                            Model-plan only |                            Model-plan only |                           Provider-managed |                           Provider-managed |
 
 The native target contract remains authoritative:
 
@@ -783,6 +791,10 @@ The native target contract remains authoritative:
 
 Workflow metadata is not injected through:
 
+- Generic Tool context fields.
+- Tool argument envelopes.
+- Model request envelopes.
+- Agent request envelopes.
 - Tool argument envelopes.
 - Go `context.Context` sidecars.
 - MCP metadata.
@@ -790,6 +802,9 @@ Workflow metadata is not injected through:
 - Skill Runtime sidecars.
 - Provider metadata.
 - Artifact-domain imports.
+
+The duplicate Tool argument-envelope entry above should be removed while
+applying this amendment.
 
 Setup can adapt a confirmed final native Tool result into a normal Workflow output port after settlement.
 
@@ -1880,6 +1895,10 @@ Session Runtime v3 owns:
 
 Canonical JSON values are used only at arbitrary JSON boundaries.
 
+Session Runtime v3 does not contain a generic Workflow-to-Model or
+Workflow-to-Agent invocation request. The former `LLMInvocationPlan` bridge is
+removed because it could bypass typed setup-owned Model and Agent planning.
+
 Typed structures own:
 
 - IDs.
@@ -2164,6 +2183,10 @@ Required source coverage:
 - [x] Workflow target admission consumes planning-owned target resolution facts instead of rebuilding target lookup from composition occurrences.
 - [x] Workflow Tool, MCP Tool, Service, and Activity transport admission uses planning-owned call-site, context-use, port-use, target, and target-set facts.
 - [x] Native URL normalization and unified-diff implementation behavior is outside `workflowruntime/appbinding`; that package is limited to Workflow binding registration and result adaptation.
+- [x] Tool-family transport support has one owner: Workflow admission over typed planning facts.
+- [x] Tool, MCP Tool, and Skill Tool execution binders do not receive generic Workflow context.
+- [x] Tool, MCP Tool, and Skill Tool runtime binders do not repeat Workflow static transport validation.
+- [x] The unsupported generic Workflow Model and Agent invocation bridge is removed.
 - [ ] Model and Agent targets remain admission failures pending a Workflow-owned typed adapter over the existing V3 LLM invocation contract.
 - [ ] Workflow compiler still contains source-shaped lowering traversal. It must remain limited to typed lowering and must not add declaration grammar validation.
 - [ ] Runtime validation needs separation between durable integrity checks and declaration grammar checks.

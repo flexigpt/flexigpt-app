@@ -36,10 +36,10 @@ type (
 )
 
 type agentLoopProgramPayload struct {
-	Defaults        SessionDefaults    `json:"defaults"`
-	InputActivityID ActivityID         `json:"inputActivityID,omitempty"`
-	Invocation      *LLMInvocationPlan `json:"invocation,omitempty"`
+	Defaults        SessionDefaults `json:"defaults"`
+	InputActivityID ActivityID      `json:"inputActivityID,omitempty"`
 }
+
 type agentLoopProgramState struct {
 	InputActivityID   ActivityID   `json:"inputActivityID"`
 	LastLLMWorkItemID WorkItemID   `json:"lastLLMWorkItemID,omitempty"`
@@ -50,10 +50,10 @@ type agentLoopProgramState struct {
 }
 
 type singleModelProgramPayload struct {
-	Defaults        SessionDefaults    `json:"defaults"`
-	InputActivityID ActivityID         `json:"inputActivityID,omitempty"`
-	Invocation      *LLMInvocationPlan `json:"invocation,omitempty"`
+	Defaults        SessionDefaults `json:"defaults"`
+	InputActivityID ActivityID      `json:"inputActivityID,omitempty"`
 }
+
 type singleModelProgramState struct {
 	InputActivityID ActivityID `json:"inputActivityID"`
 	WorkItemID      WorkItemID `json:"workItemID,omitempty"`
@@ -82,22 +82,6 @@ func NewAgentLoopProgram(defaults SessionDefaults, input ActivityID) (ProgramSna
 	)
 }
 
-func NewWorkflowAgentLoopProgram(
-	defaults SessionDefaults,
-	invocation LLMInvocationPlan,
-) (ProgramSnapshot, error) {
-	if err := invocation.Validate(); err != nil {
-		return ProgramSnapshot{}, err
-	}
-	return programSnapshot(
-		BuiltinAgentLoopInterpreterID,
-		agentLoopProgramPayload{
-			Defaults:   defaults,
-			Invocation: cloneLLMInvocationPlan(&invocation),
-		},
-	)
-}
-
 func NewSingleModelProgram(defaults SessionDefaults, input ActivityID) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
@@ -105,22 +89,6 @@ func NewSingleModelProgram(defaults SessionDefaults, input ActivityID) (ProgramS
 	return programSnapshot(
 		BuiltinSingleModelInterpreterID,
 		singleModelProgramPayload{Defaults: defaults, InputActivityID: input},
-	)
-}
-
-func NewWorkflowSingleModelProgram(
-	defaults SessionDefaults,
-	invocation LLMInvocationPlan,
-) (ProgramSnapshot, error) {
-	if err := invocation.Validate(); err != nil {
-		return ProgramSnapshot{}, err
-	}
-	return programSnapshot(
-		BuiltinSingleModelInterpreterID,
-		singleModelProgramPayload{
-			Defaults:   defaults,
-			Invocation: cloneLLMInvocationPlan(&invocation),
-		},
 	)
 }
 
@@ -248,13 +216,8 @@ func (agentLoopInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error {
 	if err := json.Unmarshal(snapshot.Payload, &value); err != nil {
 		return err
 	}
-	if value.InputActivityID == "" && value.Invocation == nil {
-		return errors.New("agent-loop input activity or workflow invocation is required")
-	}
-	if value.Invocation != nil {
-		if err := value.Invocation.Validate(); err != nil {
-			return err
-		}
+	if value.InputActivityID == "" {
+		return errors.New("agent-loop input activity is required")
 	}
 	return nil
 }
@@ -297,7 +260,7 @@ func (agentLoopInterpreter) Advance(
 	switch event.Kind {
 	case ProgramEventStarted:
 		if state.LastLLMWorkItemID == "" {
-			return startAgentLLM(state, payload.Defaults, payload.Invocation)
+			return startAgentLLM(state, payload.Defaults)
 		}
 	case ProgramEventWorkSettled:
 		item := executionWorkItem(execution, event.WorkItemID)
@@ -372,7 +335,7 @@ func (agentLoopInterpreter) Advance(
 				state.LastLLMWorkItemID,
 			)
 			if state.ContinueRequested || automaticContinuation {
-				return startAgentLLM(state, payload.Defaults, payload.Invocation)
+				return startAgentLLM(state, payload.Defaults)
 			}
 			status := ProgramFrameStateWaiting
 			return ProgramTransition{State: encodeAgentLoopState(state), Status: &status}, nil
@@ -382,7 +345,7 @@ func (agentLoopInterpreter) Advance(
 	case ProgramEventContinue:
 		state.ContinueRequested = true
 		if state.AwaitingContinue && allToolItemsSettled(execution, state.PendingToolIDs) {
-			return startAgentLLM(state, payload.Defaults, payload.Invocation)
+			return startAgentLLM(state, payload.Defaults)
 		}
 	case ProgramEventCancelled:
 		status := ProgramFrameStateCancelled
@@ -394,7 +357,6 @@ func (agentLoopInterpreter) Advance(
 func startAgentLLM(
 	state agentLoopProgramState,
 	defaults SessionDefaults,
-	invocation *LLMInvocationPlan,
 ) (ProgramTransition, error) {
 	continuations := append([]WorkItemID(nil), state.PendingToolIDs...)
 	state.Round++
@@ -415,7 +377,6 @@ func startAgentLLM(
 					LLM: new(agentLLMWork(
 						state,
 						defaults,
-						invocation,
 						continuations,
 					)),
 				},
@@ -427,7 +388,6 @@ func startAgentLLM(
 func agentLLMWork(
 	state agentLoopProgramState,
 	defaults SessionDefaults,
-	invocation *LLMInvocationPlan,
 	continuations []WorkItemID,
 ) LLMWork {
 	return LLMWork{
@@ -440,7 +400,6 @@ func agentLLMWork(
 		),
 		SystemInstructions: append([]Instruction(nil), defaults.SystemInstructions...),
 		Temperature:        cloneFloat(defaults.Temperature),
-		Invocation:         cloneLLMInvocationPlan(invocation),
 	}
 }
 
@@ -507,13 +466,8 @@ func (singleModelInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error {
 	if err := json.Unmarshal(snapshot.Payload, &value); err != nil {
 		return err
 	}
-	if value.InputActivityID == "" && value.Invocation == nil {
-		return errors.New("single-model input activity or workflow invocation is required")
-	}
-	if value.Invocation != nil {
-		if err := value.Invocation.Validate(); err != nil {
-			return err
-		}
+	if value.InputActivityID == "" {
+		return errors.New("single-model input activity is required")
 	}
 	return nil
 }
@@ -566,7 +520,6 @@ func (singleModelInterpreter) Advance(
 								InputActivityID:    payload.InputActivityID,
 								SystemInstructions: append([]Instruction(nil), payload.Defaults.SystemInstructions...),
 								Temperature:        cloneFloat(payload.Defaults.Temperature),
-								Invocation:         cloneLLMInvocationPlan(payload.Invocation),
 							},
 						},
 					},

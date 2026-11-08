@@ -30,12 +30,6 @@ func (b *Binder) bindTool(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("tool payload is missing")
 	}
-	if err := rejectUnsupportedWorkflowToolTransport(
-		req.WorkItem,
-		payload,
-	); err != nil {
-		return sessionv3Runtime.BindResult{}, err
-	}
 
 	call := payload.Call
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindUnresolved {
@@ -247,28 +241,6 @@ func (b *Binder) executeTool(
 			private.Call.Binding.Kind,
 		)
 	}
-}
-
-func rejectUnsupportedWorkflowToolTransport(
-	item sessionv3Runtime.WorkItem,
-	payload *sessionv3Runtime.ToolWork,
-) error {
-	if payload == nil {
-		return errors.New("tool payload is missing")
-	}
-	if len(payload.Context) != 0 {
-		return errors.New("workflow tool context transport is unavailable")
-	}
-	if len(item.PortInputs) != 0 {
-		return errors.New("workflow tool input port transport is unavailable")
-	}
-	for _, plan := range item.Ports {
-		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
-			plan.Stream {
-			return errors.New("workflow tool streamed port transport is unavailable")
-		}
-	}
-	return nil
 }
 
 func (b *Binder) resolveToolWait(

@@ -944,14 +944,12 @@ type LLMWork struct {
 	ContinuationWorkItemIDs []WorkItemID       `json:"continuationWorkItemIDs,omitempty"`
 	SystemInstructions      []Instruction      `json:"systemInstructions,omitempty"`
 	Temperature             *float64           `json:"temperature,omitempty"`
-	Invocation              *LLMInvocationPlan `json:"invocation,omitempty"`
 }
 
 type ToolWork struct {
-	Call    ToolCall       `json:"call"`
-	Context CanonicalValue `json:"context,omitempty"`
-	Target  *ArtifactPin   `json:"target,omitempty"`
-	MCP     *MCPToolTarget `json:"mcp,omitempty"`
+	Call   ToolCall       `json:"call"`
+	Target *ArtifactPin   `json:"target,omitempty"`
+	MCP    *MCPToolTarget `json:"mcp,omitempty"`
 }
 
 type ToolCallSource string

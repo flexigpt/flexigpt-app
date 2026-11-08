@@ -16,7 +16,10 @@ Session Runtime v3 is the durable backend for:
 - Recovery.
 - Command idempotency.
 
-Workflow Runtime v3 is the typed Workflow compiler and ProgramFrame interpreter path inside Session Runtime v3.
+Workflow source validation and source planning are outside Session Runtime v3.
+Workflow Runtime v3 is the setup-owned lowering and binding path plus the
+Session Runtime v3 ProgramFrame interpreter path. It is not a second source
+parser, target resolver, or scheduler.
 
 The target state is:
 
@@ -104,7 +107,7 @@ flowchart LR
 | ------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Declaration syntax        | `internal/llmartifactory-go/workflow/contract/v1` | Source grammar, static validation, CEL scope, target relationships, portable validity                                       | Session mutation, Artifact mutation, external work               |
 | Workflow planning         | `internal/llmartifactory-go/workflow`             | Artifact-backed relationship resolution and typed target, call-site, context, port, retry, effect, and block-path inventory | Session mutation, dispatch, provider invocation                  |
-| Admission and compilation | `internal/agentruntimesetup/workflowruntime`      | Current Artifact pin verification, typed lowering, and Service or Activity binding selection                                | Source parsing, source relationship resolution, Session mutation |
+| Admission and compilation | `internal/agentruntimesetup/workflowruntime`      | Current Artifact pin verification, lowering from planning facts, target adapter selection, and Service or Activity binding  | Source parsing, source relationship resolution, Session mutation |
 | Durable orchestration     | `internal/agentruntime-go/sessionv3`              | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable state                           | Artifact services, source parsing, provider configuration        |
 | Domain binding            | `internal/agentruntimesetup`, domain runtimes     | Model, Tool, MCP, Skill, Workspace, attachment, Service, Activity, provider adaptation                                      | Session persistence roots, Workflow source parsing               |
 | Persistence               | `internal/sessionstorev3`                         | Authoritative documents, tombstones, derived index, derived FTS                                                             | Provider and Artifact behavior                                   |
@@ -136,13 +139,21 @@ Workflow declaration and ProgramFrame
 Workflow setup adapter
         |
         v
-existing Model, Agent, Tool, Skill, MCP, Workspace, Service, or Activity API
+existing Model, Agent, Tool, Skill, MCP, Service, or Activity API
 ```
 
 The target domain remains independent of Workflow. It does not import Workflow
 or Session Runtime packages and it does not define Workflow-only request
 types. Workflow generic JSON is allowed only for Workflow values and schema
 boundaries. It is not a substitute for a typed Model or Agent invocation.
+
+Workspace is not a direct Workflow callable target. It remains a setup-owned
+contribution to a typed Model or Agent invocation plan.
+
+Go Tool, MCP Tool, and Skill Tool domains receive only their native typed
+arguments. Workflow context, input-port transport, and streamed output-port
+transport are rejected by Workflow admission and are not represented in
+durable Tool work input.
 
 ### 3.2 Single-owner validation rule
 
@@ -1188,8 +1199,11 @@ Required source coverage:
 - [x] Workflow target admission consumes the planning-owned target inventory rather than rebuilding target relationship lookup from `CapabilityPlan`.
 - [x] Workflow Tool, MCP Tool, Service, and Activity transport admission consumes typed call-site inventory rather than recursively walking lowered Workflow blocks.
 - [x] Built-in URL normalization and unified-diff native behavior live in setup-domain adapters; `workflowruntime/appbinding` contains only Workflow binding registration and result adaptation.
+- [x] Tool-family transport availability is decided once by Workflow admission from planning facts.
+- [x] V3 Tool binding no longer repeats Workflow source transport checks.
+- [x] Durable Tool work has no generic Workflow context carrier.
+- [x] The unsupported generic Workflow-to-Model or Agent `LLMInvocationPlan` bridge is removed.
 - [ ] Model and Agent Workflow targets remain unavailable until a Workflow-owned typed adapter can lower them into the existing V3 LLM invocation path.
-- [ ] Runtime durable validation must be reduced to persistence and execution invariants after declaration-lowering cleanup.
 - [ ] Runtime durable validation must be reduced to persistence and execution invariants after declaration-lowering cleanup.
 
 ### Phase 3: Close domain binding and durable recovery edges
@@ -1221,6 +1235,8 @@ Required source coverage:
 - [x] Accepted Workflow retry declarations route through a durable retry-boundary ProgramFrame and Runtime-owned timer waits.
 - [x] Retry-boundary state persists retry attempts, selected target-set facts, child settlement facts, and retry timing through recovery and cancellation.
 - [ ] The full Service and Activity binding audit remains required to verify every domain-specific effect contract and retry result adaptation.
+- [ ] A future Model or Agent Workflow adapter must reuse setup-owned typed
+      invocation planning. It must not restore a generic JSON invocation bridge.
 
 ### Phase 4: Complete the functional backend audit
 

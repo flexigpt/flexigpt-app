@@ -1335,8 +1335,7 @@ func (i *WorkflowInterpreter) call(
 								},
 							},
 						},
-						Context: workflowExternalContext(contextValue),
-						Target:  target.Artifact,
+						Target: target.Artifact,
 					},
 				},
 			},
@@ -1374,7 +1373,6 @@ func (i *WorkflowInterpreter) call(
 								},
 							},
 						},
-						Context: workflowExternalContext(contextValue),
 						MCP: &MCPToolTarget{
 							Server:   target.MCP.Server,
 							ToolName: target.MCP.ToolName,

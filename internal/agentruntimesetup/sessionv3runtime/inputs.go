@@ -18,11 +18,6 @@ func (b *Binder) buildInputs(
 	if payload == nil {
 		return nil, errors.New("LLM payload is missing")
 	}
-	if payload.Invocation != nil {
-		return nil, errors.New(
-			"workflow model and agent invocation adapter is unavailable",
-		)
-	}
 
 	session := req.Session
 	execution := req.Execution
