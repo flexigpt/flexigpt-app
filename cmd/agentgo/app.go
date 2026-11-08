@@ -722,6 +722,8 @@ func (a *App) initManagers() {
 		artifactCompositionResolver,
 		a.toolStoreAPI.api,
 		toolAdapter,
+		modelRuntime,
+		a.agentStoreAPI.api,
 	)
 	if err != nil {
 		panic(

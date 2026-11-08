@@ -83,6 +83,8 @@ func newSessionV3WorkflowAdmission(
 	resolver *composition.Resolver,
 	tools *toolAPI.Service,
 	toolCaller toolruntime.GoToolCaller,
+	models *modelruntime.SourceResolver,
+	agents *agentAPI.Service,
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
@@ -91,7 +93,9 @@ func newSessionV3WorkflowAdmission(
 	if artifacts == nil ||
 		resolver == nil ||
 		tools == nil ||
-		toolCaller == nil {
+		toolCaller == nil ||
+		models == nil ||
+		agents == nil {
 		return nil, nil, errSessionV3Deps
 	}
 
@@ -103,6 +107,13 @@ func newSessionV3WorkflowAdmission(
 	if err != nil {
 		return nil, nil, err
 	}
+	invocations, err := workflowruntime.NewModelAgentInvocationAdapter(
+		models,
+		agents,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	bindings := workflowruntime.NewBindingRegistry()
 	admission, err := workflowruntime.NewAdmission(
@@ -110,6 +121,7 @@ func newSessionV3WorkflowAdmission(
 		artifacts,
 		bindings,
 		toolInspector,
+		invocations,
 	)
 	if err != nil {
 		return nil, nil, err

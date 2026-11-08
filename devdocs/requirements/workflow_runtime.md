@@ -997,8 +997,8 @@ The Wails application composes V2 and V3 independently.
 - [x] Service targets map to Service WorkItems.
 - [x] Activity targets map to Activity WorkItems.
 - [x] Nested Workflow targets map to child ProgramFrames.
-- [ ] Workflow Agent targets are held at admission pending a Workflow-owned adapter over current Agent APIs.
-- [ ] Workflow Model targets are held at admission pending a Workflow-owned adapter over current Model APIs.
+- [x] Workflow Agent targets use a Workflow-owned adapter over current Agent and Model APIs and map to isolated child Agent-loop ProgramFrames.
+- [x] Workflow Model targets use a Workflow-owned adapter over current Model APIs and map to isolated child single-model ProgramFrames.
 - [x] Static target sets persist member selection.
 - [x] Resolver-backed target sets persist resolver WorkItems and membership.
 - [x] Provider SDK Tools remain Model-plan-only capabilities.
@@ -1010,8 +1010,10 @@ The Wails application composes V2 and V3 independently.
 - [x] Full receipt schema enforcement exists for direct WorkItems, child Agent, child Model, child Workflow, and started child work.
 - [x] Workflow Tool and MCP Tool effect guarantees are conservative unless the setup-domain binding provides the authoritative fact.
 - [x] Workflow does not inject ports or arbitrary context into synthetic Model or Agent provider messages.
-- [ ] Model and Agent callable-interface input and context adapters need completion. Current generic Workflow invocation parsing is disabled at admission and dispatch.
-- [ ] A Workflow-owned adapter layer must use existing Model and Agent domain APIs without requiring Model or Agent domains to understand Workflow.
+- [x] Model and Agent adapters accept explicit message input and instruction context forms without converting arbitrary Workflow JSON into provider messages.
+- [x] Agent handoff uses durable child ProgramFrame and conversation-ownership behavior.
+- [x] Workflow-owned adapters use existing Model and Agent domain APIs without requiring domain packages to understand Workflow.
+- [ ] Additional callable-interface input and context forms require separate target-specific mappings.
 
 ### 21.6 Structured execution
 
@@ -1185,9 +1187,11 @@ Required source coverage:
 - [x] Parallel and Foreach have typed `merge` declarations and durable StateUpdate merge boundaries.
 - [x] Workflow failed and uncertain outcomes retain typed facts and are included in Workflow projections.
 - [x] Nested Workflow published-port checks compare caller and target channel schemas before child dispatch.
-- [ ] Model and Agent Workflow targets are currently admission failures, not partial generic JSON invocations.
-- [ ] The remaining adapter work belongs in Workflow setup composition over existing domain APIs.
-- [ ] No Model, Agent, Tool, Skill, MCP, or Workspace domain contract changes are required merely to support Workflow.
+- [x] Model and Agent Workflow targets use typed Workflow adapters rather than generic JSON invocations.
+- [x] The adapter work is in Workflow setup composition over existing domain APIs.
+- [x] No Model, Agent, Tool, Skill, MCP, or Workspace domain contract changes are required merely to support Workflow.
+- [ ] The current adapter increment supports only explicit messages, instructions, output ports, streamed output ports, and Agent handoff.
+- [ ] Input-port transport and additional Model or Agent callable forms need existing typed domain-plan contributions.
 - [ ] Structured retry remains incomplete for every accepted structured retry declaration.
 
 #### Architecture cleanup status
@@ -1203,7 +1207,8 @@ Required source coverage:
 - [x] V3 Tool binding no longer repeats Workflow source transport checks.
 - [x] Durable Tool work has no generic Workflow context carrier.
 - [x] The unsupported generic Workflow-to-Model or Agent `LLMInvocationPlan` bridge is removed.
-- [ ] Model and Agent Workflow targets remain unavailable until a Workflow-owned typed adapter can lower them into the existing V3 LLM invocation path.
+- [x] Model and Agent Workflow targets lower through Workflow-owned adapters into the existing V3 LLM invocation path.
+- [ ] Model and Agent adapter expansion must remain target-specific and must not restore a generic JSON invocation bridge.
 - [ ] Runtime durable validation must be reduced to persistence and execution invariants after declaration-lowering cleanup.
 
 ### Phase 3: Close domain binding and durable recovery edges
@@ -1235,8 +1240,8 @@ Required source coverage:
 - [x] Accepted Workflow retry declarations route through a durable retry-boundary ProgramFrame and Runtime-owned timer waits.
 - [x] Retry-boundary state persists retry attempts, selected target-set facts, child settlement facts, and retry timing through recovery and cancellation.
 - [ ] The full Service and Activity binding audit remains required to verify every domain-specific effect contract and retry result adaptation.
-- [ ] A future Model or Agent Workflow adapter must reuse setup-owned typed
-      invocation planning. It must not restore a generic JSON invocation bridge.
+- [x] The Model and Agent Workflow adapter reuses setup-owned typed invocation planning and does not restore a generic JSON invocation bridge.
+- [ ] Future Model and Agent adapter forms must preserve this typed setup-owned planning boundary.
 
 ### Phase 4: Complete the functional backend audit
 

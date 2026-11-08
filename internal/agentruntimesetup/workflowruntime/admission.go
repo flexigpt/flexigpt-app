@@ -36,6 +36,32 @@ type ToolTargetInspector interface {
 	) (bool, error)
 }
 
+// WorkflowInvocationTargetCapabilities describe the current typed Workflow
+// transport that a Model or Agent adapter can bind. These are setup-owned
+// adapter facts, not a Model or Agent domain contract.
+type WorkflowInvocationTargetCapabilities struct {
+	Modes             []sessionv3Runtime.WorkflowCallMode
+	ContextForms      []string
+	InputPorts        bool
+	OutputPorts       bool
+	StreamOutputPorts bool
+}
+
+// WorkflowInvocationTargetAdapter verifies a current Model or Agent target
+// through existing domain APIs. Domain APIs remain independent of Workflow.
+type WorkflowInvocationTargetAdapter interface {
+	AdmitWorkflowModelTarget(
+		ctx context.Context,
+		pin sessionv3Runtime.ArtifactPin,
+	) error
+	AdmitWorkflowAgentTarget(
+		ctx context.Context,
+		pin sessionv3Runtime.ArtifactPin,
+	) error
+	ModelInvocationCapabilities() WorkflowInvocationTargetCapabilities
+	AgentInvocationCapabilities() WorkflowInvocationTargetCapabilities
+}
+
 // WorkBindingRequest is the typed application-domain boundary for a Workflow
 // Service or Activity invocation. Ports are already durable Runtime facts.
 // Stream is process-private and can only emit to declared streamed ports.
@@ -174,10 +200,11 @@ func (r *BindingRegistry) get(
 }
 
 type Admission struct {
-	workflows *workflowAPI.Service
-	artifacts artifact.API
-	bindings  *BindingRegistry
-	tools     ToolTargetInspector
+	workflows   *workflowAPI.Service
+	artifacts   artifact.API
+	bindings    *BindingRegistry
+	tools       ToolTargetInspector
+	invocations WorkflowInvocationTargetAdapter
 }
 
 func NewAdmission(
@@ -185,6 +212,7 @@ func NewAdmission(
 	artifacts artifact.API,
 	bindings *BindingRegistry,
 	tools ToolTargetInspector,
+	invocationAdapters ...WorkflowInvocationTargetAdapter,
 ) (*Admission, error) {
 	if workflows == nil ||
 		artifacts == nil ||
@@ -194,11 +222,21 @@ func NewAdmission(
 			"workflow admission dependencies are incomplete",
 		)
 	}
+	if len(invocationAdapters) > 1 {
+		return nil, errors.New(
+			"workflow admission has more than one model and agent invocation adapter",
+		)
+	}
+	var invocations WorkflowInvocationTargetAdapter
+	if len(invocationAdapters) == 1 {
+		invocations = invocationAdapters[0]
+	}
 	return &Admission{
-		workflows: workflows,
-		artifacts: artifacts,
-		bindings:  bindings,
-		tools:     tools,
+		workflows:   workflows,
+		artifacts:   artifacts,
+		bindings:    bindings,
+		tools:       tools,
+		invocations: invocations,
 	}, nil
 }
 
@@ -350,6 +388,9 @@ func (a *Admission) admit(
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	if err := a.verifyWorkflowInvocationTransport(plan.Inventory); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := rejectUnsupportedWorkflowToolTransport(plan.Inventory); err != nil {
@@ -548,13 +589,61 @@ func (a *Admission) bindTarget(
 			},
 		})
 
-	case workflowv1.TargetAgent,
-		workflowv1.TargetModel:
-		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-			"%w: workflow %s target %q requires a typed workflow invocation adapter",
-			ErrBindingUnavailable,
-			target.Kind,
-			target.Ref,
+	case workflowv1.TargetAgent:
+		if a.invocations == nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: workflow agent target %q requires a typed workflow invocation adapter",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+		if err := a.invocations.AdmitWorkflowAgentTarget(ctx, pin); err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: workflow agent target %q: %w",
+				ErrBindingUnavailable,
+				target.Ref,
+				err,
+			)
+		}
+		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
+			Kind:     sessionv3Runtime.WorkflowTargetAgent,
+			Artifact: &pin,
+			Effect: sessionv3Runtime.EffectContract{
+				Kind: sessionv3Runtime.EffectKindRead,
+			},
+		})
+
+	case workflowv1.TargetModel:
+		if a.invocations == nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: workflow model target %q requires a typed workflow invocation adapter",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+		if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: workflow model target %q: %w",
+				ErrBindingUnavailable,
+				target.Ref,
+				err,
+			)
+		}
+		return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
+			Kind:     sessionv3Runtime.WorkflowTargetModel,
+			Artifact: &pin,
+			Effect: sessionv3Runtime.EffectContract{
+				Kind: sessionv3Runtime.EffectKindRead,
+			},
+		},
 		)
 
 	default:
@@ -563,6 +652,21 @@ func (a *Admission) bindTarget(
 			target.Kind,
 		)
 	}
+}
+
+func (a *Admission) pinInvocationTarget(
+	ctx context.Context,
+	target workflowAPI.TargetPlan,
+) (sessionv3Runtime.ArtifactPin, error) {
+	ref, found := workflowTargetArtifactRef(target)
+	if !found {
+		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
+			"%w: workflow target %q",
+			ErrBindingUnavailable,
+			target.Name,
+		)
+	}
+	return a.pinArtifact(ctx, ref)
 }
 
 func workflowTargetArtifactRef(

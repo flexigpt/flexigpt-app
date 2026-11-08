@@ -36,8 +36,10 @@ type (
 )
 
 type agentLoopProgramPayload struct {
-	Defaults        SessionDefaults `json:"defaults"`
-	InputActivityID ActivityID      `json:"inputActivityID,omitempty"`
+	Defaults           SessionDefaults `json:"defaults"`
+	InputActivityID    ActivityID      `json:"inputActivityID,omitempty"`
+	IsolatedInput      bool            `json:"isolatedInput,omitempty"`
+	HistoryActivityIDs []ActivityID    `json:"historyActivityIDs,omitempty"`
 }
 
 type agentLoopProgramState struct {
@@ -50,8 +52,10 @@ type agentLoopProgramState struct {
 }
 
 type singleModelProgramPayload struct {
-	Defaults        SessionDefaults `json:"defaults"`
-	InputActivityID ActivityID      `json:"inputActivityID,omitempty"`
+	Defaults           SessionDefaults `json:"defaults"`
+	InputActivityID    ActivityID      `json:"inputActivityID,omitempty"`
+	IsolatedInput      bool            `json:"isolatedInput,omitempty"`
+	HistoryActivityIDs []ActivityID    `json:"historyActivityIDs,omitempty"`
 }
 
 type singleModelProgramState struct {
@@ -72,23 +76,79 @@ func NewConversationProgram(defaults SessionDefaults) (ProgramSnapshot, error) {
 	return programSnapshot(BuiltinConversationInterpreterID, conversationProgramPayload{Defaults: defaults})
 }
 
-func NewAgentLoopProgram(defaults SessionDefaults, input ActivityID) (ProgramSnapshot, error) {
+func NewAgentLoopProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+) (ProgramSnapshot, error) {
+	return newAgentLoopProgram(defaults, input, false, nil)
+}
+
+// NewAgentLoopInvocationProgram creates an Agent-loop ProgramFrame with an
+// immutable explicit message boundary. It is reusable by any orchestrator
+// that must not inherit ambient Session history.
+func NewAgentLoopInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+) (ProgramSnapshot, error) {
+	return newAgentLoopProgram(defaults, input, true, history)
+}
+
+func newAgentLoopProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	isolated bool,
+	history []ActivityID,
+) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
 	}
 	return programSnapshot(
 		BuiltinAgentLoopInterpreterID,
-		agentLoopProgramPayload{Defaults: defaults, InputActivityID: input},
+		agentLoopProgramPayload{
+			Defaults:           defaults,
+			InputActivityID:    input,
+			IsolatedInput:      isolated,
+			HistoryActivityIDs: append([]ActivityID(nil), history...),
+		},
 	)
 }
 
-func NewSingleModelProgram(defaults SessionDefaults, input ActivityID) (ProgramSnapshot, error) {
+func NewSingleModelProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+) (ProgramSnapshot, error) {
+	return newSingleModelProgram(defaults, input, false, nil)
+}
+
+// NewSingleModelInvocationProgram creates a single-model ProgramFrame with
+// an immutable explicit message boundary. It does not synthesize a user
+// message from arbitrary caller data.
+func NewSingleModelInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+) (ProgramSnapshot, error) {
+	return newSingleModelProgram(defaults, input, true, history)
+}
+
+func newSingleModelProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	isolated bool,
+	history []ActivityID,
+) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
 	}
 	return programSnapshot(
 		BuiltinSingleModelInterpreterID,
-		singleModelProgramPayload{Defaults: defaults, InputActivityID: input},
+		singleModelProgramPayload{
+			Defaults:           defaults,
+			InputActivityID:    input,
+			IsolatedInput:      isolated,
+			HistoryActivityIDs: append([]ActivityID(nil), history...),
+		},
 	)
 }
 
@@ -260,7 +320,7 @@ func (agentLoopInterpreter) Advance(
 	switch event.Kind {
 	case ProgramEventStarted:
 		if state.LastLLMWorkItemID == "" {
-			return startAgentLLM(state, payload.Defaults)
+			return startAgentLLM(state, payload)
 		}
 	case ProgramEventWorkSettled:
 		item := executionWorkItem(execution, event.WorkItemID)
@@ -335,7 +395,7 @@ func (agentLoopInterpreter) Advance(
 				state.LastLLMWorkItemID,
 			)
 			if state.ContinueRequested || automaticContinuation {
-				return startAgentLLM(state, payload.Defaults)
+				return startAgentLLM(state, payload)
 			}
 			status := ProgramFrameStateWaiting
 			return ProgramTransition{State: encodeAgentLoopState(state), Status: &status}, nil
@@ -345,7 +405,7 @@ func (agentLoopInterpreter) Advance(
 	case ProgramEventContinue:
 		state.ContinueRequested = true
 		if state.AwaitingContinue && allToolItemsSettled(execution, state.PendingToolIDs) {
-			return startAgentLLM(state, payload.Defaults)
+			return startAgentLLM(state, payload)
 		}
 	case ProgramEventCancelled:
 		status := ProgramFrameStateCancelled
@@ -356,7 +416,7 @@ func (agentLoopInterpreter) Advance(
 
 func startAgentLLM(
 	state agentLoopProgramState,
-	defaults SessionDefaults,
+	payload agentLoopProgramPayload,
 ) (ProgramTransition, error) {
 	continuations := append([]WorkItemID(nil), state.PendingToolIDs...)
 	state.Round++
@@ -376,7 +436,7 @@ func startAgentLLM(
 				Input: WorkItemPayload{
 					LLM: new(agentLLMWork(
 						state,
-						defaults,
+						payload,
 						continuations,
 					)),
 				},
@@ -387,10 +447,11 @@ func startAgentLLM(
 
 func agentLLMWork(
 	state agentLoopProgramState,
-	defaults SessionDefaults,
+	payload agentLoopProgramPayload,
 	continuations []WorkItemID,
 ) LLMWork {
-	return LLMWork{
+	defaults := payload.Defaults
+	work := LLMWork{
 		Model:           cloneSelection(defaults.Model),
 		Agent:           cloneSelection(defaults.Agent),
 		InputActivityID: state.InputActivityID,
@@ -401,6 +462,32 @@ func agentLLMWork(
 		SystemInstructions: append([]Instruction(nil), defaults.SystemInstructions...),
 		Temperature:        cloneFloat(defaults.Temperature),
 	}
+	applyIsolatedLLMInvocation(
+		&work,
+		payload.IsolatedInput,
+		payload.HistoryActivityIDs,
+		defaults,
+	)
+	return work
+}
+
+func applyIsolatedLLMInvocation(
+	work *LLMWork,
+	isolate bool,
+	history []ActivityID,
+	defaults SessionDefaults,
+) {
+	if work == nil || !isolate {
+		return
+	}
+
+	invocationDefaults := defaults
+	work.InvocationDefaults = &invocationDefaults
+	work.IsolatedInput = true
+	work.HistoryActivityIDs = append(
+		[]ActivityID(nil),
+		history...,
+	)
 }
 
 func failedAgentTransition(state agentLoopProgramState, code, message string) (ProgramTransition, error) {
@@ -504,6 +591,18 @@ func (singleModelInterpreter) Advance(
 	switch event.Kind {
 	case ProgramEventStarted:
 		if state.WorkItemID == "" {
+			work := LLMWork{
+				Model:              cloneSelection(payload.Defaults.Model),
+				InputActivityID:    payload.InputActivityID,
+				SystemInstructions: append([]Instruction(nil), payload.Defaults.SystemInstructions...),
+				Temperature:        cloneFloat(payload.Defaults.Temperature),
+			}
+			applyIsolatedLLMInvocation(
+				&work,
+				payload.IsolatedInput,
+				payload.HistoryActivityIDs,
+				payload.Defaults,
+			)
 			status := ProgramFrameStateRunning
 			return ProgramTransition{
 				State:  encodeSingleModelState(state),
@@ -515,12 +614,7 @@ func (singleModelInterpreter) Advance(
 						Automatic:   true,
 						Effect:      EffectContract{Kind: EffectKindRead},
 						Input: WorkItemPayload{
-							LLM: &LLMWork{
-								Model:              cloneSelection(payload.Defaults.Model),
-								InputActivityID:    payload.InputActivityID,
-								SystemInstructions: append([]Instruction(nil), payload.Defaults.SystemInstructions...),
-								Temperature:        cloneFloat(payload.Defaults.Temperature),
-							},
+							LLM: &work,
 						},
 					},
 				},

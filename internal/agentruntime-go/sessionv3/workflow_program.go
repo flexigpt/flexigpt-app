@@ -1294,10 +1294,16 @@ func (i *WorkflowInterpreter) call(
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
-		return workflowFailure(
+		return i.handoffWorkflowAgentTarget(
+			frame,
+			program,
 			state,
-			"workflow_invocation_adapter_unavailable",
-			"workflow Agent handoff requires a typed workflow invocation adapter",
+			path,
+			targetName,
+			target,
+			input,
+			contextValue,
+			call,
 		)
 	}
 	state.PendingTarget = targetName
@@ -1486,10 +1492,15 @@ func (i *WorkflowInterpreter) call(
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
-		return workflowFailure(
+		return i.invokeWorkflowLLMTarget(
+			frame,
 			state,
-			"workflow_invocation_adapter_unavailable",
-			"workflow Model and Agent targets require a typed workflow invocation adapter",
+			path,
+			targetName,
+			target,
+			input,
+			contextValue,
+			nil,
 		)
 
 	default:
@@ -1779,12 +1790,17 @@ func (i *WorkflowInterpreter) settleWork(
 		return err
 	}
 	selectedTarget := state.PendingTarget
-	if err := state.recordOutcome(WorkflowStepOutcome{
+	outcome := WorkflowStepOutcome{
 		ID:     step.ID,
 		Status: WorkflowStepOutcomeSucceeded,
 		Output: value,
 		Target: selectedTarget,
-	}); err != nil {
+		Effect: item.EffectState,
+	}
+	if item.Output != nil {
+		outcome.Receipt = cloneReconciliationReceipt(item.Output.Receipt)
+	}
+	if err := state.recordOutcome(outcome); err != nil {
 		return err
 	}
 	state.PendingPath = ""
@@ -1845,12 +1861,17 @@ func (i *WorkflowInterpreter) settleChild(
 			return err
 		}
 		selectedTarget := state.PendingTarget
-		if err := state.recordOutcome(WorkflowStepOutcome{
-			ID:     step.ID,
-			Status: WorkflowStepOutcomeSucceeded,
-			Output: child.Output,
-			Target: selectedTarget,
-		}); err != nil {
+		outcome := WorkflowStepOutcome{
+			ID:      step.ID,
+			Status:  WorkflowStepOutcomeSucceeded,
+			Output:  child.Output,
+			Target:  selectedTarget,
+			Receipt: cloneReconciliationReceipt(child.Receipt),
+		}
+		if child.Receipt != nil {
+			outcome.Effect = child.Receipt.EffectState
+		}
+		if err := state.recordOutcome(outcome); err != nil {
 			return err
 		}
 		state.PendingPath = ""

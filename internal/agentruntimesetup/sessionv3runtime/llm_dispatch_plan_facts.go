@@ -36,11 +36,16 @@ func enrichDurableLLMDispatchPlan(
 
 	payload := request.WorkItem.Input.LLM
 	if payload != nil {
-		for _, activity := range selectHistory(request.Session, payload) {
-			appendDurableActivityMessageDispatchPlan(output, activity)
+		activities, activityErr := llmInputActivitySequence(
+			request.Session,
+			payload,
+			plan.defaults.History,
+		)
+		if activityErr != nil {
+			return activityErr
 		}
-		if current := findActivity(request.Session, payload.InputActivityID); current != nil {
-			appendDurableActivityMessageDispatchPlan(output, *current)
+		for _, activity := range activities {
+			appendDurableActivityMessageDispatchPlan(output, activity)
 		}
 	}
 

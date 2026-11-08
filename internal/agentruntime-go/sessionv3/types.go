@@ -944,6 +944,19 @@ type LLMWork struct {
 	ContinuationWorkItemIDs []WorkItemID       `json:"continuationWorkItemIDs,omitempty"`
 	SystemInstructions      []Instruction      `json:"systemInstructions,omitempty"`
 	Temperature             *float64           `json:"temperature,omitempty"`
+
+	// InvocationDefaults are immutable per-operation facts. Normal
+	// conversation work leaves this unset and uses Session defaults.
+	InvocationDefaults *SessionDefaults `json:"invocationDefaults,omitempty"`
+
+	// IsolatedInput prevents an LLM operation from selecting ambient Session
+	// history. HistoryActivityIDs are the exact ordered prior Activities for
+	// this invocation. InputActivityID remains the final current Activity.
+	//
+	// Workflow uses this general ProgramFrame capability for explicit target
+	// input. The Model and Agent domains do not receive Workflow values.
+	IsolatedInput      bool         `json:"isolatedInput,omitempty"`
+	HistoryActivityIDs []ActivityID `json:"historyActivityIDs,omitempty"`
 }
 
 type ToolWork struct {

@@ -12,6 +12,7 @@ import (
 
 func (b *Binder) buildInputs(
 	req sessionv3Runtime.WorkDispatchRequest,
+	defaults sessionv3Runtime.SessionDefaults,
 	injectedContext []string,
 ) ([]inferenceSpec.InputUnion, error) {
 	payload := req.WorkItem.Input.LLM
@@ -21,9 +22,16 @@ func (b *Binder) buildInputs(
 
 	session := req.Session
 	execution := req.Execution
-	inputs := []inferenceSpec.InputUnion{}
-	history := selectHistory(session, payload)
-	for _, activity := range history {
+	activities, err := llmInputActivitySequence(
+		session,
+		payload,
+		defaults.History,
+	)
+	if err != nil {
+		return nil, err
+	}
+	inputs := make([]inferenceSpec.InputUnion, 0, len(activities))
+	for _, activity := range activities[:len(activities)-1] {
 		inputs = append(inputs, activityToInput(activity))
 		inputs = append(inputs, activityToolResultInputs(activity)...)
 	}
@@ -38,12 +46,9 @@ func (b *Binder) buildInputs(
 			value,
 		))
 	}
-	current := findActivity(session, payload.InputActivityID)
-	if current == nil {
-		return nil, fmt.Errorf("LLM input activity %q not found", payload.InputActivityID)
-	}
-	inputs = append(inputs, activityToInput(*current))
-	inputs = append(inputs, activityToolResultInputs(*current)...)
+	current := activities[len(activities)-1]
+	inputs = append(inputs, activityToInput(current))
+	inputs = append(inputs, activityToolResultInputs(current)...)
 	for _, id := range payload.ContinuationWorkItemIDs {
 		item := findWorkItem(execution, id)
 		if item == nil || item.Output == nil || item.Output.Tool == nil {
@@ -57,7 +62,51 @@ func (b *Binder) buildInputs(
 	return inputs, nil
 }
 
-func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.LLMWork) []sessionv3Runtime.Activity {
+func llmInputActivitySequence(
+	session sessionv3Runtime.Session,
+	payload *sessionv3Runtime.LLMWork,
+	historySelection sessionv3Runtime.HistorySelection,
+) ([]sessionv3Runtime.Activity, error) {
+	current := findActivity(session, payload.InputActivityID)
+	if current == nil {
+		return nil, fmt.Errorf(
+			"LLM input activity %q not found",
+			payload.InputActivityID,
+		)
+	}
+
+	if !payload.IsolatedInput {
+		history := selectHistory(
+			session,
+			payload,
+			historySelection,
+		)
+		return append(history, *current), nil
+	}
+
+	output := make(
+		[]sessionv3Runtime.Activity,
+		0,
+		len(payload.HistoryActivityIDs)+1,
+	)
+	for _, activityID := range payload.HistoryActivityIDs {
+		activity := findActivity(session, activityID)
+		if activity == nil {
+			return nil, fmt.Errorf(
+				"isolated LLM history activity %q not found",
+				activityID,
+			)
+		}
+		output = append(output, *activity)
+	}
+	return append(output, *current), nil
+}
+
+func selectHistory(
+	session sessionv3Runtime.Session,
+	payload *sessionv3Runtime.LLMWork,
+	selection sessionv3Runtime.HistorySelection,
+) []sessionv3Runtime.Activity {
 	reversed := make([]sessionv3Runtime.Activity, 0)
 	countUser := 0
 	for _, a := range slices.Backward(session.Timeline) {
@@ -71,7 +120,7 @@ func selectHistory(session sessionv3Runtime.Session, payload *sessionv3Runtime.L
 		if a.Message.Role == sessionv3Runtime.MessageRoleUser {
 			countUser++
 		}
-		if !session.Defaults.History.All && countUser > session.Defaults.History.IncludePreviousUserTurns {
+		if !selection.All && countUser > selection.IncludePreviousUserTurns {
 			break
 		}
 	}

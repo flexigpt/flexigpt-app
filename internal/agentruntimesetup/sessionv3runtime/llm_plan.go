@@ -41,6 +41,9 @@ func (b *Binder) prepareLLMPlan(
 	}
 
 	defaults := jsonutil.CloneJSONInValue(request.Session.Defaults)
+	if payload.InvocationDefaults != nil {
+		defaults = *payload.InvocationDefaults
+	}
 	if payload.Model != nil {
 		defaults.Model = cloneLLMArtifactSelection(payload.Model)
 	}

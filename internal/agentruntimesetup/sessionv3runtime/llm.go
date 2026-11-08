@@ -86,7 +86,11 @@ func (b *Binder) bindLLM(
 	if prompt := plan.systemPrompt(); strings.TrimSpace(prompt) != "" {
 		resolved.ModelParam.SystemPrompt = appendPrompt(resolved.ModelParam.SystemPrompt, prompt)
 	}
-	inputs, err := b.buildInputs(req, plan.context)
+	inputs, err := b.buildInputs(
+		req,
+		plan.defaults,
+		plan.context,
+	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}

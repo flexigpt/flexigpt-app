@@ -1969,8 +1969,8 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Service targets use registered typed Service bindings.
 - [x] Activity targets use registered typed Activity bindings.
 - [x] Nested Workflow targets use child Workflow ProgramFrames.
-- [ ] Agent targets are rejected at admission until a Workflow-owned typed Agent invocation adapter is composed from existing Agent APIs.
-- [ ] Model targets are rejected at admission until a Workflow-owned typed Model invocation adapter is composed from existing Model APIs.
+- [x] Agent targets use a Workflow-owned typed adapter over existing Agent and Model setup APIs and create isolated child Agent-loop ProgramFrames.
+- [x] Model targets use a Workflow-owned typed adapter over the existing Model setup API and create isolated child single-model ProgramFrames.
 - [x] Static target sets enforce member identity.
 - [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
 - [x] Selected target identity persists with the logical Workflow step.
@@ -2061,13 +2061,15 @@ The backend is then ready for frontend replacement of Session v2.
 
 ### 22.8 Current model-binding closure
 
-- [ ] Workflow Model targets are rejected at admission because no typed Workflow-to-V3-LLM invocation adapter exists.
-- [ ] Workflow Agent targets are rejected at admission because no typed Workflow-to-Agent-loop invocation adapter exists.
-- [ ] No Workflow Model or Agent child ProgramFrame, dispatch plan, or provider call is created from valid Workflow source.
+- [x] Workflow Model targets admit through a typed Workflow adapter and execute as isolated child single-model ProgramFrames.
+- [x] Workflow Agent targets admit through a typed Workflow adapter and execute as isolated child Agent-loop ProgramFrames.
+- [x] Valid explicit message and instruction Workflow invocation forms create child ProgramFrames, durable Model dispatch plans, and provider calls through the existing V3 LLM binder.
 - [x] Workflow input never becomes fallback chat text.
 - [x] Generic `messages` and `instructions` JSON envelopes remain disabled. They were a Workflow-local duplicate of Model and Agent invocation behavior.
-- [ ] The remaining work is a Workflow-owned typed adapter layer over existing Model and Agent APIs. It must not require a Workflow-specific Model or Agent domain contract.
-- [ ] Admission must prove Model and Agent input, context, port, and mode compatibility through that Workflow adapter before Workflow execution starts.
+- [x] The generic `LLMInvocationPlan` bridge is removed. The Workflow adapter lowers explicit messages to Session Activities and explicit instructions to existing Session instruction values.
+- [x] Admission verifies current Model or Agent target availability, supported call mode, supported instruction context, and output-port transport before Workflow execution starts.
+- [ ] Model and Agent adapters currently support only explicit `input.messages` and `context.instructions` forms. Other arbitrary callable input or context forms require a separate typed adapter mapping.
+- [ ] Model and Agent input-port transport remains unavailable because existing provider request contracts have no typed input-port contribution.
 
 ## 23. Remaining implementation phases
 
@@ -2143,7 +2145,9 @@ Required source coverage:
 - [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
 - [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
 - [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
-- [ ] Typed Model and Agent invocation adapters still support only the existing explicit `messages` and `instructions` request forms.
+- [x] Typed Model and Agent invocation adapters support explicit `input.messages` and `context.instructions` forms through isolated child V3 ProgramFrames.
+- [ ] Typed Model and Agent invocation adapters need additional target-specific mappings for callable forms beyond explicit messages and instructions.
+- [ ] Model and Agent input-port transport needs an existing typed Model or Agent plan contribution before admission can accept it.
 - [ ] Structured retry remains incomplete for accepted Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child-frame boundaries.
 
 ### Phase 3: Complete structured retry and published-port boundary behavior
@@ -2187,7 +2191,8 @@ Required source coverage:
 - [x] Tool, MCP Tool, and Skill Tool execution binders do not receive generic Workflow context.
 - [x] Tool, MCP Tool, and Skill Tool runtime binders do not repeat Workflow static transport validation.
 - [x] The unsupported generic Workflow Model and Agent invocation bridge is removed.
-- [ ] Model and Agent targets remain admission failures pending a Workflow-owned typed adapter over the existing V3 LLM invocation contract.
+- [x] Model and Agent targets use Workflow-owned adapters over existing V3 Model and Agent setup APIs without domain contract changes.
+- [ ] Adapter capability remains intentionally limited to explicit messages, instructions, output ports, streamed output ports, and Agent handoff.
 - [ ] Workflow compiler still contains source-shaped lowering traversal. It must remain limited to typed lowering and must not add declaration grammar validation.
 - [ ] Runtime validation needs separation between durable integrity checks and declaration grammar checks.
 
