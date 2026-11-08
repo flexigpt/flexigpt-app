@@ -20,22 +20,37 @@ func Open(config Config) (*Artifactory, error) {
 			storeSpec.ErrInvalid,
 		)
 	}
-	if config.Interpretations == nil {
+	if err := config.Scope.Validate(); err != nil {
+		return nil, err
+	}
+
+	interpretations := config.Interpretations
+	locatorFactories := config.LocatorFactories
+
+	if config.Declarations != nil {
+		if interpretations != nil || len(locatorFactories) != 0 {
+			return nil, fmt.Errorf(
+				"%w: LLM Artifactory has both declaration bundle and explicit declaration inputs",
+				storeSpec.ErrInvalid,
+			)
+		}
+		interpretations = config.Declarations.Interpretations()
+		locatorFactories = config.Declarations.LocatorFactories()
+	}
+
+	if interpretations == nil {
 		return nil, fmt.Errorf(
 			"%w: LLM Artifactory declaration interpretation registry is nil",
 			storeSpec.ErrInvalid,
 		)
 	}
 
-	if err := config.Scope.Validate(); err != nil {
-		return nil, err
-	}
-
-	locators, err := corelocator.NewRegistry(config.LocatorFactories...)
+	locators, err := corelocator.NewRegistry(
+		locatorFactories...,
+	)
 	if err != nil {
 		return nil, err
 	}
-
 	locatorResolver, err := composition.NewProviderLocatorResolver(
 		locators.Factories(),
 		config.Catalog,
@@ -48,7 +63,7 @@ func Open(config Config) (*Artifactory, error) {
 		Catalog:                      config.Catalog,
 		SourceEntries:                config.Resources,
 		Locators:                     locatorResolver,
-		Interpretations:              config.Interpretations,
+		Interpretations:              interpretations,
 		Scope:                        config.Scope,
 		DirectCapabilities:           config.DirectCapabilities,
 		ArtifactCapabilityProjectors: config.ArtifactCapabilityProjectors,
@@ -58,7 +73,7 @@ func Open(config Config) (*Artifactory, error) {
 		return nil, err
 	}
 	return &Artifactory{
-		interpretations: config.Interpretations,
+		interpretations: interpretations,
 		composition:     resolver,
 	}, nil
 }

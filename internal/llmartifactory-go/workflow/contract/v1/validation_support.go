@@ -318,39 +318,17 @@ func (v WorkflowDocument) validateLiteral(value Value, schema Schema) error {
 // JSON Schema implication is not assumed to be decidable by this validator.
 // Full value validation still occurs at each future execution boundary.
 func rejectDisjointSchemas(left, right Schema) error {
-	if bytes.Equal(bytes.TrimSpace(left), []byte("false")) ||
-		bytes.Equal(bytes.TrimSpace(right), []byte("false")) {
-		return invalid("a connected interface is unsatisfiable")
+	compatible, err := jsonutil.JSONSchemaTypesMayIntersect(
+		[]byte(left),
+		[]byte(right),
+	)
+	if err != nil {
+		return invalid("connected schema type is invalid")
 	}
-	types := func(raw Schema) map[string]bool {
-		var object map[string]json.RawMessage
-		_ = json.Unmarshal(raw, &object)
-		result := map[string]bool{}
-		var one string
-		if json.Unmarshal(object["type"], &one) == nil && one != "" {
-			result[one] = true
-		}
-		var many []string
-		if json.Unmarshal(object["type"], &many) == nil {
-			for _, name := range many {
-				result[name] = true
-			}
-		}
-		if result["number"] {
-			result["integer"] = true
-		}
-		return result
+	if !compatible {
+		return invalid("connected schemas have disjoint JSON types")
 	}
-	a, b := types(left), types(right)
-	if len(a) == 0 || len(b) == 0 {
-		return nil
-	}
-	for name := range a {
-		if b[name] {
-			return nil
-		}
-	}
-	return invalid("connected schemas have disjoint JSON types")
+	return nil
 }
 
 func validateLimits(child, parent *Limits) error {

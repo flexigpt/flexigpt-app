@@ -2,7 +2,6 @@ package sessionruntime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -1233,49 +1232,29 @@ func (c *coordinator) materializeText(
 	if err != nil {
 		return materializedTextContribution{}, err
 	}
-
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return materializedTextContribution{}, err
-	}
-
-	var wire struct {
-		Artifact         artifactModel.ArtifactRef `json:"artifact"`
-		ArtifactRevision uint64                    `json:"artifactRevision"`
-		DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-		Name             string                    `json:"name"`
-		Insert           string                    `json:"insert"`
-		Content          string                    `json:"content"`
-	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return materializedTextContribution{}, fmt.Errorf(
-			"adapt Text materialization: %w",
-			err,
-		)
-	}
-	if wire.Artifact != ref {
+	if value.Artifact != ref {
 		return materializedTextContribution{}, errors.New(
 			"text materialization returned another Artifact",
 		)
 	}
-	if wire.Insert != string(declaration.InsertInstructions) &&
-		wire.Insert != "user-message" {
+	if value.Insert != declaration.InsertInstructions &&
+		value.Insert != declaration.InsertUserMessage {
 		return materializedTextContribution{}, fmt.Errorf(
 			"text materialization returned unsupported insert mode %q",
-			wire.Insert,
+			value.Insert,
 		)
 	}
 
 	return materializedTextContribution{
-		text:   wire.Content,
-		insert: wire.Insert,
+		text:   value.Content,
+		insert: string(value.Insert),
 		used: &sessionRuntime.ResolvedArtifact{
-			RootID:     string(wire.Artifact.RootID),
-			ArtifactID: string(wire.Artifact.ArtifactID),
-			Revision:   sessionRuntime.Revision(wire.ArtifactRevision),
-			Digest:     string(wire.DefinitionDigest),
+			RootID:     string(value.Artifact.RootID),
+			ArtifactID: string(value.Artifact.ArtifactID),
+			Revision:   sessionRuntime.Revision(value.ArtifactRevision),
+			Digest:     string(value.DefinitionDigest),
 		},
-		label: wire.Name,
+		label: string(value.Name),
 	}, nil
 }
 

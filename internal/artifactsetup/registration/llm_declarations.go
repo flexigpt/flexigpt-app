@@ -4,361 +4,97 @@
 package registration
 
 import (
-	"fmt"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/llmsupport"
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/topology"
-	agentv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/contract/v1"
-	agentmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent/sourceformat/markdown"
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
-	coredecoder "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/decoder"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/support"
-	mcpv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/contract/v1"
-	mcpDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/domain"
-	mcpconfig "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/sourceformat/config"
-	mcppolicyv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcppolicy/contract/v1"
-	modelv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/contract/v1"
-	modelproviderv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/modelprovider/contract/v1"
-	pluginv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/plugin/contract/v1"
-	skillv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/contract/v1"
-	skillSource "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/source"
-	skillmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/skill/sourceformat/markdown"
-	textv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/contract/v1"
-	textmarkdown "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text/sourceformat/markdown"
-	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
-	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
-	workspacev1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace/contract/v1"
 )
 
-// NewLLMInterpretationRegistry assembles the selected application declaration
-// families. Family semantics remain owned by the family contract packages.
+// NewLLMInterpretationRegistry maps application topology support into the
+// reusable LLM declaration factory. Declaration-family assembly itself lives
+// in internal/llmartifactory-go/registration.
 func NewLLMInterpretationRegistry() (*coreinterpretation.Registry, error) {
-	registrations, err := applicationFamilyRegistrations()
+	config, err := newLLMDeclarationConfig()
 	if err != nil {
 		return nil, err
 	}
-	return coreinterpretation.NewRegistry(registrations...)
-}
-
-// LLMDeclarationSchemaCodecs returns the selected family schema codecs. Schema
-// registration is separate from decoder and locator selection.
-func LLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
-	registrations, err := applicationFamilyRegistrations()
-	if err != nil {
-		return nil, err
-	}
-	keys := make([]schemaModel.Key, 0, len(registrations))
-	for _, registration := range registrations {
-		keys = append(keys, registration.SchemaKey)
-	}
-	return LLMDeclarationSchemaCodecsForSchemaKeys(keys)
-}
-
-// LLMDeclarationSchemaCodecsForSchemaKeys returns only the requested LLM
-// declaration schema codecs. Built-in package compilation uses this narrower
-// selection so unrelated family schema changes do not alter another package
-// set's hydration fingerprint.
-func LLMDeclarationSchemaCodecsForSchemaKeys(
-	keys []schemaModel.Key,
-) ([]schema.Codec, error) {
-	if len(keys) == 0 {
-		return nil, fmt.Errorf(
-			"%w: LLM declaration schema selection is empty",
-			storeSpec.ErrInvalid,
-		)
-	}
-
-	all, err := allLLMDeclarationSchemaCodecs()
-	if err != nil {
-		return nil, err
-	}
-	byKey := make(map[schemaModel.Key]schema.Codec, len(all))
-	for _, codec := range all {
-		byKey[codec.Key()] = codec
-	}
-
-	selected := make([]schema.Codec, 0, len(keys))
-	seen := make(map[schemaModel.Key]struct{}, len(keys))
-	for _, key := range keys {
-		if err := key.Validate(); err != nil {
-			return nil, err
-		}
-		if _, duplicate := seen[key]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: LLM declaration schema %q/%q/%q is repeated",
-				storeSpec.ErrConflict,
-				key.Kind,
-				key.SchemaID,
-				key.SchemaVersion,
-			)
-		}
-		codec, found := byKey[key]
-		if !found {
-			return nil, fmt.Errorf(
-				"%w: LLM declaration schema %q/%q/%q",
-				storeSpec.ErrUnsupported,
-				key.Kind,
-				key.SchemaID,
-				key.SchemaVersion,
-			)
-		}
-		seen[key] = struct{}{}
-		selected = append(selected, codec)
-	}
-	return schema.NormalizeCodecs(selected)
-}
-
-func allLLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
-	registrations, err := applicationFamilyRegistrations()
-	if err != nil {
-		return nil, err
-	}
-	output := make([]schema.Codec, 0, len(registrations))
-	add := func(
-		registration coreinterpretation.Registration,
-		raw []byte,
-	) error {
-		codec, err := coreinterpretation.NewSchemaCodec(
-			registration,
-			raw,
-		)
-		if err != nil {
-			return err
-		}
-		output = append(output, codec)
-		return nil
-	}
-
-	if err := add(textv1.Interpretation(), textv1.TextJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Text schema codec: %w", err)
-	}
-	if err := add(modelv1.Interpretation(), modelv1.ModelJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Model schema codec: %w", err)
-	}
-	if err := add(
-		modelproviderv1.Interpretation(),
-		modelproviderv1.ModelProviderJSONSchema(),
-	); err != nil {
-		return nil, fmt.Errorf("create Model Provider schema codec: %w", err)
-	}
-	if err := add(toolv1.Interpretation(), toolv1.ToolJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Tool schema codec: %w", err)
-	}
-	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
-	if err != nil {
-		return nil, err
-	}
-	if err := add(skillv1.Interpretation(skillDocuments), skillv1.SkillJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Skill schema codec: %w", err)
-	}
-	if err := add(mcpv1.Interpretation(), mcpv1.MCPJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create MCP schema codec: %w", err)
-	}
-	if err := add(
-		mcppolicyv1.Interpretation(),
-		mcppolicyv1.MCPPolicyJSONSchema(),
-	); err != nil {
-		return nil, fmt.Errorf("create MCP Policy schema codec: %w", err)
-	}
-	if err := add(pluginv1.Interpretation(), pluginv1.PluginJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Plugin schema codec: %w", err)
-	}
-	if err := add(agentv1.Interpretation(), agentv1.AgentJSONSchema()); err != nil {
-		return nil, fmt.Errorf("create Agent schema codec: %w", err)
-	}
-
-	if err := add(
-		workflowv1.Interpretation(),
-		workflowv1.WorkflowDefinitionJSONSchema(),
-	); err != nil {
-		return nil, fmt.Errorf("create Workflow schema codec: %w", err)
-	}
-	if err := add(
-		workspacev1.Interpretation(),
-		workspacev1.WorkspaceJSONSchema(),
-	); err != nil {
-		return nil, fmt.Errorf("create Workspace schema codec: %w", err)
-	}
-	return output, nil
-}
-
-// LLMCanonicalDeclarationDecoders returns the canonical JSON and YAML
-// declaration decoders bound to one immutable interpretation registry.
-func LLMCanonicalDeclarationDecoders(
-	registry *coreinterpretation.Registry,
-) ([]ingest.Decoder, error) {
-	if registry == nil {
-		return nil, fmt.Errorf(
-			"%w: LLM declaration interpretation registry is nil",
-			storeSpec.ErrInvalid,
-		)
-	}
-
-	return LLMCanonicalDeclarationDecodersForSchemaKeys(
-		registry,
-		registry.SchemaKeys(),
+	return registration.NewInterpretationRegistry(
+		config.SkillDocuments,
 	)
 }
 
-// LLMCanonicalDeclarationDecodersForSchemaKeys returns canonical declaration
-// decoders restricted to one package set's selected schema keys. The supplied
-// registry remains complete so contained declaration semantic reconstruction
-// continues to use family-owned validators.
+func LLMDeclarationSchemaCodecs() ([]schema.Codec, error) {
+	bundle, err := newLLMDeclarationBundle()
+	if err != nil {
+		return nil, err
+	}
+	return bundle.SchemaCodecs(), nil
+}
+
+func LLMDeclarationSchemaCodecsForSchemaKeys(
+	keys []schemaModel.Key,
+) ([]schema.Codec, error) {
+	bundle, err := newLLMDeclarationBundle()
+	if err != nil {
+		return nil, err
+	}
+	return bundle.SchemaCodecsForSchemaKeys(keys)
+}
+
+func LLMCanonicalDeclarationDecoders(
+	registry *coreinterpretation.Registry,
+) ([]ingest.Decoder, error) {
+	config, err := newLLMDeclarationConfig()
+	if err != nil {
+		return nil, err
+	}
+	return registration.CanonicalDeclarationDecodersForSchemaKeys(
+		registry,
+		registry.SchemaKeys(),
+		config.CanonicalJSONCandidates,
+		config.CanonicalYAMLCandidates,
+	)
+}
+
 func LLMCanonicalDeclarationDecodersForSchemaKeys(
 	registry *coreinterpretation.Registry,
 	keys []schemaModel.Key,
 ) ([]ingest.Decoder, error) {
-	if registry == nil {
-		return nil, fmt.Errorf(
-			"%w: LLM declaration interpretation registry is nil",
-			storeSpec.ErrInvalid,
-		)
-	}
-	selected, err := registry.RequireSchemaKeys(keys)
+	config, err := newLLMDeclarationConfig()
 	if err != nil {
 		return nil, err
 	}
-	jsonCandidates, err := decoderCandidates(coredecoder.JSONDecoderID)
-	if err != nil {
-		return nil, err
-	}
-	yamlCandidates, err := decoderCandidates(coredecoder.YAMLDecoderID)
-	if err != nil {
-		return nil, err
-	}
-
-	jsonDecoder, err := coredecoder.NewJSONDecoderForSchemaKeys(
+	return registration.CanonicalDeclarationDecodersForSchemaKeys(
 		registry,
-		selected,
-		jsonCandidates,
+		keys,
+		config.CanonicalJSONCandidates,
+		config.CanonicalYAMLCandidates,
 	)
-	if err != nil {
-		return nil, err
-	}
-	yamlDecoder, err := coredecoder.NewYAMLDecoderForSchemaKeys(
-		registry,
-		selected,
-		yamlCandidates,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return []ingest.Decoder{jsonDecoder, yamlDecoder}, nil
 }
 
-// LLMSourceFormatDecoders returns the application-selected adapters for
-// non-canonical source formats. These adapters remain separate from canonical
-// declaration decoding.
 func LLMSourceFormatDecoders(
 	registry *coreinterpretation.Registry,
 ) ([]ingest.Decoder, error) {
-	if registry == nil {
-		return nil, fmt.Errorf(
-			"%w: LLM declaration interpretation registry is nil",
-			storeSpec.ErrInvalid,
-		)
-	}
-	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
+	config, err := newLLMDeclarationConfig()
 	if err != nil {
 		return nil, err
 	}
-	agentCandidates, err := decoderCandidates(
-		agentmarkdown.AgentMarkdownDecoderID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	textCandidates, err := decoderCandidates(
-		textmarkdown.TextMarkdownDecoderID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	instructionCandidates, err := documentUseCandidates(
-		topology.DocumentUseWorkspaceInstructions,
-	)
-	if err != nil {
-		return nil, err
-	}
-	skillCandidates, err := decoderCandidates(skillSource.MarkdownDecoderID)
-	if err != nil {
-		return nil, err
-	}
-	mcpCandidates, err := decoderCandidates(mcpDomain.SourceDecoderID)
-	if err != nil {
-		return nil, err
-	}
-	skillSupport, err := llmsupport.Skill()
-	if err != nil {
-		return nil, err
-	}
-
-	agentDecoder, err := agentmarkdown.NewAgentMarkdownDecoder(
+	return registration.SourceFormatDecoders(
 		registry,
-		agentCandidates,
+		config,
 	)
-	if err != nil {
-		return nil, err
-	}
-	skillDecoder, err := skillmarkdown.NewDecoder(
-		skillCandidates,
-		skillDocuments,
-		skillSupport.Package,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return []ingest.Decoder{
-		agentDecoder,
-		textmarkdown.NewTextDecoder(
-			textCandidates,
-			instructionCandidates,
-		),
-		skillDecoder,
-		mcpconfig.NewDecoder(mcpCandidates),
-	}, nil
 }
 
-// LLMPathLocatorFactories returns the selected committed-state local path
-// locator support. Additional locator kinds remain explicit application input.
 func LLMPathLocatorFactories(
 	registry *coreinterpretation.Registry,
 ) ([]corelocator.Factory, error) {
-	factory, err := corelocator.NewPathFactory(registry)
-	if err != nil {
-		return nil, err
-	}
-	return []corelocator.Factory{factory}, nil
-}
-
-func applicationFamilyRegistrations() ([]coreinterpretation.Registration, error) {
-	skillDocuments, err := documentSupport(topology.DocumentUseSkillPackage)
-	if err != nil {
-		return nil, err
-	}
-	return llmFamilyRegistrations(skillDocuments), nil
-}
-
-func llmFamilyRegistrations(skillDocuments support.Documents) []coreinterpretation.Registration {
-	return []coreinterpretation.Registration{
-		textv1.Interpretation(),
-		modelv1.Interpretation(),
-		modelproviderv1.Interpretation(),
-		toolv1.Interpretation(),
-		skillv1.Interpretation(skillDocuments),
-		mcpv1.Interpretation(),
-		mcppolicyv1.Interpretation(),
-		pluginv1.Interpretation(),
-		agentv1.Interpretation(),
-
-		workflowv1.Interpretation(),
-		workspacev1.Interpretation(),
-	}
+	return registration.PathLocatorFactories(registry)
 }
 
 func decoderCandidates(
@@ -415,4 +151,84 @@ func documentUseCandidates(
 		return support.Candidates{}, err
 	}
 	return value, nil
+}
+
+func newLLMDeclarationBundle() (*registration.Bundle, error) {
+	config, err := newLLMDeclarationConfig()
+	if err != nil {
+		return nil, err
+	}
+	return registration.New(config)
+}
+
+// newLLMDeclarationConfig is the application composition boundary. It maps
+// topology-selected names and package layouts into the generic LLM
+// declaration factory without owning declaration grammar or schema assembly.
+func newLLMDeclarationConfig() (registration.Config, error) {
+	skillDocuments, err := documentSupport(
+		topology.DocumentUseSkillPackage,
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	skillSupport, err := llmsupport.Skill()
+	if err != nil {
+		return registration.Config{}, err
+	}
+
+	jsonCandidates, err := decoderCandidates(
+		"artifact-declaration-json",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	yamlCandidates, err := decoderCandidates(
+		"artifact-declaration-yaml",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	agentMarkdownCandidates, err := decoderCandidates(
+		"agent-markdown",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	textMarkdownCandidates, err := decoderCandidates(
+		"text-markdown",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	instructionCandidates, err := documentUseCandidates(
+		topology.DocumentUseWorkspaceInstructions,
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	skillMarkdownCandidates, err := decoderCandidates(
+		"agent.skill-markdown",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+	mcpConfigCandidates, err := decoderCandidates(
+		"artifact.mcp-json",
+	)
+	if err != nil {
+		return registration.Config{}, err
+	}
+
+	config := registration.Config{
+		SkillDocuments:          skillDocuments,
+		SkillPackage:            skillSupport.Package,
+		CanonicalJSONCandidates: jsonCandidates,
+		CanonicalYAMLCandidates: yamlCandidates,
+		AgentMarkdownCandidates: agentMarkdownCandidates,
+		TextMarkdownCandidates:  textMarkdownCandidates,
+		InstructionCandidates:   instructionCandidates,
+		SkillMarkdownCandidates: skillMarkdownCandidates,
+		MCPConfigCandidates:     mcpConfigCandidates,
+	}
+	return config, config.Validate()
 }

@@ -164,17 +164,50 @@ flowchart TD
     I --> J[Derived index and FTS]
 ```
 
-| Layer                     | Primary package area                                                    | Responsibilities                                                                                                                                    |
-| ------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Declaration language      | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target relationships, portable declaration validity     |
-| Workflow planning         | `internal/llmartifactory-go/workflow/`                                  | Read-only Artifact-backed Workflow planning and capability relationship resolution                                                                  |
-| Admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Artifact pins, nested Workflow admission, Service and Activity binding selection, typed WorkflowProgram compilation, transport capability admission |
-| Durable orchestration     | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                            |
-| Domain binding            | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                                                   |
-| Persistence               | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                          |
-| Desktop composition       | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                                   |
+| Layer                     | Primary package area                                                    | Responsibilities                                                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Declaration language      | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target relationships, portable declaration validity |
+| Workflow planning         | `internal/llmartifactory-go/workflow/`                                  | Artifact-backed relationship resolution and typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory           |
+| Admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, nested Workflow admission, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission     |
+| Durable orchestration     | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                        |
+| Domain binding            | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                                               |
+| Persistence               | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                      |
+| Desktop composition       | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                               |
 
 Session Runtime v3 has no Artifact Store or setup import. It does not parse source, resolve Artifacts, configure providers, read Workspace files, discover MCP capabilities, render Skills, invoke native Tools directly, or materialize native attachments.
+
+### 4.1 Validation ownership
+
+One layer owns each validation class.
+
+| Validation class                                                                                 | Owner                                     | Other layers                               |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------ |
+| Artifact envelope, Definition integrity, persistence identity                                    | Artifact Store                            | Consume admitted Artifact facts            |
+| Workflow grammar, source schema, static CEL scope, static source relationships                   | Workflow contract v1                      | Consume typed validated declaration values |
+| Artifact-backed Workflow plan and source relationship resolution                                 | Workflow planning                         | Expose typed plan facts                    |
+| Current Artifact pin, binding, credential, policy, and transport availability                    | Setup adapter that owns the target domain | Return typed admission failure             |
+| Durable Session, ProgramFrame, WorkItem, Attempt, Wait, timer, channel, and transition integrity | Session Runtime v3                        | Persist and recover durable facts          |
+| Session document, tombstone, index, and FTS integrity                                            | Session Store v3                          | Rebuild derived records                    |
+
+Workflow setup is a lowerer and binder assembler. It must not become a second
+Workflow grammar validator, a second CEL scope validator, a second target
+relationship resolver, or a second trigger scheduler.
+
+Runtime-neutral Workflow types are deliberate boundary copies. Runtime cannot
+import Artifact or declaration packages. These copies must contain runtime
+semantics only and must not recreate source-language parsing behavior.
+
+LLM declaration-family registration is also split by ownership:
+
+- `internal/llmartifactory-go/registration` assembles family interpretations,
+  schema codecs, canonical declaration decoders, source-format decoders, and
+  locator factories.
+- `internal/artifactsetup/registration` supplies application topology choices
+  such as candidate filenames and package document layouts.
+
+Generic schema type-overlap checks are domain-neutral JSON utility behavior.
+They have one implementation in `internal/jsonutil`, used by both declaration
+and runtime boundaries.
 
 ## 5. Root declaration
 
@@ -2009,10 +2042,11 @@ The backend is then ready for frontend replacement of Session v2.
 
 ### 22.8 Current model-binding closure
 
-- [x] Workflow Model and Agent targets create typed child ProgramFrames.
-- [x] Workflow Model and Agent plans persist durable selection and dispatch-plan facts before provider dispatch.
+- [ ] Workflow Model targets are rejected at admission because no typed Workflow-to-V3-LLM invocation adapter exists.
+- [ ] Workflow Agent targets are rejected at admission because no typed Workflow-to-Agent-loop invocation adapter exists.
+- [ ] No Workflow Model or Agent child ProgramFrame, dispatch plan, or provider call is created from valid Workflow source.
 - [x] Workflow input never becomes fallback chat text.
-- [ ] Workflow Model and Agent execution is intentionally unavailable at admission. The removed generic `messages` and `instructions` JSON envelope was a Workflow-local duplicate of Model and Agent invocation behavior.
+- [x] Generic `messages` and `instructions` JSON envelopes remain disabled. They were a Workflow-local duplicate of Model and Agent invocation behavior.
 - [ ] The remaining work is a Workflow-owned typed adapter layer over existing Model and Agent APIs. It must not require a Workflow-specific Model or Agent domain contract.
 - [ ] Admission must prove Model and Agent input, context, port, and mode compatibility through that Workflow adapter before Workflow execution starts.
 
@@ -2120,6 +2154,19 @@ Required source coverage:
 - [x] Every accepted Workflow `retry` declaration now uses a durable retry-boundary ProgramFrame with persisted child attempts and Runtime-owned timer waits.
 - [x] Retry boundaries retain resolved target-set membership, use effect-contract replay safety, preserve keyed operation keys, and stop replay after uncertainty or unsafe confirmed effects.
 - [ ] The source-to-runtime audit must still verify all retry interactions with every externally supplied Service and Activity binding.
+
+#### Architecture cleanup status
+
+- [x] Workflow binder delegates deterministic WorkItems to the base V3 binder instead of executing a second deterministic route.
+- [x] Workflow setup no longer owns a duplicate trigger scheduler.
+- [x] Declaration and runtime port boundaries share one JSON Schema primitive-type compatibility helper.
+- [x] Workflow planning emits typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory facts.
+- [x] Workflow target admission consumes planning-owned target resolution facts instead of rebuilding target lookup from composition occurrences.
+- [x] Workflow Tool, MCP Tool, Service, and Activity transport admission uses planning-owned call-site, context-use, port-use, target, and target-set facts.
+- [x] Native URL normalization and unified-diff implementation behavior is outside `workflowruntime/appbinding`; that package is limited to Workflow binding registration and result adaptation.
+- [ ] Model and Agent targets remain admission failures pending a Workflow-owned typed adapter over the existing V3 LLM invocation contract.
+- [ ] Workflow compiler still contains source-shaped lowering traversal. It must remain limited to typed lowering and must not add declaration grammar validation.
+- [ ] Runtime validation needs separation between durable integrity checks and declaration grammar checks.
 
 ### Phase 4: Complete the Workflow v1 source-to-runtime audit
 

@@ -19,10 +19,9 @@ func NewInterpreter() (*sessionv3Runtime.WorkflowInterpreter, error) {
 // deterministic execution plus registered Service and Activity bindings. All
 // private binding values stay in BoundWork and are never checkpointed.
 type Binder struct {
-	Base          sessionv3Runtime.WorkBinder
-	Bindings      *BindingRegistry
-	Pins          ArtifactPinVerifier
-	Deterministic sessionv3Runtime.DeterministicExecutor
+	Base     sessionv3Runtime.WorkBinder
+	Bindings *BindingRegistry
+	Pins     ArtifactPinVerifier
 }
 
 // ArtifactPinVerifier validates a durable Workflow Artifact pin against
@@ -61,9 +60,6 @@ func (b *Binder) BindWork(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
-	if result, handled, err := b.Deterministic.Bind(ctx, request); handled || err != nil {
-		return result, err
-	}
 	if err := b.verifyWorkflowToolPins(ctx, request.WorkItem); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
@@ -82,10 +78,6 @@ func (b *Binder) ExecuteWork(
 	request sessionv3Runtime.WorkDispatchRequest,
 	bound sessionv3Runtime.BoundWork,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
-	if result, handled, err := b.Deterministic.Execute(ctx, request, bound); handled || err != nil {
-		return result, err
-	}
-
 	switch value := bound.Private.(type) {
 	case boundExternal:
 		domainRequest, err := externalWorkRequest(
@@ -105,10 +97,6 @@ func (b *Binder) ResolveWait(
 	ctx context.Context,
 	request sessionv3Runtime.WaitResolutionRequest,
 ) (sessionv3Runtime.WaitResolutionResult, error) {
-	if result, handled, err := b.Deterministic.ResolveWait(ctx, request); handled || err != nil {
-		return result, err
-	}
-
 	switch value := request.Private.(type) {
 	case boundExternal:
 		domainRequest, err := externalWaitRequest(request)

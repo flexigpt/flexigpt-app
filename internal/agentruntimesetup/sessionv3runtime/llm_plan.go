@@ -2,7 +2,6 @@ package sessionv3runtime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -26,15 +25,6 @@ type llmExecutionPlan struct {
 	texts              []sessionv3Runtime.TextDispatchPlan
 	context            []string
 	artifacts          []sessionv3Runtime.ArtifactPin
-}
-
-type v3TextMaterializationWire struct {
-	Artifact         artifactModel.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64                    `json:"artifactRevision"`
-	DefinitionDigest string                    `json:"definitionDigest"`
-	Name             string                    `json:"name"`
-	Insert           string                    `json:"insert"`
-	Content          string                    `json:"content"`
 }
 
 func (b *Binder) prepareLLMPlan(
@@ -391,41 +381,36 @@ func (b *Binder) appendAgentTextInstruction(
 	if err != nil {
 		return err
 	}
-
-	value, err := decodeV3TextMaterialization(materialized)
-	if err != nil {
-		return err
-	}
-	if value.Artifact != ref {
+	if materialized.Artifact != ref {
 		return errors.New(
 			"agent text materialization returned another artifact",
 		)
 	}
-	if value.ArtifactRevision != pin.Revision ||
-		value.DefinitionDigest != pin.Digest {
+	if materialized.ArtifactRevision != pin.Revision ||
+		string(materialized.DefinitionDigest) != pin.Digest {
 		return errors.New(
 			"agent text materialization differs from its resolved artifact pin",
 		)
 	}
 
-	insert, err := textDispatchInsert(value.Insert)
+	insert, err := textDispatchInsert(string(materialized.Insert))
 	if err != nil {
 		return err
 	}
 	plan.addText(sessionv3Runtime.TextDispatchPlan{
 		Artifact: pin,
 		Insert:   insert,
-		Content:  value.Content,
+		Content:  materialized.Content,
 	})
 
-	switch value.Insert {
+	switch materialized.Insert {
 	case "instructions":
 		plan.addInstruction(sessionv3Runtime.Instruction{
 			ID: "agent-text:" +
 				selection.RootID + ":" +
 				selection.ArtifactID,
-			Label:   value.Name,
-			Content: value.Content,
+			Label:   string(materialized.Name),
+			Content: materialized.Content,
 		})
 		return nil
 
@@ -438,7 +423,7 @@ func (b *Binder) appendAgentTextInstruction(
 	default:
 		return fmt.Errorf(
 			"agent text has unsupported insertion mode %q",
-			value.Insert,
+			materialized.Insert,
 		)
 	}
 }
@@ -991,26 +976,4 @@ func v3ArtifactRefsForCapabilities(
 		output = append(output, ref)
 	}
 	return output
-}
-
-func decodeV3TextMaterialization(
-	value any,
-) (v3TextMaterializationWire, error) {
-	raw, err := jsonutil.EncodeToJSONRaw(value)
-	if err != nil {
-		return v3TextMaterializationWire{}, err
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return v3TextMaterializationWire{}, err
-	}
-
-	var output v3TextMaterializationWire
-	if err := json.Unmarshal(canonical, &output); err != nil {
-		return v3TextMaterializationWire{}, fmt.Errorf(
-			"decode text materialization: %w",
-			err,
-		)
-	}
-	return output, nil
 }

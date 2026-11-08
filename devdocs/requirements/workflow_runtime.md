@@ -100,15 +100,15 @@ flowchart LR
     C --> F[Session Store v3]
 ```
 
-| Layer                     | Owner                                             | Responsibilities                                                                                  | Excluded responsibilities                                 |
-| ------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Declaration syntax        | `internal/llmartifactory-go/workflow/contract/v1` | Source grammar, static validation, CEL scope, target relationships, portable validity             | Session mutation, Artifact mutation, external work        |
-| Workflow planning         | `internal/llmartifactory-go/workflow`             | Artifact-backed declaration planning and capability relationship resolution                       | Session mutation, dispatch, provider invocation           |
-| Admission and compilation | `internal/agentruntimesetup/workflowruntime`      | Artifact pins, typed program compilation, Service and Activity binding selection                  | Session mutation, WorkItem dispatch, provider invocation  |
-| Durable orchestration     | `internal/agentruntime-go/sessionv3`              | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable state | Artifact services, source parsing, provider configuration |
-| Domain binding            | `internal/agentruntimesetup`, domain runtimes     | Model, Tool, MCP, Skill, Workspace, attachment, Service, Activity, provider adaptation            | Session persistence roots, Workflow source parsing        |
-| Persistence               | `internal/sessionstorev3`                         | Authoritative documents, tombstones, derived index, derived FTS                                   | Provider and Artifact behavior                            |
-| Desktop composition       | `cmd/agentgo`                                     | Wails service attachment and concrete dependency composition                                      | Runtime semantics                                         |
+| Layer                     | Owner                                             | Responsibilities                                                                                                            | Excluded responsibilities                                        |
+| ------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Declaration syntax        | `internal/llmartifactory-go/workflow/contract/v1` | Source grammar, static validation, CEL scope, target relationships, portable validity                                       | Session mutation, Artifact mutation, external work               |
+| Workflow planning         | `internal/llmartifactory-go/workflow`             | Artifact-backed relationship resolution and typed target, call-site, context, port, retry, effect, and block-path inventory | Session mutation, dispatch, provider invocation                  |
+| Admission and compilation | `internal/agentruntimesetup/workflowruntime`      | Current Artifact pin verification, typed lowering, and Service or Activity binding selection                                | Source parsing, source relationship resolution, Session mutation |
+| Durable orchestration     | `internal/agentruntime-go/sessionv3`              | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable state                           | Artifact services, source parsing, provider configuration        |
+| Domain binding            | `internal/agentruntimesetup`, domain runtimes     | Model, Tool, MCP, Skill, Workspace, attachment, Service, Activity, provider adaptation                                      | Session persistence roots, Workflow source parsing               |
+| Persistence               | `internal/sessionstorev3`                         | Authoritative documents, tombstones, derived index, derived FTS                                                             | Provider and Artifact behavior                                   |
+| Desktop composition       | `cmd/agentgo`                                     | Wails service attachment and concrete dependency composition                                                                | Runtime semantics                                                |
 
 Session Runtime v3 does not import Artifact packages or setup packages.
 
@@ -143,6 +143,48 @@ The target domain remains independent of Workflow. It does not import Workflow
 or Session Runtime packages and it does not define Workflow-only request
 types. Workflow generic JSON is allowed only for Workflow values and schema
 boundaries. It is not a substitute for a typed Model or Agent invocation.
+
+### 3.2 Single-owner validation rule
+
+The Runtime checks durable execution integrity. It does not revalidate source
+grammar that Workflow contract v1 already admitted.
+
+Setup checks current binding and capability availability. It does not repeat
+Workflow grammar, static CEL scope, declaration relationship, or source schema
+validation.
+
+The intended flow is:
+
+```text
+Artifact Store
+    validates persisted Artifact and Definition facts
+        |
+        v
+Workflow contract and planning
+    validate source grammar and static semantics
+        |
+        v
+Workflow setup lowerer
+    pin and bind current target adapters
+        |
+        v
+Session Runtime v3
+    validate and execute durable orchestration state
+```
+
+The lowerer creates runtime-neutral copies because Session Runtime has no
+Artifact or setup imports. It must not parse Workflow source, interpret
+Workflow directives, or duplicate domain-native request grammars.
+
+### 3.3 LLM declaration registration boundary
+
+`internal/llmartifactory-go/registration` owns reusable assembly of LLM
+family interpretation registrations, schema codecs, declaration decoders, and
+locator factories.
+
+`internal/artifactsetup/registration` maps application topology choices into
+that factory. It does not own declaration grammar, schema assembly, or source
+format semantics.
 
 ## 4. Typed runtime discipline
 
@@ -1136,6 +1178,19 @@ Required source coverage:
 - [ ] The remaining adapter work belongs in Workflow setup composition over existing domain APIs.
 - [ ] No Model, Agent, Tool, Skill, MCP, or Workspace domain contract changes are required merely to support Workflow.
 - [ ] Structured retry remains incomplete for every accepted structured retry declaration.
+
+#### Architecture cleanup status
+
+- [x] The composed Workflow binder delegates deterministic WorkItems to the existing base V3 binder.
+- [x] Runtime remains the single trigger, timer, retry, wait, and recovery scheduler.
+- [x] Generic JSON Schema primitive-type compatibility has one `jsonutil` implementation.
+- [x] Workflow planning exposes typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory facts.
+- [x] Workflow target admission consumes the planning-owned target inventory rather than rebuilding target relationship lookup from `CapabilityPlan`.
+- [x] Workflow Tool, MCP Tool, Service, and Activity transport admission consumes typed call-site inventory rather than recursively walking lowered Workflow blocks.
+- [x] Built-in URL normalization and unified-diff native behavior live in setup-domain adapters; `workflowruntime/appbinding` contains only Workflow binding registration and result adaptation.
+- [ ] Model and Agent Workflow targets remain unavailable until a Workflow-owned typed adapter can lower them into the existing V3 LLM invocation path.
+- [ ] Runtime durable validation must be reduced to persistence and execution invariants after declaration-lowering cleanup.
+- [ ] Runtime durable validation must be reduced to persistence and execution invariants after declaration-lowering cleanup.
 
 ### Phase 3: Close domain binding and durable recovery edges
 

@@ -6,12 +6,10 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -21,17 +19,9 @@ type Service struct {
 	resolver *composition.Resolver
 }
 
-// BindingRequirement identifies one declared callable or capability
-// requirement that needs binding preparation before use.
-//
-// UsesComposition reports whether the declaration also has a relationship in
-// Capabilities. That relationship can resolve to an Artifact or an explicitly
-// supplied direct capability. It does not establish runtime binding readiness.
-type BindingRequirement struct {
-	Path            string            `json:"path"`
-	Target          workflowv1.Target `json:"target"`
-	UsesComposition bool              `json:"usesComposition"`
-}
+// BindingRequirement is retained as a compatibility alias. New consumers use
+// Plan.Inventory.Targets, which also contains planning-owned resolution facts.
+type BindingRequirement = TargetPlan
 
 type Plan struct {
 	Workflow artifactModel.ArtifactRef `json:"workflow"`
@@ -55,6 +45,11 @@ type Plan struct {
 	// results. This field does not establish binding readiness, authorization,
 	// dynamic target availability, or runtime support.
 	CompositionComplete bool `json:"compositionComplete"`
+
+	// Inventory exposes the typed declaration facts required for runtime
+	// lowering and current binding selection. It is built by Workflow
+	// planning, not rediscovered by setup admission.
+	Inventory Inventory `json:"inventory"`
 }
 
 func NewService(resolver *composition.Resolver) (*Service, error) {
@@ -113,7 +108,7 @@ func (s *Service) ResolvePlan(
 	if err != nil {
 		return Plan{}, err
 	}
-	bindings, err := bindingRequirements(document)
+	inventory, err := buildWorkflowInventory(document, capabilities)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -124,70 +119,8 @@ func (s *Service) ResolvePlan(
 		Digest:              resolved.Definition.Digest,
 		Document:            document,
 		Capabilities:        capabilities,
-		BindingRequirements: bindings,
 		CompositionComplete: capabilities.Complete,
+		Inventory:           inventory,
+		BindingRequirements: append([]BindingRequirement(nil), inventory.Targets...),
 	}, nil
-}
-
-func bindingRequirements(
-	document workflowv1.WorkflowDocument,
-) ([]BindingRequirement, error) {
-	groups := []struct {
-		path   string
-		values map[string]workflowv1.Target
-	}{
-		{
-			path:   "targets",
-			values: document.Targets,
-		},
-		{
-			path:   "requirements",
-			values: document.Requirements,
-		},
-	}
-
-	output := make(
-		[]BindingRequirement,
-		0,
-		len(document.Targets)+len(document.Requirements),
-	)
-	for _, group := range groups {
-		names := make([]string, 0, len(group.values))
-		for name := range group.values {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-
-		for _, name := range names {
-			target := group.values[name]
-			_, usesComposition, err := target.DeclarationMember()
-			if err != nil {
-				return nil, fmt.Errorf(
-					"workflow %s/%s: %w",
-					group.path,
-					name,
-					err,
-				)
-			}
-
-			// The plan's dependency inventory and document must not share
-			// mutable pointers or slices with one another.
-			owned, err := jsonutil.CloneJSON(target)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"clone Workflow %s/%s: %w",
-					group.path,
-					name,
-					err,
-				)
-			}
-
-			output = append(output, BindingRequirement{
-				Path:            group.path + "/" + name,
-				Target:          owned,
-				UsesComposition: usesComposition,
-			})
-		}
-	}
-	return output, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
@@ -354,9 +355,7 @@ func (a *Admission) admit(
 	if err := rejectUnsupportedWorkflowToolTransport(program); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := a.verifyTargetTransportCapabilities(program); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
+
 	if err := program.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
@@ -387,49 +386,24 @@ func (a *Admission) bindTargets(
 		return errors.New("workflow program is unavailable")
 	}
 
-	refs := make(map[string]artifactModel.ArtifactRef)
-	for _, occurrence := range plan.Capabilities.Occurrences {
-		if occurrence.Target == nil ||
-			occurrence.Target.Artifact == nil {
-			continue
-		}
-		refs[occurrence.Path] = *occurrence.Target.Artifact
-	}
-
-	for _, group := range []struct {
-		path   string
-		values map[string]workflowv1.Target
-	}{
-		{
-			path:   "targets",
-			values: plan.Document.Targets,
-		},
-		{
-			path:   "requirements",
-			values: plan.Document.Requirements,
-		},
-	} {
-		for name, target := range group.values {
-			if _, duplicate := program.Targets[name]; duplicate {
-				return fmt.Errorf(
-					"workflow target %q is declared more than once",
-					name,
-				)
-			}
-
-			bound, err := a.bindTarget(
-				ctx,
-				plan.Document,
-				group.path+"/"+name,
-				target,
-				refs,
-				active,
+	for _, targetPlan := range plan.Inventory.Targets {
+		if _, duplicate := program.Targets[targetPlan.Name]; duplicate {
+			return fmt.Errorf(
+				"workflow target %q is declared more than once",
+				targetPlan.Name,
 			)
-			if err != nil {
-				return err
-			}
-			program.Targets[name] = bound
 		}
+
+		bound, err := a.bindTarget(
+			ctx,
+			plan.Document,
+			targetPlan,
+			active,
+		)
+		if err != nil {
+			return err
+		}
+		program.Targets[targetPlan.Name] = bound
 	}
 	return nil
 }
@@ -437,11 +411,11 @@ func (a *Admission) bindTargets(
 func (a *Admission) bindTarget(
 	ctx context.Context,
 	document workflowv1.WorkflowDocument,
-	path string,
-	target workflowv1.Target,
-	refs map[string]artifactModel.ArtifactRef,
+	targetPlan workflowAPI.TargetPlan,
 	active map[artifactModel.ArtifactRef]struct{},
 ) (sessionv3Runtime.WorkflowTarget, error) {
+	target := targetPlan.Target
+
 	switch target.Kind {
 	case workflowv1.TargetService:
 		value, found := a.bindings.Service(target.Ref)
@@ -478,7 +452,7 @@ func (a *Admission) bindTarget(
 		return finalizeWorkflowTarget(document, target, bound)
 
 	case workflowv1.TargetTool:
-		ref, found := refs[path]
+		ref, found := workflowTargetArtifactRef(targetPlan)
 		if !found {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
 				"%w: Tool target %q",
@@ -536,7 +510,7 @@ func (a *Admission) bindTarget(
 		)
 
 	case workflowv1.TargetWorkflow:
-		ref, found := refs[path]
+		ref, found := workflowTargetArtifactRef(targetPlan)
 		if !found {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
 				"%w: nested Workflow target %q",
@@ -589,6 +563,20 @@ func (a *Admission) bindTarget(
 			target.Kind,
 		)
 	}
+}
+
+func workflowTargetArtifactRef(
+	value workflowAPI.TargetPlan,
+) (artifactModel.ArtifactRef, bool) {
+	if !value.UsesComposition ||
+		value.Resolution == nil ||
+		value.Resolution.Status != composition.ResolutionAvailable ||
+		value.Resolution.Target == nil ||
+		value.Resolution.Target.Form != composition.TargetFormArtifact ||
+		value.Resolution.Target.Artifact == nil {
+		return artifactModel.ArtifactRef{}, false
+	}
+	return *value.Resolution.Target.Artifact, true
 }
 
 func finalizeWorkflowTarget(

@@ -139,16 +139,15 @@ func (normalizeURLService) Execute(
 		modes = append(modes, string(mode))
 	}
 
-	value := sessionv3Runtime.MustCanonicalValue(normalizeURLOutput{
-		URL:            attachment.URLRef.URL,
-		Normalized:     attachment.URLRef.Normalized,
-		Label:          attachment.Label,
-		Mode:           string(attachment.Mode),
-		AvailableModes: modes,
-	})
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
-			Value: value,
+			Value: sessionv3Runtime.MustCanonicalValue(normalizeURLOutput{
+				URL:            attachment.URLRef.URL,
+				Normalized:     attachment.URLRef.Normalized,
+				Label:          attachment.Label,
+				Mode:           string(attachment.Mode),
+				AvailableModes: modes,
+			}),
 			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      normalizeURLReceiptSystem,
 				Reference:   attachment.URLRef.Normalized,

@@ -8,17 +8,21 @@ import (
 	corelocator "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition/locator"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	coreinterpretation "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration/interpretation"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/registration"
 )
 
-// Config contains only the generic capabilities needed to build LLM
-// declaration composition plus separately named LLM-domain registrations. It deliberately
-// does not combine source drivers, persistence, runtime execution, content,
-// schemas, decoders, and locator behavior into a universal provider object.
+// Config contains generic Artifact Store capabilities and one declaration
+// registration source. Application callers can pass either Declarations or
+// the explicit interpretation and locator inputs, but not both.
 type Config struct {
 	Artifacts artifact.API
 	Catalog   catalog.API
 	Resources resourceFlow.API
 
+	Declarations *registration.Bundle
+
+	// Explicit declaration inputs remain supported for focused integration
+	// assembly. Declarations is the preferred application production path.
 	Interpretations  *coreinterpretation.Registry
 	LocatorFactories []corelocator.Factory
 
