@@ -462,27 +462,39 @@ func agentLLMWork(
 		SystemInstructions: append([]Instruction(nil), defaults.SystemInstructions...),
 		Temperature:        cloneFloat(defaults.Temperature),
 	}
-	applyIsolatedLLMInvocation(
+	applyLLMInvocationDefaults(
+		&work,
+		defaults,
+	)
+	applyIsolatedLLMInput(
 		&work,
 		payload.IsolatedInput,
 		payload.HistoryActivityIDs,
-		defaults,
 	)
 	return work
 }
 
-func applyIsolatedLLMInvocation(
+func applyLLMInvocationDefaults(
 	work *LLMWork,
-	isolate bool,
-	history []ActivityID,
 	defaults SessionDefaults,
 ) {
-	if work == nil || !isolate {
+	if work == nil {
 		return
 	}
 
 	invocationDefaults := defaults
 	work.InvocationDefaults = &invocationDefaults
+}
+
+func applyIsolatedLLMInput(
+	work *LLMWork,
+	isolate bool,
+	history []ActivityID,
+) {
+	if work == nil || !isolate {
+		return
+	}
+
 	work.IsolatedInput = true
 	work.HistoryActivityIDs = append(
 		[]ActivityID(nil),
@@ -597,11 +609,14 @@ func (singleModelInterpreter) Advance(
 				SystemInstructions: append([]Instruction(nil), payload.Defaults.SystemInstructions...),
 				Temperature:        cloneFloat(payload.Defaults.Temperature),
 			}
-			applyIsolatedLLMInvocation(
+			applyLLMInvocationDefaults(
+				&work,
+				payload.Defaults,
+			)
+			applyIsolatedLLMInput(
 				&work,
 				payload.IsolatedInput,
 				payload.HistoryActivityIDs,
-				payload.Defaults,
 			)
 			status := ProgramFrameStateRunning
 			return ProgramTransition{

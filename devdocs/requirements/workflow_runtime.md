@@ -1152,7 +1152,7 @@ Required source coverage:
 #### Phase 1 implementation status
 
 - [x] V3 exposes typed user-message Skill template preparation and instruction Skill preview through SessionV3Wrapper and setup-owned Skill resolution.
-- [x] V3 persists resolved per-message and per-continuation existing-surface defaults before normal Agent-loop dispatch.
+- [x] V3 persists resolved per-message and per-continuation existing-surface defaults through normal Agent-loop and single-model LLM WorkItems before setup binding and provider dispatch.
 - [x] V3 persists conversation and invocation execution-budget facts for normal conversation ProgramFrames.
 - [x] V3 exposes a durable-document-only consolidated frontend snapshot projection.
 - [ ] V3 still lacks the complete V2-equivalent typed configuration, override, execution-budget, command, projection, and frontend snapshot surface.

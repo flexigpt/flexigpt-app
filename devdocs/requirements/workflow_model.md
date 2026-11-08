@@ -2109,7 +2109,7 @@ Required source coverage:
 #### Phase 1 implementation status
 
 - [x] V3 user-message Skill template preparation and instruction Skill preview use typed Runtime, setup-domain, and Wails routes.
-- [x] V3 persists resolved existing-surface defaults on normal message activities and supports typed per-message and per-continuation overrides with clear semantics.
+- [x] V3 persists resolved existing-surface defaults on normal message activities and carries them through Agent-loop and single-model LLM WorkItems into setup binding and durable dispatch plans.
 - [x] V3 persists conversation-level and invocation-level normal execution budgets through normal ProgramFrame creation and child budget narrowing.
 - [x] V3 exposes a consolidated frontend-ready Session snapshot derived only from the authoritative Session document.
 - [ ] The full V2-equivalent normal Session configuration model, per-message overrides, per-continuation overrides, execution budgets, and immutable operation configuration facts remain incomplete.
