@@ -2110,6 +2110,7 @@ Required source coverage:
 
 - [x] V3 user-message Skill template preparation and instruction Skill preview use typed Runtime, setup-domain, and Wails routes.
 - [x] V3 persists resolved existing-surface defaults on normal message activities and carries them through Agent-loop and single-model LLM WorkItems into setup binding and durable dispatch plans.
+- [x] V3 supports typed Model request defaults and clears, Artifact-backed instruction selections, and Workspace Context, Skill, and MCP capability overrides in persisted normal invocation defaults.
 - [x] V3 persists conversation-level and invocation-level normal execution budgets through normal ProgramFrame creation and child budget narrowing.
 - [x] V3 exposes a consolidated frontend-ready Session snapshot derived only from the authoritative Session document.
 - [ ] The full V2-equivalent normal Session configuration model, per-message overrides, per-continuation overrides, execution budgets, and immutable operation configuration facts remain incomplete.
@@ -2145,7 +2146,7 @@ Required source coverage:
 - [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
 - [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
 - [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
-- [x] Typed Model and Agent invocation adapters support explicit `input.messages` and `context.instructions` forms through isolated child V3 ProgramFrames.
+- [x] Typed Model and Agent invocation adapters support explicit `input.messages`, `context.messages`, `context.instructions`, and typed `context.defaults` forms through isolated child V3 ProgramFrames.
 - [ ] Typed Model and Agent invocation adapters need additional target-specific mappings for callable forms beyond explicit messages and instructions.
 - [ ] Model and Agent input-port transport needs an existing typed Model or Agent plan contribution before admission can accept it.
 - [ ] Structured retry remains incomplete for accepted Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child-frame boundaries.
@@ -2176,6 +2177,8 @@ Required source coverage:
 
 - [x] Every accepted Workflow `retry` declaration now uses a durable retry-boundary ProgramFrame with persisted child attempts and Runtime-owned timer waits.
 - [x] Retry boundaries retain resolved target-set membership, use effect-contract replay safety, preserve keyed operation keys, and stop replay after uncertainty or unsafe confirmed effects.
+- [x] Non-stream Workflow output ports deliver only after confirmed WorkItem or completed child-frame settlement.
+- [x] Resumed Service and Activity waits preserve the original external binding wrapper and durable dispatch facts.
 - [ ] The source-to-runtime audit must still verify all retry interactions with every externally supplied Service and Activity binding.
 
 #### Architecture cleanup status

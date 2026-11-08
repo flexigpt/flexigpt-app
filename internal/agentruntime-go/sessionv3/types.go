@@ -46,18 +46,21 @@ type Session struct {
 }
 
 type SessionDefaults struct {
-	Model              *ArtifactSelection   `json:"model,omitempty"`
-	Agent              *ArtifactSelection   `json:"agent,omitempty"`
-	Workspace          *ArtifactSelection   `json:"workspace,omitempty"`
-	SystemInstructions []Instruction        `json:"systemInstructions,omitempty"`
-	Temperature        *float64             `json:"temperature,omitempty"`
-	Metadata           CanonicalValue       `json:"metadata,omitempty"`
-	History            HistorySelection     `json:"history"`
-	Tools              []ArtifactSelection  `json:"tools,omitempty"`
-	Skills             []ArtifactSelection  `json:"skills,omitempty"`
-	ActiveSkills       []ArtifactSelection  `json:"activeSkills,omitempty"`
-	MCP                []MCPServerSelection `json:"mcp,omitempty"`
-	ConversationBudget *ExecutionBudget     `json:"conversationBudget,omitempty"`
+	Model                *ArtifactSelection          `json:"model,omitempty"`
+	ModelOverrides       ModelDefaultsOverride       `json:"modelOverrides,omitzero"`
+	Agent                *ArtifactSelection          `json:"agent,omitempty"`
+	Workspace            *ArtifactSelection          `json:"workspace,omitempty"`
+	WorkspaceOverrides   WorkspaceSelectionOverrides `json:"workspaceOverrides,omitzero"`
+	SystemInstructions   []Instruction               `json:"systemInstructions,omitempty"`
+	InstructionArtifacts []ArtifactSelection         `json:"instructionArtifacts,omitempty"`
+	Temperature          *float64                    `json:"temperature,omitempty"`
+	Metadata             CanonicalValue              `json:"metadata,omitempty"`
+	History              HistorySelection            `json:"history"`
+	Tools                []ArtifactSelection         `json:"tools,omitempty"`
+	Skills               []ArtifactSelection         `json:"skills,omitempty"`
+	ActiveSkills         []ArtifactSelection         `json:"activeSkills,omitempty"`
+	MCP                  []MCPServerSelection        `json:"mcp,omitempty"`
+	ConversationBudget   *ExecutionBudget            `json:"conversationBudget,omitempty"`
 }
 
 // SessionDefaultsOverride changes only the existing V3 normal-session
@@ -66,34 +69,40 @@ type SessionDefaults struct {
 // Set values apply first. Clear values apply last, so clear semantics are
 // explicit and stable when an older client sends both representations.
 type SessionDefaultsOverride struct {
-	Model              *ArtifactSelection    `json:"model,omitempty"`
-	Agent              *ArtifactSelection    `json:"agent,omitempty"`
-	Workspace          *ArtifactSelection    `json:"workspace,omitempty"`
-	SystemInstructions *[]Instruction        `json:"systemInstructions,omitempty"`
-	Temperature        *float64              `json:"temperature,omitempty"`
-	Metadata           *CanonicalValue       `json:"metadata,omitempty"`
-	History            *HistorySelection     `json:"history,omitempty"`
-	Tools              *[]ArtifactSelection  `json:"tools,omitempty"`
-	Skills             *[]ArtifactSelection  `json:"skills,omitempty"`
-	ActiveSkills       *[]ArtifactSelection  `json:"activeSkills,omitempty"`
-	MCP                *[]MCPServerSelection `json:"mcp,omitempty"`
-	Clear              []SessionDefaultField `json:"clear,omitempty"`
+	Model                *ArtifactSelection           `json:"model,omitempty"`
+	ModelOverrides       *ModelDefaultsOverride       `json:"modelOverrides,omitempty"`
+	Agent                *ArtifactSelection           `json:"agent,omitempty"`
+	Workspace            *ArtifactSelection           `json:"workspace,omitempty"`
+	WorkspaceOverrides   *WorkspaceSelectionOverrides `json:"workspaceOverrides,omitempty"`
+	SystemInstructions   *[]Instruction               `json:"systemInstructions,omitempty"`
+	InstructionArtifacts *[]ArtifactSelection         `json:"instructionArtifacts,omitempty"`
+	Temperature          *float64                     `json:"temperature,omitempty"`
+	Metadata             *CanonicalValue              `json:"metadata,omitempty"`
+	History              *HistorySelection            `json:"history,omitempty"`
+	Tools                *[]ArtifactSelection         `json:"tools,omitempty"`
+	Skills               *[]ArtifactSelection         `json:"skills,omitempty"`
+	ActiveSkills         *[]ArtifactSelection         `json:"activeSkills,omitempty"`
+	MCP                  *[]MCPServerSelection        `json:"mcp,omitempty"`
+	Clear                []SessionDefaultField        `json:"clear,omitempty"`
 }
 
 type SessionDefaultField string
 
 const (
-	SessionDefaultFieldModel              SessionDefaultField = "model"
-	SessionDefaultFieldAgent              SessionDefaultField = "agent"
-	SessionDefaultFieldWorkspace          SessionDefaultField = "workspace"
-	SessionDefaultFieldSystemInstructions SessionDefaultField = "systemInstructions"
-	SessionDefaultFieldTemperature        SessionDefaultField = "temperature"
-	SessionDefaultFieldMetadata           SessionDefaultField = "metadata"
-	SessionDefaultFieldHistory            SessionDefaultField = "history"
-	SessionDefaultFieldTools              SessionDefaultField = "tools"
-	SessionDefaultFieldSkills             SessionDefaultField = "skills"
-	SessionDefaultFieldActiveSkills       SessionDefaultField = "activeSkills"
-	SessionDefaultFieldMCP                SessionDefaultField = "mcp"
+	SessionDefaultFieldModel                SessionDefaultField = "model"
+	SessionDefaultFieldModelOverrides       SessionDefaultField = "modelOverrides"
+	SessionDefaultFieldAgent                SessionDefaultField = "agent"
+	SessionDefaultFieldWorkspace            SessionDefaultField = "workspace"
+	SessionDefaultFieldWorkspaceOverrides   SessionDefaultField = "workspaceOverrides"
+	SessionDefaultFieldSystemInstructions   SessionDefaultField = "systemInstructions"
+	SessionDefaultFieldInstructionArtifacts SessionDefaultField = "instructionArtifacts"
+	SessionDefaultFieldTemperature          SessionDefaultField = "temperature"
+	SessionDefaultFieldMetadata             SessionDefaultField = "metadata"
+	SessionDefaultFieldHistory              SessionDefaultField = "history"
+	SessionDefaultFieldTools                SessionDefaultField = "tools"
+	SessionDefaultFieldSkills               SessionDefaultField = "skills"
+	SessionDefaultFieldActiveSkills         SessionDefaultField = "activeSkills"
+	SessionDefaultFieldMCP                  SessionDefaultField = "mcp"
 )
 
 type HistorySelection struct {
@@ -161,6 +170,37 @@ type ArtifactPin struct {
 	ArtifactID string `json:"artifactID"`
 	Revision   uint64 `json:"revision"`
 	Digest     string `json:"digest"`
+}
+
+type CollectionOverrideMode string
+
+const (
+	CollectionOverrideInherit CollectionOverrideMode = "inherit"
+	CollectionOverrideAdd     CollectionOverrideMode = "add"
+	CollectionOverrideRemove  CollectionOverrideMode = "remove"
+	CollectionOverrideReplace CollectionOverrideMode = "replace"
+)
+
+// ArtifactOverride changes one selected Workspace capability collection.
+// It is Session-owned configuration and has no Workspace or Workflow import.
+type ArtifactOverride struct {
+	Key   string                 `json:"key"`
+	Mode  CollectionOverrideMode `json:"mode"`
+	Value *ArtifactSelection     `json:"value,omitempty"`
+}
+
+type MCPServerOverride struct {
+	Key   string                 `json:"key"`
+	Mode  CollectionOverrideMode `json:"mode"`
+	Value *MCPServerSelection    `json:"value,omitempty"`
+}
+
+// WorkspaceSelectionOverrides narrows or replaces the Context, Skill, and
+// MCP capability selections contributed by a selected Workspace.
+type WorkspaceSelectionOverrides struct {
+	Context []ArtifactOverride  `json:"context,omitempty"`
+	Skills  []ArtifactOverride  `json:"skills,omitempty"`
+	MCP     []MCPServerOverride `json:"mcp,omitempty"`
 }
 
 type ActivityKind string

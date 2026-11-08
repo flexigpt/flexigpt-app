@@ -44,6 +44,8 @@ func (*ModelAgentInvocationAdapter) ModelInvocationCapabilities() WorkflowInvoca
 		},
 		ContextForms: []string{
 			workflowInvocationContextInstructions,
+			"messages",
+			"defaults",
 		},
 		OutputPorts:       true,
 		StreamOutputPorts: true,
@@ -59,6 +61,8 @@ func (*ModelAgentInvocationAdapter) AgentInvocationCapabilities() WorkflowInvoca
 		},
 		ContextForms: []string{
 			workflowInvocationContextInstructions,
+			"messages",
+			"defaults",
 		},
 		OutputPorts:       true,
 		StreamOutputPorts: true,

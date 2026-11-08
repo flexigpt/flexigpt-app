@@ -1153,6 +1153,7 @@ Required source coverage:
 
 - [x] V3 exposes typed user-message Skill template preparation and instruction Skill preview through SessionV3Wrapper and setup-owned Skill resolution.
 - [x] V3 persists resolved per-message and per-continuation existing-surface defaults through normal Agent-loop and single-model LLM WorkItems before setup binding and provider dispatch.
+- [x] V3 persists typed Model request defaults and clears, Artifact-backed instructions, and Workspace Context, Skill, and MCP override selections through durable invocation and Model dispatch plans.
 - [x] V3 persists conversation and invocation execution-budget facts for normal conversation ProgramFrames.
 - [x] V3 exposes a durable-document-only consolidated frontend snapshot projection.
 - [ ] V3 still lacks the complete V2-equivalent typed configuration, override, execution-budget, command, projection, and frontend snapshot surface.
@@ -1188,6 +1189,7 @@ Required source coverage:
 - [x] Workflow failed and uncertain outcomes retain typed facts and are included in Workflow projections.
 - [x] Nested Workflow published-port checks compare caller and target channel schemas before child dispatch.
 - [x] Model and Agent Workflow targets use typed Workflow adapters rather than generic JSON invocations.
+- [x] Explicit Workflow messages, instructions, context messages, and existing V3 invocation defaults lower to isolated V3 child ProgramFrames.
 - [x] The adapter work is in Workflow setup composition over existing domain APIs.
 - [x] No Model, Agent, Tool, Skill, MCP, or Workspace domain contract changes are required merely to support Workflow.
 - [ ] The current adapter increment supports only explicit messages, instructions, output ports, streamed output ports, and Agent handoff.
@@ -1239,6 +1241,8 @@ Required source coverage:
 
 - [x] Accepted Workflow retry declarations route through a durable retry-boundary ProgramFrame and Runtime-owned timer waits.
 - [x] Retry-boundary state persists retry attempts, selected target-set facts, child settlement facts, and retry timing through recovery and cancellation.
+- [x] Final non-stream WorkItem and child-frame output ports do not deliver unconfirmed or failed output.
+- [x] Service and Activity wait resumption retains the setup-owned external binding wrapper and its durable semantic dispatch plan.
 - [ ] The full Service and Activity binding audit remains required to verify every domain-specific effect contract and retry result adaptation.
 - [x] The Model and Agent Workflow adapter reuses setup-owned typed invocation planning and does not restore a generic JSON invocation bridge.
 - [ ] Future Model and Agent adapter forms must preserve this typed setup-owned planning boundary.

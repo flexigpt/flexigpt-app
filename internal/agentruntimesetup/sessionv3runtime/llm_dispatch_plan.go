@@ -21,6 +21,16 @@ func (b *Binder) durableLLMDispatchPlan(
 		PortInputs: clonePlanPortInputs(request.WorkItem.PortInputs),
 	}
 
+	if payload := request.WorkItem.Input.LLM; payload != nil {
+		overrides := sessionv3Runtime.EffectiveModelDefaultsOverride(
+			plan.defaults.ModelOverrides,
+			payload.Temperature,
+		)
+		if sessionv3Runtime.HasModelDefaultsOverride(overrides) {
+			output.ModelOverrides = &overrides
+		}
+	}
+
 	if plan.defaults.Agent != nil {
 		agent, found := pinForSelection(plan.artifacts, *plan.defaults.Agent)
 		if !found {

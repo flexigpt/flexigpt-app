@@ -14,16 +14,31 @@ func resolveSessionInvocationDefaults(
 	if override.Model != nil {
 		output.Model = cloneSessionDefaultSelection(override.Model)
 	}
+	if override.ModelOverrides != nil {
+		output.ModelOverrides = MergeModelDefaultsOverride(
+			output.ModelOverrides,
+			*override.ModelOverrides,
+		)
+	}
 	if override.Agent != nil {
 		output.Agent = cloneSessionDefaultSelection(override.Agent)
 	}
 	if override.Workspace != nil {
 		output.Workspace = cloneSessionDefaultSelection(override.Workspace)
 	}
+	if override.WorkspaceOverrides != nil {
+		output.WorkspaceOverrides = *override.WorkspaceOverrides
+	}
 	if override.SystemInstructions != nil {
 		output.SystemInstructions = append(
 			[]Instruction(nil),
 			(*override.SystemInstructions)...,
+		)
+	}
+	if override.InstructionArtifacts != nil {
+		output.InstructionArtifacts = append(
+			[]ArtifactSelection(nil),
+			(*override.InstructionArtifacts)...,
 		)
 	}
 	if override.Temperature != nil {
@@ -65,12 +80,18 @@ func resolveSessionInvocationDefaults(
 		switch field {
 		case SessionDefaultFieldModel:
 			output.Model = nil
+		case SessionDefaultFieldModelOverrides:
+			output.ModelOverrides = ModelDefaultsOverride{}
 		case SessionDefaultFieldAgent:
 			output.Agent = nil
 		case SessionDefaultFieldWorkspace:
 			output.Workspace = nil
+		case SessionDefaultFieldWorkspaceOverrides:
+			output.WorkspaceOverrides = WorkspaceSelectionOverrides{}
 		case SessionDefaultFieldSystemInstructions:
 			output.SystemInstructions = nil
+		case SessionDefaultFieldInstructionArtifacts:
+			output.InstructionArtifacts = nil
 		case SessionDefaultFieldTemperature:
 			output.Temperature = nil
 		case SessionDefaultFieldMetadata:

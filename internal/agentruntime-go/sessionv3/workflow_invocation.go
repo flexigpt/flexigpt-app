@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 )
 
@@ -23,7 +24,9 @@ type workflowInvocationInput struct {
 }
 
 type workflowInvocationContext struct {
-	Instructions []Instruction `json:"instructions,omitempty"`
+	Instructions []Instruction               `json:"instructions,omitempty"`
+	Messages     []workflowInvocationMessage `json:"messages,omitempty"`
+	Defaults     *SessionDefaultsOverride    `json:"defaults,omitempty"`
 }
 
 type workflowLLMInvocation struct {
@@ -60,6 +63,27 @@ func prepareWorkflowLLMInvocation(
 			)
 		}
 	}
+	if workflowInvocationOverridesTarget(context.Defaults) {
+		return workflowLLMInvocation{}, errors.New(
+			"workflow model or agent context cannot replace the selected target",
+		)
+	}
+
+	defaults := SessionDefaults{}
+	if context.Defaults != nil {
+		resolved, err := resolveSessionInvocationDefaults(
+			defaults,
+			context.Defaults,
+		)
+		if err != nil {
+			return workflowLLMInvocation{}, err
+		}
+		defaults = resolved
+	}
+	defaults.SystemInstructions = append(
+		defaults.SystemInstructions,
+		context.Instructions...,
+	)
 
 	if target.Artifact == nil {
 		return workflowLLMInvocation{}, errors.New(
@@ -73,9 +97,6 @@ func prepareWorkflowLLMInvocation(
 		ExpectedRevision: target.Artifact.Revision,
 		ExpectedDigest:   target.Artifact.Digest,
 	}
-	defaults := SessionDefaults{
-		SystemInstructions: context.Instructions,
-	}
 	switch target.Kind {
 	case WorkflowTargetModel:
 		defaults.Model = selection
@@ -87,10 +108,14 @@ func prepareWorkflowLLMInvocation(
 		)
 	}
 
-	activities := make([]Activity, 0, len(request.Messages))
-	activityIDs := make([]ActivityID, 0, len(request.Messages))
-	for index := range request.Messages {
-		message := request.Messages[index]
+	messages := append(
+		append([]workflowInvocationMessage(nil), context.Messages...),
+		request.Messages...,
+	)
+	activities := make([]Activity, 0, len(messages))
+	activityIDs := make([]ActivityID, 0, len(messages))
+	for index := range messages {
+		message := messages[index]
 		if message.Role == "" {
 			return workflowLLMInvocation{}, errors.New(
 				"workflow model or agent message role is required",
@@ -124,6 +149,19 @@ func prepareWorkflowLLMInvocation(
 		InputActivityID:    activityIDs[len(activityIDs)-1],
 		HistoryActivityIDs: append([]ActivityID(nil), activityIDs[:len(activityIDs)-1]...),
 	}, nil
+}
+
+func workflowInvocationOverridesTarget(
+	value *SessionDefaultsOverride,
+) bool {
+	if value == nil {
+		return false
+	}
+	if value.Model != nil || value.Agent != nil {
+		return true
+	}
+	return slices.Contains(value.Clear, SessionDefaultFieldModel) ||
+		slices.Contains(value.Clear, SessionDefaultFieldAgent)
 }
 
 func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(

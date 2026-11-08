@@ -2,6 +2,7 @@ package sessionv3runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -15,7 +16,6 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -54,7 +54,14 @@ func (b *Binder) bindLLM(
 		return sessionv3Runtime.BindResult{}, err
 	}
 
-	requestPatch := v3ModelRequestPatch(payload.Temperature)
+	requestDefaults := sessionv3Runtime.EffectiveModelDefaultsOverride(
+		plan.defaults.ModelOverrides,
+		payload.Temperature,
+	)
+	requestPatch, patchErr := v3ModelRequestPatch(requestDefaults)
+	if patchErr != nil {
+		return sessionv3Runtime.BindResult{}, patchErr
+	}
 	resolved, modelUse, err := b.deps.Models.ResolveRuntimeModelWithRequestPatch(
 		ctx,
 		ref,
@@ -434,16 +441,11 @@ func appendPrompt(base, extra string) string {
 }
 
 func v3ModelRequestPatch(
-	temperature *float64,
-) *modelruntime.RuntimeRequestPatch {
-	if temperature == nil {
-		return nil
+	overrides sessionv3Runtime.ModelDefaultsOverride,
+) (*modelruntime.RuntimeRequestPatch, error) {
+	raw, err := json.Marshal(overrides)
+	if err != nil {
+		return nil, err
 	}
-
-	value := *temperature
-	return &modelruntime.RuntimeRequestPatch{
-		Defaults: &modelDomain.DefaultsPatch{
-			Temperature: &value,
-		},
-	}
+	return modelruntime.RuntimeRequestPatchFromJSON(raw)
 }

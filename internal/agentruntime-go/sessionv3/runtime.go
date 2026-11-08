@@ -2217,7 +2217,7 @@ func (r *Runtime) advanceFrameLocked(
 		released := r.releaseFrameResourcesLocked(execution, frame.ID)
 		r.wakeResourceWaitersLocked(execution, released)
 	}
-	if frame.Status.Terminal() {
+	if frame.Status == ProgramFrameStateCompleted {
 		if err := r.deliverFramePortsLocked(session, execution, frame); err != nil {
 			frame.Status = ProgramFrameStateFailed
 			frame.Error = portPlanError(
@@ -2950,7 +2950,9 @@ func (r *Runtime) finishWorkLocked(
 			item.Error = result.Error
 		}
 	}
-	if result.Error == nil && item.Output != nil {
+	if result.Error == nil &&
+		result.Confirmed &&
+		item.Output != nil {
 		if err := r.deliverWorkPortsLocked(session, execution, item); err != nil {
 			result.Error = portPlanError("port_delivery_failed", err.Error())
 			item.Error = result.Error

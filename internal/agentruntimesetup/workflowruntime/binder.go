@@ -103,10 +103,18 @@ func (b *Binder) ResolveWait(
 		if err != nil {
 			return sessionv3Runtime.WaitResolutionResult{}, err
 		}
-		return value.binding.ResolveWait(
+		result, err := value.binding.ResolveWait(
 			ctx,
 			domainRequest,
 			value.private,
+		)
+		if err != nil {
+			return sessionv3Runtime.WaitResolutionResult{}, err
+		}
+		return wrapExternalWaitResolution(
+			request.WorkItem,
+			value,
+			result,
 		)
 	default:
 		return b.Base.ResolveWait(ctx, request)
@@ -287,6 +295,37 @@ func bindExternal(
 		SemanticBinding: semantic,
 		Private:         boundExternal{binding: binding, private: private},
 	}, nil
+}
+
+func wrapExternalWaitResolution(
+	item sessionv3Runtime.WorkItem,
+	current boundExternal,
+	result sessionv3Runtime.WaitResolutionResult,
+) (sessionv3Runtime.WaitResolutionResult, error) {
+	if !result.Resume {
+		return result, nil
+	}
+	if result.Bound == nil {
+		return sessionv3Runtime.WaitResolutionResult{}, errors.New(
+			"external wait resolution returned no bound work",
+		)
+	}
+
+	semantic, err := externalSemanticBinding(
+		item,
+		result.Bound.SemanticBinding,
+	)
+	if err != nil {
+		return sessionv3Runtime.WaitResolutionResult{}, err
+	}
+	result.Bound = &sessionv3Runtime.BoundWork{
+		SemanticBinding: semantic,
+		Private: boundExternal{
+			binding: current.binding,
+			private: result.Bound.Private,
+		},
+	}
+	return result, nil
 }
 
 func externalWorkRequest(

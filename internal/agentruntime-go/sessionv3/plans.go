@@ -23,20 +23,21 @@ type WorkflowCapabilityRequirement struct {
 }
 
 type ModelDispatchPlan struct {
-	Agent        *AgentDispatchPlan        `json:"agent,omitempty"`
-	Workspace    *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
-	Model        ModelDispatchTarget       `json:"model"`
-	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
-	Texts        []TextDispatchPlan        `json:"texts,omitempty"`
-	Tools        []ToolDispatchPlan        `json:"tools,omitempty"`
-	Skills       []SkillDispatchPlan       `json:"skills,omitempty"`
-	MCP          []MCPDispatchPlan         `json:"mcp,omitempty"`
-	Attachments  []AttachmentDispatchPlan  `json:"attachments,omitempty"`
-	Messages     []MessageDispatchPlan     `json:"messages,omitempty"`
-	Context      []ContextDispatchPlan     `json:"context,omitempty"`
-	Channels     []ChannelDispatchPlan     `json:"channels,omitempty"`
-	Ports        []PortPlan                `json:"ports,omitempty"`
-	PortInputs   []PortInput               `json:"portInputs,omitempty"`
+	Agent          *AgentDispatchPlan        `json:"agent,omitempty"`
+	Workspace      *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
+	Model          ModelDispatchTarget       `json:"model"`
+	ModelOverrides *ModelDefaultsOverride    `json:"modelOverrides,omitempty"`
+	Instructions   []InstructionDispatchPlan `json:"instructions,omitempty"`
+	Texts          []TextDispatchPlan        `json:"texts,omitempty"`
+	Tools          []ToolDispatchPlan        `json:"tools,omitempty"`
+	Skills         []SkillDispatchPlan       `json:"skills,omitempty"`
+	MCP            []MCPDispatchPlan         `json:"mcp,omitempty"`
+	Attachments    []AttachmentDispatchPlan  `json:"attachments,omitempty"`
+	Messages       []MessageDispatchPlan     `json:"messages,omitempty"`
+	Context        []ContextDispatchPlan     `json:"context,omitempty"`
+	Channels       []ChannelDispatchPlan     `json:"channels,omitempty"`
+	Ports          []PortPlan                `json:"ports,omitempty"`
+	PortInputs     []PortInput               `json:"portInputs,omitempty"`
 }
 
 type AgentDispatchPlan struct {

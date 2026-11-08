@@ -68,7 +68,12 @@ func (b *Binder) prepareLLMPlan(
 		}
 	}
 	if defaults.Workspace != nil {
-		if err := b.applyWorkspacePlan(ctx, &plan, *defaults.Workspace); err != nil {
+		if err := b.applyWorkspacePlan(
+			ctx,
+			&plan,
+			*defaults.Workspace,
+			defaults.WorkspaceOverrides,
+		); err != nil {
 			return llmExecutionPlan{}, err
 		}
 	}
@@ -80,6 +85,19 @@ func (b *Binder) prepareLLMPlan(
 
 	var err error
 	var pins []sessionv3Runtime.ArtifactPin
+
+	plan.defaults.InstructionArtifacts, pins, err = b.pinSelections(
+		ctx,
+		plan.defaults.InstructionArtifacts,
+	)
+	if err != nil {
+		return llmExecutionPlan{}, err
+	}
+	for _, pin := range pins {
+		if err := plan.addArtifact(pin); err != nil {
+			return llmExecutionPlan{}, err
+		}
+	}
 
 	plan.defaults.Tools, pins, err = b.pinSelections(
 		ctx,
@@ -131,6 +149,10 @@ func (b *Binder) prepareLLMPlan(
 		if err := plan.addArtifact(pin); err != nil {
 			return llmExecutionPlan{}, err
 		}
+	}
+
+	if err := b.applyInstructionArtifacts(ctx, &plan); err != nil {
+		return llmExecutionPlan{}, err
 	}
 
 	if len(plan.defaults.MCP) != 0 {
@@ -366,70 +388,138 @@ func (b *Binder) appendAgentTextInstruction(
 	selection sessionv3Runtime.ArtifactSelection,
 	pin sessionv3Runtime.ArtifactPin,
 ) error {
+	contribution, err := b.prepareLLMTextContribution(
+		ctx,
+		selection,
+		pin,
+	)
+	if err != nil {
+		return err
+	}
+	plan.addText(contribution.Dispatch)
+
+	switch contribution.Dispatch.Insert {
+	case sessionv3Runtime.TextDispatchInsertInstructions:
+		plan.addInstruction(sessionv3Runtime.Instruction{
+			ID: "agent-text:" +
+				selection.RootID + ":" +
+				selection.ArtifactID,
+			Label:   contribution.Label,
+			Content: contribution.Dispatch.Content,
+		})
+		return nil
+
+	case sessionv3Runtime.TextDispatchInsertUserMessage:
+		return nil
+
+	default:
+		return fmt.Errorf(
+			"agent text has unsupported insertion mode %q",
+			contribution.Dispatch.Insert,
+		)
+	}
+}
+
+type preparedLLMTextContribution struct {
+	Dispatch sessionv3Runtime.TextDispatchPlan
+	Label    string
+}
+
+func (b *Binder) prepareLLMTextContribution(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+	pin sessionv3Runtime.ArtifactPin,
+) (preparedLLMTextContribution, error) {
 	if b.deps.Texts == nil {
-		return errors.New("session v3 text runtime is unavailable")
+		return preparedLLMTextContribution{}, errors.New(
+			"session v3 text runtime is unavailable",
+		)
 	}
 
 	ref := artifactRefForSelection(selection)
 	if err := ref.Validate(); err != nil {
-		return err
+		return preparedLLMTextContribution{}, err
 	}
 
 	materialized, err := b.deps.Texts.Materialize(ctx, ref)
 	if err != nil {
-		return err
+		return preparedLLMTextContribution{}, err
 	}
 	if materialized.Artifact != ref {
-		return errors.New(
+		return preparedLLMTextContribution{}, errors.New(
 			"agent text materialization returned another artifact",
 		)
 	}
 	if materialized.ArtifactRevision != pin.Revision ||
 		string(materialized.DefinitionDigest) != pin.Digest {
-		return errors.New(
+		return preparedLLMTextContribution{}, errors.New(
 			"agent text materialization differs from its resolved artifact pin",
 		)
 	}
 
 	insert, err := textDispatchInsert(string(materialized.Insert))
 	if err != nil {
-		return err
+		return preparedLLMTextContribution{}, err
 	}
-	plan.addText(sessionv3Runtime.TextDispatchPlan{
-		Artifact: pin,
-		Insert:   insert,
-		Content:  materialized.Content,
-	})
+	return preparedLLMTextContribution{
+		Dispatch: sessionv3Runtime.TextDispatchPlan{
+			Artifact: pin,
+			Insert:   insert,
+			Content:  materialized.Content,
+		},
+		Label: string(materialized.Name),
+	}, nil
+}
 
-	switch materialized.Insert {
-	case "instructions":
+func (b *Binder) applyInstructionArtifacts(
+	ctx context.Context,
+	plan *llmExecutionPlan,
+) error {
+	if plan == nil {
+		return errors.New("llm execution plan is unavailable")
+	}
+
+	for _, selection := range plan.defaults.InstructionArtifacts {
+		pin, found := pinForSelection(plan.artifacts, selection)
+		if !found {
+			return fmt.Errorf(
+				"instruction artifact %q has no durable pin",
+				selection.ArtifactID,
+			)
+		}
+		contribution, err := b.prepareLLMTextContribution(
+			ctx,
+			selection,
+			pin,
+		)
+		if err != nil {
+			return err
+		}
+		if contribution.Dispatch.Insert !=
+			sessionv3Runtime.TextDispatchInsertInstructions {
+			return fmt.Errorf(
+				"instruction artifact %q does not insert instructions",
+				selection.ArtifactID,
+			)
+		}
+
+		plan.addText(contribution.Dispatch)
 		plan.addInstruction(sessionv3Runtime.Instruction{
-			ID: "agent-text:" +
+			ID: "session-text:" +
 				selection.RootID + ":" +
 				selection.ArtifactID,
-			Label:   string(materialized.Name),
-			Content: materialized.Content,
+			Label:   contribution.Label,
+			Content: contribution.Dispatch.Content,
 		})
-		return nil
-
-	case "user-message":
-		// Agent user-message Text remains Composer starter material. V3 has
-		// no frontend adoption yet, so it must not become an implicit hidden
-		// user message in a backend invocation.
-		return nil
-
-	default:
-		return fmt.Errorf(
-			"agent text has unsupported insertion mode %q",
-			materialized.Insert,
-		)
 	}
+	return nil
 }
 
 func (b *Binder) applyWorkspacePlan(
 	ctx context.Context,
 	plan *llmExecutionPlan,
 	selection sessionv3Runtime.ArtifactSelection,
+	overrides sessionv3Runtime.WorkspaceSelectionOverrides,
 ) error {
 	if b.deps.Workspaces == nil {
 		return errors.New("session v3 workspace runtime is unavailable")
@@ -448,7 +538,7 @@ func (b *Binder) applyWorkspacePlan(
 		return err
 	}
 
-	capabilities, err := b.deps.Workspaces.ResolveWorkspaceCapabilities(
+	capabilityPlan, err := b.deps.Workspaces.ResolveWorkspaceCapabilities(
 		ctx,
 		workspaceRef,
 	)
@@ -456,18 +546,53 @@ func (b *Binder) applyWorkspacePlan(
 		return err
 	}
 
-	promptArtifacts := v3ArtifactRefsForCapabilities(
-		capabilities,
+	promptSelections, err := workspaceArtifactSelections(
+		capabilityPlan,
 		declaration.TypeText,
 	)
-	skillArtifacts := v3ArtifactRefsForCapabilities(
-		capabilities,
+	if err != nil {
+		return err
+	}
+	promptSelections, err = applyWorkspaceArtifactOverrides(
+		promptSelections,
+		overrides.Context,
+	)
+	if err != nil {
+		return err
+	}
+
+	skillSelections, err := workspaceArtifactSelections(
+		capabilityPlan,
 		declaration.TypeSkill,
 	)
-	mcpArtifacts := v3ArtifactRefsForCapabilities(
-		capabilities,
-		declaration.TypeMCP,
+	if err != nil {
+		return err
+	}
+	skillSelections, err = applyWorkspaceArtifactOverrides(
+		skillSelections,
+		overrides.Skills,
 	)
+	if err != nil {
+		return err
+	}
+
+	mcpSelections, err := workspaceMCPSelections(
+		capabilityPlan,
+	)
+	if err != nil {
+		return err
+	}
+	mcpSelections, err = applyWorkspaceMCPOverrides(
+		mcpSelections,
+		overrides.MCP,
+	)
+	if err != nil {
+		return err
+	}
+
+	promptArtifacts := workspaceArtifactRefs(promptSelections)
+	skillArtifacts := workspaceArtifactRefs(skillSelections)
+	mcpArtifacts := workspaceMCPArtifactRefs(mcpSelections)
 
 	runtimePlan, err := b.deps.Workspaces.ResolveWorkspaceRuntimePlan(
 		ctx,
@@ -554,7 +679,7 @@ func (b *Binder) applyWorkspacePlan(
 	}
 
 	for _, ref := range v3ArtifactRefsForCapabilities(
-		capabilities,
+		capabilityPlan,
 		declaration.TypeTool,
 	) {
 		value, pin, selectionErr := b.selectionForArtifactRef(ctx, ref)
