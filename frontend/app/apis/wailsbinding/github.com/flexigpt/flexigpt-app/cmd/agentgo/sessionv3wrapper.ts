@@ -8,13 +8,28 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as sessionv3$0 from "../../internal/agentruntime-go/sessionv3/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as sessionstorev3$0 from "../../internal/sessionstorev3/models.js";
+
+export function AcceptTriggerEvent(command: sessionv3$0.AcceptTriggerEventCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.AcceptTriggerEvent", command);
+}
 
 export function Activities(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.ActivityProjection> {
     return $Call.ByName("main.SessionV3Wrapper.Activities", id);
 }
 
+export function Apps(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.AppInstance[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.Apps", id);
+}
+
 export function CancelExecution(command: sessionv3$0.CancelExecutionCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.CancelExecution", command);
+}
+
+export function CompleteToolCallAsError(command: sessionv3$0.CompleteToolCallAsErrorCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.CompleteToolCallAsError", command);
 }
 
 export function ContinueExecution(command: sessionv3$0.ContinueExecutionCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
@@ -33,6 +48,18 @@ export function DeleteSession(command: sessionv3$0.DeleteSessionCommand): $Cance
     return $Call.ByName("main.SessionV3Wrapper.DeleteSession", command);
 }
 
+export function EditAndResend(command: sessionv3$0.EditAndResendCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.EditAndResend", command);
+}
+
+export function ExecuteAppTool(command: sessionv3$0.ExecuteAppToolCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ExecuteAppTool", command);
+}
+
+export function ExecuteToolCalls(command: sessionv3$0.ExecuteToolCallsCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ExecuteToolCalls", command);
+}
+
 export function ExecuteWorkItems(command: sessionv3$0.ExecuteWorkItemsCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.ExecuteWorkItems", command);
 }
@@ -41,12 +68,44 @@ export function Execution(sessionID: sessionv3$0.SessionID, executionID: session
     return $Call.ByName("main.SessionV3Wrapper.Execution", sessionID, executionID);
 }
 
+export function ListExecutions(request: sessionstorev3$0.ListExecutionsRequest): $CancellablePromise<sessionstorev3$0.ExecutionListItem[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ListExecutions", request);
+}
+
+export function ListSessions(request: sessionstorev3$0.ListSessionsRequest): $CancellablePromise<sessionstorev3$0.SessionPage> {
+    return $Call.ByName("main.SessionV3Wrapper.ListSessions", request);
+}
+
+export function ModelOperations(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.ModelOperationProjection[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ModelOperations", id);
+}
+
+export function OpenAppView(command: sessionv3$0.OpenAppViewCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.OpenAppView", command);
+}
+
 export function PauseExecution(command: sessionv3$0.PauseExecutionCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.PauseExecution", command);
 }
 
+export function PrepareUserMessageSkillTemplate(request: sessionv3$0.UserMessageSkillTemplatePreparationRequest): $CancellablePromise<sessionv3$0.UserMessageSkillTemplateResult> {
+    return $Call.ByName("main.SessionV3Wrapper.PrepareUserMessageSkillTemplate", request);
+}
+
+export function PreviewInstructionSkill(request: sessionv3$0.InstructionSkillPreviewRequest): $CancellablePromise<sessionv3$0.InstructionSkillPreviewResult> {
+    return $Call.ByName("main.SessionV3Wrapper.PreviewInstructionSkill", request);
+}
+
 export function PublishRuntimeEvent(event: sessionv3$0.RuntimeEvent): $CancellablePromise<void> {
     return $Call.ByName("main.SessionV3Wrapper.PublishRuntimeEvent", event);
+}
+
+export function ReadAppResource(request: sessionv3$0.AppResourceReadRequest): $CancellablePromise<sessionv3$0.AppResourceReadResult> {
+    return $Call.ByName("main.SessionV3Wrapper.ReadAppResource", request);
+}
+
+export function RegisterWorkflowTriggers(command: sessionv3$0.RegisterWorkflowTriggersCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.RegisterWorkflowTriggers", command);
 }
 
 export function RenameSession(command: sessionv3$0.RenameSessionCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
@@ -61,12 +120,44 @@ export function ResumeExecution(command: sessionv3$0.ResumeExecutionCommand): $C
     return $Call.ByName("main.SessionV3Wrapper.ResumeExecution", command);
 }
 
+export function RetryToolCall(command: sessionv3$0.RetryToolCallCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.RetryToolCall", command);
+}
+
+export function SearchSessions(request: sessionstorev3$0.SearchSessionsRequest): $CancellablePromise<sessionstorev3$0.SessionPage> {
+    return $Call.ByName("main.SessionV3Wrapper.SearchSessions", request);
+}
+
 export function Session(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.Session> {
     return $Call.ByName("main.SessionV3Wrapper.Session", id);
 }
 
+export function SessionRuntimeProjection(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.SessionRuntimeProjection> {
+    return $Call.ByName("main.SessionV3Wrapper.SessionRuntimeProjection", id);
+}
+
+export function SetAutomationHold(command: sessionv3$0.SetAutomationHoldCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.SetAutomationHold", command);
+}
+
+export function SetTriggerRegistrationState(command: sessionv3$0.SetTriggerRegistrationStateCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.SetTriggerRegistrationState", command);
+}
+
 export function SignalExecution(command: sessionv3$0.SignalExecutionCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.SignalExecution", command);
+}
+
+export function SkipToolCall(command: sessionv3$0.SkipToolCallCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.SkipToolCall", command);
+}
+
+export function Snapshot(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.SessionSnapshotProjection> {
+    return $Call.ByName("main.SessionV3Wrapper.Snapshot", id);
+}
+
+export function StageAppContext(command: sessionv3$0.StageAppContextCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.StageAppContext", command);
 }
 
 export function StartWorkflow(command: sessionv3$0.StartWorkflowCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
@@ -77,8 +168,28 @@ export function SubmitMessage(command: sessionv3$0.SubmitMessageCommand): $Cance
     return $Call.ByName("main.SessionV3Wrapper.SubmitMessage", command);
 }
 
+export function ToolAttempts(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.ToolAttemptProjection[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ToolAttempts", id);
+}
+
+export function ToolCalls(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.ToolCallProjection[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.ToolCalls", id);
+}
+
+export function UpdateContinuationInput(command: sessionv3$0.UpdateContinuationInputCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.UpdateContinuationInput", command);
+}
+
 export function UpdateSessionDefaults(command: sessionv3$0.UpdateSessionDefaultsCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.UpdateSessionDefaults", command);
+}
+
+export function Usage(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.ExecutionUsageProjection[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.Usage", id);
+}
+
+export function Waits(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.WaitProjection[] | null> {
+    return $Call.ByName("main.SessionV3Wrapper.Waits", id);
 }
 
 export function Workflow(id: sessionv3$0.SessionID): $CancellablePromise<sessionv3$0.WorkflowProjection> {
